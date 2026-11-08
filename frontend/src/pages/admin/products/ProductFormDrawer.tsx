@@ -7,7 +7,6 @@ import {
   TextField,
 } from '~/admin-ui/primitives';
 import { GRANT_TYPE_OPTIONS, type ProductDraft } from './constants';
-import { yuanTextToCents } from './utils';
 import type { AdminProduct } from '../../../types/api';
 
 interface ProductFormDrawerProps {
@@ -23,8 +22,6 @@ interface ProductFormDrawerProps {
 
 /**
  * 商品表单：SKU 创建后不可改（历史订单与外部对账靠它认商品）。
- *
- * 售价提示里直接给出「入库为多少分」，运营在提交前就能核对换算。
  */
 export function ProductFormDrawer({
   open,
@@ -57,6 +54,16 @@ export function ProductFormDrawer({
       }
     >
       <div className="flex flex-col gap-4">
+        {editing && editing.orderCount > 0 && (
+          <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-[12px] leading-5 text-muted-foreground">
+            该商品已有{' '}
+            <span className="font-medium text-foreground tabular-nums">
+              {editing.orderCount}
+            </span>{' '}
+            笔历史订单，退款与对账需要回查 SKU 的原价与发放积分，因此不可删除；需要停售请用「下架」。
+          </div>
+        )}
+
         <FormField
           label="SKU"
           hint={
@@ -97,14 +104,7 @@ export function ProductFormDrawer({
         </FormField>
 
         <div className="grid grid-cols-2 gap-4">
-          <FormField
-            label="售价（元）"
-            hint={
-              yuanTextToCents(draft.priceYuan) !== null
-                ? `入库为 ${yuanTextToCents(draft.priceYuan)} 分`
-                : '两位小数'
-            }
-          >
+          <FormField label="售价（元）" hint="两位小数">
             <TextField
               ariaLabel="售价"
               inputMode="decimal"
@@ -157,22 +157,16 @@ export function ProductFormDrawer({
               options={GRANT_TYPE_OPTIONS}
             />
           </FormField>
-          <FormField label="排序权重" hint="数字越小越靠前">
+          <FormField label="排序权重" hint="数字越小越靠前，默认 100">
             <TextField
               ariaLabel="排序权重"
               inputMode="numeric"
               value={draft.sortOrder}
               onChange={(value) => onPatch({ sortOrder: value })}
-              placeholder="0"
+              placeholder="100"
             />
           </FormField>
         </div>
-
-        {editing && (
-          <p className="text-[12px] leading-4 text-muted-foreground">
-            上次更新：{new Date(editing.updatedAt).toLocaleString('zh-CN')} · 改价会写入操作审计
-          </p>
-        )}
       </div>
     </Drawer>
   );

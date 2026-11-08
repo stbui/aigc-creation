@@ -1,0 +1,572 @@
+/**
+ * PackagesPage 页面样式 —— 由 `./PackagesPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* ───────── 积分商城 /packages ─────────
+   2026-10-30 优化:
+   - 配色并回全站令牌 (品牌紫 / 中性灰 / 圆角五档 / --on-brand),
+     此前 pkg-* 自带一套参考站紫色 (#625DF5), 与全站 #5546D8 差一档, 两页之间跳变;
+   - 页头由居中标语改成横向 hero: 左标题、右「当前积分」入口 (需登录);
+   - 会员与积分包各自成区, 积分包补上区块标题 (此前两段商品直接相接, 分不清);
+   - 卡片由 4 列固定网格改为等高弹性栅格: 5 个方案在 4 列下必然落单,
+     弹性行最后一行居中, 任意数量都不出现半排空位。
+   命名空间仍独立(pkg-*), 不复用 .pk-*(ProductKit 页在用)。 */
+.pkg-shop-page {
+  --pkg-primary: var(--brand);
+  --pkg-line: var(--border);
+  --pkg-muted: var(--text-muted);
+  --pkg-text: var(--text-strong);
+  --pkg-card: var(--card-bg);
+  animation: 0.35s both fadeIn;
+}
+
+/* 不设最大宽度: 积分商城随外壳内容区铺满, 卡片自身的 max-width 负责行内留白。 */
+.pkg-shop-container {
+  padding: 24px 24px 40px;
+}
+
+.pkg-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--pkg-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pkg-back-btn:hover {
+  color: var(--pkg-text);
+}
+
+/* ── 页头: 标题 + 余额入口 ───────────────────────────────────────────── */
+.pkg-shop-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 4px 0 28px;
+  padding: 22px 24px;
+  border: 1px solid var(--pkg-line);
+  border-radius: var(--radius-hero);
+  background: linear-gradient(120deg, var(--brand-bg) 0%, var(--pkg-card) 62%);
+}
+
+.pkg-shop-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.pkg-shop-hero-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-card);
+  background: var(--brand);
+  color: var(--on-brand);
+  box-shadow: 0 8px 18px rgba(85, 70, 216, 0.22);
+}
+
+.pkg-shop-hero h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  line-height: 30px;
+  letter-spacing: -0.3px;
+  color: var(--pkg-text);
+}
+
+.pkg-shop-hero p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--pkg-muted);
+}
+
+/* 余额入口: 商城页能看见「买之前有多少」, 点击去积分明细 */
+.pkg-shop-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--pkg-line);
+  border-radius: var(--radius-pill);
+  background: var(--pkg-card);
+  color: var(--pkg-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.pkg-shop-balance strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pkg-text);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.18s ease;
+}
+
+.pkg-shop-balance:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.pkg-shop-balance:hover strong {
+  color: var(--brand);
+}
+
+/* ── 区块标题 (会员套餐 / 积分包) ─────────────────────────────────────── */
+.pkg-section {
+  margin-bottom: 30px;
+}
+
+.pkg-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-bottom: 14px;
+}
+
+.pkg-section-copy {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.pkg-section-copy h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 700;
+  color: var(--pkg-text);
+}
+
+.pkg-section-copy p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--pkg-muted);
+}
+
+/* 有效期筛选: 分段按钮, 与页签同一套胶囊语言 */
+.pkg-filter {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.pkg-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--pkg-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.pkg-filter-btn span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.pkg-filter-btn:hover {
+  color: var(--pkg-text);
+}
+
+.pkg-filter-btn.is-active {
+  background: var(--pkg-card);
+  color: var(--brand);
+  box-shadow: 0 1px 3px rgba(34, 41, 67, 0.1);
+}
+
+.pkg-filter-btn.is-active span {
+  color: var(--brand);
+}
+
+/* 当前会员状态: 只在已登录且是会员时出现 */
+.pkg-section-note {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* ── 商品卡 ───────────────────────────────────────────────────────────── */
+/* 弹性行: 每张卡从 208px 起伸展 (上限 280), 一行放不下就换行并居中,
+   这样 15 张积分包在宽屏是整齐的 5 列, 在 900 左右是 3 列。 */
+.pkg-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* 付费档固定 6 张 (免费档已压成基线行): 3 列正好排成 3×2。
+   沿用 208px 基准会被挤成 5+1, 末行只剩一张卡。 */
+.pkg-grid.is-plans .pkg-card {
+  flex: 0 1 calc(33.333% - 11px);
+  min-width: 240px;
+  max-width: none;
+}
+
+/* 免费档基线: 一行说清「免费能用到什么」, 不占卡片位 */
+.pkg-free-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 16px;
+  padding: 12px 18px;
+  background: var(--pkg-card);
+  border: 1px dashed var(--pkg-line);
+  border-radius: var(--radius-card);
+}
+
+.pkg-free-strip-name {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--pkg-text);
+}
+
+.pkg-free-strip-desc {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--pkg-muted);
+}
+
+.pkg-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 208px;
+  min-width: 0;
+  max-width: 280px;
+  padding: 22px 20px 20px;
+  background: var(--pkg-card);
+  border: 1px solid var(--pkg-line);
+  border-radius: var(--radius-panel);
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+@media (hover: hover) {
+  .pkg-card:hover {
+    box-shadow: 0 10px 26px rgba(34, 41, 67, 0.08);
+    transform: translateY(-2px);
+  }
+}
+
+.pkg-card.is-current {
+  border-color: var(--pkg-primary);
+  box-shadow: 0 0 0 3px rgba(85, 70, 216, 0.08);
+}
+
+/* 推荐档: 与「当前方案」同色但更轻; 两者同时命中时 is-current 的高亮优先 */
+.pkg-card.is-recommended {
+  border-color: var(--pkg-primary);
+}
+
+/* 当前方案角标: 脱离文档流压在卡片上沿, 不占标题行 */
+.pkg-card-flag {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  box-shadow: 0 4px 10px rgba(85, 70, 216, 0.25);
+}
+
+.pkg-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pkg-card-name {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--pkg-text);
+  overflow-wrap: anywhere;
+}
+
+.pkg-card-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--pkg-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* 免费 / 最划算: 两种营销标记各用自己的语义色, 不再一律用警告黄 */
+.pkg-card-badge.is-free {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+
+.pkg-card-badge.is-hot {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.pkg-card-points {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--pkg-primary);
+}
+
+.pkg-card-points strong {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pkg-card-points span {
+  font-size: 12px;
+  color: var(--pkg-muted);
+}
+
+.pkg-card-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--pkg-muted);
+}
+
+/* 有效期 + 折合单价: 同一行, 换行时保持 4px 行距 */
+.pkg-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+}
+
+.pkg-card-validity {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--pkg-muted);
+}
+
+.pkg-card-validity svg {
+  flex: none;
+  color: var(--text-desc);
+}
+
+.pkg-card-unit {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.pkg-card-perks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pkg-card-perks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-body);
+}
+
+.pkg-card-perks svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--brand);
+}
+
+/* 价格行压到卡片底部: 权益条数不同时, 各卡的价与按钮仍然对齐 */
+.pkg-card-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px dashed var(--pkg-line);
+}
+
+.pkg-card-price strong {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
+  color: var(--pkg-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pkg-card-price-unit {
+  font-size: 12px;
+  color: var(--pkg-muted);
+}
+
+.pkg-card-price-old {
+  font-size: 12px;
+  color: var(--text-desc);
+  text-decoration: line-through;
+}
+
+.pkg-select-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--pkg-primary);
+  color: var(--on-brand);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.pkg-select-btn:hover:not(:disabled) {
+  background: var(--brand-hover);
+}
+
+.pkg-select-btn:disabled {
+  background: var(--surface);
+  color: var(--pkg-muted);
+  cursor: not-allowed;
+}
+
+/* 购买说明: 用户口径 (有效期 / 扣费 / 退款), 不再写后台配置路径 */
+.pkg-shop-disclosure {
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--pkg-line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--pkg-muted);
+}
+
+@media (max-width: 900px) {
+  .pkg-shop-container {
+    padding: 16px 16px 32px;
+  }
+  .pkg-shop-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 20px;
+  }
+  .pkg-shop-balance {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .pkg-shop-container {
+    padding: 12px 10px 28px;
+  }
+  .pkg-back-btn {
+    margin-bottom: 12px;
+  }
+  .pkg-shop-hero {
+    padding: 18px 16px;
+    border-radius: var(--radius-panel);
+  }
+  .pkg-shop-hero h1 {
+    font-size: 20px;
+  }
+  .pkg-grid {
+    gap: 12px;
+  }
+  /* 会员权益文案较长, 窄屏一张一行; 积分包信息短, 两列并排 */
+  .pkg-card {
+    flex-basis: 100%;
+    max-width: none;
+    padding: 18px 16px 16px;
+  }
+  /* 覆盖 is-plans 的 4 列均分 (选择器优先级更高, 必须同权重重置) */
+  .pkg-grid.is-plans .pkg-card {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .pkg-grid.is-products .pkg-card {
+    flex-grow: 0;
+    flex-basis: calc(50% - 6px);
+    padding: 16px 12px 14px;
+    gap: 10px;
+  }
+  /* 商品数为奇数时, 末张占满整行 —— 半张卡悬在中间比落单更难解释 */
+  .pkg-grid.is-products .pkg-card:last-child:nth-child(odd) {
+    flex-basis: 100%;
+  }
+  .pkg-grid.is-products .pkg-card-name {
+    font-size: 14px;
+  }
+  .pkg-grid.is-products .pkg-card-points strong {
+    font-size: 22px;
+    line-height: 28px;
+  }
+  .pkg-grid.is-products .pkg-card-price strong {
+    font-size: 17px;
+  }
+}

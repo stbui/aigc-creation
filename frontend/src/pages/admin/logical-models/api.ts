@@ -3,6 +3,7 @@
  */
 
 export {
+  adminCapabilitiesApi,
   adminChannelModelsApi,
   adminChannelsApi,
   adminLogicalModelsApi,

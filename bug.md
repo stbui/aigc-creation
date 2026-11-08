@@ -6,6 +6,8 @@ https://www.designkit.cn/agent-lib
 https://www.pixpix.com/zh-CN/tools/product-set
 
 
+https://thai.quantv.com/image-creation
+
 
 http://localhost:3000/admin/logs
 http://localhost:3000/admin/payments
@@ -23,7 +25,14 @@ todo：
 - 用户系统
 - 经营系统
 - agent
-- 无限画布
+- 无限画布 open-ai-canvas
+
+
+内容替换
+探店视频
+爆款复刻
+数字人
+模特服装展示
 
 
 
@@ -33,6 +42,7 @@ systemctl status cloudcli      # 查看状态
   journalctl -u cloudcli -f      # 实时日志
 
 
+提示词稳定性
 mock 数据
 模拟
 

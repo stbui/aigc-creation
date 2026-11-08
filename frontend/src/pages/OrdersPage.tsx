@@ -1,3 +1,4 @@
+import './OrdersPage.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
@@ -70,7 +71,7 @@ export function OrdersPage() {
   /** 已加载条数（同步镜像，加载更多时作为 offset，避免闭包读到旧 state） */
   const loadedCountRef = useRef(0);
 
-  /** 已存在的发票按 orderId 索引 —— 一单一票, 后端 orderId 唯一 */
+  /** 每单展示当前有效票；被驳回后后端允许重新申请，历史记录保留 */
   const [invoices, setInvoices] = useState<Record<string, Invoice>>({});
   /** 正在填开票信息的订单 id */
   const [formFor, setFormFor] = useState<string | null>(null);
@@ -125,7 +126,10 @@ export function OrdersPage() {
       try {
         const invoiceRes = await invoicesApi.list();
         const map: Record<string, Invoice> = {};
-        for (const inv of invoiceRes.items) map[inv.orderId] = inv;
+        // 后端按创建时间倒序返回；每单只展示最新一张，避免历史驳回单覆盖当前票。
+        for (const inv of invoiceRes.items) {
+          if (!map[inv.orderId]) map[inv.orderId] = inv;
+        }
         setInvoices(map);
       } catch {
         /* 忽略 */
@@ -298,8 +302,8 @@ export function OrdersPage() {
   const pendingCount = orders.filter((o) => canPay(o)).length;
 
   /**
-   * 开票入口。一单一票: 已有发票时不再给「申请」按钮,
-   * 而是按状态展示进度 (审核中 / 已开具 / 被驳回的原因)。
+   * 开票入口。一单只有一张有效票：待审核、已开具、已冲红时不再给
+   * 「申请」按钮；被驳回后才展示重新申请入口。
    */
   const renderInvoice = (o: Order) => {
     const inv = invoices[o.id];
@@ -332,6 +336,21 @@ export function OrdersPage() {
     }
     if (inv.status === 'pending') {
       return <span className="order-invoice-state is-pending">发票 {inv.invoiceNo} 审核中</span>;
+    }
+    if (inv.status === 'red_flushed') {
+      return (
+        <span className="order-invoice-state is-rejected">
+          发票 {inv.invoiceNo} 已冲红
+          {inv.redFlushReason ? `：${inv.redFlushReason}` : ''}
+          <Button
+            size="small"
+            type="link"
+            onClick={() => void invoicesApi.preview(inv.id).catch(() => undefined)}
+          >
+            查看原件
+          </Button>
+        </span>
+      );
     }
     return (
       <span className="order-invoice-state is-rejected">
@@ -444,7 +463,15 @@ export function OrdersPage() {
                 <div className="order-line">
                   <div className="order-line-main">
                     <span className="order-line-name">{o.membershipPlanName ?? '会员套餐'}</span>
-                    <span className="order-line-meta">会员订阅 · 支付后立即生效</span>
+                    <span className="order-line-meta">
+                      {o.status === 'pending'
+                        ? '会员订阅 · 支付后自动发放'
+                        : o.status === 'paid' || o.status === 'partial_refunded'
+                          ? o.membershipAppliedAt
+                            ? '会员订阅 · 权益已生效'
+                            : '会员订阅 · 权益发放中'
+                          : '会员订阅 · 已结束'}
+                    </span>
                   </div>
                   <span className="order-line-amount">{formatYuan(o.totalCents)}</span>
                 </div>

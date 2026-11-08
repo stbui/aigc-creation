@@ -26,9 +26,9 @@ const b = await chromium.launch({ executablePath: EXEC });
 {
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
   await ctx.addInitScript((t) => {
-    localStorage.setItem('ecom_vision_token', t);
-    localStorage.setItem('ecom_vision_email', process.env.E2E_EMAIL ?? '');
-    localStorage.setItem('ecom_vision_role', 'user');
+    localStorage.setItem('huojue_token', t);
+    localStorage.setItem('huojue_email', process.env.E2E_EMAIL ?? '');
+    localStorage.setItem('huojue_role', 'user');
   }, token);
   const page = await ctx.newPage();
   for (const route of ['/product-kit', '/product-detail', '/viral-clone', '/multi-image-fusion']) {
@@ -77,9 +77,9 @@ const b = await chromium.launch({ executablePath: EXEC });
 {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN' });
   await ctx.addInitScript((t) => {
-    localStorage.setItem('ecom_vision_token', t);
-    localStorage.setItem('ecom_vision_email', process.env.E2E_EMAIL ?? '');
-    localStorage.setItem('ecom_vision_role', 'user');
+    localStorage.setItem('huojue_token', t);
+    localStorage.setItem('huojue_email', process.env.E2E_EMAIL ?? '');
+    localStorage.setItem('huojue_role', 'user');
   }, token);
   const page = await ctx.newPage();
   await page.goto(`${SITE}/free-creation`, { waitUntil: 'networkidle' });

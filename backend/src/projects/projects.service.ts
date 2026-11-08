@@ -11,7 +11,7 @@ export class ProjectsService {
 
   async list(ownerId: string) {
     return this.prisma.project.findMany({
-      where: { ownerId },
+      where: { ownerId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
   }

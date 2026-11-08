@@ -26,6 +26,7 @@ import { AppError } from "../common/app.exception";
 import { AuditAction, RequirePermission } from "./admin.decorator";
 import { PERMISSIONS } from "./permissions";
 import {
+  MembershipService,
   buildPerkLabels,
   parsePerks,
   type Perks,
@@ -217,7 +218,10 @@ function planView(plan: {
 /** 会员套餐管理：C 端价目表的唯一写入入口 */
 @Injectable()
 export class AdminMembershipPlansService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly membership: MembershipService,
+  ) {}
 
   async list() {
     const plans = await this.prisma.membershipPlan.findMany({
@@ -301,6 +305,11 @@ export class AdminMembershipPlansService {
       data,
       include: { _count: { select: { memberships: true, orders: true } } },
     });
+    // 历史订单没有分组快照时仍回退当前套餐映射；后台改动后必须立刻失效
+    // 用户分组缓存，否则最多 30 秒内新旧订单可能读取到不一致映射。
+    if (dto.userGroupCode !== undefined) {
+      await this.membership.invalidateUserGroupCatalog();
+    }
     return planView(plan);
   }
 

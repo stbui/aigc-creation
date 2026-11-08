@@ -14,5 +14,6 @@ export function multiFusionCreditCost(
   const multiplier = Number.isFinite(resolutionMultiplier) && resolutionMultiplier > 0
     ? resolutionMultiplier
     : 1;
-  return Math.round((baseCost * count * multiplier) / 4);
+  // 后端按微积分向上取整入账；展示必须使用相同口径，否则 41 分基础价会显示 10 而实扣 11。
+  return Math.ceil((baseCost * count * multiplier) / 4);
 }

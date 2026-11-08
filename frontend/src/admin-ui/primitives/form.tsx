@@ -234,7 +234,7 @@ export function TextAreaField({
         aria-invalid={ariaInvalid}
         aria-required={ariaRequired}
         onChange={(event) => onChange(event.target.value)}
-        className="resize-none text-sm"
+        className="field-sizing-fixed resize-none text-sm"
       />
       {showCount && maxLength !== undefined && (
         <span className="pointer-events-none absolute right-0 -bottom-4 text-[12px] text-muted-foreground tabular-nums">
@@ -633,6 +633,7 @@ export function ClearableField({
   onChange,
   placeholder,
   ariaLabel,
+  icon,
   id,
   className,
   disabled = false,
@@ -645,6 +646,7 @@ export function ClearableField({
   onChange: (value: string) => void;
   placeholder?: string;
   ariaLabel?: string;
+  icon?: ReactNode;
   id?: string;
   className?: string;
   disabled?: boolean;
@@ -652,6 +654,11 @@ export function ClearableField({
 } & ControlAriaProps) {
   return (
     <InputGroup className={cn('h-8 bg-background', className)}>
+      {icon && (
+        <InputGroupAddon align="inline-start" className="pl-2.5 text-muted-foreground">
+          {icon}
+        </InputGroupAddon>
+      )}
       <InputGroupInput
         id={id}
         type="text"
@@ -699,6 +706,7 @@ export function ActionButton({
   icon: Icon,
   className,
   type = 'button',
+  form,
   ariaLabel,
   ariaPressed,
   ariaExpanded,
@@ -711,6 +719,8 @@ export function ActionButton({
   icon?: React.ComponentType<{ className?: string }>;
   className?: string;
   type?: 'button' | 'submit';
+  /** 关联到弹窗 body 内的 form；Footer 在 form 外时仍可原生提交 */
+  form?: string;
   ariaLabel?: string;
   /** 分段/切换类按钮的选中态，读屏靠它而不是颜色 */
   ariaPressed?: boolean;
@@ -719,6 +729,7 @@ export function ActionButton({
   return (
     <Button
       type={type}
+      form={form}
       variant={variant}
       size={size}
       disabled={disabled}

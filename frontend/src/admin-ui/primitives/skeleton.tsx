@@ -143,12 +143,13 @@ export function SkeletonPanel({
         className,
       )}
     >
-      <CardHeader className="flex flex-row items-center gap-3 border-b border-border px-4 py-3 pb-3">
+      {/* 分隔线在内容区上沿，避免 CardHeader 的 `[.border-b]:pb-6` 把间距撑大 */}
+      <CardHeader className="flex flex-row items-center gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
           <SkeletonBar className="h-[13px] w-[180px]" />
         </div>
       </CardHeader>
-      <CardContent className="p-4">
+      <CardContent className="border-t border-border p-4">
         <SkeletonBody rows={rows} />
       </CardContent>
     </Card>
@@ -284,11 +285,20 @@ export function SkeletonDutyStrip({ className }: { className?: string }) {
 /**
  * 卡片网格骨架：与「一格一个后端」这类卡片列表同构（auto-fit，最小 300px）。
  */
-export function SkeletonCards({ count = 3, className }: { count?: number; className?: string }) {
+export function SkeletonCards({
+  count = 3,
+  className,
+  gridClassName,
+}: {
+  count?: number;
+  className?: string;
+  gridClassName?: string;
+}) {
   return (
     <div
       className={cn(
         'mt-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]',
+        gridClassName,
         className,
       )}
     >

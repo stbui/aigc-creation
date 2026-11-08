@@ -6,6 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SmsSendDto } from './dto/sms-send.dto';
+import { EmailSendDto } from './dto/email-send.dto';
 import { SmsLoginDto } from './dto/sms-login.dto';
 import { RateLimit, type RateLimitOptions } from '../common/rate-limit.guard';
 
@@ -29,6 +30,7 @@ const RL_SMS_SEND: RateLimitOptions = {
   rules: [{ limit: 1, windowSec: 60 }, { limit: 5, windowSec: 86400 }],
 };
 const RL_SMS_LOGIN: RateLimitOptions = { name: 'auth-sms-login', limit: 10, windowSec: 60, limitEnv: 'RATE_LIMIT_AUTH_PER_MIN' };
+const RL_EMAIL_SEND: RateLimitOptions = { name: 'auth-email-send', limit: 3, windowSec: 3600 };
 
 /**
  * 请求来源提取。
@@ -84,6 +86,13 @@ export class AuthController {
   @Post('sms/send')
   async sendSms(@Body() dto: SmsSendDto, @Req() req: Request) {
     return this.authService.sendSmsCode(dto, contextOf(req));
+  }
+
+  /** 发送注册邮箱验证码；对未注册与已注册邮箱返回一致响应 */
+  @RateLimit(RL_EMAIL_SEND)
+  @Post('email/send')
+  async sendEmail(@Body() dto: EmailSendDto, @Req() req: Request) {
+    return this.authService.sendEmailCode(dto, contextOf(req));
   }
 
   @RateLimit(RL_SMS_LOGIN)

@@ -92,6 +92,12 @@ function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
   const orders = {
     applyPaymentResult: vi.fn().mockResolvedValue({ applied: true, idempotentHit: false }),
   };
+  const exceptions = {
+    recordManual: vi.fn().mockResolvedValue({}),
+    autoRefundCancelledPayment: vi
+      .fn()
+      .mockResolvedValue({ case: {}, outcome: 'manual_review' }),
+  };
   adapterMock.verifyNotification.mockResolvedValue(notification);
   adapterMock.ack.mockImplementation((result: NotificationResult) => ({
     status: result.ok && result.ackSuccess ? 200 : 400,
@@ -104,12 +110,13 @@ function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
     cipher as never,
     configs as never,
     orders as never,
+    exceptions as never,
   );
-  return { service, prisma, orders };
+  return { service, prisma, orders, exceptions, notificationRow };
 }
 
-async function ingest(service: PaymentNotificationService): Promise<void> {
-  await service.ingest({
+async function ingest(service: PaymentNotificationService) {
+  return service.ingest({
     providerId: 'stripe',
     configId: CONFIG_ID,
     headers: { 'stripe-signature': 'signed' },
@@ -191,6 +198,78 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
     expect(query.orderBy).toEqual({ createdAt: 'desc' });
     expect(orders.applyPaymentResult).toHaveBeenCalledWith(
       expect.objectContaining({ paymentId: 'pay_old' }),
+    );
+  });
+});
+
+describe('PaymentNotificationService 收件箱并发闸', () => {
+  beforeEach(() => {
+    adapterMock.verifyNotification.mockReset();
+    adapterMock.ack.mockReset();
+  });
+
+  it('同步处理前先把行 claim 成 processing，与 worker 抢同一把锁', async () => {
+    const { service, prisma } = makeHarness();
+
+    await ingest(service);
+
+    const claim = prisma.paymentNotification.updateMany.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    };
+    expect(claim.where).toMatchObject({
+      id: NOTIFICATION_ID,
+      status: { in: ['pending', 'failed'] },
+    });
+    expect(claim.data).toMatchObject({
+      status: 'processing',
+      attempts: { increment: 1 },
+    });
+  });
+
+  it('行已被另一条路径占住时 ack 失败，不重复入账', async () => {
+    const { service, prisma, orders, notificationRow } = makeHarness();
+    prisma.paymentNotification.updateMany.mockResolvedValue({ count: 0 });
+    prisma.paymentNotification.findUnique.mockImplementation(
+      async ({ where }: { where: { id?: string } }) =>
+        where.id ? { ...notificationRow, status: 'processing' } : null,
+    );
+
+    const ack = await ingest(service);
+
+    expect(ack.status).toBe(400);
+    expect(orders.applyPaymentResult).not.toHaveBeenCalled();
+  });
+
+  it('行已处理完时直接 ack 成功，渠道停止重试', async () => {
+    const { service, prisma, orders, notificationRow } = makeHarness();
+    prisma.paymentNotification.updateMany.mockResolvedValue({ count: 0 });
+    prisma.paymentNotification.findUnique.mockImplementation(
+      async ({ where }: { where: { id?: string } }) =>
+        where.id ? { ...notificationRow, status: 'processed' } : null,
+    );
+
+    const ack = await ingest(service);
+
+    expect(ack.status).toBe(200);
+    expect(orders.applyPaymentResult).not.toHaveBeenCalled();
+  });
+
+  it('处理过程抛异常时把行退回可重试状态，而不是留在 processing', async () => {
+    const { service, prisma } = makeHarness();
+    prisma.order.findUnique.mockRejectedValue(new Error('db down'));
+
+    const ack = await ingest(service);
+
+    expect(ack.status).toBe(400);
+    expect(prisma.paymentNotification.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: NOTIFICATION_ID },
+        data: expect.objectContaining({
+          status: 'failed',
+          nextAttemptAt: expect.any(Date),
+        }),
+      }),
     );
   });
 });

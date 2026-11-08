@@ -32,7 +32,7 @@ export class AccountController {
   /** 改密成功后旧 token 全部失效（含当前这把），前端需跳登录 */
   @Post('password')
   async changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
-    return this.account.changePassword(user.id, dto.oldPassword, dto.newPassword);
+    return this.account.changePassword(user.id, dto.newPassword, dto.oldPassword);
   }
 
   /** 个人信息导出（JSON，同步返回） */

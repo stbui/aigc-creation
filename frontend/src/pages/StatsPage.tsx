@@ -1,3 +1,4 @@
+import './StatsPage.css';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, RefreshCw, Sparkles } from 'lucide-react';

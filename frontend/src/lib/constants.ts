@@ -50,24 +50,32 @@ export function isSupportedImageFile(file: { type: string }): boolean {
   return (SUPPORTED_IMAGE_TYPES as readonly string[]).includes(file.type);
 }
 export const POLL_INTERVAL_MS = 1200;
-export const POLL_MAX_TRIES = 60;
+
+/** 后端任务进入终态后还要下载、写 AIGC 标识并落盘，前端多留 2 分钟取结果。 */
+const POLL_RESULT_GRACE_MS = 2 * 60_000;
+
+/**
+ * 普通图像任务的轮询上限。
+ *
+ * 后端 `TaskWorkerService` 对图像任务的总轮询时限是 15 分钟；此前前端只等
+ * 60 × 1.2s ≈ 72s，模型稍慢就会把仍在后台运行的任务误报成 `POLL_TIMEOUT`。
+ * 2026-11-05 的自由创作任务实际耗时约 4 分钟并在后台成功，用户却先看到失败。
+ */
+export const POLL_MAX_TRIES = Math.ceil((15 * 60_000 + POLL_RESULT_GRACE_MS) / POLL_INTERVAL_MS);
 /**
  * 多图融合的轮询上限。
  *
- * 一次提交会并发调用模型 1-4 次，单次通道超时 120s，实测 4 变体约 85s；
- * 沿用图像 60 次 ≈ 72s 会把已经成功落库的任务误报为 POLL_TIMEOUT。
- * 失败候选会再重试一次；按单路通道超时 120s 计算，两轮最坏约 4 分钟，
- * 550 × 1.2s ≈ 11 分钟，覆盖通道等待、重试、AIGC 标识和落库时间。
+ * 多图融合仍是图像模态，后台沿用统一的 15 分钟总时限；不能因为一次生成
+ * 多个变体反而比普通图片更早被前端判失败。
  */
-export const POLL_MULTI_FUSION_MAX_TRIES = 550;
+export const POLL_MULTI_FUSION_MAX_TRIES = POLL_MAX_TRIES;
 /**
  * 视频任务的轮询上限。
  *
- * 视频生成实际需要 1–2 分钟（后端视频超时 600s），沿用图像那 60 次 ≈ 72s
- * 会让视频任务在前端**必然超时**：任务还在后台跑、已扣费，界面却报失败。
- * 550 × 1.2s ≈ 11 分钟，覆盖后端超时后再留一点下载余量。
+ * 后端 `TaskWorkerService` 对视频任务的总轮询时限是 60 分钟；前端窗口必须
+ * 覆盖后台终态，否则任务还在跑、已扣费，界面却会提前报失败。
  */
-export const POLL_VIDEO_MAX_TRIES = 550;
+export const POLL_VIDEO_MAX_TRIES = Math.ceil((60 * 60_000 + POLL_RESULT_GRACE_MS) / POLL_INTERVAL_MS);
 
 /**
  * 能力清单不再硬编码在前端 —— 全部来自 GET /api/v1/capabilities
@@ -78,7 +86,6 @@ export const POLL_VIDEO_MAX_TRIES = 550;
  * 能力模式对应的界面标注。
  *
  * mode 只回答「这项能力是否已接入真实模型通道」。
- * 单次请求实际走的线路以 task.provider 为准，由结果卡显示来源徽标。
  */
 export const MODE_LABELS: Record<string, string> = {
   real: '已接入',
@@ -98,22 +105,44 @@ export const RUNTIME_LABELS: Record<CapabilityRuntime['effective'], string> = {
   unavailable: '暂不可用',
 };
 
+/** 前台不可用提示：后端 reason 可能包含运营/配置诊断信息，不直接透出给用户。 */
+export const CAPABILITY_UNAVAILABLE_NOTICE = '当前生成服务暂不可用，请稍后再试。';
+
+/**
+ * 将能力运行时状态转换为前台可展示的数据。
+ *
+ * `unavailable` 的 reason 来自模型路由诊断，只供后台排障；C 端统一换成
+ * 面向用户的提示，避免把「真实模型 / 线路配置」等内部信息暴露到页面。
+ * 后台「能力与模型」直接使用管理接口返回的数据，不受这里影响。
+ */
+export function publicCapabilityRuntime(runtime: CapabilityRuntime): CapabilityRuntime {
+  if (runtime.effective !== 'unavailable') return runtime;
+  return { ...runtime, reason: CAPABILITY_UNAVAILABLE_NOTICE };
+}
+
 /**
  * 取能力的运行时状态；后端未下发时按定义兜底。
  *
  * 兜底刻意保守：没有 runtime 就当作「暂不可用」，不假称模型线路可用，
  * 也不能让界面承诺一条可能不存在的线路。
  */
-export function runtimeOf(
-  def: Pick<CapabilityDef, 'mode' | 'runtime'>,
-): CapabilityRuntime {
-  if (def.runtime) return def.runtime;
+export function runtimeOf(def: Pick<CapabilityDef, 'mode' | 'runtime'>): CapabilityRuntime {
+  if (def.runtime) return publicCapabilityRuntime(def.runtime);
   return {
     enabled: def.mode !== 'planned',
     remoteAvailable: false,
     effective: def.mode === 'planned' ? 'disabled' : 'unavailable',
     reason: '尚未获取模型线路状态，请刷新后重试',
   };
+}
+
+/** 从能力清单按 id 取运行时结论；清单尚未加载时返回 undefined。 */
+export function runtimeOfId(
+  items: ReadonlyArray<Pick<CapabilityDef, 'id' | 'mode' | 'runtime'>> | undefined,
+  id: string,
+): CapabilityRuntime | undefined {
+  const def = items?.find((item) => item.id === id);
+  return def ? runtimeOf(def) : undefined;
 }
 
 /**
@@ -124,16 +153,16 @@ export function runtimeOf(
  */
 const TASK_ERROR_TEXT: Record<string, string> = {
   // 生成侧异常 (42201) / 中断回收失败 (42202) / AIGC 角标失败 (42203) / 无通道 (42204)
-  // / 遮罩不被通道支持 (42205)。这些后端都会退款，文案必须说清楚「钱退了吗」，
+  // / 遮罩不被通道支持 (42205) / 结果不确定待人工核对 (42206)。文案必须说清楚「钱退了吗」，
   // 否则用户只看到一个数字码。
   '42201': '生成失败，积分已退回',
   '42202': '任务中断，产出未完成（积分已退回）',
   '42203': 'AI 标识写入失败，本次未交付图片（积分已退回）',
   '42204': '暂无可用模型通道，本次未生成图片（积分已退回）',
   '42205': '当前模型通道不支持遮罩重绘，本次未生成图片（积分已退回）',
-  CANCELLED: '任务已取消，本次未产出图片（如已扣费将自动退回）',
-  'POLL_TIMEOUT':
-    '等待超时：任务可能仍在后台生成，请稍后到「我的作品」查看（若失败会自动退回积分）',
+  '42206': '生成结果暂不明确，积分已冻结，等待人工核对',
+  CANCELLED: '任务已取消，本次未产出图片；退款以账单处理结果为准',
+  POLL_TIMEOUT: '等待超时：任务可能仍在后台生成，请稍后到「我的作品」查看（若失败会自动退回积分）',
 };
 
 export function taskErrorText(code?: string | null): string {

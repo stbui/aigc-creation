@@ -10,6 +10,8 @@ import { capabilityById } from '../../lib/capabilities';
 
 /** 能力 id → 能力定义 / 展示名 / 工具页路径 */
 export { capabilityById, capabilityName, toolPath } from '../../lib/capabilities';
+/** 能力清单响应结构（筛选分组从它的 `groups` / `items` 推导） */
+export type { CapabilitiesData } from '../../lib/capabilities';
 /** 能力运行时状态与任务失败文案 */
 export { runtimeOf, taskErrorText } from '../../lib/constants';
 /** 轮询到任务终态 (重试链路复用同一份实现) */

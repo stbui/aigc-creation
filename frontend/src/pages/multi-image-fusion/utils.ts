@@ -68,7 +68,7 @@ export function outputsOf(done: PolledResult): PolledOutput[] {
   return done.url ? [{ url: done.url, width: done.width, height: done.height }] : [];
 }
 
-/** 产出 → 结果卡片; `provider` 取本单实际通道 (新任务恒为 gateway)。 */
+/** 产出 → 结果卡片。 */
 export function resultsOf(done: PolledResult): ToolResult[] {
   return outputsOf(done).map((output) => ({
     status: 'succeeded',
@@ -77,11 +77,19 @@ export function resultsOf(done: PolledResult): ToolResult[] {
     height: output.height,
     modality: output.modality,
     durationMs: output.durationMs,
-    provider: done.provider,
   }));
 }
 
-export type FusionResultState = 'idle' | 'generating' | 'complete' | 'partial' | 'failed';
+export type FusionFailureKind = 'submit' | 'generation' | 'timeout';
+
+export type FusionResultState =
+  | 'idle'
+  | 'generating'
+  | 'complete'
+  | 'partial'
+  | 'failed'
+  | 'submit_failed'
+  | 'timeout';
 
 export interface FusionResultStatus {
   state: FusionResultState;
@@ -99,7 +107,7 @@ export function fusionResultStatusOf(input: {
   submitting: boolean;
   resultCount: number;
   requestedCount: number;
-  failed: boolean;
+  failureKind?: FusionFailureKind | null;
 }): FusionResultStatus {
   const requested = Math.max(1, Math.trunc(input.requestedCount) || 1);
   const generated = Math.max(0, Math.trunc(input.resultCount) || 0);
@@ -110,7 +118,21 @@ export function fusionResultStatusOf(input: {
       summary: `正在生成 ${requested} 张融合变体`,
     };
   }
-  if (input.failed && generated === 0) {
+  if (input.failureKind === 'timeout' && generated === 0) {
+    return {
+      state: 'timeout',
+      badge: '等待结果',
+      summary: '任务已提交，结果暂未返回',
+    };
+  }
+  if (input.failureKind === 'submit' && generated === 0) {
+    return {
+      state: 'submit_failed',
+      badge: '未提交',
+      summary: '未能创建生成任务，本次没有开始生成',
+    };
+  }
+  if (input.failureKind === 'generation' && generated === 0) {
     return {
       state: 'failed',
       badge: '失败',

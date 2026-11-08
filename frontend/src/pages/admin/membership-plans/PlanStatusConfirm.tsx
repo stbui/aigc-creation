@@ -1,4 +1,4 @@
-import { ConfirmAction } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/primitives';
 import { centsToYuan } from './utils';
 import type { AdminMembershipPlan } from '../../../types/api';
 
@@ -19,7 +19,7 @@ export function PlanStatusConfirm({
   if (!target) return null;
 
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open
       title={target.status === 'active' ? '下架会员套餐' : '上架会员套餐'}
       confirmText={target.status === 'active' ? '确认下架' : '确认上架'}

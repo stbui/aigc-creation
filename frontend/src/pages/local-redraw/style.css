@@ -1,0 +1,39 @@
+/**
+ * local-redraw 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* 模板/主体上传按钮 (参考站 local-redraw-source-upload: 虚线区 + plus 图标) */
+.local-redraw-source-upload {
+  position: relative;
+  width: 100%;
+  min-height: 120px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--text-desc);
+  padding: 16px;
+}
+
+.local-redraw-source-upload:hover {
+  border-color: var(--border-hover);
+}
+
+.local-redraw-source-upload strong {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-strong);
+}
+
+.local-redraw-source-upload small {
+  font-size: 12px;
+  color: var(--text-desc);
+}

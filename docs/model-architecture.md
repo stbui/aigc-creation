@@ -1,6 +1,6 @@
 # 模型层架构（渠道 → 前台模型 → 路由 → 计费）
 
-> 范围：`backend/src/model/**` 与它对外暴露的 `/models`、`/admin/channels`、`/admin/logical-models`、
+> 范围：`backend/src/model/**` 与它对外暴露的 `/models`、`/admin/channels`、`/admin/capabilities`、
 > `/admin/api-logs`、`/admin/billing-orders`、`/admin/finance`、`/ai/*` 中转。
 > 本文只写**当前实际实现**，每条约束都能在代码里核对；设计动机与取舍见 `docs/channel-model-design.md`。
 >
@@ -18,7 +18,7 @@
 ```
 C 端                                   后台
 GET  /models                           /admin/channels          渠道 · 渠道模型 · 价格档
-POST /models/available                 /admin/logical-models    前台模型 · revision · 线路 · 模拟
+POST /models/available                 /admin/capabilities     能力与模型 · revision · 线路 · 模拟
 POST /models/:id/quote                 /admin/user-groups       可见范围 · 倍率 · 货币换算
 POST /generate { logicalModelId }      /admin/plugins           协议插件（安装 / 校验 / 卸载）
                                        /admin/api-logs          逐次上游调用
@@ -81,7 +81,7 @@ TaskWorkerService（领取 / 轮询 / 切线 / 收尾）
 | `CreditLedgerEntry` | 流水：`grant / purchase / admin_adjust / refund_reclaim / reserve / consume / refund / expire` | 每次余额变化必有一条 |
 | `CreditReservationItem` | 预留明细：账单 → 批次 → 金额 | 退款按它**原路**退回原批次，不造新批次 |
 | `ApiCallLog` | 每次上游 HTTP：请求类型 / 渠道 / 模型 / 状态 / 耗时 / 错误 / 用量 | 只 INSERT；是结算读 Token 用量的来源 |
-| `GenerationTask` | 任务：状态 `queued / running / succeeded / failed / cancelled`、`logicalModelId` | `provider` 恒为 `gateway` |
+| `GenerationTask` | 任务：状态 `queued / running / succeeded / failed / cancelled`、`logicalModelId` / `routeId` / `channelModelId` 快照 | 任务一旦建成，供应侧字段不再随后台改价换线而变 |
 
 ## 5. 请求时序
 
@@ -143,7 +143,13 @@ running ──nextPollAt 到期──► 回查上游
 | `upstream_401` / `403` | 凭证级拒绝 | 能（冷却渠道 10min） |
 | `upstream_404` | 这个模型在这家渠道不存在 | 能（冷却该渠道模型 10min，不连坐渠道） |
 | `upstream_429` | 限流 | 能（冷却 `Retry-After` 或 30s） |
-| `upstream_5xx` / 超时 / 连接中断 / 解析失败 | 上游**可能已受理** | **不能**，判「结果不明」 |
+| `outbound_dns_failed` / `outbound_proxy_invalid` / `outbound_connection_refused` / `outbound_network_unreachable` / `outbound_invalid_url` / `outbound_blocked_host` | 请求在写出前失败：DNS、代理、TCP 建连、URL/SSRF 校验未通过 | 能（不计冷却） |
+| `upstream_5xx` / 超时 / 建连后中断 / 解析失败 | 上游**可能已受理** | **不能**，判「结果不明」 |
+
+**建连前与建连后的分界必须以证据为准**：`ECONNREFUSED`、`ENOTFOUND`、`EAI_AGAIN`、
+`ENETUNREACH`、`EHOSTUNREACH` 等 errno 发生在 TCP 建连或 DNS/代理准备阶段，上游不可能
+据此建立任务，归 `rejected_no_job`。`ECONNRESET`、`socket hang up`、超时、5xx 或响应解析
+失败可能发生在请求已写出之后，不能自动重发。
 
 ## 6. 选路（`router.service.ts`）
 
@@ -168,11 +174,15 @@ running ──nextPollAt 到期──► 回查上游
 | 场景 | 任务结果 | 账单 / 积分 |
 | --- | --- | --- |
 | 准入阶段拦下（下线 / 参数 / 余额） | 任务不创建 | 不动 |
-| 有线路但全部 `rejected_no_job` | `failed` + `42204`（遮罩任务 `42205`） | 按预留明细原路全额退还 |
-| 上游 5xx / 超时 / 连接中断 | `failed` + `42206`（结果不明） | **不切线、不自动退款**，账单停 `uncertain`，等人工核对 |
+| 有线路但全部 `rejected_no_job`（含建连前网络失败） | `failed` + `42204`（遮罩任务 `42205`） | 按预留明细原路全额退还 |
+| 建连后 5xx / 超时 / 连接中断 / 解析失败 | `failed` + `42206`（结果不明） | **不切线、不自动退款**，账单停 `uncertain`，等人工核对 |
 | 进程崩溃后回收 | `failed` + `42202` | 退款 |
 | AIGC 标识失败 | `failed` + `42203`（fail-closed） | 退款 |
 | 成功 | `succeeded` | 结算（Token 模式按上游 usage 补扣 / 退差额） |
+
+`uncertain` 的唯一业务含义是「请求可能已经到达上游，结果无法确认」。因此
+`ECONNREFUSED`、DNS 解析失败、TCP 不可达等可证明请求未写出的错误不得进入该状态；
+后续排障看到这类错误仍停在 `uncertain`，应视为失败归因回归。
 
 **切线必须换账单**：新线路的价格档可能与原线路不同，沿用旧账单等于「按 A 的价收、走 B 的线路」。
 旧账单退款后**标记为 `refundReason='route_switch'`** —— 这笔钱只是从旧线路的预授权挪到新线路的
@@ -182,6 +192,9 @@ running ──nextPollAt 到期──► 回查上游
 冷却（`route-health.service.ts`）只对**明确可归因**的失败生效；超时与 5xx 一律不冷却 ——
 上游抖动时关 10 分钟会把一次偶发故障放大成整段时间不可用。冷却只存进程内存（本仓没有 Redis），
 多实例各自判定，不影响正确性。
+
+建连前网络失败允许换线，但默认不写冷却：它可能来自本地 DNS、代理或出口网络抖动，
+直接封禁渠道会把一次基础设施故障放大成供应侧不可用。401/403/404/429 的冷却规则不变。
 
 ## 8. 计费
 
@@ -218,7 +231,7 @@ running ──nextPollAt 到期──► 回查上游
 | 页面 | 前缀 | 要点 |
 | --- | --- | --- |
 | 渠道工作台 | `/admin/channels` | 双视图：**按渠道**（左侧渠道导航 + 右侧选中渠道的详情，主从布局；左列承载新建 / 导入 / 导出全部 / 排序，详情头部承载编辑 / 复制 / 导出 / 停用·启用 / 删除，渠道模型与价格档、协议连通性测试；新建时 API Key 必填 —— 没有凭证的渠道只是永远 401 的线路；自定义请求头用结构化编辑器逐行增删，系统托管的头在提交前拦下）与**全部模型**（跨渠道列出全部线路，含停用项，按能力 / 状态 / 渠道筛选，筛选一变即回第一页；按显示名 → 模型标识 → 渠道名排序，同一模型在不同渠道的行相邻，工具条给「N 个模型 · M 个可用」计数；行内可直接改启停，**停用前出确认**说明前台模型会切到其它线路；「编辑」一步跳到该渠道并打开这条模型的编辑器，点渠道名只跳回该渠道的配置视图）；渠道与渠道内模型**排序**（`PUT .../order` 带 `expectedIds` 乐观并发，顺序被动过即 `40900` 整单拒绝）；模型编辑走弹窗（右侧详情区保持稳定视图），清单带关键字 / 能力 / 状态（含「未定价」）筛选与分页，并含 24h 稳定性列（与「全部模型」同一数据源），行内可**复制模型**（副本默认停用）；停用前出影响范围确认，**批量删除**与**统一调价**在详情区内联；**上游目录**导入走弹窗（搜索、全选/取消全选、已存在标记，默认只预选本地没有的模型）；**线路当前状态**（`GET /admin/channels/health`：启停 / 协议 / 冷却）、**线路历史表现**（`GET /admin/channel-models/health`：24h / 7d 成功率、P95、最近样本，按渠道模型出表）。渠道与渠道模型删除均保留业务确认，但不填写原因，操作仍写审计 |
-| 前台模型 | `/admin/logical-models` | 保存即发布 revision；线路优先级 / 权重；`POST /:id/simulate` 回答「这组参数会落到哪条线路、为什么没落」 |
+| 能力与模型 | `/admin/capabilities` | 能力上下线与所属前台模型在同一工作台；保存模型即发布 revision，线路优先级 / 权重；`POST /:id/simulate` 回答「这组参数会落到哪条线路、为什么没落」。旧地址 `/admin/logical-models` 重定向到本页 |
 | 用户分组 | `/admin/user-groups` | 可见渠道集合、倍率、货币换算、按模型覆盖 |
 | 插件 | `/admin/plugins` | 内置包只读；上传包可校验 / 安装 / 卸载；每项带**当前环境可用性**（停用 / 宿主引擎未内置 / 只贡献支付短信等非模型能力）与人话原因 |
 | 调用记录 | `/admin/model-calls`（数据源 `/admin/api-logs`） | 逐次上游 HTTP，含后台连通性测试（`billable=false`）；`GET /admin/api-logs/export` 导出 CSV（不含请求 / 响应体） |
@@ -257,7 +270,7 @@ C 端目录接口：`GET /models`（可选身份，登录后按分组过滤并�
 
 ### 新增一台前台模型
 
-1. `/admin/logical-models` 新建：能力、价格策略、能力合同、默认参数。
+1. `/admin/capabilities` 新建前台模型：能力、价格策略、能力合同、默认参数。
 2. 挂线路（渠道模型 + priority + weight），保存即发布新 revision。
 3. 用 `simulate` 验证一组真实参数会落到期望线路，再跑 `verify:route-catalog`。
 
@@ -293,8 +306,10 @@ C 端目录接口：`GET /models`（可选身份，登录后按分组过滤并�
 1. **改动模型层后不看目录快照就等于没改**：路由读的是 30s 快照。同进程写入会自动失效；
    跨进程最多滞后 30s，排障时先等一拍或重启。
 2. **界面说可用、提交 42204**：对照 `RouteAttempt.failureCode`。最常见是协议 id 写成插件 id（见 §3）。
-3. **账单停在 `uncertain` 不是 bug**：它表示「上游可能已经做了这件事」，只能人工核对后
-   `settle` / `refund`，两条路径都写审计。
+3. **账单停在 `uncertain` 不是 bug**：它只表示「请求可能已经到达上游，结果无法确认」，
+   只能人工核对后 `settle` / `refund`，两条路径都写审计。若 `RouteAttempt.failureCode`
+   或 `failureMessage` 明确是 `ECONNREFUSED` / DNS / TCP 不可达，则说明旧数据或归因回归，
+   不应继续人工核对。
 4. **冷却只反映本进程**：`/health` 与 `/admin/channels/health` 都只报当前实例看到的状态。
 5. **单实例内存额度**：任务并发、冷却、快照都是进程级。多实例部署时按实例数放大上游配额。
 6. **后台「调用记录」与「生成账单」口径不同**：前者逐次 HTTP，后者按任务聚合（含创建与多次轮询）。

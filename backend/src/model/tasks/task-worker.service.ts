@@ -13,8 +13,9 @@
  *
  * 关键边界（改动任何一条都是资损）
  * ------------------------------
- *   1. **只有 `rejected_no_job` 允许切线**：上游明确没接（渠道不可用 / 401 /
- *      403 / 404 / 429）。超时、5xx、连接中断一律停在「结果不明」；
+ *   1. **只有 `rejected_no_job` 允许切线**：上游明确没接（渠道不可用 / HTTP
+ *      拒绝 / DNS、代理、TCP 建连前失败）。超时、5xx、建连后中断一律停在
+ *      「结果不明」；
  *   2. **切线要换账单**：新线路的价格档可能与原线路不同，继续用旧账单会
  *      出现「按 A 的价收、走 B 的线路」；
  *   3. **落盘失败不重发**：上游已产出时把结果存进 `pendingResult` 重试落盘，
@@ -34,6 +35,8 @@ import { RouterService } from '../routing/router.service';
 import { detectImageFormat } from '../media/image-format';
 import { RouteHealthService } from '../routing/route-health.service';
 import { BillingService } from '../billing/billing.service';
+import { AppError } from '../../common/app.exception';
+import { CreditPriceService } from '../../credits/credit-price.service';
 import { UserGroupService } from '../user-groups/user-group.service';
 import { getCapability } from '../../capabilities/capability.registry';
 import { restrictIntentToSpec } from '../intent/model-intent';
@@ -44,6 +47,7 @@ import { TaskExecutorService } from './task-executor.service';
 import { TaskLifecycleService, TASK_ERROR } from './task-lifecycle.service';
 import { TaskMediaService, type PendingOutput } from './task-media.service';
 import { TaskRequestService } from './task-request.service';
+import { scaleMultiFusionDraft } from './task-billing-scale';
 
 /** 租约时长：进程被杀后最迟这么久被接管 */
 const TASK_LEASE_MS = 45_000;
@@ -87,6 +91,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly groups: UserGroupService,
     private readonly health: RouteHealthService,
     private readonly billing: BillingService,
+    /** 后台能力覆盖价：换线重建账单必须与首次建单同一套定价 */
+    private readonly price: CreditPriceService,
     private readonly channels: ChannelRuntimeService,
     private readonly slots: ChannelSlotService,
     private readonly attempts: TaskAttemptService,
@@ -213,7 +219,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     const expired = await this.prisma.generationTask.findMany({
       where: { status: 'running', leaseOwner: { not: '' }, leaseUntil: { lt: now } },
       take: 50,
-      select: { id: true, routeRun: true, leaseOwner: true, pendingResult: true },
+      select: { id: true, routeRun: true, leaseOwner: true, leaseUntil: true, pendingResult: true },
     });
     let recovered = 0;
     for (const task of expired) {
@@ -221,8 +227,11 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       const state = attempt?.dispatchState ?? 'not_sent';
       if (state === 'submission_unknown') {
         // 执行者可能在请求已发出后死掉：不能重发，交给人工核对
-        await this.lifecycle.uncertain(task.id, '执行者租约过期，且请求可能已经发出');
-        recovered += 1;
+        const claimed = await this.lifecycle.uncertain(task.id, '执行者租约过期，且请求可能已经发出', {
+          leaseOwner: task.leaseOwner,
+          leaseUntil: task.leaseUntil,
+        });
+        if (claimed) recovered += 1;
         continue;
       }
       /*
@@ -231,11 +240,17 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
        *   · accepted —— 上游已受理，`advance` 回到轮询；
        * 租约清空 + `nextPollAt=now` 才会被 `claimDuePolls` 重新领取。
        */
-      await this.prisma.generationTask.updateMany({
-        where: { id: task.id, status: 'running', leaseOwner: task.leaseOwner },
+      const claimed = await this.prisma.generationTask.updateMany({
+        where: {
+          id: task.id,
+          status: 'running',
+          leaseOwner: task.leaseOwner,
+          leaseUntil: task.leaseUntil,
+        },
         data: { leaseOwner: '', leaseUntil: null, nextPollAt: new Date() },
       });
-      recovered += 1;
+      // 只有真正认领恢复权的调用计数；续租成功会让上面的精确 CAS 失败。
+      if (claimed.count === 1) recovered += 1;
     }
     return recovered;
   }
@@ -300,7 +315,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         try {
           await this.billing.markRunning(task.billingOrderId);
         } catch (error) {
-          await this.lifecycle.uncertain(taskId, `账单无法进入运行中：${(error as Error).message}`);
+          await this.uncertainOwned(taskId, `账单无法进入运行中：${(error as Error).message}`);
           return;
         }
       }
@@ -312,7 +327,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       await this.advance(task);
     } catch (error) {
       this.log.error(`任务 ${taskId} 执行异常: ${(error as Error).message}`);
-      await this.lifecycle.uncertain(taskId, `执行异常：${(error as Error).message}`);
+      await this.uncertainOwned(taskId, `执行异常：${(error as Error).message}`);
     } finally {
       clearInterval(renew);
     }
@@ -347,22 +362,32 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
           await this.failNoRoute(fresh, params);
           return;
         }
-        const attempt = await this.startAttempt(fresh, routed, runAttempts.length + 1);
-        const outcome = await this.dispatch(fresh, attempt, params, inputIds);
-        if (outcome !== 'continue') return;
+        if (this.routeSnapshotDiffers(fresh, routed) && fresh.billingOrderId) {
+          /*
+           * 准入与真正执行之间，线路健康度 / 分组可见性可能变化，worker 会选到
+           * 另一条线路。首次 attempt 也必须和账单同生共死，否则会出现按 A 线
+           * 路价格预授权、实际走 B 线路的计费错配。
+           */
+          const replaced = await this.replaceBilling(fresh, routed, runAttempts.length + 1);
+          if (!replaced) return;
+          continue;
+        }
+        const created = await this.startAttempt(fresh, routed, runAttempts.length + 1);
+        if (!created) return;
+        // 回到主循环统一经过 attempts.begin() 的 CAS；新建 attempt 不能直接派发。
         continue;
       }
 
       const begin = await this.attempts.begin(latest);
       if (begin.action === 'uncertain') {
-        await this.lifecycle.uncertain(task.id, '派发结果不明（请求可能已经发出）');
+        await this.uncertainOwned(task.id, '派发结果不明（请求可能已经发出）');
         return;
       }
       if (begin.action === 'done') {
         // attempt 已终结但任务还在跑：上次收尾失败。成功过说明上游可能已产出，
         // 换线路会让用户为两次调用付费，只能转人工核对
         if (begin.attempt.status === 'succeeded') {
-          await this.lifecycle.uncertain(task.id, '上游已受理并可能已产出，但结果未能落盘');
+          await this.uncertainOwned(task.id, '上游已受理并可能已产出，但结果未能落盘');
           return;
         }
         const switched = await this.switchRoute(fresh, params, inputIds, runAttempts.map((item) => item.routeId));
@@ -417,7 +442,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   /** 没有可用线路：遮罩任务给 42205，其余 42204，并退款（请求没发出去） */
   private async failNoRoute(task: GenerationTask, params: Record<string, any>): Promise<StepResult> {
     const hasMask = this.requests.maskAssetId(params) !== '';
-    await this.lifecycle.fail(task.id, {
+    await this.failOwned(task.id, {
       errorCode: hasMask ? TASK_ERROR.maskUnsupported : TASK_ERROR.noRoute,
       errorMessage: !task.logicalModelId
         ? '任务未绑定前台模型（改造前创建的任务无法继续执行）'
@@ -429,36 +454,55 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     return 'stop';
   }
 
+  private routeSnapshotDiffers(task: GenerationTask, routed: RoutedModel): boolean {
+    return (
+      task.logicalModelRevisionId !== routed.revisionId ||
+      task.routeId !== routed.route.id ||
+      task.channelModelId !== routed.channelModel.id
+    );
+  }
+
   private async startAttempt(
     task: GenerationTask,
     routed: RoutedModel,
     attemptNumber: number,
-  ): Promise<RouteAttempt> {
-    const attempt = await this.attempts.create({
-      taskId: task.id,
-      routeRun: task.routeRun,
-      attemptNumber,
-      logicalModelId: routed.logicalModel.id,
-      logicalModelRevisionId: routed.revisionId,
-      routeId: routed.route.id,
-      channelModelId: routed.channelModel.id,
-      channelId: routed.channelModel.channelId,
-    });
-    await this.prisma.generationTask.update({
-      where: { id: task.id },
-      data: {
-        logicalModelRevisionId: routed.revisionId,
-        routeId: routed.route.id,
-        channelModelId: routed.channelModel.id,
-        attempts: { increment: 1 },
-        stage: 'dispatch',
-        progress: 10,
-      },
-    });
-    return attempt;
+  ): Promise<RouteAttempt | null> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const attempt = await this.attempts.create(
+          {
+            taskId: task.id,
+            routeRun: task.routeRun,
+            attemptNumber,
+            logicalModelId: routed.logicalModel.id,
+            logicalModelRevisionId: routed.revisionId,
+            routeId: routed.route.id,
+            channelModelId: routed.channelModel.id,
+            channelId: routed.channelModel.channelId,
+          },
+          tx,
+        );
+        const updated = await tx.generationTask.updateMany({
+          where: { id: task.id, status: 'running', leaseOwner: this.owner },
+          data: {
+            logicalModelRevisionId: routed.revisionId,
+            routeId: routed.route.id,
+            channelModelId: routed.channelModel.id,
+            attempts: { increment: 1 },
+            stage: 'dispatch',
+            progress: 10,
+          },
+        });
+        if (updated.count !== 1) throw new AppError(40900, '任务租约已变更，不能创建派发尝试', 409);
+        return attempt;
+      });
+    } catch (error) {
+      if (error instanceof AppError && error.code === 40900) return null;
+      throw error;
+    }
   }
 
-  /** 切换线路：先建下一条尝试，再按新线路换账单，最后派发 */
+  /** 切换线路：按新线路原子替换账单并建 attempt，由主循环统一 CAS 后派发 */
   private async switchRoute(
     task: GenerationTask,
     params: Record<string, any>,
@@ -467,7 +511,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   ): Promise<StepResult> {
     const routed = await this.resolveRoute(task, params, inputIds, new Set(triedRouteIds));
     if (!routed) {
-      await this.lifecycle.fail(task.id, {
+      await this.failOwned(task.id, {
         errorCode: this.requests.maskAssetId(params) ? TASK_ERROR.maskUnsupported : TASK_ERROR.noRoute,
         errorMessage: '全部可用线路都拒绝或无法承接本次请求',
         reason: 'generation_failed',
@@ -476,14 +520,13 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     }
 
     const attempts = await this.attempts.listRun(task.id, task.routeRun);
-    const attempt = await this.startAttempt(task, routed, attempts.length + 1);
-    const replaced = await this.replaceBilling(task, routed, attempt.attemptNumber);
+    const replaced = await this.replaceBilling(task, routed, attempts.length + 1);
     if (!replaced) return 'stop';
 
     // 账单已换：后续日志 / 结算必须引用新账单号
     const fresh = await this.prisma.generationTask.findUnique({ where: { id: task.id } });
     if (!fresh || fresh.status !== 'running' || fresh.leaseOwner !== this.owner) return 'stop';
-    return this.dispatch(fresh, attempt, params, inputIds);
+    return 'continue';
   }
 
   /**
@@ -493,25 +536,57 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
    * 用户明明能付得起却被判余额不足。旧账单此刻一定是 `reserved` / `running`
    * （只有未派发的线路才会触发切换），退款不会与结算冲突。
    */
-  private async replaceBilling(task: GenerationTask, routed: RoutedModel, attemptNumber: number): Promise<boolean> {
+  private async replaceBilling(
+    task: GenerationTask,
+    routed: RoutedModel,
+    attemptNumber: number,
+  ): Promise<RouteAttempt | null> {
     const access = await this.groups.accessForUser(task.ownerId);
     let draft;
+    let freeCampaignId: string | undefined;
     try {
-      draft = this.billing.buildDraft(access, routed);
+      /*
+       * 换线重建账单必须与首次建单走同一套定价：后台覆盖价在这里同样要生效，
+       * 否则「首次按 77 扣、换线后又按线路原价 5 扣」，用户会看到金额莫名变小，
+       * 财务上则是同一任务两笔口径不同的账。
+       */
+      const overrideCost = await this.price.resolveOverride(task.capability);
+      draft = this.billing.buildDraft(access, routed, overrideCost);
+      if (task.capability === 'multi_fusion') {
+        draft = scaleMultiFusionDraft(draft, safeJson<Record<string, unknown>>(task.params, {}));
+      }
+      // 已经以限时免费准入的任务在换线后仍应免费；活动恰好在排队期间结束，
+      // 不能把一次已承诺的免费生成变成收费生成。
+      const existingOrder = task.billingOrderId
+        ? await this.prisma.billingOrder.findUnique({
+            where: { id: task.billingOrderId },
+            select: { promotionId: true },
+          })
+        : null;
+      freeCampaignId = existingOrder?.promotionId || (await this.price.freeCampaignIdOf(task.capability, task.ownerId));
+      if (freeCampaignId) {
+        draft = { ...draft, amountMicrocredits: 0n };
+      }
     } catch (error) {
-      await this.lifecycle.fail(task.id, {
+      await this.failOwned(task.id, {
         errorCode: TASK_ERROR.generationFailed,
         errorMessage: `新线路无法计价：${(error as Error).message}`,
         reason: 'generation_failed',
       });
-      return false;
+      return null;
     }
 
-    if (task.billingOrderId) {
-      await this.billing.refund(task.billingOrderId, '线路切换，替换账单', 'route_switch').catch((error: Error) => {
-        this.log.warn(`任务 ${task.id} 旧账单退款失败: ${error.message}`);
+    const authorizedLimit = await this.resolveAuthorizedLimit(task);
+    if (draft.amountMicrocredits > authorizedLimit) {
+      await this.failOwned(task.id, {
+        errorCode: TASK_ERROR.generationFailed,
+        errorMessage: '新线路价格超出本次请求的授权上限，未继续切换',
+        reason: 'generation_failed',
       });
+      return null;
     }
+
+    let attempt: RouteAttempt | null = null;
     try {
       /*
        * 换线**不能突破用户原始授权上限**。
@@ -525,38 +600,63 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
        * 新线路更贵时直接拒绝切换（任务失败并退款），不静默多扣。
        * 限时免费单的原始授权是 0，换到收费线路同样被拒 —— 用户不该因为换线被收费。
        */
-      const authorizedLimit = await this.resolveAuthorizedLimit(task);
-      if (draft.amountMicrocredits > authorizedLimit) {
-        await this.lifecycle.fail(task.id, {
-          errorCode: TASK_ERROR.generationFailed,
-          errorMessage: '新线路价格超出本次请求的授权上限，未继续切换',
-          reason: 'generation_failed',
-        });
-        return false;
-      }
-      const reserved = await this.billing.reserveTaskBilling({
+      await this.billing.replaceTaskBilling({
         userId: task.ownerId,
         taskId: task.id,
+        expectedBillingOrderId: task.billingOrderId,
+        expectedLeaseOwner: this.owner,
         idempotencyKey: `task:${task.id}:run${task.routeRun}:attempt${attemptNumber}`,
         draft,
+        promotionId: freeCampaignId,
         chargeLimitMicrocredits: authorizedLimit,
-      });
-      await this.prisma.generationTask.update({
-        where: { id: task.id },
-        data: {
-          billingOrderId: reserved.order.id,
-          authorizedChargeMicrocredits: reserved.reserved,
-          creditCost: creditsOf(reserved.reserved),
+        afterSwap: async (tx, swapped) => {
+          attempt = await this.attempts.create(
+            {
+              taskId: task.id,
+              routeRun: task.routeRun,
+              attemptNumber,
+              logicalModelId: routed.logicalModel.id,
+              logicalModelRevisionId: routed.revisionId,
+              routeId: routed.route.id,
+              channelModelId: routed.channelModel.id,
+              channelId: routed.channelModel.channelId,
+            },
+            tx,
+          );
+          const updated = await tx.generationTask.updateMany({
+            where: {
+              id: task.id,
+              status: 'running',
+              leaseOwner: this.owner,
+              billingOrderId: swapped.order.id,
+            },
+            data: {
+              logicalModelRevisionId: routed.revisionId,
+              routeId: routed.route.id,
+              channelModelId: routed.channelModel.id,
+              attempts: { increment: 1 },
+              stage: 'dispatch',
+              progress: 10,
+            },
+          });
+          if (updated.count !== 1) {
+            throw new AppError(40900, '任务租约或账单已变更，不能切换线路', 409);
+          }
         },
       });
-      return true;
+      return attempt;
     } catch (error) {
-      await this.lifecycle.fail(task.id, {
+      // CAS 冲突说明另一执行者/终态处理已接管，当前 worker 不能反过来判失败。
+      if (error instanceof AppError && error.code === 40900) {
+        this.log.warn(`任务 ${task.id} 换线被并发变更中止: ${error.message}`);
+        return null;
+      }
+      await this.failOwned(task.id, {
         errorCode: TASK_ERROR.generationFailed,
         errorMessage: `切换线路时预留积分失败：${(error as Error).message}`,
         reason: 'generation_failed',
       });
-      return false;
+      return null;
     }
   }
 
@@ -588,6 +688,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     params: Record<string, any>,
     inputIds: string[],
   ): Promise<StepResult> {
+    // attempt 已进入 submission_unknown；真正发请求前再次核对任务仍归本执行者。
+    if (!(await this.ownsTaskLease(task.id))) return 'stop';
     let channel: ChannelExecution;
     let request: GenerationRequest;
     try {
@@ -616,7 +718,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         const routes = await this.attempts.listRun(task.id, task.routeRun);
         return this.switchRoute(task, params, inputIds, routes.map((item) => item.routeId));
       }
-      await this.lifecycle.fail(task.id, {
+      await this.failOwned(task.id, {
         errorCode: TASK_ERROR.generationFailed,
         errorMessage: (error as Error).message,
         reason: 'generation_failed',
@@ -633,6 +735,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       });
       const routes = await this.attempts.listRun(task.id, task.routeRun);
       return this.switchRoute(task, params, inputIds, routes.map((item) => item.routeId));
+    }
+
+    // 渠道准备与并发排队期间后台可能已终止任务；发送前必须再做一次租约闸门。
+    if (!(await this.ownsTaskLease(task.id))) {
+      release();
+      return 'stop';
     }
 
     let result;
@@ -659,6 +767,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       requestBody: result.requestBody,
       responseBody: result.responseBody,
       upstreamUrl: result.upstreamUrl,
+      videoSeconds: videoSecondsOf(params),
     });
 
     if (outcome.status === 'succeeded' && outcome.result) {
@@ -667,7 +776,14 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       return 'stop';
     }
     if (outcome.status === 'pending') {
-      await this.attempts.markAccepted(attempt.id, outcome.providerRequestId);
+      const accepted = await this.attempts.markAccepted(attempt.id, outcome.providerRequestId);
+      if (!accepted) {
+        await this.uncertainOwned(
+          task.id,
+          '上游已受理，但尝试状态未能从派发中转为已受理；为避免重复调用已停止自动重试',
+        );
+        return 'stop';
+      }
       if (task.billingOrderId && outcome.providerRequestId) {
         await this.billing.updateProviderRequestId(task.billingOrderId, outcome.providerRequestId);
       }
@@ -683,6 +799,10 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       providerRequestId: outcome.providerRequestId,
     });
     if (outcome.rejectedNoJob) {
+      // 父任务可能已因同批失败取消了本任务；取消时若 attempt 仍是
+      // submission_unknown，账单会先转 uncertain。这里拿到了明确拒绝，
+      // 必须立即把该账单收敛为退款，不能等默认关闭的兜底清扫。
+      await this.lifecycle.reconcileCancelledTask(task.id, 'generation_failed');
       this.recordHealth(outcome.failureCode, attempt);
       const routes = await this.attempts.listRun(task.id, task.routeRun);
       return this.switchRoute(
@@ -692,11 +812,32 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         routes.map((item) => item.routeId),
       );
     }
-    await this.lifecycle.uncertain(
+    await this.uncertainOwned(
       task.id,
       `上游调用失败（${outcome.failureCode}）：${outcome.failureMessage}`,
     );
     return 'stop';
+  }
+
+  /** 派发网关：只有任务仍为 running 且租约属于本进程时才允许越过。 */
+  private async ownsTaskLease(taskId: string): Promise<boolean> {
+    const now = new Date();
+    const owned = await this.prisma.generationTask.updateMany({
+      where: { id: taskId, status: 'running', leaseOwner: this.owner },
+      data: { heartbeatAt: now, leaseUntil: new Date(now.getTime() + TASK_LEASE_MS) },
+    });
+    return owned.count === 1;
+  }
+
+  private failOwned(
+    taskId: string,
+    input: Parameters<TaskLifecycleService['fail']>[1],
+  ): Promise<boolean> {
+    return this.lifecycle.fail(taskId, input, { leaseOwner: this.owner });
+  }
+
+  private uncertainOwned(taskId: string, message: string): Promise<boolean> {
+    return this.lifecycle.uncertain(taskId, message, { leaseOwner: this.owner });
   }
 
   // ── 轮询 ──────────────────────────────────────────────────────────
@@ -707,9 +848,10 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     params: Record<string, any>,
     inputIds: string[],
   ): Promise<StepResult> {
+    if (!(await this.ownsTaskLease(task.id))) return 'stop';
     const deadline = task.createdAt.getTime() + (POLL_DEADLINE_MS[modalityOf(task.capability)] ?? POLL_DEADLINE_MS.image);
     if (Date.now() > deadline) {
-      await this.lifecycle.uncertain(task.id, '上游长时间未返回结果');
+      await this.uncertainOwned(task.id, '上游长时间未返回结果');
       return 'stop';
     }
 
@@ -730,7 +872,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       request = built.request;
     } catch (error) {
       // 已受理任务不能切线：结果可能已经产出
-      await this.lifecycle.uncertain(task.id, `轮询前准备失败：${(error as Error).message}`);
+      await this.uncertainOwned(task.id, `轮询前准备失败：${(error as Error).message}`);
       return 'stop';
     }
 
@@ -738,6 +880,11 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     if (!release) {
       await this.schedulePoll(task, task.providerRequestId ?? '', '等待渠道并发');
       return 'wait';
+    }
+    // 排队等槽位期间任务可能已被终止或接管；GET 发出前必须再确认一次租约。
+    if (!(await this.ownsTaskLease(task.id))) {
+      release();
+      return 'stop';
     }
     let result;
     try {
@@ -768,6 +915,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       requestBody: result.requestBody,
       responseBody: result.responseBody,
       upstreamUrl: result.upstreamUrl,
+      videoSeconds: videoSecondsOf(params),
     });
 
     if (outcome.status === 'succeeded' && outcome.result) {
@@ -789,7 +937,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       rejectedNoJob: false,
       providerRequestId: outcome.providerRequestId,
     });
-    await this.lifecycle.uncertain(
+    await this.uncertainOwned(
       task.id,
       `轮询失败（${outcome.failureCode}）：${outcome.failureMessage}`,
     );
@@ -863,7 +1011,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
 
     const references = collectReferences(result);
     if (references.length === 0) {
-      await this.lifecycle.fail(task.id, {
+      await this.failOwned(task.id, {
         errorCode: TASK_ERROR.generationFailed,
         errorMessage: '上游返回成功但没有任何产出',
         reason: 'generation_failed',
@@ -874,7 +1022,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     try {
       const outputs = await this.download(references, channel, task.capability, params);
       const stored = await this.media.persist(toMediaRef(task), outputs);
-      await this.lifecycle.succeed(
+      const promoted = await this.lifecycle.succeed(
         { id: task.id, ownerId: task.ownerId, billingOrderId: task.billingOrderId, providerRequestId: task.providerRequestId },
         {
           outputAssetIds: stored.map((item) => item.assetId),
@@ -882,12 +1030,14 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
           providerRequestId,
           outputDurationMs: outputs[0]?.durationMs ?? undefined,
         },
+        { leaseOwner: this.owner },
       );
+      if (!promoted) await this.media.discardCreated(task.id, stored);
       void attempt;
     } catch (error) {
       if (TaskMediaService.isLabelError(error)) {
         // fail-closed：未标识的产出绝不交付
-        await this.lifecycle.fail(task.id, {
+        await this.failOwned(task.id, {
           errorCode: TASK_ERROR.labelFailed,
           errorMessage: (error as Error).message,
           reason: 'generation_failed',
@@ -903,7 +1053,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     const payload = JSON.stringify(result);
     if (payload.length > 4 * 1024 * 1024) {
       // 内联大结果不适合进库：上游已成功，绝不能按普通失败退款，转人工核对
-      await this.lifecycle.uncertain(taskId, `产出落盘失败且无法暂存：${message}`);
+      await this.uncertainOwned(taskId, `产出落盘失败且无法暂存：${message}`);
       return;
     }
     this.log.warn(`任务 ${taskId} 产出落盘失败，${MEDIA_RETRY_DELAY_MS / 1000}s 后重试：${message}`);
@@ -930,13 +1080,13 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       result = parsed?.result ?? parsed;
       retries = Number(parsed?.retries ?? 0);
     } catch {
-      await this.lifecycle.uncertain(task.id, '暂存的上游结果已损坏，产物状态待核对');
+      await this.uncertainOwned(task.id, '暂存的上游结果已损坏，产物状态待核对');
       return;
     }
 
     const attempt = await this.attempts.latest(task.id, task.routeRun);
     if (!attempt) {
-      await this.lifecycle.uncertain(task.id, '找不到产出对应的线路尝试，产物状态待核对');
+      await this.uncertainOwned(task.id, '找不到产出对应的线路尝试，产物状态待核对');
       return;
     }
     let channel: ChannelExecution;
@@ -956,7 +1106,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         safeJson(task.params, {}),
       );
       const stored = await this.media.persist(toMediaRef(task), outputs);
-      await this.lifecycle.succeed(
+      const promoted = await this.lifecycle.succeed(
         { id: task.id, ownerId: task.ownerId, billingOrderId: task.billingOrderId, providerRequestId: task.providerRequestId },
         {
           outputAssetIds: stored.map((item) => item.assetId),
@@ -964,10 +1114,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
           providerRequestId: task.providerRequestId ?? '',
           outputDurationMs: outputs[0]?.durationMs ?? undefined,
         },
+        { leaseOwner: this.owner },
       );
+      if (!promoted) await this.media.discardCreated(task.id, stored);
     } catch (error) {
       if (TaskMediaService.isLabelError(error)) {
-        await this.lifecycle.fail(task.id, {
+        await this.failOwned(task.id, {
           errorCode: TASK_ERROR.labelFailed,
           errorMessage: (error as Error).message,
           reason: 'generation_failed',
@@ -981,7 +1133,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   private async retryOrFail(task: GenerationTask, result: ProtocolResult, retries: number, message: string): Promise<void> {
     if (retries >= MAX_MEDIA_RETRIES) {
       // 上游已经成功且计费，只是本地落盘失败；按普通失败退款会造成「双损」
-      await this.lifecycle.uncertain(task.id, `产出落盘连续失败 ${retries} 次：${message}`);
+      await this.uncertainOwned(task.id, `产出落盘连续失败 ${retries} 次：${message}`);
       return;
     }
     await this.prisma.generationTask.updateMany({
@@ -1097,6 +1249,12 @@ function durationOf(format: string, params: Record<string, any>): number | null 
   if (!String(format).startsWith('video/') && !String(format).startsWith('audio/')) return null;
   const seconds = Number(params?.duration ?? params?.videoSeconds);
   return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : null;
+}
+
+/** 统一从任务参数读取计费时长，轮询日志不能依赖 GET 请求体。 */
+function videoSecondsOf(params: Record<string, any>): number {
+  const seconds = Number(params?.duration ?? params?.videoSeconds);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.trunc(seconds) : 0;
 }
 
 function safeHostname(): string {

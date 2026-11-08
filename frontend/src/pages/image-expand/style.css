@@ -1,0 +1,350 @@
+/**
+ * 智能扩图页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放 `.smart-expand-*` 与
+ * `.pk-workspace.smart-expand-page` 的页面专属规则；共享骨架
+ * （`.pk-workspace` / `.local-redraw-card` / `product-retouch-result*`）
+ * 仍留在全局，避免其它工具页样式被切断。
+ */
+
+/* ───────── 原图位置九宫格 (参考站 smart-expand-position-grid) ───────── */
+.smart-expand-position-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 36px);
+  gap: 6px;
+}
+.smart-expand-position-grid button {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.smart-expand-position-grid button:hover {
+  border-color: var(--brand-light);
+  color: var(--brand);
+}
+.smart-expand-position-grid button.active {
+  background: var(--brand-bg);
+  border-color: var(--brand-active);
+  color: var(--brand-active);
+}
+
+/* 参考站是两张 smart-expand-card (gap12 / padding14 16)，
+ * 占比快捷值与自定义输入同排；九宫格 28px x 3 + 4px gap。 */
+.smart-expand-card {
+  gap: 12px;
+  padding: 14px 16px;
+}
+.smart-expand-card h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 700;
+  color: var(--wb-text);
+}
+.smart-expand-section {
+  display: grid;
+  gap: 10px;
+}
+.smart-expand-scale-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.smart-expand-scale-options button,
+.smart-expand-scale-options label {
+  box-sizing: border-box;
+  height: 28px;
+  color: var(--tool-text-1);
+  background: var(--card-bg);
+  border: 1px solid var(--border-1);
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 26px;
+}
+.smart-expand-scale-options button {
+  min-width: 40px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.smart-expand-scale-options button.active {
+  color: var(--brand);
+  background: var(--wb-flow-income-bg);
+  border-color: var(--tool-border-brand-5);
+  font-weight: 600;
+}
+.smart-expand-scale-options label {
+  width: 72px;
+  overflow: hidden;
+}
+.smart-expand-scale-options input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 0 9px;
+  border: 0;
+  outline: 0;
+  color: var(--text-body);
+  font: inherit;
+}
+.smart-expand-scale-options input::placeholder {
+  color: var(--text-8);
+}
+.smart-expand-scale-options label:has(input[aria-invalid='true']) {
+  border-color: var(--tool-border-danger);
+  box-shadow: 0 0 0 2px rgb(229 72 77 / 12%);
+}
+.smart-expand-field-error {
+  margin: -4px 0 0;
+  color: var(--tool-text-danger);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* 上传态与参考站一致：虚线框被 source-row 取代，160×160 缩略图 + 重新上传。 */
+.pk-workspace.smart-expand-page .pk-dropzone-filled {
+  box-sizing: border-box;
+  min-height: 160px;
+  height: 160px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pk-workspace.smart-expand-page .pk-dropzone-filled:hover {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.smart-expand-source-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  height: 160px;
+}
+.smart-expand-source-row.processing {
+  pointer-events: none;
+}
+.smart-expand-source-thumb {
+  position: relative;
+  box-sizing: border-box;
+  display: block;
+  flex: 0 0 160px;
+  width: 160px;
+  height: 160px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: zoom-in;
+}
+.smart-expand-source-row.processing .smart-expand-source-thumb::after {
+  content: '处理中…';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.35);
+  color: var(--card-bg);
+  font-size: 12px;
+}
+.smart-expand-source-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.smart-expand-source-reupload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 88px;
+  width: 88px;
+  min-width: 88px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-border-soft);
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.smart-expand-source-reupload:hover:not(:disabled) {
+  background: var(--tool-surface-6);
+}
+.smart-expand-source-reupload:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.smart-expand-position-grid {
+  grid-template-columns: repeat(3, 28px);
+  gap: 4px;
+  width: 96px;
+}
+.smart-expand-position-grid button {
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  border-color: var(--border-1);
+  color: var(--tool-text-2);
+  font-size: 14px;
+}
+
+/* 生成图沿用「原位置」：扩图成功后右栏是一张与构图预览同尺寸的居中大图卡，
+ * 不再缩进通用「生成结果」工具栏下的 460px 对比卡。 */
+.pk-workspace.smart-expand-page .product-retouch-result-mode {
+  top: 12px;
+  right: auto;
+  left: 12px;
+  width: max-content;
+}
+.pk-workspace.smart-expand-page .product-retouch-download {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--brand);
+  box-shadow: 0 4px 10px rgba(85, 70, 216, 0.2);
+  color: var(--card-bg);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pk-workspace.smart-expand-page .product-retouch-download:hover {
+  background: var(--brand-hover);
+}
+.pk-workspace.smart-expand-page .product-recolor-generating-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 680px);
+  height: auto;
+  max-height: calc(100% - 48px);
+  min-height: 0;
+  aspect-ratio: var(--result-card-aspect, 1 / 1);
+}
+
+/* 参考站上传后即展示目标画布（棋盘格）；原图按 placement 绝对定位。
+ * 预览只表达构图，不替代模型生成结果。 */
+.smart-expand-preview-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+}
+.smart-expand-source-preview {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: auto;
+  height: min(680px, calc(100% - 48px));
+  max-width: calc(100% - 48px);
+  max-height: calc(100% - 48px);
+  margin: 0;
+  overflow: hidden;
+  background-color: var(--card-bg);
+  background-image:
+    linear-gradient(45deg, var(--tool-surface-8) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--tool-surface-8) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--tool-surface-8) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--tool-surface-8) 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+  border-radius: 16px;
+}
+.smart-expand-source-preview img {
+  position: absolute;
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+}
+.smart-expand-preview-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--tool-text-danger);
+  font-size: 12px;
+}
+
+/* 参考站是「占比」「位置」两张独立卡；位置卡没有额外说明行。 */
+@media (min-width: 861px) and (max-width: 1366px) {
+  .pk-workspace.smart-expand-page .pk-dropzone-filled {
+    height: auto;
+    min-height: 160px;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    height: auto;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-thumb {
+    flex: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-reupload {
+    flex: none;
+    width: 100%;
+  }
+}
+@media (max-width: 900px) {
+  .pk-workspace.smart-expand-page .smart-expand-card {
+    padding: 14px;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-card h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .pk-workspace.smart-expand-page .pk-dropzone-filled {
+    padding: 0;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-row {
+    gap: 12px;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-thumb {
+    flex-basis: min(160px, 48vw);
+    width: min(160px, 48vw);
+    height: min(160px, 48vw);
+  }
+}

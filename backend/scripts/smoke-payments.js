@@ -359,7 +359,17 @@ function shanghaiDate(offsetDays) {
   const oP1 = await call('GET', `/orders/${partialOrder.id}`, TA);
   check('订单置为 partial_refunded', oP1.data?.status === 'partial_refunded', oP1.data?.status);
   const balAfterPartial = await call('GET', '/credits/balance', TA);
-  check('首次退款回收全部本单积分', balBeforePartial.data?.balance - balAfterPartial.data?.balance === product.credits);
+  const expectedFirstReclaim = Math.floor((product.credits * half) / partialOrder.paidCents);
+  check(
+    '首次部分退款按比例回收积分',
+    part1.data?.creditsReclaimed === expectedFirstReclaim,
+    `回收 ${part1.data?.creditsReclaimed} / 预期 ${expectedFirstReclaim}`,
+  );
+  check(
+    '首次部分退款余额按实际回收量下降',
+    balBeforePartial.data?.balance - balAfterPartial.data?.balance === part1.data?.creditsReclaimed,
+    `${balBeforePartial.data?.balance} → ${balAfterPartial.data?.balance}`,
+  );
 
   const part2 = await call('POST', `/admin/orders/${partialOrder.id}/refund`, TADMIN, {
     amountCents: partialOrder.paidCents - half,

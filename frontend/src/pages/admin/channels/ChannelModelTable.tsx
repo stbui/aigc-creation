@@ -1,40 +1,27 @@
 import { useMemo, useState } from 'react';
-import {
-  Copy,
-  ListOrdered,
-  Pencil,
-  Plus,
-  Power,
-  RefreshCw,
-  Trash2,
-  TrendingUp,
-  Zap,
-} from 'lucide-react';
+import { Copy, ListOrdered, Pencil, Plus, Power, RefreshCw, Trash2, TrendingUp, Zap } from 'lucide-react';
 import {
   AdminDataTable,
   AppliedFilters,
   ActionButton,
   ClearableField,
-  Descriptions,
   FilterActions,
   FilterBar,
   HelpTip,
-  IconButton,
-  Panel,
   SelectField,
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
+import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
+import { ChannelModelTestResultPanel } from './ChannelModelTestResultPanel';
 import { CAPABILITY_OPTIONS, PAGE_SIZE, STATUS_FILTER_OPTIONS } from './constants';
-import type {
-  AdminChannelModelView,
-  ChannelModelHealthRowView,
-  ProtocolTestResultView,
-} from '../../../types/model';
+import type { AdminChannelModelView, ChannelModelHealthRowView, ProtocolTestResultView } from '../../../types/model';
 
 interface ChannelModelTableProps {
   models: AdminChannelModelView[] | null;
+  /** 所属渠道是否启用；渠道停用时模型自身即使启用也不会进入路由。 */
+  channelEnabled?: boolean;
   loading: boolean;
   error: string | null;
   healthById: Map<string, ChannelModelHealthRowView>;
@@ -76,6 +63,7 @@ interface ChannelModelTableProps {
  */
 export function ChannelModelTable({
   models,
+  channelEnabled = true,
   loading,
   error,
   healthById,
@@ -143,7 +131,7 @@ export function ChannelModelTable({
     {
       key: 'model',
       title: '模型',
-      width: 156,
+      width: 180,
       cellTitle: (model) => model.modelKey,
       render: (model) => (
         <div className="min-w-0">
@@ -157,7 +145,7 @@ export function ChannelModelTable({
             {model.icon ? `${model.icon} ` : ''}
             {model.displayName || '未命名'}
             {model.providerModelKey && model.providerModelKey !== model.modelKey
-              ? ` · 上游 ${model.providerModelKey}`
+              ? ` · 服务商 ${model.providerModelKey}`
               : ''}
           </div>
         </div>
@@ -166,28 +154,18 @@ export function ChannelModelTable({
     {
       key: 'capability',
       title: '能力',
-      width: 56,
-      render: (model) => (
-        <StatusTag
-          status="capability"
-          tone="brand"
-          label={
-            CAPABILITY_OPTIONS.find((item) => item.value === model.capability)?.label ?? model.capability
-          }
-        />
-      ),
+      width: 76,
+      render: (model) => <ChannelModelCapabilityTag capability={model.capability} />,
     },
     {
       key: 'health',
       title: '稳定性（24h）',
       width: 104,
-      render: (model) => (
-        <ChannelModelHealthCell health={healthById.get(model.id)} loading={healthLoading} />
-      ),
+      render: (model) => <ChannelModelHealthCell health={healthById.get(model.id)} loading={healthLoading} />,
     },
     {
       key: 'protocol',
-      title: '请求协议',
+      title: '接口类型',
       width: 92,
       cellTitle: (model) => model.protocol,
       render: (model) =>
@@ -206,80 +184,93 @@ export function ChannelModelTable({
     {
       key: 'status',
       title: '状态',
-      width: 76,
+      width: 80,
       /*
        * 一个模型只给一个状态：与「全部模型」视图同一套优先级（停用 > 未定价 > 启用）。
+       * 必须区分「渠道停用」与「模型停用」：前者会连带整组模型退出路由，
+       * 后者只影响当前这条线路。两者同时停用时也如实标出，不能只显示一个笼统的「停用」。
        * 原先「已启用 + 已定价」两枚绿标并排，行里出现两行绿色胶囊，反而看不出
        * 哪一个是需要处理的问题；正常态（已启用且已定价）不需要额外标记。
        */
       render: (model) => {
+        if (!channelEnabled && !model.enabled) {
+          return <StatusTag status="channel-model-disabled" tone="warn" label="渠道/模型停用" />;
+        }
+        if (!channelEnabled) {
+          return <StatusTag status="channel-disabled" tone="warn" label="渠道停用" />;
+        }
         if (!model.enabled) {
-          return <StatusTag status="channel-model-disabled" tone="muted" label="已停用" />;
+          return <StatusTag status="channel-model-disabled" tone="muted" label="模型停用" />;
         }
         if (!model.priceConfigured) {
           return (
-            <HelpTip tip="没有任何已配置的价格档：该模型不会被报价，也不应被线路选用">
+            <HelpTip tip="暂无价格方案：模型不会展示给用户，也无法被选用">
               <StatusTag status="unpriced" tone="warn" label="未定价" />
             </HelpTip>
           );
         }
-        return <StatusTag status="channel-model-enabled" tone="success" label="已启用" />;
+        return <StatusTag status="channel-model-enabled" tone="success" label="模型启用" />;
       },
     },
     {
       key: 'actions',
       title: '操作',
-      width: 144,
+      width: 325,
       fixed: 'right',
-      /*
-       * 行内动作保持 5 个直显（e2e 与运营动线都按名字找按钮）。
-       * 图标按钮一律走 IconButton：`label` 同时作为无障碍名与悬停提示。
-       * 停用与删除用 danger 文字色标识破坏性。
-       */
       render: (model) => (
-        <div className="flex items-center justify-end">
-          <IconButton
-            size="xs"
-            icon={Zap}
-            label={`测试模型 ${model.modelKey}`}
-            title="连通性测试"
-            disabled={testing || !canTest}
-            onClick={() => onTest(model)}
-          />
-          <IconButton
+        <div className="flex items-center justify-end gap-1">
+          <ActionButton
+           variant="ghost"
             size="xs"
             icon={Pencil}
-            label={`编辑模型 ${model.modelKey}`}
-            title="编辑"
+            ariaLabel={`编辑模型 ${model.modelKey}`}
             disabled={!writable}
             onClick={() => onEdit(model)}
-          />
-          <IconButton
+          >
+            编辑
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
             size="xs"
-            icon={Power}
-            label={`${model.enabled ? '停用' : '启用'}模型 ${model.modelKey}`}
-            title={model.enabled ? '停用' : '启用'}
+            icon={Zap}
+            ariaLabel={`测试模型 ${model.modelKey}`}
+            disabled={testing || !canTest}
+            onClick={() => onTest(model)}
+          >
+            {testing ? '测试中' : '测试'}
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
+            size="xs"
             className={model.enabled ? 'text-danger-text hover:text-danger-text' : undefined}
+            icon={Power}
+            ariaLabel={`${model.enabled ? '停用' : '启用'}模型 ${model.modelKey}`}
             disabled={!writable}
             onClick={() => onToggle(model, !model.enabled)}
-          />
-          <IconButton
+          >
+            {model.enabled ? '停用模型' : '启用模型'}
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
             size="xs"
             icon={Copy}
-            label={`复制模型 ${model.modelKey}`}
-            title="复制模型"
+            ariaLabel={`复制模型 ${model.modelKey}`}
             disabled={!writable}
             onClick={() => onCopy(model)}
-          />
-          <IconButton
+          >
+            复制
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
             size="xs"
-            icon={Trash2}
-            label={`删除模型 ${model.modelKey}`}
-            title="删除模型"
             className="text-danger-text hover:text-danger-text"
+            icon={Trash2}
+            ariaLabel={`删除模型 ${model.modelKey}`}
             disabled={!writable}
             onClick={() => onDelete(model)}
-          />
+          >
+            删除
+          </ActionButton>
         </div>
       ),
     },
@@ -287,46 +278,15 @@ export function ChannelModelTable({
 
   return (
     <>
-      {/*
-       * 这里不再套 `Panel`：外层渠道详情已经是带边框的卡片，再套一层卡片
-       * 会形成「卡片里再开一张卡片 + 筛选框」三级边框。分区改用标题 + 发丝线。
-       */}
       <section className="flex flex-col gap-3" aria-labelledby="admin-model-list-title">
         <div className="flex flex-wrap items-start gap-3 border-b border-border pb-3">
           <div className="min-w-0 flex-1">
             <h3 id="admin-model-list-title" className="text-sm font-semibold text-foreground">
-              模型清单（{(models ?? []).length}）
+              模型清单
             </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {writable
-                ? '停用后的模型不会进入路由，但历史账单与调用记录仍保留'
-                : '当前账号只有渠道模型读权限'}
-            </p>
+            {!writable && <p className="mt-0.5 text-xs text-muted-foreground">当前账号仅可查看</p>}
           </div>
           {/* 模型级入口跟着清单位置走：原先在详情顶部单独占一行，页面会被拉出一条空白工具条 */}
-          <div className="flex shrink-0 items-center gap-2">
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={RefreshCw}
-              disabled={fetching || !writable}
-              onClick={onFetchUpstream}
-            >
-              {fetching ? '拉取中…' : '拉取上游目录'}
-            </ActionButton>
-            <ActionButton
-              variant="default"
-              size="sm"
-              icon={Plus}
-              disabled={!writable}
-              onClick={onOpenCreate}
-            >
-              新建模型
-            </ActionButton>
-          </div>
-        </div>
-
-        <FilterBar className="rounded-lg border-0 bg-muted/60">
           <ClearableField
             ariaLabel="搜索模型"
             value={keyword}
@@ -334,7 +294,7 @@ export function ChannelModelTable({
               setKeyword(value);
               setPage(1);
             }}
-            placeholder="搜索模型标识、显示名或上游键"
+            placeholder="搜索模型编号、名称或服务商模型名"
             className="w-64"
           />
           <SelectField
@@ -361,16 +321,43 @@ export function ChannelModelTable({
             placeholder="全部状态"
             clearLabel="全部状态"
             allowClear
-            className="w-32"
+            className="w-36"
           />
+          <ActionButton variant="secondary" size="xs" disabled={!hasFilters} onClick={resetFilters}>
+            重置
+          </ActionButton>
+        </div>
+
+        <FilterBar className="mb-0 rounded-lg border-0 bg-muted/60">
+          <div className="flex shrink-0 items-center gap-2">
+            <ActionButton variant="default" size="sm" icon={Plus} disabled={!writable} onClick={onOpenCreate}>
+              新建模型
+            </ActionButton>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              icon={RefreshCw}
+              disabled={fetching || !writable}
+              onClick={onFetchUpstream}
+            >
+              {fetching ? '同步中…' : '同步服务商模型'}
+            </ActionButton>
+
+          </div>
+
+
           <FilterActions>
             <ActionButton
               variant="secondary"
               size="xs"
-              icon={ListOrdered}
-              disabled={!writable}
-              onClick={onOpenOrder}
+              icon={TrendingUp}
+              disabled={!writable || selectedIds.length === 0}
+              onClick={onOpenReprice}
             >
+              {selectedIds.length > 0 ? `统一调价（${selectedIds.length}）` : '统一调价'}
+            </ActionButton>
+
+            <ActionButton variant="secondary" size="xs" icon={ListOrdered} disabled={!writable} onClick={onOpenOrder}>
               排序
             </ActionButton>
             <ActionButton
@@ -382,66 +369,8 @@ export function ChannelModelTable({
             >
               {selectedIds.length > 0 ? `批量删除（${selectedIds.length}）` : '批量删除'}
             </ActionButton>
-            <ActionButton
-              variant="secondary"
-              size="xs"
-              icon={TrendingUp}
-              disabled={!writable || selectedIds.length === 0}
-              onClick={onOpenReprice}
-            >
-              {selectedIds.length > 0 ? `统一调价（${selectedIds.length}）` : '统一调价'}
-            </ActionButton>
-            <ActionButton variant="secondary" size="xs" disabled={!hasFilters} onClick={resetFilters}>
-              重置
-            </ActionButton>
+
           </FilterActions>
-          <AppliedFilters
-            items={[
-              ...(keyword.trim()
-                ? [
-                    {
-                      key: 'keyword',
-                      label: `搜索：${keyword.trim()}`,
-                      onClear: () => {
-                        setKeyword('');
-                        setPage(1);
-                      },
-                    },
-                  ]
-                : []),
-              ...(capabilityFilter
-                ? [
-                    {
-                      key: 'capability',
-                      label: `能力：${
-                        CAPABILITY_OPTIONS.find((item) => item.value === capabilityFilter)?.label ??
-                        capabilityFilter
-                      }`,
-                      onClear: () => {
-                        setCapabilityFilter(undefined);
-                        setPage(1);
-                      },
-                    },
-                  ]
-                : []),
-              ...(statusFilter
-                ? [
-                    {
-                      key: 'status',
-                      label: `状态：${
-                        STATUS_FILTER_OPTIONS.find((item) => item.value === statusFilter)?.label ??
-                        statusFilter
-                      }`,
-                      onClear: () => {
-                        setStatusFilter(undefined);
-                        setPage(1);
-                      },
-                    },
-                  ]
-                : []),
-            ]}
-            onClearAll={resetFilters}
-          />
         </FilterBar>
 
         <AdminDataTable<AdminChannelModelView>
@@ -455,12 +384,9 @@ export function ChannelModelTable({
           selected={selectedIds}
           onSelectedChange={onSelectedChange}
           rowSelectLabel={(model) => `选择模型 ${model.modelKey}`}
-          emptyText={
-            hasFilters
-              ? '没有匹配的模型。调整搜索或筛选条件后重试。'
-              : '该渠道还没有模型。可以「拉取上游目录」批量导入，或手动新建。'
-          }
-          minWidth={852}
+          emptyText={hasFilters ? '没有匹配的模型' : '暂无模型'}
+          density="compact"
+          minWidth={1104}
           fixedLayout
           pagination={{
             current: currentPage,
@@ -472,43 +398,7 @@ export function ChannelModelTable({
         />
       </section>
 
-      {testResult && (
-        <Panel title="最近一次测试结果" note={`调用记录 ${testResult.logId || '—'}（非计费）`}>
-          <Descriptions
-            columns={2}
-            items={[
-              {
-                label: '结果',
-                value: (
-                  <StatusTag
-                    status={testResult.status}
-                    tone={testResult.status === 'succeeded' ? 'success' : 'danger'}
-                    label={
-                      testResult.status === 'succeeded'
-                        ? '成功'
-                        : testResult.status === 'pending'
-                          ? '未完成'
-                          : '失败'
-                    }
-                  />
-                ),
-              },
-              { label: '耗时', value: `${testResult.durationMs}ms` },
-              { label: 'HTTP', value: String(testResult.request?.path ?? '') },
-              { label: '错误', value: testResult.error || testResult.message || '—' },
-              {
-                label: '产出',
-                value: `${testResult.result?.images ?? 0} 图 / ${testResult.result?.videos ?? 0} 视频 / ${testResult.result?.text ? '有文本' : '无文本'}`,
-              },
-            ]}
-          />
-          {testResult.responsePreview && (
-            <pre className="mt-3 max-h-[200px] overflow-auto rounded-lg bg-muted p-3 font-mono text-[12px] text-muted-foreground">
-              {testResult.responsePreview}
-            </pre>
-          )}
-        </Panel>
-      )}
+      {testResult && <ChannelModelTestResultPanel testResult={testResult} />}
     </>
   );
 }

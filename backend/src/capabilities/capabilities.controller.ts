@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import {
   CAPABILITIES,
   CAPABILITY_GROUPS,
@@ -7,6 +7,7 @@ import {
 } from './capability.registry';
 import { CreditPriceService } from '../credits/credit-price.service';
 import { CapabilityAvailabilityService } from './capability-availability.service';
+import { OptionalJwtAuthGuard } from '../common/optional-jwt-auth.guard';
 
 /**
  * 能力清单下发接口 (公开, 免登录)。
@@ -15,6 +16,7 @@ import { CapabilityAvailabilityService } from './capability-availability.service
  * 新增/下线能力只改 registry 一处。
  */
 @Controller('capabilities')
+@UseGuards(OptionalJwtAuthGuard)
 export class CapabilitiesController {
   constructor(
     private readonly price: CreditPriceService,
@@ -27,8 +29,11 @@ export class CapabilitiesController {
    * 不是「代码里写的默认值是多少」。后台改价后无需改前端即可生效。
    */
   @Get()
-  async list() {
-    const [prices, runtime] = await Promise.all([this.price.resolveAll(), this.availability.runtimeAll()]);
+  async list(@Req() req: { user?: { id: string } }) {
+    const [prices, runtime] = await Promise.all([
+      this.price.resolveAll(req.user?.id),
+      this.availability.runtimeAll(),
+    ]);
     return {
       groups: CAPABILITY_GROUPS,
       // 顺序即侧栏与工作台的展示顺序

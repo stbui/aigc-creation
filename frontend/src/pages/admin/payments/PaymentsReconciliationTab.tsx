@@ -4,19 +4,14 @@ import { adminPaymentProvidersApi, adminPaymentReconciliationApi } from './api';
 import {
   ActionButton,
   AdminDataTable,
-  AppliedFilters,
-  ConfirmAction,
-  Drawer,
-  FilterActions,
-  FilterBar,
+  ConfirmDialog,
+  DateField,
   FormField,
   ListError,
-  Notice,
   Panel,
   SelectField,
   StaleError,
   StatusTag,
-  TextField,
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -28,18 +23,19 @@ import {
   useAdminUrlFilterSync,
   useToast,
 } from './hooks';
-import type {
-  AdminReconciliationItem,
-  AdminReconciliationRun,
-  PaymentProviderId,
-} from '../../../types/payment';
+import type { AdminReconciliationRun, PaymentProviderId } from '../../../types/payment';
 import {
   PROVIDER_LABELS,
   RECONCILIATION_PROVIDER_IDS,
   RECONCILIATION_PROVIDERS,
 } from './constants';
 import { moneyText } from './utils';
-import { RECONCILIATION_RESULT_LABELS } from '../../../types/payment';
+import { ReconciliationDetailDrawer } from './ReconciliationDetailDrawer';
+import {
+  ReconciliationFilterBar,
+  type ReconciliationFilterKey,
+} from './ReconciliationFilterBar';
+import { ReconciliationRunPanel } from './ReconciliationRunPanel';
 
 /**
  * 支付对账标签。
@@ -116,6 +112,23 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
   const [filterStatus, setFilterStatus] = useState<string | undefined>(initialStatus);
   const [filterFrom, setFilterFrom] = useState(initialFrom);
   const [filterTo, setFilterTo] = useState(initialTo);
+
+  const updateFilter = (key: ReconciliationFilterKey, value: string | undefined) => {
+    switch (key) {
+      case 'providerId':
+        setFilterProvider(value);
+        break;
+      case 'status':
+        setFilterStatus(value);
+        break;
+      case 'from':
+        setFilterFrom(value ?? '');
+        break;
+      case 'to':
+        setFilterTo(value ?? '');
+        break;
+    }
+  };
 
   const providers = useAdminResource(() => adminPaymentProvidersApi.list());
 
@@ -288,128 +301,67 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
     },
   ];
 
+  const applyFilters = () =>
+    setQuery({
+      providerId: filterProvider,
+      status: filterStatus,
+      from: filterFrom || undefined,
+      to: filterTo || undefined,
+    });
+
+  const resetFilters = () => {
+    setFilterProvider(undefined);
+    setFilterStatus(undefined);
+    setFilterFrom('');
+    setFilterTo('');
+    setQuery({
+      providerId: undefined,
+      status: undefined,
+      from: undefined,
+      to: undefined,
+    });
+  };
+
+  const exportCsv = () =>
+    void adminPaymentReconciliationApi
+      .exportCsv({
+        ...(params.providerId ? { providerId: params.providerId as string } : {}),
+        ...(params.status ? { status: params.status as string } : {}),
+        ...(params.from ? { from: params.from as string } : {}),
+        ...(params.to ? { to: params.to as string } : {}),
+      })
+      .catch((e: Error) => toast.error(e.message));
+
   return (
     <div className="flex flex-col gap-3">
-      <Panel
-        title="执行对账"
-        note="系统每天 10:15 后自动对账昨日账单；失败可在同一账单日重跑"
-      >
-        <div className="flex flex-wrap items-end gap-3 px-4 py-3">
-          <FormField label="渠道" className="w-[160px]">
-            <SelectField
-              value={runProvider || undefined}
-              onChange={(value) => setRunProvider(value ?? '')}
-              options={reconcilableProviders}
-              placeholder="选择渠道"
-              ariaLabel="对账渠道"
-            />
-          </FormField>
-          <FormField label="账单日期" className="w-[180px]" hint="最早 90 天前，最晚昨天">
-            <TextField
-              type="date"
-              value={billDate}
-              onChange={setBillDate}
-              ariaLabel="账单日期"
-            />
-          </FormField>
-          <ActionButton
-            onClick={() => setRunOpen(true)}
-            disabled={!canReconcile || !runProvider}
-          >
-            执行对账
-          </ActionButton>
-          <ActionButton
-            onClick={() => {
-              setImportProvider(reconcilableProviders[0]?.value ?? '');
-              setImportBillDate(yesterday());
-              setImportFile(null);
-              setImportOpen(true);
-            }}
-            disabled={!canReconcile || reconcilableProviders.length === 0}
-          >
-            导入 CSV
-          </ActionButton>
-        </div>
-      </Panel>
+      <ReconciliationRunPanel
+        providerOptions={reconcilableProviders}
+        providerId={runProvider}
+        billDate={billDate}
+        minBillDate={ninetyDaysAgo()}
+        maxBillDate={yesterday()}
+        canReconcile={canReconcile}
+        onProviderChange={setRunProvider}
+        onBillDateChange={setBillDate}
+        onRun={() => setRunOpen(true)}
+        onOpenImport={() => {
+          setImportProvider(reconcilableProviders[0]?.value ?? '');
+          setImportBillDate(yesterday());
+          setImportFile(null);
+          setImportOpen(true);
+        }}
+      />
 
-      <FilterBar>
-        <SelectField
-          value={filterProvider}
-          onChange={setFilterProvider}
-          options={RECONCILIATION_PROVIDERS}
-          allowClear
-          className="w-[130px]"
-          ariaLabel="筛选渠道"
-        />
-        <SelectField
-          value={filterStatus}
-          onChange={setFilterStatus}
-          options={RUN_STATUS_OPTIONS}
-          allowClear
-          className="w-[120px]"
-          ariaLabel="筛选状态"
-        />
-        <TextField
-          type="date"
-          value={filterFrom}
-          onChange={setFilterFrom}
-          className="w-[140px]"
-          ariaLabel="筛选起始日期"
-        />
-        <TextField
-          type="date"
-          value={filterTo}
-          onChange={setFilterTo}
-          className="w-[140px]"
-          ariaLabel="筛选截止日期"
-        />
-        <FilterActions>
-          <ActionButton
-            onClick={() =>
-              setQuery({
-                providerId: filterProvider,
-                status: filterStatus,
-                from: filterFrom || undefined,
-                to: filterTo || undefined,
-              })
-            }
-          >
-            筛选
-          </ActionButton>
-          <ActionButton
-            onClick={() => {
-              setFilterProvider(undefined);
-              setFilterStatus(undefined);
-              setFilterFrom('');
-              setFilterTo('');
-              setQuery({
-                providerId: undefined,
-                status: undefined,
-                from: undefined,
-                to: undefined,
-              });
-            }}
-          >
-            重置
-          </ActionButton>
-          <ActionButton
-            onClick={() => {
-              void adminPaymentReconciliationApi
-                .exportCsv({
-                  ...(params.providerId ? { providerId: params.providerId as string } : {}),
-                  ...(params.status ? { status: params.status as string } : {}),
-                  ...(params.from ? { from: params.from as string } : {}),
-                  ...(params.to ? { to: params.to as string } : {}),
-                })
-                .catch((e: Error) => toast.error(e.message));
-            }}
-            disabled={!canExport || loading || !data || data.total === 0}
-          >
-            导出 CSV
-          </ActionButton>
-        </FilterActions>
-        <AppliedFilters items={appliedChips} />
-      </FilterBar>
+      <ReconciliationFilterBar
+        values={{ providerId: filterProvider, status: filterStatus, from: filterFrom, to: filterTo }}
+        statusOptions={RUN_STATUS_OPTIONS}
+        onChange={updateFilter}
+        onApply={applyFilters}
+        onReset={resetFilters}
+        onExport={exportCsv}
+        exportDisabled={!canExport || loading || !data || data.total === 0}
+        appliedChips={appliedChips}
+      />
 
       <Panel title="对账运行" note="渠道账单由系统自动下载并比对，异常项会自动补发积分">
         {error && data && <StaleError error={error} onRetry={() => void reload()} />}
@@ -433,7 +385,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         )}
       </Panel>
 
-      <ConfirmAction
+      <ConfirmDialog
         open={runOpen}
         title="执行对账"
         description="系统会向渠道下载指定账单日的交易流水并与本地支付记录比对。若发现渠道已收款但本地未入账，会幂等补发积分。"
@@ -465,7 +417,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         }}
       />
 
-      <ConfirmAction
+      <ConfirmDialog
         open={importOpen}
         title="导入对账单"
         description="渠道账单接口不可用时的兜底入口。导入后仍会逐笔核对，不一致的行进入差异列表。"
@@ -503,11 +455,12 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
               />
             </FormField>
             <FormField label="账单日期" required hint="最早 90 天前，最晚昨天">
-              <TextField
-                type="date"
+              <DateField
                 value={importBillDate}
                 onChange={setImportBillDate}
                 ariaLabel="导入账单日期"
+                minDate={ninetyDaysAgo()}
+                maxDate={yesterday()}
               />
             </FormField>
             <FormField
@@ -534,145 +487,5 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         />
       )}
     </div>
-  );
-}
-
-/** 对账明细抽屉 */
-function ReconciliationDetailDrawer({
-  runId,
-  onClose,
-}: {
-  runId: string;
-  onClose: () => void;
-}) {
-  const toast = useToast();
-  const { can } = useAdmin();
-  const [result, setResult] = useState<string | undefined>();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
-
-  const { data, loading, error, reload } = useAdminResource(
-    () => adminPaymentReconciliationApi.items(runId, { result, page, pageSize }),
-    [runId, result, page, pageSize],
-  );
-
-  const columns: Array<AdminColumn<AdminReconciliationItem>> = [
-    {
-      key: 'result',
-      title: '结果',
-      width: 110,
-      render: (row) => {
-        const meta = RECONCILIATION_RESULT_LABELS[row.result] ?? {
-          label: row.result,
-          tone: 'muted' as const,
-        };
-        return <StatusTag status={row.result} tone={meta.tone} label={meta.label} />;
-      },
-    },
-    {
-      key: 'merchantOrderNo',
-      title: '商户订单号',
-      width: 200,
-      render: (row) => (
-        <code className="font-mono text-[12px]">{row.merchantOrderNo}</code>
-      ),
-    },
-    {
-      key: 'providerTradeNo',
-      title: '渠道交易号',
-      width: 200,
-      render: (row) => (
-        <code className="font-mono text-[12px]">{row.providerTradeNo ?? '—'}</code>
-      ),
-    },
-    {
-      key: 'amount',
-      title: '金额',
-      width: 110,
-      render: (row) => (
-        <span className="tabular-nums">{moneyText(row.amountCents, row.currency)}</span>
-      ),
-    },
-    {
-      key: 'detail',
-      title: '说明',
-      render: (row) => <span className="text-muted-foreground">{row.detail ?? '—'}</span>,
-    },
-  ];
-
-  const items = data?.items ?? [];
-
-  return (
-    <Drawer
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      title="对账明细"
-      description="差异由系统比对得出；需要人工处理的异常走订单退款流程"
-      width={1080}
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <ActionButton onClick={onClose}>关闭</ActionButton>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <SelectField
-            value={result}
-            onChange={(value) => {
-              setResult(value);
-              setPage(1);
-            }}
-            options={Object.entries(RECONCILIATION_RESULT_LABELS).map(([value, meta]) => ({
-              value,
-              label: meta.label,
-            }))}
-            allowClear
-            clearLabel="全部结果"
-            className="w-[160px]"
-            ariaLabel="结果筛选"
-          />
-          <ActionButton onClick={() => void reload()}>刷新</ActionButton>
-          <ActionButton
-            onClick={() => {
-              void adminPaymentReconciliationApi
-                .exportItemsCsv(runId, result ? { result } : {})
-                .catch((e: Error) => toast.error(e.message));
-            }}
-            disabled={!can('data.export') || items.length === 0}
-          >
-            导出明细 CSV
-          </ActionButton>
-        </div>
-
-        {error && !data ? (
-          <ListError error={error} onRetry={() => void reload()} />
-        ) : (
-          <AdminDataTable
-            rows={items}
-            columns={columns}
-            rowKey={(row) => row.id}
-            loading={loading}
-            emptyText="没有差异明细"
-            minWidth={860}
-            pagination={{
-              current: data?.page ?? 1,
-              pageSize: data?.pageSize ?? 50,
-              total: data?.total ?? 0,
-              onChange: (nextPage, nextSize) => {
-                setPage(nextPage);
-                setPageSize(nextSize);
-              },
-            }}
-          />
-        )}
-
-        <Notice tone="info" title="本页不改钱">
-          对账发现「渠道已收款但本地未入账」时系统会自动补发积分；重复扣款等异常请到订单管理走退款流程。
-        </Notice>
-      </div>
-    </Drawer>
   );
 }

@@ -1,3 +1,4 @@
+import './ImageLightbox.css';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Minus, Plus, RotateCw, X } from 'lucide-react';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';

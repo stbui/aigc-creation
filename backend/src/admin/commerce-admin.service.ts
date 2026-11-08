@@ -45,6 +45,13 @@ export interface OrderListQuery {
   email?: string;
   channel?: string;
   /**
+   * 按商品筛选：只回买过这个 SKU 的订单。
+   *
+   * 走 `OrderItem.productId` 而不是 SKU 快照字符串 —— 快照里有 SKU 编码，
+   * 但同一编码可能对应重建后的新商品；订单项指向的是下单时那件商品本身。
+   */
+  productId?: string;
+  /**
    * 退款状态 (2026-10-29)。
    *
    * 退款状态挂在 `Refund` 而不是订单上：一笔订单可能多次部分退款，且渠道
@@ -99,6 +106,14 @@ const LEDGER_TYPES = [
 const GRANT_TYPES = ["immediate", "manual"] as const;
 const PRODUCT_STATUSES = ["active", "offline"] as const;
 
+/**
+ * 新建商品的默认排序权重。
+ *
+ * 取 100 而不是 0: 排序值「小的靠前」, 新商品默认插到现有商品之后,
+ * 而不是和排在最前的老商品挤在同一档里。若运营明确要置顶, 在表单里改小即可。
+ */
+const PRODUCT_DEFAULT_SORT_ORDER = 100;
+
 /** 导出上限: 再大就不该走同步 HTTP 了, 应改异步任务 + 落文件 */
 const EXPORT_LIMIT = 10_000;
 
@@ -146,6 +161,8 @@ export class AdminCommerceService {
     const list = await this.prisma.product.findMany({
       where,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      // 删除按钮要按订单数禁用/放行, 列表里一并带上, 免去逐张卡片再查一次
+      include: { _count: { select: { orderItems: true } } },
     });
     return list.map((p) => this.toProductView(p));
   }
@@ -173,8 +190,9 @@ export class AdminCommerceService {
         creditsValidDays: input.creditsValidDays ?? 0,
         grantType: input.grantType ?? "immediate",
         status: input.status ?? "offline",
-        sortOrder: input.sortOrder ?? 0,
+        sortOrder: input.sortOrder ?? PRODUCT_DEFAULT_SORT_ORDER,
       },
+      include: { _count: { select: { orderItems: true } } },
     });
     return this.toProductView(product);
   }
@@ -215,16 +233,61 @@ export class AdminCommerceService {
           ? { sortOrder: input.sortOrder }
           : {}),
       },
+      include: { _count: { select: { orderItems: true } } },
     });
     return this.toProductView(product);
   }
 
   /**
-   * 商品无物理删除。
+   * 删除商品（物理删除）。
    *
-   * 历史订单的 OrderItem 存了快照, 删商品不会让订单显示不全, 但后台就再也
-   * 查不到"这个 SKU 原来卖多少钱、发多少积分"了 —— 对账需要它。下架即够。
+   * 只允许删除**没有任何历史订单**的 SKU：
+   *   · `OrderItem.productId` 是 `ON DELETE RESTRICT` 外键，有订单时数据库本来就删不掉；
+   *   · 退款与积分回收要回查该 SKU 的原价与发放积分，删掉后对账无从追溯。
+   *
+   * 因此先数订单并给运营一句能照着做的话（改为下架），而不是把外键报错原样抛出。
+   * 已售罄但订单已清空的商品仍可删；SKU 是 `@unique`，删除后编码可复用。
    */
+  async deleteProduct(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        sku: true,
+        _count: { select: { orderItems: true } },
+      },
+    });
+    if (!product) throw new AppError(40400, "商品不存在", 404);
+
+    const orderCount = product._count.orderItems;
+    if (orderCount > 0) {
+      throw new AppError(
+        40901,
+        `该商品已有 ${orderCount} 笔历史订单，不能删除；请改为下架`,
+        409,
+      );
+    }
+
+    /*
+     * 计数与删除之间可能刚产生一笔订单：外键 RESTRICT 会在这里拦住。
+     * 转成同一条 409 提示，不把 P2003 原样抛成 500。
+     */
+    try {
+      await this.prisma.product.delete({ where: { id } });
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2003") {
+        throw new AppError(
+          40901,
+          "该商品刚刚产生了历史订单，不能删除；请改为下架",
+          409,
+        );
+      }
+      throw error;
+    }
+    return { id, sku: product.sku };
+  }
+
+  /** 价格 / 积分 / 有效期三项数值校验。创建与修改共用，口径必须一致 */
   private assertProductNumbers(
     priceCents: number,
     credits: number,
@@ -255,6 +318,8 @@ export class AdminCommerceService {
       grantType: p.grantType,
       status: p.status,
       sortOrder: p.sortOrder,
+      /** 历史订单数。> 0 时不可删除, 前台据此拦截并提示改为下架 */
+      orderCount: p._count?.orderItems ?? 0,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     };
@@ -280,6 +345,10 @@ export class AdminCommerceService {
     }
     if (q.orderNo?.trim()) where.orderNo = { contains: q.orderNo.trim() };
     if (q.email?.trim()) where.user = { email: { contains: q.email.trim() } };
+    // 商品维度：命中任一明细行即算。订单行数量有限，用 some 而非全部匹配
+    if (q.productId?.trim()) {
+      where.items = { some: { productId: q.productId.trim() } };
+    }
 
     const range = this.dateRange(q.from, q.to);
     if (range) where.createdAt = range;
@@ -302,7 +371,9 @@ export class AdminCommerceService {
         orderBy: page.orderBy,
         include: {
           user: { select: { email: true } },
-          items: { select: { id: true } },
+          // 明细只取快照名与 SKU：订单页要能看出买的是哪件商品，
+          // 商品被删除或改名都不影响这里（快照是下单时的值）
+          items: { select: { id: true, nameSnapshot: true, skuSnapshot: true } },
           payments: { select: { id: true } },
           membershipPlan: { select: { code: true, name: true } },
         },
@@ -324,6 +395,11 @@ export class AdminCommerceService {
         refundedCents: o.refundedCents,
         grantedCredits: o.grantedCredits,
         itemCount: o.items.length,
+        /** 快照名 + SKU，按明细顺序；列表只说「N 件商品」等于没说买了什么 */
+        items: o.items.map((i: any) => ({
+          name: i.nameSnapshot,
+          sku: i.skuSnapshot,
+        })),
         paymentCount: o.payments.length,
         membershipPlanCode: o.membershipPlan?.code ?? null,
         membershipPlanName: o.membershipPlan?.name ?? null,
@@ -615,17 +691,36 @@ export class AdminCommerceService {
    * 逐条独立执行并回传每条结果: 批量操作里一条失败不该让其余 99 条不生效,
    * 但失败必须逐条列出来 —— 否则运营看到"已完成"却少了一条, 只能靠对账发现。
    * 失败原因不改写成通用文案, 保留 service 抛出的原始提示 (如"余额不足")。
+   *
+   * ## 幂等
+   *
+   * 每条按 `batch:{operatorId}:{batchKey}:{rowNo}` 落幂等键。同一批重试时
+   * 已成功的行直接命中已有流水、不再二次发放；`batchKey` 由调用方传入
+   * （前端在打开抽屉时生成一次），缺省则按本次请求生成随机值 —— 那种情况下
+   * 重试**没有**防重保护，属于调用方主动放弃。
+   *
+   * 行号参与键：同一批里同一用户可能出现两次（如「先补 100 再扣 20」），
+   * 只用 userId 做键会把第二行误判成重试。
    */
   async batchAdjust(
-    items: Array<{ userId: string; delta?: number }>,
-    shared: { operatorId: string; validDays?: number },
+    items: Array<{ userId: string; delta?: number; reason?: string }>,
+    shared: {
+      operatorId: string;
+      validDays?: number;
+      reason?: string;
+      idempotencyKey?: string;
+    },
   ) {
     const results: Array<{
       userId: string;
       success: boolean;
       balance?: number;
       message?: string;
+      idempotentHit?: boolean;
     }> = [];
+
+    const reason = String(shared.reason ?? "").trim();
+    const batchKey = String(shared.idempotencyKey ?? "").trim() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     // 先批量取一次存在的用户: 逐条撞外键的话, 返回给运营的是 Prisma 的
     // 英文外键报错 (带 SQL 上下文), 既不可读也把实现细节泄进了界面
@@ -639,7 +734,7 @@ export class AdminCommerceService {
       ).map((u) => u.id),
     );
 
-    for (const item of items) {
+    for (const [index, item] of items.entries()) {
       const delta = item.delta ?? 0;
       if (!known.has(item.userId)) {
         results.push({
@@ -653,14 +748,17 @@ export class AdminCommerceService {
         const r = await this.credit.adminAdjust({
           userId: item.userId,
           delta,
-          reason: "批量调整用户积分",
+          // 单条可覆盖整批原因（批量里常有「个别特殊补偿」）
+          reason: String(item.reason ?? "").trim() || reason || undefined,
           operatorId: shared.operatorId,
           validDays: shared.validDays,
+          idempotencyKey: `batch:${shared.operatorId}:${batchKey}:${index}`,
         });
         results.push({
           userId: item.userId,
           success: true,
           balance: r.balance,
+          ...(r.idempotentHit ? { idempotentHit: true } : {}),
         });
       } catch (e: any) {
         results.push({
@@ -674,6 +772,8 @@ export class AdminCommerceService {
       total: results.length,
       succeeded: results.filter((r) => r.success).length,
       failed: results.filter((r) => !r.success).length,
+      // 重试时命中的行数，便于运营判断「这次是不是重复提交」
+      idempotentHits: results.filter((r) => r.idempotentHit).length,
       results,
     };
   }
@@ -696,7 +796,7 @@ export class AdminCommerceService {
    */
   async importCreditsCsv(
     text: string,
-    opts: { validDays?: number; operatorId: string },
+    opts: { validDays?: number; operatorId: string; importKey?: string },
   ) {
     const rows = parseCsv(text);
     if (rows.length === 0) {
@@ -757,7 +857,15 @@ export class AdminCommerceService {
     });
     const idByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
 
-    const sharedReason = "CSV 导入用户积分";
+    /*
+     * 缺省说明不再是「CSV 导入用户积分」这种等于没写的固定文案：
+     * 带上文件名以外的可辨识信息（行号由幂等键体现），并明确要求
+     * 运营在第三列写清原因 —— 积分账本要能回答「为什么给他加」。
+     */
+    const sharedReason = "CSV 导入用户积分（未填写逐行原因）";
+    /* 导入批次的幂等前缀：同一份文件重复提交时，已成功的行不再二次发放 */
+    const importKey =
+      String(opts.importKey ?? "").trim() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const results: Array<{
       row: number;
       email: string;
@@ -765,6 +873,7 @@ export class AdminCommerceService {
       success: boolean;
       balance?: number;
       message?: string;
+      idempotentHit?: boolean;
     }> = [];
 
     for (const item of parsed) {
@@ -796,6 +905,8 @@ export class AdminCommerceService {
           reason: item.reason ?? sharedReason,
           operatorId: opts.operatorId,
           validDays: opts.validDays,
+          // 行号而非邮箱做键：同一文件里同一邮箱可能出现多行（补发 + 扣减）
+          idempotencyKey: `import:${opts.operatorId}:${importKey}:${item.row}`,
         });
         results.push({
           row: item.row,
@@ -803,6 +914,7 @@ export class AdminCommerceService {
           delta: item.delta,
           success: true,
           balance: r.balance,
+          ...(r.idempotentHit ? { idempotentHit: true } : {}),
         });
       } catch (e: any) {
         results.push({
@@ -819,6 +931,7 @@ export class AdminCommerceService {
       total: results.length,
       succeeded: results.filter((r) => r.success).length,
       failed: results.filter((r) => !r.success).length,
+      idempotentHits: results.filter((r) => r.idempotentHit).length,
       results,
     };
   }

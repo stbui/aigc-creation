@@ -36,9 +36,6 @@ export function ChannelFormDrawer({
       }}
       width={760}
       title={editing ? '编辑渠道' : '新建渠道'}
-      description={
-        dirty ? '有未保存修改' : editing ? '凭证留空表示不修改现有值' : '创建后请继续在右侧补模型与价格'
-      }
       footer={
         <>
           <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={saving}>
@@ -50,111 +47,131 @@ export function ChannelFormDrawer({
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="渠道名称">
-            <TextField
-              ariaLabel="渠道名称"
-              value={draft.name}
-              onChange={(value) => onChange({ name: value })}
-              placeholder="如 火山方舟-主"
-              maxLength={80}
-            />
-          </Field>
-          <Field label="排序值" hint="数字越小越靠前">
-            <NumberField
-              ariaLabel="排序值"
-              value={Number(draft.sortOrder) || 0}
-              min={0}
-              onChange={(value) => onChange({ sortOrder: String(value ?? 0) })}
-            />
-          </Field>
-        </div>
-
-        <Field label="Base URL" hint="上游 API 根地址，不含 /v1（协议会自行拼接路径）">
-          <TextField
-            ariaLabel="Base URL"
-            value={draft.baseUrl}
-            onChange={(value) => onChange({ baseUrl: value })}
-            placeholder="https://ark.cn-beijing.volces.com/api/v3"
-          />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            label="API Key"
-            hint={
-              editing?.hasApiKey
-                ? '已配置，留空表示不修改'
-                : editing
-                  ? '上游访问凭证，仅加密存储、不回显'
-                  : '新建必填：上游访问凭证，仅加密存储、不回显'
-            }
-          >
-            <TextField
-              ariaLabel="API Key"
-              type="password"
-              value={draft.apiKey}
-              onChange={(value) => onChange({ apiKey: value })}
-              placeholder={editing?.hasApiKey ? '••••••（不修改）' : '粘贴上游 Key'}
-            />
-          </Field>
-          <Field
-            label="Secret Key"
-            hint={editing?.hasSecretKey ? '已配置，留空表示不修改' : '仅 SigV4 / TC3 类协议需要'}
-          >
-            <TextField
-              ariaLabel="Secret Key"
-              type="password"
-              value={draft.secretKey}
-              onChange={(value) => onChange({ secretKey: value })}
-              placeholder={editing?.hasSecretKey ? '••••••（不修改）' : '如无则留空'}
-            />
-          </Field>
-        </div>
-
-        <ChannelHeadersEditor
-          value={draft.headers}
-          onChange={(headers) => onChange({ headers })}
-          disabled={!writable}
-        />
-
-        <Field
-          label="出站代理"
-          hint="为该渠道单独配置出站代理，支持 socks5://、socks5h://、http://、https://；留空则直连"
-        >
-          <TextField
-            ariaLabel="出站代理"
-            value={draft.proxyUrl}
-            onChange={(value) => onChange({ proxyUrl: value })}
-            placeholder="如 socks5://127.0.0.1:1080 或 http://127.0.0.1:7890"
-          />
-        </Field>
-
-        <Field label="渠道并发上限" hint="后台任务与代理请求共享该上限；槽位暂满时请求会等待">
-          <div className="flex items-center gap-3">
-            <SwitchField
-              checked={draft.useGlobalConcurrency}
-              label="跟随系统"
-              ariaLabel="跟随系统并发上限"
-              onChange={(checked) => onChange({ useGlobalConcurrency: checked })}
-            />
-            {!draft.useGlobalConcurrency && (
-              <NumberField
-                ariaLabel="渠道并发上限"
-                value={Number(draft.concurrencyLimit) || 1}
-                min={1}
-                max={999}
-                onChange={(value) => onChange({ concurrencyLimit: String(value ?? 1) })}
+      <div className="flex flex-col gap-5">
+        <section className="flex flex-col gap-3">
+          <h3 className="text-xs font-semibold text-foreground">基础信息</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="渠道名称">
+              <TextField
+                ariaLabel="渠道名称"
+                value={draft.name}
+                onChange={(value) => onChange({ name: value })}
+                placeholder="如 火山方舟-主"
+                maxLength={80}
               />
-            )}
+            </Field>
+            <Field label="展示顺序" hint="数字越小，位置越靠前">
+              <NumberField
+                ariaLabel="展示顺序"
+                value={Number(draft.sortOrder) || 0}
+                min={0}
+                onChange={(value) => onChange({ sortOrder: String(value ?? 0) })}
+              />
+            </Field>
           </div>
-        </Field>
+
+          <Field label="服务地址" hint="服务商提供的接口地址">
+            <TextField
+              ariaLabel="服务地址"
+              value={draft.baseUrl}
+              onChange={(value) => onChange({ baseUrl: value })}
+              placeholder="https://ark.cn-beijing.volces.com/api/v3"
+            />
+          </Field>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <div>
+            <h3 className="text-xs font-semibold text-foreground">访问凭证</h3>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              用于验证渠道的调用权限，保存后不再显示。
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="访问凭证"
+              hint={
+                editing?.hasApiKey
+                  ? '已配置，留空保持不变'
+                  : editing
+                    ? '仅保存加密信息，不会再次显示'
+                    : '新建时必填，仅保存加密信息，不会再次显示'
+              }
+            >
+              <TextField
+                ariaLabel="访问凭证"
+                type="password"
+                value={draft.apiKey}
+                onChange={(value) => onChange({ apiKey: value })}
+                placeholder={editing?.hasApiKey ? '••••••（不修改）' : '输入访问凭证'}
+              />
+            </Field>
+            <Field
+              label="签名密钥"
+              hint={editing?.hasSecretKey ? '已配置，留空保持不变' : '服务商要求额外签名时填写'}
+            >
+              <TextField
+                ariaLabel="签名密钥"
+                type="password"
+                value={draft.secretKey}
+                onChange={(value) => onChange({ secretKey: value })}
+                placeholder={editing?.hasSecretKey ? '••••••（不修改）' : '如无则留空'}
+              />
+            </Field>
+          </div>
+        </section>
+
+        <details className="group rounded-lg border border-border bg-muted/30">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+            <span className="text-xs font-semibold text-foreground">高级设置</span>
+            <span className="text-[12px] text-muted-foreground">
+              仅在服务商有特殊接入要求时配置
+            </span>
+          </summary>
+          <div className="flex flex-col gap-3 border-t border-border p-3">
+            <ChannelHeadersEditor
+              value={draft.headers}
+              onChange={(headers) => onChange({ headers })}
+              disabled={!writable}
+            />
+
+            <Field label="网络代理" hint="仅在当前网络需要指定出口时填写；留空则直接连接">
+              <TextField
+                ariaLabel="网络代理"
+                value={draft.proxyUrl}
+                onChange={(value) => onChange({ proxyUrl: value })}
+                placeholder="如 socks5://127.0.0.1:1080 或 http://127.0.0.1:7890"
+              />
+            </Field>
+
+            <Field label="同时处理任务数" hint="限制该渠道同时处理的任务数量">
+              <div className="flex items-center gap-3">
+                <SwitchField
+                  checked={draft.useGlobalConcurrency}
+                  label="沿用全局设置"
+                  ariaLabel="沿用全局任务数设置"
+                  onChange={(checked) => onChange({ useGlobalConcurrency: checked })}
+                />
+                {!draft.useGlobalConcurrency && (
+                  <NumberField
+                    ariaLabel="同时处理任务数"
+                    value={Number(draft.concurrencyLimit) || 1}
+                    min={1}
+                    max={999}
+                    onChange={(value) => onChange({ concurrencyLimit: String(value ?? 1) })}
+                  />
+                )}
+              </div>
+            </Field>
+          </div>
+        </details>
 
         <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
           <div>
             <div className="text-xs font-medium text-foreground">启用渠道</div>
-            <div className="text-[12px] text-muted-foreground">停用后该渠道的全部模型退出路由目录</div>
+            <div className="text-[12px] text-muted-foreground">
+              停用后，该渠道的模型不再用于新任务
+            </div>
           </div>
           <SwitchField
             checked={draft.enabled}
@@ -162,7 +179,6 @@ export function ChannelFormDrawer({
             onChange={(checked) => onChange({ enabled: checked })}
           />
         </div>
-
       </div>
     </Drawer>
   );

@@ -1,0 +1,354 @@
+/**
+ * history-pane 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
+ *
+ * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ */
+
+/* 历史记录浮动入口 */
+.redraw-history-float-toggle {
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  z-index: 20;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--card-bg);
+  cursor: pointer;
+  transform: translateY(-50%);
+  box-shadow: 0 4px 12px rgba(31, 35, 41, 0.2);
+}
+
+.redraw-history-float-toggle:hover {
+  background: var(--brand-active);
+}
+
+.redraw-history-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.redraw-history-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tag);
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--text-muted);
+  background: var(--card-bg);
+}
+
+.redraw-history-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+  background: var(--surface);
+}
+
+.redraw-history-card span {
+  display: block;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.redraw-history-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* 历史卡与商品 SKU 图一致：方形缩略图 + 右上角悬停显形的操作，
+   不再在图片下方占用一行日期 / 积分文字。 */
+.tool-history-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.tool-history-meta-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s;
+}
+
+.tool-history-card:hover .tool-history-meta-actions,
+.tool-history-card:focus-within .tool-history-meta-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tool-history-meta-actions button,
+.tool-history-meta-actions a {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: rgba(22, 25, 33, 0.55);
+  color: var(--card-bg);
+  cursor: pointer;
+}
+
+.tool-history-meta-actions button:hover:not(:disabled),
+.tool-history-meta-actions a:hover,
+.tool-history-meta-actions button:focus-visible,
+.tool-history-meta-actions a:focus-visible {
+  background: var(--brand);
+  color: var(--card-bg);
+  outline: none;
+}
+
+.tool-history-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.tool-history-action.is-busy svg {
+  animation: state-spinner-rotate 0.8s linear infinite;
+}
+
+.tool-history-missing {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+/* 右侧常驻历史 */
+.redraw-history-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--card-bg);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.redraw-history-head {
+  flex: 0 0 48px;
+  height: 48px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.redraw-history-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 22px;
+  color: var(--text-body);
+}
+
+.redraw-history-head h2 svg {
+  color: var(--text-muted);
+}
+
+.tool-history-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.redraw-history-collapse {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.redraw-history-collapse:hover,
+.redraw-history-collapse:focus-visible {
+  color: var(--brand);
+  background: var(--brand-bg);
+  outline: none;
+}
+
+.redraw-history-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 11px 11px;
+}
+
+.redraw-history-pane .redraw-history-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+.redraw-history-pane .redraw-history-card span {
+  font-size: 12px;
+}
+
+.tool-history-preview-wrap {
+  position: relative;
+}
+
+.tool-history-preview {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.tool-history-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.tool-history-meta-actions a {
+  text-decoration: none;
+}
+
+.redraw-history-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 120px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* 收起右栏后，浮动按钮把历史重新展开；窄屏始终用浮动按钮开抽屉 */
+.redraw-history-float-toggle {
+  display: none;
+}
+
+.tool-history-float-toggle {
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  z-index: 91;
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--card-bg);
+  box-shadow: 0 4px 12px rgba(31, 35, 41, 0.2);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.pk-workspace-trailing-collapsed .tool-history-float-toggle {
+  display: grid;
+}
+
+.local-redraw-page.history-collapsed .redraw-history-float-toggle {
+  display: grid;
+}
+
+@media (max-width: 1180px) {
+  .redraw-history-float-toggle {
+    display: grid;
+  }
+  .tool-history-float-toggle {
+    display: grid;
+  }
+}
+
+.pk-workspace.local-redraw-page > .redraw-history-pane,
+.pk-workspace.watermark-removal-page > .redraw-history-pane {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--card-bg);
+}
+
+.pk-workspace.product-retouch-page > .redraw-history-pane {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--card-bg);
+}
+
+.pk-workspace.local-redraw-page.history-collapsed > .redraw-history-pane {
+  padding-top: 8px;
+  background: transparent;
+}
+
+.pk-workspace.local-redraw-page.history-collapsed > .redraw-history-pane .redraw-history-head {
+  flex: 0 0 48px;
+  height: 48px;
+  margin: 0 8px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.04);
+}
+
+.pk-workspace.local-redraw-page.history-collapsed > .redraw-history-pane .redraw-history-scroll {
+  display: none;
+}
+
+/* 触屏没有 hover：操作常驻，否则移动端历史卡只剩看大图。 */
+@media (hover: none) {
+  .tool-history-meta-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* 单列窄屏（≤1024）里历史入口不再贴视口中线：中线正好落在商品换色的色卡行、
+ * 画布工具栏这类可点控件上，触摸时点不到下面的色块。改到右下角常规浮动位，
+ * 并避开 iOS 底部安全区。SKU 页的历史是右侧滑出面板，按钮仍作侧边把手，不参与。 */
+@media (max-width: 1024px) {
+  .tool-history-float-toggle:not(.product-sku-history-float-toggle),
+  .redraw-history-float-toggle {
+    top: auto;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    transform: none;
+  }
+}
+
+/* 桌面收起后以标题行原地展开，不出现浮动按钮；浮动入口只在窄屏生效。 */
+@media (min-width: 1181px) {
+  .redraw-history-float-toggle {
+    display: none;
+  }
+}

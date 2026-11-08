@@ -315,7 +315,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await sleep(300);
   }
   check('模型桩返回后任务成功', normalTask?.status === 'succeeded', normalTask?.status);
-  check('新任务产出来源为 gateway', normalTask?.provider === 'gateway', normalTask?.provider);
+  check('新任务带前台模型快照', Boolean(normalTask?.logicalModelId), normalTask?.logicalModelId);
 
   // ── 幂等创建：重放与并发都只能扣一次 ──────────────────────────────
   console.log('\n【幂等创建 → 只扣一次、只建一个任务】');

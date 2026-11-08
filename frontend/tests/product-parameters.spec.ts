@@ -45,12 +45,48 @@ async function authed(page: Page, path: string, token: string, email: string) {
   await page.goto(`${UI}${path}`);
   await page.evaluate(
     ([t, e]) => {
-      localStorage.setItem('ecom_vision_token', t as string);
-      localStorage.setItem('ecom_vision_email', e as string);
+      localStorage.setItem('huojue_token', t as string);
+      localStorage.setItem('huojue_email', e as string);
     },
     [token, email],
   );
   await page.reload();
+}
+
+function testModel(capability: string) {
+  const needsMask = capability === 'local_redraw' || capability === 'remove_watermark';
+  const capabilitySpec = {
+    version: 1,
+    capability: 'image',
+    inputs: {
+      image: { min: 1, max: 4 },
+      ...(needsMask ? { mask: { min: 1, max: 1 } } : {}),
+    },
+  };
+  return {
+    id: `model-${capability}-e2e`,
+    code: `model-${capability}-e2e`,
+    name: `${capability} 测试模型`,
+    icon: '',
+    description: '',
+    capability,
+    sortOrder: 0,
+    pricePolicy: 'fixed',
+    pricingMode: 'fixed',
+    displayPrice: 5,
+    priceLabel: '5 积分',
+    billingMode: 'per_image',
+    unitPriceMicrocredits: 5_000_000,
+    inputPriceMicrocredits: 0,
+    outputPriceMicrocredits: 0,
+    cachedPriceMicrocredits: 0,
+    priceTiers: [],
+    legacyModelIds: [],
+    capabilitySpec,
+    capabilityProfiles: [capabilitySpec],
+    defaultOptions: {},
+    available: true,
+  };
 }
 
 async function setup(page: Page, request: APIRequestContext, capability: string) {
@@ -73,6 +109,28 @@ async function setup(page: Page, request: APIRequestContext, capability: string)
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ code: 0, data: caps, message: '' }),
+    }),
+  );
+  await page.route('**/api/v1/models*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        data: {
+          models: [
+            'matting',
+            'remove_watermark',
+            'enhance',
+            'image_translate',
+            'expand',
+            'recolor',
+            'rotate',
+            'local_redraw',
+          ].map(testModel),
+        },
+        message: '',
+      }),
     }),
   );
   await page.route('**/api/v1/projects', (route) =>
@@ -213,7 +271,10 @@ const PRODUCT_SOURCE_DESKTOP: Record<string, Size> = {
   thumb: [160, 160],
   thumbImage: [158, 158],
   reupload: [88, 40],
-  resultPane: [572, 788],
+  // 1440×900 外壳：促销条 40 + 顶栏 64，内容区 796；产品页上下 padding 各
+  // 18px，结果栏实际 760px。旧值 788 来自已废弃的固定 100vh - 76px，会让页面
+  // 超出视口 28px，不能作为布局基准。
+  resultPane: [572, 760],
   resultCard: [572, 680],
   resultImage: [572, 680],
   badge: [42, 26],
@@ -512,7 +573,10 @@ test.describe('8 个工具页参数与结果态', () => {
       placementWidth: 0.6,
       placementHeight: 0.533333,
     });
-    await expect(page.locator('.pk-result-body')).toBeVisible({ timeout: 15000 });
+    // 扩图结果与构图预览同位置：右栏直接是大图卡，不走通用「生成结果」网格。
+    await expect(
+      page.locator('.pk-workspace.smart-expand-page .product-retouch-result-card'),
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test('商品换色：提交解析后的 targetColor 并兼容 customColor', async ({ page, request }) => {
@@ -989,7 +1053,9 @@ test.describe('移动端布局烟测', () => {
     });
     expect(metrics.overflow).toBeLessThanOrEqual(1);
     expect(metrics.canvas?.[0]).toBe(metrics.canvas?.[1]);
-    expect(metrics.toolbar).toEqual({ x: 78, size: [210, 40] });
+    // 390px 视口、舞台左右各 16px、顶栏左右各再缩 12px；210px 工具栏在 334px
+    // 顶栏内居中，左边界 = 28 + (334 - 210) / 2 = 90。旧值 78 漏算了页面内边距。
+    expect(metrics.toolbar).toEqual({ x: 90, size: [210, 40] });
     expect(metrics.footer).toEqual([256, 40]);
 
     await page.goto(`${UI}/background-remove`);

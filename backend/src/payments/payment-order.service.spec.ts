@@ -58,6 +58,9 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
 
 function makeHarness(order = makeOrder()) {
   const prisma = {
+    $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback(prisma),
+    ),
     order: {
       findUnique: vi.fn().mockResolvedValue(order),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -120,11 +123,27 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
     );
 
     expectNoLocalClose(prisma);
-    expect(prisma.order.update).toHaveBeenCalledWith(
+    expect(prisma.order.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: expect.objectContaining({
+          id: ORDER_ID,
+          closeStartedAt: expect.any(Date),
+        }),
         data: expect.objectContaining({ closeStartedAt: null }),
       }),
     );
+  });
+
+  it('另一请求正在发起支付时不抢关单租约', async () => {
+    const { service, prisma } = makeHarness(
+      makeOrder({ intentStartedAt: new Date() }),
+    );
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await service.close({ orderId: ORDER_ID, actor: { kind: 'worker' } });
+
+    expect(adapterMock.queryOrder).not.toHaveBeenCalled();
+    expectNoLocalClose(prisma);
   });
 
   it('渠道关单返回 failed 时不本地关单', async () => {
@@ -145,6 +164,39 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
       /渠道关单未成功/,
     );
 
+    expectNoLocalClose(prisma);
+  });
+
+  it('渠道已支付但入账失败时只释放自己的关单租约', async () => {
+    const { service, prisma, orders } = makeHarness();
+    orders.markPaid.mockRejectedValue(new Error('lock timeout'));
+    adapterMock.queryOrder.mockResolvedValue({
+      state: 'paid',
+      orderNo: 'HJ20261102120000ABC',
+      tradeNo: 'TRADE-1',
+      amountCents: 1000,
+      currency: 'CNY',
+      paidAt: new Date('2026-11-02T02:00:00Z'),
+      providerStatus: 'SUCCESS',
+      rawPayload: '{"ok":true}',
+    });
+
+    await expect(
+      service.close({ orderId: ORDER_ID, actor: { kind: 'worker' } }),
+    ).rejects.toThrow(/lock timeout/);
+
+    expect(prisma.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: ORDER_ID,
+          closeStartedAt: expect.any(Date),
+        }),
+        data: {
+          closeStartedAt: null,
+          lastError: expect.stringContaining('渠道已支付但入账失败'),
+        },
+      }),
+    );
     expectNoLocalClose(prisma);
   });
 
@@ -220,7 +272,10 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
         data: expect.objectContaining({ status: 'closed' }),
       }),
     );
-    expect(orders.releaseReservation).toHaveBeenCalledWith(ORDER_ID);
+    expect(orders.releaseReservation).toHaveBeenCalledWith(
+      ORDER_ID,
+      expect.objectContaining({ order: prisma.order }),
+    );
   });
 
   it('多渠道尝试逐个查单：旧尝试已关闭才不会漏掉已付款', async () => {
@@ -284,8 +339,16 @@ describe('PaymentOrderService.createIntent', () => {
   beforeEach(() => {
     adapterMock.validateConfig.mockReset().mockReturnValue([]);
     adapterMock.createOrder.mockReset();
-    adapterMock.queryOrder.mockReset();
-    adapterMock.closeOrder.mockReset();
+    adapterMock.queryOrder.mockReset().mockResolvedValue({
+      state: 'pending',
+      orderNo: 'HJ20261102120000ABC',
+      rawPayload: '',
+    });
+    adapterMock.closeOrder.mockReset().mockResolvedValue({
+      state: 'closed',
+      orderNo: 'HJ20261102120000ABC',
+      rawPayload: '',
+    });
     process.env.WEB_BASE_URL = 'https://app.example.com';
     process.env.PAYMENT_NOTIFY_BASE = 'https://api.example.com';
   });
@@ -295,6 +358,84 @@ describe('PaymentOrderService.createIntent', () => {
     else process.env.WEB_BASE_URL = previousWebBase;
     if (previousNotifyBase === undefined) delete process.env.PAYMENT_NOTIFY_BASE;
     else process.env.PAYMENT_NOTIFY_BASE = previousNotifyBase;
+  });
+
+  it('另一笔支付正在发起时拒绝创建第二个渠道订单', async () => {
+    const { service, prisma, configs } = makeHarness();
+    configs.available.mockResolvedValue([{ id: 'sandbox' }]);
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.createIntent({
+        orderId: ORDER_ID,
+        userId: 'user_1',
+        providerId: 'sandbox',
+      }),
+    ).rejects.toThrow(/正在发起另一笔支付/);
+
+    expect(adapterMock.createOrder).not.toHaveBeenCalled();
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('订单正在关闭时拒绝发起支付', async () => {
+    const { service, prisma, configs } = makeHarness(
+      makeOrder({ closeStartedAt: new Date() }),
+    );
+    configs.available.mockResolvedValue([{ id: 'sandbox' }]);
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.createIntent({
+        orderId: ORDER_ID,
+        userId: 'user_1',
+        providerId: 'sandbox',
+      }),
+    ).rejects.toThrow(/订单正在关闭/);
+
+    expect(adapterMock.createOrder).not.toHaveBeenCalled();
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('租约过期被接管后，旧请求不会覆盖新 checkout', async () => {
+    const { service, prisma, configs } = makeHarness(
+      makeOrder({ payments: [] }),
+    );
+    configs.available.mockResolvedValue([{ id: 'sandbox' }]);
+    prisma.order.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    adapterMock.createOrder.mockResolvedValue({
+      mode: 'sandbox',
+      checkoutValue: '/pay/sandbox?orderId=order_1',
+      providerRef: 'sbx_old',
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    });
+
+    await expect(
+      service.createIntent({
+        orderId: ORDER_ID,
+        userId: 'user_1',
+        providerId: 'sandbox',
+      }),
+    ).rejects.toThrow(/订单状态已变化/);
+
+    expect(prisma.order.updateMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: ORDER_ID,
+          status: 'pending',
+          intentStartedAt: expect.any(Date),
+        }),
+      }),
+    );
+    expect(adapterMock.closeOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ providerRef: 'sbx_old' }),
+    );
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pay_new', status: 'pending' },
+      data: expect.objectContaining({ status: 'closed' }),
+    });
   });
 
   it('真实渠道完成后回到原订单结算页，并带上主动查单标记', async () => {
@@ -429,6 +570,115 @@ describe('PaymentOrderService.createIntent', () => {
       expect.objectContaining({
         returnUrl:
           'https://app.example.com/checkout/membership?orderId=order_1&paymentReturn=1',
+      }),
+    );
+  });
+
+  it('重新发起支付前先查单并关闭旧渠道尝试', async () => {
+    const { service, prisma, configs } = makeHarness(
+      makeOrder({
+        channel: 'stripe',
+        checkoutMode: 'redirect',
+        payments: [
+          {
+            id: 'pay_old',
+            status: 'pending',
+            channel: 'stripe',
+            providerConfigId: CONFIG_ID,
+            providerRef: 'cs_old',
+            payTransactionId: null,
+            amountCents: 1000,
+            createdAt: new Date(),
+          },
+        ],
+      }),
+    );
+    configs.available.mockResolvedValue([{ id: 'stripe' }]);
+    configs.latest.mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'stripe',
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      values: {},
+    });
+    adapterMock.createOrder.mockResolvedValue({
+      mode: 'redirect',
+      payUrl: 'https://checkout.stripe.com/c/pay/cs_new',
+      providerRef: 'cs_new',
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    });
+
+    await service.createIntent({ orderId: ORDER_ID, userId: 'user_1', providerId: 'stripe' });
+
+    expect(adapterMock.queryOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ providerRef: 'cs_old' }),
+    );
+    expect(adapterMock.closeOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ providerRef: 'cs_old' }),
+    );
+    expect(adapterMock.closeOrder.mock.invocationCallOrder[0]).toBeLessThan(
+      adapterMock.createOrder.mock.invocationCallOrder[0],
+    );
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pay_old', status: 'pending' },
+      data: expect.objectContaining({ status: 'closed' }),
+    });
+  });
+
+  it('旧渠道尝试无法关闭时不创建新的支付单', async () => {
+    const { service, prisma, configs } = makeHarness(
+      makeOrder({
+        channel: 'stripe',
+        checkoutMode: 'redirect',
+        payments: [
+          {
+            id: 'pay_old',
+            status: 'pending',
+            channel: 'stripe',
+            providerConfigId: CONFIG_ID,
+            providerRef: 'cs_old',
+            payTransactionId: null,
+            amountCents: 1000,
+            createdAt: new Date(),
+          },
+        ],
+      }),
+    );
+    configs.available.mockResolvedValue([{ id: 'stripe' }]);
+    configs.latest.mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'stripe',
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      values: {},
+    });
+    adapterMock.closeOrder.mockResolvedValue({
+      state: 'failed',
+      orderNo: 'HJ20261102120000ABC',
+      error: 'close rejected',
+      rawPayload: '',
+    });
+
+    await expect(
+      service.createIntent({ orderId: ORDER_ID, userId: 'user_1', providerId: 'stripe' }),
+    ).rejects.toThrow(/旧支付尝试无法关闭/);
+
+    expect(adapterMock.createOrder).not.toHaveBeenCalled();
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+    expect(prisma.payment.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'pay_old', status: 'pending' } }),
+    );
+    expect(prisma.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: ORDER_ID,
+          intentStartedAt: expect.any(Date),
+        }),
+        data: expect.objectContaining({
+          lastError: expect.stringContaining('旧支付尝试无法关闭'),
+        }),
       }),
     );
   });

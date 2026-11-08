@@ -4,9 +4,5 @@
 
 export { useToast } from '../../../admin-ui/providers/ToastProvider';
 export { useAdmin } from '../../../context/AdminContext';
-export {
-  useAdminDetailParam,
-  useAdminList,
-  useAdminUrlFilterSync,
-} from '../../../admin-ui/primitives';
+export { useAdminDetailParam, useAdminExport, useAdminList, useAdminUrlFilterSync } from '../../../admin-ui/primitives';
 export { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';

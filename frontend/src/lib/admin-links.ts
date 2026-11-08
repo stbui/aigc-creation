@@ -28,6 +28,19 @@ export function adminOrderHref(filters: { orderNo?: string; email?: string }): s
   return href('/admin/orders', filters);
 }
 
+/**
+ * 某个商品的全部订单。
+ *
+ * 商品卡上的「N 单」用它跳转：运营点数字就想看是哪几单，而不是自己
+ * 记住 SKU 再去订单页手填。
+ *
+ * `productName` 只用于筛选条上的可读标签（订单列表不认识商品 id），
+ * 真正的筛选口径是 `productId`。
+ */
+export function adminProductOrdersHref(productId: string, productName?: string): string {
+  return href('/admin/orders', { productId, productName });
+}
+
 export function adminOrderDetailHref(orderId: string): string {
   return href('/admin/orders', { id: orderId });
 }
@@ -38,6 +51,14 @@ export function adminCreditHref(filters: { userId?: string; email?: string }): s
 
 export function adminTaskHref(id: string): string {
   return href('/admin/tasks', { id });
+}
+
+export function adminModelCallsHref(filters: { taskId?: string }): string {
+  return href('/admin/model-calls', filters);
+}
+
+export function adminBillingOrdersHref(filters: { taskId?: string }): string {
+  return href('/admin/billing-orders', filters);
 }
 
 export function adminTasksHref(filters: { userId?: string; projectId?: string }): string {

@@ -4,13 +4,22 @@ import {
   RESIZE_HANDLES,
   type Mark,
   type MaskPainterHandle,
+  type PaintState,
   type PaintTool,
   type RegionBounds,
   type ResizeHandle,
   type ShapeMark,
   type StrokeMark,
 } from './constants';
-import { clamp, cloneMark, isRegionMark } from './utils';
+import {
+  clamp,
+  cloneMark,
+  isRegionMark,
+  regionBoundsForMark,
+  strokeHasLength,
+  visibleRegionMarks,
+  visibleStrokePoints,
+} from './utils';
 
 interface MarkInteraction {
   mode: 'move' | 'resize';
@@ -48,8 +57,8 @@ export function MaskPainter({
   maxRegions: number;
   onPanChange: (pan: { x: number; y: number }) => void;
   onRegionLimit: () => void;
-  /** 有可提交的涂抹 / 可撤回 / 可恢复 / 当前标注区域数 */
-  onChange: (painted: boolean, canUndo: boolean, canRedo: boolean, regionCount: number) => void;
+  /** 有可提交的涂抹 / 可撤回 / 可恢复 / 当前有效标注区域 */
+  onChange: (state: PaintState) => void;
   /** 原图加载后回传真实像素尺寸，供外层画布按图片比例布局。 */
   onNaturalSize?: (size: { width: number; height: number }) => void;
   handleRef: { current: MaskPainterHandle | null };
@@ -207,49 +216,29 @@ export function MaskPainter({
     return transparent >= 4;
   }, []);
 
-  /** 橡皮只是修正遮罩，不创建新区域；框选/圈选与每段涂抹各算一个区域。 */
-  const getRegionCount = useCallback((): number => {
-    return marksRef.current.filter(isRegionMark).length;
-  }, []);
+  /** 橡皮只是修正遮罩，不创建新区域；完全擦除的涂抹也不再计入。 */
+  const getRegionCount = useCallback((): number => visibleRegionMarks(marksRef.current).length, []);
 
   /** 每个可描述区域在原图上的包围盒。 */
   const getRegionBounds = useCallback((): RegionBounds[] => {
-    return marksRef.current.filter(isRegionMark).map((mark) => {
-      if (mark.kind === 'shape') {
-        return {
-          x: mark.x,
-          y: mark.y,
-          width: mark.width,
-          height: mark.height,
-          sourceWidth: naturalRef.current.w,
-          sourceHeight: naturalRef.current.h,
-        };
-      }
-      const points = mark.points;
-      const minX = Math.min(...points.map((p) => p.x));
-      const maxX = Math.max(...points.map((p) => p.x));
-      const minY = Math.min(...points.map((p) => p.y));
-      const maxY = Math.max(...points.map((p) => p.y));
-      const pad = mark.width / 2;
-      return {
-        x: Math.max(0, minX - pad),
-        y: Math.max(0, minY - pad),
-        width: maxX - minX + mark.width,
-        height: maxY - minY + mark.width,
-        sourceWidth: naturalRef.current.w,
-        sourceHeight: naturalRef.current.h,
-      };
-    });
+    const { w, h } = naturalRef.current;
+    return visibleRegionMarks(marksRef.current)
+      .map((mark) => regionBoundsForMark(mark, marksRef.current, w, h))
+      .filter((bounds): bounds is RegionBounds => bounds !== null);
   }, []);
 
   const notify = useCallback(() => {
-    onChange(hasPaint(), marksRef.current.length > 0, redoRef.current.length > 0, getRegionCount());
-  }, [getRegionCount, hasPaint, onChange]);
+    onChange({
+      painted: hasPaint(),
+      canUndo: marksRef.current.length > 0,
+      canRedo: redoRef.current.length > 0,
+      regions: getRegionBounds(),
+    });
+  }, [getRegionBounds, hasPaint, onChange]);
 
-  /** 删除第 index 个可描述区域（同时让标注卡少一条）。 */
-  const removeRegion = useCallback((index: number) => {
-    const regionMarks = marksRef.current.filter(isRegionMark);
-    const target = regionMarks[index];
+  /** 按稳定 id 删除当前可见的可描述区域（同时让标注卡少一条）。 */
+  const removeRegion = useCallback((id: number) => {
+    const target = visibleRegionMarks(marksRef.current).find((mark) => mark.id === id);
     if (!target) return;
     marksRef.current = marksRef.current.filter((mark) => mark !== target);
     redoRef.current = [];
@@ -414,7 +403,7 @@ export function MaskPainter({
     const draft = draftRef.current;
     if (!draft) return;
     if (draft.kind === 'stroke') {
-      if (draft.points.length > 0) commit(draft);
+      if (strokeHasLength(draft)) commit(draft);
       else {
         draftRef.current = null;
         render();
@@ -508,25 +497,9 @@ export function MaskPainter({
   const renderedMarks: Mark[] = draftRef.current
     ? [...marksRef.current, draftRef.current]
     : marksRef.current;
-  const regionMarks = renderedMarks.filter(isRegionMark);
+  const regionMarks = visibleRegionMarks(renderedMarks);
   const regionIndex = new Map(regionMarks.map((mark, index) => [mark.id, index + 1]));
   const cursorWidth = naturalRef.current.w > 0 ? (lineWidth() / naturalRef.current.w) * 100 : 0;
-
-  const visiblePoints = (mark: StrokeMark, allMarks: Mark[]) => {
-    const start = allMarks.indexOf(mark);
-    const erasers = allMarks
-      .slice(start + 1)
-      .filter((item): item is StrokeMark => item.kind === 'stroke' && item.tool === 'eraser');
-    if (erasers.length === 0) return mark.points;
-    return mark.points.filter(
-      (point) =>
-        !erasers.some((eraser) =>
-          eraser.points.some(
-            (erased) => Math.hypot(point.x - erased.x, point.y - erased.y) <= (eraser.width + mark.width) / 2,
-          ),
-        ),
-    );
-  };
 
   return (
     <div
@@ -570,7 +543,7 @@ export function MaskPainter({
               if (mark.kind === 'stroke') {
                 const widthPct = naturalRef.current.w > 0 ? (mark.width / naturalRef.current.w) * 100 : 0;
                 const first = mark.points[0];
-                const points = visiblePoints(mark, renderedMarks);
+                const points = visibleStrokePoints(mark, renderedMarks);
                 return (
                   <div key={mark.id}>
                     <span className="mask-brush-stroke">

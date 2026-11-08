@@ -13,6 +13,7 @@ import {
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
+import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
 import { useConfirm, useToast, useAdminUrlFilterSync } from './hooks';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
 import {
@@ -41,7 +42,8 @@ import type {
  *
  * · **状态**分五档：全部 / 启用 / 停用 / 不健康 / 未定价。
  *   「启用」= 模型自身启用 **且** 所属渠道启用（两者都为真才进路由）；
- *   「停用」= 其一不满足；
+ *   「停用」= 其一不满足；展示时会继续区分模型停用、渠道停用，
+ *   以及两者同时停用，避免把影响范围不同的开关混成一个状态；
  *   「不健康」= 24h 成功率低于 80%（**无样本不算不健康** ——
  *   「没调用过」与「在挂」是两件事，混在一起会让刚上线的线全部标红）；
  *   「未定价」= 没有任何已配置价格档（补价工作队列）。
@@ -294,13 +296,7 @@ export function AllChannelModelsPanel({
         key: 'capability',
         title: '能力',
         width: 76,
-        render: (row) => (
-          <StatusTag
-            status="capability"
-            tone="brand"
-            label={CAPABILITY_OPTIONS.find((item) => item.value === row.capability)?.label ?? row.capability}
-          />
-        ),
+        render: (row) => <ChannelModelCapabilityTag capability={row.capability} />,
       },
       {
         key: 'health',
@@ -319,10 +315,13 @@ export function AllChannelModelsPanel({
       {
         key: 'status',
         title: '状态',
-        width: 100,
+        width: 126,
         render: (row) => {
-          if (!row.enabled) return <StatusTag status="disabled" tone="muted" label="停用" />;
+          if (!row.channelEnabled && !row.enabled) {
+            return <StatusTag status="channel-model-disabled" tone="warn" label="渠道/模型停用" />;
+          }
           if (!row.channelEnabled) return <StatusTag status="channel-disabled" tone="warn" label="渠道停用" />;
+          if (!row.enabled) return <StatusTag status="disabled" tone="muted" label="模型停用" />;
           if (!row.priceConfigured) return <StatusTag status="unpriced" tone="warn" label="未定价" />;
           return <StatusTag status="enabled" tone="success" label="启用" />;
         },
@@ -358,7 +357,7 @@ export function AllChannelModelsPanel({
               disabled={!writable || togglingId !== null}
               onClick={() => void toggleEnabled(row)}
             >
-              {row.enabled ? '停用' : '启用'}
+              {row.enabled ? '停用模型' : '启用模型'}
             </ActionButton>
           </div>
         ),
@@ -376,12 +375,12 @@ export function AllChannelModelsPanel({
 
   return (
     <div className="flex flex-col gap-3">
-      <FilterBar>
+      <FilterBar className="mb-0">
         <ClearableField
           ariaLabel="搜索模型"
           value={keyword}
           onChange={(value) => updateFilter(() => setKeyword(value))}
-          placeholder="搜索模型标识、显示名或渠道"
+          placeholder="搜索模型编号、用户端名称或渠道"
           className="w-64"
         />
         <SelectField
@@ -404,7 +403,7 @@ export function AllChannelModelsPanel({
           // 运营不用逐页记这一格叫「全部状态」还是「全部模型」。
           clearLabel="全部"
           allowClear
-          className="w-32"
+          className="w-44"
         />
         <SelectField
           ariaLabel="所属渠道"
@@ -445,11 +444,8 @@ export function AllChannelModelsPanel({
         loading={loading}
         error={error}
         onRetry={() => void load()}
-        emptyText={
-          hasFilters
-            ? '当前筛选下没有匹配的模型，清除筛选后再看。'
-            : '还没有渠道模型。在渠道工作台的「模型」里导入或新建后，这里会列出全部线路。'
-        }
+        emptyText={hasFilters ? '没有匹配的模型' : '暂无渠道模型'}
+        density="compact"
         minWidth={1080}
         pagination={{
           current: page,

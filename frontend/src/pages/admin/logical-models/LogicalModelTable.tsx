@@ -68,7 +68,7 @@ export function LogicalModelTable({
             {BILLING_MODE_LABELS[row.billingMode] ?? row.billingMode}
           </span>
           <span className="tabular-nums text-muted-foreground">
-            {row.displayPrice === null ? '按渠道价格档' : `${row.displayPrice} 积分`}
+            {row.displayPrice === null ? '跟随服务价格' : `${row.displayPrice} 积分`}
             {row.priceTiers.length > 1 ? ` · ${row.priceTiers.length} 档` : ''}
           </span>
         </div>
@@ -76,7 +76,7 @@ export function LogicalModelTable({
     },
     {
       key: 'routes',
-      title: '线路',
+      title: '服务来源',
       width: 120,
       render: (row) => {
         const available = row.routes.filter((route) => route.available).length;

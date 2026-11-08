@@ -1,0 +1,1072 @@
+/**
+ * redraw 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件/页面共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/*
+ * 局部重绘的遮罩画布 (2026-10-22)。
+ *
+ * 底图与涂抹层叠在一起: <img> 决定尺寸, 画布绝对定位铺满 ——
+ * 两者必须严格重合, 否则用户涂的位置和真正送去重绘的位置会差一截。
+ * 因此这里**不给底图设 max-height / object-fit**: 任何缩放都会让
+ * 「显示尺寸 ≠ 布局尺寸」, 画布坐标换算就失去基准。
+ */
+.redraw-mask-stage {
+  position: relative;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--surface);
+  line-height: 0;
+}
+
+.redraw-mask-transform {
+  transform-origin: 0 0;
+}
+
+.redraw-mask-bg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.redraw-mask-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* 触屏上涂抹时不要触发页面滚动 */
+  cursor: crosshair;
+}
+
+.redraw-mask-overlay.tool-hand {
+  cursor: grab;
+}
+
+.redraw-mask-overlay.tool-hand:active {
+  cursor: grabbing;
+}
+
+.redraw-mask-hidden {
+  display: none;
+}
+
+.redraw-mask-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.redraw-mask-brush {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+.redraw-mask-brush input[type='range'] {
+  width: 96px;
+  accent-color: var(--brand);
+}
+
+.redraw-toolbar-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
+.redraw-zoom-value {
+  min-width: 40px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+.redraw-desc-editor {
+  align-items: flex-start;
+}
+
+.redraw-desc-editor + .redraw-desc-editor {
+  margin-top: 8px;
+}
+
+.redraw-desc-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-active);
+  padding-top: 8px;
+}
+
+.redraw-desc-label.is-pending {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.redraw-desc-label.is-marked {
+  color: var(--brand-active);
+}
+
+/* 局部重绘标注卡：每条标注 = 标题行 + 描述 + 区域缩略图 + 参考图上传 */
+.redraw-prompt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--tool-surface-12);
+  border-radius: 8px;
+}
+
+.redraw-prompt + .redraw-prompt {
+  margin-top: 8px;
+}
+
+.redraw-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.redraw-prompt-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--wb-text);
+}
+
+.redraw-prompt-label i {
+  width: 14px;
+  height: 14px;
+  border: 4px solid var(--brand);
+  border-radius: 50%;
+  background: var(--card-bg);
+  box-sizing: border-box;
+}
+
+.redraw-prompt-label.is-pending i {
+  border-color: var(--text-desc);
+}
+
+.redraw-prompt .pk-desc-expand {
+  position: static;
+}
+
+.redraw-prompt-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.redraw-prompt textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  resize: none;
+  overflow: hidden;
+}
+
+.redraw-prompt textarea::placeholder {
+  color: var(--text-desc);
+}
+
+/* 标注卡里的参考图上传与预览 */
+.redraw-prompt-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.redraw-prompt-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-desc);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.redraw-prompt-ref:hover {
+  color: var(--brand);
+  border-color: var(--brand-light);
+}
+
+.redraw-prompt-ref:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.redraw-prompt-ref-preview {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.redraw-prompt-ref-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.redraw-prompt-ref-preview button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0 0 0 6px;
+  background: rgba(0, 0, 0, 0.62);
+  color: var(--card-bg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+/* 对比弹窗 */
+.redraw-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.redraw-compare-grid figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.redraw-compare-grid img,
+.redraw-compare-missing {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tag);
+}
+
+.redraw-compare-missing {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.redraw-compare-grid figcaption {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  text-align: center;
+}
+
+/* 未上传图片时的中栏引导：与参考站同款的演示视频 (自托管 /static/mp4/)。
+ * 视频必须落本地并静音, 否则浏览器自动播放策略会停在首帧。 */
+.redraw-intro {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px;
+  text-align: center;
+  background: var(--card-bg);
+  border-radius: var(--radius-panel);
+}
+
+.redraw-intro-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 620px;
+}
+
+.redraw-intro-copy h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--text-strong);
+}
+
+.redraw-intro-copy p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-muted);
+}
+
+.redraw-intro-steps {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.redraw-intro-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--brand-bg);
+  color: var(--text-body);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.redraw-intro-steps b {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 上传后的画布舞台 */
+.pk-source-pane.redraw-stage {
+  padding: 16px 20px 12px;
+  gap: 10px;
+  overflow: hidden;
+  background: var(--page-bg);
+}
+
+.redraw-stage-topbar {
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+.redraw-toolbar {
+  max-width: 100%;
+  min-height: 40px;
+  padding: 5px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(107, 112, 128, 0.16);
+}
+
+.redraw-tool-btn {
+  height: 30px;
+  padding: 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-5);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.redraw-tool-btn:hover:not(:disabled) {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.redraw-tool-btn.active {
+  color: var(--brand);
+  background: var(--brand-bg);
+  box-shadow: inset 0 0 0 1px var(--brand-light);
+}
+
+.redraw-tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.redraw-tool-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+.redraw-toolbar-brush {
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.redraw-toolbar-brush input[type='range'] {
+  width: 100px;
+  accent-color: var(--brand);
+}
+
+.redraw-toolbar-brush output {
+  min-width: 32px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-5);
+  font-size: 12px;
+  text-align: center;
+}
+
+.redraw-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.redraw-canvas-wrap .redraw-mask-stage {
+  margin-top: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.redraw-canvas-wrap .redraw-mask-transform {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.redraw-canvas-wrap .redraw-mask-bg {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 300px);
+  object-fit: contain;
+}
+
+.redraw-canvas-footer {
+  flex: none;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(107, 112, 128, 0.14);
+}
+
+.redraw-footer-btn {
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-5);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.redraw-footer-btn:hover:not(:disabled) {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.redraw-footer-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.redraw-zoom-btn {
+  width: 28px;
+  justify-content: center;
+  padding: 0;
+}
+
+.redraw-zoom-value {
+  min-width: 44px;
+  text-align: center;
+}
+
+.redraw-shortcut-hint {
+  flex: none;
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 860px) {
+  .redraw-canvas-wrap .redraw-mask-bg {
+    max-height: none;
+  }
+  .redraw-shortcut-hint {
+    display: none;
+  }
+  .redraw-toolbar {
+    width: 100%;
+    justify-content: center;
+  }
+  .redraw-stage-topbar {
+    width: 100%;
+  }
+}
+
+.pk-workspace.local-redraw-page .redraw-intro {
+  flex: none;
+  gap: 32px;
+  width: min(100%, 720px);
+  margin: auto;
+  padding: 24px;
+  background: transparent;
+  border-radius: 16px;
+}
+
+.pk-workspace.local-redraw-page .redraw-intro-copy {
+  gap: 8px;
+}
+
+.pk-workspace.local-redraw-page .redraw-intro-copy strong {
+  color: var(--wb-text);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.pk-workspace.local-redraw-page .redraw-intro-copy p {
+  color: var(--text-desc);
+  max-width: 692px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+/* 参考站去水印空态是 480×480 演示视频；视频必须落本地并静音，
+ * 否则浏览器自动播放策略会让它停在首帧。 */
+.pk-workspace.local-redraw-page .redraw-intro-video {
+  display: block;
+  flex: none;
+  width: 480px;
+  max-width: 100%;
+  height: 480px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+/* ───────── 局部重绘：原图比例画布舞台（2026-10-26） ────────────────────
+ *
+ * 参考站 reference/ijihua/index.pretty.css:
+ *   .local-redraw-stage     flex + center + relative
+ *   .redraw-stage-topbar    position:absolute; top:0; width:100%
+ *   .redraw-toolbar         width:532px; height:40px; absolute 居中
+ *   .redraw-canvas-wrap     按原图宽高比布局; width 受可用宽高共同约束
+ *   .canvas-footer-toolbar  absolute; bottom:45px; 居中
+ *   .shortcut-hint          absolute; bottom:8px; 居中
+ *
+ * 旧实现把顶栏/底栏放在文档流里，画布只能按剩余高度压缩，上传图后
+ * 工具栏、画布和底部操作条会互相挤位。这里只收敛局部重绘页，避免影响
+ * 共用 redraw-* class 的去水印页。
+ */
+.pk-workspace.local-redraw-page .pk-source-pane.redraw-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.pk-workspace.local-redraw-page .redraw-stage-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pk-workspace.local-redraw-page .redraw-toolbar {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  box-sizing: border-box;
+  width: 532px;
+  max-width: calc(100% - 32px);
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow: hidden;
+  transform: translateX(-50%);
+}
+
+.pk-workspace.local-redraw-page .redraw-tool-btn {
+  height: 30px;
+  padding: 4px;
+}
+
+.pk-workspace.local-redraw-page .redraw-toolbar-brush {
+  margin-left: 0;
+}
+
+.pk-workspace.local-redraw-page .redraw-stage-main {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pk-workspace.local-redraw-page .redraw-canvas-wrap {
+  --redraw-image-aspect: 1;
+  position: relative;
+  flex: none;
+  width: min(
+    680px,
+    calc(100% - 80px),
+    calc((100vh - var(--workspace-topbar-height) - 144px) * var(--redraw-image-aspect))
+  );
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: var(--redraw-image-aspect);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-stage {
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0;
+}
+
+.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-transform,
+.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-bg {
+  width: 100%;
+  height: 100%;
+}
+
+.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-bg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: fill;
+}
+
+/* 提交期间画布保持可见（避免 402 等确定性拒绝后丢标注），
+ * 但锁住指针交互，反馈由提交按钮的「生成中…」承担。 */
+.pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-canvas-wrap,
+.pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-canvas-footer,
+.pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-toolbar {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.pk-workspace.local-redraw-page .redraw-result-stage {
+  flex: 1;
+  min-height: 0;
+}
+
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 0;
+}
+
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions button,
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions a {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--brand);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--brand);
+  font-size: 12px;
+  line-height: 18px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions button:hover:not(:disabled),
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions a:hover {
+  background: var(--brand-bg);
+}
+
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pk-workspace.local-redraw-page .redraw-result-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.pk-workspace.local-redraw-page .redraw-result-preview .redraw-result-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pk-workspace.local-redraw-page .redraw-result-download {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 50%;
+  background: rgba(22, 25, 33, 0.76);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(22, 25, 33, 0.28);
+  text-decoration: none;
+  transition: background 0.16s, transform 0.16s;
+}
+
+.pk-workspace.local-redraw-page .redraw-result-download:hover,
+.pk-workspace.local-redraw-page .redraw-result-download:focus-visible {
+  background: var(--brand);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.pk-workspace.local-redraw-page .redraw-canvas-footer {
+  position: absolute;
+  left: 50%;
+  bottom: 45px;
+  z-index: 5;
+  height: 40px;
+  padding: 0 16px;
+  gap: 8px;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 16px rgba(107, 112, 128, 0.16);
+}
+
+.pk-workspace.local-redraw-page .redraw-shortcut-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 4;
+  margin: 0;
+  color: var(--text-9);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 1180px) {
+  .pk-workspace.local-redraw-page .redraw-stage-topbar {
+    left: 50%;
+    width: calc(100% - 32px);
+    transform: translateX(-50%);
+  }
+  .pk-workspace.local-redraw-page .redraw-toolbar {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    justify-content: flex-start;
+    transform: none;
+  }
+  .pk-workspace.local-redraw-page .redraw-shortcut-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .pk-workspace.local-redraw-page .pk-source-pane.redraw-stage {
+    min-height: 720px;
+  }
+  .pk-workspace.local-redraw-page .redraw-stage-topbar {
+    width: calc(100% - 24px);
+  }
+  .pk-workspace.local-redraw-page .redraw-canvas-wrap {
+    width: min(600px, calc(100% - 24px));
+  }
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  grid-template-rows: 20px minmax(44px, auto);
+  column-gap: 8px;
+  row-gap: 0;
+  margin-top: 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--tool-surface-12);
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt + .redraw-prompt {
+  margin-top: 0;
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt > .redraw-prompt-label {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--wb-text);
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt-label i {
+  width: 14px;
+  height: 14px;
+  border: 4px solid var(--brand);
+  border-radius: 50%;
+  background: var(--card-bg);
+  box-sizing: border-box;
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt-label.is-pending i {
+  border-color: var(--text-desc);
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt > textarea {
+  grid-area: 2 / 1;
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 0;
+  overflow: hidden;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  resize: none;
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt > .redraw-prompt-tools.reference-upload {
+  grid-area: 1 / 2 / 3 / 3;
+  align-self: center;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  overflow: hidden;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-body);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt > .redraw-prompt-tools.reference-upload.has-image {
+  position: relative;
+  border-style: solid;
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt > .redraw-prompt-tools.reference-upload > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pk-workspace.local-redraw-page .redraw-prompt .remove-reference {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(51, 51, 51, 0.78);
+  color: var(--card-bg);
+  cursor: pointer;
+}
+
+/* 画笔滑块：参考站轨道填充与白芯紫边滑块 */
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100px;
+  height: 16px;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(to right, var(--brand) 0 var(--range-progress), var(--surface) var(--range-progress) 100%);
+}
+
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 3px solid var(--brand);
+  border-radius: 50%;
+  background: var(--card-bg);
+}
+
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-moz-range-progress {
+  height: 4px;
+  border-radius: 10px;
+  background: var(--brand);
+}
+
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--brand);
+  border-radius: 50%;
+  background: var(--card-bg);
+}
+
+.pk-workspace.local-redraw-page .redraw-canvas-footer .redraw-footer-btn {
+  padding: 0;
+}
+
+.pk-workspace.local-redraw-page .redraw-canvas-footer .redraw-tool-divider {
+  margin: 0;
+}
+
+.pk-workspace.local-redraw-page .redraw-canvas-footer .redraw-zoom-value {
+  min-width: 40px;
+}
+
+.pk-workspace.local-redraw-page .redraw-shortcut-hint {
+  line-height: 16px;
+}
+
+/* 画布：图片、交互 canvas、DOM 标注三层严格同尺寸 */
+.pk-workspace.local-redraw-page .redraw-mask-stage {
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.pk-workspace.local-redraw-page .redraw-image-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-2);
+  touch-action: none;
+}
+
+.pk-workspace.local-redraw-page .redraw-image-frame > .redraw-mask-bg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.pk-workspace.local-redraw-page .redraw-mask-overlay {
+  z-index: 1;
+  cursor: crosshair;
+}
+
+.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-hand {
+  cursor: grab;
+}
+
+.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-hand:active {
+  cursor: grabbing;
+}
+
+.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-brush,
+.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-eraser {
+  cursor: none;
+}

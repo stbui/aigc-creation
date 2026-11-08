@@ -1,0 +1,104 @@
+/**
+ * QrLoginPage 页面样式 —— 由 `./QrLoginPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* ── 扫码确认页 (手机端, B8) ──────────────────────────────────────────
+   独立页无侧栏顶导: 手机上的唯一任务是「看一眼设备信息, 点确认」。
+   卡片窄 (max 380) 且按钮通栏, 拇指可达。 */
+.qr-confirm-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px 16px;
+  background: var(--surface);
+}
+
+.qr-confirm-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 380px;
+  padding: 32px 24px;
+  background: var(--card-bg);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 20px 60px rgba(23, 26, 43, 0.08);
+  text-align: center;
+}
+
+.qr-confirm-icon {
+  color: var(--brand);
+  margin-bottom: 12px;
+}
+
+.qr-confirm-icon.is-ok {
+  color: var(--success-text);
+}
+
+.qr-confirm-icon.is-warn {
+  color: var(--danger-text);
+}
+
+.qr-confirm-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.qr-confirm-desc {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 21px;
+  color: var(--text-muted);
+}
+
+.qr-confirm-desc.is-warn {
+  color: var(--danger-text);
+}
+
+.qr-confirm-device {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  text-align: left;
+}
+
+.qr-confirm-device-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+
+.qr-confirm-device-row + .qr-confirm-device-row {
+  margin-top: 6px;
+}
+
+.qr-confirm-device-row strong {
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+/* UA 可能很长: 允许换行而不是撑破卡片 */
+.qr-confirm-ua {
+  max-width: 220px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.qr-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: auto;
+}

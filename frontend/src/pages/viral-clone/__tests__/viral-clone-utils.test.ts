@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { splitCloneInputs, viralCloneImageInputError, viralCloneProductImageLimit } from '../utils';
+import {
+  downloadExtension,
+  splitCloneInputs,
+  viralCloneImageInputError,
+  viralCloneProductImageLimit,
+} from '../utils';
 import type { PublicLogicalModel } from '../api';
 
 describe('splitCloneInputs', () => {
@@ -71,6 +76,25 @@ function hotRemakeModel(maxImages: number): PublicLogicalModel {
     available: true,
   };
 }
+
+describe('downloadExtension', () => {
+  it('把图片 MIME 类型转换为文件扩展名', () => {
+    expect(downloadExtension('image/png')).toBe('png');
+    expect(downloadExtension('image/jpeg')).toBe('jpg');
+    expect(downloadExtension('image/webp')).toBe('webp');
+  });
+
+  it('兼容已有的扩展名写法', () => {
+    expect(downloadExtension('png')).toBe('png');
+    expect(downloadExtension('.jpg')).toBe('jpg');
+  });
+
+  it('缺少或无法识别的格式回退为 png', () => {
+    expect(downloadExtension(undefined)).toBe('png');
+    expect(downloadExtension('')).toBe('png');
+    expect(downloadExtension('application/octet-stream')).toBe('png');
+  });
+});
 
 describe('爆款复刻输入数量约束', () => {
   it('为必填参考图预留 1 个模型输入位', () => {

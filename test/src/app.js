@@ -19,6 +19,8 @@ import { handleModel, handleModels } from './routes/models.js';
 import { handleFile, handleHealth, handleIndex } from './routes/assets.js';
 import {
   handleMinimaxFileRetrieve,
+  handleMinimaxV2VideoCreate,
+  handleMinimaxV2VideoQuery,
   handleMinimaxVideoCreate,
   handleMinimaxVideoQuery,
   handleOpenAiVideoContent,
@@ -123,7 +125,14 @@ async function handleRequest(ctx) {
     return;
   }
 
-  if (path === '/v1' || path.startsWith('/v1/')) verifyAuth(req, cfg);
+  if (
+    path === '/v1' ||
+    path.startsWith('/v1/') ||
+    path === '/v2' ||
+    path.startsWith('/v2/')
+  ) {
+    verifyAuth(req, cfg);
+  }
 
   if (method === 'GET' && (path === '/' || path === '/index.json')) return handleIndex(full);
   if (method === 'GET' && path === '/health') return handleHealth(full);
@@ -202,6 +211,18 @@ async function handleRequest(ctx) {
     return handleMinimaxFileRetrieve(full);
   }
 
+  if (path === '/v2/video_generation') {
+    if (method !== 'POST') return methodNotAllowed(full, 'POST');
+    full.body = await readJson(req, JSON_LIMIT);
+    return handleMinimaxV2VideoCreate(full);
+  }
+
+  const minimaxV2Query = /^\/v2\/query\/video_generation\/([^/]+)\/?$/.exec(path);
+  if (minimaxV2Query) {
+    if (method !== 'GET') return methodNotAllowed(full, 'GET');
+    return handleMinimaxV2VideoQuery(full, decodeURIComponent(minimaxV2Query[1]));
+  }
+
   const fileMatch = /^\/files\/([^/]+)\/?$/.exec(path);
   if (fileMatch) {
     if (method !== 'GET' && method !== 'HEAD') return methodNotAllowed(full, 'GET');
@@ -227,11 +248,13 @@ function isKnownPath(path) {
       '/v1/video_generation',
       '/v1/query/video_generation',
       '/v1/files/retrieve',
+      '/v2/video_generation',
     ].includes(normalized)
   ) {
     return true;
   }
   if (/^\/v1\/videos\/[^/]+(\/content)?$/.test(normalized)) return true;
+  if (/^\/v2\/query\/video_generation\/[^/]+$/.test(normalized)) return true;
   if (/^\/files\/[^/]+$/.test(normalized)) return true;
   return false;
 }

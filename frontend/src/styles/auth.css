@@ -1,0 +1,680 @@
+/**
+ * 认证体系共享样式 —— 登录弹窗 / AuthCard / 扫码面板 / 找回与重置密码页。
+ *
+ * 从 `styles/global.css` 迁出；由认证组件与页面入口共同引入。
+ */
+
+/* ───────── 登录页 (1:1 复刻参考站登录弹窗 auth-card-split, 2026-10-19 实拍 1280×900) ─────────
+   偏差与证据: docs/login-design.md。字面值全部来自参考站 computed styles 实拍:
+   卡 840x478 / radius 32 / shadow 0 20px 60px rgba(0,0,0,.18) / grid 420 420;
+   右栏 padding 32px 40px / 内层 340; tab 81.3x63; input 340x48 radius 8 bg #f2f3f5;
+   submit 340x48 渐变 90deg #8064f6→#5546d8 14px/600; 协议行 12px #86909c。
+   诚实差异: 扫码/短信 tab 置灰 (无通道), 左栏插画为自绘内联 SVG (不引参考站位图)。 */
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  /*
+   * 背景分层 (2026-11-03, 独立页背景留白优化):
+   *   1) 极淡点阵 —— 破掉大面积纯色的"死白", 密度 26px, 透明度 7%
+   *   2) 卡片背后的品牌紫辉光 —— 把卡片从底色里"托"起来
+   *   3~5) 左上品牌紫 / 右上冷蓝 / 底部淡紫三处径向光晕, 与落地页 .lp-hero 同源
+   * 全部只引用 :root 令牌, 不写裸 hex; 同一套背景对 .login-page 的四个宿主
+   * (/login、/forgot-password、/reset-password、OAuth 回调) 通用。
+   */
+  background-color: var(--page-bg);
+  background-image:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text-strong) 7%, transparent) 1px, transparent 0),
+    radial-gradient(620px 420px at 50% 46%, color-mix(in srgb, var(--brand) 12%, transparent) 0%, transparent 72%),
+    radial-gradient(900px 540px at 10% -8%, var(--brand-bg) 0%, transparent 64%),
+    radial-gradient(820px 520px at 94% 6%, var(--hero-grad-3) 0%, transparent 62%),
+    radial-gradient(760px 480px at 50% 112%, var(--login-surface-brand-5) 0%, transparent 68%);
+  background-size: 26px 26px, auto, auto, auto, auto;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  /* 用 scroll 而非 fixed: 注册态卡片可能高于一屏, fixed 会让光晕钉在视口上不跟随。 */
+  background-attachment: scroll;
+}
+
+.login-split {
+  display: grid;
+  grid-template-columns: 420px 420px;
+  width: 840px;
+  /*
+   * 高度改为「最小 478px」而非固定值 (2026-10-21, B2):
+   * 注册态多了「手机号 + 验证码 + 协议勾选」三行, 固定高度会把提交按钮挤出卡片。
+   * 登录/短信态仍恰好是 478px, 与参考站实拍一致。
+   */
+  min-height: 478px;
+  height: auto;
+  background: var(--card-bg);
+  border-radius: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── 左栏礼宾面板 (参考站 .auth-showcase / .auth-showcase-bg) ── */
+.login-showcase {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 参考站用位图 static/login/leftbg.png (底色 #a5dffc); 本地不引第三方图片, 改用品牌紫渐变 */
+.login-showcase-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, var(--login-surface-brand-5) 0%, var(--login-surface-brand-6) 46%, var(--login-surface-brand-4) 100%);
+}
+
+.login-showcase-gift {
+  position: absolute;
+  top: -38px;
+  left: -14px;
+  width: 200px;
+  height: 194px;
+  pointer-events: none;
+}
+
+.login-showcase-content {
+  position: relative;
+  width: 340px;
+  /* 标题要避开左上角的礼盒插画 (参考站 H1 实测 144x63 @panel内 x236, 即右对齐到内容块右缘) */
+  padding-top: 74px;
+}
+
+.login-showcase-title {
+  margin: 0 0 22px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 34px;
+  color: var(--text-strong);
+  text-align: right;
+}
+
+.login-showcase-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 玻璃拟态卡: 参考站 radial-gradient + 双层阴影 (0 6px 20px rgba(85,70,216,.24) + inset 白光) */
+.login-benefit {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: radial-gradient(
+    at 46% 36%,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0.48) 62%,
+    rgba(228, 219, 255, 0.42)
+  );
+  box-shadow:
+    0 6px 20px rgba(85, 70, 216, 0.24),
+    inset 0 0 24px rgba(255, 255, 255, 0.7);
+}
+
+.login-benefit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 25px;
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--wb-text);
+}
+
+.login-benefit-value {
+  font-weight: 700;
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+/* ── 右栏表单面板 (参考站 .auth-form-panel) ── */
+.login-form-panel {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 40px;
+  background: var(--card-bg);
+}
+
+.login-close {
+  position: absolute;
+  top: 32px;
+  right: 40px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.login-close:hover {
+  color: var(--brand);
+}
+
+/* 参考站 .auth-form-panel-inner @ (680,243) 但 tabs @ (680,267) → 内层有 24px 顶部留白;
+   子项间距统一 8px (tabs 底 330 → form 338 → 596 → footer 604)。本地照此对齐。 */
+.login-panel-inner {
+  width: 100%;
+  max-width: 340px;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* tab 组: 参考站 .auth-login-tabs (340x63 / padding 0 24 / gap 24 / align stretch) */
+.login-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+  height: 63px;
+  padding: 0 24px;
+}
+
+.login-tab {
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--wb-text);
+  cursor: pointer;
+  position: relative;
+}
+
+.login-tab.is-active {
+  font-weight: 600;
+}
+
+.login-tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  background: var(--brand);
+}
+
+.login-tab.is-disabled {
+  color: var(--text-10);
+  cursor: not-allowed;
+}
+
+/* 弹窗打开时焦点落在激活 tab 上, 浏览器默认 outline 是蓝色框, 与品牌紫冲突。
+   默认态去 outline, 键盘可达时给品牌紫描边。 */
+.login-tab:focus {
+  outline: none;
+}
+
+/* 激活态只有下划线, 未激活 tab 被 Tab 聚焦时没有任何提示 —— 键盘用户无法定位。
+   焦点环用品牌紫, 内缩 2px 以免被卡片 overflow 裁掉。 */
+.login-tab:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+/* 参考站 .auth-form @ (680,338) 但首个 .auth-field @ (680,350) → 12px 上间距 */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+}
+
+/* 参考站 .auth-field 340x48, 无 label 行 (只有 placeholder), 两框间距 18px (350→416)
+   输入框的形态规则见文件末尾「登录 / 认证卡片」小节（.login-input-* 系列）。 */
+.login-field {
+  margin-bottom: 18px;
+}
+
+/* 参考站 .auth-submit: 340x48 / linear-gradient(90deg,#8064f6,#5546d8) / 14px 600 / radius 8 */
+.login-submit {
+  height: 48px;
+  border-radius: 8px;
+  border: 0;
+  background: linear-gradient(90deg, var(--surface-brand-3), var(--brand));
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--card-bg);
+}
+
+.login-submit:hover {
+  background: linear-gradient(90deg, var(--brand-light), var(--login-surface-brand-1));
+}
+
+.login-submit:disabled {
+  background: linear-gradient(90deg, var(--login-surface-brand-3), var(--login-surface-brand-2));
+}
+
+/* 参考站 .auth-agreement: 12px/400/lh18 #86909c, 内嵌 3 段链接 */
+.login-agreement {
+  margin: 0;
+  /* 320/360 窄屏下卡片不足 324px, nowrap 会让协议行横向溢出卡片。
+     允许按词换行, 三行以内仍保持参考站观感。 */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+.login-agreement a {
+  color: var(--brand);
+  margin: 0 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.login-agreement a:hover {
+  color: var(--brand-hover);
+}
+
+/*
+ * `.login-agreement-note` 于 2026-10-21 删除: 第三个协议 (账号规则)
+ * 已改为真实链接, 且 /legal/privacy 这类不存在的 slug 链接一并修正。
+ * 留着一个没有任何使用方的选择器, 下次改版会误以为是活代码。
+ */
+/* 注册入口: 参考站无 (走短信/扫码), 本项目邮箱注册体系需要 → 保留文字链接 */
+.login-switch {
+  margin-top: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.login-switch a {
+  color: var(--brand);
+  cursor: pointer;
+}
+
+/* ── 通用 OAuth 登录按钮 ─────────────────────────────────────────────── */
+.login-oauth {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.login-oauth-divider {
+  font-size: 12px;
+  color: var(--text-desc);
+  text-align: center;
+}
+
+.login-oauth-btn {
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.login-oauth-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ── 扫码登录面板 (B8) ────────────────────────────────────────────────
+   二维码固定 220×220 留白 (quiet zone 由 qrcode 的 margin 生成, CSS 不再加内边距,
+   否则同一码在不同位置看起来大小不一)。过期时给一层遮罩而不是隐藏二维码 ——
+   用户看到「还是这张码」比看到空白更容易理解发生了什么。 */
+.qr-login-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.qr-login-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 220px;
+  height: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.qr-login-image {
+  width: 220px;
+  height: 220px;
+  display: block;
+}
+
+.qr-login-image.is-stale {
+  opacity: 0.25;
+}
+
+.qr-login-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.qr-login-placeholder {
+  padding: 0 20px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+}
+
+.qr-login-hint {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.qr-login-hint.is-active {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.qr-login-countdown {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.qr-login-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--danger-text);
+}
+
+.qr-login-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.qr-login-refresh:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.qr-login-refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 860px) {
+.login-split {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: 420px;
+    height: auto;
+  }
+.login-showcase {
+    display: none;
+  }
+.login-form-panel {
+    padding: 32px 24px;
+  }
+.login-close {
+    right: 24px;
+  }
+}
+
+@media (max-width: 400px) {
+.login-page {
+    padding: 12px;
+  }
+.login-form-panel {
+    padding: 24px 16px;
+  }
+.login-close {
+    top: 24px;
+    right: 16px;
+  }
+.login-tabs {
+    gap: 16px;
+    padding: 0 8px;
+  }
+}
+
+/* 登录弹窗遮罩容器: 兼容壳只负责遮罩与居中, 内容区完全透明,
+   卡片本体 (840x478 / radius 32 / 阴影) 由 .login-split 承担, 与独立页同一套样式。
+
+   ⚠️ 同 `.alp-modal`: 页面级类与容器类在**同一个元素**上, 必须写紧邻合并选择器。
+   原先三处 (子孙) 与 `.ant-modal-close` (该节点在这套壳里不存在, 关闭键是
+   `.ui-modal-close`) 全为死规则 —— @2026-11-03 实测命中数均为 0。
+   因为 LoginModal 另外用 `styles.container` 内联了同一组值, 视觉未暴露差异;
+   内联值拿掉后这里才真正生效, 故两条都要保留。
+
+   不要在这里写 `max-height: none`: 卡片本体 515px 高, 矮视口下
+   `.ui-modal-surface` 的 `calc(100vh - 32px)` 与 `overflow: auto` 是唯一的
+   兜底滚动 —— 去掉后卡片底部（含登录按钮）会被裁到视口外。 */
+.login-modal.ant-modal-container {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+/* ── 登录卡新增块 (B2: 忘记密码 / 短信验证码 / 注册协议) ─────────────────── */
+/* 「忘记密码？」—— 右对齐的单行文字链接, 与提交按钮同宽 */
+.login-links {
+  text-align: right;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.login-links a {
+  color: var(--brand);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.login-links a:hover {
+  color: var(--brand-hover);
+}
+
+/* 验证码行: 输入框自适应 + 固定宽度的「获取验证码」按钮 */
+.login-code-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.login-code-btn {
+  flex: 0 0 auto;
+  width: 108px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid var(--login-border-brand);
+  background: var(--card-bg);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+}
+
+.login-code-btn:hover:not(:disabled),
+.login-code-btn:focus-visible:not(:disabled) {
+  background: var(--brand-bg);
+  color: var(--brand-hover);
+  border-color: var(--brand);
+}
+
+.login-code-btn:disabled {
+  color: var(--text-desc);
+  border-color: var(--border);
+  background: var(--card-bg);
+}
+
+/* 注册协议勾选: 文案较长, 必须允许换行 (父级 login-agreement 是 nowrap)
+   shadcn Checkbox 的根节点是 <button>（radix Primitive.button）, 文案是它的
+   children, 故这里按按钮 + 相邻文本选择, 不能写成 label。 */
+.login-agree-field a {
+  color: var(--brand);
+  margin: 0 2px;
+}
+
+/* ── 找回 / 重置密码独立页 (无左栏礼宾面板) ──────────────────────────────── */
+.auth-plain-card {
+  width: 420px;
+  max-width: 100%;
+  padding: 40px;
+  background: var(--card-bg);
+  border-radius: var(--radius-hero);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+}
+
+.auth-plain-card h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.auth-plain-card .auth-plain-desc {
+  margin: 0 0 24px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+
+/* 找回密码 / 重置密码的表单要显示 label 行（登录卡片不显示）——
+   等价规则见文件末尾「登录 / 认证卡片」适配层
+   (.auth-plain-card .login-field .ui-form-label) */
+.auth-plain-card .auth-plain-actions {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.auth-plain-card .auth-plain-actions a {
+  color: var(--brand);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.auth-plain-result {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--brand-bg);
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.login-field .ui-form-item {
+  margin-bottom: 18px;
+}
+
+.login-field .ui-form-label {
+  display: none;
+}
+
+.auth-plain-card .login-field .ui-form-label {
+  display: block;
+}
+
+.auth-plain-card .login-field .ui-form-label > span {
+  font-size: 13px;
+  color: var(--text-body);
+}
+
+.login-field .ui-form-error {
+  font-size: 12px;
+  line-height: 18px;
+  padding-top: 4px;
+}
+
+.login-agree-field .ui-form-control {
+  min-height: 0;
+}
+
+.login-agree-field .ui-form-label {
+  display: none;
+}
+
+/* Radix Checkbox 根节点只渲染勾选框，协议文案不能作为它的 children
+   （会被组件的 Indicator 覆盖）。用原生 label 同时提供点击区域和可访问名称。 */
+.login-agree-field .login-agree-control {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-desc);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.login-agree-field .login-agree-control > [data-slot='checkbox'] {
+  margin-top: 2px;
+  flex: none;
+}
+
+.login-code-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* 弹层关闭按钮：保留旧 .ant-modal-close 的隐藏语义
+   (登录弹窗按设计不显示右上角关闭键, `closable={false}` 已不渲染;
+    这条是兜底, 防止日后误开 closable 时冒出一个关闭键) */
+.login-modal .ui-modal-close {
+  display: none;
+}

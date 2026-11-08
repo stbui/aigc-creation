@@ -44,6 +44,7 @@ import {
   normalizedScalar,
   numericRange,
 } from './option-values';
+import { fillMissingOpenAIImageSizePresets } from './openai-image-size-presets';
 import type {
   CapabilityImageSize,
   CapabilitySpec,
@@ -180,6 +181,7 @@ function capabilityLabel(capability: string): string {
 export function capabilitySpecFromModelCapabilityConfig(
   config: ModelCapabilityConfig | null | undefined,
   capability: string,
+  protocol?: string,
 ): CapabilitySpec {
   const normalizedCapability = normalizeCapability(capability);
   const spec: CapabilitySpec = {
@@ -203,22 +205,23 @@ export function capabilitySpecFromModelCapabilityConfig(
   if (normalizedCapability === 'image') {
     const image = config.image;
     if (!image) throw badRequest('渠道图片模型尚未配置能力参数');
-    addInputs(spec, 'image', 0, image.references.maxImages);
-    if (image.references.maskSupported) addInputs(spec, 'mask', 0, 1);
-    if (image.size.parameter !== 'none') {
-      const sizeConstraint = imageSizeOptionConstraint(image.size);
+    const effectiveImage = fillMissingOpenAIImageSizePresets(image, protocol);
+    addInputs(spec, 'image', 0, effectiveImage.references.maxImages);
+    if (effectiveImage.references.maskSupported) addInputs(spec, 'mask', 0, 1);
+    if (effectiveImage.size.parameter !== 'none') {
+      const sizeConstraint = imageSizeOptionConstraint(effectiveImage.size);
       if ((sizeConstraint.values ?? []).length > 0) spec.options!.size = sizeConstraint;
       // 参数表存在时尺寸档走参数合同的 activeImageSizePresets，兼容旧三元组的模型才读原始预设
-      const presets = image.parameters !== undefined ? activeImageSizePresets(image) : image.size.presets;
-      spec.imageSize = capabilityImageSizeFromConfig({ ...image.size, presets } as ImageSizeConfig);
+      const presets = effectiveImage.parameters !== undefined ? activeImageSizePresets(effectiveImage) : effectiveImage.size.presets;
+      spec.imageSize = capabilityImageSizeFromConfig({ ...effectiveImage.size, presets } as ImageSizeConfig);
     }
-    if (image.resolution.supported) spec.options!.imageResolution = anyValues(image.resolution.values);
-    if (image.quality.supported) spec.options!.quality = anyValues(image.quality.values);
-    spec.options!.transparentBackground = boolValues(image.transparentBackground.supported);
-    spec.options!.count = numericRange(1, Math.trunc(image.maxOutputs), 1);
-    if (image.parameters !== undefined) {
-      spec.options = imageParameterConstraints(image.parameters);
-      spec.imageParameters = publicImageParameters(image.parameters);
+    if (effectiveImage.resolution.supported) spec.options!.imageResolution = anyValues(effectiveImage.resolution.values);
+    if (effectiveImage.quality.supported) spec.options!.quality = anyValues(effectiveImage.quality.values);
+    spec.options!.transparentBackground = boolValues(effectiveImage.transparentBackground.supported);
+    spec.options!.count = numericRange(1, Math.trunc(effectiveImage.maxOutputs), 1);
+    if (effectiveImage.parameters !== undefined) {
+      spec.options = imageParameterConstraints(effectiveImage.parameters);
+      spec.imageParameters = publicImageParameters(effectiveImage.parameters);
     }
     return normalizeCapabilitySpec(spec);
   }
@@ -714,6 +717,7 @@ export function assertImageCapabilityConfig(image: any): void {
 export function capabilitySpecForChannelModel(options: {
   config: ModelCapabilityConfig | null;
   capability: string;
+  protocol?: string;
 }): CapabilitySpec {
-  return capabilitySpecFromModelCapabilityConfig(options.config, options.capability);
+  return capabilitySpecFromModelCapabilityConfig(options.config, options.capability, options.protocol);
 }

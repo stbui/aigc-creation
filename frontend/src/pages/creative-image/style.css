@@ -1,0 +1,359 @@
+/**
+ * creative-image 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* 自由创作页: 参考站 .free-creation-page 内边距四边均为 16 (其余能力页右侧为 24,
+   故右内边距单独收紧, 结果栏因此 784 宽而非 776 —— 实拍 [640,80,784,804]) */
+.pk-workspace.fc-workspace {
+  padding-right: 16px;
+}
+
+/* ───────── 自由创作页 (1:1 复刻 ijihua.cn/free-creation, 数值来自实拍 computed styles) ───────── */
+
+/* 窄屏标题头 (桌面 display:none 实拍确认; span 14px/700 #333 lh13 + h1 16px/700 #333 lh22) */
+.fc-section-head {
+  display: none;
+}
+
+.fc-section-head span {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--wb-text);
+  line-height: 13px;
+}
+
+.fc-section-head h1 {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--wb-text);
+  line-height: 22px;
+}
+
+/* 自由创作主卡: 实拍 .free-main-card padding 12px 16px / gap 16px
+   (共用 .pk-config-card 的其他能力页仍是 16 / 24, 故按页作用域覆盖) */
+.pk-workspace.fc-workspace .pk-config-card {
+  padding: 12px 16px;
+  gap: 16px;
+}
+
+/* 上传 section: 实拍 .free-upload-section gap 12 (提示词 section 仍为 16) */
+.fc-upload-section {
+  gap: 12px;
+}
+
+/* 上传占位块: 实拍 .free-upload-add 366x126 / padding 8 / radius 8 / 12px 20 #1D2129,
+   铺满 dropzone 内区 (原为 238x126 居中块, 无圆角无内边距) */
+.pk-dropzone.fc-dropzone .fc-upload-prompt {
+  width: 100%;
+  min-height: 126px;
+  padding: 8px;
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-1);
+}
+
+.pk-dropzone.fc-dropzone .fc-upload-prompt span {
+  color: var(--text-1);
+}
+
+/* 上传区 ready 态 (实拍: 有图后去边框/底色/padding, min-height 80, display block) */
+.pk-dropzone.fc-dropzone-ready {
+  border: 0;
+  background: none;
+  padding: 0;
+  min-height: 80px;
+  display: block;
+  cursor: default;
+}
+
+/* 参考图空态 plus 图标下移 20px (参考站全局 .workspace-upload-prompt img 规则) */
+.pk-dropzone.fc-dropzone .pk-upload-prompt svg {
+  margin-bottom: 20px;
+}
+
+/* 参考图缩略图 (实拍: repeat(auto-fill,80px) gap10 justify-start; thumb 80x80 radius8) */
+.fc-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 80px);
+  justify-content: start;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+}
+
+.fc-thumb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.fc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fc-thumb-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(29, 33, 41, 0.66);
+  color: var(--card-bg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* 排序箭头 (实拍: 18x18 圆形 rgba(29,33,41,.66) 白字, 垂直居中于缩略图) */
+.fc-thumb-order {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  right: 2px;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.fc-thumb-order button {
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(29, 33, 41, 0.66);
+  color: var(--card-bg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.fc-thumb-order button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* 添加卡片 (实拍: 80x80, bg var(--surface), border var(--surface), radius8, column gap10) */
+.fc-thumb-add {
+  width: 80px;
+  height: 80px;
+  border: 1px solid var(--surface);
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  color: var(--text-body);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.fc-thumb-add:hover {
+  border-color: var(--border-hover);
+}
+
+.fc-thumb-add span {
+  font-size: 12px;
+  line-height: 22px;
+  color: var(--text-body);
+}
+
+.fc-sort-tip {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+
+/* 创作提示词: 必填星 + 工具按钮 (实拍 label 14px/700 #333 lh13, ::before * var(--danger-ref);
+   工具按钮 12px var(--brand) h16 gap4, 组 gap12) */
+.fc-prompt-field {
+  gap: 16px;
+}
+
+.fc-prompt-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  min-height: 16px;
+}
+
+.fc-prompt-label-row > span {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--wb-text);
+  line-height: 13px;
+}
+
+.fc-prompt-label-row > span::before {
+  content: '*';
+  color: var(--danger-ref);
+  margin-right: 2px;
+}
+
+.fc-prompt-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fc-prompt-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--brand);
+  background: none;
+  border: 0;
+  padding: 0;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* hover 对齐参考站文字链版 .free-prompt-tool-btn:hover → color #5546d8 + outline none (本地复刻的是无边框文字版, 非胶囊版) (2026-10-18 对拍) */
+.fc-prompt-tool-btn:hover {
+  color: var(--brand);
+  outline: none;
+}
+
+/* 实拍 textarea resize vertical; .pk-desc-editor textarea 的 resize:none 特异性更高, 此处提权覆盖 */
+.pk-desc-editor .fc-prompt-textarea {
+  resize: vertical;
+}
+
+/* 参考站 textarea 为默认 inline-block, 父级 .description-editor 实测 84.5 高 (80 + 基线间隙);
+   本站 .pk-desc-editor textarea 统一 display:block 会矮 4.5px, 导致提示词组 112 vs 117。
+   仅本页恢复 inline-block 以对齐 (实拍 [208,335,400,84.5])。 */
+.fc-prompt-field .pk-desc-editor {
+  line-height: normal;
+}
+
+.fc-prompt-field .fc-prompt-textarea {
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+/* 提示词框撑满左栏剩余高度 (2026-10-22 用户反馈"高度靠近底部区域", 选定"再拉高填满下方空白")。
+   2026-10-21 先是从实拍 80px 加到固定 140px("高度不够"), 但 1440×900 实测:
+   卡片内容到 y=532 就结束, 提交区从 y=750 起 —— 中间 200 多像素是纯灰底空白,
+   和输入框抢的正是同一块视觉重心。固定高度解决不了它, 只会让空白随视口忽大忽小。
+   改为让输入框吃掉这块空间:
+     · 滚动区不再 align-content: start (那会让卡片按内容高度收缩);
+     · 卡片 / 提示词分组 / 编辑框容器逐层改 flex 纵向, 由 textarea 承接剩余高度;
+     · min-height 140px 保底 —— 窄屏(≤1024 视口高度 auto)或上传多张参考图导致内容超高时,
+       输入框仍有可用高度, 其余照旧滚动。
+   此处**有意偏离**参考站实拍的 80px, 与 140px 那次的取舍同源。 */
+.fc-workspace .pk-form-scroll {
+  align-content: stretch;
+}
+
+.fc-workspace .pk-config-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.fc-workspace .fc-prompt-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.fc-workspace .fc-prompt-field .pk-desc-editor {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 140px;
+}
+
+.fc-workspace .fc-prompt-field .pk-desc-editor textarea.fc-prompt-textarea {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 140px;
+}
+
+/* 提交区: actions flex column gap16 margin-top auto (sticky 底部)
+   2026-10-19 移除次要按钮行(「重置」/「清空结果」) 及 .fc-secondary-actions/.fc-ghost-btn 样式 ——
+   用户要求不要这两个按钮, 且它们在 900 高视口下被挤到首屏外(实测 y=844, 页面总高 940)。 */
+.fc-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* 实拍 .free-actions: bg #F6F7FB + padding 16px 0 0 (灰底过渡带),
+     下方 .pk-submit-actions 为白色提交卡 432x118 padding 14px 16px 16px */
+  background: var(--page-bg);
+  padding: 16px 0 0;
+}
+
+/* disabled 态说明: 曾有一条 `.fc-actions .pk-primary-btn:disabled { opacity: 1 }` 覆盖
+   （据称对齐参考站 .free-actions .primary-btn:disabled 不淡出），结果按钮功能上被 disabled、
+   视觉上毫无变化（computed opacity 恒为 1），用户看不出「没填提示词不能提交」。
+   2026-10-19 删除该覆盖，统一继承 .pk-primary-btn:disabled 的 opacity .55 + not-allowed。 */
+
+/* 高级设置 popover: 在 pk-settings-popover 基础上增加头部 (实拍: head flex
+   space-between min-height20 margin-bottom16; h2 16px/20 var(--text-strong); close 24x24 #526077) */
+/* 头部与内容间距: 参考站是 head margin-bottom 16px + 内容容器自身无外间距 =
+   16px; 本仓 .pk-settings-popover 是 `display:grid; gap:19px`, 会在这 16px 之外
+   再加 19px → 实测 35px, 分组整体下移半行。@2026-10-21 对拍修复 */
+.fc-settings-popover {
+  row-gap: 0;
+}
+
+/* 组与组之间仍是 19px (参考站 .image-output-settings 的 grid gap) */
+.fc-settings-popover .pk-settings-group + .pk-settings-group {
+  margin-top: 19px;
+}
+
+.fc-settings-popover-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 20px;
+  margin-bottom: 16px;
+}
+
+.fc-settings-popover-head h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 20px;
+  /* 参考站 .image-output-settings-popover-head h2 实拍 fw 700 + rgb(41,40,57)
+     (原为 600 + var(--text-strong) #171a2b, 字重与色阶各差一档) @2026-10-19 */
+  color: var(--text-2);
+  font-weight: 700;
+}
+
+.fc-settings-close {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  color: var(--text-4);
+  cursor: pointer;
+  padding: 0;
+}
+
+.fc-settings-close:hover {
+  color: var(--text-strong);
+}

@@ -13,7 +13,6 @@ import {
 } from '~/admin-ui/primitives';
 import {
   BILLING_MODE_OPTIONS,
-  CAPABILITY_SPEC_PLACEHOLDER,
   PRICE_POLICY_OPTIONS,
   type ModelDraft,
   type RouteDraft,
@@ -69,9 +68,7 @@ export function ModelFormDrawer({
       }}
       width={760}
       title={editing ? `编辑 · ${editing.name}` : '新建前台模型'}
-      description={
-        dirty ? '有未保存修改' : '全量提交：未填字段按默认值落库，保存后生成新 revision'
-      }
+      description={dirty ? '有未保存修改' : undefined}
       footer={
         <>
           <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={saving}>
@@ -83,14 +80,14 @@ export function ModelFormDrawer({
             disabled={saving || !writable}
             onClick={onSave}
           >
-            {saving ? '保存中…' : editing ? '保存（新 revision）' : '创建'}
+            {saving ? '保存中…' : editing ? '保存修改' : '创建模型'}
           </ActionButton>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         {unavailableReasons.length > 0 && (
-          <Notice tone="warn" title="当前模型不可用">
+          <Notice tone="warn" title="模型暂不可用">
             <ul className="mt-1 list-disc pl-4">
               {unavailableReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
@@ -99,84 +96,94 @@ export function ModelFormDrawer({
           </Notice>
         )}
 
-        <div className="grid grid-cols-3 gap-3">
-          <FormField label="编码" hint={editing ? '创建后不可修改' : '小写字母 / 数字 / . _ -'}>
-            <TextField
-              ariaLabel="编码"
-              value={draft.code}
-              onChange={(value) => onChange({ code: value })}
-              placeholder="ecom-image-pro"
-              disabled={!!editing}
-              maxLength={80}
-            />
-          </FormField>
-          <FormField label="名称">
-            <TextField
-              ariaLabel="名称"
-              value={draft.name}
-              onChange={(value) => onChange({ name: value })}
-              placeholder="电商主图 Pro"
-              maxLength={60}
-            />
-          </FormField>
-          <FormField label="图标" hint="emoji 或短字符">
-            <TextField
-              ariaLabel="图标"
-              value={draft.icon}
-              onChange={(value) => onChange({ icon: value })}
-              placeholder="🎨"
-              maxLength={8}
-            />
-          </FormField>
-        </div>
-
-        <FormField label="描述" hint="面向用户展示的一句话说明">
-          <TextAreaField
-            ariaLabel="描述"
-            value={draft.description}
-            onChange={(value) => onChange({ description: value })}
-            rows={2}
-            maxLength={200}
-            placeholder="高质量商品主图生成，支持多尺寸"
-          />
-        </FormField>
-
-        <div className="grid grid-cols-3 gap-3">
-          <FormField label="C 端能力" hint="准入按这个 id 选模型">
-            <SelectField
-              ariaLabel="C 端能力"
-              value={draft.capability || undefined}
-              options={capabilityOptions}
-              onChange={(value) => onChange({ capability: value ?? '' })}
-              placeholder="选择能力"
-            />
-          </FormField>
-          <FormField label="排序值" hint="数字越小越靠前">
-            <NumberField
-              ariaLabel="排序值"
-              value={Number(draft.sortOrder) || 0}
-              min={0}
-              onChange={(value) => onChange({ sortOrder: String(value ?? 0) })}
-            />
-          </FormField>
-          <FormField label="上架">
-            <div className="flex h-8 items-center">
-              <SwitchField
-                checked={draft.enabled}
-                label="对用户可见"
-                ariaLabel="上架"
-                onChange={(checked) => onChange({ enabled: checked })}
+        <section className="flex flex-col gap-3">
+          <div className="text-xs font-semibold text-foreground">模型信息</div>
+          <div className="grid grid-cols-3 gap-3">
+            <FormField
+              label="模型编号"
+              required
+              hint={editing ? '创建后不可修改' : undefined}
+            >
+              <TextField
+                ariaLabel="模型编号"
+                value={draft.code}
+                onChange={(value) => onChange({ code: value })}
+                placeholder="例如：ecom-image-pro"
+                disabled={!!editing}
+                maxLength={80}
               />
-            </div>
+            </FormField>
+            <FormField label="模型名称" required>
+              <TextField
+                ariaLabel="模型名称"
+                value={draft.name}
+                onChange={(value) => onChange({ name: value })}
+                placeholder="例如：电商主图 Pro"
+                maxLength={60}
+              />
+            </FormField>
+            <FormField label="模型图标">
+              <TextField
+                ariaLabel="模型图标"
+                value={draft.icon}
+                onChange={(value) => onChange({ icon: value })}
+                placeholder="🎨"
+                maxLength={8}
+              />
+            </FormField>
+          </div>
+
+          <FormField label="模型描述">
+            <TextAreaField
+              ariaLabel="模型描述"
+              value={draft.description}
+              onChange={(value) => onChange({ description: value })}
+              rows={2}
+              maxLength={200}
+              placeholder="例如：高质量商品主图生成，支持多尺寸"
+            />
           </FormField>
-        </div>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <div className="text-xs font-semibold text-foreground">上架设置</div>
+          <div className="grid grid-cols-3 gap-3">
+            <FormField label="所属能力" required>
+              <SelectField
+                ariaLabel="所属能力"
+                value={draft.capability || undefined}
+                options={capabilityOptions}
+                onChange={(value) => onChange({ capability: value ?? '' })}
+                placeholder="选择所属能力"
+              />
+            </FormField>
+            <FormField label="展示排序" hint="数字越小，展示越靠前">
+              <NumberField
+                ariaLabel="展示排序"
+                value={Number(draft.sortOrder) || 0}
+                min={0}
+                onChange={(value) => onChange({ sortOrder: String(value ?? 0) })}
+              />
+            </FormField>
+            <FormField label="上架状态">
+              <div className="flex h-8 items-center">
+                <SwitchField
+                  checked={draft.enabled}
+                  label={draft.enabled ? '已上架' : '未上架'}
+                  ariaLabel="上架状态"
+                  onChange={(checked) => onChange({ enabled: checked })}
+                />
+              </div>
+            </FormField>
+          </div>
+        </section>
 
         <div className="rounded-lg border border-border p-3">
-          <div className="mb-2 text-xs font-semibold text-foreground">计费</div>
+          <div className="mb-2 text-xs font-semibold text-foreground">价格设置</div>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="价格策略" hint="「跟随渠道」按渠道模型的价格档计费">
+            <FormField label="定价方式">
               <SelectField
-                ariaLabel="价格策略"
+                ariaLabel="定价方式"
                 value={draft.pricePolicy}
                 options={PRICE_POLICY_OPTIONS}
                 onChange={(value) => onChange({ pricePolicy: value ?? 'channel' })}
@@ -192,71 +199,56 @@ export function ModelFormDrawer({
             </FormField>
           </div>
           {draft.pricePolicy === 'unified' && (
-            <div className="mt-3 grid grid-cols-4 gap-3">
-              <FormField label="单价（积分）">
-                <TextField
-                  ariaLabel="单价"
-                  inputMode="decimal"
-                  value={draft.unitPrice}
-                  onChange={(value) => onChange({ unitPrice: value })}
-                />
-              </FormField>
-              <FormField label="输入 Token 价">
-                <TextField
-                  ariaLabel="输入 Token 价"
-                  inputMode="decimal"
-                  value={draft.inputPrice}
-                  onChange={(value) => onChange({ inputPrice: value })}
-                />
-              </FormField>
-              <FormField label="输出 Token 价">
-                <TextField
-                  ariaLabel="输出 Token 价"
-                  inputMode="decimal"
-                  value={draft.outputPrice}
-                  onChange={(value) => onChange({ outputPrice: value })}
-                />
-              </FormField>
-              <FormField label="缓存 Token 价">
-                <TextField
-                  ariaLabel="缓存 Token 价"
-                  inputMode="decimal"
-                  value={draft.cachedPrice}
-                  onChange={(value) => onChange({ cachedPrice: value })}
-                />
-              </FormField>
-            </div>
+            draft.billingMode === 'token' ? (
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <FormField label="输入内容单价">
+                  <TextField
+                    ariaLabel="输入内容单价"
+                    inputMode="decimal"
+                    value={draft.inputPrice}
+                    onChange={(value) => onChange({ inputPrice: value })}
+                  />
+                </FormField>
+                <FormField label="输出内容单价">
+                  <TextField
+                    ariaLabel="输出内容单价"
+                    inputMode="decimal"
+                    value={draft.outputPrice}
+                    onChange={(value) => onChange({ outputPrice: value })}
+                  />
+                </FormField>
+                <FormField label="缓存内容单价">
+                  <TextField
+                    ariaLabel="缓存内容单价"
+                    inputMode="decimal"
+                    value={draft.cachedPrice}
+                    onChange={(value) => onChange({ cachedPrice: value })}
+                  />
+                </FormField>
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <FormField
+                  label={draft.billingMode === 'per_second' ? '每秒价格' : '每次价格'}
+                >
+                  <TextField
+                    ariaLabel="单价"
+                    inputMode="decimal"
+                    value={draft.unitPrice}
+                    onChange={(value) => onChange({ unitPrice: value })}
+                  />
+                </FormField>
+              </div>
+            )
           )}
         </div>
-
-        <FormField
-          label="能力合同（capabilitySpec）"
-          hint="声明本模型接受的 input / operation / 参数范围；线路按它做匹配，写错会让模型选不到线路"
-        >
-          <TextAreaField
-            ariaLabel="能力合同"
-            value={draft.capabilitySpecText}
-            onChange={(value) => onChange({ capabilitySpecText: value })}
-            rows={8}
-            placeholder={CAPABILITY_SPEC_PLACEHOLDER}
-          />
-        </FormField>
-
-        <FormField label="默认参数" hint="用户未显式给出时使用的默认值（JSON 对象）">
-          <TextAreaField
-            ariaLabel="默认参数"
-            value={draft.defaultOptionsText}
-            onChange={(value) => onChange({ defaultOptionsText: value })}
-            rows={4}
-          />
-        </FormField>
 
         <div className="rounded-lg border border-border p-3">
           <div className="mb-2 flex items-center justify-between">
             <div>
-              <div className="text-xs font-semibold text-foreground">线路</div>
+              <div className="text-xs font-semibold text-foreground">服务来源</div>
               <div className="text-[12px] text-muted-foreground">
-                同一 priority 内按 weight 随机；priority 更小的层先被尝试
+                优先顺位数值越小，越先使用；同一顺位按比例分流
               </div>
             </div>
             <ActionButton
@@ -266,48 +258,55 @@ export function ModelFormDrawer({
               disabled={!writable}
               onClick={onAddRoute}
             >
-              添加线路
+              添加服务来源
             </ActionButton>
           </div>
           {draft.routes.length === 0 ? (
             <p className="py-3 text-center text-[12px] text-muted-foreground">
-              没有线路时模型永远不可用（C 端会收到 42204）。
+              尚未添加服务来源，模型暂不可用。
             </p>
           ) : (
             <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_72px_72px_96px_32px] gap-2 px-1 text-[12px] text-muted-foreground">
+                <span>服务来源</span>
+                <span>优先顺位</span>
+                <span>分流比例</span>
+                <span>状态</span>
+                <span />
+              </div>
               {draft.routes.map((route) => (
                 <div
                   key={route.key}
-                  className="grid grid-cols-[1fr_64px_64px_72px_32px] items-end gap-2"
+                  className="grid grid-cols-[minmax(0,1fr)_72px_72px_96px_32px] items-end gap-2"
                 >
                   <SelectField
-                    ariaLabel="线路渠道模型"
+                    ariaLabel="服务来源"
                     value={route.channelModelId || undefined}
                     options={channelModelOptions}
                     onChange={(value) => onUpdateRoute(route.key, { channelModelId: value ?? '' })}
-                    placeholder="选择渠道模型"
+                    placeholder="选择服务来源"
                   />
                   <NumberField
-                    ariaLabel="优先级"
+                    ariaLabel="服务来源优先顺位"
                     value={Number(route.priority) || 0}
                     min={0}
                     onChange={(value) => onUpdateRoute(route.key, { priority: String(value ?? 0) })}
                   />
                   <NumberField
-                    ariaLabel="权重"
+                    ariaLabel="服务来源分流比例"
                     value={Number(route.weight) || 0}
                     min={0}
                     onChange={(value) => onUpdateRoute(route.key, { weight: String(value ?? 0) })}
                   />
                   <SwitchField
                     checked={route.enabled}
-                    label="启用"
-                    ariaLabel="线路启用"
+                    label={route.enabled ? '已启用' : '已停用'}
+                    ariaLabel="服务来源状态"
                     onChange={(checked) => onUpdateRoute(route.key, { enabled: checked })}
                   />
                   <IconButton
                     icon={Trash2}
-                    label="删除线路"
+                    label="删除服务来源"
                     size="xs"
                     onClick={() => onRemoveRoute(route.key)}
                   />
@@ -316,6 +315,32 @@ export function ModelFormDrawer({
             </div>
           )}
         </div>
+
+        {editing && (
+          <details className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-xs font-semibold text-foreground">
+              更多设置
+            </summary>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <FormField label="能力范围" hint="限制可提供的服务与规格">
+                <TextAreaField
+                  ariaLabel="能力范围"
+                  value={draft.capabilitySpecText}
+                  onChange={(value) => onChange({ capabilitySpecText: value })}
+                  rows={6}
+                />
+              </FormField>
+              <FormField label="默认选项" hint="用户未选择时自动采用">
+                <TextAreaField
+                  ariaLabel="默认选项"
+                  value={draft.defaultOptionsText}
+                  onChange={(value) => onChange({ defaultOptionsText: value })}
+                  rows={6}
+                />
+              </FormField>
+            </div>
+          </details>
+        )}
 
       </div>
     </Drawer>

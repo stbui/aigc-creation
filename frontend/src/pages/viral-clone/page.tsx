@@ -61,6 +61,7 @@ import {
   viralCloneProductImageLimit,
 } from './utils';
 import type { Asset, MobileUploadAsset } from '../../types/api';
+import { runtimeOf } from '../../lib/constants';
 import { useApp } from '../../ui';
 
 /**
@@ -193,10 +194,10 @@ export function ViralClonePage() {
    * 没有可用模型通道 (`unavailable`) 或被后台下线 (`disabled`) 时提前拦住提交。
    */
   const { data: capData } = useCapabilities();
-  const hotRemakeRuntime = capData?.items.find((c) => c.id === 'hot_remake')?.runtime;
+  const hotRemakeDef = capData?.items.find((c) => c.id === 'hot_remake');
+  const hotRemakeRuntime = hotRemakeDef ? runtimeOf(hotRemakeDef) : null;
   const unavailableReason =
-    hotRemakeRuntime &&
-    (hotRemakeRuntime.effective === 'unavailable' || hotRemakeRuntime.effective === 'disabled')
+    hotRemakeRuntime && (hotRemakeRuntime.effective === 'unavailable' || hotRemakeRuntime.effective === 'disabled')
       ? hotRemakeRuntime.reason || '该能力当前不可提交，请稍后再试或联系客服。'
       : null;
 
@@ -357,10 +358,7 @@ export function ViralClonePage() {
   );
 
   // ── 生成 ──
-  const pollTask = useCallback(
-    (taskId: string) => pollToResult(taskId, { signal: pollSignal }),
-    [pollSignal],
-  );
+  const pollTask = useCallback((taskId: string) => pollToResult(taskId, { signal: pollSignal }), [pollSignal]);
 
   const submit = async () => {
     if (!formValid || !reference || generating) return;
@@ -401,9 +399,7 @@ export function ViralClonePage() {
       };
       const fingerprint = JSON.stringify(payload);
       const idempotencyKey =
-        pendingStartRef.current?.fingerprint === fingerprint
-          ? pendingStartRef.current.key
-          : newIdempotencyKey();
+        pendingStartRef.current?.fingerprint === fingerprint ? pendingStartRef.current.key : newIdempotencyKey();
       pendingStartRef.current = { fingerprint, key: idempotencyKey };
       const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
       pendingStartRef.current = null;

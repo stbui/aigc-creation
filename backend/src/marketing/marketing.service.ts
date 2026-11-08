@@ -4,6 +4,7 @@ import { AppError } from '../common/app.exception';
 import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { CreditService } from '../credits/credit.service';
 import { Prisma } from '@prisma/client';
+import { lockUserRow } from '../account/user-row-lock';
 
 /**
  * 营销中心 (M11 · admin-prd.md B-64~B-67 / admin-detailed-design.md §12)。
@@ -156,9 +157,10 @@ export class MarketingService {
       }),
     ]);
 
+    const pendingByCoupon = await this.pendingReservationCounts(rows.map((c) => c.id));
     const now = new Date();
     return {
-      items: rows.map((c) => this.toCouponView(c, now)),
+      items: rows.map((c) => this.toCouponView(c, now, pendingByCoupon.get(c.id) ?? 0)),
       total,
       page,
       pageSize,
@@ -189,7 +191,8 @@ export class MarketingService {
       take: CSV_EXPORT_MAX_ROWS,
     });
     const now = new Date();
-    const views = rows.map((c) => this.toCouponView(c, now));
+    const pendingByCoupon = await this.pendingReservationCounts(rows.map((c) => c.id));
+    const views = rows.map((c) => this.toCouponView(c, now, pendingByCoupon.get(c.id) ?? 0));
     return toCsv(
       [
         { label: '券码', value: (c) => c.code },
@@ -200,6 +203,7 @@ export class MarketingService {
         { label: '适用范围', value: (c) => c.scopeLabel },
         { label: '发放总量', value: (c) => c.totalCount },
         { label: '已使用', value: (c) => c.usedCount },
+        { label: '待支付预占', value: (c) => c.pendingReserved },
         { label: '剩余', value: (c) => (c.remaining === null ? '不限' : c.remaining) },
         { label: '每人限用', value: (c) => c.perUserLimit },
         { label: '开关', value: (c) => (c.status === 'on' ? '启用' : '停用') },
@@ -231,7 +235,8 @@ export class MarketingService {
   async getCoupon(id: string) {
     const c = await this.prisma.coupon.findUnique({ where: { id } });
     if (!c) throw new AppError(40400, '优惠券不存在', 404);
-    return this.toCouponView(c, new Date());
+    const pending = await this.pendingReservationCounts([id]);
+    return this.toCouponView(c, new Date(), pending.get(id) ?? 0);
   }
 
   /** 创建券 */
@@ -259,7 +264,7 @@ export class MarketingService {
         status: dto.status ?? 'on',
       },
     });
-    return this.toCouponView(created, new Date());
+    return this.toCouponView(created, new Date(), 0);
   }
 
   /** 更新券。券码不可改, 规则改动不追溯已核销订单 (§12.6) */
@@ -299,7 +304,8 @@ export class MarketingService {
         ...(dto.status ? { status: dto.status } : {}),
       },
     });
-    return this.toCouponView(updated, new Date());
+    const pending = await this.pendingReservationCounts([id]);
+    return this.toCouponView(updated, new Date(), pending.get(id) ?? 0);
   }
 
   /** 停用券 (不删除: 已核销订单仍需引用, 删除会让历史订单悬空) */
@@ -310,7 +316,8 @@ export class MarketingService {
       where: { id },
       data: { status: existing.status === 'on' ? 'off' : 'on' },
     });
-    return this.toCouponView(updated, new Date());
+    const pending = await this.pendingReservationCounts([id]);
+    return this.toCouponView(updated, new Date(), pending.get(id) ?? 0);
   }
 
   /**
@@ -365,9 +372,20 @@ export class MarketingService {
     userId: string;
     code: string;
     items: Array<{ productId: string; priceCents: number; quantity: number }>;
+    /** 建单事务内传 tx，确保限量与每人限额检查能锁住券行 */
+    db?: Prisma.TransactionClient;
+    /** 为 true 时先取得 Coupon 行写锁，再统计待支付预占 */
+    lockForReservation?: boolean;
   }): Promise<{ discountCents: number; coupon: any; reason: string | null }> {
     const code = params.code.trim().toUpperCase();
-    const coupon = await this.prisma.coupon.findUnique({ where: { code } });
+    const db = (params.db ?? this.prisma) as Prisma.TransactionClient;
+    if (params.lockForReservation) {
+      // SQLite 的 deferred BEGIN 不提供读锁升级保证；先 no-op UPDATE 取得写锁，
+      // 让同一张券的建单事务串行化。支付核销也必须先锁同一行。
+      await db.$executeRaw`
+        UPDATE "Coupon" SET "updatedAt" = "updatedAt" WHERE code = ${code}`;
+    }
+    const coupon = await db.coupon.findUnique({ where: { code } });
     if (!coupon) throw new AppError(40400, `券码不存在: ${code}`, 404);
 
     const now = new Date();
@@ -377,9 +395,18 @@ export class MarketingService {
     if (now < coupon.validFrom) return fail('尚未到生效时间');
     if (now > coupon.validTo) return fail('已过有效期');
 
-    // 限量: totalCount=0 表示不限量
-    if (coupon.totalCount > 0 && coupon.usedCount >= coupon.totalCount) {
-      return fail('优惠券已被领完');
+    /*
+     * 限量 = 已支付核销 + 待支付预占。
+     * 只统计 usedCount 会让并发的待支付订单都能拿到同一张限量券；只统计全部
+     * 订单又会把已核销数量重复计算。取消/超时后订单离开 pending，名额自动释放。
+     */
+    if (coupon.totalCount > 0) {
+      const pendingReservations = await db.order.count({
+        where: { couponId: coupon.id, status: 'pending' },
+      });
+      if (coupon.usedCount + pendingReservations >= coupon.totalCount) {
+        return fail('优惠券已被领完');
+      }
     }
 
     const subtotal = params.items.reduce((s, i) => s + i.priceCents * i.quantity, 0);
@@ -394,19 +421,19 @@ export class MarketingService {
       if (!hit) return fail('订单商品不在优惠券适用范围内');
     }
     if (coupon.scope === 'new_user') {
-      const paidCount = await this.prisma.order.count({
+      const paidCount = await db.order.count({
         where: { userId: params.userId, status: { in: ['paid', 'partial_refunded', 'refunded'] } },
       });
       if (paidCount > 0) return fail('该优惠券仅限未购买过的新用户使用');
     }
 
-    // 每人限用: 只统计已支付订单 —— 下单未支付不算, 否则超时取消会白占名额
+    // 每人限用同样把 pending 算作占用，否则同一用户可先挂多笔待支付单绕过限额。
     if (coupon.perUserLimit > 0) {
-      const used = await this.prisma.order.count({
+      const used = await db.order.count({
         where: {
           userId: params.userId,
           couponId: coupon.id,
-          status: { in: ['paid', 'partial_refunded', 'refunded'] },
+          status: { in: ['pending', 'paid', 'partial_refunded', 'refunded'] },
         },
       });
       if (used >= coupon.perUserLimit) {
@@ -430,28 +457,39 @@ export class MarketingService {
     return Math.max(0, Math.min(discount, subtotal));
   }
 
-  /**
-   * 支付成功后核销券: usedCount +1。
-   *
-   * 用条件更新 (usedCount < totalCount) 而非读后写 —— 并发下两个请求
-   * 都读到 usedCount=k, 各自 +1 会超发。影响 0 行即视为抢空, 记WARN 但不阻断支付。
-   */
-  async redeemCoupon(couponId: string, _orderId: string): Promise<void> {
-    const coupon = await this.prisma.coupon.findUnique({
-      where: { id: couponId },
-      select: { totalCount: true, usedCount: true, code: true },
-    });
-    if (!coupon) return;
+  /** 取得优惠券行写锁。建单预留与支付核销必须使用同一把锁。 */
+  async lockCoupon(couponId: string, tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE "Coupon" SET "updatedAt" = "updatedAt" WHERE id = ${couponId}`;
+  }
 
-    const res = await this.prisma.coupon.updateMany({
-      where: {
-        id: couponId,
-        ...(coupon.totalCount > 0 ? { usedCount: { lt: coupon.totalCount } } : {}),
-      },
+  /**
+   * 支付成功后在**同一事务内**核销券: usedCount +1。
+   *
+   * 下单时已经用 pending 订单预占名额；支付事务先锁券行再置订单 paid 并递增，
+   * 与建单侧串行化。这里不再用 `usedCount < totalCount` 条件更新：订单已经
+   * 享受了折扣，即使运营事后调低 totalCount，也必须如实记录本次核销。
+   */
+  async redeemCoupon(
+    couponId: string,
+    orderId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const db = (tx ?? this.prisma) as Prisma.TransactionClient;
+    await this.lockCoupon(couponId, db);
+
+    // 只核销本单在事务内已置为 paid 的券，防止调用方传错订单造成计数漂移。
+    const applied = await db.order.count({
+      where: { id: orderId, couponId, status: 'paid' },
+    });
+    if (applied === 0) return;
+
+    const res = await db.coupon.updateMany({
+      where: { id: couponId },
       data: { usedCount: { increment: 1 } },
     });
     if (res.count === 0) {
-      this.log.warn(`券 ${coupon.code} 并发核销时已发完, 订单照常支付但未计数`);
+      this.log.warn(`券 ${couponId} 已不存在，订单 ${orderId} 核销未记账`);
     }
   }
 
@@ -464,10 +502,11 @@ export class MarketingService {
    * 共用一个字段名会让前端把「券过期了」显示成「券被停用了」,
    * 运营会去找根本不存在的误操作, 而过期与停用的正确处置完全不同。
    */
-  private toCouponView(c: any, now: Date) {
+  private toCouponView(c: any, now: Date, pendingReserved = 0) {
     const notStarted = now < new Date(c.validFrom);
     const expired = now > new Date(c.validTo);
-    const soldOut = c.totalCount > 0 && c.usedCount >= c.totalCount;
+    const occupied = c.usedCount + pendingReserved;
+    const soldOut = c.totalCount > 0 && occupied >= c.totalCount;
 
     const effective: 'on' | 'off' | 'expired' | 'not_started' | 'sold_out' =
       c.status !== 'on'
@@ -500,7 +539,8 @@ export class MarketingService {
       productIds: this.parseJson<string[]>(c.productIds, []),
       totalCount: c.totalCount,
       usedCount: c.usedCount,
-      remaining: c.totalCount > 0 ? Math.max(0, c.totalCount - c.usedCount) : null,
+      pendingReserved,
+      remaining: c.totalCount > 0 ? Math.max(0, c.totalCount - occupied) : null,
       perUserLimit: c.perUserLimit,
       validFrom: c.validFrom,
       validTo: c.validTo,
@@ -509,6 +549,26 @@ export class MarketingService {
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
     };
+  }
+
+  /** 批量统计待支付订单对券名额的预占，避免后台视图把已预占的券显示成可售 */
+  private async pendingReservationCounts(
+    couponIds: string[],
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<Map<string, number>> {
+    const ids = [...new Set(couponIds.filter(Boolean))];
+    if (ids.length === 0) return new Map();
+
+    const rows = await db.order.groupBy({
+      by: ['couponId'],
+      where: { couponId: { in: ids }, status: 'pending' },
+      _count: { _all: true },
+    });
+    return new Map(
+      rows
+        .filter((row): row is typeof row & { couponId: string } => Boolean(row.couponId))
+        .map((row) => [row.couponId, row._count._all]),
+    );
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -697,22 +757,26 @@ export class MarketingService {
    */
   async findLimitedPriceCampaign(
     productId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+    userId?: string,
   ): Promise<{ id: string; priceCents: number; campaignName: string } | null> {
     const now = new Date();
 
     // 商品不可售时一律不生效: 下架商品不该再被活动拉回可购买状态
-    const product = await this.prisma.product.findUnique({
+    const product = await db.product.findUnique({
       where: { id: productId },
       select: { priceCents: true, status: true },
     });
     if (!product || product.status !== 'active') return null;
 
-    const rows = await this.prisma.campaign.findMany({
+    const rows = await db.campaign.findMany({
       where: { type: 'limited_price', status: 'active', startAt: { lte: now }, endAt: { gte: now } },
     });
 
     let best: { id: string; priceCents: number; campaignName: string } | null = null;
+    const eligibleNewUser = userId ? await this.isNewUser(userId, db) : null;
     for (const c of rows) {
+      if (!this.audienceMatches(c.audience, eligibleNewUser)) continue;
       const payload = this.parseJson<{ productId?: string; priceCents?: number }>(c.payload, {});
       if (payload.productId !== productId || !Number.isInteger(payload.priceCents)) continue;
 
@@ -782,7 +846,7 @@ export class MarketingService {
    * 并不存在的优惠，比不展示更糟。`popup` 走 `activePopupCampaign`（带人群定向），
    * 不进这个列表 —— 弹窗位不是「套餐区的一个页签」。
    */
-  async activeCampaigns(): Promise<
+  async activeCampaigns(userId?: string): Promise<
     Array<{
       id: string;
       name: string;
@@ -805,6 +869,8 @@ export class MarketingService {
       orderBy: { startAt: 'asc' },
     });
     if (rows.length === 0) return [];
+
+    const eligibleNewUser = userId ? await this.isNewUser(userId, this.prisma) : null;
 
     const productIds = rows
       .map((c) => this.parseJson<{ productId?: string }>(c.payload, {}).productId)
@@ -830,6 +896,8 @@ export class MarketingService {
     }> = [];
 
     for (const c of rows) {
+      // 匿名访问保留“仅新用户”活动用于拉新；已登录用户则必须按真实新客状态过滤。
+      if (!this.audienceMatches(c.audience, eligibleNewUser)) continue;
       if (c.type === 'limited_price') {
         const payload = this.parseJson<{ productId?: string; priceCents?: number }>(c.payload, {});
         const product = payload.productId ? productById.get(payload.productId) : undefined;
@@ -863,14 +931,16 @@ export class MarketingService {
   }
 
   /** 限时免费当前覆盖的能力 id 集合 (供生成链路判定免积分) */
-  async freeCapabilityIds(): Promise<Set<string>> {
+  async freeCapabilityIds(userId?: string): Promise<Set<string>> {
     const now = new Date();
     const rows = await this.prisma.campaign.findMany({
       where: { type: 'limited_free', status: 'active', startAt: { lte: now }, endAt: { gte: now } },
-      select: { payload: true },
+      select: { payload: true, audience: true },
     });
+    const eligibleNewUser = userId ? await this.isNewUser(userId, this.prisma) : null;
     const set = new Set<string>();
     for (const r of rows) {
+      if (!this.audienceMatches(r.audience, eligibleNewUser)) continue;
       const payload = this.parseJson<{ capabilityIds?: string[] }>(r.payload, {});
       for (const id of payload.capabilityIds ?? []) set.add(id);
     }
@@ -941,7 +1011,12 @@ export class MarketingService {
     items: Array<{ productId: string; priceCents: number; quantity: number }>;
     couponCode?: string | null;
     campaignIds?: string[];
+    /** 建单事务内传入，所有校验与最终优惠计算都读取同一事务快照 */
+    tx?: Prisma.TransactionClient;
+    /** 在事务内首次计算券时一并取得 Coupon 行写锁 */
+    lockCouponForReservation?: boolean;
   }): Promise<DiscountResult> {
+    const db = (params.tx ?? this.prisma) as Prisma.TransactionClient;
     const empty: DiscountResult = {
       discountCents: 0,
       source: null,
@@ -959,23 +1034,28 @@ export class MarketingService {
       snapshot: Record<string, unknown>;
     } | null = null;
 
-    // 显式传 id 时只查这些; 省略或传空数组时自动匹配全部命中商品的在架活动。
-    // 空数组不表示"不参与活动" —— 自动匹配才是限时价的默认语义 (§12.2 到点即生效)
-    const explicit = params.campaignIds && params.campaignIds.length > 0 ? params.campaignIds : null;
+    // undefined = 自动匹配当前所有生效活动；[] = 用户明确不参与活动；
+    // 非空数组 = 只考虑指定活动。三种语义必须可区分，否则空数组会悄悄变成自动匹配。
+    const explicit = params.campaignIds !== undefined ? params.campaignIds : null;
     const productIds = params.items.map((i) => i.productId);
 
     const now = new Date();
-    const rows = await this.prisma.campaign.findMany({
-      where: {
-        type: 'limited_price',
-        status: 'active',
-        startAt: { lte: now },
-        endAt: { gte: now },
-        ...(explicit ? { id: { in: explicit } } : {}),
-      },
-    });
+    const rows =
+      explicit?.length === 0
+        ? []
+        : await db.campaign.findMany({
+            where: {
+              type: 'limited_price',
+              status: 'active',
+              startAt: { lte: now },
+              endAt: { gte: now },
+              ...(explicit ? { id: { in: explicit } } : {}),
+            },
+          });
+    const eligibleNewUser = await this.isNewUser(params.userId, db);
 
     for (const c of rows) {
+      if (!this.audienceMatches(c.audience, eligibleNewUser)) continue;
       const payload = this.parseJson<{ productId?: string; priceCents?: number }>(c.payload, {});
       if (!payload.productId || !Number.isInteger(payload.priceCents)) continue;
       if (!productIds.includes(payload.productId)) continue;
@@ -983,7 +1063,7 @@ export class MarketingService {
       // 自动匹配时二次校验商品仍在架且活动价不高于原价:
       // build 时商品可能已下架, 或活动价被误配成高于原价(名为优惠实为涨价)
       if (!explicit) {
-        const verified = await this.findLimitedPriceCampaign(payload.productId);
+        const verified = await this.findLimitedPriceCampaign(payload.productId, db, params.userId);
         if (!verified || verified.id !== c.id) continue;
       }
 
@@ -1025,6 +1105,8 @@ export class MarketingService {
         userId: params.userId,
         code: params.couponCode,
         items: params.items,
+        db,
+        lockForReservation: params.lockCouponForReservation,
       });
       if (evaluated.reason) {
         couponWarning = evaluated.reason;
@@ -1197,36 +1279,66 @@ export class MarketingService {
   /**
    * 绑定邀请关系 (注册时调用)。
    *
-   * ⚠ 四个拒绝条件 (§12.6): 空码、码不存在、自邀请、已被绑定。
+   * ⚠ 拒绝条件 (§12.6): 空码、码不存在、自邀请、已被绑定、已付费。
    * **自邀请必须拒**: 否则用户自己注册小号刷邀请积分, 是最直接的资损路径。
    * **已绑定不覆盖**: 覆盖会让先到的邀请人丢失已发放奖励的归属, 对账无从归因。
+   * **已付费不绑定**: 否则用户先付款、后补邀请码，下一笔订单就能冒领“首次付费”奖励。
    */
   async bindInvite(params: { inviteCode: string; inviteeId: string }) {
     const code = params.inviteCode.trim().toUpperCase();
     if (!code) return { bound: false, reason: 'empty_code' };
 
-    const inviter = await this.prisma.user.findUnique({
-      where: { inviteCode: code },
-      select: { id: true },
-    });
-    if (!inviter) return { bound: false, reason: 'code_not_found' };
-    if (inviter.id === params.inviteeId) return { bound: false, reason: 'self_invite' };
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      // 与 OrderService.markPaid 使用同一把锁，关闭“已付费检查通过后、创建
+      // 关系前恰好完成支付”的窗口。锁必须先于所有读取。
+      await lockUserRow(tx, params.inviteeId);
 
-    const existing = await this.prisma.inviteRelation.findUnique({
-      where: { inviteeId: params.inviteeId },
-    });
-    if (existing) return { bound: false, reason: 'already_bound' };
+      const [inviter, existing, paidCount] = await Promise.all([
+        tx.user.findUnique({
+          where: { inviteCode: code },
+          select: { id: true },
+        }),
+        tx.inviteRelation.findUnique({ where: { inviteeId: params.inviteeId } }),
+        tx.order.count({
+          where: {
+            userId: params.inviteeId,
+            status: { in: ['paid', 'partial_refunded', 'refunded'] },
+          },
+        }),
+      ]);
+      if (!inviter) return { bound: false as const, reason: 'code_not_found' };
+      if (inviter.id === params.inviteeId) {
+        return { bound: false as const, reason: 'self_invite' };
+      }
+      if (existing) return { bound: false as const, reason: 'already_bound' };
+      if (paidCount > 0) return { bound: false as const, reason: 'already_paid' };
 
-    const created = await this.prisma.inviteRelation.create({
-      data: { inviteCode: code, inviterId: inviter.id, inviteeId: params.inviteeId, rewardStatus: 'pending' },
+      try {
+        const created = await tx.inviteRelation.create({
+          data: {
+            inviteCode: code,
+            inviterId: inviter.id,
+            inviteeId: params.inviteeId,
+            rewardStatus: 'pending',
+          },
+        });
+        return { bound: true as const, relationId: created.id };
+      } catch (error) {
+        // 并发绑定由 inviteeId 唯一约束裁决，重复请求按已绑定返回而不是抛 500。
+        if (isUniqueViolation(error)) {
+          return { bound: false as const, reason: 'already_bound' };
+        }
+        throw error;
+      }
     });
+    if (!outcome.bound) return outcome;
 
     // 规则为 register 时立即发放
     const rule = await this.getInviteRule();
     if (rule.configured && rule.valid && rule.triggerOn === 'register') {
-      await this.grantInviteReward(created.id);
+      await this.grantInviteReward(outcome.relationId);
     }
-    return { bound: true, relationId: created.id };
+    return outcome;
   }
 
   /**
@@ -1236,46 +1348,58 @@ export class MarketingService {
    * 支付回调会重复到达, 没有这道闸就是重复发积分。
    */
   async grantInviteReward(relationId: string): Promise<{ granted: boolean; credits: number }> {
-    const claimed = await this.prisma.inviteRelation.updateMany({
-      where: { id: relationId, rewardStatus: 'pending' },
-      data: { rewardStatus: 'granted' },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const relation = await tx.inviteRelation.findUnique({ where: { id: relationId } });
+      if (!relation || relation.rewardStatus !== 'pending') {
+        return { granted: false, credits: 0 };
+      }
+
+      const rule = await tx.inviteRewardRule.findUnique({ where: { id: 'default' } });
+      // 未配置或已关闭时不抢占 pending；规则重新开启后仍可补发。
+      if (!rule || !rule.valid) return { granted: false, credits: 0 };
+
+      // 条件更新是并发去重闸门。它与两笔积分发放处于同一事务：
+      // 任一笔发放失败都会回滚为 pending，重复回调可以完整重试。
+      const claimed = await tx.inviteRelation.updateMany({
+        where: { id: relationId, rewardStatus: 'pending' },
+        data: { rewardStatus: 'granted' },
+      });
+      if (claimed.count === 0) return { granted: false, credits: 0 };
+
+      let total = 0;
+      if (rule.inviterCredits > 0) {
+        await this.credit.grant(
+          {
+            userId: relation.inviterId,
+            credits: rule.inviterCredits,
+            source: 'grant',
+            reason: `邀请奖励 (${relation.inviteeId.slice(-6)})`,
+            idempotencyKey: `invite:${relation.id}:inviter`,
+          },
+          tx,
+        );
+        total += rule.inviterCredits;
+      }
+      if (rule.inviteeCredits > 0) {
+        await this.credit.grant(
+          {
+            userId: relation.inviteeId,
+            credits: rule.inviteeCredits,
+            source: 'grant',
+            reason: '新用户邀请奖励',
+            idempotencyKey: `invite:${relation.id}:invitee`,
+          },
+          tx,
+        );
+        total += rule.inviteeCredits;
+      }
+      return { granted: true, credits: total };
     });
-    if (claimed.count === 0) return { granted: false, credits: 0 };
 
-    const relation = await this.prisma.inviteRelation.findUnique({ where: { id: relationId } });
-    if (!relation) return { granted: false, credits: 0 };
-
-    const rule = await this.getInviteRule();
-    if (!rule.valid) {
-      // 规则已关闭: 关系标记回 pending, 等规则重新开启后再发, 不静默吞掉
-      await this.prisma.inviteRelation.update({
-        where: { id: relationId },
-        data: { rewardStatus: 'pending' },
-      });
-      return { granted: false, credits: 0 };
+    if (result.granted) {
+      this.log.log(`邀请奖励已发放: 关系 ${relationId}, 合计 ${result.credits} 积分`);
     }
-
-    let total = 0;
-    if (rule.inviterCredits > 0) {
-      await this.credit.grant({
-        userId: relation.inviterId,
-        credits: rule.inviterCredits,
-        source: 'grant',
-        reason: `邀请奖励 (${relation.inviteeId.slice(-6)})`,
-      });
-      total += rule.inviterCredits;
-    }
-    if (rule.inviteeCredits > 0) {
-      await this.credit.grant({
-        userId: relation.inviteeId,
-        credits: rule.inviteeCredits,
-        source: 'grant',
-        reason: '新用户邀请奖励',
-      });
-      total += rule.inviteeCredits;
-    }
-    this.log.log(`邀请奖励已发放: 关系 ${relationId}, 合计 ${total} 积分`);
-    return { granted: true, credits: total };
+    return result;
   }
 
   /** 支付成功后触发: 首次付费的被邀请人, 关系转granted */
@@ -1414,13 +1538,17 @@ export class MarketingService {
   }
 
   async updateCheckinRule(dto: any) {
-    // 同一 day 只保留一条, 命中高的优先: 否则"第 3 天"配两次会发放两份加成
-    const deduped = new Map<number, number>();
-    for (const b of dto.bonusRules ?? []) {
-      const prev = deduped.get(b.day);
-      if (prev === undefined || b.bonus > prev) deduped.set(b.day, b.bonus);
+    this.validateCheckinRule(dto);
+
+    // 同一 day 不允许配置多次。静默取最大值会让后台看到的规则与实际发分不一致。
+    const bonusByDay = new Map<number, number>();
+    for (const b of dto.bonusRules) {
+      if (bonusByDay.has(b.day)) {
+        throw new AppError(40001, `连续签到第 ${b.day} 天重复配置`, 400);
+      }
+      bonusByDay.set(b.day, b.bonus);
     }
-    const bonusRules = [...deduped.entries()]
+    const bonusRules = [...bonusByDay.entries()]
       .map(([day, bonus]) => ({ day, bonus }))
       .sort((a, b) => a.day - b.day);
 
@@ -1445,6 +1573,42 @@ export class MarketingService {
     return this.getCheckinRule();
   }
 
+  /** service 层兜底校验：即使绕过 DTO（脚本/内部调用）也不能写入非法规则。 */
+  private validateCheckinRule(dto: any): void {
+    if (!dto || typeof dto !== 'object') {
+      throw new AppError(40001, '签到规则格式不正确', 400);
+    }
+    if (!Number.isInteger(dto.baseCredits) || dto.baseCredits < 0) {
+      throw new AppError(40001, '基础积分必须是非负整数', 400);
+    }
+    if (
+      dto.maxStreak !== undefined &&
+      (!Number.isInteger(dto.maxStreak) || dto.maxStreak < 0)
+    ) {
+      throw new AppError(40001, '连续签到上限必须是非负整数', 400);
+    }
+    if (
+      dto.dailyCap !== undefined &&
+      (!Number.isInteger(dto.dailyCap) || dto.dailyCap < 0)
+    ) {
+      throw new AppError(40001, '每日积分上限必须是非负整数', 400);
+    }
+    if (dto.enabled !== undefined && typeof dto.enabled !== 'boolean') {
+      throw new AppError(40001, '签到启用状态必须是布尔值', 400);
+    }
+    if (dto.bonusRules !== undefined && !Array.isArray(dto.bonusRules)) {
+      throw new AppError(40001, '签到加成必须是数组', 400);
+    }
+    for (const bonus of dto.bonusRules ?? []) {
+      if (!Number.isInteger(bonus?.day) || bonus.day <= 0) {
+        throw new AppError(40001, '加成天数必须是正整数', 400);
+      }
+      if (!Number.isInteger(bonus?.bonus) || bonus.bonus < 0) {
+        throw new AppError(40001, '加成积分必须是非负整数', 400);
+      }
+    }
+  }
+
   /** 本地日期 YYYY-MM-DD。用本地时区而非 UTC: 签到是"用户所在地的今天" */
   private localDay(d = new Date()): string {
     const y = d.getFullYear();
@@ -1459,11 +1623,17 @@ export class MarketingService {
    * 从今天往前数连续存在的签到日。**今天没签不算断** —— 断签要到明天才成立,
    * 否则用户白天没来得及签, 界面就显示"已断签 1 天", 属误报。
    */
-  private async calcStreak(userId: string): Promise<number> {
+  /** 有效连签天数 = min(真实连续天数, maxStreak)；0 表示不封顶 */
+  private capStreak(streak: number, maxStreak: number): number {
+    return maxStreak > 0 ? Math.min(streak, maxStreak) : streak;
+  }
+
+  private async calcStreak(userId: string, maxStreak = 0): Promise<number> {
     const records = await this.prisma.checkinRecord.findMany({
       where: { userId },
       orderBy: { day: 'desc' },
-      take: 400, // 上限: 超过 400 天连签在业务上无意义, 同时避免无界加载
+      // 达到 maxStreak 后无需继续加载更早历史，避免长签到用户无界扫描。
+      take: maxStreak > 0 ? Math.max(1, maxStreak) : 400,
       select: { day: true },
     });
     if (records.length === 0) return 0;
@@ -1477,9 +1647,9 @@ export class MarketingService {
     while (days.has(this.localDay(cursor))) {
       streak += 1;
       cursor.setDate(cursor.getDate() - 1);
-      if (streak >= 400) break;
+      if (maxStreak > 0 ? streak >= maxStreak : streak >= 400) break;
     }
-    return streak;
+    return this.capStreak(streak, maxStreak);
   }
 
   /** 签到状态 (今日是否已签 + 可得积分) */
@@ -1489,8 +1659,8 @@ export class MarketingService {
     const done = await this.prisma.checkinRecord.findUnique({
       where: { userId_day: { userId, day: today } },
     });
-    const streak = await this.calcStreak(userId);
-    const nextStreak = streak > 0 && done ? streak : streak + 1;
+    const streak = await this.calcStreak(userId, rule.maxStreak);
+    const nextStreak = done ? streak : this.capStreak(streak + 1, rule.maxStreak);
     const preview = this.calcCheckinCredits(rule, nextStreak);
 
     return {
@@ -1507,7 +1677,15 @@ export class MarketingService {
     };
   }
 
-  private calcCheckinCredits(rule: { baseCredits: number; bonusRules: Array<{ day: number; bonus: number }>; dailyCap: number }, streak: number): number {
+  private calcCheckinCredits(
+    rule: {
+      baseCredits: number;
+      bonusRules: Array<{ day: number; bonus: number }>;
+      maxStreak: number;
+      dailyCap: number;
+    },
+    streak: number,
+  ): number {
     const bonus = rule.bonusRules.find((b) => b.day === streak)?.bonus ?? 0;
     let total = rule.baseCredits + bonus;
     if (rule.dailyCap > 0) total = Math.min(total, rule.dailyCap);
@@ -1515,7 +1693,12 @@ export class MarketingService {
   }
 
   private forecast(
-    rule: { baseCredits: number; bonusRules: Array<{ day: number; bonus: number }>; dailyCap: number },
+    rule: {
+      baseCredits: number;
+      bonusRules: Array<{ day: number; bonus: number }>;
+      maxStreak: number;
+      dailyCap: number;
+    },
     currentStreak: number,
     checkedDay: string | null,
     days: number,
@@ -1524,7 +1707,9 @@ export class MarketingService {
     // 今天已签 → 从明天起算; 未签 → 今天算第 currentStreak+1 天
     const cursor = new Date();
     if (checkedDay) cursor.setDate(cursor.getDate() + 1);
-    let streak = checkedDay ? currentStreak : currentStreak + 1;
+    let streak = checkedDay
+      ? this.capStreak(currentStreak, rule.maxStreak)
+      : this.capStreak(currentStreak + 1, rule.maxStreak);
 
     for (let i = 0; i < days; i++) {
       out.push({
@@ -1533,7 +1718,7 @@ export class MarketingService {
         credits: this.calcCheckinCredits(rule, streak),
       });
       cursor.setDate(cursor.getDate() + 1);
-      streak += 1;
+      streak = this.capStreak(streak + 1, rule.maxStreak);
     }
     return out;
   }
@@ -1556,22 +1741,31 @@ export class MarketingService {
       return { alreadyCheckedIn: true, credits: existing.credits, streak: existing.streak, record: existing };
     }
 
-    const currentStreak = await this.calcStreak(userId);
-    const streak = currentStreak + 1;
+    const currentStreak = await this.calcStreak(userId, rule.maxStreak);
+    const streak = this.capStreak(currentStreak + 1, rule.maxStreak);
     const credits = this.calcCheckinCredits(rule, streak);
 
     try {
-      const record = await this.prisma.checkinRecord.create({
-        data: { userId, day: today, credits, streak },
-      });
-      if (credits > 0) {
-        await this.credit.grant({
-          userId,
-          credits,
-          source: 'grant',
-          reason: `每日签到 (连续 ${streak} 天)`,
+      // 记录与积分必须同事务：只落记录不发分会把当日签到永久锁死，
+      // 重试只能得到 alreadyCheckedIn，积分永远补不回来。
+      const record = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.checkinRecord.create({
+          data: { userId, day: today, credits, streak },
         });
-      }
+        if (credits > 0) {
+          await this.credit.grant(
+            {
+              userId,
+              credits,
+              source: 'grant',
+              reason: `每日签到 (连续 ${streak} 天)`,
+              idempotencyKey: `checkin:${userId}:${today}`,
+            },
+            tx,
+          );
+        }
+        return created;
+      });
       return { alreadyCheckedIn: false, credits, streak, record };
     } catch (e: any) {
       // 唯一约束冲突 = 并发下另一请求已写入
@@ -1634,6 +1828,31 @@ export class MarketingService {
     } catch {
       return fallback;
     }
+  }
+
+  /** 新用户口径与券的 new_user 范围一致：存在任何已支付/退款订单即非新用户 */
+  private async isNewUser(
+    userId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<boolean> {
+    const paidCount = await db.order.count({
+      where: {
+        userId,
+        status: { in: ['paid', 'partial_refunded', 'refunded'] },
+      },
+    });
+    return paidCount === 0;
+  }
+
+  /**
+   * 活动人群匹配。
+   *
+   * eligibleNewUser=null 表示匿名或尚未判定：保留“仅新用户”活动用于拉新；
+   * 已登录用户传入真实布尔值，老用户绝不会命中定向活动。
+   */
+  private audienceMatches(audienceRaw: string, eligibleNewUser: boolean | null): boolean {
+    const audience = this.parseJson<{ onlyNewUsers?: boolean }>(audienceRaw, {});
+    return !audience.onlyNewUsers || eligibleNewUser !== false;
   }
 }
 

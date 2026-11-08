@@ -1,0 +1,1525 @@
+/**
+ * WorkbenchPage 页面样式 —— 由 `./WorkbenchPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* hero: 参考站 .wb-workflow-banner — 实拍 1148x212 (1280) / radius 16 / padding 0 100px /
+   bg var(--hero-grad-1) + bannerbg.png cover。本项目不引用第三方图片资源 → 渐变背景 + 真实产出拼贴（诚实替代）。
+   padding 用参考站字面值 100px (2026-10-19 修正, 原 84px 是按 ~100px 侧栏的补偿值):
+   侧栏改 ≤1366px 自动塌缩为 100px 轨后双态均自然对齐参考站实测 —— 轨态 (侧栏 100 + 重叠 16
+   + padding 24 + 100) 标题落 x=208 (= 参考站 1280 实测); 横排态 (176 + 24 + 100) 落
+   x=300 (= 参考站 1440 实测)。84px 在 176px 侧栏下反而偏 16px (321 vs 300)。 */
+.wb-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 212px;
+  padding: 0 100px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-panel);
+  background: linear-gradient(90deg, var(--hero-grad-1) 0%, var(--hero-grad-2) 55%, var(--hero-grad-3) 100%);
+  overflow: hidden;
+}
+
+.wb-hero-text {
+  position: relative;
+  z-index: 1;
+  max-width: 476px;
+}
+
+/* 实拍 h1 32px/500 #000 lh20; 文案块总高 75 = 20 + margin24 + 副标题 31 */
+.wb-hero-title {
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--wb-text-hero);
+  margin: 0 0 24px;
+  letter-spacing: 0.2px;
+}
+
+.wb-hero-sub {
+  font-size: 17px;
+  line-height: 31px;
+  color: var(--wb-text-muted);
+  margin: 0;
+}
+
+/* hero 右侧真实产出作品集: 主图 + 两张偏移小卡 (无产出时由 HeroArt 回退 SVG)。
+   绝对定位: 不参与 flex 布局, 保证 hero 高度恒为实拍的 212px */
+.wb-hero-collage {
+  position: absolute;
+  right: 24px;
+  top: 0;
+  width: 440px;
+  height: 212px;
+}
+
+@media (max-width: 1200px) {
+  /* 窄容器放不下 440px 拼贴: 收起拼贴, hero 保留渐变 + 文案 (不塞假图) */
+  .wb-hero {
+    padding: 0 48px;
+  }
+  .wb-hero-collage,
+  .wb-hero-art {
+    display: none;
+  }
+}
+
+.wb-hero-photo {
+  position: absolute;
+  display: block;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--wb-card, var(--card-bg));
+  box-shadow: 0 10px 24px rgba(35, 39, 74, 0.14);
+}
+
+.wb-hero-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.wb-hero-photo-main {
+  width: 264px;
+  height: 172px;
+  right: 44px;
+  top: 20px;
+  transform: rotate(-1.5deg);
+  z-index: 2;
+}
+
+.wb-hero-photo-back {
+  width: 160px;
+  height: 114px;
+  right: 240px;
+  top: 44px;
+  transform: rotate(5deg);
+  z-index: 1;
+}
+
+.wb-hero-photo-front {
+  width: 140px;
+  height: 102px;
+  right: 24px;
+  bottom: 8px;
+  transform: rotate(-4deg);
+  z-index: 3;
+}
+
+/* 数据小卡: 白底圆角 + 迷你柱状图, 呼应参考站 hero 右侧 UI 卡片 */
+.wb-hero-chip {
+  position: absolute;
+  right: 266px;
+  top: 26px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  background: var(--wb-card, var(--card-bg));
+  box-shadow: 0 10px 24px rgba(35, 39, 74, 0.14);
+}
+
+.wb-hero-chip-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 34px;
+}
+
+.wb-hero-chip-bar i {
+  display: block;
+  width: 7px;
+  border-radius: 2px 2px 0 0;
+  background: var(--info-soft-bg);
+}
+
+.wb-hero-chip-bar i:last-child {
+  background: var(--wb-brand);
+}
+
+.wb-hero-chip-num {
+  font-size: 12px;
+  color: var(--wb-text-muted);
+}
+
+.wb-hero-dot {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--info-soft-bg);
+  opacity: 0.7;
+}
+
+.wb-hero-dot-a {
+  width: 10px;
+  height: 10px;
+  right: 300px;
+  top: 150px;
+}
+
+.wb-hero-dot-b {
+  width: 7px;
+  height: 7px;
+  right: 30px;
+  top: 60px;
+}
+
+.wb-hero-dot-c {
+  width: 5px;
+  height: 5px;
+  right: 220px;
+  bottom: 30px;
+}
+
+.wb-hero-art {
+  width: 420px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .wb-hero {
+    padding: 24px;
+  }
+  .wb-hero-title {
+    font-size: 24px;
+  }
+}
+
+/* 工具网格: 参考站 6 列, gap 16 (1280 实测卡 178 = (1148-5*16)/6), 区块间距统一 16 */
+.wb-tools {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1100px) {
+  .wb-tools {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .wb-tools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .wb-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* 参考站 390 实测 gap 8 (卡 181 = (370-8)/2), 桌面 16 在 2 列下过疏 */
+    gap: 8px;
+  }
+}
+
+/* 卡片: 177x197, 白底 radius 16, 缩略图通顶无内边距 */
+.wb-card {
+  display: flex;
+  flex-direction: column;
+  /* 关键: Chrome UA 样式给 <button> 设了 `align-items: center`, column flex 子项因此不 stretch,
+     .wb-card-body 会按 min-content(= nowrap 描述整句宽度, 实测 224px) 定宽并冲出 178px 栅格轨。
+     显式 stretch 后子项由轨道宽度决定, 描述才真正走 ellipsis。
+     配合下面的 min-width: 0(覆盖 grid item 自动最小尺寸) 两条一起才彻底封住。 */
+  align-items: stretch;
+  padding: 0;
+  text-align: left;
+  background: var(--wb-card, var(--card-bg));
+  border: none;
+  border-radius: var(--radius-panel);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  /* <button> 作为 grid item 的自动最小尺寸 (min-width:auto) 会解析成 min-content,
+     而卡片里的描述是 nowrap → min-content = 整句描述宽 (实测 224px) 冲出 178px 栅格轨。
+     置 0 后由栅格轨决定宽度, 描述才真正走 ellipsis。与 .wb-card-body 的 min-width:0 同源。 */
+  min-width: 0;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+/* hover 与参考站 .wb-tool-card:hover 一致: 仅阴影 0 7 20 #21234114, 无上浮 (2026-10-18 交互态对拍修正) */
+.wb-card:hover:not(:disabled) {
+  box-shadow: var(--wb-hover-shadow, 0 7px 20px rgba(33, 35, 65, 0.08));
+}
+
+.wb-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.66;
+}
+
+/* 缩略图 2:1, 圆角只裁顶部; 图标块允许下溢出跨到文字区 */
+.wb-card-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.wb-card-thumb-clip {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--hero-grad-3) 0%, var(--wb-border) 100%);
+}
+
+.wb-card-thumb-clip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.18s ease;
+}
+
+/* 参考 .wb-tool-card:hover .wb-tool-visual img → scale(1.06) (2026-10-18 交互态对拍补充) */
+.wb-card:hover .wb-card-thumb-clip img {
+  transform: scale(1.06);
+}
+
+.wb-card-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--wb-text-desc);
+}
+
+/* 图标块 40x40: 参考站 left 15, 垂直居中于缩略图/文字分界线 (bottom -20) */
+.wb-card-icon {
+  position: absolute;
+  left: 15px;
+  bottom: -20px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  background: var(--wb-card, var(--card-bg));
+  box-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
+  color: var(--wb-brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.wb-card-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-cta);
+  color: var(--card-bg);
+}
+
+.wb-card-badge-planned {
+  background: var(--wb-text-desc);
+}
+
+/* 文字区: padding 40px 16px 20px (顶部让位图标块);
+   实拍标题 14px/600 var(--wb-text-strong) lh16 (2026-10-17 重拍修正, 旧基准 16px/#333 已过时) */
+.wb-card-body {
+  box-sizing: border-box;
+  height: 108px;
+  padding: 40px 16px 24px;
+  /* 关键: .wb-card 是 column flex 容器, body 作为 flex item 的自动最小尺寸 (min-width:auto)
+     会解析成 min-content —— 而里面的 .wb-card-desc 是 nowrap, min-content 就是整句描述宽度。
+     不置 0 的话 body 撑到 min-content (实测 200px) 冲出 178px 卡片, ellipsis 形同虚设。
+     这是 flexbox 的经典陷阱, 与字体无关, 换 PingFang 时同样溢出、只是不明显。 */
+  min-width: 0;
+}
+
+.wb-card-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 16px;
+}
+
+.wb-card-desc {
+  display: block;
+  font-size: 12px;
+  color: var(--text-desc);
+  line-height: 20px;
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 数据区: 参考站 .wb-data-layout — 2:1 双面板 + 通栏, 白底 padding 24, 高 268,
+   margin-top 16 (实拍); 面板圆角: 账号/创作数据 12, 最近任务 16。
+   grid 列取参考站字面值 minmax(0,2fr) minmax(300px,1fr) (2026-10-19 从覆盖层并入,
+   原 2fr 1fr 与实拍 754.66/377.34 差 ~10px); ≤900px 堆叠为 1fr */
+.wb-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .wb-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wb-panel {
+  background: var(--wb-card, var(--card-bg));
+  border-radius: var(--radius-card);
+  padding: 24px;
+  min-height: 268px;
+  display: flex;
+  flex-direction: column;
+}
+
+.wb-panel-recent {
+  border-radius: var(--radius-panel);
+}
+
+/* 数据区严格按参考站样式产物 (`wb-*`):
+   panel-title  flex space-between center gap12; 按钮 12px var(--wb-text-muted) inline-flex gap3 padding0
+   account-metrics grid 1fr 1fr 1.35fr gap16; 块 var(--wb-surface) radius8 padding 20 24
+   account th var(--wb-text-body) bg var(--wb-surface) padding 9 12 fw500 / td border-bottom var(--border-row) padding 9 12
+   flow-type inline-block radius4 padding 2 7 11px/15px
+   jobs-list flex column gap24 margin-top24
+   job-thumb 80x80 flex 0 0 80px radius8 var(--wb-surface) / job-copy flex1 min-width0 / job-status flex 0 0 80px 14px
+   jobs-empty var(--wb-text-muted) center padding 100px 0 13px
+   dashboard-stats repeat(6,minmax(0,1fr)) gap16 margin-top24; 块 var(--wb-surface) radius8 padding 24
+   dashboard-head 首列 span = chip border var(--wb-border) radius14 padding 7 12 12px var(--wb-text-muted)
+   chart-title margin 24 0 12 13px / trend-chart 100% x 210 */
+.wb-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.wb-panel-head h3 {
+  margin: 0;
+  line-height: 22px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wb-text);
+}
+
+.wb-panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  color: var(--wb-text-muted);
+  padding: 0;
+}
+
+.wb-panel-link:hover {
+  color: var(--wb-brand);
+}
+
+/* .wb-panel-loading 已移除 (2026-10-20): 面板加载态改用 StateSkeleton 骨架屏,
+   由 .state-skeleton 自带脉动动画, 不再需要单独的居中转圈容器。 */
+
+/* 指标块: 灰底卡片 (账号面板 padding 20 24, 数据面板 padding 24) */
+.wb-account-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.35fr;
+  gap: 16px;
+}
+
+.wb-metric-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  background: var(--wb-surface);
+  border-radius: var(--radius-control);
+  padding: 20px 24px;
+}
+
+.wb-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--wb-text-muted);
+}
+
+.wb-stat-value {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--wb-text);
+  line-height: 1.2;
+}
+
+.wb-stat-foot {
+  font-size: 12px;
+  color: var(--wb-text-desc);
+}
+
+/* 账号流水表: 版式取参考站 wb-account th/td + wb-flow-type */
+.wb-flow-table-wrap {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.wb-flow-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.wb-flow-table th {
+  color: var(--wb-text-body);
+  text-align: left;
+  background: var(--wb-surface);
+  padding: 9px 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.wb-flow-table td {
+  color: var(--wb-text-body);
+  border-bottom: 1px solid var(--border-row);
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+
+.wb-flow-table .wb-table-empty {
+  text-align: center;
+  color: var(--wb-text-muted);
+  border-bottom: 0;
+  padding: 18px 12px;
+}
+
+.wb-flow-type {
+  display: inline-block;
+  border-radius: var(--radius-tag);
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 15px;
+  background: var(--wb-brand-bg);
+  color: var(--wb-brand);
+}
+
+.wb-flow-type.flow-ai_retouch {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+
+.wb-flow-type.flow-ai_video {
+  background: var(--success-soft-bg);
+  color: var(--warn-text);
+}
+
+.wb-panel-note {
+  margin: 14px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--wb-text-muted);
+}
+
+/* 最近任务: 80x80 job 行 (参考站 wb-job-thumb / wb-job-copy / wb-job-status) */
+.wb-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.wb-job {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: start;
+}
+
+.wb-job-thumb {
+  flex: 0 0 80px;
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--wb-surface);
+  color: var(--wb-text-desc);
+}
+
+.wb-job-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.wb-job-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wb-job-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wb-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wb-job-time {
+  font-size: 12px;
+  color: var(--wb-text-muted);
+}
+
+.wb-job-status {
+  flex: 0 0 80px;
+  width: 80px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 16px;
+  color: var(--wb-text-muted);
+}
+
+.wb-job:hover .wb-job-name {
+  color: var(--wb-brand);
+}
+
+.wb-jobs-empty {
+  color: var(--wb-text-muted);
+  text-align: center;
+  padding: 100px 0;
+  font-size: 13px;
+}
+
+/* 数据面板: 6 格指标 + 210px 趋势图 */
+.wb-dashboard-head {
+  margin-bottom: 0;
+}
+
+.wb-dashboard-chip {
+  display: inline-flex;
+  align-items: center;
+  color: var(--wb-text-muted);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--radius-panel);
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.wb-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.wb-dashboard-stats .wb-metric-block {
+  padding: 24px;
+}
+
+.wb-chart-title {
+  margin: 24px 0 12px;
+  font-size: 13px;
+  color: var(--wb-text);
+}
+
+.wb-trend-chart {
+  width: 100%;
+  height: 210px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.wb-trend-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.wb-trend-count {
+  font-size: 12px;
+  color: var(--wb-text-muted);
+}
+
+.wb-trend-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.wb-trend-bar {
+  width: 60%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--wb-brand);
+}
+
+.wb-trend-date {
+  font-size: 12px;
+  color: var(--wb-text-desc);
+}
+
+@media (max-width: 1200px) {
+  .wb-account-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .wb-dashboard-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .wb-account-metrics,
+  .wb-dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 工作台严格 1:1 覆盖层 (参考站 wb-* 规则字面值, 2026-10-17)
+   置于工作台区块之后, 覆盖前面为通用 token 写的值, 保证逐条对齐参考站产物 CSS ── */
+.wb-workflow-banner .wb-hero-title,
+.wb-hero-title {
+  color: var(--wb-text-hero);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.wb-hero-sub {
+  color: var(--wb-text-muted);
+  font-size: 17px;
+  line-height: 31px;
+  margin: 24px 0 0;
+}
+
+/* 工具卡: 参考 .wb-tool-card / .wb-tool-visual / .wb-tool-copy / .wb-tool-icon。
+   ⚠️ 网格列数由第一套规则 (.wb-tools + 1100/760/520 断点) 统一管辖,
+   此处曾静态重复 repeat(6,...) 把响应式断点全部压死 (2026-10-19 拆除) */
+.wb-card {
+  color: var(--wb-text);
+  border-radius: var(--radius-panel);
+  /* 参考 .wb-tool-card: 图标块以「卡片」为定位基准 (bottom 88 / left 15), 故卡片必须 relative */
+  position: relative;
+  overflow: hidden;
+  transition:
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+
+.wb-card:hover {
+  box-shadow: var(--wb-hover-shadow);
+}
+
+.wb-card-thumb {
+  aspect-ratio: 2;
+  background: var(--wb-visual-bg);
+}
+
+.wb-card-thumb-empty {
+  background: var(--wb-visual-empty);
+}
+
+.wb-card-icon {
+  width: 40px;
+  height: 40px;
+  left: 15px;
+  bottom: 88px;
+  top: auto;
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  box-shadow: var(--wb-icon-shadow);
+}
+
+/* 2026-10-19 删除本覆盖层里对 .wb-card-title / .wb-card-desc 的静态重述:
+   两者与基座 (global.css:1360 / 1367) 逐值同值 (--wb-text-strong=#171a2b、
+   --wb-text-desc=#86909c, 其余字面值一致), 重述毫无收益, 却把基座里
+   `.wb-card-desc` 的 `white-space/overflow/text-overflow: ellipsis` 三件套丢掉了
+   —— 结构属性被覆盖会让文字直接溢出卡片 (实测 1280 下描述右缘 1302 > 卡片右缘 1256,
+   溢出 46px)。与本项目 10-19 修过的「覆盖层静态重述 grid-template-columns 压死响应式断点」
+   是同一类错误: 媒体查询不增加特异性, 覆盖层只能加不能减。 */
+.wb-card:hover .wb-card-title {
+  color: var(--wb-brand);
+}
+
+/* 图标 hover 简化替代 (2026-10-18): 参考站为双层 img 结构 (:before 紫 mask 显 / img 隐),
+   本地为单层 lucide SVG (currentColor), 无法 1:1 复刻双层切换, 用 hover 变品牌紫模拟"灰图标→彩图标" */
+.wb-card:hover .wb-card-icon svg {
+  color: var(--brand);
+}
+
+/* 角标: 参考 .wb-tool-title em → #FFF on #F00024 */
+.wb-card-badge {
+  border-radius: var(--radius-control);
+  padding: 1px 5px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  font-style: normal;
+  background: var(--wb-badge-bg);
+  color: var(--card-bg);
+}
+
+/* 数据区列宽已并入第一套 .wb-panels 规则 (含 ≤900px 堆叠断点),
+   此处曾静态重复 minmax(0,2fr) minmax(300px,1fr) 把堆叠断点压死 (2026-10-19 拆除) */
+.wb-panel {
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+}
+
+.wb-panel-recent {
+  border-radius: var(--radius-panel);
+}
+
+.wb-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wb-panel-head h3 {
+  margin: 0;
+  color: var(--wb-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.wb-panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--wb-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wb-panel-link:hover {
+  color: var(--wb-brand);
+}
+
+/* 账号指标: 参考 .wb-account-metrics span/b/a。
+   ⚠️ grid 列由第一套 .wb-account-metrics 规则管辖 (含 ≤900px 堆叠断点),
+   此处曾静态重复 1fr 1fr 1.35fr 把堆叠断点压死 (2026-10-19 拆除) */
+.wb-metric-block {
+  background: var(--wb-surface);
+  border-radius: var(--radius-control);
+  min-width: 0;
+  padding: 20px 24px;
+}
+
+.wb-metric-block .wb-stat-label {
+  display: block;
+  color: var(--wb-text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.wb-metric-block .wb-stat-value {
+  display: block;
+  color: var(--wb-text);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 27px;
+  margin: 8px 0;
+}
+
+.wb-metric-block .wb-stat-foot {
+  display: block;
+  color: var(--wb-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* 流水表: 参考 .wb-account th/td + .wb-flow-type */
+.wb-flow-head {
+  margin: 24px 0 12px;
+  font-size: 14px;
+}
+
+.wb-flow-table th {
+  color: var(--wb-text-body);
+  background: var(--wb-surface);
+  padding: 9px 12px;
+  font-weight: 500;
+}
+
+.wb-flow-table td {
+  color: var(--wb-text-body);
+  border-bottom: 1px solid var(--wb-border-row);
+  padding: 9px 12px;
+}
+
+.wb-flow-type {
+  border-radius: var(--radius-tag);
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.wb-flow-type.flow-income {
+  color: var(--wb-flow-income-fg);
+  background: var(--wb-flow-income-bg);
+}
+
+.wb-flow-type.flow-expense {
+  color: var(--wb-flow-expense-fg);
+  background: var(--wb-flow-expense-bg);
+}
+
+/* 最近任务: 参考 .wb-jobs-list / .wb-job-* */
+.wb-jobs-list {
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.wb-job-thumb {
+  flex: 0 0 80px;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-control);
+  background: var(--wb-thumb-bg);
+  color: var(--wb-thumb-fg);
+}
+
+.wb-job-copy b,
+.wb-job-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--wb-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wb-job-copy > .wb-job-time {
+  display: block;
+  color: var(--wb-text-desc);
+  font-size: 12px;
+  line-height: 20px;
+  margin-top: 8px;
+}
+
+.wb-job-status {
+  flex: 0 0 80px;
+  width: 80px;
+  font-size: 14px;
+  line-height: 16px;
+}
+
+.wb-job-status.status-succeeded {
+  color: var(--wb-status-completed);
+}
+
+.wb-job-status.status-failed {
+  color: var(--wb-status-failed);
+}
+
+.wb-job-status.status-running,
+.wb-job-status.status-pending {
+  color: var(--wb-status-processing);
+}
+
+.wb-jobs-empty {
+  color: var(--wb-empty);
+  text-align: center;
+  padding: 100px 0;
+  font-size: 13px;
+}
+
+/* 数据面板: 参考 .wb-dashboard-* / .wb-chart-title / .wb-trend-chart。
+   ⚠️ 网格列由第一套 .wb-dashboard-stats 规则管辖 (含 ≤900px 两列断点),
+   此处曾静态重复 repeat(6,...) 把断点压死 (2026-10-19 拆除) */
+.wb-dashboard-stats .wb-metric-block {
+  padding: 24px;
+}
+
+.wb-dashboard-chip {
+  color: var(--wb-text-muted);
+  border: 1px solid var(--wb-border);
+  border-radius: 14px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.wb-chart-title {
+  margin: 24px 0 12px;
+  font-size: 13px;
+}
+
+.wb-trend-chart {
+  width: 100%;
+  height: 210px;
+}
+
+.wb-trend-bar {
+  background: var(--wb-brand);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   我的作品 / 素材库 / 工作台 2026-10-28 复原
+   参考站新产物：index-B4lo6Cz6.js + index-DDOEXtwn.css
+   目标：工作台 12 卡 + 固定示例图；我的作品游客空态；素材库游客空态。
+   ──────────────────────────────────────────────────────────────── */
+
+/* 工作台页面自身承载 24/24/64 内边距（参考 .workbench-content），
+   因此让 .app-content 在仅承载工作台时不再叠加第二层 padding。 */
+.app-content:has(> .workbench-content) {
+  padding: 0;
+}
+
+.workbench-content {
+  min-width: 0;
+  padding: 24px 24px 64px;
+  color: var(--wb-text);
+  font-size: 16px;
+  line-height: normal;
+}
+
+/* Hero：参考站高 212、radius16、padding 0 100、背景 bannerbg.png cover。 */
+.wb-workflow-banner {
+  display: flex;
+  align-items: center;
+  height: 212px;
+  margin-bottom: 16px;
+  padding: 0 100px;
+  border-radius: 16px;
+  background: var(--hero-grad-1)  50% / cover no-repeat;
+}
+
+.wb-workflow-banner h1 {
+  margin: 0;
+  color: var(--wb-text-hero);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.wb-workflow-banner p {
+  margin: 24px 0 0;
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 31px;
+}
+
+/* 工具卡：6 列、2:1 示例图、40×40 跨界图标、108 高文字区。 */
+.wb-tool-section {
+  margin-bottom: 16px;
+}
+
+.wb-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.wb-tool-card {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  background: var(--card-bg);
+  color: var(--wb-text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.wb-tool-card:hover:not(:disabled) {
+  box-shadow: 0 7px 20px rgba(33, 35, 65, 0.08);
+}
+
+.wb-tool-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.wb-tool-visual {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2;
+  overflow: hidden;
+  background: var(--wb-visual-bg);
+  color: var(--text-desc);
+}
+
+.wb-tool-visual--empty {
+  background: var(--wb-visual-empty);
+}
+
+.wb-tool-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.25s ease;
+}
+
+.wb-tool-card:hover:not(:disabled) .wb-tool-visual img {
+  transform: scale(1.06);
+}
+
+.wb-tool-icon {
+  position: absolute;
+  left: 15px;
+  bottom: 88px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  box-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
+}
+
+.wb-tool-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  background: var(--brand);
+  -webkit-mask: var(--wb-tool-icon) center / contain no-repeat;
+  mask: var(--wb-tool-icon) center / contain no-repeat;
+  transition: opacity 0.25s ease;
+}
+
+.wb-tool-icon img {
+  position: absolute;
+  inset: 0;
+  width: 24px;
+  height: 24px;
+  margin: auto;
+  object-fit: contain;
+  transition: opacity 0.25s ease;
+}
+
+.wb-tool-card:hover:not(:disabled) .wb-tool-icon::before {
+  opacity: 1;
+}
+
+.wb-tool-card:hover:not(:disabled) .wb-tool-icon img {
+  opacity: 0;
+}
+
+.wb-tool-copy {
+  box-sizing: border-box;
+  height: 108px;
+  padding: 40px 16px 24px;
+}
+
+.wb-tool-title {
+  display: flex;
+  align-items: center;
+  /* 两个角标（免费 + 暂不可用）并排时 6 列卡片的标题会被压成「一键…」，
+     收紧到 4px 让 4 字标题在 1440 下仍能完整显示。 */
+  gap: 4px;
+  min-width: 0;
+}
+
+.wb-tool-title strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.25s ease;
+}
+
+.wb-tool-title em {
+  flex: none;
+  padding: 1px 4px;
+  border-radius: 8px;
+  background: var(--wb-badge-bg);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 14px;
+}
+
+.wb-tool-copy > span {
+  display: block;
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-tool-card:hover:not(:disabled) .wb-tool-title strong {
+  color: var(--brand);
+}
+
+/* 数据区：2:1 双面板 + 通栏，游客态统一登录引导。 */
+.wb-data-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.wb-panel.wb-account,
+.wb-panel.wb-recent,
+.wb-panel.wb-dashboard {
+  display: block;
+  min-height: auto;
+  padding: 24px;
+}
+
+.wb-panel.wb-recent {
+  border-radius: 16px;
+}
+
+.wb-panel-title,
+.wb-dashboard-head,
+.wb-flow-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wb-panel-title strong,
+.wb-dashboard-head strong {
+  color: var(--wb-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.wb-panel-title button,
+.wb-flow-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wb-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--wb-text);
+  font-size: 14px;
+}
+
+.wb-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--wb-surface-warning);
+  color: var(--card-bg);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wb-account-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.35fr;
+  gap: 16px;
+}
+
+.wb-account-metrics > div {
+  min-width: 0;
+  padding: 20px 24px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.wb-account-metrics span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.wb-account-metrics b {
+  display: block;
+  margin: 8px 0;
+  color: var(--wb-text);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 27px;
+}
+
+.wb-flow-head {
+  margin: 24px 0 12px;
+  font-size: 14px;
+}
+
+.wb-flow-table-wrap {
+  overflow-x: auto;
+}
+
+.wb-account table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.wb-account th {
+  padding: 9px 12px;
+  background: var(--surface);
+  color: var(--wb-text-body);
+  font-weight: 500;
+  text-align: left;
+}
+
+.wb-account td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-row);
+  color: var(--wb-text-body);
+}
+
+.wb-flow-type {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.wb-flow-type.expense {
+  background: var(--color-border-soft);
+  color: var(--wb-flow-expense-fg);
+}
+
+.wb-login-prompt {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+  min-height: 220px;
+  text-align: center;
+}
+
+.wb-login-prompt p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.wb-login-prompt button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--wb-flow-income-fg);
+  color: var(--card-bg);
+  cursor: pointer;
+}
+
+.wb-dashboard-head > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.wb-dashboard-head > div:first-child > span {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.wb-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.wb-dashboard-stats > div {
+  min-width: 0;
+  padding: 24px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.wb-dashboard-stats span,
+.wb-dashboard-stats b {
+  display: block;
+}
+
+.wb-dashboard-stats span {
+  color: var(--wb-text-body);
+  font-size: 13px;
+}
+
+.wb-dashboard-stats b {
+  margin-top: 12px;
+  color: var(--wb-text);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.wb-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.wb-job {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: 80px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--wb-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wb-job:hover {
+  background: var(--wb-surface-brand);
+}
+
+.wb-job-thumb {
+  display: grid;
+  flex: 0 0 80px;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--wb-thumb-bg);
+  color: var(--wb-thumb-fg);
+}
+
+.wb-job-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.wb-job-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.wb-job-copy b,
+.wb-job-copy > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-job-copy b {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.wb-job-copy > span {
+  margin-top: 8px;
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.wb-job-status {
+  display: inline-flex;
+  flex: 0 0 80px;
+  align-items: center;
+  gap: 8px;
+  width: 80px;
+  font-size: 14px;
+  line-height: 16px;
+}
+
+.wb-job-status.completed { color: var(--wb-status-completed); }
+
+.wb-job-status.processing { color: var(--wb-flow-income-fg); }
+
+.wb-job-status.failed { color: var(--wb-status-failed); }
+
+.wb-jobs-empty {
+  padding: 100px 0;
+  color: var(--wb-empty);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 1050px) {
+  .workbench-content { padding: 16px 14px 48px; }
+  .wb-workflow-banner { height: 180px; padding: 0 48px; }
+  .wb-tool-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .wb-data-layout { grid-template-columns: 1fr; margin-top: 16px; }
+  .wb-dashboard-stats { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .wb-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wb-panel.wb-account,
+  .wb-panel.wb-recent,
+  .wb-panel.wb-dashboard { padding: 16px; }
+}

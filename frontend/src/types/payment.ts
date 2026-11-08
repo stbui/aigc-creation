@@ -269,12 +269,44 @@ export interface AdminReconciliationItem {
   providerTradeNo: string | null;
   amountCents: number;
   currency: string;
-  /** matched / amount_mismatch / missing_local / missing_channel / duplicate 等 */
+  /** matched / recovered / amount_mismatch / duplicate_charge 等 */
   result: string;
   resolved: boolean;
   detail: string | null;
   createdAt: string;
 }
+
+/** 支付异常补偿单。真实资金差异必须在这里闭环，而不是只留在对账批次明细。 */
+export interface AdminPaymentException {
+  id: string;
+  providerId: string;
+  orderId: string | null;
+  merchantOrderNo: string;
+  providerTradeNo: string | null;
+  amountCents: number;
+  currency: string;
+  kind: string;
+  status: string;
+  priority: string;
+  ownerId: string | null;
+  slaDueAt: string;
+  overdue: boolean;
+  refundId: string | null;
+  refundStatus: string | null;
+  providerRefundId: string | null;
+  resolution: string | null;
+  lastError: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PaymentExceptionStatus =
+  | "open"
+  | "auto_refund_pending"
+  | "refunded"
+  | "manual_review"
+  | "closed";
 
 /** 对账差异类型 → 文案与色调的唯一映射 */
 export const RECONCILIATION_RESULT_LABELS: Record<
@@ -283,7 +315,15 @@ export const RECONCILIATION_RESULT_LABELS: Record<
 > = {
   matched: { label: "一致", tone: "success" },
   recovered: { label: "已补发", tone: "success" },
+  auto_refunded: { label: "已自动退款", tone: "success" },
+  refund_processing: { label: "退款处理中", tone: "warn" },
+  refund_failed: { label: "退款失败", tone: "danger" },
   amount_mismatch: { label: "金额不符", tone: "danger" },
+  trade_no_mismatch: { label: "交易号不符", tone: "danger" },
+  duplicate_charge: { label: "疑似重复扣款", tone: "danger" },
+  local_order_not_found: { label: "本地缺单", tone: "danger" },
+  provider_record_missing: { label: "渠道缺单", tone: "danger" },
+  credit_failed: { label: "补发失败", tone: "danger" },
   missing_local: { label: "本地缺单", tone: "danger" },
   missing_channel: { label: "渠道缺单", tone: "danger" },
   duplicate: { label: "重复交易", tone: "warn" },

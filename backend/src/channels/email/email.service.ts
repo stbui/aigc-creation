@@ -202,4 +202,36 @@ export class EmailService implements OnModuleInit {
       html,
     });
   }
+
+  /** 邮箱归属验证码。正文只含验证码和有效期，不携带账号资料。 */
+  async sendEmailVerification(params: {
+    to: string;
+    code: string;
+    expiresMinutes: number;
+  }): Promise<DeliveryResult> {
+    const code = String(params.code).replace(/[^0-9]/g, '').slice(0, 6);
+    const text = [
+      `你的货觉AI邮箱验证码是：${code}`,
+      '',
+      `验证码 ${params.expiresMinutes} 分钟内有效，仅可使用一次。`,
+      '如果不是你本人操作，请忽略本邮件。',
+      '',
+      '—— 货觉AI 团队',
+    ].join('\n');
+    const html = [
+      '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#171a2b">',
+      '<h2 style="font-size:18px;margin:0 0 16px">验证你的邮箱</h2>',
+      '<p style="color:#4e5969;line-height:1.7">你的货觉AI邮箱验证码是：</p>',
+      `<p style="font-size:32px;letter-spacing:8px;font-weight:700;margin:20px 0">${escapeHtml(code)}</p>`,
+      `<p style="color:#86909c;font-size:12px;line-height:1.7">验证码 ${params.expiresMinutes} 分钟内有效，仅可使用一次。如果不是你本人操作，请忽略本邮件。</p>`,
+      '<p style="color:#86909c;font-size:12px;margin-top:24px">—— 货觉AI 团队</p>',
+      '</div>',
+    ].join('');
+    return this.send({
+      to: params.to,
+      subject: '【货觉AI】邮箱验证码',
+      text,
+      html,
+    });
+  }
 }

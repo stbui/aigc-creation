@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -19,6 +20,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
@@ -88,16 +90,37 @@ export class RefundDto {
   @IsString() @MaxLength(200) reason!: string;
 }
 
+/** 异步退款人工核销：必须先到渠道商户后台核实最终结果 */
+export class RefundConfirmDto {
+  @IsIn(["succeeded", "failed"])
+  outcome!: "succeeded" | "failed";
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  providerRefundId?: string;
+
+  @IsString()
+  @IsNotEmpty({ message: "请填写人工核销依据" })
+  @MaxLength(300)
+  reason!: string;
+}
+
 /**
  * 人工调整积分 (B-52)。
  *
  * 字段名用 **delta** 而非 amount —— delta 明确表达「有正负的变动量」,
  * amount 会被误解为「金额」或「绝对值」, 后者会让"扣减"无法表达。
+ *
+ * `reason` 可选：有具体业务依据时写入流水备注；未填写时由系统按增减方向
+ * 生成稳定说明，操作人、目标用户和动作仍由审计日志自动记录。
  */
 export class AdjustCreditDto {
   @IsString() userId!: string;
   /** 正数为增加, 负数为扣减, 不能为 0 */
   @IsInt() delta!: number;
+  /** 调整备注。写入积分流水；留空时由服务端生成系统说明 */
+  @IsOptional() @IsString() @MaxLength(200) reason?: string;
   @IsOptional() @IsInt() @Min(0) validDays?: number;
 }
 
@@ -105,10 +128,13 @@ export class AdjustCreditDto {
  * 批量调整积分。
  *
  * 上限 100 条: 再大应走导入任务, 而不是一个可能超时 30s 的同步请求。
+ *
+ * `reason` 整批共用；逐条可再带 `reason` 覆盖（批量里往往有个别「特殊补偿」）。
  */
 export class BatchAdjustItemDto {
   @IsString() userId!: string;
   @IsInt() delta!: number;
+  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
 export class BatchAdjustDto {
@@ -117,6 +143,15 @@ export class BatchAdjustDto {
   @ValidateNested({ each: true })
   @Type(() => BatchAdjustItemDto)
   items!: BatchAdjustItemDto[];
+
+  /** 整批共用的调整备注（可选；单条可用自己的 reason 覆盖） */
+  @IsOptional() @IsString() @MaxLength(200) reason?: string;
+
+  /**
+   * 幂等键（建议前端在打开抽屉时生成一次，重试时原样复用）。
+   * 缺省时服务端按请求生成，此时重试无法防重。
+   */
+  @IsOptional() @IsString() @MaxLength(80) idempotencyKey?: string;
 
   @IsOptional() @IsInt() @Min(0) validDays?: number;
 }
@@ -156,6 +191,15 @@ export class CreditImportDto {
   @IsInt()
   @Min(0)
   validDays?: number;
+
+  /**
+   * 幂等键。导入是 500 行级别的写操作，超时重试必须有防重手段：
+   * 前端在选好文件后生成一次，重试时原样带上。
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  importKey?: string;
 }
 
 /** 把 query 里的数字安全转成 number; 非法值给 undefined 让 service 用默认值 */
@@ -273,6 +317,19 @@ export class AdminCommerceController {
     return { id: product.id, status: product.status };
   }
 
+  /**
+   * 删除商品（物理删除）。
+   *
+   * 只允许删除没有历史订单的 SKU；已有订单返回 409 并提示改为下架 ——
+   * 退款与积分回收要回查该 SKU 的原价与发放积分，记录必须留着。
+   */
+  @Delete("products/:id")
+  @RequirePermission(PERMISSIONS.productDelete)
+  @AuditAction("product.delete")
+  deleteProduct(@Param("id") id: string) {
+    return this.commerce.deleteProduct(id);
+  }
+
   // ── 订单 (B-39~B-44) ─────────────────────────────────────────────
 
   /**
@@ -289,6 +346,7 @@ export class AdminCommerceController {
     @Query("email") email?: string,
     @Query("channel") channel?: string,
     @Query("refundState") refundState?: string,
+    @Query("productId") productId?: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
     @Query("userId") userId?: string,
@@ -302,6 +360,7 @@ export class AdminCommerceController {
       email,
       channel,
       refundState,
+      productId,
       from,
       to,
       page: num(page),
@@ -326,6 +385,7 @@ export class AdminCommerceController {
     @Query("email") email?: string,
     @Query("channel") channel?: string,
     @Query("refundState") refundState?: string,
+    @Query("productId") productId?: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
   ) {
@@ -335,6 +395,7 @@ export class AdminCommerceController {
       email,
       channel,
       refundState,
+      productId,
       from,
       to,
     });
@@ -401,6 +462,31 @@ export class AdminCommerceController {
     });
   }
 
+  /**
+   * 异步退款人工核销。
+   *
+   * 渠道返回 PROCESSING 后，订单与积分都保持未变；运营在商户后台确认最终
+   * 结果后调用本接口。成功会原子扣回积分并推进订单，失败则只关闭退款单。
+   */
+  @Post("orders/:id/refunds/:refundId/confirm")
+  @RequirePermission(PERMISSIONS.orderRefund)
+  @AuditAction("order.refund_confirm")
+  confirmRefund(
+    @Param("id") id: string,
+    @Param("refundId") refundId: string,
+    @Body() dto: RefundConfirmDto,
+    @AdminUser() actor: AdminUser,
+  ) {
+    return this.orders.confirmRefund({
+      orderId: id,
+      refundId,
+      outcome: dto.outcome,
+      providerRefundId: dto.providerRefundId,
+      reason: dto.reason,
+      operatorId: actor.id,
+    });
+  }
+
   // ── 支付流水 (B-45) ─────────────────────────────────────────────
 
   @Get("payments")
@@ -464,6 +550,20 @@ export class AdminCommerceController {
     sendCsv(res, "credits", csv);
   }
 
+  /**
+   * 账实核对：比对「账户可用 + 冻结」与「Σ 批次剩余」。
+   *
+   * 只读，不修数。积分体系有两条必须相等的余额（账户权威 / 批次权威），
+   * 任何一处绕过钱包直接改批次都会让等式破裂，而破裂后**所有扣费都会失败**。
+   * 此前只在注释里承诺「每日对账」，实际没有检测入口。
+   */
+  @Get("credits/audit")
+  @RequirePermission(PERMISSIONS.creditRead)
+  auditCredits(@Query("limit") limit?: string) {
+    const n = num(limit);
+    return this.credit.auditConsistency(n !== undefined && n > 0 ? Math.min(n, 5000) : 500);
+  }
+
   /** 某用户的批次明细 (B-50) */
   @Get("credits/:userId/lots")
   @RequirePermission(PERMISSIONS.creditRead)
@@ -493,7 +593,7 @@ export class AdminCommerceController {
     });
   }
 
-  /** 人工增减积分 (B-52)。 */
+  /** 人工增减积分 (B-52)。备注可选，动作与操作人由审计自动留痕。 */
   @Post("credits/adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
   @AuditAction("credit.adjust")
@@ -501,13 +601,19 @@ export class AdminCommerceController {
     return this.credit.adminAdjust({
       userId: dto.userId,
       delta: dto.delta,
-      reason: "人工调整用户积分",
+      reason: dto.reason,
       operatorId: actor.id,
       validDays: dto.validDays,
     });
   }
 
-  /** 批量调整积分。逐条独立执行并回传每条结果 */
+  /**
+   * 批量调整积分。逐条独立执行并回传每条结果。
+   *
+   * 幂等键按「操作人 + 批次号」生成，由前端在打开抽屉时生成并随提交带上：
+   * 超时重试不会二次发放。缺省时服务端生成一次性键（此时重试无保护，
+   * 前端不传即等于放弃该保护）。
+   */
   @Post("credits/batch-adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
   @AuditAction("credit.batch_adjust")
@@ -515,6 +621,8 @@ export class AdminCommerceController {
     return this.commerce.batchAdjust(dto.items, {
       operatorId: actor.id,
       validDays: dto.validDays,
+      reason: dto.reason,
+      idempotencyKey: dto.idempotencyKey,
     });
   }
 
@@ -553,6 +661,7 @@ export class AdminCommerceController {
     return this.commerce.importCreditsCsv(file.buffer.toString("utf8"), {
       validDays: dto.validDays,
       operatorId: actor.id,
+      importKey: dto.importKey,
     });
   }
 }

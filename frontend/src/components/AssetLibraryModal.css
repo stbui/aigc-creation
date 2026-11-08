@@ -1,0 +1,678 @@
+/**
+ * AssetLibraryModal 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
+ *
+ * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   素材库导入选择器 (asset-library-picker)
+   ───────────────────────────────────────────────────────────────────
+   数值全部抄自参考站线上样式表 index-glaqVozH.css 的
+   .asset-library-picker-* 规则 (2026-10-20 取证)。
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ⚠️ **必须是紧邻合并选择器 `.alp-modal.ant-modal-container`, 不能写成后代形式。**
+   兼容壳 (`ui/primitives/modal.tsx`) 把页面级类与容器类挂在**同一个元素**上:
+     <div class="ui-modal-surface ant-modal-container ant-modal-content alp-modal">
+   故 `.alp-modal .ant-modal-container` (后代) 恒不命中 —— @2026-11-03 实测命中数 0,
+   参考站实测的 padding 0 / radius 20 / 1px #e5e8f0 边框 / 阴影 / max-height 760 /
+   纵向 flex **全部失效**, 弹窗退回 `.ui-modal-surface` 的默认
+   (radius 12 / display block / overflow auto / max-height calc(100vh - 32px))。
+   症状: 内部三段高度不受约束, 底部操作条被撑到文档流末端 —— 900px 视口实测
+   `.alp-footer` 的 bottom = 2615 (屏外 1700px 余), 「已选 N / 取消 / 确定」要点进去
+   再滚动整页才看得到。@2026-11-03 对拍修复 */
+.alp-modal.ant-modal-container {
+  padding: 0 !important;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgb(40 43 76 / 0.2);
+  border: 1px solid var(--alp-border-7);
+  color: var(--text-strong);
+  /* 参考站 .asset-library-picker-dialog: 纵向 flex + max-height min(760px, 100vh - 40px) */
+  display: flex;
+  flex-direction: column;
+  max-height: min(760px, calc(100vh - 40px));
+}
+
+/* header / body 是容器的**子元素**, 后代选择器在这里是对的 (与上面不同) */
+.alp-modal .ant-modal-header {
+  flex: none;
+}
+
+.alp-modal .ant-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* antd 6 的 body 默认是 block。只给外层 max-height 时，block 子级会按
+     内容自然高度排版，内部 .alp-body 的 100% 高度因此失效，footer 被撑到
+     可视区之外（实拍 900px 视口里 footer 的 y=1818）。这里让 body 成为
+     纵向 flex 容器，中间素材区才能收缩并滚动。 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 参考站 dialog 的三段: header(固定) / toolbar+layout(自适应) / footer(固定) */
+.alp-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.alp-modal .ant-modal-header {
+  padding: 0;
+  margin: 0;
+  border-bottom: 1px solid var(--alp-border-8);
+}
+
+.alp-modal .ant-modal-body {
+  padding: 0;
+}
+
+/* 头部 */
+.alp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 26px 18px;
+}
+
+.alp-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alp-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.alp-close {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--alp-surface-2);
+  color: var(--alp-text-8);
+  cursor: pointer;
+  padding: 0;
+}
+
+.alp-close:hover {
+  background: var(--surface-1);
+  color: var(--alp-text-4);
+}
+
+/* 工具栏 */
+.alp-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 26px;
+  background: var(--alp-surface-info);
+  /* 参考站 .asset-library-picker-toolbar **无**下边框 (只有 #fbfcfe 底)",
+     此前多画了一条 #eef0f5 分隔线 @2026-10-21 */
+}
+
+.alp-groups {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.alp-groups::-webkit-scrollbar {
+  display: none;
+}
+
+.alp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  flex: none;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--alp-text-7);
+  background: var(--card-bg);
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.alp-chip:hover {
+  color: var(--brand);
+  border-color: var(--border-brand);
+}
+
+.alp-chip.is-active {
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-color: var(--alp-border-brand-6);
+  font-weight: 600;
+}
+
+.alp-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+/* 日期筛选平铺展示, 不再藏进下拉菜单, 所有时间档位一眼可见。 */
+.alp-date-flat {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: 34px;
+  padding: 2px;
+  background: var(--surface-4);
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+}
+
+.alp-filter-label {
+  padding: 0 6px 0 5px;
+  font-size: 12px;
+  line-height: 28px;
+  color: var(--alp-text-10);
+}
+
+.alp-date-option {
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--alp-text-7);
+  background: transparent;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.alp-date-option:hover {
+  color: var(--brand);
+}
+
+.alp-date-option.is-active {
+  color: var(--brand);
+  background: var(--card-bg);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgb(43 45 83 / 0.102);
+}
+
+/* 搜索 —— 结构由 `Input` 兼容壳给出 (`.login-input-wrap` 外壳 + `-prefix` / `-inner`
+   / `-suffix` 三段), 这里只按参考站数值覆写。`.alp-search` 是加在外壳上的 class,
+   故下面每条都要带 `.alp-search` 前缀才能压过 `.login-input-wrap` 的同名属性。 */
+.alp-search.login-input-wrap {
+  gap: 7px;
+  width: 250px;
+  height: 34px;
+  padding: 0 10px;
+  color: var(--alp-text-11);
+  background: var(--card-bg);
+  border: 1px solid var(--alp-border-4);
+  border-radius: 9px;
+}
+
+.alp-search.login-input-wrap:focus-within {
+  border-color: var(--alp-border-brand-4);
+  box-shadow: 0 0 0 3px rgb(85 70 216 / 0.102);
+}
+
+/* 前缀图标: 兼容壳默认 margin-right 10 → 覆写为 0 (间距交给外层 gap=7)。
+   `flex: 0 1 auto` 是刻意的: 兼容壳给的是 `flex: 0 0 auto`, 图标因此保持 14px 宽,
+   而原先裸 svg 作为 flex 子项会被压缩到 13px —— 用不可收缩会让整个输入框
+   右移 1px、占位文案跟着挪位。这里保留可收缩语义, 与改动前的实测盒一致。 */
+.alp-search .login-input-prefix {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-right: 0;
+  color: var(--alp-text-11);
+}
+
+.alp-search .login-input-inner {
+  width: 100%;
+  height: auto;
+  /* 浏览器对 input 的默认内边距是 1px 2px; shadcn Input 的 px-3/py-1 已被覆盖,
+     这里写回参考站实测值 —— 写 0 会让文字整体上移 1px、行高变矮 2px */
+  padding: 1px 2px;
+  /* 覆盖 shadcn Input 自带的 rounded-md(8px) —— 参考站这个内在 input 是方角,
+     圆角只属于外层外壳 (9px) */
+  border-radius: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--alp-text-1);
+  background: none;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.alp-search .login-input-inner::placeholder {
+  color: var(--alp-text-13);
+}
+
+.alp-search .login-input-suffix {
+  margin-left: 0;
+}
+
+.alp-search-clear.ui-btn {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--alp-text-10);
+  cursor: pointer;
+}
+
+.alp-search-clear.ui-btn:hover {
+  background: none;
+  color: var(--alp-text-3);
+}
+
+/* 主体布局 */
+.alp-layout {
+  flex: auto;
+  display: flex;
+  min-height: 0;
+}
+
+.alp-sidebar {
+  flex: 0 0 184px;
+  width: 184px;
+  box-sizing: border-box;
+  padding: 18px 12px 20px;
+  background: var(--alp-surface-brand-6);
+  border-right: 1px solid var(--alp-border-8);
+  overflow: auto;
+}
+
+.alp-sidebar > strong,
+.alp-sidebar-section > strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 14px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--alp-text-2);
+}
+
+.alp-sidebar-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--alp-border-8);
+}
+
+.alp-sidebar-section > strong {
+  padding-bottom: 6px;
+}
+
+.alp-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alp-sidebar nav button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  text-align: left;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--alp-text-9);
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.alp-sidebar nav button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alp-sidebar-count {
+  flex: none;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  color: var(--alp-text-10);
+  background: var(--surface-4);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px;
+  text-align: center;
+}
+
+.alp-sidebar nav button:hover {
+  color: var(--brand);
+  background: var(--alp-surface-brand-3);
+}
+
+.alp-sidebar nav button.is-active {
+  color: var(--brand);
+  background: var(--card-bg);
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgb(43 45 83 / 0.0706);
+}
+
+.alp-sidebar nav button.is-active .alp-sidebar-count {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+/* 用途项数量多, 收紧行高让常见分类在 900px 高弹窗内一次看全 */
+.alp-sidebar-section nav {
+  gap: 1px;
+}
+
+.alp-sidebar-section nav button {
+  min-height: 31px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.alp-main {
+  flex: auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.alp-content {
+  flex: auto;
+  min-height: 280px;
+  padding: 20px 26px 24px;
+  overflow: auto;
+}
+
+.alp-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  min-height: 280px;
+  color: var(--alp-text-9);
+  font-size: 13px;
+}
+
+/* 网格与卡片 */
+.alp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 14px;
+}
+
+.alp-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--alp-text-3);
+  background: var(--card-bg);
+  border: 1px solid var(--alp-border-6);
+  border-radius: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+
+.alp-card:hover {
+  border-color: var(--alp-border-brand-5);
+  transform: translateY(-2px);
+  box-shadow: 0 7px 18px rgb(85 70 216 / 0.1216);
+}
+
+.alp-card.is-selected {
+  border: 2px solid var(--brand);
+  box-shadow: 0 0 0 3px rgb(85 70 216 / 0.1098);
+}
+
+/* 到达选择上限后, 未选中的卡片置灰。
+   只改 cursor 是不够的 —— 卡片与可点状态**长得一模一样**, 用户仍会去点,
+   点了没反应只会以为界面卡住。降透明度让「不能再选」在视觉上先成立,
+   hover 也不该再浮起 (下面把 hover 效果一并收掉)。 */
+.alp-card:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.alp-card:disabled:hover {
+  border-color: var(--alp-border-6);
+  transform: none;
+  box-shadow: none;
+}
+
+.alp-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--surface-4);
+  overflow: hidden;
+}
+
+.alp-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.alp-origin-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgb(17 24 39 / 0.24);
+}
+
+.alp-origin-badge.is-original {
+  background: color-mix(in srgb, var(--brand) 88%, transparent);
+}
+
+.alp-origin-badge.is-generated {
+  background: color-mix(in srgb, var(--text-strong) 72%, transparent);
+}
+
+.alp-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgb(38 31 117 / 0.251);
+}
+
+.alp-capability {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  max-width: calc(100% - 16px);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--card-bg) 90%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  box-shadow: 0 1px 4px rgb(17 24 39 / 0.18);
+  backdrop-filter: blur(4px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 底部 */
+.alp-footer {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 26px 18px;
+  font-size: 12px;
+  color: var(--alp-text-9);
+  border-top: 1px solid var(--alp-border-8);
+}
+
+.alp-footer-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.alp-clear {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.alp-clear:hover {
+  text-decoration: underline;
+}
+
+.alp-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.alp-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.alp-btn-cancel {
+  color: var(--alp-text-5);
+  background: var(--card-bg);
+  border-color: var(--border-1);
+}
+
+.alp-btn-cancel:hover {
+  background: var(--surface-6);
+  border-color: var(--alp-border-1);
+}
+
+.alp-btn-confirm {
+  color: var(--card-bg);
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.alp-btn-confirm:hover:not(:disabled) {
+  background: var(--alp-surface-brand-1);
+}
+
+.alp-btn-confirm:disabled {
+  color: var(--alp-text-12);
+  cursor: not-allowed;
+  background: var(--alp-surface-1);
+  border-color: var(--alp-border-2);
+}
+
+/* 窄屏: 参考站同款降级 (侧栏收窄, 工具栏纵向) */
+@media (max-width: 760px) {
+  .alp-header,
+  .alp-toolbar,
+  .alp-content,
+  .alp-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .alp-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  /* 参考站窄屏把「日期筛选 / 搜索」拆成两行各自撑满; 本仓两者包在
+     .alp-toolbar-right 里, 故让它占满一行, 日期保留自身宽(不折行)、搜索吃掉剩余 */
+  .alp-toolbar-right {
+    width: 100%;
+  }
+  .alp-search {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .alp-sidebar {
+    flex-basis: 124px;
+    width: 124px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .alp-sidebar > strong,
+  .alp-sidebar-section > strong {
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 12px;
+  }
+  .alp-sidebar nav button {
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 12px;
+  }
+  .alp-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .alp-footer-actions {
+    width: 100%;
+  }
+  .alp-btn {
+    flex: 1;
+  }
+}

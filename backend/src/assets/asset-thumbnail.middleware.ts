@@ -5,7 +5,8 @@
  *
  * 素材库是纯图网格, 卡片实际只有 200 多像素, 但接口给的是原图 —— 本机实测
  * 首屏 20 张合计约 29MB (单张最大 3.4MB)。素材一多, 图片加载和内存都会被
- * 原图拖垮。这里按 URL 上的 `w` / `h` 生成方形 JPEG 缩略图并落盘缓存,
+ * 原图拖垮。这里按 URL 上的 `w` / `h` 生成 JPEG 缩略图并落盘缓存:
+ * 同时传 `w` / `h` 时裁成指定尺寸; 只传 `w` 时保持原图纵横比。
  * 同尺寸重复请求直接读缓存。
  *
  * ## 回落语义
@@ -18,7 +19,7 @@
  * 必须在签名中间件**之后** (复用同一份访问校验)、`useStaticAssets` **之前**
  * (静态中间件命中即响应, 注册在后面就拿不到缩略图了)。
  *
- * 缓存目录在 `<UPLOAD_DIR>/.thumbs/<w>x<h>/<key>.jpg`。素材 key 带随机段且
+ * 缓存目录在 `<UPLOAD_DIR>/.thumbs/<w>x<h|auto>/<key>.jpg`。素材 key 带随机段且
  * 从不原地覆盖, 因此缓存文件不会过期; 删除素材时 `AssetsService.remove()`
  * 会一并清理所有尺寸变体。
  */
@@ -98,8 +99,9 @@ export function createAssetThumbnailMiddleware(uploadsDir: string) {
     }
 
     const w = sizeParam(req.query.w, DEFAULT_SIZE);
-    const h = sizeParam(req.query.h, w);
-    const cacheFile = join(cacheRoot, `${w}x${h}`, `${key}.jpg`);
+    const hasHeight = typeof req.query.h === 'string';
+    const h = hasHeight ? sizeParam(req.query.h, w) : null;
+    const cacheFile = join(cacheRoot, `${w}x${h ?? 'auto'}`, `${key}.jpg`);
 
     const serve = (body: Buffer) => {
       res.setHeader('Content-Type', 'image/jpeg');
@@ -140,7 +142,7 @@ export function createAssetThumbnailMiddleware(uploadsDir: string) {
     }
 
     /**
-     * 读原图 → 方形裁切 → 编码 JPEG → 落盘缓存。
+     * 读原图 → 裁切或等比缩放 → 编码 JPEG → 落盘缓存。
      * 透明图先铺白底再合 JPEG, 否则 alpha 会被编码成黑底。
      */
     async function generate(): Promise<ThumbReply | null> {
@@ -154,7 +156,12 @@ export function createAssetThumbnailMiddleware(uploadsDir: string) {
         if (!dims || dims.width * dims.height > maxUploadPixels()) return null;
 
         const image = await Jimp.read(source);
-        image.cover({ w, h });
+        if (h === null) {
+          const target = widthOnlyDimensions(dims.width, dims.height, w, MAX_SIZE);
+          image.resize(target);
+        } else {
+          image.cover({ w, h });
+        }
 
         let body: Buffer;
         if (image.hasAlpha()) {
@@ -177,5 +184,20 @@ export function createAssetThumbnailMiddleware(uploadsDir: string) {
         return null;
       }
     }
+  };
+}
+
+/** 只限制宽度时保持比例；极端长图额外限制高度，避免生成超大位图。 */
+function widthOnlyDimensions(
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  maxHeight: number,
+): { w: number; h: number } {
+  const proportionalHeight = Math.max(1, Math.round((sourceHeight / sourceWidth) * targetWidth));
+  if (proportionalHeight <= maxHeight) return { w: targetWidth, h: proportionalHeight };
+  return {
+    w: Math.max(1, Math.round((sourceWidth / sourceHeight) * maxHeight)),
+    h: maxHeight,
   };
 }

@@ -13,7 +13,7 @@ describe('TaskAdmissionService 输入素材归属', () => {
     const prisma = {
       generationTask: { findUnique: vi.fn().mockResolvedValue(null) },
       project: {
-        findUnique: vi.fn().mockResolvedValue({ id: 'project-current', ownerId: 'user-1' }),
+        findFirst: vi.fn().mockResolvedValue({ id: 'project-current', ownerId: 'user-1' }),
       },
       asset: { findMany: vi.fn().mockResolvedValue(assets) },
     };
@@ -57,7 +57,15 @@ describe('TaskAdmissionService 输入素材归属', () => {
     ).rejects.toThrow('所选模型不可用，请重新选择');
 
     expect(prisma.asset.findMany).toHaveBeenCalledWith({
-      where: { id: { in: ['asset-from-another-project'] }, ownerId: 'user-1' },
+      where: {
+        id: { in: ['asset-from-another-project'] },
+        ownerId: 'user-1',
+        status: 'visible',
+        project: { deletedAt: null },
+      },
+    });
+    expect(prisma.project.findFirst).toHaveBeenCalledWith({
+      where: { id: 'project-current', deletedAt: null },
     });
   });
 

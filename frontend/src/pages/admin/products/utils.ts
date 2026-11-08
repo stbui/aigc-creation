@@ -11,12 +11,11 @@ import type {
   CreateProductPayload,
   UpdateProductPayload,
 } from '../../../types/api';
-import type { ProductDraft } from './constants';
+import { formatYuanPlain } from '../../../admin-ui/lib/format';
+import { DEFAULT_SORT_ORDER, type ProductDraft } from './constants';
 
-/** 分 → 元（输入框回填值） */
-export function centsToYuanText(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
+/** 分 → 元（输入框回填值；统一实现在 admin-ui/lib/format.ts） */
+export const centsToYuanText = formatYuanPlain;
 
 /** 元 → 分。非法输入返回 null，由调用方拦截 */
 export function yuanTextToCents(text: string): number | null {
@@ -28,6 +27,35 @@ export function yuanTextToCents(text: string): number | null {
 /** 积分有效期的人类可读文案。0 是「永久」而不是「0 天」 */
 export function validDaysText(days: number): string {
   return days === 0 ? '永久有效' : `${days} 天`;
+}
+
+/**
+ * 每积分单价（元 / 积分）。
+ *
+ * 跨 SKU 比「谁更划算」的唯一口径 —— 与 C 端结算页的「折合单价」同源。
+ * 免费商品或不发积分的商品没有可比单价，返回 null（调用方隐藏该行，
+ * 不写「0.0000」当数字看）。
+ */
+export function perCreditYuanText(
+  priceCents: number,
+  credits: number,
+): string | null {
+  if (priceCents <= 0 || credits <= 0) return null;
+  return `¥${(priceCents / credits / 100).toFixed(4)}`;
+}
+
+/**
+ * 删除前置条件：只有从没卖出去过的 SKU 能删。
+ *
+ * 有订单的商品要保留记录供退款 / 积分回收回查，只能下架。返回 `null`
+ * 表示可以删；否则返回可直接展示给运营的提示 —— 文案里必须给出下一步，
+ * 只说「不能删除」等于把问题丢回给人猜。
+ */
+export function deleteBlockedReason(
+  product: Pick<AdminProduct, 'orderCount'>,
+): string | null {
+  if (product.orderCount <= 0) return null;
+  return `该商品已有 ${product.orderCount} 笔历史订单，不能删除；请改为下架`;
 }
 
 export function toDraft(p: AdminProduct): ProductDraft {
@@ -76,6 +104,13 @@ export function buildProductPayload(
   if (!Number.isInteger(validDays) || validDays < 0) {
     return { ok: false, error: '积分有效期必须是非负整数天' };
   }
+  // 排序留空 = 用默认值（新建 100）；非空必须是合法非负整数，不接受静默兜底
+  const rawSortOrder = draft.sortOrder.trim();
+  const parsedSortOrder = Number(rawSortOrder);
+  if (rawSortOrder !== '' && (!Number.isInteger(parsedSortOrder) || parsedSortOrder < 0)) {
+    return { ok: false, error: '排序权重必须是非负整数' };
+  }
+  const sortOrder = rawSortOrder === '' ? Number(DEFAULT_SORT_ORDER) : parsedSortOrder;
 
   const update: UpdateProductPayload = {
     name: draft.name.trim(),
@@ -85,7 +120,7 @@ export function buildProductPayload(
     credits,
     creditsValidDays: validDays,
     grantType: draft.grantType,
-    sortOrder: Number(draft.sortOrder) || 0,
+    ...(rawSortOrder === '' ? {} : { sortOrder }),
   };
 
   const create: CreateProductPayload = {
@@ -98,7 +133,7 @@ export function buildProductPayload(
     credits,
     creditsValidDays: validDays,
     grantType: draft.grantType,
-    sortOrder: Number(draft.sortOrder) || 0,
+    sortOrder,
     status: 'offline',
   };
 

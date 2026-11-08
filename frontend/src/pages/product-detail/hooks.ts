@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCreditCost } from '../../hooks/useCreditLabel';
-import { DEFAULT_SECTIONS, MAX_SECTIONS, SECTION_VALUES } from './constants';
+import {
+  DEFAULT_SECTIONS,
+  MAX_SECTIONS,
+  SECTION_MODULES,
+  SECTION_VALUES,
+} from './constants';
 import { useApp } from '../../ui';
 
 /**

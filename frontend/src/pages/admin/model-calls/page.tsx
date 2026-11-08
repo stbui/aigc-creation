@@ -2,10 +2,30 @@ import { useCallback, useMemo, useState } from 'react';
 import { REQUEST_KIND_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import { useAdmin, useToast, useAdminDetailParam, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
 import { adminApiLogsApi } from '../../../lib/api';
+import { ModelCallDetailDrawer } from './ModelCallDetailDrawer';
 
-import { ActionButton, AdminDataTable, AppliedFilters, Descriptions, Drawer, FilterActions, FilterBar, Notice, PageHeader, Panel, SelectField, StatCard, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  RefreshButton,
+  ExportCsvButton,
+  useAdminExport,
+  AdminDataTable,
+  AppliedFilters,
+  ClearableField,
+  DateRangeField,
+  FilterActions,
+  FilterBar,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatusTag,
+  StaleError,
+  formatDateTimeLoose,
+  formatDuration,
+  type AdminColumn,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
 import type { ApiLogListResult, ApiLogView } from '../../../types/model';
 
 /**
@@ -65,10 +85,7 @@ export function AdminModelCallsPage() {
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<ApiLogListResult>(
-    fetcher,
-    initial,
-  );
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<ApiLogListResult>(fetcher, initial);
   /** 页面内改筛选后回写地址栏；`id`（详情抽屉）由 `useAdminDetailParam` 自己维护 */
   useAdminUrlFilterSync({
     status: params.status as string | undefined,
@@ -82,34 +99,40 @@ export function AdminModelCallsPage() {
     to: params.to as string | undefined,
   });
   const rows = data?.items ?? [];
-  const summary = data?.summary;
+  /** 任一筛选生效：空态文案与「清除筛选」入口据此切换 */
+  const hasFilter = [
+    params.status,
+    params.requestKind,
+    params.billable,
+    params.model,
+    params.channelId,
+    params.taskId,
+    params.userId,
+    params.from,
+    params.to,
+  ].some(Boolean);
 
   const { can } = useAdmin();
   const toast = useToast();
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
 
   /** 导出走当前筛选条件 —— 文件的筛选口径必须与屏幕上看到的一致 */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await adminApiLogsApi.exportCsv({
-        status: params.status as string | undefined,
-        requestKind: params.requestKind as string | undefined,
-        billable: params.billable as string | undefined,
-        model: params.model as string | undefined,
-        channelId: params.channelId as string | undefined,
-        taskId: params.taskId as string | undefined,
-        userId: params.userId as string | undefined,
-        from: params.from as string | undefined,
-        to: params.to as string | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        adminApiLogsApi.exportCsv({
+          status: params.status as string | undefined,
+          requestKind: params.requestKind as string | undefined,
+          billable: params.billable as string | undefined,
+          model: params.model as string | undefined,
+          channelId: params.channelId as string | undefined,
+          taskId: params.taskId as string | undefined,
+          userId: params.userId as string | undefined,
+          from: params.from as string | undefined,
+          to: params.to as string | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const [detailId, setDetailId] = useAdminDetailParam();
   const detail = rows.find((row) => row.id === detailId) ?? null;
@@ -150,6 +173,18 @@ export function AdminModelCallsPage() {
     });
   };
 
+  /*
+   * 已生效条件全部回显成 chip：表格被横向滚动或筛选条换行时，用户仍能一眼看到
+   * 「现在到底按什么在查」，并逐条撤掉，不必回头找对应的输入框。
+   */
+  const dateChipLabel = params.from
+    ? params.to
+      ? `时间：${params.from} ~ ${params.to}`
+      : `时间：${params.from} 起`
+    : params.to
+      ? `时间：截至 ${params.to}`
+      : null;
+
   const appliedChips: AppliedFilter[] = [
     params.status
       ? {
@@ -171,6 +206,36 @@ export function AdminModelCallsPage() {
           },
         }
       : null,
+    params.billable
+      ? {
+          key: 'billable',
+          label: `计费：${params.billable === 'true' ? '计费' : '不计费'}`,
+          onClear: () => {
+            setBillable(undefined);
+            setQuery({ billable: undefined });
+          },
+        }
+      : null,
+    params.model
+      ? {
+          key: 'model',
+          label: `模型：${params.model}`,
+          onClear: () => {
+            setModel('');
+            setQuery({ model: undefined });
+          },
+        }
+      : null,
+    params.channelId
+      ? {
+          key: 'channelId',
+          label: `渠道：${params.channelId}`,
+          onClear: () => {
+            setChannelId('');
+            setQuery({ channelId: undefined });
+          },
+        }
+      : null,
     params.taskId
       ? {
           key: 'taskId',
@@ -178,6 +243,27 @@ export function AdminModelCallsPage() {
           onClear: () => {
             setTaskId('');
             setQuery({ taskId: undefined });
+          },
+        }
+      : null,
+    params.userId
+      ? {
+          key: 'userId',
+          label: `用户：${params.userId}`,
+          onClear: () => {
+            setUserId('');
+            setQuery({ userId: undefined });
+          },
+        }
+      : null,
+    dateChipLabel
+      ? {
+          key: 'date',
+          label: dateChipLabel,
+          onClear: () => {
+            setFrom('');
+            setTo('');
+            setQuery({ from: undefined, to: undefined });
           },
         }
       : null,
@@ -189,24 +275,22 @@ export function AdminModelCallsPage() {
         key: 'createdAt',
         title: '时间',
         width: 150,
-        render: (row) => (
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            {new Date(row.createdAt).toLocaleString('zh-CN')}
-          </span>
-        ),
+        render: (row) => formatDateTimeLoose(row.createdAt),
       },
       {
         key: 'status',
         title: '状态',
         width: 100,
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[12px]">
+          <div className="flex flex-col">
             <StatusTag
               status={row.status}
               tone={STATUS_TONES[row.status] ?? 'muted'}
               label={STATUS_LABELS[row.status] ?? row.status}
             />
-            <span className="tabular-nums text-muted-foreground">HTTP {row.statusCode || '—'}</span>
+            <span className={row.statusCode >= 400 ? 'text-danger-text' : undefined}>
+              HTTP {row.statusCode || '—'}
+            </span>
           </div>
         ),
       },
@@ -215,9 +299,9 @@ export function AdminModelCallsPage() {
         title: '类型',
         width: 100,
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[12px]">
-            <span className="text-foreground">{REQUEST_KIND_LABELS[row.requestKind] ?? row.requestKind}</span>
-            <span className={row.billable ? 'text-muted-foreground' : 'text-warn-text'}>
+          <div className="flex flex-col">
+            <span>{REQUEST_KIND_LABELS[row.requestKind] ?? row.requestKind}</span>
+            <span className={row.billable ? undefined : 'text-warn-text'}>
               {row.billable ? '计费' : '不计费'}
             </span>
           </div>
@@ -229,8 +313,12 @@ export function AdminModelCallsPage() {
         width: 220,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate text-[12px] text-foreground">{row.channelName || row.channelId || '—'}</div>
-            <div className="truncate font-mono text-[12px] text-muted-foreground">{row.model || '—'}</div>
+            <div title={row.channelName || row.channelId || undefined}>
+              {row.channelName || row.channelId || '—'}
+            </div>
+            <div className="truncate" title={row.model || undefined}>
+              {row.model || '—'}
+            </div>
           </div>
         ),
       },
@@ -239,15 +327,18 @@ export function AdminModelCallsPage() {
         title: '用量',
         width: 160,
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[12px] tabular-nums text-muted-foreground">
-            <span>{row.durationMs} ms{row.pollCount > 1 ? ` · 轮询 ${row.pollCount}` : ''}</span>
+          <div className="flex flex-col">
+            <span>
+              {formatDuration(row.durationMs)}
+              {row.pollCount > 1 ? ` · 轮询 ${row.pollCount}` : ''}
+            </span>
             {row.usageAvailable && (
-              <span className="text-muted-foreground">
+              <span>
                 输入 {row.inputTokens} / 输出 {row.outputTokens}
               </span>
             )}
-            {row.mediaCount > 0 && <span className="text-muted-foreground">产出 {row.mediaCount} 个</span>}
-            {row.videoSeconds > 0 && <span className="text-muted-foreground">{row.videoSeconds}s 视频</span>}
+            {row.mediaCount > 0 && <span>产出 {row.mediaCount} 个</span>}
+            {row.videoSeconds > 0 && <span>{row.videoSeconds}s 视频</span>}
           </div>
         ),
       },
@@ -257,14 +348,14 @@ export function AdminModelCallsPage() {
         width: 220,
         render: (row) =>
           row.error || row.errorCode ? (
-            <div className="min-w-0 text-[12px]">
-              {row.errorCode && <span className="font-mono text-danger-text">{row.errorCode}</span>}
-              <span className="ml-1 line-clamp-1 text-muted-foreground" title={row.error}>
+            <div className="min-w-0">
+              {row.errorCode && <span className="text-danger-text">{row.errorCode}</span>}
+              <span className="ml-1 line-clamp-1" title={row.error}>
                 {row.error}
               </span>
             </div>
           ) : (
-            <span className="text-muted-foreground">—</span>
+            <span>—</span>
           ),
       },
       {
@@ -287,37 +378,9 @@ export function AdminModelCallsPage() {
       <PageHeader
         title="调用记录"
         description="逐次留痕的上游 HTTP 调用，含后台连通性测试（不计费）。排查「哪个请求失败、返回了什么」看这里。"
-        actions={
-          <>
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                icon={Download}
-                disabled={exporting}
-                onClick={() => void exportCsv()}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
-            <ActionButton variant="secondary" size="sm" onClick={() => void reload()}>
-              刷新
-            </ActionButton>
-          </>
-        }
       />
 
-      {summary && (
-        <div className="mb-3 grid grid-cols-4 gap-3">
-          <StatCard label="调用总数" value={summary.total} hint="受当前筛选影响" />
-          <StatCard label="成功" value={summary.success} tone={undefined} />
-          <StatCard label="失败 / 取消" value={summary.failed} tone={summary.failed > 0 ? 'danger' : undefined} />
-          <StatCard label="平均耗时" value={`${summary.avgDurationMs} ms`} hint={`其它状态 ${summary.other} 条`} />
-        </div>
-      )}
-
-      <Panel title="调用明细">
-        <FilterBar>
+       <FilterBar>
           <SelectField
             ariaLabel="调用状态"
             placeholder="全部状态"
@@ -341,6 +404,7 @@ export function AdminModelCallsPage() {
               { value: 'create', label: '创建' },
               { value: 'poll', label: '轮询' },
               { value: 'task', label: '连通性测试' },
+              { value: 'proxy', label: '中转' },
             ]}
             allowClear
             onChange={setRequestKind}
@@ -348,8 +412,8 @@ export function AdminModelCallsPage() {
           />
           <SelectField
             ariaLabel="是否计费"
-            placeholder="全部计费方式"
-            clearLabel="全部计费方式"
+            placeholder="全部计费"
+            clearLabel="全部计费"
             value={billable}
             options={[
               { value: 'true', label: '计费' },
@@ -357,9 +421,19 @@ export function AdminModelCallsPage() {
             ]}
             allowClear
             onChange={setBillable}
-            className="w-28"
+            className="w-32"
           />
-          <TextField
+          <DateRangeField
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom);
+              setTo(nextTo);
+            }}
+            className="w-60"
+          />
+          {/* 精确定位用的 ID 输入排在常用条件之后，窄屏时自然换到第二行 */}
+          <ClearableField
             ariaLabel="模型"
             value={model}
             onChange={setModel}
@@ -367,7 +441,7 @@ export function AdminModelCallsPage() {
             onEnter={applyFilters}
             className="w-40"
           />
-          <TextField
+          <ClearableField
             ariaLabel="渠道 ID"
             value={channelId}
             onChange={setChannelId}
@@ -375,7 +449,7 @@ export function AdminModelCallsPage() {
             onEnter={applyFilters}
             className="w-40"
           />
-          <TextField
+          <ClearableField
             ariaLabel="任务 ID"
             value={taskId}
             onChange={setTaskId}
@@ -383,27 +457,13 @@ export function AdminModelCallsPage() {
             onEnter={applyFilters}
             className="w-40"
           />
-          <TextField
+          <ClearableField
             ariaLabel="用户 ID"
             value={userId}
             onChange={setUserId}
             placeholder="用户 ID"
             onEnter={applyFilters}
             className="w-40"
-          />
-          <TextField
-            ariaLabel="开始日期"
-            type="date"
-            value={from}
-            onChange={setFrom}
-            className="w-36"
-          />
-          <TextField
-            ariaLabel="结束日期"
-            type="date"
-            value={to}
-            onChange={setTo}
-            className="w-36"
           />
           <FilterActions>
             <ActionButton variant="default" size="sm" onClick={applyFilters}>
@@ -416,6 +476,15 @@ export function AdminModelCallsPage() {
           <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
         </FilterBar>
 
+      <Panel
+        title="调用明细"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
+          </>
+        }
+      >
         {error && rows.length > 0 && <StaleError error={error} onRetry={() => void reload()} />}
         <AdminDataTable<ApiLogView>
           rows={rows}
@@ -424,7 +493,20 @@ export function AdminModelCallsPage() {
           loading={loading}
           error={rows.length === 0 ? error : null}
           onRetry={() => void reload()}
-          emptyText="没有调用记录。生成任务或执行连通性测试后才会产生记录。"
+          /* 整行可点开详情：只有最右侧「详情」链接时，横向滚动后入口容易被裁掉 */
+          onRowClick={(row) => setDetailId(row.id)}
+          emptyText={
+            hasFilter
+              ? '没有符合条件的调用记录。清除筛选或换个条件试试。'
+              : '没有调用记录。生成任务或执行连通性测试后才会产生记录。'
+          }
+          emptyAction={
+            hasFilter ? (
+              <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
+                清除筛选
+              </ActionButton>
+            ) : undefined
+          }
           minWidth={1180}
           pagination={{
             current: Number(params.page ?? 1),
@@ -435,63 +517,7 @@ export function AdminModelCallsPage() {
         />
       </Panel>
 
-      <Drawer
-        open={detailId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDetailId(null);
-        }}
-        width={720}
-        title="调用详情"
-        description={detail ? `${detail.method} ${detail.path}` : undefined}
-        footer={
-          <ActionButton variant="secondary" size="sm" onClick={() => setDetailId(null)}>
-            关闭
-          </ActionButton>
-        }
-      >
-        {detail ? (
-          <div className="flex flex-col gap-4">
-            {detail.error && (
-              <Notice tone="danger" title={`调用失败${detail.errorCode ? `（${detail.errorCode}）` : ''}`}>
-                {detail.error}
-              </Notice>
-            )}
-            <Descriptions
-              items={[
-                { label: '状态', value: `${STATUS_LABELS[detail.status] ?? detail.status} · HTTP ${detail.statusCode || '—'}` },
-                { label: '请求类型', value: `${REQUEST_KIND_LABELS[detail.requestKind] ?? detail.requestKind}${detail.billable ? '（计费）' : '（不计费）'}` },
-                { label: '来源', value: detail.source || '—' },
-                { label: '渠道', value: `${detail.channelName || '—'}（${detail.channelId || '—'}）` },
-                { label: '模型', value: <span className="font-mono text-xs">{detail.model || '—'}</span> },
-                { label: '协议 / 格式', value: detail.apiFormat || '—' },
-                { label: '能力 / 操作', value: `${detail.capability || '—'} · ${detail.operation || '—'}` },
-                { label: '耗时', value: `${detail.durationMs} ms${detail.pollCount > 0 ? ` · 第 ${detail.pollCount} 次轮询` : ''}` },
-                { label: '上游状态', value: detail.providerStatus || '—' },
-                { label: '请求方法', value: <span className="font-mono text-xs">{detail.method || '—'}</span> },
-                { label: '请求路径', value: <span className="break-all font-mono text-xs">{detail.path || '—'}</span> },
-                { label: '上游请求号', value: <span className="font-mono text-xs">{detail.providerRequestId || '—'}</span> },
-                { label: '任务', value: <span className="font-mono text-xs">{detail.taskId || '—'}</span> },
-                { label: '账单', value: <span className="font-mono text-xs">{detail.billingOrderId || '—'}</span> },
-                { label: '用户', value: detail.userId || '—' },
-                { label: '追踪号', value: <span className="font-mono text-xs">{detail.traceId || '—'}</span> },
-                {
-                  label: 'Token 用量',
-                  value: detail.usageAvailable
-                    ? `输入 ${detail.inputTokens} · 输出 ${detail.outputTokens} · 缓存 ${detail.cachedTokens}`
-                    : '无用量数据',
-                },
-                { label: '产出', value: `${detail.mediaCount} 个媒体${detail.videoSeconds > 0 ? ` · ${detail.videoSeconds}s` : ''}` },
-                { label: '时间', value: new Date(detail.createdAt).toLocaleString('zh-CN') },
-              ]}
-              columns={2}
-            />
-          </div>
-        ) : (
-          <p className="py-6 text-center text-xs text-muted-foreground">
-            该记录不在当前页。请回到列表按任务 ID 或渠道 ID 定位。
-          </p>
-        )}
-      </Drawer>
+      <ModelCallDetailDrawer detailId={detailId} detail={detail} onClose={() => setDetailId(null)} />
     </>
   );
 }

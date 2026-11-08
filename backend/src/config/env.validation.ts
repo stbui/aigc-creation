@@ -71,7 +71,7 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'cors.allowPrivateLan', env: 'CORS_ALLOW_PRIVATE_LAN', type: 'boolean', def: false },
 
   // ── 鉴权 ──────────────────────────────────────────────────────────────
-  { key: 'jwt.secret', env: 'JWT_SECRET', type: 'string', def: 'dev-ecom-vision-secret-2024-do-not-use-in-prod' },
+  { key: 'jwt.secret', env: 'JWT_SECRET', type: 'string', def: 'dev-huojue-secret-do-not-use-in-prod' },
   { key: 'jwt.ttl', env: 'JWT_TTL', type: 'string', def: '7d' },
   // 前端站点基址 —— 邮件里的「重置密码」链接用它拼绝对地址。
   // 与 ASSET_PUBLIC_BASE 分开：后者是给**外部模型网关**拉参考图用的，

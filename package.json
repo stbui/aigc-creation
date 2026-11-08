@@ -1,8 +1,8 @@
 {
-  "name": "aigc-creation",
+  "name": "huojue",
   "version": "1.0.0",
   "private": true,
-  "description": "AIGC creation platform monorepo developer entrypoint",
+  "description": "货觉AI 电商视觉创作平台 monorepo 开发入口",
   "engines": {
     "node": ">=22.12.0"
   },

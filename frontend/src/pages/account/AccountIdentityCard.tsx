@@ -75,6 +75,9 @@ export function AccountIdentityCard({
           <span className="account-field-label">邮箱</span>
           <div className="account-field-value">
             <span className="account-field-text">{profile?.email}</span>
+            <span className={`account-pill${profile?.emailVerifiedAt ? ' is-ok' : ' is-muted'}`}>
+              {profile?.emailVerifiedAt ? '已验证' : '未验证'}
+            </span>
             <span className="account-hint">登录标识，已用于订单与发票，暂不支持修改</span>
           </div>
         </div>

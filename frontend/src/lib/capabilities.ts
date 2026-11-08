@@ -1,5 +1,5 @@
 import { API_ROOT, unwrapEnvelope } from './http';
-import { runtimeOf } from './constants';
+import { publicCapabilityRuntime, runtimeOf } from './constants';
 import type { Capability, CapabilityDef, CapabilityGroup } from '../types/api';
 
 /**
@@ -37,7 +37,12 @@ export async function loadCapabilities(force = false): Promise<CapabilitiesData>
     const res = await fetch(`${API_ROOT}/capabilities`);
     if (!res.ok) throw new Error(`能力清单加载失败（${res.status}）`);
     const data = unwrapEnvelope<CapabilitiesData>(await res.json());
-    cache = data;
+    cache = {
+      ...data,
+      items: data.items.map((item) =>
+        item.runtime ? { ...item, runtime: publicCapabilityRuntime(item.runtime) } : item,
+      ),
+    };
     cachedAt = Date.now();
     return cache;
   })();
@@ -79,9 +84,7 @@ export function capabilityName(id: string | undefined | null): string {
  * 这种能力仍保留入口，页面内会说明原因并禁用提交 —— 直接隐藏会让用户
  * 误以为产品没有这项能力。
  */
-export function isCapabilityVisible(
-  def: Pick<CapabilityDef, 'mode' | 'runtime'>,
-): boolean {
+export function isCapabilityVisible(def: Pick<CapabilityDef, 'mode' | 'runtime'>): boolean {
   return def.mode !== 'planned' && runtimeOf(def).effective !== 'disabled';
 }
 

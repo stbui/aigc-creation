@@ -17,7 +17,6 @@ export const MAX_IMAGES = 5;
 export const MAX_NAME_LEN = 100;
 /** 商品描述输入上限 */
 export const MAX_DESC_LEN = 5000;
-
 // ───────────────── 包含模块 ─────────────────
 
 /**

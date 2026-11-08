@@ -1,3 +1,4 @@
+import '../styles/auth.css';
 import { Modal } from '../ui';
 import { AuthCard } from './AuthCard';
 import { useAuth } from '../context/AuthContext';
@@ -29,7 +30,11 @@ export function LoginModal({ open, onClose, authEpoch }: Props) {
       keyboard
       width={840}
       className="login-modal"
-      styles={{ container: { background: 'transparent', boxShadow: 'none', border: 'none' } }}
+      styles={{
+        container: { background: 'transparent', boxShadow: 'none', border: 'none' },
+        // AuthCard 自己按 840px 双栏排版；通用 modal 内边距会把内容撑宽并产生横向滚动。
+        body: { padding: 0 },
+      }}
     >
       {/* key 绑定身份版本: 每次登录成功都重建卡片, 清空内部表单态 */}
       <AuthCard key={authEpoch} onSuccess={onClose} />

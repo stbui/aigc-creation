@@ -141,12 +141,11 @@ export function ShoppableCarouselPage() {
     [submitting, gallery.items],
   );
   const generationCount = useMemo(() => countGenerations(gallery.items), [gallery.items]);
-
-  const { rightTab, pick: pickRightTab, showResults } = useRightTab();
   const refreshGallery = useCallback(() => {
     void gallery.reload();
   }, [gallery.reload]);
 
+  const { rightTab, pick: pickRightTab, showResults } = useRightTab();
   // ── 能力运行时（不可用时禁用提交并给出原因） ──
   const { runtime, blocked, reason } = useCapabilityRuntime(CAPABILITY_ID);
 
@@ -551,7 +550,6 @@ export function ShoppableCarouselPage() {
               ? '提交任务后，这次生成的带货图文会按批次陈列在这里'
               : '登录后，你在这个页面生成过的图文都会显示在这里'
           }
-          onRefresh={refreshGallery}
           onDeleteRow={deleteRow}
         />
       </Modal>

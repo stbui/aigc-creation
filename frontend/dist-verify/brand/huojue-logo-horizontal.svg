@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 264 96" width="264" height="96">
+  <title>货觉AI 横版组合</title>
+  <desc>主标记 + 货觉 (深色) + AI (品牌紫) 横版锁定组合, 用于顶栏 / 登录页 / 页脚等横排场景</desc>
+  <defs>
+    <linearGradient id="hj-g-h" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8064f6"/>
+      <stop offset="1" stop-color="#5546d8"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="96" height="96" rx="22" fill="url(#hj-g-h)"/>
+  <path d="M 23 48 Q 48 28 73 48 Q 48 68 23 48 Z" fill="none" stroke="#ffffff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 48 37 Q 50 46 59 48 Q 50 50 48 59 Q 46 50 37 48 Q 46 46 48 37 Z" fill="#ffffff"/>
+  <text x="116" y="63" font-family="'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" font-size="42" font-weight="700" letter-spacing="1" fill="#171a2b">货觉</text>
+  <text x="204" y="63" font-family="'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" font-size="42" font-weight="700" letter-spacing="1" fill="#5546d8">AI</text>
+</svg>

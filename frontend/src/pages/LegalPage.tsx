@@ -1,3 +1,4 @@
+import './LegalPage.css';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ExceptionPage } from '../components/ExceptionPage';
@@ -44,7 +45,7 @@ const DOCS: Record<string, LegalDoc> = {
         heading: '第二条 服务内容',
         paragraphs: [
           '本平台提供电商图片生成与处理能力，包括商品主图、商品详情图、爆款复刻、局部重绘、一键抠图、去水印、产品精修、图片翻译、智能扩图、商品换色、旋转角度等工具。',
-          '产出由云端模型完成，页面按单次请求的实际通道如实标注产出来源；历史记录中的本地结果会单独标明。',
+          '产出由云端模型完成；无可用模型线路时任务失败并退还积分，不产出占位或本地生成结果。',
         ],
       },
       {

@@ -23,6 +23,18 @@ export class RegisterDto {
   password: string;
 
   /**
+   * 邮箱归属验证码（`POST /auth/email/send`）。
+   *
+   * DTO 层先保留可选，由 AuthService 依据运行环境强制校验。这样可以仅在
+   * `NODE_ENV=test` 且显式打开测试旁路时跳过，生产环境永远无法因漏配环境
+   * 变量而绕过邮箱验证。
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(6)
+  emailCode?: string;
+
+  /**
    * 昵称 —— **必填**。
    *
    * 前端注册表单此前把该字段设为 hidden 却仍在提交 undefined, 导致注册必然

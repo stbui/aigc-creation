@@ -50,7 +50,13 @@ export function CouponFormDrawer({
           <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={busy}>
             取消
           </ActionButton>
-          <ActionButton variant="default" size="sm" disabled={busy} onClick={onSave}>
+          <ActionButton
+            variant="default"
+            size="sm"
+            /* 编辑态没有改动时不必再发一次保存：成功 toast 会让人误以为改了什么 */
+            disabled={busy || (Boolean(editing) && !dirty)}
+            onClick={onSave}
+          >
             {busy ? '保存中…' : '保存'}
           </ActionButton>
         </>
@@ -185,7 +191,8 @@ export function CouponFormDrawer({
 
         {editing && (
           <p className="text-[12px] leading-4 text-muted-foreground">
-            已核销 {editing.usedCount} 张 · 券码不可修改，停用后已发放的券立即失效
+            已核销 {editing.usedCount} 张 · 待支付预占 {editing.pendingReserved} 张 ·
+            券码不可修改，停用后已发放的券立即失效
           </p>
         )}
       </div>

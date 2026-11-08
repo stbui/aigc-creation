@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { createAdminAuditFixture } from './support/admin-business-fixtures';
 
 /**
  * 后台布局回归。
@@ -11,8 +12,9 @@ import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
  * 断言用几何量测而非截图比对 —— 截图会被无关的样式改动弄红,
  * 而"内容区宽度 =视口 -侧栏" 与 "行高 ≤ 46" 是硬约束, 不会因视觉微调而失效。
  *
- * 外壳采用经典「上左右」：顶部 56px 承担品牌与账号，侧栏只放导航，
- * 导航区独立滚动。选择器统一走 `data-testid="admin-*"`。
+ * 外壳采用 shadcn Sidebar 组合：侧栏占满视口高度（品牌头 + 导航 + 账号底），
+ * 内容区顶部是 56px 顶栏（折叠开关 + 面包屑），导航区独立滚动。
+ * 选择器统一走 `data-testid="admin-*"`。
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
@@ -33,6 +35,13 @@ const SIZES: Array<[number, number]> = [
 
 test.describe('后台布局', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
+
+  let auditFixture: Awaited<ReturnType<typeof createAdminAuditFixture>> | null = null;
+
+  test.beforeAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    auditFixture = await createAdminAuditFixture();
+  });
 
   for (const [w, h] of SIZES) {
     test(`${w}px 宽下内容区正确扣除侧栏宽度且无横向溢出`, async ({ page }) => {
@@ -67,7 +76,28 @@ test.describe('后台布局', () => {
     });
   }
 
-  test('顶栏固定、侧栏占满剩余高度且导航区独立滚动', async ({ page }) => {
+  test('侧栏首次默认全展开，折叠分组互不影响', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${UI}/admin`);
+    await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
+
+    // 清除历史偏好，验证首次进入的默认态，而不是测试浏览器里残留的折叠状态。
+    await page.evaluate(() => localStorage.removeItem('huojue.admin.sidebar-groups'));
+    await page.reload();
+    const nav = page.getByTestId('admin-sider');
+    const overview = nav.getByRole('button', { name: '总览', exact: true });
+    const operations = nav.getByRole('button', { name: '运营', exact: true });
+
+    await expect(overview).toHaveAttribute('aria-expanded', 'true');
+    await expect(operations).toHaveAttribute('aria-expanded', 'true');
+
+    await overview.click();
+    await expect(overview).toHaveAttribute('aria-expanded', 'false');
+    await expect(operations).toHaveAttribute('aria-expanded', 'true');
+    await expect(nav.getByRole('button', { name: '用户管理', exact: true })).toBeVisible();
+  });
+
+  test('顶栏固定 56px、侧栏占满视口且导航区独立滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/roles`); // 权限页最长, 最能暴露滚动问题
     await page.waitForSelector('[data-testid="admin-header"]', { timeout: 15000 });
@@ -81,32 +111,32 @@ test.describe('后台布局', () => {
       const r = sider.getBoundingClientRect();
       return {
         headerHeight: Math.round(headerRect.height),
-        headerBottom: Math.round(headerRect.bottom),
+        headerTop: Math.round(headerRect.top),
         siderTop: Math.round(r.top),
         height: Math.round(r.height),
         viewport: window.innerHeight,
         navOverflowY: getComputedStyle(navScroll).overflowY,
-        docScrollH: document.documentElement.scrollHeight,
       };
     });
 
-    // 顶栏固定 56px，侧栏从顶栏底部开始并占满剩余视口
+    // 侧栏全高，顶栏在内容区顶部固定 56px（不随内容滚动）
     expect(m.headerHeight).toBe(56);
-    expect(m.siderTop).toBe(m.headerBottom);
-    expect(m.height).toBeLessThanOrEqual(m.viewport - m.headerHeight + 2);
-    expect(m.height).toBeGreaterThan(400);
+    expect(m.headerTop).toBe(0);
+    expect(m.siderTop).toBe(0);
+    expect(Math.abs(m.height - m.viewport)).toBeLessThanOrEqual(2);
     // 长内容时导航区自身滚动
     expect(['auto', 'scroll']).toContain(m.navOverflowY);
   });
 
-  test('品牌在顶栏左侧，账号在顶栏右侧', async ({ page }) => {
+  test('品牌在侧栏顶部，账号在侧栏底部', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${UI}/admin`);
-    await page.waitForSelector('[data-testid="admin-header"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
     await page.waitForSelector('[data-testid="admin-account-trigger"]', { timeout: 15000 });
 
-    await expect(page.getByTestId('admin-brand')).toContainText('logon+');
-    await expect(page.getByRole('button', { name: /折叠|收起侧栏|展开侧栏/ })).toHaveCount(0);
+    const sider = page.getByTestId('admin-sider');
+    await expect(sider.getByTestId('admin-brand')).toContainText('货觉');
+    await expect(sider.getByTestId('admin-account-trigger')).toBeVisible();
 
     const m = await page.evaluate(() => {
       const rect = (selector: string) => {
@@ -115,93 +145,108 @@ test.describe('后台布局', () => {
         return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
       };
       return {
-        header: rect('[data-testid="admin-header"]'),
+        sider: rect('[data-testid="admin-sider"]'),
         brand: rect('[data-testid="admin-brand"]'),
         account: rect('[data-testid="admin-account-trigger"]'),
       };
     });
 
-    expect(m.brand.left - m.header.left).toBeLessThan(32);
-    expect(m.header.right - m.account.right).toBeLessThan(32);
-    expect(m.account.left).toBeGreaterThan(m.brand.right);
-    expect(m.brand.top).toBeGreaterThanOrEqual(m.header.top);
-    expect(m.brand.bottom).toBeLessThanOrEqual(m.header.bottom);
-    expect(m.account.top).toBeGreaterThanOrEqual(m.header.top);
-    expect(m.account.bottom).toBeLessThanOrEqual(m.header.bottom);
+    expect(m.brand.top - m.sider.top).toBeLessThan(32);
+    expect(m.sider.bottom - m.account.bottom).toBeLessThan(32);
+    expect(m.account.top).toBeGreaterThan(m.brand.bottom);
+    expect(m.brand.left).toBeGreaterThanOrEqual(m.sider.left);
+    expect(m.account.right).toBeLessThanOrEqual(m.sider.right + 1);
   });
 
-  test('用户表格行高一致、操作列不换行', async ({ page }) => {
+  test('用户列表使用四列卡片网格且操作平铺', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/users`);
-    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-user-card"]', { timeout: 15000 });
     await page.waitForTimeout(800);
 
     const m = await page.evaluate(() => {
-      const rows = Array.from(
-        document.querySelectorAll('[data-testid="admin-table-row"]'),
+      const cards = Array.from(
+        document.querySelectorAll('[data-testid="admin-user-card"]'),
       ) as HTMLElement[];
+      const grid = document.querySelector('[data-testid="admin-user-grid"]') as HTMLElement | null;
+      const actionGroups = cards.map(
+        (card) =>
+          card.querySelector('[data-testid="admin-user-card-actions"]') as HTMLElement | null,
+      );
       return {
-        heights: rows.map((r) => Math.round(r.getBoundingClientRect().height)),
-        // 动作项数应 ≤2 (详情 + 更多), 多的应在下拉里
-        counts: rows.map(
-          (r) => r.querySelectorAll('td:last-child button').length,
+        gridDisplay: grid ? getComputedStyle(grid).display : '',
+        columns: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
+        counts: cards.map(
+          (card) =>
+            card
+              .querySelector('[data-testid="admin-user-card-actions"]')
+              ?.querySelectorAll('button').length ?? 0,
+        ),
+        actionDisplays: actionGroups.map((group) => (group ? getComputedStyle(group).display : '')),
+        actionColumns: actionGroups.map((group) =>
+          group ? getComputedStyle(group).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
         ),
       };
     });
 
-    // 小号按钮是 32px，单元格 py-2.5 ⇒ 单行行高约 52px；
-    // 换行会把行高撑到 70+，所以「所有行等高且 ≤60」就是没换行。
-    const max = Math.max(...m.heights);
-    const min = Math.min(...m.heights);
-    expect(max, `最高行 ${max}px, 疑似换行`).toBeLessThanOrEqual(60);
-    expect(max - min, `行高不一致(${min}~${max}px), 疑似个别行换行`).toBeLessThanOrEqual(2);
-    for (const [i, c] of m.counts.entries()) {
-      expect(c, `第 ${i} 行直显动作 ${c} 个, 应 ≤2`).toBeLessThanOrEqual(2);
-    }
+    expect(m.gridDisplay).toBe('grid');
+    expect(m.columns).toBe(4);
+    // 当前登录管理员等身份会少显示高风险操作，不能假设每张卡片都有同样权限。
+    // 页面只需保证所有可用操作平铺在四列网格中，且至少有一个完整操作组可验证布局。
+    expect(Math.min(...m.counts)).toBeGreaterThanOrEqual(1);
+    expect(Math.max(...m.counts)).toBeGreaterThanOrEqual(3);
+    expect(m.actionDisplays.every((display) => display === 'grid')).toBe(true);
+    expect(m.actionColumns.every((columns) => columns === 4)).toBe(true);
   });
 
-  test('全局搜索可用 Ctrl+K 唤起并支持 Esc 关闭', async ({ page }) => {
+  test('顶栏不提供全局搜索入口', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${UI}/admin/users`);
     await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
 
+    await expect(page.getByTestId('admin-global-search-trigger')).toHaveCount(0);
     await page.keyboard.press('Control+K');
-    const search = page.getByRole('textbox', { name: '后台全局搜索' });
-    await expect(search).toBeFocused();
-    await search.fill('o');
-    await expect(page.getByText('输入至少 2 个字符开始搜索')).toBeVisible();
-
-    await search.press('Escape');
-    await expect(search).toBeHidden();
+    await expect(page.getByRole('dialog', { name: '全局搜索' })).toHaveCount(0);
   });
 
-  test('操作列的下拉菜单可用', async ({ page }) => {
+  test('点击用户卡片打开详情', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/users`);
-    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-user-card"]', { timeout: 15000 });
 
-    await page
-      .getByTestId('admin-table-row')
-      .first()
-      .getByRole('button', { name: '更多' })
-      .click();
-    // shadcn DropdownMenu（radix 底座）：弹层是 role=menu，动作是 menuitem。
-    // 菜单的可访问名由 RowMenu 显式给成「更多操作」，radix 默认会取触发器文字「更多」。
-    const menu = page.getByRole('menu', { name: '更多操作' });
-    await expect(menu).toBeVisible();
-    expect(await menu.getByRole('menuitem').count()).toBeGreaterThanOrEqual(2);
+    const firstCard = page.getByTestId('admin-user-card').first();
+    await firstCard.getByRole('button', { name: /查看用户 .* 详情/ }).click();
+
+    const drawer = page.getByTestId('admin-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole('heading', { name: '用户详情' })).toBeVisible();
+    await expect(drawer.getByText('账号资料、登录活动与最近使用情况')).toBeVisible();
+    await expect(drawer.getByRole('link', { name: '任务记录' })).toBeVisible();
+    await expect(drawer.getByRole('link', { name: '订单记录' })).toBeVisible();
+    await expect(drawer.getByRole('link', { name: '积分账本' })).toBeVisible();
+    await expect(drawer.getByRole('heading', { name: '会员', exact: true })).toBeVisible();
+    await expect(drawer.getByTestId('admin-user-membership')).toBeVisible();
+
+    const bodyOverflow = await drawer.locator('.overflow-y-auto').evaluate((el) => ({
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+    }));
+    expect(bodyOverflow.scrollWidth).toBeLessThanOrEqual(bodyOverflow.clientWidth);
+
+    await drawer.getByRole('button', { name: '关闭' }).click();
+    await expect(drawer).toHaveCount(0);
   });
 
   test('审计详情在行内展开，不使用抽屉或确认弹窗', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(`${UI}/admin/audit-logs`);
+    await page.goto(
+      `${UI}/admin/audit-logs?action=${encodeURIComponent(auditFixture!.action)}&targetId=${encodeURIComponent(auditFixture!.productId)}`,
+    );
     await page.waitForSelector('.adm-content', { timeout: 15000 });
-    await page
-      .waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 })
-      .catch(() => undefined);
+    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
 
     const detailButton = page.getByRole('button', { name: '详情', exact: true }).first();
-    test.skip((await detailButton.count()) === 0, '当前库中暂无审计记录');
+    await expect(detailButton).toBeVisible();
 
     await detailButton.click();
     await expect(page.getByTestId('admin-table-expanded')).toBeVisible();

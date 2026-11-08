@@ -35,6 +35,7 @@ export interface ConsumeResult {
   id?: string;
   userId?: string | null;
   phone?: string | null;
+  email?: string | null;
 }
 
 export interface SmsVerifyResult {
@@ -50,10 +51,12 @@ export class AccountTokenService {
     PASSWORD_RESET: 'password_reset',
     SMS_LOGIN: 'sms_login',
     SMS_VERIFY: 'sms_verify',
+    EMAIL_VERIFY: 'email_verify',
   } as const;
 
   static readonly RESET_TTL_MS = 30 * 60 * 1000;
   static readonly SMS_TTL_MS = 5 * 60 * 1000;
+  static readonly EMAIL_TTL_MS = 5 * 60 * 1000;
   /** 单个验证码允许的失败次数，超过即作废 */
   static readonly MAX_ATTEMPTS = 5;
 
@@ -71,7 +74,7 @@ export class AccountTokenService {
 
   /** HMAC-SHA256，输出 64 位十六进制 */
   static hash(raw: string): string {
-    const secret = process.env.JWT_SECRET || 'dev-ecom-vision-secret-2024-do-not-use-in-prod';
+    const secret = process.env.JWT_SECRET || 'dev-huojue-secret-do-not-use-in-prod';
     return createHmac('sha256', secret).update(raw, 'utf8').digest('hex');
   }
 
@@ -93,6 +96,7 @@ export class AccountTokenService {
     type: string;
     userId?: string;
     phone?: string;
+    email?: string;
     ttlMs: number;
     ip?: string;
     /** 是否作废旧令牌，默认 true */
@@ -111,6 +115,7 @@ export class AccountTokenService {
           usedAt: null,
           ...(params.userId ? { userId: params.userId } : {}),
           ...(params.phone ? { phone: params.phone } : {}),
+          ...(params.email ? { email: params.email } : {}),
         },
         data: { usedAt: new Date() },
       });
@@ -121,6 +126,7 @@ export class AccountTokenService {
         type: params.type,
         userId: params.userId ?? null,
         phone: params.phone ?? null,
+        email: params.email ?? null,
         tokenHash: AccountTokenService.hash(raw),
         expiresAt,
         requestedIp: params.ip ?? null,
@@ -141,6 +147,7 @@ export class AccountTokenService {
     raw: string;
     userId?: string;
     phone?: string;
+    email?: string;
   }): Promise<ConsumeResult> {
     const tokenHash = AccountTokenService.hash(String(params.raw || '').trim());
     const record = await this.prisma.accountToken.findUnique({ where: { tokenHash } });
@@ -148,6 +155,7 @@ export class AccountTokenService {
     if (!record || record.type !== params.type) return { ok: false, reason: 'invalid' };
     if (params.userId && record.userId !== params.userId) return { ok: false, reason: 'invalid' };
     if (params.phone && record.phone !== params.phone) return { ok: false, reason: 'invalid' };
+    if (params.email && record.email !== params.email) return { ok: false, reason: 'invalid' };
     if (record.usedAt) return { ok: false, reason: 'used' };
     if (record.expiresAt.getTime() < Date.now()) return { ok: false, reason: 'expired' };
 
@@ -158,7 +166,13 @@ export class AccountTokenService {
     });
     if (claimed.count !== 1) return { ok: false, reason: 'used' };
 
-    return { ok: true, id: record.id, userId: record.userId, phone: record.phone };
+    return {
+      ok: true,
+      id: record.id,
+      userId: record.userId,
+      phone: record.phone,
+      email: record.email,
+    };
   }
 
   /**
@@ -172,11 +186,26 @@ export class AccountTokenService {
     phone: string;
     code: string;
   }): Promise<SmsVerifyResult> {
+    return this.verifyCode(params);
+  }
+
+  /**
+   * 按手机号或邮箱 + 类型校验一次性验证码。邮箱注册与短信注册共用同一套
+   * 过期、失败计数和 CAS 消费逻辑，避免两套实现出现安全属性漂移。
+   */
+  async verifyCode(params: {
+    type: string;
+    phone?: string;
+    email?: string;
+    code: string;
+  }): Promise<SmsVerifyResult> {
+    if (!params.phone && !params.email) return { ok: false, reason: '验证码无效' };
     const now = new Date();
     const candidates = await this.prisma.accountToken.findMany({
       where: {
         type: params.type,
-        phone: params.phone,
+        ...(params.phone ? { phone: params.phone } : {}),
+        ...(params.email ? { email: params.email } : {}),
         usedAt: null,
         expiresAt: { gt: now },
       },

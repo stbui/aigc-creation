@@ -1,6 +1,6 @@
-const TOKEN_KEY = 'ecom_vision_token';
-const EMAIL_KEY = 'ecom_vision_email';
-const ROLE_KEY = 'ecom_vision_role';
+const TOKEN_KEY = 'huojue_token';
+const EMAIL_KEY = 'huojue_email';
+const ROLE_KEY = 'huojue_role';
 
 /** 后台角色 code —— C 端用户为 'user' */
 export type StoredRole = 'user' | 'admin' | 'operator' | 'finance';

@@ -1,3 +1,5 @@
+import '../styles/auth.css';
+import './QrLoginPage.css';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, useApp } from '../ui';

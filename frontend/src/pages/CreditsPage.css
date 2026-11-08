@@ -1,0 +1,290 @@
+/**
+ * CreditsPage 页面样式 —— 由 `./CreditsPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* ── 积分明细页 ────────────────────────────────────────────────────────── */
+
+/* 宽度与内边距由 .personal-page 骨架决定, 这里只挂页面级语义色 */
+.credits-page {
+  /*
+   * 增减金额的专用语义色。--success-text / --danger-text 在各自淡底上
+   * 只有 3.99 / 4.14，13px 表格数字不达标；这里压深一档，色相不变。
+   */
+  --credits-plus: var(--misc-text-success);
+  --credits-minus: var(--misc-text-danger);
+}
+
+.credits-stat-label {
+  font-size: 12px;
+  color: var(--text-muted, var(--text-muted));
+  margin-bottom: 6px;
+}
+
+.credits-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-strong, var(--text-strong));
+}
+
+.credits-stat-value.is-warn {
+  color: var(--warn-text);
+}
+
+.credits-amount.is-plus {
+  color: var(--credits-plus);
+  font-weight: 600;
+}
+
+.credits-amount.is-minus {
+  color: var(--credits-minus);
+  font-weight: 600;
+}
+
+/* 批次状态: 深色前景 + 淡底胶囊, 不再用 antd 预设 success / error 的 2.41:1 绿字
+   （Tag 的 DOM 形见文件末尾「状态标签」适配层 .credits-status.ui-tag） */
+.credits-status.is-active {
+  color: var(--credits-plus);
+  background: var(--success-soft-bg);
+}
+
+.credits-status.is-expired {
+  color: var(--credits-minus);
+  background: var(--danger-soft-bg);
+}
+
+.credits-status.is-exhausted {
+  color: var(--text-body);
+  background: var(--surface);
+}
+
+.credits-ledger-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.credits-ledger-toolbar .ui-select-trigger {
+  width: 148px;
+}
+
+/* 积分页 */
+.credits-hero {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-panel) !important;
+  background: linear-gradient(120deg, var(--brand-bg) 0%, var(--card-bg) 62%) !important;
+}
+
+.credits-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.credits-hero-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--brand);
+  box-shadow: 0 2px 10px rgb(85 70 216 / 12%);
+}
+
+.credits-hero-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-body);
+}
+
+.credits-hero-value {
+  margin-top: 2px;
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.credits-hero-note {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-body);
+}
+
+/* 扣减规则作为整体换行: 窄屏下只剩「扣减」两字吊在第二行比换行本身更难读 */
+.credits-hero-rule {
+  white-space: nowrap;
+}
+
+.credits-hero-side {
+  flex: none;
+  text-align: right;
+}
+
+.credits-hero-warn {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 12px;
+}
+
+.credits-stats {
+  margin-bottom: 0;
+}
+
+.credits-stat-card .credits-stat-label {
+  margin-bottom: 4px;
+}
+
+.credits-list-card {
+  border-radius: var(--radius-panel) !important;
+}
+
+/*
+ * 窄屏列表（≤767px，由 useMediaQuery 切结构）。
+ *
+ * 流水五列最小 680px，批次最小 620px，在手机上必然是「半截列」而不是可读的
+ * 表格，所以这一档不再渲染 Table：每条记录两行，第一行标题 + 金额 / 状态，
+ * 第二行时间与余额 / 到期日，横向不再需要滚动。
+ */
+.credits-mobile-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credits-mobile-item {
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.credits-mobile-item:last-child {
+  border-bottom: 0;
+}
+
+.credits-mobile-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 22px;
+}
+
+.credits-mobile-line .credits-amount {
+  font-size: 14px;
+}
+
+.credits-mobile-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.credits-mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.credits-mobile-note {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+}
+
+.credits-mobile-pager {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+.credits-hero .ui-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+}
+
+.credits-stat-card .ui-card-body {
+  padding: 14px 16px;
+}
+
+.credits-list-card .ui-card-body {
+  padding: 16px 20px 20px;
+}
+
+@media (max-width: 900px) {
+  .credits-hero .ui-card-body {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px;
+  }
+  .credits-list-card .ui-card-body {
+    padding: 12px 14px 16px;
+  }
+}
+
+/* 状态标签：Tag 不再带 .ant-tag，保留同一套深色前景 / 淡底胶囊 */
+.credits-status.ui-tag {
+  margin-inline-end: 0;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+/* 积分 Tabs：与「我的作品」同款线形页签（品牌色下划线），不用 shadcn 默认灰底胶囊 */
+.credits-list-card .ui-tabs-list {
+  gap: 24px;
+  margin-bottom: 12px;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.credits-list-card .ui-tabs-list [data-slot='tabs-trigger'] {
+  flex: none;
+  height: auto;
+  padding: 0 0 12px;
+  border-radius: 0;
+  color: var(--text-desc);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.credits-list-card .ui-tabs-list [data-slot='tabs-trigger']:hover {
+  color: var(--text-body);
+}
+
+.credits-list-card .ui-tabs-list [data-slot='tabs-trigger'][data-state='active'] {
+  background: transparent;
+  color: var(--brand);
+  box-shadow: none;
+}
+
+.credits-list-card .ui-tabs-list [data-slot='tabs-trigger']::after {
+  bottom: -1px;
+  height: 2px;
+  background: var(--brand);
+}

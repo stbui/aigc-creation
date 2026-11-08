@@ -64,15 +64,20 @@ export class TaskLifecycleService {
   async succeed(
     task: { id: string; ownerId: string; billingOrderId: string | null; providerRequestId: string | null },
     input: { outputAssetIds: string[]; aigcMeta: string; providerRequestId?: string; outputDurationMs?: number },
-  ): Promise<void> {
+    /** 传入后只有仍持有该租约的执行者才能提交结果，防止过期执行者覆盖接管者。 */
+    guard?: { leaseOwner: string },
+  ): Promise<boolean> {
     const claimed = await this.prisma.generationTask.updateMany({
-      where: { id: task.id, status: 'running' },
+      where: {
+        id: task.id,
+        status: 'running',
+        ...(guard ? { leaseOwner: guard.leaseOwner } : {}),
+      },
       data: {
         status: 'succeeded',
         outputAssetId: input.outputAssetIds[0] ?? null,
         outputAssetIds: JSON.stringify(input.outputAssetIds),
         aigcMeta: input.aigcMeta,
-        provider: 'gateway',
         stage: 'done',
         progress: 100,
         leaseOwner: '',
@@ -86,31 +91,39 @@ export class TaskLifecycleService {
     });
     if (claimed.count === 0) {
       // 已被后台终止 / 恢复流程改写：产出已登记，但任务不属于本次调用
-      this.log.warn(`任务 ${task.id} 在落结果前已离开 running，跳过结算`);
-      return;
+      this.log.warn(`任务 ${task.id} 在落结果前已离开 running 或租约已变更，跳过结算`);
+      return false;
     }
-    if (!task.billingOrderId) return;
+    if (!task.billingOrderId) return true;
     try {
       await this.billing.settle(task.billingOrderId, {
         providerRequestId: input.providerRequestId ?? task.providerRequestId ?? undefined,
         audioDurationMs: input.outputDurationMs,
+        deliveredQuantity: input.outputAssetIds.length,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.log.error(`任务 ${task.id} 已交付但结算失败，转人工核对：${message}`);
       await this.billing.markUncertain(task.billingOrderId, `结算失败：${message}`).catch(() => undefined);
     }
+    return true;
   }
 
   /** 任务失败：退款（默认）或转人工核对 */
   async fail(
     taskId: string,
     input: { errorCode: TaskErrorCode | string; errorMessage?: string; reason: FailureReason; refund?: boolean },
+    guard?: { leaseOwner: string; leaseUntil?: Date | null },
   ): Promise<boolean> {
     const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
     if (!task) return false;
     const claimed = await this.prisma.generationTask.updateMany({
-      where: { id: taskId, status: { in: ['queued', 'running'] } },
+      where: {
+        id: taskId,
+        status: { in: ['queued', 'running'] },
+        ...(guard ? { leaseOwner: guard.leaseOwner } : {}),
+        ...(guard?.leaseUntil !== undefined ? { leaseUntil: guard.leaseUntil } : {}),
+      },
       data: {
         status: 'failed',
         errorCode: String(input.errorCode),
@@ -139,15 +152,24 @@ export class TaskLifecycleService {
   /**
    * 结果不明：任务判失败但**不退款**，账单转 uncertain 等人工核对。
    *
-   * 只用于「请求可能已经打到上游」的失败（超时 / 5xx / 连接中断 / 轮询失败）。
+   * 只用于「请求可能已经打到上游」的失败（超时 / 5xx / 建连后中断 / 轮询失败）。
    * 自动退款会让平台为一次已完成的上游调用白付钱，也可能让用户拿回积分
    * 同时又拿到图。
    */
-  async uncertain(taskId: string, message: string): Promise<boolean> {
+  async uncertain(
+    taskId: string,
+    message: string,
+    guard?: { leaseOwner: string; leaseUntil?: Date | null },
+  ): Promise<boolean> {
     const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
     if (!task) return false;
     const claimed = await this.prisma.generationTask.updateMany({
-      where: { id: taskId, status: { in: ['queued', 'running'] } },
+      where: {
+        id: taskId,
+        status: { in: ['queued', 'running'] },
+        ...(guard ? { leaseOwner: guard.leaseOwner } : {}),
+        ...(guard?.leaseUntil !== undefined ? { leaseUntil: guard.leaseUntil } : {}),
+      },
       data: {
         status: 'failed',
         errorCode: TASK_ERROR.uncertain,
@@ -177,7 +199,6 @@ export class TaskLifecycleService {
       throw new AppError(40000, '仅等待中或执行中的任务可终止', 400);
     }
 
-    const dispatched = await this.wasDispatched(taskId, task.routeRun);
     const claimed = await this.prisma.generationTask.updateMany({
       where: { id: taskId, status: { in: ['queued', 'running'] } },
       data: {
@@ -193,6 +214,13 @@ export class TaskLifecycleService {
 
     await this.cancelQueuedChildren(taskId, 'cancelled_by_admin');
 
+    /*
+     * 必须先落任务终态，再判断请求是否已离开宿主。反过来会留下竞态窗口：
+     * worker 在检查与取消 CAS 之间把 attempt 改成 submission_unknown，随后仍
+     * 调上游，而本方法却按「未派发」退款。先取消后回查时，worker 的租约闸门
+     * 会看到 cancelled 停止发送；若 attempt 已进入派发态，则账单必须转待核对。
+     */
+    const dispatched = await this.wasDispatched(taskId, task.routeRun);
     if (dispatched) {
       await this.toUncertain(taskId, task.billingOrderId, `后台终止：${reason}`);
       return { status: 'cancelled', billing: 'uncertain' };
@@ -201,21 +229,47 @@ export class TaskLifecycleService {
     return { status: 'cancelled', billing: task.billingOrderId ? 'refunded' : 'none' };
   }
 
+  /**
+   * 取消时 attempt 仍可能处于 `submission_unknown`，worker 随后才拿到明确结果。
+   *
+   * 取消路径为了不误退「可能已到上游」的请求会先转 `uncertain`；如果之后上游
+   * 明确拒绝、连接在建连前失败（`rejected_no_job`），就必须把冻结积分自动退回。
+   * 这里每次重新读取全部 attempt，只有确认本轮没有任何结果不明的派发时才退款。
+   */
+  async reconcileCancelledTask(taskId: string, reason: FailureReason): Promise<boolean> {
+    const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
+    if (!task || task.status !== 'cancelled') return false;
+
+    const attempts = await this.prisma.routeAttempt.findMany({
+      where: { taskId, routeRun: task.routeRun },
+      select: { status: true, dispatchState: true },
+    });
+    const mayHaveDispatched = attempts.some(
+      (attempt) =>
+        attempt.status === 'succeeded' ||
+        attempt.dispatchState === 'accepted' ||
+        attempt.dispatchState === 'submission_unknown',
+    );
+    if (mayHaveDispatched) return false;
+
+    await this.refund(task, reason, '已确认请求未到达上游，取消任务自动退款', false);
+    return true;
+  }
+
   // ── 内部 ──────────────────────────────────────────────────────────
 
   /**
    * 父任务结束（失败 / 终止）时取消尚未派发的子任务并退回它们自己的账单。
    *
    * 每张图各有一份预授权，取消就要按各自账单退回，否则这批钱会一直冻结在
-   * 钱包里。**已经打到上游的不碰** —— 上游可能正在生成并计费，让它们按自己的
-   * 结果收尾，避免多出一次「结果不明」。
+   * 钱包里。已经越过派发 CAS 的子任务不能按未派发退款：这里先取消任务，
+   * 再按 attempt 事实将账单转 `uncertain`，等待人工核对上游是否已计费。
    */
   private async cancelQueuedChildren(parentTaskId: string, reason: FailureReason): Promise<void> {
     const children = await this.prisma.generationTask.findMany({
       where: { parentTaskId, status: { in: ['queued', 'running'] } },
     });
     for (const child of children) {
-      if (await this.wasDispatched(child.id, child.routeRun)) continue;
       const claimed = await this.prisma.generationTask
         .updateMany({
           where: { id: child.id, status: { in: ['queued', 'running'] } },
@@ -230,7 +284,13 @@ export class TaskLifecycleService {
         })
         .catch(() => undefined);
       // 通知由父任务按整批汇总发一条，这里只退钱
-      if (claimed?.count) await this.refund(child, reason, '同批次的其它图已取消', false);
+      if (!claimed?.count) continue;
+      // 同样先取消再回查：如果 worker 已越过派发 CAS，账单只能转待核对。
+      if (await this.wasDispatched(child.id, child.routeRun)) {
+        await this.toUncertain(child.id, child.billingOrderId, `同批次的其它图已取消：${reason}`);
+      } else {
+        await this.refund(child, reason, '同批次的其它图已取消', false);
+      }
     }
   }
 
@@ -241,7 +301,11 @@ export class TaskLifecycleService {
       orderBy: { attemptNumber: 'desc' },
     });
     if (!attempt) return false;
-    return attempt.dispatchState === 'accepted' || attempt.dispatchState === 'submission_unknown';
+    return (
+      attempt.status === 'succeeded' ||
+      attempt.dispatchState === 'accepted' ||
+      attempt.dispatchState === 'submission_unknown'
+    );
   }
 
   /** 退款：新任务按账单，存量任务（无账单）回退旧积分批次 */

@@ -105,7 +105,7 @@ Hero 右半幅是本站自有的能力产出拼贴，不做外链图片。素材
 
 ## 5. 新客营销弹窗
 
-`frontend/src/components/GuestPromoDialog.tsx`，仅游客首访渲染，关闭后写 `localStorage` 键 `ecom-guest-promo-dismissed-v1`；登录用户不渲染。
+`frontend/src/components/GuestPromoDialog.tsx`，仅游客首访渲染，关闭后写 `localStorage` 键 `huojue-guest-promo-dismissed-v1`；登录用户不渲染。
 
 - 尺寸 500×427 居中对话框，遮罩 + 入场动画。仅在用户停留 6 秒且没有指针、
   键盘或滚轮操作时自动出现；用户一旦开始操作即取消本次弹出，营销入口继续保留在顶部促销条。

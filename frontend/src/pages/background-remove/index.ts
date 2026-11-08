@@ -8,4 +8,5 @@
  * hook `./hooks`、纯函数 `./utils`、常量 `./constants`；本页独有的预览组件是
  * `./BackgroundSourcePreview`。分层约定见 `docs/frontend-module-conventions.md`。
  */
+import './style.css';
 export { BackgroundRemovePage } from './page';

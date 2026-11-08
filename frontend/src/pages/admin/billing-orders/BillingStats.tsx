@@ -1,4 +1,4 @@
-import { StatCard } from '~/admin-ui/primitives';
+import { StatCards } from '~/admin-ui/primitives';
 import { STATUS_LABELS } from './constants';
 
 /**
@@ -9,15 +9,15 @@ import { STATUS_LABELS } from './constants';
  */
 export function BillingStats({ counts }: { counts: Record<string, number> }) {
   return (
-    <div className="mb-3 grid grid-cols-5 gap-3">
-      {Object.entries(STATUS_LABELS).map(([key, label]) => (
-        <StatCard
-          key={key}
-          label={label}
-          value={counts[key] ?? 0}
-          tone={key === 'uncertain' && (counts[key] ?? 0) > 0 ? 'danger' : undefined}
-        />
-      ))}
-    </div>
+    <StatCards
+      columns={5}
+      className="mb-3"
+      items={Object.entries(STATUS_LABELS).map(([key, label]) => ({
+        key,
+        label,
+        value: counts[key] ?? 0,
+        tone: key === 'uncertain' && (counts[key] ?? 0) > 0 ? 'danger' : undefined,
+      }))}
+    />
   );
 }

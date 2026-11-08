@@ -1,10 +1,19 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
-import { ActionButton, PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  ExportCsvButton,
+  useAdminExport,
+  PageHeader,
+  Panel,
+  RefreshButton,
+  StaleError,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
-import { STATUS_LABEL, type FormState } from './constants';
+import { STATUS_LABEL, TYPE_LABEL, type FormState } from './constants';
 import { buildCampaignPayload, emptyForm, toLocalInput } from './utils';
 import { CampaignFilterBar } from './CampaignFilterBar';
 import { CampaignTable } from './CampaignTable';
@@ -33,20 +42,21 @@ export function AdminCampaignsPage() {
   // 地址栏参数不可信: 只接受筛选下拉里真实存在的状态值
   const rawStatus = searchParams.get('status');
   const initialStatus = rawStatus && rawStatus in STATUS_LABEL ? rawStatus : undefined;
+  const rawType = searchParams.get('type');
+  const initialType = rawType && rawType in TYPE_LABEL ? rawType : undefined;
 
   const [keyword, setKeyword] = useState(initialKeyword);
+  const [type, setType] = useState<string | undefined>(initialType);
   const [status, setStatus] = useState<string | undefined>(initialStatus);
   const [busy, setBusy] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
   const [editing, setEditing] = useState<AdminCampaign | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [formBase, setFormBase] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const formDirty = Boolean(
-    formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
-  );
+  const formDirty = Boolean(formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase));
   useUnsavedGuard(formDirty);
   const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
@@ -56,6 +66,7 @@ export function AdminCampaignsPage() {
         page: params.page as number,
         pageSize: params.pageSize as number,
         keyword: params.keyword as string | undefined,
+        type: params.type as string | undefined,
         status: params.status as string | undefined,
       }),
     [],
@@ -68,25 +79,30 @@ export function AdminCampaignsPage() {
     pageSize: number;
   }>(fetcher, {
     keyword: initialKeyword || undefined,
+    type: initialType,
     status: initialStatus,
   });
 
   // 只同步已生效的筛选, 不同步分页
   useAdminUrlFilterSync({
     keyword: params.keyword as string | undefined,
+    type: params.type as string | undefined,
     status: params.status as string | undefined,
   });
 
-  const hasFilter = Boolean(params.keyword || params.status);
+  const hasFilter = Boolean(params.keyword || params.type || params.status);
+  const rows = data?.items ?? [];
 
-  const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, status });
+  const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, type, status });
   const resetFilters = () => {
     setKeyword('');
+    setType(undefined);
     setStatus(undefined);
-    setQuery({ keyword: undefined, status: undefined });
+    setQuery({ keyword: undefined, type: undefined, status: undefined });
   };
 
   const appliedKeyword = (params.keyword as string | undefined) ?? '';
+  const appliedType = params.type as string | undefined;
   const appliedStatus = params.status as string | undefined;
   const appliedChips: AppliedFilter[] = [
     appliedKeyword
@@ -96,6 +112,16 @@ export function AdminCampaignsPage() {
           onClear: () => {
             setKeyword('');
             setQuery({ keyword: undefined });
+          },
+        }
+      : null,
+    appliedType
+      ? {
+          key: 'type',
+          label: `类型：${TYPE_LABEL[appliedType as keyof typeof TYPE_LABEL] ?? appliedType}`,
+          onClear: () => {
+            setType(undefined);
+            setQuery({ type: undefined });
           },
         }
       : null,
@@ -112,20 +138,16 @@ export function AdminCampaignsPage() {
   ].filter(Boolean) as AppliedFilter[];
 
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await marketingApi.exportCampaigns({
-        keyword: params.keyword as string | undefined,
-        status: params.status as string | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        marketingApi.exportCampaigns({
+          keyword: params.keyword as string | undefined,
+          type: params.type as string | undefined,
+          status: params.status as string | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const patchForm = (patch: Partial<FormState>) => setForm((prev) => ({ ...prev, ...patch }));
 
@@ -207,37 +229,21 @@ export function AdminCampaignsPage() {
         title="限时活动"
         description="限时价 / 限时免费 / 弹窗位。状态为「进行中」但不在时间窗内，活动不会展示。"
         actions={
-          <>
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                icon={Download}
-                disabled={exporting}
-                onClick={() => void exportCsv()}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
-            {writable ? (
-              <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
-                新建活动
-              </ActionButton>
-            ) : (
-              <span className="text-[12px] text-muted-foreground">
-                当前账号无 marketing.write 权限，仅可查看
-              </span>
-            )}
-          </>
+          writable ? (
+            <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
+              新建活动
+            </ActionButton>
+          ) : (
+            <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
+          )
         }
       />
-
-      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <CampaignFilterBar
         keyword={keyword}
         onKeywordChange={setKeyword}
+        type={type}
+        onTypeChange={setType}
         status={status}
         onStatusChange={setStatus}
         appliedChips={appliedChips}
@@ -245,11 +251,23 @@ export function AdminCampaignsPage() {
         onReset={resetFilters}
       />
 
-      <Panel title="活动列表" note="列表状态为派生结果：时间窗、人工开关与上下线共同决定">
+      <Panel
+        title="活动列表"
+        note="列表状态为派生结果：时间窗、人工开关与上下线共同决定"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
+          </>
+        }
+      >
+        {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+        {error && data && <StaleError error={error} onRetry={reload} />}
+
         <CampaignTable
-          rows={data?.items ?? []}
+          rows={rows}
           loading={loading}
-          error={error}
+          error={rows.length === 0 ? error : null}
           onRetry={reload}
           writable={writable}
           busy={busy}

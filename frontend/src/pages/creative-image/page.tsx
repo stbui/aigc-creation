@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Plus, Sparkles, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImagePlus, Plus, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import {
@@ -17,6 +17,7 @@ import {
 } from './constants';
 import {
   AssetLibraryModal,
+  CreationPromptField,
   ImageToPromptModal,
   MobileUploadModal,
   ModelPicker,
@@ -29,7 +30,7 @@ import {
   notifyCreditsChanged,
   useAssetLibrary,
   useAuth,
-  useCapabilities,
+  useCapabilityRuntime,
   useCreditLabel,
   useGenerateError,
   usePasteUpload,
@@ -38,21 +39,8 @@ import {
   useResultGallery,
   type GalleryItem,
 } from './hooks';
-import {
-  assetsApi,
-  assetSrc,
-  generateApi,
-  newIdempotencyKey,
-  resolveModelId,
-  toAbsoluteUrl,
-} from './api';
-import {
-  assetThumbUrl,
-  isSupportedImageFile,
-  pollToResult,
-  resolveCreationCapability,
-  taskErrorText,
-} from './utils';
+import { assetsApi, assetSrc, generateApi, newIdempotencyKey, resolveModelId, toAbsoluteUrl } from './api';
+import { assetThumbUrl, isSupportedImageFile, pollToResult, resolveCreationCapability, taskErrorText } from './utils';
 import type { Asset, MobileUploadAsset } from '../../types/api';
 import { useApp, Modal, Spin } from '../../ui';
 
@@ -95,8 +83,7 @@ import { useApp, Modal, Spin } from '../../ui';
  * 后端 inputs=0 不强制张数); 比例/画质 → ratio / size 参数; 张数与顺序直达 provider
  * (顶部条带横排参考图, 真实参与构图)。
  *
- * 产出来源不向用户展示: 创作统一走 API 调用模型, 界面不标
- * 历史本地产出标签已停用；新任务只显示真实模型来源。
+ * 产出来源不向用户展示: 创作统一走 API 调用模型, 新任务只来自真实模型线路。
  *
  * 没通道就失败: 两种能力都只允许模型生成。后端无可用模型通道时任务按 42204 失败并退款;
  * 本页据此在 /capabilities 报 unavailable 时直接禁用提交并写明原因 ——
@@ -180,18 +167,10 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
   const formValid = prompt.trim().length > 0;
 
   /*
-   * 运行时可用性: 本能力本地没有实现, 没有云端模型通道时
-   * 后端一定会判失败并退款。与其让用户等一次注定失败的任务, 不如提前拦住并说明原因。
-   * 只在后端明确报 unavailable/disabled 时拦 —— 清单还没加载完 (或加载失败) 不拦,
-   * 否则一次网络抖动就会让整页不可用。
+   * 只在后端明确报 unavailable/disabled 时拦截；清单加载中或加载失败不拦，
+   * 避免一次网络抖动就让整页不可用。
    */
-  const { data: capData } = useCapabilities();
-  const freeCreateRuntime = capData?.items.find((c) => c.id === capability)?.runtime;
-  const unavailableReason =
-    freeCreateRuntime &&
-    (freeCreateRuntime.effective === 'unavailable' || freeCreateRuntime.effective === 'disabled')
-      ? freeCreateRuntime.reason || '该能力当前不可提交，请稍后再试或联系客服。'
-      : null;
+  const { blocked: capabilityBlocked, reason: unavailableReason } = useCapabilityRuntime(capability);
 
   // ── 上传: 参考图 (点击/拖拽/粘贴, 最多 4 张, 顺序保留) ──
   const uploadFiles = useCallback(
@@ -404,10 +383,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
   };
 
   // ── 生成 ──
-  const pollTask = useCallback(
-    (taskId: string) => pollToResult(taskId, { signal: pollSignal }),
-    [pollSignal],
-  );
+  const pollTask = useCallback((taskId: string) => pollToResult(taskId, { signal: pollSignal }), [pollSignal]);
 
   const submit = async () => {
     if (!formValid || generating) return;
@@ -435,9 +411,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
       };
       const fingerprint = JSON.stringify(payload);
       const idempotencyKey =
-        pendingStartRef.current?.fingerprint === fingerprint
-          ? pendingStartRef.current.key
-          : newIdempotencyKey();
+        pendingStartRef.current?.fingerprint === fingerprint ? pendingStartRef.current.key : newIdempotencyKey();
       pendingStartRef.current = { fingerprint, key: idempotencyKey };
       const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
       pendingStartRef.current = null;
@@ -557,7 +531,9 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
                     <label className="pk-upload-prompt fc-upload-prompt">
                       <ImagePlus size={14} />
                       <span>点击、拖拽或粘贴参考图片到此处上传</span>
-                      <small>最多可上传 {MAX_REF_IMAGES} 张参考图片，单张不超过 {MAX_IMAGE_MB}MB</small>
+                      <small>
+                        最多可上传 {MAX_REF_IMAGES} 张参考图片，单张不超过 {MAX_IMAGE_MB}MB
+                      </small>
                     </label>
                   ) : (
                     <>
@@ -628,40 +604,13 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
               </div>
 
               {/* 创作提示词 (必填) */}
-              <div className="pk-section fc-prompt-field">
-                <div className="fc-prompt-label-row">
-                  <span>创作提示词</span>
-                  <div className="fc-prompt-tools">
-                    <button type="button" className="fc-prompt-tool-btn" title="AI 优化当前创作提示词" onClick={runPolish}>
-                      <Sparkles size={13} />
-                      <span>AI润色</span>
-                    </button>
-                    <button type="button" className="fc-prompt-tool-btn" title="上传图片，AI 反推创作提示词" onClick={runImageToPrompt}>
-                      <Sparkles size={13} />
-                      <span>图片转提示词</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="pk-desc-editor">
-                  <textarea
-                    className="fc-prompt-textarea"
-                    rows={8}
-                    maxLength={MAX_PROMPT_LEN}
-                    value={prompt}
-                    placeholder="例如：把这款产品放在未来感厨房场景中，清晨自然光，干净高级，电商广告质感"
-                    onChange={(e) => setPrompt(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="pk-desc-expand"
-                    aria-label="放大编辑创作提示词"
-                    title="编辑"
-                    onClick={() => setExpandOpen(true)}
-                  >
-                    <Maximize2 size={15} />
-                  </button>
-                </div>
-              </div>
+              <CreationPromptField
+                value={prompt}
+                onChange={setPrompt}
+                onPolish={runPolish}
+                onImageToPrompt={runImageToPrompt}
+                onExpand={() => setExpandOpen(true)}
+              />
             </section>
           </div>
 
@@ -678,7 +627,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
                * (见 free-creation-submit.spec.ts 的登录墙契约), 置灰会把它挡掉。
                * 已登录时置灰 + 上方说明, 避免发起一次注定 42204 的请求。
                */
-              disabled={!formValid || (Boolean(token) && Boolean(unavailableReason))}
+              disabled={!formValid || (Boolean(token) && capabilityBlocked)}
               label="立即生成"
               guestLabel="登录免费生成"
               creditLabel={creditLabel ?? undefined}

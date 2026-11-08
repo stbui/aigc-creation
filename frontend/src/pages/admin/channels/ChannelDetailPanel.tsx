@@ -1,4 +1,4 @@
-import { Copy, Download, Plus, Power, Trash2 } from 'lucide-react';
+import { Copy, Download, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import { ActionButton, EmptyState, Panel, StatusTag } from '~/admin-ui/primitives';
 import { ChannelModelManager } from './ChannelModelManager';
 import type { AdminChannelView } from '../../../types/model';
@@ -55,31 +55,27 @@ export function ChannelDetailPanel({
       {selected ? (
         <Panel
           title={
-            <span className="flex items-center gap-2">
-              {selected.name}
-              <StatusTag
-                status={selected.enabled ? 'channel-enabled' : 'channel-disabled'}
-                tone={selected.enabled ? 'success' : 'muted'}
-                label={selected.enabled ? '已启用' : '已停用'}
-              />
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 truncate" title={selected.name}>
+                {selected.name}
+              </span>
+              <span className="shrink-0">
+                <StatusTag
+                  status={selected.enabled ? 'channel-enabled' : 'channel-disabled'}
+                  tone={selected.enabled ? 'success' : 'muted'}
+                  label={selected.enabled ? '渠道已启用' : '渠道已停用'}
+                />
+              </span>
             </span>
           }
           note={
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-mono text-[12px]" title={selected.baseUrl}>
+              <span className="min-w-0 max-w-full truncate font-mono text-[12px]" title={selected.baseUrl}>
                 {selected.baseUrl}
               </span>
-              <span>
-                {selected.hasApiKey
-                  ? selected.hasSecretKey
-                    ? 'AK/SK 已配置'
-                    : 'API Key 已配置'
-                  : '凭证未配置'}
-              </span>
-              <span>
-                最大并发：{selected.concurrencyLimit === 0 ? '跟随系统' : selected.concurrencyLimit}
-              </span>
-              {selected.proxyUrl && <span className="font-mono">代理：{selected.proxyUrl}</span>}
+              {!selected.hasApiKey && <span>访问凭证未配置</span>}
+              {selected.hasApiKey && selected.hasSecretKey && <span>访问凭证与签名密钥已配置</span>}
+              {selected.proxyUrl && <span className="font-mono">网络代理：{selected.proxyUrl}</span>}
               {selected.catalogProviderId && (
                 <span>来源：服务商目录 · {selected.catalogProviderId}</span>
               )}
@@ -87,7 +83,13 @@ export function ChannelDetailPanel({
           }
           extra={
             <div className="flex items-center gap-1">
-              <ActionButton variant="secondary" size="xs" disabled={!writable} onClick={() => onEdit(selected)}>
+              <ActionButton
+                variant="ghost"
+                size="xs"
+                icon={Pencil}
+                disabled={!writable || saving}
+                onClick={() => onEdit(selected)}
+              >
                 编辑
               </ActionButton>
               <ActionButton
@@ -124,14 +126,14 @@ export function ChannelDetailPanel({
                 disabled={!writable || saving}
                 onClick={() => onToggle(selected)}
               >
-                {selected.enabled ? '停用' : '启用'}
+                {selected.enabled ? '停用渠道' : '启用渠道'}
               </ActionButton>
               <ActionButton
                 variant="ghost"
                 size="xs"
                 className="text-danger-text hover:text-danger-text"
                 icon={Trash2}
-                disabled={!writable}
+                disabled={!writable || saving}
                 onClick={() => onDelete(selected)}
               >
                 删除
@@ -159,16 +161,7 @@ export function ChannelDetailPanel({
                   ? '暂时无法读取渠道'
                   : hasFilters
                     ? '没有匹配的渠道'
-                    : '选择左侧渠道'
-            }
-            description={
-              loading
-                ? '加载完成后在此显示该渠道的模型与价格。'
-                : error
-                  ? '请重试加载渠道列表。'
-                  : hasFilters
-                    ? '当前筛选下没有渠道，清除筛选后再选。'
-                    : '选中渠道后，在这里维护它的模型、能力合同与价格档。'
+                    : '请选择渠道'
             }
             action={
               !hasFilters && !loading && !error ? (

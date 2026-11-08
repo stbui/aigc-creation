@@ -1,0 +1,292 @@
+"use strict";
+/**
+ * 文本工具调用（提示词润色 / 图片转提示词）。
+ *
+ * 与生成任务的区别：产出是**文字**，没有任务、没有轮询、没有账单 ——
+ * 用户按一次润色不该在作品列表里多出一条记录。但它仍走**真实协议**：
+ * 渠道模型 → 协议 adapter → 统一出站层，凭证、SSRF、超时与自定义头全部
+ * 复用任务链路，不另开一条「工具专用」的 HTTP 通道。
+ *
+ * ## 模型从哪里来
+ *
+ * 取 `ChannelModel.capability='text'` 且自身与所属渠道都启用的候选，按渠道
+ * `sortOrder` → 模型 `sortOrder` 依次尝试。第一条失败就换下一条：文本工具是
+ * 同步调用，用户看不到「内部切线」的过程，但也不能因为第一条线路 401 就整体失败。
+ *
+ * ## 不交付伪结果
+ *
+ * 没有可用文本线路、或全部线路失败时抛 `50201`（HTTP 502），**不拼接模板文案**。
+ * 每次尝试写一条 `ApiCallLog`（`source='tool'`、`billable=false`），排障时能在
+ * 后台调用记录里看到「这条线路请求了哪里、上游回了什么」。
+ */
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var TextToolService_1;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TextToolService = void 0;
+const common_1 = require("@nestjs/common");
+const prisma_service_1 = require("../../prisma/prisma.service");
+const app_exception_1 = require("../../common/app.exception");
+const channel_runtime_service_1 = require("../channels/channel-runtime.service");
+const executor_1 = require("../protocol/executor");
+const usage_1 = require("../protocol/usage");
+const MAX_TOKENS_DEFAULT = 1024;
+const BODY_PREVIEW_CHARS = 4000;
+const ERROR_PREVIEW_CHARS = 1000;
+const TEXT_TOOL_UNAVAILABLE_MESSAGE = '文字处理暂时不可用，请稍后再试';
+let TextToolService = TextToolService_1 = class TextToolService {
+    constructor(prisma, channels, executor) {
+        this.prisma = prisma;
+        this.channels = channels;
+        this.executor = executor;
+        this.log = new common_1.Logger(TextToolService_1.name);
+    }
+    /**
+     * 同步文本调用。
+     *
+     * 每条候选失败都写一条调用记录并继续下一条；全部失败时只抛最后一条的原因 ——
+     * 用户看到的是「文本模型调用失败」加一句可读原因，完整清单在调用记录与进程日志里。
+     */
+    async generate(call) {
+        const candidates = await this.candidates();
+        if (candidates.length === 0) {
+            this.log.warn('文本工具无可用线路：未找到启用的 text 渠道模型');
+            throw new app_exception_1.AppError(50201, TEXT_TOOL_UNAVAILABLE_MESSAGE, 502);
+        }
+        let lastError = '';
+        for (const candidate of candidates) {
+            let channel;
+            try {
+                channel = await this.channels.prepare(candidate.channelModelId);
+            }
+            catch (error) {
+                lastError = messageOf(error);
+                // 渠道在派发前就不可用：请求没发出去，没有调用记录可写
+                if (!(error instanceof channel_runtime_service_1.ChannelUnavailableError)) {
+                    this.log.warn(`文本线路装配失败 channel-model=${candidate.channelModelId}: ${lastError}`);
+                }
+                continue;
+            }
+            const request = this.buildRequest(channel, call);
+            const startedAt = Date.now();
+            let response = null;
+            let path = '';
+            let method = 'POST';
+            try {
+                const spec = await channel.adapter.buildCreate({ baseUrl: channel.runtime.baseUrl, request });
+                path = spec.path;
+                method = spec.method;
+                response = await this.executor.send(spec, channel.runtime);
+                const parsed = await this.readText(channel, request, response);
+                await this.logCall({
+                    call,
+                    channel,
+                    request,
+                    response,
+                    method,
+                    path,
+                    status: 'success',
+                    errorCode: '',
+                    error: '',
+                    startedAt,
+                });
+                return {
+                    text: parsed.text,
+                    model: channel.providerModelKey,
+                    channelModelId: channel.channelModelId,
+                    usage: parsed.usage,
+                };
+            }
+            catch (error) {
+                lastError = messageOf(error);
+                await this.logCall({
+                    call,
+                    channel,
+                    request,
+                    response,
+                    method,
+                    path,
+                    status: 'failed',
+                    errorCode: error instanceof TextUpstreamError ? error.code : failureCodeOf(error),
+                    error: lastError,
+                    startedAt,
+                });
+                this.log.warn(`文本调用失败 channel-model=${channel.channelModelId}: ${lastError}`);
+            }
+        }
+        throw new app_exception_1.AppError(50201, TEXT_TOOL_UNAVAILABLE_MESSAGE, 502);
+    }
+    buildRequest(channel, call) {
+        return {
+            capability: 'text',
+            model: channel.providerModelKey,
+            instructions: call.instructions,
+            prompt: call.prompt,
+            messages: call.messages,
+            images: call.images,
+            /*
+             * 采样参数按协议命名空间下发：清单模板读
+             * `request.providerOptions.<plugin-id>.max_tokens`，写在顶层字段上会被静默忽略。
+             */
+            providerOptions: {
+                [channel.protocol]: {
+                    max_tokens: call.maxTokens ?? MAX_TOKENS_DEFAULT,
+                    temperature: call.temperature,
+                },
+            },
+        };
+    }
+    /**
+     * 解析 create 响应。
+     *
+     * 非 2xx 与 `failed` / 空文本都抛错：文本工具没有「先建任务稍后取结果」的路径，
+     * 到这里没拿到文字就是失败。
+     */
+    async readText(channel, request, response) {
+        if (response.status < 200 || response.status >= 300) {
+            throw new TextUpstreamError(`upstream_${response.status}`, `上游返回 HTTP ${response.status}：${snippet(response.text)}`);
+        }
+        const create = await channel.adapter.parseCreate(response.body, request);
+        if (create.status !== 'succeeded') {
+            throw new TextUpstreamError('upstream_rejected', create.message || '上游没有返回成功的文本结果');
+        }
+        const text = String(create.result?.text ?? '').trim();
+        if (text === '')
+            throw new TextUpstreamError('upstream_no_result', '上游返回成功但没有文本内容');
+        return { text, usage: create.result?.usage };
+    }
+    /**
+     * 候选线路：启用 + 未删的 text 渠道模型，且所属渠道启用、未删。
+     *
+     * 不做价格过滤 —— 文本工具不扣积分，没有账单，价格配置缺失不该拦住「润色一下」；
+     * 真正该拦的是渠道 / 模型本身不可用。
+     */
+    async candidates() {
+        const models = await this.prisma.channelModel.findMany({
+            where: { capability: 'text', enabled: true, deletedAt: null },
+            select: { id: true, channelId: true, sortOrder: true },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        });
+        if (models.length === 0)
+            return [];
+        const channels = await this.prisma.modelChannel.findMany({
+            where: {
+                id: { in: [...new Set(models.map((row) => row.channelId))] },
+                enabled: true,
+                deletedAt: null,
+            },
+            select: { id: true, sortOrder: true },
+        });
+        const channelOrder = new Map(channels.map((row) => [row.id, row.sortOrder]));
+        return models
+            .filter((row) => channelOrder.has(row.channelId))
+            .map((row) => ({
+            channelModelId: row.id,
+            sortOrder: row.sortOrder,
+            channelSortOrder: channelOrder.get(row.channelId) ?? 0,
+        }))
+            .sort((left, right) => left.channelSortOrder - right.channelSortOrder || left.sortOrder - right.sortOrder);
+    }
+    /** 调用记录：失败也写，`billable=false`（文本工具不扣积分） */
+    async logCall(input) {
+        const usage = (0, usage_1.extractUsage)(readUsage(input.response));
+        try {
+            await this.prisma.apiCallLog.create({
+                data: {
+                    userId: input.call.userId ?? '',
+                    channelId: input.channel.channelId,
+                    channelName: input.channel.channelName,
+                    channelModelId: input.channel.channelModelId,
+                    source: 'tool',
+                    capability: 'text',
+                    operation: input.call.operation,
+                    requestKind: 'create',
+                    billable: false,
+                    apiFormat: input.channel.protocol,
+                    method: input.method,
+                    path: input.path,
+                    model: input.channel.providerModelKey,
+                    status: input.status,
+                    statusCode: input.response?.status ?? 0,
+                    durationMs: Date.now() - input.startedAt,
+                    inputTokens: usage?.inputTokens ?? 0n,
+                    outputTokens: usage?.outputTokens ?? 0n,
+                    cachedTokens: usage?.cachedTokens ?? 0n,
+                    usageAvailable: usage !== null,
+                    errorCode: input.errorCode,
+                    error: input.error.slice(0, ERROR_PREVIEW_CHARS),
+                    concurrencyLimit: input.channel.concurrencyLimit,
+                    upstreamUrl: input.response?.url ?? '',
+                    requestContentType: 'application/json',
+                    requestBody: previewJson(input.request),
+                    responseBody: String(input.response?.text ?? '').slice(0, BODY_PREVIEW_CHARS),
+                    startedAt: new Date(input.startedAt),
+                },
+            });
+        }
+        catch (error) {
+            // 记录写不进去不该打断业务：用户要的是提示词，不是审计的完整性
+            this.log.warn(`文本调用记录写入失败 channel-model=${input.channel.channelModelId}: ${messageOf(error)}`);
+        }
+    }
+};
+exports.TextToolService = TextToolService;
+exports.TextToolService = TextToolService = TextToolService_1 = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        channel_runtime_service_1.ChannelRuntimeService,
+        executor_1.ProtocolExecutor])
+], TextToolService);
+/** 上游明确失败：带归一的失败码，写进调用记录 */
+class TextUpstreamError extends Error {
+    constructor(code, message) {
+        super(message);
+        this.code = code;
+        this.name = 'TextUpstreamError';
+    }
+}
+/** 从响应体里尽力取 `usage`（解析失败按「上游没给用量」处理） */
+function readUsage(response) {
+    const text = String(response?.text ?? '').trim();
+    if (text === '')
+        return null;
+    try {
+        const payload = JSON.parse(text);
+        return payload && typeof payload === 'object' ? (payload.usage ?? null) : null;
+    }
+    catch {
+        return null;
+    }
+}
+function failureCodeOf(error) {
+    const message = messageOf(error).toLowerCase();
+    if (message.includes('timeout') || message.includes('超时') || message.includes('aborted'))
+        return 'timeout';
+    return 'provider_error';
+}
+function messageOf(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+function snippet(text) {
+    return String(text ?? '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 200);
+}
+/** 请求体预览：内联 base64 折叠，避免把整张图写进调用记录 */
+function previewJson(value) {
+    try {
+        return String(JSON.stringify(value) ?? '').replace(/(data:[^;"]+;base64,)[A-Za-z0-9+/=]{64,}/g, '$1…');
+    }
+    catch {
+        return '';
+    }
+}
+//# sourceMappingURL=text-tool.service.js.map

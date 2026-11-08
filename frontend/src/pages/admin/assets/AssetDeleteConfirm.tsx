@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActionButton, ConfirmAction, SkeletonBody } from '~/admin-ui/primitives';
+import { ActionButton, ConfirmDialog, SkeletonBody } from '~/admin-ui/primitives';
 import { adminAssetsApi } from './api';
 import { BACKEND_LABEL, type AssetDeleteTarget } from './constants';
 import { assetLabel, fmtBytes } from './utils';
@@ -52,7 +52,7 @@ export function AssetDeleteConfirm({
   }, [singleId, reloadKey]);
 
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open
       title={target.kind === 'single' ? '删除素材' : `批量删除 ${target.count} 张素材`}
       confirmText={target.kind === 'single' ? '确认删除' : '确认批量删除'}

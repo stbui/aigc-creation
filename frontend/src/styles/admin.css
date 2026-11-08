@@ -64,6 +64,9 @@
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
   --color-brand-bg: var(--brand-bg);
+  /* 渐变浅端。缺这一条时 `via-brand-light` / `to-brand-light` 静默失效 ——
+     工具类不存在不报错，渐变悄悄少一个色标，排查成本很高。 */
+  --color-brand-light: var(--brand-light);
 
   /* ── shadcn 语义变量 → 项目令牌 ──────────────────────────────
    *
@@ -126,6 +129,14 @@
   --color-warn-text: var(--warn-text);
   --color-danger-soft: var(--danger-soft-bg);
   --color-danger-text: var(--danger-text);
+  --color-sidebar: var(--surface);
+  --color-sidebar-foreground: var(--text-strong);
+  --color-sidebar-primary: var(--brand);
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: var(--brand-bg);
+  --color-sidebar-accent-foreground: var(--brand-hover);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--brand);
 }
 
 @layer base {
@@ -228,12 +239,23 @@
   }
 
   /*
-   * ⑤ 定义列表重置：后台不加载 preflight，浏览器会默认给 `dl` 上下 16px
-   * 外边距、给 `dd` 40px 左缩进，导致详情里的标签和值错位。详情组件的节奏
-   * 由 grid gap 与 spacing utilities 控制；这些工具类在更高层，仍可覆盖此处。
+   * ⑤ 排版复位（preflight 子集）：后台不加载 preflight，浏览器会给标题、
+   * 段落、列表保留默认外边距 —— 面板标题因此多出一行空白（h2 上下各 ~11px），
+   * 列表还会多出 16px 上下 margin 与 40px 缩进。shadcn 组件按 preflight 的
+   * 零外边距假设编写，所以这里只补排版相关的四项：margin / list-style /
+   * padding / dd 缩进。utilities 层（`list-disc` / `pl-4` / `m-0`）仍可覆盖。
+   *
+   * 作用域限定 `.admin-root` 与 `.admin-portal`：C 端内容页依赖自己的段距，
+   * 不能被这条规则波及；弹层渲染在 body 下，靠 `admin-portal` 一并覆盖。
    */
-  :where(.admin-root, .admin-portal) :where(dl, dd) {
+  :where(.admin-root, .admin-portal)
+    :where(h1, h2, h3, h4, h5, h6, p, ul, ol, dl, dd, figure, blockquote) {
     margin-block: 0;
+  }
+
+  :where(.admin-root, .admin-portal) :where(ul, ol) {
+    padding-inline-start: 0;
+    list-style: none;
   }
 
   :where(.admin-root, .admin-portal) dd {
@@ -303,4 +325,15 @@
   :is(.admin-root, .admin-portal) a.text-brand:hover {
     color: var(--brand-hover);
   }
+}
+/* Sidebar 的运行时变量。颜色继续复用全站令牌，避免引入第二套灰/紫色。 */
+:root {
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--text-strong);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-bg);
+  --sidebar-accent-foreground: var(--brand-hover);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--brand);
 }

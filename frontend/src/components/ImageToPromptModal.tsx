@@ -1,3 +1,5 @@
+import './ImageToPromptModal.css';
+import './PromptPolishModal.css';
 import {
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,

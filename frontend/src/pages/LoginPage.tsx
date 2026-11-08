@@ -1,3 +1,4 @@
+import '../styles/auth.css';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthCard } from '../components/AuthCard';
 import { useAuth } from '../context/AuthContext';

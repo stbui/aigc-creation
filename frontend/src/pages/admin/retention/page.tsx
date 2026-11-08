@@ -5,7 +5,7 @@ import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { ShieldAlert } from 'lucide-react';
 import { adminRetentionApi } from '../../../lib/api';
 
-import { ActionButton, AdminDataTable, ConfirmAction, NumberField, Notice, PageHeader, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/primitives';
+import { ActionButton, AdminDataTable, ConfirmDialog, NumberField, Notice, PageHeader, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/primitives';
 import type { AdminCleanupLog, AdminRetentionTarget } from '../../../types/api';
 
 /**
@@ -291,7 +291,7 @@ export function AdminRetentionPage() {
       </Panel>
 
       {pending && (
-        <ConfirmAction
+        <ConfirmDialog
           open
           title={`清理${pending.label}`}
           confirmText="确认清理"

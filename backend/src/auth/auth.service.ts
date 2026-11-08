@@ -12,9 +12,11 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SmsSendDto } from './dto/sms-send.dto';
+import { EmailSendDto } from './dto/email-send.dto';
 import { SmsLoginDto } from './dto/sms-login.dto';
 import { AccountTokenService } from './account-token.service';
 import { normalizePhone } from './phone';
+import { normalizeEmail } from './email';
 
 export interface PublicUser {
   id: string;
@@ -25,6 +27,10 @@ export interface PublicUser {
   role: string;
   /** 手机号（已脱敏展示由前端决定；未绑定为 null） */
   phone?: string | null;
+  /** 邮箱归属验证时间。为空表示账号仍未验证邮箱 */
+  emailVerifiedAt?: Date | null;
+  /** 是否设置了可登录密码；纯 OAuth 账号为 false */
+  hasPassword: boolean;
 }
 
 /** 请求来源，用于登录审计。由 controller 从 `req` 中提取 */
@@ -49,9 +55,26 @@ export class AuthService {
 
   // 注册后直接签发 token (前端 LoginPage 注册模式同样消费 accessToken 自动登录)
   async register(dto: RegisterDto): Promise<{ accessToken: string; user: PublicUser }> {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
       throw new AppError(40001, '该邮箱已注册', 400);
+    }
+
+    // 仅测试环境允许显式旁路；生产即使误配该变量也仍然强制验证。
+    const emailVerificationBypassed =
+      process.env.NODE_ENV === 'test' &&
+      process.env.AUTH_EMAIL_VERIFICATION_BYPASS === 'true';
+    if (!emailVerificationBypassed) {
+      if (!dto.emailCode) {
+        throw new AppError(40002, '请先获取并填写邮箱验证码', 400);
+      }
+      const verified = await this.tokens.verifyCode({
+        type: AccountTokenService.TYPE.EMAIL_VERIFY,
+        email,
+        code: dto.emailCode,
+      });
+      if (!verified.ok) throw new AppError(40003, verified.reason, 400);
     }
 
     /*
@@ -89,33 +112,33 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     try {
-      const user = await this.prisma.user.create({
-        data: {
-          email: dto.email,
-          passwordHash,
-          name,
-          ...(phone ? { phone, phoneVerifiedAt: new Date() } : {}),
-        },
-      });
-      /*
-       * 同意记录 (B4)。只在前端确实给了版本号时落库 —— 不替用户补一个
-       * 「默认同意」：那会在合规审查时变成一条**伪造的证据**。
-       */
-      if (dto.consentVersion) {
-        await this.prisma.consentRecord
-          .create({
+      const user = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            email,
+            passwordHash,
+            name,
+            emailVerifiedAt: new Date(),
+            ...(phone ? { phone, phoneVerifiedAt: new Date() } : {}),
+          },
+        });
+        /*
+         * 同意记录 (B4)。只在前端确实给了版本号时落库 —— 不替用户补一个
+         * 「默认同意」：那会在合规审查时变成一条**伪造的证据**。与建号放在
+         * 同一事务，避免账号已创建但同意凭证永久缺失。
+         */
+        if (dto.consentVersion) {
+          await tx.consentRecord.create({
             data: {
-              userId: user.id,
+              userId: created.id,
               kind: 'register',
               slug: 'user-agreement',
               version: dto.consentVersion,
             },
-          })
-          .catch((e: Error) => {
-            // 同意记录写失败不该阻断注册: 账号已经建好, 抛错会让用户重试时撞邮箱唯一约束
-            this.logger.warn(`同意记录写入失败 user=${user.id}: ${e.message}`);
           });
-      }
+        }
+        return created;
+      });
 
       const accessToken = JwtService.sign({
         sub: user.id,
@@ -138,9 +161,10 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ctx: RequestContext = {}): Promise<{ accessToken: string; user: PublicUser }> {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const email = normalizeEmail(dto.email);
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
-      await this.recordLogin({ email: dto.email, ctx, success: false, reason: 'bad_credentials' });
+      await this.recordLogin({ email, ctx, success: false, reason: 'bad_credentials' });
       throw new AppError(40101, '邮箱或密码错误', 401);
     }
 
@@ -148,7 +172,7 @@ export class AuthService {
     if (!ok) {
       await this.recordLogin({
         userId: user.id,
-        email: dto.email,
+        email,
         ctx,
         success: false,
         reason: 'bad_credentials',
@@ -212,7 +236,7 @@ export class AuthService {
    * 「账号批量探测工具」。真实投递情况只进服务端日志。
    */
   async forgotPassword(dto: ForgotPasswordDto, ctx: RequestContext = {}): Promise<{ requested: true }> {
-    const email = String(dto.email || '').trim().toLowerCase();
+    const email = normalizeEmail(dto.email);
 
     try {
       const user = await this.prisma.user.findUnique({ where: { email } });
@@ -291,6 +315,46 @@ export class AuthService {
 
     this.logger.log(`密码已重置: ${maskEmail(user.email)}，旧会话已失效`);
     return { ok: true };
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // 邮箱验证码
+  // ────────────────────────────────────────────────────────────────────
+
+  /**
+   * 发送注册邮箱验证码。响应恒定，已注册邮箱静默不发送，避免把该接口
+   * 变成账号枚举工具。真实投递结果只写日志并放在 delivered 调试字段中。
+   */
+  async sendEmailCode(
+    dto: EmailSendDto,
+    ctx: RequestContext = {},
+  ): Promise<{ sent: true; delivered: boolean }> {
+    const email = normalizeEmail(dto.email);
+    if (!email) return { sent: true, delivered: false };
+
+    try {
+      const owner = await this.prisma.user.findUnique({ where: { email } });
+      if (owner) {
+        this.logger.log(`邮箱验证码: ${maskEmail(email)} 已被注册，静默返回`);
+        return { sent: true, delivered: false };
+      }
+
+      const { raw } = await this.tokens.issue({
+        type: AccountTokenService.TYPE.EMAIL_VERIFY,
+        email,
+        ttlMs: AccountTokenService.EMAIL_TTL_MS,
+        ip: ctx.ip,
+      });
+      const result = await this.email.sendEmailVerification({
+        to: email,
+        code: raw,
+        expiresMinutes: Math.round(AccountTokenService.EMAIL_TTL_MS / 60_000),
+      });
+      return { sent: true, delivered: result.delivered };
+    } catch (err) {
+      this.logger.error(`发送邮箱验证码异常: ${(err as Error).message}`);
+      return { sent: true, delivered: false };
+    }
   }
 
   // ────────────────────────────────────────────────────────────────────
@@ -476,6 +540,8 @@ export class AuthService {
     createdAt: Date;
     role: string;
     phone?: string | null;
+    emailVerifiedAt?: Date | null;
+    passwordHash?: string | null;
   }): PublicUser {
     return {
       id: user.id,
@@ -484,6 +550,8 @@ export class AuthService {
       createdAt: user.createdAt,
       role: user.role,
       phone: user.phone ?? null,
+      emailVerifiedAt: user.emailVerifiedAt ?? null,
+      hasPassword: Boolean(user.passwordHash),
     };
   }
 }

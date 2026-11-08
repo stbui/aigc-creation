@@ -5,6 +5,20 @@ import { cn } from '../lib/cn';
 import { Alert } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../components/ui/empty';
+import {
+  Pagination as PaginationRoot,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+} from '../components/ui/pagination';
 import { Progress } from '../components/ui/progress';
 import { STATUS_META, type TagTone } from '../../components/admin/statusMeta';
 import { EmptyState } from './layout';
@@ -37,9 +51,12 @@ export function FilterBar({ children, className }: { children: ReactNode; classN
 }
 
 /** 筛选条右侧的动作区（查询 / 重置）。 */
-export function FilterActions({ children }: { children: ReactNode }) {
+export function FilterActions({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div data-testid="admin-filter-actions" className="ml-auto flex shrink-0 items-center gap-2">
+    <div
+      data-testid="admin-filter-actions"
+      className={cn('ml-auto flex shrink-0 items-center gap-2', className)}
+    >
       {children}
     </div>
   );
@@ -74,25 +91,28 @@ export function AppliedFilters({
     >
       <span className="text-xs text-muted-foreground">已筛选</span>
       {items.map((item) => (
-        <span
+        <Badge
           key={item.key}
+          variant="secondary"
           data-testid="admin-filter-chip"
           data-filter-key={item.key}
           title={item.label}
-          className="inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-xs text-accent-foreground"
+          className="gap-1 overflow-visible rounded-md bg-accent px-1.5 py-0.5 text-xs font-normal text-accent-foreground"
         >
           <span className="max-w-[220px] truncate">{item.label}</span>
           {item.onClear && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               aria-label={`清除筛选：${item.label}`}
-              className="rounded-sm text-accent-foreground/70 transition-colors hover:text-accent-foreground"
               onClick={item.onClear}
+              className="size-4 rounded-sm p-0 text-accent-foreground/70 hover:bg-transparent hover:text-accent-foreground"
             >
-              <X className="size-3" aria-hidden />
-            </button>
+              <X aria-hidden />
+            </Button>
           )}
-        </span>
+        </Badge>
       ))}
       {onClearAll && (
         <Button variant="ghost" size="xs" className="ml-1" onClick={onClearAll}>
@@ -124,10 +144,12 @@ export function StatusTag({
   status,
   label,
   tone,
+  showDot = false,
 }: {
   status: string;
   label?: string;
   tone?: TagTone;
+  showDot?: boolean;
 }) {
   const meta = STATUS_META[status] ?? { label: status, tone: 'muted' as TagTone };
   return (
@@ -135,10 +157,10 @@ export function StatusTag({
       variant="secondary"
       data-status={status}
       className={cn(
-        'h-5 rounded-md border-transparent px-1.5 text-[12px] font-medium',
         TAG_TONE_CLASS[tone ?? meta.tone],
       )}
     >
+      {showDot && <span data-testid="status-dot" className="size-1.5 rounded-full bg-current" aria-hidden />}
       {label ?? meta.label}
     </Badge>
   );
@@ -304,35 +326,62 @@ export function Pagination({
   for (let index = start; index <= end; index += 1) pages.push(index);
 
   return (
-    <nav className={cn('flex items-center gap-1', className)} aria-label={ariaLabel}>
-      <Button
-        variant="outline"
-        size="xs"
-        disabled={current <= 1}
-        onClick={() => onChange(current - 1)}
-      >
-        <ChevronLeft className="size-3.5" aria-hidden />
-        {previousLabel}
-      </Button>
+    <PaginationRoot
+      className={cn('mx-0 w-auto justify-start', className)}
+      aria-label={ariaLabel}
+    >
+      <PaginationContent className="gap-1">
+        <PaginationItem>
+          <Button
+            variant="outline"
+            size="xs"
+            disabled={current <= 1}
+            onClick={() => onChange(current - 1)}
+          >
+            <ChevronLeft aria-hidden />
+            {previousLabel}
+          </Button>
+        </PaginationItem>
 
-      {start > 1 && <PageCell page={1} current={current} onChange={onChange} />}
-      {start > 2 && <span className="px-1 text-xs text-muted-foreground">…</span>}
-      {pages.map((item) => (
-        <PageCell key={item} page={item} current={current} onChange={onChange} />
-      ))}
-      {end < total - 1 && <span className="px-1 text-xs text-muted-foreground">…</span>}
-      {end < total && <PageCell page={total} current={current} onChange={onChange} />}
+        {start > 1 && (
+          <PaginationItem>
+            <PageCell page={1} current={current} onChange={onChange} />
+          </PaginationItem>
+        )}
+        {start > 2 && (
+          <PaginationItem>
+            <PaginationEllipsis className="size-6" />
+          </PaginationItem>
+        )}
+        {pages.map((item) => (
+          <PaginationItem key={item}>
+            <PageCell page={item} current={current} onChange={onChange} />
+          </PaginationItem>
+        ))}
+        {end < total - 1 && (
+          <PaginationItem>
+            <PaginationEllipsis className="size-6" />
+          </PaginationItem>
+        )}
+        {end < total && (
+          <PaginationItem>
+            <PageCell page={total} current={current} onChange={onChange} />
+          </PaginationItem>
+        )}
 
-      <Button
-        variant="outline"
-        size="xs"
-        disabled={current >= total}
-        onClick={() => onChange(current + 1)}
-      >
-        {nextLabel}
-        <ChevronRight className="size-3.5" aria-hidden />
-      </Button>
-    </nav>
+        <PaginationItem>
+          <Button
+            variant="outline"
+            size="xs"
+            disabled={current >= total}
+            onClick={() => onChange(current + 1)}
+          >
+            {nextLabel}
+            <ChevronRight aria-hidden />
+          </Button>
+        </PaginationItem>
+      </PaginationContent>
+    </PaginationRoot>
   );
 }
 
@@ -347,20 +396,16 @@ function PageCell({
 }) {
   const active = page === current;
   return (
-    <button
-      type="button"
+    <Button
+      variant={active ? 'outline' : 'ghost'}
+      size="icon-xs"
       aria-current={active ? 'page' : undefined}
+      aria-label={`第 ${page} 页`}
       onClick={() => onChange(page)}
-      className={cn(
-        'inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1.5 text-xs tabular-nums transition-colors',
-        'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-        active
-          ? 'bg-accent font-medium text-accent-foreground'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-      )}
+      className={cn('tabular-nums', active && 'font-medium')}
     >
       {page}
-    </button>
+    </Button>
   );
 }
 
@@ -385,13 +430,17 @@ export function EmptyHint({
 }) {
   if (!icon) return <EmptyState title={title} description={description} action={action} />;
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-      <div className="text-muted-foreground [&>svg]:size-7">{icon}</div>
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      {description && (
-        <p className="max-w-md text-xs leading-5 text-muted-foreground">{description}</p>
-      )}
-      {action && <div className="mt-2">{action}</div>}
-    </div>
+    <Empty className="gap-2 px-6 py-14">
+      <EmptyMedia variant="default" className="text-muted-foreground [&_svg]:size-7">
+        {icon}
+      </EmptyMedia>
+      <EmptyHeader className="gap-2">
+        <EmptyTitle className="text-sm font-medium text-foreground">{title}</EmptyTitle>
+        {description && (
+          <EmptyDescription className="max-w-md text-xs leading-5">{description}</EmptyDescription>
+        )}
+      </EmptyHeader>
+      {action && <EmptyContent className="mt-2 max-w-none">{action}</EmptyContent>}
+    </Empty>
   );
 }

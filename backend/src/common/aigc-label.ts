@@ -109,10 +109,10 @@ export function crc32(buf: Buffer): number {
 
 const XMP_PACKET = (opts: AigcLabelOptions): string => {
   const iso = (opts.createdAt ?? new Date()).toISOString();
-  const tool = ['HuojueAI', opts.capability].filter(Boolean).join(' / ');
+  const tool = ['Huojue AI', opts.capability].filter(Boolean).join(' / ');
   // XMP 是纯文本 XML，注意转义；能力 id 与任务 id 均为 [a-z0-9_] / cuid，无需复杂清洗
   return `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="HuojueAI">
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Huojue AI">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
     xmlns:xmp="http://ns.adobe.com/xap/1.0/"
@@ -184,7 +184,7 @@ function insertPngMetadata(buf: Buffer, opts: AigcLabelOptions): Buffer {
   if (iend < 0) throw new Error('PNG 结构无法解析（找不到 IEND）');
   const xmp = XMP_PACKET(opts);
   const chunks = Buffer.concat([
-    pngTextChunk('Software', 'HuojueAI'),
+    pngTextChunk('Software', 'Huojue AI'),
     pngTextChunk('Comment', 'AI-generated content (AIGC). Labeled per GB 45438-2025.'),
     pngItxtChunk('XML:com.adobe.xmp', xmp),
   ]);

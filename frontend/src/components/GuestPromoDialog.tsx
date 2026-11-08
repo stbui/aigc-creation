@@ -1,3 +1,4 @@
+import './GuestPromoDialog.css';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
@@ -7,8 +8,8 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { myMarketingApi } from '../lib/api';
 import type { PopupCampaign } from '../types/api';
 
-const DISMISS_KEY = 'ecom-guest-promo-dismissed-v1';
-const SESSION_SHOWN_KEY = 'ecom-guest-promo-shown-v1';
+const DISMISS_KEY = 'huojue-guest-promo-dismissed-v1';
+const SESSION_SHOWN_KEY = 'huojue-guest-promo-shown-v1';
 const SHOW_DELAY_MS = 6000;
 const FALLBACK_CTA_URL = '/background-remove';
 

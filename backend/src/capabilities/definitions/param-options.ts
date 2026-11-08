@@ -149,6 +149,14 @@ export const RATIOS: ParamOption[] = [
   { value: '21:9', label: '21:9' },
 ];
 
+/** 详情模块图的常用比例；平台只约束成品宽度，不替用户决定画面比例。 */
+export const DETAIL_RATIOS: ParamOption[] = [
+  { value: '3:4', label: '3:4' },
+  { value: '4:5', label: '4:5' },
+  { value: '1:1', label: '1:1' },
+  { value: '9:16', label: '9:16' },
+];
+
 /**
  * 修图系工具的比例选项: 参考站这些页面高级设置默认「原比例」(保持输入图尺寸),
  * 复刻时把「原比例」作为首项与默认值, 其余 8 项与生图工具一致。
@@ -372,7 +380,7 @@ export const platformSpecText = (p: Record<string, any>): string => {
  * 投放平台 + 详情长图规格 → 提示词片段（如 `，适配淘宝平台（详情长图建议宽度 750px）`）。
  *
  * 与主图规格同一套收敛原则：用户显式选了低于平台建议的画质时不再补规格。
- * 详情长图没有「比例」语义，只有宽度，故不比较 ratio。
+ * 平台只给出成品宽度；模型画面比例由独立的 ratio 参数决定。
  */
 export const platformDetailSpecText = (p: Record<string, any>): string => {
   const label = optionLabel(PLATFORMS, p?.platform);

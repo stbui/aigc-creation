@@ -85,7 +85,7 @@ export class AdminOverviewService {
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { createdAt: { gte: since } } }),
-      this.prisma.project.count(),
+      this.prisma.project.count({ where: { deletedAt: null } }),
       this.prisma.generationTask.groupBy({
         by: ['status'],
         _count: { _all: true },
@@ -98,7 +98,6 @@ export class AdminOverviewService {
           id: true,
           capability: true,
           status: true,
-          provider: true,
           errorCode: true,
           createdAt: true,
           updatedAt: true,
@@ -344,7 +343,6 @@ export class AdminOverviewService {
           capabilityName: def?.name ?? t.capability,
           mode: def?.mode ?? 'unknown',
           status: t.status,
-          provider: t.provider,
           errorCode: t.errorCode,
           createdAt: t.createdAt,
           durationMs: t.updatedAt.getTime() - t.createdAt.getTime(),

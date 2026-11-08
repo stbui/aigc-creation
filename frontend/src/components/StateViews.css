@@ -1,0 +1,327 @@
+/**
+ * StateViews 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
+ *
+ * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   全站统一状态组件 (2026-10-20)
+   StateSkeleton / StateLoading / StateEmpty / StateError
+   组件: frontend/src/components/StateViews.tsx
+
+   设计要点:
+   - 骨架屏占住最终布局形状, 内容到达时零位移 (转圈会让区域塌陷再撑开)
+   - 空态与失败态视觉可区分: 空态品牌紫, 失败态红色
+   - 色值全部 var(--token), 不写裸 hex
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 骨架屏 ────────────────────────────────────────────────────── */
+.state-skeleton {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+
+.state-skeleton.is-card {
+  grid-template-columns: repeat(var(--skeleton-columns, 6), minmax(0, 1fr));
+}
+
+.state-skeleton.is-row,
+.state-skeleton.is-panel {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.state-skeleton.is-block {
+  grid-template-columns: 1fr;
+  gap: 0;
+  min-height: 180px;
+}
+
+.state-skeleton-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.state-skeleton-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.state-skeleton-line {
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.state-skeleton-line.is-wide {
+  height: 14px;
+  width: 60%;
+}
+
+.state-skeleton-line.is-short {
+  width: 40%;
+}
+
+.state-skeleton-block {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+/* 脉动: 用 opacity 而非位移, 位移在网格里会带动周围元素抖动 */
+.state-skeleton-item > * {
+  animation: state-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.state-skeleton-item:nth-child(2n) > * {
+  animation-delay: 0.2s;
+}
+
+.state-skeleton-item:nth-child(3n) > * {
+  animation-delay: 0.4s;
+}
+
+/* ── 行内加载 ──────────────────────────────────────────────────── */
+.state-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 16px;
+  min-height: 180px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.state-loading.is-full {
+  min-height: 100vh;
+}
+
+.state-loading-tip {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.state-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--brand);
+  animation: state-spinner-rotate 0.8s linear infinite;
+}
+
+.state-spinner.is-small {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+/* ── 空态 ──────────────────────────────────────────────────────── */
+.state-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.state-empty.is-compact {
+  padding: 32px 16px;
+  gap: 8px;
+}
+
+.state-empty-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--text-strong);
+}
+
+.state-empty-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+  max-width: 420px;
+}
+
+.state-empty-action {
+  margin-top: 6px;
+}
+
+/* ── 失败态 ────────────────────────────────────────────────────── */
+.state-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.state-error.is-compact {
+  padding: 32px 16px;
+  gap: 8px;
+}
+
+.state-error-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--text-strong);
+}
+
+.state-error-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+  max-width: 420px;
+}
+
+.state-error-detail {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+  font-size: 12px;
+  line-height: 18px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.state-error-action {
+  margin-top: 6px;
+}
+
+/* ── 状态按钮 (与 .exc-btn 同一套视觉) ────────────────────────── */
+.state-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 20px;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.state-btn.is-primary {
+  background: var(--brand);
+  color: var(--card-bg);
+}
+
+.state-btn.is-primary:hover {
+  background: var(--brand-hover);
+}
+
+.state-btn.is-ghost {
+  background: var(--card-bg);
+  border-color: var(--border);
+  color: var(--text-body);
+}
+
+.state-btn.is-ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.state-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.state-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.pk-result-generating .state-skeleton.is-block {
+  flex: 1;
+  min-height: 0;
+}
+
+.pk-result-generating .state-skeleton.is-block .state-skeleton-item {
+  flex: 1;
+}
+
+.pk-result-generating .state-skeleton.is-block .state-skeleton-item > * {
+  height: 100%;
+}
+
+/* ── 整页状态容器 (2026-10-20) ────────────────────────────────────
+   加载 / 失败 / 空 三种整页态的统一容器。
+   此前各页各写 wrapper (list-page / list-page-empty / co-shell …),
+   宽度与内边距不一致, 同一套状态组件在不同页呈现不同宽度。 */
+.state-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  box-sizing: border-box;
+}
+
+.state-page .state-skeleton {
+  max-width: 100%;
+}
+
+.pk-workspace.product-recolor-page .product-recolor-generating-card .state-loading {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 24px;
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.pk-workspace.product-recolor-page .product-recolor-generating-card .state-loading-tip {
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.pk-workspace.product-recolor-page .product-recolor-generating-card .state-spinner {
+  width: 32px;
+  height: 32px;
+  border-color: var(--tool-border-6);
+  border-top-color: var(--tool-border-brand-3);
+}
+
+.state-spinner.is-large {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+
+/* ── 动效降级: 尊重系统「减少动态效果」偏好 ───────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .state-skeleton-item > *,
+  .state-spinner {
+    animation: none;
+  }
+}

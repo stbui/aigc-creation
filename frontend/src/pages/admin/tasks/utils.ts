@@ -6,11 +6,14 @@
 
 /* 外部工具转出：目录内文件不直接引 `src/lib/*` */
 export { cn } from '../../../admin-ui/lib/cn';
-export { formatDuration } from '../../../admin-ui/lib/format';
+export { formatDateTime, formatDuration } from '../../../admin-ui/lib/format';
 export { taskErrorLabel } from '../../../lib/admin-error-codes';
+export { toCredits } from '../../../lib/microcredits';
 export {
   adminAssetHref,
+  adminBillingOrdersHref,
   adminCreditHref,
+  adminModelCallsHref,
   adminOrderHref,
   adminTaskHref,
   adminTasksHref,

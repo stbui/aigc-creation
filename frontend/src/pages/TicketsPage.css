@@ -1,0 +1,434 @@
+/**
+ * TicketsPage 页面样式 —— 由 `./TicketsPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* ───────── 我的工单 (B7) ───────── */
+
+/* 状态胶囊: 前置圆点跟随文字色, 四态只换底色不改形状 */
+.ticket-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.ticket-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ticket-status.is-open {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.ticket-status.is-processing {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.ticket-status.is-resolved {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+
+.ticket-status.is-closed {
+  background: var(--surface);
+  color: var(--text-desc);
+}
+
+/* 状态筛选: 胶囊按钮, 计数靠右。窄屏横向滑动, 不换行堆成两排 */
+.ticket-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ticket-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.ticket-filter:hover {
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
+  color: var(--text-strong);
+}
+
+.ticket-filter.is-active {
+  border-color: var(--brand-bg);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.ticket-filter-count {
+  font-size: 12px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-filter.is-active .ticket-filter-count {
+  color: var(--brand);
+}
+
+.ticket-filter-empty {
+  padding: 40px 0;
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-desc);
+}
+
+.ticket-compose {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  padding: 22px 24px 24px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg);
+}
+
+.ticket-compose-head {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-row);
+}
+
+.ticket-compose-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.ticket-compose-head p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+.ticket-compose label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ticket-compose label.is-full {
+  grid-column: 1 / -1;
+}
+
+/* 输入框样式交给组件自身: 再叠一层 border/padding 会与字数统计、缩放手柄打架 */
+/* 字数统计默认绝对定位在输入框下沿, 会压到按钮行上; 改常规流内右对齐。
+   兼容壳输出的是 .login-textarea-count（.ant-input-data-count 已随 antd 移除）。 */
+.ticket-compose .login-textarea-count,
+.ticket-reply .login-textarea-count {
+  position: static;
+  display: block;
+  padding: 2px 2px 0;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.ticket-compose-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ticket-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 16px 18px;
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ticket-card:hover {
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border));
+  box-shadow: var(--shadow-card);
+}
+
+.ticket-card.is-active {
+  border-color: var(--brand);
+}
+
+.ticket-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ticket-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 只有「高」才单独标记: 中/低是默认值, 逐个标反而噪声 */
+.ticket-card-flag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--radius-tag);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+/* 元信息拆成独立片段: 窄屏换行时不会把分隔点甩在行尾 */
+.ticket-card-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+.ticket-card-sub > span + span::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--text-desc);
+  opacity: 0.6;
+}
+
+.ticket-card-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.ticket-card-arrow {
+  color: var(--text-desc);
+}
+
+.ticket-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 左侧 3px 色条区分「客服 / 我」: 深色底 + 色条比整块换色更不刺眼 */
+.ticket-msg {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+
+.ticket-msg.is-admin {
+  border-color: var(--border);
+  border-left-color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.ticket-msg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.ticket-msg-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-strong);
+}
+
+.ticket-msg-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.ticket-msg.is-admin .ticket-msg-avatar {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.ticket-msg-time {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-msg-body {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ticket-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg);
+}
+
+.ticket-reply-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.ticket-reply-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.ticket-reply-head h3 svg {
+  color: var(--brand);
+}
+
+.ticket-reply-head span {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+/* 次要动作 (关闭) 在左, 主操作 (发送) 在右 —— 与全站表单一致 */
+.ticket-reply-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 已关闭工单: 虚线弱化, 不留可编辑错觉 */
+.ticket-closed-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ticket-error {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--danger-soft-text);
+}
+
+@media (max-width: 640px) {
+  /* 五个筛选项挤不进一行, 横向滑动比折成两排更好读 */
+  .ticket-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  .ticket-filter {
+    flex: none;
+  }
+  .ticket-card {
+    gap: 10px;
+    padding: 14px;
+  }
+  /* 标题让出两行: 单行省略在 390 屏上会把长标题截成半句 */
+  .ticket-card-row {
+    flex-wrap: wrap;
+  }
+  .ticket-card-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+  .ticket-msg {
+    padding: 12px 14px;
+  }
+  .ticket-reply,
+  .ticket-compose {
+    padding: 16px;
+  }
+}

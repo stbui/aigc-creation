@@ -3,10 +3,11 @@
  */
 
 import type { AdminCoupon, CouponType, UpsertCouponPayload } from '../../../types/api';
+import { formatYuanPlain } from '../../../admin-ui/lib/format';
 import type { FormState } from './constants';
 
-/** 分 → 元 */
-export const yuan = (cents: number) => (cents / 100).toFixed(2);
+/** 分 → 元（统一实现在 admin-ui/lib/format.ts） */
+export const yuan = formatYuanPlain;
 
 /** 面额展示：语义随类型而变，不统一按元显示 */
 export function faceValue(c: { type: CouponType; value: number }): string {

@@ -27,6 +27,10 @@ describe('ratioOptions', () => {
                   id: 'main_image',
                   params: [{ key: 'ratio', options: ratios.slice(1) }],
                 },
+                {
+                  id: 'detail_image',
+                  params: [{ key: 'ratio', options: ratios.slice(1) }],
+                },
               ],
             },
           }),
@@ -43,6 +47,7 @@ describe('ratioOptions', () => {
       '4:3',
     ]);
     expect(ratioOptions('main_image').map((option) => option.value)).toEqual(['1:1', '4:3']);
+    expect(ratioOptions('detail_image').map((option) => option.value)).toEqual(['1:1', '4:3']);
   });
 });
 

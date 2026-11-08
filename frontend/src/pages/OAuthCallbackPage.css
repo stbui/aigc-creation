@@ -1,0 +1,28 @@
+/**
+ * OAuthCallbackPage 页面样式 —— 由 `./OAuthCallbackPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+.oauth-callback-card {
+  width: min(480px, calc(100vw - 32px));
+  margin: 12vh auto 0;
+  padding: 40px 32px;
+  border-radius: 16px;
+  background: var(--card-bg);
+  box-shadow: 0 10px 30px rgba(35, 39, 74, 0.12);
+  text-align: center;
+}
+
+.oauth-callback-card h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.oauth-callback-card p {
+  margin: 16px 0;
+  color: var(--text-muted);
+}

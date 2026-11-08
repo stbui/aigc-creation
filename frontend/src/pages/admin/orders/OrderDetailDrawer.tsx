@@ -14,20 +14,23 @@ import {
   adminTasksHref,
   adminUserDetailHref,
   cn,
+  fmtTime,
   yuan,
 } from './utils';
-import type { AdminOrderDetail, AdminOrderRow } from '../../../types/api';
+import type { AdminOrderDetail, AdminOrderRefund, AdminOrderRow } from '../../../types/api';
 
 /** 详情抽屉里的一条时间线记录：状态点 + 主行 + 灰色补充行 */
 function RecordRow({
   head,
   meta,
   state = 'done',
+  action,
 }: {
   head: ReactNode;
   meta: ReactNode;
   /** 未成功的流水/退款用灰点：既保留时间线，又不假装它已经成立 */
   state?: 'done' | 'pending';
+  action?: ReactNode;
 }) {
   return (
     <li className="flex items-start gap-2.5 px-3 py-2">
@@ -42,6 +45,7 @@ function RecordRow({
         <span className="block text-xs text-foreground">{head}</span>
         <span className="mt-0.5 block text-[12px] leading-4 text-muted-foreground">{meta}</span>
       </span>
+      {action && <span className="shrink-0">{action}</span>}
     </li>
   );
 }
@@ -50,7 +54,7 @@ function RecordRow({
  * 订单详情抽屉。
  *
  * 从页面拆出：详情的数据获取与退款/核销入口和列表筛选是两套生命周期；
- * 动作仍回到页面统一走确认条，避免同一笔订单出现两个确认入口。
+ * 动作仍回到页面统一走确认弹窗，避免同一笔订单出现两个确认入口。
  */
 export function OrderDetailDrawer({
   detailId,
@@ -59,6 +63,7 @@ export function OrderDetailDrawer({
   canRefund,
   onClose,
   onAction,
+  onConfirmRefund,
 }: {
   detailId: string | null;
   rows: AdminOrderRow[];
@@ -66,6 +71,11 @@ export function OrderDetailDrawer({
   canRefund: boolean;
   onClose: () => void;
   onAction: (kind: 'markPaid' | 'refund', row: AdminOrderRow) => void;
+  onConfirmRefund: (
+    orderId: string,
+    refund: AdminOrderRefund,
+    outcome: 'succeeded' | 'failed',
+  ) => void;
 }) {
   const detailFetcher = useCallback(async () => {
     if (!detailId) throw new Error('订单不存在');
@@ -185,12 +195,12 @@ export function OrderDetailDrawer({
                   label: '渠道',
                   value: d.channel ? CHANNEL_LABELS[d.channel] ?? d.channel : '—',
                 },
-                { label: '下单时间', value: new Date(d.createdAt).toLocaleString('zh-CN') },
+                { label: '下单时间', value: fmtTime(d.createdAt) },
                 {
                   label: '支付时间',
-                  value: d.paidAt ? new Date(d.paidAt).toLocaleString('zh-CN') : '未支付',
+                  value: d.paidAt ? fmtTime(d.paidAt) : '未支付',
                 },
-                { label: '支付时限', value: new Date(d.expiresAt).toLocaleString('zh-CN') },
+                { label: '支付时限', value: fmtTime(d.expiresAt) },
                 ...(d.membershipPlan
                   ? [
                       {
@@ -200,7 +210,24 @@ export function OrderDetailDrawer({
                             {d.membershipPlan.name}（{d.membershipPlan.durationDays} 天 · 每月{' '}
                             {d.membershipPlan.monthlyCredits} 积分）
                             {d.membershipAppliedAt ? (
-                              <span className="text-[12px] text-muted-foreground"> · 权益已发放</span>
+                              <>
+                                <span className="text-[12px] text-muted-foreground"> · 权益已发放</span>
+                                {d.membershipPeriodStartAt && d.membershipPeriodEndAt ? (
+                                  <span className="text-[12px] text-muted-foreground">
+                                    {' '}· 周期 {fmtTime(d.membershipPeriodStartAt)} 至{' '}
+                                    {fmtTime(d.membershipPeriodEndAt)}
+                                  </span>
+                                ) : (
+                                  <span className="text-[12px] text-muted-foreground"> · 历史订单无周期快照</span>
+                                )}
+                                {d.membershipPeriodRevokedAt ? (
+                                  <span className="text-[12px] text-danger-text">
+                                    {' '}· 周期已撤销（{fmtTime(d.membershipPeriodRevokedAt)}）
+                                  </span>
+                                ) : (
+                                  <span className="text-[12px] text-success-text"> · 周期有效</span>
+                                )}
+                              </>
                             ) : (
                               <span className="text-[12px] text-danger-text"> · 权益尚未发放</span>
                             )}
@@ -260,7 +287,7 @@ export function OrderDetailDrawer({
                         <code className="font-mono">{p.payTransactionId}</code>
                         {p.sandboxScenario ? ` · 沙箱/${p.sandboxScenario}` : ''}
                         {p.message ? ` · ${p.message}` : ''} ·{' '}
-                        {new Date(p.createdAt).toLocaleString('zh-CN')}
+                        {fmtTime(p.createdAt)}
                       </>
                     }
                   />
@@ -290,8 +317,41 @@ export function OrderDetailDrawer({
                     }
                     meta={
                       <>
-                        {r.reason} · {new Date(r.createdAt).toLocaleString('zh-CN')}
+                        {r.reason} · {fmtTime(r.createdAt)}
+                        {r.providerRefundId ? (
+                          <>
+                            {' '}· 渠道退款号 <code className="font-mono">{r.providerRefundId}</code>
+                          </>
+                        ) : null}
+                        {r.status === 'succeeded' ? (
+                          <>
+                            {' '}· 回收积分 {r.creditsReclaimed}
+                            {r.creditsUnreclaimable > 0
+                              ? `，另有 ${r.creditsUnreclaimable} 已消耗无法回收`
+                              : ''}
+                          </>
+                        ) : null}
                       </>
+                    }
+                    action={
+                      r.status === 'processing' && canRefund ? (
+                        <div className="flex items-center gap-1">
+                          <ActionButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onConfirmRefund(d.id, r, 'succeeded')}
+                          >
+                            确认渠道已退款
+                          </ActionButton>
+                          <ActionButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onConfirmRefund(d.id, r, 'failed')}
+                          >
+                            确认退款失败
+                          </ActionButton>
+                        </div>
+                      ) : undefined
                     }
                   />
                 ))}

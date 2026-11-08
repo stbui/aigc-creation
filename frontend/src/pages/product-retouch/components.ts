@@ -15,4 +15,9 @@ export { PillOptions, ToolCard } from '../../components/ToolWidgets';
 /** 历史产出面板 */
 export { ToolHistoryPane } from '../../components/ToolHistoryPane';
 /** 商品图上传预览与原图展示 (与换色 / 详情图共用) */
-export { ProductSourceResult, ProductSourceUploadPreview } from '../../components/ProductSourcePreview';
+export {
+  ProductSourceResult,
+  ProductSourceUploadPreview,
+  productSourcePane,
+  productSourceUploadPreview,
+} from '../../components/ProductSourcePreview';

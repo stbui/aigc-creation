@@ -38,7 +38,7 @@ describe('审计页交互边界', () => {
     );
 
     expect(source).not.toMatch(
-      /\b(?:ConfirmAction|useConfirm|useDiscardConfirm|useUnsavedGuard|window\.confirm)\b/,
+      /\b(?:ConfirmDialog|useConfirm|useDiscardConfirm|useUnsavedGuard|window\.confirm)\b/,
     );
   });
 });

@@ -42,6 +42,25 @@ const DETAIL_FIELDS = [
   "type",
 ];
 
+/**
+ * 仅特定动作需要额外落审计的请求字段。
+ *
+ * 不把这些字段加入全局 DETAIL_FIELDS：`reason` / `ids` / `action` 在多数
+ * 后台接口里可能是自由文本或批量操作参数，全局收集会扩大审计面并改变既有
+ * 契约。这里按动作精确放行，既保留追溯依据，也不影响其他接口。
+ */
+const ACTION_DETAIL_FIELDS: Record<string, readonly string[]> = {
+  "invoice.red_flush": ["reason"],
+  "order.refund_confirm": [
+    "outcome",
+    "reason",
+    "refundId",
+    "providerRefundId",
+  ],
+  "billing_order.resolve": ["action", "reason"],
+  "billing_order.batch_resolve": ["ids", "action", "reason"],
+};
+
 /** 绝不写进审计 detail 的字段名片段 (大小写不敏感) */
 const SENSITIVE_PATTERNS = [
   "password",
@@ -82,9 +101,11 @@ const AUDIT_REASON_LABELS: Record<string, string> = {
   "membership-plan.status": "变更会员套餐状态",
   "invoice.issue": "开具发票",
   "invoice.reject": "驳回发票",
+  "invoice.red_flush": "登记发票冲红",
   "order.mark_paid": "标记订单已支付",
   "order.batch": "批量处理订单",
   "order.refund": "订单退款",
+  "order.refund_confirm": "人工核销异步退款",
   "credit.adjust": "人工调整用户积分",
   "credit.batch_adjust": "批量调整用户积分",
   "credit.import": "导入用户积分",
@@ -152,6 +173,14 @@ const AUDIT_REASON_LABELS: Record<string, string> = {
   "checkin.rule_update": "更新签到规则",
 };
 
+interface BatchAuditEntry {
+  targetId: string;
+  /** 批量结果携带 userId 时，目标对象是用户而不是 URL 中的资源名。 */
+  targetType?: string;
+  success: boolean;
+  message?: string;
+}
+
 /**
  * 操作审计拦截器。
  *
@@ -202,7 +231,7 @@ export class AuditInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap({
-        next: () => {
+        next: (response: unknown) => {
           void this.write(
             request,
             method,
@@ -211,6 +240,7 @@ export class AuditInterceptor implements NestInterceptor {
             declaredTarget,
             true,
             null,
+            response,
           );
         },
         error: (err: unknown) => {
@@ -243,6 +273,7 @@ export class AuditInterceptor implements NestInterceptor {
     declaredTarget: AuditTargetMetadata | undefined,
     success: boolean,
     err: unknown,
+    response?: unknown,
   ): Promise<void> {
     try {
       const { action, targetType, targetId } = this.resolveTarget(
@@ -252,24 +283,114 @@ export class AuditInterceptor implements NestInterceptor {
         request.params,
       );
 
+      const batch = this.batchEntries(response);
+      if (batch) {
+        const summary = {
+          total: batch.length,
+          succeeded: batch.filter((item) => item.success).length,
+          failed: batch.filter((item) => !item.success).length,
+        };
+        for (const item of batch) {
+          try {
+            await this.prisma.adminAuditLog.create({
+              data: this.auditData(
+                request,
+                adminUser,
+                action,
+                item.targetType ?? targetType,
+                item.targetId,
+                this.buildDetail(
+                  action,
+                  {
+                    ...request,
+                    auditExtra: { ...(request.auditExtra ?? {}), batch: summary },
+                  },
+                  item.success,
+                  item.message ? new Error(item.message) : null,
+                ),
+                item.success,
+              ),
+            });
+          } catch (e) {
+            this.logger.warn(
+              `审计写入失败 (不阻断业务): ${method} ${request.url} #${item.targetId} — ${(e as Error).message}`,
+            );
+          }
+        }
+        return;
+      }
+
       await this.prisma.adminAuditLog.create({
-        data: {
-          actorId: adminUser?.id ?? "unknown",
-          actorRole: adminUser?.role ?? "unknown",
+        data: this.auditData(
+          request,
+          adminUser,
           action,
           targetType,
           targetId,
-          detail: JSON.stringify(this.buildDetail(request, success, err)),
-          reason: this.automaticReason(action, request.body),
-          ip: request.ip ?? "unknown",
+          this.buildDetail(action, request, success, err),
           success,
-        },
+        ),
       });
     } catch (e) {
       this.logger.warn(
         `审计写入失败 (不阻断业务): ${method} ${request.url} — ${(e as Error).message}`,
       );
     }
+  }
+
+  private auditData(
+    request: { ip?: string; body?: Record<string, unknown> },
+    adminUser: { id: string; email: string; role: string } | undefined,
+    action: string,
+    targetType: string,
+    targetId: string,
+    detail: Record<string, unknown>,
+    success: boolean,
+  ) {
+    return {
+      actorId: adminUser?.id ?? "unknown",
+      actorRole: adminUser?.role ?? "unknown",
+      action,
+      targetType,
+      targetId,
+      detail: JSON.stringify(detail),
+      reason: this.automaticReason(action, request.body),
+      ip: request.ip ?? "unknown",
+      success,
+    };
+  }
+
+  /**
+   * 识别带逐条结果的批量响应。
+   *
+   * 后台批量接口目前有三类历史形状：`{id, ok}`、`{userId, success}` 与
+   * 账单核对的 `{id, ok, error}`。只有完整可识别时才拆成逐条审计；任一条
+   * 缺少目标 id 或明确成败，就按普通响应回退为一条请求级审计，避免猜测。
+   */
+  private batchEntries(response: unknown): BatchAuditEntry[] | null {
+    if (!response || typeof response !== "object") return null;
+    const results = (response as { results?: unknown }).results;
+    if (!Array.isArray(results) || results.length === 0) return null;
+
+    const entries: BatchAuditEntry[] = [];
+    for (const result of results) {
+      if (!result || typeof result !== "object") return null;
+      const row = result as Record<string, unknown>;
+      const rawTargetId = row.id ?? row.userId;
+      const rawSuccess = row.ok ?? row.success;
+      if (typeof rawTargetId !== "string" || !rawTargetId.trim()) return null;
+      if (typeof rawSuccess !== "boolean") return null;
+      const rawMessage = row.message ?? row.error;
+      entries.push({
+        targetId: rawTargetId.trim(),
+        ...(typeof row.userId === "string" ? { targetType: "users" } : {}),
+        success: rawSuccess,
+        ...(typeof rawMessage === "string" && rawMessage
+          ? { message: rawMessage.slice(0, 200) }
+          : {}),
+      });
+    }
+    return entries;
   }
 
   /**
@@ -309,8 +430,10 @@ export class AuditInterceptor implements NestInterceptor {
 
   /** 只保留白名单字段, 过滤敏感字段 */
   private buildDetail(
+    action: string,
     request: {
       body?: Record<string, unknown>;
+      params?: Record<string, string | undefined>;
       auditExtra?: Record<string, unknown>;
     },
     success: boolean,
@@ -321,12 +444,19 @@ export class AuditInterceptor implements NestInterceptor {
       ok: success,
       ...(request.auditExtra ?? {}),
     };
-    for (const field of DETAIL_FIELDS) {
+    const allowedFields = [
+      ...DETAIL_FIELDS,
+      ...(ACTION_DETAIL_FIELDS[action] ?? []),
+    ];
+    for (const field of allowedFields) {
       // 双保险: 白名单已限定字段, 这里再挡一次敏感词, 防止后续往 DETAIL_FIELDS
       // 追加字段时误把凭据类内容写进审计 (审计本身对所有后台角色可读)
       if (SENSITIVE_PATTERNS.some((p) => field.toLowerCase().includes(p)))
         continue;
       if (field in source) detail[field] = source[field];
+      else if (request.params?.[field] !== undefined) {
+        detail[field] = request.params[field];
+      }
     }
     if (!success && err instanceof Error) {
       detail.error = err.message.slice(0, 200);

@@ -4,4 +4,10 @@
  * 约定：`tasks/` 下的文件不从 `src/lib/api` 直接取东西，一律经由本文件。
  */
 
-export { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from '../../../lib/api';
+export {
+  adminApiLogsApi,
+  adminBillingOrdersApi,
+  adminTasksApi,
+  assetThumbUrl,
+  toAbsoluteUrl,
+} from '../../../lib/api';

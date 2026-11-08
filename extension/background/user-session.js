@@ -19,7 +19,7 @@ import {
  * 两边各写一份字符串是这套集成里最容易静默失联的地方（改一边不改另一边，
  * 扩展会一直显示「未登录」而站点明明已登录）。
  */
-const USER_TOKEN_STORAGE_KEY = "ecom_vision_token";
+const USER_TOKEN_STORAGE_KEY = "huojue_token";
 const SESSION_KEY_SUFFIX =
   `:${ACTIVE_ENVIRONMENT}:${new URL(FRONTEND_ORIGIN).hostname}`;
 const SESSION_USER_TOKEN_KEY = `huojueSessionUserToken${SESSION_KEY_SUFFIX}`;

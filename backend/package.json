@@ -1,7 +1,7 @@
 {
-  "name": "ecom-vision-mvp-backend",
+  "name": "huojue-backend",
   "version": "1.0.0",
-  "description": "智能电商图片与商品视觉生成平台 - MVP 后端 (NestJS + Prisma + SQLite + Jimp)",
+  "description": "货觉AI 后端 (NestJS + Prisma + SQLite + Jimp)",
   "private": true,
   "scripts": {
     "build": "nest build",
@@ -17,7 +17,7 @@
     "db:push:test": "NODE_ENV=test npm run prisma:push",
     "db:push:prod": "NODE_ENV=production npm run prisma:push",
     "db:reset:test": "node scripts/reset-test-env.js",
-    "db:migrate:provider": "node scripts/migrate-provider-values.js",
+    "db:migrate:project-lifecycle": "node scripts/migrate-project-lifecycle.js",
     "db:migrate:tool-idempotency": "node scripts/migrate-tool-idempotency.js",
     "seed:test": "NODE_ENV=test npm run seed:all",
     "prisma:generate": "prisma generate",
@@ -48,7 +48,8 @@
     "verify:protocol-runtime": "ts-node -T scripts/verify-protocol-runtime.ts",
     "verify:route-catalog": "ts-node -T scripts/verify-route-catalog.ts",
     "verify:task-runtime": "ts-node -T scripts/verify-task-runtime.ts",
-    "verify:proxy-runtime": "ts-node -T scripts/verify-proxy-runtime.ts"
+    "verify:proxy-runtime": "ts-node -T scripts/verify-proxy-runtime.ts",
+    "reconcile:preconnection": "ts-node -T scripts/reconcile-preconnection-network-failures.ts"
   },
   "dependencies": {
     "@jimp/plugin-print": "1.6.1",

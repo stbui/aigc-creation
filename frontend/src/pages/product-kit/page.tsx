@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import {
-  MAX_IMAGE_MB,
-  MAX_IMAGES,
-  VARIANT_FIELDS,
-} from './constants';
+import { MAX_IMAGE_MB, MAX_IMAGES, VARIANT_FIELDS } from './constants';
 import {
   AssetLibraryModal,
   MobileUploadModal,
@@ -132,9 +128,9 @@ export function ProductKitPage() {
    */
   const pendingBatchRef = useRef<{ fingerprint: string; keys: string[]; batchId: string } | null>(null);
   /*
-   * 不再读取 capability runtime 在此页展示「该能力需要真实模型才能生成，当前暂不可用」。
-   * 该提示是运营/配置侧的内部原因，C 端工作台不展示；真正的可用性仍由后端把关
-   * （下架走 40005，无线路由 resolveModelId 在提交时如实报错）。
+   * 本页不直接展示 capability runtime 的后台诊断原因；运行时不可用文案统一由
+   * `runtimeOf` 转换为用户提示。真正的可用性仍由后端把关（下架走 40005，
+   * 无线路由 resolveModelId 在提交时如实报错）。
    */
   // ── 右侧结果栏 ──
   //
@@ -162,20 +158,10 @@ export function ProductKitPage() {
         : '登录后，你在这个页面生成过的图都会显示在这里',
     [token],
   );
-  const refreshGallery = useCallback(() => {
-    void gallery.reload();
-  }, [gallery.reload]);
-
   // 首访落在「功能示例」, 有历史产出时自动切到「创作结果」; 用户点过页签后不再自动切换
-  const { rightTab, pick: pickRightTab, showResults } = useRightTab(
-    gallery.items.length,
-    gallery.loading,
-  );
+  const { rightTab, pick: pickRightTab, showResults } = useRightTab(gallery.items.length, gallery.loading);
 
-  const totalCount = useMemo(
-    () => VARIANT_FIELDS.reduce((sum, v) => sum + (counts[v.key] ?? 0), 0),
-    [counts],
-  );
+  const totalCount = useMemo(() => VARIANT_FIELDS.reduce((sum, v) => sum + (counts[v.key] ?? 0), 0), [counts]);
   /*
    * 价签必须按“本次要出几张”计算。此前只显示单张单价，用户选 3 个变体时
    * 按钮仍写“本次消耗 10 积分”，实际扣 30 —— 属于计费披露错误。
@@ -186,9 +172,7 @@ export function ProductKitPage() {
     if (unit == null) return null;
     if (unit === 0) return '免费';
     const total = unit * Math.max(totalCount, 1);
-    return modelQuoteCredits == null
-      ? `本次消耗 ${total} 积分`
-      : `本次约 ${total} 积分（按所选模型）`;
+    return modelQuoteCredits == null ? `本次消耗 ${total} 积分` : `本次约 ${total} 积分（按所选模型）`;
   }, [unitCreditCost, modelQuoteCredits, totalCount]);
   const formValid =
     images.length > 0 &&
@@ -310,9 +294,7 @@ export function ProductKitPage() {
         baseParams,
         plan,
       });
-      const previous = pendingBatchRef.current?.fingerprint === fingerprint
-        ? pendingBatchRef.current
-        : null;
+      const previous = pendingBatchRef.current?.fingerprint === fingerprint ? pendingBatchRef.current : null;
       const batchId = previous?.batchId ?? newIdempotencyKey();
       const keys = previous?.keys ?? plan.map(() => newIdempotencyKey());
       pendingBatchRef.current = { fingerprint, keys, batchId };
@@ -438,7 +420,6 @@ export function ProductKitPage() {
             />
           </div>
 
-
           {/* 高级设置 + 提交 (sticky 底部) */}
           <ToolSubmitBar
             submitting={generating}
@@ -511,12 +492,7 @@ export function ProductKitPage() {
               <ProductKitExamplePanel />
             </div>
           ) : (
-            <div
-              role="tabpanel"
-              id="pk-panel-results"
-              aria-labelledby="pk-tab-results"
-              className="pd-right-panel"
-            >
+            <div role="tabpanel" id="pk-panel-results" aria-labelledby="pk-tab-results" className="pd-right-panel">
               <ProductKitResultList
                 items={gallery.items}
                 loading={gallery.loading}
@@ -524,7 +500,6 @@ export function ProductKitPage() {
                 emptyTitle="效果图预览"
                 emptyDesc={resultEmptyDesc}
                 emptyChildren={resultEmptyChildren}
-                onRefresh={refreshGallery}
                 onDeleteRow={deleteRow}
                 downloadNamePrefix="main-image"
               />

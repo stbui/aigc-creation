@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BarChart3 } from 'lucide-react';
 
 import {
@@ -12,6 +12,7 @@ import { PersonalPage, StateButton, StateEmpty, StateSkeleton } from './componen
 import { useAuth } from './hooks';
 import { useDocumentMeta } from '../../hooks/useDocumentMeta';
 import {
+  authApi,
   creditsApi,
   membershipApi,
   meApi,
@@ -19,6 +20,7 @@ import {
   ordersApi,
   ticketsApi,
 } from './api';
+import type { OAuthProviderInfo } from './api';
 import { downloadJson, exportFilenameOf, fmtDate } from './utils';
 import { AccountAssetsCard } from './AccountAssetsCard';
 import { AccountDeleteModal } from './AccountDeleteModal';
@@ -57,6 +59,7 @@ import type {
 export function AccountPage() {
   useDocumentMeta('账户设置 · 货觉AI', '管理账号资料、安全、数据导出与注销。');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { token, logout, openLogin } = useAuth();
   const { message, modal } = useApp();
 
@@ -67,6 +70,8 @@ export function AccountPage() {
   const [unread, setUnread] = useState(0);
   const [ticketTotal, setTicketTotal] = useState<number | null>(null);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
+  const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [savingName, setSavingName] = useState(false);
@@ -96,13 +101,14 @@ export function AccountPage() {
     }
     setLoading(true);
     try {
-      const [p, c, m, n, t, o] = await Promise.allSettled([
+      const [p, c, m, n, t, o, providers] = await Promise.allSettled([
         meApi.profile(),
         creditsApi.balance(),
         membershipApi.me(),
         notificationsApi.list({ limit: RECENT_MESSAGES_LIMIT }),
         ticketsApi.list({ limit: 1 }),
         ordersApi.list(),
+        authApi.oauthProviders(),
       ]);
       if (p.status === 'fulfilled') {
         setProfile(p.value);
@@ -120,6 +126,7 @@ export function AccountPage() {
       if (t.status === 'fulfilled') setTicketTotal(t.value.total);
       // 只展示最近三笔；后端已按创建时间倒序返回
       if (o.status === 'fulfilled') setRecentOrders(o.value.items.slice(0, RECENT_ORDER_LIMIT));
+      if (providers.status === 'fulfilled') setOauthProviders(providers.value);
     } finally {
       setLoading(false);
     }
@@ -128,6 +135,14 @@ export function AccountPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const linkedProvider = searchParams.get('oauthLinked');
+    if (!linkedProvider) return;
+    const providerName = oauthProviders.find((item) => item.id === linkedProvider)?.name ?? linkedProvider;
+    message.success(`已绑定 ${providerName}`);
+    navigate('/account', { replace: true });
+  }, [message, navigate, oauthProviders, searchParams]);
 
   /** 取消自动续费：已付周期保留，到期后不再发放下一周期权益。 */
   const cancelMembership = () => {
@@ -204,8 +219,13 @@ export function AccountPage() {
    * 校验失败 (密码太短 / 两次不一致) 停在原地让用户改, 而不是丢掉已填内容。
    */
   const changePassword = async (): Promise<boolean> => {
+    const hasPassword = profile?.hasPassword ?? true;
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
       message.warning(`新密码至少 ${MIN_PASSWORD_LENGTH} 位`);
+      return false;
+    }
+    if (hasPassword && !oldPassword) {
+      message.warning('请输入当前密码');
       return false;
     }
     if (newPassword !== confirmPassword) {
@@ -214,8 +234,8 @@ export function AccountPage() {
     }
     setChanging(true);
     try {
-      await meApi.changePassword(oldPassword, newPassword);
-      message.success('密码已修改，请重新登录');
+      await meApi.changePassword(hasPassword ? oldPassword : undefined, newPassword);
+      message.success(hasPassword ? '密码已修改，请重新登录' : '密码已设置，请重新登录');
       setPwdOpen(false);
       // 后端已把 tokenVersion + 1，旧 token 全部失效 —— 主动登出比等 401 更干净
       logout();
@@ -235,6 +255,17 @@ export function AccountPage() {
     setNewPassword('');
     setConfirmPassword('');
     setPwdOpen(true);
+  };
+
+  const linkOAuth = async (provider: OAuthProviderInfo) => {
+    setLinkingProvider(provider.id);
+    try {
+      const { url } = await authApi.linkOauth(provider.id, '/account');
+      window.location.assign(url);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '绑定失败');
+      setLinkingProvider(null);
+    }
   };
 
   const exportData = async () => {
@@ -269,13 +300,13 @@ export function AccountPage() {
       message.warning(`请输入确认词「${DELETE_CONFIRM_WORD}」`);
       return;
     }
-    if (!deletePassword) {
+    if ((profile?.hasPassword ?? true) && !deletePassword) {
       message.warning('请输入当前密码');
       return;
     }
     setDeleting(true);
     try {
-      await meApi.deleteAccount(deletePassword, deleteConfirm);
+      await meApi.deleteAccount(profile?.hasPassword ? deletePassword : undefined, deleteConfirm);
       message.success('账号已注销');
       logout();
       navigate('/', { replace: true });
@@ -370,8 +401,13 @@ export function AccountPage() {
       </div>
 
       <AccountSecurityCard
+        hasPassword={profile?.hasPassword ?? true}
+        oauthProviders={oauthProviders}
+        linkedOAuthProviders={profile?.linkedOAuthProviders ?? []}
+        linkingProvider={linkingProvider}
         exporting={exporting}
         onChangePassword={openPassword}
+        onLinkOAuth={(provider) => void linkOAuth(provider)}
         onExportData={() => void exportData()}
         onDeleteAccount={() => void openDelete()}
       />
@@ -379,6 +415,7 @@ export function AccountPage() {
       <AccountPasswordModal
         open={pwdOpen}
         changing={changing}
+        hasPassword={profile?.hasPassword ?? true}
         oldPassword={oldPassword}
         newPassword={newPassword}
         confirmPassword={confirmPassword}
@@ -392,6 +429,7 @@ export function AccountPage() {
       <AccountDeleteModal
         open={deleteOpen}
         deleting={deleting}
+        hasPassword={profile?.hasPassword ?? true}
         preview={preview}
         previewLoading={previewLoading}
         deletePassword={deletePassword}

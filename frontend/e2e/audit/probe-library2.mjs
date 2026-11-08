@@ -13,9 +13,9 @@ const login = await fetch('http://127.0.0.1:4100/api/v1/auth/login', {
 const token = login.data.accessToken;
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
 await ctx.addInitScript((t) => {
-  localStorage.setItem('ecom_vision_token', t);
-  localStorage.setItem('ecom_vision_email', process.env.E2E_EMAIL ?? '');
-  localStorage.setItem('ecom_vision_role', 'user');
+  localStorage.setItem('huojue_token', t);
+  localStorage.setItem('huojue_email', process.env.E2E_EMAIL ?? '');
+  localStorage.setItem('huojue_role', 'user');
 }, token);
 const page = await ctx.newPage();
 await page.goto('http://localhost:5200/library', { waitUntil: 'networkidle' });

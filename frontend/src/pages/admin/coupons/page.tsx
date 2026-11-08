@@ -1,33 +1,24 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
 import {
   ActionButton,
+  ExportCsvButton,
+  useAdminExport,
   AppliedFilters,
   ClearableField,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
+  RefreshButton,
   SelectField,
   StaleError,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
-import {
-  useAdmin,
-  useAdminList,
-  useAdminUrlFilterSync,
-  useDiscardConfirm,
-  useToast,
-  useUnsavedGuard,
-} from './hooks';
-import {
-  STATUS_OPTIONS,
-  TYPE_LABEL,
-  TYPE_OPTIONS,
-  type FormState,
-} from './constants';
+import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
+import { STATUS_OPTIONS, TYPE_LABEL, TYPE_OPTIONS, type FormState } from './constants';
 import { buildCouponPayload, emptyForm, toLocalInput } from './utils';
 import { CouponTable } from './CouponTable';
 import { CouponFormDrawer } from './CouponFormDrawer';
@@ -63,7 +54,7 @@ export function AdminCouponsPage() {
   const [type, setType] = useState<string | undefined>(initialType);
   const [status, setStatus] = useState<string | undefined>(initialStatus);
   const [busy, setBusy] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
 
   const [editing, setEditing] = useState<AdminCoupon | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -71,9 +62,7 @@ export function AdminCouponsPage() {
   const [formBase, setFormBase] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const formDirty = Boolean(
-    formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
-  );
+  const formDirty = Boolean(formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase));
   useUnsavedGuard(formDirty);
   const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
@@ -108,9 +97,9 @@ export function AdminCouponsPage() {
   });
 
   const hasFilter = Boolean(params.keyword || params.type || params.status);
+  const rows = data?.items ?? [];
 
-  const applyFilters = () =>
-    setQuery({ keyword: keyword.trim() || undefined, type, status });
+  const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, type, status });
   const resetFilters = () => {
     setKeyword('');
     setType(undefined);
@@ -155,21 +144,16 @@ export function AdminCouponsPage() {
   ].filter(Boolean) as AppliedFilter[];
 
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await marketingApi.exportCoupons({
-        keyword: params.keyword as string | undefined,
-        type: params.type as string | undefined,
-        status: params.status as string | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        marketingApi.exportCoupons({
+          keyword: params.keyword as string | undefined,
+          type: params.type as string | undefined,
+          status: params.status as string | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const openCreate = () => {
     setEditing(null);
@@ -204,8 +188,7 @@ export function AdminCouponsPage() {
     setFormOpen(true);
   };
 
-  const patchForm = (patch: Partial<FormState>) =>
-    setForm((prev) => ({ ...prev, ...patch }));
+  const patchForm = (patch: Partial<FormState>) => setForm((prev) => ({ ...prev, ...patch }));
 
   const save = async () => {
     const payload = buildCouponPayload(form, editing);
@@ -251,33 +234,15 @@ export function AdminCouponsPage() {
         title="优惠券"
         description="发放范围、使用条件、有效期与限用。券不提供删除 —— 已核销订单仍引用它，只能停用。"
         actions={
-          <>
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                icon={Download}
-                disabled={exporting}
-                onClick={() => void exportCsv()}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
-            {writable ? (
-              <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
-                新建优惠券
-              </ActionButton>
-            ) : (
-              <span className="text-[12px] text-muted-foreground">
-                当前账号无 marketing.write 权限，仅可查看
-              </span>
-            )}
-          </>
+          writable ? (
+            <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
+              新建优惠券
+            </ActionButton>
+          ) : (
+            <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
+          )
         }
       />
-
-      {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <FilterBar>
         <ClearableField
@@ -291,7 +256,8 @@ export function AdminCouponsPage() {
         <SelectField
           className="w-32"
           ariaLabel="按类型筛选"
-          placeholder="类型"
+          placeholder="全部类型"
+          clearLabel="全部类型"
           allowClear
           value={type}
           onChange={setType}
@@ -300,7 +266,8 @@ export function AdminCouponsPage() {
         <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
-          placeholder="状态"
+          placeholder="全部状态"
+          clearLabel="全部状态"
           allowClear
           value={status}
           onChange={setStatus}
@@ -317,11 +284,23 @@ export function AdminCouponsPage() {
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
-      <Panel title="券列表" note="核销进度按发行总量计算，不限量券不显示进度">
+      <Panel
+        title="券列表"
+        note="核销进度按发行总量计算，不限量券不显示进度"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
+          </>
+        }
+      >
+        {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
+        {error && data && <StaleError error={error} onRetry={reload} />}
+
         <CouponTable
-          rows={data?.items ?? []}
+          rows={rows}
           loading={loading}
-          error={error}
+          error={rows.length === 0 ? error : null}
           hasFilter={hasFilter}
           current={data?.page ?? 1}
           pageSize={data?.pageSize ?? 20}

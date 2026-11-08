@@ -37,9 +37,9 @@ export function ChannelHeadersEditor({
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs font-medium text-foreground">自定义请求头</div>
-          <div className="mt-0.5 break-all text-[12px] leading-4 text-muted-foreground">
-            默认发送 {DEFAULT_USER_AGENT}；添加 User-Agent 后会覆盖默认值。
+          <div className="text-xs font-medium text-foreground">附加请求信息</div>
+          <div className="mt-0.5 text-[12px] leading-4 text-muted-foreground">
+            仅在服务商要求额外校验信息时填写。
           </div>
         </div>
         {!hasUserAgent && (
@@ -49,7 +49,7 @@ export function ChannelHeadersEditor({
             disabled={disabled || full}
             onClick={() => onChange([...headers, { name: 'User-Agent', value: DEFAULT_USER_AGENT }])}
           >
-            添加 User-Agent
+            添加客户端标识
           </ActionButton>
         )}
       </div>
@@ -60,17 +60,17 @@ export function ChannelHeadersEditor({
           className="grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_32px] items-center gap-2"
         >
           <TextField
-            ariaLabel={`请求头 ${index + 1} 名称`}
+            ariaLabel={`附加信息 ${index + 1} 名称`}
             value={header.name}
             onChange={(next) => updateHeader(index, { name: next })}
-            placeholder="Header 名称"
+            placeholder="名称"
             disabled={disabled}
           />
           <TextField
-            ariaLabel={`请求头 ${index + 1} 值`}
+            ariaLabel={`附加信息 ${index + 1} 内容`}
             value={header.value}
             onChange={(next) => updateHeader(index, { value: next })}
-            placeholder="Header 值"
+            placeholder="内容"
             disabled={disabled}
             /* 名字像凭据就遮起来：截图与投屏时不该把值摊在屏幕上 */
             type={/token|key|secret/i.test(header.name) ? 'password' : 'text'}
@@ -78,7 +78,7 @@ export function ChannelHeadersEditor({
           <IconButton
             icon={Trash2}
             size="xs"
-            label={`删除请求头 ${index + 1}`}
+            label={`删除附加信息 ${index + 1}`}
             disabled={disabled}
             onClick={() => onChange(headers.filter((_, itemIndex) => itemIndex !== index))}
           />
@@ -93,10 +93,10 @@ export function ChannelHeadersEditor({
           disabled={disabled || full}
           onClick={() => onChange([...headers, { name: '', value: '' }])}
         >
-          添加请求头
+          添加附加信息
         </ActionButton>
         <span className={validation ? 'text-[12px] text-danger-text' : 'text-[12px] text-muted-foreground'}>
-          {validation || `${headers.length}/${MAX_HEADER_COUNT}`}
+          {validation || `${headers.length}/${MAX_HEADER_COUNT} 项`}
         </span>
       </div>
     </div>

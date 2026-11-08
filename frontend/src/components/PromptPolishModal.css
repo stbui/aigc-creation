@@ -1,0 +1,124 @@
+/**
+ * PromptPolishModal 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* 原始提示词区 (只读, 供对照) */
+.pt-polish-source {
+  margin-top: 4px;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  padding: 12px;
+}
+
+.pt-polish-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pt-polish-source-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--text-strong);
+}
+
+/* 「仅润色文字」开关: 参考站是一个可点文字, 选中态用品牌色 + 下划线提示 */
+.pt-polish-textonly {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-body);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pt-polish-textonly:hover {
+  color: var(--brand);
+}
+
+.pt-polish-textonly.is-on {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.pt-polish-source-body {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 96px;
+  overflow: auto;
+}
+
+/* 输出区 */
+.pt-polish-output {
+  position: relative;
+  margin-top: 12px;
+}
+
+.pt-polish-textarea {
+  width: 100%;
+  min-height: 180px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 21px;
+  color: var(--text-strong);
+  background: var(--card-bg);
+  resize: vertical;
+  outline: none;
+  display: block;
+}
+
+.pt-polish-textarea:focus {
+  border-color: var(--brand-light);
+}
+
+.pt-polish-textarea::placeholder {
+  color: var(--placeholder-text);
+}
+
+.pt-polish-loading {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+}
+
+/* 底部: 字数 + 按钮 */
+.pt-polish-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pt-polish-count {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+.pt-polish-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 产出来源披露: 文本无本地兜底, 输出必来自真实模型 —— 说清是哪个模型 */
+.pt-polish-source-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-desc);
+  text-align: right;
+}

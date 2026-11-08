@@ -4,36 +4,29 @@ import { adminPaymentProductsApi, adminPaymentProvidersApi } from './api';
 import {
   ActionButton,
   AdminDataTable,
-  ConfirmAction,
-  Drawer,
+  ConfirmDialog,
   EmptyState,
-  FormField,
   ListError,
-  Notice,
-  NumberField,
   PageSkeleton,
   Panel,
   SelectField,
-  StatCard,
+  StatCards,
   StatusTag,
-  SwitchField,
-  TextAreaField,
-  TextField,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast } from './hooks';
-import type {
-  AdminPaymentProductView,
-  PaymentCurrency,
-  PaymentSaleStrategy,
-} from '../../../types/payment';
+import type { AdminPaymentProductView, PaymentCurrency } from '../../../types/payment';
+import { EMPTY_PAYMENT_PRODUCT_DRAFT, PAYMENT_CURRENCY_OPTIONS, type PaymentProductDraft } from './constants';
 import {
   SALE_STATUS_META,
+  buildPaymentProductPayload,
   creditsText,
   moneyText,
+  paymentProductToDraft,
   saleStatusOf,
   strategyText,
 } from './utils';
+import { PaymentProductFormDrawer } from './PaymentProductFormDrawer';
 
 /**
  * 充值商品标签。
@@ -47,112 +40,12 @@ import {
  * 同时生效。
  */
 
-const STRATEGY_OPTIONS: Array<{ value: PaymentSaleStrategy; label: string }> = [
-  { value: 'unlimited', label: '不限量' },
-  { value: 'periodic', label: '周期限购' },
-  { value: 'inventory', label: '库存' },
-  { value: 'timed', label: '限时' },
-];
-
-interface ProductDraft {
-  name: string;
-  description: string;
-  currency: PaymentCurrency;
-  /** 元 / 美元，输入用小数，提交前换算成分 */
-  price: string;
-  originalPrice: string;
-  credits: string;
-  creditsValidDays: string;
-  grantType: 'immediate' | 'manual';
-  saleStrategy: PaymentSaleStrategy;
-  periodDays: string;
-  periodPurchaseLimit: string;
-  stockTotal: string;
-  saleStartAt: string;
-  saleEndAt: string;
-  sortOrder: string;
-  enabled: boolean;
-}
-
-const EMPTY_DRAFT: ProductDraft = {
-  name: '',
-  description: '',
-  currency: 'CNY',
-  price: '',
-  originalPrice: '',
-  credits: '',
-  creditsValidDays: '0',
-  grantType: 'immediate',
-  saleStrategy: 'unlimited',
-  periodDays: '30',
-  periodPurchaseLimit: '1',
-  stockTotal: '0',
-  saleStartAt: '',
-  saleEndAt: '',
-  sortOrder: '0',
-  enabled: false,
-};
-
-function centsToText(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
-
-/**
- * UTC ISO → `datetime-local` 值。
- *
- * 不能直接 slice ISO 字符串：后端存的是 UTC，`slice(0,16)` 会把 UTC 时间
- * 当成浏览器本地时间显示，每次编辑保存都会把限时窗口平移时区差（国内 8 小时）。
- */
-function isoToLocalInput(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-function textToCents(text: string): number | null {
-  const trimmed = text.trim();
-  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;
-  return Math.round(Number(trimmed) * 100);
-}
-
-function toDraft(p: AdminPaymentProductView): ProductDraft {
-  return {
-    name: p.name,
-    description: p.description,
-    currency: p.currency,
-    price: centsToText(p.priceCents),
-    originalPrice: p.originalPriceCents === null ? '' : centsToText(p.originalPriceCents),
-    credits: String(p.credits),
-    creditsValidDays: String(p.creditsValidDays),
-    grantType: p.grantType === 'manual' ? 'manual' : 'immediate',
-    saleStrategy: p.saleStrategy,
-    periodDays: String(p.periodDays || 30),
-    periodPurchaseLimit: String(p.periodPurchaseLimit || 1),
-    stockTotal: String(p.stockTotal || 0),
-    saleStartAt: isoToLocalInput(p.saleStartAt),
-    saleEndAt: isoToLocalInput(p.saleEndAt),
-    sortOrder: String(p.sortOrder),
-    enabled: p.status === 'active',
-  };
-}
-
-/** `datetime-local` → ISO；空串返回 null */
-function localToIso(value: string): string | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
 export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) {
   const toast = useToast();
   const { can } = useAdmin();
   const writable = can('product.write');
 
-  const { data, loading, error, reload } = useAdminResource(() =>
-    adminPaymentProductsApi.list(),
-  );
+  const { data, loading, error, reload } = useAdminResource(() => adminPaymentProductsApi.list());
   const settings = useAdminResource(() => adminPaymentProvidersApi.settings());
   const providers = useAdminResource(() => adminPaymentProvidersApi.list());
 
@@ -167,7 +60,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
 
   const [editing, setEditing] = useState<AdminPaymentProductView | null>(null);
   const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<PaymentProductDraft>(EMPTY_PAYMENT_PRODUCT_DRAFT);
   const [saving, setSaving] = useState(false);
 
   const [currencyOpen, setCurrencyOpen] = useState(false);
@@ -176,13 +69,16 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
   const formOpen = creating || editing !== null;
 
   const openCreate = useCallback(() => {
-    setDraft({ ...EMPTY_DRAFT, currency: settings.data?.defaultCurrency ?? 'CNY' });
+    setDraft({
+      ...EMPTY_PAYMENT_PRODUCT_DRAFT,
+      currency: settings.data?.defaultCurrency ?? 'CNY',
+    });
     setEditing(null);
     setCreating(true);
   }, [settings.data?.defaultCurrency]);
 
   const openEdit = useCallback((p: AdminPaymentProductView) => {
-    setDraft(toDraft(p));
+    setDraft(paymentProductToDraft(p));
     setEditing(p);
     setCreating(false);
   }, []);
@@ -193,6 +89,11 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
     setEditing(null);
   }, [saving]);
 
+  const patchDraft = useCallback(
+    (patch: Partial<PaymentProductDraft>) => setDraft((prev) => ({ ...prev, ...patch })),
+    [],
+  );
+
   const products = data?.items ?? [];
   const stats = useMemo(() => {
     const onSale = products.filter((p) => saleStatusOf(p) === 'on_sale').length;
@@ -202,9 +103,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
   }, [products]);
 
   /** 可用币种：CNY 始终可选；USD 需要有已配置的美元渠道 */
-  const usdAvailable = (providers.data?.items ?? []).some(
-    (p) => p.configured && p.supportedCurrencies.includes('USD'),
-  );
+  const usdAvailable = (providers.data?.items ?? []).some((p) => p.configured && p.supportedCurrencies.includes('USD'));
 
   const columns: Array<AdminColumn<AdminPaymentProductView>> = [
     {
@@ -214,9 +113,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">{row.name}</span>
-          <span className="text-[12px] text-muted-foreground">
-            {row.description || '无说明'}
-          </span>
+          <span className="text-[12px] text-muted-foreground">{row.description || '无说明'}</span>
         </div>
       ),
     },
@@ -280,79 +177,22 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
   if (!data) return <EmptyState title="还没有充值商品" />;
 
   const submit = async () => {
-    const priceCents = textToCents(draft.price);
-    if (priceCents === null || priceCents <= 0) {
-      toast.error('售价必须大于 0，请填两位小数的金额，如 9.90');
+    const result = buildPaymentProductPayload(draft, usdAvailable);
+    if (!result.ok) {
+      toast.error(result.error);
       return;
     }
-    let originalPriceCents: number | null = null;
-    if (draft.originalPrice.trim()) {
-      originalPriceCents = textToCents(draft.originalPrice);
-      if (originalPriceCents === null) {
-        toast.error('划线价格式不正确');
-        return;
-      }
-      if (originalPriceCents < priceCents) {
-        toast.error('划线价不能低于售价');
-        return;
-      }
-    }
-    if (draft.saleStrategy === 'inventory' && (Number(draft.stockTotal) || 0) < 1) {
-      toast.error('库存商品必须填写大于 0 的库存总量');
-      return;
-    }
-    const credits = Number(draft.credits);
-    if (!Number.isInteger(credits) || credits < 0) {
-      toast.error('到账积分必须是非负整数');
-      return;
-    }
-    const validDays = Number(draft.creditsValidDays || '0');
-    if (!Number.isInteger(validDays) || validDays < 0 || validDays > 3650) {
-      toast.error('积分有效期必须是 0–3650 之间的整数天');
-      return;
-    }
-    if (draft.enabled && draft.currency === 'USD' && !usdAvailable) {
-      toast.error('当前没有已配置的美元支付渠道，无法上架美元商品');
-      return;
-    }
-    const payload = {
-      // DTO 必填：当前只支持积分商品
-      kind: 'credits' as const,
-      name: draft.name.trim(),
-      description: draft.description,
-      currency: draft.currency,
-      priceCents,
-      originalPriceCents,
-      credits,
-      creditsValidDays: validDays,
-      grantType: draft.grantType,
-      sortOrder: Number(draft.sortOrder) || 0,
-      saleStrategy: draft.saleStrategy,
-      ...(draft.saleStrategy === 'periodic'
-        ? {
-            periodDays: Number(draft.periodDays) || 30,
-            periodPurchaseLimit: Number(draft.periodPurchaseLimit) || 1,
-          }
-        : {}),
-      ...(draft.saleStrategy === 'inventory'
-        ? { stockTotal: Number(draft.stockTotal) || 0 }
-        : {}),
-      ...(draft.saleStrategy === 'timed'
-        ? {
-            saleStartAt: localToIso(draft.saleStartAt),
-            saleEndAt: localToIso(draft.saleEndAt),
-          }
-        : {}),
-      status: draft.enabled ? 'active' : 'offline',
-    };
 
     setSaving(true);
     try {
       if (editing) {
-        await adminPaymentProductsApi.update(editing.id, payload);
+        await adminPaymentProductsApi.update(editing.id, result.payload);
         toast.success('商品已更新');
       } else {
-        await adminPaymentProductsApi.create({ ...payload, sku: undefined });
+        await adminPaymentProductsApi.create({
+          ...result.payload,
+          sku: undefined,
+        });
         toast.success('商品已创建');
       }
       closeForm();
@@ -366,12 +206,23 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-4 gap-3">
-        <StatCard label="商品总数" value={stats.total} />
-        <StatCard label="销售中" value={stats.onSale} />
-        <StatCard label="待发售" value={stats.upcoming} tone={stats.upcoming > 0 ? 'warn' : undefined} />
-        <StatCard label="已售罄" value={stats.soldOut} tone={stats.soldOut > 0 ? 'danger' : undefined} />
-      </div>
+      <StatCards
+        columns={4}
+        items={[
+          { label: '商品总数', value: stats.total },
+          { label: '销售中', value: stats.onSale },
+          {
+            label: '待发售',
+            value: stats.upcoming,
+            tone: stats.upcoming > 0 ? 'warn' : undefined,
+          },
+          {
+            label: '已售罄',
+            value: stats.soldOut,
+            tone: stats.soldOut > 0 ? 'danger' : undefined,
+          },
+        ]}
+      />
 
       <Panel
         title="充值商品"
@@ -411,7 +262,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         </div>
       </Panel>
 
-      <ConfirmAction
+      <ConfirmDialog
         open={currencyOpen}
         title="更改默认充值货币"
         description="默认货币决定 C 端商品卡的展示顺序与结算币种。更改只影响展示与下单口径，已生成的订单按下单时的币种结算。"
@@ -420,7 +271,9 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         onConfirm={async () => {
           setSaving(true);
           try {
-            await adminPaymentProvidersApi.saveSettings({ defaultCurrency: currencyDraft });
+            await adminPaymentProvidersApi.saveSettings({
+              defaultCurrency: currencyDraft,
+            });
             toast.success('默认货币已更新');
             setCurrencyOpen(false);
             settings.reload();
@@ -435,223 +288,24 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
             <SelectField
               value={currencyDraft}
               onChange={(value) => setCurrencyDraft((value as PaymentCurrency) ?? 'CNY')}
-              options={[
-                { value: 'CNY', label: '人民币 CNY' },
-                { value: 'USD', label: '美元 USD' },
-              ]}
+              options={PAYMENT_CURRENCY_OPTIONS}
               ariaLabel="默认充值货币"
             />
           </div>
         }
       />
 
-      {formOpen && (
-        <Drawer
-          open
-          onOpenChange={(open) => {
-            if (!open) closeForm();
-          }}
-          title={editing ? `编辑商品 · ${editing.name}` : '新增商品'}
-          description="售价按元 / 美元填写，提交时换算为整数分"
-          width={520}
-          footer={
-            <div className="flex items-center justify-end gap-2">
-              <ActionButton onClick={closeForm} disabled={saving}>
-                取消
-              </ActionButton>
-              <ActionButton
-                onClick={submit}
-                disabled={saving || !draft.name.trim()}
-              >
-                {saving ? '保存中…' : '保存'}
-              </ActionButton>
-            </div>
-          }
-        >
-          <div className="flex flex-col gap-3.5">
-            <FormField label="商品名称" required>
-              <TextField
-                value={draft.name}
-                onChange={(value) => setDraft({ ...draft, name: value })}
-                placeholder="例如：2,000 积分高能包"
-                maxLength={80}
-                disabled={!writable}
-              />
-            </FormField>
-
-            <FormField label="商品说明">
-              <TextAreaField
-                value={draft.description}
-                onChange={(value) => setDraft({ ...draft, description: value })}
-                maxLength={200}
-                disabled={!writable}
-              />
-            </FormField>
-
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="售价币种" required>
-                <SelectField
-                  value={draft.currency}
-                  onChange={(value) =>
-                    setDraft({ ...draft, currency: (value as PaymentCurrency) ?? 'CNY' })
-                  }
-                  options={[
-                    { value: 'CNY', label: '人民币 CNY' },
-                    { value: 'USD', label: '美元 USD' },
-                  ]}
-                  disabled={!writable}
-                />
-              </FormField>
-
-              <FormField label="售价" required hint="大于 0，最多两位小数">
-                <TextField
-                  value={draft.price}
-                  onChange={(value) => setDraft({ ...draft, price: value })}
-                  placeholder="9.90"
-                  inputMode="decimal"
-                  disabled={!writable}
-                />
-              </FormField>
-            </div>
-
-            {!usdAvailable && draft.currency === 'USD' && (
-              <Notice tone="warn" title="暂无美元支付渠道">
-                当前没有已配置的美元渠道，美元商品可以保存为下架状态，但不能上架。
-              </Notice>
-            )}
-
-            <FormField label="划线价" hint="留空表示没有划线价">
-              <TextField
-                value={draft.originalPrice}
-                onChange={(value) => setDraft({ ...draft, originalPrice: value })}
-                placeholder="19.90"
-                inputMode="decimal"
-                disabled={!writable}
-              />
-            </FormField>
-
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="到账积分" required>
-                <TextField
-                  value={draft.credits}
-                  onChange={(value) => setDraft({ ...draft, credits: value })}
-                  inputMode="numeric"
-                  placeholder="2000"
-                  disabled={!writable}
-                />
-              </FormField>
-
-              <FormField label="积分有效期（天）" hint="0 = 永久有效">
-                <TextField
-                  value={draft.creditsValidDays}
-                  onChange={(value) => setDraft({ ...draft, creditsValidDays: value })}
-                  inputMode="numeric"
-                  disabled={!writable}
-                />
-              </FormField>
-            </div>
-
-            <FormField label="上架策略" required>
-              <SelectField
-                value={draft.saleStrategy}
-                onChange={(value) =>
-                  setDraft({ ...draft, saleStrategy: (value as PaymentSaleStrategy) ?? 'unlimited' })
-                }
-                options={STRATEGY_OPTIONS}
-                disabled={!writable}
-              />
-            </FormField>
-
-            {draft.saleStrategy === 'periodic' && (
-              <div className="grid grid-cols-2 gap-3">
-                <FormField label="周期天数" required>
-                  <NumberField
-                    value={Number(draft.periodDays) || 30}
-                    onChange={(value) => setDraft({ ...draft, periodDays: String(value ?? 30) })}
-                    min={1}
-                    max={365}
-                    disabled={!writable}
-                    ariaLabel="周期天数"
-                  />
-                </FormField>
-                <FormField label="周期限购次数" required>
-                  <NumberField
-                    value={Number(draft.periodPurchaseLimit) || 1}
-                    onChange={(value) =>
-                      setDraft({ ...draft, periodPurchaseLimit: String(value ?? 1) })
-                    }
-                    min={1}
-                    max={999}
-                    disabled={!writable}
-                    ariaLabel="周期限购次数"
-                  />
-                </FormField>
-              </div>
-            )}
-
-            {draft.saleStrategy === 'inventory' && (
-              <FormField label="库存总量" required hint="必须大于 0；售罄后不可购买">
-                <NumberField
-                  value={Number(draft.stockTotal) || 0}
-                  onChange={(value) => setDraft({ ...draft, stockTotal: String(value ?? 0) })}
-                  min={1}
-                  max={1_000_000}
-                  disabled={!writable}
-                  ariaLabel="库存总量"
-                />
-              </FormField>
-            )}
-
-            {draft.saleStrategy === 'timed' && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField label="开售时间" required>
-                    <TextField
-                      type="datetime-local"
-                      value={draft.saleStartAt}
-                      onChange={(value) => setDraft({ ...draft, saleStartAt: value })}
-                      disabled={!writable}
-                    />
-                  </FormField>
-                  <FormField label="结束时间" required>
-                    <TextField
-                      type="datetime-local"
-                      value={draft.saleEndAt}
-                      onChange={(value) => setDraft({ ...draft, saleEndAt: value })}
-                      disabled={!writable}
-                    />
-                  </FormField>
-                </div>
-                <p className="text-[12px] text-muted-foreground">
-                  时间按浏览器本地时区显示，保存为绝对时间（中国区即北京时间）。
-                </p>
-              </>
-            )}
-
-            <FormField label="排序" hint="数字越小越靠前">
-              <NumberField
-                value={Number(draft.sortOrder) || 0}
-                onChange={(value) => setDraft({ ...draft, sortOrder: String(value ?? 0) })}
-                min={0}
-                max={9999}
-                disabled={!writable}
-                ariaLabel="排序"
-              />
-            </FormField>
-
-
-            <FormField label="上架" hint="下架的商品用户看不到也买不了">
-              <SwitchField
-                checked={draft.enabled}
-                onChange={(checked) => setDraft({ ...draft, enabled: checked })}
-                label={draft.enabled ? '已上架' : '已下架'}
-                disabled={!writable}
-                ariaLabel="上架开关"
-              />
-            </FormField>
-          </div>
-        </Drawer>
-      )}
+      <PaymentProductFormDrawer
+        open={formOpen}
+        editing={editing}
+        draft={draft}
+        writable={writable}
+        usdAvailable={usdAvailable}
+        saving={saving}
+        onPatch={patchDraft}
+        onClose={closeForm}
+        onSubmit={() => void submit()}
+      />
     </div>
   );
 }

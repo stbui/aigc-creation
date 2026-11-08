@@ -91,6 +91,15 @@ describe('鉴权与探活', () => {
     assert.equal(res.status, 404);
   });
 
+  test('OPTIONS V2 视频路径：鉴权并返回 204', async () => {
+    const ok = await fetch(url('/v2/video_generation'), { method: 'OPTIONS', headers: auth() });
+    assert.equal(ok.status, 204);
+    assert.ok(String(ok.headers.get('allow')).includes('POST'));
+
+    const denied = await fetch(url('/v2/query/video_generation/task_missing'), { method: 'OPTIONS' });
+    assert.equal(denied.status, 401);
+  });
+
   test('受保护路径缺少令牌返回 401', async () => {
     const res = await fetch(url('/v1/models'));
     assert.equal(res.status, 401);
@@ -448,6 +457,64 @@ describe('文生视频', () => {
     });
     assert.equal(res.status, 200);
     assert.equal((await jsonOf(res)).base_resp.status_code, 1002);
+  });
+
+  test('MiniMax V2 视频：content[] 首帧 → 路径轮询 Success → task.content.url 可下载', async () => {
+    const create = await fetch(url('/v2/video_generation'), {
+      method: 'POST',
+      headers: auth(API_KEY, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        model: 'MiniMax-Hailuo-2.3',
+        content: [
+          { type: 'text', text: 'the product rotates slowly on a turntable' },
+          {
+            type: 'image_url',
+            image_url: { url: 'https://example.invalid/first-frame.png' },
+            role: 'first_frame',
+          },
+        ],
+        duration: 4,
+        resolution: '768P',
+        ratio: 'adaptive',
+      }),
+    });
+    assert.equal(create.status, 200);
+    const created = await jsonOf(create);
+    assert.match(created.task.id, /^task_[0-9a-f]+$/);
+    assert.equal(created.task_id, created.task.id);
+    assert.equal(created.base_resp.status_code, 0);
+
+    const done = await pollUntil(
+      async () =>
+        jsonOf(
+          await fetch(url(`/v2/query/video_generation/${encodeURIComponent(created.task.id)}`), {
+            headers: auth(),
+          }),
+        ),
+      (json) => json.task?.status === 'Success',
+    );
+    assert.equal(done.base_resp.status_code, 0);
+    assert.match(done.task.content.url, /\/files\/.+\.mp4$/);
+
+    const download = await fetch(done.task.content.url, { headers: auth() });
+    assert.equal(download.status, 200);
+    assert.equal(download.headers.get('content-type'), 'video/mp4');
+    const bytes = Buffer.from(await download.arrayBuffer());
+    assert.equal(bytes.subarray(4, 8).toString('ascii'), ISO_BMFF_MAGIC);
+  });
+
+  test('MiniMax V2 视频：缺 text block 返回 1002，未知任务返回 2013', async () => {
+    const missing = await fetch(url('/v2/video_generation'), {
+      method: 'POST',
+      headers: auth(API_KEY, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ model: 'MiniMax-Hailuo-2.3', content: [], duration: 4 }),
+    });
+    assert.equal(missing.status, 200);
+    assert.equal((await jsonOf(missing)).base_resp.status_code, 1002);
+
+    const unknown = await fetch(url('/v2/query/video_generation/task_missing'), { headers: auth() });
+    assert.equal(unknown.status, 200);
+    assert.equal((await jsonOf(unknown)).base_resp.status_code, 2013);
   });
 });
 

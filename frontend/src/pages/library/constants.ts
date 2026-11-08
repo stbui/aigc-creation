@@ -16,8 +16,11 @@ export {
 /** 首屏与「加载更多」每次追加的素材数 */
 export const PAGE_SIZE = 20;
 
-/** 素材来源筛选: 全部 / 上传原图 / 生成图 */
+/** 素材来源筛选: 全部 / 本地上传 / 生成图 */
 export type Kind = 'all' | 'original' | 'generated';
+
+/** 默认来源：素材库主路径是管理本地上传的原图，生成结果由用户主动切换查看 */
+export const DEFAULT_KIND: Kind = 'original';
 
 /** 分组依据。'none' = 不分组，只在面板上给切换入口 */
 export type GroupBy = 'none' | 'project' | 'capability' | 'date';
@@ -33,6 +36,6 @@ export interface AssetGroup {
 /** 来源筛选下拉项 */
 export const KIND_OPTIONS: Array<{ value: Kind; label: string }> = [
   { value: 'all', label: '全部来源' },
-  { value: 'original', label: '原图' },
+  { value: 'original', label: '本地上传' },
   { value: 'generated', label: '生成图' },
 ];

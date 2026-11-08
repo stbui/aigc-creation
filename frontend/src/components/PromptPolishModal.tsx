@@ -1,3 +1,4 @@
+import './PromptPolishModal.css';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { promptToolsApi } from '../lib/api';

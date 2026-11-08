@@ -1,0 +1,1084 @@
+/**
+ * works 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   我的作品 (2026-10-30 重排版; 2026-10-31 与素材库对齐版面)
+
+   内容网格页的版面基准是素材库 / 工作台: 逃逸 .app-content 内边距拿整幅宽度,
+   页面自报 padding, 网格按容器宽度分档 (5/4/3/2/1 列)。此前本页固定 1120 内容列,
+   大屏两侧留出上百像素空档, 与小屏 4 列、大屏 6 列, 与素材库的栅格节奏都不一致。
+
+   现统一为:
+   - 版面与 .asset-library-page 同骨架 (逃逸 + 自有 padding), 标题 28/700, 说明 13px;
+   - 网格断点与素材库一致 (≤1200 4 列 / ≤980 3 列 / ≤640 2 列 / ≤380 1 列);
+   - 卡片 = 方形缩略图 + 白底文案脚注, 能力名 / 时间 / 尺寸移到图片下方, 网格行高一致;
+   - 所有颜色回落设计令牌 (--brand / --border / --surface / --text-*), 不写裸 hex。
+   ───────────────────────────────────────────────────────────────────────────── */
+.my-works-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* 参考站页面自身只扣 64px 顶栏；开启促销条时仍保持该 min-height，
+     由外壳提供剩余 40px 背景，不把促销条高度算进页面。 */
+  min-height: calc(100vh - 64px);
+  padding: 24px 24px 56px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .app-content > .my-works-page {
+    margin: -16px -10px -24px;
+    width: auto;
+  }
+}
+
+/* 页头: 标题 + 说明在左, 刷新在右 (与 .personal-page-head 同一套度量) */
+.my-works-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.my-works-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.my-works-heading h1 {
+  margin: 0;
+  /* 与素材库标题同一度量: 28/700/lh40 */
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 40px;
+  color: var(--text-strong);
+}
+
+.my-works-heading p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+}
+
+.my-works-refresh {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.my-works-refresh:hover {
+  border-color: var(--border-hover);
+  color: var(--brand);
+}
+
+.my-works-refresh:disabled {
+  border-color: var(--border);
+  background: var(--surface-tint);
+  color: var(--text-desc);
+  cursor: not-allowed;
+}
+
+.my-works-refresh .my-work-generating-spinner {
+  color: var(--brand);
+}
+
+/* 页签: 下划线贴住分隔线, 选中用品牌色, 未选中用 --text-desc */
+.my-works-tabs {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.my-works-tabs button {
+  position: relative;
+  padding: 0 0 12px;
+  border: 0;
+  background: none;
+  color: var(--text-desc);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.my-works-tabs button:hover {
+  color: var(--text-body);
+}
+
+.my-works-tabs button.active {
+  color: var(--brand);
+}
+
+.my-works-tabs button.active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+
+/* 工具栏: 与卡片同款描边容器, 筛选器是 34px 的控件而非胶囊大按钮 */
+.my-works-toolbar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg);
+}
+
+.my-works-filter-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.my-works-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.my-works-filter-trigger:hover {
+  border-color: var(--border-hover);
+  color: var(--text-strong);
+}
+
+/* 展开与「已选筛选」共用一个激活态: 品牌色描边 + 品牌淡底, 不再混入参考站的蓝色系 */
+.my-works-filter-trigger.active,
+.my-works-filter-trigger.is-open {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.my-works-filter-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* 浮层: 白底 + 常规卡片阴影, 描边与工具栏统一 */
+.my-works-filter-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.my-works-business-popover {
+  width: 330px;
+}
+
+.my-works-date-popover {
+  width: 308px;
+}
+
+.my-works-status-popover {
+  width: 214px;
+}
+
+.my-works-task-popover {
+  width: 318px;
+}
+
+.my-works-popover-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+}
+
+.my-works-popover-head strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.my-works-popover-head span {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.my-works-business-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.my-works-business-all.selected {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.my-works-checkbox {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-tag);
+  background: var(--card-bg);
+  color: var(--on-brand);
+}
+
+.my-works-checkbox.on {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.my-works-option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.my-works-option-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-desc);
+}
+
+.my-works-option-chips,
+.my-works-date-pills,
+.my-works-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.my-works-option-chip,
+.my-works-date-pills button,
+.my-works-status-pills button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.my-works-option-chip:hover,
+.my-works-date-pills button:hover,
+.my-works-status-pills button:hover {
+  border-color: var(--border-hover);
+  color: var(--text-body);
+}
+
+.my-works-option-chip.selected,
+.my-works-date-pills button.selected,
+.my-works-status-pills button.selected {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.my-works-custom-date {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-row);
+}
+
+.my-works-custom-date-label {
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+.my-works-date-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+.my-works-date-fields input {
+  flex: 1;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.my-works-date-fields input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-bg);
+}
+
+.my-works-custom-date-hint {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.my-works-task-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  color: var(--text-desc);
+}
+
+.my-works-task-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.my-works-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.my-works-task-list > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text-body);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.my-works-task-list > button:hover {
+  background: var(--surface-tint);
+}
+
+.my-works-task-list > button.selected {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.my-works-task-list small {
+  color: var(--text-desc);
+}
+
+.my-works-task-empty {
+  padding: 12px;
+  color: var(--text-desc);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* 批量下载: 工具栏右端的主操作 */
+.my-works-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  margin-left: auto;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.my-works-download:not(:disabled):hover {
+  background: var(--brand-hover);
+}
+
+.my-works-download:disabled {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text-desc);
+  cursor: not-allowed;
+}
+
+.my-works-filter-clear {
+  height: 34px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.my-works-filter-clear:hover {
+  color: var(--brand);
+}
+
+/* 多选操作条: 淡紫底 + 品牌色文字, 操作靠右 */
+.my-works-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--radius-control);
+  background: var(--brand-bg);
+  color: var(--brand-hover);
+  font-size: 13px;
+}
+
+.my-works-selection-bar > span:first-child {
+  margin-right: auto;
+}
+
+.my-works-selection-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.my-works-selection-bar button:disabled {
+  background: var(--border);
+  color: var(--text-desc);
+  cursor: not-allowed;
+}
+
+.my-works-selection-bar .my-works-selection-exit {
+  background: none;
+  color: var(--brand-hover);
+}
+
+.my-works-selection-bar .my-works-selection-exit:hover {
+  background: var(--card-bg);
+}
+
+/* 计数行: 数量在左, 排序说明在右 */
+.my-works-count-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 12px;
+  color: var(--text-body);
+  font-size: 13px;
+}
+
+.my-works-count-extra {
+  margin-left: 6px;
+  color: var(--text-desc);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.my-works-sort-label {
+  margin-left: auto;
+  color: var(--text-desc);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 网格: 列宽由容器决定 (1120 内 6 列 ≈ 175px, 390 手机 2 列), 不再按断点硬切 */
+/* 网格列数与 .asset-library-grid 同档: 5 / 4 / 3 / 2 / 1。
+   不再用 auto-fill —— 168px 下限会在 1920 铺出 8 列小图, 与素材库的大卡节奏不一致。 */
+.my-works-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .my-works-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .my-works-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .my-works-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 380px) {
+  .my-works-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 单卡: 描边白卡 = 图 + 文案脚注 */
+.my-work-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.my-work-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-card);
+}
+
+.my-work-card.selected {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-bg);
+}
+
+/* 图区: 图 / 视频 / 占位共用, 承载 hover 浮层与勾选框 */
+.my-work-media {
+  position: relative;
+  display: block;
+  width: 100%;
+  background: var(--surface);
+}
+
+/* 统一方形画布 + contain: 产出比例不一, 统一裁切会切掉商品主体, 只留白边不裁内容 */
+.my-work-image-button {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: linear-gradient(100deg, var(--surface) 20%, var(--border-row) 40%, var(--surface) 60%);
+  background-size: 200% 100%;
+  cursor: zoom-in;
+  animation: fc-result-shimmer 1.4s ease-in-out infinite;
+}
+
+.my-work-image-button.is-loaded {
+  background: var(--surface);
+  animation: none;
+}
+
+.my-work-image-button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.my-work-image-button.is-loaded img {
+  opacity: 1;
+}
+
+.my-work-image-button.is-failed {
+  cursor: pointer;
+  background: var(--surface);
+  animation: none;
+}
+
+.my-work-image-failed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--surface);
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+.my-work-image-button.is-failed:hover .my-work-image-failed {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+/* 视频: 直接给可播放的播放器 (原生控件不能被 <button> 包住), 16:9 留黑边不裁画面 */
+.my-work-media.is-video {
+  aspect-ratio: 16 / 9;
+}
+
+.my-work-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 360px;
+  background: var(--text-strong);
+  object-fit: contain;
+}
+
+/* 视频右上角的 AI 标识由 ResultMedia 的 .aigc-badge 承担, 这里只保证不被裁 */
+.my-work-media .result-media-aigc {
+  display: block;
+  position: relative;
+}
+
+/*
+ * 视频卡的操作全收到顶部一行: 底部操作条会压住原生播放控件 (播放键 / 进度条点不到)。
+ */
+.my-work-media.is-video .my-work-hover-actions {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  inset: 8px 8px auto auto;
+  padding: 0;
+}
+
+.my-work-media.is-video .my-work-hover-bottom {
+  margin-top: 0;
+}
+
+/* 失败 / 生成中占位: 同样方形, 说明 + 重试 */
+.my-work-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 16px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.my-work-media.is-video .my-work-image-placeholder {
+  aspect-ratio: 16 / 9;
+}
+
+.my-work-image-placeholder strong {
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.my-work-image-placeholder small {
+  max-width: 100%;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+.my-work-placeholder-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  margin-top: 2px;
+  padding: 0 12px;
+  border: 1px solid var(--brand-light);
+  border-radius: var(--radius-control);
+  background: var(--brand-bg);
+  color: var(--brand-hover);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.my-work-placeholder-retry:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.my-work-placeholder-retry:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* hover 浮层: 再来一张在左上, 下载 / 删除在右下; 默认透明, 不压住画面 */
+.my-work-hover-actions {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  /*
+   * 浮层本身不接收点击: 它铺满整个图片区, 若可点击就会把下面
+   * 「点图片看大图」和视频原生控件全部吃掉 (浮层透明时用户根本看不出原因)。
+   * 只有里面的操作按钮恢复可点。
+   */
+  pointer-events: none;
+}
+
+.my-work-card:hover .my-work-hover-actions,
+.my-work-card:focus-within .my-work-hover-actions {
+  opacity: 1;
+}
+
+.my-work-hover-actions [role='button']:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.my-work-hover-top,
+.my-work-hover-bottom {
+  display: flex;
+  gap: 6px;
+  /* 容器本身也不吃点击, 否则底部长条会盖住图片下半部分的「看大图 / 播放」 */
+  pointer-events: none;
+}
+
+.my-work-hover-bottom {
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.my-work-hover-actions [role='button'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text-body);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.16);
+}
+
+.my-work-hover-actions [role='button']:hover {
+  background: var(--card-bg);
+  color: var(--brand);
+}
+
+.my-work-hover-actions [role='button'].is-danger:hover {
+  color: var(--danger-text);
+}
+
+/* 勾选框: 白底描边, 选中实心品牌色 */
+.my-work-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 8;
+  cursor: pointer;
+}
+
+.my-work-check input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.my-work-check span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(23, 26, 43, 0.14);
+  border-radius: 5px;
+  /* 半透明白底: 平时是轻量的勾选提示, 悬停才变实, 不在缩略图右上角放一块白砖 */
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--on-brand);
+  backdrop-filter: blur(2px);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.my-work-card:hover .my-work-check span,
+.my-work-check:hover span {
+  border-color: rgba(23, 26, 43, 0.22);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+/* 选中态要压过上面的悬停白底 (选择器权重比 .my-work-card:hover 高一级) */
+.my-work-card .my-work-check input:checked + span,
+.my-work-card:hover .my-work-check input:checked + span {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.my-work-check input:focus-visible + span {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* 文案脚注: 能力名 + 时间 / 尺寸, 都在白底上, 不再压图 */
+.my-work-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 9px;
+  border-top: 1px solid var(--border-row);
+  background: var(--card-bg);
+  pointer-events: none;
+}
+
+.my-work-caption-name {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-work-caption small {
+  overflow: hidden;
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 加载更多: 与工具栏同款描边控件 */
+.my-works-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.my-works-load-more:hover {
+  border-color: var(--border-hover);
+  color: var(--brand);
+}
+
+/* 空态: 与 StateEmpty 同一套度量, 图标弱化, 主操作用品牌色 */
+.my-works-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 300px;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.my-works-empty svg {
+  color: var(--text-desc);
+  opacity: 0.6;
+}
+
+.my-works-empty h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.my-works-empty p {
+  margin: 0;
+  max-width: 420px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.my-works-empty-action {
+  height: 36px;
+  margin-top: 6px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.my-works-empty-action:hover {
+  background: var(--brand-hover);
+}
+
+.my-work-generating-spinner {
+  animation: my-works-spin 1s linear infinite;
+}
+
+@keyframes my-works-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 移动端规则必须留在页面样式内：本文件随路由懒加载，加载顺序晚于 global.css，
+   同一选择器的全局媒体查询会被这里的基础规则覆盖。 */
+@media (max-width: 900px) {
+  .app-content > .my-works-page {
+    margin: -16px -10px -24px;
+    width: auto;
+  }
+
+  .my-works-page {
+    padding: 16px 16px 52px;
+  }
+
+  .my-works-heading h1 {
+    font-size: 28px;
+    line-height: 35px;
+  }
+}
+
+/* 计数行在 390 宽下会与排序说明挤成一行，允许换行。 */
+@media (max-width: 700px) {
+  .my-works-count-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+}
+
+/* 窄屏: 筛选器两列排布，下载通栏；恢复参考站 14px 工具栏内边距与 10px 间距。 */
+@media (max-width: 640px) {
+  .my-works-toolbar {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .my-works-filter-wrap {
+    flex: 1 1 calc(50% - 5px);
+  }
+
+  .my-works-filter-trigger {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .my-works-download {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .my-works-filter-clear {
+    width: 100%;
+    padding: 0 4px;
+    text-align: left;
+  }
+
+  .my-works-selection-bar {
+    flex-wrap: wrap;
+  }
+
+  .my-works-selection-bar > span:first-child {
+    width: 100%;
+    margin-right: 0;
+  }
+}
+
+/* 触屏没有 hover: 操作常驻，隐藏「再来一张」(与勾选框 / 播放控件抢位置)。 */
+@media (hover: none) {
+  .my-work-hover-actions {
+    opacity: 1;
+  }
+
+  .my-work-hover-actions.is-placeholder {
+    justify-content: flex-end;
+  }
+
+  .my-work-hover-top {
+    display: none;
+  }
+}

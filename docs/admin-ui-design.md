@@ -6,7 +6,7 @@
 > 后台曾先后经历 antd、自建组件套件、shadcn 三轮换装，**前两轮的组件与样式已全部删除**，
 > 仓库内不再有残留引用。历史决策过程见 `docs/README.md`；本文只写现状。
 >
-> 后台 34 个页面全部走 shadcn 原子件（`admin-ui/components/ui/*`），经 `admin-ui/primitives/*`
+> 后台 32 个页面全部走 shadcn 原子件（`admin-ui/components/ui/*`），经 `admin-ui/primitives/*`
 > 这一层组合件供给页面。C 端（前台）不复用这套组合件，页面只从 `frontend/src/ui` 兼容层取件；
 > 该层底层同样复用 `admin-ui/components/ui` 的 shadcn/radix 原子件，**antd 已从依赖与源码中移除**。
 
@@ -82,19 +82,17 @@ Tailwind v4 的默认阶梯与项目规定对不齐，`admin.css` 的 `@theme in
 
 ### 2.1 骨架
 
-外壳由 `admin-ui/shell/AdminBoardLayout` 实现，经典「上左右」结构，无值班带：
+外壳由 `admin-ui/shell/AdminBoardLayout` 实现，基于 shadcn `Sidebar` 组合，无值班带：
 
 ```
-Topbar 56px（sticky top-0）
-├── 左：品牌（标记 24 + 「货觉 运营后台」）+ 当前位置（分组 / 页面）
-└── 右：环境标识 + 用户菜单
+Sidebar 232px（折叠 60px，≤1280px 自动折叠；h-svh 全高）
+├── 品牌头：56px，标记 + 「货觉AI 运营后台」
+├── 导航：8 个分组（总览 / 运营 / 模型与渠道 / 交易 / 财务 / 内容与合规 / 系统 / 数据安全），可折叠，按权限点过滤；导航区自身滚动
+└── 底：账号菜单（品牌紫头像 + 邮箱 / 角色，菜单含返回前台 / 退出登录）
 
-Sider 232px（折叠 60px，≤1280px 自动折叠；sticky top-0，h-full）
-├── 品牌头：56px，标记 + 「货觉 运营后台」
-├── 导航：8 个分组（总览 / 运营 / 内容 / 交易 / 财务 / 系统 / 模型 / 数据安全），可折叠，按权限点过滤
-└── 底：环境标识、折叠 / 展开按钮、账号菜单
-
-Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不设统一限宽），横向滚动限在该区内
+SidebarInset（内容区）
+├── Topbar 56px：折叠开关 + 分隔线 + 面包屑（分组 / 页面），右侧告警铃铛 + 环境标识
+└── Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不设统一限宽），横向滚动限在该区内
 ```
 
 `.adm-*` 在仓库里只剩三个类，规则在 `styles/admin.css` 的 `@layer base`：
@@ -111,24 +109,25 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 | 项 | 规格 |
 | --- | --- |
-| 顶栏 | 高 56px（`data-testid="admin-topbar"`），左侧品牌 + 当前位置，右侧环境标识与账号 |
-| 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），顶栏与底部按钮不参与 |
-| 底部区 | 侧栏底、上边框分隔；非生产显示环境标识与折叠按钮，账号菜单固定在底部；折叠态只留图标 |
-| 分组标题 | 12px / 600 `text-muted-foreground` / `tracking-wider`，可点击折叠/展开；默认只展开当前页面所在组，展开状态记入 `localStorage`；侧栏折叠态隐藏标题并改用分隔线 |
+| 顶栏 | 高 56px（`data-testid="admin-header"`），内容区顶部：折叠开关 + 面包屑（分组 / 页面），右侧告警铃铛与环境标识 |
+| 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），品牌头与底部账号菜单不参与 |
+| 底部区 | 侧栏底、上边框分隔；账号菜单固定在底部，折叠态只留头像 |
+| 分组标题 | 12px / 600 `text-muted-foreground` / `tracking-wider`，可点击折叠/展开；首次进入默认展开全部分组，之后沿用写入 `localStorage` 的用户偏好；侧栏折叠态隐藏标题并改用分隔线 |
 | 菜单项 | 高 34px，圆角 8px，13px / 500 文字，padding `0 10px`，左侧 16px 图标 + 10px 间距 |
-| 悬停 | 底 `bg-muted`，字 `text-foreground` |
-| 选中 | 底 `bg-accent`、字 `text-accent-foreground` / 600，左侧 3px 品牌色竖条 |
-| 折叠态 | 只留图标并居中，`aria-label` / `title` 给全称；分组之间用分隔线代替标题 |
+| 悬停 | 底 `bg-sidebar-accent`，字 `text-sidebar-accent-foreground` |
+| 选中 | 底 `bg-sidebar-accent`、字 `text-sidebar-accent-foreground` / 600，左侧 3px 品牌色竖条 |
+| 折叠态 | 只留图标并居中，`tooltip` 给全称；分组之间用分隔线代替标题；`Ctrl/Cmd + B` 与顶栏开关均可切换 |
 | 规划项 | 标「待建」小胶囊（`planned` 字段） |
 
 菜单按权限过滤：无权项不渲染，整组为空时整组隐藏。
 
-### 2.3 顶栏右侧
+### 2.3 顶栏右侧与账号菜单
 
 | 项 | 规格 |
 | --- | --- |
+| 告警铃铛 | `AdminAlertBell`，角标是待处理事项数；点击展开最近告警，可跳对应页面 |
 | 环境标识 | 灰底胶囊 + 橙点，**仅非生产显示**，避免误在生产执行测试操作 |
-| 用户菜单 | 品牌紫头像 + 邮箱 / 角色两行；展开后头部复显身份，菜单含返回前台、退出登录（危险色） |
+| 用户菜单 | 位于侧栏底部：品牌紫头像 + 邮箱 / 角色两行；展开后头部复显身份，菜单含返回前台、退出登录（危险色）；折叠态只留头像 |
 
 ### 2.4 内容区
 
@@ -149,7 +148,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 ### 3.1 PageHeader
 
-`primitives/layout.PageHeader`：标题 + 副标题在左，操作在右。标题 `h1` / 20px / 600，副标题 13px `text-muted-foreground`（不截断 —— 它通常是一句话说明「这一页在管什么」）。操作区右对齐、可换行。
+`primitives/layout.PageHeader`：轻量标题卡，品牌色左边线定位；标题 + 副标题在左，操作在右。标题 `h1` / 20px / 600，副标题 13px `text-muted-foreground`（不截断 —— 它通常是一句话说明「这一页在管什么」）。操作区右对齐、可换行。
 
 正文与表格链接默认使用品牌紫、500 字重；悬停显示下划线并转到 `--brand-hover`。整行可点击条目与图片链接用 `text-inherit no-underline` 保留其容器语义，不受该默认值影响。
 
@@ -223,10 +222,10 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 | 场景 | 组件 | 形态 |
 | --- | --- | --- |
-| 页面内高危动作（删除渠道、退款） | `ConfirmAction` | **贴底操作条，不是弹层** —— 运营要能一边看被影响的行一边确认后果。`impact` 逐条列出连带影响 |
+| 页面内高危动作（删除渠道、退款） | `ConfirmDialog` | shadcn `AlertDialog` 组合壳（阻塞式弹窗）；`impact` 逐条列出连带影响 |
 | 跨页面复用的二次确认（离开未保存页、批量动作） | `useConfirm()` | shadcn Dialog；需要原因时聚焦输入框，原因写入审计 |
 
-`ConfirmAction` 曾经被误改成 `AlertDialog`，是违反产品决策的：高危动作不许弹阻塞层。
+`ConfirmDialog` 只组合 AlertDialog 的标题 / 影响范围 / 附加表单 / 底部动作，弹层行为（焦点锁定、Esc、关闭后焦点归位）由 radix 提供。点击确认不自动关闭，由调用方在请求成功后再收起。`overlay.tsx` 不再保留手写的贴底确认条。
 
 **确认只属于业务动作，审计页面永远不弹确认。** 操作审计页只查询、展开和导出，导出也直接执行；审计只被动记录业务操作的动作、原因与结果，不能反过来要求用户确认审计本身。高危确认发生在其业务页面，原因由业务操作收集后写入审计。
 
@@ -238,7 +237,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 ### 3.8 批量条与结果
 
-勾选后出现批量条（已选 N 项 + 动作 + 取消选择）。执行后 `BatchResultModal` 逐条展示，**失败项排最前**并带原因 —— 批量操作的失败是常态，只报成功数会让运营以为全都成了。
+勾选后出现批量条（已选 N 项 + 动作 + 取消选择）。执行后用 **toast 汇报成功 / 失败条数**，不再弹二次结果框 —— 批量动作在前置确认里已经确认过一次，失败时运营可回到列表按状态筛选处理。
 
 ### 3.9 提示条
 
@@ -248,14 +247,14 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 ## 4. 页面原型
 
-34 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
+32 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
 
 | 原型 | 页面 | 结构 |
 | --- | --- | --- |
 | 看板页 | 平台概览 | 值班条 + 指标卡栅格 + 趋势图 + 交易概览 + 最近任务列表 |
 | 告警页 | 告警中心 | 级别统计卡 + 级别筛选 + 告警卡片列表 + 口径说明 |
-| 列表页 | 用户 / 素材 / 任务 / 工单 / 订单 / 积分 / 优惠券 / 活动 / 邀请与签到 / 商品 / 能力消耗价 / 发票 / 支付订单 / 支付对账 / 操作审计 / 调用记录 / 数据备份 | 页头 → 筛选条 → 批量条（可选）→ 表格 → 分页；行操作走抽屉或确认条 |
-| 配置页 | 系统设置 / 存储配置 / AI 标识 / 角色权限 / 能力管控 / 渠道工作台 / 前台模型 / 用户分组 / 定时任务 / 保留期清理 / 法务文档 / 站内消息 | 分区表单或页签；底部署固定操作条（保存 / 重置），渠道与前台模型用列表 + 抽屉 |
+| 列表页 | 用户 / 素材 / 任务 / 工单 / 订单 / 积分 / 优惠券 / 活动 / 邀请与签到 / 商品 / 发票 / 支付订单 / 支付对账 / 操作审计 / 调用记录 / 数据备份 | 页头 → 筛选条 → 批量条（可选）→ 表格 → 分页；行操作走抽屉或确认弹窗 |
+| 配置页 | 系统设置 / 存储配置 / AI 标识 / 角色权限 / 能力与模型 / 渠道工作台 / 用户分组 / 定时任务 / 保留期清理 / 法务文档 / 站内消息 | 分区表单或页签；底部署固定操作条（保存 / 重置），渠道用列表 + 抽屉，能力与模型用分组卡片 + 模型抽屉 |
 | 标签页 | 支付充值（支付渠道 / 充值商品 / 支付订单 / 支付对账） | 页头 → 提示条 → 分段页签（`SegmentedTabs`，`?tab=` 同步 URL）→ 每个标签自持数据与筛选 |
 
 ### 4.1 各页特殊约定
@@ -263,10 +262,10 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | 页面 | 约定 |
 | --- | --- |
 | 平台概览 | 首屏是 `DutyStrip`（值班条）：100 根产出刻度 + 四个计数 + 「接手最早异常」主动作；趋势图用 `TrendBarChart`（Recharts 真坐标轴，非 CSS 自绘） |
-| 渠道工作台 | 主从布局：左列是**渠道导航与全部渠道级入口**（新建渠道 / 导入 / 导出全部 / 搜索 / 状态筛选 / 调整顺序），右侧选中渠道的详情内联模型清单（模态 / 协议 / 权重 / 优先级 / 价格档），模型编辑走弹窗；详情头部外露 编辑 / 复制 / 导出 / 停用·启用 / 删除 五个动作，停用与删除走 `ConfirmAction`（写明影响范围），导出只导配置不含凭证；健康列用 `StatusTag`，连通性测试在详情区发起；「全部模型」视图跨渠道平铺同一份数据 |
-| 前台模型 | `AdminDataTable` + `Drawer`：模型 → revision → 线路三段；`simulate` 结果在抽屉内展开，不跳页 |
+| 渠道工作台 | 主从布局：左列是**渠道导航与全部渠道级入口**（新建渠道 / 导入 / 导出全部 / 搜索 / 状态筛选 / 调整顺序），右侧选中渠道的详情内联模型清单（模态 / 协议 / 权重 / 优先级 / 价格档），模型编辑走弹窗；详情头部外露 编辑 / 复制 / 导出 / 停用·启用 / 删除 五个动作，停用与删除走 `ConfirmDialog`（写明影响范围），导出只导配置不含凭证；健康列用 `StatusTag`，连通性测试在详情区发起；「全部模型」视图跨渠道平铺同一份数据 |
 | AI 标识 | 左编辑、右预览两栏；上层是 CSS 还原的角标外观，下层是 Canvas 按服务端几何规则画在示例底图上的效果；关闭态预览显示「可见角标已关闭」而非空白；顶部开关配法律风险提示 |
-| 能力管控 | 16 行能力表，下架必须填原因（表单内联校验，不是弹窗里的单行输入） |
+| 能力与模型 | 17 项能力按分组排成卡片网格；每卡直接展示运行状态、实现程度、能力上下线动作以及所属模型，模型行展示价格、计费方式、线路数、revision 与编辑 / 模拟 / 归档动作；模型复杂维护走 `Drawer`，`simulate` 结果在抽屉内展开。下线走 `ConfirmDialog` 列业务影响，下线原因统一生成并下发 C 端；孤儿模型单独列在表格区，不因缺少能力定义而丢失 |
+| 商品管理 | 统计卡 + 筛选条（关键词 / 状态 / 发放方式，客户端即时生效，`?status=` `?grantType=` `?q=` 同步 URL）+ 商品卡片网格 + 客户端分页；卡片自上而下为身份（SKU / 状态 / 名称 / 说明）、数字面板（积分 / 售价 / 划线价·折合单价）、规格行与页脚动作（编辑 / 上下架 / 删除），点卡片主体打开编辑抽屉；删除只对无历史订单的 SKU 生效，有订单时提示改为下架；统计卡始终基于完整目录，不随筛选变化 |
 | 支付充值 | 四标签共页，`?tab=` 同步 URL 且非法值回落到「支付渠道」；筛选是**草稿 → 应用**两段式（草稿改完点「查询」才生效，避免「改了没生效」的误判）；刷新只重取当前筛选下的数据，不重置筛选与分页；渠道配置抽屉里密钥字段是密码框 + 「留空即沿用」提示，身份字段禁用；对账页只展示结果、**不提供改钱入口** |
 | 法务文档 | 版本列表 + 编辑器；已发布版本只读，改文本必须「另存为新版本」 |
 | 数据备份 | 列表 + 校验结果列（SHA-256 通过 / 不通过），下载与删除分开两类按钮，删除走高危确认 |
@@ -336,9 +335,8 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | `skeleton.tsx` | `PageSkeleton` / `SkeletonPanel` / `SkeletonBody` / `SkeletonStats` / `SkeletonCards` / `SkeletonTabs` / `SkeletonDutyStrip` / `Skeleton` |
 | `fields.tsx` | `CheckboxField` / `FilePicker` / `HelpTip` / `IconButton` / `ColorField` / `RangeField` / `SuggestField` |
 | `table.tsx` | `AdminDataTable` |
-| `overlay.tsx` | `ModalDialog` / `Drawer` / `ConfirmAction` / `RowMenu` |
+| `overlay.tsx` | `ModalDialog` / `Drawer` / `ConfirmDialog`（shadcn `AlertDialog` 组合壳）/ `RowMenu` |
 | `drawer.tsx` | `AdminDrawer`（懒加载详情抽屉） |
-| `batch-result.tsx` | `BatchResultModal` |
 | `duty-strip.tsx` / `duty-tower.tsx` | 概览首屏的值班条与值班塔 |
 | `chart.tsx` | `TrendBarChart`（Recharts） |
 
@@ -403,7 +401,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 | 钩子 | 位置 |
 | --- | --- |
-| `admin-topbar` / `admin-sider` / `admin-nav-scroll` | 外壳 |
+| `admin-header` / `admin-sider` / `admin-nav-scroll` | 外壳 |
 | `admin-panel` / `admin-stat-card` / `admin-save-bar` | 面板 / 指标卡 / 保存条 |
 | `admin-filter` / `admin-filter-actions` / `admin-filter-chips` / `admin-filter-chip` | 筛选条 |
 | `admin-table` / `admin-table-scroll` / `admin-table-row` / `admin-table-expanded` | 表格 |

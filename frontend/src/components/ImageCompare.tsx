@@ -1,3 +1,4 @@
+import './ImageCompare.css';
 import { useState } from 'react';
 
 /**

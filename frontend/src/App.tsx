@@ -1,3 +1,4 @@
+import './styles/route-fallback.css';
 import { lazy, Suspense, type ComponentType } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -89,6 +90,11 @@ const ImageTranslatePage = lazyRoute('/image-translate', () => import('./pages/i
 const ImageExpandPage = lazyRoute('/image-expand', () => import('./pages/image-expand'), 'ImageExpandPage');
 const ProductRecolorPage = lazyRoute('/product-recolor', () => import('./pages/product-recolor'), 'ProductRecolorPage');
 const RotateAnglePage = lazyRoute('/rotate-angle', () => import('./pages/rotate-angle'), 'RotateAnglePage');
+const ImageToVideoPage = lazyRoute(
+  '/tools/image_to_video',
+  () => import('./pages/image-to-video'),
+  'ImageToVideoPage',
+);
 const ToolPage = lazyRoute('/tools/*', () => import('./pages/ToolPage'), 'ToolPage');
 const WorksPage = lazyRoute(['/works', '/my-works'], () => import('./pages/works'), 'WorksPage');
 const LibraryPage = lazyRoute(['/library', '/asset-library'], () => import('./pages/library'), 'LibraryPage');
@@ -301,6 +307,12 @@ function Shell() {
               }
             />
             <Route
+              path="/tools/image_to_video"
+              element={
+                  <ImageToVideoPage />
+              }
+            />
+            <Route
               path="/tools/:capability"
               element={
                   <ToolPage />
@@ -386,7 +398,7 @@ function Shell() {
             />
             {/* 2026-10-20: 此前是 <Navigate to="/workbench" replace />, 未知 URL 被静默
                 弹回工作台 —— 用户输错路径时分不清是「页面不存在」还是「页面坏了」。
-                这与 AdminDashboardPage.tsx:288 自定的原则相悖, 现改为显式 404。
+                这与 AdminShell.tsx 里「不用 Navigate 静默弹回」的决策原则相悖, 现改为显式 404。
                 已核对 tests/ 与 e2e/: 无任何用例依赖 catch-all 跳工作台。 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

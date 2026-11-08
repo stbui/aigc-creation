@@ -24,3 +24,19 @@ export { SkuResultPanel, type SkuResultItem } from '../../components/SkuResultPa
 export { SkuHistoryPane } from '../../components/SkuHistoryPane';
 /** 模板图区域框选弹窗 */
 export { SkuRegionEditorModal, type SkuRegion } from '../../components/SkuRegionEditorModal';
+
+/** shadcn 组合件：卡片、输入、按钮与加载态统一从 C 端 UI 入口取用。 */
+export {
+  Button,
+  Input,
+  InputGroup,
+  InputGroupInput,
+  InputGroupText,
+  Spin,
+  Surface,
+  SurfaceAction,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceHeader,
+  SurfaceTitle,
+} from '../../ui';

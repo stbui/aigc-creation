@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { AppError } from "../common/app.exception";
 import { CSV_EXPORT_MAX_ROWS, centsToYuan, toCsv } from "../common/csv";
 import { PrismaService } from "../prisma/prisma.service";
@@ -10,11 +11,12 @@ import { escapeHtml } from "../channels/template";
  * 发票 (B3)。
  *
  * 规则:
- *   · 一单一票 (`Invoice.orderId @unique`)
+ *   · 同一订单保留完整申请历史, 但同一时刻最多一张有效票
+ *     (`pending` / `issued` / `red_flushed`); 只有 `rejected` 可重提
  *   · 只有**已支付**的订单可申请; 金额取 `paidCents - refundedCents` 的
  *     申请时快照 —— 开票之后再退款, 票面金额不会自己变
  *   · 企业抬头必须给纳税人识别号, 否则票开出来不能用, 退回来重开是纯损耗
- *   · C 端只能申请; 开具 / 驳回在后台 (`invoice.write` 权限)
+ *   · C 端只能申请; 开具 / 驳回 / 冲红登记在后台 (`invoice.write` 权限)
  *
  * 为什么文件是 HTML 而不是 PDF: 项目零新增依赖, 手写 PDF 的字体嵌入
  * 与中文排版风险远大于收益。可打印的 HTML 用浏览器「打印为 PDF」即可
@@ -43,56 +45,107 @@ export class InvoicesService {
       content?: string;
     },
   ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: dto.orderId },
-    });
-    if (!order) throw new AppError(40400, "订单不存在", 404);
-    if (order.userId !== userId)
-      throw new AppError(40301, "无权为该订单开票", 403);
-    if (order.status !== "paid" && order.status !== "partial_refunded") {
-      throw new AppError(40901, "仅已支付的订单可申请开票", 409);
-    }
-
-    const amountCents = order.paidCents - order.refundedCents;
-    if (amountCents <= 0) {
-      throw new AppError(40901, "该订单已无可开票金额", 409);
-    }
-
     const title = (dto.title ?? "").trim();
     if (!title) throw new AppError(40001, "请填写发票抬头", 400);
     if (dto.kind === "company" && !(dto.taxNo ?? "").trim()) {
       throw new AppError(40001, "企业抬头必须填写纳税人识别号", 400);
     }
 
-    const existing = await this.prisma.invoice.findUnique({
-      where: { orderId: order.id },
-    });
-    if (existing) {
-      throw new AppError(
-        40901,
-        `该订单已申请过发票 (${existing.invoiceNo})`,
-        409,
-      );
+    // 订单状态、可开票金额、历史与建单必须同事务读取和写入：否则订单在
+    // 校验后发生退款时，可能按旧状态 / 旧金额创建发票。
+    let created: {
+      invoice: { id: string; invoiceNo: string };
+      orderNo: string;
+      amountCents: number;
+    };
+    try {
+      created = await this.prisma.$transaction(async (tx) => {
+        const order = await tx.order.findUnique({
+          where: { id: dto.orderId },
+        });
+        if (!order) throw new AppError(40400, "订单不存在", 404);
+        if (order.userId !== userId)
+          throw new AppError(40301, "无权为该订单开票", 403);
+        if (order.status !== "paid" && order.status !== "partial_refunded") {
+          throw new AppError(40901, "仅已支付的订单可申请开票", 409);
+        }
+
+        const amountCents = order.paidCents - order.refundedCents;
+        if (amountCents <= 0) {
+          throw new AppError(40901, "该订单已无可开票金额", 409);
+        }
+        const processingRefund = await tx.refund.count({
+          where: { orderId: order.id, status: "processing" },
+        });
+        if (processingRefund > 0) {
+          throw new AppError(
+            40901,
+            "该订单有退款正在处理中，请等待退款结果后再申请开票",
+            409,
+          );
+        }
+
+        const active = await tx.invoice.findFirst({
+          where: {
+            orderId: order.id,
+            status: { in: ["pending", "issued", "red_flushed"] },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+        if (active) {
+          const suffix =
+            active.status === "red_flushed" ? "已冲红" : "已存在有效发票";
+          throw new AppError(
+            40901,
+            `该订单${suffix} (${active.invoiceNo})，不可重复申请`,
+            409,
+          );
+        }
+
+        return {
+          invoice: await tx.invoice.create({
+            data: {
+              invoiceNo: await this.nextInvoiceNo(tx),
+              orderId: order.id,
+              // 数据库唯一约束兜底并发: 同一订单只允许一条有效票
+              activeOrderId: order.id,
+              userId,
+              amountCents,
+              kind: dto.kind,
+              title,
+              taxNo: (dto.taxNo ?? "").trim() || null,
+              email: (dto.email ?? "").trim() || null,
+              content: (dto.content ?? "").trim() || "技术服务费",
+            },
+          }),
+          orderNo: order.orderNo,
+          amountCents,
+        };
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code !== "P2002") throw error;
+      // 并发申请时唯一键冲突由数据库裁决；转成业务冲突而不是 500
+      const active = await this.prisma.invoice.findFirst({
+        where: {
+          orderId: dto.orderId,
+          status: { in: ["pending", "issued", "red_flushed"] },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      if (active) {
+        throw new AppError(
+          40901,
+          `该订单已存在有效发票 (${active.invoiceNo})，不可重复申请`,
+          409,
+        );
+      }
+      throw error;
     }
 
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        invoiceNo: await this.nextInvoiceNo(),
-        orderId: order.id,
-        userId,
-        amountCents,
-        kind: dto.kind,
-        title,
-        taxNo: (dto.taxNo ?? "").trim() || null,
-        email: (dto.email ?? "").trim() || null,
-        content: (dto.content ?? "").trim() || "技术服务费",
-      },
-    });
-
     this.logger.log(
-      `发票申请: ${invoice.invoiceNo} 订单 ${order.orderNo} ${amountCents} 分`,
+      `发票申请: ${created.invoice.invoiceNo} 订单 ${created.orderNo} ${created.amountCents} 分`,
     );
-    return this.detail(invoice.id, userId);
+    return this.detail(created.invoice.id, userId);
   }
 
   async listByUser(userId: string, limit = 50) {
@@ -141,8 +194,9 @@ export class InvoicesService {
     if (opts.userId && invoice.userId !== opts.userId) {
       throw new AppError(40301, "无权查看该发票", 403);
     }
-    if (invoice.status !== "issued") {
-      // 未开具的发票不能下载: 它还没有法律效力, 给出去只会引发「票是假的」质疑
+    if (invoice.status !== "issued" && invoice.status !== "red_flushed") {
+      // 未开具的发票不能下载: 它还没有法律效力, 给出去只会引发「票是假的」质疑。
+      // 已冲红发票仍保留原件供财务追溯和用户留档。
       throw new AppError(40901, "发票尚未开具", 409);
     }
     return {
@@ -224,6 +278,9 @@ export class InvoicesService {
         { label: "金额(元)", value: (r) => centsToYuan(r.amountCents) },
         { label: "状态", value: (r) => r.status },
         { label: "驳回原因", value: (r) => r.rejectReason ?? "" },
+        { label: "冲红时间", value: (r) => r.redFlushedAt ?? "" },
+        { label: "冲红操作人", value: (r) => r.redFlushedBy ?? "" },
+        { label: "冲红原因", value: (r) => r.redFlushReason ?? "" },
         { label: "申请时间", value: (r) => r.createdAt },
         { label: "开具时间", value: (r) => r.issuedAt ?? "" },
       ],
@@ -261,7 +318,16 @@ export class InvoicesService {
   async issue(id: string, operatorId: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
-      include: { order: { select: { orderNo: true } } },
+      include: {
+        order: {
+          select: {
+            orderNo: true,
+            status: true,
+            paidCents: true,
+            refundedCents: true,
+          },
+        },
+      },
     });
     if (!invoice) throw new AppError(40400, "发票不存在", 404);
     if (invoice.status !== "pending") {
@@ -271,34 +337,68 @@ export class InvoicesService {
         409,
       );
     }
+    await this.assertOrderInvoiceable(invoice);
 
     const html = await this.buildHtml(invoice);
     const key = this.storage.buildKey("invoices", "html");
-    let fileKey: string | null = null;
-    try {
-      await this.storage
-        .getActive()
-        .put(key, Buffer.from(html, "utf8"), "text/html; charset=utf-8");
-      fileKey = key;
-    } catch (e) {
-      // 文件落盘失败不阻断开具: 下载接口会按最新数据实时渲染
-      this.logger.warn(
-        `发票文件写入失败, 将按需实时渲染: ${(e as Error).message}`,
-      );
-    }
-
-    const claimed = await this.prisma.invoice.updateMany({
-      where: { id, status: "pending" },
-      data: {
-        status: "issued",
-        issuedAt: new Date(),
-        issuedBy: operatorId,
-        fileKey,
-        rejectReason: null,
-      },
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const fresh = await tx.invoice.findUnique({
+        where: { id },
+        include: {
+          order: {
+            select: {
+              orderNo: true,
+              status: true,
+              paidCents: true,
+              refundedCents: true,
+            },
+          },
+        },
+      });
+      if (!fresh || fresh.status !== "pending") {
+        throw new AppError(40901, "发票状态已被其它操作改变, 请刷新后重试", 409);
+      }
+      await this.assertOrderInvoiceable(fresh, tx);
+      return tx.invoice.updateMany({
+        where: { id, status: "pending" },
+        data: {
+          status: "issued",
+          issuedAt: new Date(),
+          issuedBy: operatorId,
+          rejectReason: null,
+        },
+      });
     });
     if (claimed.count === 0) {
       throw new AppError(40901, "发票状态已被其它操作改变, 请刷新后重试", 409);
+    }
+
+    /*
+     * 先完成状态抢占，再写票据文件。否则事务内的退款复核失败时，前面已经
+     * 写入的文件没有任何数据库引用，成为孤儿对象。文件写失败仍不阻断开具：
+     * 下载接口会按最新数据实时渲染。
+     */
+    let provider: ReturnType<StorageService["getActive"]> | null = null;
+    try {
+      provider = this.storage.getActive();
+      await provider.put(
+        key,
+        Buffer.from(html, "utf8"),
+        "text/html; charset=utf-8",
+      );
+      const attached = await this.prisma.invoice.updateMany({
+        where: { id, status: "issued", fileKey: null },
+        data: { fileKey: key },
+      });
+      if (attached.count === 0) {
+        throw new Error("发票状态已变化，文件未绑定");
+      }
+    } catch (e) {
+      // 写入成功但绑定失败时主动清理，避免留下无引用文件。
+      await provider?.delete(key).catch(() => undefined);
+      this.logger.warn(
+        `发票文件写入失败, 将按需实时渲染: ${(e as Error).message}`,
+      );
     }
 
     this.logger.log(
@@ -330,6 +430,90 @@ export class InvoicesService {
     return this.detail(id);
   }
 
+  /**
+   * 开具前重新校验订单的实时可开票余额。
+   *
+   * 发票金额是申请时的快照，但订单退款可能在申请之后发生。因此不能只信
+   * 建单时的校验：开具前和事务内都要按最新订单状态复核，避免给已全额退款
+   * 或票面超过剩余实付的订单开出有效票。退款处理中同样暂缓开具。
+   */
+  private async assertOrderInvoiceable(
+    invoice: {
+      orderId: string;
+      amountCents: number;
+      order: {
+        status: string;
+        paidCents: number;
+        refundedCents: number;
+      };
+    },
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    if (
+      invoice.order.status !== "paid" &&
+      invoice.order.status !== "partial_refunded"
+    ) {
+      throw new AppError(40901, "订单当前状态不可开票", 409);
+    }
+
+    const processingRefund = await db.refund.count({
+      where: { orderId: invoice.orderId, status: "processing" },
+    });
+    if (processingRefund > 0) {
+      throw new AppError(
+        40901,
+        "订单有退款正在处理中，请等待退款结果后再开具",
+        409,
+      );
+    }
+
+    const invoiceableCents =
+      invoice.order.paidCents - invoice.order.refundedCents;
+    if (invoice.amountCents > invoiceableCents) {
+      throw new AppError(
+        40901,
+        `订单退款后可开票余额仅 ${Math.max(invoiceableCents, 0)} 分，低于票面金额；请驳回该申请后由用户按最新余额重新申请`,
+        409,
+      );
+    }
+  }
+
+  /**
+   * 冲红登记。
+   *
+   * 当前不对接税务平台，只把「哪张已开具票、何时、由谁、因何冲红」
+   * 固化到系统台账。状态 CAS 保证同一张票只登记一次。
+   */
+  async redFlush(id: string, operatorId: string, reason: string) {
+    const trimmed = String(reason ?? "").trim();
+    if (!trimmed) throw new AppError(40001, "请填写冲红原因", 400);
+    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    if (!invoice) throw new AppError(40400, "发票不存在", 404);
+    if (invoice.status !== "issued") {
+      throw new AppError(
+        40901,
+        `发票当前状态为 ${invoice.status}, 不可冲红`,
+        409,
+      );
+    }
+    const claimed = await this.prisma.invoice.updateMany({
+      where: { id, status: "issued" },
+      data: {
+        status: "red_flushed",
+        redFlushedAt: new Date(),
+        redFlushedBy: operatorId,
+        redFlushReason: trimmed,
+      },
+    });
+    if (claimed.count === 0) {
+      throw new AppError(40901, "发票状态已被其它操作改变, 请刷新后重试", 409);
+    }
+    this.logger.log(
+      `发票冲红: ${invoice.invoiceNo} 操作人 ${operatorId} 原因: ${trimmed}`,
+    );
+    return this.detail(id);
+  }
+
   async reject(id: string, operatorId: string, reason: string) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id } });
     if (!invoice) throw new AppError(40400, "发票不存在", 404);
@@ -342,7 +526,12 @@ export class InvoicesService {
     }
     const claimed = await this.prisma.invoice.updateMany({
       where: { id, status: "pending" },
-      data: { status: "rejected", rejectReason: reason, issuedBy: operatorId },
+      data: {
+        status: "rejected",
+        rejectReason: reason,
+        issuedBy: operatorId,
+        activeOrderId: null,
+      },
     });
     if (claimed.count === 0) {
       throw new AppError(40901, "发票状态已被其它操作改变, 请刷新后重试", 409);
@@ -356,17 +545,19 @@ export class InvoicesService {
   // ── 内部 ──────────────────────────────────────────────────────────
 
   /** 发票号: HX + yyyymmdd + 6 位流水。唯一约束兜底并发冲突 */
-  private async nextInvoiceNo(): Promise<string> {
+  private async nextInvoiceNo(
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<string> {
     const d = new Date();
     const day = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
       d.getDate(),
     ).padStart(2, "0")}`;
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const count = await this.prisma.invoice.count({
+      const count = await db.invoice.count({
         where: { invoiceNo: { startsWith: `HX${day}` } },
       });
       const no = `HX${day}${String(count + 1 + attempt).padStart(6, "0")}`;
-      const exists = await this.prisma.invoice.findUnique({
+      const exists = await db.invoice.findUnique({
         where: { invoiceNo: no },
       });
       if (!exists) return no;
@@ -387,6 +578,9 @@ export class InvoicesService {
     status: string;
     rejectReason: string | null;
     issuedAt: Date | null;
+    redFlushedAt: Date | null;
+    redFlushedBy: string | null;
+    redFlushReason: string | null;
     createdAt: Date;
     fileKey?: string | null;
     order?: { orderNo: string } | null;
@@ -405,8 +599,14 @@ export class InvoicesService {
       status: i.status,
       rejectReason: i.rejectReason,
       issuedAt: i.issuedAt,
+      redFlushedAt: i.redFlushedAt,
+      redFlushedBy: i.redFlushedBy,
+      redFlushReason: i.redFlushReason,
       createdAt: i.createdAt,
-      fileUrl: i.status === "issued" ? `/api/v1/invoices/${i.id}/file` : null,
+      fileUrl:
+        i.status === "issued" || i.status === "red_flushed"
+          ? `/api/v1/invoices/${i.id}/file`
+          : null,
       hasStoredFile: Boolean(i.fileKey),
     };
   }

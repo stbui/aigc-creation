@@ -1,6 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
 import { ensureAdminLogin } from './support/admin-login';
+import {
+  createCouponFixture,
+  removeCouponFixture,
+  type CouponFixture,
+} from './support/marketing-fixtures';
 
 /**
  * 营销中心 E2E (admin-prd.md §3.12 B-64~B-67 / M11)。
@@ -32,6 +37,18 @@ async function pick(page: Page, label: string, option: string) {
 
 test.describe('营销中心', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
+
+  let couponFixture: CouponFixture | null = null;
+
+  test.beforeAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    couponFixture = await createCouponFixture();
+  });
+
+  test.afterAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    await removeCouponFixture();
+  });
 
   test('优惠券页渲染', async ({ page }) => {
     await login(page);
@@ -103,16 +120,10 @@ test.describe('营销中心', () => {
   test('编辑时无券码输入框 (改码等于让已发出的券失效)', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/coupons`);
-    await page
-      .getByTestId('admin-table-row')
-      .first()
-      .waitFor({ state: 'visible', timeout: 20000 })
-      .catch(() => undefined);
-
-    // 用列表里已有的券, 不依赖"新建成功" —— 建券要过唯一性校验,
-    // 重复运行时容易因码已存在而让本用例的前置条件变得不稳定
-    const edit = page.getByTestId('admin-table-row').getByRole('button', { name: '编辑' }).first();
-    test.skip((await edit.count()) === 0, '当前库中暂无优惠券');
+    const couponRow = page.getByTestId('admin-table-row').filter({ hasText: couponFixture!.code });
+    await expect(couponRow).toBeVisible({ timeout: 20000 });
+    const edit = couponRow.getByRole('button', { name: '编辑' });
+    await expect(edit).toBeVisible();
     await edit.click();
 
     const panel = page.getByRole('dialog', { name: /^编辑优惠券/ });
@@ -127,16 +138,11 @@ test.describe('营销中心', () => {
   test('券列表无删除入口 (已核销订单仍引用)', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/coupons`);
-    await page
-      .getByTestId('admin-table-row')
-      .first()
-      .waitFor({ state: 'visible', timeout: 20000 })
-      .catch(() => undefined);
-    await page.waitForTimeout(600);
+    const couponRow = page.getByTestId('admin-table-row').filter({ hasText: couponFixture!.code });
+    await expect(couponRow).toBeVisible({ timeout: 20000 });
 
     // 操作列只有「编辑」和「停用/启用」
-    const firstRow = page.getByTestId('admin-table-row').first();
-    const actions = await firstRow.locator('td:last-child button').allTextContents();
+    const actions = await couponRow.locator('td:last-child button').allTextContents();
     expect(actions.join(',')).not.toContain('删除');
   });
 

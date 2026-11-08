@@ -147,6 +147,33 @@ export class PaymentOrderListQueryDto extends PageQueryDto {
   to?: string;
 }
 
+export class PaymentExceptionListQueryDto extends PageQueryDto {
+  @IsOptional()
+  @IsIn(["open", "auto_refund_pending", "refunded", "manual_review", "closed", "all"])
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  providerId?: string;
+
+  @IsOptional()
+  @IsIn(["urgent", "normal"])
+  priority?: "urgent" | "normal";
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true" || value === "1")
+  @IsBoolean()
+  overdue?: boolean;
+}
+
+export class PaymentExceptionCloseDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(500)
+  resolution!: string;
+}
+
 
 export class ReconciliationRunDto {
   @IsIn(PAYMENT_PROVIDER_IDS, { message: "渠道非法" })

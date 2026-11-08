@@ -37,7 +37,6 @@ export function ImageExpandPage() {
   const [occupy, setOccupy] = useState(DEFAULT_OCCUPY);
   const [occupyText, setOccupyText] = useState('');
   const [position, setPosition] = useState('center');
-  const [sourceUrl, setSourceUrl] = useState('');
   const [previewRatio, setPreviewRatio] = useState('original');
   const [preparing, setPreparing] = useState(false);
 
@@ -49,7 +48,6 @@ export function ImageExpandPage() {
   const effectiveOccupy = effectiveOccupyOf(occupyText, occupy);
 
   const handleHistoryReuse = () => {
-    setSourceUrl('');
     setResult(null);
   };
 
@@ -115,18 +113,13 @@ export function ImageExpandPage() {
       formValid={!preparing && occupyValid}
       submitting={submitting}
       result={result}
+      resultView="product-card"
       resultTag={`占比 ${effectiveOccupy}% · ${positionLabelOf(position)}`}
-      resultCompare={
-        result?.status === 'succeeded' && result.url && sourceUrl
-          ? { beforeUrl: sourceUrl, beforeLabel: '原图', afterLabel: '扩图后' }
-          : undefined
-      }
       onSubmit={async (inputs, settings) => {
         if (!occupyValid) {
           message.error('原图占比需为 1-99% 的整数');
           return;
         }
-        setSourceUrl(inputs[0]?.url ?? '');
         setPreparing(true);
         try {
           const size = await loadImageSize(inputs[0]?.url ?? '');

@@ -1,3 +1,4 @@
+import './SitemapPage.css';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { isCapabilityVisible } from '../lib/capabilities';

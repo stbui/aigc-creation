@@ -53,7 +53,7 @@ export function ChannelModelHealthCell({
   if (!health || health.windows.day.samples === 0) {
     // 这一列只有 100px 出头：长句「近 24 小时无调用」会吃掉整列，细因放进提示
     return (
-      <span className="text-[12px] text-muted-foreground" title="近 24 小时没有终态调用">
+      <span className="text-[12px] text-muted-foreground" title="近 24 小时没有调用记录">
         无调用
       </span>
     );

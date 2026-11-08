@@ -24,6 +24,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { Jimp, JimpMime } = require('jimp');
 const { loadEnvOnce, resolveDbUrl } = require('./db-url');
+const { grantCredits, clearCredits } = require('./credit-fixture');
 const {
   signAssetUrl,
   verifyAssetUrl,
@@ -194,6 +195,7 @@ async function signedServer() {
 
     const project = await call('POST', '/projects', token, { name: `sign-${run}` });
     const projectId = project.data?.id;
+    check('临时项目创建', Boolean(projectId), project.message || '');
 
     const img = new Jimp({ width: 300, height: 200, color: 0x5546d8ff });
     const form = new FormData();
@@ -227,19 +229,53 @@ async function signedServer() {
       check('HEAD 也受同一套校验', headRes.status === 200, String(headRes.status));
     }
 
+    // 数据中心缩略图只来自真实产出任务，不能用手工伪造的 Asset 代替。
+    const catalog = await call('GET', '/models', token);
+    const model = (catalog.data?.models ?? []).find((m) => m.capability === 'main_image' && m.available === true);
+    check('存在可用的 main_image 前台模型', Boolean(model), `status=${catalog.httpStatus} ${catalog.message || ''}`);
+
+    let taskId = null;
+    if (model && asset?.id) {
+      await grantCredits(prisma, { userId, credits: 20, reason: '签名冒烟发放' });
+      const created = await call('POST', '/generate', token, {
+        projectId,
+        capability: 'main_image',
+        logicalModelId: model.id,
+        inputAssetIds: [asset.id],
+        params: { platform: 'taobao', size: '1k', ratio: '1:1' },
+      });
+      taskId = created.data?.taskId;
+      check('创建真实生成任务', Boolean(taskId), `status=${created.httpStatus} ${created.message || ''}`);
+    }
+
+    let task = null;
+    for (let i = 0; taskId && i < 90; i += 1) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const result = await call('GET', `/tasks/${taskId}`, token);
+      task = result.data;
+      if (task && (task.status === 'succeeded' || task.status === 'failed')) break;
+    }
+    check('产出任务成功', task?.status === 'succeeded', `status=${task?.status} err=${task?.errorCode ?? ''}`);
+
     // 后台缩略图走 displayUrl：开启签名后必须可直接渲染
     const stats = await call('GET', '/stats/overview', token);
-    const recent = Array.isArray(stats.data?.recentTasks) ? stats.data.recentTasks[0] : null;
+    const recent = Array.isArray(stats.data?.recentTasks)
+      ? stats.data.recentTasks.find((item) => item.id === taskId)
+      : null;
+    check('数据中心返回真实产出任务', Boolean(recent), `taskId=${taskId ?? 'null'}`);
+    check('数据中心缩略图已签名', Boolean(recent?.thumbnailUrl?.includes('sig=')), recent?.thumbnailUrl ?? 'null');
     if (recent?.thumbnailUrl) {
-      check('数据中心缩略图已签名', String(recent.thumbnailUrl).includes('sig='), recent.thumbnailUrl);
-    } else {
-      console.log('  SKIP  数据中心缩略图（本账号暂无产出任务）');
+      const thumb = await fetch(`${ROOT}${recent.thumbnailUrl}`);
+      const type = thumb.headers.get('content-type') || '';
+      check('数据中心签名缩略图可渲染', thumb.status === 200 && type.startsWith('image/'), `${thumb.status} ${type}`);
     }
   } finally {
     child.kill('SIGKILL');
     await new Promise((r) => setTimeout(r, 300));
     fs.closeSync(fd);
     if (userId) {
+      await clearCredits(prisma, userId).catch(() => {});
+      await prisma.generationTask.deleteMany({ where: { ownerId: userId } }).catch(() => {});
       await prisma.project.deleteMany({ where: { ownerId: userId } }).catch(() => {});
       await prisma.asset.deleteMany({ where: { ownerId: userId } }).catch(() => {});
       await prisma.user.deleteMany({ where: { id: userId } }).catch(() => {});

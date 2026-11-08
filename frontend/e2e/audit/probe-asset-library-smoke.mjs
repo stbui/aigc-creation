@@ -23,8 +23,8 @@ async function open(viewport, tok = token) {
   const ctx = await b.newContext({ viewport, locale: 'zh-CN' });
   if (tok) {
     await ctx.addInitScript((t) => {
-      localStorage.setItem('ecom_vision_token', t);
-      localStorage.setItem('ecom_vision_email', 'admin@admin.com');
+      localStorage.setItem('huojue_token', t);
+      localStorage.setItem('huojue_email', 'admin@admin.com');
     }, tok);
   }
   const p = await ctx.newPage();

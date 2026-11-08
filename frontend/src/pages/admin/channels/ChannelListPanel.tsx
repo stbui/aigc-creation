@@ -1,10 +1,12 @@
-import { Download, ListOrdered, Plus } from 'lucide-react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { Download, FileJson, ListOrdered, Plus, X } from 'lucide-react';
 import {
   StaleError,
   ActionButton,
   ClearableField,
   EmptyState,
   FilePicker,
+  IconButton,
   Panel,
   SelectField,
 } from '~/admin-ui/primitives';
@@ -43,7 +45,7 @@ interface ChannelListPanelProps {
 /**
  * 渠道工作台左列：渠道导航。
  *
- * 只负责「选哪条渠道」，260 足够放下名称 + 健康摘要；余量全部给右侧模型表。
+ * 只负责「选哪条渠道」，272 能在一行内放下状态、模型数与健康摘要；余量给右侧模型表。
  * 搜索与状态筛选都在本地过滤，切渠道只有一次点击。
  */
 export function ChannelListPanel({
@@ -72,10 +74,74 @@ export function ChannelListPanel({
   onImport,
   onReorder,
 }: ChannelListPanelProps) {
+  const activeRef = useRef<HTMLButtonElement | null>(null);
+
+  // 深链打开或键盘移动选中项时，只在目标不在视口内才滚动，避免普通点击抢滚动
+  useEffect(() => {
+    const node = activeRef.current;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+      node.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedId, visible]);
+
+  const handleChannelKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowDown') nextIndex = Math.min(index + 1, visible.length - 1);
+    else if (event.key === 'ArrowUp') nextIndex = Math.max(index - 1, 0);
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = visible.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    onSelect(visible[nextIndex].id);
+    const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="admin-channel-item"]',
+    );
+    buttons?.[nextIndex]?.focus();
+  };
+
   return (
     <Panel
-      title="渠道"
-      note={hasFilters ? `${visible.length} / ${rows.length} 个` : `共 ${rows.length} 个`}
+      title={
+        <span className="flex items-baseline gap-2">
+          渠道
+          <span className="text-xs font-normal text-muted-foreground tabular-nums">
+            {hasFilters ? `${visible.length} / ${rows.length} 个` : `共 ${rows.length} 个`}
+          </span>
+        </span>
+      }
+      extra={
+        <div className="flex items-center gap-0.5">
+          <FilePicker
+            compact
+            file={importFile}
+            accept="application/json,.json"
+            onPick={onPickImportFile}
+            onClear={onClearImportFile}
+            disabled={!writable || importing}
+            label="导入渠道"
+            hint="渠道导出文件"
+          />
+          <IconButton
+            icon={Download}
+            size="xs"
+            label="导出全部渠道"
+            disabled={exporting || rows.length === 0}
+            onClick={onExportAll}
+          />
+          <IconButton
+            icon={ListOrdered}
+            size="xs"
+            label="调整渠道顺序"
+            disabled={!writable}
+            onClick={onReorder}
+          />
+        </div>
+      }
     >
       <div className="flex flex-col gap-2">
         {/* 新建与导入导出都在列表旁：这三件事的目的都是「让列表里多一条渠道」 */}
@@ -89,54 +155,32 @@ export function ChannelListPanel({
         >
           新建渠道
         </ActionButton>
-        <div className="flex items-center gap-2">
-          <FilePicker
-            file={importFile}
-            accept="application/json,.json"
-            onPick={onPickImportFile}
-            onClear={onClearImportFile}
-            disabled={!writable || importing}
-            label="导入"
-            hint="JSON"
-          />
-          <span className="ml-auto shrink-0" title="导出全部渠道，不含 API Key 等凭证">
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={Download}
-              disabled={exporting || rows.length === 0}
-              onClick={onExportAll}
-            >
-              {exporting ? '导出中…' : '导出全部'}
-            </ActionButton>
-          </span>
-        </div>
         {importFile && (
-          <ActionButton
-            variant="default"
-            size="sm"
-            className="w-full justify-center"
-            disabled={importing || !writable}
-            onClick={onImport}
-          >
-            {importing ? '导入中…' : '开始导入'}
-          </ActionButton>
+          <div className="rounded-md border border-border bg-muted/50 p-2">
+            <div className="flex min-w-0 items-center gap-1.5 text-xs">
+              <FileJson className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-foreground" title={importFile.name}>
+                {importFile.name}
+              </span>
+              <IconButton
+                icon={X}
+                size="xs"
+                label="移除已选文件"
+                disabled={importing}
+                onClick={onClearImportFile}
+              />
+            </div>
+            <ActionButton
+              variant="default"
+              size="sm"
+              className="mt-2 w-full justify-center"
+              disabled={importing || !writable}
+              onClick={onImport}
+            >
+              {importing ? '导入中…' : '开始导入'}
+            </ActionButton>
+          </div>
         )}
-        <ClearableField
-          ariaLabel="搜索渠道"
-          value={keyword}
-          onChange={onKeywordChange}
-          placeholder="搜索渠道名或 Base URL"
-        />
-        <SelectField
-          ariaLabel="渠道状态"
-          value={status}
-          options={CHANNEL_STATUS_OPTIONS}
-          placeholder="全部状态"
-          clearLabel="全部状态"
-          allowClear
-          onChange={onStatusChange}
-        />
 
         {error && (
           <div className="py-2">
@@ -152,21 +196,16 @@ export function ChannelListPanel({
          * 改高（或浏览器放大字号）都会让列表底边错位；且它视口变高时不跟随
          * 增长（900px 以上恒为 316px），长列表仍要在小窗里滚两次。
          *
-         * 外壳内容区 `.adm-content` 是页面级滚动（`self-start` + `overflow-y-auto`），
-         * 后台其余 30 余个页面也都是这个动线；左列跟着整页滚才与它们一致。
+         * 外壳内容区 `.adm-content` 是页面级滚动；工作台只把左列容器设为 sticky，
+         * 让右侧长内容滚动时仍能换渠道。列表自身保持自然高度，不与页面抢滚动。
          */}
-        <div className="flex flex-col gap-1" aria-busy={loading}>
+        <div className="flex flex-col gap-0.5" aria-busy={loading}>
           {loading && rows.length === 0 && (
             <p className="py-6 text-center text-xs text-muted-foreground">加载中…</p>
           )}
           {!loading && !error && visible.length === 0 && (
             <EmptyState
-              title={hasFilters ? '没有匹配的渠道' : '还没有渠道'}
-              description={
-                hasFilters
-                  ? '调整搜索词或状态筛选，或清除筛选查看全部渠道。'
-                  : '新建渠道并导入模型后，C 端才会有可选模型。'
-              }
+              title={hasFilters ? '没有匹配的渠道' : '暂无渠道'}
               action={
                 hasFilters ? (
                   <ActionButton variant="secondary" size="sm" onClick={onClearFilters}>
@@ -176,7 +215,7 @@ export function ChannelListPanel({
               }
             />
           )}
-          {visible.map((row) => {
+          {visible.map((row, index) => {
             const active = row.id === selectedId;
             const stats = healthByChannel.get(row.id);
             const rate = stats && stats.samples > 0 ? stats.success / stats.samples : null;
@@ -188,6 +227,7 @@ export function ChannelListPanel({
                 data-testid="admin-channel-item"
                 aria-pressed={active}
                 aria-controls="admin-channel-detail"
+                title={`${row.name}\n${row.baseUrl}`}
                 /*
                  * 未选中项保持透明，选中态只给浅底 + 内描边；两者必须区分开，
                  * 否则整列看起来都像选中。
@@ -198,43 +238,51 @@ export function ChannelListPanel({
                   active && 'bg-accent ring-1 ring-inset ring-brand/30 hover:bg-accent',
                 )}
                 onClick={() => onSelect(row.id)}
+                onKeyDown={(event) => handleChannelKeyDown(event, index)}
+                ref={active ? activeRef : undefined}
               >
                 <span className="flex w-full min-w-0 flex-col gap-1">
-                  <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="flex min-w-0 items-center gap-2">
                     <span
                       data-testid="admin-channel-name"
-                      className="truncate text-[13px] font-medium text-foreground"
+                      className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground"
                     >
                       {row.name}
                     </span>
+                    {!row.hasApiKey && (
+                      <span className="shrink-0 text-[12px] font-medium text-danger-text">凭证缺失</span>
+                    )}
                   </span>
-                  <span className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                    {/* 状态用圆点：每行一颗绿色「启用」胶囊会把整列刷成绿色，异常项反而看不见 */}
-                    <span className="inline-flex items-center gap-1">
-                      <span
-                        className={`size-1.5 shrink-0 rounded-full ${
-                          row.enabled ? 'bg-success-text' : 'bg-muted-foreground'
-                        }`}
-                        aria-hidden
-                      />
-                      {row.enabled ? '启用' : '停用'}
+                  <span className="flex items-center justify-between gap-2 text-[12px] text-muted-foreground">
+                    <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                      {/* 状态用圆点：每行一颗绿色「启用」胶囊会把整列刷成绿色，异常项反而看不见 */}
+                      <span className="inline-flex items-center gap-1">
+                        <span
+                          className={`size-1.5 shrink-0 rounded-full ${
+                            row.enabled ? 'bg-success-text' : 'bg-muted-foreground'
+                          }`}
+                          aria-hidden
+                        />
+                        {row.enabled ? '启用' : '停用'}
+                      </span>
+                      <span className="text-border" aria-hidden>·</span>
+                      <span className="tabular-nums">{row.modelCosts?.length ?? 0} 个模型</span>
                     </span>
-                    <span className="tabular-nums">{row.modelCosts?.length ?? 0} 个模型</span>
                     {rate !== null && (
                       <span
-                        className={
+                        className={cn(
+                          'shrink-0 whitespace-nowrap tabular-nums',
                           tone === 'success'
                             ? 'text-success-text'
                             : tone === 'warn'
                               ? 'text-warn-text'
-                              : 'text-danger-text'
-                        }
+                              : 'text-danger-text',
+                        )}
                         title={`近 24 小时 ${stats?.samples ?? 0} 次生成请求，成功 ${stats?.success ?? 0} 次`}
                       >
-                        {formatRate(rate)}
+                        24h {formatRate(rate)}
                       </span>
                     )}
-                    {!row.hasApiKey && <span className="text-danger-text">未配置 Key</span>}
                   </span>
                 </span>
               </button>
@@ -242,18 +290,6 @@ export function ChannelListPanel({
           })}
         </div>
 
-        <div className="border-t border-border pt-2">
-          <ActionButton
-            variant="secondary"
-            size="sm"
-            icon={ListOrdered}
-            className="w-full"
-            disabled={!writable}
-            onClick={onReorder}
-          >
-            调整渠道顺序
-          </ActionButton>
-        </div>
       </div>
     </Panel>
   );

@@ -8,11 +8,14 @@ import {
   paymentActions,
 } from '../constants';
 import {
+  buildPaymentProductPayload,
   creditsText,
   moneyText,
+  paymentProductPriceToCents,
   productSaleStatusOf,
   strategyText,
 } from '../utils';
+import { EMPTY_PAYMENT_PRODUCT_DRAFT } from '../constants';
 
 /**
  * 支付充值的展示口径。
@@ -52,13 +55,19 @@ describe('PAYMENT_STATUS_META', () => {
 describe('paymentActions', () => {
   it('未终态订单可查单可关单', () => {
     for (const status of ['created', 'pending', 'create_failed', 'closing'] as const) {
-      expect(paymentActions(status)).toEqual({ canQuery: true, canClose: true });
+      expect(paymentActions(status)).toEqual({
+        canQuery: true,
+        canClose: true,
+      });
     }
   });
 
   it('终态订单两个动作都没有', () => {
     for (const status of ['closed', 'credited', 'refunded', 'partial_refunded'] as const) {
-      expect(paymentActions(status)).toEqual({ canQuery: false, canClose: false });
+      expect(paymentActions(status)).toEqual({
+        canQuery: false,
+        canClose: false,
+      });
     }
   });
 });
@@ -75,15 +84,7 @@ describe('标签映射', () => {
   });
 
   it('订单筛选包含七渠道，对账筛选仍只保留可自动对账渠道', () => {
-    expect(ORDER_PROVIDER_IDS).toEqual([
-      'sandbox',
-      'alipay',
-      'wechat',
-      'paypal',
-      'stripe',
-      'epay',
-      'zpay',
-    ]);
+    expect(ORDER_PROVIDER_IDS).toEqual(['sandbox', 'alipay', 'wechat', 'paypal', 'stripe', 'epay', 'zpay']);
     expect(RECONCILIATION_PROVIDER_IDS).toEqual(['sandbox', 'alipay', 'wechat']);
   });
 
@@ -229,5 +230,86 @@ describe('productSaleStatusOf', () => {
         stockRemaining: 10,
       }),
     ).toBe('on_sale');
+  });
+});
+
+describe('paymentProductPriceToCents', () => {
+  it('元 / 美元文本按两位小数换算为整数分', () => {
+    expect(paymentProductPriceToCents('9.90')).toBe(990);
+    expect(paymentProductPriceToCents(' 9.9 ')).toBe(990);
+    expect(paymentProductPriceToCents('0.01')).toBe(1);
+  });
+
+  it('非法或超过两位小数的金额返回 null', () => {
+    expect(paymentProductPriceToCents('')).toBeNull();
+    expect(paymentProductPriceToCents('9.999')).toBeNull();
+    expect(paymentProductPriceToCents('-1')).toBeNull();
+    expect(paymentProductPriceToCents('abc')).toBeNull();
+  });
+});
+
+describe('buildPaymentProductPayload', () => {
+  it('按售卖策略只提交对应字段', () => {
+    const result = buildPaymentProductPayload(
+      {
+        ...EMPTY_PAYMENT_PRODUCT_DRAFT,
+        name: ' 2000 积分包 ',
+        price: '9.90',
+        originalPrice: '19.90',
+        credits: '2000',
+        saleStrategy: 'periodic',
+        periodDays: '30',
+        periodPurchaseLimit: '2',
+      },
+      true,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toMatchObject({
+      name: '2000 积分包',
+      priceCents: 990,
+      originalPriceCents: 1990,
+      credits: 2000,
+      saleStrategy: 'periodic',
+      periodDays: 30,
+      periodPurchaseLimit: 2,
+      status: 'offline',
+    });
+    expect(result.payload).not.toHaveProperty('stockTotal');
+    expect(result.payload).not.toHaveProperty('saleStartAt');
+  });
+
+  it('库存策略必须填写正数库存', () => {
+    const result = buildPaymentProductPayload(
+      {
+        ...EMPTY_PAYMENT_PRODUCT_DRAFT,
+        price: '9.90',
+        credits: '100',
+        saleStrategy: 'inventory',
+        stockTotal: '0',
+      },
+      true,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: '库存商品必须填写大于 0 的库存总量',
+    });
+  });
+
+  it('没有美元渠道时允许保存下架商品，但不能上架', () => {
+    const draft = {
+      ...EMPTY_PAYMENT_PRODUCT_DRAFT,
+      price: '9.90',
+      credits: '100',
+      currency: 'USD' as const,
+    };
+
+    expect(buildPaymentProductPayload(draft, false).ok).toBe(true);
+    expect(buildPaymentProductPayload({ ...draft, enabled: true }, false)).toEqual({
+      ok: false,
+      error: '当前没有已配置的美元支付渠道，无法上架美元商品',
+    });
   });
 });

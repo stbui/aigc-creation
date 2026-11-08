@@ -64,8 +64,8 @@ export function ChannelUpstreamDialog({
         if (!next) onClose();
       }}
       width={760}
-      title="选择要导入的模型"
-      description="只写入勾选项；导入后默认停用，需要补能力合同与价格后再启用"
+      title="导入服务商模型"
+      description="仅添加勾选的模型；导入后默认停用，设置能力与价格后再启用"
       footer={
         <>
           <ActionButton variant="secondary" size="sm" disabled={importing} onClick={onClose}>
@@ -85,10 +85,10 @@ export function ChannelUpstreamDialog({
     >
       <div className="flex flex-col gap-3">
         <ClearableField
-          ariaLabel="搜索上游模型"
+          ariaLabel="搜索服务商模型"
           value={keyword}
           onChange={setKeyword}
-          placeholder="搜索模型标识或显示名"
+          placeholder="搜索模型编号或用户端名称"
         />
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
           <span className="text-xs text-muted-foreground">
@@ -125,7 +125,7 @@ export function ChannelUpstreamDialog({
         <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto rounded-lg border border-border p-2">
           {visible.length === 0 ? (
             <p className="py-6 text-center text-xs text-muted-foreground">
-              {keyword.trim() ? `没有匹配「${keyword.trim()}」的模型` : '上游没有返回可用模型'}
+              {keyword.trim() ? `没有匹配「${keyword.trim()}」的模型` : '服务商没有返回可用模型'}
             </p>
           ) : (
             visible.map((item) => {
@@ -140,7 +140,7 @@ export function ChannelUpstreamDialog({
                       checked ? [...prev, item.id] : prev.filter((id) => id !== item.id),
                     )
                   }
-                  ariaLabel={`选择上游模型 ${item.id}`}
+                  ariaLabel={`选择服务商模型 ${item.id}`}
                   className="w-full rounded-lg px-2 py-1.5 hover:bg-muted"
                   label={
                     <span className="flex min-w-0 flex-1 items-center gap-2">

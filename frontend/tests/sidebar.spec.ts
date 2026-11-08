@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { prepareGuestSession } from './support/guest-session';
 
 /**
  * 左侧菜单复原回归。
@@ -9,13 +10,8 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 const API = process.env.E2E_API ?? 'http://localhost:4100';
-const GUEST_PROMO_DISMISS_KEY = 'ecom-guest-promo-dismissed-v1';
-
 async function skipGuestPromo(page: Page) {
-  await page.addInitScript(
-    ([key]) => localStorage.setItem(key as string, '1'),
-    [GUEST_PROMO_DISMISS_KEY],
-  );
+  await prepareGuestSession(page, { dismissPromo: true });
 }
 
 async function registerUser(request: APIRequestContext) {
@@ -62,7 +58,9 @@ test.describe('左侧菜单复原', () => {
       await page.locator('.app-sider-wrap .workspace-menu-section-label').allTextContents(),
     ).toEqual(['AI视频', '电商生图', 'AI修图', '数据中心']);
     expect(
-      await page.locator('.app-sider-wrap .workspace-side-menu-btn .side-menu-label').allTextContents(),
+      await page
+        .locator('.app-sider-wrap .workspace-side-menu-btn .side-menu-label')
+        .allTextContents(),
     ).toEqual([
       '工作台',
       '我的作品',
@@ -74,6 +72,7 @@ test.describe('左侧菜单复原', () => {
       '创意生图',
       '多图融合',
       '商品SKU图',
+      'AI 带货图文',
       '局部重绘',
       '一键抠图',
       '去除水印',
@@ -131,9 +130,9 @@ test.describe('左侧菜单复原', () => {
     await expect(toggle).toHaveCSS('width', '77px');
     await expect(toggle).toHaveCSS('height', '24px');
     await expect(toggle).toHaveCSS('font-size', '12px');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(
-      false,
-    );
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    ).toBe(false);
   });
 
   test('断点精确落在 1366 / 1367', async ({ page }) => {
@@ -178,8 +177,8 @@ test.describe('左侧菜单复原', () => {
     await page.goto(`${UI}/workbench`);
     await page.evaluate(
       ([value, userEmail]) => {
-        localStorage.setItem('ecom_vision_token', value as string);
-        localStorage.setItem('ecom_vision_email', userEmail as string);
+        localStorage.setItem('huojue_token', value as string);
+        localStorage.setItem('huojue_email', userEmail as string);
       },
       [token, email],
     );
@@ -189,10 +188,13 @@ test.describe('左侧菜单复原', () => {
     await expect(page).toHaveURL(/\/tickets$/);
     await expect(page.locator('.ticket-compose')).toBeVisible();
     await expect(page.getByLabel('标题')).toHaveValue('产品建议');
-    await expect(page.getByRole('combobox', { name: /问题类型.*其他/ })).toBeVisible();
+    const type = page.getByRole('combobox', { name: '问题类型' });
+    await expect(type).toBeVisible();
+    await expect(type).toContainText('其他');
 
     await page.locator('.app-sider-wrap .workspace-customer-service-trigger').click();
-    await expect(page.getByRole('combobox', { name: /问题类型.*咨询/ })).toBeVisible();
+    await expect(type).toBeVisible();
+    await expect(type).toContainText('咨询');
   });
 
   test('390 移动抽屉保留完整分组与真实入口，无横向溢出', async ({ page }) => {
@@ -204,13 +206,13 @@ test.describe('左侧菜单复原', () => {
     const drawer = page.locator('.app-mobile-drawer');
     await expect(drawer).toBeVisible();
     await expect(drawer.locator('.workspace-menu-section-toggle')).toHaveCount(4);
-    await expect(drawer.locator('.workspace-side-menu-btn')).toHaveCount(20);
+    await expect(drawer.locator('.workspace-side-menu-btn')).toHaveCount(21);
     await expect(drawer.getByText('AI视频', { exact: true })).toBeVisible();
     await expect(drawer.getByText('图生视频', { exact: true })).toBeVisible();
     await expect(drawer.getByText('产品建议', { exact: true })).toBeAttached();
     await expect(drawer.getByText('联系客服', { exact: true })).toBeAttached();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(
-      false,
-    );
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    ).toBe(false);
   });
 });

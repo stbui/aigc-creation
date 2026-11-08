@@ -1,0 +1,243 @@
+/**
+ * MobileUploadPage 页面样式 —— 由 `./MobileUploadPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+.mup-card {
+  box-sizing: border-box;
+  width: min(520px, 100%);
+  padding: 24px;
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.9608);
+  border: 1px solid rgb(255 255 255 / 0.8);
+  box-shadow: 0 24px 70px rgb(70 55 130 / 0.1412);
+}
+
+.mup-card > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--mup-text-brand-1);
+}
+
+.mup-icon {
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  padding: 9px;
+  border-radius: 12px;
+  background: var(--mup-surface-brand-2);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.mup-card header small {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--mup-text-5);
+}
+
+.mup-card h1 {
+  margin: 2px 0 0;
+  font-size: 22px;
+  line-height: 28px;
+  color: var(--mup-text-2);
+}
+
+.mup-tip {
+  margin: 18px 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--mup-surface-brand-4);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--mup-text-3);
+}
+
+.mup-message,
+.mup-error {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.mup-message {
+  color: var(--mup-text-success-1);
+  background: var(--mup-surface-success);
+}
+
+.mup-error {
+  color: var(--mup-text-danger-1);
+  background: var(--mup-surface-danger);
+}
+
+.mup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mup-preview,
+.mup-picker {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.mup-preview {
+  background: var(--mup-surface);
+}
+
+.mup-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mup-preview > span {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(20 18 30 / 0.702);
+  color: var(--card-bg);
+  font-size: 12px;
+}
+
+.mup-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(20 18 30 / 0.702);
+  color: var(--card-bg);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mup-order {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  display: flex;
+  overflow: hidden;
+  border-radius: 7px;
+  background: rgb(20 18 30 / 0.7216);
+}
+
+.mup-order button {
+  width: 29px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--card-bg);
+  cursor: pointer;
+  padding: 0;
+}
+
+.mup-order button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.mup-picker {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  color: var(--mup-text-brand-2);
+  background: var(--mif-surface-drag);
+  border: 1.5px dashed var(--mup-border-brand);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.mup-picker strong {
+  font-size: 13px;
+}
+
+.mup-picker small {
+  font-size: 12px;
+  color: var(--mup-text-4);
+}
+
+.mup-summary {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--mup-text-5);
+  text-align: center;
+}
+
+.mup-submit {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  margin-top: 20px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--surface-brand-2), var(--mup-surface-brand-1));
+  color: var(--card-bg);
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mup-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 成功 / 失败 / 参数缺失态: 居中列 */
+.mup-card.is-success,
+.mup-card.is-error {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.mup-card.is-success > svg {
+  color: var(--mup-text-success-2);
+}
+
+.mup-card.is-error > svg {
+  color: var(--mup-text-danger-2);
+}
+
+.mup-card.is-success p,
+.mup-card.is-error p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-7);
+}

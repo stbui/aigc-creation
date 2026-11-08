@@ -1,41 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, FolderOpen, Grid3x3, List } from 'lucide-react';
-import {
-  ActionButton,
-  AppliedFilters,
-  BatchBar,
-  BatchResultModal,
-  CheckboxField,
-  ClearableField,
-  FilterActions,
-  FilterBar,
-  PageHeader,
-  Panel,
-  SegmentedGroup,
-  SelectField,
-  StaleError,
-  type AppliedFilter,
-} from '~/admin-ui/primitives';
+import { PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
 import { adminAssetsApi } from './api';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
 import {
   BACKEND_LABEL,
-  BACKEND_OPTIONS,
   GRID_PAGE_SIZE,
-  KIND_OPTIONS,
-  STATUS_OPTIONS,
   TABLE_PAGE_SIZE,
   type AssetDeleteTarget,
   type AssetRow,
 } from './constants';
-import { assetLabel, fmtBytes, fmtFormat, thumbOf } from './utils';
-import { AssetStats } from './AssetStats';
+import { assetLabel, fmtBytes, thumbOf } from './utils';
+import { AssetFilterBar } from './AssetFilterBar';
 import { AssetGrid } from './AssetGrid';
 import { AssetTable } from './AssetTable';
 import { AssetPreview } from './AssetPreview';
 import { AssetDeleteConfirm } from './AssetDeleteConfirm';
-import type { AdminAssetListResult, AdminAssetStats, AssetStatus, BatchSummary } from '../../../types/api';
+import { AssetViewToolbar } from './AssetViewToolbar';
+import type { AdminAssetListResult, AssetStatus } from '../../../types/api';
 
 /**
  * 素材管理 (B-22~B-26)。
@@ -46,10 +28,11 @@ import type { AdminAssetListResult, AdminAssetStats, AssetStatus, BatchSummary }
  * 格式、存储后端、所属用户都在列上，一页 20 行。切换视图同时改页码与页大小，
  * 否则从网格第 4 页切到表格会落在越界页上显示空表。
  *
- * ## 批量动作要逐条结果
+ * ## 批量动作结果用 toast 汇总
  *
  * 素材可能在这几秒内被用户删掉或被别的运营下架 —— 只回一个总数时，少处理的
- * 几条会被「已处理 N 条」掩盖。批量接口回逐条结果，弹窗把失败原因摊开。
+ * 几条会被「已处理 N 条」掩盖。批量接口仍回逐条结果，页面用 toast 报成功 /
+ * 失败条数，不再弹一次结果框；失败行可回列表按状态筛选处理。
  *
  * ## 删除必须二次确认
  *
@@ -73,9 +56,7 @@ export function AdminAssetsPage() {
   const initialStatus = rawStatus === 'visible' || rawStatus === 'hidden' ? rawStatus : undefined;
   const rawBackend = searchParams.get('backend');
   const initialBackend =
-    rawBackend && Object.prototype.hasOwnProperty.call(BACKEND_LABEL, rawBackend)
-      ? rawBackend
-      : undefined;
+    rawBackend && Object.prototype.hasOwnProperty.call(BACKEND_LABEL, rawBackend) ? rawBackend : undefined;
   const initialView: 'grid' | 'table' = searchParams.get('view') === 'table' ? 'table' : 'grid';
 
   const [keyword, setKeyword] = useState(initialKeyword);
@@ -85,14 +66,11 @@ export function AdminAssetsPage() {
   /** B-25: 缩略图网格与表格视图切换。网格适合看图，表格适合查属性 */
   const [view, setView] = useState<'grid' | 'table'>(initialView);
 
-  const [stats, setStats] = useState<AdminAssetStats | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AssetDeleteTarget | null>(null);
-  const [batchSummary, setBatchSummary] = useState<BatchSummary<unknown> | null>(null);
-  const [batchTitle, setBatchTitle] = useState('');
   const appliedQ = useRef(initialKeyword);
 
   const fetcher = useCallback(
@@ -108,14 +86,13 @@ export function AdminAssetsPage() {
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } =
-    useAdminList<AdminAssetListResult>(fetcher, {
-      pageSize: initialView === 'grid' ? GRID_PAGE_SIZE : TABLE_PAGE_SIZE,
-      ...(initialKeyword ? { keyword: initialKeyword } : {}),
-      ...(initialKind ? { kind: initialKind } : {}),
-      ...(initialStatus ? { status: initialStatus } : {}),
-      ...(initialBackend ? { backend: initialBackend } : {}),
-    });
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<AdminAssetListResult>(fetcher, {
+    pageSize: initialView === 'grid' ? GRID_PAGE_SIZE : TABLE_PAGE_SIZE,
+    ...(initialKeyword ? { keyword: initialKeyword } : {}),
+    ...(initialKind ? { kind: initialKind } : {}),
+    ...(initialStatus ? { status: initialStatus } : {}),
+    ...(initialBackend ? { backend: initialBackend } : {}),
+  });
   const items = data?.items ?? [];
 
   const previewItems = useMemo(
@@ -128,13 +105,10 @@ export function AdminAssetsPage() {
         height: a.height,
         createdAt: a.createdAt,
         meta: [
-          assetLabel(a),
-          a.status === 'visible' ? '已上架' : '已下架',
-          fmtFormat(a.format),
+          // 只保留技术信息：大小与存储位置。能力、上下架状态、格式、所属用户、
+          // 项目都属于业务属性，放在查看器里会干扰看图。
           fmtBytes(a.sizeBytes),
           BACKEND_LABEL[a.storageBackend] ?? a.storageBackend,
-          a.ownerEmail,
-          a.projectName,
         ],
       })),
     [items],
@@ -213,13 +187,6 @@ export function AdminAssetsPage() {
     view,
   });
 
-  useEffect(() => {
-    adminAssetsApi
-      .stats()
-      .then(setStats)
-      .catch(() => undefined);
-  }, [reload]);
-
   const applyFilters = useCallback(() => {
     appliedQ.current = keyword.trim();
     setSelected([]);
@@ -238,7 +205,12 @@ export function AdminAssetsPage() {
     setStatus(undefined);
     setBackend(undefined);
     setSelected([]);
-    setQuery({ keyword: undefined, kind: undefined, status: undefined, backend: undefined });
+    setQuery({
+      keyword: undefined,
+      kind: undefined,
+      status: undefined,
+      backend: undefined,
+    });
   }, [setQuery]);
 
   const handleViewChange = (next: 'grid' | 'table') => {
@@ -248,16 +220,15 @@ export function AdminAssetsPage() {
     setPreviewId(null);
     // 网格适合扫图，一页 60 张；表格适合查属性，一页 20 行。页码回到 1，
     // 否则从网格第 4 页切到表格时可能直接落在越界页。
-    setQuery({ page: 1, pageSize: next === 'grid' ? GRID_PAGE_SIZE : TABLE_PAGE_SIZE });
+    setQuery({
+      page: 1,
+      pageSize: next === 'grid' ? GRID_PAGE_SIZE : TABLE_PAGE_SIZE,
+    });
   };
 
   const toggleSelected = (id: string, checked: boolean) => {
     setSelected((current) =>
-      checked
-        ? current.includes(id)
-          ? current
-          : [...current, id]
-        : current.filter((item) => item !== id),
+      checked ? (current.includes(id) ? current : [...current, id]) : current.filter((item) => item !== id),
     );
   };
 
@@ -295,8 +266,12 @@ export function AdminAssetsPage() {
     setBusy(true);
     try {
       const summary = await adminAssetsApi.batch(selected, action);
-      setBatchTitle(action === 'hide' ? '批量下架结果' : '批量恢复结果');
-      setBatchSummary(summary);
+      const verb = action === 'hide' ? '下架' : '恢复';
+      if (summary.failed > 0) {
+        toast.warning(`批量${verb}完成：成功 ${summary.succeeded} 张，失败 ${summary.failed} 张`);
+      } else {
+        toast.success(`批量${verb}完成：成功 ${summary.succeeded} 张`);
+      }
       setSelected([]);
       reload();
     } catch (e) {
@@ -335,8 +310,11 @@ export function AdminAssetsPage() {
         reload();
       } else {
         const summary = await adminAssetsApi.batch(selected, 'delete');
-        setBatchTitle('批量删除结果');
-        setBatchSummary(summary);
+        if (summary.failed > 0) {
+          toast.warning(`批量删除完成：成功 ${summary.succeeded} 张，失败 ${summary.failed} 张`);
+        } else {
+          toast.success(`批量删除完成：成功 ${summary.succeeded} 张`);
+        }
         setSelected([]);
         reload();
       }
@@ -353,163 +331,48 @@ export function AdminAssetsPage() {
 
   return (
     <>
-      <PageHeader
-        title="素材管理"
-        description="管理全平台用户的上传与生成素材；下架后用户端不可见但可恢复"
-        actions={
-          <>
-            <SegmentedGroup
-              ariaLabel="切换视图"
-              value={view}
-              onChange={(next) => handleViewChange(next as 'grid' | 'table')}
-              options={[
-                {
-                  value: 'grid',
-                  label: (
-                    <span className="inline-flex items-center gap-1" title="缩略图网格">
-                      <Grid3x3 className="size-3.5" aria-hidden />
-                      网格
-                    </span>
-                  ),
-                },
-                {
-                  value: 'table',
-                  label: (
-                    <span className="inline-flex items-center gap-1" title="表格视图">
-                      <List className="size-3.5" aria-hidden />
-                      表格
-                    </span>
-                  ),
-                },
-              ]}
-            />
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                icon={Download}
-                onClick={() => void exportAssets()}
-              >
-                导出 CSV
-              </ActionButton>
-            )}
-          </>
-        }
-      />
-
-      {stats && <AssetStats stats={stats} />}
+      <PageHeader title="素材管理" />
 
       {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
       {error && data && <StaleError error={error} onRetry={reload} />}
 
-      <FilterBar>
-        <ClearableField
-          className="w-56"
-          placeholder="ID / 能力关键词"
-          ariaLabel="按素材 ID 或能力关键词筛选"
-          value={keyword}
-          onChange={setKeyword}
-          onEnter={applyFilters}
-        />
-        <SelectField
-          className="w-32"
-          ariaLabel="按类型筛选"
-          placeholder="类型"
-          allowClear
-          clearLabel="全部类型"
-          value={kind}
-          onChange={setKind}
-          options={KIND_OPTIONS}
-        />
-        <SelectField
-          className="w-32"
-          ariaLabel="按状态筛选"
-          placeholder="状态"
-          allowClear
-          clearLabel="全部状态"
-          value={status}
-          onChange={setStatus}
-          options={STATUS_OPTIONS}
-        />
-        <SelectField
-          className="w-36"
-          ariaLabel="按存储后端筛选"
-          placeholder="存储后端"
-          allowClear
-          clearLabel="全部存储后端"
-          value={backend}
-          onChange={setBackend}
-          options={BACKEND_OPTIONS}
-        />
-        <FilterActions>
-          <ActionButton variant="default" onClick={applyFilters}>
-            查询
-          </ActionButton>
-          <ActionButton
-            variant="secondary"
-            onClick={resetFilters}
-            disabled={appliedChips.length === 0 && !keyword && !kind && !status && !backend}
-          >
-            重置
-          </ActionButton>
-        </FilterActions>
-        <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
-      </FilterBar>
-
-      <BatchBar count={selected.length} unit="张素材">
-        {view === 'grid' && (
-          <CheckboxField
-            size="sm"
-            checked={allPageSelected}
-            indeterminate={somePageSelected}
-            label={allPageSelected ? '取消全选' : '全选本页'}
-            onChange={toggleSelectPage}
-          />
-        )}
-        {can('asset.hide') && (
-          <>
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              onClick={() => void runBatch('hide')}
-              disabled={busy}
-            >
-              批量下架
-            </ActionButton>
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              onClick={() => void runBatch('show')}
-              disabled={busy}
-            >
-              批量恢复
-            </ActionButton>
-          </>
-        )}
-        {can('asset.delete') && (
-          <ActionButton
-            variant="destructive"
-            size="sm"
-            onClick={() => void runBatch('delete')}
-            disabled={busy}
-          >
-            批量删除
-          </ActionButton>
-        )}
-        <ActionButton variant="ghost" size="sm" onClick={() => setSelected([])}>
-          清空选择
-        </ActionButton>
-      </BatchBar>
+      <AssetFilterBar
+        keyword={keyword}
+        kind={kind}
+        status={status}
+        backend={backend}
+        appliedChips={appliedChips}
+        onKeywordChange={setKeyword}
+        onKindChange={setKind}
+        onStatusChange={setStatus}
+        onBackendChange={setBackend}
+        onApply={applyFilters}
+        onReset={resetFilters}
+      />
 
       <Panel
         title={view === 'grid' ? '缩略图网格' : '素材列表'}
         note={`${total} 张`}
         extra={
-          view === 'grid' && items.length > 0 ? (
-            <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <FolderOpen className="size-3.5" aria-hidden />
-              每页 {pageSize} 张
-            </span>
-          ) : undefined
+          <AssetViewToolbar
+            view={view}
+            itemCount={items.length}
+            selectedCount={selected.length}
+            selectable={selectable}
+            canHide={can('asset.hide')}
+            canDelete={can('asset.delete')}
+            canExport={can('data.export')}
+            busy={busy}
+            allPageSelected={allPageSelected}
+            somePageSelected={somePageSelected}
+            onBatchHide={() => void runBatch('hide')}
+            onBatchShow={() => void runBatch('show')}
+            onBatchDelete={() => void runBatch('delete')}
+            onClearSelection={() => setSelected([])}
+            onToggleSelectPage={toggleSelectPage}
+            onViewChange={handleViewChange}
+            onExport={() => void exportAssets()}
+          />
         }
       >
         {view === 'grid' ? (
@@ -522,16 +385,12 @@ export function AdminAssetsPage() {
             total={total}
             selected={selected}
             selectable={selectable}
-            statusBusyId={statusBusyId}
-            canHide={can('asset.hide')}
-            canDelete={can('asset.delete')}
             hasFilter={appliedChips.length > 0}
             onRetry={reload}
             onResetFilters={resetFilters}
             onToggleSelected={toggleSelected}
+            onSelectMany={setSelected}
             onPreview={setPreviewId}
-            onToggleStatus={(row, next) => void toggleStatus(row, next)}
-            onDelete={requestDelete}
             onPageChange={(next) => {
               setSelected([]);
               setPage(next);
@@ -588,13 +447,6 @@ export function AdminAssetsPage() {
           onConfirm={() => void confirmDelete()}
         />
       )}
-
-      <BatchResultModal
-        open={batchSummary !== null}
-        title={batchTitle}
-        summary={batchSummary}
-        onClose={() => setBatchSummary(null)}
-      />
     </>
   );
 }

@@ -1,19 +1,19 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Download, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import {
   ActionButton,
+  ExportCsvButton,
+  useAdminExport,
   AdminDataTable,
   AppliedFilters,
   ClearableField,
-  EmptyState,
   FilterActions,
   FilterBar,
-  ListError,
   PageHeader,
   Panel,
-  SkeletonBody,
-  StatCard,
+  RefreshButton,
+  StatCards,
   StaleError,
   type AdminColumn,
   type AppliedFilter,
@@ -62,12 +62,9 @@ export function AdminCreditsPage() {
   const [detail, setDetail] = useState<AdminCreditRow | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useCreditDirectory(
-    initialEmail,
-    initialUserId,
-  );
+  const { data, loading, error, params, setQuery, setPage, reload } = useCreditDirectory(initialEmail, initialUserId);
 
   // 只同步已生效的筛选, 不同步分页
   useAdminUrlFilterSync({
@@ -87,10 +84,9 @@ export function AdminCreditsPage() {
     );
   }, [rows]);
 
-  const hasFilter = Boolean(email || userId);
+  const hasFilter = Boolean(params.email || params.userId);
 
-  const applyQuery = () =>
-    setQuery({ email: email.trim() || undefined, userId: userId.trim() || undefined });
+  const applyQuery = () => setQuery({ email: email.trim() || undefined, userId: userId.trim() || undefined });
 
   const reset = () => {
     setEmail('');
@@ -127,20 +123,15 @@ export function AdminCreditsPage() {
    * 导出走**已生效**的筛选, 而不是输入框里的草稿 ——
    * 用户输入后未点「查询」时, 导出的必须与屏幕上的列表同口径。
    */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await adminCreditsApi.exportCsv({
-        email: params.email as string | undefined,
-        userId: params.userId as string | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        adminCreditsApi.exportCsv({
+          email: params.email as string | undefined,
+          userId: params.userId as string | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const columns: Array<AdminColumn<AdminCreditRow>> = [
     {
@@ -149,14 +140,14 @@ export function AdminCreditsPage() {
       width: 230,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm text-foreground">{row.name || row.email}</span>
-          <span className="text-[12px] text-muted-foreground">
+          <span className="text-foreground">{row.name || row.email}</span>
+          <span className="text-muted-foreground">
             <Link className="text-brand hover:underline" to={adminUserDetailHref(row.userId)}>
               {row.email}
             </Link>
             {row.name ? '' : ' · 无昵称'}
           </span>
-          <code className="text-[12px] text-muted-foreground" title={row.userId}>
+          <code className="text-muted-foreground" title={row.userId}>
             {row.userId}
           </code>
         </div>
@@ -176,7 +167,7 @@ export function AdminCreditsPage() {
         row.expiringSoon > 0 ? (
           <span className="tabular-nums text-warn-text">{row.expiringSoon}</span>
         ) : (
-          <span className="text-[12px] text-muted-foreground">—</span>
+          <span className="text-muted-foreground">—</span>
         ),
     },
     {
@@ -201,13 +192,11 @@ export function AdminCreditsPage() {
       key: 'nearestExpiry',
       title: '最近到期',
       width: 160,
-      render: (row) => (
-        <span className="text-[12px] text-muted-foreground">{fmtTime(row.nearestExpiry)}</span>
-      ),
+      render: (row) => <span className="text-muted-foreground">{fmtTime(row.nearestExpiry)}</span>,
     },
     {
       key: 'ops',
-      title: '',
+      title: '操作',
       width: 80,
       fixed: 'right',
       render: (row) => (
@@ -224,49 +213,37 @@ export function AdminCreditsPage() {
         title="积分账本"
         description="余额由批次推导，流水只追加不修改。人工调整会立即改变用户可用余额并写入审计。"
         actions={
-          <>
-            {can('credit.adjust') && (
+          can('credit.adjust') ? (
+            <>
               <ActionButton variant="secondary" icon={Upload} onClick={() => setBatchOpen(true)}>
                 批量调整
               </ActionButton>
-            )}
-            {/* CSV 导入走邮箱而非用户 ID: 运营手里的补偿名单通常是邮箱表, 不是 cuid */}
-            {/* 后端 /admin/credits/import 的权限点是 credit.adjust（导入会改余额，
-                与人工调整同一套规则）。权限跟动作走：导入属于给钱，统一要求
-                credit.adjust，不再使用无效的通用导入权限。 */}
-            {can('credit.adjust') && (
+              {/* CSV 导入走邮箱而非用户 ID: 运营手里的补偿名单通常是邮箱表, 不是 cuid */}
+              {/* 后端 /admin/credits/import 的权限点是 credit.adjust（导入会改余额，
+                  与人工调整同一套规则）。权限跟动作走：导入属于给钱，统一要求
+                  credit.adjust，不再使用无效的通用导入权限。 */}
               <ActionButton variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>
                 导入 CSV
               </ActionButton>
-            )}
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                icon={Download}
-                onClick={() => void exportCsv()}
-                disabled={exporting}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
-          </>
+            </>
+          ) : undefined
         }
       />
 
-      <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <StatCard label="用户总数" value={data?.total ?? '—'} hint="符合当前筛选的账户数" />
-        <StatCard
-          label="本页余额合计"
-          value={pageSummary.balance}
-          hint="仅统计当前页，不是全站总量"
-        />
-        <StatCard
-          label="本页 30 天内到期"
-          value={pageSummary.expiring}
-          hint="到期会被自动回收，用户可能察觉余额下降"
-          tone={pageSummary.expiring > 0 ? 'warn' : undefined}
-        />
-      </div>
+      <StatCards
+        columns={3}
+        className="mb-3"
+        items={[
+          { label: '用户总数', value: data?.total ?? '—', hint: '符合当前筛选的账户数' },
+          { label: '本页余额合计', value: pageSummary.balance, hint: '仅统计当前页，不是全站总量' },
+          {
+            label: '本页 30 天内到期',
+            value: pageSummary.expiring,
+            hint: '到期会被自动回收，用户可能察觉余额下降',
+            tone: pageSummary.expiring > 0 ? 'warn' : undefined,
+          },
+        ]}
+      />
 
       <FilterBar>
         <ClearableField
@@ -296,49 +273,44 @@ export function AdminCreditsPage() {
         <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
-      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
+      <Panel
+        title="用户积分总览"
+        note="按注册时间倒序；点击整行查看批次与流水"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
+          </>
+        }
+      >
+        {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+        {error && data && <StaleError error={error} onRetry={reload} />}
 
-      <Panel title="用户积分总览" note="按注册时间倒序">
-        {loading && !data ? (
-          /* 面板外壳已经是实的，只替内容行 */
-          <SkeletonBody rows={4} />
-        ) : error && !data ? (
-          <ListError error={error} onRetry={reload} />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            title={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}
-            description={
-              hasFilter
-                ? '清除筛选后可查看全部账户。'
-                : '用户注册后，其积分余额与批次会在这里出现。'
-            }
-            action={
-              hasFilter ? (
-                <ActionButton variant="secondary" onClick={reset}>
-                  清除筛选
-                </ActionButton>
-              ) : undefined
-            }
-          />
-        ) : (
-          <AdminDataTable<AdminCreditRow>
-            rows={rows}
-            columns={columns}
-            rowKey={(row) => row.userId}
-            loading={loading}
-            error={error}
-            onRetry={reload}
-            minWidth={1100}
-            pagination={{
-              current: data?.page ?? 1,
-              pageSize: data?.pageSize ?? 20,
-              total: data?.total ?? 0,
-              unit: '个账户',
-              onChange: (page, size) => setPage(page, size),
-            }}
-          />
-        )}
+        <AdminDataTable<AdminCreditRow>
+          rows={rows}
+          columns={columns}
+          rowKey={(row) => row.userId}
+          loading={loading}
+          error={rows.length === 0 ? error : null}
+          onRetry={reload}
+          onRowClick={setDetail}
+          minWidth={1100}
+          emptyText={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}
+          emptyAction={
+            hasFilter ? (
+              <ActionButton variant="secondary" onClick={reset}>
+                清除筛选
+              </ActionButton>
+            ) : undefined
+          }
+          pagination={{
+            current: data?.page ?? 1,
+            pageSize: data?.pageSize ?? 20,
+            total: data?.total ?? 0,
+            unit: '个账户',
+            onChange: (page, size) => setPage(page, size),
+          }}
+        />
       </Panel>
 
       {detail && (

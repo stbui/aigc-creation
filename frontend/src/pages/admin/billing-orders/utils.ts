@@ -9,12 +9,5 @@ import { toCredits, toCreditsInput } from '../../../lib/microcredits';
 
 export { toCredits, toCreditsInput };
 
-export function formatTime(value: string | null): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('zh-CN');
-}
-
-/** 可人工核对的状态：已结算 / 已退款只能看，不能再次处置 */
-export function canResolveStatus(status: string): boolean {
-  return status === 'uncertain' || status === 'reserved' || status === 'running';
-}
+/** 时间展示（统一实现在 admin-ui/lib/format.ts） */
+export { formatDateTimeLoose as formatTime } from '../../../admin-ui/primitives';

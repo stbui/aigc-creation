@@ -1,21 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminChannelsApi } from './api';
-import { ConfirmAction, Notice } from '~/admin-ui/primitives';
+import { ConfirmDialog, Notice } from '~/admin-ui/primitives';
 import { useToast } from './hooks';
-import { ChannelModelFormDialog } from './ChannelModelFormDialog';
-import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';
+import { ChannelModelDialogs } from './ChannelModelDialogs';
 import { ChannelModelTable } from './ChannelModelTable';
-import { ChannelOrderDialog } from './ChannelOrderDialog';
-import { ChannelUpstreamDialog } from './ChannelUpstreamDialog';
 import { EMPTY_MODEL_DRAFT, EMPTY_TIER, type ModelDraft } from './constants';
-import {
-  buildPriceTiers,
-  toModelDraft,
-  staleTierUpstream,
-  clearStaleTierUpstream,
-  validateModelTags,
-} from './utils';
-import { useChannelModelHealth, useChannelModels, useProtocolCatalog } from './useChannelModels';
+import { buildPriceTiers, toModelDraft } from './utils';
+import { useChannelModelHealth, useChannelModels } from './useChannelModels';
 import type {
   AdminChannelModelView,
   AdminChannelView,
@@ -91,7 +82,6 @@ export function ChannelModelManager({
   /** 模型排序弹窗 */
   const [orderOpen, setOrderOpen] = useState(false);
 
-  const { options: protocolOptions } = useProtocolCatalog(draft.capability);
 
   useEffect(() => {
     if (!channelId) return;
@@ -188,35 +178,21 @@ export function ChannelModelManager({
     setTestResult(null);
   };
 
-  const submit = async () => {
+  const submit = async (draft: ModelDraft) => {
     if (!channelId) return;
     const modelKey = draft.modelKey.trim();
-    if (!modelKey) {
-      toast.error('请填写模型标识');
-      return;
-    }
-    if (!draft.protocol) {
-      toast.error('请选择请求协议');
-      return;
-    }
     let capabilityConfig: unknown = null;
     if (draft.capabilityConfig.trim()) {
       try {
         capabilityConfig = JSON.parse(draft.capabilityConfig);
       } catch {
-        toast.error('能力合同不是合法 JSON');
+        toast.error('能力配置格式不正确');
         return;
       }
     }
     const tierResult = buildPriceTiers(draft);
     if ('error' in tierResult) {
       toast.error(tierResult.error);
-      return;
-    }
-    // 标签已在编辑器里结构化维护；提交前再校验一次，避免绕过界面的写入
-    const tagError = validateModelTags(draft.tags);
-    if (tagError) {
-      toast.error(tagError);
       return;
     }
     const body = {
@@ -283,8 +259,8 @@ export function ChannelModelManager({
         waitForResult: true,
       });
       setTestResult(result);
-      if (result.status === 'succeeded') toast.success('连通性测试通过');
-      else toast.error(result.error || result.message || '连通性测试失败');
+      if (result.status === 'succeeded') toast.success('服务连接正常');
+      else toast.error(result.error || result.message || '服务连接失败');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '测试失败');
     } finally {
@@ -297,9 +273,9 @@ export function ChannelModelManager({
     try {
       const res = await adminChannelsApi.fetchModels(channelId);
       setUpstream(res.models);
-      if (res.models.length === 0) toast.error('上游目录为空，请检查 Base URL 与凭证');
+      if (res.models.length === 0) toast.error('服务商没有返回可用模型，请检查服务地址与访问凭证');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '拉取上游目录失败');
+      toast.error(e instanceof Error ? e.message : '同步服务商模型失败');
     } finally {
       setFetching(false);
     }
@@ -318,7 +294,7 @@ export function ChannelModelManager({
     setImporting(true);
     try {
       const res = await adminChannelsApi.importModels(channelId, ids);
-      toast.success(`已导入 ${res.added} 个模型，默认停用，请补能力与价格后再启用`);
+      toast.success(`已导入 ${res.added} 个模型，默认停用；设置能力与价格后再启用`);
       setUpstream(null);
       await load();
       onChanged();
@@ -372,43 +348,6 @@ export function ChannelModelManager({
   return (
     <>
       <div className="flex flex-col gap-4">
-        <ChannelModelFormDialog
-          open={formOpen}
-          editing={editing}
-          draft={draft}
-          setDraft={setDraft}
-          protocolOptions={protocolOptions}
-          testResult={testResult}
-          testing={testing}
-          saving={saving}
-          writable={writable}
-          onTest={async () => {
-            if (!editing) {
-              toast.error('先保存模型再测试：测试使用库内凭证与能力合同');
-              return;
-            }
-            await runTest(editing);
-          }}
-          onClose={closeForm}
-          onSubmit={() => void submit()}
-          previousProviderModelKey={editing?.providerModelKey ?? ''}
-          onFollowModelUpstream={() => {
-            const stale = staleTierUpstream(draft, editing?.providerModelKey ?? '');
-            if (stale.length === 0) return;
-            setDraft(clearStaleTierUpstream(draft, stale));
-            toast.success(`已清除 ${stale.length} 个档位的独立上游名，改为跟随模型`);
-          }}
-        />
-
-        <ChannelUpstreamDialog
-          open={upstream !== null}
-          models={upstream ?? []}
-          existingKeys={existingUpstreamKeys}
-          importing={importing}
-          onClose={closeUpstream}
-          onImport={(ids) => void runImport(ids)}
-        />
-
         <div className="flex flex-col gap-4">
           {/* 已有数据时保留旧清单并提示读取失败；空清单由表格自己的错误态给重试 */}
           {error && (models ?? []).length > 0 && (
@@ -419,6 +358,7 @@ export function ChannelModelManager({
 
           <ChannelModelTable
             models={models}
+            channelEnabled={channel.enabled}
             loading={loading}
             error={error}
             healthById={healthById}
@@ -445,11 +385,11 @@ export function ChannelModelManager({
             fetching={fetching}
           />
 
-          <ConfirmAction
+          <ConfirmDialog
             open={deleteTarget !== null}
             title={`删除模型 ${deleteTarget?.modelKey ?? ''}？`}
-            description="删除后从路由目录移除；引用该模型的前台线路会变为不可用。历史账单与调用记录保留。"
-            impact={['该渠道模型的价格档一并作废', '引用它的前台模型线路需要重新选路']}
+            description="删除后该模型将停止使用；历史账单与调用记录保留。"
+            impact={['该模型的价格方案一并作废', '使用该模型的前台服务需要重新配置来源']}
             danger
             confirmText="确认删除"
             loading={saving}
@@ -457,13 +397,13 @@ export function ChannelModelManager({
             onConfirm={() => void runDelete()}
           />
 
-          <ConfirmAction
+          <ConfirmDialog
             open={batchDeleteOpen}
             title={`批量删除 ${selectedIds.length} 个模型？`}
-            description="软删除：所选模型从路由目录移除，价格档一并作废；历史账单与调用记录保留。"
+            description="删除后所选模型将停止使用，价格方案一并作废；历史账单与调用记录保留。"
             impact={[
-              '任一模型仍被前台线路或进行中任务使用时，本次不删除任何模型',
-              '引用这些模型的前台线路需要重新选路',
+              '任一模型仍被前台服务或进行中任务使用时，本次不会删除模型',
+              '使用这些模型的前台服务需要重新配置来源',
             ]}
             danger
             confirmText="确认删除"
@@ -472,12 +412,12 @@ export function ChannelModelManager({
             onConfirm={() => void runBatchDelete()}
           />
 
-          <ConfirmAction
+          <ConfirmDialog
             open={disableTarget !== null}
             title={`停用模型 ${disableTarget?.modelKey ?? ''}？`}
-            description="停用后新任务不再路由到该模型，引用它的前台线路会走其他可用线路；价格与配置保留，可随时重新启用。"
+            description="停用后新任务不再使用该模型，前台服务会切换到其他可用模型；价格与配置保留，可随时重新启用。"
             impact={[
-              '路由目录会剔除该模型（本进程立即生效，其他进程最多滞后一个缓存周期）',
+              '该模型会立即停止接单',
               '进行中的任务不受影响',
             ]}
             danger
@@ -491,32 +431,50 @@ export function ChannelModelManager({
         </div>
       </div>
 
-      {/*
-        调价 / 排序弹窗与详情区**平级**：两个 React Aria 模态嵌套时焦点作用域
-        会互相抢，关掉弹窗后焦点回不到触发它的那个复选框。
-      */}
-      {repriceOpen && channelId && (
-        <ChannelModelRepriceDialog
-          channelId={channelId}
-          channelName={channel.name}
-          models={(models ?? []).filter((model) => selectedIds.includes(model.id))}
-          onClose={() => setRepriceOpen(false)}
-          onSaved={() => {
+      <ChannelModelDialogs
+        channelId={channelId}
+        channelName={channel.name}
+        form={{
+          open: formOpen,
+          editing,
+          draft,
+          testResult,
+          testing,
+          saving,
+          writable,
+          previousProviderModelKey: editing?.providerModelKey ?? '',
+          onTest: async () => {
+            if (!editing) {
+              toast.error('请先保存模型，再测试服务连接');
+              return;
+            }
+            await runTest(editing);
+          },
+          onClose: closeForm,
+          onSubmit: (next) => void submit(next),
+        }}
+        upstream={{
+          models: upstream,
+          existingKeys: existingUpstreamKeys,
+          importing,
+          onClose: closeUpstream,
+          onImport: (ids) => void runImport(ids),
+        }}
+        reprice={{
+          open: repriceOpen,
+          models: (models ?? []).filter((model) => selectedIds.includes(model.id)),
+          onClose: () => setRepriceOpen(false),
+          onSaved: () => {
             setSelectedIds([]);
             return load();
-          }}
-        />
-      )}
-
-      {orderOpen && channelId && (
-        <ChannelOrderDialog
-          open
-          channelId={channelId}
-          channelName={channel.name}
-          onClose={() => setOrderOpen(false)}
-          onSaved={() => load()}
-        />
-      )}
+          },
+        }}
+        order={{
+          open: orderOpen,
+          onClose: () => setOrderOpen(false),
+          onSaved: () => load(),
+        }}
+      />
     </>
   );
 }

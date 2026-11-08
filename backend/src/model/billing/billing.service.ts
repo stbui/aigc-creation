@@ -53,6 +53,54 @@ export const USAGE_SOURCE_VIDEO_FORMULA = 'video_formula';
 /** Prisma 账单行（各调用方直接复用，避免重复 import Prisma） */
 export type BillingOrderRow = BillingOrder;
 
+/** `running` 超过该时长仍未完成，才允许人工核对 */
+export const REVIEW_RUNNING_STALE_MS = 40 * 60_000;
+
+/** 人工核对需要读取的任务信息，避免把整个 GenerationTask 带进判定函数 */
+export interface BillingReviewTask {
+  status: string;
+  outputAssetId: string | null;
+  pendingResult: string | null;
+  mediaRecoveryError: string | null;
+}
+
+/**
+ * 人工核对资格的唯一判定口径。
+ *
+ * 列表、详情、批量选择和真正执行 resolve 都必须调用这一处：
+ *   · 已有作品或仍在补交付的任务永远不可核对；
+ *   · uncertain 永远可核对；
+ *   · running 仅在超过 40 分钟时视为执行者可能已死；
+ *   · reserved 只有在对应任务明确 failed / cancelled 时才可核对。
+ *
+ * 单纯的 reserved / 新鲜 running 仍可能正常执行，提前人工退款会让平台
+ * 白付上游成本，并可能在任务继续执行时造成重复交付。
+ */
+export function isBillingOrderReviewable(
+  order: Pick<BillingOrder, 'status' | 'updatedAt'>,
+  task?: BillingReviewTask | null,
+  now = Date.now(),
+): boolean {
+  // `mediaRecoveryError` 也被普通失败路径用作错误说明；只有任务仍在运行且
+  // 结果已暂存 / 正在重试落盘时才算「正在补交付」。
+  const hasDeliverable =
+    task?.outputAssetId != null ||
+    task?.pendingResult != null ||
+    (task != null &&
+      task.mediaRecoveryError != null &&
+      task.status === 'running');
+  if (hasDeliverable) return false;
+
+  if (order.status === 'uncertain') return true;
+  if (order.status === 'running') {
+    return now - order.updatedAt.getTime() > REVIEW_RUNNING_STALE_MS;
+  }
+  if (order.status === 'reserved') {
+    return task?.status === 'failed' || task?.status === 'cancelled';
+  }
+  return false;
+}
+
 /** 一次结算所用的上游用量 */
 export interface BillingUsage {
   inputTokens: bigint;
@@ -167,6 +215,18 @@ export class BillingService {
     private readonly wallet: CreditWalletService,
   ) {}
 
+  /**
+   * 只读余额预检查。
+   *
+   * 真正的余额权威校验仍在建单事务内（`reserveBatchBilling`）；这里用于在
+   * 触发有成本的上游调用（例如局部重绘参考图转描述）之前，尽早拒绝明显
+   * 余额不足的请求。调用方不能把这里的快照当成预留成功的依据。
+   */
+  async availableMicrocreditsOf(userId: string): Promise<bigint> {
+    const balance = await this.wallet.balanceOf(this.prisma, userId);
+    return balance.availableMicrocredits;
+  }
+
   // ── 建单 ──────────────────────────────────────────────────────────
 
   /**
@@ -175,8 +235,30 @@ export class BillingService {
    * `channel` 策略读价格档单价并按分组货币换算；`unified` 读前台模型标量价。
    * 两种策略都必须用同一次 `routed` —— 换一条线路就是换一份价格，
    * 账单与目录报价必须同源，否则「看到的价」与「扣的钱」会打架。
+   *
+   * ## `overrideCreditCost`：后台改价的唯一落点
+   *
+   * 后台「能力消耗价」(`SystemSetting['creditPrice.<capabilityId>']`) 与
+   * 线路价 / 模型标量价是**两套价格**，此前只影响 `/capabilities` 下发
+   * 给用户看的数字，扣费仍走线路价 —— 表现为「后台显示已保存，用户却仍按
+   * 旧价扣费」。这个参数由调用方从 `CreditPriceService.resolve()` 取来传入，
+   * 把能力维度的覆盖价接进真正的计费路径。
+   *
+   * 只对**固定价**（`fixed_request`）生效，且仅在 `unified` 策略下：
+   *   · `per_second` / `token` 是按量计价，能力维度的「一次多少钱」无法直接
+   *     换算成每秒 / 每 token 单价，强行覆盖会让按量账单算出荒谬金额；
+   *   · `channel` 策略的价格是渠道成本 + 加价的结果，绕过渠道价等于让渠道
+   *     结算与账单脱钩。
+   * 这两种情况下覆盖价**不生效**，由后台改价页的 `source` 字段透出真实来源，
+   * 运营能看出「这一项不是能力价在管」。
+   *
+   * @param overrideCreditCost 能力维度覆盖价（积分）。null/undefined = 不覆盖
    */
-  buildDraft(access: UserGroupAccess, routed: RoutedModel): BillingDraft {
+  buildDraft(
+    access: UserGroupAccess,
+    routed: RoutedModel,
+    overrideCreditCost?: number | null,
+  ): BillingDraft {
     const capability = normalizeCapability(routed.intent.capability);
     if (!capability) throw badRequest('模型能力类型无效');
     const base: Omit<BillingDraft, 'billingMode' | 'amountMicrocredits'> = {
@@ -262,7 +344,7 @@ export class BillingService {
       cachedTokenPriceMicrocredits: BigInt(model.cachedPriceMicrocredits),
       amountMicrocredits: 0n,
     };
-    return this.withAmount(draft, routed.intent, false);
+    return this.withAmount(withCreditPriceOverride(draft, overrideCreditCost, pricing), routed.intent, false);
   }
 
   /**
@@ -430,6 +512,98 @@ export class BillingService {
   }
 
   /**
+   * 线路切换时原子替换任务账单。
+   *
+   * 旧账单退款、新账单创建/预留、任务当前账单 CAS 与路由尝试建单必须同生共死：
+   *   · 先退款旧单再预留新单，避免旧预授权占住余额导致「本可支付却被判余额不足」；
+   *   · 任一步失败都回滚，旧账单继续有效，任务不会停在「已退款但没新账」；
+   *   · CAS 同时校验任务租约与旧账单，防止两个执行者并发替换。
+   *
+   * `afterSwap` 由任务层提供，用于在同一事务内创建 RouteAttempt 并写线路快照。
+   */
+  async replaceTaskBilling(params: {
+    userId: string;
+    taskId: string;
+    expectedBillingOrderId: string | null;
+    expectedLeaseOwner: string;
+    idempotencyKey: string;
+    draft: BillingDraft;
+    /** 限时免费等活动 id；换线后仍要留在新账单上供后续审计 */
+    promotionId?: string;
+    chargeLimitMicrocredits: bigint;
+    afterSwap?: (
+      tx: Prisma.TransactionClient,
+      result: { order: BillingOrderRow; reserved: bigint },
+    ) => Promise<void>;
+  }): Promise<{ order: BillingOrderRow; reserved: bigint }> {
+    validateChargeLimit(
+      { chargeLimitSet: true, chargeLimitMicrocredits: params.chargeLimitMicrocredits },
+      params.draft.amountMicrocredits,
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      const task = await tx.generationTask.findUnique({
+        where: { id: params.taskId },
+        select: { ownerId: true, billingOrderId: true, status: true, leaseOwner: true },
+      });
+      if (!task || task.ownerId !== params.userId) {
+        throw new AppError(40400, '任务不存在或无权限', 404);
+      }
+      if (
+        task.status !== 'running' ||
+        task.leaseOwner !== params.expectedLeaseOwner ||
+        task.billingOrderId !== params.expectedBillingOrderId
+      ) {
+        throw new AppError(40900, '任务租约或账单已变更，不能替换账单', 409);
+      }
+
+      if (params.expectedBillingOrderId) {
+        const oldOrder = await tx.billingOrder.findUnique({
+          where: { id: params.expectedBillingOrderId },
+        });
+        if (!oldOrder || oldOrder.userId !== params.userId || oldOrder.taskId !== params.taskId) {
+          throw new AppError(40900, '旧账单不属于当前任务，不能替换', 409);
+        }
+        if (oldOrder.status !== 'reserved' && oldOrder.status !== 'running') {
+          throw new AppError(40909, '旧账单状态已变更，不能替换', 409);
+        }
+        await this.refundInTransaction(tx, oldOrder, '线路切换，替换账单', 'route_switch');
+      }
+
+      const reserved = await this.createReservedOrder(tx, {
+        userId: params.userId,
+        taskId: params.taskId,
+        idempotencyKey: params.idempotencyKey,
+        draft: params.draft,
+        promotionId: params.promotionId,
+        chargeLimitSet: true,
+        chargeLimitMicrocredits: params.chargeLimitMicrocredits,
+      });
+
+      const swapped = await tx.generationTask.updateMany({
+        where: {
+          id: params.taskId,
+          ownerId: params.userId,
+          status: 'running',
+          leaseOwner: params.expectedLeaseOwner,
+          billingOrderId: params.expectedBillingOrderId,
+        },
+        data: {
+          billingOrderId: reserved.order.id,
+          authorizedChargeMicrocredits: reserved.reserved,
+          creditCost: Number((reserved.reserved + CREDIT_SCALE - 1n) / CREDIT_SCALE),
+        },
+      });
+      if (swapped.count !== 1) {
+        throw new AppError(40900, '任务租约或账单已变更，不能替换账单', 409);
+      }
+
+      await params.afterSwap?.(tx, reserved);
+      return reserved;
+    });
+  }
+
+  /**
    * 一次提交拆成 N 张图时，**在同一事务里**为每张建单并预留。
    *
    * 不能逐张调 `reserveTaskBilling`：第 3 张余额不足时，前 2 张的预授权已经落库，
@@ -583,10 +757,11 @@ export class BillingService {
    * 文本预授权只是估算，不能拿它当最终账单。
    *
    * @param audioDurationMs 音频 / 视频处理任务的实测时长（毫秒）；按秒计费必传
+   * @param deliveredQuantity 多图融合实际交付张数；用于按交付量结算并退回未交付部分
    */
   async settle(
     billingOrderId: string,
-    options: { providerRequestId?: string; audioDurationMs?: number } = {},
+    options: { providerRequestId?: string; audioDurationMs?: number; deliveredQuantity?: number } = {},
   ): Promise<BillingOrderRow> {
     if (!billingOrderId) throw new AppError(40001, '账单 id 不能为空', 400);
 
@@ -617,7 +792,7 @@ export class BillingService {
   private async settleInTransaction(
     tx: Prisma.TransactionClient,
     order: BillingOrderRow,
-    options: { providerRequestId?: string; audioDurationMs?: number },
+    options: { providerRequestId?: string; audioDurationMs?: number; deliveredQuantity?: number },
     onObserved: (value: { usage: BillingUsage; source: string; actual: bigint }) => void,
   ): Promise<BillingOrderRow> {
     const reserved =
@@ -659,6 +834,27 @@ export class BillingService {
         throw new AppError(40909, `${mediaLabel}实际费用超过本次授权上限，需人工核对`, 409);
       }
       note = `${mediaLabel}按实际输出时长结算`;
+    } else if (
+      order.capability === 'multi_fusion' &&
+      options.deliveredQuantity !== undefined
+    ) {
+      const requested = Number(order.quantity);
+      const delivered = Math.trunc(options.deliveredQuantity);
+      if (!Number.isSafeInteger(requested) || requested <= 0) {
+        throw new AppError(40909, '多图融合请求张数无效，无法结算', 409);
+      }
+      if (!Number.isFinite(delivered) || delivered <= 0) {
+        throw new AppError(40909, '多图融合没有可用交付，无法按交付量结算', 409);
+      }
+      quantity = BigInt(Math.min(requested, delivered));
+      // 预留金额已按「请求张数 × 画质倍率」缩放，按实际张数占比结算即可；
+      // 向上取整保证至少一张的金额不会被浮点/截断吞掉。
+      actual =
+        (order.amountMicrocredits * quantity + order.quantity - 1n) / order.quantity;
+      validateChargeLimit(order, actual);
+      if (quantity < order.quantity) {
+        note = `按实际交付 ${quantity.toString()}/${order.quantity.toString()} 张结算`;
+      }
     } else {
       validateChargeLimit(order, order.amountMicrocredits);
     }
@@ -739,14 +935,23 @@ export class BillingService {
     });
   }
 
-  /** 在调用方事务内完成退款；终态 CAS 防止同一张账单被并发退两次 */
+  /**
+   * 在调用方事务内完成退款；终态 CAS 防止同一张账单被并发退两次。
+   *
+   * 退款金额取 **`reservedAmountMicrocredits`**（真正冻结的量），而不是
+   * `amountMicrocredits`（建单时的预授权快照）。两者目前恒等，但一旦引入
+   * 授权上限截断、部分预授权之类的改动就会分叉 —— 那时按 `amount` 退款会
+   * 与钱包里实际冻结的数不一致，`wallet.refund` 的 CAS 直接失败，
+   * 表现为「点了退款但退不掉」。取冻结量才是语义正确的口径。
+   */
   private async refundInTransaction(
     tx: Prisma.TransactionClient,
     order: BillingOrderRow,
     errorText: string,
     reason: RefundReason,
   ): Promise<BillingOrderRow> {
-    const amount = order.amountMicrocredits;
+    const amount =
+      order.reservedAmountMicrocredits > 0n ? order.reservedAmountMicrocredits : order.amountMicrocredits;
     if (amount > 0n) {
       await this.wallet.refund(tx, {
         userId: order.userId,
@@ -783,13 +988,14 @@ export class BillingService {
 
   /**
    * 人工核对：`settle` 按现有用量结算，`refund` 全额退回。
-   * 只对 reserved / running / uncertain 生效 —— 终态账单不允许被再次改写。
+   * 是否可核对由 `isBillingOrderReviewable` 统一判定，终态永不可改写。
    */
   async resolve(
     billingOrderId: string,
     action: 'settle' | 'refund',
     actorUserId: string,
     note: string,
+    options: { reviewBatchId?: string } = {},
   ): Promise<BillingOrderRow> {
     const reason = String(note ?? '').trim();
     if (!reason) throw new AppError(40001, '请填写核对依据', 400);
@@ -801,8 +1007,23 @@ export class BillingService {
       return await this.prisma.$transaction(async (tx) => {
         const order = await tx.billingOrder.findUnique({ where: { id: billingOrderId } });
         if (!order) throw new AppError(40400, '账单不存在', 404);
-        if (!['reserved', 'running', 'uncertain'].includes(order.status)) {
-          throw new AppError(40001, '当前账单不需要人工核对', 400);
+        const task = order.taskId
+          ? await tx.generationTask.findUnique({
+              where: { id: order.taskId },
+              select: {
+                status: true,
+                outputAssetId: true,
+                pendingResult: true,
+                mediaRecoveryError: true,
+              },
+            })
+          : null;
+        if (!isBillingOrderReviewable(order, task)) {
+          throw new AppError(
+            40909,
+            '当前账单不满足人工核对条件：任务仍可执行、已有作品或正在补交付；仅结果不明、超时运行，或预授权对应的任务已失败/取消时才可核对',
+            409,
+          );
         }
 
         const updated =
@@ -819,7 +1040,11 @@ export class BillingService {
 
         const marked = await tx.billingOrder.updateMany({
           where: { id: updated.id, status: updated.status },
-          data: { resolvedBy: actorUserId, resolutionNote: reason },
+          data: {
+            resolvedBy: actorUserId,
+            resolutionNote: reason,
+            reviewBatchId: String(options.reviewBatchId ?? '').trim(),
+          },
         });
         if (marked.count !== 1) throw new AppError(40909, '账单状态已变更，请刷新后重试', 409);
         const result = await tx.billingOrder.findUnique({ where: { id: updated.id } });
@@ -938,4 +1163,31 @@ export class BillingService {
 
 function truncate(value: string, max: number): string {
   return [...value].slice(0, max).join('');
+}
+
+/**
+ * 把能力维度的后台覆盖价挂到草案上。
+ *
+ * 只在「固定价 + unified 策略」时生效，理由见 `buildDraft` 的注释：
+ * 按量计价无法把「一次多少钱」换算成每秒 / 每 token 单价，
+ * 渠道价策略则会绕过渠道结算。
+ *
+ * 覆盖价以**积分**为单位传入，这里换算成微积分并保留分组倍率 ——
+ * 倍率是用户分组的权益（会员折扣 / 加价），不应该因为是后台改的价就失效。
+ */
+function withCreditPriceOverride(
+  draft: BillingDraft,
+  overrideCreditCost: number | null | undefined,
+  pricing: { multiplierBasisPoints: bigint },
+): BillingDraft {
+  if (overrideCreditCost === null || overrideCreditCost === undefined) return draft;
+  if (draft.billingMode !== 'fixed_request') return draft;
+  const cost = Number(overrideCreditCost);
+  if (!Number.isFinite(cost) || cost < 0) return draft;
+  return {
+    ...draft,
+    unitPriceMicrocredits: BigInt(Math.trunc(cost)) * CREDIT_SCALE,
+    // 覆盖价是最终成交价的基准，倍率仍按用户分组叠加
+    multiplierBasisPoints: pricing.multiplierBasisPoints,
+  };
 }

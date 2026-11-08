@@ -18,7 +18,6 @@ import type {
   AdminAigcLabel,
   AigcLabelSpec,
   AdminUserDetail,
-  AdminUserImpact,
   AdminLoginLogResult,
   AdminUserListResult,
   AdminAssetListResult,
@@ -121,6 +120,7 @@ import type {
   CreditImportResult,
   ShoppableCarouselTemplatesResult,
 } from "../types/api";
+import type { AdminUserImpact } from "../types/admin-users";
 import type {
   AdminPageResult,
   AdminPaymentOrderDetail,
@@ -152,7 +152,6 @@ import type {
   ChannelPageResult,
   FinanceAnalyticsView,
   ModelIntentPayload,
-  ModelQuoteView,
   PluginListResult,
   PluginVerifyResultView,
   PluginView,
@@ -160,15 +159,12 @@ import type {
   ProviderVerifyResult,
   ProtocolCatalogEntryView,
   ProtocolTestResultView,
-  PublicChannelView,
-  PublicModelCatalogResult,
   SimulateResultView,
   SystemChannelExportView,
   SystemChannelImportResultView,
   UpstreamModelPreview,
   UserGroupView,
 } from "../types/model";
-import type { PublicLogicalModel } from "./models";
 
 export class ApiError extends Error {
   status: number;
@@ -202,7 +198,7 @@ interface RequestOptions {
   body?: BodyInit | Record<string, unknown> | object | null;
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
@@ -329,8 +325,7 @@ export interface OAuthProviderInfo {
 export const authApi = {
   login: (data: LoginRequest) =>
     request<AuthResponse>("/auth/login", { method: "POST", body: data }),
-  register: (data: RegisterRequest) =>
-    request<AuthResponse>("/auth/register", { method: "POST", body: data }),
+  register: (data: RegisterRequest) => request<AuthResponse>("/auth/register", { method: "POST", body: data }), sendEmail: (email: string) => request<{ sent: true; delivered: boolean }>("/auth/email/send", { method: "POST", body: { email } }),
 
   /**
    * 申请密码重置邮件。
@@ -390,7 +385,7 @@ export const authApi = {
     }),
 
   /** 通用 OAuth：列出已启用的 provider，登录页据此渲染按钮 */
-  oauthProviders: () => request<OAuthProviderInfo[]>("/auth/oauth/providers"),
+  oauthProviders: () => request<OAuthProviderInfo[]>("/auth/oauth/providers"), linkOauth: (provider: string, returnTo?: string) => request<{ url: string }>(`/auth/oauth/${encodeURIComponent(provider)}/link${toQuery(returnTo ? { returnTo } : {})}`),
 
   /** OAuth 回调拿到短时 ticket 后换取正式会话 */
   oauthComplete: (ticket: string) =>
@@ -505,13 +500,13 @@ export const generateApi = {
       offset?: number;
       capability?: string;
       projectId?: string;
+      excludeFailed?: boolean;
     } = {},
   ) => {
-    const qs = new URLSearchParams();
-    qs.set("limit", String(params.limit ?? 50));
-    qs.set("offset", String(params.offset ?? 0));
+    const qs = new URLSearchParams({ limit: String(params.limit ?? 50), offset: String(params.offset ?? 0) });
     if (params.capability) qs.set("capability", params.capability);
     if (params.projectId) qs.set("projectId", params.projectId);
+    if (params.excludeFailed) qs.set("excludeFailed", "1");
     return request<TaskPageResult>(`/tasks/page?${qs.toString()}`);
   },
   remove: (id: string) =>
@@ -619,7 +614,7 @@ export const mobileUploadApi = {
     fd.append("token", token);
     return request<{
       ok: boolean;
-      status: string;
+      status: "waiting" | "receiving" | "received" | "expired";
       assetId: string | null;
       assets: Array<{ id: string; url: string; filename: string }>;
     }>(`/mobile-upload/sessions/${encodeURIComponent(sessionId)}/receive`, {
@@ -693,10 +688,10 @@ export const adminCreditPricesApi = {
 };
 
 /**
- * 能力上下线（后台「能力管控」）。
+ * 能力上下线（后台「能力与模型」）。
  *
- * 下架必须填原因 —— 原因会展示给 C 端用户并进审计。只写「已下线」
- * 会让用户去问客服，写清「云端通道维护中」才是可自助的。
+ * 后端要求下架时 reason 非空。页面统一生成一句对 C 端可读的下线提示并随请求
+ * 下发（同时进入审计），不再让运营手填。
  */
 export const adminCapabilitiesApi = {
   list: () => request<AdminCapabilityControl[]>("/admin/capabilities"),
@@ -933,18 +928,18 @@ export function assetThumbSrc(
 export function assetThumbUrl(
   url?: string | null,
   size = 640,
+  preserveAspect = false,
 ): string | undefined {
   const abs = toAbsoluteUrl(url);
   if (!abs) return undefined;
   // 相对路径由 toAbsoluteUrl 拼接 API_BASE 得到，已确定指向本服务
   const isOwnUploads =
-    abs.startsWith("/uploads/") ||
-    (Boolean(API_BASE) && abs.startsWith(`${API_BASE}/uploads/`));
-  return isOwnUploads ? appendThumbParams(abs, size) : abs;
+    abs.startsWith("/uploads/") || abs.startsWith(`${API_BASE}/uploads/`);
+  return isOwnUploads ? appendThumbParams(abs, size, preserveAspect) : abs;
 }
 
-function appendThumbParams(src: string, size: number): string {
-  return `${src}${src.includes("?") ? "&" : "?"}w=${size}&h=${size}`;
+function appendThumbParams(src: string, size: number, preserveAspect = false): string {
+  return `${src}${src.includes("?") ? "&" : "?"}w=${size}${preserveAspect ? "" : `&h=${size}`}`;
 }
 
 /**
@@ -1002,7 +997,7 @@ export const adminUsersApi = {
       method: "POST",
     }),
 
-  /** 默认软删; hard=true 物理删除可删部分 (订单不在删除范围) */
+  /** 默认软注销; hard=true 物理删除, 仅限无资金记录的账号 */
   remove: (id: string, hard = false, confirm?: string) =>
     request<{
       id: string;
@@ -1090,7 +1085,6 @@ export const adminTasksApi = {
       pageSize?: number;
       status?: string;
       capability?: string;
-      provider?: string;
       userId?: string;
       projectId?: string;
       from?: string;
@@ -1114,7 +1108,6 @@ export const adminTasksApi = {
     params: {
       status?: string;
       capability?: string;
-      provider?: string;
       userId?: string;
       projectId?: string;
       from?: string;
@@ -1164,18 +1157,13 @@ export const adminAuditApi = {
       action?: string;
       targetId?: string;
       success?: boolean;
+      from?: string;
+      to?: string;
       page?: number;
       pageSize?: number;
     } = {},
   ) => {
-    const qs = new URLSearchParams();
-    if (params.actorId) qs.set("actorId", params.actorId);
-    if (params.action) qs.set("action", params.action);
-    if (params.targetId) qs.set("targetId", params.targetId);
-    if (params.success !== undefined) qs.set("success", String(params.success));
-    if (params.page) qs.set("page", String(params.page));
-    if (params.pageSize) qs.set("pageSize", String(params.pageSize));
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const suffix = toQuery(params);
     return request<{
       result: AdminAuditListResult;
       actions: Array<{ action: string; count: number }>;
@@ -1302,11 +1290,14 @@ export const adminAssetsApi = {
     return request<AdminProjectListResult>(`/admin/projects${suffix}`);
   },
 
+  /** @deprecated hard 参数仅为旧客户端兼容，后端始终只标记项目 deletedAt。 */
   removeProject: (id: string, hard = false) =>
     request<{
       id: string;
       hard: boolean;
-      impact: { assets: number; tasks: number; bytes: number };
+      deprecatedHard: true;
+      deletedAt: string;
+      retained: { assets: number; tasks: number };
     }>(`/admin/projects/${id}${hard ? "?hard=true" : ""}`, {
       method: "DELETE",
     }),
@@ -1625,8 +1616,8 @@ async function openHtmlDocument(path: string): Promise<void> {
 /**
  * 商品管理 (B-34~B-36)。
  *
- * 无删除: 历史订单的明细存了快照, 删商品不会让订单显示不全, 但对账时
- * 就再也查不到"这个 SKU 原来卖多少钱"了 —— 下架即够。
+ * 删除只对没有历史订单的 SKU 开放：退款与积分回收要回查该 SKU 的原价与
+ * 发放积分，有订单的商品请下架。后端会再校验一次，前端按 orderCount 先行提示。
  */
 export const adminProductsApi = {
   list: (status?: "active" | "offline") =>
@@ -1646,6 +1637,12 @@ export const adminProductsApi = {
     request<{ id: string; status: string }>(`/admin/products/${id}/status`, {
       method: "PATCH",
       body: { status },
+    }),
+
+  /** 有历史订单的商品会返回 409，需先改为下架 */
+  remove: (id: string) =>
+    request<{ id: string; sku: string }>(`/admin/products/${id}`, {
+      method: "DELETE",
     }),
 };
 
@@ -1682,6 +1679,8 @@ export const adminOrdersApi = {
       channel?: string;
       /** processing / failed / succeeded —— 退款状态挂在 Refund 行上 */
       refundState?: string;
+      /** 商品维度：只回买过该商品的订单（商品卡「N 单」深链） */
+      productId?: string;
       from?: string;
       to?: string;
       userId?: string;
@@ -1700,6 +1699,7 @@ export const adminOrdersApi = {
       email?: string;
       channel?: string;
       refundState?: string;
+      productId?: string;
       from?: string;
       to?: string;
     } = {},
@@ -1738,8 +1738,8 @@ export const adminOrdersApi = {
       refundedCents: number;
       fullyRefunded: boolean;
       creditsReclaimed: number;
-      creditsUnreclaimable: number;
-      message?: string;
+      creditsUnreclaimable: number; membershipTerminated: boolean;
+      invoiceFollowUp: { invoiceId: string; invoiceNo: string; status: "pending" | "issued"; message: string } | null; message?: string;
     }>(`/admin/orders/${id}/refund`, {
       method: "POST",
       body: { amountCents, reason },
@@ -1788,7 +1788,8 @@ export const adminCreditsApi = {
       `/admin/credits/${userId}/ledger${toQuery(params)}`,
     ),
 
-  adjust: (payload: { userId: string; delta: number; validDays?: number }) =>
+  /** 人工调整。备注可选；操作人与动作由后台审计自动留痕。 */
+  adjust: (payload: { userId: string; delta: number; reason?: string; validDays?: number }) =>
     request<{ userId: string; balance: number; delta: number }>(
       "/admin/credits/adjust",
       {
@@ -1797,9 +1798,16 @@ export const adminCreditsApi = {
       },
     ),
 
-  /** 批量调整。逐条独立执行, 返回每条结果 (一条失败不影响其余) */
+  /**
+   * 批量调整。逐条独立执行, 返回每条结果 (一条失败不影响其余)。
+   *
+   * `idempotencyKey` 由调用方在打开抽屉时生成一次并复用：超时重试时
+   * 已成功的行会命中幂等键，不会二次发放。
+   */
   batchAdjust: (payload: {
-    items: Array<{ userId: string; delta: number }>;
+    items: Array<{ userId: string; delta: number; reason?: string }>;
+    reason?: string;
+    idempotencyKey?: string;
     validDays?: number;
   }) =>
     request<AdminBatchAdjustResult>("/admin/credits/batch-adjust", {
@@ -1816,11 +1824,13 @@ export const adminCreditsApi = {
    * multipart 上传: 走 FormData 而不是 JSON —— 运营手里的就是 Excel 导出的
    * 文件, 让他们自己转成 JSON 等于逼人在本地写脚本。
    */
-  importCsv: (file: File, opts: { validDays?: number } = {}) => {
+  importCsv: (file: File, opts: { validDays?: number; importKey?: string } = {}) => {
     const form = new FormData();
     form.append("file", file);
     if (opts.validDays !== undefined)
       form.append("validDays", String(opts.validDays));
+    // 导入幂等键：同一文件重试不二次发放
+    if (opts.importKey) form.append("importKey", opts.importKey);
     return request<CreditImportResult>("/admin/credits/import", {
       method: "POST",
       body: form,
@@ -2079,10 +2089,10 @@ export const meApi = {
     }),
 
   /** 改密成功后该账号全部旧 token 失效（含当前这把），调用方必须跳登录 */
-  changePassword: (oldPassword: string, newPassword: string) =>
+  changePassword: (oldPassword: string | undefined, newPassword: string) =>
     request<{ changed: true }>("/me/password", {
       method: "POST",
-      body: { oldPassword, newPassword },
+      body: { ...(oldPassword ? { oldPassword } : {}), newPassword },
     }),
 
   /** 个人数据导出（JSON）。调用方负责用 Blob 下载 */
@@ -2092,10 +2102,10 @@ export const meApi = {
   deletionPreview: () => request<DeletionPreview>("/me/deletion-preview"),
 
   /** 自助注销：密码 + 确认词「注销」 */
-  deleteAccount: (password: string, confirm: string) =>
+  deleteAccount: (password: string | undefined, confirm: string) =>
     request<{ id: string; deleted: boolean }>("/me", {
       method: "DELETE",
-      body: { password, confirm },
+      body: { ...(password ? { password } : {}), confirm },
     }),
 };
 
@@ -2599,17 +2609,17 @@ export const adminBillingOrdersApi = {
 
   get: (id: string) => request<BillingOrderView>(`/admin/billing-orders/${id}`),
 
-  resolve: (id: string, action: "settle" | "refund") =>
+  resolve: (id: string, action: "settle" | "refund", reason: string) =>
     request<BillingOrderView>(`/admin/billing-orders/${id}/resolve`, {
       method: "POST",
-      body: { action },
+      body: { action, reason },
     }),
 
   /** 批量核对：逐条独立处置，返回每条结果 */
-  batchResolve: (ids: string[], action: "settle" | "refund") =>
+  batchResolve: (ids: string[], action: "settle" | "refund", reason: string) =>
     request<BillingBatchResolveResult>(`/admin/billing-orders/batch-resolve`, {
       method: "POST",
-      body: { ids: ids.join(","), action },
+      body: { ids: ids.join(","), action, reason },
     }),
 };
 
@@ -2648,55 +2658,4 @@ export const adminAnalyticsApi = {
     request<FinanceAnalyticsView>(`/admin/analytics/finance${toQuery(params)}`),
 };
 
-/** 前台模型目录（产品视角，`/models*`） */
-export const modelsApi = {
-  list: () => request<{ models: PublicLogicalModel[] }>("/models"),
-
-  available: (intent: ModelIntentPayload) =>
-    request<{ models: PublicLogicalModel[] }>("/models/available", {
-      method: "POST",
-      body: intent,
-    }),
-
-  quote: (id: string, intent: ModelIntentPayload) =>
-    request<{ quote: ModelQuoteView }>(`/models/${id}/quote`, {
-      method: "POST",
-      body: intent,
-    }),
-};
-
-/**
- * 渠道模型目录（供应视角，`/model-catalog*`）。
- *
- * `models` 恒为空数组，模型在 `channels[].models` 内；渠道名恒为空串，
- * 前端统一显示「系统模型」。报价必须带 `channelId` + `modelKey` ——
- * 不同渠道的同名模型价格与协议都可能不同，不接受按 modelKey 全局搜索。
- */
-export const modelCatalogApi = {
-  catalog: () => request<PublicModelCatalogResult>("/model-catalog"),
-
-  available: (intent: ModelIntentPayload) =>
-    request<PublicModelCatalogResult>("/model-catalog/available", {
-      method: "POST",
-      body: intent,
-    }),
-
-  quote: (channelId: string, modelKey: string, intent: ModelIntentPayload) =>
-    request<{ quote: ModelQuoteView }>("/model-catalog/quote", {
-      method: "POST",
-      body: { ...intent, channelId, modelKey },
-    }),
-};
-
-/**
- * 公开的系统渠道连接信息（`/channels/system`）。
- *
- * 与 `/model-catalog` 的分工：目录给「有哪些模型、什么价」，本端点给
- * 「有哪些渠道、怎么连（中转入口）」。两者都不下发凭证与上游地址。
- *
- * 管理员走同一端点拿到后台视角（真实名称与上游地址），因此返回类型用
- * `PublicChannelView` 的宽松基线：非管理员视角下 `name` 恒为空串。
- */
-export const publicChannelsApi = {
-  system: () => request<{ channels: PublicChannelView[] }>("/channels/system"),
-};
+export { modelCatalogApi, modelsApi, publicChannelsApi } from "./model-catalog-api";

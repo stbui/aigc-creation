@@ -22,18 +22,22 @@ export class StatsService {
     const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const [taskGroups, assetGroups, projectCount, recentTasks, weekTasks] = await Promise.all([
-      this.prisma.generationTask.groupBy({ by: ['capability', 'status'], where: { ownerId }, _count: { _all: true } }),
+      this.prisma.generationTask.groupBy({
+        by: ['capability', 'status'],
+        where: { ownerId, project: { deletedAt: null } },
+        _count: { _all: true },
+      }),
       // 素材统计与素材库同口径: 只算 status='visible'。
       // 若把后台已下架的也算进来, 数据中心「素材总量 / 生成图」会比素材库
       // 的「共 N 个素材」多出看不见的条目, 用户无法核对。
       this.prisma.asset.groupBy({
         by: ['kind'],
-        where: { ownerId, status: 'visible' },
+        where: { ownerId, status: 'visible', project: { deletedAt: null } },
         _count: { _all: true },
       }),
-      this.prisma.project.count({ where: { ownerId } }),
+      this.prisma.project.count({ where: { ownerId, deletedAt: null } }),
       this.prisma.generationTask.findMany({
-        where: { ownerId },
+        where: { ownerId, project: { deletedAt: null } },
         orderBy: { createdAt: 'desc' },
         take: 5,
         select: {
@@ -45,7 +49,7 @@ export class StatsService {
         },
       }),
       this.prisma.generationTask.findMany({
-        where: { ownerId, createdAt: { gte: since } },
+        where: { ownerId, project: { deletedAt: null }, createdAt: { gte: since } },
         select: { createdAt: true, status: true },
       }),
     ]);
@@ -85,7 +89,12 @@ export class StatsService {
     // 每项能力取最近一次成功产出, 作为工作台卡片的示例图 (真实产出优先, 没有则前端用设计化占位)
     const capabilityThumbs = new Map<string, { url: string; createdAt: Date }>();
     for (const t of await this.prisma.generationTask.findMany({
-      where: { ownerId, status: 'succeeded', outputAssetId: { not: null } },
+      where: {
+        ownerId,
+        project: { deletedAt: null },
+        status: 'succeeded',
+        outputAssetId: { not: null },
+      },
       orderBy: { createdAt: 'desc' },
       select: {
         capability: true,

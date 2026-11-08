@@ -13,6 +13,7 @@ import { Alert, Input, Modal } from '../../ui';
 export function AccountDeleteModal({
   open,
   deleting,
+  hasPassword,
   preview,
   previewLoading,
   deletePassword,
@@ -24,6 +25,7 @@ export function AccountDeleteModal({
 }: {
   open: boolean;
   deleting: boolean;
+  hasPassword: boolean;
   preview: DeletionPreview | null;
   previewLoading: boolean;
   deletePassword: string;
@@ -41,7 +43,7 @@ export function AccountDeleteModal({
       okButtonProps={{
         danger: true,
         loading: deleting,
-        disabled: deleteConfirm !== DELETE_CONFIRM_WORD || !deletePassword,
+        disabled: deleteConfirm !== DELETE_CONFIRM_WORD || (hasPassword && !deletePassword),
       }}
       cancelText="取消"
       onOk={onOk}
@@ -61,12 +63,16 @@ export function AccountDeleteModal({
                 : '未能获取影响面预览，但不影响注销流程。'
           }
         />
-        <Input.Password
-          placeholder="当前密码"
-          value={deletePassword}
-          onChange={(e) => onPasswordChange(e.target.value)}
-          autoComplete="current-password"
-        />
+        {hasPassword ? (
+          <Input.Password
+            placeholder="当前密码"
+            value={deletePassword}
+            onChange={(e) => onPasswordChange(e.target.value)}
+            autoComplete="current-password"
+          />
+        ) : (
+          <p className="account-hint">当前账号未设置密码，将凭当前登录会话确认注销。</p>
+        )}
         <Input
           placeholder={`请输入确认词：${DELETE_CONFIRM_WORD}`}
           value={deleteConfirm}

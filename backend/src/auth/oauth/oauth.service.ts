@@ -1,24 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppError } from '../../common/app.exception';
+import { AccountTokenService } from '../account-token.service';
+import { normalizeEmail } from '../email';
 import { OAuthRegistryService } from './oauth.registry';
 import { OAuthStateService } from './oauth-state.service';
 import { OAuthProfile, OAuthProviderInfo } from './oauth.types';
 import { AuthService, type RequestContext } from '../auth.service';
 
+export type OAuthCallbackResult =
+  | { linked: true; provider: string }
+  | { linked: false; ticket: string; provider: string; returnTo?: string };
+
 /**
  * 通用 OAuth 登录编排。
  *
- * 流程：
- *   GET /auth/oauth/:provider/authorize   → 生成 state → 302 provider
- *   provider 回调 /auth/oauth/:provider/callback → 验 state → 换 token → 拉 profile
- *     → 找/建/绑本地账号 → 签 60s 短时登录票 → 302 前端完成页
- *   POST /auth/oauth/complete             → 验票 → 签正式 accessToken
- *
  * 安全约束：
- *   - state 绑定 provider 且 10 分钟过期，防 CSRF 与跨 provider 复用；
- *   - 只有 provider 明确确权的 email 才会被用于自动绑定已有账号；
- *   - accessToken 不进 URL，只通过短时登录票在前端换取。
+ *   - state/ticket 都是数据库中一次性、只存 HMAC 的挑战值；
+ *   - identity 已存在才允许自动登录，同邮箱账号不会因第三方回调被静默合并；
+ *   - 同邮箱已有账号时，用户必须先登录，再走受 JWT 保护的显式绑定入口；
+ *   - 新用户与 identity 在同一事务创建，避免产生无法再次登录的半成品账号。
  */
 @Injectable()
 export class OAuthService {
@@ -35,30 +37,51 @@ export class OAuthService {
     return this.registry.list().filter((p) => p.enabled);
   }
 
-  async authorizeUrl(providerId: string, returnTo?: string): Promise<string> {
+  async authorizeUrl(providerId: string, returnTo?: string, linkUserId?: string): Promise<string> {
     const provider = this.requireProvider(providerId);
-    return provider.buildAuthorizationUrl(
-      this.state.signState({ provider: providerId, returnTo: this.safeReturnTo(returnTo) }),
-    );
+    const state = await this.state.createState({
+      provider: providerId,
+      returnTo: this.safeReturnTo(returnTo),
+      linkUserId,
+    });
+    return provider.buildAuthorizationUrl(state);
   }
 
-  async handleCallback(providerId: string, code: string, state: string): Promise<{ ticket: string; provider: string; returnTo?: string }> {
+  async handleCallback(
+    providerId: string,
+    code: string,
+    state: string,
+  ): Promise<OAuthCallbackResult> {
     const provider = this.requireProvider(providerId);
     if (!code) throw new AppError(40001, 'OAuth 回调缺少 code', 400);
 
-    const payload = this.verifyState(state, providerId);
+    // state 必须在任何外部副作用之前消费，避免并发回调重复换取 provider token。
+    const payload = await this.verifyState(state, providerId);
     const tokens = await provider.exchange(code);
     const profile = await provider.fetchProfile(tokens);
-    const userId = await this.resolveUserId(profile);
+    if (!profile.subject) {
+      throw new AppError(40001, `${profile.provider} 未返回用户唯一标识`, 400);
+    }
 
-    const ticket = this.state.signTicket({ sub: userId, provider: providerId });
-    return { ticket, provider: providerId, returnTo: payload.returnTo };
+    if (payload.linkUserId) {
+      await this.linkIdentity(payload.linkUserId, profile);
+      return { linked: true, provider: providerId };
+    }
+
+    const userId = await this.resolveLoginUser(profile);
+    const ticket = await this.state.createTicket({ userId, provider: providerId });
+    return { linked: false, ticket, provider: providerId, returnTo: payload.returnTo };
   }
 
   async complete(ticket: string, ctx: RequestContext = {}) {
-    const payload = this.state.verifyTicket(ticket);
+    let payload: { userId: string; provider: string };
+    try {
+      payload = await this.state.consumeTicket(ticket);
+    } catch (err) {
+      throw new AppError(40004, (err as Error).message, 400);
+    }
     const reason = payload.provider ? `oauth:${payload.provider}` : 'oauth';
-    return this.auth.issueSessionFor(payload.sub, ctx, reason);
+    return this.auth.issueSessionFor(payload.userId, ctx, reason);
   }
 
   private requireProvider(providerId: string) {
@@ -69,19 +92,15 @@ export class OAuthService {
     return provider;
   }
 
-  private verifyState(state: string, providerId: string) {
+  private async verifyState(state: string, providerId: string) {
     try {
-      return this.state.verifyState(state, providerId);
+      return await this.state.consumeState(state, providerId);
     } catch (err) {
       throw new AppError(40004, (err as Error).message, 400);
     }
   }
 
-  private async resolveUserId(profile: OAuthProfile): Promise<string> {
-    if (!profile.subject) {
-      throw new AppError(40001, `${profile.provider} 未返回用户唯一标识`, 400);
-    }
-
+  private async resolveLoginUser(profile: OAuthProfile): Promise<string> {
     const existing = await this.prisma.oAuthIdentity.findUnique({
       where: { provider_subject: { provider: profile.provider, subject: profile.subject } },
     });
@@ -92,38 +111,90 @@ export class OAuthService {
       return existing.userId;
     }
 
-    const email = profile.email && profile.emailVerified ? profile.email : null;
-    if (email) {
-      const emailUser = await this.prisma.user.findUnique({ where: { email } });
+    const verifiedEmail = profile.email && profile.emailVerified
+      ? normalizeEmail(profile.email)
+      : null;
+    if (verifiedEmail) {
+      const emailUser = await this.prisma.user.findUnique({ where: { email: verifiedEmail } });
       if (emailUser) {
-        if (emailUser.status !== 'active') {
-          throw new AppError(40302, '该邮箱关联的账号不可用', 403);
-        }
-        await this.linkIdentity(emailUser.id, profile);
-        return emailUser.id;
+        throw new AppError(
+          40901,
+          '该邮箱已注册，请先使用原账号登录，再在账号设置中显式绑定此第三方账号',
+          409,
+        );
       }
     }
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: email ?? `${profile.provider}+${profile.subject}@oauth.local`,
-        passwordHash: '',
-        name: this.safeName(profile.name),
-      },
-    });
-
+    const fallbackEmail = this.fallbackEmail(profile.provider, profile.subject);
     try {
-      await this.linkIdentity(user.id, profile);
+      return await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            email: verifiedEmail ?? fallbackEmail,
+            emailVerifiedAt: verifiedEmail ? new Date() : null,
+            passwordHash: '',
+            name: this.safeName(profile.name),
+          },
+        });
+        await tx.oAuthIdentity.create({
+          data: {
+            userId: user.id,
+            provider: profile.provider,
+            subject: profile.subject,
+            lastLoginAt: new Date(),
+          },
+        });
+        return user.id;
+      });
     } catch (err) {
-      this.logger.warn(`OAuth 身份绑定失败 user=${user.id} provider=${profile.provider}: ${(err as Error).message}`);
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new AppError(
+          40901,
+          '该第三方账号或邮箱已被绑定，请先使用原账号登录',
+          409,
+        );
+      }
+      throw err;
     }
-    return user.id;
   }
 
+  /** 显式绑定当前登录用户。重复绑定同一 identity 幂等，跨账号绑定拒绝。 */
   private async linkIdentity(userId: string, profile: OAuthProfile): Promise<void> {
-    await this.prisma.oAuthIdentity.create({
-      data: { userId, provider: profile.provider, subject: profile.subject },
+    const existing = await this.prisma.oAuthIdentity.findUnique({
+      where: { provider_subject: { provider: profile.provider, subject: profile.subject } },
     });
+    if (existing) {
+      if (existing.userId !== userId) {
+        throw new AppError(40901, '该第三方账号已绑定其他用户', 409);
+      }
+      await this.prisma.oAuthIdentity.update({
+        where: { id: existing.id },
+        data: { lastLoginAt: new Date() },
+      });
+      return;
+    }
+
+    try {
+      await this.prisma.oAuthIdentity.create({
+        data: {
+          userId,
+          provider: profile.provider,
+          subject: profile.subject,
+          lastLoginAt: new Date(),
+        },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new AppError(40901, '该第三方账号已绑定其他用户', 409);
+      }
+      throw err;
+    }
+    this.logger.log(`OAuth 显式绑定成功 user=${userId} provider=${profile.provider}`);
+  }
+
+  private fallbackEmail(provider: string, subject: string): string {
+    const digest = AccountTokenService.hash(`${provider}:${subject}`).slice(0, 32);
+    return `oauth-${provider}-${digest}@oauth.local`;
   }
 
   private safeName(name: string | null): string {

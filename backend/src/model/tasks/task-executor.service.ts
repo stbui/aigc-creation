@@ -11,7 +11,8 @@
  * 失败码归一（顺序即优先级）：
  *   `channel_unavailable` → 请求没发出去，可安全切线；
  *   `upstream_401/403/404/429` → 上游拒绝，同样可切线并触发冷却；
- *   其余（超时 / 5xx / 连接中断 / 解析失败）→ **不可切线**，停在结果不明。
+ *   DNS / 代理 / 网络不可达 / TCP 连接被拒 → 建连前失败，可安全切线；
+ *   其余（超时 / 5xx / 建连后中断 / 解析失败）→ **不可切线**，停在结果不明。
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -28,6 +29,7 @@ import type {
 } from '../protocol/runtime';
 import type { ChannelExecution } from '../channels/channel-runtime.service';
 import { extractUsage } from '../protocol/usage';
+import { preConnectionNetworkFailure, safeRouteFailure } from './task-failure-policy';
 
 /** 上游响应的可读错误（优先取结构化字段，最后退回截断原文） */
 export function upstreamErrorText(body: string): string {
@@ -106,6 +108,8 @@ export interface CallLogInput {
   requestBody: string;
   responseBody: string;
   upstreamUrl: string;
+  /** 业务请求中的视频时长；轮询 GET 没有请求体，不能只靠 requestBody 推断 */
+  videoSeconds?: number;
 }
 
 @Injectable()
@@ -303,7 +307,7 @@ export class TaskExecutorService {
           cachedTokens: usage?.cachedTokens ?? 0n,
           usageAvailable: usage !== null,
           mediaCount,
-          videoSeconds: Math.max(0, Math.trunc(Number(extractVideoSeconds(input.requestBody)) || 0)),
+          videoSeconds: logVideoSeconds(input),
           providerRequestId: outcome.providerRequestId,
           errorCode: outcome.failureCode,
           error: truncate(outcome.failureMessage, 1000),
@@ -340,13 +344,18 @@ export function upstreamFailureCode(status: number): string {
 /**
  * 异常 → 归一失败码。
  *
- * `OutboundError` 的 code 直接映射成 `outbound_<code>`；连接被重置 / 超时
- * 一律归为 `timeout`（不可切线）。
+ * `OutboundError` 的 code 直接映射成 `outbound_<code>`。DNS、网络不可达与
+ * TCP 连接被拒发生在请求写出前，单独归类为可切线失败；连接建立后的重置 /
+ * 超时仍归为结果不明。
  */
 export function failureCodeOf(error: unknown, statusCode = 0): string {
   if (error instanceof OutboundError) {
     const code = String(error.code ?? '').trim();
     if (code === 'timeout' || code === 'aborted') return 'timeout';
+    if (code === 'network') {
+      const preConnection = preConnectionNetworkFailure(error.message);
+      if (preConnection) return preConnection;
+    }
     return `outbound_${code || 'error'}`;
   }
   if (statusCode > 0) return upstreamFailureCode(statusCode);
@@ -360,17 +369,7 @@ export function failureCodeOf(error: unknown, statusCode = 0): string {
 
 /** 该失败码是否允许切换线路（只有「上游明确没接」才可以） */
 export function safeFailure(failureCode: string): boolean {
-  switch (failureCode) {
-    case 'channel_unavailable':
-    case 'upstream_401':
-    case 'upstream_403':
-    case 'upstream_404':
-    case 'upstream_429':
-    case 'upstream_rejected':
-      return true;
-    default:
-      return false;
-  }
+  return safeRouteFailure(failureCode);
 }
 
 /** 从请求体里尽力取按时长计费的秒数（日志展示用，读不到返回空） */
@@ -382,4 +381,12 @@ function extractVideoSeconds(requestBody: string): string {
   } catch {
     return '';
   }
+}
+
+function logVideoSeconds(input: CallLogInput): number {
+  const explicit = input.videoSeconds;
+  return Math.max(
+    0,
+    Math.trunc(Number(explicit !== undefined ? explicit : extractVideoSeconds(input.requestBody)) || 0),
+  );
 }

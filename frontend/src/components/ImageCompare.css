@@ -1,0 +1,124 @@
+/**
+ * ImageCompare 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
+ *
+ * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ── 原图 / 结果图分割对比 (局部重绘、去水印) ─────────────────────
+ * 结果图作为底层撑开高度，原图按 clip-path 叠在左侧。range 铺满整张图，
+ * 鼠标/触屏都能拖动分割线，交互与参考站 .compare-range 一致。
+ */
+.image-compare-frame {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface-5);
+  user-select: none;
+  touch-action: none;
+}
+
+.image-compare-after {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.image-compare-before {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  will-change: clip-path;
+}
+
+.image-compare-before img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.image-compare-before-label,
+.image-compare-after-label {
+  position: absolute;
+  top: 14px;
+  z-index: 4;
+  padding: 4px 9px;
+  border-radius: 12px;
+  background: rgba(38, 42, 52, 0.58);
+  color: var(--card-bg);
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.image-compare-before-label {
+  left: 14px;
+}
+
+.image-compare-after-label {
+  right: 14px;
+}
+
+.image-compare-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 2px;
+  background: var(--card-bg);
+  box-shadow: 0 0 0 1px rgba(38, 42, 52, 0.14), 0 0 10px rgba(0, 0, 0, 0.22);
+  transform: translateX(-1px);
+  pointer-events: none;
+  will-change: left;
+}
+
+.image-compare-line::after {
+  content: '‹›';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--brand);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.image-compare-range {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.image-compare-range::-webkit-slider-thumb {
+  width: 28px;
+  height: 100%;
+  appearance: none;
+}
+
+.image-compare-range::-moz-range-thumb {
+  width: 28px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}

@@ -37,7 +37,7 @@ import {
   type LightboxItem,
 } from './components';
 import type { GalleryItem, ResultGallery } from './hooks';
-import { splitCloneInputs, taskErrorText } from './utils';
+import { downloadExtension, splitCloneInputs, taskErrorText } from './utils';
 
 type CompareState = 'ready' | 'generating' | 'failed' | 'idle';
 
@@ -105,11 +105,11 @@ function formatTime(iso?: string): string {
  *
  * 复刻页真正需要被比较的是三张图：上传的商品图、被复刻的参考图、最终生成图。
  * 因此这里不再只铺生成图缩略图，而是按任务逐行陈列完整的「上传图 → 参考图 →
- * 生成图」链路；页面刚上传、任务生成中和历史回看都沿用同一视觉结构。
+ * 生成图」链路；任务生成中和历史回看沿用同一视觉结构。
  *
  * 数据口径：
  * - 历史任务的输入顺序由后端保留为 `[商品图..., 参考图]`，从 `inputUrls` 末位拆参考图；
- * - 本次提交尚未完成时，直接使用表单里当前的商品图与参考图；
+ * - 用户点击生成后，本次任务使用表单里当前的商品图与参考图；
  * - 生成成功的任务由 `gallery.prepend` 立刻进入首行，不等待历史列表重新拉取。
  */
 export function ViralCloneResultPane({
@@ -160,14 +160,12 @@ export function ViralCloneResultPane({
     result?.status === 'succeeded' &&
     Boolean(result.url) &&
     gallery.items.some((item) => item.url === result.url);
-  // 成功后由 gallery.prepend 插入的正式记录承接展示；当前行只负责草稿、
-  // 生成中和失败态。结果状态先于列表更新时仍由当前行兜底，避免短暂空白。
+  // 成功后由 gallery.prepend 插入的正式记录承接展示；当前行只负责生成中、
+  // 失败态，以及结果先于列表更新时的短暂兜底。未点击生成前不展示当前输入。
   const showCurrent =
     submitting ||
     result?.status === 'failed' ||
-    (result?.status === 'succeeded'
-      ? !resultInGallery && (images.length > 0 || reference !== null)
-      : !result && (images.length > 0 || reference !== null));
+    (result?.status === 'succeeded' && !resultInGallery);
   const currentRow = useMemo<CompareRow>(
     () => ({
       key: 'current',
@@ -198,7 +196,7 @@ export function ViralCloneResultPane({
   const download = (row: CompareRow) => {
     const item = row.item;
     if (!item?.url) return;
-    const ext = (item.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
+    const ext = downloadExtension(item.format);
     const link = document.createElement('a');
     link.href = toAbsoluteUrl(item.url) ?? item.url;
     link.download = `viral-clone-${item.id.slice(-6)}.${ext}`;

@@ -31,9 +31,9 @@
 | `40900` | 排序列表已变化：`expectedIds` 与库中不一致，整单拒绝，需重新加载后再保存 | `model/channels/channel.service.ts` |
 | `42201` | 有线路但全部失败（任务失败，退款） | `model/tasks/task-lifecycle.service.ts` |
 | `42202` / `42203` | 任务中断回收失败 / AIGC 显式角标失败（均退款） | 同上 |
-| `42204` | 无可用线路：所有线路都明确未接单，或存量 `route=local`（任务失败，退款，不交付任何产出） | `model/tasks/task-worker.service.ts` |
+| `42204` | 无可用线路：所有线路都明确未接单（含 DNS / 代理 / TCP 建连前网络失败），或存量 `route=local`（任务失败，退款，不交付任何产出） | `model/tasks/task-worker.service.ts` |
 | `42205` | 带遮罩但所有线路都不支持遮罩重绘，**不忽略遮罩整图重绘**（任务失败，退款） | `model/tasks/task-admission.service.ts` / `task-worker.service.ts` |
-| `42206` | 上游已受理但超时/结果不明，转人工核对：**不切线、不退款**，冻结保留 | `model/tasks/task-lifecycle.service.ts` |
+| `42206` | 请求可能已到达上游，但建连后超时 / 中断 / 5xx / 解析失败导致结果不明，转人工核对：**不切线、不退款**，冻结保留。建连前 DNS / 代理 / TCP 失败不得使用此码 | `model/tasks/task-lifecycle.service.ts` |
 | `42901` | 触发限流，附 `Retry-After` | `common/rate-limit.guard.ts` |
 | `50301` / `50302` | 支付通道未配置（缺凭据，绝不回落沙箱）/ **渠道退款未完成**（HTTP 502；订单状态与积分不变，可用同一退款单重试） | `payments/payment.factory.ts` / `orders/order.service.ts` |
 
@@ -59,7 +59,7 @@
 | POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`logicalModelId` 必填（前台模型 id，来自 `/models`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前只有商品详情图）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
 | GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图；`errorCode` 取 `42201`–`42206` |
 | GET | `/api/v1/tasks` | 任务列表（含 `outputAsset`，历史页缩略图依赖它） |
-| GET | `/api/v1/tasks/page` | 任务列表分页（`projectId` / `capability` / `limit` / `offset`），返回 `{ items, total, limit, offset }`。**必须注册在 `/tasks/:id` 之前**，否则 `page` 会被当成 id |
+| GET | `/api/v1/tasks/page` | 任务列表分页（`projectId` / `capability` / `excludeFailed` / `limit` / `offset`），返回 `{ items, total, limit, offset }`；`excludeFailed=1` 时列表与总数都排除失败任务。**必须注册在 `/tasks/:id` 之前**，否则 `page` 会被当成 id |
 | DELETE | `/api/v1/tasks/:id` | 删除作品（连带产物与磁盘文件） |
 | GET | `/api/v1/stats/overview` | 数据中心聚合（含按能力缩略图） |
 | GET | `/api/v1/models` | 前台模型目录（匿名可读；带 token 时按会员分组过滤线路并折算价格，不暴露渠道字段） |
@@ -77,7 +77,7 @@
 | POST | `/api/v1/payments/:orderId/intent` | 发起真实渠道支付（返回 `redirect` 跳转或 `qrcode` 扫码） |
 | GET/POST | `/api/v1/payments/callback/:providerId/:configId` | **渠道异步回调（公开，无信封，`@Res()` 直写）**，验签 + 金额核对 + 幂等；易支付与 ZPay 使用 GET，PayPal/Stripe 使用 POST |
 | GET | `/api/v1/payments/:orderId/status` | 支付状态轮询 |
-| POST/GET | `/api/v1/invoices`、`/invoices/:id/file` | 申请开票（一单一票）/ 列表 / 取可打印 HTML |
+| POST/GET | `/api/v1/invoices`、`/invoices/:id/file` | 申请开票 / 列表 / 取可打印 HTML。同一订单保留完整申请历史；同一时刻最多一张有效票（服务层校验 + 数据库唯一占用键兜底），只有 `rejected` 可重新申请，`red_flushed` 不可重提 |
 | GET | `/api/v1/marketing/{popup,invites,checkin}` | 营销弹窗 / 邀请 / 签到 |
 | GET | `/api/v1/marketing/campaigns` | 进行中的限时价 / 限时免活动（公开；只回真正更便宜且商品在售的） |
 | POST | `/api/v1/prompt-tools/{polish,image-to-prompt}` | 提示词润色 / 图片转提示词 |
@@ -100,11 +100,12 @@
 | GET | `/api/v1/admin/{me,overview,permissions}` | 后台身份 / 概览 / 权限点 |
 | GET | `/api/v1/admin/alerts` | 告警中心：按当前角色权限聚合待处理工单 / 失败任务 / 对账差异 / 退款卡单 / 备份 / 发票（只要求后台身份） |
 | GET/PATCH/POST/DELETE | `/api/v1/admin/users*`、`assets*`、`tasks*` | 用户 / 素材 / 任务管理 |
-| GET/PUT/POST | `/api/v1/admin/{credit-prices,products,orders,payments,credits}*` | 交易与积分管理 |
+| GET/PUT/POST/DELETE | `/api/v1/admin/{credit-prices,products,orders,payments,credits}*` | 交易与积分管理。商品删除（`DELETE /admin/products/:id`，`product.delete`）只允许没有历史订单的 SKU；已有订单返回 **409** 并提示改为下架（退款与积分回收要回查 SKU 原价与发放积分）。列表每项带 `orderCount` 供前端预检。订单列表 / 导出支持 `productId` 筛选（只回买过该商品的订单，商品卡「N 单」深链用），与 `status` / `orderNo` / `email` / `channel` / `refundState` / 时间范围同口径 |
 | GET/POST/PATCH | `/api/v1/admin/membership-plans*` | 会员套餐列表 / 新建 / 改价改权益 / 上下架（`product.read` / `product.write`，写操作自动写审计；下架不影响存量会员） |
 | POST | `/api/v1/admin/orders/:id/refund` | 渠道退款（**先调渠道再改本地账**；渠道失败 `50302` 且订单/积分不变，在途退款 `40908`，`order.refund` 权限 + 必填原因 + 审计） |
+| POST | `/api/v1/admin/orders/:id/refunds/:refundId/confirm` | 异步退款最终人工核销：`{ outcome: 'succeeded' \| 'failed', providerRefundId?, reason }`。`succeeded` 原子回收积分并推进订单；`failed` 只关闭退款单，订单与积分不变；两者均要求原因、写审计，`order.refund` |
 | GET/PUT/POST | `/api/v1/admin/{coupons,campaigns,marketing-rules}*` | 营销管理 |
-| GET/POST | `/api/v1/admin/invoices*` | 发票审核与开具（读 / 写统一使用 `invoice.write`） |
+| GET/POST | `/api/v1/admin/invoices*` | 发票列表 / 开具 / 驳回；`POST /:id/red-flush` 登记已开具发票冲红，请求体 `{ reason }`（必填）。读 / 写统一使用 `invoice.write`，冲红保留历史并写审计 |
 | GET | `/api/v1/admin/payments/providers` | 支付适配器视图列表（沙箱 / 支付宝 / 微信）：启用状态、是否配置齐、缺哪几项、checkoutMode、关单分钟、配置版本、字段元数据、风险告警。**只回配置状态不回密钥明文**（`secretConfigured` 只给布尔），`payment.read` |
 | PUT | `/api/v1/admin/payments/providers/:id/config` | 保存支付适配器配置（版本化 + 加密 + 追加写）。请求体 `{ enabled, closeAfterMinutes, values }`，保存写审计但不要求填写原因；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
 | GET/PUT | `/api/v1/admin/payments/settings` | 后台默认币种设置，读 `payment.read` / 写 `payment.write`，写操作自动写审计 |
@@ -131,10 +132,10 @@
 | GET/PATCH/POST/DELETE | `/api/v1/admin/plugins*`、`/plugins/:id/verify`、`/plugins/install` | 插件清单 / 启停（立即重注册协议）/ 契约校验 / 上传安装（multipart `file`，`origin='installed'`）/ 卸载（内置包 40001，仍被渠道模型引用 40909）；`plugin.read` / `plugin.write`，装卸写审计。清单每项带 `availability: { available, reason }`：本环境不可用时 `reason` 是**人话**说明（停用 / 声明了本仓未内置的 `host:<engine>` 引擎 / 只贡献支付短信等非模型能力而本仓独立实现），不允许「插件列在那里但就是不工作」这种静默缺失 |
 | GET/POST | `/api/v1/admin/provider-catalog`、`/refresh`、`/:id/{verify,install}` | 服务商目录（插件包上游清单）：未配置 `MODEL_PROVIDER_CATALOG_URL` 时返回空态与原因；安装走与上传安装同一套校验；`plugin.read` / `plugin.write` |
 | GET | `/api/v1/admin/analytics/finance?from&to` | 财务汇总：实收 = 已结算 `actualAmountMicrocredits`，已退 = `refundedAmountMicrocredits`，净收入 = 实收 − 已退；预留 / 运行 / 待核对单列挂账**不计入实收**；区间默认 30 天、上限 366 天，`model.analytics_read` |
-| GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve`、`/billing-orders/batch-resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`，写操作自动写审计，`billing_order.read` / `billing_order.resolve`）；列表支持 `?status=review`「待核对」队列口径；批量核对逐条独立处置并回显失败原因 |
+| GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve`、`/billing-orders/batch-resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`）。单条与批量请求均必须带 `reason`（≤ 500 字），批量同一次操作共享 `reviewBatchId`；写操作自动写审计，`billing_order.read` / `billing_order.resolve`；列表支持 `?status=review`「待核对」队列口径；批量核对逐条独立处置并回显失败原因 |
 | GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read` |
 | GET | `/api/v1/admin/api-logs/export` | 调用记录 CSV（与列表同筛选口径，上限 5000 行；**不含请求体 / 响应体**），`model.call_read + data.export` + 审计 |
-| GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架必须填原因，写需 `capability.write`（高危，走审计） |
+| GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架请求必须带原因（后台页面统一生成并下发 C 端），写需 `capability.write`（高危，走审计） |
 | GET/PUT | `/api/v1/admin/aigc-label` | 读 / 改角标样式（`setting.read` / `setting.write`，PUT 自动写审计 `aigc.label_update`） |
 | GET | `/api/v1/admin/tickets`、`/tickets/stats`、`/tickets/export` | 工单列表 / 状态计数 / CSV 导出 |
 | GET/POST/PATCH | `/api/v1/admin/tickets/:id`、`/tickets/:id/replies` | 工单详情与回复 / 改状态或指派（`ticket.handle`） |
@@ -146,6 +147,26 @@
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`） |
 | GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`provider` / `delivers` / `configured`，不含凭据；`message.write`） |
 | GET/POST | `/api/v1/admin/{storage,scheduler,backups,audit-logs,roles,settings}*` | 系统管理 |
+
+#### 任务全链路查询口径
+
+`GET /api/v1/admin/tasks/:id`（`task.read`）在任务基础字段、输入素材、参数、产出和状态时间线之外，返回 `routeAttempts`：按 `routeRun ASC, attemptNumber ASC` 排序的线路派发快照，包含逻辑模型、线路、渠道模型、`status`、`dispatchState`、上游请求号、失败码 / 失败原因和起止时间。该数组是任务排障数据，不包含账单金额或上游请求 / 响应正文。
+
+任务详情抽屉把分散在同一 `taskId` 下的数据组成集中排障页，但保留各自权限边界：
+
+- `GET /admin/tasks/:id`：提交时间、任务状态、参数、线路尝试、产出，`task.read`。
+- `GET /admin/api-logs?taskId=`：模型调用摘要及全部调用深链，`model.call_read`；最近 20 条用于抽屉内定位，完整列表在 `/admin/model-calls?taskId=`。
+- `GET /admin/billing-orders?taskId=`：积分预留、结算、退款与人工核对结果，`billing_order.read`；详情抽屉最多加载 100 条，完整列表在 `/admin/billing-orders?taskId=`。
+
+资金终态以 `BillingOrder` 为准，不能仅凭 `RouteAttempt.dispatchState` 判断是否需要人工复核：`reviewable=true` 才进入待核对队列；`refunded` 且 `resolvedBy=system:preconnection-reconcile` 表示建连前网络失败已由系统自动退款，应显示“无需人工复核”。`refundReason=route_switch` 是换线内部重预留，不计入真实退款。
+
+当前是**任务级追踪**，统一以 `taskId` 关联。若请求在创建 `GenerationTask` 之前就失败（前端、网关、鉴权等），库中没有 `taskId`，不会出现在该详情页；这类入口级排障需另接 `traceId` 与网关请求日志。
+
+#### 交易与发票处置约束
+
+- **账单人工核对只处理可核对项**：列表和详情返回同一口径的 `reviewable`；任务仍在执行、已有作品或正在补交付的账单不得处置。`reason` 必填，批量操作每次共享同一个 `reviewBatchId`，但每条账单仍独立事务处置。
+- **异步退款不能提前销账**：`processing` 退款单在人工确认前不改订单金额、状态和积分。确认失败只把退款单置为 `failed` 并保留渠道证据；确认成功与同步退款复用同一原子记账路径。
+- **发票历史不可覆盖**：订单与发票是一对多；驳回后可重新申请，旧记录仍保留。已开具发票可登记 `red_flushed`，必须填写原因、记录操作人和时间，冲红后不能再次申请。
 
 ### 3.3 模型中转（代理）
 

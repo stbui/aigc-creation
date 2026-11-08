@@ -1,4 +1,4 @@
-// Prisma schema for ecom-vision-mvp backend.
+// Prisma schema for huojue backend.
 // 说明: SQLite provider 不支持 Prisma enum 类型, 因此 capability / status / kind
 // 使用 String 存储, 取值范围在 DTO / service 层通过白名单强制约束。
 
@@ -13,6 +13,8 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
+  /// 邮箱归属验证时间。注册必须完成邮箱验证码；OAuth 仅在该字段有值时才视为已验证。
+  emailVerifiedAt DateTime?
   passwordHash String
   name         String
   createdAt    DateTime @default(now())
@@ -98,6 +100,26 @@ model OAuthIdentity {
 
   @@unique([provider, subject])
   @@index([userId])
+}
+
+/// OAuth 一次性挑战。state 与登录票都只落 HMAC，兑换后 CAS 作废。
+/// 这样即使浏览器历史、代理日志或前端 URL 泄露了原值，也无法重放第二次。
+model OAuthChallenge {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  /// state | ticket
+  kind      String
+  provider  String
+  /// 普通登录票的目标用户；linkUserId 只表示显式绑定发起人
+  userId    String?
+  /// 发起绑定流程时的当前登录用户；普通登录为空
+  linkUserId String?
+  returnTo  String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([kind, expiresAt])
 }
 
 // ── 后台角色与权限点 (admin-detailed-design.md §0.3) ──────────────
@@ -252,6 +274,9 @@ model Order {
   lastError             String?
   /// 关单租约。条件更新抢占，防止用户手动关单与 worker 同时执行
   closeStartedAt        DateTime?
+  /// 发起支付租约。覆盖「关闭旧尝试 → 渠道下单 → 写回本地」全过程，
+  /// 防止并发请求各自在渠道创建一笔可支付订单；超时后可被新请求接管。
+  intentStartedAt       DateTime?
   closedAt              DateTime?
 
   /// 渠道侧支付时间；paidAt 仍是本地入账时间
@@ -273,14 +298,30 @@ model Order {
   membershipPlanId    String?
   membershipPlan      MembershipPlan?   @relation("PlanOrders", fields: [membershipPlanId], references: [id])
   membershipUsage     MembershipUsage[]
-  /// 发票: 一单一票 (orderId 在 Invoice 侧 unique)
-  invoice             Invoice?
+  /// 发票: 保留每次申请历史; 同一订单同时最多一张有效票
+  invoices            Invoice[]
   /// 会员权益开始发放的时刻。**该订单是否已兑换会员的唯一凭据**。
   ///
   /// 不能靠 Membership.orderId 判断: 同一用户续费时复用同一条 Membership 行,
   /// orderId 会被后一笔订单覆盖 —— 旧订单因此"看起来没被用过", 重放它就能
   /// 再白拿一期会员与月度积分。此字段与订单同生命周期, 不会被覆盖。
   membershipAppliedAt DateTime?
+
+  /// 本订单实际兑换出的会员周期快照。续费同样复用 Membership 行, 因此
+  /// 退款时不能从当前会员反推某笔历史订单买了哪一段时间。
+  /// 权益与周期天数在下单时快照；后续运营改套餐只影响新订单。
+  membershipPeriodStartAt   DateTime?
+  membershipPeriodEndAt     DateTime?
+  membershipPerksSnapshot   String?
+  membershipMonthlyCreditsSnapshot Int?
+  membershipDurationDaysSnapshot Int?
+  /// 下单时套餐映射的用户分组编码。空串表示默认分组。
+  /// 分组承载渠道可见性、价格倍率与兑换比例，必须与权益一起冻结；
+  /// 否则运营改套餐映射会追溯改变已付费用户的可用渠道和计费倍率。
+  membershipUserGroupCodeSnapshot String?
+  /// 全额退款撤销本周期的时间。为 null 且订单仍为 paid/partial_refunded
+  /// 才代表该周期仍有效；保留字段用于退款后审计周期边界。
+  membershipPeriodRevokedAt DateTime?
 
   @@unique([userId, idempotencyKey])
   @@index([membershipPlanId])
@@ -313,6 +354,14 @@ model OrderItem {
   priceCentsSnapshot Int
   creditsSnapshot    Int
   validDaysSnapshot  Int
+  /// 下单时的发放方式快照。支付成功时只能按此字段发分，不能读取 Product
+  /// 的实时值；否则运营在待支付窗口内切换 immediate/manual 会追溯改变订单。
+  /// null 仅用于兼容加列前创建的历史订单。
+  grantTypeSnapshot  String?
+  /// 下单时实际占用的库存数量。库存策略可能在待支付窗口内被后台修改，
+  /// 支付/取消时必须按此快照归还或转已售，不能读取 Product.saleStrategy。
+  /// 0 = 未占库存；null 仅用于兼容加列前创建的历史订单。
+  stockReservedSnapshot Int?
 
   quantity Int @default(1)
 
@@ -417,7 +466,8 @@ model CreditLot {
 
   /// 批次来源: 'purchase' 购买 | 'grant' 发放 | 'admin_adjust' 人工 | 'refund_reclaim' 退款扣回
   source  String
-  /// 关联订单 (购买来源时)
+  /// 关联订单。购买积分批次指向购买单；会员月度积分批次指向该发分
+  /// 时点所属的会员周期订单，退款按此精确回收。
   orderId String?
 
   totalMicrocredits     BigInt
@@ -433,10 +483,18 @@ model CreditLot {
 
   @@index([userId, expireAt])
   @@index([expireAt])
+  @@index([orderId])
 }
 
-/// 积分流水 —— **只追加, 不可修改删除**。
-/// 是积分变动的唯一事实来源, 对账以此为准。
+/// ⚠️ **已废弃的旧流水表，不要写入。**
+///
+/// 当前积分流水的唯一事实来源是 `CreditLedgerEntry`（微积分口径，含
+/// available/reserved 变动与变动后快照）。本表用 Int 积分、缺 reserved 维度，
+/// 无法与 `CreditAccount` / `CreditLot` 对齐，全仓已无任何代码引用。
+///
+/// 保留原因：历史数据尚未迁移清理。**禁止新增写入或读取** ——
+/// 新旧两张流水表并存且都自称「唯一事实来源」，是后续误读的最大来源。
+/// 清理计划：随下一次数据迁移把历史行并入 `CreditLedgerEntry` 后 drop。
 model CreditLedger {
   id     String @id @default(cuid())
   userId String
@@ -457,7 +515,7 @@ model CreditLedger {
   /// 资金/积分动作幂等键。退款按 taskId 生成稳定键，重复调用只能落一条流水。
   idempotencyKey String? @unique
 
-  /// 人工调整的原因。强制填写 (PRD B-52)
+  /// 人工调整备注。可选；留空时写系统说明，操作审计另行自动记录
   reason     String?
   operatorId String?
 
@@ -666,16 +724,19 @@ model AdminAuditLog {
 }
 
 model Project {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   ownerId   String
   name      String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  /// 软删除时刻。素材保留用于追溯，但项目本身不再对用户可见/可用。
+  deletedAt DateTime?
 
   owner  User             @relation(fields: [ownerId], references: [id])
   assets Asset[]
   tasks  GenerationTask[]
 
-  @@index([ownerId])
+  @@index([ownerId, deletedAt])
+  @@index([deletedAt])
 }
 
 model Asset {
@@ -743,6 +804,7 @@ model Asset {
   @@index([ownerId])
   @@index([status])
   @@index([storageBackend])
+  @@unique([storageBackend, storageKey])
   @@index([capability])
   @@index([createdAt])
 }
@@ -764,6 +826,8 @@ model GenerationTask {
   /// 历史、后台和 1:1 关系，本字段只扩展“同一任务的其它产出”。
   outputAssetIds String?
   params        String // JSON 对象字符串
+  /// 历史供应商标识。新链路以 channelModelId / routeId 快照为准，本字段仅为
+  /// 兼容存量数据保留，避免数据库升级时删除仍有审计价值的历史值。
   provider      String?
   errorCode     String?
   // 本次实际扣掉的积分数快照 (0 = 免费)。用于后台展示与退款核算
@@ -780,6 +844,8 @@ model GenerationTask {
   parentTaskId  String?
   /// 请求幂等键。与 ownerId 组成唯一约束，客户端重试不能重复建任务/扣费。
   idempotencyKey String?
+  /// 原始生成请求的稳定指纹；同一 owner 的幂等键只能复用完全相同的请求
+  requestFingerprint String?
 
   // ── 任务监控 (admin-prd.md B-32 重试) ────────────────────────────
   // 本任务由哪个失败任务重试而来 (null = 用户首次发起)。
@@ -789,6 +855,9 @@ model GenerationTask {
   // 与旧的产出图抢同一个唯一键。此字段只作来源追溯, 不建外键 ——
   // 来源任务被清理后重试链仍要能读, 加 FK 会让来源一删就连带失败。
   retriedFromId String?
+  /// 重试幂等键。每个来源任务最多派生一个重试任务，用于消除后台并发重试
+  /// 的竞态；与面向调用方的 `idempotencyKey` 分开，避免污染用户请求语义。
+  retryKey      String? @unique
 
   /// 执行期存活心跳。任务运行期间每 30s 写一次。
   ///
@@ -893,8 +962,8 @@ model GenerationTask {
 /// ⚠ **金额一律整数**: 满减/固定额用 `value`(分), 折扣用 `value`(万分比, 8500 = 85折)。
 /// 浮点会在累加时产生分位误差 —— 与 Order/Payment 同一约定。
 ///
-/// `usedCount` 只在**支付成功**时 +1, 下单占用不算: 下单可超时取消,
-/// 若下单即计数, 用户反复下单不付款就能把券耗光。
+/// `usedCount` 只在**支付成功**时 +1；待支付订单以 pending 状态预占名额，
+/// 取消/超时后自动释放，避免未付款订单永久消耗限量券。
 model Coupon {
   id   String @id @default(cuid())
   /// 券码。用户手动输入, 大写规范化后唯一
@@ -1036,7 +1105,7 @@ model CheckinRule {
   /// 连签加成: JSON 数组, 形如 [{"day":3,"bonus":10},{"day":7,"bonus":30}]
   /// 用数组而非 map: 连续天数是无序的整数键, JSON 对象键必须是字符串
   bonusRules  String   @default("[]")
-  /// 周期上限。0 = 连签奖励无限累积 (不推荐, 长签到用户成本不可控)
+  /// 有效连签天数上限。达到后连续天数与奖励档位保持封顶，0 = 不限
   maxStreak   Int      @default(0)
   /// 周期内每日可得积分上限。0 = 不限
   dailyCap    Int      @default(0)
@@ -1062,7 +1131,9 @@ model AccountToken {
   userId      String?
   /// 未注册场景(注册时的手机号验证)按手机号归属
   phone       String?
-  /// 'password_reset' | 'sms_login' | 'sms_verify' —— 取值由 service 常量约束
+  /// 未注册场景(注册时的邮箱验证)按邮箱归属
+  email       String?
+  /// 'password_reset' | 'sms_login' | 'sms_verify' | 'email_verify' —— 取值由 service 常量约束
   type        String
   /// HMAC-SHA256(raw, JWT_SECRET)。6 位验证码的可枚举空间只有 100 万,
   /// 裸 sha256 在库泄露后可被离线穷举, 故用带密钥的 HMAC。
@@ -1079,7 +1150,56 @@ model AccountToken {
 
   @@index([userId, type])
   @@index([phone, type])
+  @@index([email, type])
   @@index([expiresAt])
+}
+
+/// 支付异常补偿单。每笔无法自动入账/自动退款成功的真实渠道流水都必须落单，
+/// 不依赖对账明细是否被某个运行批次带出。状态机:
+/// open -> auto_refund_pending -> refunded | manual_review -> closed
+model PaymentExceptionCase {
+  id               String    @id @default(cuid())
+  /// 渠道事件指纹，回调/对账重复发现时只更新同一张单
+  fingerprint      String    @unique
+  providerId       String
+  orderId          String?
+  merchantOrderNo  String
+  providerTradeNo  String?
+  amountCents      Int
+  currency         String    @default("CNY")
+  kind             String
+  status           String    @default("open")
+  priority         String    @default("urgent")
+  ownerId          String?
+  slaDueAt         DateTime
+  refundId         String?   @unique
+  resolution       String?
+  lastError        String?
+  closedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status, priority, slaDueAt])
+  @@index([providerId, merchantOrderNo])
+  @@index([orderId])
+}
+
+/// 自动对账的按渠道/账单日状态。不要把「今天已触发」只放在进程内存里：
+/// 进程重启或多实例部署后，失败渠道会永久漏掉重试；成功渠道也会被重复下载账单。
+model PaymentAutoReconcileState {
+  id            String    @id @default(cuid())
+  providerId    String
+  billDate      String
+  /// pending | succeeded | failed
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([providerId, billDate])
+  @@index([status, nextAttemptAt])
 }
 
 /// 登录审计 —— 成功与失败都记。
@@ -1155,8 +1275,9 @@ model LoginSession {
 
 /// 发票。
 ///
-/// 一单一票 (`orderId @unique`): 拆票会让「本单已开多少」需要汇总计算,
-/// 而退款冲红又要按票逐张处理 —— MVP 阶段收益远小于复杂度。
+/// 同一订单可保留多条申请历史: 驳回后允许用户重提, 但同一时刻最多只有
+/// 一张 `pending` / `issued` / `red_flushed` 票。所有历史行都保留, 便于
+/// 财务追溯「哪次申请被驳回、哪次最终开具、是否已冲红」。
 ///
 /// 金额取**开票时的可开票余额快照** (`paidCents - refundedCents`),
 /// 不按当前订单金额重算: 开票之后再退款, 票面金额必须还是当时那个数。
@@ -1164,8 +1285,10 @@ model Invoice {
   id        String @id @default(cuid())
   /// 发票号, 后台开具时生成 (前缀 + 日期 + 序号), 全局唯一
   invoiceNo String @unique
-  /// 一单一票
-  orderId   String @unique
+  orderId   String
+  /// 有效票占用键: 有效发票等于 orderId, 驳回后置空。
+  /// 数据库唯一约束兜底多实例并发申请; 历史数据该字段可能为空, 仍由状态校验兼容。
+  activeOrderId String? @unique
   userId    String
 
   /// 开票金额 (整数分), 开具时的快照
@@ -1181,14 +1304,18 @@ model Invoice {
   /// 开票内容
   content     String  @default("技术服务费")
 
-  /// 'pending' 待开具 | 'issued' 已开具 | 'rejected' 已驳回
-  status       String    @default("pending")
-  rejectReason String?
+  /// 'pending' 待开具 | 'issued' 已开具 | 'rejected' 已驳回 | 'red_flushed' 已冲红
+  status         String    @default("pending")
+  rejectReason   String?
   /// 可打印 HTML 文件在存储后端里的 key (开具时生成)
-  fileKey      String?
-  issuedAt     DateTime?
+  fileKey        String?
+  issuedAt       DateTime?
   /// 开具人 (后台管理员 id)
-  issuedBy     String?
+  issuedBy       String?
+  /// 冲红登记时间 / 操作人 / 原因。当前只做系统台账, 不对接税务平台
+  redFlushedAt   DateTime?
+  redFlushedBy   String?
+  redFlushReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1198,6 +1325,7 @@ model Invoice {
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([orderId, createdAt])
 }
 
 /// 一次对账导入。
@@ -1863,6 +1991,8 @@ model BillingOrder {
   errorText         String @default("")
   resolvedBy        String @default("")
   resolutionNote    String @default("")
+  /// 批量人工核对批次号。同一次批量操作写入同一个值，便于财务追溯
+  reviewBatchId     String @default("")
 
   startedAt  DateTime?
   settledAt  DateTime?
@@ -1886,6 +2016,7 @@ model BillingOrder {
   @@index([channelId])
   @@index([channelModelId])
   @@index([status, createdAt])
+  @@index([reviewBatchId])
   /// 财务分析按模型 / 能力 / 场景三维分组聚合
   @@index([model])
   @@index([capability])
@@ -1935,6 +2066,7 @@ model CreditLedgerEntry {
   @@index([userId, createdAt])
   @@index([userId, type])
   @@index([billingOrderId])
+  @@index([lotId])
 }
 
 /// 预留明细：某个账单从哪些批次扣了多少微积分（结算/退款按此回填）。
@@ -2152,7 +2284,7 @@ model PaymentReconciliationItem {
   amountCents     Int
   currency        String   @default("CNY")
   /// matched | recovered | local_order_not_found | provider_record_missing
-  /// | amount_mismatch | trade_no_mismatch | credit_failed
+  /// | amount_mismatch | trade_no_mismatch | duplicate_charge | credit_failed
   result          String
   /// 该差异是否已由本次运行自动处理；不表示人工结案
   resolved        Boolean  @default(false)
@@ -2161,7 +2293,9 @@ model PaymentReconciliationItem {
 
   run PaymentReconciliationRun @relation(fields: [runId], references: [id])
 
-  @@unique([runId, merchantOrderNo])
+  /// 同一商户订单号可能对应多条渠道流水（例如重复扣款）。
+  /// 对账明细必须保留每次渠道交易，不能用商户订单号互相覆盖。
+  @@unique([runId, merchantOrderNo, providerTradeNo])
   @@index([result])
   @@index([providerId, merchantOrderNo])
 }

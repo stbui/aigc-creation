@@ -1,3 +1,4 @@
+import '../styles/auth.css';
 import { useState } from 'react';
 import { Button, Form, FormItem, Input, useApp } from '../ui';
 import { Link, useSearchParams } from 'react-router-dom';

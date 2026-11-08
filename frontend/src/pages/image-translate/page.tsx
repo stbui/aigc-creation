@@ -2,12 +2,12 @@ import { useState } from 'react';
 
 import { DEFAULT_TARGET_LANG } from './constants';
 import {
-  ProductSourceResult,
-  ProductSourceUploadPreview,
   ToolCard,
   ToolHistoryPane,
   ToolShell,
   ToolSwitch,
+  productSourcePane,
+  productSourceUploadPreview,
 } from './components';
 import { useToolTask } from './hooks';
 import { languageLabelOf, languageOptions, translatePayload } from './utils';
@@ -50,12 +50,7 @@ export function ImageTranslatePage() {
       desc="智能翻译图片文字，保留原版式快速本地化"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       replaceUpload
-      renderUploadPreview={(uploads, controls) => {
-        const image = uploads[0];
-        return image ? (
-          <ProductSourceUploadPreview image={image} controls={controls} alt="待翻译图片" />
-        ) : null;
-      }}
+      renderUploadPreview={productSourceUploadPreview('待翻译图片')}
       settings={{ resolution: true }}
       submitLabel="立即翻译"
       emptyVideo="/static/mp4/05_tpfy.mp4"
@@ -73,10 +68,7 @@ export function ImageTranslatePage() {
         setSourceUrl(inputs[0]?.url ?? '');
         return run(inputs, translatePayload(targetLang, protect, settings));
       }}
-      sourcePane={(images) => {
-        const image = images[0];
-        return image ? <ProductSourceResult image={image} alt="待翻译图片" /> : null;
-      }}
+      sourcePane={productSourcePane('待翻译图片')}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="image_translate" refreshKey={result?.url} emptyText="暂无翻译记录" />

@@ -37,7 +37,7 @@ import { AppError } from '../common/app.exception';
  *
  * mode 含义 (语义不变):
  *   real    —— 已接入真实模型通道, 界面标「已接入」。
- *              具体走哪条线路以**每单真实的 task.provider** 为准。
+ *              具体走哪条线路以任务快照的 `routeId` / `channelModelId` 为准。
  *   mock    —— (2026-10-22 已移除) 过去表示「本地只画占位图」; 占位实现已全部删除
  *   planned —— 参考站有、本项目暂未实现, 界面标「规划中」且不可提交
  *

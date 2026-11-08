@@ -465,6 +465,7 @@ export class LogicalModelAdminService {
         capabilitySpecFromModelCapabilityConfig(
           decodeCapabilityConfig(channelModel.capabilityConfigJson),
           channelModel.capability,
+          channelModel.protocol,
         ),
         tiers.filter((tier) => tier.channelModelId === channelModel.id),
         channelModel.protocol,
@@ -616,6 +617,7 @@ export class LogicalModelAdminService {
           capabilitySpecFromModelCapabilityConfig(
             decodeCapabilityConfig(channelModel.capabilityConfigJson),
             channelModel.capability,
+            channelModel.protocol,
           ),
           ctx.tiers.filter((tier) => tier.channelModelId === channelModel.id),
           channelModel.protocol,

@@ -292,19 +292,53 @@ export class AdminAlertsService {
   }
 
   private async invoiceAlerts(): Promise<AdminAlert[]> {
-    const pending = await this.prisma.invoice.count({ where: { status: 'pending' } });
+    const [pending, blockedRows] = await Promise.all([
+      this.prisma.invoice.count({ where: { status: 'pending' } }),
+      this.prisma.$queryRaw<Array<{ count: number | bigint }>>`
+        SELECT COUNT(*) AS count
+        FROM "Invoice" AS i
+        JOIN "Order" AS o ON o.id = i.orderId
+        WHERE i.status = 'pending'
+          AND (
+            o.status NOT IN ('paid', 'partial_refunded')
+            OR i.amountCents > (o.paidCents - o.refundedCents)
+            OR EXISTS (
+              SELECT 1
+              FROM "Refund" AS r
+              WHERE r.orderId = o.id AND r.status = 'processing'
+            )
+          )
+      `,
+    ]);
     if (pending === 0) return [];
-    return [
-      {
+
+    const blocked = Number(blockedRows[0]?.count ?? 0);
+    const alerts: AdminAlert[] = [];
+    if (blocked > 0) {
+      alerts.push({
+        key: 'invoice-refund-blocked',
+        severity: 'warning',
+        category: 'invoice',
+        title: '有退款后待处置的发票',
+        detail: '订单已退款、退款处理中或票面超过剩余可开票金额，需核对后驳回或等待退款结果',
+        count: blocked,
+        link: '/admin/invoices',
+      });
+    }
+
+    const awaitingIssue = pending - blocked;
+    if (awaitingIssue > 0) {
+      alerts.push({
         key: 'invoice-pending',
         severity: 'warning',
         category: 'invoice',
         title: '有待开具发票',
         detail: '用户已提交开票申请，审核后会生成可下载的票据',
-        count: pending,
+        count: awaitingIssue,
         link: '/admin/invoices',
-      },
-    ];
+      });
+    }
+    return alerts;
   }
 }
 

@@ -1,5 +1,12 @@
 import { Plus } from 'lucide-react';
-import { ActionButton, AdminDataTable, Meter, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  AdminDataTable,
+  Meter,
+  StatusTag,
+  formatDate,
+  type AdminColumn,
+} from '~/admin-ui/primitives';
 import {
   EFFECTIVE_META,
   SCOPE_LABEL,
@@ -56,7 +63,7 @@ export function CouponTable({
       render: (row) => (
         <button
           type="button"
-          className="rounded font-mono text-xs font-medium text-brand hover:underline"
+          className="rounded font-mono font-medium text-brand hover:underline"
           onClick={() => onEdit(row)}
         >
           {row.code}
@@ -68,7 +75,7 @@ export function CouponTable({
       key: 'type',
       title: '类型',
       width: 70,
-      render: (row) => <span className="text-xs">{TYPE_LABEL[row.type] ?? row.type}</span>,
+      render: (row) => <span>{TYPE_LABEL[row.type] ?? row.type}</span>,
     },
     {
       key: 'value',
@@ -88,14 +95,14 @@ export function CouponTable({
         row.thresholdCents > 0 ? (
           <span className="tabular-nums">满 ¥{yuan(row.thresholdCents)}</span>
         ) : (
-          <span className="text-[12px] text-muted-foreground">无门槛</span>
+          <span className="text-muted-foreground">无门槛</span>
         ),
     },
     {
       key: 'scope',
       title: '适用范围',
       width: 110,
-      render: (row) => <span className="text-xs">{SCOPE_LABEL[row.scope] ?? row.scope}</span>,
+      render: (row) => <span>{SCOPE_LABEL[row.scope] ?? row.scope}</span>,
     },
     {
       key: 'used',
@@ -103,13 +110,19 @@ export function CouponTable({
       width: 100,
       render: (row) => {
         const total = row.totalCount === 0 ? null : row.totalCount;
-        const pct = total ? Math.round((row.usedCount / total) * 100) : null;
+        const occupied = row.usedCount + row.pendingReserved;
+        const pct = total ? Math.round((occupied / total) * 100) : null;
         return (
           <div className="flex flex-col gap-1">
             <span className="tabular-nums">
-              {row.usedCount}
+              {occupied}
               {total ? ` / ${total}` : ' / 不限'}
             </span>
+            {row.pendingReserved > 0 && (
+              <span className="text-xs text-muted-foreground">
+                含待支付预占 {row.pendingReserved}
+              </span>
+            )}
             {pct !== null && (
               <Meter value={Math.min(pct, 100)} className="h-1 w-16" decorative />
             )}
@@ -120,11 +133,10 @@ export function CouponTable({
     {
       key: 'valid',
       title: '有效期',
-      width: 170,
+      width: 180,
       render: (row) => (
-        <span className="text-[12px] tabular-nums text-muted-foreground">
-          {new Date(row.validFrom).toLocaleDateString('zh-CN')} ~{' '}
-          {new Date(row.validTo).toLocaleDateString('zh-CN')}
+        <span className="tabular-nums text-muted-foreground">
+          {formatDate(row.validFrom)} ~ {formatDate(row.validTo)}
         </span>
       ),
     },
@@ -140,8 +152,8 @@ export function CouponTable({
     },
     {
       key: 'ops',
-      title: '',
-      width: 110,
+      title: '操作',
+      width: 120,
       fixed: 'right',
       render: (row) =>
         writable ? (
@@ -150,8 +162,10 @@ export function CouponTable({
               编辑
             </ActionButton>
             <ActionButton
-              variant={row.status === 'on' ? 'destructive' : 'ghost'}
+              variant="ghost"
               size="sm"
+              /* 停用不必用一整块红底: 一行一个红按钮会把整张表压成告警墙 */
+              className={row.status === 'on' ? 'text-danger-text' : undefined}
               disabled={busy}
               onClick={() => onToggle(row)}
             >
@@ -170,7 +184,9 @@ export function CouponTable({
       loading={loading}
       error={error}
       onRetry={onRetry}
-      minWidth={1060}
+      /* 整行可点开编辑；只读账号不挂这个入口，避免打开一个存不了的抽屉 */
+      onRowClick={writable ? onEdit : undefined}
+      minWidth={1120}
       pagination={{
         current,
         pageSize,

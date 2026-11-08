@@ -23,11 +23,11 @@ export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   active: { label: '正常', tone: 'success' },
   disabled: { label: '已禁用', tone: 'warn' },
   deleted: { label: '已注销', tone: 'muted' },
-  // 角色
+  // 角色。四种角色使用不同色调快速区分；角色文字仍是无障碍识别的主要依据。
   user: { label: '用户', tone: 'muted' },
   admin: { label: '管理员', tone: 'brand' },
   operator: { label: '运营', tone: 'success' },
-  finance: { label: '财务', tone: 'success' },
+  finance: { label: '财务', tone: 'warn' },
   // 订单状态。任务状态改用 `queued` 后，`pending` 只服务订单与发票，
   // 两页都通过 <StatusTag label="待支付/待开具"> 覆盖文案。
   pending: { label: '等待', tone: 'warn' },
@@ -39,4 +39,5 @@ export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   // 发票状态。`pending` 复用库存量条的「等待」色，发票页用 `label="待开具"` 覆盖文案
   issued: { label: '已开具', tone: 'success' },
   rejected: { label: '已驳回', tone: 'danger' },
+  red_flushed: { label: '已冲红', tone: 'muted' },
 };

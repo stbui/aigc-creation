@@ -1,63 +1,112 @@
-import * as jwt from 'jsonwebtoken';
+import { Injectable } from '@nestjs/common';
+import { randomBytes } from 'crypto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { AccountTokenService } from '../account-token.service';
 
 /**
  * OAuth state 与回调后的短时登录票。
  *
- * state 是浏览器跳转期间防 CSRF 的一次性凭据；登录票是「provider 回调 →
- * 前端登录完成页」之间的短时接力凭据，避免把 7 天的 accessToken 放进 URL。
+ * 两者都是一次性凭据：浏览器只拿到 32 字节随机原值，数据库仅保存 HMAC。
+ * 消费使用 `updateMany({ id, usedAt: null })` 做 CAS，因此并发重放最多
+ * 有一个请求成功。state 在回调开始时消费；ticket 在换取正式会话时消费。
  */
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-ecom-vision-secret-2024-do-not-use-in-prod';
-
-const STATE_TTL = '10m';
-const TICKET_TTL = '60s';
+const STATE_TTL_MS = 10 * 60 * 1000;
+const TICKET_TTL_MS = 60 * 1000;
 
 export interface OAuthStatePayload {
   provider: string;
   /** 登录完成后回跳的站内路径。未提供时回落 /workbench */
   returnTo?: string;
+  /** 显式绑定流程的发起用户；普通登录为空 */
+  linkUserId?: string;
 }
 
 export interface OAuthTicketPayload {
-  sub: string;
+  userId: string;
   provider: string;
 }
 
+@Injectable()
 export class OAuthStateService {
-  signState(payload: OAuthStatePayload): string {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: STATE_TTL, algorithm: 'HS256' });
+  constructor(private readonly prisma: PrismaService) {}
+
+  async createState(payload: OAuthStatePayload): Promise<string> {
+    return this.createChallenge({
+      kind: 'state',
+      provider: payload.provider,
+      linkUserId: payload.linkUserId,
+      returnTo: payload.returnTo,
+      ttlMs: STATE_TTL_MS,
+    });
   }
 
-  verifyState(token: string, provider: string): OAuthStatePayload {
-    let payload: unknown;
-    try {
-      payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-    } catch {
-      throw new Error('OAuth state 无效或已过期，请重新发起登录');
-    }
-    const decoded = payload as jwt.JwtPayload & OAuthStatePayload;
-    if (!decoded.provider || decoded.provider !== provider) {
+  async consumeState(raw: string, provider: string): Promise<OAuthStatePayload> {
+    const challenge = await this.consumeChallenge(raw, 'state');
+    if (challenge.provider !== provider) {
       throw new Error('OAuth state 与 provider 不匹配，请重新发起登录');
     }
     return {
-      provider: String(decoded.provider),
-      returnTo: decoded.returnTo ? String(decoded.returnTo) : undefined,
+      provider: challenge.provider,
+      returnTo: challenge.returnTo ?? undefined,
+      linkUserId: challenge.linkUserId ?? undefined,
     };
   }
 
-  signTicket(payload: OAuthTicketPayload): string {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: TICKET_TTL, algorithm: 'HS256' });
+  async createTicket(payload: OAuthTicketPayload): Promise<string> {
+    return this.createChallenge({
+      kind: 'ticket',
+      provider: payload.provider,
+      userId: payload.userId,
+      ttlMs: TICKET_TTL_MS,
+    });
   }
 
-  verifyTicket(token: string): OAuthTicketPayload {
-    let payload: unknown;
-    try {
-      payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-    } catch {
-      throw new Error('OAuth 登录票无效或已过期，请重新登录');
+  async consumeTicket(raw: string): Promise<OAuthTicketPayload> {
+    const challenge = await this.consumeChallenge(raw, 'ticket');
+    if (!challenge.userId) throw new Error('OAuth 登录票缺少用户标识');
+    return { userId: challenge.userId, provider: challenge.provider };
+  }
+
+  private async createChallenge(params: {
+    kind: 'state' | 'ticket';
+    provider: string;
+    ttlMs: number;
+    userId?: string;
+    linkUserId?: string;
+    returnTo?: string;
+  }): Promise<string> {
+    const raw = randomBytes(32).toString('base64url');
+    await this.prisma.oAuthChallenge.create({
+      data: {
+        tokenHash: AccountTokenService.hash(raw),
+        kind: params.kind,
+        provider: params.provider,
+        userId: params.userId ?? null,
+        linkUserId: params.linkUserId ?? null,
+        returnTo: params.returnTo ?? null,
+        expiresAt: new Date(Date.now() + params.ttlMs),
+      },
+    });
+    return raw;
+  }
+
+  private async consumeChallenge(raw: string, kind: 'state' | 'ticket') {
+    const label = kind === 'state' ? 'OAuth state' : 'OAuth 登录票';
+    const tokenHash = AccountTokenService.hash(String(raw || '').trim());
+    const record = await this.prisma.oAuthChallenge.findUnique({ where: { tokenHash } });
+    if (!record || record.kind !== kind) {
+      throw new Error(`${label}无效，请重新登录`);
     }
-    const decoded = payload as jwt.JwtPayload & OAuthTicketPayload;
-    if (!decoded.sub) throw new Error('OAuth 登录票缺少用户标识');
-    return { sub: String(decoded.sub), provider: String(decoded.provider ?? '') };
+    if (record.usedAt) throw new Error(`${label}已使用，请重新登录`);
+    if (record.expiresAt.getTime() <= Date.now()) {
+      throw new Error(`${label}已过期，请重新登录`);
+    }
+    const claimed = await this.prisma.oAuthChallenge.updateMany({
+      where: { id: record.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+    if (claimed.count !== 1) throw new Error(`${label}已使用，请重新登录`);
+    return record;
   }
 }

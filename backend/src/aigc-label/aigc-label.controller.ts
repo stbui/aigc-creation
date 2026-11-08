@@ -38,7 +38,7 @@ export class AigcLabelSpecDto {
   @IsString() @MaxLength(120) fontFamily!: string;
   @IsInt() @Min(12) @Max(120) fontSize!: number;
   @IsInt() @Min(100) @Max(900) fontWeight!: number;
-  @IsNumber() @Min(0) @Max(20) letterSpacing!: number;
+  @IsInt() @Min(0) @Max(20) letterSpacing!: number;
 
   @Matches(/^#[0-9a-fA-F]{6}$/, { message: "文字颜色必须是 #rrggbb" })
   textColor!: string;

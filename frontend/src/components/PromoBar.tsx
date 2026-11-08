@@ -6,7 +6,7 @@ import { myMarketingApi } from '../lib/api';
 import { safeInternalPath } from '../lib/safePath';
 import type { PopupCampaign } from '../types/api';
 
-const DISMISS_KEY = 'ecom-promo-dismissed-v1';
+const DISMISS_KEY = 'huojue-promo-dismissed-v1';
 
 /**
  * 顶部推广条: 参考站工作台顶部的通栏促销位。

@@ -1,3 +1,4 @@
+import './TicketsPage.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {

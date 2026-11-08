@@ -185,10 +185,10 @@ backend/src/model/
 | `ModelChannel`（modality/priority/health 版） | 删除，按 §3.1 重建；不做数据迁移（开发阶段无存量运营数据） |
 | `ModelChannelConfig` | 删除；通道配置全部迁入 `ModelChannel` |
 | `ModelCallLog` | 删除，由 `ApiCallLog` + `RouteAttempt` 取代 |
-| `GenerationTask` | 原地扩展：`logicalModelId`、`logicalModelRevisionId`、`routeId`、`channelModelId`、`routeRun`、`billingOrderId`、`providerRequestId`、`pollStage`、`nextPollAt`、`leaseOwner`、`leaseUntil`、`attempts`、`stage`、`progress`、`authorizedChargeMicrocredits`；`provider` 恒为 `managed`；`creditCost` 改为账单金额只读投影 |
+| `GenerationTask` | 原地扩展：`logicalModelId`、`logicalModelRevisionId`、`routeId`、`channelModelId`、`routeRun`、`billingOrderId`、`providerRequestId`、`pollStage`、`nextPollAt`、`leaseOwner`、`leaseUntil`、`attempts`、`stage`、`progress`、`authorizedChargeMicrocredits`；`creditCost` 改为账单金额只读投影 |
 | `CreditLot` | 保留为「发放批次」，`amount` → `remainingMicrocredits BigInt`，增加 `expiresAt`；FEFO 扣减仍按批次 |
 | `CreditTransaction` | 迁移为 `CreditLedgerEntry`（微积分、available/reserved 双列） |
-| `User` | **不改表**：分组由「有效会员 → `MembershipPlan.userGroupCode`」解析（无有效会员落 `default` 分组），见 §14.2。控制器不得读用户列推断分组 |
+| `User` | **不改表**：分组由「有效会员订单的分组快照 → `MembershipPlan.userGroupCode`（仅历史订单兜底）」解析，无有效会员落 `default` 分组，见 §14.2。控制器不得读用户列推断分组；运营修改套餐映射只影响之后创建的订单 |
 | `MembershipPlan` | 增加 `userGroupCode String?`：会员等级映射分组，`fastChannel` 权益通过分组可见更优线路实现，不新增运行时分支 |
 
 ### 3.4 `ApiCallLog` 字段
@@ -257,7 +257,7 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 ### 5.2 路由目录缓存
 
 - 内存快照：`TTL 30s`、最大过期 `5min`、刷新失败冷却 `2s`；
-- 失效：后台任何渠道/模型/前台模型/分组写入后 `invalidate()`，并将 `RouteCatalogVersion.version + 1`；
+- 失效：后台任何渠道/模型/前台模型/分组写入后 `invalidate()`，并将 `RouteCatalogVersion.version + 1`；会员激活、周期切换、退款撤销、到期以及套餐分组映射修改也属于分组来源变更，事务提交后同样必须清用户分组缓存并递增版本；
 - 装载时剔除：渠道或模型停用、`pricePolicy=unified && billingMode=token` 但协议不支持 Token、`pricePolicy=channel` 但无有效价格档、能力配置非法；
 - 快照内容：前台模型、revision、可路由线路、线路能力规格、默认参数。
 
@@ -297,10 +297,16 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 | 派发前 | CAS `not_sent → submission_unknown`（同时 `status=dispatching`）；CAS 失败即视为结果不明，禁止重发 |
 | 上游已接受 | 记录 `providerRequestId` → `accepted` |
 | 成功 | `succeeded/accepted` |
-| 失败且无 providerRequestId | `safeRouteRejection` 为真 → `rejected_no_job`；否则 `submission_unknown` |
+| 建连前失败 / 上游明确拒绝，且无 providerRequestId | `safeRouteRejection` 为真 → `rejected_no_job` |
+| 建连后结果不明，且无 providerRequestId | → `submission_unknown` |
 | 失败但有 providerRequestId | `failed/accepted`（不切换） |
 
-**只有 `rejected_no_job` 才切换线路**；`submission_unknown` 一律停住等待人工/恢复，避免同一请求在两个上游各扣一次费。
+建连前失败的判定包括 `outbound_dns_failed`、`outbound_proxy_invalid`、
+`outbound_connection_refused`、`outbound_network_unreachable`、`outbound_invalid_url`、
+`outbound_blocked_host`，以及失败文本中的 `ECONNREFUSED`、`ENOTFOUND`、`EAI_AGAIN`、
+`ENETUNREACH`、`EHOSTUNREACH`。此时 TCP 连接尚未建立，上游不可能创建任务。
+
+**只有 `rejected_no_job` 才切换线路**；`submission_unknown` 一律停住等待人工/恢复，避免同一请求在两个上游各扣一次费。`ECONNRESET`、`socket hang up`、超时、5xx 与响应解析失败发生在建连后：没有 `providerRequestId` 时归 `submission_unknown`，已有请求号时维持 `failed/accepted`。
 
 ### 5.7 故障切换
 
@@ -319,7 +325,8 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 
 - 冷却只写本进程内存（未接共享存储）；
 - 读取同时检查 `channel:` / `channel-model:` / `route:` 三键；
-- 只有 `safeRouteRejection`（渠道槽位失败或 401/403/404/429）才可能触发冷却；超时、5xx、连接中断不冷却也不切换。
+- 只有 401/403/404/429 产生冷却；渠道槽位失败与建连前网络失败可以换线，但不写冷却；
+- 超时、5xx、建连后中断不冷却也不切换。
 
 ### 5.9 worker 与租约
 
@@ -484,7 +491,7 @@ model: {
 | 页面 | 内容 |
 | --- | --- |
 | `/admin/channels` | 渠道工作台：列表、编辑抽屉（连接/凭证/请求头/代理/并发）、模型列表与价格档、成本与售价并列、批量调价/删除、排序、导出导入、上游拉取/导入/测试、健康 |
-| `/admin/logical-models` | 前台模型：能力合同编辑器、线路选择（priority/weight）、默认参数、价格策略、路由模拟；`channel` 策略下价格只读并提示去渠道模型定价 |
+| `/admin/capabilities` | 能力与模型：能力上下线与所属前台模型共用一个工作台；模型支持能力合同编辑、线路选择（priority/weight）、默认参数、价格策略与路由模拟，`channel` 策略下价格只读并提示去渠道模型定价。旧地址 `/admin/logical-models` 重定向到本页 |
 | `/admin/user-groups` | 分组：可见渠道、倍率、货币兑换、模型覆盖、用户数 |
 | `/admin/plugins` | 插件：内置/上传、启停、能力统计、校验结果 |
 | `/admin/model-calls` | 调用记录（`ApiCallLog` 维度） |

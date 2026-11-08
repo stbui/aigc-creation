@@ -70,7 +70,7 @@ describe('ChannelModelHealthPanel', () => {
 
     expect(screen.getAllByText('无样本').length).toBe(2);
     // 24h 窗口提示与「最近样本」空态各一处
-    expect(screen.getAllByText('窗口内没有终态调用').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('暂无调用').length).toBeGreaterThanOrEqual(1);
   });
 
   it('成功率按语义分档展示', () => {
@@ -125,8 +125,8 @@ describe('ChannelModelHealthPanel', () => {
     );
 
     expect(screen.getByText('停用')).toBeTruthy();
-    expect(screen.getByText('协议未注册')).toBeTruthy();
-    expect(screen.getByText('冷却中')).toBeTruthy();
+    expect(screen.getByText('接口不可用')).toBeTruthy();
+    expect(screen.getByText('暂时不可用')).toBeTruthy();
   });
 
   it('最近样本显示错误码', () => {
@@ -157,6 +157,6 @@ describe('ChannelModelHealthPanel', () => {
   it('没有任何线路时给出可操作的空态', () => {
     render(<ChannelModelHealthPanel rows={[]} loading={false} />);
 
-    expect(screen.getByText(/没有可观测的线路/)).toBeTruthy();
+    expect(screen.getByText('暂无可观测线路')).toBeTruthy();
   });
 });

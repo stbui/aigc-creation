@@ -1,0 +1,1321 @@
+/**
+ * AppLayout 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件/页面共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ───────── 顶部推广条 (复刻参考站工作台通栏促销位, 内容为自有真实卖点) ───────── */
+.app-promo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 44px 0 24px;
+  background: linear-gradient(90deg, var(--accent-orange) 0%, var(--cta-text) 55%, var(--danger-soft-text) 100%);
+  color: var(--card-bg);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.app-promo-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.app-promo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.app-promo-text {
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.app-promo-cta {
+  background: var(--card-bg);
+  color: var(--danger-text);
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 28px;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+}
+
+.app-promo-cta:hover {
+  background: var(--danger-soft-bg);
+}
+
+.app-promo-close {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+}
+
+.app-promo-close:hover {
+  color: var(--card-bg);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+@media (max-width: 640px) {
+  .app-promo-text {
+    display: none;
+  }
+}
+
+/* ───────── 应用骨架 ───────── */
+.app-boot {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-layout {
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: var(--color-card);
+  /* 参考站实拍 border-bottom 1px #f2f3f5 —— 比全局 --color-border(#e2e8f0) 更浅 */
+  border-bottom: 1px solid var(--color-border-soft);
+  padding: 0 24px; /* 参考站 padding 0 24 (原 0 20, 品牌块 x 差 4px) */
+  height: 64px;
+  /* antd <Header> 默认 line-height:64px 会被子元素继承, 使 .app-quota / .app-user 的
+     行盒撑到 64px (再加 padding 即 72px), 溢出 64px 顶栏上下各 4px —— 2026-10-19 实测复现, 此处归零 */
+  line-height: normal;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.app-header.is-scrolled {
+  border-bottom-color: var(--color-border-soft);
+  box-shadow: 0 8px 24px rgba(31, 41, 55, 0.06);
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text-strong);
+  flex-shrink: 0;
+}
+
+/* brand 图标块 36x36 (对齐参考站 workspace-brand-logo 尺寸);
+   2026-10-19 换货觉AI「觉眼」logo (SVG 自带渐变容器, 此处不再铺底色) */
+.app-brand-mark {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: inline-flex;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.app-brand-mark-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* AI 后缀: 品牌紫, 与主名「货觉」深色形成层级 */
+.app-brand-ai {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.app-brand-text {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.app-topnav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+/* 顶栏导航: 对齐参考站 workspace-auth-nav button (13px/700 #667085 / radius8 / padding 0 14 / hover #5546d8 on #f1efff) */
+.app-topnav-item {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 14px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-control);
+  white-space: nowrap;
+  flex: none;
+}
+
+.app-topnav-item:hover {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.app-topnav-item-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px; /* 参考站下拉条目 gap 10 (icon 20 ↔ 文字) */
+}
+
+/* 下拉菜单皮肤: 逐值对齐参考站 .workspace-nav-menu
+   (实测 1280: 宽 137 / radius 12 / border 1px #e5e7f0 / shadow 0 18px 42px rgba(31,41,55,.14) /
+    pad 10 8 / 条目 119x36 radius 9 pad 0 12 / 文字 13px 600 #475467 / icon 20 /
+    条目 hover #f2efff + #5b4df5) —— antd 默认皮肤全部不符, 见 docs/topnav-design.md P2-1
+   实际生效的选择器在文件末尾「顶部导航下拉」适配层（Radix Content 取代 .ant-dropdown-menu）。 */
+/* guest「登录/注册」纯文字钮: 参考站 #workspace-logout (68x32 / pad 8 / radius 6 / 13-700 #667085) */
+.app-guest-login {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 8px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+.app-guest-login:hover {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+/*
+ * 右侧动作区 (2026-10-30 收拢)
+ *
+ * 之前三个控件的视觉尺度各走各的: 铃铛 32 高、余额胶囊 24 高、用户钮 34 高，
+ * 余额又是灰字灰底，看起来像一段不可点的状态文字。现在统一成 32px 控件带，
+ * 余额用「白底 + 细描边 + 深色数字」成为唯一有量的信息，身份区前加一道
+ * 16px 细分割线；hover 一律落到品牌淡紫，强调色仍然只给交互态。
+ */
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.app-header-divider {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+}
+
+.app-quota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--color-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.app-quota:hover {
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-color: var(--brand);
+}
+
+.app-quota svg {
+  flex: none;
+  color: var(--text-desc);
+  transition: color 0.18s ease;
+}
+
+.app-quota:hover svg {
+  color: var(--brand);
+}
+
+.app-quota-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.18s ease;
+}
+
+.app-quota:hover .app-quota-num {
+  color: var(--brand);
+}
+
+.app-quota-label {
+  color: inherit;
+}
+
+.app-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px 0 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-control);
+  transition: background 0.18s ease;
+}
+
+/* 用户区 hover: 对齐参考站 #f1efff (2026-10-18 去蓝, 原 slate-100) */
+.app-user:hover,
+.app-user.is-open {
+  background: var(--brand-bg);
+}
+
+.app-user-avatar {
+  flex: none;
+  background: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.app-user-email {
+  max-width: 168px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-body);
+}
+
+.app-user-chevron {
+  flex: none;
+  color: var(--text-desc);
+  transition: transform 0.18s ease;
+}
+
+.app-user.is-open .app-user-chevron {
+  transform: rotate(180deg);
+}
+
+/* 移动端汉堡按钮: 仅 ≤900px 显示 (桌面隐藏), 点击开 Drawer 承载侧栏 */
+.app-mobile-toggle {
+  display: none;
+}
+
+/* 顶导窄档收敛 (2026-11-02 复测 8 项导航):
+   导航右缘固定在 869px, 右侧动作区（铃铛 + 胶囊 + 分割线 + 用户菜单）宽 350px
+   （含邮箱）/ 230px（隐藏邮箱），加 24px 间距后分别需要 1267 / 1147 的视口。
+   原阈值 1199 / 1099 各差一截：1200~1266 与 1100~1122 两段会顶出文档级横向滚动。
+   不隐藏导航项（参考站 900 档仍显示全部 8 项），只按「先减邮箱、次减胶囊」两档收窄。 */
+@media (max-width: 1249px) {
+  .app-user-email {
+    display: none;
+  }
+}
+
+@media (max-width: 1149px) {
+  .app-quota,
+  .app-header-divider {
+    display: none;
+  }
+}
+
+/* 侧栏与内容并排。以前依赖 antd Layout 提供 display:flex, 移除 antd 后
+   只剩 flex-direction 会让 .app-body 退回块级, 内容区被推到侧栏下方
+   (视觉上像"主区空白")。display / 方向都显式写在这里。 */
+.app-body {
+  display: flex;
+  flex-direction: row;
+  /* 必须跟随完整 chrome：促销条开启时是 104px。原先写死 64px，比可视区多出
+     40px，固定视口高度的工具页（商品主图 / 详情图 / 创意生图 / 自由创作 / 多图融合）
+     会凭空多出一截纵向滚动。变量在 promo 关闭时由 html[data-promo='off'] 归零。 */
+  min-height: calc(100vh - var(--workspace-topbar-height, 64px));
+  align-items: stretch;
+}
+
+/* 侧栏外壳: 宽度由 CSS 托管 —— 桌面 176px 横排 / ≤1366px 自动塌缩 100px 垂直轨 /
+   ≤900px display:none (响应式规则见文件末尾「响应式外壳」块)。
+   曾经由 JSX inline width 注入, inline 会压过媒体查询导致窄屏塌缩失效 (2026-10-19 修正)。
+   top/height 必须跟随完整 chrome 高度: 促销条开启时为 64 + 40 = 104px, 若仍写死 64
+   会让侧栏底部超出视口 40px, 客服入口不可见 (2026-10-28 修正)。
+   边框由内层 .workspace-side-menu-v2 自带 (#f2f3f5), 此处不重复描边 */
+.app-sider-wrap {
+  background: var(--color-card);
+  flex: 0 0 auto;
+  width: 176px;
+  position: sticky;
+  top: var(--workspace-topbar-height, 64px);
+  height: calc(100vh - var(--workspace-topbar-height, 64px));
+  overflow: visible;
+}
+
+/* 侧边菜单 —— 复刻参考站 workspace-side-menu-v2 (2026-10-28 重抓) */
+.workspace-side-menu-v2 {
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--card-bg);
+  border-right: 1px solid var(--color-border-soft);
+  padding: 16px 12px 24px 24px;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-side-menu-sections {
+  flex: auto;
+  min-height: 0;
+  padding-right: 6px;
+  padding-top: 8px;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(85, 70, 216, 0.32) transparent;
+  scrollbar-gutter: auto;
+  display: grid;
+  grid-auto-rows: max-content;
+  gap: 16px;
+  align-content: start;
+}
+
+/* macOS 的 overlay 滚动条默认会隐藏，截断处会像排版错误；用底部渐隐提示还有入口，
+   滚到底（SideRail 的 has-more 判定）后撤掉，不遮住最后一个入口。 */
+.workspace-side-menu-sections.has-more {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+
+/* Firefox 等仍按下面两条渲染常显细滚动条。 */
+.workspace-side-menu-sections::-webkit-scrollbar {
+  width: 6px;
+}
+
+.workspace-side-menu-sections::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.workspace-side-menu-sections::-webkit-scrollbar-thumb {
+  background: rgba(85, 70, 216, 0.32);
+  border-radius: 999px;
+}
+
+.workspace-menu-section {
+  min-width: 0;
+}
+
+.workspace-menu-section-toggle {
+  width: 100%;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workspace-menu-section-toggle:hover,
+.workspace-menu-section-toggle:focus-visible {
+  background: var(--surface-brand-5);
+}
+
+.workspace-menu-section-toggle svg {
+  flex: none;
+  color: var(--text-body);
+  transition: transform 0.18s;
+}
+
+.workspace-menu-section:not(.open) .workspace-menu-section-toggle svg {
+  transform: rotate(180deg);
+}
+
+.workspace-menu-section-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-side-menu-list {
+  display: grid;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.workspace-side-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  height: 45px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--wb-text);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    color 0.18s;
+  position: relative;
+}
+
+.workspace-side-menu-btn:hover {
+  color: var(--brand);
+  background: var(--surface-brand-5);
+}
+
+.workspace-side-menu-btn.active,
+.workspace-side-menu-btn[aria-current='page'] {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.workspace-menu-icon img {
+  width: auto;
+  max-width: 24px;
+  height: auto;
+  max-height: 24px;
+  display: block;
+  filter: grayscale() opacity(0.62);
+  transition: filter 0.18s;
+}
+
+.workspace-menu-icon.is-active img,
+.workspace-side-menu-btn:hover .workspace-menu-icon img,
+.workspace-side-menu-btn:focus-visible .workspace-menu-icon img,
+.workspace-customer-service-trigger:hover .workspace-menu-icon img,
+.workspace-customer-service-trigger:focus-visible .workspace-menu-icon img {
+  filter: brightness(0) saturate() invert(34%) sepia(78%) saturate(2147%)
+    hue-rotate(232deg) brightness(88%) contrast(90%);
+}
+
+/* 底部真实入口: 参考站 sidebar 固定在菜单列末尾 */
+.workspace-customer-service {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app-content {
+  /* 与侧栏同排时占满剩余宽度; 没有 min-width:0 时宽表/长词会把整列撑出视口 */
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 24px 24px 32px;
+  overflow: auto;
+}
+
+.app-content-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 140px);
+}
+
+/* 页面级 padding 与外壳 padding 的叠加治理 (2026-10-19)
+   参考站 .workspace-route-content **无内边距**, 页面自带 padding, 内容列从 route 边缘起算;
+   本地父级 .app-content 带 24px/24px/32px, 页面再带一层就右移 24px、窄 48px。
+   实测 @1280 (参考站目标: 内容列 x=108 / 宽 1148):
+     library   x=132 / 1100   ← 双重padding
+     my-works  ✅ 已与素材库同骨架逃逸 (2026-10-31), 自有 padding 24px
+     invite    x=108 / 1148   ✅ 自身横向 0, 无需动
+     pkg-shop  x=108 / 1148   ✅ 自身无 padding, 无需动
+     mif       x=108 / 1141   ✅ 已有逃逸规则
+   修法沿用 mif 的既有范式 (.app-content > X { margin:0 -24px -32px }): 页面盒逃到
+   app-content 的 padding 之外, 再由页面自身 padding 定位 —— 页面级 padding 语义不被破坏,
+   底部 -32 同时抵消 app-content 的 32, 使总下边距等于参考站的页面级值。
+   仅对 ≥901px 生效: ≤900px 时 .app-content padding 变成 16px 10px 24px, 固定 -24 会反冲。 */
+@media (min-width: 901px) {
+  .app-content > .asset-library-page {
+    margin: 0 -24px -32px;
+    width: auto;
+  }
+}
+
+/* ── 响应式外壳 (2026-10-28 复测) ──
+   参考站侧栏为视口响应式双态: ≤1366 → 100px 垂直轨 / ≥1367 → 176px 横排列表。
+   断点实测: 1366 → 100px 轨 / 1367 → 176px 横排。
+   ≤900 → 本地保留移动抽屉 (参考站侧栏在 900 仍显示, ≤768 才隐藏; 该差异见文档)。
+   注意层级: 1366 块在前、900 块在后 —— .app-content 的 margin-left 需要 900 块覆盖
+   1366 块的 -16px。 */
+@media (max-width: 1366px) {
+  /* 100px 垂直轨: 参考站 1280 实测 (aside pad 8 8 20 / sections 83 宽 gap14 /
+     条目 77×60 / 标签 10px / 分组标题 77×24) */
+  .app-sider-wrap {
+    width: 100px;
+  }
+  /* 参考站内容列 x=108 = 侧栏 100 − 16 重叠 + padding 24 (其 route content x=84 实测);
+     负 16px 复刻该重叠量, 配合 hero padding 100px 使标题落 x=208 (参考站 1280 实测值) */
+  .app-content {
+    margin-left: -16px;
+  }
+  .app-sider-wrap .workspace-side-menu-v2 {
+    padding: 8px 8px 20px;
+  }
+  .app-sider-wrap .workspace-side-menu-sections {
+    gap: 14px;
+    padding-top: 6px;
+  }
+  .app-sider-wrap .workspace-menu-section-toggle {
+    height: 24px;
+    padding: 0 4px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+  .app-sider-wrap .workspace-menu-section-toggle svg {
+    width: 12px;
+    height: 12px;
+  }
+  .app-sider-wrap .workspace-side-menu-btn,
+  .app-sider-wrap .side-menu-disabled {
+    width: 77px;
+    height: 60px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 2px;
+  }
+  .app-sider-wrap .workspace-menu-icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+  }
+  .app-sider-wrap .workspace-side-menu-btn .side-menu-label {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 14px;
+    text-align: center;
+  }
+  /* 参考站窄轨下底部入口相对内容列再右移 8px, 形成 x=16 / 83px 宽的实拍几何。 */
+  .app-sider-wrap .workspace-customer-service {
+    left: 8px;
+  }
+  .app-sider-wrap .product-suggestion-sidebar-launcher,
+  .app-sider-wrap .workspace-customer-service-trigger {
+    height: 60px;
+    padding: 5px 2px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    font-size: 12px;
+    line-height: 14px;
+    text-align: center;
+  }
+  .app-sider-wrap .product-suggestion-sidebar-icon,
+  .app-sider-wrap .workspace-customer-service-trigger .workspace-menu-icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@media (max-width: 900px) {
+  /* 参考站移动态 390 实测: 无促销条 / 顶栏 54px (pad 0 14) / 侧栏 display:none / 2 列网格 */
+  .app-header {
+    height: 54px;
+    padding: 0 14px;
+    gap: 12px;
+  }
+  .app-topnav,
+  .app-quota,
+  .app-header-divider,
+  .app-user-email,
+  .app-sider-wrap {
+    display: none;
+  }
+  .app-body {
+    min-height: calc(100vh - 54px);
+  }
+  /* 侧栏已隐藏, 撤销 1366 块的 -16px 重叠, 否则内容会向左溢出 16px。
+     左右 10px: 参考站 390 实测 hero 宽 370 (= 390 − 20), 卡片 2 列 181 */
+  .app-content {
+    margin-left: 0;
+    padding: 16px 10px 24px;
+  }
+  .app-mobile-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-control);
+    color: var(--wb-text);
+    cursor: pointer;
+  }
+  .app-mobile-toggle:hover {
+    background: var(--brand-bg);
+    color: var(--brand);
+  }
+  /* 抽屉顶部补桌面顶导里的三个入口（首页/套餐/邀请） */
+  .app-mobile-links {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px 12px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-mobile-links a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    border-radius: var(--radius-control);
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  /* Drawer 内恢复完整横排菜单: 不受桌面窄轨的 77×60 / 10px 标签影响。 */
+  .app-mobile-drawer .workspace-side-menu-v2 {
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    padding: 8px;
+    border-right: none;
+  }
+  .app-mobile-drawer .workspace-side-menu-sections {
+    flex: none;
+    max-height: none;
+    padding-right: 0;
+    overflow: visible;
+  }
+  .app-mobile-drawer .workspace-menu-section-toggle {
+    height: 44px;
+  }
+  .app-mobile-drawer .workspace-side-menu-btn,
+  .app-mobile-drawer .side-menu-disabled {
+    width: 100%;
+    height: 45px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 8px 4px;
+  }
+  .app-mobile-drawer .workspace-side-menu-btn .side-menu-label {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 20px;
+    text-align: left;
+  }
+  .app-mobile-drawer .workspace-customer-service {
+    left: auto;
+  }
+  .app-mobile-drawer .product-suggestion-sidebar-launcher,
+  .app-mobile-drawer .workspace-customer-service-trigger {
+    height: 44px;
+    padding: 8px 4px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    font-size: 14px;
+    line-height: 20px;
+    text-align: left;
+  }
+  /* 注意: .wb-* 的移动栅格规则不放在本块 —— 媒体查询不增特异性, 后方第一套
+     base 规则会反压; 已改放到 wb 区块 base 规则之后 (见「工作台数据区移动适配」) */
+}
+
+.workspace-material-library-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*
+ * 逃逸 .app-content 的 padding, 与 .asset-library-page 同源:
+ * 页面自带内边距, 负数 margin 只在能精确抵消外壳 padding 的断点生效
+ * (≤900px 外壳 padding 变成 16px 10px 24px, 固定 -24 会反冲)。
+ * width:auto 必须显式写 —— width:100% 会锁在 app-content 内容盒宽度,
+ * 负 margin 只平移不变宽, 右侧会留出外壳 padding 的空档。
+ */
+@media (min-width: 901px) {
+  .app-content > .my-works-page {
+    margin: -24px -24px -32px;
+    width: auto;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   顶导消息铃铛 (B4, 2026-10-21)
+   与 .app-quota 同一视觉尺度: 32px 高、12px 字号、中性色, 避免在 64px 顶栏里
+   抢过品牌与导航。未读角标由 antd Badge 托管, 不自定义。
+   ───────────────────────────────────────────────────────────────────────────── */
+.app-notif-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.app-notif-trigger:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+/* 未读角标压到 12px 并加 2px 白描边: 18px 铃铛上的默认角标会糊成一团红点。
+   角标的实际 DOM 是 .ui-badge-count（Badge 兼容壳不再输出 .ant-badge），
+   覆盖规则见文件末尾「消息角标」适配层。 */
+.app-notif-panel {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+}
+
+.app-notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-notif-body {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+
+.app-notif-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.app-notif-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-notif-item:hover {
+  background: var(--surface);
+}
+
+/* 未读用左侧圆点而非整行底色: 底色会让列表看起来每一行都是"选中的" */
+.app-notif-item.is-unread .app-notif-title::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  vertical-align: middle;
+}
+
+.app-notif-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.app-notif-text {
+  font-size: 12px;
+  color: var(--text-body);
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.app-notif-time {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+/* 外壳 .app-body 的 min-height 只扣 64px 顶栏；本页固定视口工作台在促销条
+ * 开启时会因此多出 40px 页面滚动。仅在局部重绘页存在时校正外壳高度。 */
+.app-body:has(> .app-content > .local-redraw-page) {
+  min-height: calc(100vh - var(--workspace-topbar-height));
+}
+
+.app-body:has(> .app-content > .local-redraw-page) > .app-sider-wrap {
+  height: calc(100vh - var(--workspace-topbar-height));
+}
+
+/* 产品系与抠图页同样是固定视口工作台：顶栏 + 推广条合计 104px，
+ * 外壳的 64px 扣减会让文档多出 12–40px 的假滚动。只在这两类页面收敛，
+ * 避免影响长文档页面（素材库 / 我的作品 / 首页）。 */
+.app-body:has(> .app-content > .product-retouch-page),
+.app-body:has(> .app-content > .background-remove-page) {
+  min-height: calc(100vh - var(--workspace-topbar-height));
+}
+
+.app-body:has(> .app-content > .product-retouch-page) > .app-sider-wrap,
+.app-body:has(> .app-content > .background-remove-page) > .app-sider-wrap {
+  height: calc(100vh - var(--workspace-topbar-height));
+}
+
+/* 参考站在 ≤900px 把滚动交给 route content，文档本身不产生第二层滚动。
+ * 本地对应容器是 .app-content；只在局部重绘存在时收敛高度。 */
+@media (max-width: 900px) {
+  .app-layout:has(> .app-body > .app-content > .local-redraw-page),
+  .app-layout:has(> .app-body > .app-content > .background-remove-page) {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .app-body:has(> .app-content > .local-redraw-page),
+  .app-body:has(> .app-content > .background-remove-page) {
+    height: calc(100vh - var(--workspace-topbar-height));
+    min-height: 0;
+    overflow: hidden;
+  }
+  .app-body:has(> .app-content > .local-redraw-page) > .app-content,
+  .app-body:has(> .app-content > .background-remove-page) > .app-content {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden auto;
+  }
+}
+
+/* 素材库: 页面自带 24px 内边距, 仍逃逸 .app-content 的 padding 以拿到整幅宽度。
+   我的作品 (2026-10-31) 与素材库同规则逃逸 —— 见 .app-content > .my-works-page。 */
+@media (min-width: 901px) {
+  .app-content > .asset-library-page {
+    margin: -24px -24px -32px;
+  }
+}
+
+/* 顶部导航下拉：Radix Content 取代 .ant-dropdown-menu */
+.app-topnav-dropdown.ui-dropdown-content {
+  min-width: 137px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-2);
+  background: var(--card-bg);
+  box-shadow: 0 18px 42px rgba(31, 41, 55, 0.14);
+}
+
+.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item:hover {
+  background: var(--surface-brand-4);
+  color: var(--text-brand-2);
+}
+
+.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item[data-disabled] {
+  color: var(--shell-text-2);
+}
+
+.app-topnav .ui-btn.app-topnav-item {
+  padding: 0 14px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.app-topnav .ui-btn.app-topnav-item:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+/* 901–1024：此时侧栏仍在（折叠 60），但顶栏还是桌面版。8 项导航 + 右侧动作区
+   最小需要约 995px，901–994 会顶出文档级横向滚动（≤900 才切移动外壳）。
+   这一段只收内边距与间距：顶栏左右 24 → 12、导航项 14 → 8、导航间距 10 → 2；
+   字号与 8 项导航不动 —— 参考站 900 档同样显示全部 8 项。 */
+@media (min-width: 901px) and (max-width: 1024px) {
+  .app-header {
+    padding: 0 12px;
+  }
+  .app-topnav {
+    gap: 2px;
+  }
+  .app-topnav .app-topnav-item,
+  .app-topnav .ui-btn.app-topnav-item {
+    padding: 0 8px;
+  }
+}
+
+.app-user-avatar {
+  flex: none;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 用户账户面板：身份、套餐与常用入口集中在一个下拉层里。 */
+.app-user-dropdown.ui-dropdown-content {
+  width: min(352px, calc(100vw - 24px));
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  background: var(--color-card);
+  box-shadow: 0 22px 60px rgba(31, 41, 55, 0.16);
+  /* 大面板不做缩放入场: 从 95% 放大到完整尺寸会让整块内容产生跳动感 */
+  animation: none !important;
+}
+
+.app-user-menu-head {
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(85, 70, 216, 0.1), transparent 42%),
+    linear-gradient(180deg, #f8f6ff 0%, #ffffff 100%);
+}
+
+.app-user-menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.app-user-menu-avatar {
+  flex: none;
+  background: linear-gradient(145deg, var(--brand) 0%, #7b5df1 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(85, 70, 216, 0.22);
+}
+
+.app-user-menu-user-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.app-user-menu-user-copy strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-user-menu-user-copy span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-user-menu-balance {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-left: 8px;
+}
+
+.app-user-menu-balance span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.app-user-menu-balance strong {
+  color: var(--text-strong);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+}
+
+.app-user-menu-package {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(85, 70, 216, 0.15);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 22px rgba(66, 55, 145, 0.06);
+}
+
+.app-user-menu-package-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.app-user-menu-package-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.app-user-menu-package-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.app-user-menu-package-copy span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.app-user-menu-package-copy strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-user-menu-plan-state {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.app-user-menu-plan-state.is-active {
+  background: #eaf8ef;
+  color: #168447;
+}
+
+.app-user-menu-package-meta {
+  display: grid;
+  gap: 6px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.app-user-menu-package-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.app-user-menu-package-meta svg {
+  flex: none;
+  color: var(--text-desc);
+}
+
+.app-user-menu-package-meta strong {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--text-body);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-user-menu-package-note {
+  margin: 9px 0 0;
+  color: #9a6700;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.app-user-menu-package-action {
+  width: 100%;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 10px;
+  border: 1px solid rgba(85, 70, 216, 0.18);
+  border-radius: 9px;
+  background: var(--brand-bg);
+  color: var(--brand);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.app-user-menu-package-action:hover {
+  border-color: var(--brand);
+  background: #e9e5ff;
+}
+
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item {
+  min-height: 50px;
+  height: auto;
+  margin: 2px 8px;
+  padding: 7px 8px;
+  border-radius: 11px;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.app-user-menu-head + .ui-dropdown-item {
+  margin-top: 8px;
+}
+
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item:hover,
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item:focus {
+  background: var(--surface-brand-4);
+}
+
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item[data-slot='dropdown-menu-item'] {
+  color: var(--text-body);
+}
+
+.app-user-menu-link-icon {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-desc);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item:hover .app-user-menu-link-icon,
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item:focus .app-user-menu-link-icon {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.app-user-menu-link-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.app-user-menu-link-copy strong {
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.app-user-menu-link-copy small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.app-user-dropdown.ui-dropdown-content [data-slot='dropdown-menu-separator'] {
+  height: 1px;
+  margin: 6px 12px;
+  background: var(--border-soft);
+}
+
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item.text-danger-text,
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item.text-danger-text .app-user-menu-link-copy strong {
+  color: var(--danger-text);
+}
+
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item.text-danger-text .app-user-menu-link-icon {
+  background: var(--danger-soft-bg);
+  color: var(--danger-text);
+}
+
+.app-notif-trigger .ui-badge-count {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  line-height: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px var(--color-card);
+}

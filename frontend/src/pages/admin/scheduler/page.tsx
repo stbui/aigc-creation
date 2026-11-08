@@ -2,11 +2,22 @@ import { useEffect, useState } from 'react';
 import { FRESHNESS_STYLE } from './constants';
 import { since, freshness } from './utils';
 import { useAdmin, useToast, useAdminResource } from './hooks';
-import { AlertTriangle, Play, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Play } from 'lucide-react';
 
 import { adminSchedulerApi } from '../../../lib/api';
 
-import { ActionButton, EmptyState, ListError, Notice, PageHeader, PageSkeleton, Panel, StaleError, ToneBadge } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  RefreshButton,
+  EmptyState,
+  ListError,
+  Notice,
+  PageHeader,
+  PageSkeleton,
+  Panel,
+  StaleError,
+  ToneBadge,
+} from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
 import type { AdminSchedulerTask } from '../../../types/api';
 
@@ -75,11 +86,7 @@ export function AdminSchedulerPage() {
       <PageSkeleton
         title="定时任务"
         description="订单超时关闭、积分到期回收、备份与保留期清理的统一调度"
-        actions={
-          <ActionButton variant="secondary" icon={RefreshCw} disabled>
-            刷新
-          </ActionButton>
-        }
+        actions={<RefreshButton disabled />}
         panels={2}
         panelRows={5}
       />
@@ -99,16 +106,7 @@ export function AdminSchedulerPage() {
       <PageHeader
         title="定时任务"
         description="订单超时关闭、积分到期回收、备份与保留期清理的统一调度"
-        actions={
-          <ActionButton
-            variant="secondary"
-            icon={RefreshCw}
-            disabled={loading}
-            onClick={() => void reload()}
-          >
-            刷新
-          </ActionButton>
-        }
+        actions={<RefreshButton loading={loading} onRefresh={reload} />}
       />
 
       {/*
@@ -148,9 +146,7 @@ export function AdminSchedulerPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-medium text-foreground">{task.label}</span>
-                    <code className="font-mono text-[12px] text-muted-foreground">
-                      {task.name}
-                    </code>
+                    <code className="font-mono text-[12px] text-muted-foreground">{task.name}</code>
                   </div>
                   <div className="mt-0.5 text-[12px] leading-4 text-muted-foreground">
                     上次执行：{since(task.lastRunAt)}
@@ -158,10 +154,7 @@ export function AdminSchedulerPage() {
                     {task.totalRuns > 0 && ` · 累计 ${task.totalRuns} 次`}
                   </div>
                   {task.lastError && (
-                    <div
-                      className="mt-1 truncate font-mono text-[12px] text-danger-text"
-                      title={task.lastError}
-                    >
+                    <div className="mt-1 truncate font-mono text-[12px] text-danger-text" title={task.lastError}>
                       {task.lastError}
                     </div>
                   )}
@@ -178,12 +171,7 @@ export function AdminSchedulerPage() {
                   {!data.manuallyRunnable.includes(task.name) ? (
                     <span className="text-[12px] text-muted-foreground">定时执行</span>
                   ) : writable ? (
-                    <ActionButton
-                      variant="secondary"
-                      icon={Play}
-                      disabled={busy}
-                      onClick={() => void runNow(task)}
-                    >
+                    <ActionButton variant="secondary" icon={Play} disabled={busy} onClick={() => void runNow(task)}>
                       立即执行
                     </ActionButton>
                   ) : (
@@ -207,13 +195,12 @@ export function AdminSchedulerPage() {
             它们会写文件或删数据，被随意触发可能覆盖可用备份或误删未到期数据。
           </li>
           <li>
-            <strong className="text-foreground">失败隔离</strong>：每个任务独立捕获异常。
-            早期版本用一个大 try 包住全部任务，结果备份一抛错，订单超时关闭就被跳过 ——
-            订单不关闭会直接影响用户看到的可用金额。
+            <strong className="text-foreground">失败隔离</strong>：每个任务独立捕获异常。 早期版本用一个大 try
+            包住全部任务，结果备份一抛错，订单超时关闭就被跳过 —— 订单不关闭会直接影响用户看到的可用金额。
           </li>
           <li>
-            <strong className="text-foreground">节流</strong>：订单关闭最短间隔 5 分钟、积分回收
-            10 分钟。订单超时是 30 分钟粒度，再密也没意义，而回收涉及多次写库。
+            <strong className="text-foreground">节流</strong>：订单关闭最短间隔 5 分钟、积分回收 10 分钟。订单超时是 30
+            分钟粒度，再密也没意义，而回收涉及多次写库。
           </li>
         </ul>
       </Panel>

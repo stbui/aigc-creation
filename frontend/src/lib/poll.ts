@@ -29,14 +29,6 @@ export interface PolledResult {
   height?: number;
   errorCode?: string | null;
   /**
-   * 产出的真实来源: gateway=真实模型通道；local 仅用于历史任务。
-   *
-   * 必须透出给结果卡 —— 页面要按**这一单实际走了哪条通道**显示徽标,
-   * 而不是按能力清单的静态 mode 猜。新任务只会是 gateway；
-   * 历史 local 记录仍须如实呈现，不能伪装成模型产出。
-   */
-  provider?: string | null;
-  /**
    * 产出模态 (2026-10-20 视频通道落地) —— 'image' | 'video'。
    *
    * 必须透出到结果卡: 视频**不能**用 `<img>` 渲染 (浏览器会当图片解码,
@@ -124,7 +116,13 @@ export async function waitForTask(taskId: string, options: PollOptions = {}): Pr
         typeof e === 'object' && e !== null && 'status' in e
           ? Number((e as { status: unknown }).status)
           : 0;
-      if (status === 401 || status === 403) throw e;
+      /*
+       * 明确的客户端错误不会因下一轮轮询而恢复：请求参数错误、任务不存在、
+       * 或轮询游标/状态冲突都必须立即终止。继续重试只会把真实原因拖成超时。
+       */
+      if (status === 400 || status === 401 || status === 403 || status === 404 || status === 409) {
+        throw e;
+      }
       /* 其余网络抖动: 不中断, 下一轮重试 */
     }
     if (signal?.aborted) return PENDING;
@@ -143,7 +141,6 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
     return {
       status: 'failed',
       errorCode: task.errorCode ?? 'CANCELLED',
-      provider: task.provider ?? null,
     };
   }
   const taskOutputs = task.outputAssets?.length ? task.outputAssets : task.outputAsset ? [task.outputAsset] : [];
@@ -173,7 +170,6 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
     width: primary?.width,
     height: primary?.height,
     errorCode: task.errorCode ?? null,
-    provider: task.provider ?? null,
     modality: primary?.modality,
     durationMs: primary?.durationMs,
     outputs,

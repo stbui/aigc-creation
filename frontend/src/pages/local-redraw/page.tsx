@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronRight, ChevronUp, Columns2, History, Minus, Plus, Trash2, Undo2, Redo2, X } from 'lucide-react';
 
-import { MAX_ANNOTATIONS, TOOLS, type MaskPainterHandle, type PaintTool } from './constants';
+import {
+  MAX_ANNOTATIONS,
+  TOOLS,
+  type MaskPainterHandle,
+  type PaintState,
+  type PaintTool,
+  type RegionBounds,
+} from './constants';
 import { MaskPainter } from './MaskPainter';
 import { ToolCard, ToolHistoryGrid, ToolShell, type ToolAsset } from './components';
 import {
@@ -47,13 +54,12 @@ export function LocalRedrawPage() {
   const [painted, setPainted] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  const [regionCount, setRegionCount] = useState(0);
-  /** 最多 3 条标注描述，与参考站一致 */
-  const [prompts, setPrompts] = useState<string[]>(['', '', '']);
+  /** 当前有效的画布区域；id 稳定，描述/参考图都按 id 绑定。 */
+  const [regions, setRegions] = useState<RegionBounds[]>([]);
+  /** 每个区域各有一份描述与可选参考图；删除/重排其它区域不会串位。 */
+  const [annotationDrafts, setAnnotationDrafts] = useState<Record<number, { prompt: string; reference: ToolAsset | null }>>({});
   /** 遮罩上传期间也要禁用按钮 —— 否则连点会传两份遮罩 */
   const [preparing, setPreparing] = useState(false);
-  /** 每条标注可选上传的参考图 */
-  const [references, setReferences] = useState<Array<ToolAsset | null>>([null, null, null]);
   /**
    * 正在上传参考图的下标集合。
    *
@@ -84,22 +90,31 @@ export function LocalRedrawPage() {
   const lastSourceIdRef = useRef<string | null>(null);
   const { token } = useAuth();
 
-  const setPromptAt = (index: number, value: string) =>
-    setPrompts((prev) => prev.map((p, i) => (i === index ? value : p)));
+  const updateAnnotationDraft = (
+    id: number,
+    patch: Partial<{ prompt: string; reference: ToolAsset | null }>,
+  ) => {
+    setAnnotationDrafts((prev) => {
+      const current = prev[id] ?? { prompt: '', reference: null };
+      return { ...prev, [id]: { ...current, ...patch } };
+    });
+  };
 
-  const uploadReference = async (index: number, file: File | undefined) => {
+  const uploadReference = async (id: number, file: File | undefined) => {
     if (!file) return;
     try {
-      setReferenceUploading((prev) => new Set(prev).add(index));
+      setReferenceUploading((prev) => new Set(prev).add(id));
       const projectId = await ensureProject();
       const asset = await assetsApi.upload(file, projectId);
-      setReferences((prev) => prev.map((item, i) => (i === index ? { id: asset.id, url: assetSrc(asset) ?? '', name: file.name } : item)));
+      updateAnnotationDraft(id, {
+        reference: { id: asset.id, url: assetSrc(asset) ?? '', name: file.name },
+      });
     } catch (e) {
       message.error((e as Error).message || '参考图上传失败，请重试');
     } finally {
       setReferenceUploading((prev) => {
         const next = new Set(prev);
-        next.delete(index);
+        next.delete(id);
         return next;
       });
     }
@@ -148,7 +163,8 @@ export function LocalRedrawPage() {
     setPainted(false);
     setCanUndo(false);
     setCanRedo(false);
-    setRegionCount(0);
+    setRegions([]);
+    setAnnotationDrafts({});
     setZoom(100);
     setPan({ x: 0, y: 0 });
     setResult(null);
@@ -163,8 +179,6 @@ export function LocalRedrawPage() {
       lastSourceIdRef.current = nextId;
       setSourceAspect(1);
       clearMaskSession();
-      setPrompts(['', '', '']);
-      setReferences([null, null, null]);
       setReferenceUploading(() => new Set());
     },
     [clearMaskSession],
@@ -187,8 +201,6 @@ export function LocalRedrawPage() {
    */
   const handleHistoryReuse = () => {
     clearMaskSession();
-    setPrompts(['', '', '']);
-    setReferences([null, null, null]);
     setHistoryOpen(false);
   };
 
@@ -196,7 +208,10 @@ export function LocalRedrawPage() {
     <>
       <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
         <div className="redraw-history-head">
-          <h2>历史记录</h2>
+          <h2>
+            <History size={15} />
+            历史记录
+          </h2>
           <button
             type="button"
             className="redraw-history-collapse"
@@ -252,11 +267,11 @@ export function LocalRedrawPage() {
   );
 
   const handlePaintState = useCallback(
-    (isPainted: boolean, undoable: boolean, redoable: boolean, regions: number) => {
-      setPainted(isPainted);
-      setCanUndo(undoable);
-      setCanRedo(redoable);
-      setRegionCount(regions);
+    (state: PaintState) => {
+      setPainted(state.painted);
+      setCanUndo(state.canUndo);
+      setCanRedo(state.canRedo);
+      setRegions(state.regions);
     },
     [],
   );
@@ -267,14 +282,19 @@ export function LocalRedrawPage() {
     setSourceAspect((current) => (Math.abs(current - next) < 0.0001 ? current : next));
   }, []);
 
-  const removeAnnotationAt = (index: number) => {
+  const removeAnnotationAt = (id: number) => {
     if (uploadBusy) {
       message.warning('参考图上传中，请稍候再删除标注');
       return;
     }
-    painter.current?.removeRegion(index);
-    setPrompts((prev) => [...prev.filter((_, i) => i !== index), '']);
-    setReferences((prev) => [...prev.filter((_, i) => i !== index), null]);
+    const index = regions.findIndex((region) => region.id === id);
+    if (index < 0) return;
+    painter.current?.removeRegion(id);
+    setAnnotationDrafts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   // 快捷键：H/B/E/R/O 切工具，Ctrl+Z 撤回，Ctrl+Shift+Z 恢复，+/- 缩放
@@ -308,6 +328,34 @@ export function LocalRedrawPage() {
       message.warning('参考图上传中，请稍候再提交');
       return;
     }
+    const submitRegions = painter.current?.getRegionBounds() ?? regions;
+    if (submitRegions.length === 0) {
+      message.warning('请先在图片上标注需要重绘的区域');
+      return;
+    }
+    const missingDescription = submitRegions.some(
+      (region) => !annotationDrafts[region.id]?.prompt.trim(),
+    );
+    if (missingDescription) {
+      message.warning('请为每个标注区域填写重绘描述');
+      return;
+    }
+    const annotations = submitRegions.map((region, index) => ({
+      annotationId: String(region.id),
+      label: `标注${index + 1}`,
+      instruction: annotationDrafts[region.id]!.prompt.trim(),
+      referenceAssetId: annotationDrafts[region.id]?.reference?.id ?? null,
+      bounds: {
+        x: region.x,
+        y: region.y,
+        width: region.width,
+        height: region.height,
+        sourceWidth: region.sourceWidth,
+        sourceHeight: region.sourceHeight,
+      },
+    }));
+    const parts = annotations.map((item) => `${item.label}：${item.instruction}`);
+
     const sourceId = inputs[0]?.id ?? null;
     if (maskSourceIdRef.current !== sourceId) {
       maskBlobRef.current = null;
@@ -341,17 +389,6 @@ export function LocalRedrawPage() {
       setPreparing(false);
     }
 
-    const annotationCount = Math.max(1, Math.min(MAX_ANNOTATIONS, regionCount));
-    const annotations = prompts
-      .slice(0, annotationCount)
-      .map((p, i) => ({
-        annotationId: String(i + 1),
-        label: `标注${i + 1}`,
-        instruction: p.trim(),
-        referenceAssetId: references[i]?.id ?? null,
-      }))
-      .filter((item) => item.instruction);
-    const parts = annotations.map((item) => `${item.label}：${item.instruction}`);
     await run(inputs, {
       prompt: parts.join('；'),
       annotations: JSON.stringify(annotations),
@@ -365,9 +402,9 @@ export function LocalRedrawPage() {
     });
   };
 
-  /** 与参考站一致: 未标注时只给一条描述位; 标注后按区域数展开, 最多 3 条 */
-  const visiblePromptCount = Math.max(1, Math.min(MAX_ANNOTATIONS, regionCount));
-  const filledCount = prompts.slice(0, visiblePromptCount).filter((p) => p.trim()).length;
+  /** 每个有效区域必须逐区填写描述；最多 3 条与画布限制一致。 */
+  const filledCount = regions.filter((region) => annotationDrafts[region.id]?.prompt.trim()).length;
+  const formValid = painted && regions.length > 0 && filledCount === regions.length && !uploadBusy && !preparing;
 
   return (
     <>
@@ -416,7 +453,7 @@ export function LocalRedrawPage() {
       settings={{ ratio: true, resolution: true }}
       submitLabel="开始重绘"
       emptyDesc="上传图片并标注区域、写下描述后，重绘结果将在此处展示"
-      formValid={painted && filledCount > 0 && !uploadBusy && !preparing}
+      formValid={formValid}
       /*
        * uploadBusy 只通过 formValid 禁用提交，不能并入 submitting：ToolShell 在
        * submitting 时会用生成态替换 sourcePane，画布会被卸载，参考图上传完成
@@ -579,77 +616,87 @@ export function LocalRedrawPage() {
           <>
             <ToolCard
               title={<><i className="pk-required-mark">*</i>重绘描述</>}
-              actions={<span>{filledCount}/{MAX_ANNOTATIONS}</span>}
+              actions={<span>{filledCount}/{regions.length}</span>}
               className="prompt-card"
             >
-              {prompts.slice(0, visiblePromptCount).map((prompt, index) => (
-                <div key={index} className={`redraw-prompt${index < regionCount ? '' : ' is-pending'}`}>
-                  {index < regionCount && (
+              {regions.length === 0 ? (
+                <div className="redraw-prompt is-pending">
+                  <label className="redraw-prompt-label is-pending">
+                    <i />
+                    标注1
+                  </label>
+                  <textarea rows={2} value="" disabled placeholder="请先在图片上标注区域..." />
+                </div>
+              ) : regions.map((region, index) => {
+                const draft = annotationDrafts[region.id];
+                const reference = draft?.reference ?? null;
+                return (
+                  <div key={region.id} className="redraw-prompt">
                     <button
                       type="button"
                       className="remove-annotation"
                       aria-label={`删除标注${index + 1}`}
                       title={`删除标注${index + 1}`}
                       disabled={uploadBusy}
-                      onClick={() => removeAnnotationAt(index)}
+                      onClick={() => removeAnnotationAt(region.id)}
                     >
                       <X size={13} />
                     </button>
-                  )}
-                  <label className={`redraw-prompt-label${index < regionCount ? ' is-marked' : ' is-pending'}`}>
-                    <i />
-                    标注{index + 1}
-                  </label>
-                  <textarea
-                    rows={2}
-                    maxLength={200}
-                    value={prompt}
-                    placeholder="请输入您要重绘的内容，例如：更换颜色..."
-                    onChange={(e) => setPromptAt(index, e.target.value)}
-                  />
-                  <label
-                    className={`redraw-prompt-tools reference-upload${references[index] ? ' has-image' : ''}`}
-                    title={references[index] ? `替换标注${index + 1}参考图` : `上传标注${index + 1}参考图`}
-                  >
-                    {references[index] && (
-                      <>
-                        <img src={assetThumbUrl(references[index]!.url, 240) ?? references[index]!.url} alt={`标注${index + 1}参考图`} />
-                        <button
-                          type="button"
-                          className="remove-reference"
-                          aria-label={`移除标注${index + 1}参考图`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setReferences((prev) => prev.map((item, i) => (i === index ? null : item)));
-                          }}
-                        >
-                          <X size={12} />
-                        </button>
-                      </>
-                    )}
-                    {referenceUploading.has(index) && !references[index] ? (
-                      <span>上传中…</span>
-                    ) : !references[index] ? (
-                      <>
-                        <Plus size={16} />
-                        <span>上传图片</span>
-                      </>
-                    ) : null}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      hidden
-                      disabled={referenceUploading.has(index)}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        void uploadReference(index, file);
-                        e.target.value = '';
-                      }}
+                    <label className="redraw-prompt-label is-marked">
+                      <i />
+                      标注{index + 1}
+                    </label>
+                    <textarea
+                      rows={2}
+                      maxLength={200}
+                      value={draft?.prompt ?? ''}
+                      placeholder="请输入您要重绘的内容，例如：更换颜色..."
+                      onChange={(e) => updateAnnotationDraft(region.id, { prompt: e.target.value })}
                     />
-                  </label>
-                </div>
-              ))}
+                    <label
+                      className={`redraw-prompt-tools reference-upload${reference ? ' has-image' : ''}`}
+                      title={reference ? `替换标注${index + 1}参考图` : `上传标注${index + 1}参考图`}
+                    >
+                      {reference && (
+                        <>
+                          <img src={assetThumbUrl(reference.url, 240) ?? reference.url} alt={`标注${index + 1}参考图`} />
+                          <button
+                            type="button"
+                            className="remove-reference"
+                            aria-label={`移除标注${index + 1}参考图`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              updateAnnotationDraft(region.id, { reference: null });
+                            }}
+                          >
+                            <X size={12} />
+                          </button>
+                        </>
+                      )}
+                      {referenceUploading.has(region.id) && !reference ? (
+                        <span>上传中…</span>
+                      ) : !reference ? (
+                        <>
+                          <Plus size={16} />
+                          <span>上传图片</span>
+                        </>
+                      ) : null}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        hidden
+                        disabled={referenceUploading.has(region.id)}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          void uploadReference(region.id, file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                );
+              })}
             </ToolCard>
           </>
         );

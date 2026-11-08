@@ -213,12 +213,53 @@ export class UserGroupService implements OnModuleInit {
     const cached = this.userGroupCodes.get(userId);
     const now = Date.now();
     if (cached && now - cached.loadedAt < USER_GROUP_CACHE_TTL_MS) return cached.code;
-    const membership = await this.prisma.membership.findFirst({
-      where: { userId, status: { in: ['active', 'grace'] } },
-      orderBy: [{ expiresAt: 'desc' }],
-      select: { plan: { select: { userGroupCode: true } } },
-    });
-    const code = normalizeUserGroupCode(membership?.plan?.userGroupCode);
+    const at = new Date(now);
+    const [activePeriod, hasPeriodSnapshot, legacyMembership] = await Promise.all([
+      // 已付订单周期是会员权益的权威来源。直接读 Membership.plan 会把已经
+      // 提前购买、尚未开始的未来套餐算成当前分组。
+      this.prisma.order.findFirst({
+        where: {
+          userId,
+          membershipPlanId: { not: null },
+          membershipAppliedAt: { not: null },
+          membershipPeriodStartAt: { lte: at },
+          membershipPeriodEndAt: { gt: at },
+          membershipPeriodRevokedAt: null,
+          status: { in: ['paid', 'partial_refunded'] },
+        },
+        orderBy: { membershipPeriodStartAt: 'desc' },
+        select: {
+          membershipUserGroupCodeSnapshot: true,
+          membershipPlan: { select: { userGroupCode: true } },
+        },
+      }),
+      this.prisma.order.findFirst({
+        where: {
+          userId,
+          membershipPlanId: { not: null },
+          membershipAppliedAt: { not: null },
+          membershipPeriodEndAt: { not: null },
+        },
+        select: { id: true },
+      }),
+      this.prisma.membership.findFirst({
+        where: {
+          userId,
+          status: { in: ['active', 'grace', 'cancelled'] },
+          expiresAt: { gt: at },
+        },
+        orderBy: [{ expiresAt: 'desc' }],
+        select: { plan: { select: { userGroupCode: true } } },
+      }),
+    ]);
+    const code = normalizeUserGroupCode(
+      activePeriod?.membershipUserGroupCodeSnapshot ??
+        // 历史订单没有分组快照时才回退当前套餐映射。
+        activePeriod?.membershipPlan?.userGroupCode ??
+        // 已有订单快照但当前处于周期空档/仅未来周期时落默认分组，不能用
+        // Membership 的未来套餐投影兜底。
+        (hasPeriodSnapshot ? '' : legacyMembership?.plan?.userGroupCode),
+    );
     this.userGroupCodes.set(userId, { code, loadedAt: now });
     return code;
   }

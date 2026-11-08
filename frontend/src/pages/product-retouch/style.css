@@ -1,0 +1,62 @@
+/**
+ * product-retouch 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* 产品精修：两张 block 卡，标题 20+12，选项 gap8，textarea 72。 */
+.pk-workspace.product-retouch-main-page .local-redraw-card.tool-card {
+  display: block;
+  padding: 14px;
+}
+
+.pk-workspace.product-retouch-main-page .local-redraw-card.tool-card .card-title-row {
+  min-height: 20px;
+  margin: 0 0 12px;
+}
+
+.pk-workspace.product-retouch-main-page .local-redraw-card.tool-card .card-title-row h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.pk-workspace.product-retouch-main-page .retouch-mode-options {
+  gap: 8px;
+}
+
+.pk-workspace.product-retouch-main-page .retouch-mode-options button {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.pk-workspace.product-retouch-main-page .product-retouch-card > textarea {
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  height: 56px;
+  padding: 9px;
+  border: 1px solid var(--border-1);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--wb-text-hero);
+  font-size: 12px;
+  line-height: normal;
+  resize: none;
+  outline: none;
+}
+
+.pk-workspace.product-retouch-main-page .product-retouch-card:has(> textarea) {
+  font-size: 16px;
+  line-height: normal;
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.product-retouch-main-page .product-retouch-card > textarea {
+    height: 72px;
+    padding: 9px 10px;
+  }
+}

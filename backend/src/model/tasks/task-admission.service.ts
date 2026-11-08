@@ -21,14 +21,16 @@
  *   · 余额不足 → `40201`（Payment Required，前端展示「去充值」）。
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppError } from '../../common/app.exception';
 import { getCapability, sanitizeParams, validateCapabilityParams } from '../../capabilities/capability.registry';
-import { parseLocalRedrawAnnotations } from '../../capabilities/definitions/local_redraw';
-import { multiFusionCreditMultiplier } from '../../capabilities/definitions/multi_fusion';
+import {
+  normalizeLocalRedrawBounds,
+  parseLocalRedrawAnnotations,
+} from '../../capabilities/definitions/local_redraw';
 import { CapabilityAvailabilityService } from '../../capabilities/capability-availability.service';
 import { MembershipService } from '../../membership/membership.service';
 import { CreditPriceService } from '../../credits/credit-price.service';
@@ -38,6 +40,7 @@ import { BillingService, type BillingDraft } from '../billing/billing.service';
 import { RouterService } from '../routing/router.service';
 import { UserGroupService } from '../user-groups/user-group.service';
 import { restrictIntentToSpec } from '../intent/model-intent';
+import { scaleMultiFusionDraft } from './task-billing-scale';
 
 /** 一次准入的输入 */
 export interface AdmissionInput {
@@ -81,13 +84,14 @@ export class TaskAdmissionService {
   async admit(input: AdmissionInput): Promise<AdmissionResult> {
     const { ownerId, dto } = input;
     const idempotencyKey = normalizeIdempotencyKey(dto.idempotencyKey, input.idempotencyHeader);
+    const requestFingerprint = idempotencyKey ? generationRequestFingerprint(dto) : undefined;
 
     // 1. 幂等命中：直接返回原任务，不再校验任何会随状态变化的约束
     if (idempotencyKey) {
       const existing = await this.prisma.generationTask.findUnique({
         where: { ownerId_idempotencyKey: { ownerId, idempotencyKey } },
       });
-      if (existing) return toResult(existing, true);
+      if (existing) return toIdempotentResult(existing, requestFingerprint!);
     }
 
     // 2. 能力与参数白名单
@@ -134,7 +138,9 @@ export class TaskAdmissionService {
     const perks = await this.membership.perksOf(ownerId);
 
     // 6. 项目与素材归属
-    const project = await this.prisma.project.findUnique({ where: { id: dto.projectId } });
+    const project = await this.prisma.project.findFirst({
+      where: { id: dto.projectId, deletedAt: null },
+    });
     if (!project || project.ownerId !== ownerId) {
       throw new AppError(40001, '项目不存在或无权限', 403);
     }
@@ -145,7 +151,12 @@ export class TaskAdmissionService {
      * 任务产出仍写入 dto.projectId，输入素材保持原归属，便于用户追溯。
      */
     const assets = await this.prisma.asset.findMany({
-      where: { id: { in: dto.inputAssetIds }, ownerId },
+      where: {
+        id: { in: dto.inputAssetIds },
+        ownerId,
+        status: 'visible',
+        project: { deletedAt: null },
+      },
     });
     if (assets.length !== dto.inputAssetIds.length) {
       throw new AppError(40001, '部分输入素材不存在或无权限', 400);
@@ -154,7 +165,9 @@ export class TaskAdmissionService {
     // 7. 遮罩与局部重绘标注（都是生成输入，必须在扣费前确认可用）
     await this.validateMask(ownerId, dto, assets);
     const sanitized = sanitizeParams(dto.capability, dto.params);
-    await this.validateAnnotations(ownerId, dto);
+    const sourceAsset = assets.find((asset: { id: string }) => asset.id === dto.inputAssetIds[0]);
+    await this.validateAnnotations(ownerId, dto, sourceAsset);
+    this.assertLocalRedrawHasInput(dto, sanitized);
 
     // 8. 模型解析：只有目录里真实可用、且支持该能力的模型才允许建单
     const logicalModelId = String(dto.logicalModelId ?? '').trim();
@@ -193,17 +206,34 @@ export class TaskAdmissionService {
       throw new AppError(42205, '当前线路不支持遮罩重绘，请更换模型', 400);
     }
 
-    // 10. 计价：价格快照与目录报价同源；限时免费命中即 0 并记活动
-    let draft = this.billing.buildDraft(access, routed);
+    /*
+     * 10. 计价：价格快照与目录报价同源；后台覆盖价与限时免费优先。
+     *
+     * 顺序不能颠倒：
+     *   · 先取后台能力覆盖价（`creditPrice.<capabilityId>`），再建草案 ——
+     *     早先只把覆盖价用在 `/capabilities` 下发上，扣费仍走线路价，
+     *     表现为「后台改完价用户没少花钱」；
+     *   · 限时免费在草案之后把金额直接置 0，并记下活动 id 供账单追溯。
+     */
+    const overrideCost = await this.price.resolveOverride(dto.capability);
+    let draft = this.billing.buildDraft(access, routed, overrideCost);
     if (dto.capability === 'multi_fusion') {
-      draft = scaleDraft(draft, sanitized);
+      draft = scaleMultiFusionDraft(draft, sanitized);
     }
-    const freeCampaignId = await this.price.freeCampaignIdOf(dto.capability);
+    const freeCampaignId = await this.price.freeCampaignIdOf(dto.capability, ownerId);
     const amountMicrocredits = freeCampaignId ? 0n : draft.amountMicrocredits;
     const creditCost = microcreditsToCredits(amountMicrocredits);
 
     // 11. 局部重绘参考图的文字描述（只做一次，落进任务参数避免每次轮询重算）
     if (dto.capability === 'local_redraw') {
+      const annotations = parseLocalRedrawAnnotations(sanitized.annotations);
+      const hasReferenceImages = annotations.some((item) => Boolean(item.referenceAssetId));
+      if (hasReferenceImages && amountMicrocredits > 0n) {
+        const available = await this.billing.availableMicrocreditsOf(ownerId);
+        if (available < amountMicrocredits) {
+          throw new AppError(40201, '积分不足，请充值后再试', 402);
+        }
+      }
       await this.attachReferenceHints(sanitized, ownerId);
     }
 
@@ -231,7 +261,6 @@ export class TaskAdmissionService {
       stage: '排队中',
       progress: 0,
       inputAssetIds: JSON.stringify(dto.inputAssetIds),
-      provider: 'gateway',
       logicalModelId: routed.logicalModel.id,
       logicalModelRevisionId: routed.revisionId,
       routeId: routed.route.id,
@@ -256,6 +285,7 @@ export class TaskAdmissionService {
     const taskIds = await this.createTasksWithBilling({
       ownerId,
       idempotencyKey,
+      requestFingerprint,
       creditCost,
       taskBase,
       paramsFor,
@@ -269,7 +299,7 @@ export class TaskAdmissionService {
         const existing = await this.prisma.generationTask.findUnique({
           where: { ownerId_idempotencyKey: { ownerId, idempotencyKey } },
         });
-        if (existing) return toResult(existing, true);
+        if (existing) return toIdempotentResult(existing, requestFingerprint!);
       }
       if (error instanceof AppError && error.code === 40002) {
         throw new AppError(40201, error.message, 402);
@@ -310,6 +340,7 @@ export class TaskAdmissionService {
   private async createTasksWithBilling(params: {
     ownerId: string;
     idempotencyKey?: string;
+    requestFingerprint?: string;
     creditCost: number;
     taskBase: Omit<Prisma.GenerationTaskUncheckedCreateInput, 'params'>;
     paramsFor: (index: number) => Record<string, any>;
@@ -318,14 +349,26 @@ export class TaskAdmissionService {
     amountMicrocredits: bigint;
     freeCampaignId?: string;
   }): Promise<string[]> {
-    const { ownerId, idempotencyKey, creditCost, taskBase, paramsFor, outputs, draft } = params;
+    const { ownerId, idempotencyKey, requestFingerprint, creditCost, taskBase, paramsFor, outputs, draft } = params;
     return this.prisma.$transaction(async (tx) => {
+      // 项目校验与任务落库之间可能隔着模型解析、计价等步骤；后台软删项目
+      // 若恰好发生在这段窗口内，必须在扣费事务内再次拒绝，避免任务/账单
+      // 落进一个已经删除的项目。
+      const activeProject = await tx.project.findFirst({
+        where: { id: taskBase.projectId, ownerId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!activeProject) {
+        throw new AppError(40001, '项目不存在或无权限', 403);
+      }
+
       const ids: string[] = [];
       const parent = await tx.generationTask.create({
         data: {
           ...taskBase,
           params: JSON.stringify(paramsFor(0)),
           idempotencyKey,
+          requestFingerprint,
           creditCost,
         },
         select: { id: true },
@@ -389,7 +432,13 @@ export class TaskAdmissionService {
     const maskAssetId = this.maskAssetId(dto.params);
     if (!maskAssetId) return;
     const maskAsset = await this.prisma.asset.findFirst({
-      where: { id: maskAssetId, ownerId, kind: 'original' },
+      where: {
+        id: maskAssetId,
+        ownerId,
+        kind: 'original',
+        status: 'visible',
+        project: { deletedAt: null },
+      },
       select: { id: true, format: true, width: true, height: true },
     });
     if (!maskAsset) throw new AppError(40001, '遮罩素材不存在或无权限', 400);
@@ -412,38 +461,74 @@ export class TaskAdmissionService {
     }
   }
 
-  /** 局部重绘标注：1–3 项、每项有区域描述、参考图属于本人 */
-  private async validateAnnotations(ownerId: string, dto: CreateGenerationDto): Promise<void> {
+  /** 局部重绘标注：1–3 项、每项有区域描述、多区域带合法坐标、参考图属于本人 */
+  private async validateAnnotations(
+    ownerId: string,
+    dto: CreateGenerationDto,
+    sourceAsset?: { width: number | null; height: number | null },
+  ): Promise<void> {
     if (dto.capability !== 'local_redraw') return;
     const raw = dto.params?.annotations;
-    if (raw === undefined) return;
+    if (raw === undefined || raw === null || raw === '') return;
+    if (typeof raw !== 'string') {
+      throw new AppError(40001, 'annotations 必须是 JSON 字符串', 400);
+    }
 
     let decoded: unknown;
     try {
-      decoded = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      decoded = JSON.parse(raw);
     } catch {
       throw new AppError(40001, 'annotations 必须是合法 JSON', 400);
     }
     if (!Array.isArray(decoded) || decoded.length === 0 || decoded.length > 3) {
       throw new AppError(40001, 'annotations 必须是 1 至 3 项数组', 400);
     }
-    const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
-    if (parseLocalRedrawAnnotations(text).length !== decoded.length) {
+    if (parseLocalRedrawAnnotations(raw).length !== decoded.length) {
       throw new AppError(40001, '每个标注都必须包含非空区域描述', 400);
     }
-    // API 调用方可能直接发数组：落库统一用字符串，避免 sanitizeParams 把对象变成 [object Object]
-    if (typeof raw !== 'string') dto.params!.annotations = text;
 
-    const referenceIds = parseLocalRedrawAnnotations(text)
+    for (const item of decoded) {
+      const record = item as Record<string, unknown>;
+      const bounds = normalizeLocalRedrawBounds(record.bounds);
+      if (record.bounds !== undefined) {
+        if (!bounds) throw new AppError(40001, '标注区域坐标无效', 400);
+        if (
+          sourceAsset?.width &&
+          sourceAsset.height &&
+          (bounds.sourceWidth !== sourceAsset.width || bounds.sourceHeight !== sourceAsset.height)
+        ) {
+          throw new AppError(40001, '标注区域坐标与原图尺寸不一致', 400);
+        }
+      } else if (decoded.length > 1) {
+        throw new AppError(40001, '多区域标注必须为每个区域提供坐标', 400);
+      }
+    }
+
+    const referenceIds = parseLocalRedrawAnnotations(raw)
       .map((item) => item.referenceAssetId)
       .filter((id): id is string => typeof id === 'string' && Boolean(id.trim()));
     for (const referenceId of new Set(referenceIds)) {
       const reference = await this.prisma.asset.findFirst({
-        where: { id: referenceId, ownerId, kind: 'original' },
+        where: {
+          id: referenceId,
+          ownerId,
+          kind: 'original',
+          status: 'visible',
+          project: { deletedAt: null },
+        },
         select: { id: true },
       });
       if (!reference) throw new AppError(40001, '局部重绘参考图素材不存在或无权限', 400);
     }
+  }
+
+  /** 局部重绘至少需要遮罩、文字描述或标注之一；空白字符串不算输入。 */
+  private assertLocalRedrawHasInput(dto: CreateGenerationDto, sanitized: Record<string, any>): void {
+    if (dto.capability !== 'local_redraw') return;
+    const prompt = typeof sanitized.prompt === 'string' ? sanitized.prompt.trim() : '';
+    const annotations = parseLocalRedrawAnnotations(sanitized.annotations);
+    if (this.maskAssetId(sanitized) || prompt || annotations.length > 0) return;
+    throw new AppError(40001, '请至少提交遮罩、重绘描述或标注区域之一', 400);
   }
 
   /**
@@ -454,17 +539,21 @@ export class TaskAdmissionService {
    */
   private async attachReferenceHints(params: Record<string, any>, ownerId: string): Promise<void> {
     const annotations = parseLocalRedrawAnnotations(params.annotations);
-    const hints: string[] = [];
-    for (const item of annotations) {
-      if (typeof item.referenceAssetId !== 'string' || !item.referenceAssetId.trim()) continue;
-      try {
-        const result = await this.promptTools.imageToPrompt(ownerId, item.referenceAssetId, item.instruction);
-        const text = result.text?.trim();
-        if (text) hints.push(`${item.label || '参考图'}：${text}`);
-      } catch (error) {
-        this.log.warn(`局部重绘参考图 ${item.referenceAssetId} 转描述失败，已跳过：${(error as Error).message}`);
-      }
-    }
+    const hints = (
+      await Promise.all(
+        annotations.map(async (item) => {
+          if (typeof item.referenceAssetId !== 'string' || !item.referenceAssetId.trim()) return null;
+          try {
+            const result = await this.promptTools.imageToPrompt(ownerId, item.referenceAssetId, item.instruction);
+            const text = result.text?.trim();
+            return text ? `${item.label || '参考图'}：${text}` : null;
+          } catch (error) {
+            this.log.warn(`局部重绘参考图 ${item.referenceAssetId} 转描述失败，已跳过：${(error as Error).message}`);
+            return null;
+          }
+        }),
+      )
+    ).filter((hint): hint is string => Boolean(hint));
     if (hints.length > 0) params.__referenceHints = hints;
   }
 
@@ -504,20 +593,60 @@ function toResult(
 }
 
 /**
- * 多图融合按「张数 × 画质倍率」放缩。
- *
- * 价格档给出的是 4 张默认档的单价，实际提交可能只要 1–4 张、也可能选 2K/4K。
- * 与 `multiFusionCreditCost` 同一公式，只是保留微积分精度、最后一次取整。
+ * 幂等键只能复用**同一份生成请求**。旧任务没有指纹时无法证明请求一致，
+ * 因而宁可直接拒绝并让客户端换键，也不能返回一个内容可能完全不同的任务。
  */
-function scaleDraft(draft: BillingDraft, params: Record<string, any>): BillingDraft {
-  const count = Math.max(1, Math.min(4, Math.floor(Number(params.variantCount) || 1)));
-  const multiplier = BigInt(multiFusionCreditMultiplier(params.size));
-  const amount = (draft.amountMicrocredits * BigInt(count) * multiplier + 3n) / 4n;
-  return {
-    ...draft,
-    amountMicrocredits: amount,
-    quantity: draft.quantity * BigInt(count),
+function toIdempotentResult(
+  task: {
+    id: string;
+    status: string;
+    creditCost: number;
+    params?: string | null;
+    requestFingerprint?: string | null;
+  },
+  fingerprint: string,
+): AdmissionResult {
+  if (!task.requestFingerprint) {
+    throw new AppError(40900, '该幂等键对应的旧任务缺少请求指纹，请更换幂等键后重试', 409);
+  }
+  if (task.requestFingerprint !== fingerprint) {
+    throw new AppError(40900, '幂等键已用于不同请求，请更换幂等键或复用原请求', 409);
+  }
+  return toResult(task, true);
+}
+
+/**
+ * 原始生成请求的稳定指纹。
+ *
+ * 参数对象递归按 key 排序；数组及输入素材顺序保持不变，因为它们本身会影响
+ * 生成语义。这样客户端只是调整 JSON 字段顺序时仍能命中幂等，而项目、模型、
+ * 素材或任一参数发生变化时会被识别为冲突。
+ */
+export function generationRequestFingerprint(
+  dto: Pick<CreateGenerationDto, 'projectId' | 'capability' | 'logicalModelId' | 'inputAssetIds' | 'params'>,
+): string {
+  const canonical = {
+    projectId: String(dto.projectId ?? ''),
+    capability: String(dto.capability ?? ''),
+    logicalModelId: String(dto.logicalModelId ?? '').trim(),
+    inputAssetIds: (dto.inputAssetIds ?? []).map((id) => String(id)),
+    params: canonicalizeJson(dto.params ?? {}),
   };
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+function canonicalizeJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeJson);
+  if (value && typeof value === 'object') {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((out, key) => {
+        const item = (value as Record<string, unknown>)[key];
+        if (item !== undefined) out[key] = canonicalizeJson(item);
+        return out;
+      }, {});
+  }
+  return value;
 }
 
 /** 微积分 → 展示用积分（向上取整，避免 0.4 积分显示成 0） */

@@ -2,8 +2,5 @@
  * AdminNotificationsPage 的本地工具函数。
  */
 
-export function fmt(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('zh-CN', { hour12: false });
-}
+/** 时间展示（统一实现在 admin-ui/lib/format.ts） */
+export { formatDateTimeLoose as fmt } from '../../../admin-ui/primitives';

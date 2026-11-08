@@ -8,6 +8,11 @@ import { SignedUrlService } from '../common/signed-url.service';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
 import type { AssetListQueryDto, ProjectListQueryDto } from './dto/asset.dto';
 import type { StorageBackend } from '../storage/storage.provider';
+import {
+  detachAssetFromTasks,
+  orderedOutputIds,
+  taskOutputReferenceWhere,
+} from '../assets/task-output-links';
 
 /** 素材管理 (admin-prd.md §3.4 B-21~B-27) */
 @Injectable()
@@ -26,7 +31,7 @@ export class AdminAssetsService {
   async listProjects(query: ProjectListQueryDto) {
     const page = buildPage(query, ['createdAt', 'name'], 'createdAt:desc');
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { deletedAt: null };
     if (query.keyword) where.name = { contains: query.keyword };
     if (query.ownerId) where.ownerId = query.ownerId;
 
@@ -61,56 +66,44 @@ export class AdminAssetsService {
   }
 
   /**
-   * 删除项目 (B-22): 连带素材与任务。
+   * 删除项目 (B-22): **只标记 Project.deletedAt**。
    *
-   * 硬删时先提交数据库事务，再尽力删除对象存储文件。反过来先删文件，
-   * 一旦数据库事务失败，就会留下「记录还在、文件已丢」的坏数据；文件删除
-   * 失败则只会留下孤儿文件，后续可清理，不会破坏业务记录。
+   * 项目是用户资产的归档容器，删除项目不能连带破坏历史任务、素材记录或对象
+   * 存储文件。素材可见性由项目生命周期决定，不再把 Asset.status 改成 hidden，
+   * 否则恢复项目时无法区分「随项目下架」与运营主动下架。
    *
-   * 软删只下架素材并保留文件 —— 否则素材记录虽然还在，内容却已经不可恢复。
+   * `hard` 参数仅为兼容旧客户端保留，已废弃且会被忽略。重复删除按幂等成功
+   * 处理，不重复覆盖首次删除时间。
    */
-  async removeProject(id: string, hard: boolean) {
+  async removeProject(id: string, _hard = false) {
     const project = await this.prisma.project.findUnique({
       where: { id },
-      include: {
-        assets: { select: { id: true, storageKey: true, storageBackend: true } },
-        tasks: { select: { id: true } },
+      select: {
+        id: true,
+        deletedAt: true,
+        _count: { select: { assets: true, tasks: true } },
       },
     });
     if (!project) throw new AppError(40400, '项目不存在', 404);
 
-    const impact = {
-      assets: project.assets.length,
-      tasks: project.tasks.length,
-      bytes: 0,
+    const deletedAt = project.deletedAt ?? new Date();
+    if (!project.deletedAt) {
+      await this.prisma.project.update({
+        where: { id },
+        data: { deletedAt },
+      });
+    }
+
+    return {
+      id,
+      hard: false,
+      deprecatedHard: true,
+      deletedAt,
+      retained: {
+        assets: project._count.assets,
+        tasks: project._count.tasks,
+      },
     };
-
-    // 统计字节数需要再查一次 Asset.sizeBytes
-    const sizes = await this.prisma.asset.findMany({
-      where: { projectId: id },
-      select: { sizeBytes: true },
-    });
-    impact.bytes = sizes.reduce((sum, s) => sum + s.sizeBytes, 0);
-
-    // 1) 数据库事务保证项目、任务与素材记录一致
-    await this.prisma.$transaction(async (tx) => {
-      await tx.generationTask.deleteMany({ where: { projectId: id } });
-      if (hard) {
-        await tx.asset.deleteMany({ where: { projectId: id } });
-      } else {
-        // 软删: 素材置下架而非删除 —— 记录保留便于追溯项目被删时素材去了哪
-        await tx.asset.updateMany({
-          where: { projectId: id },
-          data: { status: 'hidden' },
-        });
-      }
-      await tx.project.delete({ where: { id } });
-    });
-
-    // 2) 硬删提交后再清文件；删除失败只留孤儿文件，不影响已提交的数据事实
-    if (hard) await this.deleteStoredAssets(project.assets);
-
-    return { id, hard, impact };
   }
 
   // ── 素材 (B-23~B-27) ───────────────────────────────────────────────
@@ -282,14 +275,10 @@ export class AdminAssetsService {
     return { id, status };
   }
 
-  /** 批量下架/恢复 */
+  /** 兼容旧入口的批量下架/恢复；逐条返回结果，供审计落到每个素材。 */
   async setStatusMany(ids: string[], status: 'visible' | 'hidden') {
-    if (ids.length === 0) throw new AppError(40001, '未选择素材', 400);
-    const res = await this.prisma.asset.updateMany({
-      where: { id: { in: ids } },
-      data: { status },
-    });
-    return { count: res.count, status };
+    const summary = await runBatch(ids, (id) => this.setStatus(id, status));
+    return { ...summary, count: summary.succeeded, status };
   }
 
   /**
@@ -306,9 +295,9 @@ export class AdminAssetsService {
     if (!asset) throw new AppError(40400, '素材不存在', 404);
 
     const removedTasks = await this.prisma.$transaction(async (tx) => {
-      const tasks = await tx.generationTask.deleteMany({ where: { outputAssetId: id } });
+      const removedTasks = await detachAssetFromTasks(tx, id);
       await tx.asset.delete({ where: { id } });
-      return tasks.count;
+      return removedTasks;
     });
 
     // 数据库提交后再清文件；失败不回滚，避免记录还在但文件已丢
@@ -321,7 +310,13 @@ export class AdminAssetsService {
   async impact(id: string) {
     const asset = await this.prisma.asset.findUnique({ where: { id } });
     if (!asset) throw new AppError(40400, '素材不存在', 404);
-    const tasks = await this.prisma.generationTask.count({ where: { outputAssetId: id } });
+    const linkedTasks = await this.prisma.generationTask.findMany({
+      where: taskOutputReferenceWhere(id),
+      select: { id: true, outputAssetId: true, outputAssetIds: true },
+    });
+    const tasks = linkedTasks.filter((task) =>
+      orderedOutputIds(task.outputAssetId, task.outputAssetIds).includes(id),
+    ).length;
     return { sizeBytes: asset.sizeBytes, tasks, storageBackend: asset.storageBackend };
   }
 

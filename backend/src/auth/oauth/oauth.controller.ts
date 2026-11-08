@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { OAuthService } from './oauth.service';
 import { OAuthAuthorizeQueryDto, OAuthCompleteDto } from './oauth.dto';
 import { contextOf } from '../auth.controller';
 import { RateLimit, type RateLimitOptions } from '../../common/rate-limit.guard';
+import { JwtAuthGuard } from '../../common/jwt-auth.guard';
+import { CurrentUser, type AuthUser } from '../../common/current-user.decorator';
 
 const RL_OAUTH_AUTHORIZE: RateLimitOptions = {
   name: 'auth-oauth-authorize',
@@ -56,6 +58,22 @@ export class OAuthController {
     }
   }
 
+  /**
+   * 显式绑定入口。必须已登录，避免第三方回调凭邮箱自动接管站内账号。
+   * 返回 provider 授权 URL 由前端跳转，而不是让 API 客户端直接 302。
+   */
+  @RateLimit(RL_OAUTH_AUTHORIZE)
+  @UseGuards(JwtAuthGuard)
+  @Get(':provider/link')
+  async link(
+    @Param('provider') provider: string,
+    @Query() query: OAuthAuthorizeQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const url = await this.oauth.authorizeUrl(provider, query.returnTo, user.id);
+    return { url };
+  }
+
   @RateLimit(RL_OAUTH_CALLBACK)
   @Get(':provider/callback')
   async callback(
@@ -71,6 +89,12 @@ export class OAuthController {
     }
     try {
       const result = await this.oauth.handleCallback(provider, code, state);
+      if (!('ticket' in result)) {
+        return res.redirect(
+          302,
+          `${this.webBase()}/account?oauthLinked=${encodeURIComponent(result.provider)}`,
+        );
+      }
       const params = new URLSearchParams({
         ticket: result.ticket,
         provider: result.provider,

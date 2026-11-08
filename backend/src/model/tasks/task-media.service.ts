@@ -24,6 +24,7 @@ import { inspectMaskImage, inspectUploadedImage } from '../../assets/image-valid
 import { detectImageFormat } from '../media/image-format';
 import { multiFusionOutputDimensions } from '../../capabilities/definitions/multi_fusion';
 import { resolveUploadsDir } from '../../config/env-files';
+import { orderedOutputIds, taskOutputReferenceWhere } from '../../assets/task-output-links';
 import type { StorageBackend } from '../../storage/storage.provider';
 import type { MediaReference } from '../protocol/runtime';
 
@@ -41,6 +42,8 @@ export interface StoredOutput {
   buffer: Buffer;
   format: string;
   aigcMeta: AigcMeta;
+  /** 本次 persist 是否新建了该素材；用于成功 CAS 失败后的安全回收。 */
+  created: boolean;
 }
 
 /** 任务侧素材服务需要的最小任务形状 */
@@ -74,7 +77,13 @@ export class TaskMediaService {
     inputAssetIds: string[],
     options: { absoluteBaseUrl?: string } = {},
   ): Promise<MediaReference[]> {
-    const assets = await this.prisma.asset.findMany({ where: { id: { in: inputAssetIds } } });
+    const assets = await this.prisma.asset.findMany({
+      where: {
+        id: { in: inputAssetIds },
+        status: 'visible',
+        project: { deletedAt: null },
+      },
+    });
     const byId = new Map(assets.map((asset) => [asset.id, asset]));
     const references: MediaReference[] = [];
     for (const [index, id] of inputAssetIds.entries()) {
@@ -112,7 +121,13 @@ export class TaskMediaService {
     if (!id) return null;
 
     const asset = await this.prisma.asset.findFirst({
-      where: { id, ownerId, kind: 'original' },
+      where: {
+        id,
+        ownerId,
+        kind: 'original',
+        status: 'visible',
+        project: { deletedAt: null },
+      },
       select: { id: true, sourceUrl: true, storageKey: true, storageBackend: true, format: true },
     });
     if (!asset) throw new Error('遮罩素材不存在或无权限');
@@ -157,7 +172,7 @@ export class TaskMediaService {
     const stored: StoredOutput[] = [];
     const isVideo = String(outputs[0].format).startsWith('video/');
 
-    for (const output of outputs) {
+    for (const [index, output] of outputs.entries()) {
       let buffer = output.buffer;
       let format = output.format;
       let aigcMeta: AigcMeta;
@@ -191,32 +206,144 @@ export class TaskMediaService {
       }
 
       const ext = extOfFormat(format);
-      const key = this.storage.buildKey('generated', ext);
-      const written = await storage.put(key, buffer, format);
-      const url = await storage.url(key);
-      const dims = isVideo ? { width: null, height: null } : await readImageDims(buffer);
+      const key = generatedOutputStorageKey(task.id, index, ext);
 
-      const asset = await this.prisma.asset.create({
-        data: {
-          projectId: task.projectId,
-          ownerId: task.ownerId,
-          kind: 'generated',
-          capability: task.capability,
-          sourceUrl: url,
-          width: dims.width,
-          height: dims.height,
-          format,
-          sizeBytes: written.sizeBytes,
-          durationMs: output.durationMs,
-          storageBackend: storage.backend,
-          storageKey: key,
-          aigcMeta: JSON.stringify(aigcMeta),
-          aigcLabeledAt: labeledAt,
-        },
+      // 落盘失败会保留上游结果并延后重试。key 必须是任务内确定性的，否则
+      // 每次重试都会多写一份文件、多建一条 Asset；已登记的直接复用。
+      const existing = await this.prisma.asset.findFirst({
+        where: { storageBackend: storage.backend, storageKey: key },
       });
-      stored.push({ assetId: asset.id, buffer, format, aigcMeta });
+      if (existing) {
+        stored.push({
+          assetId: existing.id,
+          buffer,
+          format,
+          aigcMeta: parseAigcMeta(existing.aigcMeta),
+          created: false,
+        });
+        continue;
+      }
+
+      let asset: Awaited<ReturnType<typeof this.prisma.asset.create>>;
+      try {
+        const written = await storage.put(key, buffer, format);
+        const url = await storage.url(key);
+        const dims = isVideo ? { width: null, height: null } : await readImageDims(buffer);
+
+        asset = await this.prisma.asset.create({
+          data: {
+            projectId: task.projectId,
+            ownerId: task.ownerId,
+            kind: 'generated',
+            capability: task.capability,
+            sourceUrl: url,
+            width: dims.width,
+            height: dims.height,
+            format,
+            sizeBytes: written.sizeBytes,
+            durationMs: output.durationMs,
+            storageBackend: storage.backend,
+            storageKey: key,
+            aigcMeta: JSON.stringify(aigcMeta),
+            aigcLabeledAt: labeledAt,
+          },
+        });
+      } catch (error) {
+        // 并发重试可能已由另一执行者登记同一 key。先回查，确认没有登记才删
+        // 刚写入的对象；绝不能因为一次 P2002 把对方正在引用的文件删掉。
+        let concurrent: Awaited<ReturnType<typeof this.prisma.asset.findFirst>> = null;
+        try {
+          concurrent = await this.prisma.asset.findFirst({
+            where: { storageBackend: storage.backend, storageKey: key },
+          });
+        } catch (lookupError) {
+          // 数据库状态无法确认时宁可保留孤儿文件，也不能误删有效素材。
+          this.log.error(`产出登记失败且无法回查 key=${key}: ${(lookupError as Error).message}`);
+          throw error;
+        }
+        if (concurrent) {
+          stored.push({
+            assetId: concurrent.id,
+            buffer,
+            format,
+            aigcMeta: parseAigcMeta(concurrent.aigcMeta),
+            created: false,
+          });
+          continue;
+        }
+        await this.deleteUnreferencedObject(storage, key, error);
+        throw error;
+      }
+      stored.push({ assetId: asset.id, buffer, format, aigcMeta, created: true });
     }
     return stored;
+  }
+
+  /**
+   * 成功收口 CAS 失败后的补偿清理。
+   *
+   * 只处理本次新建的素材；只要任务仍为 running，就可能已有接管者复用了
+   * 确定性 storageKey，绝不能删除。任务已进入终态时再逐个确认没有任务引用，
+   * 才删库并清理对象，避免误伤并发重试的产出。
+   */
+  async discardCreated(taskId: string, stored: StoredOutput[]): Promise<number> {
+    const created = stored.filter((item) => item.created);
+    if (created.length === 0) return 0;
+
+    const task = await this.prisma.generationTask.findUnique({
+      where: { id: taskId },
+      select: { status: true },
+    });
+    if (!task || task.status === 'running') return 0;
+
+    let removed = 0;
+    for (const item of created) {
+      try {
+        const references = await this.prisma.generationTask.findMany({
+          where: taskOutputReferenceWhere(item.assetId),
+          select: { outputAssetId: true, outputAssetIds: true },
+        });
+        const referenced = references.some((task) =>
+          orderedOutputIds(task.outputAssetId, task.outputAssetIds).includes(item.assetId),
+        );
+        if (referenced) continue;
+
+        const asset = await this.prisma.asset.findUnique({
+          where: { id: item.assetId },
+          select: { storageBackend: true, storageKey: true },
+        });
+        if (!asset) continue;
+
+        const deleted = await this.prisma.asset.deleteMany({ where: { id: item.assetId } });
+        if (deleted.count !== 1) continue;
+        removed += 1;
+        if (asset.storageKey) {
+          const provider = this.storage.get(asset.storageBackend as StorageBackend);
+          if (!provider) {
+            this.log.warn(`素材记录已回收，但存储后端未启用，对象保留: ${asset.storageKey}`);
+            continue;
+          }
+          await provider.delete(asset.storageKey);
+        }
+      } catch (error) {
+        this.log.error(`成功收口失败后回收素材失败 asset=${item.assetId}: ${(error as Error).message}`);
+      }
+    }
+    return removed;
+  }
+
+  private async deleteUnreferencedObject(
+    storage: ReturnType<StorageService['getActive']>,
+    key: string,
+    cause: unknown,
+  ): Promise<void> {
+    try {
+      await storage.delete(key);
+    } catch (cleanupError) {
+      this.log.error(
+        `产出登记失败且清理孤儿文件失败 key=${key}: ${(cleanupError as Error).message}; 原始错误: ${(cause as Error)?.message ?? String(cause)}`,
+      );
+    }
   }
 
   /** AIGC 角标合成失败的错误类型再导出，避免调用方直接依赖 common 层 */
@@ -307,6 +434,26 @@ export class TaskMediaService {
     return {
       buffer: await image.getBuffer(format === 'image/jpeg' ? JimpMime.jpeg : JimpMime.png),
       format,
+    };
+  }
+}
+
+/** 任务内确定性产出 key：同一任务同一下标重试只对应一个对象。 */
+export function generatedOutputStorageKey(taskId: string, index: number, ext: string): string {
+  const safeTaskId = String(taskId).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'unknown';
+  return `generated/task/${safeTaskId}/output-${index + 1}.${ext}`;
+}
+
+function parseAigcMeta(raw: string): AigcMeta {
+  try {
+    return JSON.parse(raw) as AigcMeta;
+  } catch {
+    return {
+      labeled: false,
+      metadata: false,
+      visible: false,
+      method: 'unsupported',
+      warning: '历史素材的 AIGC 标识元数据无法解析',
     };
   }
 }

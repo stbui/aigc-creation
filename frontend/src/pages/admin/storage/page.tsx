@@ -1,11 +1,22 @@
 import { useState } from 'react';
 import { META } from './constants';
 import { useAdmin, useToast, useAdminResource } from './hooks';
-import { CheckCircle2, Lock, RefreshCw, XCircle } from 'lucide-react';
+import { CheckCircle2, Lock, XCircle } from 'lucide-react';
 
 import { adminStorageApi } from '../../../lib/api';
 
-import { ActionButton, EmptyState, ListError, Notice, PageHeader, PageSkeleton, Skeleton, StaleError, ToneBadge } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  RefreshButton,
+  EmptyState,
+  ListError,
+  Notice,
+  PageHeader,
+  PageSkeleton,
+  Skeleton,
+  StaleError,
+  ToneBadge,
+} from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
 import type { StorageBackendId } from '../../../types/api';
 
@@ -30,9 +41,7 @@ export function AdminStoragePage() {
     try {
       const res = await adminStorageApi.probe(backend);
       if (res.ok) {
-        toast.success(
-          `${META[backend].label} 连通正常${res.latencyMs ? ` (${res.latencyMs}ms)` : ''}`,
-        );
+        toast.success(`${META[backend].label} 连通正常${res.latencyMs ? ` (${res.latencyMs}ms)` : ''}`);
       } else {
         toast.error(res.message);
       }
@@ -70,11 +79,7 @@ export function AdminStoragePage() {
    * `credentialSource` 来自接口 —— 加载期间用一根灰条占位，高度对得上。
    */
   const credentialNotice = (loading: boolean) => (
-    <Notice
-      tone="locked"
-      title="凭据不在界面配置。"
-      icon={<Lock className="size-4 shrink-0" aria-hidden />}
-    >
+    <Notice tone="locked" title="凭据不在界面配置。" icon={<Lock className="size-4 shrink-0" aria-hidden />}>
       <p>出于安全考虑，OSS / MinIO 的密钥只从部署环境变量读取，页面仅显示是否配置与脱敏值。</p>
       {loading ? (
         <Skeleton className="mt-1 h-3 w-72" />
@@ -91,11 +96,7 @@ export function AdminStoragePage() {
       <PageSkeleton
         title="存储配置"
         description="素材文件的存放位置。切换只影响新上传，已写入的素材仍按原后端读取。"
-        actions={
-          <ActionButton variant="secondary" icon={RefreshCw} disabled>
-            刷新
-          </ActionButton>
-        }
+        actions={<RefreshButton disabled />}
         notice={credentialNotice(true)}
         panels={0}
         cards={3}
@@ -110,16 +111,7 @@ export function AdminStoragePage() {
       <PageHeader
         title="存储配置"
         description="素材文件的存放位置。切换只影响新上传，已写入的素材仍按原后端读取。"
-        actions={
-          <ActionButton
-            variant="secondary"
-            icon={RefreshCw}
-            disabled={loading}
-            onClick={() => void reload()}
-          >
-            刷新
-          </ActionButton>
-        }
+        actions={<RefreshButton loading={loading} onRefresh={reload} />}
       />
 
       {error && <StaleError error={error} onRetry={() => void reload()} />}
@@ -152,12 +144,7 @@ export function AdminStoragePage() {
               )}
             >
               <div className="flex items-start gap-2.5">
-                <span
-                  className={cn(
-                    'mt-0.5 shrink-0',
-                    b.active ? 'text-brand' : 'text-muted-foreground',
-                  )}
-                >
+                <span className={cn('mt-0.5 shrink-0', b.active ? 'text-brand' : 'text-muted-foreground')}>
                   <Icon className="size-[18px]" aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -191,9 +178,7 @@ export function AdminStoragePage() {
               </div>
 
               {b.probeMessage && (
-                <p className="mt-2 font-mono text-[12px] leading-4 break-all text-muted-foreground">
-                  {b.probeMessage}
-                </p>
+                <p className="mt-2 font-mono text-[12px] leading-4 break-all text-muted-foreground">{b.probeMessage}</p>
               )}
 
               <dl className="mt-3 grid grid-cols-[40px_1fr] gap-x-2 gap-y-1 text-[12px] leading-4">
@@ -208,9 +193,7 @@ export function AdminStoragePage() {
                   )}
                 </dd>
                 <dt className="text-muted-foreground">地址</dt>
-                <dd className="min-w-0 truncate font-mono text-foreground">
-                  {b.endpoint ?? '—'}
-                </dd>
+                <dd className="min-w-0 truncate font-mono text-foreground">{b.endpoint ?? '—'}</dd>
               </dl>
 
               {!b.configured && b.backend !== 'local' && (
@@ -240,10 +223,7 @@ export function AdminStoragePage() {
                   </ActionButton>
                 )}
                 {can('setting.write') && b.configured && !b.active && (
-                  <ActionButton
-                    disabled={busy}
-                    onClick={() => void doSwitch(b.backend as StorageBackendId)}
-                  >
+                  <ActionButton disabled={busy} onClick={() => void doSwitch(b.backend as StorageBackendId)}>
                     设为默认
                   </ActionButton>
                 )}

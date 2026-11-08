@@ -1,4 +1,9 @@
-import type { PaymentDisplayStatus, PaymentProviderId } from '../../../types/payment';
+import type {
+  PaymentCurrency,
+  PaymentDisplayStatus,
+  PaymentProviderId,
+  PaymentSaleStrategy,
+} from '../../../types/payment';
 
 /**
  * 支付订单与渠道的状态文案 / 色调映射。
@@ -22,6 +27,20 @@ export const PAYMENT_STATUS_META: Record<
   refunded: { label: '已退款', tone: 'danger' },
   partial_refunded: { label: '部分退款', tone: 'warn' },
 };
+
+/** 支付订单筛选状态；顺序与状态映射保持一致。 */
+export const PAYMENT_ORDER_STATUS_OPTIONS = (
+  Object.entries(PAYMENT_STATUS_META) as Array<
+    [PaymentDisplayStatus, (typeof PAYMENT_STATUS_META)[PaymentDisplayStatus]]
+  >
+).map(([value, meta]) => ({ value, label: meta.label }));
+
+/** 支付订单日期筛选口径。 */
+export const PAYMENT_ORDER_TIME_FIELD_OPTIONS = [
+  { value: 'created', label: '按下单时间' },
+  { value: 'paid', label: '按支付时间' },
+  { value: 'credited', label: '按入账时间' },
+];
 
 /** 支付方式（checkoutMode）→ 中文 */
 export const CHECKOUT_MODE_LABELS: Record<string, string> = {
@@ -63,11 +82,7 @@ export const ORDER_PROVIDERS = ORDER_PROVIDER_IDS.map((id) => ({
  * 对账页保留原有可对账渠道筛选。PayPal / Stripe / 易支付 / ZPay 当前不参与自动
  * 渠道账单下载，不把它们混进对账筛选，避免出现永远为空的选项。
  */
-export const RECONCILIATION_PROVIDER_IDS: PaymentProviderId[] = [
-  'sandbox',
-  'alipay',
-  'wechat',
-];
+export const RECONCILIATION_PROVIDER_IDS: PaymentProviderId[] = ['sandbox', 'alipay', 'wechat'];
 export const RECONCILIATION_PROVIDERS = RECONCILIATION_PROVIDER_IDS.map((id) => ({
   value: id,
   label: PROVIDER_LABELS[id],
@@ -83,10 +98,64 @@ export function paymentActions(status: PaymentDisplayStatus): {
   canQuery: boolean;
   canClose: boolean;
 } {
-  const actionable =
-    status === 'created' ||
-    status === 'pending' ||
-    status === 'create_failed' ||
-    status === 'closing';
+  const actionable = status === 'created' || status === 'pending' || status === 'create_failed' || status === 'closing';
   return { canQuery: actionable, canClose: actionable };
 }
+
+/** 充值商品表单草稿。金额在表单里保留字符串，提交时才换算为整数分。 */
+export interface PaymentProductDraft {
+  name: string;
+  description: string;
+  currency: PaymentCurrency;
+  /** 元 / 美元，输入用小数，提交前换算成分 */
+  price: string;
+  originalPrice: string;
+  credits: string;
+  creditsValidDays: string;
+  grantType: 'immediate' | 'manual';
+  saleStrategy: PaymentSaleStrategy;
+  periodDays: string;
+  periodPurchaseLimit: string;
+  stockTotal: string;
+  saleStartAt: string;
+  saleEndAt: string;
+  sortOrder: string;
+  enabled: boolean;
+}
+
+export const EMPTY_PAYMENT_PRODUCT_DRAFT: PaymentProductDraft = {
+  name: '',
+  description: '',
+  currency: 'CNY',
+  price: '',
+  originalPrice: '',
+  credits: '',
+  creditsValidDays: '0',
+  grantType: 'immediate',
+  saleStrategy: 'unlimited',
+  periodDays: '30',
+  periodPurchaseLimit: '1',
+  stockTotal: '0',
+  saleStartAt: '',
+  saleEndAt: '',
+  sortOrder: '0',
+  enabled: false,
+};
+
+export const PAYMENT_PRODUCT_STRATEGY_OPTIONS: Array<{
+  value: PaymentSaleStrategy;
+  label: string;
+}> = [
+  { value: 'unlimited', label: '不限量' },
+  { value: 'periodic', label: '周期限购' },
+  { value: 'inventory', label: '库存' },
+  { value: 'timed', label: '限时' },
+];
+
+export const PAYMENT_CURRENCY_OPTIONS: Array<{
+  value: PaymentCurrency;
+  label: string;
+}> = [
+  { value: 'CNY', label: '人民币 CNY' },
+  { value: 'USD', label: '美元 USD' },
+];

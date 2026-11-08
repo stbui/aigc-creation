@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Download,
-  Eye,
   LayoutGrid,
   RefreshCw,
-  Sparkles,
-  Trash2,
+  Smartphone,
   Upload,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Button,
-  Checkbox,
   EmptyState,
   EmptyStateContent,
   EmptyStateDescription,
@@ -19,25 +16,24 @@ import {
   EmptyStateMedia,
   EmptyStateTitle,
   ImageLightbox,
-  Popconfirm,
-  ResultMedia,
+  MobileUploadModal,
   Select,
   StateError,
   StateSkeleton,
-  StatusBadge,
   Surface,
   SurfaceContent,
   SurfaceDescription,
   SurfaceHeader,
   SurfaceTitle,
   ToggleGroup,
-  cn,
   modalityOfFormat,
   type LightboxItem,
 } from './components';
-import { assetsApi, assetSrc, assetThumbSrc, projectsApi } from './api';
+import { AssetCard } from './AssetCard';
+import { assetsApi, assetSrc, projectsApi } from './api';
 import { useApp, useAuth, useCapabilities, useDocumentMeta, useProject } from './hooks';
 import {
+  DEFAULT_KIND,
   KIND_OPTIONS,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
@@ -55,7 +51,7 @@ import {
   isSupportedImageFile,
   toolPath,
 } from './utils';
-import type { Asset, Project } from '../../types/api';
+import type { Asset, MobileUploadAsset, Project } from '../../types/api';
 
 /**
  * 素材库页面。完整视觉与文案规范见 `docs/library-design.md`。
@@ -77,7 +73,7 @@ export function LibraryPage() {
 
   const [items, setItems] = useState<Asset[]>([]);
   const [total, setTotal] = useState(0);
-  const [kind, setKind] = useState<Kind>('all');
+  const [kind, setKind] = useState<Kind>(DEFAULT_KIND);
   const [capability, setCapability] = useState('all');
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
@@ -89,6 +85,8 @@ export function LibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  /** 手机扫码上传弹窗；素材由后端直落素材库，接收后只需刷新列表 */
+  const [mobileOpen, setMobileOpen] = useState(false);
   /** 大图查看器下标；null = 关闭。只收录图片素材，视频继续使用原生播放器。 */
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
@@ -254,7 +252,8 @@ export function LibraryPage() {
   );
 
   /** 空态不是一种状态：游客、真实空库、筛选无结果显示不同的原因与下一步。 */
-  const hasActiveFilters = kind !== 'all' || capability !== 'all' || activeGroup !== null;
+  const hasActiveFilters =
+    kind !== DEFAULT_KIND || capability !== 'all' || activeGroup !== null;
   const emptyState = !token
     ? {
         title: '登录后管理素材',
@@ -268,7 +267,7 @@ export function LibraryPage() {
           action: '清除筛选',
         }
       : {
-          title: '还没有素材',
+          title: '还没有本地上传的素材',
           description: '上传原图后，可在这里统一筛选、预览和下载。',
           action: '上传素材',
         };
@@ -355,6 +354,18 @@ export function LibraryPage() {
     }
   };
 
+  /**
+   * 手机端传回图片 → 刷新素材列表。
+   *
+   * 与工具页回填参考图位不同，手机上传在这里**就走素材库主路径**：
+   * 后端接收时已按 owner / project 落库，刷新即可看到，不需要前端再上传一次。
+   */
+  const receiveFromMobile = async (assets: MobileUploadAsset[]) => {
+    setMobileOpen(false);
+    message.success(`已从手机接收 ${assets.length} 张素材`);
+    await load();
+  };
+
   const remove = async (id: string) => {
     try {
       const res = await assetsApi.remove(id);
@@ -395,7 +406,7 @@ export function LibraryPage() {
       return;
     }
     if (hasActiveFilters) {
-      setKind('all');
+      setKind(DEFAULT_KIND);
       setCapability('all');
       setGroupKey(null);
       return;
@@ -409,9 +420,6 @@ export function LibraryPage() {
         <header className="asset-library-header">
           <div>
             <h1 className="asset-library-title">素材库</h1>
-            <p className="asset-library-sub">
-              统一管理上传原图与生成结果，支持筛选、分组、预览和批量下载
-            </p>
           </div>
           {token && (
             <div className="asset-library-header-actions">
@@ -438,6 +446,13 @@ export function LibraryPage() {
                 onClick={() => void load()}
               >
                 刷新
+              </Button>
+              <Button
+                icon={<Smartphone className="size-3.5" />}
+                className="asset-library-button"
+                onClick={() => setMobileOpen(true)}
+              >
+                手机上传
               </Button>
               <Button
                 type="primary"
@@ -479,6 +494,15 @@ export function LibraryPage() {
                 ]}
                 onValueChange={(next) => {
                   if (!next) return;
+                  /*
+                   * 能力只存在于生成结果上：默认来源是「本地上传」，
+                   * 留在该来源下按能力分组只会剩一个「未关联能力」。
+                   * 切到按能力时同步放开来源与能力筛选，否则用户看不到任何能力分组。
+                   */
+                  if (next === 'capability') {
+                    setKind('all');
+                    setCapability('all');
+                  }
                   setGroupBy(next as GroupBy);
                   setGroupKey(null);
                 }}
@@ -597,124 +621,24 @@ export function LibraryPage() {
         ) : (
           <>
             <div className="asset-library-grid">
-              {shown.slice(0, visible).map((a, index) => {
-                const url = assetSrc(a);
-                const isVideo = modalityOfFormat(a.format) === 'video';
-                /*
-                 * 网格只加载缩略图; 视频没有缩略图管线, 直接用原文件 (卡片是懒加载)。
-                 * 首行优先加载, 让首屏尽早出图。
-                 */
-                const previewUrl = isVideo ? url : assetThumbSrc(a, 640) ?? url;
-                const isSel = selected.includes(a.id);
-                const previewAt = isVideo ? -1 : lightboxItems.findIndex((item) => item.id === a.id);
-                const openMedia = () => {
-                  if (previewAt >= 0) {
-                    setPreviewIndex(previewAt);
-                    return;
+              {shown.slice(0, visible).map((a, index) => (
+                <AssetCard
+                  key={a.id}
+                  asset={a}
+                  selected={selected.includes(a.id)}
+                  priority={index < 5}
+                  previewIndex={
+                    modalityOfFormat(a.format) === 'video'
+                      ? -1
+                      : lightboxItems.findIndex((item) => item.id === a.id)
                   }
-                  if (url) window.open(url, '_blank', 'noopener');
-                };
-                return (
-                  <Surface
-                    key={a.id}
-                    className={cn('asset-library-card', isSel && 'is-selected')}
-                  >
-                    <SurfaceContent className="asset-library-card-body p-0">
-                      <div className="asset-library-cover">
-                        {previewUrl && (isVideo ? (
-                          <ResultMedia
-                            url={previewUrl}
-                            modality="video"
-                            alt={`${capabilityName(a.capability)} 素材`}
-                            priority={index < 5}
-                            aigc={a.aigc}
-                          />
-                        ) : (
-                          <Button
-                            type="text"
-                            className="asset-library-cover-button"
-                            aria-label={`查看${capabilityName(a.capability)}素材大图`}
-                            title="点击查看大图"
-                            onClick={openMedia}
-                          >
-                            <ResultMedia
-                              url={previewUrl}
-                              modality="image"
-                              alt={`${capabilityName(a.capability)} 素材`}
-                              priority={index < 5}
-                            />
-                          </Button>
-                        ))}
-                        <Checkbox
-                          checked={isSel}
-                          onChange={() => toggle(a.id)}
-                          className={cn('asset-library-check', isSel && 'on')}
-                          aria-label={isSel ? '取消选择' : '选择该素材'}
-                        />
-                        {a.kind === 'original' && (
-                          <StatusBadge
-                            variant="secondary"
-                            className="asset-library-source-badge"
-                          >
-                            上传原图
-                          </StatusBadge>
-                        )}
-                        <div className="asset-library-hover-actions">
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<Eye className="size-3" />}
-                            aria-label={isVideo ? '在新标签页查看视频' : '查看大图'}
-                            title={isVideo ? '在新标签页查看视频' : '查看大图'}
-                            onClick={openMedia}
-                          >
-                            查看
-                          </Button>
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<Download className="size-3" />}
-                            aria-label="下载素材"
-                            title="下载素材"
-                            onClick={() => downloadAsset(a)}
-                          >
-                            下载
-                          </Button>
-                          {a.kind === 'generated' && a.capability && (
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<Sparkles className="size-3" />}
-                              onClick={() => navigate(toolPath(a.capability as string))}
-                            >
-                              再来一张
-                            </Button>
-                          )}
-                          <Popconfirm
-                            title="删除该素材？"
-                            description={
-                              a.kind === 'generated' ? '会连带删除产出它的作品记录' : '历史作品与结果会保留'
-                            }
-                            okText="删除"
-                            cancelText="取消"
-                            okButtonProps={{ danger: true }}
-                            onConfirm={() => void remove(a.id)}
-                          >
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<Trash2 className="size-3" />}
-                              className="asset-library-hover-delete"
-                              aria-label={`删除素材${a.kind === 'generated' ? '及其作品记录' : ''}`}
-                              title="删除素材"
-                            />
-                          </Popconfirm>
-                        </div>
-                      </div>
-                    </SurfaceContent>
-                  </Surface>
-                );
-              })}
+                  onToggle={toggle}
+                  onPreview={setPreviewIndex}
+                  onDownload={downloadAsset}
+                  onRemove={(id) => void remove(id)}
+                  onReuse={(capability) => navigate(toolPath(capability))}
+                />
+              ))}
             </div>
 
             {visible < shown.length && (
@@ -738,6 +662,13 @@ export function LibraryPage() {
             ariaLabel="素材预览"
           />
         )}
+
+        {/* 手机上传弹窗 (二维码方案): 手机扫码选图/拍照, 电脑端接收后刷新列表 */}
+        <MobileUploadModal
+          open={mobileOpen}
+          onReceived={(assets) => void receiveFromMobile(assets)}
+          onCancel={() => setMobileOpen(false)}
+        />
       </div>
     </div>
   );

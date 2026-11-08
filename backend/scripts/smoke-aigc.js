@@ -265,15 +265,14 @@ async function api() {
   if (!sourceAssetId) throw new Error(`上传失败: ${JSON.stringify(up).slice(0, 200)}`);
 
   /*
-   * 新模型层：建任务必须带前台模型 id。先问一次「现在能跑 main_image 的模型」；
-   * 没有配置线路时如实跳过端到端段（离屏标识断言已经在上面跑完了），
-   * 不伪造产出、不把缺线路说成通过。
+   * 新模型层：建任务必须带前台模型 id。`/models/available` 的 capability
+   * 是请求意图（text/image/video/audio），不能传前台产品能力 main_image；
+   * 公开目录已经带 available，直接选可跑的前台模型即可。
    */
-  const available = await call('POST', '/models/available', token, { capability: 'main_image' });
-  const model = (available.data?.models ?? []).find((m) => m.capability === 'main_image');
+  const catalog = await call('GET', '/models', token);
+  const model = (catalog.data?.models ?? []).find((m) => m.capability === 'main_image' && m.available === true);
+  check('存在可用的 main_image 前台模型', Boolean(model), `status=${catalog.httpStatus} ${catalog.message || ''}`);
   if (!model) {
-    console.log('  SKIP  端到端生成：没有可用于 main_image 的模型线路');
-    console.log('        在后台「渠道工作台」配置一条 image 线路后重跑本脚本');
     await cleanup();
     return;
   }

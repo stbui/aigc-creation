@@ -1,6 +1,6 @@
-import { ActionButton, Descriptions, Drawer, Notice } from '~/admin-ui/primitives';
+import { ActionButton, Descriptions, Drawer, Notice, TextAreaField } from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS, REFUND_REASON_LABELS, STATUS_LABELS } from './constants';
-import { canResolveStatus, formatTime, toCredits, toCreditsInput } from './utils';
+import { formatTime, toCredits, toCreditsInput } from './utils';
 import type { BillingOrderView } from '../../../types/model';
 
 interface BillingDetailDrawerProps {
@@ -9,6 +9,8 @@ interface BillingDetailDrawerProps {
   resolvable: boolean;
   action: 'settle' | 'refund';
   onActionChange: (action: 'settle' | 'refund') => void;
+  reason: string;
+  onReasonChange: (reason: string) => void;
   resolving: boolean;
   onClose: () => void;
   onResolve: () => void;
@@ -26,11 +28,14 @@ export function BillingDetailDrawer({
   resolvable,
   action,
   onActionChange,
+  reason,
+  onReasonChange,
   resolving,
   onClose,
   onResolve,
 }: BillingDetailDrawerProps) {
-  const canResolve = Boolean(detail && resolvable && canResolveStatus(detail.status));
+  const canResolve = Boolean(detail && resolvable && detail.reviewable);
+  const hasReason = reason.trim().length > 0;
 
   return (
     <Drawer
@@ -50,7 +55,7 @@ export function BillingDetailDrawer({
             <ActionButton
               variant="default"
               size="sm"
-              disabled={resolving}
+              disabled={resolving || !hasReason}
               onClick={onResolve}
             >
               {resolving ? '处理中…' : action === 'refund' ? '确认退款' : '确认结算'}
@@ -101,6 +106,7 @@ export function BillingDetailDrawer({
               },
               { label: '开始 / 结算', value: `${formatTime(detail.startedAt)} / ${formatTime(detail.settledAt)}` },
               { label: '退款时间', value: formatTime(detail.refundedAt) },
+              { label: '核对批次', value: <span className="font-mono text-xs">{detail.reviewBatchId || '—'}</span> },
               { label: '上游请求号', value: <span className="font-mono text-xs">{detail.providerRequestId || '—'}</span> },
             ]}
             columns={2}
@@ -137,12 +143,28 @@ export function BillingDetailDrawer({
                   全额退款
                 </ActionButton>
               </div>
+              <TextAreaField
+                ariaLabel="核对依据"
+                aria-required
+                value={reason}
+                onChange={onReasonChange}
+                placeholder="填写核对依据、渠道回执或工单号（必填）"
+                maxLength={500}
+                showCount
+                rows={3}
+                className="mt-2"
+              />
               {action === 'refund' && (
                 <p className="mt-1 text-[12px] text-danger-text">
                   退款会按预留金额原额退回用户积分，且不可撤销。
                 </p>
               )}
             </div>
+          )}
+          {detail && !detail.reviewable && (
+            <Notice tone="info" title="当前不可人工核对">
+              仅结果不明、超时运行，或预授权对应任务已失败/取消，且尚未产生作品、也不在补交付中的账单可核对。
+            </Notice>
           )}
         </div>
       ) : (

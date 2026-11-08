@@ -3,6 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { CreditService } from '../credits/credit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CatalogVersionService } from '../model/infra/catalog-version.service';
+import { UserGroupService } from '../model/user-groups/user-group.service';
+import type { Prisma } from '@prisma/client';
 
 /**
  * 会员体系 (落地页订阅卡兑现)。
@@ -83,6 +86,17 @@ export interface ResolvedMembership {
   cancelAtPeriodEnd: boolean;
 }
 
+/** 已付会员周期。Membership 是一人一行投影，历史必须从订单周期快照还原。 */
+export interface MembershipPeriodHistoryItem {
+  id: string;
+  planCode: string;
+  planName: string;
+  status: 'active' | 'scheduled' | 'expired' | 'refunded';
+  startAt: Date;
+  expiresAt: Date;
+  monthlyCredits: number;
+}
+
 @Injectable()
 export class MembershipService {
   private readonly logger = new Logger(MembershipService.name);
@@ -91,7 +105,45 @@ export class MembershipService {
     private readonly prisma: PrismaService,
     private readonly credit: CreditService,
     private readonly notifications: NotificationsService,
+    private readonly groups: UserGroupService,
+    private readonly catalogVersion: CatalogVersionService,
   ) {}
+
+  /**
+   * 会员周期变化会改变「有效订单 → 用户分组」的解析结果。
+   *
+   * 必须在数据库事务提交后调用：先清本进程缓存，再递增跨进程目录版本。
+   * 这是支付/退款主链路的后置动作，失败不能反向让已提交的资金与权益变成
+   * 500；但必须留下错误日志，靠 30 秒 TTL 兜底恢复。
+   */
+  async invalidateUserGroupCatalog(): Promise<void> {
+    this.groups.invalidate();
+    try {
+      await this.catalogVersion.invalidate();
+    } catch (error) {
+      this.logger.error(
+        `会员周期已提交，但用户分组目录版本失效失败: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * 串行化同一用户的会员投影变更。
+   *
+   * SQLite 的 deferred transaction 与 PostgreSQL 的 READ COMMITTED 都不会因为
+   * “稍后要更新 Membership” 而提前锁住用户。两笔不同的续费订单可以各自更新
+   * 自己的订单行，再同时读到同一个旧 `expiresAt`，最后后提交者覆盖前者。
+   *
+   * 因此所有会重算会员投影的事务必须先对 User 做一次 no-op UPDATE。锁顺序
+   * 固定为 User → Order/Membership，与退款记账保持一致，避免反向加锁死锁。
+   */
+  async lockMembershipProjectionInTransaction(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE "User" SET "name" = "name" WHERE id = ${userId}`;
+  }
 
   /**
    * 解析用户当前权益。
@@ -112,18 +164,71 @@ export class MembershipService {
     if (!userId) return NON_MEMBER;
 
     try {
+      const now = new Date();
       const m = await this.prisma.membership.findFirst({
-        where: {
-          userId,
-          // cancelled 表示已取消自动续费, 但用户已付的周期不能被立刻收回。
-          status: { in: ['active', 'grace', 'cancelled'] },
-          expiresAt: { gt: new Date() },
+        where: { userId },
+        include: {
+          plan: { select: { code: true, name: true } },
+          order: {
+            select: {
+              membershipPeriodStartAt: true,
+              membershipPeriodEndAt: true,
+            },
+          },
         },
-        include: { plan: { select: { code: true, name: true } } },
         orderBy: { expiresAt: 'desc' },
       });
       if (!m) return NON_MEMBER;
 
+      /*
+       * 已付订单的周期快照才是当前权益的权威来源。Membership 是一人一行的
+       * 投影：提前续费会指向未来订单，退掉当前周期后还可能留下未来周期，
+       * 单看 Membership.expiresAt 会把未来权益提前生效，也会把周期之间的
+       * 空档误判成仍然有效。
+       */
+      const activePeriod = await this.prisma.order.findFirst({
+        where: {
+          userId,
+          membershipPlanId: { not: null },
+          membershipAppliedAt: { not: null },
+          membershipPeriodStartAt: { lte: now },
+          membershipPeriodEndAt: { gt: now },
+          membershipPeriodRevokedAt: null,
+          status: { in: ['paid', 'partial_refunded'] },
+        },
+        select: {
+          membershipPeriodEndAt: true,
+          membershipPerksSnapshot: true,
+          membershipMonthlyCreditsSnapshot: true,
+          membershipPlan: { select: { code: true, name: true } },
+        },
+        orderBy: { membershipPeriodStartAt: 'desc' },
+      });
+      if (activePeriod?.membershipPeriodEndAt && activePeriod.membershipPlan) {
+        return {
+          isMember: true,
+          planCode: activePeriod.membershipPlan.code,
+          planName: activePeriod.membershipPlan.name,
+          perks: parsePerks(activePeriod.membershipPerksSnapshot ?? m.perksSnapshot),
+          expiresAt: activePeriod.membershipPeriodEndAt.toISOString(),
+          monthlyCredits:
+            activePeriod.membershipMonthlyCreditsSnapshot ?? m.monthlyCreditsSnapshot,
+          cancelAtPeriodEnd: m.status === 'cancelled',
+        };
+      }
+
+      // 订单已有周期快照却没有覆盖当前时刻，说明用户处于未付费空档。
+      if (m.order?.membershipPeriodStartAt || m.order?.membershipPeriodEndAt) {
+        return NON_MEMBER;
+      }
+
+      // 兼容旧数据：没有订单周期快照时仍按 Membership 投影判断。
+      if (
+        !['active', 'grace', 'cancelled'].includes(m.status) ||
+        m.expiresAt <= now
+      ) {
+        return NON_MEMBER;
+      }
       return {
         isMember: true,
         planCode: m.plan.code,
@@ -256,13 +361,23 @@ export class MembershipService {
   }> {
     const order = await this.prisma.order.findUnique({
       where: { id: params.orderId },
-      select: { id: true, userId: true, status: true, membershipPlanId: true, orderNo: true },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        membershipPlanId: true,
+        membershipPerksSnapshot: true,
+        membershipMonthlyCreditsSnapshot: true,
+        membershipDurationDaysSnapshot: true,
+        membershipUserGroupCodeSnapshot: true,
+        orderNo: true,
+      },
     });
     if (!order) throw new AppError(40400, '订单不存在', 404);
     if (order.userId !== params.userId) {
       throw new AppError(40301, '无权使用该订单', 403);
     }
-    if (order.status !== 'paid') {
+    if (order.status !== 'paid' && order.status !== 'partial_refunded') {
       throw new AppError(40901, '订单未支付, 不能开通会员', 409);
     }
     if (order.membershipPlanId !== params.planId) {
@@ -275,44 +390,82 @@ export class MembershipService {
      * ⚠ 这里**不校验 plan.status** —— 用户付款时套餐是可售的, 之后运营下架
      * 不该让已付款的订单永远开通不了。"是否可购买"是下单时的判定 (OrderService.create)。
      */
-    if (plan.durationDays <= 0) {
+    const durationDays = order.membershipDurationDaysSnapshot ?? plan.durationDays;
+    const monthlyCredits = order.membershipMonthlyCreditsSnapshot ?? plan.monthlyCredits;
+    const orderPerksSnapshot =
+      order.membershipPerksSnapshot ?? JSON.stringify(parsePerks(plan.perks));
+    // 历史待支付订单没有分组快照时，只能在兑换时回退到当前套餐配置。
+    const userGroupCode =
+      order.membershipUserGroupCodeSnapshot ?? plan.userGroupCode ?? '';
+    if (durationDays <= 0) {
       throw new AppError(40001, '默认套餐不支持购买', 400);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 同一用户的并发续费必须串行重算到期时间；先锁 User，再抢订单闸门。
+      await this.lockMembershipProjectionInTransaction(tx, params.userId);
+
       // 一次性闸门: 只有闸门从 null 变成时间戳的那次调用能继续往下走
       const claim = await tx.order.updateMany({
-        where: { id: order.id, status: 'paid', membershipAppliedAt: null },
+        where: {
+          id: order.id,
+          status: { in: ['paid', 'partial_refunded'] },
+          membershipAppliedAt: null,
+        },
         data: { membershipAppliedAt: new Date() },
       });
       if (claim.count === 0) return { claimed: false as const };
 
       const now = new Date();
       const current = await tx.membership.findFirst({
-        // 已取消但尚未到期的会员仍可续费: 新订单会把它重新激活并顺延到期时间。
-        where: { userId: params.userId, status: { in: ['active', 'grace', 'cancelled'] } },
-        orderBy: { expiresAt: 'desc' },
+        // Membership 是用户级投影，不是每次订阅新增一行。过期后重新订阅也必须
+        // 复用原行；否则 refund/resolve/scheduler 的 findFirst 会逐渐产生歧义。
+        where: { userId: params.userId },
+        orderBy: [{ expiresAt: 'desc' }, { createdAt: 'desc' }],
       });
 
-      // 从当前到期时间顺延, 已过期则从现在开始
-      const base = current && current.expiresAt > now ? current.expiresAt : now;
-      const expiresAt = new Date(base.getTime() + plan.durationDays * 24 * 3600 * 1000);
-
-      const perksSnapshot = JSON.stringify(parsePerks(plan.perks));
-      const nextCreditAt = new Date(
-        Math.min(expiresAt.getTime(), now.getTime() + plan.durationDays * 24 * 3600 * 1000),
+      // 从当前到期时间顺延, 已过期则从现在开始。提前续费的新周期尚未开始，
+      // 因此不能立即发放新周期积分，也不能提前覆盖当前周期的套餐权益。
+      const hasCurrentPeriod = Boolean(
+        current &&
+          ['active', 'grace', 'cancelled'].includes(current.status) &&
+          current.expiresAt > now,
       );
-
+      const periodStartAt = hasCurrentPeriod ? current!.expiresAt : now;
+      const startsImmediately = !hasCurrentPeriod;
+      const expiresAt = new Date(
+        periodStartAt.getTime() + durationDays * 24 * 3600 * 1000,
+      );
+      const nextMonthlyCreditAt = new Date(
+        periodStartAt.getTime() + 30 * 24 * 3600 * 1000,
+      );
+      const nextCreditAt = startsImmediately
+        ? monthlyCredits > 0
+          ? new Date(Math.min(expiresAt.getTime(), nextMonthlyCreditAt.getTime()))
+          : null
+        : current?.nextCreditAt &&
+            current.nextCreditAt.getTime() <= periodStartAt.getTime()
+          ? current.nextCreditAt
+          :
+            /*
+             * 提前续费即使新套餐月积分为 0，也必须在该周期开始时唤醒调度器
+             * 切换 Membership 投影。否则后台套餐/用户分组会一直停留在上一期。
+             */
+            periodStartAt;
+      const keepCurrentProjection = hasCurrentPeriod && current !== null;
       const membership = current
         ? await tx.membership.update({
             where: { id: current.id },
             data: {
-              planId: plan.id,
+              planId: keepCurrentProjection ? current.planId : plan.id,
               status: 'active',
-              // 换套餐时刷新快照; 同套餐续期则保留原权益 (用户已付费)
-              perksSnapshot: current.planId === plan.id ? current.perksSnapshot : perksSnapshot,
-              monthlyCreditsSnapshot: plan.monthlyCredits,
-              startAt: current.startAt,
+              perksSnapshot: keepCurrentProjection
+                ? current.perksSnapshot
+                : orderPerksSnapshot,
+              monthlyCreditsSnapshot: keepCurrentProjection
+                ? current.monthlyCreditsSnapshot
+                : monthlyCredits,
+              startAt: keepCurrentProjection ? current.startAt : now,
               expiresAt,
               nextCreditAt,
               orderId: params.orderId,
@@ -323,8 +476,8 @@ export class MembershipService {
               userId: params.userId,
               planId: plan.id,
               status: 'active',
-              perksSnapshot,
-              monthlyCreditsSnapshot: plan.monthlyCredits,
+              perksSnapshot: orderPerksSnapshot,
+              monthlyCreditsSnapshot: monthlyCredits,
               startAt: now,
               expiresAt,
               nextCreditAt,
@@ -332,25 +485,47 @@ export class MembershipService {
             },
           });
 
-      // 首期订阅积分立即发放 (与订单同 orderId, 退款回收按此批次扣回)
-      if (plan.monthlyCredits > 0) {
-        await this.credit.grant(
+      /*
+       * 周期快照必须落在触发它的订单上, 而不是只更新当前 Membership。
+       * Membership 是一人一行的投影, 续费会覆盖 orderId/expiresAt; 没有
+       * 订单级快照时, 退款既找不到旧订单买的区间, 也无法判断退掉的是哪一期。
+       */
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          membershipPeriodStartAt: periodStartAt,
+          membershipPeriodEndAt: expiresAt,
+          membershipPerksSnapshot: orderPerksSnapshot,
+          membershipMonthlyCreditsSnapshot: monthlyCredits,
+          membershipDurationDaysSnapshot: durationDays,
+          membershipUserGroupCodeSnapshot: userGroupCode,
+          membershipPeriodRevokedAt: null,
+        },
+      });
+
+      // 只有周期真正从当前时刻开始时才立即发首期积分；提前续费要等到
+      // 新周期开始，由调度器按该周期订单发放。
+      if (startsImmediately && monthlyCredits > 0) {
+        const granted = await this.credit.grant(
           {
             userId: params.userId,
-            credits: plan.monthlyCredits,
+            credits: monthlyCredits,
             source: 'grant',
-            // 会员积分与订阅同周期到期
-            validDays: plan.durationDays,
+            // 月度赠送积分不滚存；首期与后续月份统一 30 天有效
+            validDays: 30,
             orderId: params.orderId,
+            idempotencyKey: `membership-initial:${params.orderId}`,
             reason: `会员订阅积分 (${plan.name})`,
           },
           tx,
         );
-        // 下期发放时间 = 一个月后
-        await tx.membership.update({
-          where: { id: membership.id },
-          data: { nextCreditAt: new Date(now.getTime() + 30 * 24 * 3600 * 1000) },
-        });
+        if (!granted.idempotentHit) {
+          // 退款按实际发放账本回收，不能把尚未到账的积分预记到订单上。
+          await tx.order.update({
+            where: { id: order.id },
+            data: { grantedCredits: { increment: monthlyCredits } },
+          });
+        }
       }
 
       return { claimed: true as const, membershipId: membership.id, expiresAt };
@@ -374,6 +549,8 @@ export class MembershipService {
       };
     }
 
+    await this.invalidateUserGroupCatalog();
+
     this.logger.log(
       `会员开通/续期: user=${params.userId} plan=${plan.code} 到期=${result.expiresAt.toISOString()} order=${order.orderNo}`,
     );
@@ -386,43 +563,271 @@ export class MembershipService {
   }
 
   /**
+   * 全额退款时撤销某一笔订单产生的会员周期。
+   *
+   * 调用方必须传入退款记账事务，保证「订单退款成功、积分扣回、会员周期撤销、
+   * 会员投影重算」同生共死。撤销的是订单级周期快照，不是整条 Membership：
+   *   · 退最新一期 → 回退到仍在付费的上一期到期时间；
+   *   · 退较早一期 → 当前有效周期不受影响；
+   *   · 最后一期退款 → 立即失效并停发后续月度积分。
+   *
+   * 对旧数据（periodEndAt 为空）保留一次保守降级：只有 Membership.orderId
+   * 仍指向本单时才终止，避免无法证明归属的旧周期被误撤。
+   */
+  async revokeOrderPeriodInTransaction(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<{
+    affected: boolean;
+    terminated: boolean;
+    remainingExpiresAt: string | null;
+    revokedPeriodStartAt: string | null;
+    revokedPeriodEndAt: string | null;
+  }> {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        membershipPlanId: true,
+        membershipAppliedAt: true,
+        membershipPeriodStartAt: true,
+        membershipPeriodEndAt: true,
+        membershipPeriodRevokedAt: true,
+      },
+    });
+    if (!order?.membershipPlanId || !order.membershipAppliedAt) {
+      return {
+        affected: false,
+        terminated: false,
+        remainingExpiresAt: null,
+        revokedPeriodStartAt: null,
+        revokedPeriodEndAt: null,
+      };
+    }
+
+    // 两笔不同订单并发退款时，也必须串行重算剩余周期与 Membership 投影。
+    await this.lockMembershipProjectionInTransaction(tx, order.userId);
+
+    const now = new Date();
+    const current = await tx.membership.findFirst({
+      where: { userId: order.userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    // 退款事务会先把订单状态改成 refunded，再调用本方法；此时不能再按
+    // status=paid 判断。订单自身的周期快照已足以说明退款前是否覆盖当前时刻。
+    const wasEntitled = Boolean(
+      !order.membershipPeriodRevokedAt &&
+        order.membershipPeriodStartAt &&
+        order.membershipPeriodStartAt <= now &&
+        order.membershipPeriodEndAt &&
+        order.membershipPeriodEndAt > now,
+    );
+
+    // 旧订单没有订单级周期快照，无法安全重算历史区间，保守处理当前行。
+    if (!order.membershipPeriodEndAt) {
+      const ended = await tx.membership.updateMany({
+        where: {
+          userId: order.userId,
+          orderId: order.id,
+          status: { in: ['active', 'grace', 'cancelled'] },
+        },
+        data: { status: 'expired', expiresAt: now, nextCreditAt: null, orderId: null },
+      });
+      return {
+        affected: ended.count > 0,
+        terminated: ended.count > 0,
+        remainingExpiresAt: null,
+        revokedPeriodStartAt: null,
+        revokedPeriodEndAt: null,
+      };
+    }
+
+    const revokedAt = new Date();
+    const revoked = await tx.order.updateMany({
+      where: { id: order.id, membershipPeriodRevokedAt: null },
+      data: { membershipPeriodRevokedAt: revokedAt },
+    });
+    if (revoked.count === 0) {
+      return {
+        affected: false,
+        terminated: false,
+        remainingExpiresAt: current?.expiresAt.toISOString() ?? null,
+        revokedPeriodStartAt: order.membershipPeriodStartAt?.toISOString() ?? null,
+        revokedPeriodEndAt: order.membershipPeriodEndAt.toISOString(),
+      };
+    }
+
+    const remaining = await tx.order.findMany({
+      where: {
+        userId: order.userId,
+        membershipPlanId: { not: null },
+        membershipAppliedAt: { not: null },
+        membershipPeriodEndAt: { not: null },
+        membershipPeriodRevokedAt: null,
+        status: { in: ['paid', 'partial_refunded'] },
+      },
+      select: {
+        id: true,
+        membershipPlanId: true,
+        membershipPeriodStartAt: true,
+        membershipPeriodEndAt: true,
+        membershipPerksSnapshot: true,
+        membershipMonthlyCreditsSnapshot: true,
+      },
+      orderBy: [
+        { membershipPeriodEndAt: 'desc' },
+        { membershipPeriodStartAt: 'desc' },
+      ],
+    });
+
+    const finalEndAt = remaining.length
+      ? new Date(
+          Math.max(
+            ...remaining.map((period) => period.membershipPeriodEndAt!.getTime()),
+          ),
+        )
+      : null;
+    const activePeriod = remaining
+      .filter(
+        (period) =>
+          period.membershipPeriodStartAt !== null &&
+          period.membershipPeriodStartAt <= now &&
+          period.membershipPeriodEndAt! > now,
+      )
+      .sort(
+        (a, b) =>
+          b.membershipPeriodStartAt!.getTime() -
+          a.membershipPeriodStartAt!.getTime(),
+      )[0];
+    const futurePeriod = remaining
+      .filter(
+        (period) =>
+          period.membershipPeriodStartAt !== null &&
+          period.membershipPeriodStartAt > now,
+      )
+      .sort(
+        (a, b) =>
+          a.membershipPeriodStartAt!.getTime() -
+          b.membershipPeriodStartAt!.getTime(),
+      )[0];
+    const projection = activePeriod ?? futurePeriod;
+    const stillEntitled = Boolean(activePeriod);
+
+    if (!current) {
+      return {
+        affected: true,
+        terminated: wasEntitled && !stillEntitled,
+        remainingExpiresAt: finalEndAt?.toISOString() ?? null,
+        revokedPeriodStartAt: order.membershipPeriodStartAt?.toISOString() ?? null,
+        revokedPeriodEndAt: order.membershipPeriodEndAt.toISOString(),
+      };
+    }
+
+    if (!projection) {
+      /*
+       * 没有当前或未来已付周期时直接置 expired；订单快照仍保留原边界用于审计。
+       */
+      await tx.membership.update({
+        where: { id: current.id },
+        data: {
+          status: 'expired',
+          expiresAt: now,
+          nextCreditAt: null,
+          orderId: null,
+        },
+      });
+      return {
+        affected: true,
+        terminated: wasEntitled && !stillEntitled,
+        remainingExpiresAt: null,
+        revokedPeriodStartAt: order.membershipPeriodStartAt?.toISOString() ?? null,
+        revokedPeriodEndAt: order.membershipPeriodEndAt.toISOString(),
+      };
+    }
+
+    const status = current.status === 'cancelled'
+      ? 'cancelled'
+      : current.status === 'grace'
+        ? 'grace'
+        : 'active';
+    /*
+     * 保留尚未越界的发分计划；若当前没有计划但还有未来周期，则用最近一期
+     * 的开始时间唤醒调度器，既切换权益投影，也发放该期首月积分。
+     */
+    const pendingCreditAt =
+      current.nextCreditAt && current.nextCreditAt < finalEndAt!
+        ? current.nextCreditAt
+        : null;
+    const nextCreditAt = pendingCreditAt ?? futurePeriod?.membershipPeriodStartAt ?? null;
+
+    await tx.membership.update({
+      where: { id: current.id },
+      data: {
+        planId: projection.membershipPlanId!,
+        perksSnapshot:
+          projection.membershipPerksSnapshot ?? current.perksSnapshot,
+        monthlyCreditsSnapshot:
+          projection.membershipMonthlyCreditsSnapshot ??
+          current.monthlyCreditsSnapshot,
+        startAt: projection.membershipPeriodStartAt ?? current.startAt,
+        expiresAt: finalEndAt!,
+        status,
+        nextCreditAt,
+        orderId: projection.id,
+      },
+    });
+
+    return {
+      affected: true,
+      terminated: wasEntitled && !stillEntitled,
+      remainingExpiresAt: finalEndAt!.toISOString(),
+      revokedPeriodStartAt: order.membershipPeriodStartAt?.toISOString() ?? null,
+      revokedPeriodEndAt: order.membershipPeriodEndAt.toISOString(),
+    };
+  }
+
+  /**
    * 取消订阅。
    *
    * 保留到当前周期结束 —— 已付的钱不能立刻作废, 这是用户权益的基本尊重。
    * 立即退款属退款流程, 不在此处理。
    */
   async cancel(userId: string): Promise<{ expiresAt: string }> {
-    const m = await this.prisma.membership.findFirst({
-      // cancelled 也要能查到: 重复点「取消续费」应幂等返回同一到期时间,
-      // 而不是报「没有生效中的会员」让用户以为第一次没生效。
-      where: { userId, status: { in: ['active', 'grace', 'cancelled'] }, expiresAt: { gt: new Date() } },
-      orderBy: { expiresAt: 'desc' },
-    });
-    if (!m) throw new AppError(40400, '没有生效中的会员', 404);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockMembershipProjectionInTransaction(tx, userId);
+      const m = await tx.membership.findFirst({
+        // cancelled 也要能查到: 重复点「取消续费」应幂等返回同一到期时间,
+        // 而不是报「没有生效中的会员」让用户以为第一次没生效。
+        where: { userId, status: { in: ['active', 'grace', 'cancelled'] }, expiresAt: { gt: new Date() } },
+        orderBy: { expiresAt: 'desc' },
+      });
+      if (!m) throw new AppError(40400, '没有生效中的会员', 404);
 
-    // 已经取消过: 不再改状态, 直接回同一到期时间
-    if (m.status === 'cancelled') {
-      return { expiresAt: m.expiresAt.toISOString() };
-    }
+      // 已经取消过: 不再改状态, 直接回同一到期时间
+      if (m.status === 'cancelled') return m;
 
-    /*
-     * 已付周期保留到 `expiresAt`，只停止自动续费。
-     *
-     * 旧实现把状态置 cancelled 后 `resolve()` 又只认 active/grace，导致用户
-     * 刚点完取消就立刻失去会员 —— 与确认框承诺的「权益保留至到期日」不符。
-     * 现在 resolve() 也接受 cancelled，到期由调度任务统一失效。
-     */
-    const updated = await this.prisma.membership.update({
-      where: { id: m.id },
-      data: {
-        // 查询已限定 expiresAt > now，所以这里一定是「未到期」的取消
-        status: 'cancelled',
-        nextCreditAt: null,
-      },
+      /*
+       * 已付周期保留到 `expiresAt`，只停止自动续费。
+       *
+       * 旧实现把状态置 cancelled 后 `resolve()` 又只认 active/grace，导致用户
+       * 刚点完取消就立刻失去会员 —— 与确认框承诺的「权益保留至到期日」不符。
+       * 现在 resolve() 也接受 cancelled，到期由调度任务统一失效。
+       */
+      return tx.membership.update({
+        where: { id: m.id },
+        data: {
+          // 查询已限定 expiresAt > now，所以这里一定是「未到期」的取消。
+          // 只停止未来续费，不停止已付费周期内的月度积分；nextCreditAt 必须保留，
+          // 否则提前买好的未来周期到点后不会发积分。
+          status: 'cancelled',
+        },
+      });
     });
 
     // expiresAt 保持不变: cancelled 在到期前仍算会员, 只是不再自动续费
-    this.logger.log(`会员取消: user=${userId}, 权益保留至 ${m.expiresAt.toISOString()}`);
+    this.logger.log(`会员取消: user=${userId}, 权益保留至 ${updated.expiresAt.toISOString()}`);
     return { expiresAt: updated.expiresAt.toISOString() };
   }
 
@@ -445,52 +850,236 @@ export class MembershipService {
     const now = new Date();
 
     // 1) 到期转expired
-    //    先查出到期的是哪些人, 再条件更新: 通知需要一个 userId, 而 updateMany
-    //    只回 count。条件里带上 status/expiresAt 保证并发下不会重复通知。
+    //    逐条条件更新：并发调度时只有把 status 真正改为 expired 的那一轮发通知，
+    //    避免两个实例同时读到到期记录后重复通知。
     const expiring = await this.prisma.membership.findMany({
       // cancelled 也要在周期结束时真正失效, 否则会永远保留权益。
       where: { status: { in: ['active', 'grace', 'cancelled'] }, expiresAt: { lte: now } },
       select: { id: true, userId: true, expiresAt: true },
     });
-    const expiredRes = await this.prisma.membership.updateMany({
-      where: { id: { in: expiring.map((m) => m.id) } },
-      data: { status: 'expired', nextCreditAt: null },
-    });
+    const expired: typeof expiring = [];
+    for (const m of expiring) {
+      const transitioned = await this.prisma.membership.updateMany({
+        where: {
+          id: m.id,
+          status: { in: ['active', 'grace', 'cancelled'] },
+          expiresAt: { lte: now },
+        },
+        data: { status: 'expired', nextCreditAt: null },
+      });
+      if (transitioned.count > 0) expired.push(m);
+    }
+    let membershipProjectionChanged = expired.length > 0;
 
     // 2) 发月度积分
     const due = await this.prisma.membership.findMany({
-      where: { status: 'active', nextCreditAt: { lte: now } },
+      // cancelled 表示不再自动续费，但用户已经付过的当前/未来周期仍应发分。
+      where: {
+        status: { in: ['active', 'cancelled'] },
+        nextCreditAt: { lte: now },
+      },
       take: 200,
     });
 
+    let creditsGranted = 0;
     let creditsIssued = 0;
     for (const m of due) {
-      // 会员已过期就不该再发 —— 条件更新保证并发下只发一次
-      const claimed = await this.prisma.membership.updateMany({
-        where: { id: m.id, nextCreditAt: m.nextCreditAt },
-        data: { nextCreditAt: new Date(now.getTime() + 30 * 24 * 3600 * 1000) },
-      });
-      if (claimed.count === 0) continue;
+      if (!m.nextCreditAt) continue;
+      try {
+        const outcome = await this.prisma.$transaction(async (tx) => {
+          // 先锁用户，再重读会员：等待锁期间续费/退款可能已推进到期时间或
+          // nextCreditAt，不能继续使用事务外读到的旧投影做发分与计划计算。
+          await this.lockMembershipProjectionInTransaction(tx, m.userId);
+          const current = await tx.membership.findUnique({ where: { id: m.id } });
+          if (
+            !current ||
+            !current.nextCreditAt ||
+            current.nextCreditAt.getTime() !== m.nextCreditAt!.getTime() ||
+            !['active', 'cancelled'].includes(current.status)
+          ) {
+            return { issued: 0, projectionChanged: false };
+          }
 
-      if (m.monthlyCreditsSnapshot > 0) {
-        try {
-          await this.credit.grant({
-            userId: m.userId,
-            credits: m.monthlyCreditsSnapshot,
-            source: 'grant',
-            validDays: 30,
-            reason: '会员月度积分',
+          // 条件更新与发积分同事务：发积分失败时 nextCreditAt 回滚，下轮可重试。
+          const claimed = await tx.membership.updateMany({
+            where: {
+              id: current.id,
+              status: { in: ['active', 'cancelled'] },
+              nextCreditAt: current.nextCreditAt,
+            },
+            data: {
+              nextCreditAt: new Date(current.nextCreditAt.getTime() + 30 * 24 * 3600 * 1000),
+            },
           });
-          creditsIssued += m.monthlyCreditsSnapshot;
-        } catch (e) {
-          this.logger.warn(`会员月度积分发放失败 user=${m.userId}: ${(e as Error).message}`);
+          if (claimed.count === 0) {
+            return { issued: 0, projectionChanged: false };
+          }
+
+          /*
+           * 月度积分必须归属到 nextCreditAt 所在的那一笔已付会员周期。
+           * 仅看 Membership.orderId 不够：提前续费后它指向最新一期，不能代表
+           * 本次发分发生在哪一期。周期归属写进 CreditLot.orderId 后，退款
+           * 才能通过 reclaimForOrder 精确回收该订单实际发出的全部月度积分。
+           */
+          const dueAt = current.nextCreditAt;
+          const periodOrder = await tx.order.findFirst({
+            where: {
+              userId: current.userId,
+              membershipPlanId: { not: null },
+              membershipAppliedAt: { not: null },
+              membershipPeriodStartAt: { lte: dueAt },
+              membershipPeriodEndAt: { gt: dueAt },
+              membershipPeriodRevokedAt: null,
+              status: { in: ['paid', 'partial_refunded'] },
+            },
+            orderBy: [{ membershipPeriodStartAt: 'desc' }],
+            select: {
+              id: true,
+              membershipPlanId: true,
+              membershipPerksSnapshot: true,
+              membershipMonthlyCreditsSnapshot: true,
+            },
+          });
+          // 旧数据的 Membership.orderId 是唯一可用归属；仅当旧订单没有周期快照
+          // 或周期确实覆盖 dueAt 时才兜底，避免把已撤销周期的积分挂到续费单。
+          const fallbackOrder = !periodOrder && current.orderId
+            ? await tx.order.findFirst({
+                where: {
+                  id: current.orderId,
+                  userId: current.userId,
+                  membershipAppliedAt: { not: null },
+                  membershipPeriodRevokedAt: null,
+                  status: { in: ['paid', 'partial_refunded'] },
+                  OR: [
+                    { membershipPeriodStartAt: null, membershipPeriodEndAt: null },
+                    {
+                      membershipPeriodStartAt: { lte: dueAt },
+                      membershipPeriodEndAt: { gt: dueAt },
+                    },
+                  ],
+                },
+                select: {
+                  id: true,
+                  membershipPlanId: true,
+                  membershipPerksSnapshot: true,
+                  membershipMonthlyCreditsSnapshot: true,
+                },
+              })
+            : null;
+          const creditOrder = periodOrder ?? fallbackOrder;
+          if (!creditOrder) {
+            /*
+             * 必须让事务回滚 nextCreditAt。此前只记一条 warn 后正常返回，事务会把
+             * nextCreditAt 推进 30 天，积分却永远不再重试，造成静默漏发。
+             */
+            throw new Error(
+              `找不到会员月度积分归属订单 user=${current.userId} due=${dueAt.toISOString()}`,
+            );
+          }
+
+          const credits =
+            creditOrder.membershipMonthlyCreditsSnapshot ??
+            current.monthlyCreditsSnapshot;
+
+          /*
+           * 下一站点取「30 天后」和「下一期开始」中更早者。标准 30 天套餐
+           * 两者相同；非 30 天周期或年卡则必须在新周期开始就切换权益并发放
+           * 首月积分，不能机械地再等 30 天而漏掉新周期开头。
+           */
+          const nextPeriod = await tx.order.findFirst({
+            where: {
+              userId: current.userId,
+              membershipPlanId: { not: null },
+              membershipAppliedAt: { not: null },
+              membershipPeriodStartAt: { gt: dueAt },
+              membershipPeriodRevokedAt: null,
+              status: { in: ['paid', 'partial_refunded'] },
+            },
+            orderBy: [{ membershipPeriodStartAt: 'asc' }],
+            select: { membershipPeriodStartAt: true },
+          });
+          const nextMonthlyAt = new Date(
+            dueAt.getTime() + 30 * 24 * 3600 * 1000,
+          );
+          const nextEventAt = credits > 0
+            ? nextPeriod?.membershipPeriodStartAt &&
+              nextPeriod.membershipPeriodStartAt < nextMonthlyAt
+              ? nextPeriod.membershipPeriodStartAt
+              : nextMonthlyAt
+            : nextPeriod?.membershipPeriodStartAt ?? null;
+          const nextCreditAt =
+            nextEventAt && nextEventAt < current.expiresAt ? nextEventAt : null;
+
+          // 到达新周期后把 Membership 投影切到该周期套餐；即使该期积分为 0，
+          // 投影也必须切换，否则后台套餐和用户分组会停留在上一期。
+          await tx.membership.update({
+            where: { id: current.id },
+            data: {
+              ...(periodOrder?.membershipPlanId
+                ? {
+                    planId: periodOrder.membershipPlanId,
+                    perksSnapshot:
+                      periodOrder.membershipPerksSnapshot ?? current.perksSnapshot,
+                    monthlyCreditsSnapshot:
+                      periodOrder.membershipMonthlyCreditsSnapshot ??
+                      current.monthlyCreditsSnapshot,
+                  }
+                : {}),
+              nextCreditAt,
+            },
+          });
+
+          if (credits <= 0) {
+            return { issued: 0, projectionChanged: true };
+          }
+
+          const granted = await this.credit.grant(
+            {
+              userId: current.userId,
+              credits,
+              source: 'grant',
+              validDays: 30,
+              orderId: creditOrder.id,
+              idempotencyKey: `membership-monthly:${current.id}:${dueAt.toISOString()}`,
+              reason: '会员月度积分',
+            },
+            tx,
+          );
+          if (granted.idempotentHit) {
+            return { issued: 0, projectionChanged: true };
+          }
+
+          // grantedCredits 是退款回收的账本上限，必须与 CreditLot 同事务累加。
+          const bumped = await tx.order.updateMany({
+            where: {
+              id: creditOrder.id,
+              userId: current.userId,
+              status: { in: ['paid', 'partial_refunded'] },
+              membershipPeriodRevokedAt: null,
+            },
+            data: { grantedCredits: { increment: credits } },
+          });
+          if (bumped.count === 0) {
+            throw new Error('会员月度积分归属订单已不可发放');
+          }
+          return { issued: credits, projectionChanged: true };
+        });
+        if (outcome.issued > 0) {
+          creditsGranted += 1;
+          creditsIssued += outcome.issued;
         }
+        if (outcome.projectionChanged) membershipProjectionChanged = true;
+      } catch (e) {
+        this.logger.warn(`会员月度积分发放失败 user=${m.userId}: ${(e as Error).message}`);
       }
     }
 
-    // 到期通知 (B4)。只在真的由 active/grace 改为 expired 时发,
-    // updateMany 的 count 与 expiring 长度一致才算全部改写成功。
-    for (const m of expiring) {
+    if (membershipProjectionChanged) {
+      await this.invalidateUserGroupCatalog();
+    }
+
+    // 到期通知 (B4)。只给本调度实例真正完成状态迁移的用户发。
+    for (const m of expired) {
       await this.notifications.notify({
         userId: m.userId,
         type: 'membership_expired',
@@ -501,25 +1090,103 @@ export class MembershipService {
       });
     }
 
-    if (expiredRes.count > 0 || due.length > 0) {
+    if (expired.length > 0 || creditsGranted > 0) {
       this.logger.log(
-        `会员调度: ${expiredRes.count} 个到期, ${due.length} 个发放积分, 共 ${creditsIssued} 积分`,
+        `会员调度: ${expired.length} 个到期, ${creditsGranted} 个发放积分, 共 ${creditsIssued} 积分`,
       );
     }
-    return { expired: expiredRes.count, creditsGranted: due.length, creditsIssued };
+    return { expired: expired.length, creditsGranted, creditsIssued };
   }
 
   // ── 查询 ──────────────────────────────────────────────────────────
 
+  /**
+   * 订阅周期历史。
+   *
+   * `Membership` 只保留用户当前投影，续费会覆盖同一行，不能拿来当历史列表。
+   * 真正的历史来源是已兑换会员的订单周期快照；退款后也保留原区间和撤销标记，
+   * 便于客服核对“哪一笔订单买的是哪一段”。
+   *
+   * 对加列前的纯旧数据仍回退到 Membership 投影，避免历史页突然全空。
+   */
+  async historyOf(userId: string, take = 10): Promise<MembershipPeriodHistoryItem[]> {
+    const limit = Math.min(Math.max(Number(take) || 10, 1), 50);
+    const now = Date.now();
+    const periods = await this.prisma.order.findMany({
+      where: {
+        userId,
+        membershipPlanId: { not: null },
+        membershipAppliedAt: { not: null },
+        membershipPeriodStartAt: { not: null },
+        membershipPeriodEndAt: { not: null },
+      },
+      orderBy: [{ membershipPeriodStartAt: 'desc' }],
+      take: limit,
+      select: {
+        id: true,
+        status: true,
+        membershipPeriodStartAt: true,
+        membershipPeriodEndAt: true,
+        membershipPeriodRevokedAt: true,
+        membershipMonthlyCreditsSnapshot: true,
+        membershipPlan: { select: { code: true, name: true } },
+      },
+    });
+
+    if (periods.length > 0) {
+      return periods.flatMap((period) => {
+        if (
+          !period.membershipPlan ||
+          !period.membershipPeriodStartAt ||
+          !period.membershipPeriodEndAt
+        ) {
+          return [];
+        }
+        const status: MembershipPeriodHistoryItem['status'] =
+          period.membershipPeriodRevokedAt || period.status === 'refunded'
+            ? 'refunded'
+            : period.membershipPeriodStartAt.getTime() > now
+              ? 'scheduled'
+              : period.membershipPeriodEndAt.getTime() <= now
+                ? 'expired'
+                : 'active';
+        return [{
+          id: period.id,
+          planCode: period.membershipPlan.code,
+          planName: period.membershipPlan.name,
+          status,
+          startAt: period.membershipPeriodStartAt,
+          expiresAt: period.membershipPeriodEndAt,
+          monthlyCredits: period.membershipMonthlyCreditsSnapshot ?? 0,
+        }];
+      });
+    }
+
+    const legacy = await this.prisma.membership.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'desc' }],
+      take: limit,
+      include: { plan: { select: { code: true, name: true } } },
+    });
+    return legacy.map((membership) => ({
+      id: membership.id,
+      planCode: membership.plan.code,
+      planName: membership.plan.name,
+      status:
+        ['active', 'grace', 'cancelled'].includes(membership.status) &&
+        membership.expiresAt.getTime() > now
+          ? 'active'
+          : 'expired',
+      startAt: membership.startAt,
+      expiresAt: membership.expiresAt,
+      monthlyCredits: membership.monthlyCreditsSnapshot,
+    }));
+  }
+
   /** 我的会员详情 */
   async detailOf(userId: string) {
     const resolved = await this.resolve(userId);
-    const history = await this.prisma.membership.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-      include: { plan: { select: { code: true, name: true } } },
-    });
+    const history = await this.historyOf(userId, 10);
 
     const usage = await this.prisma.membershipUsage.aggregate({
       where: { userId },
@@ -532,15 +1199,7 @@ export class MembershipService {
       totalSavedCents: usage._sum.savedCents ?? 0,
       totalSavedYuan: ((usage._sum.savedCents ?? 0) / 100).toFixed(2),
       discountedOrders: usage._count._all,
-      history: history.map((h) => ({
-        id: h.id,
-        planCode: h.plan.code,
-        planName: h.plan.name,
-        status: h.status,
-        startAt: h.startAt,
-        expiresAt: h.expiresAt,
-        monthlyCredits: h.monthlyCreditsSnapshot,
-      })),
+      history,
     };
   }
 

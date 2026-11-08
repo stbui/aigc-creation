@@ -24,6 +24,6 @@ export { notifyCreditsChanged } from '../../context/CreditsContext';
 /** 粘贴上传 (参考图区直接接收剪贴板图片) */
 export { usePasteUpload } from '../../hooks/usePasteUpload';
 /** 能力运行时状态: 后台下线或无线路时在前端事前标注 */
-export { useCapabilities } from '../../hooks/useCapabilities';
+export { useCapabilityRuntime } from '../../hooks/useCapabilityRuntime';
 /** 素材库取数 (定义在 AssetLibraryModal 文件里) */
 export { useAssetLibrary } from '../../components/AssetLibraryModal';

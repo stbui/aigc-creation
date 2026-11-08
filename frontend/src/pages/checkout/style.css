@@ -1,0 +1,673 @@
+/**
+ * checkout 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* ════════════════════════════════════════════════════════════════════════════
+   结算与支付态 (2026-10-20 接入真实订单与沙箱支付后补齐)
+   订单与沙箱支付链路已通, confirm / pay-btn / result-card 有了真实数据可承载。
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 结算页 (CheckoutPage) ────────────────────────────────────────────────
+   2026-10-30 优化:
+   - 去掉页面自带的 100vh 灰底与 24px 内边距 —— 结算页在 AppShell 内,
+     .app-content 已经给过留白, 再套一层灰底会浮出一块与外壳错位的色块;
+   - 560px 单列改为 1040px 双列: 左侧套餐/权益/支付方式, 右侧金额与支付按钮
+     粘性跟随, 宽屏不再留大半屏空白;
+   - 应付金额由 `--pkg-alipay` 蓝改回品牌紫 —— 全站唯一强调色是 #5546D8;
+   - 颜色全部走令牌, 去掉 #f5d9a8 / #fffaeb / #8a5a00 / #a32d2d 等裸值。
+   共用类 .pkg-confirm-card / .pkg-confirm-row / .pkg-pay-btn / .pkg-pay-hint /
+   .pkg-sandbox-btn / .pkg-result-actions / .pkg-result-btn 仍被 OrdersPage
+   的订单抽屉复用, 只在此处改成直接引用令牌, 不改变结构与尺寸。 */
+
+.pkg-checkout-page {
+  --co-line: var(--border);
+  --co-line-soft: var(--border-row);
+  --co-muted: var(--text-muted);
+  --co-text: var(--text-strong);
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 4px 0 48px;
+  box-sizing: border-box;
+  animation: 0.35s both fadeIn;
+}
+
+/* 加载 / 失败 / 结果三态是单块内容, 收窄到 560px 居中 */
+.co-shell {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.co-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px -2px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--co-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.co-back:hover {
+  color: var(--co-text);
+}
+
+/* ── 页头 ─────────────────────────────────────────────────────────────── */
+.co-head {
+  margin-bottom: 16px;
+}
+
+.co-head-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.co-head-title h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 30px;
+  letter-spacing: -0.3px;
+  color: var(--co-text);
+}
+
+.co-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--co-muted);
+}
+
+.co-head-badge {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* ── 双列骨架: 左内容 + 右粘性结算栏 ───────────────────────────────────── */
+.co-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 336px;
+  gap: 16px;
+  align-items: start;
+}
+
+.co-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.co-card {
+  padding: 18px 20px;
+  border: 1px solid var(--co-line);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg);
+}
+
+.co-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.co-card-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--co-text);
+}
+
+.co-card-head > span {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.co-rows {
+  margin: 0;
+}
+
+.co-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--co-line-soft);
+}
+
+.co-row:first-child {
+  border-top: 0;
+}
+
+.co-row dt {
+  flex: none;
+  font-size: 13px;
+  color: var(--co-muted);
+}
+
+.co-row dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--co-text);
+  text-align: right;
+  word-break: break-word;
+}
+
+.co-perks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.co-perks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-body);
+}
+
+.co-perks svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--success-text);
+}
+
+/* ── 支付方式 ─────────────────────────────────────────────────────────── */
+.co-pay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.co-pay-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-card);
+  background: var(--brand-bg);
+}
+
+.co-pay-option.is-selectable {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-color: var(--border);
+  background: var(--card-bg);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.co-pay-option.is-selectable:hover {
+  border-color: var(--brand);
+}
+
+.co-pay-option.is-selectable.is-active {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.co-pay-option.is-muted {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.co-blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.co-blocked .co-btn {
+  text-align: center;
+  text-decoration: none;
+}
+
+.co-pay-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.co-pay-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.co-pay-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--co-text);
+}
+
+.co-pay-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--co-muted);
+}
+
+.co-pay-check {
+  flex: none;
+  color: var(--brand);
+}
+
+/* ⚠ 沙箱声明: 不做「假支付蒙混」。真实通道接入前必须让用户清楚
+   这里不产生真实扣款, 否则截图外流会被误认为已接通支付。 */
+.co-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-control);
+  background: var(--warn-bg);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--warn-text);
+}
+
+.co-notice svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.co-notice code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+/* ── 结算栏 ───────────────────────────────────────────────────────────── */
+.co-side {
+  position: sticky;
+  top: 16px;
+  min-width: 0;
+}
+
+.co-side-card {
+  padding: 18px 20px;
+  border: 1px solid var(--co-line);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg);
+}
+
+.co-side-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--co-text);
+}
+
+.co-coupon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.co-coupon > span {
+  flex: none;
+  font-size: 13px;
+  color: var(--co-muted);
+}
+
+.co-coupon input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--co-line);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--co-text);
+  font-size: 13px;
+}
+
+.co-coupon input::placeholder {
+  color: var(--text-desc);
+}
+
+.co-coupon input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 12%, transparent);
+}
+
+.co-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--co-muted);
+}
+
+.co-hint.is-error {
+  color: var(--danger-text);
+}
+
+.co-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--co-line-soft);
+}
+
+.co-total span {
+  font-size: 13px;
+  color: var(--co-muted);
+}
+
+.co-total strong {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+
+.co-sub {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.co-pay-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.co-pay-btn:hover:not(:disabled) {
+  background: var(--brand-hover);
+}
+
+.co-pay-btn:disabled {
+  background: var(--border-hover);
+  cursor: not-allowed;
+}
+
+.co-sandbox {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--co-line-soft);
+}
+
+.co-sandbox-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.co-sandbox-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.co-sandbox-btn {
+  padding: 8px;
+  border: 1px solid var(--co-line);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.co-sandbox-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.co-sandbox-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.co-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.co-qr img {
+  border: 1px solid var(--co-line);
+  border-radius: var(--radius-control);
+}
+
+.co-qr .co-hint {
+  margin: 0;
+  text-align: center;
+}
+
+.co-pay-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.co-refresh-payment {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-desc);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.co-refresh-payment:hover:not(:disabled) {
+  color: var(--text-body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.co-refresh-payment:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.co-btn {
+  padding: 8px 18px;
+  border: 1px solid var(--co-line);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.co-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.co-btn.is-primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.co-btn.is-primary:hover {
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
+  color: var(--on-brand);
+}
+
+.co-side-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+/* ── 支付结果 ─────────────────────────────────────────────────────────── */
+.co-result {
+  padding: 36px 28px 28px;
+  border: 1px solid var(--co-line);
+  border-radius: var(--radius-hero);
+  background: var(--card-bg);
+  text-align: center;
+  animation: 0.35s both fadeIn;
+}
+
+.co-result-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  color: var(--on-brand);
+}
+
+.co-result-icon.is-success {
+  background: var(--success-text);
+}
+
+.co-result-icon.is-timeout {
+  background: var(--warn-text);
+}
+
+.co-result-icon.is-failed {
+  background: var(--danger-text);
+}
+
+.co-result-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  line-height: 28px;
+  color: var(--co-text);
+}
+
+.co-result-desc {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--co-muted);
+}
+
+.co-result-rows {
+  margin: 0;
+  border: 1px solid var(--co-line-soft);
+  border-radius: var(--radius-card);
+  background: var(--surface-tint);
+  overflow: hidden;
+  text-align: left;
+}
+
+.co-result-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--co-line-soft);
+  font-size: 13px;
+}
+
+.co-result-row:first-child {
+  border-top: 0;
+}
+
+.co-result-row dt {
+  color: var(--co-muted);
+}
+
+.co-result-row dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--co-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.co-result-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+@media (max-width: 640px) {
+  .pkg-checkout-page {
+    padding-bottom: 32px;
+  }
+  .co-head-title h1 {
+    font-size: 20px;
+  }
+  .co-card,
+  .co-side-card {
+    padding: 16px;
+  }
+  .co-perks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .co-total strong {
+    font-size: 24px;
+    line-height: 30px;
+  }
+  .co-result {
+    padding: 28px 18px 22px;
+    border-radius: var(--radius-panel);
+  }
+  .co-result-actions {
+    flex-direction: column;
+  }
+  .co-result-actions .co-btn {
+    width: 100%;
+  }
+}

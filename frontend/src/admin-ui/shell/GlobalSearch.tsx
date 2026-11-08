@@ -147,7 +147,7 @@ export function GlobalSearch({ onNavigate }: { onNavigate: (to: string) => void 
         >
           <Search className="size-4 shrink-0" aria-hidden />
           <span className="min-w-0 flex-1 truncate">搜索用户、订单、工单、任务或素材</span>
-          <kbd className="shrink-0 rounded border border-border bg-card px-1.5 py-0.5 font-sans text-[11px] text-muted-foreground">
+          <kbd className="shrink-0 rounded border border-border bg-card px-1.5 py-0.5 font-sans text-xs text-muted-foreground">
             {modifierKey} K
           </kbd>
         </button>
@@ -174,7 +174,7 @@ export function GlobalSearch({ onNavigate }: { onNavigate: (to: string) => void 
           {loading && (
             <LoaderCircle className="size-4 shrink-0 animate-spin text-muted-foreground" aria-label="搜索中" />
           )}
-          <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground">
+          <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
             ESC
           </kbd>
         </div>
@@ -198,7 +198,7 @@ export function GlobalSearch({ onNavigate }: { onNavigate: (to: string) => void 
             <div className="py-2">
               {result.groups.map((group) => (
                 <section key={group.key} aria-labelledby={`search-group-${group.key}`}>
-                  <div className="flex items-center justify-between px-4 pb-1 pt-2 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                  <div className="flex items-center justify-between px-4 pb-1 pt-2 text-xs font-semibold tracking-wide text-muted-foreground">
                     <h2 id={`search-group-${group.key}`}>{group.label}</h2>
                     <span>{group.total} 条</span>
                   </div>
@@ -222,7 +222,7 @@ export function GlobalSearch({ onNavigate }: { onNavigate: (to: string) => void 
                               activeIndex === index ? 'bg-accent text-accent-foreground' : 'hover:bg-muted',
                             )}
                           >
-                            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold uppercase text-muted-foreground">
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold uppercase text-muted-foreground">
                               {group.label.slice(0, 1)}
                             </span>
                             <span className="min-w-0 flex-1">
@@ -233,7 +233,7 @@ export function GlobalSearch({ onNavigate }: { onNavigate: (to: string) => void 
                                 {item.subtitle}
                               </span>
                             </span>
-                            <span className="shrink-0 text-[11px] text-muted-foreground">打开</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">打开</span>
                           </button>
                         );
                       })}
@@ -250,7 +250,7 @@ export function GlobalSearch({ onNavigate }: { onNavigate: (to: string) => void 
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-border bg-muted/30 px-4 py-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between border-t border-border bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
           <span>↑ ↓ 选择 · Enter 打开 · Esc 关闭</span>
           <span>只显示你有权限查看的数据</span>
         </div>

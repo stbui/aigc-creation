@@ -104,14 +104,16 @@ export function DutyStrip() {
             <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
             <span className="truncate">读数没有刷新：{error}</span>
           </span>
-          <button
+          <Button
             type="button"
-            className="inline-flex shrink-0 items-center gap-1 underline"
+            variant="ghost"
+            size="xs"
             onClick={reload}
+            className="h-auto shrink-0 gap-1 px-0 text-inherit underline hover:bg-transparent hover:text-inherit"
           >
-            <RotateCcw className="size-3" aria-hidden />
+            <RotateCcw aria-hidden />
             重试
-          </button>
+          </Button>
         </div>
       )}
 

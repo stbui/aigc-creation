@@ -161,7 +161,7 @@ function check(name, ok, detail = '') {
       data: {
         projectId: project.id, ownerId: user.id, capability: 'main_image',
         status: 'running', inputAssetIds: JSON.stringify([asset.id]),
-        params: '{}', provider: 'pending',
+        params: '{}',
       },
     });
   }

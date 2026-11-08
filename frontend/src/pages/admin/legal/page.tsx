@@ -2,10 +2,28 @@ import { useState, type ReactNode } from 'react';
 import { SLUGS, SLUG_LABEL, STATUS_LABEL, STATUS_TONE_KEY } from './constants';
 import { fmt } from './utils';
 import { useAdminResource, useAdmin, useDiscardConfirm, useUnsavedGuard, useToast } from './hooks';
-import { ActionButton, AdminDataTable, ConfirmAction, Drawer, FilterActions, FilterBar, FormField, ModalDialog, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  RefreshButton,
+  AdminDataTable,
+  ConfirmDialog,
+  Drawer,
+  FilterActions,
+  FilterBar,
+  FormField,
+  ModalDialog,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatusTag,
+  StaleError,
+  TextAreaField,
+  TextField,
+  type AdminColumn,
+} from '~/admin-ui/primitives';
 import { adminLegalApi } from '../../../lib/api';
 
-import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../../types/api';
+import type { AdminLegalDoc, LegalSlug } from '../../../types/api';
 
 /** draft/archived 在 StatusTag 的通用语义表里没有对应项, 显式给标签 */
 
@@ -53,15 +71,10 @@ export function AdminLegalPage() {
    * 筛选条件是唯一的请求变量 —— 交给 useAdminResource 的依赖数组,
    * 换文档类别即自动重查, 不必手写一个只在 slugFilter 变化时重建的 useCallback。
    */
-  const { data, loading, error, reload } = useAdminResource(
-    () => adminLegalApi.versions(slugFilter),
-    [slugFilter],
-  );
+  const { data, loading, error, reload } = useAdminResource(() => adminLegalApi.versions(slugFilter), [slugFilter]);
   const rows = data ?? [];
 
-  const formDirty = Boolean(
-    formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
-  );
+  const formDirty = Boolean(formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase));
   useUnsavedGuard(formDirty);
   const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
@@ -159,9 +172,7 @@ export function AdminLegalPage() {
       key: 'status',
       title: '状态',
       width: 100,
-      render: (row) => (
-        <StatusTag status={STATUS_TONE_KEY[row.status]} label={STATUS_LABEL[row.status]} />
-      ),
+      render: (row) => <StatusTag status={STATUS_TONE_KEY[row.status]} label={STATUS_LABEL[row.status]} />,
     },
     { key: 'publishedAt', title: '发布时间', width: 170, render: (row) => fmt(row.publishedAt) },
     { key: 'updatedAt', title: '更新时间', width: 170, render: (row) => fmt(row.updatedAt) },
@@ -181,11 +192,7 @@ export function AdminLegalPage() {
             </ActionButton>
           )}
           {writable && row.status !== 'published' && (
-            <ActionButton
-              variant="ghost"
-              size="sm"
-              onClick={() => setPublishTarget(row)}
-            >
+            <ActionButton variant="ghost" size="sm" onClick={() => setPublishTarget(row)}>
               发布
             </ActionButton>
           )}
@@ -224,16 +231,12 @@ export function AdminLegalPage() {
           options={SLUGS}
         />
         <FilterActions>
-          <ActionButton variant="secondary" size="sm" onClick={() => void reload()}>
-            刷新
-          </ActionButton>
+          <RefreshButton onRefresh={reload} />
         </FilterActions>
       </FilterBar>
 
       <Panel>
-        {error && rows.length > 0 && (
-          <StaleError error={error} onRetry={() => void reload()} />
-        )}
+        {error && rows.length > 0 && <StaleError error={error} onRetry={() => void reload()} />}
         {/*
          * 法务文档总量小（4 类 × 若干版本），后端一次全量返回，因此不做分页：
          * 分页器只会在「只有一页」时占掉一整行。
@@ -281,12 +284,7 @@ export function AdminLegalPage() {
             <ActionButton variant="secondary" size="sm" onClick={requestCloseForm}>
               取消
             </ActionButton>
-            <ActionButton
-              variant="default"
-              size="sm"
-              disabled={busy}
-              onClick={() => void save()}
-            >
+            <ActionButton variant="default" size="sm" disabled={busy} onClick={() => void save()}>
               {busy ? '保存中…' : '保存草稿'}
             </ActionButton>
           </>
@@ -356,7 +354,7 @@ export function AdminLegalPage() {
         </div>
       </Drawer>
 
-      <ConfirmAction
+      <ConfirmDialog
         open={!!publishTarget}
         title="发布该版本"
         description={

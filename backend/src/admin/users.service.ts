@@ -3,6 +3,7 @@ import * as bcrypt from "bcryptjs";
 import { randomInt } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { AccountLifecycleService } from "../account/account-lifecycle.service";
+import { lockAndAssertActiveAdminMutable } from "../account/last-admin.guard";
 import { AppError } from "../common/app.exception";
 import { runBatch } from "../common/batch";
 import { CSV_EXPORT_MAX_ROWS, toCsv } from "../common/csv";
@@ -10,6 +11,7 @@ import { SignedUrlService } from "../common/signed-url.service";
 import { StorageService } from "../storage/storage.service";
 import type { StorageBackend } from "../storage/storage.provider";
 import { getCapability } from "../capabilities/capability.registry";
+import { MembershipService } from "../membership/membership.service";
 import { ROLE_LABELS, USER_STATUS_LABELS } from "./permissions";
 import { buildPage, paginate, type PageResult } from "./dto/page-query.dto";
 import type {
@@ -36,12 +38,14 @@ export class AdminUsersService {
     private readonly signedUrl: SignedUrlService,
     // 物理删除要连带删对象存储里的文件（只在 local 删会漏掉云上的）
     private readonly storage: StorageService,
+    // 当前会员判定必须复用 C 端口径：投影可能指向未来周期，不能只看 expiresAt。
+    private readonly membership: MembershipService,
   ) {}
 
   /**
    * 用户列表。
    *
-   * 统计口径说明: 项目/任务/素材数用 `_count` 关联查询, 不做 N+1。
+   * 统计口径说明: 项目/任务/素材数按"项目未软删"聚合, 不逐用户查询。
    * 已注销用户 (status='deleted') 默认不在列表里 —— 运营要找的是活跃账号;
    * 需要查历史时可显式传 status=deleted。
    */
@@ -63,27 +67,30 @@ export class AdminUsersService {
           status: true,
           createdAt: true,
           lastLoginAt: true,
-          _count: { select: { projects: true, tasks: true, assets: true } },
         },
       }),
       this.prisma.user.count({ where }),
     ]);
+    const counts = await this.usageCounts(items.map((user) => user.id));
 
     return paginate(
-      items.map((u) => ({
-        id: u.id,
-        email: u.email,
-        name: u.name,
-        role: u.role,
-        roleLabel: ROLE_LABELS[u.role] ?? u.role,
-        status: u.status,
-        statusLabel: USER_STATUS_LABELS[u.status] ?? u.status,
-        createdAt: u.createdAt,
-        lastLoginAt: u.lastLoginAt,
-        projectCount: u._count.projects,
-        taskCount: u._count.tasks,
-        assetCount: u._count.assets,
-      })),
+      items.map((u) => {
+        const usage = counts.get(u.id) ?? { projects: 0, tasks: 0, assets: 0 };
+        return {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          roleLabel: ROLE_LABELS[u.role] ?? u.role,
+          status: u.status,
+          statusLabel: USER_STATUS_LABELS[u.status] ?? u.status,
+          createdAt: u.createdAt,
+          lastLoginAt: u.lastLoginAt,
+          projectCount: usage.projects,
+          taskCount: usage.tasks,
+          assetCount: usage.assets,
+        };
+      }),
       total,
       page,
     );
@@ -111,9 +118,9 @@ export class AdminUsersService {
         status: true,
         createdAt: true,
         lastLoginAt: true,
-        _count: { select: { projects: true, tasks: true, assets: true } },
       },
     });
+    const counts = await this.usageCounts(rows.map((user) => user.id));
     return toCsv(
       [
         { label: "用户 ID", value: (u) => u.id },
@@ -124,9 +131,9 @@ export class AdminUsersService {
           label: "状态",
           value: (u) => USER_STATUS_LABELS[u.status] ?? u.status,
         },
-        { label: "项目数", value: (u) => u._count.projects },
-        { label: "任务数", value: (u) => u._count.tasks },
-        { label: "素材数", value: (u) => u._count.assets },
+        { label: "项目数", value: (u) => counts.get(u.id)?.projects ?? 0 },
+        { label: "任务数", value: (u) => counts.get(u.id)?.tasks ?? 0 },
+        { label: "素材数", value: (u) => counts.get(u.id)?.assets ?? 0 },
         { label: "注册时间", value: (u) => u.createdAt },
         { label: "最后登录", value: (u) => u.lastLoginAt ?? "" },
       ],
@@ -150,7 +157,7 @@ export class AdminUsersService {
   }
 
   /**
-   * 用户详情: 基本信息 + 三项统计 + 最近任务 + 最近素材。
+   * 用户详情: 基本信息 + 三项统计 + 最近任务 + 最近素材 + 会员权益。
    *
    * 只取最近 20 条而非全量 —— 抽屉是概览用途, 全量会把响应体撑大。
    */
@@ -168,14 +175,22 @@ export class AdminUsersService {
         phone: true,
         phoneVerifiedAt: true,
         tokenVersion: true,
-        _count: { select: { projects: true, tasks: true, assets: true } },
       },
     });
     if (!user) throw new AppError(40400, "用户不存在", 404);
 
-    const [recentTasks, recentAssets] = await Promise.all([
+    const [
+      recentTasks,
+      recentAssets,
+      taskStats,
+      currentMembership,
+      resolvedMembership,
+      membershipHistory,
+      membershipUsage,
+      usageCounts,
+    ] = await Promise.all([
       this.prisma.generationTask.findMany({
-        where: { ownerId: id },
+        where: { ownerId: id, project: { deletedAt: null } },
         orderBy: { createdAt: "desc" },
         take: 20,
         select: {
@@ -187,7 +202,7 @@ export class AdminUsersService {
         },
       }),
       this.prisma.asset.findMany({
-        where: { ownerId: id },
+        where: { ownerId: id, project: { deletedAt: null } },
         orderBy: { createdAt: "desc" },
         take: 20,
         select: {
@@ -198,13 +213,34 @@ export class AdminUsersService {
           height: true,
         },
       }),
+      this.prisma.generationTask.groupBy({
+        by: ["status"],
+        where: { ownerId: id, project: { deletedAt: null } },
+        _count: { _all: true },
+      }),
+      // 与 C 端 MembershipService.resolve() 保持同一口径:
+      // cancelled 只表示关闭自动续费, 到期前仍享有已付费周期权益。
+      this.prisma.membership.findFirst({
+        where: {
+          userId: id,
+          status: { in: ["active", "grace", "cancelled"] },
+          expiresAt: { gt: new Date() },
+        },
+        include: { plan: { select: { code: true, name: true } } },
+        orderBy: { expiresAt: "desc" },
+      }),
+      this.membership.resolve(id),
+      this.membership.historyOf(id, 10),
+      this.prisma.membershipUsage.aggregate({
+        where: { userId: id },
+        _sum: { savedCents: true },
+        _count: { _all: true },
+      }),
+      this.usageCounts([id]).then(
+        (counts) => counts.get(id) ?? { projects: 0, tasks: 0, assets: 0 },
+      ),
     ]);
 
-    const taskStats = await this.prisma.generationTask.groupBy({
-      by: ["status"],
-      where: { ownerId: id },
-      _count: { _all: true },
-    });
     const statusCount: Record<string, number> = {};
     for (const g of taskStats) statusCount[g.status] = g._count._all;
 
@@ -221,9 +257,9 @@ export class AdminUsersService {
       phone: user.phone,
       phoneVerifiedAt: user.phoneVerifiedAt,
       stats: {
-        projects: user._count.projects,
-        tasks: user._count.tasks,
-        assets: user._count.assets,
+        projects: usageCounts.projects,
+        tasks: usageCounts.tasks,
+        assets: usageCounts.assets,
         taskStatus: {
           succeeded: statusCount["succeeded"] ?? 0,
           failed: statusCount["failed"] ?? 0,
@@ -250,6 +286,29 @@ export class AdminUsersService {
         width: a.width,
         height: a.height,
       })),
+      membership: {
+        isMember: resolvedMembership.isMember,
+        planCode: resolvedMembership.planCode,
+        planName: resolvedMembership.planName,
+        status: resolvedMembership.isMember
+          ? currentMembership?.status ?? "active"
+          : null,
+        startAt: resolvedMembership.isMember
+          ? currentMembership?.startAt ?? null
+          : null,
+        expiresAt: resolvedMembership.isMember
+          ? resolvedMembership.expiresAt
+          : null,
+        monthlyCredits: resolvedMembership.isMember
+          ? resolvedMembership.monthlyCredits
+          : 0,
+        cancelAtPeriodEnd: resolvedMembership.isMember
+          ? resolvedMembership.cancelAtPeriodEnd
+          : false,
+        savedCents: membershipUsage._sum.savedCents ?? 0,
+        discountedOrders: membershipUsage._count._all,
+      },
+      membershipHistory,
     };
   }
 
@@ -268,19 +327,15 @@ export class AdminUsersService {
     if (user.status === "deleted") {
       throw new AppError(40001, "已注销用户无需禁用", 400);
     }
-    // 最后一个 admin 被禁用会让系统失去唯一管理入口
-    if (user.role === "admin" && dto.status === "disabled") {
-      const adminCount = await this.prisma.user.count({
-        where: { role: "admin", status: "active" },
-      });
-      if (adminCount <= 1) {
-        throw new AppError(40901, "至少保留一个启用的管理员", 409);
+    await this.prisma.$transaction(async (tx) => {
+      // 末位管理员检查与状态写入必须在同一写事务，count 后再 update 会被并发绕过。
+      if (user.role === "admin" && user.status === "active" && dto.status === "disabled") {
+        await lockAndAssertActiveAdminMutable(tx, id);
       }
-    }
-
-    await this.prisma.user.update({
-      where: { id },
-      data: { status: dto.status },
+      await tx.user.update({
+        where: { id },
+        data: { status: dto.status },
+      });
     });
 
     return { id, status: dto.status };
@@ -315,17 +370,13 @@ export class AdminUsersService {
       throw new AppError(40301, "只有管理员可以授予管理员角色", 403);
     }
 
-    // 最后一个 admin 保护
-    if (user.role === "admin") {
-      const adminCount = await this.prisma.user.count({
-        where: { role: "admin", status: "active" },
-      });
-      if (adminCount <= 1) {
-        throw new AppError(40901, "至少保留一个管理员", 409);
+    await this.prisma.$transaction(async (tx) => {
+      // 已禁用的 admin 不提供管理入口，降级它不会减少可用管理员数量。
+      if (user.role === "admin" && user.status === "active") {
+        await lockAndAssertActiveAdminMutable(tx, id);
       }
-    }
-
-    await this.prisma.user.update({ where: { id }, data: { role: dto.role } });
+      await tx.user.update({ where: { id }, data: { role: dto.role } });
+    });
     return { id, role: dto.role, roleLabel: ROLE_LABELS[dto.role] ?? dto.role };
   }
 
@@ -414,9 +465,15 @@ export class AdminUsersService {
    *   直接拒绝，请运营改用注销。删掉用户行会让那些记录变成指向不存在账号的
    *   孤儿数据，既对不了账也举不了证。
    */
-  async remove(id: string, hard: boolean, confirm?: string) {
+  async remove(id: string, hard: boolean, confirm: string | undefined, actorId: string) {
     const user = await this.findUser(id);
 
+    if (id === actorId) {
+      throw new AppError(40001, "不能删除自己的账号", 400);
+    }
+    if (user.status === "deleted") {
+      throw new AppError(40001, "该用户已注销，无需重复删除", 400);
+    }
     if (hard) {
       if (confirm !== "删除") {
         throw new AppError(40001, "物理删除需要确认词「删除」", 400);
@@ -435,6 +492,7 @@ export class AdminUsersService {
        * 只有与删除处于同一事务，才能保证「有资金记录就不物理删除」不被竞态绕过。
        */
       const deleted = await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertActiveAdminMutable(tx, id);
         const [
           orderCount,
           paymentCount,
@@ -559,7 +617,8 @@ export class AdminUsersService {
       };
     }
 
-    // 软删: 与 C 端自助注销走同一份实现 (AccountLifecycleService)
+    // 软删: 与 C 端自助注销走同一份实现 (AccountLifecycleService)。后者会在
+    // 自己的事务内执行末位管理员保护，避免后台预检查与写入之间的竞态。
     await this.lifecycle.softDelete(id);
     return { id, hard: false };
   }
@@ -567,12 +626,44 @@ export class AdminUsersService {
   /** 账号注销后遗留的孤儿数据清理说明, 供前端展示 */
   async impactPreview(id: string) {
     const user = await this.findUser(id);
-    const [projects, tasks, assets] = await Promise.all([
+    const [
+      projects,
+      tasks,
+      assets,
+      orders,
+      payments,
+      refunds,
+      invoices,
+      billingOrders,
+      creditLedgerEntries,
+    ] = await Promise.all([
       this.prisma.project.count({ where: { ownerId: id } }),
       this.prisma.generationTask.count({ where: { ownerId: id } }),
       this.prisma.asset.count({ where: { ownerId: id } }),
+      this.prisma.order.count({ where: { userId: id } }),
+      this.prisma.payment.count({ where: { userId: id } }),
+      this.prisma.refund.count({ where: { userId: id } }),
+      this.prisma.invoice.count({ where: { userId: id } }),
+      this.prisma.billingOrder.count({ where: { userId: id } }),
+      this.prisma.creditLedgerEntry.count({ where: { userId: id } }),
     ]);
-    return { email: user.email, projects, tasks, assets };
+    const retained = {
+      orders,
+      payments,
+      refunds,
+      invoices,
+      billingOrders,
+      creditLedgerEntries,
+    };
+    return {
+      email: user.email,
+      projects,
+      tasks,
+      assets,
+      retained,
+      /** 仅作兼容展示；管理端默认始终走软注销。 */
+      hardDeleteAllowed: Object.values(retained).every((count) => count === 0),
+    };
   }
 
   /** 列表 / 导出共用的筛选条件（两处各写一份必然漂移） */
@@ -599,6 +690,46 @@ export class AdminUsersService {
       if (Object.keys(createdAt).length > 0) where["createdAt"] = createdAt;
     }
     return where;
+  }
+
+  /** 用户可见统计: 软删项目及其任务、素材不计入，按用户批量聚合避免 N+1。 */
+  private async usageCounts(userIds: string[]) {
+    const ids = [...new Set(userIds)];
+    const counts = new Map<string, { projects: number; tasks: number; assets: number }>();
+    if (ids.length === 0) return counts;
+
+    const [projects, tasks, assets] = await Promise.all([
+      this.prisma.project.groupBy({
+        by: ["ownerId"],
+        where: { ownerId: { in: ids }, deletedAt: null },
+        _count: { _all: true },
+      }),
+      this.prisma.generationTask.groupBy({
+        by: ["ownerId"],
+        where: { ownerId: { in: ids }, project: { deletedAt: null } },
+        _count: { _all: true },
+      }),
+      this.prisma.asset.groupBy({
+        by: ["ownerId"],
+        where: { ownerId: { in: ids }, project: { deletedAt: null } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    for (const id of ids) counts.set(id, { projects: 0, tasks: 0, assets: 0 });
+    for (const row of projects) {
+      const count = counts.get(row.ownerId);
+      if (count) count.projects = row._count._all;
+    }
+    for (const row of tasks) {
+      const count = counts.get(row.ownerId);
+      if (count) count.tasks = row._count._all;
+    }
+    for (const row of assets) {
+      const count = counts.get(row.ownerId);
+      if (count) count.assets = row._count._all;
+    }
+    return counts;
   }
 
   private async findUser(id: string) {

@@ -5,6 +5,7 @@ import { decodeCsvBuffer, parseCsv } from "../common/csv";
 import { readFirstCsvFromZip } from "../common/archive/zip-reader";
 import { PaymentConfigService } from "./payment-config.service";
 import { PaymentOrderService } from "./payment-order.service";
+import { PaymentExceptionService } from "./payment-exception.service";
 import { getAdapter } from "./adapters";
 import {
   BillRecord,
@@ -25,7 +26,11 @@ export const RECONCILIATION_RESULTS = [
   "provider_record_missing",
   "amount_mismatch",
   "trade_no_mismatch",
+  "duplicate_charge",
   "credit_failed",
+  "auto_refunded",
+  "refund_processing",
+  "refund_failed",
 ] as const;
 
 export type ReconciliationResult = (typeof RECONCILIATION_RESULTS)[number];
@@ -92,6 +97,7 @@ export class PaymentReconciliationService {
     private readonly prisma: PrismaService,
     private readonly configs: PaymentConfigService,
     private readonly orders: PaymentOrderService,
+    private readonly exceptions: PaymentExceptionService,
   ) {}
 
   // ── 执行 ────────────────────────────────────────────────────────
@@ -279,7 +285,7 @@ export class PaymentReconciliationService {
     const where: Record<string, unknown> = { runId };
     if (query.result && query.result !== "all") {
       if (query.result === "abnormal") {
-        where.result = { notIn: ["matched", "recovered"] };
+        where.result = { notIn: ["matched", "recovered", "auto_refunded"] };
       } else if (
         (RECONCILIATION_RESULTS as readonly string[]).includes(query.result)
       ) {
@@ -344,7 +350,7 @@ export class PaymentReconciliationService {
     const where: Record<string, unknown> = { runId };
     if (result && result !== "all") {
       if (result === "abnormal")
-        where.result = { notIn: ["matched", "recovered"] };
+        where.result = { notIn: ["matched", "recovered", "auto_refunded"] };
       else where.result = result;
     }
     const total = await this.prisma.paymentReconciliationItem.count({ where });
@@ -375,17 +381,29 @@ export class PaymentReconciliationService {
     let recovered = 0;
     let errors = 0;
     const seenOrderNos = new Set<string>();
+    const tradesByOrderNo = new Map<string, Set<string>>();
 
     for (const record of records) {
       seenOrderNos.add(record.merchantOrderNo);
+      const seenTrades =
+        tradesByOrderNo.get(record.merchantOrderNo) ?? new Set<string>();
+      // 同一交易号重复导出行不是第二笔扣款；保留首行结果，避免 upsert 覆盖。
+      if (seenTrades.has(record.providerTradeNo)) continue;
+      const previousTradeNo = seenTrades.values().next().value as
+        | string
+        | undefined;
+      seenTrades.add(record.providerTradeNo);
+      tradesByOrderNo.set(record.merchantOrderNo, seenTrades);
+
       const outcome = await this.compareOne(
         runId,
         providerId,
         configId,
         record,
+        previousTradeNo,
       );
       if (outcome === "matched") matched += 1;
-      else if (outcome === "recovered") recovered += 1;
+      else if (outcome === "recovered" || outcome === "auto_refunded") recovered += 1;
       else errors += 1;
     }
 
@@ -393,7 +411,7 @@ export class PaymentReconciliationService {
     const localPaid = await this.prisma.order.findMany({
       where: {
         channel: providerId,
-        status: "paid",
+        status: { in: ["paid", "refunded", "partial_refunded"] },
         providerPaidAt: {
           gte: startOfShanghaiDay(billDate),
           lte: new Date(
@@ -425,6 +443,16 @@ export class PaymentReconciliationService {
           detail: "本地已支付但渠道账单没有该笔记录",
         },
       });
+      await this.exceptions.recordManual({
+        providerId,
+        orderId: order.id,
+        merchantOrderNo: order.orderNo,
+        providerTradeNo: order.providerTradeNo,
+        amountCents: order.paidCents,
+        currency: order.currency || "CNY",
+        kind: "provider_record_missing",
+        detail: "本地已支付但渠道账单没有该笔记录",
+      });
       errors += 1;
     }
 
@@ -451,6 +479,7 @@ export class PaymentReconciliationService {
     providerId: PaymentProviderId,
     configId: string,
     record: BillRecord,
+    previousTradeNo?: string,
   ): Promise<ReconciliationResult> {
     const order = await this.prisma.order.findUnique({
       where: { orderNo: record.merchantOrderNo },
@@ -464,9 +493,10 @@ export class PaymentReconciliationService {
     ): Promise<void> => {
       await this.prisma.paymentReconciliationItem.upsert({
         where: {
-          runId_merchantOrderNo: {
+          runId_merchantOrderNo_providerTradeNo: {
             runId,
             merchantOrderNo: record.merchantOrderNo,
+            providerTradeNo: record.providerTradeNo,
           },
         },
         create: {
@@ -486,17 +516,86 @@ export class PaymentReconciliationService {
     };
 
     if (!order) {
+      if (previousTradeNo) {
+        await this.exceptions.recordManual({
+          providerId,
+          merchantOrderNo: record.merchantOrderNo,
+          providerTradeNo: record.providerTradeNo,
+          amountCents: record.amountCents,
+          currency: record.currency,
+          kind: "duplicate_charge",
+          detail: `同一商户订单号出现多个渠道交易号（先见 ${previousTradeNo}，本次 ${record.providerTradeNo}），且本地不存在该订单`,
+        });
+        await writeItem(
+          "duplicate_charge",
+          `同一商户订单号出现多个渠道交易号（先见 ${previousTradeNo}，本次 ${record.providerTradeNo}），且本地不存在该订单`,
+        );
+        return "duplicate_charge";
+      }
+      await this.exceptions.recordManual({
+        providerId,
+        merchantOrderNo: record.merchantOrderNo,
+        providerTradeNo: record.providerTradeNo,
+        amountCents: record.amountCents,
+        currency: record.currency,
+        kind: "local_order_not_found",
+        detail: "本地不存在该商户订单号",
+      });
       await writeItem("local_order_not_found", "本地不存在该商户订单号");
       return "local_order_not_found";
     }
 
-    if (order.status === "cancelled") {
+    if (previousTradeNo) {
+      await this.exceptions.recordManual({
+        providerId,
+        orderId: order.id,
+        merchantOrderNo: record.merchantOrderNo,
+        providerTradeNo: record.providerTradeNo,
+        amountCents: record.amountCents,
+        currency: record.currency,
+        kind: "duplicate_charge",
+        detail: `同一商户订单号出现多个渠道交易号（先见 ${previousTradeNo}，本次 ${record.providerTradeNo}），疑似重复扣款`,
+      });
       await writeItem(
-        "credit_failed",
-        "本地订单已取消但渠道账单显示成功，需人工补单或退款",
+        "duplicate_charge",
+        `同一商户订单号出现多个渠道交易号（先见 ${previousTradeNo}，本次 ${record.providerTradeNo}），疑似重复扣款`,
         order.id,
       );
-      return "credit_failed";
+      return "duplicate_charge";
+    }
+
+    if (order.status === "cancelled") {
+      const refund = await this.exceptions.autoRefundCancelledPayment({
+        providerId,
+        merchantOrderNo: order.orderNo,
+        providerTradeNo: record.providerTradeNo,
+        amountCents: record.amountCents,
+        currency: record.currency,
+        detail: "本地订单已取消但渠道账单显示成功，尝试自动原路退款",
+      });
+      if (refund.outcome === "refunded") {
+        await writeItem(
+          "auto_refunded",
+          "订单已取消，已自动原路退款",
+          order.id,
+          true,
+        );
+        return "auto_refunded";
+      }
+      if (refund.outcome === "refund_processing") {
+        await writeItem(
+          "refund_processing",
+          "订单已取消，渠道退款仍在异步处理中",
+          order.id,
+        );
+        return "refund_processing";
+      }
+      await writeItem(
+        "refund_failed",
+        refund.case.lastError ?? "自动退款未能完成，已转人工处理",
+        order.id,
+      );
+      return "refund_failed";
     }
 
     if (
@@ -508,6 +607,16 @@ export class PaymentReconciliationService {
         order.providerTradeNo &&
         order.providerTradeNo !== record.providerTradeNo
       ) {
+        await this.exceptions.recordManual({
+          providerId,
+          orderId: order.id,
+          merchantOrderNo: record.merchantOrderNo,
+          providerTradeNo: record.providerTradeNo,
+          amountCents: record.amountCents,
+          currency: record.currency,
+          kind: "trade_no_mismatch",
+          detail: `本地交易号 ${order.providerTradeNo} 与账单 ${record.providerTradeNo} 不一致`,
+        });
         await writeItem(
           "trade_no_mismatch",
           `本地交易号 ${order.providerTradeNo} 与账单 ${record.providerTradeNo} 不一致`,
@@ -516,6 +625,16 @@ export class PaymentReconciliationService {
         return "trade_no_mismatch";
       }
       if (order.paidCents !== record.amountCents) {
+        await this.exceptions.recordManual({
+          providerId,
+          orderId: order.id,
+          merchantOrderNo: record.merchantOrderNo,
+          providerTradeNo: record.providerTradeNo,
+          amountCents: record.amountCents,
+          currency: record.currency,
+          kind: "amount_mismatch",
+          detail: `本地实付 ${order.paidCents} 分与账单 ${record.amountCents} 分不一致`,
+        });
         await writeItem(
           "amount_mismatch",
           `本地实付 ${order.paidCents} 分与账单 ${record.amountCents} 分不一致`,
@@ -529,6 +648,16 @@ export class PaymentReconciliationService {
 
     // 本地 pending，账单显示成功 → 必须用固定配置查单二次确认后才补发
     if (!configId) {
+      await this.exceptions.recordManual({
+        providerId,
+        orderId: order.id,
+        merchantOrderNo: record.merchantOrderNo,
+        providerTradeNo: record.providerTradeNo,
+        amountCents: record.amountCents,
+        currency: record.currency,
+        kind: "credit_failed",
+        detail: "渠道未配置，无法二次查单确认",
+      });
       await writeItem(
         "credit_failed",
         "渠道未配置，无法二次查单确认",
@@ -539,6 +668,16 @@ export class PaymentReconciliationService {
     const config = await this.configs.latest(providerId);
     const adapter = getAdapter(providerId);
     if (!config || !adapter) {
+      await this.exceptions.recordManual({
+        providerId,
+        orderId: order.id,
+        merchantOrderNo: record.merchantOrderNo,
+        providerTradeNo: record.providerTradeNo,
+        amountCents: record.amountCents,
+        currency: record.currency,
+        kind: "credit_failed",
+        detail: "渠道配置缺失，无法二次查单确认",
+      });
       await writeItem(
         "credit_failed",
         "渠道配置缺失，无法二次查单确认",
@@ -559,6 +698,16 @@ export class PaymentReconciliationService {
         providerTradeNo: record.providerTradeNo,
       });
       if (queried.state !== "paid") {
+        await this.exceptions.recordManual({
+          providerId,
+          orderId: order.id,
+          merchantOrderNo: record.merchantOrderNo,
+          providerTradeNo: record.providerTradeNo,
+          amountCents: record.amountCents,
+          currency: record.currency,
+          kind: "credit_failed",
+          detail: `账单显示成功但查单结果为 ${queried.state}`,
+        });
         await writeItem(
           "credit_failed",
           `账单显示成功但查单结果为 ${queried.state}`,
@@ -580,6 +729,16 @@ export class PaymentReconciliationService {
       await writeItem("recovered", "已通过查单确认并自动补发", order.id, true);
       return "recovered";
     } catch (e) {
+      await this.exceptions.recordManual({
+        providerId,
+        orderId: order.id,
+        merchantOrderNo: record.merchantOrderNo,
+        providerTradeNo: record.providerTradeNo,
+        amountCents: record.amountCents,
+        currency: record.currency,
+        kind: "credit_failed",
+        detail: `补发失败: ${(e as Error).message}`,
+      });
       await writeItem(
         "credit_failed",
         `补发失败: ${(e as Error).message}`,
@@ -658,13 +817,9 @@ export class PaymentReconciliationService {
   private assertBillDate(billDate: string): void {
     parseDateStrict(billDate);
     const start = startOfShanghaiDay(billDate).getTime();
-    const yesterday = new Date(Date.now() - 8 * 3600 * 1000);
-    const todayStart = new Date(
-      Date.UTC(
-        yesterday.getUTCFullYear(),
-        yesterday.getUTCMonth(),
-        yesterday.getUTCDate(),
-      ),
+    // 日期窗口以上海时区为准；不能用 UTC 零点，否则东八区深夜会放行当天账单。
+    const todayStart = startOfShanghaiDay(
+      formatShanghai(new Date()).slice(0, 10),
     ).getTime();
     if (start >= todayStart)
       throw new AppError(40001, "账单日期不能晚于昨天", 400);

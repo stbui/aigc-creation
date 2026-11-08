@@ -73,6 +73,7 @@ export function ProductDetailPage() {
   const [description, setDescription] = useState('');
   // 包含模块: 上限、顺序归一化与默认勾选都在 useSectionSelection + DetailSectionPicker
   const { sections, toggle: toggleSection } = useSectionSelection();
+  const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
   /** 用户手动改过画质后，切换平台不再覆盖 */
   const [resolutionTouched, setResolutionTouched] = useState(false);
@@ -123,14 +124,10 @@ export function ProductDetailPage() {
   const resultEmptyDesc = useMemo(
     () =>
       token
-        ? '提交任务后，每个模块都会生成一张图，按次陈列在这里'
+        ? '生成后，每个模块都会得到一张图，按次陈列在这里'
         : '登录后，你在这个页面生成过的图都会显示在这里',
     [token],
   );
-  const refreshGallery = useCallback(() => {
-    void gallery.reload();
-  }, [gallery.reload]);
-
   // 首访落在「功能示例」, 有历史产出时自动切到「创作结果」; 用户点过页签后不再自动切换
   const { rightTab, pick: pickRightTab, showResults } = useRightTab(
     gallery.items.length,
@@ -211,6 +208,7 @@ export function ProductDetailPage() {
       const logicalModelId = await resolveModelId(DETAIL_CAPABILITY);
       /*
        * 服务端按勾选模块把这次提交拆成 N 个任务 (每张各扣一次单价),
+       * 每个任务携带自己的模块提示词并发执行,
        * 返回 batchId / batchSize / 本次合计积分。这里**不单点轮询某一任务** ——
        * 首张完成不代表整套图完成; 重拉一次列表拿到全部占位卡,
        * 之后 useResultGallery 会一直轮询到整批任务都到终态。
@@ -225,6 +223,7 @@ export function ProductDetailPage() {
         language,
         description,
         sections,
+        ratio,
         resolution,
       };
       const fingerprint = JSON.stringify(input);
@@ -417,12 +416,13 @@ export function ProductDetailPage() {
                   setResolutionTouched(true);
                   setResolution(v);
                 }}
+                ratio={ratio}
+                onRatioChange={setRatio}
                 capabilityId={DETAIL_CAPABILITY}
-                showRatio={false}
                 modelPicker={
                   <ModelPicker
                     capability={DETAIL_CAPABILITY}
-                    options={{ resolution }}
+                    options={{ ratio, resolution }}
                     onQuoteChange={setModelQuoteCredits}
                   />
                 }
@@ -482,7 +482,6 @@ export function ProductDetailPage() {
                 emptyTitle="效果图预览"
                 emptyDesc={resultEmptyDesc}
                 emptyChildren={resultEmptyChildren}
-                onRefresh={refreshGallery}
                 onDeleteRow={deleteRow}
                 downloadNamePrefix="product-detail"
               />

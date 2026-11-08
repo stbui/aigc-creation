@@ -6,25 +6,25 @@
  */
 
 export const PRICE_POLICY_OPTIONS = [
-  { value: 'unified', label: '统一价（按本页价格计费）' },
-  { value: 'channel', label: '跟随渠道（按渠道模型价格档）' },
+  { value: 'unified', label: '固定价格' },
+  { value: 'channel', label: '跟随服务价格' },
 ];
 
 export const BILLING_MODE_OPTIONS = [
-  { value: 'fixed_request', label: '按次' },
-  { value: 'per_second', label: '按时长（秒）' },
-  { value: 'token', label: '按 Token 用量' },
+  { value: 'fixed_request', label: '按次计费' },
+  { value: 'per_second', label: '按时长计费' },
+  { value: 'token', label: '按用量计费' },
 ];
 
 export const PRICE_POLICY_LABELS: Record<string, string> = {
-  unified: '统一价',
-  channel: '跟随渠道',
+  unified: '固定价格',
+  channel: '跟随服务价格',
 };
 
 export const BILLING_MODE_LABELS: Record<string, string> = {
   fixed_request: '按次',
-  per_second: '按秒',
-  token: '按 Token',
+  per_second: '按时长',
+  token: '按用量',
 };
 
 /** 表单里的单条线路草稿；`key` 只用于 React 列表定位，不提交后端 */
@@ -63,7 +63,7 @@ export const EMPTY_DRAFT: ModelDraft = {
   description: '',
   capability: '',
   sortOrder: '0',
-  enabled: true,
+  enabled: false,
   pricePolicy: 'channel',
   billingMode: 'fixed_request',
   unitPrice: '0',
@@ -74,7 +74,3 @@ export const EMPTY_DRAFT: ModelDraft = {
   defaultOptionsText: '{}',
   routes: [],
 };
-
-/** 能力合同里预置的示例，只在新建时作为占位提示，不写入草稿 */
-export const CAPABILITY_SPEC_PLACEHOLDER =
-  '{"version": 1, "capability": "image", "operations": ["generate"]}';

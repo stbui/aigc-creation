@@ -59,6 +59,28 @@ export function degreeCaption(params: Record<string, unknown>): string | undefin
 
 
 /**
+ * 下载文件扩展名。
+ *
+ * 后端资产的 `format` 是 MIME 类型（如 `image/png`），不能直接拼进文件名；
+ * 同时兼容历史数据里已经存成 `png` / `.png` 的格式。
+ */
+export function downloadExtension(format: string | null | undefined): string {
+  const normalized = (format || '').trim().toLowerCase().replace(/^\./, '');
+  if (!normalized) return 'png';
+
+  const mimeSubtype = normalized.replace(/^image\//, '').split(';', 1)[0]?.trim() || '';
+  const aliases: Record<string, string> = {
+    jpeg: 'jpg',
+    'svg+xml': 'svg',
+    'x-icon': 'ico',
+    'vnd.microsoft.icon': 'ico',
+  };
+  const extension = aliases[mimeSubtype] ?? mimeSubtype.split('+', 1)[0] ?? '';
+  return /^[a-z0-9]+$/.test(extension) ? extension : 'png';
+}
+
+
+/**
  * 拆出爆款复刻任务的商品图与参考图。
  *
  * 提交顺序由后端保留为 `[商品图..., 参考图]`；历史任务若只拿到一张图，

@@ -13,7 +13,7 @@
 
 import { Body, Controller, Get, Param, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
-import { IsString } from "class-validator";
+import { IsNotEmpty, IsString, MaxLength } from "class-validator";
 import {
   AdminUser,
   AuditAction,
@@ -32,6 +32,10 @@ import {
 /** 人工核对入参：动作只允许 settle / refund（语义校验在 service） */
 export class BillingResolveBodyDto {
   @IsString() action: string;
+  @IsString()
+  @IsNotEmpty({ message: "请填写核对依据" })
+  @MaxLength(500)
+  reason: string;
 }
 
 /** 批量核对入参：单条失败不影响其它条目 */
@@ -39,6 +43,10 @@ export class BillingBatchResolveBodyDto {
   /** 单次最多核对的条数（与前端批量上限一致） */
   @IsString() ids?: string;
   @IsString() action?: string;
+  @IsString()
+  @IsNotEmpty({ message: "请填写核对依据" })
+  @MaxLength(500)
+  reason: string;
 }
 
 @Controller("admin/billing-orders")
@@ -94,7 +102,12 @@ export class AdminBillingOrdersController {
     @Body() body: BillingResolveBodyDto,
     @AdminUser() user: AdminUserContext,
   ) {
-    return this.billing.resolveOrder(id, body?.action, user?.id ?? "");
+    return this.billing.resolveOrder(
+      id,
+      body?.action,
+      user?.id ?? "",
+      body?.reason,
+    );
   }
 
   /**
@@ -114,7 +127,12 @@ export class AdminBillingOrdersController {
       .split(",")
       .map((item) => item.trim())
       .filter((item) => item !== "");
-    return this.billing.batchResolveOrders(ids, body?.action, user?.id ?? "");
+    return this.billing.batchResolveOrders(
+      ids,
+      body?.action,
+      user?.id ?? "",
+      body?.reason,
+    );
   }
 }
 

@@ -38,7 +38,13 @@ export function RuleActions({
           放弃变更
         </ActionButton>
       )}
-      <ActionButton variant="default" size="sm" disabled={busy} onClick={onSave}>
+      <ActionButton
+        variant="default"
+        size="sm"
+        /* 没有改动时保存按钮不可点：可点却什么都不改变，会让人以为「已经保存过」 */
+        disabled={busy || !dirty}
+        onClick={onSave}
+      >
         {busy ? '保存中…' : saveText}
       </ActionButton>
     </div>
@@ -238,6 +244,27 @@ export function AdminMarketingRulesPage() {
               />
             </FormField>
 
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="连续签到封顶 (天)" hint="0 表示不封顶">
+                <NumberField
+                  ariaLabel="连续签到封顶天数"
+                  min={0}
+                  value={checkin.maxStreak}
+                  disabled={!writable}
+                  onChange={(value) => setCheckin({ ...checkin, maxStreak: value ?? 0 })}
+                />
+              </FormField>
+              <FormField label="每日积分上限" hint="0 表示不限制">
+                <NumberField
+                  ariaLabel="每日签到积分上限"
+                  min={0}
+                  value={checkin.dailyCap}
+                  disabled={!writable}
+                  onChange={(value) => setCheckin({ ...checkin, dailyCap: value ?? 0 })}
+                />
+              </FormField>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-foreground">连续加成</span>
               <p className="text-[12px] leading-4 text-muted-foreground">
@@ -263,6 +290,7 @@ export function AdminMarketingRulesPage() {
                     <NumberField
                       ariaLabel={`第 ${i + 1} 档加成积分`}
                       className="w-[90px]"
+                      min={0}
                       value={b.bonus}
                       disabled={!writable}
                       onChange={(value) => {
@@ -316,7 +344,7 @@ export function AdminMarketingRulesPage() {
 
             {writable && (
               <RuleActions
-                hint={`基础 ${checkin.baseCredits} 分/天 · ${checkin.bonusRules.length} 个加成档位`}
+                hint={`基础 ${checkin.baseCredits} 分/天 · 连签封顶 ${checkin.maxStreak || '不限'} · 日上限 ${checkin.dailyCap || '不限'} · ${checkin.bonusRules.length} 个加成档位`}
                 dirty={checkinDirty}
                 busy={busy}
                 onDiscard={() => setCheckin(checkinBase)}

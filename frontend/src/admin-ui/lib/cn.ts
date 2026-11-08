@@ -35,6 +35,7 @@ const cn = createCn({
         'brand',
         'brand-hover',
         'brand-bg',
+        'brand-light',
         'success-soft',
         'success-text',
         'success-border',

@@ -43,7 +43,7 @@ export const MAX_HEADER_COUNT = 32;
 export const MAX_HEADER_BYTES = 16 * 1024;
 const MAX_PROXY_URL_BYTES = 512;
 const MAX_CUSTOM_RELAY_URL_BYTES = 4096;
-const DEFAULT_USER_AGENT = 'ecom-vision/1.0';
+const DEFAULT_USER_AGENT = 'huojue/1.0';
 
 /** 自定义渠道额外拒绝的保留用途网段（对齐参考实现 blockedCustomRelayPrefixes） */
 const BLOCKED_CUSTOM_RELAY_V4: Array<[string, number]> = [

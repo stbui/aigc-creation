@@ -35,7 +35,7 @@ export function AdminAlertBell({ onNavigate }: { onNavigate: (to: string) => voi
           {pending > 0 && (
             <span
               data-testid="admin-alert-badge"
-              className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-danger-text px-1 text-[10px] font-semibold leading-4 text-white"
+              className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-danger-text px-1 text-xs font-semibold leading-4 text-white"
             >
               {pending > 99 ? '99+' : pending}
             </span>
@@ -47,7 +47,7 @@ export function AdminAlertBell({ onNavigate }: { onNavigate: (to: string) => voi
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-foreground">告警中心</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {loading && !data
                 ? '正在检查…'
                 : pending > 0
@@ -120,7 +120,7 @@ export function AdminAlertBell({ onNavigate }: { onNavigate: (to: string) => voi
                         </span>
                       )}
                     </span>
-                    <span className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-muted-foreground">
+                    <span className="mt-0.5 line-clamp-2 block text-xs leading-4 text-muted-foreground">
                       {item.detail}
                     </span>
                   </span>
@@ -137,7 +137,7 @@ export function AdminAlertBell({ onNavigate }: { onNavigate: (to: string) => voi
                 event.preventDefault();
                 void reload();
               }}
-              className="whitespace-normal px-1.5 py-1.5 text-[11px] leading-4 text-warn-text focus:bg-accent focus:text-warn-text"
+              className="whitespace-normal px-1.5 py-1.5 text-xs leading-4 text-warn-text focus:bg-accent focus:text-warn-text"
             >
               <RefreshCw className="size-3.5" aria-hidden />
               <span className="flex-1">刷新失败，显示上次结果。{error}</span>

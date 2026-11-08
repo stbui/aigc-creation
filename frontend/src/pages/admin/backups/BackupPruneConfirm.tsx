@@ -1,4 +1,4 @@
-import { ConfirmAction, FormField, NumberField } from '~/admin-ui/primitives';
+import { ConfirmDialog, FormField, NumberField } from '~/admin-ui/primitives';
 
 interface BackupPruneConfirmProps {
   open: boolean;
@@ -23,7 +23,7 @@ export function BackupPruneConfirm({
   if (!open) return null;
 
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open
       title="保留份数清理"
       confirmText="执行清理"

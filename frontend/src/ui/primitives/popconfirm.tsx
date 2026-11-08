@@ -13,7 +13,6 @@ export interface PopconfirmProps {
   disabled?: boolean;
 }
 
-/** antd Popconfirm 的兼容壳：点击确认后关闭。 */
 export function Popconfirm({
   title,
   description,

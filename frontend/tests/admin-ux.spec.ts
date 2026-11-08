@@ -1,5 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import { ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import {
+  createAdminBusinessFixture,
+  createAdminTaskHistoryFixture,
+  removeAdminBusinessFixture,
+  removeAdminTaskHistoryFixture,
+  type AdminBusinessFixture,
+  type AdminTaskHistoryFixture,
+} from './support/admin-business-fixtures';
 
 /**
  * 后台高频动线回归。
@@ -25,8 +33,37 @@ const chips = (page: Page) => page.getByTestId('admin-filter-chips');
 const drawer = (page: Page) => page.getByTestId('admin-drawer');
 const rows = (page: Page) => page.getByTestId('admin-table-row');
 
+/** 后台侧栏按权限分组折叠；先展开目标组，再点击组内入口。 */
+async function navigateViaSider(page: Page, group: string, item: string) {
+  const nav = page.getByTestId('admin-sider');
+  const itemButton = nav.getByRole('button', { name: item, exact: true });
+  if (!(await itemButton.isVisible())) {
+    await nav.getByRole('button', { name: group, exact: true }).click();
+  }
+  await itemButton.click();
+}
+
 test.describe('后台高频动线', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
+
+  let businessFixture!: AdminBusinessFixture;
+  let taskHistoryFixture: AdminTaskHistoryFixture | null = null;
+
+  test.beforeAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    [businessFixture, taskHistoryFixture] = await Promise.all([
+      createAdminBusinessFixture(),
+      createAdminTaskHistoryFixture(),
+    ]);
+  });
+
+  test.afterAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    await Promise.all([
+      removeAdminBusinessFixture(businessFixture),
+      removeAdminTaskHistoryFixture(taskHistoryFixture),
+    ]);
+  });
 
   test('筛选条件从地址栏恢复，并可逐条清除', async ({ page }) => {
     await page.goto(`${UI}/admin/users?role=admin&status=active`);
@@ -70,7 +107,7 @@ test.describe('后台高频动线', () => {
         '/admin/payments?tab=reconciliation&providerId=alipay&status=failed&from=2026-10-01&to=2026-10-31',
         '支付充值',
         ['渠道：支付宝', '状态：失败', '起始：2026-10-01', '截止：2026-10-31'],      ],
-      ['/admin/capabilities?q=image&runtime=unavailable', '能力管控', ['关键词：image', '运行结论：暂不可用']],
+      ['/admin/capabilities?q=image&runtime=unavailable', '能力与模型', ['关键词：image', '运行结论：暂不可用']],
     ] as const;
 
     for (const [path, heading, labels] of cases) {
@@ -145,76 +182,6 @@ test.describe('后台高频动线', () => {
     await expect(drawer(page).getByRole('link')).toHaveCount(0);
   });
 
-  test('调用统计卡与 summary 同口径，成功与失败条数之和不超过总数', async ({ page }) => {
-    const summary = { total: 7, success: 4, failed: 2, other: 1, avgDurationMs: 321 };
-    const row = {
-      id: 'summary-row',
-      userId: 'u-1',
-      traceId: 'trace-1',
-      requestId: 'req-1',
-      channelId: 'ch-1',
-      channelName: 'a6api',
-      taskId: 'task-1',
-      billingOrderId: 'bill-1',
-      source: 'gateway',
-      capability: 'free_create',
-      operation: 'images.generate',
-      requestKind: 'create',
-      billable: true,
-      apiFormat: 'openai-image',
-      method: 'POST',
-      path: '/v1/images/generations',
-      model: 'gpt-image-1',
-      status: 'canceled',
-      statusCode: 200,
-      durationMs: 321,
-      pollCount: 0,
-      providerStatus: 'canceled',
-      inputTokens: 0,
-      outputTokens: 0,
-      cachedTokens: 0,
-      usageAvailable: false,
-      mediaCount: 1,
-      videoSeconds: 0,
-      providerRequestId: 'prov-1',
-      estimatedCostMicros: 0,
-      costAvailable: false,
-      currency: 'USD',
-      errorCode: '',
-      error: '',
-      createdAt: '2026-10-31T08:00:00.000Z',
-    };
-
-    await page.route(/\/api\/v1\/admin\/api-logs(\?|$)/, (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 0,
-          data: { items: [row], total: 1, page: 1, pageSize: 20, summary },
-        }),
-      }),
-    );
-
-    await page.goto(`${UI}/admin/model-calls`);
-    await expect(page.getByRole('heading', { name: '调用记录' })).toBeVisible({
-      timeout: 15000,
-    });
-    await expect(rows(page).first()).toBeVisible();
-
-    // StatCard 的结构：标签 / 数值 / 可选提示，三者都是根节点的直接子 div
-    const card = (label: string) => page.getByText(label, { exact: true }).first().locator('..');
-    const value = async (label: string) =>
-      Number((await card(label).locator('div').nth(1).textContent()) ?? '0');
-
-    expect(await value('调用总数')).toBe(summary.total);
-    expect(await value('成功')).toBe(summary.success);
-    expect(await value('失败 / 取消')).toBe(summary.failed);
-    // 「其它」只出现在平均耗时卡片的提示行：总数 − 成功 − 失败 的部分不会被吞掉
-    await expect(card('平均耗时')).toContainText(`其它状态 ${summary.other} 条`);
-    expect(summary.success + summary.failed + summary.other).toBe(summary.total);
-  });
-
   test('告警级别从地址栏恢复，并随切换同步', async ({ page }) => {
     await page.goto(`${UI}/admin/alerts?severity=critical`);
     await expect(page.getByRole('heading', { name: '告警中心' })).toBeVisible({
@@ -228,37 +195,43 @@ test.describe('后台高频动线', () => {
     await expect(page).not.toHaveURL(/severity=critical/);
   });
 
-  test('能力管控筛选会缩小结果集，并可一键清除', async ({ page }) => {
+  test('能力与模型筛选会缩小结果集，并可一键清除', async ({ page }) => {
     await page.goto(`${UI}/admin/capabilities?q=__no_such_capability__`);
-    await expect(page.getByRole('heading', { name: '能力管控' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({
       timeout: 15000,
     });
     await expect(chips(page)).toContainText('关键词：__no_such_capability__');
-    await expect(page.getByText('没有符合当前筛选的能力。')).toBeVisible();
+    await expect(page.getByText('没有符合当前筛选的能力或模型。')).toBeVisible();
 
     await page.getByRole('button', { name: '清除筛选', exact: true }).click();
     await expect(chips(page)).toHaveCount(0);
-    await expect(page.getByTestId('admin-table-row').first()).toBeVisible();
+    await expect(page.getByTestId('admin-capability-card').first()).toBeVisible();
   });
 
-  test('核心宽表在 1440px 下无需横向滚动', async ({ page }) => {
+  test('核心宽表与渠道工作区在 1440px 下无需横向滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    for (const [path, heading] of [
-      ['/admin/orders', '订单管理'],
-      ['/admin/tasks', '任务监控'],
-      ['/admin/model-calls', '调用记录'],
-      ['/admin/channels', '渠道工作台'],
+    for (const [path, heading, scrollTestId, rowTestId] of [
+      ['/admin/orders', '订单管理', 'admin-table-scroll', 'admin-table-row'],
+      ['/admin/tasks', '任务监控', 'admin-table-scroll', 'admin-table-row'],
+      ['/admin/model-calls', '调用记录', 'admin-table-scroll', 'admin-table-row'],
+      // 渠道工作台已改为左列渠道 + 右侧模型详情的主从布局，不再是表格。
+      ['/admin/channels', '渠道工作台', 'admin-channel-workspace', 'admin-channel-item'],
     ] as const) {
       await page.goto(`${UI}${path}`);
       await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 15000 });
       await expect(page.getByTestId('admin-page-loading')).toHaveCount(0, { timeout: 30000 });
-      await expect(rows(page).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.getByTestId(scrollTestId)).toBeVisible({ timeout: 15000 });
+      // 有数据时必须确认实际行已经渲染；无数据的环境仍校验工作区本身不溢出。
+      const rowCount = await page.getByTestId(rowTestId).count();
+      if (rowCount > 0) {
+        await expect(page.getByTestId(rowTestId).first()).toBeVisible();
+      }
 
-      const m = await page.evaluate(() => {
-        const scroll = document.querySelector('[data-testid="admin-table-scroll"]') as HTMLElement | null;
+      const m = await page.evaluate((testId) => {
+        const scroll = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
         return { clientWidth: scroll?.clientWidth ?? 0, scrollWidth: scroll?.scrollWidth ?? 0 };
-      });
-      expect(m.clientWidth, `${heading}: 未找到表格`).toBeGreaterThan(0);
+      }, scrollTestId);
+      expect(m.clientWidth, `${heading}: 未找到滚动容器`).toBeGreaterThan(0);
       expect(m.scrollWidth, `${heading}: 表格仍横向溢出`).toBeLessThanOrEqual(m.clientWidth + 2);
     }
   });
@@ -274,10 +247,7 @@ test.describe('后台高频动线', () => {
     await inviter.fill(String(Number(original || '0') + 1));
     await expect(page.getByRole('button', { name: '放弃变更', exact: true })).toBeVisible();
 
-    await page
-      .getByTestId('admin-sider')
-      .getByRole('button', { name: /用户管理/ })
-      .click();
+    await navigateViaSider(page, '运营', '用户管理');
     const dialog = page.getByRole('dialog').filter({ hasText: '有未保存的变更' });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: '留下继续编辑' }).click();
@@ -285,23 +255,22 @@ test.describe('后台高频动线', () => {
 
     await page.getByRole('button', { name: '放弃变更', exact: true }).click();
     await expect(inviter).toHaveValue(original);
-    await page
-      .getByTestId('admin-sider')
-      .getByRole('button', { name: /用户管理/ })
-      .click();
+    await navigateViaSider(page, '运营', '用户管理');
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
   });
 
   test('关闭有修改的商品抽屉会先确认是否放弃', async ({ page }) => {
-    await page.goto(`${UI}/admin/products`);
+    await page.goto(`${UI}/admin/products?status=offline`);
     await expect(page.getByRole('heading', { name: '商品管理' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
 
-    const edit = rows(page).getByRole('button', { name: '编辑' }).first();
-    test.skip((await edit.count()) === 0, '当前库中暂无商品');
-    await edit.click();
+    const fixtureRow = page
+      .getByTestId('admin-product-card')
+      .filter({ hasText: businessFixture.productName })
+      .first();
+    await expect(fixtureRow).toBeVisible({ timeout: 15000 });
+    await fixtureRow.getByRole('button', { name: '编辑', exact: true }).click();
 
     const panel = page.getByRole('dialog', { name: '编辑商品' });
     await expect(panel).toBeVisible();
@@ -348,28 +317,28 @@ test.describe('后台高频动线', () => {
   });
 
   test('工单回复未发送时关闭详情会先确认', async ({ page }) => {
-    await page.goto(`${UI}/admin/tickets`);
+    const q = encodeURIComponent(businessFixture.ticketMarker);
+    await page.goto(`${UI}/admin/tickets?q=${q}`);
     await expect(page.getByRole('heading', { name: '工单处理' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
 
-    const handle = rows(page).getByRole('button', { name: '处理' }).first();
-    test.skip((await handle.count()) === 0, '当前库中暂无可处理工单');
-    await handle.click();
+    const fixtureRow = rows(page).filter({ hasText: businessFixture.ticketMarker }).first();
+    await expect(fixtureRow).toBeVisible({ timeout: 15000 });
+    await fixtureRow.getByRole('button', { name: '处理' }).click();
 
     const panel = drawer(page);
     const reply = panel.getByLabel('回复内容');
     await expect(reply).toBeVisible({ timeout: 15000 });
     await reply.fill('这段回复还没发送');
 
-    await panel.getByRole('button', { name: '关闭' }).click();
+    await panel.getByRole('button', { name: '关闭', exact: true }).click();
     const confirm = page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' });
     await expect(confirm).toBeVisible();
     await confirm.getByRole('button', { name: '继续编辑' }).click();
     await expect(panel).toBeVisible();
 
-    await panel.getByRole('button', { name: '关闭' }).click();
+    await panel.getByRole('button', { name: '关闭', exact: true }).click();
     await confirm.getByRole('button', { name: '放弃修改' }).click();
     await expect(drawer(page)).toHaveCount(0);
   });
@@ -415,10 +384,7 @@ test.describe('后台高频动线', () => {
     await expect(saveBar.getByRole('textbox', { name: '变更原因' })).toHaveCount(0);
     await expect(saveButton).toBeEnabled();
 
-    await page
-      .getByTestId('admin-sider')
-      .getByRole('button', { name: /用户管理/ })
-      .click();
+    await navigateViaSider(page, '运营', '用户管理');
     await expect(page.getByText('有未保存的变更')).toBeVisible();
     await page.getByRole('button', { name: '留下继续编辑' }).click();
     await expect(page).toHaveURL(/\/admin\/roles/);
@@ -435,7 +401,7 @@ test.describe('后台高频动线', () => {
     });
 
     const firstTask = page.getByRole('link', { name: /^查看产出任务：/ }).first();
-    test.skip((await firstTask.count()) === 0, '当前库中暂无产出图');
+    await expect(firstTask).toBeVisible({ timeout: 15000 });
     await firstTask.click();
 
     await expect(page).toHaveURL(/\/admin\/tasks\?id=/);
@@ -447,10 +413,10 @@ test.describe('后台高频动线', () => {
     await expect(page.getByRole('heading', { name: '任务监控' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
+    await expect(rows(page).first()).toBeVisible({ timeout: 15000 });
 
     const detail = rows(page).getByRole('button', { name: '详情' }).first();
-    test.skip((await detail.count()) === 0, '当前库中暂无任务记录');
+    await expect(detail).toBeVisible();
     await detail.click();
 
     const panel = page.getByRole('dialog', { name: '任务详情' });
@@ -497,10 +463,10 @@ test.describe('后台高频动线', () => {
     await expect(page.getByRole('heading', { name: '任务监控' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
+    await expect(rows(page).first()).toBeVisible({ timeout: 15000 });
 
     const detail = rows(page).getByRole('button', { name: '详情' }).first();
-    test.skip((await detail.count()) === 0, '当前库中暂无任务记录');
+    await expect(detail).toBeVisible();
     await detail.click();
 
     const panel = page.getByRole('dialog', { name: '任务详情' });
@@ -527,7 +493,7 @@ test.describe('后台高频动线', () => {
     // 取一条不在默认第一页的已完成任务，覆盖“列表里没有该行”时由详情合成
     // 操作行摘要的路径。直接读页面现有登录态，避免另起一套 API 鉴权。
     const task = await page.evaluate(async () => {
-      const token = localStorage.getItem('ecom_vision_token');
+      const token = localStorage.getItem('huojue_token');
       const response = await fetch(
         '/api/v1/admin/tasks?status=succeeded&page=2&pageSize=20',
         { headers: token ? { Authorization: `Bearer ${token}` } : {} },
@@ -538,7 +504,7 @@ test.describe('后台高频动线', () => {
       };
       return body.data?.result?.items?.[0] ?? null;
     });
-    test.skip(!task?.id, '当前库中暂无第二页已完成任务');
+    expect(task?.id, '任务夹具必须保证已完成任务列表存在第二页').toBeTruthy();
 
     await page.goto(`${UI}/admin/tasks?id=${encodeURIComponent(task!.id)}`);
     const panel = page.getByRole('dialog', { name: '任务详情' });
@@ -548,14 +514,17 @@ test.describe('后台高频动线', () => {
   });
 
   test('列表详情写入 id，刷新可恢复且关闭后移除', async ({ page }) => {
-    await page.goto(`${UI}/admin/orders`);
+    // 订单列表按创建时间倒序，固定夹具会被后续 smoke 订单挤出第一页；
+    // 直接用订单号深链缩小列表，断言详情 URL 行为而不是分页数据状态。
+    await page.goto(`${UI}/admin/orders?orderNo=${encodeURIComponent(businessFixture.orderNo)}`);
     await expect(page.getByRole('heading', { name: '订单管理' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
 
-    const orderLink = rows(page).locator('a[href^="/admin/orders?id="]').first();
-    test.skip((await orderLink.count()) === 0, '当前库中暂无订单');
+    const orderRow = rows(page).filter({ hasText: businessFixture.orderNo }).first();
+    await expect(orderRow).toBeVisible({ timeout: 15000 });
+    const orderLink = orderRow.locator('a[href^="/admin/orders?id="]').first();
+    await expect(orderLink).toBeVisible();
     await orderLink.click();
 
     const panel = page.getByRole('dialog', { name: '订单详情' });

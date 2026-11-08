@@ -13,6 +13,8 @@ export { ResultMedia, modalityOfFormat } from '../../components/ResultMedia';
 export { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
 /** 失败态 / 骨架屏 */
 export { StateError, StateSkeleton } from '../../components/StateViews';
+/** 手机扫码上传弹窗 */
+export { MobileUploadModal } from '../../components/MobileUploadModal';
 
 /** shadcn 组合件与类名合并 */
 export {

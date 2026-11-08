@@ -16,9 +16,9 @@ async function signIn(page: Page, request: APIRequestContext) {
   await page.goto(`${UI}/workbench`);
   await page.evaluate(
     ([token, userEmail, role]) => {
-      localStorage.setItem('ecom_vision_token', token as string);
-      localStorage.setItem('ecom_vision_email', userEmail as string);
-      localStorage.setItem('ecom_vision_role', role as string);
+      localStorage.setItem('huojue_token', token as string);
+      localStorage.setItem('huojue_email', userEmail as string);
+      localStorage.setItem('huojue_role', role as string);
     },
     [session.accessToken as string, session.user.email as string, session.user.role as string],
   );

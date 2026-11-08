@@ -282,7 +282,7 @@ function RepriceTable({
   if (rows.length === 0) {
     return (
       <p className="rounded-lg border border-border px-3 py-6 text-center text-xs text-muted-foreground">
-        所选模型没有已启用的价格档，无法调价。
+        所选模型没有已启用的价格方案，无法调价。
       </p>
     );
   }
@@ -296,7 +296,7 @@ function RepriceTable({
             <span className="text-[12px] text-muted-foreground">
               {group[0].modelName}
               {group[0].channelLabel ? ` · ${group[0].channelLabel}` : ''}
-              {group[0].providerModelKey ? ` · 上游 ${group[0].providerModelKey}` : ''}
+              {group[0].providerModelKey ? ` · 服务商 ${group[0].providerModelKey}` : ''}
             </span>
           </div>
           <div className="flex flex-col divide-y divide-border">

@@ -1,0 +1,475 @@
+/**
+ * invitations 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* ───────── 邀请页 (复刻 ijihua.cn/invitations 版面: 主视觉 + 三步 + 规则 + 数据明细) ───────── */
+.invite-page {
+  padding: 24px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 页头: 左文案 / 右二维码。二维码与「邀请码」并置, 电脑上复制链接、
+   面对面时直接让对方扫码, 不必先打开海报弹窗 */
+.invite-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 30px 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background:
+    radial-gradient(120% 160% at 100% 0%, var(--brand-bg) 0%, transparent 58%),
+    linear-gradient(115deg, var(--brand-bg) 0%, var(--card-bg) 64%);
+}
+
+.invite-hero-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.invite-hero h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--text-strong);
+}
+
+.invite-hero p {
+  margin: 12px 0 0;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--text-muted);
+}
+
+.invite-hero-actions {
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.invite-hero-qr {
+  flex: none;
+  width: 188px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+
+.invite-hero-qr img,
+.invite-hero-qr-fallback {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.invite-hero-qr-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.invite-hero-qr-meta strong {
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.invite-hero-qr p {
+  margin: 4px 0 0;
+  max-width: none;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-desc);
+}
+
+/* 邀请海报弹窗 (B8): 图片按弹窗宽度等比展示, 下载按钮通栏 */
+.invite-poster-image {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+}
+
+.invite-poster-download {
+  width: 100%;
+  height: 40px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.invite-poster-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+  text-align: center;
+}
+
+.invite-block {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 22px 24px 24px;
+}
+
+.invite-block-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 16px;
+}
+
+.invite-block h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+  /* 签到块标题内嵌 lucide 图标 (M11), 需 flex 对齐;
+     未内嵌图标的标题同样适用, 故不另开类名 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invite-block h2 svg {
+  flex: none;
+  color: var(--brand);
+}
+
+.invite-block-sub {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+/* 签到: 两项数据 + 主按钮一行, 下方 7 天连签路线 */
+.invite-checkin {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.invite-checkin-stats {
+  display: flex;
+  flex: 1 1 320px;
+  gap: 12px;
+  min-width: 0;
+}
+
+.invite-checkin-stat {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-card);
+  background: var(--page-bg);
+}
+
+.invite-checkin-value {
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.invite-checkin-value em {
+  margin-left: 4px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* 非数字值 (签到未开启) 用小一号文字, 不冒充积分数量 */
+.invite-checkin-value.is-text {
+  font-size: 15px;
+  line-height: 30px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.invite-checkin-btn {
+  flex: none;
+  align-self: center;
+  min-width: 148px;
+  height: 42px;
+  margin: 0;
+}
+
+.invite-checkin-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invite-checkin-days li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: var(--radius-control);
+  background: var(--page-bg);
+}
+
+.invite-checkin-day {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+.invite-checkin-streak {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.invite-checkin-days strong {
+  font-size: 14px;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 今天与含加成日: 淡紫底 + 品牌色, 一眼看出哪格多拿 */
+.invite-checkin-days li.is-today {
+  background: var(--brand-bg);
+}
+
+.invite-checkin-days li.is-today .invite-checkin-day {
+  color: var(--brand);
+}
+
+.invite-checkin-days li.is-bonus strong {
+  color: var(--brand);
+}
+
+.invite-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.invite-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--page-bg);
+}
+
+.invite-step-no {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--brand-strong);
+  color: var(--on-brand);
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+}
+
+.invite-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.invite-step-desc {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-muted);
+}
+
+.invite-rules {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--text-body);
+}
+
+.invite-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.invite-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--page-bg);
+}
+
+.invite-metric-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.invite-metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* 收益是本页唯一「到手」的指标, 用品牌色与其余计数区分 */
+.invite-metric-value.is-brand {
+  color: var(--brand);
+}
+
+/* 邀请记录: 一行一人, 名称 / 绑定时间 / 奖励状态三段对齐 */
+.invite-relations {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invite-relation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-row);
+  font-size: 13px;
+}
+
+.invite-relation:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.invite-relation:last-child {
+  padding-bottom: 0;
+}
+
+.invite-relation-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text-strong);
+}
+
+.invite-relation-date {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.invite-relation-status {
+  flex: none;
+  min-width: 60px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  text-align: center;
+}
+
+.invite-relation-status.is-granted {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+
+.invite-relation-status.is-pending {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.invite-relation-status.is-rejected {
+  background: var(--surface);
+  color: var(--text-desc);
+}
+
+@media (max-width: 640px) {
+  .invite-block {
+    padding: 18px 16px 20px;
+  }
+  .invite-checkin {
+    flex-direction: column;
+    gap: 12px;
+  }
+  /* 竖排后 flex-basis 落在高度轴上, 320px 会把两块数据撑成空轮胎 */
+  .invite-checkin-stats {
+    flex: 0 0 auto;
+  }
+  .invite-checkin-btn {
+    width: 100%;
+  }
+  /* 7 天一屏放不下就横向滑动, 不折行破坏「连续 7 天」的读法 */
+  .invite-checkin-days {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 68px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  .invite-relation {
+    gap: 8px;
+  }
+}
+
+/* 邀请页 */
+.invite-hero-actions .ui-btn {
+  height: 36px;
+  padding-inline: 16px;
+  border-radius: var(--radius-control);
+}
+
+/* 签到按钮在 flex 行内垂直居中, 不再靠 margin 顶开 (2026-10-30 重排版式) */
+.invite-checkin-btn {
+  margin-top: 0;
+}
+
+.invite-poster-download {
+  margin-top: 16px;
+  height: 40px;
+}
+
+.invite-hero-actions .ui-btn {
+  flex: 1;
+}

@@ -5,6 +5,7 @@ import { AppError } from '../common/app.exception';
 import { PaymentCipher } from './payment-cipher';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentOrderService } from './payment-order.service';
+import { PaymentExceptionService } from './payment-exception.service';
 import { getAdapter } from './adapters';
 import { NotificationResult, PaymentAck, PaymentProviderId } from './adapters/types';
 
@@ -35,6 +36,7 @@ export class PaymentNotificationService {
     private readonly cipher: PaymentCipher,
     private readonly configs: PaymentConfigService,
     private readonly orders: PaymentOrderService,
+    private readonly exceptions: PaymentExceptionService,
   ) {}
 
   async ingest(input: {
@@ -133,7 +135,57 @@ export class PaymentNotificationService {
       return adapter.ack(result);
     }
 
-    const outcome = await this.processNotification(row!.id, result);
+    /*
+     * 同步处理前先抢占这一行（processing），与 worker 的 `retry()` 抢同一把锁。
+     *
+     * 不占锁的后果：一条回调在 HTTP 线程处理的同时，worker 每 15 秒的扫描
+     * （`status in (pending,failed) && nextAttemptAt <= now`）会把它再处理一遍。
+     * 资金侧有 `markPaid` 的条件更新兜底，但 attempts 会虚高、差异记录会重复，
+     * 且两条路径可能给出相反的 ack。
+     */
+    const claimed = await this.prisma.paymentNotification.updateMany({
+      where: { id: row!.id, status: { in: ['pending', 'failed'] } },
+      data: { status: 'processing', attempts: { increment: 1 } },
+    });
+    if (claimed.count === 0) {
+      const latest = await this.prisma.paymentNotification.findUnique({
+        where: { id: row!.id },
+        select: { status: true },
+      });
+      // 已被另一条路径处理完：ack 成功，渠道不必再重试
+      if (latest?.status === 'processed') return adapter.ack(result);
+      // 另一条路径正在处理同一事件：让渠道稍后重试，绝不能抢先 ack 成功
+      return adapter.ack({
+        ok: false,
+        ackSuccess: false,
+        reason: '通知正在处理中',
+        rawPayload: '',
+      });
+    }
+
+    let outcome: { ok: boolean; permanent?: boolean; reason?: string };
+    try {
+      outcome = await this.processNotification(row!.id, result);
+    } catch (e) {
+      /*
+       * 异常不能把行留在 processing 等 worker 5 分钟后回收：立即退回可重试状态，
+       * 同时 ack 失败让渠道也重试一次 —— 两条通道谁先到都能完成入账。
+       */
+      const message = ((e as Error)?.message ?? String(e)).slice(0, 200);
+      this.logger.error(`回调处理异常 (${input.providerId}): ${message}`);
+      await this.prisma.paymentNotification
+        .update({
+          where: { id: row!.id },
+          data: { status: 'failed', nextAttemptAt: new Date(), lastError: message },
+        })
+        .catch(() => undefined);
+      return adapter.ack({
+        ok: false,
+        ackSuccess: false,
+        reason: '回调处理异常',
+        rawPayload: '',
+      });
+    }
     if (outcome.ok) return adapter.ack(result);
     if (outcome.permanent) {
       /*
@@ -421,7 +473,13 @@ export class PaymentNotificationService {
         });
       }
       await this.prisma.paymentReconciliationItem.upsert({
-        where: { runId_merchantOrderNo: { runId: run.id, merchantOrderNo: input.merchantOrderNo } },
+        where: {
+          runId_merchantOrderNo_providerTradeNo: {
+            runId: run.id,
+            merchantOrderNo: input.merchantOrderNo,
+            providerTradeNo: input.providerTradeNo,
+          },
+        },
         create: {
           runId: run.id,
           providerId: input.providerId,
@@ -435,6 +493,33 @@ export class PaymentNotificationService {
         },
         update: { result: input.result, detail: input.detail.slice(0, 200) },
       });
+
+      // 对账明细是运行快照；另建不会随下一次运行消失的补偿单。
+      // 已取消订单若能精确匹配到成功支付流水，立即尝试原路退款。
+      const order = input.orderId
+        ? await this.prisma.order.findUnique({ where: { id: input.orderId }, select: { status: true } })
+        : await this.prisma.order.findUnique({ where: { orderNo: input.merchantOrderNo }, select: { status: true } });
+      if (order?.status === 'cancelled' && input.providerTradeNo) {
+        await this.exceptions.autoRefundCancelledPayment({
+          providerId: input.providerId,
+          merchantOrderNo: input.merchantOrderNo,
+          providerTradeNo: input.providerTradeNo,
+          amountCents: input.amountCents,
+          currency: input.currency,
+          detail: input.detail,
+        });
+      } else {
+        await this.exceptions.recordManual({
+          providerId: input.providerId,
+          orderId: input.orderId,
+          merchantOrderNo: input.merchantOrderNo,
+          providerTradeNo: input.providerTradeNo,
+          amountCents: input.amountCents,
+          currency: input.currency,
+          kind: input.result,
+          detail: input.detail,
+        });
+      }
       const counts = await this.prisma.paymentReconciliationItem.groupBy({
         by: ['result'],
         where: { runId: run.id },

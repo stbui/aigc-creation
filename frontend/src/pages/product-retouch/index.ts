@@ -8,4 +8,5 @@
  * hook `./hooks`、纯函数 `./utils`、常量与模式表 `./constants`。
  * 分层约定见 `docs/frontend-module-conventions.md`。
  */
+import './style.css';
 export { ProductRetouchPage } from './page';

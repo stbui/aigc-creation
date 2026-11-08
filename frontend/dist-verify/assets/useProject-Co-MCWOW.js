@@ -1,0 +1,1 @@
+import{o as e,y as t}from"./http-P5h6r8k_.js";import{xt as n}from"./vendor-D9KETRnM.js";import{at as r,gt as i}from"./api-BTjnsNnb.js";var a=t(n(),1);function o(){return{ensureProject:(0,a.useCallback)(async()=>{if(!i())throw window.dispatchEvent(new Event(`auth:required`)),Error(`请先登录`);let t=await r.list();return t.length>0?t[0].id:(await r.create(e)).id},[])}}export{o as t};

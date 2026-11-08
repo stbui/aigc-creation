@@ -1,8 +1,9 @@
 # 货觉AI · Agent 集成方案（v2）
 
-> 版本：v2.0  
-> 日期：2026-10-25  
-> 状态：方案设计，未实施  
+> 版本：v2.1
+> 日期：2026-11-05
+> 状态：方案设计，未实施
+> 变更：补充前台模型选型与报价、`outputPlan` 多任务建模、步骤幂等、状态机边界；能力口径校正为 17 项（16 image + 1 video）
 > 关联：`docs/agent-prd.md`、`docs/model-architecture.md`、`CLAUDE.md`
 
 ---
@@ -14,9 +15,9 @@
 四条不可变的集成原则：
 
 1. **Agent 只做规划，不直接执行任意工具。** LLM 输出声明式计划，服务端校验后由 `StepExecutor` 调用既有服务。
-2. **能力清单仍以 `capability.registry.ts` 为唯一事实源。** 新能力自动进入 Agent 可规划范围，不维护第二份能力表。
+2. **能力清单仍以 `capabilities/definitions/<id>.ts` 为唯一事实源**（`capability.registry.ts` 只是聚合门面）。新能力自动进入 Agent 可规划范围，不维护第二份能力表。
 3. **生成必须复用 `GenerateService.createTask`。** 扣积分、建任务、路由、回落、退款、AIGC 标识、产出入库全部沿用现有链路。
-4. **LLM 走现有文本链路。** 不新增 LangChain、OpenAI SDK 或第二套模型客户端：规划调用走 `src/model/text` 的文本工具链路（text 模态渠道模型 → 前台模型线路），每次调用写 `ApiCallLog`（`source='agent'`、`billable=false`）。
+4. **LLM 走现有文本链路。** 不新增 LangChain、OpenAI SDK 或第二套模型客户端：规划调用走 `src/model/text` 的 `TextToolService`（直接遍历启用的 text 模态渠道模型，不经过前台模型与用户分组），每次调用写 `ApiCallLog`（`source='agent'`、`billable=false`）。现有 `TextToolService` 固定写 `source='tool'`，需扩展 `TextToolCall` 的可选 `source / agentRunId` 字段。
 
 `agent/` 目录中的 Codex Web 是**本机研发工具**：它允许受控沙箱内的文件与命令操作，只有单进程内存会话和可选静态 Token，没有货觉账号、项目、积分、素材归属与审计体系。它可以作为交互与 SSE 的实现参考，但不应部署为面向用户的 Agent 服务。
 
@@ -52,7 +53,8 @@
 
 | 基础 | 现状 | 对 Agent 的价值 |
 | --- | --- | --- |
-| 能力注册表 | `backend/src/capabilities/capability.registry.ts` 聚合 16 项能力，参数、提示词、模态、积分价均自包含 | 直接派生计划目录与校验规则 |
+| 能力注册表 | `backend/src/capabilities/capability.registry.ts` 聚合 17 项能力（16 image + 1 video），参数、提示词、模态、积分价均自包含 | 直接派生**能力**目录与校验规则；前台模型目录另由 `CatalogService` 提供 |
+| 前台模型目录 | `CatalogService.publicModels()` / `POST /models/available` / `POST /models/:id/quote`：按能力、意图、用户分组返回可承接的 `LogicalModel` 与报价 | Agent 必须从这里选 `logicalModelId` 并生成预估积分 |
 | 文生文通道 | `src/model/text` 的 `TextToolService` 走 text 模态渠道模型（OpenAI 兼容 `chat/completions` 等协议），多候选依次尝试并写 `ApiCallLog` | 规划不需要新建 LLM 基础设施 |
 | 生成任务 | `GenerateService.createTask` 已统一校验、扣费、建任务、路由、回落、退款与入库 | Agent 不再造平行任务体系 |
 | 异步执行 | `GenerationTask` 有心跳、孤儿恢复、失败退款 | Agent 步骤可围绕任务状态做恢复 |
@@ -73,12 +75,12 @@ Agent 是**新增入口，不是替代入口**。现有工作台、工具页、�
 
 | 维度 | 现有手动路径 | Agent 路径 | 是否共用 |
 | --- | --- | --- | --- |
-| 能力定义 | `/capabilities` | `CatalogService` 派生 | 是，均来自 `capability.registry.ts` |
+| 能力定义 | `/capabilities` | `CatalogService` 派生 | 是，均来自 `capabilities/definitions/` |
 | 参数校验 | 页面表单 + DTO + `sanitizeParams` | `PlanValidator` + `sanitizeParams` | 是，服务端最终口径一致 |
 | 生成任务 | `POST /generate` | `StepExecutor → GenerateService` | 是，同一 `GenerationTask` |
 | 积分与退款 | `GenerateService` | `GenerateService` | 是，同一账本与退款规则 |
 | 产出 | `Asset` | `Asset` | 是，同时出现在素材库与我的作品 |
-| 上下线/改价 | 后台能力管控与渠道工作台 | 同一运行时目录 | 是，后台操作对两端同时生效 |
+| 上下线/改价 | 后台「能力与模型」与「渠道工作台」 | 同一运行时目录 | 是，后台操作对两端同时生效 |
 
 因此不允许出现以下分叉：
 
@@ -96,7 +98,7 @@ Agent 是**新增入口，不是替代入口**。现有工作台、工具页、�
 ### 3.1 P0：能形成闭环
 
 - 自然语言 → 结构化计划 → 用户确认 → 串行执行 → 产出进「我的作品」。
-- 覆盖注册表中全部可提交的生成能力（当前 16 项，含图片与视频），新能力加入注册表后自动进入目录。
+- 覆盖注册表中全部可提交且 `runtime.effective='remote'` 的生成能力（当前 17 项：16 image + 1 video，含 `shoppable_carousel`），新能力加入注册表后自动进入目录。
 - 需要画布、框选等精确人工输入的能力，可交给现有工具页继续；Agent 携带项目、素材与已填参数，不丢上下文。
 - 关键输入缺失或有歧义时先澄清，不猜测。
 - 支持选择当前项目素材，以及从已有作品选择参考图。
@@ -124,7 +126,7 @@ Agent 是**新增入口，不是替代入口**。现有工作台、工具页、�
 
 | 现有产品能力 | Agent P0 关系 | 说明 |
 | --- | --- | --- |
-| 16 项生成能力（`CAPABILITIES`） | **全部可进入 Agent 计划** | 能直接执行的走 `GenerateService`；需要画布精确输入的走 handoff |
+| 17 项生成能力（`CAPABILITIES`） | **全部可进入 Agent 计划（需有可用前台模型）** | 能直接执行的走 `GenerateService`；需要画布精确输入的走 handoff；无线路的能力不进入规划 |
 | `local_redraw` 局部重绘 | 可直接规划；精确涂抹时 handoff | 无遮罩时可用声明中的 `region + prompt` 执行；需要遮罩时转交 `/local-redraw` 画布 |
 | `sku_image` 商品 SKU 图 | 可直接规划；精确框选时 handoff | 无框选时可用区域枚举执行；需要多区域框选时转交 `/product-sku` |
 | `image_to_video` 图生视频 | 可直接规划执行 | 与图片能力使用同一任务、积分、作品体系 |
@@ -164,8 +166,8 @@ Agent 是**新增入口，不是替代入口**。现有工作台、工具页、�
                                           ▼
 ┌──────────────────────────▼───────────────────────────────────┐
 │ 既有生成链路                                                  │
-│ GenerateService → IMAGE_PROVIDER / VIDEO_PROVIDER            │
-│ → GenerationTask → Asset → 我的作品 / 素材库 / 后台调用记录      │
+│ GenerateService → TaskAdmissionService → RouterService        │
+│ → 协议执行器 → GenerationTask → Asset → 我的作品 / 素材库        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -179,7 +181,7 @@ Agent 的职责只有三件事：
 
 它不拥有新的模型通道、新的任务表或新的积分体系。这样即使 Agent 功能整体下线，原有工作台与工具页也不受影响。
 
-图中两条前端路径最终都落到同一个 `GenerateService.createTask`：Agent 只是把自然语言翻译成任务，现有页面仍然直接提交任务。任何一边产生的 `GenerationTask`、`Asset`、积分流水，另一边都能看到并继续使用。
+图中的两条前端路径最终都落到同一个 `GenerateService.createTask`：Agent 只是把自然语言翻译成任务，现有页面仍然直接提交任务。任何一边产生的 `GenerationTask`、`Asset`、积分流水，另一边都能看到并继续使用。**但 Agent 多了一层选型责任**：`CreateGenerationDto.logicalModelId` 是必填字段，Agent 必须在规划阶段从 `CatalogService` 的可用前台模型中选定，并在计划卡上如实展示；这项工作不能交给 LLM。
 
 ---
 
@@ -193,9 +195,10 @@ Agent 的职责只有三件事：
         ▼
 PlannerService
   ├─ 读取最近 N 条消息
-  ├─ 读取 CatalogService 的可用能力目录
-  ├─ 调 TextToolService.generate({ operation: 'agent_plan', ... })
-  └─ 解析为 PlanDraft
+  ├─ 读取 CatalogService 的可用能力目录（仅 effective='remote'）
+  ├─ 读取 CatalogService.publicModels(access, intent) 得到可承接的前台模型
+  ├─ 调 TextToolService.generate({ operation: 'agent_plan', source: 'agent', ... })
+  └─ 解析为 PlanDraft（LLM 只产出能力与参数，不选模型）
         │
         ▼
 PlanValidator
@@ -203,12 +206,13 @@ PlanValidator
   │          仍不合法 → 返回 clarify / 降级手动模式
   ├─ 信息不足或有假设 → clarify
   ├─ 需要画布/框选等人工输入 → handoff
+  ├─ 为每步绑定 logicalModelId（服务端选定），并按 QuoteService 报价
   └─ 可执行 → 冻结计划，落 AgentRun(status='awaiting_confirm')
 ```
 
 规划阶段**不扣积分、不建生成任务**。计划确认后，才逐步骤进入执行。每条用户消息对应一条 `AgentRun`：
 
-- 需要澄清时，本次运行落 `awaiting_input`；用户回答后创建下一条运行。
+- 需要澄清时，本次运行落 `awaiting_input`；用户回答后创建下一条运行，旧运行转 `cancelled`。
 - 形成可执行计划时，本次运行落 `awaiting_confirm`。
 
 ### 5.2 PlanDraft 契约
@@ -238,6 +242,7 @@ type PlanDraft =
 interface PlanStep {
   ref: string;                    // s1 / s2，仅用于本计划内引用
   capability: string;             // 必须来自 CatalogService
+  logicalModelId: string;         // 服务端从可用前台模型中选定；LLM 不得填写
   title: string;
   inputRefs: string[];            // asset:A1 / step:s1.output
   dependsOn: string[];            // 必须指向前序 step
@@ -256,12 +261,13 @@ interface StyleLockDraft {
 
 - 单次计划最多 6 步。
 - 每步只能引用已选素材或更早步骤的产出。
-- 参数只允许能力声明中非 `hidden` 的 key。
-- 能力必须存在、非 `planned`、当前未被后台下线。
-- 输入素材数量必须满足 `CapabilityPlugin.inputs`。
+- 参数只允许能力声明中非 `hidden` 的 key；`hidden` 字段由服务端按上下文代填。
+- 能力必须存在、非 `planned`、当前 `runtime.effective === 'remote'`。
+- `logicalModelId` 必须是 `CatalogService` 中可承接该能力与意图、且对当前用户分组可见的前台模型。
+- 输入素材数量必须满足 `CapabilityPlugin.inputs` 与所选前台模型的 `productSpec.inputs`。
 - 计划 JSON 最大 32 KB；超出直接判失败，不写入数据库。
 
-`kind='handoff'` 时只生成服务端可信的跳转描述：路由由能力 id 映射（复用 `toolPath`），不允许模型给任意 URL；`prefill` 只包含非 `hidden` 参数，素材仍以服务端解析后的归属为准。
+`kind='handoff'` 时只返回能力 id 与服务端校验过的 `prefill`，**不返回 URL**：路由由前端用现有 `toolPath()` 映射（该函数只存在于 `frontend/src/lib/capabilities.ts`，后端不复刻第二份路由表）；`prefill` 只包含非 `hidden` 参数且必须通过 `validateCapabilityParams`，素材仍以服务端解析后的归属为准。
 
 handoff 本身不创建任务、不扣积分、不改变会话项目；用户在现有工具页完成操作时，仍按该页面原有的生成与计费规则执行。
 
@@ -280,24 +286,45 @@ running ──► step 1 running ──► succeeded ──► step 2 running ..
   └─ 全部成功 ──► succeeded
 ```
 
+运行状态转移（P0，服务端只允许以下边）：
+
+| 当前状态 | 事件 | 下一状态 |
+| --- | --- | --- |
+| `planning` | 计划可执行 | `awaiting_confirm` |
+| `planning` | 信息不足 | `awaiting_input` |
+| `planning` | 超时 / 校验两次失败 | `failed` |
+| `awaiting_input` | 用户回答 | 旧运行 `cancelled`（`AGENT_CLARIFY_SUPERSEDED`），新建一条 `planning` 运行 |
+| `awaiting_confirm` | confirm 条件更新成功 | `running` |
+| `awaiting_confirm` | 用户取消 / 超过 `expiresAt` | `cancelled` / `failed`（`AGENT_PLAN_EXPIRED`） |
+| `running` | 全部步骤成功 | `succeeded` |
+| `running` | 有失败或仍有未执行步骤 | `partial` |
+| `running` | `cancelRequested=true` 且当前步（批）终态 | `cancelled` |
+| `partial` | resume 后全部剩余步骤成功 | `succeeded` |
+
+`partial` 不是终态：用户可继续执行剩余 `pending` 步骤或重试失败步骤；`succeeded / failed / cancelled` 为终态。`handoff` 不参与执行状态机，只表示计划已转交现有工具页。
+
 每个步骤调用一次 `GenerateService.createTask(ownerId, dto)`：
 
-- `projectId` 来自会话，服务端再次校验归属。
-- `capability`、`inputAssetIds`、`params` 已由 `PlanValidator` 规范化。
+- `projectId` 来自会话，服务端再次校验归属且 `Project.deletedAt === null`。
+- `capability`、`logicalModelId`、`inputAssetIds`、`params` 已由 `PlanValidator` 规范化；`logicalModelId` 来自服务端选定的前台模型，不接受模型输出。
 - 真实扣费、任务创建、模型路由、失败退款全部沿用既有实现。
-- 拿到 `taskId` 后，Agent 通过 `GenerateService.getTask` 在服务端轮询，直到 `succeeded | failed`。
-- 成功后记录 `outputAssetId`，供后续步骤引用；失败后记录 `errorCode`，停止依赖该步骤的后继步骤。
+- **一步可能产生多个任务**：`detail_image` / `shoppable_carousel` 声明了 `outputPlan`，准入层会按返回值拆成 N 个 `GenerationTask`，各自建账单、共享 `batchId`。`AgentStep` 必须保存 `taskIds / batchId / outputAssetIds`，不能只保存单个 `taskId`。
+- 拿到 `taskIds` 后，Agent 通过 `GenerateService.getTask` 在服务端轮询，直到该批全部 `succeeded | failed | cancelled`。
+- 成功后记录 `outputAssetIds`，供后续步骤引用；失败后记录 `errorCode`，停止依赖该步骤的后继步骤。
+- 每步建任务必须带幂等键 `agent:<runId>:<stepRef>:<attempt>`，消除并发重试与恢复器重复拾取导致的二次扣费。
 
-**不要**在 Agent 内直接调用 IMAGE/VIDEO Provider，也不要复制 `GenerateService` 中的扣费与任务创建逻辑。
+**不要**在 Agent 内直接调用渠道模型或协议执行器，也不要复制 `GenerateService` 中的扣费与任务创建逻辑。
 
-同一会话同时只允许一个 `planning | running` 运行；同一用户最多 2 个活跃运行。前端必须在发送后禁用重复提交，服务端仍以状态条件更新兜底。
+同一会话同时只允许一个 `planning | awaiting_input | awaiting_confirm | running` 运行；同一用户最多 2 个活跃运行。前端必须在发送后禁用重复提交，服务端仍以状态条件更新兜底。
 
 ### 5.4 单步重试
 
-重试只允许针对 `failed` 步骤：
+重试只允许针对 `failed` / `partial` 步骤：
 
-- 重新创建一条 `GenerationTask`，`retriedFromId` 指向原任务。
-- `AgentStep.attempt` 累加；历史任务的失败现场通过 `GenerationTask.retriedFromId` 链追溯。
+- 走 `GenerateService.createTask` 重新计费，**不复用** `GenerateService.retryTask`：后者是后台运维语义，`creditCost=0`、不建账单，用它等于「免费重跑」。
+- 若需要保留来源链，在准入层增加一个**仅用于追溯**的可选 `retriedFromId`（不参与计价）；不增加时用 `AgentStep.attempt` + `taskIds` 追溯，不伪造 `GenerationTask.retriedFromId`。
+- `AgentStep.attempt` 累加，`taskIds` 追加而不是覆盖，历史尝试保留可查。
+- 多任务步骤只重建失败的那几张，不重跑同批已成功的任务。
 - 已成功步骤及其产出保持不变。
 - 若后续步骤曾消费该失败步骤的产出，则后续步骤本来就不会成功；重试成功后只继续执行处于 `pending/skipped` 的下游步骤。
 - 任何重试都必须再次经过 `GenerateService` 的真实扣费与退款流程，不做「免费重跑」。
@@ -311,8 +338,8 @@ running ──► step 1 running ──► succeeded ──► step 2 running ..
 | 行为 | 语义 |
 | --- | --- |
 | 关闭 SSE / 刷新页面 | **不取消任务**。生成已付费且在后台运行，用户重新进入会话看快照。 |
-| 停止后续步骤 | 设置 `cancelRequested=true`；当前生成任务继续，执行器不再启动下一步。 |
-| 管理员终止任务 | 沿用现有后台任务终止与退款能力。 |
+| 停止后续步骤 | 设置 `cancelRequested=true`；当前生成任务（整批）继续，执行器不再启动下一步。当前步进入终态后，运行转 `cancelled`，未执行步骤置 `skipped`。 |
+| 管理员终止任务 | 沿用现有后台任务终止与退款能力。已终止任务按现有规则退款或转 `uncertain`。 |
 
 P0 不承诺中断正在执行的外部模型调用；如果用户要求强制终止，由后台任务终止路径处理。
 
@@ -321,10 +348,11 @@ P0 不承诺中断正在执行的外部模型调用；如果用户要求强制�
 启动时执行一次轻量恢复：
 
 - `AgentRun.status='planning'` 且超过 2 分钟：标记失败，错误码 `AGENT_PLAN_INTERRUPTED`。
-- `AgentStep.status='running'` 且已有 `taskId`：读取对应 `GenerationTask`。
-  - 任务成功 → 步骤补记为成功，运行转 `partial`，等待用户点击「继续剩余步骤」。
-  - 任务失败 → 步骤补记为失败，运行转 `partial`。
-  - 任务仍在运行 → 交给 `GenerateService` 的启动恢复逻辑。
+- `AgentStep.status='running'` 且已有 `taskIds`：逐条读取对应 `GenerationTask`。
+  - 全部成功 → 步骤补记为成功，运行转 `partial`，等待用户点击「继续剩余步骤」。
+  - 有失败 → 步骤补记为失败 / `partial`，运行转 `partial`。
+  - 仍有任务在运行 → 交给 `GenerateService` 的启动恢复逻辑，本轮不重复派发。
+- `AgentStep.status='running'` 但 `taskIds` 为空（崩溃在创建任务与落库之间）：步骤转 `failed`，错误码 `AGENT_STEP_INTERRUPTED`，由用户手动重试；不自动重放。
 - `AgentRun.status='running'` 但没有任何 running 步骤：标记 `partial`，错误码 `AGENT_EXECUTOR_RESTARTED`，由用户手动重试。
 
 宁可让用户重试，也不要自动重放可能已扣费或已产出文件的步骤。
@@ -343,9 +371,9 @@ interface AgentCapabilitySpec {
   name: string;
   summary: string;
   modality: 'image' | 'video';
-  inputs: number;
-  creditCost: number;       // CreditPriceService 的运行时价
-  enabled: boolean;         // CapabilityAvailabilityService
+  inputs: 0 | 1 | 2;
+  inputImageMode?: 'reference' | 'edit';
+  effective: 'remote' | 'disabled' | 'unavailable'; // 只有 remote 可进入规划
   params: Array<{
     key: string;
     type: 'enum' | 'number' | 'text' | 'boolean';
@@ -355,18 +383,24 @@ interface AgentCapabilitySpec {
     max?: number;
     maxLength?: number;
   }>;
+  /** 可承接该能力的前台模型；由 CatalogService 按用户分组与意图过滤 */
+  models: Array<{
+    logicalModelId: string;
+    name: string;
+    priceLabel: string;
+  }>;
 }
 ```
 
 过滤规则：
 
 - `mode='planned'` 不进入目录。
-- `runtime.enabled=false` 不进入目录。
-- `param.hidden=true` 默认不进入目录；需要页面代填的技术参数由服务端从上下文补齐。
-- `creditCost` 必须使用运行时价，不能读 `def.creditCost` 静态值。
+- `runtime.effective !== 'remote'` 不进入目录（`disabled` 已下线，`unavailable` 没有可用线路）。只看 `runtime.enabled` 会把「没有配模型」的能力也放进来，提交时才 `40005`。
+- `param.hidden=true` 不进入模型可见的参数 schema；需要页面代填的技术参数由服务端从上下文补齐。
+- 预估积分**不使用** `CreditPriceService.resolve()` 的能力价：实际账单由 `BillingService.buildDraft` 按线路价/统一价叠分组倍率生成。必须用 `QuoteService.quoteLogicalModel(access, logicalModelId, intent)` 报价，并按 `outputPlan(params).length` 求和。
 - **不得因为存在 `hidden` 参数就把能力排除出目录。** 若缺少的 `hidden` 参数是可选/有安全默认值，正常规划；若它必须由用户交互产生，则生成 `handoff`，而不是静默删掉该能力。
 
-这样新增能力只需改 `definitions/`，Agent 目录自动更新；能力下线后模型也无法再规划它。`local_redraw` 的遮罩、`sku_image` 的精确框选都按「可执行则执行，不可执行则 handoff」处理。
+这样新增能力只需改 `definitions/`，Agent 的能力目录自动更新；但前台模型仍需在后台配置，否则该能力落到 `unavailable`，不会进入规划。能力下线后模型也无法再规划它。`local_redraw` 的遮罩、`sku_image` 的精确框选都按「可执行则执行，不可执行则 handoff」处理；handoff 的判定优先由服务端规则给出（如遮罩/框选缺失），模型只能建议，不能把本可执行的任务改成 handoff 来逃避执行。
 
 ### 6.2 素材引用不直接暴露真实 ID
 
@@ -389,13 +423,14 @@ LLM 只能引用 `asset:A1`。服务端再把符号解析为真实 `assetId`，�
 
 `PlanValidator` 依次执行：
 
-1. 能力存在、可提交、当前在线。
+1. 能力存在、`mode !== 'planned'`、目录项 `effective === 'remote'`。
 2. 步骤引用无环，`dependsOn` 只能指向前序步骤。
-3. `inputRefs` 数量满足 `inputs`，来源属于当前用户。
-4. 参数 key 属于能力声明，`hidden` 参数禁止模型填写。
-5. enum 值必须命中声明选项；number 收敛到 `min/max`；text 按 `maxLength` 截断。
-6. 服务端重新计算积分，不接受模型给出的价格。
-7. 尝试调用 `sanitizeParams` 做最后一层收敛，并比对是否有静默丢参。
+3. 为步骤选定 `logicalModelId`：从 `CatalogService.publicModels(access, intent)` 中选第一个可承接该能力与意图的模型；没有候选则整步判失败，不进入计划。
+4. `inputRefs` 数量满足能力 `inputs` 与步骤 3 选定模型的输入约束，来源属于当前用户。
+5. 参数 key 属于能力声明，`hidden` 参数禁止模型填写（现有 `validateCapabilityParams` 不会拒绝 hidden key，这一步必须由 Agent 自己执行）。
+6. enum 值必须命中声明选项；number 收敛到 `min/max`；text 按 `maxLength` 截断。
+7. 用 `QuoteService.quoteLogicalModel(access, logicalModelId, intent)` 报价，再按 `outputPlan(params).length` 求和得到步骤预估；不接受模型给出的价格。
+8. 尝试调用 `sanitizeParams` 做最后一层收敛，并比对是否有静默丢参。
 
 校验失败时允许一次「带错误原因重新规划」，避免一次 JSON 小错就整轮失败；第二次仍失败则返回澄清或降级手动模式。
 
@@ -413,7 +448,7 @@ interface StyleLock {
 }
 ```
 
-风格锁在计划确认时冻结到 `AgentRun.styleLock`，本轮执行中不随会话后续修改而变化。
+风格锁在计划确认时冻结到 `AgentRun.styleLock`，本轮执行中不随会话后续修改而变化。`AgentSession.styleLock` 只保存「下一轮规划的默认风格」，在用户明确确认或修改风格时才写入；两者不要混用，运行时以 `AgentRun.styleLock` 为准。
 
 执行时按能力声明合并：`promptPrefix` 通过 `stylePrompt` 注入；`params` 只合并到该能力实际声明、且不属于 `hidden` 的 key，其余项忽略并在计划卡明示。这样风格锁不会突破能力的参数白名单。
 
@@ -433,6 +468,8 @@ const base = plugin.buildPrompt(sanitizedParams, refCount);
 const style = sanitizedParams.__stylePrompt;
 return style ? `${style}。${base}` : base;
 ```
+
+实现落点：`sanitizeParams` 在 `TaskAdmissionService.admit()` 内执行，`__stylePrompt` 应在它之后写入任务参数；真正拼提示词的位置是 `src/model/tasks/task-request.service.ts` 的 `def.buildPrompt(context.params, ...)`，应在那里统一前置，而不是在每个能力的 `buildPrompt` 里各改一次。`__stylePrompt` 只允许服务端写入，不能出现在能力参数 schema 中，也不能接受模型输出。
 
 这样不需要为每项能力单独维护「哪个参数是提示词」的映射，也不会出现新增能力忘记接风格锁的问题。
 
@@ -462,7 +499,7 @@ return style ? `${style}。${base}` : base;
 
 所有普通 JSON 接口继续使用 `{ code, data, message }` 信封；SSE 接口通过 `@Res()` 直接写响应，不使用信封。
 
-存在 `planning | awaiting_confirm | running` 运行时的会话不允许直接删除，返回 409 并提示先取消；避免前端删掉会话后后台仍在执行。
+存在 `planning | awaiting_input | awaiting_confirm | running` 运行时的会话不允许直接删除，返回 409 并提示先取消或等待澄清结束；避免前端删掉会话后后台仍在执行。
 
 ### 8.2 创建会话
 
@@ -474,7 +511,7 @@ Content-Type: application/json
 { "projectId": "proj_xxx", "title": "夏季桌面风扇整套图" }
 ```
 
-服务端必须校验 `project.ownerId === currentUser.id`。前端可复用 `useProject().ensureProject()` 获取项目；未登录时在发送动作处唤起登录弹窗。
+服务端必须校验 `project.ownerId === currentUser.id` 且 `project.deletedAt === null`。前端可复用 `useProject().ensureProject()` 获取项目；未登录时在发送动作处唤起登录弹窗。
 
 ### 8.3 发送消息
 
@@ -482,16 +519,18 @@ Content-Type: application/json
 POST /api/v1/agent/sessions/:id/messages
 Authorization: Bearer <jwt>
 Content-Type: application/json
-Idempotency-Key: 4adf...
 
 {
   "clientMessageId": "c-01",
+  "idempotencyKey": "4adf...",
   "text": "用这张商品图做一套小红书风格主图、详情图和 SKU 图",
   "assetIds": ["asset_xxx"]
 }
 ```
 
-返回 `text/event-stream`。`clientMessageId` 在会话内唯一；重复提交从同一运行的当前快照继续推送事件，不重复调用 LLM。
+返回 `text/event-stream`。`clientMessageId` 在会话内唯一；重复提交从同一运行的当前快照继续推送事件，不重复调用 LLM。幂等键**以请求体 `idempotencyKey` 为主**：CORS 白名单当前只有 `X-Idempotency-Key`，没有 `Idempotency-Key`，跨域部署下用后者会在预检阶段失败；若要保留 `Idempotency-Key` 头，必须同时把它加入 `main.ts` 的 `allowedHeaders`。
+
+同一会话已存在 `awaiting_confirm` 运行时，新消息默认**拒绝并返回 409**，提示用户先确认、调整或取消当前计划；不允许静默覆盖已冻结的计划。`awaiting_input` 的澄清运行在用户回答后由新运行接替，旧运行转 `cancelled` 并记录 `errorCode='AGENT_CLARIFY_SUPERSEDED'`。
 
 ### 8.4 确认运行
 
@@ -499,9 +538,9 @@ Idempotency-Key: 4adf...
 POST /api/v1/agent/runs/:runId/confirm
 Authorization: Bearer <jwt>
 Content-Type: application/json
-Idempotency-Key: 9c13...
 
 {
+  "idempotencyKey": "9c13...",
   "selectedStepRefs": ["s1", "s2", "s3"],
   "stepOverrides": {
     "s1": { "params": { "ratio": "3:4" } }
@@ -509,7 +548,9 @@ Idempotency-Key: 9c13...
 }
 ```
 
-`stepOverrides` 只允许修改目录中非 `hidden` 的参数；服务端必须重新执行完整 `PlanValidator` 并重新计算预估积分，再把覆盖后的计划写回 `AgentRun.plan`。不允许借覆盖绕过能力、素材或积分校验。
+幂等键口径同 §8.3：走请求体 `idempotencyKey`，不依赖 `Idempotency-Key` 头。
+
+`stepOverrides` 只允许修改目录中非 `hidden` 的参数，以及把 `logicalModelId` 切换到 `CatalogService` 中可承接该步骤的其他前台模型；服务端必须重新执行完整 `PlanValidator`、重新选型并用 `QuoteService` 重算预估积分，再把覆盖后的计划写回 `AgentRun.plan`。不允许借覆盖绕过能力、素材、模型或积分校验。
 
 确认动作必须用条件更新抢占：
 
@@ -522,6 +563,8 @@ updateMany({
 
 只有 `count === 1` 的请求可以启动执行器；重复点击不会重复建任务或重复扣费。
 
+抢占成功后，执行器**不能绑定在 HTTP 响应上**：确认请求把运行交给进程内执行器后立即返回（或开始推送 SSE），执行器只读写 `AgentRun / AgentStep` 与 `GenerationTask`，不依赖 `res`。客户端断开只关闭事件流；执行器继续推进到下一步，SSE 重新连接时通过 `GET /agent/runs/:id` 对齐快照。这样也避免 `ResponseInterceptor` / 异常过滤器在响应已发出后再次写入 JSON。
+
 ### 8.5 SSE 事件
 
 ```text
@@ -532,10 +575,10 @@ event: plan.ready
 data: {"run":{"id":"run_x","status":"awaiting_confirm","estimateCredits":30,...}}
 
 event: step.started
-data: {"stepIndex":0,"capability":"main_image","taskId":"task_x"}
+data: {"stepIndex":0,"capability":"detail_image","taskIds":["task_x","task_y","task_z"],"batchId":"batch_x"}
 
 event: step.succeeded
-data: {"stepIndex":0,"taskId":"task_x","outputAssetId":"asset_y"}
+data: {"stepIndex":0,"taskIds":["task_x","task_y","task_z"],"outputAssetIds":["asset_a","asset_b","asset_c"]}
 
 event: run.completed
 data: {"status":"succeeded","actualCredits":30}
@@ -566,8 +609,9 @@ P0 不做 LLM token 级流式输出。原因：真实产出是中英混合的纯
 - 使用 `fetch + ReadableStream`，不用原生 `EventSource`。原生 EventSource 不能设置 `Authorization` 头，把 JWT 放 query 会进入访问日志。
 - 服务端设置 `Content-Type: text/event-stream; charset=utf-8`、`Cache-Control: no-cache, no-transform`、`X-Accel-Buffering: no`。
 - Nginx 现有 `/api/` 反代已允许 300 秒长请求；心跳 15 秒足以避免空闲超时。
-- 客户端断开只结束流，不终止已确认的后台任务。
+- 客户端断开只结束流，不终止已确认的后台任务；执行器归属见 §8.4。
 - 每个事件带单调递增 `seq`；断线后重新 `GET /agent/runs/:id` 拿快照，不依赖事件重放表。
+- SSE 响应一旦开始写入，异常过滤器不得再回写 JSON；流内错误通过 `notice` 事件或最终快照表达。
 
 ---
 
@@ -644,14 +688,21 @@ model AgentStep {
   ref             String
   title           String
   capability      String
-  inputRefs       String   @default("[]") // JSON
-  inputAssetIds   String   @default("[]") // 服务端解析后的真实资产
+  /** 服务端选定的前台模型；不来自 LLM */
+  logicalModelId  String
+  inputRefs       String   @default("[]") // JSON，计划阶段冻结：asset:A1 / step:s1.output
+  inputAssetIds   String   @default("[]") // JSON，执行到该步时解析并回填的真实资产
   dependsOn       String   @default("[]") // JSON
   params          String   @default("{}")
   status          String   @default("pending")
-  // pending | running | succeeded | failed | skipped
-  taskId          String?
+  // pending | running | succeeded | partial | failed | skipped
+  /** outputPlan 可能把一步拆成 N 个任务：primaryTaskId 供索引与后台反查 */
+  primaryTaskId   String?
+  taskIds         String   @default("[]") // JSON，本步全部 GenerationTask
+  batchId         String?
+  /** 首个产出，兼容单图展示 */
   outputAssetId   String?
+  outputAssetIds  String   @default("[]") // JSON，本步全部产出
   estimateCredits Int      @default(0)
   actualCredits   Int      @default(0)
   attempt         Int      @default(1)
@@ -663,7 +714,8 @@ model AgentStep {
 
   @@unique([runId, stepIndex])
   @@index([runId, status])
-  @@index([taskId])
+  @@index([primaryTaskId])
+  @@index([batchId])
 }
 ```
 
@@ -687,17 +739,18 @@ model ApiCallLog {
 ### 10.1 用户计费
 
 - 规划阶段不收费、不创建任务。
-- 计划卡展示 `estimateCredits = Σ(runtimePrice(capability))`，并展示当前余额。
-- 确认后每一步由 `GenerateService.createTask` 真实扣费。
+- 计划卡展示的 `estimateCredits` 必须与真实账单同源：对每步调用 `QuoteService.quoteLogicalModel(access, logicalModelId, intent)`，再按 `outputPlan(params).length` 求和。**不要**用 `CreditPriceService.resolve()` 的能力价或 `def.creditCost` 估算——实际账单由线路价/统一价叠用户分组倍率生成，两者默认不相等。
+- 展示时同时给出每步的模型名、输出张数、小计与当前余额，避免用户只看到一个总数。
+- 确认后每一步由 `GenerateService.createTask` 真实扣费；实际金额以任务快照 `creditCost` / 账单为准。
 - 失败由既有 `GenerateService` 自动退款，Agent 不二次退款。
 - 未执行步骤不扣费。
 - LLM token 成本 P0 不向用户计费，仅内部核算。
 
-余额不足属于正常业务结果：执行到该步骤时停止，运行转 `partial`，UI 显示「余额不足，后续 N 步未执行」，提供充值入口。
+余额不足属于正常业务结果：`createTasksWithBilling` 是事务，余额不足时整批任务与账单一起回滚，该步以 `40201` 失败；运行转 `partial`，UI 显示「余额不足，后续 N 步未执行」，提供充值入口。不会出现「同批只执行了一部分」的中间态。
 
 ### 10.2 LLM 调用记录
 
-复用 `TextToolService.generate` 的日志能力：每次尝试写一条 `ApiCallLog`（`source='tool'`、`billable=false`），并补齐以下信息：
+复用 `TextToolService.generate` 的日志能力：每次尝试写一条 `ApiCallLog`（`source='agent'`、`billable=false`），并补齐以下信息：
 
 - `TextToolCall.userId` 写入既有 `ApiCallLog.userId`：用于按用户核算 Agent 成本。
 - 新增 `agentRunId` 列：关联规划运行与成本。
@@ -710,11 +763,12 @@ interface TextToolCall {
   operation: string;   // 如 `agent_plan`
   userId?: string;
   agentRunId?: string;
+  source?: 'tool' | 'agent'; // 缺省 'tool'，保持既有调用方行为不变
   // ...既有 instructions / prompt / messages / images
 }
 ```
 
-现有调用方不传 `agentRunId` 即可保持行为不变；`TextToolService` 把 `agentRunId` 原样写进调用记录。
+现有调用方不传 `agentRunId` / `source` 即可保持行为不变；`TextToolService.logCall` 把 `agentRunId` 原样写进调用记录，并按 `source` 覆写默认值。
 
 ### 10.3 运行指标
 
@@ -722,7 +776,8 @@ interface TextToolCall {
 
 - 规划耗时、修复重试次数、clarify 比例。
 - 每个运行的步数、预估/实扣积分、成功率、失败错误码。
-- 每步实际 provider（`gateway` / `local`）与耗时。
+- 每次生成任务命中的线路（`routeId` / `channelModelId`）与耗时。
+- 每个步骤的 `logicalModelId`、预估/实扣积分，以及 `taskIds` / `batchId`，便于把 Agent 步骤与多任务批次对应起来。
 - LLM token 用量与模型名。
 
 日志必须带 `sessionId`、`runId`、`stepId`、`ownerId`，便于串联请求、模型调用与生成任务。
@@ -750,8 +805,8 @@ interface TextToolCall {
 
 - `AgentPage.tsx`：页面编排与会话切换。
 - `AgentConversation.tsx`：消息与流式状态。
-- `PlanCard.tsx`：计划、假设、预估积分、确认/调整/降级。
-- `StepTimeline.tsx`：步骤状态、失败原因、单步重试。
+- `PlanCard.tsx`：计划、假设、每步模型名、输出张数、预估积分小计与合计、确认/调整/降级。
+- `StepTimeline.tsx`：步骤状态、多任务进度（成功 x / 共 N）、失败原因、单步重试。
 - `AgentOutputGallery.tsx`：产出与「查看作品 / 再创作」。
 - `ManualCapabilityPicker.tsx`：LLM 不可用或用户拒绝计划时的手动入口。
 - `HandoffCard.tsx`：需要画布/框选时展示原因与「继续在原工具页完成」，自动携带项目和素材上下文。
@@ -759,9 +814,8 @@ interface TextToolCall {
 
 结果卡必须如实展示：
 
-- 实际 `provider`：新任务为真实模型通道；历史任务可能为已停用的本地产出。
-- `creditCost`：该步骤真实扣费。
-- AIGC 标识信息。
+- `creditCost`：该步骤真实扣费（多任务步骤展示各任务小计与合计）。
+- 实际使用的模型名与 AIGC 标识信息。
 - 失败错误码与可操作建议。
 
 ### 11.3 降级
@@ -779,7 +833,8 @@ interface TextToolCall {
 | 风险 | 对策 |
 | --- | --- |
 | 越权读取素材/项目 | `ownerId` 只从 JWT 注入；素材符号在服务端解析并二次校验归属 |
-| LLM 编造能力或参数 | 能力目录由注册表派生；计划只接受目录内 id 与声明参数 |
+| LLM 编造能力或参数 | 能力目录由注册表派生；计划只接受目录内 id 与声明参数；`hidden` 参数由 `PlanValidator` 显式拒绝，不能依赖 `validateCapabilityParams` |
+| LLM 选错/编造前台模型 | `logicalModelId` 只由服务端从 `CatalogService` 选定，不接受模型输出 |
 | LLM 发起任意操作 | 模型只产出 JSON，不拥有工具调用权；服务端只暴露白名单动作 |
 | 重复确认导致重复扣费 | `clientMessageId` 唯一索引 + 条件更新抢占运行 |
 | SSE 泄露 Token | 使用 Bearer 头 + fetch 流，不把 token 放 query |
@@ -794,6 +849,8 @@ interface TextToolCall {
 - `POST /agent/runs/:id/confirm`：5 次/分钟/用户。
 - 单个用户同时最多 2 个 `planning` 或 `running` 运行。
 
+现有 `RateLimitGuard` 的计数存在**单进程内存**（`common/rate-limit.guard.ts`），P0 单实例可接受；多实例部署前必须换成共享计数器，否则每个实例各放行一份。
+
 ---
 
 ## 13. 失败与降级矩阵
@@ -801,10 +858,12 @@ interface TextToolCall {
 | 故障 | 用户看到 | 系统行为 |
 | --- | --- | --- |
 | 文本通道未配置 | 手动模式，不显示 5xx | `/agent/status` 返回不可用原因；不调用 LLM |
+| 能力无可用线路 / 无可用前台模型 | 目录中不出现，或计划卡说明原因 | 规划阶段过滤 `effective !== 'remote'`；不进入执行 |
 | 规划超时/失败 | 「暂时无法生成计划」+ 重试/手动入口 | 运行落 `failed`，不扣积分 |
 | 计划 JSON 非法 | 一次自动修复；仍失败则手动入口 | 校验器拒绝落库 |
-| 某步生成失败 | 步骤红色 + 错误码 + 重试 | 既有退款；运行 `partial` |
-| 余额不足 | 未执行步骤列表 + 充值入口 | 停止后续，不预扣未来步骤 |
+| 某步生成失败 | 步骤红色 + 错误码 + 重试 | 既有退款；同批其它任务不受影响；运行 `partial` |
+| 多任务步骤部分失败 | 展示成功张数与失败张数 | 失败任务各自退款，成功产出保留，步骤转 `partial` |
+| 余额不足 | 未执行步骤列表 + 充值入口 | 当前步整批回滚，停止后续，不预扣未来步骤 |
 | 进程重启 | 会话保留；运行显示可重试 | 恢复器只对齐状态，不重复执行 |
 | 前端断线 | 后台继续跑，重新进入可看快照 | SSE 断开不等于取消任务 |
 | 视频任务较长 | 持续心跳与步骤进度 | SSE 心跳保活，任务侧轮询等待 |
@@ -820,24 +879,28 @@ interface TextToolCall {
 | AG-01 | 「做一套主图+详情+SKU」 | 返回结构化计划，步骤引用合法能力 |
 | AG-02 | 缺少商品图 | 返回 clarify；不创建生成任务、不扣积分 |
 | AG-03 | 模型编造能力 id | 校验拒绝，不产生任务与扣费 |
-| AG-04 | 用户确认计划 | 每步创建 `GenerationTask`，产出进「我的作品」 |
+| AG-04 | 用户确认计划 | 每步创建 `GenerationTask`（多产出步骤为一批），产出进「我的作品」 |
 | AG-05 | 某步失败 | 该步退款，后续依赖步不执行，运行 `partial` |
-| AG-06 | 单步重试 | 只新建一次任务，已成功步骤不重复扣费 |
+| AG-06 | 单步重试 | 只重建失败任务，已成功任务与步骤不重复扣费 |
 | AG-07 | 重复点击确认/重复消息 ID | 不重复建任务、不重复扣费 |
 | AG-08 | 文本通道停用 | 手动模式可用，不 5xx、不白屏 |
 | AG-09 | 越权素材/项目 | 403/404，不泄露存在性 |
 | AG-10 | 前端断线后重进 | 快照状态与后台一致 |
 | AG-11 | 进程重启 | 不重复执行已完成步骤 |
 | AG-12 | 规划调用 | `ApiCallLog` 可按 `agentRunId` 查到模型、耗时、token |
-| AG-13 | 能力覆盖矩阵 | 遍历 `SUBMITTABLE_CAPABILITY_IDS`，每项都能生成可校验的最小计划或显式 handoff |
-| AG-14 | 局部重绘精确涂抹 | 返回 handoff，路由为 `/local-redraw`，不创建任务、不扣积分 |
-| AG-15 | 新增能力 | 只改 `definitions/` 后，目录覆盖测试与 Agent 可规划列表自动更新 |
+| AG-13 | 能力覆盖矩阵 | 遍历 `SUBMITTABLE_CAPABILITY_IDS`（当前 17 项），每项都能生成可校验的最小计划或显式 handoff |
+| AG-14 | 局部重绘精确涂抹 | 返回 handoff，前端 `toolPath()` 映射为 `/local-redraw`，不创建任务、不扣积分 |
+| AG-15 | 新增能力 | 只改 `definitions/` 后，能力目录自动更新；未配前台模型时该能力落到 `unavailable`，不进入规划 |
 | AG-16 | 双入口回归 | Agent 上线后现有 `/capabilities`、`/generate`、`/tasks`、`/works` 行为不变 |
+| AG-17 | 预估与实扣一致 | 计划卡 `estimateCredits` 与执行后账单合计一致（含分组倍率与多产出张数） |
+| AG-18 | 多产出步骤 | `detail_image` 勾 6 个模块 / `shoppable_carousel` 8 张：一步跟踪 6 / 8 个任务与账单，部分失败可单独退款 |
+| AG-19 | 无可用模型 | 能力存在但无可用前台模型 / 线路时，不进入 Agent 目录，提交不产生任务 |
+| AG-20 | hidden 参数 | 模型输出 `maskAssetId` 等 hidden key 时被 `PlanValidator` 拒绝，不进入建任务 |
 
 ### 14.2 测试层
 
-- 单元测试：`PlanValidator`、`CatalogService`、状态机与条件更新。
-- 覆盖测试：以 `SUBMITTABLE_CAPABILITY_IDS` 为输入逐个生成最小合法计划；任何能力只能在「可执行」或「可 handoff」中二选一，不允许从 Agent 视野消失。
+- 单元测试：`PlanValidator`、`CatalogService`（含前台模型选型）、`QuoteService` 预估算路、状态机与条件更新。
+- 覆盖测试：以 `SUBMITTABLE_CAPABILITY_IDS` 为输入逐个生成最小合法计划；任何能力只能在「可执行」或「可 handoff」中二选一，不允许从 Agent 视野消失；同时断言 `effective !== 'remote'` 的能力不出现。
 - 集成测试：假文本上游 + 假生成任务，覆盖规划、确认、失败、重试、恢复。
 - HTTP 冒烟：`smoke-agent.js`，验证鉴权、幂等、归属与响应形状。
 - 浏览器 E2E：登录 → 建会话 → 发消息 → 确认 → 看到步骤与产出 → 刷新恢复。
@@ -861,6 +924,7 @@ interface TextToolCall {
 | LLM 不直接调用工具 | 计划可审计、可校验；模型故障不会直接产生资损动作 |
 | P0 不做 token 流式 | 结构化 JSON 流式展示价值低；事件流已提供即时反馈 |
 | 不做积分预占 | 复用现有逐步扣费最稳；预占需要新的账本语义与失败回滚 |
+| LLM 不选前台模型 | 模型选择由服务端从 `CatalogService` 确定，避免模型编造不可用模型或跨分组模型；用户可在计划卡切换候选模型 |
 | 不做事件重放表 | 运行/步骤快照已能恢复 UI；避免多一张高速增长的表 |
 | 不自动恢复执行 | 避免进程重启后重复扣费或重复产出 |
 
@@ -872,4 +936,4 @@ interface TextToolCall {
 4. Agent 会话与运行记录的留存期是否沿用 90 天？
 5. 是否允许用户手动编辑计划中的参数后再确认（建议允许，但只开放非 hidden 参数）？
 
-在以上问题确认前，推荐按本文默认值推进：**P0 覆盖全部 16 项生成能力、Prompt 工具与查数保留现有入口、允许部分执行、会话绑定项目、留存 90 天、允许编辑非 hidden 参数**。
+在以上问题确认前，推荐按本文默认值推进：**P0 覆盖全部 17 项生成能力、Prompt 工具与查数保留现有入口、允许部分执行、会话绑定项目、留存 90 天、允许编辑非 hidden 参数与切换候选前台模型**。

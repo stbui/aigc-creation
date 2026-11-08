@@ -1,0 +1,544 @@
+/**
+ * BatchResultList 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件/页面共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ── 详情图「创作结果」批次行 (pages/product-detail/DetailResultList.tsx) ──────
+ * 一次生成 = 一行: 行头「日期 + 提示词」, 行内第一格是上传的原图
+ * (下方标商品名称), 之后每格是一张模块图 (下方标模块名称)。
+ * 图横排且可能多达 11 格 (原图 + 10 个模块), 溢出交给行内横向滚动,
+ * 页面本身不产生横向滚动条。 */
+
+.pd-result-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.pd-result-row {
+  flex: none;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+
+.pd-result-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.pd-result-date {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-body);
+}
+
+/* 提示词单行省略: 5000 字描述会把行头撑成半屏, 全文走 title 悬浮 */
+.pd-result-prompt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.pd-result-delete {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-desc);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.pd-result-delete:hover:not(:disabled) {
+  color: var(--danger-text);
+  background: var(--danger-soft-bg);
+}
+
+.pd-result-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── 商品详情卡片布局 ────────────────────────────────────────────────
+ * 第一行商品名 + 时间, 第二行任务参数 + 状态, 第三行原图 + 一键下载,
+ * 之后是五列生成图。信息按阅读顺序分层, 不再把参数挤在横向缩略图行头。 */
+.pd-result-card {
+  padding: 16px;
+}
+
+.pd-result-card-head {
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.pd-result-card-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pd-result-card-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.pd-result-card-title time {
+  flex: none;
+  color: var(--text-desc);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.pd-result-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.pd-result-meta-chip,
+.pd-result-status {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-body);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pd-result-meta-chip {
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-result-status.is-processing {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.pd-result-status.is-done {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+
+.pd-result-status.is-partial {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.pd-result-status.is-failed {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+
+.pd-result-card-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.pd-result-card-source-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pd-result-card-source-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pd-result-card-source-thumbs .pd-result-source-thumb {
+  flex: 0 0 52px;
+  width: 52px;
+  aspect-ratio: 1;
+  background: var(--card-bg);
+}
+
+.pd-result-card-source-empty {
+  flex: none;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+.pd-result-download-all {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pd-result-download-all:hover:not(:disabled) {
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
+}
+
+.pd-result-download-all:disabled {
+  border-color: var(--border);
+  background: var(--border);
+  color: var(--text-desc);
+  cursor: not-allowed;
+}
+
+.pd-result-card-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pd-result-card-grid .pd-result-cell {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+/* 模块名作为每张生成图的标题, 放在图片上方并提高层级 */
+.pd-result-card-grid .pd-result-label {
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.pd-result-card-grid .pd-result-thumb {
+  aspect-ratio: 3 / 4;
+}
+
+.pd-result-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+/* 列宽可伸缩: 默认 6 个模块 + 原图正好铺满一行; 选到 10 个模块时
+   每格收到 84px 后开始横向滚动, 而不是把图压成看不清的窄条 */
+.pd-result-cell {
+  flex: 1 1 84px;
+  min-width: 84px;
+  max-width: 124px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 缩略图统一 3:4: 原图与模块图同高, 标签才会落在同一基线上 */
+.pd-result-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.pd-result-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 生成图比例由用户选择，缩略图只能等比展示，不能为了铺满而裁切内容 */
+  object-fit: contain;
+}
+
+.pd-result-thumb:hover:not(:disabled) {
+  border-color: var(--brand-light);
+}
+
+.pd-result-thumb:disabled {
+  cursor: default;
+}
+
+/* 原图是参照物, 与产出区分: 稍深的描边 */
+.pd-result-cell-source .pd-result-thumb,
+.pd-result-cell-source .pd-result-source-thumb {
+  border-color: var(--border);
+}
+
+/*
+ * 多原图: 全部素材铺在同一格内, 但**不额外拉高整行** ——
+ * 早期做法是把这一格撑到 252px 宽 3 列, 结果后面的模块图被挤出可视区、
+ * 行高也被拉成两行。现在这一格定宽 132px (2 列方图, 每张 64px 可见),
+ * 2 行 = 132px 高, 与模块图 (84×112) 基本齐平, 行内仍然是一行。
+ */
+.pd-result-cell-source.is-multiple {
+  flex: 0 0 132px;
+  min-width: 132px;
+  max-width: 132px;
+}
+
+.pd-result-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pd-result-source-grid.is-single {
+  grid-template-columns: 1fr;
+}
+
+.pd-result-source-grid.is-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pd-result-source-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+/* 多原图用方图: 同宽下能排下更多张, 且总高度不超过模块图 */
+.pd-result-source-grid:not(.is-single) .pd-result-source-thumb {
+  aspect-ratio: 1;
+}
+
+.pd-result-source-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pd-result-source-thumb:hover {
+  border-color: var(--brand-light);
+}
+
+.pd-result-source-index {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text-strong) 72%, transparent);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 非图状态 (生成中 / 失败 / 原图缺失) 与图片同框同尺寸, 行内保持对齐 */
+.pd-result-thumb.is-pending,
+.pd-result-thumb.is-failed,
+.pd-result-thumb.is-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-desc);
+  cursor: default;
+}
+
+/* 非图状态没有「悬停变紫」, 否则会被读成可点 */
+.pd-result-thumb.is-pending:hover,
+.pd-result-thumb.is-failed:hover {
+  border-color: var(--border-soft);
+}
+
+.pd-result-thumb.is-pending {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.pd-result-thumb.is-failed {
+  padding: 12px;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--danger-soft-text) 18%, var(--border));
+  background:
+    radial-gradient(
+        circle,
+        color-mix(in srgb, var(--danger-soft-text) 6%, transparent) 1px,
+        transparent 1.2px
+      )
+      0 0 / 12px 12px,
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--danger-soft-bg) 52%, var(--card-bg)),
+      var(--surface-tint)
+    );
+}
+
+.pd-result-thumb.is-failed:hover {
+  border-color: color-mix(in srgb, var(--danger-soft-text) 22%, var(--border));
+}
+
+.pd-result-failure-label {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--danger-soft-text) 16%, var(--border-soft));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--danger-soft-bg) 78%, var(--card-bg));
+  color: var(--danger-soft-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.pd-result-thumb.is-empty {
+  border-style: dashed;
+}
+
+.pd-result-thumb-wrap {
+  position: relative;
+}
+
+/* 下载键叠在缩略图右下: 悬停才出现, 触屏常显 */
+.pd-result-download {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-control);
+  /* 深底取自 --text-strong 的透明度, 不写裸 rgba (与全站色值收拢一致) */
+  background: color-mix(in srgb, var(--text-strong) 72%, transparent);
+  color: var(--card-bg);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.pd-result-thumb-wrap:hover .pd-result-download,
+.pd-result-download:focus-visible {
+  opacity: 1;
+}
+
+.pd-result-label {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (hover: none) {
+  .pd-result-download {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* 窄屏右栏不再是满高列, 列表回到内容高度 */
+  .pd-result-list {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 640px) {
+  .pd-result-row {
+    padding: 10px 12px 12px;
+  }
+  .pd-result-card-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .pd-result-card-source {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .pd-result-card-source-main {
+    width: 100%;
+  }
+  .pd-result-download-all {
+    align-self: stretch;
+  }
+  .pd-result-card-grid {
+    gap: 8px;
+  }
+  /* 手机宽度再收一档, 两格半可见即可 */
+  .pd-result-cell {
+    min-width: 96px;
+    max-width: 108px;
+  }
+}
+
+/* 结果列表里的模板标签 */
+.pd-result-template {
+  flex: none;
+  font-size: 12px;
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-radius: var(--radius-tag);
+  padding: 1px 6px;
+}
