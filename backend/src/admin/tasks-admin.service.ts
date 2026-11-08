@@ -89,10 +89,21 @@ export class TasksAdminService {
         orderBy: page.orderBy,
         /*
          * owner/project 用于列表的「用户」「项目」两列; outputAsset 取缩略图。
-         * 三者都是必填外键或带唯一索引的 1:1, include 是单次 join 而非 N+1 ——
+         * 三者都是必填外键或带唯一索引的 1:1, select 是单次 join 而非 N+1 ——
          * 监控页默认 20 行, N+1 会打出 60 条查询, 列表明显变卡。
+         *
+         * 同时显式选列：任务行上的 `pendingResult` 可能保存整份上游产出
+         * （含内联 base64），列表用不到，不能随每页 20 行一起读出来。
          */
-        include: {
+        select: {
+          id: true,
+          capability: true,
+          status: true,
+          errorCode: true,
+          creditCost: true,
+          retriedFromId: true,
+          createdAt: true,
+          updatedAt: true,
           owner: { select: { id: true, email: true } },
           project: { select: { id: true, name: true } },
           outputAsset: { select: { sourceUrl: true } },
@@ -194,7 +205,14 @@ export class TasksAdminService {
       where: this.listWhere(query),
       orderBy: { createdAt: 'desc' },
       take: CSV_EXPORT_MAX_ROWS,
-      include: {
+      select: {
+        id: true,
+        capability: true,
+        status: true,
+        errorCode: true,
+        creditCost: true,
+        createdAt: true,
+        updatedAt: true,
         owner: { select: { email: true } },
         project: { select: { name: true } },
       },
@@ -250,10 +268,23 @@ export class TasksAdminService {
   async detail(id: string) {
     const task = await this.prisma.generationTask.findUnique({
       where: { id },
-      include: {
+      // 详情页用不到 pendingResult（可能存着整份上游产出），显式选列避免整行读取
+      select: {
+        id: true,
+        capability: true,
+        status: true,
+        errorCode: true,
+        creditCost: true,
+        retriedFromId: true,
+        createdAt: true,
+        updatedAt: true,
+        inputAssetIds: true,
+        params: true,
         owner: { select: { id: true, email: true } },
         project: { select: { id: true, name: true } },
-        outputAsset: true,
+        outputAsset: {
+          select: { id: true, sourceUrl: true, width: true, height: true, format: true, sizeBytes: true },
+        },
       },
     });
     if (!task) throw new AppError(40400, '任务不存在', 404);

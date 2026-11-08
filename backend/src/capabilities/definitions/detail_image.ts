@@ -141,7 +141,7 @@ export const DetailImage: CapabilityPlugin = {
   summary: '按模块逐张生成详情页版块图。',
   sidebarHint: '上传商品图，即可生成全套详情图',
   mode: 'real',
-  creditCost: 10, // 整次生成（N 张模块图）统一按价目表扣一次
+  creditCost: 10, // 单张模块图价格；一次提交按模块数各扣一份（见 outputPlan）
   params: [
     { key: 'productName', label: '商品名称', type: 'text', placeholder: '例如：夏季轻音桌面循环扇' },
     { key: 'brand', label: '品牌（选填）', type: 'text', placeholder: '请输入品牌（选填）' },

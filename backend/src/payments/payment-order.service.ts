@@ -765,7 +765,33 @@ export class PaymentOrderService {
     });
     if (!order) throw new AppError(40400, "订单不存在", 404);
 
-    if (order.status === "paid") return { applied: false, idempotentHit: true };
+    if (order.status === "paid") {
+      /*
+       * 只有**同一个渠道交易号**才是幂等重放。
+       *
+       * 已支付订单收到另一个交易号，说明渠道侧发生了第二笔成功扣款（旧链接
+       * 未关干净、用户重复支付等）。旧实现直接按幂等成功返回，第二笔钱既
+       * 不落 Payment 也不落异常单；若渠道不支持对账就完全不可见。
+       *
+       * 这里抛 409，让回调收件箱把差异落到 PaymentExceptionCase；真正的
+       * 同号重复回调仍走幂等，不会影响渠道重试。
+       */
+      const knownTradeNo = order.providerTradeNo ?? "";
+      if (input.tradeNo && knownTradeNo && input.tradeNo !== knownTradeNo) {
+        const samePayment = await this.prisma.payment.findUnique({
+          where: { payTransactionId: input.tradeNo },
+          select: { orderId: true },
+        });
+        if (samePayment?.orderId !== order.id) {
+          throw new AppError(
+            40901,
+            `订单已支付，渠道交易号 ${input.tradeNo} 与已入账交易号 ${knownTradeNo} 不一致`,
+            409,
+          );
+        }
+      }
+      return { applied: false, idempotentHit: true };
+    }
     if (order.status !== "pending") {
       throw new AppError(40901, `订单当前状态不可入账: ${order.status}`, 409);
     }

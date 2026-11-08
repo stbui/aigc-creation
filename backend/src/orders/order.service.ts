@@ -904,9 +904,16 @@ export class OrderService {
         }
 
         for (const item of autoGrantItems) {
+          /*
+           * 0 积分商品（免费发放 / 纯权益商品）没有可发的批次。
+           * `CreditService.grant` 对 ≤ 0 明确抛错，若不跳过，整笔支付事务会
+           * 回滚——订单永远停在 pending，渠道重试也无法入账。
+           */
+          const credits = item.creditsSnapshot * item.quantity;
+          if (credits <= 0) continue;
           await this.credit.grant({
             userId: params.userId,
-            credits: item.creditsSnapshot * item.quantity,
+            credits,
             source: 'purchase',
             validDays: item.validDaysSnapshot,
             orderId: order.id,

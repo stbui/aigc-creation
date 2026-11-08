@@ -143,8 +143,16 @@ export function ModelPicker({
     let alive = true;
     const timer = window.setTimeout(() => {
       setQuoteFailed(false);
+      /*
+       * 报价接口的 `capability` 是模型供应侧模态（image/video/text/audio），
+       * 不是产品能力 id（main_image / detail_image …）。直接传产品 id 会被
+       * 后端拒绝，报价永远回落到能力 registry 价。这里取所选模型的
+       * capabilitySpec.capability，报价与建单的模型语义一致。
+       */
+      const quoteModel = candidates.find((model) => model.id === selectedId);
+      const quoteCapability = quoteModel?.capabilitySpec?.capability || capability;
       modelsApi
-        .quote(selectedId, { capability, options })
+        .quote(selectedId, { capability: quoteCapability, options })
         .then((result) => {
           if (alive) {
             setQuote(result.quote);
@@ -167,9 +175,10 @@ export function ModelPicker({
       alive = false;
       window.clearTimeout(timer);
     };
-    // optionsKey 是 options 的稳定序列化，直接依赖对象会在每次渲染重发请求
+    // optionsKey 是 options 的稳定序列化，直接依赖对象会在每次渲染重发请求；
+    // candidates 变化（目录加载完成）时也必须重算报价。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, capability, optionsKey]);
+  }, [selectedId, capability, optionsKey, candidates]);
 
   const selected = candidates.find((model) => model.id === selectedId) ?? null;
 

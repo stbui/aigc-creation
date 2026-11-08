@@ -499,10 +499,6 @@ GET /api/v1/tasks/page?capability=detail_image&limit=100&offset=0
 
 `DetailExamplePanel` 当前文案仍使用“输出一张可上架的详情长图”，与实际 N 张模块图不符。页面文案应描述“生成一套模块详情图”。
 
-### 14.3 能力定义中的旧计费注释
-
-`detail_image.creditCost` 附近仍残留“整次生成统一按价目表扣一次”的旧注释。现行为是单张单价 × 模块数，以 `TaskAdmissionService` 和前端价签为准。
-
 ## 15. 变更检查清单
 
 修改详情图生成链路时至少检查：

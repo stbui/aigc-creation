@@ -260,14 +260,25 @@ export class MembershipService {
    *
    * @returns 当前并发数与上限; 超出时抛 400
    */
-  async checkConcurrency(userId: string): Promise<{ current: number; limit: number }> {
-    const { perks } = await this.resolve(userId);
+  async checkConcurrency(
+    userId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+    /**
+     * 调用方已解析的权益。
+     *
+     * 建任务链路会先取一次 `perksOf()`（要写进任务参数），紧接着又要校验并发；
+     * 不传时这里会再按同一用户查两遍会员/订单周期。传入即可复用同一次解析结果，
+     * 事务内的复核仍不传，保证看到的是锁内最新权益。
+     */
+    knownPerks?: Perks,
+  ): Promise<{ current: number; limit: number }> {
+    const perks = knownPerks ?? (await this.resolve(userId)).perks;
     if (perks.maxConcurrent <= 0) {
       // 不限 —— 仍返回当前数供 UI 展示
-      const current = await this.countActive(userId);
+      const current = await this.countActive(userId, db);
       return { current, limit: 0 };
     }
-    const current = await this.countActive(userId);
+    const current = await this.countActive(userId, db);
     if (current >= perks.maxConcurrent) {
       throw new AppError(
         40003,
@@ -278,8 +289,11 @@ export class MembershipService {
     return { current, limit: perks.maxConcurrent };
   }
 
-  private async countActive(userId: string): Promise<number> {
-    return this.prisma.generationTask.count({
+  private async countActive(
+    userId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<number> {
+    return db.generationTask.count({
       // ⚠ GenerationTask 用 ownerId 而非 userId (与 Asset 一致)。
       // 写成 userId 时 Prisma 报 `Unknown argument 'userId'` → 500, 而非 400。
       //

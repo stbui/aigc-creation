@@ -399,7 +399,14 @@ export class SystemProxyService {
       streamed,
     });
 
-    if (billingOrderId) await this.settleBilling(billingOrderId, statusCode, success, logged);
+    /*
+     * 本地读取失败已经转过 uncertain，不能在同一个请求里再按失败退款：
+     * 上游可能已经产生费用，退款会让平台白付一次调用。只有「上游明确返回
+     * 非 2xx」才进入 settleBilling 的退款分支。
+     */
+    if (billingOrderId && readError === '') {
+      await this.settleBilling(billingOrderId, statusCode, success, logged);
+    }
 
     if (readError !== '') {
       // SSE 响应头已经发出，只能中断连接；非流式仍能给结构化错误

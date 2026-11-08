@@ -115,6 +115,74 @@ describe('BillingService 多图融合部分交付结算', () => {
   });
 });
 
+describe('BillingService 限时免费结算', () => {
+  /**
+   * 准入只把金额置 0，单价快照保留。按秒 / Token 分支若不短路，
+   * 结算会按实际用量重新算出正数金额，把已承诺的免费生成变成收费。
+   */
+  it('按秒计费订单命中限时免费时不再按实际时长扣费', async () => {
+    const order = {
+      id: 'bill-free-video',
+      status: 'running',
+      billingMode: 'per_second',
+      capability: 'video',
+      promotionId: 'campaign-free-1',
+      amountMicrocredits: 0n,
+      reservedAmountMicrocredits: 0n,
+      actualAmountMicrocredits: 0n,
+      quantity: 6n,
+      unitPriceMicrocredits: 2_000_000n,
+      multiplierBasisPoints: 10_000n,
+      userId: 'user-1',
+      taskId: 'task-1',
+      model: 'video-model',
+      channelId: 'channel-1',
+      scene: 'image_to_video',
+      usageSource: '',
+      providerRequestId: null,
+      chargeLimitSet: false,
+      chargeLimitMicrocredits: 0n,
+      inputTokens: 0n,
+      outputTokens: 0n,
+      cachedTokens: 0n,
+    };
+    const settled = { ...order, status: 'settled' };
+    const tx = {
+      billingOrder: {
+        findUnique: vi.fn().mockResolvedValueOnce(order).mockResolvedValueOnce(settled),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
+    };
+    const wallet = {
+      settle: vi.fn().mockResolvedValue({}),
+      refund: vi.fn().mockResolvedValue({}),
+    };
+    const service = new BillingService(prisma as never, wallet as never);
+
+    await service.settle('bill-free-video', { audioDurationMs: 6_000 });
+
+    expect(wallet.settle).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        reservedMicrocredits: 0n,
+        actualMicrocredits: 0n,
+        note: '限时免费活动生效，按 0 积分结算',
+      }),
+    );
+    expect(tx.billingOrder.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actualAmountMicrocredits: 0n,
+          refundedAmountMicrocredits: 0n,
+        }),
+      }),
+    );
+  });
+});
+
 describe('BillingService 人工核对', () => {
   let tx: {
     billingOrder: {

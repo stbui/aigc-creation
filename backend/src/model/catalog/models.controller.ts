@@ -70,6 +70,8 @@ export class ModelsController {
   @Post(':id/quote')
   async quote(@Param('id') id: string, @Body() body: ModelIntentBodyDto, @Req() req: { user?: { id: string } }) {
     const access = await this.groups.accessForUser(req.user?.id);
-    return { quote: await this.quotes.quoteLogicalModel(access, id, toIntent(body)) };
+    return {
+      quote: await this.quotes.quoteLogicalModel(access, id, toIntent(body), req.user?.id),
+    };
   }
 }

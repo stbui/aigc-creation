@@ -1,3 +1,4 @@
+import { getToken } from './auth';
 import { API_ROOT, unwrapEnvelope } from './http';
 import { publicCapabilityRuntime, runtimeOf } from './constants';
 import type { Capability, CapabilityDef, CapabilityGroup } from '../types/api';
@@ -27,14 +28,30 @@ const CACHE_TTL_MS = 5_000;
 
 let cache: CapabilitiesData | null = null;
 let cachedAt = 0;
+let cacheKey = '';
 let inflight: Promise<CapabilitiesData> | null = null;
+let inflightKey = '';
+
+/** 能力价与限时免费活动可能按用户身份不同，缓存必须区分登录态。 */
+function identityKey(): string {
+  return getToken() ? 'member' : 'guest';
+}
 
 export async function loadCapabilities(force = false): Promise<CapabilitiesData> {
-  if (cache && !force && Date.now() - cachedAt < CACHE_TTL_MS) return cache;
-  if (inflight && !force) return inflight;
+  const key = identityKey();
+  if (cache && !force && key === cacheKey && Date.now() - cachedAt < CACHE_TTL_MS) return cache;
+  if (inflight && !force && key === inflightKey) return inflight;
 
-  inflight = (async () => {
-    const res = await fetch(`${API_ROOT}/capabilities`);
+  inflightKey = key;
+  const task = (async () => {
+    /*
+     * 必须带 token：后端 `/capabilities` 用可选身份判定「仅新用户限时免费」。
+     * 之前这里是裸 fetch，已登录老用户也会被当成匿名，看到 0 元价却按原价扣费。
+     */
+    const headers = new Headers();
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const res = await fetch(`${API_ROOT}/capabilities`, { headers });
     if (!res.ok) throw new Error(`能力清单加载失败（${res.status}）`);
     const data = unwrapEnvelope<CapabilitiesData>(await res.json());
     cache = {
@@ -44,13 +61,18 @@ export async function loadCapabilities(force = false): Promise<CapabilitiesData>
       ),
     };
     cachedAt = Date.now();
+    cacheKey = key;
     return cache;
   })();
 
+  inflight = task;
   try {
-    return await inflight;
+    return await task;
   } finally {
-    inflight = null;
+    if (inflight === task) {
+      inflight = null;
+      inflightKey = '';
+    }
   }
 }
 

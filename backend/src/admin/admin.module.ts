@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { OrdersModule } from '../orders/orders.module';
 import { CreditsModule } from '../credits/credits.module';
+import { PricingModule } from '../credits/pricing.module';
 import { MembershipModule } from '../membership/membership.module';
 import { AdminController } from './admin.controller';
 import { AdminUsersController } from './users.controller';
@@ -87,6 +88,7 @@ import { SchedulerService } from './scheduler.service';
     PrismaModule,
     StorageModule,
     CreditsModule,
+    PricingModule,
     OrdersModule,
     MembershipModule,
     MarketingCoreModule,

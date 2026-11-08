@@ -10,6 +10,7 @@ function createService(upsert = vi.fn()) {
   return new CapabilityAvailabilityService(
     prisma as never,
     {} as never,
+    { isBlocked: () => false } as never,
   );
 }
 

@@ -438,6 +438,51 @@ export class MarketingService {
     const coupon = await db.coupon.findUnique({ where: { code } });
     if (!coupon) throw new AppError(40400, `券码不存在: ${code}`, 404);
 
+    /*
+     * 三项占用统计互不依赖，并行取回；只在该券确实需要时发查询：
+     *   · totalCount > 0 → 待支付预占
+     *   · scope = new_user → 用户已支付订单数
+     *   · perUserLimit > 0 → 本人在该券上的占用
+     */
+    const [pendingReservations, paidOrderCount, usedCount] = await Promise.all([
+      coupon.totalCount > 0
+        ? db.order.count({ where: { couponId: coupon.id, status: 'pending' } })
+        : Promise.resolve(0),
+      coupon.scope === 'new_user'
+        ? db.order.count({
+            where: { userId: params.userId, status: { in: ['paid', 'partial_refunded', 'refunded'] } },
+          })
+        : Promise.resolve(0),
+      coupon.perUserLimit > 0
+        ? db.order.count({
+            where: {
+              userId: params.userId,
+              couponId: coupon.id,
+              status: { in: ['pending', 'paid', 'partial_refunded', 'refunded'] },
+            },
+          })
+        : Promise.resolve(0),
+    ]);
+
+    return this.applyCouponRules(coupon, params.items, {
+      pendingReservations,
+      paidOrderCount,
+      usedCount,
+    });
+  }
+
+  /**
+   * 券规则的纯判定部分（不查库）。
+   *
+   * 拆出来是为了让「试算可用券」先把候选券的占用情况批量查一次，再逐张复用
+   * 同一套规则；否则预览页会对每张候选券重新查券行 + 最多三项统计，
+   * 50 张候选就是约 200 次查询。规则只此一处实现，避免试算与下单判定漂移。
+   */
+  private applyCouponRules(
+    coupon: any,
+    items: Array<{ productId: string; priceCents: number; quantity: number }>,
+    counts: { pendingReservations: number; paidOrderCount: number; usedCount: number },
+  ): { discountCents: number; coupon: any; reason: string | null } {
     const now = new Date();
     const fail = (reason: string) => ({ discountCents: 0, coupon, reason });
 
@@ -451,15 +496,12 @@ export class MarketingService {
      * 订单又会把已核销数量重复计算。取消/超时后订单离开 pending，名额自动释放。
      */
     if (coupon.totalCount > 0) {
-      const pendingReservations = await db.order.count({
-        where: { couponId: coupon.id, status: 'pending' },
-      });
-      if (coupon.usedCount + pendingReservations >= coupon.totalCount) {
+      if (coupon.usedCount + counts.pendingReservations >= coupon.totalCount) {
         return fail('优惠券已被领完');
       }
     }
 
-    const subtotal = params.items.reduce((s, i) => s + i.priceCents * i.quantity, 0);
+    const subtotal = items.reduce((s, i) => s + i.priceCents * i.quantity, 0);
     if (coupon.thresholdCents > 0 && subtotal < coupon.thresholdCents) {
       return fail(`未达使用门槛 (需满 ${(coupon.thresholdCents / 100).toFixed(2)} 元)`);
     }
@@ -467,26 +509,16 @@ export class MarketingService {
     // 范围校验
     if (coupon.scope === 'product') {
       const allowed = this.parseJson<string[]>(coupon.productIds, []);
-      const hit = params.items.some((i) => allowed.includes(i.productId));
+      const hit = items.some((i) => allowed.includes(i.productId));
       if (!hit) return fail('订单商品不在优惠券适用范围内');
     }
     if (coupon.scope === 'new_user') {
-      const paidCount = await db.order.count({
-        where: { userId: params.userId, status: { in: ['paid', 'partial_refunded', 'refunded'] } },
-      });
-      if (paidCount > 0) return fail('该优惠券仅限未购买过的新用户使用');
+      if (counts.paidOrderCount > 0) return fail('该优惠券仅限未购买过的新用户使用');
     }
 
     // 每人限用同样把 pending 算作占用，否则同一用户可先挂多笔待支付单绕过限额。
     if (coupon.perUserLimit > 0) {
-      const used = await db.order.count({
-        where: {
-          userId: params.userId,
-          couponId: coupon.id,
-          status: { in: ['pending', 'paid', 'partial_refunded', 'refunded'] },
-        },
-      });
-      if (used >= coupon.perUserLimit) {
+      if (counts.usedCount >= coupon.perUserLimit) {
         return fail(`每人限用 ${coupon.perUserLimit} 张, 已用完`);
       }
     }
@@ -1151,18 +1183,48 @@ export class MarketingService {
           });
     const eligibleNewUser = await this.isNewUser(params.userId, db);
 
+    /*
+     * 自动匹配时，每个商品只允许「当前最优（最低成交价）」的那个活动参与。
+     *
+     * 原实现在循环里逐个调用 `findLimitedPriceCampaign`：每个活动都要重新查
+     * 商品、重查全部活动、再查一次新用户资格 —— N 个活动就是 3N 次查询，
+     * 而且发生在建单事务里，会拉长写锁持有时间。这里一次性算好：
+     * 先取在架商品，再按与 `findLimitedPriceCampaign` 相同的规则选最优活动。
+     */
+    let bestCampaignByProduct: Map<string, string> | null = null;
+    if (!explicit && productIds.length > 0) {
+      const activeProducts = await db.product.findMany({
+        where: { id: { in: [...new Set(productIds)] }, status: 'active' },
+        select: { id: true, priceCents: true },
+      });
+      const priceById = new Map(activeProducts.map((product) => [product.id, product.priceCents]));
+      bestCampaignByProduct = new Map();
+      const bestPriceByProduct = new Map<string, number>();
+      for (const c of rows) {
+        if (!this.audienceMatches(c.audience, eligibleNewUser)) continue;
+        const payload = this.parseJson<{ productId?: string; priceCents?: number }>(c.payload, {});
+        if (!payload.productId || !Number.isInteger(payload.priceCents)) continue;
+        const originalPrice = priceById.get(payload.productId);
+        // 商品已下架 / 不存在时活动不生效，不能把它拉回可购买状态
+        if (originalPrice === undefined) continue;
+        // 活动价高于原价时按原价计，不允许「名为优惠实为涨价」
+        const price = Math.min(payload.priceCents as number, originalPrice);
+        const previous = bestPriceByProduct.get(payload.productId);
+        if (previous === undefined || price < previous) {
+          bestPriceByProduct.set(payload.productId, price);
+          bestCampaignByProduct.set(payload.productId, c.id);
+        }
+      }
+    }
+
     for (const c of rows) {
       if (!this.audienceMatches(c.audience, eligibleNewUser)) continue;
       const payload = this.parseJson<{ productId?: string; priceCents?: number }>(c.payload, {});
       if (!payload.productId || !Number.isInteger(payload.priceCents)) continue;
       if (!productIds.includes(payload.productId)) continue;
 
-      // 自动匹配时二次校验商品仍在架且活动价不高于原价:
-      // build 时商品可能已下架, 或活动价被误配成高于原价(名为优惠实为涨价)
-      if (!explicit) {
-        const verified = await this.findLimitedPriceCampaign(payload.productId, db, params.userId);
-        if (!verified || verified.id !== c.id) continue;
-      }
+      // 自动匹配时只让该商品的最优活动参与，与逐活动回查的语义一致
+      if (bestCampaignByProduct && bestCampaignByProduct.get(payload.productId) !== c.id) continue;
 
       const matched = params.items.filter((i) => i.productId === payload.productId);
       const quantity = matched.reduce((s, i) => s + i.quantity, 0);
@@ -1277,18 +1339,58 @@ export class MarketingService {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+    if (candidates.length === 0) return [];
+
+    const ids = candidates.map((coupon) => coupon.id);
+    const needsNewUserCheck = candidates.some((coupon) => coupon.scope === 'new_user');
+    /*
+     * 占用情况批量取回：原先逐张调用 evaluateCoupon，每张都重新查券行，
+     * 再各查 pending 预占 / 新人资格 / 每人限额（最多约 200 次查询）。
+     * 这里按 couponId 一次分组统计，候选数量再多也只是固定几条 SQL。
+     */
+    const [pendingGroups, usedGroups, paidOrderCount] = await Promise.all([
+      this.prisma.order.groupBy({
+        by: ['couponId'],
+        where: { couponId: { in: ids }, status: 'pending' },
+        _count: { _all: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['couponId'],
+        where: {
+          couponId: { in: ids },
+          userId: params.userId,
+          status: { in: ['pending', 'paid', 'partial_refunded', 'refunded'] },
+        },
+        _count: { _all: true },
+      }),
+      needsNewUserCheck
+        ? this.prisma.order.count({
+            where: {
+              userId: params.userId,
+              status: { in: ['paid', 'partial_refunded', 'refunded'] },
+            },
+          })
+        : Promise.resolve(0),
+    ]);
+    const pendingByCoupon = new Map(pendingGroups.map((row) => [row.couponId, row._count._all]));
+    const usedByCoupon = new Map(usedGroups.map((row) => [row.couponId, row._count._all]));
 
     const usable: Array<{ id: string; code: string; name: string; discountCents: number; valueLabel: string; thresholdLabel: string }> = [];
     for (const c of candidates) {
-      const r = await this.evaluateCoupon({ userId: params.userId, code: c.code, items: params.items });
+      const r = this.applyCouponRules(c, params.items, {
+        pendingReservations: pendingByCoupon.get(c.id) ?? 0,
+        paidOrderCount,
+        usedCount: usedByCoupon.get(c.id) ?? 0,
+      });
       if (r.reason || r.discountCents <= 0) continue;
+      const view = this.toCouponView(c, now);
       usable.push({
         id: c.id,
         code: c.code,
         name: c.name,
         discountCents: r.discountCents,
-        valueLabel: this.toCouponView(c, now).valueLabel,
-        thresholdLabel: this.toCouponView(c, now).thresholdLabel,
+        valueLabel: view.valueLabel,
+        thresholdLabel: view.thresholdLabel,
       });
     }
     usable.sort((a, b) => b.discountCents - a.discountCents);

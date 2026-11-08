@@ -374,7 +374,12 @@ export class PaymentNotificationService {
       const err = e as AppError;
       const message = err?.message ?? String(e);
       if (err instanceof AppError && err.getStatus() === 409) {
-        // 金额/币种/状态不符：这是业务终态, 必须落差异并让渠道停止重试
+        // 金额/币种/交易号/状态不符：这是业务终态, 必须落差异并让渠道停止重试
+        const resultKind = message.includes('金额')
+          ? 'amount_mismatch'
+          : message.includes('交易号')
+            ? 'duplicate_charge'
+            : 'credit_failed';
         await this.recordException({
           providerId: row.providerId,
           orderId: order.id,
@@ -382,7 +387,7 @@ export class PaymentNotificationService {
           providerTradeNo: result.providerTradeNo,
           amountCents: result.amountCents,
           currency: result.currency,
-          result: message.includes('金额') ? 'amount_mismatch' : 'credit_failed',
+          result: resultKind,
           detail: message,
         });
         await this.markFailed(notificationId, message);

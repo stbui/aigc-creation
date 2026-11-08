@@ -803,7 +803,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       // submission_unknown，账单会先转 uncertain。这里拿到了明确拒绝，
       // 必须立即把该账单收敛为退款，不能等默认关闭的兜底清扫。
       await this.lifecycle.reconcileCancelledTask(task.id, 'generation_failed');
-      this.recordHealth(outcome.failureCode, attempt);
+      this.recordHealth(outcome.failureCode, attempt, outcome.retryAfterMs);
       const routes = await this.attempts.listRun(task.id, task.routeRun);
       return this.switchRoute(
         task,
@@ -975,8 +975,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private recordHealth(failureCode: string, attempt: RouteAttempt): void {
-    const retryAfter = failureCode === 'upstream_429' ? 30_000 : undefined;
+  private recordHealth(
+    failureCode: string,
+    attempt: RouteAttempt,
+    retryAfterMs?: number,
+  ): void {
+    const retryAfter = failureCode === 'upstream_429' ? retryAfterMs ?? 30_000 : undefined;
     this.health.recordFailure(
       failureCode,
       {
