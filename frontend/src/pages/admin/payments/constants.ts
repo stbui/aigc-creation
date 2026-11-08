@@ -1,6 +1,7 @@
 import type {
   PaymentCurrency,
   PaymentDisplayStatus,
+  PaymentExceptionStatus,
   PaymentProviderId,
   PaymentSaleStrategy,
 } from '../../../types/payment';
@@ -42,6 +43,34 @@ export const PAYMENT_ORDER_TIME_FIELD_OPTIONS = [
   { value: 'credited', label: '按入账时间' },
 ];
 
+/**
+ * 支付订单筛选草稿。
+ *
+ * 筛选条是「草稿 → 应用」两段式：输入期间只改草稿，点「查询」才写入查询
+ * 参数与地址栏。类型放常量层是为了让 `hooks.ts` 与筛选条共用同一份形状，
+ * 不必从组件反向取类型。
+ */
+export type PaymentOrderFilterValues = {
+  keyword: string;
+  status?: PaymentDisplayStatus;
+  providerId?: string;
+  timeField?: string;
+  from: string;
+  to: string;
+};
+
+export type PaymentOrderFilterKey = keyof PaymentOrderFilterValues;
+
+/** 重置后的空条件。 */
+export const EMPTY_PAYMENT_ORDER_FILTERS: PaymentOrderFilterValues = {
+  keyword: '',
+  status: undefined,
+  providerId: undefined,
+  timeField: undefined,
+  from: '',
+  to: '',
+};
+
 /** 支付方式（checkoutMode）→ 中文 */
 export const CHECKOUT_MODE_LABELS: Record<string, string> = {
   sandbox: '站内模拟',
@@ -79,14 +108,113 @@ export const ORDER_PROVIDERS = ORDER_PROVIDER_IDS.map((id) => ({
 }));
 
 /**
- * 对账页保留原有可对账渠道筛选。PayPal / Stripe / 易支付 / ZPay 当前不参与自动
- * 渠道账单下载，不把它们混进对账筛选，避免出现永远为空的选项。
+ * 对账深链允许的渠道 id。
+ *
+ * 页面上的渠道下拉取自 `GET /admin/payments/providers` 的实时能力（支持对账且
+ * 已配置），这份静态清单只用于校验 URL 里的 `?providerId=`，避免手改地址栏
+ * 注入任意字符串。PayPal / Stripe / 易支付 / ZPay 不参与自动渠道账单下载，
+ * 不放进白名单。
  */
 export const RECONCILIATION_PROVIDER_IDS: PaymentProviderId[] = ['sandbox', 'alipay', 'wechat'];
-export const RECONCILIATION_PROVIDERS = RECONCILIATION_PROVIDER_IDS.map((id) => ({
-  value: id,
-  label: PROVIDER_LABELS[id],
-}));
+
+/** 对账运行状态 → 展示文案 / 色调。 */
+export const RECONCILIATION_RUN_STATUS_META: Record<
+  'running' | 'completed' | 'failed',
+  { label: string; tone: 'success' | 'danger' | 'brand' }
+> = {
+  running: { label: '执行中', tone: 'brand' },
+  completed: { label: '已完成', tone: 'success' },
+  failed: { label: '失败', tone: 'danger' },
+};
+
+/** 对账运行筛选状态；从状态映射派生，避免文案维护两份。 */
+export const RECONCILIATION_RUN_STATUS_OPTIONS = Object.entries(
+  RECONCILIATION_RUN_STATUS_META,
+).map(([value, meta]) => ({ value, label: meta.label }));
+
+/**
+ * 对账页唯一一套查询条件：渠道 + 账单日 + 状态。
+ *
+ * 渠道与账单日同时是「执行对账」的入参 —— 页面上不再另起一套执行区，避免
+ * 同一屏出现两个渠道下拉、两个日期控件且口径可能不一致。
+ */
+export type ReconciliationFilterValues = {
+  providerId?: string;
+  status?: string;
+  /** 单日账单，空串表示不按账单日过滤（此时也不能执行对账） */
+  billDate: string;
+};
+
+export type ReconciliationFilterKey = keyof ReconciliationFilterValues;
+
+/** 重置后的空条件。 */
+export const EMPTY_RECONCILIATION_FILTERS: ReconciliationFilterValues = {
+  providerId: undefined,
+  status: undefined,
+  billDate: '',
+};
+
+/**
+ * 支付异常单的状态 / 差异类型 / 筛选条件。
+ *
+ * 异常队列是「真资金差异」的兜底入口，状态文案只在这里维护一份；页面与
+ * hook 都从这里取，筛选下拉、chips 与列表标签不会各写一份而漂移。
+ */
+export const PAYMENT_EXCEPTION_STATUS_META: Record<
+  PaymentExceptionStatus,
+  { label: string; tone: 'success' | 'danger' | 'warn' | 'brand' | 'muted' }
+> = {
+  open: { label: '待处理', tone: 'warn' },
+  auto_refund_pending: { label: '退款处理中', tone: 'brand' },
+  refunded: { label: '已退款', tone: 'success' },
+  manual_review: { label: '需人工核对', tone: 'danger' },
+  closed: { label: '已结案', tone: 'muted' },
+};
+
+export const PAYMENT_EXCEPTION_STATUS_OPTIONS = Object.entries(
+  PAYMENT_EXCEPTION_STATUS_META,
+).map(([value, meta]) => ({ value, label: meta.label }));
+
+/** 差异类型 → 中文；后端新增类型时前端自动回落原值，不阻塞展示。 */
+export const PAYMENT_EXCEPTION_KIND_LABELS: Record<string, string> = {
+  cancelled_but_paid: '已取消仍扣款',
+  refund_failed: '退款失败',
+  refund_processing: '退款异步处理中',
+  auto_reconcile_failed: '自动对账失败',
+  local_order_not_found: '本地订单缺失',
+  provider_record_missing: '渠道流水缺失',
+  amount_mismatch: '金额不一致',
+  trade_no_mismatch: '交易号不一致',
+  duplicate_charge: '疑似重复扣款',
+  credit_failed: '补发积分失败',
+};
+
+export const PAYMENT_EXCEPTION_PRIORITY_OPTIONS = [
+  { value: 'urgent', label: '紧急' },
+  { value: 'normal', label: '普通' },
+];
+
+export const PAYMENT_EXCEPTION_OVERDUE_OPTIONS = [
+  { value: 'true', label: '仅看逾期' },
+  { value: 'false', label: '全部 SLA' },
+];
+
+/** 异常单筛选草稿；`overdue` 保留下拉的字符串值，提交时才转布尔。 */
+export type PaymentExceptionFilterValues = {
+  status?: string;
+  providerId?: string;
+  priority?: string;
+  overdue?: string;
+};
+
+export type PaymentExceptionFilterKey = keyof PaymentExceptionFilterValues;
+
+export const EMPTY_PAYMENT_EXCEPTION_FILTERS: PaymentExceptionFilterValues = {
+  status: undefined,
+  providerId: undefined,
+  priority: undefined,
+  overdue: undefined,
+};
 
 /**
  * 订单状态 → 可执行动作。

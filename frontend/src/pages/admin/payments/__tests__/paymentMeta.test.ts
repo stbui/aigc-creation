@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   CHECKOUT_MODE_LABELS,
   ORDER_PROVIDER_IDS,
+  PAYMENT_EXCEPTION_STATUS_META,
+  PAYMENT_EXCEPTION_STATUS_OPTIONS,
   PAYMENT_STATUS_META,
   PROVIDER_LABELS,
   RECONCILIATION_PROVIDER_IDS,
+  RECONCILIATION_RUN_STATUS_META,
+  RECONCILIATION_RUN_STATUS_OPTIONS,
   paymentActions,
 } from '../constants';
 import {
@@ -13,6 +17,7 @@ import {
   moneyText,
   paymentProductPriceToCents,
   productSaleStatusOf,
+  providerLabel,
   strategyText,
 } from '../utils';
 import { EMPTY_PAYMENT_PRODUCT_DRAFT } from '../constants';
@@ -83,15 +88,46 @@ describe('标签映射', () => {
     expect(PROVIDER_LABELS.zpay).toBe('ZPay');
   });
 
-  it('订单筛选包含七渠道，对账筛选仍只保留可自动对账渠道', () => {
+  it('订单筛选包含七渠道，对账深链白名单仍只保留可自动对账渠道', () => {
     expect(ORDER_PROVIDER_IDS).toEqual(['sandbox', 'alipay', 'wechat', 'paypal', 'stripe', 'epay', 'zpay']);
     expect(RECONCILIATION_PROVIDER_IDS).toEqual(['sandbox', 'alipay', 'wechat']);
+  });
+
+  it('对账状态筛选项由状态映射派生，文案只维护一份', () => {
+    expect(RECONCILIATION_RUN_STATUS_OPTIONS).toEqual(
+      Object.entries(RECONCILIATION_RUN_STATUS_META).map(([value, meta]) => ({
+        value,
+        label: meta.label,
+      })),
+    );
   });
 
   it('三种支付方式都有文案', () => {
     expect(CHECKOUT_MODE_LABELS.sandbox).toBe('站内模拟');
     expect(CHECKOUT_MODE_LABELS.redirect).toBe('网站跳转');
     expect(CHECKOUT_MODE_LABELS.qrcode).toBe('扫码支付');
+  });
+
+  it('渠道短名缺失时原样返回，空值显示占位符', () => {
+    expect(providerLabel('alipay')).toBe('支付宝');
+    expect(providerLabel('unknown-provider')).toBe('unknown-provider');
+    expect(providerLabel(null)).toBe('—');
+  });
+
+  it('支付异常状态与筛选项只维护一份文案', () => {
+    expect(Object.keys(PAYMENT_EXCEPTION_STATUS_META)).toEqual([
+      'open',
+      'auto_refund_pending',
+      'refunded',
+      'manual_review',
+      'closed',
+    ]);
+    expect(PAYMENT_EXCEPTION_STATUS_OPTIONS).toEqual(
+      Object.entries(PAYMENT_EXCEPTION_STATUS_META).map(([value, meta]) => ({
+        value,
+        label: meta.label,
+      })),
+    );
   });
 });
 

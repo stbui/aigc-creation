@@ -101,11 +101,18 @@ export async function createCouponFixture(): Promise<CouponFixture> {
   return { id: coupon.id, code: coupon.code, name: coupon.name };
 }
 
-/** 券没有删除 API；测试结束后停用固定夹具，保留已核销历史引用。 */
+/** 清理固定夹具：无订单时直接删除；有历史引用时退回停用。 */
 export async function removeCouponFixture(): Promise<void> {
   const token = await login();
   const coupon = await findCoupon(token);
-  if (coupon?.status === 'on') {
-    await call('PATCH', `/admin/coupons/${coupon.id}/toggle`, token);
+  if (!coupon) return;
+
+  try {
+    await call('DELETE', `/admin/coupons/${coupon.id}`, token);
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 409) throw error;
+    if (coupon.status === 'on') {
+      await call('PATCH', `/admin/coupons/${coupon.id}/toggle`, token);
+    }
   }
 }

@@ -147,6 +147,7 @@ export class MarketingService {
         orderBy: { createdAt: 'desc' },
         skip,
         take: pageSize,
+        include: { _count: { select: { orders: true } } },
       }),
       this.prisma.coupon.count({ where }),
       // 汇总不受分页影响 —— 否则翻到第 2 页就看不到全站券总量
@@ -233,7 +234,10 @@ export class MarketingService {
   }
 
   async getCoupon(id: string) {
-    const c = await this.prisma.coupon.findUnique({ where: { id } });
+    const c = await this.prisma.coupon.findUnique({
+      where: { id },
+      include: { _count: { select: { orders: true } } },
+    });
     if (!c) throw new AppError(40400, '优惠券不存在', 404);
     const pending = await this.pendingReservationCounts([id]);
     return this.toCouponView(c, new Date(), pending.get(id) ?? 0);
@@ -303,18 +307,64 @@ export class MarketingService {
         validTo: new Date(merged.validTo),
         ...(dto.status ? { status: dto.status } : {}),
       },
+      include: { _count: { select: { orders: true } } },
     });
     const pending = await this.pendingReservationCounts([id]);
     return this.toCouponView(updated, new Date(), pending.get(id) ?? 0);
   }
 
-  /** 停用券 (不删除: 已核销订单仍需引用, 删除会让历史订单悬空) */
+  /**
+   * 删除券。
+   *
+   * 只有从未产生过订单的券可以物理删除。已有关联订单时必须保留券行，
+   * 否则历史订单的优惠来源会悬空，运营应改为停用。
+   */
+  async deleteCoupon(id: string) {
+    const existing = await this.prisma.coupon.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        _count: { select: { orders: true } },
+      },
+    });
+    if (!existing) throw new AppError(40400, '优惠券不存在', 404);
+
+    const orderCount = existing._count.orders;
+    if (orderCount > 0) {
+      throw new AppError(
+        40901,
+        `该优惠券已有 ${orderCount} 笔关联订单，不能删除；请改为停用`,
+        409,
+      );
+    }
+
+    try {
+      await this.prisma.coupon.delete({ where: { id } });
+    } catch (error) {
+      // 预检后仍可能有订单并发写入；统一转成 409，不把外键错误暴露成 500。
+      if ((error as { code?: string }).code === 'P2003') {
+        throw new AppError(
+          40901,
+          '该优惠券刚刚产生了关联订单，不能删除；请改为停用',
+          409,
+        );
+      }
+      throw error;
+    }
+
+    return { id, code: existing.code, name: existing.name };
+  }
+
+  /** 启停券。停用不影响已核销订单。 */
   async disableCoupon(id: string) {
     const existing = await this.prisma.coupon.findUnique({ where: { id } });
     if (!existing) throw new AppError(40400, '优惠券不存在', 404);
     const updated = await this.prisma.coupon.update({
       where: { id },
       data: { status: existing.status === 'on' ? 'off' : 'on' },
+      include: { _count: { select: { orders: true } } },
     });
     const pending = await this.pendingReservationCounts([id]);
     return this.toCouponView(updated, new Date(), pending.get(id) ?? 0);
@@ -540,6 +590,7 @@ export class MarketingService {
       totalCount: c.totalCount,
       usedCount: c.usedCount,
       pendingReserved,
+      orderCount: c._count?.orders ?? 0,
       remaining: c.totalCount > 0 ? Math.max(0, c.totalCount - occupied) : null,
       perUserLimit: c.perUserLimit,
       validFrom: c.validFrom,
@@ -594,6 +645,7 @@ export class MarketingService {
         orderBy: { createdAt: 'desc' },
         skip,
         take: pageSize,
+        include: { _count: { select: { orders: true } } },
       }),
       this.prisma.campaign.count({ where }),
       // 进行中数量单独算: 它取决于**当前时间**而非 status 字段, 列表页要如实反映
@@ -714,6 +766,50 @@ export class MarketingService {
       data: { status: existing.status === 'off' ? 'active' : 'off' },
     });
     return this.toCampaignView(updated, new Date());
+  }
+
+  /**
+   * 删除活动。
+   *
+   * `Order.campaignId` 是 RESTRICT 外键：已经有订单使用过该活动的优惠时，
+   * 物理删除会让历史订单无法追溯优惠来源，因此只允许删除从未产生订单的活动。
+   * 有关联订单时给出可执行提示——改为下线，保住历史对账链路。
+   */
+  async deleteCampaign(id: string) {
+    const existing = await this.prisma.campaign.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        _count: { select: { orders: true } },
+      },
+    });
+    if (!existing) throw new AppError(40400, '活动不存在', 404);
+
+    const orderCount = existing._count.orders;
+    if (orderCount > 0) {
+      throw new AppError(
+        40901,
+        `该活动已有 ${orderCount} 笔关联订单，不能删除；请改为下线`,
+        409,
+      );
+    }
+
+    try {
+      await this.prisma.campaign.delete({ where: { id } });
+    } catch (error) {
+      // 预检后仍可能有订单并发写入；统一转成 409，不把外键错误暴露成 500。
+      if ((error as { code?: string }).code === 'P2003') {
+        throw new AppError(
+          40901,
+          '该活动刚刚产生了关联订单，不能删除；请改为下线',
+          409,
+        );
+      }
+      throw error;
+    }
+
+    return { id, name: existing.name };
   }
 
   private validateCampaign(dto: any) {
@@ -989,6 +1085,7 @@ export class MarketingService {
       statusLabel: CAMPAIGN_STATUS_LABELS[c.status as CampaignStatus] ?? c.status,
       effective,
       audience: this.parseJson<Record<string, unknown>>(c.audience, {}),
+      orderCount: c._count?.orders ?? 0,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
     };

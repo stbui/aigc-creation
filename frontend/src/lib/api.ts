@@ -1337,12 +1337,7 @@ export const adminStorageApi = {
     ),
 };
 
-/**
- * 营销中心 (admin-prd.md §3.12 B-64~B67 / M11)。
- *
- * 券不提供删除端点 —— 已核销订单仍引用该券, 删了历史订单悬空。
- * 只能通过 toggle 停用。
- */
+/** 营销中心 (admin-prd.md §3.12 B-64~B67 / M11)；历史订单/会员数据一律保留。 */
 export const marketingApi = {
   // ── 优惠券 (B-64) ──────────────────────────────────────────────
   coupons: (params: Record<string, string | number | undefined> = {}) => {
@@ -1371,8 +1366,9 @@ export const marketingApi = {
     }),
 
   /** 启停切换。停用不影响已核销订单 */
-  toggleCoupon: (id: string) =>
-    request<AdminCoupon>(`/admin/coupons/${id}/toggle`, { method: "PATCH" }),
+  toggleCoupon: (id: string) => request<AdminCoupon>(`/admin/coupons/${id}/toggle`, { method: "PATCH" }),
+
+  removeCoupon: (id: string) => request<{ id: string; code: string; name: string }>(`/admin/coupons/${id}`, { method: "DELETE" }),
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
   exportCoupons: (
@@ -1410,6 +1406,8 @@ export const marketingApi = {
     request<AdminCampaign>(`/admin/campaigns/${id}/toggle`, {
       method: "PATCH",
     }),
+
+  removeCampaign: (id: string) => request<{ id: string; name: string }>(`/admin/campaigns/${id}`, { method: "DELETE" }),
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
   exportCampaigns: (
@@ -1657,6 +1655,8 @@ export const adminMembershipPlansApi = {
       method: "PATCH",
       body: { status },
     }),
+
+  remove: (id: string) => request<{ id: string; code: string; name: string }>(`/admin/membership-plans/${id}`, { method: "DELETE" }),
 };
 
 /** 订单管理 (B-39~B-44) */

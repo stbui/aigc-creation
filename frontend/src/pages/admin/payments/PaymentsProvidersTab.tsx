@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { adminPaymentProvidersApi } from './api';
 import {
   ActionButton,
@@ -10,11 +10,19 @@ import {
   NumberField,
   SelectField,
   SkeletonCards,
+  StaleError,
   SwitchField,
   TextAreaField,
   TextField,
 } from '~/admin-ui/primitives';
-import { useAdmin, useAdminResource, useToast } from './hooks';
+import {
+  useAdmin,
+  useAdminResource,
+  useDiscardConfirm,
+  useRefreshOnNonce,
+  useToast,
+  useUnsavedGuard,
+} from './hooks';
 import type {
   AdminPaymentProviderView,
   PaymentConfigField,
@@ -61,14 +69,19 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
     adminPaymentProvidersApi.list(),
   );
 
-  // 刷新按钮只重取数据，不重置筛选（本标签无筛选，但保持与其它标签一致的口径）
-  useEffect(() => {
-    if (refreshNonce > 0) void reload();
-  }, [refreshNonce, reload]);
+  // 刷新按钮只重取数据，不重置筛选（本标签无筛选）
+  useRefreshOnNonce(refreshNonce, reload);
 
   const [editing, setEditing] = useState<AdminPaymentProviderView | null>(null);
   const [draft, setDraft] = useState<ConfigDraft | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // 密字段留空 = 沿用旧值；任何改动在关闭抽屉前都要确认，避免白填一遍密钥
+  const dirty = useMemo(() => {
+    if (!editing || !draft) return false;
+    return JSON.stringify(draft) !== JSON.stringify(toDraft(editing));
+  }, [draft, editing]);
+  useUnsavedGuard(dirty && !saving);
 
   const openConfig = useCallback((provider: AdminPaymentProviderView) => {
     setEditing(provider);
@@ -80,6 +93,8 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
     setEditing(null);
     setDraft(null);
   }, [saving]);
+
+  const requestCloseConfig = useDiscardConfirm(dirty && !saving, closeConfig);
 
   const providers = data?.items ?? [];
 
@@ -94,13 +109,13 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
-  if (!data) return <EmptyState title="没有发现支付渠道" />;
-  if (providers.length === 0) return <EmptyState title="没有发现支付渠道" />;
+  if (!data || providers.length === 0) return <EmptyState title="没有发现支付渠道" />;
 
   const allWarnings = providers.flatMap((p) => p.warnings);
 
   return (
     <div className="flex flex-col gap-3">
+      {error && <StaleError error={error} onRetry={() => void reload()} />}
       {allWarnings.length > 0 && (
         <Notice tone={allWarnings.some((w) => w.level === 'danger') ? 'danger' : 'warn'} title="支付渠道风险提示">
           <ul className="flex list-disc flex-col gap-1 pl-4">
@@ -132,7 +147,7 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
           writable={writable}
           saving={saving}
           onDraftChange={setDraft}
-          onClose={closeConfig}
+          onClose={requestCloseConfig}
           onSubmit={async () => {
             setSaving(true);
             try {

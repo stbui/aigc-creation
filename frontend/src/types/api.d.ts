@@ -1336,7 +1336,7 @@ export interface AdminCoupon {
   productIds: string[];
   /** 0 = 不限量 */ totalCount: number;
   usedCount: number;
-  /** 已创建待支付订单、尚未核销的预占数量 */ pendingReserved: number;
+  /** 待支付预占数量与关联订单总数 */ pendingReserved: number; orderCount: number;
   /** 0 = 不限 */ perUserLimit: number;
   validFrom: string;
   validTo: string;
@@ -1404,7 +1404,7 @@ export interface AdminCampaign {
    * 以为活动已在跑而实际没有曝光。
    */
   effective: "draft" | "live" | "scheduled" | "ended" | "off";
-  audience: { onlyNewUsers?: boolean };
+  audience: { onlyNewUsers?: boolean }; orderCount: number;
   createdAt: string;
   updatedAt: string;
 }

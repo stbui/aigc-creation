@@ -17,7 +17,7 @@
 当页面长到需要拆分时，按本约定落位。参考实现见
 [`frontend/src/pages/admin/channels/`](../frontend/src/pages/admin/channels/)、
 [`frontend/src/pages/admin/payments/`](../frontend/src/pages/admin/payments/)（后台；
-后者是**多标签页**形态：`page.tsx` 只做标签切换与 URL 同步，四个标签各自
+后者是**多标签页**形态：`page.tsx` 只做标签切换与 URL 同步，每个标签各自
 一个 `<业务组件>.tsx`，状态文案与动作判定放在 `constants.ts`，金额/积分等
 展示函数放在 `utils.ts`）
 与 [`frontend/src/pages/product-detail/`](../frontend/src/pages/product-detail/)、

@@ -7,6 +7,7 @@ import {
   ListError,
   Notice,
   SelectField,
+  StaleError,
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
@@ -113,6 +114,7 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
           </ActionButton>
         </div>
 
+        {error && data && <StaleError error={error} onRetry={() => void reload()} />}
         {error && !data ? (
           <ListError error={error} onRetry={() => void reload()} />
         ) : (

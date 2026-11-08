@@ -3,6 +3,7 @@ import {
   ActionButton,
   AdminDataTable,
   Meter,
+  RowMenu,
   StatusTag,
   formatDate,
   type AdminColumn,
@@ -34,6 +35,7 @@ export function CouponTable({
   busy,
   onEdit,
   onToggle,
+  onDelete,
   onPageChange,
   onRetry,
   onResetFilters,
@@ -50,6 +52,7 @@ export function CouponTable({
   busy: boolean;
   onEdit: (row: AdminCoupon) => void;
   onToggle: (row: AdminCoupon) => void;
+  onDelete: (row: AdminCoupon) => void;
   onPageChange: (page: number, size?: number) => void;
   onRetry: () => void;
   onResetFilters: () => void;
@@ -153,7 +156,7 @@ export function CouponTable({
     {
       key: 'ops',
       title: '操作',
-      width: 120,
+      width: 160,
       fixed: 'right',
       render: (row) =>
         writable ? (
@@ -171,6 +174,17 @@ export function CouponTable({
             >
               {row.status === 'on' ? '停用' : '启用'}
             </ActionButton>
+            <RowMenu
+              label={`${row.name} 更多操作`}
+              items={[
+                {
+                  key: 'delete',
+                  label: '删除',
+                  danger: true,
+                  onSelect: () => onDelete(row),
+                },
+              ]}
+            />
           </div>
         ) : null,
     },

@@ -27,6 +27,7 @@ interface PlanCardGridProps {
   onCreate: () => void;
   onEdit: (row: AdminMembershipPlan) => void;
   onToggle: (row: AdminMembershipPlan) => void;
+  onDelete: (row: AdminMembershipPlan) => void;
 }
 
 /** 会员套餐卡片列表：一张卡片对应一个套餐，保留列表的加载与空态。 */
@@ -40,6 +41,7 @@ export function PlanCardGrid({
   onCreate,
   onEdit,
   onToggle,
+  onDelete,
 }: PlanCardGridProps) {
   if (loading && rows.length === 0) {
     return (
@@ -87,6 +89,7 @@ export function PlanCardGrid({
           saving={saving}
           onEdit={() => onEdit(row)}
           onToggle={() => onToggle(row)}
+          onDelete={() => onDelete(row)}
         />
       ))}
     </div>
@@ -105,12 +108,14 @@ function PlanCard({
   saving,
   onEdit,
   onToggle,
+  onDelete,
 }: {
   row: AdminMembershipPlan;
   writable: boolean;
   saving: boolean;
   onEdit: () => void;
   onToggle: () => void;
+  onDelete: () => void;
 }) {
   const active = row.status === 'active';
   const builtIn = row.code === 'free';
@@ -338,22 +343,33 @@ function PlanCard({
             {builtIn ? (
               <span
                 className="px-2 text-[12px] text-muted-foreground"
-                title="该套餐由系统内置，不能下架"
+                title="该套餐由系统内置，不能下架或删除"
               >
                 内置
               </span>
             ) : (
-              <ActionButton
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  active && 'text-danger-text hover:text-danger-text',
-                )}
-                disabled={saving}
-                onClick={onToggle}
-              >
-                {active ? '下架' : '上架'}
-              </ActionButton>
+              <>
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    active && 'text-danger-text hover:text-danger-text',
+                  )}
+                  disabled={saving}
+                  onClick={onToggle}
+                >
+                  {active ? '下架' : '上架'}
+                </ActionButton>
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  className="text-danger-text hover:text-danger-text"
+                  disabled={saving}
+                  onClick={onDelete}
+                >
+                  删除
+                </ActionButton>
+              </>
             )}
           </CardFooter>
         </>

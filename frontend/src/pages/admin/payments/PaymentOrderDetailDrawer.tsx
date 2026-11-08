@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActionButton,
   RefreshButton,
@@ -7,13 +7,15 @@ import {
   Drawer,
   ListError,
   Notice,
+  StaleError,
   StatusTag,
   formatShanghaiDateTime,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { adminPaymentOrdersApi } from './api';
-import { CHECKOUT_MODE_LABELS, PAYMENT_STATUS_META, PROVIDER_LABELS } from './constants';
-import { moneyText } from './utils';
+import { CHECKOUT_MODE_LABELS, PAYMENT_STATUS_META } from './constants';
+import { moneyText, providerLabel } from './utils';
+import { useAdminResource } from './hooks';
 import type { AdminPaymentOrderDetail } from '../../../types/payment';
 
 type PaymentItem = AdminPaymentOrderDetail['items'][number];
@@ -54,7 +56,7 @@ function paymentAttemptColumns(currency: string): Array<AdminColumn<PaymentAttem
     {
       key: 'provider',
       title: '渠道',
-      render: (payment) => PROVIDER_LABELS[payment.providerId as keyof typeof PROVIDER_LABELS] ?? payment.providerId,
+      render: (payment) => providerLabel(payment.providerId),
     },
     {
       key: 'providerRef',
@@ -94,34 +96,12 @@ export function PaymentOrderDetailDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const [data, setData] = useState<AdminPaymentOrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    adminPaymentOrdersApi
-      .detail(orderId)
-      .then((result) => {
-        if (cancelled) return;
-        setData(result.order);
-        setError(null);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : '加载失败');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [orderId, reloadKey]);
-
-  const order = data;
+  const { data: order, loading, error, reload } = useAdminResource(
+    () => adminPaymentOrdersApi.detail(orderId).then((result) => result.order),
+    [orderId, reloadKey],
+  );
 
   return (
     <Drawer
@@ -144,6 +124,7 @@ export function PaymentOrderDetailDrawer({
         <ListError error={error} onRetry={() => setReloadKey((k) => k + 1)} />
       ) : order ? (
         <div className="flex flex-col gap-4">
+          {error && <StaleError error={error} onRetry={() => void reload()} />}
           {order.lastError && (
             <Notice tone="danger" title="失败原因">
               {order.lastError}
@@ -163,7 +144,7 @@ export function PaymentOrderDetailDrawer({
               { label: '商品', value: order.productName },
               {
                 label: '支付渠道',
-                value: `${PROVIDER_LABELS[order.providerId as keyof typeof PROVIDER_LABELS] ?? order.providerId}（${CHECKOUT_MODE_LABELS[order.checkout.mode ?? ''] ?? order.checkout.mode ?? '—'}）`,
+                value: `${providerLabel(order.providerId)}（${CHECKOUT_MODE_LABELS[order.checkout.mode ?? ''] ?? order.checkout.mode ?? '—'}）`,
               },
               {
                 label: '金额',

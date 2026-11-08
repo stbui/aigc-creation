@@ -11,7 +11,7 @@ import {
  * 营销中心 E2E (admin-prd.md §3.12 B-64~B-67 / M11)。
  *
  * 守住三条约束:
- *   1. 券不提供删除 —— 已核销订单仍引用它
+ *   1. 券仅在没有订单时可删除 —— 有历史订单只能停用
  *   2. 编辑时券码不可改 —— 改了等于让用户手里的券集体失效
  *   3. 无 marketing.write 权限时只读 (财务角色看不到写入口)
  *
@@ -135,15 +135,16 @@ test.describe('营销中心', () => {
     await expect(panel.getByLabel('面额')).toBeVisible();
   });
 
-  test('券列表无删除入口 (已核销订单仍引用)', async ({ page }) => {
+  test('券列表提供删除入口，由后端按订单引用校验', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/coupons`);
     const couponRow = page.getByTestId('admin-table-row').filter({ hasText: couponFixture!.code });
     await expect(couponRow).toBeVisible({ timeout: 20000 });
 
-    // 操作列只有「编辑」和「停用/启用」
-    const actions = await couponRow.locator('td:last-child button').allTextContents();
-    expect(actions.join(',')).not.toContain('删除');
+    await couponRow.getByRole('button', { name: `${couponFixture!.name} 更多操作` }).click();
+    await expect(
+      page.getByRole('menu', { name: '更多操作' }).getByRole('menuitem', { name: '删除' }),
+    ).toBeVisible();
   });
 
   test('限时活动页渲染', async ({ page }) => {

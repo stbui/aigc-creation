@@ -20,6 +20,7 @@ import {
 import { EMPTY_DRAFT, type PlanDraft } from './constants';
 import { buildPlanPayload, toDraft } from './utils';
 import { PlanCardGrid } from './PlanCardGrid';
+import { PlanDeleteConfirm } from './PlanDeleteConfirm';
 import { PlanFormDrawer } from './PlanFormDrawer';
 import { PlanStatusConfirm } from './PlanStatusConfirm';
 import type { AdminMembershipPlan } from '../../../types/api';
@@ -29,10 +30,11 @@ import type { AdminMembershipPlan } from '../../../types/api';
  *
  * 会员套餐与积分包是两套商品：会员按周期生效、带权益快照，积分包一次性发放。
  *
- * 三条约束：
+ * 四条约束：
  * 1. 套餐编码创建后不可改（订单与外部对账靠它认套餐）；
  * 2. 下架不影响存量会员，已付周期的权益仍按 `Membership.perksSnapshot` 执行；
  * 3. 改价/改权益/上下架都必须写原因，审计要能回答「谁为什么改」。
+ * 4. 只有无会员、无订单且非 free 的套餐可以删除，其余只能下架。
  *
  * ## 模块划分
  *
@@ -55,6 +57,9 @@ export function AdminMembershipPlansPage() {
   const [saving, setSaving] = useState(false);
 
   const [statusTarget, setStatusTarget] = useState<AdminMembershipPlan | null>(
+    null,
+  );
+  const [deleteTarget, setDeleteTarget] = useState<AdminMembershipPlan | null>(
     null,
   );
 
@@ -135,6 +140,37 @@ export function AdminMembershipPlansPage() {
     }
   };
 
+  /** 有会员或订单的套餐承载历史权益，只允许下架；先在前端给出可执行提示。 */
+  const requestDelete = (plan: AdminMembershipPlan) => {
+    if (plan.code === 'free') {
+      toast.error('free 套餐由系统内置，不能删除');
+      return;
+    }
+    const usage: string[] = [];
+    if (plan.memberCount > 0) usage.push(`${plan.memberCount} 名会员`);
+    if (plan.orderCount > 0) usage.push(`${plan.orderCount} 笔订单`);
+    if (usage.length > 0) {
+      toast.error(`该套餐已有 ${usage.join('、')}，不能删除；请改为下架`);
+      return;
+    }
+    setDeleteTarget(plan);
+  };
+
+  const runDelete = async () => {
+    if (!deleteTarget) return;
+    setSaving(true);
+    try {
+      await adminMembershipPlansApi.remove(deleteTarget.id);
+      toast.success(`已删除会员套餐「${deleteTarget.name}」`);
+      setDeleteTarget(null);
+      void reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '删除失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   /*
    * 页头照常渲染：加载期间标题与说明就该在位。
    * 骨架与真实版面同构：四列套餐卡。
@@ -202,6 +238,7 @@ export function AdminMembershipPlansPage() {
           onCreate={openCreate}
           onEdit={openEdit}
           onToggle={setStatusTarget}
+          onDelete={requestDelete}
         />
       </section>
 
@@ -221,6 +258,13 @@ export function AdminMembershipPlansPage() {
         saving={saving}
         onCancel={() => setStatusTarget(null)}
         onConfirm={() => void runToggle()}
+      />
+
+      <PlanDeleteConfirm
+        target={deleteTarget}
+        saving={saving}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void runDelete()}
       />
     </>
   );

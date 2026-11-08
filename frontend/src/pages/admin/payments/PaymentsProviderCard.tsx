@@ -14,44 +14,31 @@ import type { AdminPaymentProviderView } from '../../../types/payment';
 import { CHECKOUT_MODE_LABELS } from './constants';
 
 /** 渠道图标：内联小方块，避免拉外链图片（后台不该有第三方资源依赖） */
+const PROVIDER_ACCENTS: Record<string, string> = {
+  alipay: 'bg-brand/10 text-brand',
+  wechat: 'bg-success-soft text-success-text',
+  epay: 'bg-warn-soft text-warn-text',
+};
+
+const PROVIDER_GLYPHS: Record<string, string> = {
+  alipay: '支',
+  wechat: '微',
+  paypal: 'P',
+  stripe: 'S',
+  epay: '易',
+  zpay: 'Z',
+};
+
 function ProviderIcon({ icon }: { icon: string }) {
   // 品牌图标色用语义 token，不写裸 hex —— 支付宝/微信的品牌色也不进全站令牌表
-  const tone =
-    icon === 'alipay'
-      ? 'bg-brand/10 text-brand'
-      : icon === 'wechat'
-        ? 'bg-success-soft text-success-text'
-        : icon === 'paypal'
-          ? 'bg-brand/10 text-brand'
-          : icon === 'stripe'
-            ? 'bg-brand/10 text-brand'
-            : icon === 'epay'
-              ? 'bg-warn-soft text-warn-text'
-              : icon === 'zpay'
-                ? 'bg-brand/10 text-brand'
-                : 'bg-muted text-muted-foreground';
-
-  const glyph =
-    icon === 'alipay'
-      ? '支'
-      : icon === 'wechat'
-        ? '微'
-        : icon === 'paypal'
-          ? 'P'
-          : icon === 'stripe'
-            ? 'S'
-            : icon === 'epay'
-              ? '易'
-              : icon === 'zpay'
-                ? 'Z'
-                : '沙';
-
   return (
     <span
       aria-hidden
-      className={`inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${tone}`}
+      className={`inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${
+        PROVIDER_ACCENTS[icon] ?? 'bg-muted text-muted-foreground'
+      }`}
     >
-      {glyph}
+      {PROVIDER_GLYPHS[icon] ?? '沙'}
     </span>
   );
 }

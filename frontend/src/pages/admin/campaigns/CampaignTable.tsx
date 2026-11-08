@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import {
   ActionButton,
   AdminDataTable,
+  RowMenu,
   StatusTag,
   ToneBadge,
   formatDate,
@@ -20,6 +21,7 @@ interface CampaignTableProps {
   busy: boolean;
   onEdit: (row: AdminCampaign) => void;
   onToggle: (row: AdminCampaign) => void;
+  onDelete: (row: AdminCampaign) => void;
   pagination: {
     current: number;
     pageSize: number;
@@ -41,6 +43,7 @@ export function CampaignTable({
   busy,
   onEdit,
   onToggle,
+  onDelete,
   pagination,
   emptyText,
   emptyAction,
@@ -103,7 +106,7 @@ export function CampaignTable({
       {
         key: 'ops',
         title: '操作',
-        width: 120,
+        width: 160,
         fixed: 'right',
         render: (row) =>
           writable ? (
@@ -115,11 +118,22 @@ export function CampaignTable({
               <ActionButton variant="ghost" size="sm" disabled={busy} onClick={() => onToggle(row)}>
                 {row.status === 'off' ? '上线' : '下线'}
               </ActionButton>
+              <RowMenu
+                label={`${row.name} 更多操作`}
+                items={[
+                  {
+                    key: 'delete',
+                    label: '删除',
+                    danger: true,
+                    onSelect: () => onDelete(row),
+                  },
+                ]}
+              />
             </div>
           ) : null,
       },
     ],
-    [writable, busy, onEdit, onToggle],
+    [writable, busy, onEdit, onToggle, onDelete],
   );
 
   return (

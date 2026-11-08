@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
 import {
   ActionButton,
+  ConfirmDialog,
   ExportCsvButton,
   useAdminExport,
   PageHeader,
@@ -51,6 +52,7 @@ export function AdminCampaignsPage() {
   const [busy, setBusy] = useState(false);
   const { exporting, runExport } = useAdminExport(toast);
   const [editing, setEditing] = useState<AdminCampaign | null>(null);
+  const [deleting, setDeleting] = useState<AdminCampaign | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [formBase, setFormBase] = useState<FormState | null>(null);
@@ -223,6 +225,30 @@ export function AdminCampaignsPage() {
     }
   };
 
+  /** 有订单的活动不能物理删除；先给出下一步，不让运营点进注定失败的确认框。 */
+  const requestDelete = (row: AdminCampaign) => {
+    if (row.orderCount > 0) {
+      toast.error(`该活动已有 ${row.orderCount} 笔关联订单，不能删除；请改为下线`);
+      return;
+    }
+    setDeleting(row);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      await marketingApi.removeCampaign(deleting.id);
+      toast.success(`已删除活动「${deleting.name}」`);
+      setDeleting(null);
+      reload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -273,6 +299,7 @@ export function AdminCampaignsPage() {
           busy={busy}
           onEdit={openEdit}
           onToggle={(row) => void doToggle(row)}
+          onDelete={requestDelete}
           pagination={{
             current: data?.page ?? 1,
             pageSize: data?.pageSize ?? 20,
@@ -309,6 +336,31 @@ export function AdminCampaignsPage() {
         onPatch={patchForm}
         onClose={requestCloseForm}
         onSave={() => void save()}
+      />
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title={deleting ? `删除活动「${deleting.name}」` : '删除活动'}
+        description={
+          deleting
+            ? deleting.status === 'active'
+              ? '该活动当前处于上线状态，删除后将立即停止投放，且无法恢复。'
+              : '删除后活动将从后台列表移除，且无法恢复。'
+            : undefined
+        }
+        impact={
+          deleting
+            ? [
+                `活动类型：${TYPE_LABEL[deleting.type] ?? deleting.type}`,
+                '该活动没有关联订单，删除不影响任何历史交易',
+              ]
+            : undefined
+        }
+        danger
+        confirmText="删除活动"
+        loading={busy}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => void confirmDelete()}
       />
     </>
   );

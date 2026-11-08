@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
 import {
   ActionButton,
+  ConfirmDialog,
   ExportCsvButton,
   useAdminExport,
   AppliedFilters,
@@ -27,9 +28,9 @@ import type { AdminCoupon, CouponType } from '../../../types/api';
 /**
  * 优惠券（`/admin/coupons`）。
  *
- * 券不提供删除 —— 已核销订单仍引用它，只能停用。创建 / 编辑走全量表单，
- * 金额在表单内一律用「元」与「万分比」，只在提交时换算一次，避免同一份
- * 数据在页面里出现两套单位。
+ * 从未产生订单的券可以删除；有历史订单的券只能停用。创建 / 编辑走全量
+ * 表单，金额在表单内一律用「元」与「万分比」，只在提交时换算一次，避免
+ * 同一份数据在页面里出现两套单位。
  *
  * ## 模块划分
  *
@@ -57,6 +58,7 @@ export function AdminCouponsPage() {
   const { exporting, runExport } = useAdminExport(toast);
 
   const [editing, setEditing] = useState<AdminCoupon | null>(null);
+  const [deleting, setDeleting] = useState<AdminCoupon | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [formBase, setFormBase] = useState<FormState | null>(null);
@@ -228,11 +230,35 @@ export function AdminCouponsPage() {
     }
   };
 
+  /** 有关联订单的券不能物理删除，先给出「改为停用」的下一步。 */
+  const requestDelete = (row: AdminCoupon) => {
+    if (row.orderCount > 0) {
+      toast.error(`该优惠券已有 ${row.orderCount} 笔关联订单，不能删除；请改为停用`);
+      return;
+    }
+    setDeleting(row);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      await marketingApi.removeCoupon(deleting.id);
+      toast.success(`已删除优惠券「${deleting.name}」`);
+      setDeleting(null);
+      reload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
         title="优惠券"
-        description="发放范围、使用条件、有效期与限用。券不提供删除 —— 已核销订单仍引用它，只能停用。"
+        description="发放范围、使用条件、有效期与限用。有历史订单的券只能停用；从未产生订单的券可删除。"
         actions={
           writable ? (
             <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
@@ -309,6 +335,7 @@ export function AdminCouponsPage() {
           busy={busy}
           onEdit={openEdit}
           onToggle={(row) => void doToggle(row)}
+          onDelete={requestDelete}
           onPageChange={setPage}
           onRetry={reload}
           onResetFilters={resetFilters}
@@ -326,6 +353,32 @@ export function AdminCouponsPage() {
         onPatch={patchForm}
         onClose={requestCloseForm}
         onSave={() => void save()}
+      />
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title={deleting ? `删除优惠券「${deleting.name}」` : '删除优惠券'}
+        description={
+          deleting
+            ? deleting.status === 'on'
+              ? '该券当前处于启用状态，删除后用户将无法再使用，且无法恢复。'
+              : '删除后该券将从后台列表移除，且无法恢复。'
+            : undefined
+        }
+        impact={
+          deleting
+            ? [
+                `券码：${deleting.code}`,
+                `面额：${deleting.valueLabel}（${TYPE_LABEL[deleting.type] ?? deleting.type}）`,
+                '该券没有关联订单，删除不影响任何历史交易',
+              ]
+            : undefined
+        }
+        danger
+        confirmText="删除优惠券"
+        loading={busy}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => void confirmDelete()}
       />
     </>
   );

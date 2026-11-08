@@ -104,9 +104,10 @@ test.describe('后台高频动线', () => {
       ],
       ['/admin/products?status=active', '商品管理', ['状态：在售']],
       [
-        '/admin/payments?tab=reconciliation&providerId=alipay&status=failed&from=2026-10-01&to=2026-10-31',
+        '/admin/payments?tab=reconciliation&providerId=alipay&status=failed&billDate=2026-10-31',
         '支付充值',
-        ['渠道：支付宝', '状态：失败', '起始：2026-10-01', '截止：2026-10-31'],      ],
+        ['渠道：支付宝', '状态：失败', '账单日：2026-10-31'],
+      ],
       ['/admin/capabilities?q=image&runtime=unavailable', '能力与模型', ['关键词：image', '运行结论：暂不可用']],
     ] as const;
 

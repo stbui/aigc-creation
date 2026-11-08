@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { adminPaymentProductsApi, adminPaymentProvidersApi } from './api';
 import {
@@ -10,13 +10,25 @@ import {
   PageSkeleton,
   Panel,
   SelectField,
+  StaleError,
   StatCards,
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
-import { useAdmin, useAdminResource, useToast } from './hooks';
+import {
+  useAdmin,
+  useAdminResource,
+  useDiscardConfirm,
+  useRefreshOnNonce,
+  useToast,
+  useUnsavedGuard,
+} from './hooks';
 import type { AdminPaymentProductView, PaymentCurrency } from '../../../types/payment';
-import { EMPTY_PAYMENT_PRODUCT_DRAFT, PAYMENT_CURRENCY_OPTIONS, type PaymentProductDraft } from './constants';
+import {
+  EMPTY_PAYMENT_PRODUCT_DRAFT,
+  PAYMENT_CURRENCY_OPTIONS,
+  type PaymentProductDraft,
+} from './constants';
 import {
   SALE_STATUS_META,
   buildPaymentProductPayload,
@@ -50,44 +62,47 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
   const providers = useAdminResource(() => adminPaymentProvidersApi.list());
 
   // 刷新只重取数据，不动表单草稿
-  useEffect(() => {
-    if (refreshNonce > 0) {
-      void reload();
-      void settings.reload();
-      void providers.reload();
-    }
-  }, [refreshNonce, reload, settings.reload, providers.reload]);
+  useRefreshOnNonce(refreshNonce, reload, settings.reload, providers.reload);
 
   const [editing, setEditing] = useState<AdminPaymentProductView | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<PaymentProductDraft>(EMPTY_PAYMENT_PRODUCT_DRAFT);
+  const [baseDraft, setBaseDraft] = useState<PaymentProductDraft>(EMPTY_PAYMENT_PRODUCT_DRAFT);
   const [saving, setSaving] = useState(false);
 
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [currencyDraft, setCurrencyDraft] = useState<PaymentCurrency>('CNY');
 
   const formOpen = creating || editing !== null;
+  const formDirty =
+    formOpen && !saving && JSON.stringify(draft) !== JSON.stringify(baseDraft);
 
-  const openCreate = useCallback(() => {
-    setDraft({
-      ...EMPTY_PAYMENT_PRODUCT_DRAFT,
-      currency: settings.data?.defaultCurrency ?? 'CNY',
-    });
-    setEditing(null);
-    setCreating(true);
-  }, [settings.data?.defaultCurrency]);
-
-  const openEdit = useCallback((p: AdminPaymentProductView) => {
-    setDraft(paymentProductToDraft(p));
-    setEditing(p);
-    setCreating(false);
-  }, []);
-
+  useUnsavedGuard(formDirty);
   const closeForm = useCallback(() => {
     if (saving) return;
     setCreating(false);
     setEditing(null);
   }, [saving]);
+  const requestCloseForm = useDiscardConfirm(formDirty, closeForm);
+
+  const openDraft = useCallback((next: PaymentProductDraft, product: AdminPaymentProductView | null) => {
+    setDraft(next);
+    setBaseDraft(next);
+    setEditing(product);
+    setCreating(product === null);
+  }, []);
+
+  const openCreate = useCallback(() => {
+    openDraft(
+      { ...EMPTY_PAYMENT_PRODUCT_DRAFT, currency: settings.data?.defaultCurrency ?? 'CNY' },
+      null,
+    );
+  }, [openDraft, settings.data?.defaultCurrency]);
+
+  const openEdit = useCallback(
+    (product: AdminPaymentProductView) => openDraft(paymentProductToDraft(product), product),
+    [openDraft],
+  );
 
   const patchDraft = useCallback(
     (patch: Partial<PaymentProductDraft>) => setDraft((prev) => ({ ...prev, ...patch })),
@@ -96,14 +111,20 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
 
   const products = data?.items ?? [];
   const stats = useMemo(() => {
-    const onSale = products.filter((p) => saleStatusOf(p) === 'on_sale').length;
-    const upcoming = products.filter((p) => saleStatusOf(p) === 'upcoming').length;
-    const soldOut = products.filter((p) => saleStatusOf(p) === 'sold_out').length;
-    return { onSale, upcoming, soldOut, total: products.length };
+    const result = { onSale: 0, upcoming: 0, soldOut: 0, total: products.length };
+    for (const product of products) {
+      const status = saleStatusOf(product);
+      if (status === 'on_sale') result.onSale += 1;
+      else if (status === 'upcoming') result.upcoming += 1;
+      else if (status === 'sold_out') result.soldOut += 1;
+    }
+    return result;
   }, [products]);
 
   /** 可用币种：CNY 始终可选；USD 需要有已配置的美元渠道 */
-  const usdAvailable = (providers.data?.items ?? []).some((p) => p.configured && p.supportedCurrencies.includes('USD'));
+  const usdAvailable = (providers.data?.items ?? []).some(
+    (provider) => provider.configured && provider.supportedCurrencies.includes('USD'),
+  );
 
   const columns: Array<AdminColumn<AdminPaymentProductView>> = [
     {
@@ -159,7 +180,11 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
       title: '操作',
       width: 80,
       render: (row) => (
-        <ActionButton onClick={() => openEdit(row)} disabled={!writable} ariaLabel={`编辑${row.name}`}>
+        <ActionButton
+          onClick={() => openEdit(row)}
+          disabled={!writable}
+          ariaLabel={`编辑${row.name}`}
+        >
           编辑
         </ActionButton>
       ),
@@ -189,13 +214,11 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         await adminPaymentProductsApi.update(editing.id, result.payload);
         toast.success('商品已更新');
       } else {
-        await adminPaymentProductsApi.create({
-          ...result.payload,
-          sku: undefined,
-        });
+        await adminPaymentProductsApi.create({ ...result.payload, sku: undefined });
         toast.success('商品已创建');
       }
-      closeForm();
+      setCreating(false);
+      setEditing(null);
       reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '保存失败');
@@ -228,38 +251,42 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         title="充值商品"
         note="商品是用户用真金白银兑换积分的售卖对象"
         extra={
-          writable ? (
-            <ActionButton icon={Plus} onClick={openCreate}>
-              新增商品
+          <>
+            <span className="text-[12px] text-muted-foreground">
+              默认货币
+              <span className="ml-1 font-medium text-foreground">
+                {settings.data?.defaultCurrency ?? 'CNY'}
+              </span>
+            </span>
+            <ActionButton
+              variant="ghost"
+              size="sm"
+              ariaLabel="更改默认充值货币"
+              disabled={!can('payment.write')}
+              onClick={() => {
+                setCurrencyDraft(settings.data?.defaultCurrency ?? 'CNY');
+                setCurrencyOpen(true);
+              }}
+            >
+              更改
             </ActionButton>
-          ) : undefined
+            {writable && (
+              <ActionButton icon={Plus} onClick={openCreate}>
+                新增商品
+              </ActionButton>
+            )}
+          </>
         }
       >
+        {error && <StaleError error={error} onRetry={() => void reload()} />}
         <AdminDataTable
           rows={products}
           columns={columns}
           rowKey={(row) => row.id}
+          loading={loading}
           emptyText="还没有充值商品"
           minWidth={900}
         />
-      </Panel>
-
-      <Panel title="默认充值货币" note="C 端商品卡按此排序与展示">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <span className="text-sm">
-            当前默认货币：
-            <span className="font-medium">{settings.data?.defaultCurrency ?? 'CNY'}</span>
-          </span>
-          <ActionButton
-            onClick={() => {
-              setCurrencyDraft(settings.data?.defaultCurrency ?? 'CNY');
-              setCurrencyOpen(true);
-            }}
-            disabled={!can('payment.write')}
-          >
-            更改
-          </ActionButton>
-        </div>
       </Panel>
 
       <ConfirmDialog
@@ -267,13 +294,12 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         title="更改默认充值货币"
         description="默认货币决定 C 端商品卡的展示顺序与结算币种。更改只影响展示与下单口径，已生成的订单按下单时的币种结算。"
         confirmText="确认更改"
+        loading={saving}
         onCancel={() => setCurrencyOpen(false)}
         onConfirm={async () => {
           setSaving(true);
           try {
-            await adminPaymentProvidersApi.saveSettings({
-              defaultCurrency: currencyDraft,
-            });
+            await adminPaymentProvidersApi.saveSettings({ defaultCurrency: currencyDraft });
             toast.success('默认货币已更新');
             setCurrencyOpen(false);
             settings.reload();
@@ -284,14 +310,12 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
           }
         }}
         extra={
-          <div className="flex flex-col gap-2">
-            <SelectField
-              value={currencyDraft}
-              onChange={(value) => setCurrencyDraft((value as PaymentCurrency) ?? 'CNY')}
-              options={PAYMENT_CURRENCY_OPTIONS}
-              ariaLabel="默认充值货币"
-            />
-          </div>
+          <SelectField
+            value={currencyDraft}
+            onChange={(value) => setCurrencyDraft((value as PaymentCurrency) ?? 'CNY')}
+            options={PAYMENT_CURRENCY_OPTIONS}
+            ariaLabel="默认充值货币"
+          />
         }
       />
 
@@ -303,7 +327,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         usdAvailable={usdAvailable}
         saving={saving}
         onPatch={patchDraft}
-        onClose={closeForm}
+        onClose={requestCloseForm}
         onSubmit={() => void submit()}
       />
     </div>

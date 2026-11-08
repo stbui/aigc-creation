@@ -1,39 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
 import { adminPaymentOrdersApi } from './api';
 import {
   ActionButton,
   AdminDataTable,
   ConfirmDialog,
-  ListError,
   Panel,
   StaleError,
   StatusTag,
   formatShanghaiDateTimeShort,
   type AdminColumn,
-  type AppliedFilter,
 } from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminDetailParam,
-  useAdminList,
-  useAdminUrlFilterSync,
+  usePaymentOrderFilters,
+  useRefreshOnNonce,
   useToast,
 } from './hooks';
-import type { AdminPaymentOrderRow, PaymentDisplayStatus } from '../../../types/payment';
-import {
-  ORDER_PROVIDER_IDS,
-  PAYMENT_ORDER_STATUS_OPTIONS,
-  PAYMENT_ORDER_TIME_FIELD_OPTIONS,
-  PAYMENT_STATUS_META,
-  PROVIDER_LABELS,
-} from './constants';
-import { moneyText } from './utils';
+import type { AdminPaymentOrderRow } from '../../../types/payment';
+import { PAYMENT_STATUS_META, paymentActions } from './constants';
+import { moneyText, providerLabel } from './utils';
 import { PaymentOrderDetailDrawer } from './PaymentOrderDetailDrawer';
-import {
-  PaymentOrdersFilterBar,
-  type PaymentOrderFilterKey,
-} from './PaymentOrdersFilterBar';
+import { PaymentOrdersFilterBar } from './PaymentOrdersFilterBar';
 
 /**
  * 支付订单标签。
@@ -43,6 +31,9 @@ import {
  *
  * 页面**不提供退款**：退款在订单管理里，且退款要动积分与优惠券回滚，
  * 放在支付域会让人以为「关单 = 退款」。关单只停止未支付订单继续挂着。
+ *
+ * 筛选、地址栏同步与导出都在 `usePaymentOrderFilters`；这里只保留渲染与
+ * 查单 / 关单两个写操作。
  */
 
 export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
@@ -50,176 +41,25 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
   const { can } = useAdmin();
   const canExport = can('data.export');
 
-  const [searchParams] = useSearchParams();
-
-  // 初始筛选从 URL 读，避免先发一次空筛选请求
-  const initialStatus = (() => {
-    const raw = searchParams.get('status');
-    return PAYMENT_ORDER_STATUS_OPTIONS.some((o) => o.value === raw)
-      ? (raw as PaymentDisplayStatus)
-      : undefined;
-  })();
-  const initialProvider = (() => {
-    const raw = searchParams.get('providerId');
-    return raw && (ORDER_PROVIDER_IDS as string[]).includes(raw) ? raw : undefined;
-  })();
-  const initialTimeField = (() => {
-    const raw = searchParams.get('timeField');
-    return raw === 'created' || raw === 'paid' || raw === 'credited' ? raw : undefined;
-  })();
-  const initialKeyword = searchParams.get('keyword') ?? '';
-  const initialFrom = searchParams.get('from') ?? '';
-  const initialTo = searchParams.get('to') ?? '';
-
-  // 草稿
-  const [keyword, setKeyword] = useState(initialKeyword);
-  const [status, setStatus] = useState<PaymentDisplayStatus | undefined>(initialStatus);
-  const [providerId, setProviderId] = useState<string | undefined>(initialProvider);
-  const [timeField, setTimeField] = useState<string | undefined>(initialTimeField);
-  const [from, setFrom] = useState(initialFrom);
-  const [to, setTo] = useState(initialTo);
-
-  const updateFilter = (key: PaymentOrderFilterKey, value: string | undefined) => {
-    switch (key) {
-      case 'keyword':
-        setKeyword(value ?? '');
-        break;
-      case 'status':
-        setStatus(value as PaymentDisplayStatus | undefined);
-        break;
-      case 'providerId':
-        setProviderId(value);
-        break;
-      case 'timeField':
-        setTimeField(value);
-        break;
-      case 'from':
-        setFrom(value ?? '');
-        break;
-      case 'to':
-        setTo(value ?? '');
-        break;
-    }
-  };
-
-  const fetcher = useCallback(
-    (params: Record<string, unknown>) =>
-      adminPaymentOrdersApi.list({
-        page: params.page as number,
-        pageSize: params.pageSize as number,
-        ...(params.status ? { status: params.status as string } : {}),
-        ...(params.keyword ? { keyword: params.keyword as string } : {}),
-        ...(params.providerId ? { providerId: params.providerId as string } : {}),
-        ...(params.timeField ? { timeField: params.timeField as 'created' | 'paid' | 'credited' } : {}),
-        ...(params.from ? { from: params.from as string } : {}),
-        ...(params.to ? { to: params.to as string } : {}),
-      }),
-    [],
-  );
-
-  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList(fetcher, {
-    pageSize: 30,
-    ...(initialStatus ? { status: initialStatus } : {}),
-    ...(initialKeyword ? { keyword: initialKeyword } : {}),
-    ...(initialProvider ? { providerId: initialProvider } : {}),
-    ...(initialTimeField ? { timeField: initialTimeField } : {}),
-    ...(initialFrom ? { from: initialFrom } : {}),
-    ...(initialTo ? { to: initialTo } : {}),
-  });
-
-  useAdminUrlFilterSync({
-    status: params.status as string | undefined,
-    keyword: params.keyword as string | undefined,
-    providerId: params.providerId as string | undefined,
-    timeField: params.timeField as string | undefined,
-    from: params.from as string | undefined,
-    to: params.to as string | undefined,
-  });
+  const {
+    data,
+    loading,
+    error,
+    values,
+    updateFilter,
+    applyFilters,
+    resetFilters,
+    draftChanged,
+    appliedChips,
+    setPage,
+    reload,
+    exporting,
+    exportCsv,
+  } = usePaymentOrderFilters();
 
   // 刷新只重取当前筛选下的数据，筛选与分页都不动
-  useEffect(() => {
-    if (refreshNonce > 0) void reload();
-  }, [refreshNonce, reload]);
+  useRefreshOnNonce(refreshNonce, reload);
 
-  // 草稿与应用值不一致 → 提示先查询
-  const draftChanged = useMemo(() => {
-    return (
-      keyword !== (params.keyword ?? '') ||
-      (status ?? '') !== (params.status ?? '') ||
-      (providerId ?? '') !== (params.providerId ?? '') ||
-      (timeField ?? '') !== (params.timeField ?? '') ||
-      from !== (params.from ?? '') ||
-      to !== (params.to ?? '')
-    );
-  }, [keyword, status, providerId, timeField, from, to, params]);
-
-  const appliedChips: AppliedFilter[] = [];
-  if (params.status) {
-    const meta = PAYMENT_STATUS_META[params.status as PaymentDisplayStatus];
-    appliedChips.push({
-      key: 'status',
-      label: `状态：${meta?.label ?? params.status}`,
-      onClear: () => {
-        setStatus(undefined);
-        setQuery({ status: undefined });
-      },
-    });
-  }
-  if (params.keyword) {
-    appliedChips.push({
-      key: 'keyword',
-      label: `关键词：${params.keyword}`,
-      onClear: () => {
-        setKeyword('');
-        setQuery({ keyword: undefined });
-      },
-    });
-  }
-  if (params.providerId) {
-    appliedChips.push({
-      key: 'providerId',
-      label: `渠道：${PROVIDER_LABELS[params.providerId as keyof typeof PROVIDER_LABELS] ?? params.providerId}`,
-      onClear: () => {
-        setProviderId(undefined);
-        setQuery({ providerId: undefined });
-      },
-    });
-  }
-  if (params.timeField) {
-    appliedChips.push({
-      key: 'timeField',
-      label: `时间口径：${PAYMENT_ORDER_TIME_FIELD_OPTIONS.find((o) => o.value === params.timeField)?.label ?? params.timeField}`,
-      onClear: () => {
-        setTimeField(undefined);
-        setQuery({ timeField: undefined });
-      },
-    });
-  }
-  if (params.from) {
-    appliedChips.push({
-      key: 'from',
-      label: `起始：${params.from}`,
-      onClear: () => {
-        setFrom('');
-        setQuery({ from: undefined });
-      },
-    });
-  }
-  if (params.to) {
-    appliedChips.push({
-      key: 'to',
-      label: `截止：${params.to}`,
-      onClear: () => {
-        setTo('');
-        setQuery({ to: undefined });
-      },
-    });
-  }
-
-  /*
-   * 详情抽屉用 `?orderId=` 深链：刷新后抽屉还在、链接可分享。
-   * 订单页与对账页都可能开抽屉，语义不同就不能共用 `id`，所以参数名各自定制。
-   */
   const [detailId, setDetailId] = useAdminDetailParam('orderId');
   const [action, setAction] = useState<{
     order: AdminPaymentOrderRow;
@@ -228,6 +68,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
   const [busy, setBusy] = useState(false);
 
   const rows = data?.items ?? [];
+  const hasFilter = appliedChips.length > 0;
 
   const columns: Array<AdminColumn<AdminPaymentOrderRow>> = [
     {
@@ -259,11 +100,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
       key: 'provider',
       title: '渠道',
       width: 100,
-      render: (row) => (
-        <span className="text-muted-foreground">
-          {PROVIDER_LABELS[row.providerId as keyof typeof PROVIDER_LABELS] ?? row.providerId}
-        </span>
-      ),
+      render: (row) => <span className="text-muted-foreground">{providerLabel(row.providerId)}</span>,
     },
     {
       key: 'amount',
@@ -308,34 +145,27 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
       title: '操作',
       width: 160,
       render: (row) => {
-        const actionable =
-          row.status === 'created' ||
-          row.status === 'pending' ||
-          row.status === 'create_failed' ||
-          row.status === 'closing';
+        const { canQuery, canClose } = paymentActions(row.status);
         return (
           <div className="flex items-center gap-1">
-            <ActionButton
-              onClick={() => setDetailId(row.id)}
-              ariaLabel={`查看订单${row.orderNo}`}
-            >
+            <ActionButton onClick={() => setDetailId(row.id)} ariaLabel={`查看订单${row.orderNo}`}>
               详情
             </ActionButton>
-            {actionable && (
-              <>
-                <ActionButton
-                  onClick={() => setAction({ order: row, kind: 'query' })}
-                  ariaLabel={`同步状态${row.orderNo}`}
-                >
-                  同步状态
-                </ActionButton>
-                <ActionButton
-                  onClick={() => setAction({ order: row, kind: 'close' })}
-                  ariaLabel={`关闭订单${row.orderNo}`}
-                >
-                  关闭
-                </ActionButton>
-              </>
+            {canQuery && (
+              <ActionButton
+                onClick={() => setAction({ order: row, kind: 'query' })}
+                ariaLabel={`同步状态${row.orderNo}`}
+              >
+                同步状态
+              </ActionButton>
+            )}
+            {canClose && (
+              <ActionButton
+                onClick={() => setAction({ order: row, kind: 'close' })}
+                ariaLabel={`关闭订单${row.orderNo}`}
+              >
+                关闭
+              </ActionButton>
             )}
           </div>
         );
@@ -343,55 +173,15 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
     },
   ];
 
-  const applyQuery = () =>
-    setQuery({
-      keyword: keyword.trim() || undefined,
-      status,
-      providerId,
-      timeField,
-      from: from || undefined,
-      to: to || undefined,
-    });
-
-  const resetQuery = () => {
-    setKeyword('');
-    setStatus(undefined);
-    setProviderId(undefined);
-    setTimeField(undefined);
-    setFrom('');
-    setTo('');
-    setQuery({
-      keyword: undefined,
-      status: undefined,
-      providerId: undefined,
-      timeField: undefined,
-      from: undefined,
-      to: undefined,
-    });
-  };
-
-  const exportCsv = () =>
-    void adminPaymentOrdersApi
-      .exportCsv({
-        ...(params.status ? { status: params.status as string } : {}),
-        ...(params.keyword ? { keyword: params.keyword as string } : {}),
-        ...(params.providerId ? { providerId: params.providerId as string } : {}),
-        ...(params.timeField
-          ? { timeField: params.timeField as 'created' | 'paid' | 'credited' }
-          : {}),
-        ...(params.from ? { from: params.from as string } : {}),
-        ...(params.to ? { to: params.to as string } : {}),
-      })
-      .catch((e: Error) => toast.error(e.message));
-
   return (
     <div className="flex flex-col gap-3">
       <PaymentOrdersFilterBar
-        values={{ keyword, status, providerId, timeField, from, to }}
+        values={values}
         onChange={updateFilter}
-        onApply={applyQuery}
-        onReset={resetQuery}
+        onApply={applyFilters}
+        onReset={resetFilters}
         onExport={exportCsv}
+        exporting={exporting}
         exportDisabled={!canExport || draftChanged || loading || !data || data.total === 0}
         appliedChips={appliedChips}
       />
@@ -401,25 +191,32 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
       )}
 
       <Panel title="支付订单" note="本页不提供退款；退款请到订单管理">
+        {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
         {error && data && <StaleError error={error} onRetry={() => void reload()} />}
-        {error && !data ? (
-          <ListError error={error} onRetry={() => void reload()} />
-        ) : (
-          <AdminDataTable
-            rows={rows}
-            columns={columns}
-            rowKey={(row) => row.id}
-            loading={loading}
-            emptyText="还没有支付订单"
-            minWidth={1040}
-            pagination={{
-              current: data?.page ?? 1,
-              pageSize: data?.pageSize ?? 30,
-              total: data?.total ?? 0,
-              onChange: (page, pageSize) => setPage(page, pageSize),
-            }}
-          />
-        )}
+        <AdminDataTable
+          rows={rows}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={data ? null : error}
+          onRetry={() => void reload()}
+          emptyText={hasFilter ? '没有匹配的支付订单，清除筛选后再试' : '还没有支付订单'}
+          emptyAction={
+            hasFilter ? (
+              <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
+                清除筛选
+              </ActionButton>
+            ) : undefined
+          }
+          minWidth={1040}
+          onRowClick={(row) => setDetailId(row.id)}
+          pagination={{
+            current: data?.page ?? 1,
+            pageSize: data?.pageSize ?? 30,
+            total: data?.total ?? 0,
+            onChange: (page, pageSize) => setPage(page, pageSize),
+          }}
+        />
       </Panel>
 
       <ConfirmDialog

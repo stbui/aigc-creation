@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Notice,
   PageHeader,
   RefreshButton,
   Tabs,
@@ -72,15 +71,15 @@ export function AdminPaymentsPage() {
     <div className="flex flex-col">
       <PageHeader
         title="支付充值"
-        description="管理系统支付适配器、充值商品、支付订单与 T+1 对账"
+        description="支付渠道、充值商品、支付订单与 T+1 对账；退款请到订单管理"
         actions={
-          <RefreshButton variant="default" onRefresh={() => setRefreshNonce((n) => n + 1)} ariaLabel="刷新当前标签" />
+          <RefreshButton
+            variant="default"
+            onRefresh={() => setRefreshNonce((n) => n + 1)}
+            ariaLabel="刷新当前标签"
+          />
         }
       />
-
-      <Notice tone="info" title="退款请到订单管理">
-        本页不提供退款。管理端提供查单、关单和对账：关单前始终先向渠道查单； 对账发现已支付未入账订单时会幂等补发积分。
-      </Notice>
 
       <Tabs value={tab} onValueChange={switchTab} className="gap-3">
         <TabsList aria-label="支付域标签" className="h-9 gap-1 p-1">
@@ -96,11 +95,13 @@ export function AdminPaymentsPage() {
         </TabsList>
 
         {/*
-         * 五个标签各自持有 loading/error/data，切换标签不互相清空。
+         * 筛选条件与详情深链都在地址栏，切回标签时能恢复；标签未激活时不挂载
+         * （Radix 默认），离开标签即释放各自的数据与分页状态，避免进页就并发
+         * 拉五份列表。
          *
          * `refreshNonce` 作为 prop 下传而不是当 `key`：remount 会把筛选与分页
          * 一起重置，而「刷新」的语义是**重取当前筛选下的数据**，不是回到初始态。
-         * 各标签在 nonce 变化时调自己的 reload()，筛选条件原样保留。
+         * 各标签只在 nonce 变化时调自己的 reload()，筛选条件原样保留。
          */}
         <TabsContent value="providers">
           <PaymentsProvidersTab refreshNonce={refreshNonce} />

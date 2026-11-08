@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Injectable,
   Param,
@@ -339,6 +340,53 @@ export class AdminMembershipPlansService {
     return code;
   }
 
+  /**
+   * 删除未使用的会员套餐。
+   *
+   * free 是系统兜底等级，不能删；已有会员或订单的套餐承载着权益快照与
+   * 历史对账关联，只能下架。预检后仍可能并发产生订阅，外键错误统一转成 409。
+   */
+  async remove(id: string) {
+    const existing = await this.prisma.membershipPlan.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        _count: { select: { memberships: true, orders: true } },
+      },
+    });
+    if (!existing) throw new AppError(40400, "会员套餐不存在", 404);
+    if (existing.code === "free") {
+      throw new AppError(40001, "free 套餐由系统内置，不能删除", 400);
+    }
+
+    const memberCount = existing._count.memberships;
+    const orderCount = existing._count.orders;
+    if (memberCount > 0 || orderCount > 0) {
+      throw new AppError(
+        40901,
+        `该套餐已有 ${memberCount} 名会员、${orderCount} 笔订单，不能删除；请改为下架`,
+        409,
+      );
+    }
+
+    try {
+      await this.prisma.membershipPlan.delete({ where: { id } });
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2003") {
+        throw new AppError(
+          40901,
+          "该套餐刚刚产生了会员或订单，不能删除；请改为下架",
+          409,
+        );
+      }
+      throw error;
+    }
+
+    return { id, code: existing.code, name: existing.name };
+  }
+
   async setStatus(id: string, dto: PlanStatusDto) {
     const existing = await this.prisma.membershipPlan.findUnique({
       where: { id },
@@ -386,5 +434,12 @@ export class AdminMembershipPlansController {
   @AuditAction("membership-plan.status")
   setStatus(@Param("id") id: string, @Body() dto: PlanStatusDto) {
     return this.plans.setStatus(id, dto);
+  }
+
+  @Delete(":id")
+  @RequirePermission(PERMISSIONS.productWrite)
+  @AuditAction("membership-plan.delete")
+  remove(@Param("id") id: string) {
+    return this.plans.remove(id);
   }
 }

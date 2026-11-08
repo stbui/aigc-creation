@@ -9,19 +9,13 @@ import {
   TextField,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
-import { ORDER_PROVIDERS, PAYMENT_ORDER_STATUS_OPTIONS, PAYMENT_ORDER_TIME_FIELD_OPTIONS } from './constants';
-import type { PaymentDisplayStatus } from '../../../types/payment';
-
-export interface PaymentOrderFilterValues {
-  keyword: string;
-  status?: PaymentDisplayStatus;
-  providerId?: string;
-  timeField?: string;
-  from: string;
-  to: string;
-}
-
-export type PaymentOrderFilterKey = keyof PaymentOrderFilterValues;
+import {
+  ORDER_PROVIDERS,
+  PAYMENT_ORDER_STATUS_OPTIONS,
+  PAYMENT_ORDER_TIME_FIELD_OPTIONS,
+  type PaymentOrderFilterKey,
+  type PaymentOrderFilterValues,
+} from './constants';
 
 /** 支付订单筛选条：草稿值与查询动作分开，导出按钮始终使用已应用条件。 */
 export function PaymentOrdersFilterBar({
@@ -30,6 +24,7 @@ export function PaymentOrdersFilterBar({
   onApply,
   onReset,
   onExport,
+  exporting,
   exportDisabled,
   appliedChips,
 }: {
@@ -38,6 +33,7 @@ export function PaymentOrdersFilterBar({
   onApply: () => void;
   onReset: () => void;
   onExport: () => void;
+  exporting: boolean;
   exportDisabled: boolean;
   appliedChips: AppliedFilter[];
 }) {
@@ -87,7 +83,12 @@ export function PaymentOrdersFilterBar({
       <FilterActions>
         <ActionButton onClick={onApply}>查询</ActionButton>
         <ActionButton onClick={onReset}>重置</ActionButton>
-        <ExportCsvButton size="default" onExport={onExport} disabled={exportDisabled} />
+        <ExportCsvButton
+          size="default"
+          onExport={onExport}
+          exporting={exporting}
+          disabled={exportDisabled}
+        />
       </FilterActions>
       <AppliedFilters items={appliedChips} />
     </FilterBar>

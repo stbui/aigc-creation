@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { AppError } from '../common/app.exception';
 import { MarketingService } from './marketing.service';
 
 describe('MarketingService 邀请绑定与奖励幂等', () => {
@@ -199,6 +200,118 @@ describe('MarketingService 签到幂等与封顶', () => {
       }),
     ).rejects.toMatchObject({ code: 40001 });
     expect(prisma.checkinRule.upsert).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('MarketingService 优惠券与活动删除', () => {
+  let prisma: Record<string, any>;
+  let service: MarketingService;
+
+  beforeEach(() => {
+    prisma = {
+      coupon: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+      },
+      campaign: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+      },
+    };
+    service = new MarketingService(prisma as never, { grant: vi.fn() } as never);
+  });
+
+  it('优惠券没有关联订单时物理删除', async () => {
+    prisma.coupon.findUnique.mockResolvedValue({
+      id: 'coupon-1',
+      code: 'SAVE10',
+      name: '立减券',
+      _count: { orders: 0 },
+    });
+    prisma.coupon.delete.mockResolvedValue({ id: 'coupon-1' });
+
+    await expect(service.deleteCoupon('coupon-1')).resolves.toEqual({
+      id: 'coupon-1',
+      code: 'SAVE10',
+      name: '立减券',
+    });
+    expect(prisma.coupon.delete).toHaveBeenCalledWith({ where: { id: 'coupon-1' } });
+  });
+
+  it('优惠券有历史订单时拒绝删除并提示改为停用', async () => {
+    prisma.coupon.findUnique.mockResolvedValue({
+      id: 'coupon-1',
+      code: 'SAVE10',
+      name: '立减券',
+      _count: { orders: 2 },
+    });
+
+    const error = await service.deleteCoupon('coupon-1').catch((e) => e);
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).code).toBe(40901);
+    expect((error as AppError).getResponse()).toMatchObject({
+      message: expect.stringContaining('请改为停用'),
+    });
+    expect(prisma.coupon.delete).not.toHaveBeenCalled();
+  });
+
+  it('优惠券预检后并发产生订单时，外键错误转为 409', async () => {
+    prisma.coupon.findUnique.mockResolvedValue({
+      id: 'coupon-1',
+      code: 'SAVE10',
+      name: '立减券',
+      _count: { orders: 0 },
+    });
+    prisma.coupon.delete.mockRejectedValue(Object.assign(new Error('fk'), { code: 'P2003' }));
+
+    const error = await service.deleteCoupon('coupon-1').catch((e) => e);
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).code).toBe(40901);
+  });
+
+  it('活动没有关联订单时物理删除', async () => {
+    prisma.campaign.findUnique.mockResolvedValue({
+      id: 'campaign-1',
+      name: '限时特惠',
+      _count: { orders: 0 },
+    });
+    prisma.campaign.delete.mockResolvedValue({ id: 'campaign-1' });
+
+    await expect(service.deleteCampaign('campaign-1')).resolves.toEqual({
+      id: 'campaign-1',
+      name: '限时特惠',
+    });
+    expect(prisma.campaign.delete).toHaveBeenCalledWith({ where: { id: 'campaign-1' } });
+  });
+
+  it('活动有历史订单时拒绝删除并提示改为下线', async () => {
+    prisma.campaign.findUnique.mockResolvedValue({
+      id: 'campaign-1',
+      name: '限时特惠',
+      _count: { orders: 3 },
+    });
+
+    const error = await service.deleteCampaign('campaign-1').catch((e) => e);
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).code).toBe(40901);
+    expect((error as AppError).getResponse()).toMatchObject({
+      message: expect.stringContaining('请改为下线'),
+    });
+    expect(prisma.campaign.delete).not.toHaveBeenCalled();
+  });
+
+  it('活动预检后并发产生订单时，外键错误转为 409', async () => {
+    prisma.campaign.findUnique.mockResolvedValue({
+      id: 'campaign-1',
+      name: '限时特惠',
+      _count: { orders: 0 },
+    });
+    prisma.campaign.delete.mockRejectedValue(Object.assign(new Error('fk'), { code: 'P2003' }));
+
+    const error = await service.deleteCampaign('campaign-1').catch((e) => e);
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).code).toBe(40901);
   });
 });
 

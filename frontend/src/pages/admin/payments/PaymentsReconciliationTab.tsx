@@ -1,42 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { adminPaymentProvidersApi, adminPaymentReconciliationApi } from './api';
 import {
   ActionButton,
   AdminDataTable,
   ConfirmDialog,
   DateField,
+  FilePicker,
   FormField,
-  ListError,
   Panel,
   SelectField,
   StaleError,
   StatusTag,
   formatShanghaiDateTime,
   type AdminColumn,
-  type AppliedFilter,
 } from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminDetailParam,
-  useAdminList,
   useAdminResource,
-  useAdminUrlFilterSync,
+  useReconciliationFilters,
+  useRefreshOnNonce,
   useToast,
 } from './hooks';
 import type { AdminReconciliationRun, PaymentProviderId } from '../../../types/payment';
 import {
-  PROVIDER_LABELS,
-  RECONCILIATION_PROVIDER_IDS,
-  RECONCILIATION_PROVIDERS,
+  RECONCILIATION_RUN_STATUS_META,
+  RECONCILIATION_RUN_STATUS_OPTIONS,
 } from './constants';
-import { moneyText } from './utils';
+import { ninetyDaysAgo, providerLabel, yesterday } from './utils';
 import { ReconciliationDetailDrawer } from './ReconciliationDetailDrawer';
-import {
-  ReconciliationFilterBar,
-  type ReconciliationFilterKey,
-} from './ReconciliationFilterBar';
-import { ReconciliationRunPanel } from './ReconciliationRunPanel';
+import { ReconciliationToolbar } from './ReconciliationToolbar';
 
 /**
  * 支付对账标签。
@@ -49,34 +42,10 @@ import { ReconciliationRunPanel } from './ReconciliationRunPanel';
  * 新版由系统每天 10:15 自动下载渠道账单并比对，发现「渠道已收款但本地没入账」
  * 会自动补发积分；失败可在同一账单日重跑。**页面只展示结果，不提供改钱入口**。
  * 人工要处理的是「渠道重复扣款」「本地多记了一笔」这类真异常，走订单退款流程。
+ *
+ * 执行与筛选共用工具栏里的同一套渠道 + 账单日（见 `ReconciliationToolbar`），
+ * 执行成功后列表切到本次执行的条件。
  */
-
-const RUN_STATUS_OPTIONS = [
-  { value: 'running', label: '执行中' },
-  { value: 'completed', label: '已完成' },
-  { value: 'failed', label: '失败' },
-];
-
-const RUN_STATUS_META: Record<string, { label: string; tone: 'success' | 'danger' | 'warn' | 'brand' | 'muted' }> = {
-  running: { label: '执行中', tone: 'brand' },
-  completed: { label: '已完成', tone: 'success' },
-  failed: { label: '失败', tone: 'danger' },
-};
-
-/** 昨天（YYYY-MM-DD，上海时区）。对账只能选昨天及更早 */
-function yesterday(): string {
-  // 必须按上海时区切日：用 toISOString 会在东八区 00:00–08:00 默认成前天
-  const shifted = new Date(Date.now() + 8 * 3600 * 1000);
-  shifted.setUTCDate(shifted.getUTCDate() - 1);
-  return shifted.toISOString().slice(0, 10);
-}
-
-/** 90 天前的日期，对账最早回溯范围 */
-function ninetyDaysAgo(): string {
-  const shifted = new Date(Date.now() + 8 * 3600 * 1000);
-  shifted.setUTCDate(shifted.getUTCDate() - 90);
-  return shifted.toISOString().slice(0, 10);
-}
 
 export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: number }) {
   const toast = useToast();
@@ -84,22 +53,28 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
   const canReconcile = can('finance.reconcile');
   const canExport = can('data.export');
 
-  const [searchParams] = useSearchParams();
+  const {
+    data,
+    loading,
+    error,
+    values: filterValues,
+    updateFilter,
+    applyFilters,
+    resetFilters,
+    draftChanged,
+    appliedChips,
+    exporting,
+    exportCsv,
+    setPage,
+    reload,
+  } = useReconciliationFilters();
 
-  const initialProvider = (() => {
-    const raw = searchParams.get('providerId');
-    return raw && (RECONCILIATION_PROVIDER_IDS as string[]).includes(raw) ? raw : undefined;
-  })();
-  const initialStatus = (() => {
-    const raw = searchParams.get('status');
-    return raw && raw in RUN_STATUS_META ? raw : undefined;
-  })();
-  const initialFrom = searchParams.get('from') ?? '';
-  const initialTo = searchParams.get('to') ?? '';
+  const providers = useAdminResource(() => adminPaymentProvidersApi.list());
 
-  // 执行区草稿
-  const [runProvider, setRunProvider] = useState<string>('');
-  const [billDate, setBillDate] = useState(yesterday());
+  // 刷新只重取当前筛选下的数据，筛选与分页都不动
+  useRefreshOnNonce(refreshNonce, reload, providers.reload);
+
+  // 执行区与筛选共用同一套条件，这里只保留弹窗开关
   const [runOpen, setRunOpen] = useState(false);
 
   // CSV / ZIP 兜底导入
@@ -108,113 +83,13 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
   const [importBillDate, setImportBillDate] = useState<string>(yesterday());
   const [importFile, setImportFile] = useState<File | null>(null);
 
-  // 列表筛选草稿
-  const [filterProvider, setFilterProvider] = useState<string | undefined>(initialProvider);
-  const [filterStatus, setFilterStatus] = useState<string | undefined>(initialStatus);
-  const [filterFrom, setFilterFrom] = useState(initialFrom);
-  const [filterTo, setFilterTo] = useState(initialTo);
-
-  const updateFilter = (key: ReconciliationFilterKey, value: string | undefined) => {
-    switch (key) {
-      case 'providerId':
-        setFilterProvider(value);
-        break;
-      case 'status':
-        setFilterStatus(value);
-        break;
-      case 'from':
-        setFilterFrom(value ?? '');
-        break;
-      case 'to':
-        setFilterTo(value ?? '');
-        break;
-    }
-  };
-
-  const providers = useAdminResource(() => adminPaymentProvidersApi.list());
-
-  const fetcher = useCallback(
-    (params: Record<string, unknown>) =>
-      adminPaymentReconciliationApi.list({
-        page: params.page as number,
-        pageSize: params.pageSize as number,
-        ...(params.providerId ? { providerId: params.providerId as string } : {}),
-        ...(params.status ? { status: params.status as string } : {}),
-        ...(params.from ? { from: params.from as string } : {}),
-        ...(params.to ? { to: params.to as string } : {}),
-      }),
-    [],
-  );
-
-  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList(fetcher, {
-    pageSize: 30,
-    ...(initialProvider ? { providerId: initialProvider } : {}),
-    ...(initialStatus ? { status: initialStatus } : {}),
-    ...(initialFrom ? { from: initialFrom } : {}),
-    ...(initialTo ? { to: initialTo } : {}),
-  });
-
-  useAdminUrlFilterSync({
-    providerId: params.providerId as string | undefined,
-    status: params.status as string | undefined,
-    from: params.from as string | undefined,
-    to: params.to as string | undefined,
-  });
-
-  // 刷新只重取当前筛选下的数据，筛选与分页都不动
-  useEffect(() => {
-    if (refreshNonce > 0) {
-      void reload();
-      void providers.reload();
-    }
-  }, [refreshNonce, reload, providers.reload]);
-
-  const appliedChips: AppliedFilter[] = [];
-  if (params.providerId) {
-    appliedChips.push({
-      key: 'providerId',
-      label: `渠道：${PROVIDER_LABELS[params.providerId as keyof typeof PROVIDER_LABELS] ?? params.providerId}`,
-      onClear: () => {
-        setFilterProvider(undefined);
-        setQuery({ providerId: undefined });
-      },
-    });
-  }
-  if (params.status) {
-    appliedChips.push({
-      key: 'status',
-      label: `状态：${RUN_STATUS_META[params.status as string]?.label ?? params.status}`,
-      onClear: () => {
-        setFilterStatus(undefined);
-        setQuery({ status: undefined });
-      },
-    });
-  }
-  if (params.from) {
-    appliedChips.push({
-      key: 'from',
-      label: `起始：${params.from}`,
-      onClear: () => {
-        setFilterFrom('');
-        setQuery({ from: undefined });
-      },
-    });
-  }
-  if (params.to) {
-    appliedChips.push({
-      key: 'to',
-      label: `截止：${params.to}`,
-      onClear: () => {
-        setFilterTo('');
-        setQuery({ to: undefined });
-      },
-    });
-  }
-
   const [detailId, setDetailId] = useAdminDetailParam('runId');
   const [busy, setBusy] = useState(false);
 
   const runs = data?.items ?? [];
+  const runProvider = filterValues.providerId;
+  const runBillDate = filterValues.billDate;
+  const runProviderLabel = runProvider ? providerLabel(runProvider) : '所选渠道';
 
   /** 可参与对账的渠道：需已配置且渠道本身支持账单下载；沙箱没有渠道侧账单 */
   const reconcilableProviders = useMemo(
@@ -223,7 +98,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         .filter((provider) => provider.supportsReconciliation && provider.configured)
         .map((provider) => ({
           value: provider.id,
-          label: PROVIDER_LABELS[provider.id as keyof typeof PROVIDER_LABELS] ?? provider.name,
+          label: providerLabel(provider.id),
         })),
     [providers.data],
   );
@@ -239,18 +114,16 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       key: 'provider',
       title: '渠道',
       width: 100,
-      render: (row) => (
-        <span className="text-muted-foreground">
-          {PROVIDER_LABELS[row.providerId as keyof typeof PROVIDER_LABELS] ?? row.providerId}
-        </span>
-      ),
+      render: (row) => <span className="text-muted-foreground">{providerLabel(row.providerId)}</span>,
     },
     {
       key: 'status',
       title: '状态',
       width: 90,
       render: (row) => {
-        const meta = RUN_STATUS_META[row.status] ?? { label: row.status, tone: 'muted' as const };
+        const meta = RECONCILIATION_RUN_STATUS_META[
+          row.status as keyof typeof RECONCILIATION_RUN_STATUS_META
+        ] ?? { label: row.status, tone: 'muted' as const };
         return <StatusTag status={row.status} tone={meta.tone} label={meta.label} />;
       },
     },
@@ -265,7 +138,11 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       title: '自动补发',
       width: 90,
       render: (row) => (
-        <span className={row.recoveredItems > 0 ? 'font-medium text-success-text tabular-nums' : 'tabular-nums'}>
+        <span
+          className={
+            row.recoveredItems > 0 ? 'font-medium text-success-text tabular-nums' : 'tabular-nums'
+          }
+        >
           {row.recoveredItems}
         </span>
       ),
@@ -275,7 +152,11 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       title: '异常',
       width: 70,
       render: (row) => (
-        <span className={row.errorItems > 0 ? 'font-medium text-danger-text tabular-nums' : 'tabular-nums'}>
+        <span
+          className={
+            row.errorItems > 0 ? 'font-medium text-danger-text tabular-nums' : 'tabular-nums'
+          }
+        >
           {row.errorItems}
         </span>
       ),
@@ -302,94 +183,71 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
     },
   ];
 
-  const applyFilters = () =>
-    setQuery({
-      providerId: filterProvider,
-      status: filterStatus,
-      from: filterFrom || undefined,
-      to: filterTo || undefined,
-    });
-
-  const resetFilters = () => {
-    setFilterProvider(undefined);
-    setFilterStatus(undefined);
-    setFilterFrom('');
-    setFilterTo('');
-    setQuery({
-      providerId: undefined,
-      status: undefined,
-      from: undefined,
-      to: undefined,
-    });
-  };
-
-  const exportCsv = () =>
-    void adminPaymentReconciliationApi
-      .exportCsv({
-        ...(params.providerId ? { providerId: params.providerId as string } : {}),
-        ...(params.status ? { status: params.status as string } : {}),
-        ...(params.from ? { from: params.from as string } : {}),
-        ...(params.to ? { to: params.to as string } : {}),
-      })
-      .catch((e: Error) => toast.error(e.message));
-
   return (
     <div className="flex flex-col gap-3">
-      <ReconciliationRunPanel
+      <ReconciliationToolbar
+        values={filterValues}
         providerOptions={reconcilableProviders}
-        providerId={runProvider}
-        billDate={billDate}
+        statusOptions={RECONCILIATION_RUN_STATUS_OPTIONS}
         minBillDate={ninetyDaysAgo()}
         maxBillDate={yesterday()}
         canReconcile={canReconcile}
-        onProviderChange={setRunProvider}
-        onBillDateChange={setBillDate}
-        onRun={() => setRunOpen(true)}
-        onOpenImport={() => {
-          setImportProvider(reconcilableProviders[0]?.value ?? '');
-          setImportBillDate(yesterday());
-          setImportFile(null);
-          setImportOpen(true);
-        }}
-      />
-
-      <ReconciliationFilterBar
-        values={{ providerId: filterProvider, status: filterStatus, from: filterFrom, to: filterTo }}
-        statusOptions={RUN_STATUS_OPTIONS}
         onChange={updateFilter}
         onApply={applyFilters}
         onReset={resetFilters}
+        onRun={() => setRunOpen(true)}
+        onOpenImport={() => {
+          setImportProvider(runProvider ?? reconcilableProviders[0]?.value ?? '');
+          setImportBillDate(runBillDate || yesterday());
+          setImportFile(null);
+          setImportOpen(true);
+        }}
         onExport={exportCsv}
+        exporting={exporting}
         exportDisabled={!canExport || loading || !data || data.total === 0}
         appliedChips={appliedChips}
       />
 
-      <Panel title="对账运行" note="渠道账单由系统自动下载并比对，异常项会自动补发积分">
+      {draftChanged && (
+        <p className="text-xs text-warn-text">筛选条件已修改，请点击「查询」以应用。</p>
+      )}
+
+      <Panel
+        title="对账运行"
+        note="系统每天 10:15 后自动对账昨日账单；渠道账单自动下载比对，异常项会补发积分，失败可在同一账单日重跑"
+      >
         {error && data && <StaleError error={error} onRetry={() => void reload()} />}
-        {error && !data ? (
-          <ListError error={error} onRetry={() => void reload()} />
-        ) : (
-          <AdminDataTable
-            rows={runs}
-            columns={columns}
-            rowKey={(row) => row.id}
-            loading={loading}
-            emptyText="还没有对账记录"
-            minWidth={880}
-            pagination={{
-              current: data?.page ?? 1,
-              pageSize: data?.pageSize ?? 30,
-              total: data?.total ?? 0,
-              onChange: (page, pageSize) => setPage(page, pageSize),
-            }}
-          />
-        )}
+        <AdminDataTable
+          rows={runs}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={data ? null : error}
+          onRetry={() => void reload()}
+          emptyText={
+            appliedChips.length > 0 ? '当前筛选下没有对账记录，清除筛选后再试' : '还没有对账记录'
+          }
+          emptyAction={
+            appliedChips.length > 0 ? (
+              <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
+                清除筛选
+              </ActionButton>
+            ) : undefined
+          }
+          minWidth={880}
+          pagination={{
+            current: data?.page ?? 1,
+            pageSize: data?.pageSize ?? 30,
+            total: data?.total ?? 0,
+            onChange: (page, pageSize) => setPage(page, pageSize),
+          }}
+        />
       </Panel>
 
       <ConfirmDialog
         open={runOpen}
         title="执行对账"
-        description="系统会向渠道下载指定账单日的交易流水并与本地支付记录比对。若发现渠道已收款但本地未入账，会幂等补发积分。"
+        description={`系统会向${runProviderLabel}下载 ${runBillDate || '—'} 的交易流水并与本地支付记录比对。若发现渠道已收款但本地未入账，会幂等补发积分。`}
         impact={[
           '下载并比对渠道账单',
           '发现已支付未入账的订单会自动补发积分',
@@ -399,17 +257,19 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         loading={busy}
         onCancel={() => setRunOpen(false)}
         onConfirm={async () => {
+          if (!runProvider || !runBillDate) return;
           setBusy(true);
           try {
             const result = await adminPaymentReconciliationApi.run({
               providerId: runProvider as PaymentProviderId,
-              billDate,
+              billDate: runBillDate,
             });
             toast.success(
               result.reused ? '该账单日已有一次成功的运行记录，已复用' : '对账已执行完成',
             );
             setRunOpen(false);
-            reload();
+            // 执行条件与列表筛选同源：成功后把列表切到本次执行的渠道 + 账单日
+            applyFilters();
           } catch (e) {
             toast.error(e instanceof Error ? e.message : '执行失败');
           } finally {
@@ -469,12 +329,13 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
               required
               hint={importProvider === 'alipay' ? 'CSV，或支付宝导出的 ZIP' : 'CSV'}
             >
-              <input
-                type="file"
+              <FilePicker
+                file={importFile}
                 accept={importProvider === 'alipay' ? '.csv,.zip' : '.csv'}
-                onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:text-foreground"
-                aria-label="对账单文件"
+                onPick={setImportFile}
+                onClear={() => setImportFile(null)}
+                label="选择对账单"
+                hint={importProvider === 'alipay' ? 'CSV / ZIP' : 'CSV'}
               />
             </FormField>
           </div>
@@ -482,10 +343,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       />
 
       {detailId && (
-        <ReconciliationDetailDrawer
-          runId={detailId}
-          onClose={() => setDetailId(null)}
-        />
+        <ReconciliationDetailDrawer runId={detailId} onClose={() => setDetailId(null)} />
       )}
     </div>
   );

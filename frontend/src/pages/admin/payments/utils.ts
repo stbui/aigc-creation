@@ -5,20 +5,49 @@ import type {
   PaymentSaleStatus,
   PaymentSaleStrategy,
 } from '../../../types/payment';
-import type { PaymentProductDraft } from './constants';
+import { PROVIDER_LABELS, type PaymentProductDraft } from './constants';
 
 /**
- * 商品展示派生：销售状态、上架策略文案、权益文案、金额格式化。
+ * 支付域的纯函数：账单日期（上海时区）、商品展示派生、金额与时间换算。
  *
  * **状态以服务端为准**：后端已按 `Asia/Shanghai` 判定并回 `saleStatus`，
  * 前端只做展示兜底 —— 浏览器时区与服务器不一致时，按本地时间算窗口会把
  * 「已开售」显示成「待发售」，比晚一分钟开卖更让人误判。
  */
 
+/**
+ * 昨天（`YYYY-MM-DD`，上海时区）。对账只能选昨天及更早的账单日。
+ *
+ * 必须按上海时区切日：用 `toISOString` 会在东八区 00:00–08:00 默认成前天。
+ */
+export function yesterday(): string {
+  const shifted = new Date(Date.now() + 8 * 3600 * 1000);
+  shifted.setUTCDate(shifted.getUTCDate() - 1);
+  return shifted.toISOString().slice(0, 10);
+}
+
+/** 90 天前（`YYYY-MM-DD`，上海时区），对账最早回溯范围。 */
+export function ninetyDaysAgo(): string {
+  const shifted = new Date(Date.now() + 8 * 3600 * 1000);
+  shifted.setUTCDate(shifted.getUTCDate() - 90);
+  return shifted.toISOString().slice(0, 10);
+}
+
 /** 金额格式化：分 → 带币种符号的两位小数 */
 export function moneyText(cents: number, currency: string): string {
   const symbol = currency === 'USD' ? '$' : '¥';
   return `${symbol}${(cents / 100).toFixed(2)}`;
+}
+
+/**
+ * 渠道 id → 展示短名。
+ *
+ * 订单、对账、异常三个列表都要把渠道 id 翻成人话；未登记的 id 原样返回，
+ * 保证新增渠道时页面不会出现空白格。
+ */
+export function providerLabel(id: string | null | undefined): string {
+  if (!id) return '—';
+  return PROVIDER_LABELS[id] ?? id;
 }
 
 /** 积分文案：带千分位；有效期 0 = 永久 */

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -131,11 +132,18 @@ export class AdminCouponsController {
     return this.marketing.updateCoupon(id, dto);
   }
 
-  /** 启停切换。不提供删除: 已核销订单仍引用该券, 删了历史订单悬空 */
+  /** 启停切换。停用不影响已核销订单 */
   @Patch(":id/toggle")
   @AuditAction("coupon.toggle")
   toggle(@Param("id") id: string) {
     return this.marketing.disableCoupon(id);
+  }
+
+  /** 只允许删除没有关联订单的券；有订单时改为停用 */
+  @Delete(":id")
+  @AuditAction("coupon.delete")
+  remove(@Param("id") id: string) {
+    return this.marketing.deleteCoupon(id);
   }
 }
 
@@ -183,6 +191,12 @@ export class AdminCampaignsController {
   @AuditAction("campaign.toggle")
   toggle(@Param("id") id: string) {
     return this.marketing.disableCampaign(id);
+  }
+
+  @Delete(":id")
+  @AuditAction("campaign.delete")
+  remove(@Param("id") id: string) {
+    return this.marketing.deleteCampaign(id);
   }
 }
 
