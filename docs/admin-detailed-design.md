@@ -61,7 +61,7 @@ frontend/src/components/admin/
 ├── DutyContext.tsx                 # 概览首屏值班塔的数据轮询
 └── statusMeta.ts                   # 状态 → 文案 / 色调映射
 
-frontend/src/pages/admin/            # 33 个页面 + channels/、payments/ 子目录
+frontend/src/pages/admin/            # 32 个页面 + channels/、payments/ 子目录
 ```
 
 ### 0.2 守卫链与审计
@@ -302,7 +302,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ## 9. 商品与消耗价
 
-`/admin/products`（`product.read` / `product.write` / `product.publish` / `product.delete`）与 `/admin/credit-prices`（`product.price`）。
+`/admin/products`（`product.read` / `product.write` / `product.publish` / `product.delete`）与 `/admin/capabilities?tab=pricing`（`product.price`，旧地址 `/admin/credit-prices` 重定向到此）。
 
 - 商品 SKU 存 `Product`，价格与积分以快照字段落到 `OrderItem`（`priceCentsSnapshot` / `creditsSnapshot`）。
 - 删除只对**没有历史订单**的 SKU 开放：`OrderItem.productId` 是 RESTRICT 外键，且退款与积分回收要回查 SKU 原价与发放积分；有订单时返回 409 并提示改为下架。列表每项带 `orderCount`，前端在打开确认框前就拦下。

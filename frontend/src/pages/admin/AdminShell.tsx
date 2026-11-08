@@ -22,7 +22,6 @@ import {
   AdminCapabilitiesPage,
   AdminChannelsPage,
   AdminCouponsPage,
-  AdminCreditPricesPage,
   AdminCreditsPage,
   AdminFinancePage,
   AdminInvoicesPage,
@@ -160,8 +159,11 @@ export function AdminShell() {
               <Route path="tasks" element={<AdminTasksPage />} />
               {/* 工单处理：客服队列，与任务监控同组 */}
               <Route path="tickets" element={<AdminTicketsPage />} />
-              {/* 能力消耗价 */}
-              <Route path="credit-prices" element={<AdminCreditPricesPage />} />
+              {/* 能力消耗价已并入能力与模型，保留旧地址深链 */}
+              <Route
+                path="credit-prices"
+                element={<Navigate to="/admin/capabilities?tab=pricing" replace />}
+              />
               {/* 交易后台：商品 / 订单 / 积分账本 / 保留期清理 */}
               <Route path="products" element={<AdminProductsPage />} />
               <Route path="membership-plans" element={<AdminMembershipPlansPage />} />

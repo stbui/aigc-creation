@@ -321,6 +321,37 @@ test.describe('渠道与模型 P5', () => {
     expect(tierAfter.unitPriceMicrocredits).toBe(expected);
   });
 
+  test('能力消耗价：旧地址重定向到能力页定价标签', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/credit-prices`);
+    await expect(page).toHaveURL(`${UI}/admin/capabilities?tab=pricing`);
+    await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(page.getByRole('tab', { name: '能力消耗价' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.getByRole('heading', { name: '能力消耗价' })).toBeVisible();
+
+    // 两个工作区同时挂载：切到能力页再回来，未保存的定价草稿不能丢。
+    const priceInput = page.getByRole('spinbutton', { name: /生效消耗价/ }).first();
+    const original = await priceInput.inputValue();
+    const draft = original === '0' ? '1' : String(Number(original) + 1);
+    await priceInput.fill(draft);
+    await page.getByRole('tab', { name: '能力与模型' }).click();
+    await expect(page).toHaveURL(`${UI}/admin/capabilities`);
+    await expect(page.getByRole('heading', { name: '能力与模型清单' })).toBeVisible();
+    await page.getByRole('tab', { name: '能力消耗价' }).click();
+    await expect(page).toHaveURL(`${UI}/admin/capabilities?tab=pricing`);
+    await expect(priceInput).toHaveValue(draft);
+
+    // 复原草稿后回到默认标签，保持既有 `/admin/capabilities` 深链形态。
+    await priceInput.fill(original);
+    await page.getByRole('tab', { name: '能力与模型' }).click();
+    await expect(page).toHaveURL(`${UI}/admin/capabilities`);
+  });
+
   test('能力与模型：旧地址重定向、清单与路由模拟', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/logical-models`);

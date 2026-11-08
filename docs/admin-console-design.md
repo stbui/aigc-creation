@@ -23,14 +23,14 @@
 
 ## 2. 信息架构
 
-8 组 33 页，菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
+8 组 32 页，菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
 
 | 组 | 页面 |
 | --- | --- |
 | 总览 | 平台概览 / 告警中心 |
 | 运营 | 用户管理 / 素材管理 / 任务监控 / 工单处理 |
 | 模型与渠道 | 渠道工作台 / 插件 / 能力与模型 / 用户分组 / 调用记录 |
-| 交易 | 商品管理 / 会员套餐 / 订单管理 / 积分账本 / 能力消耗价 / 优惠券 / 限时活动 / 邀请与签到 |
+| 交易 | 商品管理 / 会员套餐 / 订单管理 / 积分账本 / 优惠券 / 限时活动 / 邀请与签到 |
 | 财务 | 支付充值 / 发票管理 / 生成账单 / 财务分析 |
 | 内容与合规 | 法务文档 / 站内消息 / AI 标识 |
 | 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 |
@@ -111,7 +111,7 @@
 | 会员套餐 | 套餐列表、新建、改价 / 改权益 / 上下架；编码不可改，已付会员按 `perksSnapshot` 保留原权益；写操作自动写审计 |
 | 订单管理 | 列表与详情、标记已支付、发起渠道退款（`order.refund`，必填原因） |
 | 积分账本 | 用户余额总览、批次与流水、人工增减（`credit.adjust`）、CSV 导入导出（导入走 `credit.adjust`，导出走 `credit.read + data.export`，按邮箱匹配逐行报结果） |
-| 能力消耗价 | 读写运行时积分价，生效来源显示 `override` / `campaign`；限时免活动命中时显示活动来源，运营据此判断「改了价没生效」是活动在起作用 |
+| 能力与模型 · 能力消耗价页签 | 读写运行时积分价，生效来源显示 `override` / `campaign`；限时免活动命中时显示活动来源，运营据此判断「改了价没生效」是活动在起作用 |
 
 计费口径详见 `docs/commerce-design.md`。
 
@@ -204,7 +204,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | --- | --- |
 | 路由 | `/admin/*` 在 `App.tsx` 中必须注册在 catch-all 之前，否则会被 C 端 `Shell` 吞掉 |
 | 外壳 | `admin-ui/shell/AdminBoardLayout.tsx` + `components/admin/adminNav.ts`（菜单单一事实源） |
-| 页面 | `pages/admin/` 33 个页面 + `channels/`、`payments/` 子目录 |
+| 页面 | `pages/admin/` 32 个页面 + `channels/`、`payments/` 子目录 |
 | 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
 | 类型 | `types/api.d.ts` 的 `Admin*` 段 |
 | 组件 | 通用骨架走 `admin-ui/primitives`（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），底层是 shadcn 原子件；后台树内不引 antd，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |

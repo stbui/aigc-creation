@@ -54,10 +54,6 @@ export const AdminCapabilitiesPage = lazyAdminPage(
 );
 export const AdminTasksPage = lazyAdminPage(() => import('./tasks'), 'AdminTasksPage');
 export const AdminTicketsPage = lazyAdminPage(() => import('./tickets'), 'AdminTicketsPage');
-export const AdminCreditPricesPage = lazyAdminPage(
-  () => import('./credit-prices'),
-  'AdminCreditPricesPage',
-);
 export const AdminProductsPage = lazyAdminPage(() => import('./products'), 'AdminProductsPage');
 export const AdminMembershipPlansPage = lazyAdminPage(
   () => import('./membership-plans'),

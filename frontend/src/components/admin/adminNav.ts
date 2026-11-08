@@ -31,7 +31,6 @@ import {
   Share2,
   ShieldCheck,
   Tag,
-  Tags,
   Ticket,
   Trash2,
   TrendingUp,
@@ -125,7 +124,7 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         path: "/admin/capabilities",
         label: "能力与模型",
         icon: Boxes,
-        permission: ["capability.read", "logical_model.read"],
+        permission: ["capability.read", "logical_model.read", "product.price"],
       },
       {
         path: "/admin/user-groups",
@@ -167,12 +166,6 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         label: "积分账本",
         icon: Coins,
         permission: "credit.read",
-      },
-      {
-        path: "/admin/credit-prices",
-        label: "能力消耗价",
-        icon: Tags,
-        permission: "product.price",
       },
       {
         path: "/admin/coupons",
