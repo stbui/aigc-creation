@@ -20,11 +20,12 @@ export const MAX_IMAGES = 5;
 export const MAX_SELLING_POINTS_LEN = 2000;
 
 /**
- * 生成张数区间 (参考站步进器实测: 6–10, 减号在 6 时禁用、加号在 10 时禁用)
+ * 生成张数区间 (参考站步进器实测: 6–10)
  *
- * 与后端 `definitions/shoppable_carousel.ts` 的
- * `SHOPPABLE_CAROUSEL_MIN_COUNT` / `SHOPPABLE_CAROUSEL_MAX_COUNT` 同值 ——
- * 服务端同样收敛, 直接调接口绕过步进器也拿不到越界张数。
+ * 只作首屏兜底：页面拿到 `GET /shoppable-carousel/templates` 的 `countRange`
+ * 后以服务端为准。本地值必须与后端 `SHOPPABLE_CAROUSEL_MIN_COUNT` /
+ * `SHOPPABLE_CAROUSEL_MAX_COUNT` 同值，否则首屏会短暂显示错误区间；
+ * 直接调接口的越界张数仍由服务端 `validateCapabilityParams` 拒绝。
  */
 export const MIN_COUNT = 6;
 export const MAX_COUNT = 10;

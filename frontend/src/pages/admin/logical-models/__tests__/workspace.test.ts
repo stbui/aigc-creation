@@ -92,7 +92,7 @@ describe('能力与模型工作台数据', () => {
   it('按能力归组模型，翻译分组名，并保留未归属模型', () => {
     const workspace = buildCapabilityWorkspace({
       definitions: [
-        definition({ id: 'main_image', name: '商品主图', group: 'image-tools' }),
+        definition({ id: 'main_image', name: '商品主图', group: 'ai_retouch' }),
       ],
       controls: [],
       models: [
@@ -107,7 +107,7 @@ describe('能力与模型工作台数据', () => {
         }),
         model({ id: 'orphan', name: '孤儿模型', code: 'orphan', capability: 'legacy' }),
       ],
-      groupNames: new Map([['image-tools', '图像工具']]),
+      groupNames: new Map([['ai_retouch', '图像工具']]),
     });
 
     expect(workspace.items).toHaveLength(1);
@@ -126,7 +126,7 @@ describe('能力与模型工作台数据', () => {
   it('管控记录覆盖能力定义，并补齐公开清单尚未加载到的能力', () => {
     const workspace = buildCapabilityWorkspace({
       definitions: [
-        definition({ id: 'main_image', name: '商品主图', group: 'image-tools' }),
+        definition({ id: 'main_image', name: '商品主图', group: 'ai_retouch' }),
       ],
       controls: [
         control({
@@ -167,14 +167,14 @@ describe('能力与模型工作台数据', () => {
   it('关键词命中能力时保留其全部模型，命中模型时只保留匹配模型', () => {
     const workspace = buildCapabilityWorkspace({
       definitions: [
-        definition({ id: 'main_image', name: '商品主图', group: 'image-tools' }),
+        definition({ id: 'main_image', name: '商品主图', group: 'ai_retouch' }),
       ],
       controls: [],
       models: [
         model({ id: 'seedream', name: 'Seedream', code: 'seedream', capability: 'main_image' }),
         model({ id: 'nano', name: 'Nano Banana', code: 'nano', capability: 'main_image' }),
       ],
-      groupNames: new Map([['image-tools', '图像工具']]),
+      groupNames: new Map([['ai_retouch', '图像工具']]),
     });
 
     const byCapability = filterCapabilityWorkspace(workspace, {
@@ -195,14 +195,14 @@ describe('能力与模型工作台数据', () => {
   it('孤儿模型只参与关键词筛选，不参与分组与运行结论筛选', () => {
     const workspace = buildCapabilityWorkspace({
       definitions: [
-        definition({ id: 'main_image', name: '商品主图', group: 'image-tools' }),
+        definition({ id: 'main_image', name: '商品主图', group: 'ai_retouch' }),
       ],
       controls: [],
       models: [
         model({ id: 'main', name: '主图模型', code: 'main', capability: 'main_image' }),
         model({ id: 'legacy', name: '旧版模型', code: 'legacy', capability: 'legacy' }),
       ],
-      groupNames: new Map([['image-tools', '图像工具']]),
+      groupNames: new Map([['ai_retouch', '图像工具']]),
     });
 
     const keywordOnly = filterCapabilityWorkspace(workspace, {

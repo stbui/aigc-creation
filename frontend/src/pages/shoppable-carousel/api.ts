@@ -8,8 +8,8 @@
  * 一律经由本文件转出 —— 一个页面的后端依赖集中可见, 换实现只改一处。
  */
 
-/** 通用接口模块 (生成 / 提示词工具 / 幂等键) */
-export { generateApi, newIdempotencyKey, promptToolsApi } from '../../lib/api';
+/** 通用接口模块 (生成 / 提示词工具 / 幂等键 / 接口错误类型) */
+export { ApiError, generateApi, newIdempotencyKey, promptToolsApi } from '../../lib/api';
 
 /**
  * 模板清单接口。

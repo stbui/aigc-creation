@@ -2,6 +2,7 @@ import {
   ActionButton,
   ExportCsvButton,
   AppliedFilters,
+  DateRangeField,
   FilterActions,
   FilterBar,
   SelectField,
@@ -73,19 +74,15 @@ export function PaymentOrdersFilterBar({
         className="w-[130px]"
         ariaLabel="时间口径"
       />
-      <TextField
-        type="date"
-        value={values.from}
-        onChange={(value) => onChange('from', value)}
-        className="w-[140px]"
-        ariaLabel="起始日期"
-      />
-      <TextField
-        type="date"
-        value={values.to}
-        onChange={(value) => onChange('to', value)}
-        className="w-[140px]"
-        ariaLabel="截止日期"
+      <DateRangeField
+        from={values.from}
+        to={values.to}
+        onChange={({ from, to }) => {
+          onChange('from', from);
+          onChange('to', to);
+        }}
+        className="w-[280px]"
+        ariaLabel="订单日期范围"
       />
       <FilterActions>
         <ActionButton onClick={onApply}>查询</ActionButton>

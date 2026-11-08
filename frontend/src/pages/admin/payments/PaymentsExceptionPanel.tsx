@@ -12,6 +12,7 @@ import {
   StaleError,
   StatusTag,
   TextAreaField,
+  formatShanghaiDateTime,
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -265,7 +266,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
       width: 160,
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-xs tabular-nums">
-          <span>{row.slaDueAt.replace('T', ' ').slice(0, 19)}</span>
+          <span>{formatShanghaiDateTime(row.slaDueAt)}</span>
           <span className={row.overdue ? 'font-medium text-danger-text' : 'text-muted-foreground'}>
             {row.overdue ? '已逾期' : '处理中'}
           </span>

@@ -52,6 +52,8 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
   const [uploading, setUploading] = useState(false);
   /** 上传互斥：拖拽/粘贴/选择文件可能在一次上传途中再次触发 */
   const uploadingRef = useRef(false);
+  /** 清空代次：清空后，清空前发起的上传完成后不得再回填图片位 */
+  const resetSeqRef = useRef(0);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   /**
@@ -93,8 +95,10 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
 
       uploadingRef.current = true;
       setUploading(true);
+      const seq = resetSeqRef.current;
       try {
         const projectId = await ensureProject();
+        if (seq !== resetSeqRef.current) return;
         const uploaded: UploadedImage[] = [];
         for (const file of accepted) {
           const asset = await assetsApi.upload(file, projectId);
@@ -105,6 +109,8 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
             projectId,
           });
         }
+        // 上传期间用户点了「新建任务」：已上传的素材留在素材库，但不回填图片位
+        if (seq !== resetSeqRef.current) return;
         // 同步镜像先落，避免上传完成到 setState 之间又触发一次上传
         imagesRef.current = [...imagesRef.current, ...uploaded];
         setImages((prev) => [...prev, ...uploaded]);
@@ -122,6 +128,18 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
   const removeImage = useCallback((id: string) => {
     imagesRef.current = imagesRef.current.filter((x) => x.id !== id);
     setImages((prev) => prev.filter((x) => x.id !== id));
+  }, []);
+
+  /**
+   * 清空图片位（工具页「新建任务」回到空态）。
+   *
+   * 同时推进清空代次：清空前发起的上传完成后不会再把图片塞回图片位。
+   * 已上传到服务端的素材仍留在素材库，可再次选用。
+   */
+  const clearImages = useCallback(() => {
+    resetSeqRef.current += 1;
+    imagesRef.current = [];
+    setImages([]);
   }, []);
 
   /**
@@ -211,6 +229,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
     uploadFiles,
     removeImage,
     replaceImage,
+    clearImages,
     /** 素材库弹窗状态 (openLibrary / closeLibrary / pick) */
     library,
     /** 手机上传弹窗: 状态 + 打开 + 接收回调 (弹窗由页面渲染) */

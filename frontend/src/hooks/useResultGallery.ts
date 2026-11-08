@@ -17,6 +17,13 @@ export interface GalleryItem {
   /** 任务 id (稳定且唯一) */
   id: string;
   /**
+   * 父任务 id（一次提交拆成多个任务时，子任务指向父任务）。
+   *
+   * 删除批次必须只删父任务：后端会级联删除整批，逐张删会得到
+   * 「父任务删完后其余 403」的假失败提示。
+   */
+  parentTaskId?: string | null;
+  /**
    * 任务状态。生成中的任务没有 url, 由结果栏渲染成占位卡;
    * 缺省视为 succeeded (页面内 prepend 的新图都是已完成态)。
    */
@@ -138,6 +145,7 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
           .filter((url): url is string => Boolean(url));
         const base = {
           id: t.id,
+          parentTaskId: t.parentTaskId ?? null,
           createdAt: t.createdAt,
           params,
           prompt: promptOf(params),

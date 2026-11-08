@@ -10,7 +10,7 @@
 export { assetThumbUrl } from '../../lib/api';
 
 import type { GalleryItem } from './hooks';
-import { buildBatchRows, formatBatchDate, type BatchRowBase } from '../../components/batchResult';
+import { buildBatchRows, cellState, formatBatchDate, type BatchRowBase } from '../../components/batchResult';
 
 /* ------------------------------------------------------------------------- */
 /* 模板筛选                                                                 */
@@ -60,7 +60,8 @@ export function clampCount(raw: number, min: number, max: number): number {
 
 /** 行内的一格: 产出图 */
 export type { CellState } from '../../components/batchResult';
-export { batchIndexOf, cellState } from '../../components/batchResult';
+export { batchIndexOf } from '../../components/batchResult';
+export { cellState };
 
 /** 一行 = 一次生成 (批次内全部任务); 页面在公共字段之外多带卖点与模板 */
 export interface ResultRow extends BatchRowBase {
@@ -70,11 +71,30 @@ export interface ResultRow extends BatchRowBase {
   templateName?: string;
 }
 
-/** 格子的展示名: 优先任务 caption, 回落「第 N 张」 */
+/**
+ * 格子的展示名: 优先任务 caption, 其次「第 N 张 · 拍名」, 最后「第 N 张」。
+ *
+ * `beatLabel` 由准入层随任务参数落库（模板模式为模板三拍名，AI 模式为空），
+ * 不读它的话结果与下载文件名都只剩「第 N 张」，看不出本张属于哪一拍。
+ */
 export function labelOf(item: GalleryItem): string {
   if (item.caption) return item.caption;
   const shot = Number(item.params?.shotIndex);
-  return Number.isFinite(shot) && shot > 0 ? `第 ${shot} 张` : '带货图文';
+  const base = Number.isFinite(shot) && shot > 0 ? `第 ${shot} 张` : '带货图文';
+  const beat = textParam(item, 'beatLabel');
+  return beat ? `${base} · ${beat}` : base;
+}
+
+/**
+ * 批次没有可展示封面时的状态文案。
+ *
+ * 历史条原先只要没有封面就写「生成中」——整批失败 / 取消后用户
+ * 会一直等一个不会完成的批次。这里按格子的真实状态区分。
+ */
+export function emptyBatchLabel(cells: GalleryItem[]): string {
+  if (cells.some((cell) => cellState(cell) === 'pending')) return '生成中';
+  if (cells.some((cell) => cell.status === 'cancelled')) return '已取消';
+  return '失败';
 }
 
 /** 取任务参数里的字符串参数; 非字符串或空串返回 undefined */
@@ -90,13 +110,14 @@ export function rowKeyOf(item: GalleryItem): string {
 }
 
 /**
- * 结果行数（一次生成 = 一行），供页签角标使用。
+ * 一次生成应有多少张：优先任务参数里的 `batchSize`。
  *
- * 页签上直接写任务数会把「一次生成 6 张」显示成 6 次；角标语义必须和
- * 下方列表的行数一致。
+ * 批次内某几张被单独删除后，`cells.length` 会变小；历史卡若用现存任务数
+ * 当分母，会把「2/6」显示成「2/2」，把缺失藏起来。
  */
-export function countGenerations(items: GalleryItem[]): number {
-  return new Set(items.map(rowKeyOf)).size;
+export function batchSizeOf(cells: GalleryItem[]): number {
+  const declared = Number(cells[0]?.params?.batchSize);
+  return Number.isFinite(declared) && declared > 0 ? declared : cells.length;
 }
 
 /** 按 batchId 归组; 无 batchId 的任务各自成行。列表本身已按时间倒序 */

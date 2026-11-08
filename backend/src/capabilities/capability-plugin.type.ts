@@ -205,6 +205,14 @@ export interface CapabilityPlugin {
   /** 需要上传几张输入图 */
   inputs: 0 | 1 | 2;
   /**
+   * 输入图数量上限（可选）。
+   *
+   * 未声明时只受准入层全局上限约束；声明后准入层按本值拒绝超额提交。
+   * 用于页面有明确张数约定的能力（如带货图文「同一产品，最多 5 张」），
+   * 避免绕过前端直接调接口传入更多参考图。
+   */
+  maxInputs?: number;
+  /**
    * 输入图在模型侧的用途（默认 `reference`）。
    *
    * - `reference`: 作为生成条件/参考图，允许走协议的生成端点。
@@ -260,6 +268,18 @@ export function assertCapabilityIntegrity(plugins: CapabilityPlugin[]): void {
 
     if (!p.modality) {
       errors.push(`能力 ${tag} 未声明 modality`);
+    }
+
+    /*
+     * 输入上限必须是有意义的值：小于下限等于该能力永远无法提交，
+     * 非整数会在准入层变成「当前 3 张 > 上限 2.5 张」这种不可读的拒绝。
+     */
+    if (p.maxInputs !== undefined) {
+      if (!Number.isInteger(p.maxInputs) || p.maxInputs < p.inputs) {
+        errors.push(
+          `能力 ${tag} 的 maxInputs(${p.maxInputs}) 必须是 ≥ inputs(${p.inputs}) 的整数`,
+        );
+      }
     }
 
     // 模型映射缺失会让该能力在准入时无参数可映射（提交必失败），属声明错误

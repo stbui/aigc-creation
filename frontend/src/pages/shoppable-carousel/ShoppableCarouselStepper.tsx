@@ -1,7 +1,5 @@
 import { Minus, Plus } from 'lucide-react';
 
-import { MAX_COUNT, MIN_COUNT } from './constants';
-
 /**
  * 生成张数步进器。
  *
@@ -9,13 +7,19 @@ import { MAX_COUNT, MIN_COUNT } from './constants';
  * 而不是配置卡片里的一项 —— 参考站的「张数 热门图文多为 6 张 − 6 +」
  * 与「生成带货图文」按钮同属提交区（`docs/shoppable-carousel-design.md` §4）。
  *
- * 取值范围 6–10（参考站实测：减号在 6 时禁用、加号在 10 时禁用）。
+ * 区间由页面按后端 `GET /shoppable-carousel/templates` 的 `countRange`
+ * 下发（参考站实测 6–10：减号在下界禁用、加号在上界禁用），
+ * 组件自己不持有区间常量，避免与后端漂移。
  */
 export function ShoppableCarouselStepper({
   count,
+  min,
+  max,
   onCountChange,
 }: {
   count: number;
+  min: number;
+  max: number;
   onCountChange: (value: number) => void;
 }) {
   return (
@@ -30,31 +34,31 @@ export function ShoppableCarouselStepper({
         <button
           type="button"
           aria-label="减少张数"
-          disabled={count <= MIN_COUNT}
-          onClick={() => onCountChange(Math.max(MIN_COUNT, count - 1))}
+          disabled={count <= min}
+          onClick={() => onCountChange(Math.max(min, count - 1))}
         >
           <Minus size={13} />
         </button>
         <input
           type="number"
-          min={MIN_COUNT}
-          max={MAX_COUNT}
+          min={min}
+          max={max}
           value={count}
           aria-label="生成张数"
           onChange={(e) => {
             const n = Number(e.target.value);
             onCountChange(
               Number.isFinite(n)
-                ? Math.min(MAX_COUNT, Math.max(MIN_COUNT, Math.round(n)))
-                : MIN_COUNT,
+                ? Math.min(max, Math.max(min, Math.round(n)))
+                : min,
             );
           }}
         />
         <button
           type="button"
           aria-label="增加张数"
-          disabled={count >= MAX_COUNT}
-          onClick={() => onCountChange(Math.min(MAX_COUNT, count + 1))}
+          disabled={count >= max}
+          onClick={() => onCountChange(Math.min(max, count + 1))}
         >
           <Plus size={13} />
         </button>

@@ -44,6 +44,7 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/v1/capabilities` | 能力清单（公开免登录），前端全部渲染依据 |
+| GET | `/api/v1/shoppable-carousel/templates` | AI 带货图文模板清单（公开免登录）：10 个业务分类 + 49 个模板（三拍文案 / 结构化提示词片段 / 静态缩略图路径）+ 张数区间 6–10 |
 | POST | `/api/v1/auth/register` | 注册，**直接返回 `accessToken`**（注册即登录） |
 | POST | `/api/v1/auth/login` | 登录，返回 `{ accessToken, user }` |
 | POST/GET | `/api/v1/auth/qr/create`、`/auth/qr/status` | 扫码登录：桌面建码 / 轮询换 token（公开，`status` 首次兑换即作废） |
@@ -56,7 +57,7 @@
 | GET | `/api/v1/assets` | 素材库列表（`kind`/`capability`/`limit`/`offset`） |
 | PATCH | `/api/v1/assets/move` | 批量移动素材到另一项目（`{ ids: string[], projectId }`，≤100），返回 `{ moved, missing, projectId }`；只改素材分组，不动任务归属 |
 | DELETE | `/api/v1/assets/:id` | 删除素材（生成图连带删除产出它的任务） |
-| POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`logicalModelId` 必填（前台模型 id，来自 `/models`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前只有商品详情图）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
+| POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`logicalModelId` 必填（前台模型 id，来自 `/models`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前为商品详情图与 AI 带货图文）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
 | GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图；`errorCode` 取 `42201`–`42206` |
 | GET | `/api/v1/tasks` | 任务列表（含 `outputAsset`，历史页缩略图依赖它） |
 | GET | `/api/v1/tasks/page` | 任务列表分页（`projectId` / `capability` / `excludeFailed` / `limit` / `offset`），返回 `{ items, total, limit, offset }`；`excludeFailed=1` 时列表与总数都排除失败任务。**必须注册在 `/tasks/:id` 之前**，否则 `page` 会被当成 id |
