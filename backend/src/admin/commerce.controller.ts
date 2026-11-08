@@ -409,6 +409,17 @@ export class AdminCommerceController {
     return this.commerce.orderDetail(id);
   }
 
+  /**
+   * 删除订单。仅允许没有支付/退款/积分/会员/发票/对账/工单关联的
+   * 待支付或已取消订单；已支付订单保留并走退款流程。
+   */
+  @Delete("orders/:id")
+  @RequirePermission(PERMISSIONS.orderDelete)
+  @AuditAction("order.delete")
+  deleteOrder(@Param("id") id: string) {
+    return this.commerce.deleteOrder(id);
+  }
+
   /** 手工核销 (B-42): 标记已支付, 须写审计 */
   @Post("orders/:id/mark-paid")
   @RequirePermission(PERMISSIONS.orderMarkPaid)

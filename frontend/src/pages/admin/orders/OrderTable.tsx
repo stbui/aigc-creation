@@ -3,6 +3,7 @@ import {
   ActionButton,
   AdminDataTable,
   BatchBar,
+  RowMenu,
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
@@ -27,12 +28,14 @@ export function OrderTable({
   hasFilter,
   canMarkPaid,
   canRefund,
+  canDelete,
   busy,
   onRetry,
   onSelectedChange,
   onPageChange,
   onOpenDetail,
   onAction,
+  onDelete,
   onBatchMarkPaid,
   onReset,
 }: {
@@ -46,12 +49,14 @@ export function OrderTable({
   hasFilter: boolean;
   canMarkPaid: boolean;
   canRefund: boolean;
+  canDelete: boolean;
   busy: boolean;
   onRetry: () => void;
   onSelectedChange: (keys: string[]) => void;
   onPageChange: (page: number, pageSize: number) => void;
   onOpenDetail: (id: string) => void;
   onAction: (kind: 'markPaid' | 'refund', row: AdminOrderRow) => void;
+  onDelete: (row: AdminOrderRow) => void;
   onBatchMarkPaid: () => void;
   onReset: () => void;
 }) {
@@ -177,7 +182,7 @@ export function OrderTable({
     {
       key: 'ops',
       title: '操作',
-      width: 130,
+      width: 170,
       /* 固定在最右, 保证滚动时高频动作仍可见 */
       fixed: 'right',
       render: (row) => (
@@ -204,6 +209,21 @@ export function OrderTable({
               >
                 退款
               </ActionButton>
+            )}
+          {canDelete &&
+            (row.status === 'pending' || row.status === 'cancelled') &&
+            row.paymentCount === 0 && (
+              <RowMenu
+                label={`订单 ${row.orderNo} 更多操作`}
+                items={[
+                  {
+                    key: 'delete',
+                    label: '删除',
+                    danger: true,
+                    onSelect: () => onDelete(row),
+                  },
+                ]}
+              />
             )}
         </div>
       ),
@@ -240,7 +260,7 @@ export function OrderTable({
         onRetry={onRetry}
         /* 整行可点开详情：操作列在横向滚动后容易被裁掉 */
         onRowClick={(row) => onOpenDetail(row.id)}
-        minWidth={1160}
+        minWidth={1200}
         selectable
         selected={selected}
         onSelectedChange={onSelectedChange}

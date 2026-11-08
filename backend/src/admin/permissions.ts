@@ -69,6 +69,8 @@ export const PERMISSIONS = {
   orderRead: "order.read",
   orderMarkPaid: "order.mark_paid",
   orderRefund: "order.refund",
+  /** 删除从未产生支付、积分、会员等业务记录的待支付/已取消订单 */
+  orderDelete: "order.delete",
   paymentRead: "payment.read",
   /** 渠道配置写入。高危: 保存时写审计，但不要求填写 reason */
   paymentWrite: "payment.write",
@@ -210,6 +212,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.orderRead,
     PERMISSIONS.orderMarkPaid,
     PERMISSIONS.orderRefund,
+    PERMISSIONS.orderDelete,
     PERMISSIONS.paymentRead,
     // 财务可查单/关单(推进渠道事实), 但不能改收款通道配置
     PERMISSIONS.paymentOperate,
@@ -247,6 +250,7 @@ export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.taskDelete,
   PERMISSIONS.productDelete,
   PERMISSIONS.orderRefund,
+  PERMISSIONS.orderDelete,
   PERMISSIONS.creditAdjust,
   PERMISSIONS.complianceTakedown,
   PERMISSIONS.capabilityWrite,

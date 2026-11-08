@@ -440,6 +440,165 @@ export class AdminCommerceService {
       });
   }
 
+  /**
+   * 删除一笔未支付订单。
+   *
+   * 订单一旦产生支付、退款、积分、会员、发票、对账或工单记录就是业务证据，不能物理删除。
+   * 这里只放行 pending / cancelled，并在删除前重新核对所有关联；待支付订单占用的
+   * 库存要随订单一起释放，否则删除测试单会让库存永久少卖。
+   */
+  async deleteOrder(id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        orderNo: true,
+        status: true,
+        totalCents: true,
+        refundedCents: true,
+        grantedCredits: true,
+        paidAt: true,
+        providerPaidAt: true,
+        providerTradeNo: true,
+        membershipAppliedAt: true,
+        stockReserved: true,
+        membership: { select: { id: true } },
+        items: {
+          select: {
+            productId: true,
+            quantity: true,
+            stockReservedSnapshot: true,
+          },
+        },
+        payments: { select: { id: true }, take: 1 },
+        refunds: { select: { id: true }, take: 1 },
+        invoices: { select: { id: true }, take: 1 },
+        membershipUsage: { select: { id: true }, take: 1 },
+      },
+    });
+    if (!order) throw new AppError(40400, "订单不存在", 404);
+
+    if (order.status !== "pending" && order.status !== "cancelled") {
+      throw new AppError(
+        40901,
+        "只有待支付或已取消订单可删除；已支付订单请通过退款流程处理",
+        409,
+      );
+    }
+
+    /*
+     * 支付尝试（即使失败）、退款、积分批次/流水、会员、发票、对账和工单证据都禁止删除。
+     * 先给出可解释的 409，避免把数据库外键错误直接暴露给运营。
+     */
+    const [
+      creditLots,
+      legacyLedger,
+      creditLedgerEntries,
+      notifications,
+      exceptions,
+      reconciliation,
+      legacyReconciliation,
+      tickets,
+    ] = await Promise.all([
+      this.prisma.creditLot.count({ where: { orderId: id } }),
+      this.prisma.creditLedger.count({ where: { orderId: id } }),
+      this.prisma.creditLedgerEntry.count({ where: { paymentOrderId: id } }),
+      this.prisma.paymentNotification.count({
+        where: { OR: [{ orderId: id }, { merchantOrderNo: order.orderNo }] },
+      }),
+      this.prisma.paymentExceptionCase.count({
+        where: { OR: [{ orderId: id }, { merchantOrderNo: order.orderNo }] },
+      }),
+      this.prisma.paymentReconciliationItem.count({
+        where: { OR: [{ orderId: id }, { merchantOrderNo: order.orderNo }] },
+      }),
+      // 旧对账明细与工单只保存字符串引用，没有数据库外键兜底。
+      this.prisma.reconciliationItem.count({ where: { orderId: id } }),
+      this.prisma.ticket.count({ where: { orderId: id } }),
+    ]);
+
+    const hasFinancialHistory =
+      order.refundedCents > 0 ||
+      order.grantedCredits > 0 ||
+      order.paidAt !== null ||
+      order.providerPaidAt !== null ||
+      order.providerTradeNo !== null ||
+      order.membershipAppliedAt !== null ||
+      order.membership !== null ||
+      order.payments.length > 0 ||
+      order.refunds.length > 0 ||
+      order.invoices.length > 0 ||
+      order.membershipUsage.length > 0 ||
+      creditLots +
+        legacyLedger +
+        creditLedgerEntries +
+        notifications +
+        exceptions +
+        reconciliation +
+        legacyReconciliation +
+        tickets >
+        0;
+    if (hasFinancialHistory) {
+      throw new AppError(
+        40901,
+        "该订单已有支付、退款、积分、会员、发票、对账或工单关联，不能删除；请保留订单用于追溯",
+        409,
+      );
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (order.stockReserved) {
+          const reserved = new Map<string, number>();
+          for (const item of order.items) {
+            const quantity = item.stockReservedSnapshot ?? 0;
+            if (quantity > 0) {
+              reserved.set(item.productId, (reserved.get(item.productId) ?? 0) + quantity);
+            }
+          }
+          for (const [productId, quantity] of reserved) {
+            const released = await tx.product.updateMany({
+              where: { id: productId, stockReserved: { gte: quantity } },
+              data: { stockReserved: { decrement: quantity } },
+            });
+            if (released.count === 0) {
+              throw new AppError(
+                40901,
+                "订单库存占用状态异常，请刷新后重试",
+                409,
+              );
+            }
+          }
+        }
+
+        // OrderItem 是必填外键，先删明细再删订单；状态条件防止与支付回调并发误删。
+        // paidCents 是应付金额，不是已支付金额，不能作为删除条件。
+        await tx.orderItem.deleteMany({ where: { orderId: id } });
+        const deleted = await tx.order.deleteMany({
+          where: { id, status: { in: ["pending", "cancelled"] } },
+        });
+        if (deleted.count === 0) {
+          throw new AppError(
+            40909,
+            "订单状态已变化，请刷新后重试",
+            409,
+          );
+        }
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2003") {
+        throw new AppError(
+          40901,
+          "该订单刚刚产生了关联记录，不能删除；请刷新后确认",
+          409,
+        );
+      }
+      throw error;
+    }
+
+    return { id: order.id, orderNo: order.orderNo };
+  }
+
   /** 订单导出 (CSV)。金额列同时给分与元, 财务按元核对, 技术按分回查 */
   async exportOrders(q: OrderListQuery): Promise<string> {
     const rows = await this.prisma.order.findMany({

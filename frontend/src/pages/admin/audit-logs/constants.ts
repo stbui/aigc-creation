@@ -92,6 +92,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'order.batch': '批量处理订单',
   'order.mark_paid': '标记订单已支付',
   'order.refund': '订单退款',
+  'order.delete': '删除订单',
   'order.refund_confirm': '确认订单退款',
   'payment.order_close': '关闭支付订单',
   'payment.order_query': '查询支付订单',

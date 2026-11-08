@@ -26,6 +26,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   "order.read": "查看订单",
   "order.mark_paid": "订单手工核销",
   "order.refund": "订单退款",
+  "order.delete": "删除订单",
   "payment.read": "查看支付流水",
   "finance.dashboard": "查看财务概览",
   "finance.reconcile": "渠道对账",

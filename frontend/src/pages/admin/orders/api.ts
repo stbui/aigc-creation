@@ -36,6 +36,12 @@ export type RefundConfirmationResult =
 export const adminOrdersApi = {
   ...baseAdminOrdersApi,
 
+  /** 安全删除：后端仅允许无支付/退款/积分/会员等业务记录的待支付或已取消订单。 */
+  remove: (id: string) =>
+    request<{ id: string; orderNo: string }>(`/admin/orders/${id}`, {
+      method: 'DELETE',
+    }),
+
   /**
    * 异步退款最终人工核销。
    *

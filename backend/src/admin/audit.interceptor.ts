@@ -105,6 +105,7 @@ const AUDIT_REASON_LABELS: Record<string, string> = {
   "invoice.red_flush": "登记发票冲红",
   "order.mark_paid": "标记订单已支付",
   "order.batch": "批量处理订单",
+  "order.delete": "删除订单",
   "order.refund": "订单退款",
   "order.refund_confirm": "人工核销异步退款",
   "credit.adjust": "人工调整用户积分",

@@ -11,6 +11,7 @@ import { useAdmin, useAdminDetailParam, useToast } from './hooks';
 import { yuan, yuanToCents } from './utils';
 import { OrderDetailDrawer } from './OrderDetailDrawer';
 import { OrderFilterBar } from './OrderFilterBar';
+import { OrderDeleteConfirm } from './OrderDeleteConfirm';
 import { OrderTable } from './OrderTable';
 import {
   BatchMarkPaidDialog,
@@ -64,6 +65,7 @@ export function AdminOrdersPage() {
 
   const [detailId, setDetailId] = useAdminDetailParam();
   const [action, setAction] = useState<{ kind: 'markPaid' | 'refund'; row: AdminOrderRow } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminOrderRow | null>(null);
   /** 退款金额（元）。打开弹窗时预填可退上限 */
   const [refundYuan, setRefundYuan] = useState('');
   const [refundReason, setRefundReason] = useState('');
@@ -136,6 +138,35 @@ export function AdminOrdersPage() {
       reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '操作失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requestDelete = (row: AdminOrderRow) => {
+    if (row.status !== 'pending' && row.status !== 'cancelled') {
+      toast.error('只有待支付或已取消订单可删除；已支付订单请使用退款流程');
+      return;
+    }
+    if (row.paymentCount > 0) {
+      toast.error('该订单已有支付尝试记录，不能删除；请保留用于追溯');
+      return;
+    }
+    setDeleteTarget(row);
+  };
+
+  const runDelete = async () => {
+    if (!deleteTarget) return;
+    setBusy(true);
+    try {
+      await adminOrdersApi.remove(deleteTarget.id);
+      toast.success(`已删除订单 ${deleteTarget.orderNo}`);
+      if (detailId === deleteTarget.id) setDetailId(null);
+      setSelected((current) => current.filter((id) => id !== deleteTarget.id));
+      setDeleteTarget(null);
+      reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '删除订单失败');
     } finally {
       setBusy(false);
     }
@@ -240,12 +271,14 @@ export function AdminOrdersPage() {
           hasFilter={hasFilter}
           canMarkPaid={can('order.mark_paid')}
           canRefund={can('order.refund')}
+          canDelete={can('order.delete')}
           busy={busy}
           onRetry={reload}
           onSelectedChange={setSelected}
           onPageChange={setPage}
           onOpenDetail={setDetailId}
           onAction={openAction}
+          onDelete={requestDelete}
           onBatchMarkPaid={() => setBatchOpen(true)}
           onReset={reset}
         />
@@ -282,6 +315,13 @@ export function AdminOrdersPage() {
         onProviderRefundIdChange={setRefundProviderId}
         onCancel={() => setRefundConfirmation(null)}
         onConfirm={() => void runRefundConfirmation()}
+      />
+
+      <OrderDeleteConfirm
+        target={deleteTarget}
+        loading={busy}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void runDelete()}
       />
 
       <BatchMarkPaidDialog
