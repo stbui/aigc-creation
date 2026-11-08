@@ -235,7 +235,8 @@ export class CreditWalletService {
    * 结算：消费预留，差额退回原批次。
    *
    * @param actualMicrocredits 实际应扣金额，必须 ≤ 预留 + 可补扣的可用余额
-   * @returns refund：退回可用余额的部分；supplement：从可用余额补扣的部分
+   * @returns refund：从冻结中释放的差额（命中已过期批次的部分立即作废，不计入可用余额）；
+   *          supplement：从可用余额补扣的部分
    */
   async settle(
     db: WalletDb,
@@ -254,6 +255,17 @@ export class CreditWalletService {
     const refund = reserved > actual ? reserved - actual : 0n;
     const supplement = actual > reserved ? actual - reserved : 0n;
 
+    /*
+     * 先回填批次再同步账户：回填可能命中已在任务执行期间过期的批次，
+     * 这部分积分按「过期即作废」处理，不进入可用余额，也不能进批次。
+     * `expired` 必须从可用增量里扣除，否则用户会看到一笔可用却无法消费的
+     * 余额（`takeFromLots` 只取未过期批次），并在下次到期清扫前扣费失败。
+     */
+    const restored =
+      refund > 0n
+        ? await this.restoreToLots(db, params.billingOrderId, refund)
+        : { restored: 0n, expired: 0n };
+
     const updated = await db.creditAccount.updateMany({
       where: {
         userId: params.userId,
@@ -261,7 +273,7 @@ export class CreditWalletService {
         availableMicrocredits: { gte: supplement },
       },
       data: {
-        availableMicrocredits: { increment: refund - supplement },
+        availableMicrocredits: { increment: refund - restored.expired - supplement },
         reservedMicrocredits: { decrement: reserved },
         version: { increment: 1 },
       },
@@ -270,7 +282,6 @@ export class CreditWalletService {
       throw new AppError(40909, '预留积分不足以完成结算，已转人工核对', 409);
     }
 
-    if (refund > 0n) await this.restoreToLots(db, params.billingOrderId, refund);
     /*
      * 补扣必须同时从批次扣减：账户可用减少而批次不动，
      * 「available == Σ remaining」立刻破掉，之后的每日对账再也对不上。
@@ -285,16 +296,27 @@ export class CreditWalletService {
       note: params.note ?? '',
     });
     if (refund > 0n) {
+      const refundNote = params.note ? `${params.note}；预授权差额退回` : '预授权差额退回';
       await this.writeEntry(db, params.userId, 'refund', refund, refund, 0n, after, {
         ...params.meta,
         billingOrderId: params.billingOrderId,
-        note: params.note ? `${params.note}；预授权差额退回` : '预授权差额退回',
+        note:
+          restored.expired > 0n
+            ? `${refundNote}（其中 ${formatAmount(restored.expired)} 积分因批次已过期作废）`
+            : refundNote,
+      });
+    }
+    if (restored.expired > 0n) {
+      await this.writeEntry(db, params.userId, 'expire', -restored.expired, -restored.expired, 0n, after, {
+        ...params.meta,
+        billingOrderId: params.billingOrderId,
+        note: '退款差额命中已过期批次，立即作废',
       });
     }
     return { refund, supplement, balance: after };
   }
 
-  /** 退款：冻结金额全额退回可用余额，批次明细原路回填 */
+  /** 退款：冻结金额退回可用余额，批次明细原路回填；命中已过期批次的部分立即作废 */
   async refund(
     db: WalletDb,
     params: {
@@ -308,10 +330,13 @@ export class CreditWalletService {
     const amount = params.amountMicrocredits;
     if (amount <= 0n) return { balance: await this.balanceOf(db, params.userId) };
 
+    // 与 settle 同口径：命中已过期批次的回填立即作废，不进入可用余额。
+    const { expired } = await this.restoreToLots(db, params.billingOrderId, amount);
+
     const updated = await db.creditAccount.updateMany({
       where: { userId: params.userId, reservedMicrocredits: { gte: amount } },
       data: {
-        availableMicrocredits: { increment: amount },
+        availableMicrocredits: { increment: amount - expired },
         reservedMicrocredits: { decrement: amount },
         version: { increment: 1 },
       },
@@ -319,28 +344,47 @@ export class CreditWalletService {
     if (updated.count === 0) {
       throw new AppError(40909, '预留积分与账单不一致，已转人工核对', 409);
     }
-    await this.restoreToLots(db, params.billingOrderId, amount);
     const after = await this.balanceOf(db, params.userId);
     await this.writeEntry(db, params.userId, 'refund', amount, amount, -amount, after, {
       ...params.meta,
       billingOrderId: params.billingOrderId,
-      note: params.note ?? '',
+      note:
+        expired > 0n
+          ? `${params.note?.trim() || '退款'}（其中 ${formatAmount(expired)} 积分因批次已过期作废）`
+          : params.note ?? '',
     });
+    if (expired > 0n) {
+      await this.writeEntry(db, params.userId, 'expire', -expired, -expired, 0n, after, {
+        ...params.meta,
+        billingOrderId: params.billingOrderId,
+        note: '退款命中已过期批次，立即作废',
+      });
+    }
     return { balance: after };
   }
 
-  /** 到期回收：批次剩余清零，可用余额同步减少，写 expire 流水 */
+  /** 到期回收：批次剩余清零，可用余额同步减少，写 expire 流水；返回实际回收量 */
   async expireLot(
     db: WalletDb,
-    lot: { id: string; userId: string; remainingMicrocredits: bigint },
-  ): Promise<boolean> {
-    const amount = lot.remainingMicrocredits;
-    if (amount <= 0n) return false;
+    lot: { id: string; userId: string },
+  ): Promise<bigint> {
+    /*
+     * 必须在事务内读取当前剩余量。调用方在事务外扫描到期批次，扫描与逐条
+     * 回收之间可能已有结算 / 退款把差额回填进同一批次；沿用扫描时的旧值会
+     * 「清零 R+Δ、只扣 R」，让 available 与 Σ 批次永久差 Δ。
+     */
+    const current = await db.creditLot.findUnique({
+      where: { id: lot.id },
+      select: { userId: true, remainingMicrocredits: true },
+    });
+    if (!current || current.userId !== lot.userId) return 0n;
+    const amount = current.remainingMicrocredits;
+    if (amount <= 0n) return 0n;
     const zeroed = await db.creditLot.updateMany({
       where: { id: lot.id, remainingMicrocredits: { gt: 0n } },
       data: { remainingMicrocredits: 0n },
     });
-    if (zeroed.count === 0) return false;
+    if (zeroed.count === 0) return 0n;
     await this.ensureAccount(db, lot.userId);
     /*
      * CAS 条件 `available >= amount` 不可省：到期回收与生成任务的 reserve
@@ -363,7 +407,7 @@ export class CreditWalletService {
       lotId: lot.id,
       note: '积分到期回收',
     });
-    return true;
+    return amount;
   }
 
   /** 账单的预留明细 */
@@ -425,25 +469,59 @@ export class CreditWalletService {
    * 把金额退回原批次（结算差额 / 全额退款）。
    *
    * 到期时间保留：退款不是新发积分，不能借退款把快过期的积分续成永久的。
-   * 若批次已在任务执行期间过期，余额会落到已过期批次上，由下一次到期回收统一清零 ——
-   * 这与「过期即作废」的规则一致，且不会让账户与批次产生差额。
+   * 若批次已在任务执行期间过期，回填部分**立即作废**：不写回批次、不计入可用
+   * 余额，只把 `expired` 返回给调用方写 expire 流水。
+   *
+   * 旧实现把过期批次也写回去、等下一轮到期清扫清零：中间窗口里 `available`
+   * 包含这笔积分，但 `takeFromLots` 只取未过期批次，用户看到余额却一提交生成
+   * 就撞 50001。作废必须与回填同时发生。
    */
-  private async restoreToLots(db: WalletDb, billingOrderId: string, amount: bigint): Promise<void> {
-    if (amount <= 0n) return;
-    const items = await this.reservationItems(db, billingOrderId);
+  private async restoreToLots(
+    db: WalletDb,
+    billingOrderId: string,
+    amount: bigint,
+  ): Promise<{ restored: bigint; expired: bigint }> {
+    if (amount <= 0n) return { restored: 0n, expired: 0n };
+    const items = (await this.reservationItems(db, billingOrderId)).sort((a, b) =>
+      a.lotId < b.lotId ? -1 : a.lotId > b.lotId ? 1 : 0,
+    );
+    const lotIds = [...new Set(items.map((item) => item.lotId))];
+    const lots = lotIds.length
+      ? await db.creditLot.findMany({
+          where: { id: { in: lotIds } },
+          select: { id: true, expireAt: true },
+        })
+      : [];
+    const expireAtById = new Map(lots.map((lot) => [lot.id, lot.expireAt]));
+    const now = new Date();
+
     let remaining = amount;
-    for (const item of items.sort((a, b) => (a.lotId < b.lotId ? -1 : a.lotId > b.lotId ? 1 : 0))) {
+    let restored = 0n;
+    let expired = 0n;
+    for (const item of items) {
       if (remaining <= 0n) break;
       const take = item.microcredits < remaining ? item.microcredits : remaining;
-      await db.creditLot.updateMany({
+      const expireAt = expireAtById.get(item.lotId) ?? null;
+      if (expireAt && expireAt.getTime() <= now.getTime()) {
+        // 批次已过期：回填即作废，由调用方从可用余额增量里扣除。
+        expired += take;
+        remaining -= take;
+        continue;
+      }
+      const bumped = await db.creditLot.updateMany({
         where: { id: item.lotId },
         data: { remainingMicrocredits: { increment: take } },
       });
+      if (bumped.count === 0) {
+        throw new AppError(50001, '预留批次不存在，退款回填失败，已转人工核对', 500);
+      }
+      restored += take;
       remaining -= take;
     }
     if (remaining > 0n) {
       throw new AppError(50001, '退款金额超过预留明细，已转人工核对', 500);
     }
+    return { restored, expired };
   }
 
   /** 写一条流水；快照取账户当前值，调用方必须先完成账户更新 */

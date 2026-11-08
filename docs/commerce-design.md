@@ -75,7 +75,7 @@ Product (SKU) ──下单──> Order ──支付──> Payment ──回调
 
 ### 2.4 账实核对
 
-`GET /admin/credits/audit` 比对 `available + reserved` 与「Σ 批次剩余」（只读，不修数）。差额必须人工判断是漏扣还是漏退，自动抹平等于掩盖资损。
+`GET /admin/credits/audit` 比对 `available` 与「Σ 批次剩余」（只读，不修数）。冻结量不参与等式：预留是「可用 -X、冻结 +X，同时批次 -X」，已冻结部分在预留时就离开了批次；把 `reserved` 加回等式会让所有有进行中任务的用户被误报。差额必须人工判断是漏扣还是漏退，自动抹平等于掩盖资损。
 
 ## 3. 商品
 

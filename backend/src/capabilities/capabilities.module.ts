@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CreditsModule } from '../credits/credits.module';
+import { PricingModule } from '../credits/pricing.module';
 import { ModelModule } from '../model/model.module';
 import { CapabilitiesController } from './capabilities.controller';
 import { ShoppableCarouselController } from './shoppable-carousel.controller';
@@ -18,7 +19,7 @@ import { CapabilityAvailabilityService } from './capability-availability.service
  * 不反向依赖本模块, 无循环。
  */
 @Module({
-  imports: [CreditsModule, ModelModule],
+  imports: [CreditsModule, PricingModule, ModelModule],
   controllers: [CapabilitiesController, ShoppableCarouselController],
   providers: [CapabilityAvailabilityService],
   exports: [CapabilityAvailabilityService],

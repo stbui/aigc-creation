@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RouteCatalogService } from '../model/catalog/route-catalog.service';
+import type { CachedLogicalModel, RouteCatalogSnapshot } from '../model/routing/routing.types';
+import { RouteHealthService } from '../model/routing/route-health.service';
 import { CAPABILITIES, getCapability } from './capability.registry';
 import { AppError } from '../common/app.exception';
 
@@ -83,9 +85,22 @@ export class CapabilityAvailabilityService {
   /** 每项能力的线路可用性缓存（能力 id → 结论） */
   private readonly remoteCache = new Map<string, { at: number; info: RemoteInfo }>();
 
+  /**
+   * 快照内的「能力 id → 前台模型」索引，按快照引用懒构建。
+   *
+   * `runtimeAll()` 会对 17 项能力逐个调用 `remoteOf`，每次都从
+   * `snapshot.ordered` 全量扫描一遍；模型数量增长后这是 17 × N 的无谓重复。
+   * 按能力分桶后每项只看自己的模型，判定逻辑与逐条扫描完全一致。
+   */
+  private modelIndex: {
+    snapshot: RouteCatalogSnapshot;
+    byCapability: Map<string, CachedLogicalModel[]>;
+  } | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalog: RouteCatalogService,
+    private readonly health: RouteHealthService,
   ) {}
 
   /**
@@ -101,10 +116,29 @@ export class CapabilityAvailabilityService {
     let info: RemoteInfo = { available: false, label: '' };
     try {
       const snapshot = await this.catalog.snapshotOrThrow();
-      for (const id of snapshot.ordered) {
-        const model = snapshot.models.get(id);
-        if (!model || model.capability !== capabilityId) continue;
-        const route = model.routes.find((item) => item.enabled && item.weight > 0);
+      if (!this.modelIndex || this.modelIndex.snapshot !== snapshot) {
+        const byCapability = new Map<string, CachedLogicalModel[]>();
+        for (const id of snapshot.ordered) {
+          const model = snapshot.models.get(id);
+          if (!model) continue;
+          const list = byCapability.get(model.capability) ?? [];
+          list.push(model);
+          byCapability.set(model.capability, list);
+        }
+        this.modelIndex = { snapshot, byCapability };
+      }
+      for (const model of this.modelIndex.byCapability.get(capabilityId) ?? []) {
+        const route = model.routes.find(
+          (item) =>
+            item.enabled &&
+            item.weight > 0 &&
+            // 冷却中的线路与选路器一样不可用；否则界面会亮绿灯、提交后选路失败。
+            !this.health.isBlocked({
+              channelId: item.channelModel.channelId,
+              channelModelId: item.channelModel.id,
+              routeId: item.id,
+            }),
+        );
         if (!route) continue;
         info = {
           available: true,
@@ -124,6 +158,7 @@ export class CapabilityAvailabilityService {
   invalidate(): void {
     this.cache = null;
     this.remoteCache.clear();
+    this.modelIndex = null;
   }
 
   private async controls(): Promise<Map<string, ControlRow>> {

@@ -326,6 +326,8 @@ model Order {
   @@unique([userId, idempotencyKey])
   @@index([membershipPlanId])
   @@index([userId, status])
+  /// 我的订单列表：按用户 + 时间倒序分页
+  @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([createdAt])
   @@index([couponId])
@@ -803,6 +805,8 @@ model Asset {
   @@index([projectId])
   @@index([ownerId])
   @@index([status])
+  /// 素材库列表 / 计数热路径：owner + 可见状态 + 时间倒序
+  @@index([ownerId, status, createdAt])
   @@index([storageBackend])
   @@unique([storageBackend, storageKey])
   @@index([capability])

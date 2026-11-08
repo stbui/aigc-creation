@@ -13,12 +13,19 @@
  */
 
 import { Injectable } from '@nestjs/common';
+import { CreditPriceService } from '../../credits/credit-price.service';
 import { badRequest } from '../domain/json';
 import { normalizeCapability } from '../domain/capability-config';
-import { creditAmount, convertCurrencyPrice, toSafeNumber, tokenAmount } from '../infra/microcredits';
+import {
+  CREDIT_SCALE,
+  creditAmount,
+  convertCurrencyPrice,
+  toSafeNumber,
+  tokenAmount,
+} from '../infra/microcredits';
 import { PriceTierService } from '../routing/price-tier.service';
 import { RouterService } from '../routing/router.service';
-import type { CachedChannelModel, CachedPriceTier } from '../routing/routing.types';
+import type { CachedChannelModel, CachedLogicalModel, CachedPriceTier } from '../routing/routing.types';
 import type { UserGroupAccess } from '../user-groups/user-group.service';
 import type { ModelRequestIntent } from '../intent/spec-types';
 
@@ -86,88 +93,172 @@ export class QuoteService {
   constructor(
     private readonly router: RouterService,
     private readonly priceTiers: PriceTierService,
+    private readonly price: CreditPriceService,
   ) {}
 
   async quoteLogicalModel(
     access: UserGroupAccess,
     logicalModelId: string,
     intent: ModelRequestIntent,
+    userId?: string,
   ): Promise<ModelQuote> {
     validateQuoteIntent(intent);
-    const routed = await this.router.resolve(access, logicalModelId, intent);
+    /*
+     * 报价页通常只传能力与参数，不带「已上传几张图」；模型合同却会要求
+     * `image.min` 等输入数量。报价是估算，不是建单，按该模型各线路要求的
+     * **最小输入数**补齐后再选路，否则所有需要上传图片的工具都会报价失败。
+     * 调用方显式传入的 inputs 优先，不会被最小值覆盖。
+     */
+    const quoteModel = await this.router.findModel(logicalModelId);
+    const quoteIntent = quoteModel ? this.withMinimumInputs(quoteModel, intent) : intent;
+    const routed = await this.router.resolve(access, logicalModelId, quoteIntent);
     const capability = normalizeCapability(routed.intent.capability);
     const modelKeys = [routed.logicalModel.code, routed.channelModel.modelKey];
+
+    /*
+     * 报价与建单必须使用同一套运行时价格：
+     *   · 限时免费活动命中时，无论线路/模型价是多少，实际扣费都是 0；
+     *   · 后台能力覆盖价只在「unified + fixed_request」生效（与
+     *     BillingService.withCreditPriceOverride 同口径），这里同样只在
+     *     fixed_request 分支应用，避免渠道价 / 按量计费被错误覆盖。
+     */
+    const productCapability = routed.logicalModel.capability;
+    const [freeCampaignId, overrideCost] = await Promise.all([
+      this.price.freeCampaignIdOf(productCapability, userId),
+      this.price.resolveOverride(productCapability),
+    ]);
+    const free = Boolean(freeCampaignId);
 
     if (routed.logicalModel.pricePolicy === 'channel') {
       const tier = routed.priceTier;
       if (!tier) throw badRequest('当前模型尚未配置所选规格的价格');
-      return this.channelTierQuote(access, {
-        logicalModelId: routed.logicalModel.id,
-        code: routed.logicalModel.code,
-        modelKeys,
-        channelModel: routed.channelModel,
-        tier,
-        intent: routed.intent,
-        capability,
-        forceToken: routed.logicalModel.billingMode === 'token',
-      });
+      return this.withFreeCampaign(
+        this.channelTierQuote(access, {
+          logicalModelId: routed.logicalModel.id,
+          code: routed.logicalModel.code,
+          modelKeys,
+          channelModel: routed.channelModel,
+          tier,
+          intent: routed.intent,
+          capability,
+          forceToken: routed.logicalModel.billingMode === 'token',
+        }),
+        free,
+      );
     }
 
     if (routed.logicalModel.pricePolicy !== 'unified') {
       throw badRequest('当前模型价格策略无效');
     }
-    const pricing = access.pricing('credits', modelKeys);
+    // 与 BillingService.buildDraft 的 unified 分支一致：只按前台模型 code 匹配
+    // 分组价，不把渠道模型 key 混进匹配链，否则报价与账单会取到不同倍率。
+    const pricing = access.pricing('credits', [routed.logicalModel.code]);
     const model = routed.logicalModel;
     switch (model.billingMode) {
       case 'fixed_request': {
-        const amount = toSafeNumber(creditAmount(model.unitPriceMicrocredits, 1, pricing.multiplierBasisPoints));
-        return {
-          logicalModelId: model.id,
-          code: model.code,
-          billingMode: model.billingMode,
-          quantity: 1,
-          amountMicrocredits: amount,
-          estimated: false,
-          priceTierId: '',
-          priceSelector: {},
-          note: amount > 0 ? '' : '当前模型尚未配置有效的用户价格',
-        };
+        const unitPriceMicrocredits =
+          overrideCost === null || overrideCost === undefined
+            ? model.unitPriceMicrocredits
+            : BigInt(Math.trunc(Number(overrideCost))) * CREDIT_SCALE;
+        const amount = toSafeNumber(
+          creditAmount(unitPriceMicrocredits, 1, pricing.multiplierBasisPoints),
+        );
+        return this.withFreeCampaign(
+          {
+            logicalModelId: model.id,
+            code: model.code,
+            billingMode: model.billingMode,
+            quantity: 1,
+            amountMicrocredits: amount,
+            estimated: false,
+            priceTierId: '',
+            priceSelector: {},
+            note: amount > 0 ? '' : '当前模型尚未配置有效的用户价格',
+          },
+          free,
+        );
       }
       case 'per_second': {
         const quantity = requestedBillingQuantity(capability, routed.intent.options);
         if (quantity <= 0) throw badRequest('当前模型按时长计费，但请求未提供有效时长');
         const amount = toSafeNumber(creditAmount(model.unitPriceMicrocredits, quantity, pricing.multiplierBasisPoints));
-        return {
-          logicalModelId: model.id,
-          code: model.code,
-          billingMode: model.billingMode,
-          quantity,
-          amountMicrocredits: amount,
-          estimated: false,
-          priceTierId: '',
-          priceSelector: {},
-          note: '',
-        };
+        return this.withFreeCampaign(
+          {
+            logicalModelId: model.id,
+            code: model.code,
+            billingMode: model.billingMode,
+            quantity,
+            amountMicrocredits: amount,
+            estimated: false,
+            priceTierId: '',
+            priceSelector: {},
+            note: '',
+          },
+          free,
+        );
       }
       case 'token':
-        return this.tokenQuote(
-          model.id,
-          model.code,
-          'token',
-          capability,
-          routed.intent,
-          {
-            input: model.inputPriceMicrocredits,
-            output: model.outputPriceMicrocredits,
-            cached: model.cachedPriceMicrocredits,
-          },
-          pricing.multiplierBasisPoints,
-          '',
-          {},
+        return this.withFreeCampaign(
+          this.tokenQuote(
+            model.id,
+            model.code,
+            'token',
+            capability,
+            routed.intent,
+            {
+              input: model.inputPriceMicrocredits,
+              output: model.outputPriceMicrocredits,
+              cached: model.cachedPriceMicrocredits,
+            },
+            pricing.multiplierBasisPoints,
+            '',
+            {},
+          ),
+          free,
         );
       default:
         throw badRequest('当前模型计费方式暂不支持');
     }
+  }
+
+  /**
+   * 为报价补齐各线路要求的最小输入数量。
+   *
+   * 只用于报价：真正建任务时 `TaskAdmissionService` 仍会按用户实际上传的
+   * 素材重新校验，数量不足会被明确拒绝。这里不能改写成「按 1 张」之类的
+   * 固定值，否则多图合同（image.min > 1）仍会失败。
+   */
+  private withMinimumInputs(
+    model: CachedLogicalModel,
+    intent: ModelRequestIntent,
+  ): ModelRequestIntent {
+    const minimums: Record<string, number> = {};
+    const specs = [
+      model.productSpec,
+      ...model.routes.map((route) => route.channelModel.capabilitySpec),
+    ];
+    for (const spec of specs) {
+      for (const [name, constraint] of Object.entries(spec.inputs ?? {})) {
+        const min = Number(constraint?.min ?? 0);
+        if (min > 0) minimums[name] = Math.max(minimums[name] ?? 0, min);
+      }
+    }
+    if (Object.keys(minimums).length === 0) return intent;
+    return {
+      ...intent,
+      inputs: { ...minimums, ...(intent.inputs ?? {}) },
+    };
+  }
+
+  /**
+   * 限时免费活动命中的报价归零。
+   *
+   * 视频 Token 等本就没有确定金额（`amountMicrocredits === null`）的报价保持
+   * 原样：这类请求在建任务时仍会被拒绝，不能用一个 0 元报价误导用户。
+   */
+  private withFreeCampaign(quote: ModelQuote, free: boolean): ModelQuote {
+    if (!free || quote.amountMicrocredits === null) return quote;
+    return { ...quote, amountMicrocredits: 0, note: '限时免费活动生效' };
   }
 
   /**

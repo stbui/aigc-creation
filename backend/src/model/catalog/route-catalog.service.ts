@@ -50,6 +50,14 @@ export class RouteCatalogService implements OnModuleInit {
   private retryAt = 0;
   /** 上一次成功读取到的目录版本；版本读取失败时用它兜底 */
   private lastVersion = 0;
+  /**
+   * 线路 id → 线路的索引，按快照对象懒构建。
+   *
+   * `findRoute` 在每次派发 / 轮询都要调用；直接遍历 `models × routes` 是
+   * O(目录规模) 的线性扫描，目录越大损耗越明显。用快照引用做键，刷新后
+   * 自然重建，不需要额外的失效通知。
+   */
+  private routeIndex: { snapshot: RouteCatalogSnapshot; byId: Map<string, CachedLogicalRoute> } | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -64,6 +72,7 @@ export class RouteCatalogService implements OnModuleInit {
   /** 丢弃本地快照；版本号由写入方负责递增 */
   invalidateLocal(): void {
     this.snapshot = null;
+    this.routeIndex = null;
     this.refreshError = null;
     this.retryAt = 0;
   }
@@ -83,12 +92,14 @@ export class RouteCatalogService implements OnModuleInit {
     const key = String(routeId ?? '').trim();
     if (!key) return null;
     const snapshot = await this.snapshotOrThrow();
-    for (const model of snapshot.models.values()) {
-      for (const route of model.routes) {
-        if (route.id === key) return route;
+    if (!this.routeIndex || this.routeIndex.snapshot !== snapshot) {
+      const byId = new Map<string, CachedLogicalRoute>();
+      for (const model of snapshot.models.values()) {
+        for (const route of model.routes) byId.set(route.id, route);
       }
+      this.routeIndex = { snapshot, byId };
     }
-    return null;
+    return this.routeIndex.byId.get(key) ?? null;
   }
 
   /**

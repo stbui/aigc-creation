@@ -803,7 +803,23 @@ export class BillingService {
     let usageSource = order.usageSource;
     let note = '';
 
-    if (order.billingMode === 'token' && !zeroPricedTokenOrder(order)) {
+    /*
+     * 限时免费：准入只把**金额**置 0，单价快照仍然保留（Token / 按秒计费需要
+     * 它来算量）。若不在这里短路，Token 分支会按上游 usage、按秒分支会按实际
+     * 时长重新算出正数金额，把一次已承诺的免费生成变成收费；换线账单还带
+     * `chargeLimit=0`，会直接抛 40909 转人工。
+     *
+     * `promotionId` 目前只由命中 `limited_free` 的活动写入，且该路径金额恒为 0，
+     * 所以「有活动 id + 金额与预留均为 0」足以判定为免费单。
+     */
+    const campaignFree =
+      order.promotionId !== '' &&
+      order.reservedAmountMicrocredits === 0n &&
+      order.amountMicrocredits === 0n;
+    if (campaignFree) {
+      actual = 0n;
+      note = '限时免费活动生效，按 0 积分结算';
+    } else if (order.billingMode === 'token' && !zeroPricedTokenOrder(order)) {
       const observedUsage = await this.tokenSettlementUsage(tx, order);
       if (!observedUsage) throw new AppError(40909, '上游用量不可用，无法结算 Token 账单', 409);
       usage = observedUsage.usage;

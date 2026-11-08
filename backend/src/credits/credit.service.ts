@@ -230,18 +230,11 @@ export class CreditService {
     if (accounts.length === 0) return { checked: 0, mismatched: [] };
 
     const ids = accounts.map((a) => a.userId);
-    const [reserved, lotSums] = await Promise.all([
-      this.prisma.creditAccount.findMany({
-        where: { userId: { in: ids } },
-        select: { userId: true, reservedMicrocredits: true },
-      }),
-      this.prisma.creditLot.groupBy({
-        by: ['userId'],
-        where: { userId: { in: ids }, remainingMicrocredits: { gt: 0n } },
-        _sum: { remainingMicrocredits: true },
-      }),
-    ]);
-    const reservedByUser = new Map(reserved.map((r) => [r.userId, r.reservedMicrocredits]));
+    const lotSums = await this.prisma.creditLot.groupBy({
+      by: ['userId'],
+      where: { userId: { in: ids }, remainingMicrocredits: { gt: 0n } },
+      _sum: { remainingMicrocredits: true },
+    });
     const lotByUser = new Map(lotSums.map((r) => [r.userId, r._sum.remainingMicrocredits ?? 0n]));
 
     const mismatched: Array<{
@@ -252,10 +245,14 @@ export class CreditService {
     }> = [];
     for (const account of accounts) {
       /*
-       * 等式是「可用 + 冻结 == Σ 批次剩余」：预留把可用挪到冻结，批次同时被扣，
-       * 只比可用会把所有有预授权的用户全判成不一致。
+       * 等式是「可用 == Σ 批次剩余」，**不含冻结量**。
+       *
+       * 预留是「可用 -X、冻结 +X，同时批次 -X」（见 CreditWalletService.reserve）：
+       * 已冻结的积分在预留那一刻就离开了批次，再把它加回等式，会让所有有进行中
+       * 任务 / 待核对账单的用户都被判成不一致。`scripts/verify-billing.ts` 的
+       * `balanceIs()` 也是按这条口径断言的。
        */
-      const expected = account.availableMicrocredits + (reservedByUser.get(account.userId) ?? 0n);
+      const expected = account.availableMicrocredits;
       const actual = lotByUser.get(account.userId) ?? 0n;
       if (expected === actual) continue;
       mismatched.push({
@@ -436,7 +433,44 @@ export class CreditService {
     };
 
     if (tx) return execute(tx);
-    return this.prisma.$transaction(execute);
+    try {
+      return await this.prisma.$transaction(execute);
+    } catch (error) {
+      /*
+       * 并发同键：两个请求都未查到已有流水，由 `referenceKey` 唯一约束裁决。
+       * 事务已整体回滚（批次与账户增量不会残留），回查赢家流水按幂等命中返回。
+       *
+       * 调用方传入 `tx` 时不在此处理：那时事务归属调用方，必须由它自己的
+       * 条件更新 / 唯一键闸门保证（会员、签到、邀请、支付入账均已具备）。
+       */
+      const balance = referenceKey
+        ? await this.idempotentBalanceOf(error, referenceKey, params.userId)
+        : null;
+      if (balance !== null) return { lotId: '', balance, idempotentHit: true };
+      throw error;
+    }
+  }
+
+  /**
+   * 唯一键冲突后的幂等回查。
+   *
+   * 返回 `null` 表示不是 P2002 或赢家流水尚不可见（事务已回滚，应原样抛错）；
+   * 键属于其它用户时抛冲突，与正常幂等分支口径一致。
+   */
+  private async idempotentBalanceOf(
+    error: unknown,
+    referenceKey: string,
+    userId: string,
+  ): Promise<number | null> {
+    if ((error as { code?: string })?.code !== 'P2002') return null;
+    const existing = await this.prisma.creditLedgerEntry.findUnique({
+      where: { referenceKey },
+      select: { userId: true },
+    });
+    if (!existing) return null;
+    if (existing.userId !== userId) throw new AppError(40001, '积分幂等键冲突', 400);
+    const balance = await this.wallet.balanceOf(this.prisma, userId);
+    return microcreditsToCredits(balance.availableMicrocredits);
   }
 
   // ── 扣减 ──────────────────────────────────────────────────────────
@@ -514,7 +548,17 @@ export class CreditService {
         lotId: result.items[result.items.length - 1]?.lotId ?? null,
       };
     };
-    return tx ? execute(tx) : this.prisma.$transaction(execute);
+    if (tx) return execute(tx);
+    try {
+      return await this.prisma.$transaction(execute);
+    } catch (error) {
+      // 并发同键的处理与 grant 完全一致：回查赢家流水，按幂等命中返回。
+      const balance = referenceKey
+        ? await this.idempotentBalanceOf(error, referenceKey, params.userId)
+        : null;
+      if (balance !== null) return { consumed: 0, balance, lotId: null };
+      throw error;
+    }
   }
 
   /** 余额是否足够 */
@@ -728,7 +772,7 @@ export class CreditService {
     const now = new Date();
     const due = await this.prisma.creditLot.findMany({
       where: { remainingMicrocredits: { gt: 0n }, expireAt: { lte: now } },
-      select: { id: true, userId: true, remainingMicrocredits: true },
+      select: { id: true, userId: true },
       orderBy: { expireAt: 'asc' },
       take: Math.max(1, limit),
     });
@@ -738,14 +782,17 @@ export class CreditService {
     let failed = 0;
     for (const lot of due) {
       try {
-        const done = await this.prisma.$transaction((tx) => this.wallet.expireLot(tx, lot));
-        if (!done) continue;
+        // 实际回收量以事务内重读的批次余额为准：扫描之后可能已有退款回填。
+        const expired = await this.prisma.$transaction((tx) =>
+          this.wallet.expireLot(tx, { id: lot.id, userId: lot.userId }),
+        );
+        if (expired <= 0n) continue;
         expiredLots += 1;
-        expiredMicro += lot.remainingMicrocredits;
+        expiredMicro += expired;
       } catch (error) {
         failed += 1;
         this.logger.warn(
-          `积分到期回收失败（批次 ${lot.id} 用户 ${lot.userId} ${microcreditsToCredits(lot.remainingMicrocredits)} 积分）：${
+          `积分到期回收失败（批次 ${lot.id} 用户 ${lot.userId}）：${
             error instanceof Error ? error.message : String(error)
           }`,
         );

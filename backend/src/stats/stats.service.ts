@@ -4,6 +4,14 @@ import { getCapability } from '../capabilities/capability.registry';
 import { SignedUrlService } from '../common/signed-url.service';
 
 /**
+ * 能力示例图的最大扫描行数。
+ *
+ * 能力总量固定（17 项），取每项最新一张可见产出；500 条窗口留出足够余量，
+ * 同时避免用户历史任务无限增长后每次打开数据中心都全量读取。
+ */
+const THUMB_SCAN_LIMIT = 500;
+
+/**
  * 数据中心聚合。
  *
  * 全部用真实表统计, 不编造"积分/消耗"这类尚不存在的概念 —— 账号数据区展示的是
@@ -88,22 +96,32 @@ export class StatsService {
 
     // 每项能力取最近一次成功产出, 作为工作台卡片的示例图 (真实产出优先, 没有则前端用设计化占位)
     const capabilityThumbs = new Map<string, { url: string; createdAt: Date }>();
+    /*
+     * 只扫最近一段成功任务，而不是该用户的全部历史。
+     *
+     * 这里只需要「每项能力最新一张可见产出」，能力总量是有限的（17 项），
+     * 最近 500 条成功记录足以覆盖；不设上限时，老用户积累上千条任务后
+     * 每次打开数据中心都要把全部任务行连同素材关系读出来。
+     *
+     * 下架产出在 SQL 层就用关系过滤剔除，与素材库口径一致，也避免为
+     * 已下架素材建缩略图 URL 后再丢弃。
+     */
     for (const t of await this.prisma.generationTask.findMany({
       where: {
         ownerId,
         project: { deletedAt: null },
         status: 'succeeded',
-        outputAssetId: { not: null },
+        outputAsset: { is: { status: 'visible' } },
       },
       orderBy: { createdAt: 'desc' },
+      take: THUMB_SCAN_LIMIT,
       select: {
         capability: true,
         createdAt: true,
-        outputAsset: { select: { sourceUrl: true, status: true } },
+        outputAsset: { select: { sourceUrl: true } },
       },
     })) {
-      // 下架产出不拿来当示例图: 素材库看不到它, 这里却展示会让用户点开 404
-      const url = t.outputAsset?.status === 'visible' ? t.outputAsset.sourceUrl : null;
+      const url = t.outputAsset?.sourceUrl;
       if (url && !capabilityThumbs.has(t.capability)) {
         capabilityThumbs.set(t.capability, { url, createdAt: t.createdAt });
       }

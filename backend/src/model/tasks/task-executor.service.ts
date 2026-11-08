@@ -88,6 +88,8 @@ export interface CallOutcome {
   /** 失败时是否允许切换线路（见文件头） */
   rejectedNoJob: boolean;
   statusCode: number;
+  /** 上游 429 的 Retry-After（毫秒）；未提供时 undefined */
+  retryAfterMs?: number;
   durationMs: number;
   latencyMs: number;
 }
@@ -180,6 +182,7 @@ export class TaskExecutorService {
         // 200 明确失败与 HTTP 拒绝都表示「上游没有建立任务」；请求根本没发出去也是
         rejectedNoJob: failureCode !== '' && safeFailure(failureCode),
         statusCode,
+        retryAfterMs: retryAfterMsOf(response?.headers),
         durationMs,
         latencyMs: durationMs,
       },
@@ -258,6 +261,7 @@ export class TaskExecutorService {
         // 轮询阶段的任何失败都可能已计费，一律不切线
         rejectedNoJob: false,
         statusCode,
+        retryAfterMs: retryAfterMsOf(response?.headers),
         durationMs,
         latencyMs: durationMs,
       },
@@ -370,6 +374,23 @@ export function failureCodeOf(error: unknown, statusCode = 0): string {
 /** 该失败码是否允许切换线路（只有「上游明确没接」才可以） */
 export function safeFailure(failureCode: string): boolean {
   return safeRouteFailure(failureCode);
+}
+
+/**
+ * 解析上游 `Retry-After`：支持秒数与 HTTP 日期两种格式。
+ *
+ * 429 的冷却时长优先用上游给的值；缺失或非法时才回落到 30 秒。
+ */
+export function retryAfterMsOf(
+  headers: Record<string, string | string[] | undefined> | undefined,
+): number | undefined {
+  const raw = headers?.['retry-after'];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const text = String(value ?? '').trim();
+  if (!text) return undefined;
+  if (/^\d+$/.test(text)) return Number(text) * 1000;
+  const at = Date.parse(text);
+  return Number.isFinite(at) ? Math.max(0, at - Date.now()) : undefined;
 }
 
 /** 从请求体里尽力取按时长计费的秒数（日志展示用，读不到返回空） */

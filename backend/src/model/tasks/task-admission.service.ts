@@ -139,33 +139,37 @@ export class TaskAdmissionService {
     }
 
     // 5. 会员并发（必须在扣费之前：校验失败却已扣分会造成资损）
-    const concurrency = await this.membership.checkConcurrency(ownerId);
+    // 先解析一次权益，供并发校验与任务参数复用 —— 两者此前各查一遍
+    // 会员 / 订单周期，同一请求内是纯重复读。
+    const perks = await this.membership.perksOf(ownerId);
+    const concurrency = await this.membership.checkConcurrency(ownerId, undefined, perks);
     if (concurrency.limit > 0) {
       this.log.debug(`并发校验: ${concurrency.current}/${concurrency.limit}`);
     }
-    const perks = await this.membership.perksOf(ownerId);
 
-    // 6. 项目与素材归属
-    const project = await this.prisma.project.findFirst({
-      where: { id: dto.projectId, deletedAt: null },
-    });
+    // 6. 项目与素材归属（两条查询互不依赖，并行取回）
+    const [project, assets] = await Promise.all([
+      this.prisma.project.findFirst({
+        where: { id: dto.projectId, deletedAt: null },
+      }),
+      /*
+       * 素材库按账号展示全部项目素材，用户可以在任意工作台选择历史素材。
+       * 项目是组织维度而不是鉴权边界，因此这里只校验 ownerId；若再要求
+       * asset.projectId === dto.projectId，跨项目选择会误报「不存在或无权限」。
+       * 任务产出仍写入 dto.projectId，输入素材保持原归属，便于用户追溯。
+       */
+      this.prisma.asset.findMany({
+        where: {
+          id: { in: dto.inputAssetIds },
+          ownerId,
+          status: 'visible',
+          project: { deletedAt: null },
+        },
+      }),
+    ]);
     if (!project || project.ownerId !== ownerId) {
       throw new AppError(40001, '项目不存在或无权限', 403);
     }
-    /*
-     * 素材库按账号展示全部项目素材，用户可以在任意工作台选择历史素材。
-     * 项目是组织维度而不是鉴权边界，因此这里只校验 ownerId；若再要求
-     * asset.projectId === dto.projectId，跨项目选择会误报「不存在或无权限」。
-     * 任务产出仍写入 dto.projectId，输入素材保持原归属，便于用户追溯。
-     */
-    const assets = await this.prisma.asset.findMany({
-      where: {
-        id: { in: dto.inputAssetIds },
-        ownerId,
-        status: 'visible',
-        project: { deletedAt: null },
-      },
-    });
     if (assets.length !== dto.inputAssetIds.length) {
       throw new AppError(40001, '部分输入素材不存在或无权限', 400);
     }
@@ -369,6 +373,18 @@ export class TaskAdmissionService {
       if (!activeProject) {
         throw new AppError(40001, '项目不存在或无权限', 403);
       }
+
+      /*
+       * 并发上限必须在写事务内复核。
+       *
+       * 事务外那次 checkConcurrency 只用于快速失败；两个同时提交的请求都能
+       * 读到旧数量并各自建任务，实际并发会超过会员上限。先用 no-op UPDATE
+       * 取得用户行写锁（与 OrderService.create 同一口径），再在锁内统计，
+       * 让同一用户的建任务串行化；超限时整个事务回滚，不留任务/账单。
+       */
+      await tx.$executeRaw`
+        UPDATE "User" SET "name" = "name" WHERE id = ${ownerId}`;
+      await this.membership.checkConcurrency(ownerId, tx);
 
       const ids: string[] = [];
       const parent = await tx.generationTask.create({

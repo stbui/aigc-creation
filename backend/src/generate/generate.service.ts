@@ -26,6 +26,32 @@ import { TaskAdmissionService } from '../model/tasks/task-admission.service';
 import { TaskLifecycleService, TASK_ERROR } from '../model/tasks/task-lifecycle.service';
 import { TaskWorkerService } from '../model/tasks/task-worker.service';
 
+/**
+ * 任务读接口只取展示所需的列。
+ *
+ * 最关键的是**不读 `pendingResult`**：上游产出落盘失败时会把整份结果
+ * （可能含内联 base64）暂存到该列，而任务详情每 1.2 秒被轮询一次。
+ * 不带 select 时每次轮询都会把这坨大字段读出来再丢掉；`params` 等其余列
+ * 则是序列化需要的，必须保留。
+ */
+const TASK_VIEW_SELECT = {
+  id: true,
+  projectId: true,
+  ownerId: true,
+  capability: true,
+  status: true,
+  inputAssetIds: true,
+  params: true,
+  parentTaskId: true,
+  errorCode: true,
+  logicalModelId: true,
+  creditCost: true,
+  createdAt: true,
+  updatedAt: true,
+  outputAssetId: true,
+  outputAssetIds: true,
+} as const;
+
 @Injectable()
 export class GenerateService {
   private readonly logger = new Logger(GenerateService.name);
@@ -177,15 +203,33 @@ export class GenerateService {
   async getTask(ownerId: string, id: string) {
     const task = await this.prisma.generationTask.findFirst({
       where: { id, ownerId, project: { deletedAt: null } },
+      select: TASK_VIEW_SELECT,
     });
     if (!task) {
       throw new AppError(40001, '任务不存在或无权限', 403);
     }
 
     const outputIds = orderedOutputIds(task.outputAssetId, task.outputAssetIds);
-    const outputs = outputIds.length
-      ? await this.prisma.asset.findMany({ where: { id: { in: outputIds } } })
-      : [];
+    const inputAssetIds = parseIdList(task.inputAssetIds);
+    /*
+     * 详情接口是前端轮询的最高频读路径（每个进行中的任务每 2-3 秒一次）。
+     * 产出与输入互不依赖，必须并行取回；串行会把一次轮询变成两次串行往返。
+     */
+    const [outputs, inputRows] = await Promise.all([
+      outputIds.length
+        ? this.prisma.asset.findMany({ where: { id: { in: outputIds } } })
+        : Promise.resolve([]),
+      inputAssetIds.length
+        ? this.prisma.asset.findMany({
+            where: {
+              id: { in: inputAssetIds },
+              ownerId: task.ownerId,
+              status: 'visible',
+              project: { deletedAt: null },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
     const outputById = new Map(outputs.map((asset) => [asset.id, asset]));
     const outputAssets = outputIds
       .map((assetId) => outputById.get(assetId))
@@ -196,17 +240,6 @@ export class GenerateService {
       )
       .map((asset) => this.serializeOutputAsset(asset, task.ownerId));
 
-    const inputAssetIds = parseIdList(task.inputAssetIds);
-    const inputRows = inputAssetIds.length
-      ? await this.prisma.asset.findMany({
-          where: {
-            id: { in: inputAssetIds },
-            ownerId: task.ownerId,
-            status: 'visible',
-            project: { deletedAt: null },
-          },
-        })
-      : [];
     const inputById = new Map(inputRows.map((asset) => [asset.id, asset]));
     const inputAssets = inputAssetIds
       .map((assetId) => inputById.get(assetId))
@@ -254,9 +287,32 @@ export class GenerateService {
      */
     const batch = await this.prisma.generationTask.findMany({
       where: { OR: [{ id: task.id }, { parentTaskId: task.id }] },
-      select: { id: true, outputAssetId: true, outputAssetIds: true },
+      select: { id: true, status: true, outputAssetId: true, outputAssetIds: true },
     });
     const targets = batch.length > 0 ? batch : [task];
+
+    /*
+     * 删除只允许发生在「任务与账单都已落定」之后。
+     *
+     * 直接删任务行会让预授权账单失去任务归属：
+     *   · reserved 账单的 `isBillingOrderReviewable` 只有在任务 failed/cancelled
+     *     时才放行；任务行不存在后它永远不可核对，积分会永久冻结；
+     *   · running / uncertain 账单同样需要任务信息才能判断是否已交付。
+     *
+     * 因此 queued/running 一律拒绝（应先走终止流程），账单未结清或待人工
+     * 核对的也拒绝删除，避免把资金证据一起删掉。
+     */
+    const active = targets.filter((row) => row.status === 'queued' || row.status === 'running');
+    if (active.length > 0) {
+      throw new AppError(40901, '任务仍在排队或执行中，不能删除；请等待完成或先终止任务', 409);
+    }
+    const billingOrders = await this.prisma.billingOrder.findMany({
+      where: { taskId: { in: targets.map((row) => row.id) } },
+      select: { status: true },
+    });
+    if (billingOrders.some((order) => ['reserved', 'running', 'uncertain'].includes(order.status))) {
+      throw new AppError(40901, '任务积分账单尚未结清或待人工核对，暂不能删除；请先处理账单', 409);
+    }
 
     const outputIds = targets.flatMap((row) => orderedOutputIds(row.outputAssetId, row.outputAssetIds));
     const outputs = outputIds.length
@@ -299,10 +355,12 @@ export class GenerateService {
     };
     if (projectId) where.projectId = projectId;
 
+    // 产出素材由 serializeTasks 按 id 批量取回；再 include 关系等于把同一批
+    // 素材先 JOIN 一次又丢掉，纯属重复读。
     const tasks = await this.prisma.generationTask.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { outputAsset: true },
+      select: TASK_VIEW_SELECT,
     });
     return this.serializeTasks(tasks);
   }
@@ -340,7 +398,7 @@ export class GenerateService {
         orderBy: { createdAt: 'desc' },
         skip,
         take,
-        include: { outputAsset: true },
+        select: TASK_VIEW_SELECT,
       }),
       this.prisma.generationTask.count({ where }),
     ]);
@@ -357,24 +415,27 @@ export class GenerateService {
     const allOutputIds = Array.from(
       new Set(tasks.flatMap((task) => orderedOutputIds(task.outputAssetId, task.outputAssetIds))),
     );
-    const outputRows = allOutputIds.length
-      ? await this.prisma.asset.findMany({ where: { id: { in: allOutputIds } } })
-      : [];
-    const outputById = new Map(outputRows.map((asset) => [asset.id, asset]));
     // 输入图一次性取回：详情图结果行要按批次展示「原图」，逐任务查会放大到 N 次往返
     const inputIdsByTask = new Map(tasks.map((t) => [t.id, parseIdList(t.inputAssetIds)]));
     const allInputIds = Array.from(new Set([...inputIdsByTask.values()].flat()));
     const taskOwnerIds = Array.from(new Set(tasks.map((t) => t.ownerId)));
-    const inputRows = allInputIds.length
-      ? await this.prisma.asset.findMany({
-          where: {
-            id: { in: allInputIds },
-            ownerId: { in: taskOwnerIds },
-            status: 'visible',
-            project: { deletedAt: null },
-          },
-        })
-      : [];
+    // 产出与输入互不依赖，并行取回；列表页只多一条 SQL 的往返，而不是串行两轮。
+    const [outputRows, inputRows] = await Promise.all([
+      allOutputIds.length
+        ? this.prisma.asset.findMany({ where: { id: { in: allOutputIds } } })
+        : Promise.resolve([]),
+      allInputIds.length
+        ? this.prisma.asset.findMany({
+            where: {
+              id: { in: allInputIds },
+              ownerId: { in: taskOwnerIds },
+              status: 'visible',
+              project: { deletedAt: null },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+    const outputById = new Map(outputRows.map((asset) => [asset.id, asset]));
     const inputById = new Map(inputRows.map((asset) => [asset.id, asset]));
 
     return tasks.map((t) => {

@@ -3,6 +3,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "../common/app.exception";
 import { GenerateService } from "./generate.service";
 
+const taskViewSelect = {
+  id: true,
+  projectId: true,
+  ownerId: true,
+  capability: true,
+  status: true,
+  inputAssetIds: true,
+  params: true,
+  parentTaskId: true,
+  errorCode: true,
+  logicalModelId: true,
+  creditCost: true,
+  createdAt: true,
+  updatedAt: true,
+  outputAssetId: true,
+  outputAssetIds: true,
+} as const;
+
 function task(overrides: Record<string, unknown> = {}) {
   return {
     id: "task-1",
@@ -181,7 +199,7 @@ describe("GenerateService 任务读取与重试", () => {
       orderBy: { createdAt: "desc" },
       skip: 0,
       take: 50,
-      include: { outputAsset: true },
+      select: taskViewSelect,
     });
     expect(prisma.generationTask.count).toHaveBeenCalledWith({ where });
   });
@@ -198,6 +216,7 @@ describe("GenerateService 任务读取与重试", () => {
         ownerId: "user-1",
         project: { deletedAt: null },
       },
+      select: taskViewSelect,
     });
   });
 

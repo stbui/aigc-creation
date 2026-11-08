@@ -55,6 +55,7 @@ import { AdminProviderCatalogController } from './plugins/provider-catalog.contr
 import { ProviderCatalogService } from './plugins/provider-catalog.service';
 import { CreditWalletService } from './billing/credit-wallet.service';
 import { BillingService } from './billing/billing.service';
+import { PricingModule } from '../credits/pricing.module';
 import { BillingAdminService } from './billing/billing-admin.service';
 import { AdminApiLogsController, AdminBillingOrdersController } from './billing/billing-admin.controller';
 import { AdminAnalyticsController } from './billing/analytics.controller';
@@ -90,7 +91,7 @@ export class ModelBootstrapService implements OnModuleInit {
 }
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PricingModule],
   controllers: [
     AdminChannelsController,
     AdminChannelModelsController,

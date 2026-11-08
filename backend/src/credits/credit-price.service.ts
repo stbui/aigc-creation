@@ -106,7 +106,11 @@ export class CreditPriceService {
 
   /** 批量解析 (前端下发 / 后台展示用), 一次查库 */
   async resolveAll(userId?: string): Promise<Record<string, number>> {
-    await this.refresh();
+    // 与 resolve() 共用同一份缓存：/capabilities 是每次打开站点的首个请求，
+    // 无条件 refresh 会让它每次都打「设置 + 活动」两张表，缓存形同虚设。
+    if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
+      await this.refresh();
+    }
     const hasTargetedCampaign = [...this.freeCampaigns.values()].some((campaigns) =>
       campaigns.some((campaign) => campaign.onlyNewUsers),
     );
@@ -266,7 +270,9 @@ export class CreditPriceService {
     const campaigns = this.freeCampaigns.get(capabilityId) ?? [];
     return (
       campaigns.find((campaign) => !campaign.onlyNewUsers)?.id ??
-      campaigns.find((campaign) => campaign.onlyNewUsers && eligibleNewUser !== false)?.id ??
+      // 定向活动只对**明确判定为新用户**的身份生效。匿名 / 尚未判定（null）
+      // 不能按免费展示，否则已登录老用户会看到 0 元价、提交时却按原价扣费。
+      campaigns.find((campaign) => campaign.onlyNewUsers && eligibleNewUser === true)?.id ??
       ''
     );
   }

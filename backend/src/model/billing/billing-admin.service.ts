@@ -28,6 +28,48 @@ import { billingCreditCost } from "./cost-amount";
 const MAX_PAGE_SIZE = 200;
 const DEFAULT_PAGE_SIZE = 50;
 
+/**
+ * 调用记录列表 / 导出只取展示需要的列。
+ *
+ * `requestBody` / `responseBody` 是 TEXT 大字段（可能含整段 base64 或上游
+ * 响应），列表与 CSV 都不下发它们。不写 `select` 时实测会把当前页每行的
+ * 请求体、响应体一并读出再丢掉 —— 一页 50 行就可能多读数 MB。
+ */
+const API_LOG_VIEW_SELECT = {
+  id: true,
+  userId: true,
+  traceId: true,
+  requestId: true,
+  channelId: true,
+  channelName: true,
+  taskId: true,
+  billingOrderId: true,
+  source: true,
+  capability: true,
+  operation: true,
+  requestKind: true,
+  billable: true,
+  apiFormat: true,
+  method: true,
+  path: true,
+  model: true,
+  status: true,
+  statusCode: true,
+  durationMs: true,
+  pollCount: true,
+  providerStatus: true,
+  inputTokens: true,
+  outputTokens: true,
+  cachedTokens: true,
+  usageAvailable: true,
+  mediaCount: true,
+  videoSeconds: true,
+  providerRequestId: true,
+  errorCode: true,
+  error: true,
+  createdAt: true,
+} as const;
+
 export interface BillingOrderQuery {
   status?: string;
   userId?: string;
@@ -353,16 +395,18 @@ export class BillingAdminService {
   ): Promise<PageResult<ApiLogView> & { summary: ApiLogSummary }> {
     const { page, pageSize, skip, take } = paging(query);
     const where = apiLogWhere(query);
-    const [rows, total, summary] = await Promise.all([
+    // summary 已经统计了同一 where 的总数，不再单独 count 一次。
+    const [rows, summary] = await Promise.all([
       this.prisma.apiCallLog.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip,
         take,
+        select: API_LOG_VIEW_SELECT,
       }),
-      this.prisma.apiCallLog.count({ where }),
       this.apiLogSummary(where),
     ]);
+    const total = summary.total;
     /*
      * 关联投影：一次查询把「谁调的 / 任务什么状态 / 账单什么状态」铺平。
      *
@@ -472,6 +516,7 @@ export class BillingAdminService {
       where: apiLogWhere(query),
       orderBy: { createdAt: "desc" },
       take: CSV_EXPORT_MAX_ROWS,
+      select: API_LOG_VIEW_SELECT,
     });
     return toCsv(
       [

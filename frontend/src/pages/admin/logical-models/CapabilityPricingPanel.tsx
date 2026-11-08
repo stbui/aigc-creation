@@ -158,7 +158,7 @@ export function CapabilityPricingPanel() {
             />
           </HelpTip>
         ) : row.source === 'setting' ? (
-          <HelpTip tip="后台覆盖中。回落默认后恢复为 registry 的值">
+          <HelpTip tip="后台覆盖中。仅对「统一固定价」模型生效；渠道价与按量计费仍以模型价格档为准。回落默认后恢复为 registry 的值">
             <StatusTag status="setting" tone="warn" label="后台设置" />
           </HelpTip>
         ) : (

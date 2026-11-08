@@ -327,24 +327,83 @@ describe('CreditService 人工调整幂等', () => {
   });
 });
 
+describe('CreditService 并发幂等', () => {
+  /**
+   * 两个请求同时通过「先查后写」时，由 referenceKey 唯一约束裁决。
+   * 输家的事务已整体回滚，必须回查赢家流水并按幂等命中返回，
+   * 不能把一次并发重试变成 P2002 失败。
+   */
+  function concurrentSetup() {
+    const winner = { userId: 'u1' };
+    const prisma = {
+      $transaction: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })),
+      creditLedgerEntry: { findUnique: vi.fn().mockResolvedValue(winner) },
+    };
+    const wallet = {
+      balanceOf: vi.fn().mockResolvedValue({
+        availableMicrocredits: 100_000_000n,
+        reservedMicrocredits: 0n,
+      }),
+    };
+    return { prisma, wallet };
+  }
+
+  it('grant 同键并发冲突后按幂等命中返回', async () => {
+    const { prisma, wallet } = concurrentSetup();
+    const service = new CreditService(prisma as never, wallet as never);
+
+    await expect(
+      service.grant({ userId: 'u1', credits: 10, source: 'grant', idempotencyKey: 'k1' }),
+    ).resolves.toEqual({ lotId: '', balance: 100, idempotentHit: true });
+    expect(prisma.creditLedgerEntry.findUnique).toHaveBeenCalledWith({
+      where: { referenceKey: 'credit-grant:k1' },
+      select: { userId: true },
+    });
+  });
+
+  it('consume 同键并发冲突后按幂等命中返回', async () => {
+    const { prisma, wallet } = concurrentSetup();
+    const service = new CreditService(prisma as never, wallet as never);
+
+    await expect(
+      service.consume({ userId: 'u1', credits: 10, idempotencyKey: 'k2' }),
+    ).resolves.toEqual({ consumed: 0, balance: 100, lotId: null });
+    expect(prisma.creditLedgerEntry.findUnique).toHaveBeenCalledWith({
+      where: { referenceKey: 'credit-consume:k2' },
+      select: { userId: true },
+    });
+  });
+
+  it('非唯一约束错误原样上抛', async () => {
+    const { prisma, wallet } = concurrentSetup();
+    prisma.$transaction.mockRejectedValueOnce(new Error('database is locked'));
+    const service = new CreditService(prisma as never, wallet as never);
+
+    await expect(
+      service.grant({ userId: 'u1', credits: 10, source: 'grant', idempotencyKey: 'k3' }),
+    ).rejects.toThrow('database is locked');
+    expect(prisma.creditLedgerEntry.findUnique).not.toHaveBeenCalled();
+  });
+});
+
 describe('CreditService 账实核对', () => {
   /**
-   * 等式是「可用 + 冻结 == Σ 批次剩余」。
-   * 只比可用会把所有有预授权的用户全判成不一致 —— 预留正是把可用挪到冻结、
-   * 同时扣掉批次，两边都不进 available。
+   * 等式是「可用 == Σ 批次剩余」，冻结量不参与。
+   * 预留是「可用 -X、冻结 +X，同时批次 -X」——已冻结的积分在预留时就离开了
+   * 批次，把它重新加回等式会把所有有预授权的用户全判成不一致。
    */
   it('预留中的账户不应被判为不一致', async () => {
     const prisma = {
       creditAccount: {
-        findMany: vi
-          .fn()
-          // 第一次：账户快照
-          .mockResolvedValueOnce([{ userId: 'u1', availableMicrocredits: 60_000_000n }])
-          // 第二次：冻结量
-          .mockResolvedValueOnce([{ userId: 'u1', reservedMicrocredits: 40_000_000n }]),
+        // 冻结量只在账户行上存在；核对不得把它加进等式（否则 expected=100）。
+        findMany: vi.fn().mockResolvedValue([
+          { userId: 'u1', availableMicrocredits: 60_000_000n, reservedMicrocredits: 40_000_000n },
+        ]),
       },
       creditLot: {
-        groupBy: vi.fn().mockResolvedValue([{ userId: 'u1', _sum: { remainingMicrocredits: 100_000_000n } }]),
+        groupBy: vi.fn().mockResolvedValue([{ userId: 'u1', _sum: { remainingMicrocredits: 60_000_000n } }]),
       },
     };
     const service = new CreditService(prisma as never, {} as never);
@@ -358,10 +417,7 @@ describe('CreditService 账实核对', () => {
   it('批次总额与账户不符时报出差额', async () => {
     const prisma = {
       creditAccount: {
-        findMany: vi
-          .fn()
-          .mockResolvedValueOnce([{ userId: 'u1', availableMicrocredits: 100_000_000n }])
-          .mockResolvedValueOnce([{ userId: 'u1', reservedMicrocredits: 0n }]),
+        findMany: vi.fn().mockResolvedValue([{ userId: 'u1', availableMicrocredits: 100_000_000n }]),
       },
       creditLot: {
         groupBy: vi.fn().mockResolvedValue([{ userId: 'u1', _sum: { remainingMicrocredits: 70_000_000n } }]),

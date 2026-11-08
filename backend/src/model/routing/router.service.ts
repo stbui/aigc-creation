@@ -114,7 +114,9 @@ export class RouterService {
 
     const requirePriceTier = cached.pricePolicy === 'channel';
     const eligible = this.eligibleRoutes(access, cached.routes, resolved, tried, requirePriceTier);
-    if (eligible.length === 0) throw badRequest('当前模型暂时无法满足这组输入和参数');
+    // 无可用线路（冷却 / 分组不可见 / 全部停用 / 价格档缺失）是 40005，
+    // 与「参数不合法」区分开，前端才能引导用户换模型或稍后重试。
+    if (eligible.length === 0) throw badRequest('当前模型暂时无法满足这组输入和参数', 40005);
     const selected = weightedRoute(eligible);
 
     let priceTier: CachedPriceTier | null = null;
