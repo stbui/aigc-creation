@@ -116,6 +116,14 @@ export class TaskAdmissionService {
     if (dto.inputAssetIds.length > MAX_INPUT_ASSETS) {
       throw new AppError(40001, `一次最多提交 ${MAX_INPUT_ASSETS} 张输入图片`, 400);
     }
+    // 能力自己的张数约定（如带货图文最多 5 张）优先于全局上限
+    if (def.maxInputs !== undefined && dto.inputAssetIds.length > def.maxInputs) {
+      throw new AppError(
+        40001,
+        `${def.name} 最多支持 ${def.maxInputs} 张输入图片（当前 ${dto.inputAssetIds.length} 张）`,
+        400,
+      );
+    }
     if (dto.inputAssetIds.some((id) => !id?.trim())) {
       throw new AppError(40001, '输入素材 id 不能为空', 400);
     }

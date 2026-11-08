@@ -380,9 +380,15 @@ function parseDateValue(value: string): Date | undefined {
   return isValid(date) ? date : undefined;
 }
 
-/** 日期按钮文案统一用中文长格式，避免 `MM/dd/yyyy` 与页面其它日期混排。 */
+/**
+ * 日期按钮文案统一 `YYYY-MM-DD`。
+ *
+ * 之前这里用 `PPP`（2026年11月7日），而筛选芯片、URL 参数、列表列都是
+ * `2026-11-07` —— 同一页出现两种日期写法，运营要自己换算。统一成机器口径，
+ * 与 URL、导出 CSV、账单日（billDate）完全一致。
+ */
 function formatDateLabel(date: Date): string {
-  return format(date, 'PPP', { locale: zhCN });
+  return format(date, 'yyyy-MM-dd');
 }
 
 type DateFieldAriaProps = Pick<

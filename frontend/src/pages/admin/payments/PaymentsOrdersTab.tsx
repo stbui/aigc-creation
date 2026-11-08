@@ -9,6 +9,7 @@ import {
   Panel,
   StaleError,
   StatusTag,
+  formatShanghaiDateTimeShort,
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -298,7 +299,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
       width: 110,
       render: (row) => (
         <span className="text-[12px] text-muted-foreground tabular-nums">
-          {row.createdAt.slice(5, 16).replace('T', ' ')}
+          {formatShanghaiDateTimeShort(row.createdAt)}
         </span>
       ),
     },

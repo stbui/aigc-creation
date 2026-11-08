@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 import { ImageLightbox, type LightboxItem } from './components';
-import { assetThumbUrl, buildRows, formatDate, formatShortDate, labelOf, type ResultRow } from './utils';
+import { assetThumbUrl, batchSizeOf, buildRows, emptyBatchLabel, formatDate, formatShortDate, labelOf, type ResultRow } from './utils';
 import type { GalleryItem } from './hooks';
 import { Spin } from '../../ui';
 
@@ -33,6 +33,8 @@ interface BatchCard {
   coverUrl?: string;
   readyCount: number;
   total: number;
+  /** 无封面时的真实状态: 生成中 / 已取消 / 失败 */
+  emptyLabel: string;
 }
 
 function batchCardsOf(items: GalleryItem[]): BatchCard[] {
@@ -42,7 +44,8 @@ function batchCardsOf(items: GalleryItem[]): BatchCard[] {
       row,
       coverUrl: ready[0]?.url,
       readyCount: ready.length,
-      total: row.cells.length,
+      total: batchSizeOf(row.cells),
+      emptyLabel: emptyBatchLabel(row.cells),
     };
   });
 }
@@ -74,7 +77,11 @@ function ShoppableCarouselHistoryImpl({
 
   const openBatch = (card: BatchCard) => {
     const list = lightboxOf(card);
-    if (list.length === 0) return;
+    // 整批失败 / 取消时没有可看的图，直接打开完整记录让用户看到失败状态
+    if (list.length === 0) {
+      onOpenAll();
+      return;
+    }
     setPreview({ items: list, index: 0 });
   };
 
@@ -118,7 +125,7 @@ function ShoppableCarouselHistoryImpl({
                 {card.coverUrl ? (
                   <img src={assetThumbUrl(card.coverUrl, 320)} alt="" loading="lazy" />
                 ) : (
-                  <span className="sc-history-thumb-empty">生成中</span>
+                  <span className="sc-history-thumb-empty">{card.emptyLabel}</span>
                 )}
                 <span className="sc-history-badge">{card.readyCount}/{card.total}</span>
               </span>

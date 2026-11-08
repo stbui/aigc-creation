@@ -1620,11 +1620,8 @@ async function openHtmlDocument(path: string): Promise<void> {
  * 发放积分，有订单的商品请下架。后端会再校验一次，前端按 orderCount 先行提示。
  */
 export const adminProductsApi = {
-  list: (status?: "active" | "offline") =>
-    request<AdminProduct[]>(`/admin/products${toQuery({ status })}`),
-
-  create: (payload: CreateProductPayload) =>
-    request<AdminProduct>("/admin/products", { method: "POST", body: payload }),
+  list: (status?: "active" | "offline") => request<AdminProduct[]>(`/admin/products${toQuery({ status })}`),
+  create: (payload: CreateProductPayload) => request<AdminProduct>("/admin/products", { method: "POST", body: payload }),
 
   /** sku 不可改, 故 payload 里没有该字段 */
   update: (id: string, payload: UpdateProductPayload) =>
@@ -1634,16 +1631,9 @@ export const adminProductsApi = {
     }),
 
   setStatus: (id: string, status: "active" | "offline") =>
-    request<{ id: string; status: string }>(`/admin/products/${id}/status`, {
-      method: "PATCH",
-      body: { status },
-    }),
-
+    request<{ id: string; status: string }>(`/admin/products/${id}/status`, { method: "PATCH", body: { status } }),
   /** 有历史订单的商品会返回 409，需先改为下架 */
-  remove: (id: string) =>
-    request<{ id: string; sku: string }>(`/admin/products/${id}`, {
-      method: "DELETE",
-    }),
+  remove: (id: string) => request<{ id: string; sku: string }>(`/admin/products/${id}`, { method: "DELETE" }),
 };
 
 /** 会员套餐管理：C 端价目表的唯一写入入口 */

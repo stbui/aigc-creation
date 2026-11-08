@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   batchIndexOf,
+  batchSizeOf,
   buildRows,
   cellState,
   clampCount,
-  countGenerations,
   downloadFileName,
+  emptyBatchLabel,
   filterTemplatesByCategory,
   labelOf,
   rowKeyOf,
@@ -101,13 +102,21 @@ describe('结果批次归组', () => {
     expect(rows).toHaveLength(2);
   });
 
-  it('页签角标按批次计，不按任务数', () => {
-    const items = [
-      item({ id: '1', params: { batchId: 'B' } }),
-      item({ id: '2', params: { batchId: 'B' } }),
-      item({ id: '3', params: { batchId: 'C' } }),
-    ];
-    expect(countGenerations(items)).toBe(2);
+  it('批次张数取 batchSize，部分删除后仍显示原始张数', () => {
+    expect(
+      batchSizeOf([
+        item({ id: '1', params: { batchSize: 6, batchIndex: 3 } }),
+        item({ id: '2', params: { batchSize: 6, batchIndex: 4 } }),
+      ]),
+    ).toBe(6);
+  });
+
+  it('没有 batchSize 的旧任务按现存张数计', () => {
+    expect(batchSizeOf([item({ id: '1' }), item({ id: '2' })])).toBe(2);
+  });
+
+  it('batchSize 非法时回落现存张数', () => {
+    expect(batchSizeOf([item({ id: '1', params: { batchSize: 0 } })])).toBe(1);
   });
 
   it('批内按 batchIndex 升序', () => {
@@ -145,6 +154,16 @@ describe('格子展示口径', () => {
     expect(labelOf(item({ id: '1', params: { shotIndex: 4 } }))).toBe('第 4 张');
   });
 
+  it('labelOf 拼接拍名（beatLabel 由准入层落库）', () => {
+    expect(labelOf(item({ id: '1', params: { shotIndex: 2, beatLabel: '多场景上身' } }))).toBe(
+      '第 2 张 · 多场景上身',
+    );
+  });
+
+  it('labelOf 的 beatLabel 为空时保持「第 N 张」（AI 智能生成）', () => {
+    expect(labelOf(item({ id: '1', params: { shotIndex: 5, beatLabel: '' } }))).toBe('第 5 张');
+  });
+
   it('labelOf 无任何信息时给通用名，不返回空', () => {
     expect(labelOf(item({ id: '1' }))).toBe('带货图文');
   });
@@ -159,6 +178,30 @@ describe('格子展示口径', () => {
 
   it('下载文件名带真实格式，不是固定 png', () => {
     expect(downloadFileName(item({ id: 'abcdef123456', format: 'webp' }))).toContain('.webp');
+  });
+});
+
+describe('历史条无封面时的状态文案', () => {
+  it('仍有排队 / 运行中的任务 → 生成中', () => {
+    expect(
+      emptyBatchLabel([
+        item({ id: '1', status: 'running' }),
+        item({ id: '2', status: 'failed' }),
+      ]),
+    ).toBe('生成中');
+  });
+
+  it('整批失败 → 失败（不能停留在生成中）', () => {
+    expect(
+      emptyBatchLabel([
+        item({ id: '1', status: 'failed' }),
+        item({ id: '2', status: 'failed' }),
+      ]),
+    ).toBe('失败');
+  });
+
+  it('整批取消 → 已取消', () => {
+    expect(emptyBatchLabel([item({ id: '1', status: 'cancelled' })])).toBe('已取消');
   });
 });
 

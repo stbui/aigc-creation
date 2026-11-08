@@ -8,6 +8,7 @@ import {
   ListError,
   Notice,
   StatusTag,
+  formatShanghaiDateTime,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { adminPaymentOrdersApi } from './api';
@@ -76,7 +77,7 @@ function paymentAttemptColumns(currency: string): Array<AdminColumn<PaymentAttem
       title: '创建时间',
       render: (payment) => (
         <span className="text-xs text-muted-foreground tabular-nums">
-          {payment.createdAt.replace('T', ' ').slice(0, 19)}
+          {formatShanghaiDateTime(payment.createdAt)}
         </span>
       ),
     },
@@ -194,19 +195,19 @@ export function PaymentOrderDetailDrawer({
                 label: '配置版本',
                 value: order.providerConfigVersion === null ? '—' : `v${order.providerConfigVersion}`,
               },
-              { label: '创建时间', value: order.createdAt.replace('T', ' ').slice(0, 19) },
-              { label: '过期时间', value: order.expiresAt.replace('T', ' ').slice(0, 19) },
+              { label: '创建时间', value: formatShanghaiDateTime(order.createdAt) },
+              { label: '过期时间', value: formatShanghaiDateTime(order.expiresAt) },
               {
                 label: '支付时间',
-                value: order.providerPaidAt ? order.providerPaidAt.replace('T', ' ').slice(0, 19) : '—',
+                value: formatShanghaiDateTime(order.providerPaidAt),
               },
               {
                 label: '入账时间',
-                value: order.creditedAt ? order.creditedAt.replace('T', ' ').slice(0, 19) : '—',
+                value: formatShanghaiDateTime(order.creditedAt),
               },
               {
                 label: '关闭时间',
-                value: order.closedAt ? order.closedAt.replace('T', ' ').slice(0, 19) : '—',
+                value: formatShanghaiDateTime(order.closedAt),
               },
             ]}
           />

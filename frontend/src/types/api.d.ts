@@ -1654,8 +1654,7 @@ export interface AdminProduct {
   grantType: "immediate" | "manual";
   status: "active" | "offline";
   sortOrder: number;
-  /** 历史订单数。> 0 时不可删除，删除前会被提示改为下架 */
-  orderCount: number;
+  orderCount: number; // 历史订单数。> 0 时不可删除，删除前会被提示改为下架
   createdAt: string;
   updatedAt: string;
 }
@@ -1679,9 +1678,7 @@ export interface CreateProductPayload {
  * `originalPriceCents` 允许显式传 null —— 那是「清空划线价」, 与「不改」
  * (不传该字段) 是两件事, 用 undefined 表达不了后者之外的语义。
  */
-export type UpdateProductPayload = Partial<
-  Omit<CreateProductPayload, "sku" | "originalPriceCents">
-> & {
+export type UpdateProductPayload = Partial<Omit<CreateProductPayload, "sku" | "originalPriceCents">> & {
   originalPriceCents?: number | null;
 };
 
@@ -1750,8 +1747,7 @@ export interface AdminOrderRow {
   refundedCents: number;
   grantedCredits: number;
   itemCount: number;
-  /** 明细快照（下单时的名称与 SKU），用于列表直接看出买的是什么 */
-  items: Array<{ name: string; sku: string }>;
+  items: Array<{ name: string; sku: string }>; // 下单时的名称与 SKU 快照
   paymentCount: number;
   membershipPlanCode: string | null;
   membershipPlanName: string | null;

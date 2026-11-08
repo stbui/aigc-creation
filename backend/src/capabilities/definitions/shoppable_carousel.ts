@@ -156,6 +156,13 @@ export const ShoppableCarousel: CapabilityPlugin = {
     { key: 'noText', label: '图片不加文字', type: 'boolean', default: false },
     { key: 'socialCaption', label: '生成社媒帖子发布文案', type: 'boolean', default: true },
     // ── 批次技术字段（页面按一次提交代填, 结果栏据此把多张图聚合成一行） ──
+    /*
+     * 模板名必须声明为 hidden 参数才会被 `sanitizeParams` 保留：
+     * 未声明的 key 会被静默丢弃，历史记录就只剩 templateId，
+     * 卡片只能回落成「AI 智能生成」，把模板批次误标成 AI 生成。
+     * 值由服务端在 `outputPlan` 里按 templateId 回填，不信任客户端传值。
+     */
+    { key: 'templateName', label: '模板名称', type: 'text', hidden: true, maxLength: 64 },
     { key: 'beatIndex', label: '拍序号', type: 'number', hidden: true, min: 1, max: 3, step: 1 },
     { key: 'beatLabel', label: '拍名称', type: 'text', hidden: true },
     { key: 'shotIndex', label: '本批张序', type: 'number', hidden: true, min: 1, max: 10, step: 1 },
@@ -172,7 +179,6 @@ export const ShoppableCarousel: CapabilityPlugin = {
     const market = labelOf(TARGET_MARKETS, p.market);
     const language = labelOf(OUTPUT_LANGUAGES, p.language);
     const count = shoppableCarouselCount(p.count);
-    const round = Math.ceil(count / 3);
 
     const parts: string[] = [];
     parts.push(
@@ -182,14 +188,14 @@ export const ShoppableCarousel: CapabilityPlugin = {
       const cats = template.categoryIds.map((c) => CATEGORY_LABEL.get(c)).filter(Boolean).join('、');
       parts.push(
         `采用「${template.name}」模板的三拍叙事结构，本张为第 ${beat} 拍（${beatLabel}）` +
-          `${round > 1 ? `，同模板共出 ${count} 张、三拍各出 ${round} 轮，本张需与同轮其它张在同一商品与场景基调下呈现不同层次` : ''}。` +
+          `${count > 3 ? `，同模板共出 ${count} 张、按三拍循环出图，本张需与同批其它张在同一商品与场景基调下呈现不同层次` : ''}。` +
           (cats ? `商品品类定位：${cats}。` : '') +
           template.promptFragment,
       );
     } else {
       parts.push(
         `AI 智能生成版式：按社媒带货图文惯例自动设计图文内容与排版，本张为第 ${beat} 段（${beatLabel || '产品展示'}）` +
-          `${round > 1 ? `，同批共 ${count} 张，需与同批其它张在主体一致的前提下呈现不同内容角度` : ''}。`,
+          `${count > 1 ? `，同批共 ${count} 张，需与同批其它张在主体一致的前提下呈现不同内容角度` : ''}。`,
       );
     }
     parts.push(
@@ -242,6 +248,8 @@ export const ShoppableCarousel: CapabilityPlugin = {
           beatIndex: beat,
           beatLabel,
           shotIndex: shot,
+          // 展示名以服务端模板表为准, 覆盖客户端传入值
+          templateName: mode === 'template' ? (template?.name ?? '') : '',
           // mode=template 但没选模板时, 退回 AI 智能生成 —— 不能让模型收到空模板
           ...(mode === 'template' && template ? {} : { mode: 'ai' }),
         },
@@ -251,5 +259,7 @@ export const ShoppableCarousel: CapabilityPlugin = {
   modality: 'image',
   model: { capability: 'image', operation: 'text_to_image', intent: generateImageIntent },
   inputs: 1,
+  /** 参考站实拍「同一产品，最多 5 张」—— 服务端同样拒绝超额提交 */
+  maxInputs: 5,
   inWorkbench: true,
 };

@@ -12,6 +12,48 @@ function displayDateTime(iso: string, invalidFallback: string): string {
   return date.toLocaleString('zh-CN', { hour12: false });
 }
 
+/** 固定东八区偏移。运营口径是北京时间，不能跟着浏览器时区漂。 */
+const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+/**
+ * ISO 字符串 → `2026-11-03 10:20:25`（固定东八区）。
+ *
+ * 与后端 `formatShanghai` 同口径：后台列表、抽屉、导出看到的都是同一时刻。
+ * 直接 `slice(0, 19)` 截 ISO 字符串会把 UTC 当成本地时间显示，比北京时间
+ * 少 8 小时 —— 对账「完成时间」这类要跟渠道账单对齐的字段尤其致命。
+ */
+export function formatShanghaiDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  const shifted = new Date(date.getTime() + SHANGHAI_OFFSET_MS);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return (
+    `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())} ` +
+    `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:${pad(shifted.getUTCSeconds())}`
+  );
+}
+
+/**
+ * ISO 字符串 → `2026-11-03 10:20`（固定东八区，精确到分钟）。
+ *
+ * 列表列宽有限、要能扫读的场景用它；需要秒的用 {@link formatShanghaiDateTime}。
+ */
+export function formatShanghaiDateTimeShort(iso: string | null | undefined): string {
+  const full = formatShanghaiDateTime(iso);
+  return full === '—' ? full : full.slice(0, 16);
+}
+
+/** ISO 字符串 → `2026-11-03`（固定东八区）。与 {@link formatShanghaiDateTime} 同口径。 */
+export function formatShanghaiDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  const shifted = new Date(date.getTime() + SHANGHAI_OFFSET_MS);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
 /** ISO 字符串 → `2026/11/02 14:03:12`。无法解析时原样返回（便于发现脏数据）。 */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
