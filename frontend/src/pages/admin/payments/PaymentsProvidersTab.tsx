@@ -1,30 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Settings2 } from 'lucide-react';
 import { adminPaymentProvidersApi } from './api';
 import {
   ActionButton,
-  AdminDataTable,
   Drawer,
   EmptyState,
   FormField,
   ListError,
   Notice,
   NumberField,
-  PageSkeleton,
-  Panel,
   SelectField,
-  StatusTag,
+  SkeletonCards,
   SwitchField,
   TextAreaField,
   TextField,
-  type AdminColumn,
 } from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import type {
   AdminPaymentProviderView,
   PaymentConfigField,
 } from '../../../types/payment';
-import { CHECKOUT_MODE_LABELS } from './constants';
+import { PaymentsProviderCard } from './PaymentsProviderCard';
 
 /**
  * 支付渠道标签。
@@ -35,45 +30,6 @@ import { CHECKOUT_MODE_LABELS } from './constants';
  *
  * 密钥字段后端只回「是否已配置」，不回明文 —— 输入框留空即表示沿用旧值。
  */
-
-/** 渠道图标：内联小方块，避免拉外链图片（后台不该有第三方资源依赖） */
-function ProviderIcon({ icon }: { icon: string }) {
-  // 品牌图标色用语义 token，不写裸 hex —— 支付宝/微信的品牌色也不进全站令牌表
-  const tone =
-    icon === 'alipay'
-      ? 'bg-brand/10 text-brand'
-      : icon === 'wechat'
-        ? 'bg-success-soft text-success-text'
-        : icon === 'paypal'
-          ? 'bg-brand/10 text-brand'
-          : icon === 'stripe'
-            ? 'bg-brand/10 text-brand'
-            : icon === 'epay'
-              ? 'bg-warn-soft text-warn-text'
-              : icon === 'zpay'
-                ? 'bg-brand/10 text-brand'
-                : 'bg-muted text-muted-foreground';
-  return (
-    <span
-      aria-hidden
-      className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold ${tone}`}
-    >
-      {icon === 'alipay'
-        ? '支'
-        : icon === 'wechat'
-          ? '微'
-          : icon === 'paypal'
-            ? 'P'
-            : icon === 'stripe'
-              ? 'S'
-              : icon === 'epay'
-                ? '易'
-                : icon === 'zpay'
-                  ? 'Z'
-                  : '沙'}
-    </span>
-  );
-}
 
 interface ConfigDraft {
   enabled: boolean;
@@ -126,94 +82,20 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
   }, [saving]);
 
   const providers = data?.items ?? [];
-  const enabledCount = providers.filter((p) => p.enabled && p.configured).length;
 
-  const columns: Array<AdminColumn<AdminPaymentProviderView>> = [
-    {
-      key: 'provider',
-      title: '支付渠道',
-      width: 220,
-      render: (row) => (
-        <div className="flex items-center gap-2.5">
-          <ProviderIcon icon={row.icon} />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate font-medium">{row.name}</span>
-            <code className="font-mono text-[12px] text-muted-foreground">{row.id}</code>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'checkoutMode',
-      title: '支付方式',
-      width: 100,
-      render: (row) => <span className="text-muted-foreground">{CHECKOUT_MODE_LABELS[row.checkoutMode] ?? row.checkoutMode}</span>,
-    },
-    {
-      key: 'status',
-      title: '状态',
-      width: 200,
-      render: (row) => {
-        const usable = row.enabled && row.configured;
-        return (
-          <div className="flex flex-col gap-1">
-            <StatusTag
-              status={usable ? 'usable' : 'unusable'}
-              tone={usable ? 'success' : 'muted'}
-              label={usable ? '可用' : '不可用'}
-            />
-            <span className="text-[12px] text-muted-foreground">
-              配置{row.enabled ? '已启用' : '已停用'} ·{' '}
-              {row.configured ? '密钥已配齐' : `缺 ${row.missing.length} 项`}
-            </span>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'closeAfterMinutes',
-      title: '未支付自动关闭',
-      width: 130,
-      render: (row) => <span>{row.closeAfterMinutes} 分钟</span>,
-    },
-    {
-      key: 'version',
-      title: '配置版本',
-      width: 100,
-      render: (row) =>
-        row.version === null ? (
-          <span className="text-muted-foreground">未配置</span>
-        ) : (
-          <code className="font-mono text-xs">v{row.version}</code>
-        ),
-    },
-    {
-      key: 'actions',
-      title: '操作',
-      width: 90,
-      render: (row) => (
-        <ActionButton
-          icon={Settings2}
-          onClick={() => openConfig(row)}
-          ariaLabel={writable ? `配置${row.name}` : `查看${row.name}`}
-        >
-          {writable ? '配置' : '查看'}
-        </ActionButton>
-      ),
-    },
-  ];
-
-  /*
-   * 标签页内的加载骨架只占**这一块面板**的位置：页头、页签、提示条都在上面，
-   * 已经渲染好了，不该跟着塌。面板限宽与真实 `Panel` 一致（不限宽）。
-   */
+  /* 标签页内的加载骨架只占卡片区域，页头、页签、提示条已经渲染好了。 */
   if (loading && !data) {
     return (
-      <PageSkeleton panels={1} panelRows={5} />
+      <SkeletonCards
+        count={6}
+        className="mt-0"
+        gridClassName="grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3"
+      />
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
   if (!data) return <EmptyState title="没有发现支付渠道" />;
+  if (providers.length === 0) return <EmptyState title="没有发现支付渠道" />;
 
   const allWarnings = providers.flatMap((p) => p.warnings);
 
@@ -229,13 +111,19 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
         </Notice>
       )}
 
-      <AdminDataTable
-        rows={providers}
-        columns={columns}
-        rowKey={(row) => row.id}
-        emptyText="没有发现支付渠道"
-        minWidth={840}
-      />
+      <div
+        data-testid="admin-provider-grid"
+        className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3"
+      >
+        {providers.map((provider) => (
+          <PaymentsProviderCard
+            key={provider.id}
+            provider={provider}
+            writable={writable}
+            onConfigure={() => openConfig(provider)}
+          />
+        ))}
+      </div>
 
       {editing && draft && (
         <ProviderConfigDrawer

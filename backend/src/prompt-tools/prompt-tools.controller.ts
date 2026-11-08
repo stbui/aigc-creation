@@ -1,6 +1,7 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
+import { RateLimit } from '../common/rate-limit.guard';
 import { PromptToolsService, type PromptToolResult } from './prompt-tools.service';
 import { PolishPromptDto } from './dto/polish-prompt.dto';
 import { ImageToPromptDto } from './dto/image-to-prompt.dto';
@@ -21,6 +22,8 @@ import { ImageToPromptDto } from './dto/image-to-prompt.dto';
  */
 @Controller('prompt-tools')
 @UseGuards(JwtAuthGuard)
+// 两个入口都会触发真实文本/多模态上游调用；按用户限流，避免同一账号刷成本。
+@RateLimit({ name: 'prompt-tools', scope: 'user', limit: 20, windowSec: 60 })
 export class PromptToolsController {
   constructor(private readonly service: PromptToolsService) {}
 

@@ -215,6 +215,18 @@ export class BillingService {
     private readonly wallet: CreditWalletService,
   ) {}
 
+  /**
+   * 只读余额预检查。
+   *
+   * 真正的余额权威校验仍在建单事务内（`reserveBatchBilling`）；这里用于在
+   * 触发有成本的上游调用（例如局部重绘参考图转描述）之前，尽早拒绝明显
+   * 余额不足的请求。调用方不能把这里的快照当成预留成功的依据。
+   */
+  async availableMicrocreditsOf(userId: string): Promise<bigint> {
+    const balance = await this.wallet.balanceOf(this.prisma, userId);
+    return balance.availableMicrocredits;
+  }
+
   // ── 建单 ──────────────────────────────────────────────────────────
 
   /**

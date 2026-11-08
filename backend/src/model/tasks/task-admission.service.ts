@@ -27,7 +27,10 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppError } from '../../common/app.exception';
 import { getCapability, sanitizeParams, validateCapabilityParams } from '../../capabilities/capability.registry';
-import { parseLocalRedrawAnnotations } from '../../capabilities/definitions/local_redraw';
+import {
+  normalizeLocalRedrawBounds,
+  parseLocalRedrawAnnotations,
+} from '../../capabilities/definitions/local_redraw';
 import { CapabilityAvailabilityService } from '../../capabilities/capability-availability.service';
 import { MembershipService } from '../../membership/membership.service';
 import { CreditPriceService } from '../../credits/credit-price.service';
@@ -162,7 +165,9 @@ export class TaskAdmissionService {
     // 7. 遮罩与局部重绘标注（都是生成输入，必须在扣费前确认可用）
     await this.validateMask(ownerId, dto, assets);
     const sanitized = sanitizeParams(dto.capability, dto.params);
-    await this.validateAnnotations(ownerId, dto);
+    const sourceAsset = assets.find((asset: { id: string }) => asset.id === dto.inputAssetIds[0]);
+    await this.validateAnnotations(ownerId, dto, sourceAsset);
+    this.assertLocalRedrawHasInput(dto, sanitized);
 
     // 8. 模型解析：只有目录里真实可用、且支持该能力的模型才允许建单
     const logicalModelId = String(dto.logicalModelId ?? '').trim();
@@ -221,6 +226,14 @@ export class TaskAdmissionService {
 
     // 11. 局部重绘参考图的文字描述（只做一次，落进任务参数避免每次轮询重算）
     if (dto.capability === 'local_redraw') {
+      const annotations = parseLocalRedrawAnnotations(sanitized.annotations);
+      const hasReferenceImages = annotations.some((item) => Boolean(item.referenceAssetId));
+      if (hasReferenceImages && amountMicrocredits > 0n) {
+        const available = await this.billing.availableMicrocreditsOf(ownerId);
+        if (available < amountMicrocredits) {
+          throw new AppError(40201, '积分不足，请充值后再试', 402);
+        }
+      }
       await this.attachReferenceHints(sanitized, ownerId);
     }
 
@@ -448,29 +461,50 @@ export class TaskAdmissionService {
     }
   }
 
-  /** 局部重绘标注：1–3 项、每项有区域描述、参考图属于本人 */
-  private async validateAnnotations(ownerId: string, dto: CreateGenerationDto): Promise<void> {
+  /** 局部重绘标注：1–3 项、每项有区域描述、多区域带合法坐标、参考图属于本人 */
+  private async validateAnnotations(
+    ownerId: string,
+    dto: CreateGenerationDto,
+    sourceAsset?: { width: number | null; height: number | null },
+  ): Promise<void> {
     if (dto.capability !== 'local_redraw') return;
     const raw = dto.params?.annotations;
-    if (raw === undefined) return;
+    if (raw === undefined || raw === null || raw === '') return;
+    if (typeof raw !== 'string') {
+      throw new AppError(40001, 'annotations 必须是 JSON 字符串', 400);
+    }
 
     let decoded: unknown;
     try {
-      decoded = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      decoded = JSON.parse(raw);
     } catch {
       throw new AppError(40001, 'annotations 必须是合法 JSON', 400);
     }
     if (!Array.isArray(decoded) || decoded.length === 0 || decoded.length > 3) {
       throw new AppError(40001, 'annotations 必须是 1 至 3 项数组', 400);
     }
-    const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
-    if (parseLocalRedrawAnnotations(text).length !== decoded.length) {
+    if (parseLocalRedrawAnnotations(raw).length !== decoded.length) {
       throw new AppError(40001, '每个标注都必须包含非空区域描述', 400);
     }
-    // API 调用方可能直接发数组：落库统一用字符串，避免 sanitizeParams 把对象变成 [object Object]
-    if (typeof raw !== 'string') dto.params!.annotations = text;
 
-    const referenceIds = parseLocalRedrawAnnotations(text)
+    for (const item of decoded) {
+      const record = item as Record<string, unknown>;
+      const bounds = normalizeLocalRedrawBounds(record.bounds);
+      if (record.bounds !== undefined) {
+        if (!bounds) throw new AppError(40001, '标注区域坐标无效', 400);
+        if (
+          sourceAsset?.width &&
+          sourceAsset.height &&
+          (bounds.sourceWidth !== sourceAsset.width || bounds.sourceHeight !== sourceAsset.height)
+        ) {
+          throw new AppError(40001, '标注区域坐标与原图尺寸不一致', 400);
+        }
+      } else if (decoded.length > 1) {
+        throw new AppError(40001, '多区域标注必须为每个区域提供坐标', 400);
+      }
+    }
+
+    const referenceIds = parseLocalRedrawAnnotations(raw)
       .map((item) => item.referenceAssetId)
       .filter((id): id is string => typeof id === 'string' && Boolean(id.trim()));
     for (const referenceId of new Set(referenceIds)) {
@@ -488,6 +522,15 @@ export class TaskAdmissionService {
     }
   }
 
+  /** 局部重绘至少需要遮罩、文字描述或标注之一；空白字符串不算输入。 */
+  private assertLocalRedrawHasInput(dto: CreateGenerationDto, sanitized: Record<string, any>): void {
+    if (dto.capability !== 'local_redraw') return;
+    const prompt = typeof sanitized.prompt === 'string' ? sanitized.prompt.trim() : '';
+    const annotations = parseLocalRedrawAnnotations(sanitized.annotations);
+    if (this.maskAssetId(sanitized) || prompt || annotations.length > 0) return;
+    throw new AppError(40001, '请至少提交遮罩、重绘描述或标注区域之一', 400);
+  }
+
   /**
    * 参考图 → 文字描述，写进 `params.__referenceHints`。
    *
@@ -496,17 +539,21 @@ export class TaskAdmissionService {
    */
   private async attachReferenceHints(params: Record<string, any>, ownerId: string): Promise<void> {
     const annotations = parseLocalRedrawAnnotations(params.annotations);
-    const hints: string[] = [];
-    for (const item of annotations) {
-      if (typeof item.referenceAssetId !== 'string' || !item.referenceAssetId.trim()) continue;
-      try {
-        const result = await this.promptTools.imageToPrompt(ownerId, item.referenceAssetId, item.instruction);
-        const text = result.text?.trim();
-        if (text) hints.push(`${item.label || '参考图'}：${text}`);
-      } catch (error) {
-        this.log.warn(`局部重绘参考图 ${item.referenceAssetId} 转描述失败，已跳过：${(error as Error).message}`);
-      }
-    }
+    const hints = (
+      await Promise.all(
+        annotations.map(async (item) => {
+          if (typeof item.referenceAssetId !== 'string' || !item.referenceAssetId.trim()) return null;
+          try {
+            const result = await this.promptTools.imageToPrompt(ownerId, item.referenceAssetId, item.instruction);
+            const text = result.text?.trim();
+            return text ? `${item.label || '参考图'}：${text}` : null;
+          } catch (error) {
+            this.log.warn(`局部重绘参考图 ${item.referenceAssetId} 转描述失败，已跳过：${(error as Error).message}`);
+            return null;
+          }
+        }),
+      )
+    ).filter((hint): hint is string => Boolean(hint));
     if (hints.length > 0) params.__referenceHints = hints;
   }
 

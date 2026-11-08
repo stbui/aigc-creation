@@ -58,12 +58,23 @@ export const RESIZE_HANDLES: ResizeHandle[] = [
 
 /** 一个可描述区域在原图上的包围盒（像素坐标） */
 export interface RegionBounds {
+  /** 标记的稳定 id；删除/重排其它区域时，这个值不会变化 */
+  id: number;
   x: number;
   y: number;
   width: number;
   height: number;
   sourceWidth: number;
   sourceHeight: number;
+}
+
+/** 画布每次变更后回传给页面的状态。 */
+export interface PaintState {
+  painted: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  /** 只包含当前仍有可见遮罩的标注区域 */
+  regions: RegionBounds[];
 }
 
 /** 画布对外的动作 */
@@ -74,5 +85,6 @@ export interface MaskPainterHandle {
   redo: () => void;
   getRegionCount: () => number;
   getRegionBounds: () => RegionBounds[];
-  removeRegion: (index: number) => void;
+  /** 按稳定标记 id 删除区域；不能按下标，完全擦除的隐藏区域会导致错删。 */
+  removeRegion: (id: number) => void;
 }

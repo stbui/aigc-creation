@@ -2,10 +2,10 @@ import {
   ActionButton,
   ExportCsvButton,
   AppliedFilters,
+  DateRangeField,
   FilterActions,
   FilterBar,
   SelectField,
-  TextField,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
 import { RECONCILIATION_PROVIDERS } from './constants';
@@ -57,19 +57,15 @@ export function ReconciliationFilterBar({
         className="w-[120px]"
         ariaLabel="筛选状态"
       />
-      <TextField
-        type="date"
-        value={values.from}
-        onChange={(value) => onChange('from', value)}
-        className="w-[140px]"
-        ariaLabel="筛选起始日期"
-      />
-      <TextField
-        type="date"
-        value={values.to}
-        onChange={(value) => onChange('to', value)}
-        className="w-[140px]"
-        ariaLabel="筛选截止日期"
+      <DateRangeField
+        from={values.from}
+        to={values.to}
+        onChange={({ from, to }) => {
+          onChange('from', from);
+          onChange('to', to);
+        }}
+        className="w-[280px]"
+        ariaLabel="筛选日期范围"
       />
       <FilterActions>
         <ActionButton onClick={onApply}>筛选</ActionButton>

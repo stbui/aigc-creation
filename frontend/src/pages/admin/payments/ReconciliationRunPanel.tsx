@@ -1,10 +1,12 @@
-import { ActionButton, FormField, Panel, SelectField, TextField } from '~/admin-ui/primitives';
+import { ActionButton, DateField, FormField, Panel, SelectField } from '~/admin-ui/primitives';
 
 /** 手动执行对账与兜底导入入口。 */
 export function ReconciliationRunPanel({
   providerOptions,
   providerId,
   billDate,
+  minBillDate,
+  maxBillDate,
   canReconcile,
   onProviderChange,
   onBillDateChange,
@@ -14,6 +16,8 @@ export function ReconciliationRunPanel({
   providerOptions: Array<{ value: string; label: string }>;
   providerId: string;
   billDate: string;
+  minBillDate: string;
+  maxBillDate: string;
   canReconcile: boolean;
   onProviderChange: (value: string) => void;
   onBillDateChange: (value: string) => void;
@@ -36,11 +40,12 @@ export function ReconciliationRunPanel({
           />
         </FormField>
         <FormField label="账单日期" className="w-[180px]" hint="最早 90 天前，最晚昨天">
-          <TextField
-            type="date"
+          <DateField
             value={billDate}
             onChange={onBillDateChange}
             ariaLabel="账单日期"
+            minDate={minBillDate}
+            maxDate={maxBillDate}
           />
         </FormField>
         <ActionButton onClick={onRun} disabled={!canReconcile || !providerId}>

@@ -31,6 +31,11 @@ interface SetupOptions {
   sourceHeight?: number;
   /** router.resolve 返回的 capabilitySpec 是否声明 mask 输入 */
   resolveReturnsMaskInput?: boolean;
+  /** 覆盖默认的局部重绘参数 */
+  params?: Record<string, unknown>;
+  /** 本次计价金额与用户可用余额（微积分） */
+  amountMicrocredits?: bigint;
+  availableMicrocredits?: bigint;
 }
 
 function setup(opts: SetupOptions = {}) {
@@ -67,10 +72,17 @@ function setup(opts: SetupOptions = {}) {
     freeCampaignIdOf: vi.fn().mockResolvedValue(undefined),
   };
   const billing = {
-    buildDraft: vi.fn().mockReturnValue({ amountMicrocredits: 0n, quantity: 1n }),
+    buildDraft: vi.fn().mockReturnValue({
+      amountMicrocredits: opts.amountMicrocredits ?? 500n,
+      quantity: 1n,
+    }),
+    availableMicrocreditsOf: vi.fn().mockResolvedValue(opts.availableMicrocredits ?? 1000n),
     reserveBatchBilling: vi.fn(),
   };
   const groups = { accessForUser: vi.fn().mockResolvedValue({}) };
+  const promptTools = {
+    imageToPrompt: vi.fn().mockResolvedValue({ text: '一张金属材质的参考图' }),
+  };
   const router = {
     findModel: vi.fn().mockResolvedValue({
       id: 'model-lr',
@@ -99,7 +111,7 @@ function setup(opts: SetupOptions = {}) {
     billing as never,
     router as never,
     groups as never,
-    {} as never,
+    promptTools as never,
   );
 
   const dto = {
@@ -107,10 +119,10 @@ function setup(opts: SetupOptions = {}) {
     capability: 'local_redraw',
     logicalModelId: 'model-lr',
     inputAssetIds: [SOURCE_ID],
-    params: { region: 'center', prompt: '把背景换成纯白', maskAssetId: MASK_ID },
+    params: opts.params ?? { region: 'center', prompt: '把背景换成纯白', maskAssetId: MASK_ID },
   };
 
-  return { service, prisma, router, billing, dto, maskId: MASK_ID, sourceId: SOURCE_ID };
+  return { service, prisma, router, billing, promptTools, dto, maskId: MASK_ID, sourceId: SOURCE_ID };
 }
 
 describe('TaskAdmissionService 局部重绘遮罩拒绝路径', () => {
@@ -183,5 +195,123 @@ describe('TaskAdmissionService 局部重绘遮罩拒绝路径', () => {
       thrownCode = (err as { code?: number }).code;
     }
     expect([40001, 42205]).not.toContain(thrownCode);
+  });
+});
+
+describe('TaskAdmissionService 局部重绘输入与标注坐标', () => {
+  const bounds = {
+    x: 20,
+    y: 30,
+    width: 100,
+    height: 50,
+    sourceWidth: 200,
+    sourceHeight: 200,
+  };
+
+  it('无遮罩、无描述、无标注 → 40001，且不进入计价或预留', async () => {
+    const { service, billing, dto } = setup({
+      params: { region: 'center', prompt: '   ' },
+    });
+
+    await expect(service.admit({ ownerId: 'user-1', dto: dto as never })).rejects.toMatchObject({
+      code: 40001,
+      message: expect.stringContaining('至少提交'),
+    });
+
+    expect(billing.buildDraft).not.toHaveBeenCalled();
+    expect(billing.reserveBatchBilling).not.toHaveBeenCalled();
+  });
+
+  it('annotations 直接传数组 → 40001，且不预留积分', async () => {
+    const { service, billing, dto } = setup({
+      params: {
+        region: 'center',
+        annotations: [{ instruction: '改成金属材质', bounds }],
+      },
+    });
+
+    await expect(service.admit({ ownerId: 'user-1', dto: dto as never })).rejects.toMatchObject({
+      code: 40001,
+    });
+
+    expect(billing.reserveBatchBilling).not.toHaveBeenCalled();
+  });
+
+  it('多区域标注缺少坐标 → 40001，且不预留积分', async () => {
+    const { service, billing, dto } = setup({
+      maskAsset: { format: 'image/png' },
+      params: {
+        region: 'center',
+        maskAssetId: MASK_ID,
+        annotations: JSON.stringify([
+          { annotationId: '1', label: '标注1', instruction: '改成金属材质', bounds },
+          { annotationId: '2', label: '标注2', instruction: '改成哑光玻璃' },
+        ]),
+      },
+    });
+
+    await expect(service.admit({ ownerId: 'user-1', dto: dto as never })).rejects.toMatchObject({
+      code: 40001,
+      message: expect.stringContaining('每个区域'),
+    });
+
+    expect(billing.reserveBatchBilling).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['缺字段', { x: 20, y: 30, width: 100, height: 50 }],
+    ['非数字', { ...bounds, x: '20' }],
+    ['非有限数', { ...bounds, width: null }],
+    ['负数', { ...bounds, x: -1 }],
+    ['零宽', { ...bounds, width: 0 }],
+    ['越界', { ...bounds, x: 150, width: 100 }],
+    ['原图尺寸不一致', { ...bounds, sourceWidth: 100 }],
+  ])('坐标%s → 40001，且不预留积分', async (_name, invalidBounds) => {
+    const { service, billing, dto } = setup({
+      maskAsset: { format: 'image/png' },
+      params: {
+        region: 'center',
+        maskAssetId: MASK_ID,
+        annotations: JSON.stringify([
+          { annotationId: '1', label: '标注1', instruction: '改成金属材质', bounds: invalidBounds },
+        ]),
+      },
+    });
+
+    await expect(service.admit({ ownerId: 'user-1', dto: dto as never })).rejects.toMatchObject({
+      code: 40001,
+    });
+
+    expect(billing.reserveBatchBilling).not.toHaveBeenCalled();
+  });
+
+  it('有参考图且余额不足时，在解析参考图之前返回 40201', async () => {
+    const { service, billing, promptTools, dto } = setup({
+      maskAsset: { format: 'image/png' },
+      resolveReturnsMaskInput: true,
+      params: {
+        region: 'center',
+        maskAssetId: MASK_ID,
+        annotations: JSON.stringify([
+          {
+            annotationId: '1',
+            label: '标注1',
+            instruction: '参照这张图改成金属材质',
+            referenceAssetId: 'reference-1',
+            bounds,
+          },
+        ]),
+      },
+      amountMicrocredits: 500n,
+      availableMicrocredits: 499n,
+    });
+
+    await expect(service.admit({ ownerId: 'user-1', dto: dto as never })).rejects.toMatchObject({
+      code: 40201,
+    });
+
+    expect(billing.availableMicrocreditsOf).toHaveBeenCalledWith('user-1');
+    expect(promptTools.imageToPrompt).not.toHaveBeenCalled();
+    expect(billing.reserveBatchBilling).not.toHaveBeenCalled();
   });
 });

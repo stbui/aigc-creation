@@ -16,6 +16,8 @@ import { prepareGuestSession } from './support/guest-session';
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 const API = process.env.E2E_API ?? 'http://localhost:4100';
+const E2E_EMAIL = process.env.E2E_USER_EMAIL ?? '';
+const E2E_PASSWORD = process.env.E2E_USER_PASSWORD ?? '';
 
 type Caps = {
   groups: Array<{ id: string; name: string; desc: string }>;
@@ -115,6 +117,15 @@ async function mockTaskList(page: Page, items: unknown[]) {
 }
 
 async function register(request: APIRequestContext): Promise<{ token: string; email: string }> {
+  // 本地开发档默认要求邮箱验证码；优先复用显式提供的测试账号，未提供时
+  // 才走一次性注册（测试档 AUTH_EMAIL_VERIFICATION_BYPASS=true）。
+  if (E2E_EMAIL && E2E_PASSWORD) {
+    const res = await request.post(`${API}/api/v1/auth/login`, {
+      data: { email: E2E_EMAIL, password: E2E_PASSWORD },
+    });
+    if (!res.ok()) throw new Error(`登录失败 ${res.status()}: ${await res.text()}`);
+    return { token: (await res.json()).data.accessToken, email: E2E_EMAIL };
+  }
   const email = `e2e-caps-${Date.now()}-${Math.floor(Math.random() * 1e6)}@local.dev`;
   // 多个用例共用同一测试实例时，注册接口的滑动窗口限流会正常触发。
   // 测试等待服务端给出的窗口，不绕过限流，也不把 429 误判成产品故障。
@@ -662,8 +673,12 @@ test.describe('局部重绘画布', () => {
     // 第 4 笔必须被拒绝，否则遮罩里会出现一条没有描述的区域。
     await expect(page.locator('.redraw-prompt')).toHaveCount(3);
 
-    await page.locator('textarea').first().fill('把这里改成哑光材质');
     const submit = page.locator('button.pk-primary-btn').first();
+    const promptFields = page.locator('.redraw-prompt textarea');
+    await promptFields.nth(0).fill('把这里改成哑光材质');
+    await expect(submit).toBeDisabled();
+    await promptFields.nth(1).fill('把这里改成金属材质');
+    await promptFields.nth(2).fill('把这里改成磨砂玻璃');
     await expect(submit).toBeEnabled();
 
     await page.locator('.redraw-prompt-tools input[type=file]').first().setInputFiles({
@@ -687,16 +702,46 @@ test.describe('局部重绘画布', () => {
     await expect.poll(() => posted).not.toBeNull();
     const annotations = JSON.parse(posted.params.annotations);
     expect(annotations).toEqual([
-      {
-        annotationId: '1',
+      expect.objectContaining({
+        annotationId: expect.any(String),
         label: '标注1',
         instruction: '把这里改成哑光材质',
         referenceAssetId: 'asset-reference',
-      },
+        bounds: expect.objectContaining({
+          x: expect.any(Number),
+          y: expect.any(Number),
+          width: expect.any(Number),
+          height: expect.any(Number),
+          sourceWidth: 240,
+          sourceHeight: 160,
+        }),
+      }),
+      expect.objectContaining({
+        annotationId: expect.any(String),
+        label: '标注2',
+        instruction: '把这里改成金属材质',
+        referenceAssetId: null,
+        bounds: expect.objectContaining({ sourceWidth: 240, sourceHeight: 160 }),
+      }),
+      expect.objectContaining({
+        annotationId: expect.any(String),
+        label: '标注3',
+        instruction: '把这里改成磨砂玻璃',
+        referenceAssetId: null,
+        bounds: expect.objectContaining({ sourceWidth: 240, sourceHeight: 160 }),
+      }),
     ]);
+    for (const annotation of annotations) {
+      expect(annotation.bounds.width).toBeGreaterThan(0);
+      expect(annotation.bounds.height).toBeGreaterThan(0);
+      expect(annotation.bounds.x + annotation.bounds.width).toBeLessThanOrEqual(240);
+      expect(annotation.bounds.y + annotation.bounds.height).toBeLessThanOrEqual(160);
+    }
     expect(posted.params.modelGuideAssetId).toBe('asset-mask');
     expect(posted.params.maskAssetId).toBe('asset-mask');
-    expect(posted.params.prompt).toBe('标注1：把这里改成哑光材质');
+    expect(posted.params.prompt).toBe(
+      '标注1：把这里改成哑光材质；标注2：把这里改成金属材质；标注3：把这里改成磨砂玻璃',
+    );
     expect(posted.params.imageRatio).toBe('4:3');
     expect(posted.params.strength).toBe(0.5);
     expect(posted.params.outputCount).toBe(1);

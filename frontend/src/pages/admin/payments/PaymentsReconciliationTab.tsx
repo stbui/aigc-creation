@@ -5,13 +5,13 @@ import {
   ActionButton,
   AdminDataTable,
   ConfirmDialog,
+  DateField,
   FormField,
   ListError,
   Panel,
   SelectField,
   StaleError,
   StatusTag,
-  TextField,
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -338,6 +338,8 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         providerOptions={reconcilableProviders}
         providerId={runProvider}
         billDate={billDate}
+        minBillDate={ninetyDaysAgo()}
+        maxBillDate={yesterday()}
         canReconcile={canReconcile}
         onProviderChange={setRunProvider}
         onBillDateChange={setBillDate}
@@ -453,11 +455,12 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
               />
             </FormField>
             <FormField label="账单日期" required hint="最早 90 天前，最晚昨天">
-              <TextField
-                type="date"
+              <DateField
                 value={importBillDate}
                 onChange={setImportBillDate}
                 ariaLabel="导入账单日期"
+                minDate={ninetyDaysAgo()}
+                maxDate={yesterday()}
               />
             </FormField>
             <FormField

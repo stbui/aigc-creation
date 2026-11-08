@@ -1,6 +1,14 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshButton, Notice, PageHeader, SegmentedTabs } from '~/admin-ui/primitives';
+import {
+  Notice,
+  PageHeader,
+  RefreshButton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '~/admin-ui/primitives';
 import { PaymentsProvidersTab } from './PaymentsProvidersTab';
 import { PaymentsProductsTab } from './PaymentsProductsTab';
 import { PaymentsOrdersTab } from './PaymentsOrdersTab';
@@ -74,27 +82,42 @@ export function AdminPaymentsPage() {
         本页不提供退款。管理端提供查单、关单和对账：关单前始终先向渠道查单； 对账发现已支付未入账订单时会幂等补发积分。
       </Notice>
 
-      <div className="mb-4">
-        <SegmentedTabs
-          value={tab}
-          onChange={switchTab}
-          options={TABS.map((t) => ({ value: t.value, label: t.label }))}
-          ariaLabel="支付域标签"
-        />
-      </div>
+      <Tabs value={tab} onValueChange={switchTab} className="gap-3">
+        <TabsList aria-label="支付域标签" className="h-9 gap-1 p-1">
+          {TABS.map((item) => (
+            <TabsTrigger
+              key={item.value}
+              value={item.value}
+              className="h-7 px-3 text-sm font-medium"
+            >
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {/*
-       * 五个标签各自持有 loading/error/data，切换标签不互相清空。
-       *
-       * `refreshNonce` 作为 prop 下传而不是当 `key`：remount 会把筛选与分页
-       * 一起重置，而「刷新」的语义是**重取当前筛选下的数据**，不是回到初始态。
-       * 各标签在 nonce 变化时调自己的 reload()，筛选条件原样保留。
-       */}
-      {tab === 'providers' && <PaymentsProvidersTab refreshNonce={refreshNonce} />}
-      {tab === 'products' && <PaymentsProductsTab refreshNonce={refreshNonce} />}
-      {tab === 'orders' && <PaymentsOrdersTab refreshNonce={refreshNonce} />}
-      {tab === 'reconciliation' && <PaymentsReconciliationTab refreshNonce={refreshNonce} />}
-      {tab === 'exceptions' && <PaymentsExceptionPanel refreshNonce={refreshNonce} />}
+        {/*
+         * 五个标签各自持有 loading/error/data，切换标签不互相清空。
+         *
+         * `refreshNonce` 作为 prop 下传而不是当 `key`：remount 会把筛选与分页
+         * 一起重置，而「刷新」的语义是**重取当前筛选下的数据**，不是回到初始态。
+         * 各标签在 nonce 变化时调自己的 reload()，筛选条件原样保留。
+         */}
+        <TabsContent value="providers">
+          <PaymentsProvidersTab refreshNonce={refreshNonce} />
+        </TabsContent>
+        <TabsContent value="products">
+          <PaymentsProductsTab refreshNonce={refreshNonce} />
+        </TabsContent>
+        <TabsContent value="orders">
+          <PaymentsOrdersTab refreshNonce={refreshNonce} />
+        </TabsContent>
+        <TabsContent value="reconciliation">
+          <PaymentsReconciliationTab refreshNonce={refreshNonce} />
+        </TabsContent>
+        <TabsContent value="exceptions">
+          <PaymentsExceptionPanel refreshNonce={refreshNonce} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

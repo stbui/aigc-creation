@@ -69,6 +69,7 @@ export {
   CardDescription,
   CardContent,
 } from '../components/ui/card';
+export { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 export { Button } from '../components/ui/button';
 export { Separator } from '../components/ui/separator';
 
@@ -99,6 +100,7 @@ export {
 
 export {
   CheckboxField,
+  DateField,
   DateRangeField,
   FilePicker,
   HelpTip,

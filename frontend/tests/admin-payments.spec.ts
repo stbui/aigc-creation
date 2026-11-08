@@ -79,7 +79,8 @@ test.describe('支付充值', () => {
     await login(page);
     await page.goto(`${UI}/admin/payments?tab=providers`);
 
-    await expect(page.getByTestId('admin-table')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId('admin-provider-grid')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId('admin-provider-card').first()).toBeVisible();
     await expect(page.getByText('沙箱').first()).toBeVisible();
     await expect(page.getByText('支付宝').first()).toBeVisible();
     await expect(page.getByText('微信支付').first()).toBeVisible();
@@ -116,6 +117,9 @@ test.describe('支付充值', () => {
 
     await expect(page.getByRole('button', { name: '执行对账' })).toBeVisible({ timeout: 20000 });
     await expect(page.getByLabel('账单日期')).toBeVisible();
+    await expect(page.locator('input[type="date"]')).toHaveCount(0);
+    await page.getByLabel('账单日期').click();
+    await expect(page.getByRole('grid')).toBeVisible();
     // 无对账记录时是空态而不是表格
     await expect(page.getByText('还没有对账记录')).toBeVisible();
   });

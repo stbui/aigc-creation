@@ -18,13 +18,41 @@ const MAX_REFERENCE_HINT_CHARS = 1600;
 /** 与页面上的 3 条描述位一致；超出部分不进入提示词，也不触发参考图解析。 */
 export const MAX_LOCAL_REDRAW_ANNOTATIONS = 3;
 
+/** 标注区域在原图像素坐标系中的包围盒。 */
+export interface InpaintingBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sourceWidth: number;
+  sourceHeight: number;
+}
+
 /** 参考站 createInpainting 的标注项（前端以 JSON 字符串提交）。 */
 interface InpaintingAnnotation {
   annotationId: string;
   label: string;
   instruction: string;
+  /** 多区域标注必须带坐标；单区域仍兼容旧调用方不带 bounds。 */
+  bounds?: InpaintingBounds;
   /** 该标注单独上传的参考图素材 id（执行期转成文字描述后并入提示词）。 */
   referenceAssetId?: string | null;
+}
+
+/** 严格解析 bounds；结构不完整或坐标越界时返回 null，由准入层拒绝。 */
+export function normalizeLocalRedrawBounds(raw: unknown): InpaintingBounds | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  const values = ['x', 'y', 'width', 'height', 'sourceWidth', 'sourceHeight'].map((key) =>
+    typeof record[key] === 'number' ? record[key] : Number.NaN,
+  );
+  if (values.some((value) => !Number.isFinite(value))) return null;
+  const [x, y, width, height, sourceWidth, sourceHeight] = values;
+  if (x < 0 || y < 0 || width <= 0 || height <= 0 || sourceWidth <= 0 || sourceHeight <= 0) {
+    return null;
+  }
+  if (x + width > sourceWidth || y + height > sourceHeight) return null;
+  return { x, y, width, height, sourceWidth, sourceHeight };
 }
 
 /**
@@ -58,10 +86,12 @@ export function parseLocalRedrawAnnotations(raw: unknown): InpaintingAnnotation[
       typeof record.referenceAssetId === 'string' && record.referenceAssetId.trim()
         ? record.referenceAssetId.trim()
         : null;
+    const bounds = normalizeLocalRedrawBounds(record.bounds);
     annotations.push({
       annotationId: rawAnnotationId || String(annotations.length + 1),
       label: rawLabel || `标注${annotations.length + 1}`,
       instruction,
+      ...(bounds ? { bounds } : {}),
       referenceAssetId,
     });
     if (annotations.length >= MAX_LOCAL_REDRAW_ANNOTATIONS) break;
@@ -120,7 +150,7 @@ export const LocalRedraw: CapabilityPlugin = {
       type: 'text',
       hidden: true,
       maxLength: 10000,
-      help: 'JSON 字符串：[{annotationId,label,instruction}]，由页面代填',
+      help: 'JSON 字符串：[{annotationId,label,instruction,bounds}]，由页面代填；多区域标注必须带 bounds',
     },
     {
       key: 'strength',
@@ -168,7 +198,12 @@ export const LocalRedraw: CapabilityPlugin = {
     const hintText = referenceText ? `；参考图描述：${referenceText}` : '';
     if (annotations.length > 0) {
       const requirements = annotations
-        .map((item) => `${item.label}：${item.instruction}`)
+        .map((item) => {
+          if (!item.bounds) return `${item.label}：${item.instruction}`;
+          const { x, y, width, height, sourceWidth, sourceHeight } = item.bounds;
+          const format = (value: number) => Math.round(value * 100) / 100;
+          return `${item.label}[区域 x=${format(x)}, y=${format(y)}, 宽=${format(width)}, 高=${format(height)}, 原图=${format(sourceWidth)}×${format(sourceHeight)}]：${item.instruction}`;
+        })
         .join('；');
       return `局部重绘：只重绘${area}，其余像素保持不变。修改要求：${requirements || '按描述局部修改'}${hintText}${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`;
     }
