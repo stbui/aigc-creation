@@ -4,19 +4,30 @@ import { type AppliedFilter } from '~/admin-ui/primitives';
 import { adminUsersApi } from './api';
 import {
   DEFAULT_SORT,
+  MEMBERSHIP_OPTIONS,
   ROLE_OPTIONS,
+  SEGMENT_OPTIONS,
   STATUS_OPTIONS,
 } from './constants';
 import { useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
-import type { AdminUserListResult } from '../../../types/api';
+import type {
+  AdminUserListResult,
+  AdminUserStats,
+} from '../../../types/api';
 import type {
   AdminUserListQuery,
+  AdminUserMembershipFilter,
   AdminUserRole,
+  AdminUserSegment,
   AdminUserStatus,
 } from './types';
 
 const ROLE_VALUES = new Set<string>(ROLE_OPTIONS.map(({ value }) => value));
 const STATUS_VALUES = new Set<string>(STATUS_OPTIONS.map(({ value }) => value));
+const SEGMENT_VALUES = new Set<string>(SEGMENT_OPTIONS.map(({ value }) => value));
+const MEMBERSHIP_VALUES = new Set<string>(
+  MEMBERSHIP_OPTIONS.map(({ value }) => value),
+);
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -38,6 +49,20 @@ function statusValue(value: unknown): AdminUserStatus | undefined {
     : undefined;
 }
 
+function segmentValue(value: unknown): AdminUserSegment | undefined {
+  return typeof value === 'string' && SEGMENT_VALUES.has(value)
+    ? (value as AdminUserSegment)
+    : undefined;
+}
+
+function membershipValue(
+  value: unknown,
+): AdminUserMembershipFilter | undefined {
+  return typeof value === 'string' && MEMBERSHIP_VALUES.has(value)
+    ? (value as AdminUserMembershipFilter)
+    : undefined;
+}
+
 function readOption<T extends string>(
   params: URLSearchParams,
   key: string,
@@ -47,11 +72,24 @@ function readOption<T extends string>(
   return value && values.has(value) ? (value as T) : undefined;
 }
 
+/** 日期选择器给的是 `yyyy-MM-dd`（浏览器本地时区）；发送前补成当天起止时刻。 */
+function dayStart(value: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function dayEnd(value: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(`${value}T23:59:59.999`);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
 /**
- * 用户列表筛选、URL 同步与导出。
+ * 用户列表筛选、URL 同步、全局统计与导出。
  *
  * 输入草稿和已生效查询分开：输入框只在「查询」或回车时提交，避免每键请求。
- * URL 只同步已生效条件，深链刷新与浏览器前后退都能恢复相同口径。
+ * URL 只同步筛选与排序，不同步页码 —— 分享链接不应该把对方带到第 7 页。
  */
 export function useAdminUserFilters() {
   const toast = useToast();
@@ -59,13 +97,42 @@ export function useAdminUserFilters() {
 
   const initialKeyword = searchParams.get('q') ?? '';
   const initialRole = readOption<AdminUserRole>(searchParams, 'role', ROLE_VALUES);
-  const initialStatus = readOption<AdminUserStatus>(searchParams, 'status', STATUS_VALUES);
+  const initialStatus = readOption<AdminUserStatus>(
+    searchParams,
+    'status',
+    STATUS_VALUES,
+  );
+  const initialFrom = searchParams.get('from') ?? '';
+  const initialTo = searchParams.get('to') ?? '';
+  const initialSegment = readOption<AdminUserSegment>(
+    searchParams,
+    'segment',
+    SEGMENT_VALUES,
+  );
+  const initialMembership = readOption<AdminUserMembershipFilter>(
+    searchParams,
+    'membership',
+    MEMBERSHIP_VALUES,
+  );
+  const initialSort = searchParams.get('sort') ?? DEFAULT_SORT;
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [role, setRole] = useState<AdminUserRole | undefined>(initialRole);
   const [status, setStatus] = useState<AdminUserStatus | undefined>(initialStatus);
+  const [from, setFrom] = useState(initialFrom);
+  const [to, setTo] = useState(initialTo);
+  const [segment, setSegment] = useState<AdminUserSegment | undefined>(
+    initialSegment,
+  );
+  const [membership, setMembership] = useState<
+    AdminUserMembershipFilter | undefined
+  >(initialMembership);
   const [exporting, setExporting] = useState(false);
+  const [stats, setStats] = useState<AdminUserStats | null>(null);
+  const [statsEpoch, setStatsEpoch] = useState(0);
+
   const exportingRef = useRef(false);
+  const statsSeq = useRef(0);
   const appliedQ = useRef(initialKeyword);
 
   const fetcher = useCallback((raw: Record<string, unknown>) => {
@@ -75,6 +142,10 @@ export function useAdminUserFilters() {
       keyword: stringValue(raw.keyword),
       role: roleValue(raw.role),
       status: statusValue(raw.status),
+      from: dayStart(stringValue(raw.from) ?? ''),
+      to: dayEnd(stringValue(raw.to) ?? ''),
+      segment: segmentValue(raw.segment),
+      membership: membershipValue(raw.membership),
       sort: stringValue(raw.sort) ?? DEFAULT_SORT,
     };
     return adminUsersApi.list(query);
@@ -85,6 +156,11 @@ export function useAdminUserFilters() {
       ...(initialKeyword ? { keyword: initialKeyword } : {}),
       ...(initialRole ? { role: initialRole } : {}),
       ...(initialStatus ? { status: initialStatus } : {}),
+      ...(initialFrom ? { from: initialFrom } : {}),
+      ...(initialTo ? { to: initialTo } : {}),
+      ...(initialSegment ? { segment: initialSegment } : {}),
+      ...(initialMembership ? { membership: initialMembership } : {}),
+      ...(initialSort !== DEFAULT_SORT ? { sort: initialSort } : {}),
     });
 
   /*
@@ -99,18 +175,71 @@ export function useAdminUserFilters() {
     setQuery({ keyword: urlQ || undefined });
   }, [urlQ, setQuery]);
 
-  useAdminUrlFilterSync({
-    q: stringValue(params.keyword),
-    role: stringValue(params.role),
-    status: stringValue(params.status),
-  });
-
   const appliedKeyword = stringValue(params.keyword) ?? '';
   const appliedRole = roleValue(params.role);
   const appliedStatus = statusValue(params.status);
+  const appliedFrom = stringValue(params.from) ?? '';
+  const appliedTo = stringValue(params.to) ?? '';
+  const appliedSegment = segmentValue(params.segment);
+  const appliedMembership = membershipValue(params.membership);
   const sort = stringValue(params.sort) ?? DEFAULT_SORT;
   const rows = data?.items ?? [];
-  const hasFilter = Boolean(appliedKeyword || appliedRole || appliedStatus);
+  const hasFilter = Boolean(
+    appliedKeyword ||
+      appliedRole ||
+      appliedStatus ||
+      appliedFrom ||
+      appliedTo ||
+      appliedSegment ||
+      appliedMembership,
+  );
+
+  useAdminUrlFilterSync({
+    q: appliedKeyword || undefined,
+    role: appliedRole,
+    status: appliedStatus,
+    from: appliedFrom || undefined,
+    to: appliedTo || undefined,
+    segment: appliedSegment,
+    membership: appliedMembership,
+    sort: sort === DEFAULT_SORT ? undefined : sort,
+  });
+
+  /** 全局统计与列表共用同一组筛选条件；reload 时同步刷新。 */
+  useEffect(() => {
+    const seq = ++statsSeq.current;
+    adminUsersApi
+      .stats({
+        keyword: appliedKeyword || undefined,
+        role: appliedRole,
+        status: appliedStatus,
+        from: dayStart(appliedFrom),
+        to: dayEnd(appliedTo),
+        segment: appliedSegment,
+        membership: appliedMembership,
+      })
+      .then((next) => {
+        if (seq === statsSeq.current) setStats(next);
+      })
+      .catch(() => {
+        // 统计失败不覆盖列表：顶部退化为「—」，不把整页打成错误态。
+        if (seq === statsSeq.current) setStats(null);
+      });
+  }, [
+    appliedKeyword,
+    appliedRole,
+    appliedStatus,
+    appliedFrom,
+    appliedTo,
+    appliedSegment,
+    appliedMembership,
+    statsEpoch,
+  ]);
+
+  const reloadAll = useCallback(() => {
+    reload();
+    setStatsEpoch((value) => value + 1);
+  }, [reload]);
 
   const applyFilters = () => {
     const nextKeyword = keyword.trim();
@@ -119,6 +248,10 @@ export function useAdminUserFilters() {
       keyword: nextKeyword || undefined,
       role,
       status,
+      from: from || undefined,
+      to: to || undefined,
+      segment,
+      membership,
     });
   };
 
@@ -127,7 +260,20 @@ export function useAdminUserFilters() {
     setKeyword('');
     setRole(undefined);
     setStatus(undefined);
-    setQuery({ keyword: undefined, role: undefined, status: undefined });
+    setFrom('');
+    setTo('');
+    setSegment(undefined);
+    setMembership(undefined);
+    setQuery({
+      keyword: undefined,
+      role: undefined,
+      status: undefined,
+      from: undefined,
+      to: undefined,
+      segment: undefined,
+      membership: undefined,
+      sort: DEFAULT_SORT,
+    });
   };
 
   const clearKeyword = () => {
@@ -146,11 +292,27 @@ export function useAdminUserFilters() {
     setQuery({ status: undefined });
   };
 
+  const clearDateRange = () => {
+    setFrom('');
+    setTo('');
+    setQuery({ from: undefined, to: undefined });
+  };
+
+  const clearSegment = () => {
+    setSegment(undefined);
+    setQuery({ segment: undefined });
+  };
+
+  const clearMembership = () => {
+    setMembership(undefined);
+    setQuery({ membership: undefined });
+  };
+
   const appliedChipCandidates: Array<AppliedFilter | null> = [
     appliedKeyword
       ? {
         key: 'keyword',
-        label: `邮箱「${appliedKeyword}」`,
+        label: `关键词「${appliedKeyword}」`,
         onClear: clearKeyword,
       }
       : null,
@@ -168,6 +330,27 @@ export function useAdminUserFilters() {
         onClear: clearStatus,
       }
       : null,
+    appliedFrom || appliedTo
+      ? {
+        key: 'date',
+        label: `注册：${appliedFrom || '不限'} ~ ${appliedTo || '不限'}`,
+        onClear: clearDateRange,
+      }
+      : null,
+    appliedSegment
+      ? {
+        key: 'segment',
+        label: `分群：${SEGMENT_OPTIONS.find((option) => option.value === appliedSegment)?.label ?? appliedSegment}`,
+        onClear: clearSegment,
+      }
+      : null,
+    appliedMembership
+      ? {
+        key: 'membership',
+        label: `会员：${MEMBERSHIP_OPTIONS.find((option) => option.value === appliedMembership)?.label ?? appliedMembership}`,
+        onClear: clearMembership,
+      }
+      : null,
   ];
   const appliedChips = appliedChipCandidates.filter(
     (item): item is AppliedFilter => item !== null,
@@ -179,18 +362,38 @@ export function useAdminUserFilters() {
     setExporting(true);
     try {
       // 导出必须与屏幕上的列表同口径：使用已生效参数，而不是输入框草稿。
-      await adminUsersApi.exportCsv({
+      const result = await adminUsersApi.exportCsv({
         keyword: appliedKeyword || undefined,
         role: appliedRole,
         status: appliedStatus,
+        from: dayStart(appliedFrom),
+        to: dayEnd(appliedTo),
+        segment: appliedSegment,
+        membership: appliedMembership,
+        sort,
       });
+      if (result.truncated) {
+        toast.error(
+          `导出已截断：共 ${result.total} 条，文件只包含前 ${result.limit} 条`,
+        );
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '导出失败');
     } finally {
       exportingRef.current = false;
       setExporting(false);
     }
-  }, [appliedKeyword, appliedRole, appliedStatus, toast]);
+  }, [
+    appliedKeyword,
+    appliedRole,
+    appliedStatus,
+    appliedFrom,
+    appliedTo,
+    appliedSegment,
+    appliedMembership,
+    sort,
+    toast,
+  ]);
 
   return {
     keyword,
@@ -199,18 +402,29 @@ export function useAdminUserFilters() {
     setRole,
     status,
     setStatus,
+    from,
+    setFrom,
+    to,
+    setTo,
+    segment,
+    setSegment,
+    membership,
+    setMembership,
     data,
     loading,
     error,
     rows,
     params,
     sort,
+    stats,
     appliedChips,
     hasFilter,
     exporting,
     setQuery,
-    setPage,
-    reload,
+    setPage: (page: number, pageSize?: number) => {
+      setPage(page, pageSize);
+    },
+    reload: reloadAll,
     applyFilters,
     resetFilters,
     exportUsers,

@@ -16,10 +16,12 @@ import {
   DutyChannelTower,
   DutyStrip,
   TrendBarChart,
+  WorkQueue,
   earliestFailure,
   useAdminResource,
 } from '../../../admin-ui/primitives';
 import { useDuty } from '../../../components/admin/DutyContext';
+import { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';
 import type { AdminOverview } from '../../../types/api';
 import {
   EmptyInline,
@@ -68,8 +70,21 @@ export function AdminDashboardContent() {
   const { data, loading, error, reload } = useAdminResource(() => adminApi.overview(days), [days]);
   const { data: duty } = useDuty();
   const { can } = useAdmin();
-  /* 财务没有任务读权：队列、产出条、任务趋势整体换成交易视角 */
-  const isFinance = !can('task.read');
+  const {
+    data: workbench,
+    loading: workbenchLoading,
+    error: workbenchError,
+    view,
+    canSwitchView,
+    setView,
+  } = useAdminWorkbench();
+  /*
+   * 财务没有任务读权：队列、产出条、任务趋势整体换成交易视角。
+   * 管理员预览财务视角时也按财务版式渲染，但权限不变。
+   */
+  const isFinance = view === 'finance' || !can('task.read');
+  const workbenchTitle =
+    view === 'finance' ? '资金待办' : view === 'operator' ? '今日待办' : '系统待办';
 
   /*
    * 首屏骨架：只有完全没有数据时才塌**正文**。
@@ -154,6 +169,18 @@ export function AdminDashboardContent() {
         )} · 每 ${data.cacheTtlSeconds} 秒刷新`}
         actions={
           <>
+            {canSwitchView && (
+              <SegmentedTabs
+                ariaLabel="工作台视角"
+                value={view}
+                onChange={(value) => setView(value as typeof view)}
+                options={[
+                  { value: 'admin', label: '管理员' },
+                  { value: 'operator', label: '运营' },
+                  { value: 'finance', label: '财务' },
+                ]}
+              />
+            )}
             <SegmentedTabs
               ariaLabel="统计时间窗"
               value={String(days)}
@@ -172,6 +199,14 @@ export function AdminDashboardContent() {
       {error && <StaleError error={error} onRetry={() => void reload()} />}
 
       <DutyStrip />
+
+      <WorkQueue
+        groups={workbench?.groups ?? []}
+        loading={workbenchLoading}
+        error={workbenchError}
+        emptyTitle={`${workbenchTitle}已清空`}
+        emptyDescription="当前没有需要你处理的事项；下方仍保留经营与产出摘要。"
+      />
 
       {/*
        * 首屏双栏：左 62% 给需要动作的队列，右 38% 给机器状态。

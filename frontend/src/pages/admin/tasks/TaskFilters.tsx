@@ -20,6 +20,8 @@ interface TaskFiltersProps {
   onOwnerChange: (value: string) => void;
   project: string;
   onProjectChange: (value: string) => void;
+  errorCode: string;
+  onErrorCodeChange: (value: string) => void;
   from: string;
   onFromChange: (value: string) => void;
   to: string;
@@ -40,6 +42,8 @@ export function TaskFilters({
   onOwnerChange,
   project,
   onProjectChange,
+  errorCode,
+  onErrorCodeChange,
   from,
   onFromChange,
   to,
@@ -88,6 +92,14 @@ export function TaskFilters({
         placeholder="项目 ID"
         value={project}
         onChange={onProjectChange}
+        onEnter={onApply}
+      />
+      <ClearableField
+        className="w-32"
+        ariaLabel="按错误码筛选"
+        placeholder="错误码"
+        value={errorCode}
+        onChange={onErrorCodeChange}
         onEnter={onApply}
       />
       <TextField

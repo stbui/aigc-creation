@@ -12,6 +12,9 @@ import { StorageService } from "../storage/storage.service";
 import type { StorageBackend } from "../storage/storage.provider";
 import { getCapability } from "../capabilities/capability.registry";
 import { MembershipService } from "../membership/membership.service";
+import { CreditService } from "../credits/credit.service";
+import { UserGroupService } from "../model/user-groups/user-group.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { ROLE_LABELS, USER_STATUS_LABELS } from "./permissions";
 import { buildPage, paginate, type PageResult } from "./dto/page-query.dto";
 import type {
@@ -40,6 +43,11 @@ export class AdminUsersService {
     private readonly storage: StorageService,
     // 当前会员判定必须复用 C 端口径：投影可能指向未来周期，不能只看 expiresAt。
     private readonly membership: MembershipService,
+    // 余额与分组必须复用 C 端同一份服务：后台另算一套必然与账单口径漂移。
+    private readonly credit: CreditService,
+    private readonly groups: UserGroupService,
+    // 重置密码 / 禁用后通知本人；notify() 永不抛异常，不阻断主流程。
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -105,23 +113,34 @@ export class AdminUsersService {
    * 不导出密码哈希、tokenVersion 这类内部字段 —— 导出文件会被转存、
    * 用邮件发走，只放运营真正需要的列。
    */
-  async exportCsv(query: UserListQueryDto): Promise<string> {
-    const rows = await this.prisma.user.findMany({
-      where: this.listWhere(query),
-      orderBy: { createdAt: "desc" },
-      take: CSV_EXPORT_MAX_ROWS,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        status: true,
-        createdAt: true,
-        lastLoginAt: true,
-      },
-    });
+  async exportCsv(query: UserListQueryDto): Promise<{
+    csv: string;
+    total: number;
+    limit: number;
+    truncated: boolean;
+  }> {
+    const page = buildPage(query, [...SORTABLE], "createdAt:desc");
+    const where = this.listWhere(query);
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        // 导出必须跟随屏幕上的排序；固定 createdAt 会与列表口径对不上。
+        orderBy: page.orderBy,
+        take: CSV_EXPORT_MAX_ROWS,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          status: true,
+          createdAt: true,
+          lastLoginAt: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
     const counts = await this.usageCounts(rows.map((user) => user.id));
-    return toCsv(
+    const csv = toCsv(
       [
         { label: "用户 ID", value: (u) => u.id },
         { label: "邮箱", value: (u) => u.email },
@@ -139,6 +158,32 @@ export class AdminUsersService {
       ],
       rows,
     );
+    return {
+      csv,
+      total,
+      limit: CSV_EXPORT_MAX_ROWS,
+      truncated: total > CSV_EXPORT_MAX_ROWS,
+    };
+  }
+
+  /**
+   * 全局用户统计（跟随筛选条件）。
+   *
+   * 列表顶部的「正常 / 受限 / 管理身份」如果按当前页计算，翻页就会变，
+   * 运营很容易把它当成全站数字。这里用与列表完全相同的 where 做聚合。
+   */
+  async stats(query: UserListQueryDto) {
+    const where = this.listWhere(query);
+    const [total, byRoleRows, byStatusRows] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.groupBy({ by: ["role"], where, _count: { _all: true } }),
+      this.prisma.user.groupBy({ by: ["status"], where, _count: { _all: true } }),
+    ]);
+    const byRole: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    for (const row of byRoleRows) byRole[row.role] = row._count._all;
+    for (const row of byStatusRows) byStatus[row.status] = row._count._all;
+    return { total, byRole, byStatus };
   }
 
   /**
@@ -174,7 +219,6 @@ export class AdminUsersService {
         lastLoginAt: true,
         phone: true,
         phoneVerifiedAt: true,
-        tokenVersion: true,
       },
     });
     if (!user) throw new AppError(40400, "用户不存在", 404);
@@ -188,6 +232,11 @@ export class AdminUsersService {
       membershipHistory,
       membershipUsage,
       usageCounts,
+      creditBalance,
+      groupAccess,
+      orderCount,
+      ticketCount,
+      invoiceCount,
     ] = await Promise.all([
       this.prisma.generationTask.findMany({
         where: { ownerId: id, project: { deletedAt: null } },
@@ -239,6 +288,12 @@ export class AdminUsersService {
       this.usageCounts([id]).then(
         (counts) => counts.get(id) ?? { projects: 0, tasks: 0, assets: 0 },
       ),
+      // 余额/分组复用 C 端服务，避免后台另算一套与账单口径漂移。
+      this.credit.balanceOf(id),
+      this.groups.accessForUser(id),
+      this.prisma.order.count({ where: { userId: id } }),
+      this.prisma.ticket.count({ where: { userId: id } }),
+      this.prisma.invoice.count({ where: { userId: id } }),
     ]);
 
     const statusCount: Record<string, number> = {};
@@ -256,10 +311,26 @@ export class AdminUsersService {
       lastLoginAt: user.lastLoginAt,
       phone: user.phone,
       phoneVerifiedAt: user.phoneVerifiedAt,
+      /** 当前可用积分与到期信息；与 C 端 /credits/balance 同源 */
+      credit: {
+        balance: creditBalance.balance,
+        expiringSoon: creditBalance.expiringSoon,
+        activeLots: creditBalance.activeLots,
+        nearestExpiry: creditBalance.nearestExpiry,
+      },
+      /** 计费分组（会员套餐映射，无有效会员落默认分组） */
+      group: {
+        code: groupAccess.group.code,
+        name: groupAccess.group.name,
+        ratioBasisPoints: groupAccess.group.ratioBasisPoints,
+      },
       stats: {
         projects: usageCounts.projects,
         tasks: usageCounts.tasks,
         assets: usageCounts.assets,
+        orders: orderCount,
+        tickets: ticketCount,
+        invoices: invoiceCount,
         taskStatus: {
           succeeded: statusCount["succeeded"] ?? 0,
           failed: statusCount["failed"] ?? 0,
@@ -338,6 +409,17 @@ export class AdminUsersService {
       });
     });
 
+    // 通知失败不影响处置结果；notify() 自身永不抛异常。
+    await this.notifications.notify({
+      userId: id,
+      type: dto.status === "disabled" ? "account_disabled" : "account_enabled",
+      fallbackTitle: dto.status === "disabled" ? "账号已被禁用" : "账号已恢复",
+      fallbackBody:
+        dto.status === "disabled"
+          ? "你的账号已被管理员禁用，当前登录已失效。如有疑问请联系客服。"
+          : "你的账号已恢复，可以重新登录使用。",
+    });
+
     return { id, status: dto.status };
   }
 
@@ -396,10 +478,27 @@ export class AdminUsersService {
     /*
      * 一并自增 tokenVersion: 管理员重置密码通常意味着「怀疑账号被盗」，
      * 此时旧会话必须立即失效，否则重置密码只防住了下一次登录。
+     *
+     * mustChangePassword 强制用户用临时密码登录后先改密；tempPasswordExpiresAt
+     * 防止临时密码长期有效。两者与密码写入同一事务，避免只改了一半。
      */
+    const expiresAt = new Date(Date.now() + 24 * 3600 * 1000);
     await this.prisma.user.update({
       where: { id },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        tokenVersion: { increment: 1 },
+        mustChangePassword: true,
+        tempPasswordExpiresAt: expiresAt,
+      },
+    });
+
+    await this.notifications.notify({
+      userId: id,
+      type: "password_reset",
+      fallbackTitle: "登录密码已被重置",
+      fallbackBody:
+        "管理员已重置你的登录密码。请使用临时密码登录，并立即设置新密码；临时密码 24 小时内有效。",
     });
 
     return {
@@ -407,8 +506,35 @@ export class AdminUsersService {
       email: user.email,
       // 明文只在这里出现一次, 不入库、不落盘、不入审计
       tempPassword: password,
-      notice: "此密码仅显示一次, 关闭后无法再次查看",
+      mustChangePassword: true,
+      expiresAt,
+      notice: "此密码仅显示一次, 关闭后无法再次查看；用户下次登录后必须先修改密码",
     };
+  }
+
+  /**
+   * 强制下线：账号保持可用，只让已签发的会话立即失效。
+   *
+   * 与禁用不同，用户仍可用原密码重新登录 —— 适用于「怀疑 token 泄露」
+   * 或客服要求「把我在别的设备踢下线」。
+   */
+  async logoutAll(id: string, actorId: string) {
+    const user = await this.findUser(id);
+    if (id === actorId) {
+      throw new AppError(40001, "不能强制自己下线", 400);
+    }
+    if (user.status === "deleted") {
+      throw new AppError(40001, "已注销用户无需强制下线", 400);
+    }
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id },
+        data: { tokenVersion: { increment: 1 } },
+      }),
+      // 扫码登录票据也一并作废；未确认的扫码请求不应在下次打开时继续有效。
+      this.prisma.loginSession.deleteMany({ where: { userId: id } }),
+    ]);
+    return { id, revoked: true };
   }
 
   /**
@@ -661,24 +787,72 @@ export class AdminUsersService {
       tasks,
       assets,
       retained,
-      /** 仅作兼容展示；管理端默认始终走软注销。 */
-      hardDeleteAllowed: Object.values(retained).every((count) => count === 0),
     };
   }
 
-  /** 列表 / 导出共用的筛选条件（两处各写一份必然漂移） */
+  /**
+   * 列表 / 统计 / 导出共用的筛选条件（三处各写一份必然漂移）。
+   *
+   * 关键词与分群都可能产生 OR，因此统一收进 `AND` 数组；直接把两个 `OR`
+   * 挂在 where 顶层会互相覆盖，表现为「输入关键词后分群条件静默失效」。
+   */
   private listWhere(query: UserListQueryDto): Record<string, unknown> {
     const where: Record<string, unknown> = {};
-    if (query.keyword) {
-      // 前缀优先: 走索引更快; 用户习惯是输入邮箱开头
-      where["email"] = { contains: query.keyword };
+    const and: Array<Record<string, unknown>> = [];
+
+    const keyword = String(query.keyword ?? "").trim();
+    if (keyword) {
+      // 与顶栏全局搜索同口径：邮箱 / 昵称 / 手机号模糊，用户 ID 精确匹配。
+      and.push({
+        OR: [
+          { email: { contains: keyword } },
+          { name: { contains: keyword } },
+          { phone: { contains: keyword } },
+          { id: keyword },
+        ],
+      });
     }
+
     if (query.role) where["role"] = query.role;
     // 未指定 status 时默认排除 deleted, 避免注销账号长期占据列表
     if (query.status) {
       where["status"] = query.status;
     } else {
       where["status"] = { not: "deleted" };
+    }
+
+    if (query.segment === "never_login") {
+      and.push({ lastLoginAt: null });
+    } else if (query.segment === "inactive_30d") {
+      and.push({
+        OR: [
+          { lastLoginAt: null },
+          { lastLoginAt: { lt: new Date(Date.now() - 30 * 24 * 3600 * 1000) } },
+        ],
+      });
+    } else if (query.segment === "no_tasks") {
+      // 与列表的「任务数」同口径：软删项目下的任务不算。
+      and.push({ tasks: { none: { project: { deletedAt: null } } } });
+    }
+
+    if (query.membership === "member") {
+      and.push({
+        memberships: {
+          some: {
+            status: { in: ["active", "grace", "cancelled"] },
+            expiresAt: { gt: new Date() },
+          },
+        },
+      });
+    } else if (query.membership === "non_member") {
+      and.push({
+        memberships: {
+          none: {
+            status: { in: ["active", "grace", "cancelled"] },
+            expiresAt: { gt: new Date() },
+          },
+        },
+      });
     }
 
     if (query.from || query.to) {
@@ -689,6 +863,8 @@ export class AdminUsersService {
       if (to) createdAt["lte"] = to;
       if (Object.keys(createdAt).length > 0) where["createdAt"] = createdAt;
     }
+
+    if (and.length > 0) where["AND"] = and;
     return where;
   }
 

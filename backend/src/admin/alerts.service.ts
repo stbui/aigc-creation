@@ -2,6 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminRoleService } from './admin-role.service';
 import { PERMISSIONS } from './permissions';
+import {
+  BACKUP_STALE_HOURS,
+  FAILED_CRITICAL_THRESHOLD,
+  REFUND_CRITICAL_HOURS,
+  REFUND_STUCK_MINUTES,
+  RUNNING_ALERT_THRESHOLD,
+  TICKET_CRITICAL_HOURS,
+} from './alert-thresholds';
 
 /**
  * 后台告警中心。
@@ -39,25 +47,6 @@ export interface AdminAlert {
   /** 点击跳转的后台路径 */
   link: string;
 }
-
-/** 运行中任务超过此值即视为积压，与任务监控页保持同一阈值 */
-const RUNNING_ALERT_THRESHOLD = 50;
-/** 失败任务近 24 小时达到此值升为 critical */
-const FAILED_CRITICAL_THRESHOLD = 10;
-/** 工单等待超过此小时数升为 critical */
-const TICKET_CRITICAL_HOURS = 24;
-/** 备份超过此小时数未成功即告警 */
-const BACKUP_STALE_HOURS = 48;
-/**
- * 渠道异步退款超过此分钟数仍未落账即告警。
- *
- * 微信 v3 可能在受理后退回 PROCESSING，本仓库没有退款回调端点，订单状态
- * 与积分都不会自动变更。门槛不能太短，否则刚提交、下一分钟就可能完成的
- * 异步退款也会被算成故障。
- */
-const REFUND_STUCK_MINUTES = 30;
-/** 退款卡单超过此小时数升为 critical */
-const REFUND_CRITICAL_HOURS = 24;
 
 const SEVERITY_ORDER: Record<AlertSeverity, number> = {
   critical: 0,

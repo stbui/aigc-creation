@@ -40,6 +40,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
   const initialCapability = searchParams.get('capability') ?? undefined;
   const initialOwner = searchParams.get('userId') ?? '';
   const initialProject = searchParams.get('projectId') ?? '';
+  const initialErrorCode = searchParams.get('errorCode') ?? '';
   const initialFrom = searchParams.get('from') ?? '';
   const initialTo = searchParams.get('to') ?? '';
 
@@ -47,6 +48,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
   const [capability, setCapability] = useState<string | undefined>(initialCapability);
   const [owner, setOwner] = useState(initialOwner);
   const [project, setProject] = useState(initialProject);
+  const [errorCode, setErrorCode] = useState(initialErrorCode);
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [exporting, setExporting] = useState(false);
@@ -68,6 +70,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
       capability: stringValue(raw.capability),
       userId: stringValue(raw.userId),
       projectId: stringValue(raw.projectId),
+      errorCode: stringValue(raw.errorCode),
       from: stringValue(raw.from),
       to: stringValue(raw.to),
       sort: stringValue(raw.sort),
@@ -81,6 +84,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
       ...(initialCapability ? { capability: initialCapability } : {}),
       ...(initialOwner ? { userId: initialOwner } : {}),
       ...(initialProject ? { projectId: initialProject } : {}),
+      ...(initialErrorCode ? { errorCode: initialErrorCode } : {}),
       ...(initialFrom ? { from: initialFrom } : {}),
       ...(initialTo ? { to: initialTo } : {}),
     });
@@ -110,6 +114,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     capability: stringValue(params.capability),
     userId: stringValue(params.userId),
     projectId: stringValue(params.projectId),
+    errorCode: stringValue(params.errorCode),
     from: stringValue(params.from),
     to: stringValue(params.to),
   });
@@ -127,13 +132,20 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
   const appliedCapability = stringValue(params.capability);
   const appliedOwner = stringValue(params.userId) ?? '';
   const appliedProject = stringValue(params.projectId) ?? '';
+  const appliedErrorCode = stringValue(params.errorCode) ?? '';
   const appliedFrom = stringValue(params.from) ?? '';
   const appliedTo = stringValue(params.to) ?? '';
   const sort = stringValue(params.sort) ?? 'createdAt:desc';
 
   /** 空态与结果卡按已生效查询判断，输入框里尚未提交的草稿不算。 */
   const hasFilter = Boolean(
-    appliedStatus || appliedCapability || appliedOwner || appliedProject || appliedFrom || appliedTo,
+    appliedStatus ||
+      appliedCapability ||
+      appliedOwner ||
+      appliedProject ||
+      appliedErrorCode ||
+      appliedFrom ||
+      appliedTo,
   );
 
   const applyFilters = () => {
@@ -146,6 +158,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
       capability,
       userId: owner.trim() || undefined,
       projectId: nextProject || undefined,
+      errorCode: errorCode.trim() || undefined,
       // datetime-local 的值没有时区，后端 parseDate 与本机 new Date() 口径一致。
       from: from || undefined,
       to: to || undefined,
@@ -159,6 +172,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     setCapability(undefined);
     setOwner('');
     setProject('');
+    setErrorCode('');
     setFrom('');
     setTo('');
     notifyQueryChange();
@@ -167,6 +181,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
       capability: undefined,
       userId: undefined,
       projectId: undefined,
+      errorCode: undefined,
       from: undefined,
       to: undefined,
     });
@@ -193,6 +208,11 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     setProject('');
     notifyQueryChange();
     setQuery({ projectId: undefined });
+  };
+  const clearErrorCode = () => {
+    setErrorCode('');
+    notifyQueryChange();
+    setQuery({ errorCode: undefined });
   };
   const clearFrom = () => {
     setFrom('');
@@ -234,6 +254,13 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
           onClear: clearProject,
         }
       : null,
+    appliedErrorCode
+      ? {
+          key: 'errorCode',
+          label: `错误码：${appliedErrorCode}`,
+          onClear: clearErrorCode,
+        }
+      : null,
     appliedFrom
       ? {
           key: 'from',
@@ -264,6 +291,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
         capability: appliedCapability,
         userId: appliedOwner || undefined,
         projectId: appliedProject || undefined,
+        errorCode: appliedErrorCode || undefined,
         from: appliedFrom || undefined,
         to: appliedTo || undefined,
       });
@@ -275,6 +303,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     }
   }, [
     appliedCapability,
+    appliedErrorCode,
     appliedFrom,
     appliedOwner,
     appliedProject,
@@ -292,6 +321,8 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     setOwner,
     project,
     setProject,
+    errorCode,
+    setErrorCode,
     from,
     setFrom,
     to,

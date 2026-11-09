@@ -9,6 +9,13 @@ vi.mock('../../lib/api', () => ({
   adminSearchApi: { search: searchMock },
 }));
 
+vi.mock('../../context/AdminContext', () => ({
+  useAdmin: () => ({
+    canAny: () => true,
+    me: { id: 'admin-1' },
+  }),
+}));
+
 import { GlobalSearch } from './GlobalSearch';
 
 const SEARCH_RESULT: AdminSearchResult = {

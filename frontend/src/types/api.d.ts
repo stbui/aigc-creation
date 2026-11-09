@@ -262,6 +262,8 @@ export interface UserProfile {
   name?: string;
   /** 后台角色: 'user' | 'admin' | 'operator' | 'finance'。前端据此决定是否请求后台身份 */
   role?: string;
+  /** 后台重置密码后为 true：登录后必须先在客户端改密 */
+  mustChangePassword?: boolean;
 }
 
 export interface AuthResponse {
@@ -518,6 +520,44 @@ export interface AdminAlertsResult {
   items: AdminAlertItem[];
 }
 
+/** GET /api/v1/admin/workbench — 角色首屏待办 */
+export type AdminWorkbenchRoleView = "admin" | "operator" | "finance";
+export type AdminWorkbenchSeverity = "critical" | "warning" | "info";
+export type AdminWorkbenchGroupKey =
+  | "ticket"
+  | "task"
+  | "refund"
+  | "reconciliation"
+  | "invoice"
+  | "billing"
+  | "backup";
+
+export interface AdminWorkbenchItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  meta: Array<{ label: string; value: string; tone?: "danger" | "warn" | "muted" }>;
+  target: { path: string; intent?: string };
+}
+
+export interface AdminWorkbenchGroup {
+  key: AdminWorkbenchGroupKey;
+  label: string;
+  severity: AdminWorkbenchSeverity;
+  /** 全量待处理数，不是 items.length */
+  count: number;
+  amountCents?: number;
+  oldestAt?: string;
+  link: string;
+  items: AdminWorkbenchItem[];
+}
+
+export interface AdminWorkbench {
+  generatedAt: string;
+  roleView: AdminWorkbenchRoleView;
+  groups: AdminWorkbenchGroup[];
+}
+
 /** GET /api/v1/admin/overview — 平台概览 */
 export interface AdminOverview {
   /** 数据生成时间（后端 30 秒缓存） */
@@ -644,6 +684,13 @@ export interface AdminUserListResult {
   pageSize: number;
 }
 
+/** GET /api/v1/admin/users/stats，跟随当前筛选条件 */
+export interface AdminUserStats {
+  total: number;
+  byRole: Record<string, number>;
+  byStatus: Record<string, number>;
+}
+
 /** GET /api/v1/admin/users/:id */
 /** 后台用户详情的最近登录记录 (B2) */
 export interface AdminLoginLogItem {
@@ -674,10 +721,26 @@ export interface AdminUserDetail extends AdminUserMembershipFields {
   statusLabel: string;
   createdAt: string;
   lastLoginAt: string | null;
+  /** 当前可用积分与到期信息（与 C 端 /credits/balance 同源） */
+  credit?: {
+    balance: number;
+    expiringSoon: number;
+    activeLots: number;
+    nearestExpiry: string | null;
+  };
+  /** 计费分组（会员套餐映射，无有效会员落默认分组） */
+  group?: {
+    code: string;
+    name: string;
+    ratioBasisPoints: number;
+  };
   stats: {
     projects: number;
     tasks: number;
     assets: number;
+    orders: number;
+    tickets: number;
+    invoices: number;
     taskStatus: {
       succeeded: number;
       failed: number;
@@ -709,6 +772,9 @@ export interface AdminPasswordReset {
   email: string;
   /** 明文仅此一次返回, 不入库不入审计 */
   tempPassword: string;
+  mustChangePassword: boolean;
+  /** 临时密码有效期；过期后用户需重新联系管理员 */
+  expiresAt: string;
   notice: string;
 }
 
@@ -1131,6 +1197,8 @@ export interface AdminTaskListResult {
   };
   congestion: AdminTaskCongestion;
   capabilities: Array<{ capability: string; count: number }>;
+  /** 近 24 小时失败任务按错误码聚合，用于「同因」快捷筛选 */
+  failureGroups: Array<{ errorCode: string; count: number }>;
 }
 
 /** 任务详情 */
@@ -2067,6 +2135,9 @@ export interface MyProfile {
   status: string;
   createdAt: string;
   lastLoginAt: string | null;
+  /** 后台重置密码后为 true；前端据此弹出强制改密弹窗 */
+  mustChangePassword?: boolean;
+  tempPasswordExpiresAt?: string | null;
   counts: { projects: number; tasks: number; assets: number; orders: number };
   unread: number;
 }
@@ -2150,7 +2221,17 @@ export interface TicketReplyItem {
   /** 回复当时的展示名（快照，用户改名后历史回复不变） */
   authorName: string;
   content: string;
+  /** public 对用户可见；internal 只给后台看 */
+  visibility?: "public" | "internal";
   createdAt: string;
+}
+
+/** GET /admin/tickets/assignees — 可指派的启用后台账号 */
+export interface AdminTicketAssignee {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
 }
 
 export interface Ticket {

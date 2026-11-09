@@ -13,8 +13,6 @@ export interface AdminUserImpact {
     billingOrders: number;
     creditLedgerEntries: number;
   };
-  /** 没有任何资金记录时才允许物理删除 */
-  hardDeleteAllowed: boolean;
 }
 
 /** 后台用户详情中的当前会员权益，口径与 C 端会员判定一致 */

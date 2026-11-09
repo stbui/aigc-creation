@@ -40,7 +40,14 @@ export class JwtAuthGuard implements CanActivate {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, status: true, tokenVersion: true },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        tokenVersion: true,
+        mustChangePassword: true,
+        tempPasswordExpiresAt: true,
+      },
     });
     if (!user) {
       // 账号已被硬删除: 签名仍然有效, 但主体已不存在
@@ -59,6 +66,30 @@ export class JwtAuthGuard implements CanActivate {
     }
     if (user.status === 'deleted') {
       throw new AppError(40302, '账号已注销', 403);
+    }
+
+    /*
+     * 后台重置的临时密码必须「登录后先改密」。
+     *
+     * 只放行 /me（读资料）与 /me/password（改密）两个路径；其余接口一律
+     * 40303，前端据此弹出不可关闭的改密弹窗。不这样做的话，临时密码会
+     * 变成长期可用的正式密码 —— 重置密码只是换了个密码，没有完成闭环。
+     */
+    if (user.mustChangePassword) {
+      if (
+        user.tempPasswordExpiresAt &&
+        user.tempPasswordExpiresAt.getTime() <= Date.now()
+      ) {
+        throw new AppError(40304, '临时密码已过期，请联系管理员重新重置', 403);
+      }
+      const path = String(request.originalUrl ?? request.url ?? '').split('?')[0];
+      const method = String(request.method ?? 'GET').toUpperCase();
+      const passwordChangeAllowed =
+        (method === 'GET' && path.endsWith('/me')) ||
+        (method === 'POST' && path.endsWith('/me/password'));
+      if (!passwordChangeAllowed) {
+        throw new AppError(40303, '首次登录请先修改密码', 403);
+      }
     }
 
     request.user = { id: user.id, email: user.email };

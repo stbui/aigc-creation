@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
@@ -165,6 +165,14 @@ export function AdminCouponsPage() {
     setFormError(null);
     setFormOpen(true);
   };
+
+  /* 命令面板「新建优惠券」带 ?create=1 进入 */
+  const createIntentApplied = useRef(false);
+  useEffect(() => {
+    if (searchParams.get('create') !== '1' || createIntentApplied.current) return;
+    createIntentApplied.current = true;
+    openCreate();
+  }, [searchParams]);
 
   const openEdit = (c: AdminCoupon) => {
     setEditing(c);

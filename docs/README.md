@@ -85,6 +85,7 @@
 | [`canvas-port-design.md`](canvas-port-design.md) | 无限画布全量移植方案（对齐 open-ai-canvas）：Postgres + Redis 前置、文档 operations 协议、协作与实时、快照/分享、四模态生成、Agent/3D 末排、工作分解与验收 | 规划中，未实施 |
 | [`channel-model-design.md`](channel-model-design.md) | 渠道与模型子系统整体移植方案（对齐 open-ai-canvas）：渠道/渠道模型/价格档/前台模型/路由/微积分计费/分组/协议插件/代理 —— 现模型层的设计依据与取舍记录 | 已实施（P0–P6） |
 | [`payment-refactor-design.md`](payment-refactor-design.md) | 支付域重构方案 v2（对齐 open-ai-canvas）：多渠道配置版本化与加密托管、查单/关单、回调收件箱与 15s worker、T+1 对账自动补发、`/admin/payments` 四标签页完整规格、迁移与验收标准 | 部分实施：后端主链路已落地；前端页面与开放差距见 §25 |
+| [`admin-workflow-design.md`](admin-workflow-design.md) | 后台角色化工作流：运营/财务/管理员三种首屏、统一待办、上下文直达、保存视图与命令面板、工单转交、批量动作与分期验收 | P0 已实施（对账保存视图未落地）；P1 / P2 规划中 |
 
 ## 6. 文档命名与放置规范
 
@@ -94,7 +95,7 @@
 - 文件名 = `前缀（域）` + `粒度/主题` + `类型后缀`，缺哪段省哪段。
 - 类型后缀只有两个：`-prd`（需求）、`-design`（产品/设计方案）。技术文档与测试文档不加后缀，直接用领域名词（`environments.md` / `testing.md` / `model-architecture.md` / `docker-deployment.md`）。
 - 域前缀：整站文档不带前缀（`prd.md`）；子系统带前缀（`admin-` / `agent-` / `commerce-` / `workbench-` / `login-` …）。
-- 一个域内有多份文档时用「域-粒度-类型」，粒度由总到细固定为 `suite` → `console` → `detailed` → `ui`。新增粒度词须先改本节。
+- 一个域内有多份文档时用「域-粒度-类型」，粒度由总到细固定为 `suite` → `console` → `detailed` → `ui`；跨页流程与角色动线用 `workflow`。新增粒度词须先改本节。
 
 ### 6.2 禁止事项
 

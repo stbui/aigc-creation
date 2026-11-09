@@ -31,6 +31,8 @@ export interface PublicUser {
   emailVerifiedAt?: Date | null;
   /** 是否设置了可登录密码；纯 OAuth 账号为 false */
   hasPassword: boolean;
+  /** 后台重置密码后为 true：前端必须弹出强制改密弹窗 */
+  mustChangePassword: boolean;
 }
 
 /** 请求来源，用于登录审计。由 controller 从 `req` 中提取 */
@@ -204,6 +206,22 @@ export class AuthService {
       throw new AppError(40302, '账号已注销', 403);
     }
 
+    // 后台一次性临时密码到期后不再接受登录；用户需要重新联系管理员重置。
+    if (
+      user.mustChangePassword &&
+      user.tempPasswordExpiresAt &&
+      user.tempPasswordExpiresAt.getTime() <= Date.now()
+    ) {
+      await this.recordLogin({
+        userId: user.id,
+        email,
+        ctx,
+        success: false,
+        reason: 'temp_password_expired',
+      });
+      throw new AppError(40304, '临时密码已过期，请联系管理员重新重置', 403);
+    }
+
     // 记录最近登录时间 (后台用户列表展示用)。失败不影响登录本身。
     await this.prisma.user
       .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
@@ -302,7 +320,13 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        tokenVersion: { increment: 1 },
+        // 用户通过邮件令牌自己设的新密码，不再需要强制改密。
+        mustChangePassword: false,
+        tempPasswordExpiresAt: null,
+      },
     });
 
     // 同一用户的其它未使用令牌一并作废（多个重置链接同时生效没有意义）
@@ -542,6 +566,7 @@ export class AuthService {
     phone?: string | null;
     emailVerifiedAt?: Date | null;
     passwordHash?: string | null;
+    mustChangePassword?: boolean | null;
   }): PublicUser {
     return {
       id: user.id,
@@ -552,6 +577,7 @@ export class AuthService {
       phone: user.phone ?? null,
       emailVerifiedAt: user.emailVerifiedAt ?? null,
       hasPassword: Boolean(user.passwordHash),
+      mustChangePassword: Boolean(user.mustChangePassword),
     };
   }
 }

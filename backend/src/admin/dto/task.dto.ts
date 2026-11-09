@@ -32,6 +32,12 @@ export class TaskListQueryDto extends PageQueryDto {
   @MaxLength(64)
   projectId?: string;
 
+  /** 失败任务按错误码定位；与「同因聚合」的快捷筛选共用 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  errorCode?: string;
+
   @IsOptional()
   @IsString()
   from?: string;

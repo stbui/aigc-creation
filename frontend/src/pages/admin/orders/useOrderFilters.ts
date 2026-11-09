@@ -318,6 +318,45 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
     setQuery({ from: undefined, to: undefined });
   };
 
+  /**
+   * 应用保存视图：一次性覆盖输入草稿与已生效筛选。
+   *
+   * 不能复用 `updateFilter` + `applyQuery` —— 两次 setState 之间读不到新值，
+   * 会把用户的视图应用成上一组条件。
+   */
+  const applyView = (next: {
+    status?: string;
+    refundState?: string;
+    orderNo?: string;
+    email?: string;
+    channel?: string;
+    from?: string;
+    to?: string;
+  }) => {
+    appliedOrderNoRef.current = next.orderNo ?? '';
+    appliedUrlRefundState.current = next.refundState;
+    setStatus(next.status);
+    setRefundState(next.refundState);
+    setOrderNo(next.orderNo ?? '');
+    setEmail(next.email ?? '');
+    setChannel(next.channel);
+    setFrom(next.from ?? '');
+    setTo(next.to ?? '');
+    notifyQueryChange();
+    setQuery({
+      status: next.status,
+      refundState: next.refundState,
+      orderNo: next.orderNo,
+      email: next.email,
+      channel: next.channel,
+      from: next.from,
+      to: next.to,
+      // 保存视图不包含商品筛选时清掉，避免旧商品条件把结果筛空
+      productId: undefined,
+      productName: undefined,
+    });
+  };
+
   const appliedChipCandidates: Array<AppliedFilter | null> = [
     appliedOrderNo
       ? {
@@ -404,6 +443,7 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
     values,
     updateFilter,
     applyQuery,
+    applyView,
     reset,
     appliedChips,
     hasFilter,

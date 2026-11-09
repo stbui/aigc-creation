@@ -42,6 +42,8 @@ import { AdminSchedulerController } from './scheduler.controller';
 import { AdminTasksController } from './tasks-admin.controller';
 import { AdminAlertsController } from './alerts.controller';
 import { AdminAlertsService } from './alerts.service';
+import { AdminWorkbenchController } from './workbench.controller';
+import { AdminWorkbenchService } from './workbench.service';
 import { AdminCapabilitiesController } from './capability.controller';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import {
@@ -63,6 +65,7 @@ import { AdminAssetsService } from './assets-admin.service';
 import { TasksAdminService } from './tasks-admin.service';
 import { MarketingCoreModule } from '../marketing/marketing-core.module';
 import { GenerateModule } from '../generate/generate.module';
+import { ModelModule } from '../model/model.module';
 import { SchedulerService } from './scheduler.service';
 
 /**
@@ -93,6 +96,9 @@ import { SchedulerService } from './scheduler.service';
     MembershipModule,
     MarketingCoreModule,
     GenerateModule,
+    // 用户详情要展示计费分组；UserGroupService 只在 ModelModule 导出，
+    // 后台另读分组表会与 C 端会员→分组的映射规则漂移。
+    ModelModule,
     // 支付充值页: 渠道配置、支付订单、对账全部复用支付域服务,
     // 不在后台另写一份「哪些通道可用」的规则 (两处判定必然漂移)
     PaymentsModule,
@@ -141,6 +147,8 @@ import { SchedulerService } from './scheduler.service';
     AdminTasksController,
     // 顶栏告警中心：按权限聚合待处理工单 / 失败任务 / 对账差异 / 备份状态
     AdminAlertsController,
+    // 角色工作台：首屏按角色给出可动作的实体队列，只读
+    AdminWorkbenchController,
     AdminCapabilitiesController,
     // 营销中心 (M11)
     AdminCouponsController,
@@ -163,6 +171,7 @@ import { SchedulerService } from './scheduler.service';
     AdminMembershipPlansService,
     TasksAdminService,
     AdminAlertsService,
+    AdminWorkbenchService,
     AdminSearchService,
     SchedulerService,
     { provide: APP_GUARD, useClass: AdminGuard },

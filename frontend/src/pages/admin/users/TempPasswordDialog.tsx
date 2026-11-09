@@ -8,6 +8,7 @@ import {
   ModalDialog,
 } from '~/admin-ui/primitives';
 import { useToast } from './hooks';
+import { formatDateTime } from './utils';
 
 /**
  * 临时密码只展示一次。
@@ -16,9 +17,11 @@ import { useToast } from './hooks';
  */
 export function TempPasswordDialog({
   password,
+  expiresAt,
   onClose,
 }: {
   password: string;
+  expiresAt?: string;
   onClose: () => void;
 }) {
   const toast = useToast();
@@ -59,6 +62,10 @@ export function TempPasswordDialog({
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
+        <p className="text-xs leading-5 text-muted-foreground">
+          用户首次登录后必须先修改密码，改密前只能访问账号资料与改密接口。
+          {expiresAt && `临时密码有效期至 ${formatDateTime(expiresAt)}。`}
+        </p>
       </div>
     </ModalDialog>
   );

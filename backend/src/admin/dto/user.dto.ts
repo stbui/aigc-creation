@@ -27,18 +27,42 @@ export class UserListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsString()
   to?: string;
+
+  /** 运营分群：从未登录 / 30 天未登录 / 无可见任务 */
+  @IsOptional()
+  @IsIn(["never_login", "inactive_30d", "no_tasks"], {
+    message: "segment 取值非法",
+  })
+  segment?: "never_login" | "inactive_30d" | "no_tasks";
+
+  /** 会员状态：有生效中的会员记录 / 没有 */
+  @IsOptional()
+  @IsIn(["member", "non_member"], { message: "membership 取值非法" })
+  membership?: "member" | "non_member";
 }
 
 /** 禁用/启用 */
 export class ChangeUserStatusDto {
   @IsIn(["active", "disabled"], { message: "只能设为正常或禁用" })
   status!: "active" | "disabled";
+
+  /** 可选操作原因；写入审计 detail，便于事后追责（≤500 字） */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 /** 角色变更 */
 export class ChangeUserRoleDto {
   @IsIn(USER_ROLES, { message: "role 取值非法" })
   role!: UserRole;
+
+  /** 可选操作原因；写入审计 detail（≤500 字） */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 /** 物理删除 */

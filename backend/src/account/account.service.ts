@@ -33,6 +33,8 @@ export class AccountService {
         status: true,
         createdAt: true,
         lastLoginAt: true,
+        mustChangePassword: true,
+        tempPasswordExpiresAt: true,
         oauthIdentities: {
           select: { provider: true },
           orderBy: { createdAt: 'asc' },
@@ -121,7 +123,13 @@ export class AccountService {
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        tokenVersion: { increment: 1 },
+        // 用户已自行改密，强制改密标记与临时密码有效期一并清除。
+        mustChangePassword: false,
+        tempPasswordExpiresAt: null,
+      },
     });
     return { changed: true };
   }

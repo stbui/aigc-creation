@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react';
-import { Notice, PageHeader } from '~/admin-ui/primitives';
+import { useSearchParams } from 'react-router-dom';
+import { ContextBanner, Notice, PageHeader, SavedViewBar } from '~/admin-ui/primitives';
+import { readAdminDone } from '../../../lib/admin-context-link';
 import { useAdmin, useAdminDetailParam, useDuty } from './hooks';
 import { TaskActionDialogs } from './TaskActionDialogs';
 import { TaskDetailDrawer } from './TaskDetailDrawer';
+import { TaskFailureGroups } from './TaskFailureGroups';
 import { TaskFilters } from './TaskFilters';
 import { TaskListSection } from './TaskListSection';
 import { TaskStats } from './TaskStats';
@@ -38,6 +41,8 @@ export function AdminTasksPage() {
     onAction: actions.openConfirm,
   });
 
+  const [searchParams] = useSearchParams();
+  const done = readAdminDone(searchParams);
   const { data: duty } = useDuty();
   const list = filters.data?.result;
   const liveCongestion = duty?.congestion ?? filters.data?.congestion;
@@ -47,11 +52,33 @@ export function AdminTasksPage() {
     <>
       <PageHeader title="任务监控" />
 
+      {(done === 'billing_settled' || done === 'billing_refunded') && (
+        <ContextBanner
+          title={done === 'billing_refunded' ? '关联账单已退款' : '关联账单已结算'}
+          detail="账单终态已更新；如需重试，请重新发起并确认扣费影响。"
+        />
+      )}
+
       <TaskStats
         total={list?.total ?? null}
         congestion={liveCongestion ?? null}
         hasFilter={filters.hasFilter}
         loading={filters.loading}
+      />
+
+      <TaskFailureGroups
+        groups={filters.data?.failureGroups ?? []}
+        activeErrorCode={filters.errorCode || undefined}
+        onSelect={(errorCode) => {
+          clearSelection();
+          filters.setStatus('failed');
+          filters.setErrorCode(errorCode);
+          filters.setQuery({ status: 'failed', errorCode });
+        }}
+        onClear={() => {
+          filters.setErrorCode('');
+          filters.setQuery({ errorCode: undefined });
+        }}
       />
 
       {/* 超阈值只在真的超了才出现：常亮的阈值提示会变成装饰。 */}
@@ -73,6 +100,8 @@ export function AdminTasksPage() {
         onOwnerChange={filters.setOwner}
         project={filters.project}
         onProjectChange={filters.setProject}
+        errorCode={filters.errorCode}
+        onErrorCodeChange={filters.setErrorCode}
         from={filters.from}
         onFromChange={filters.setFrom}
         to={filters.to}
@@ -81,6 +110,37 @@ export function AdminTasksPage() {
         appliedChips={filters.appliedChips}
         onApply={filters.applyFilters}
         onReset={filters.resetFilters}
+      />
+
+      <SavedViewBar
+        pageKey="tasks"
+        currentFilters={{
+          status: filters.status,
+          capability: filters.capability,
+          userId: filters.owner || undefined,
+          projectId: filters.project || undefined,
+          errorCode: filters.errorCode || undefined,
+          from: filters.from || undefined,
+          to: filters.to || undefined,
+        }}
+        onApply={(next) => {
+          filters.setStatus(next.status);
+          filters.setCapability(next.capability);
+          filters.setOwner(next.userId ?? '');
+          filters.setProject(next.projectId ?? '');
+          filters.setErrorCode(next.errorCode ?? '');
+          filters.setFrom(next.from ?? '');
+          filters.setTo(next.to ?? '');
+          filters.setQuery({
+            status: next.status,
+            capability: next.capability,
+            userId: next.userId,
+            projectId: next.projectId,
+            errorCode: next.errorCode,
+            from: next.from,
+            to: next.to,
+          });
+        }}
       />
 
       <TaskListSection

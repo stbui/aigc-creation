@@ -1,11 +1,19 @@
 import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  ContextBanner,
   ExportCsvButton,
   PageHeader,
   Panel,
   RefreshButton,
+  SavedViewBar,
   StaleError,
 } from '~/admin-ui/primitives';
+import {
+  readAdminActionContext,
+  readAdminDone,
+  withAdminDone,
+} from '../../../lib/admin-context-link';
 import { adminOrdersApi } from './api';
 import { useAdmin, useAdminDetailParam, useToast } from './hooks';
 import { yuan, yuanToCents } from './utils';
@@ -44,12 +52,17 @@ import type { AdminOrderRefund, AdminOrderRow } from '../../../types/api';
 export function AdminOrdersPage() {
   const toast = useToast();
   const { can } = useAdmin();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const actionContext = readAdminActionContext(searchParams);
+  const done = readAdminDone(searchParams);
   const [selected, setSelected] = useState<string[]>([]);
 
   const {
     values,
     updateFilter,
     applyQuery,
+    applyView,
     reset,
     appliedChips,
     hasFilter,
@@ -86,6 +99,27 @@ export function AdminOrdersPage() {
     // 默认退款金额 = 可退上限 (实付 - 已退)。部分退款时运营只需改小
     setRefundYuan(kind === 'refund' ? yuan(Math.max(row.paidCents - row.refundedCents, 0)) : '');
   };
+
+  /**
+   * 从工单/工作台带 `returnTo` 进入时，动作完成后回来源并标记结果。
+   * 没有来源就保持原行为：留在订单页并刷新。
+   */
+  const returnToSource = (doneKey: string) => {
+    if (actionContext.returnTo) navigate(withAdminDone(actionContext.returnTo, doneKey));
+  };
+  const fromLabel = actionContext.from?.startsWith('ticket:')
+    ? `工单 ${actionContext.from.slice('ticket:'.length)}`
+    : actionContext.from === 'workbench'
+      ? '工作台待办'
+      : actionContext.from ?? '';
+  const intentLabel =
+    actionContext.intent === 'refund'
+      ? '准备为这笔订单退款'
+      : actionContext.intent === 'confirmRefund'
+        ? '核对渠道退款结果'
+        : actionContext.intent === 'markPaid'
+          ? '准备手工核销'
+          : '查看订单';
 
   const runAction = async () => {
     if (!action) return;
@@ -134,6 +168,7 @@ export function AdminOrdersPage() {
       setAction(null);
       setDetailId(null);
       reload();
+      returnToSource(action.kind === 'refund' ? 'refunded' : 'marked_paid');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '操作失败');
     } finally {
@@ -174,6 +209,7 @@ export function AdminOrdersPage() {
       setRefundConfirmation(null);
       setDetailVersion((value) => value + 1);
       reload();
+      returnToSource('refund_confirmed');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '退款核销失败');
     } finally {
@@ -208,12 +244,53 @@ export function AdminOrdersPage() {
         description="订单、支付与退款。核销与退款会写入操作审计，并即时回收或发放积分。"
       />
 
+      {(actionContext.from || done) && (
+        <ContextBanner
+          title={
+            done
+              ? done === 'refunded'
+                ? '该订单已退款'
+                : done === 'refund_confirmed'
+                  ? '渠道退款结果已确认'
+                  : '该订单已标记为已支付'
+              : `来自${fromLabel}`
+          }
+          detail={done ? undefined : intentLabel}
+          returnTo={actionContext.returnTo}
+        />
+      )}
+
       <OrderFilterBar
         values={values}
         onChange={updateFilter}
         onApply={applyQuery}
         onReset={reset}
         appliedChips={appliedChips}
+      />
+
+      <SavedViewBar
+        pageKey="orders"
+        currentFilters={{
+          status: values.status,
+          refundState: values.refundState,
+          orderNo: values.orderNo || undefined,
+          email: values.email || undefined,
+          channel: values.channel,
+          from: values.from || undefined,
+          to: values.to || undefined,
+        }}
+        onApply={(next) => {
+          setSelected([]);
+          applyView({
+            status: next.status,
+            refundState: next.refundState,
+            orderNo: next.orderNo,
+            email: next.email,
+            channel: next.channel,
+            from: next.from,
+            to: next.to,
+          });
+        }}
       />
 
       <Panel
@@ -257,6 +334,13 @@ export function AdminOrdersPage() {
         rows={data?.items ?? []}
         canMarkPaid={can('order.mark_paid')}
         canRefund={can('order.refund')}
+        initialIntent={
+          actionContext.intent === 'refund' ||
+          actionContext.intent === 'confirmRefund' ||
+          actionContext.intent === 'markPaid'
+            ? actionContext.intent
+            : null
+        }
         onClose={() => setDetailId(null)}
         onAction={openAction}
         onConfirmRefund={openRefundConfirmation}

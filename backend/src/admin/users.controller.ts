@@ -19,9 +19,8 @@ import {
 } from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
 import { AdminUsersService } from "./users.service";
-import { PERMISSIONS, ROLE_LABELS } from "./permissions";
+import { PERMISSIONS } from "./permissions";
 import { AppError } from "../common/app.exception";
-import { runBatch } from "../common/batch";
 import { sendCsv } from "../common/csv-response";
 import {
   ChangeUserRoleDto,
@@ -76,8 +75,24 @@ export class AdminUsersController {
   @RequireAllPermissions(PERMISSIONS.userRead, PERMISSIONS.dataExport)
   @AuditAction("data.export")
   async export(@Query() query: UserListQueryDto, @Res() res: Response) {
-    const csv = await this.users.exportCsv(query);
-    sendCsv(res, "users", csv);
+    const result = await this.users.exportCsv(query);
+    sendCsv(res, "users", result.csv, {
+      // 前端据此提示「已截断」；不把提示写进 CSV 首行，避免破坏表头解析。
+      "X-Export-Total": String(result.total),
+      "X-Export-Limit": String(result.limit),
+      "X-Export-Truncated": result.truncated ? "1" : "0",
+    });
+  }
+
+  /**
+   * 全局用户统计（跟随当前筛选条件）。
+   *
+   * ⚠️ 必须声明在 `:id` 之前，否则 `stats` 会被当成用户 id。
+   */
+  @Get("stats")
+  @RequirePermission(PERMISSIONS.userRead)
+  stats(@Query() query: UserListQueryDto) {
+    return this.users.stats(query);
   }
 
   /**
@@ -171,6 +186,19 @@ export class AdminUsersController {
   }
 
   /**
+   * 强制下线：递增 tokenVersion 并清理扫码登录会话。
+   *
+   * 与「禁用」的区别：账号仍可正常登录，只是当前所有已签发 token 立即失效。
+   * 适用于「怀疑会话泄露但不想停用账号」的处置。
+   */
+  @Post(":id/logout-all")
+  @RequirePermission(PERMISSIONS.userDisable)
+  @AuditAction("user.logout_all")
+  logoutAll(@Param("id") id: string, @AdminUser() actor: AdminUser) {
+    return this.users.logoutAll(id, actor.id);
+  }
+
+  /**
    * 删除用户。
    *
    * 默认软删 (status='deleted' + 匿名化); `?hard=true` 物理删除可删部分。
@@ -186,20 +214,5 @@ export class AdminUsersController {
     @AdminUser() actor: AdminUser,
   ) {
     return this.users.remove(id, hard === "true", dto?.confirm, actor.id);
-  }
-
-  /**
-   * 角色下拉选项 (供用户列表筛选用)。
-   *
-   * 方法名不能叫 `roles` —— 构造函数里注入的 `AdminRoleService` 占了这个名字,
-   * 同类内重复声明的成员会让编译直接失败。路由路径不受影响。
-   */
-  @Get("meta/roles")
-  @RequirePermission(PERMISSIONS.userRead)
-  roleOptions() {
-    return Object.entries(ROLE_LABELS).map(([code, label]) => ({
-      code,
-      label,
-    }));
   }
 }

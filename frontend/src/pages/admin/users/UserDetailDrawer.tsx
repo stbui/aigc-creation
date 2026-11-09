@@ -226,6 +226,39 @@ export function UserDetailDrawer({
             </dl>
           </DetailSection>
 
+          <DetailSection title="积分与分组">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <InfoItem
+                label="可用积分"
+                value={
+                  <span className="text-base font-semibold tabular-nums">
+                    {d.credit?.balance ?? '—'}
+                  </span>
+                }
+              />
+              <InfoItem
+                label="30 天内到期"
+                value={
+                  <span className="tabular-nums">
+                    {d.credit ? d.credit.expiringSoon : '—'}
+                  </span>
+                }
+              />
+              <InfoItem
+                label="计费分组"
+                value={
+                  d.group
+                    ? `${d.group.name}（${d.group.code} · 倍率 ${(d.group.ratioBasisPoints / 10000).toFixed(2)}）`
+                    : '—'
+                }
+              />
+              <InfoItem
+                label="有效积分批次"
+                value={<span className="tabular-nums">{d.credit?.activeLots ?? '—'}</span>}
+              />
+            </dl>
+          </DetailSection>
+
           <UserMembershipSection
             membership={d.membership}
             history={d.membershipHistory}
@@ -267,6 +300,29 @@ export function UserDetailDrawer({
                     {d.stats.taskStatus.queued}
                   </strong>
                 </span>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+              <Link
+                className="rounded-md border border-border bg-card px-3 py-2 transition-colors hover:border-primary/40"
+                to={adminOrderHref({ email: d.email })}
+              >
+                <span className="text-muted-foreground">订单</span>
+                <strong className="ml-2 tabular-nums text-foreground">
+                  {d.stats.orders}
+                </strong>
+              </Link>
+              <div className="rounded-md border border-border bg-card px-3 py-2">
+                <span className="text-muted-foreground">工单</span>
+                <strong className="ml-2 tabular-nums text-foreground">
+                  {d.stats.tickets}
+                </strong>
+              </div>
+              <div className="rounded-md border border-border bg-card px-3 py-2">
+                <span className="text-muted-foreground">发票</span>
+                <strong className="ml-2 tabular-nums text-foreground">
+                  {d.stats.invoices}
+                </strong>
               </div>
             </div>
           </DetailSection>

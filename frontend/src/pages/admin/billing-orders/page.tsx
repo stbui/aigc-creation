@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminBillingOrdersApi } from './api';
-import { ActionButton, PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  ContextBanner,
+  PageHeader,
+  Panel,
+  SavedViewBar,
+  StaleError,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
+import {
+  readAdminActionContext,
+  readAdminDone,
+  withAdminDone,
+} from '../../../lib/admin-context-link';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -35,6 +49,10 @@ import type { BillingOrderListResult, BillingOrderView } from '../../../types/mo
 export function AdminBillingOrdersPage() {
   const { can } = useAdmin();
   const toast = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const actionContext = readAdminActionContext(searchParams);
+  const done = readAdminDone(searchParams);
   const resolvable = can('billing_order.resolve');
 
   const [status, setStatus] = useState<string | undefined>(undefined);
@@ -89,6 +107,23 @@ export function AdminBillingOrdersPage() {
     setAction('settle');
     setReason('');
   };
+
+  /*
+   * 从任务/工作台带 intent 进来时预选动作；只打开详情，不自动提交。
+   * 资金动作仍要求填写依据并点确认。
+   */
+  useEffect(() => {
+    if (detailId && actionContext.intent === 'refund') setAction('refund');
+  }, [detailId, actionContext.intent]);
+
+  const returnToSource = (doneKey: string) => {
+    if (actionContext.returnTo) navigate(withAdminDone(actionContext.returnTo, doneKey));
+  };
+  const fromLabel = actionContext.from?.startsWith('task:')
+    ? `任务 ${actionContext.from.slice('task:'.length)}`
+    : actionContext.from === 'workbench'
+      ? '工作台待办'
+      : actionContext.from ?? '';
 
   const openDetail = useCallback(
     (row: BillingOrderView) => {
@@ -155,6 +190,7 @@ export function AdminBillingOrdersPage() {
       );
       await reload();
       requestCloseDetail();
+      returnToSource(action === 'refund' ? 'billing_refunded' : 'billing_settled');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '核对失败');
     } finally {
@@ -235,6 +271,20 @@ export function AdminBillingOrdersPage() {
         description="一次任务一条账单。人工核对只做结算或全额退款，金额口径完全由计费服务决定。"
       />
 
+      {(actionContext.from || done) && (
+        <ContextBanner
+          title={
+            done
+              ? done === 'billing_refunded'
+                ? '账单已退款'
+                : '账单已结算'
+              : `来自${fromLabel}`
+          }
+          detail={done ? undefined : '核对结果不明账单：先看任务链路，再决定结算或退款'}
+          returnTo={actionContext.returnTo}
+        />
+      )}
+
       <BillingStats counts={statusCounts} />
 
       <BillingFilterBar
@@ -255,6 +305,38 @@ export function AdminBillingOrdersPage() {
         appliedChips={appliedChips}
         onApply={applyFilters}
         onReset={resetFilters}
+      />
+
+      <SavedViewBar
+        pageKey="billing-orders"
+        currentFilters={{
+          status,
+          billingMode,
+          model: model || undefined,
+          userId: userId || undefined,
+          taskId: taskId || undefined,
+          from: from || undefined,
+          to: to || undefined,
+        }}
+        onApply={(next) => {
+          setStatus(next.status);
+          setBillingMode(next.billingMode);
+          setModel(next.model ?? '');
+          setUserId(next.userId ?? '');
+          setTaskId(next.taskId ?? '');
+          setFrom(next.from ?? '');
+          setTo(next.to ?? '');
+          setSelected([]);
+          setQuery({
+            status: next.status,
+            billingMode: next.billingMode,
+            model: next.model,
+            userId: next.userId,
+            taskId: next.taskId,
+            from: next.from,
+            to: next.to,
+          });
+        }}
       />
 
       <Panel title="账单列表" note="「结果不明」既不切线也不退款，需要人工核对后落到结算或退款。">
