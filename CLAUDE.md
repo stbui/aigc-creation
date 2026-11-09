@@ -371,7 +371,8 @@ npm run e2e                 # Playwright
 
 ### 仓库约定
 
-- 根目录有 `.git`（`main` 分支，未配置远端）；历史与回滚可用，但**不要代为 commit**。
+- 根目录有 `.git`，远端 `origin` 指向 `github.com/stbui/aigc-creation`；`main` 是集成分支，功能与修复从 `main` 切 `feat/*` / `fix/*` 分支、走 PR、CI 绿后合并。**默认不要代为 commit / push / tag**；用户当轮明确说「提交」/「推送」时才执行，提交权在仓库所有者。
+- 提交信息按 Conventional Commits：`<type>(<scope>): <中文 subject>`，body 写取舍理由；分支、PR、合并与回滚规则见 `docs/development-workflow.md` §9。
 - `README.md` **只写现状**：页面结构、能力清单、目录树、启动方式、环境坑。不追加逐轮改动与验证记录；闸口清单与已知缺口维护在 `docs/testing.md`。与代码冲突时以代码为准并顺手改 README。
 
 ## 环境注意事项（踩坑，务必遵守）

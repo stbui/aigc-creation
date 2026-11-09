@@ -61,7 +61,7 @@
 | [`model-architecture.md`](model-architecture.md) | 模型层：渠道 / 前台模型 / 路由与冷却 / 任务执行 / 账单退款 / 代理中转、扩展 SOP |
 | [`api-contract.md`](api-contract.md) | 统一响应信封、跨模块错误码、主要接口清单、令牌时长 |
 | [`runtime-infrastructure.md`](runtime-infrastructure.md) | AIGC 标识、签名 URL、限流、健康检查、请求追踪、日志落盘 |
-| [`development-workflow.md`](development-workflow.md) | Agent 执行手册：阶段执行卡、闸口命令、证据标准、交人边界 |
+| [`development-workflow.md`](development-workflow.md) | Agent 执行手册：阶段执行卡、闸口命令、证据标准、交人边界、Git 工作流（分支 / 提交 / PR / 回滚） |
 | [`frontend-module-conventions.md`](frontend-module-conventions.md) | 前端多文件功能目录的分层、入口文件、导入方向与新增文件落位 |
 | [`product-detail-generation.md`](product-detail-generation.md) | `/product-detail` 商品详情图：模块拆批、任务与账单、提示词、执行状态机、轮询聚合、删除与失败边界 |
 | [`typography.md`](typography.md) | 字体、主题桥接、圆角阴影与组件微规格 |
@@ -72,9 +72,9 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [`testing.md`](testing.md) | 四层测试、闸口清单、Vitest / E2E 用例清单、覆盖矩阵、已知红灯、测试数据清理 |
+| [`testing.md`](testing.md) | 四层测试、闸口清单、Vitest / E2E 用例清单、覆盖矩阵、已知缺口、测试数据清理 |
 
-`testing.md` 只维护清单、覆盖矩阵与已知红灯；单次运行的真实结果（通过 / 失败数、定性结论）随提交说明记录。
+`testing.md` 只维护清单、覆盖矩阵与已知缺口；单次运行的真实结果（通过 / 失败数、定性结论）随提交说明记录。
 
 ## 5. 规划文档（未实施）
 
