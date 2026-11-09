@@ -31,7 +31,11 @@ export const PAYMENT_PROVIDER_IDS: PaymentProviderId[] = [
 export type PaymentCurrency = 'CNY' | 'USD';
 export const PAYMENT_CURRENCIES: PaymentCurrency[] = ['CNY', 'USD'];
 
-export type CheckoutMode = 'redirect' | 'qrcode' | 'sandbox';
+/**
+ * `qrcode` 由前端把 `codeUrl` 渲染成二维码；
+ * `qrcode-image` 的 `codeUrl` 本身就是渠道给好的二维码图片地址，前端直接展示。
+ */
+export type CheckoutMode = 'redirect' | 'qrcode' | 'qrcode-image' | 'sandbox';
 
 export interface PaymentConfigField {
   name: string;
@@ -76,6 +80,8 @@ export interface CreateOrderInput {
   notifyUrl: string;
   /** 服务端从 req.ip 提取的用户 IP；禁止使用前端自报值 */
   clientIp?: string;
+  /** 服务端从请求头提取的 User-Agent，用于渠道判定设备类型 */
+  clientUserAgent?: string;
   expiresAt: Date;
 }
 

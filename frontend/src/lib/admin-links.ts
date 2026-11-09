@@ -53,12 +53,31 @@ export function adminTaskHref(id: string): string {
   return href('/admin/tasks', { id });
 }
 
-export function adminModelCallsHref(filters: { taskId?: string }): string {
+export function adminModelCallsHref(filters: {
+  taskId?: string;
+  channelId?: string;
+  model?: string;
+}): string {
   return href('/admin/model-calls', filters);
+}
+
+/**
+ * 渠道工作台深链。
+ *
+ * 给了 `channelId` 就直接选中该渠道（渠道页用 `?id=`）；不给则落在列表首页 ——
+ * 「这台机器为什么不可用」从能力卡与任务失败都能一键跳到供应侧。
+ */
+export function adminChannelHref(channelId?: string): string {
+  return href('/admin/channels', { id: channelId });
 }
 
 export function adminBillingOrdersHref(filters: { taskId?: string }): string {
   return href('/admin/billing-orders', filters);
+}
+
+/** 单条生成账单的详情深链（账单页支持 `?id=`） */
+export function adminBillingOrderDetailHref(billingOrderId: string): string {
+  return href('/admin/billing-orders', { id: billingOrderId });
 }
 
 export function adminTasksHref(filters: { userId?: string; projectId?: string }): string {

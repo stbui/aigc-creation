@@ -24,6 +24,9 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       findMany: ReturnType<typeof vi.fn>;
     };
     membershipUsage: { aggregate: ReturnType<typeof vi.fn> };
+    order: { count: ReturnType<typeof vi.fn> };
+    ticket: { count: ReturnType<typeof vi.fn> };
+    invoice: { count: ReturnType<typeof vi.fn> };
     $transaction: ReturnType<typeof vi.fn>;
   };
   let storage: { get: ReturnType<typeof vi.fn> };

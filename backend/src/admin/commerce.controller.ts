@@ -67,6 +67,18 @@ export class ProductCreateDto {
     "immediate" | "manual";
   @IsOptional() @IsIn(["active", "offline"]) status?: "active" | "offline";
   @IsOptional() @IsInt() sortOrder?: number;
+  /** 收款币种。USD 商品只有存在可用美元渠道时才允许上架 */
+  @IsOptional() @IsIn(["CNY", "USD"]) currency?: "CNY" | "USD";
+  /** 上架策略：不限量 / 周期限购 / 库存 / 限时 */
+  @IsOptional()
+  @IsIn(["unlimited", "periodic", "inventory", "timed"])
+  saleStrategy?: "unlimited" | "periodic" | "inventory" | "timed";
+  @IsOptional() @IsInt() @Min(1) @Max(365) periodDays?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(999) periodPurchaseLimit?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1_000_000) stockTotal?: number;
+  /** 限时售卖窗口；接受 yyyy-mm-dd / yyyy-mm-ddTHH:mm */
+  @IsOptional() @IsString() saleStartAt?: string | null;
+  @IsOptional() @IsString() saleEndAt?: string | null;
 }
 
 /** 修改商品。sku 不可改, 故不在此列 */
@@ -81,6 +93,15 @@ export class ProductUpdateDto {
     "immediate" | "manual";
   @IsOptional() @IsIn(["active", "offline"]) status?: "active" | "offline";
   @IsOptional() @IsInt() sortOrder?: number;
+  @IsOptional() @IsIn(["CNY", "USD"]) currency?: "CNY" | "USD";
+  @IsOptional()
+  @IsIn(["unlimited", "periodic", "inventory", "timed"])
+  saleStrategy?: "unlimited" | "periodic" | "inventory" | "timed";
+  @IsOptional() @IsInt() @Min(1) @Max(365) periodDays?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(999) periodPurchaseLimit?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1_000_000) stockTotal?: number;
+  @IsOptional() @IsString() saleStartAt?: string | null;
+  @IsOptional() @IsString() saleEndAt?: string | null;
 }
 
 /** 退款 */

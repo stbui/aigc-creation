@@ -101,6 +101,18 @@ export function ChannelModelForm({
   const imageParameterDefinitions = selectedProtocol?.imageParameters ?? EMPTY_IMAGE_PARAMETERS;
   const staleTiers = staleTierUpstream(values, previousProviderModelKey);
 
+  /*
+   * 存量模型的协议可能因插件停用而不再可选。下拉里不补这一项会显示空白，
+   * 看上去像「没选」，实际表单仍带着旧值；补一项并标出来，运营才知道要改配。
+   * 保存时后端也会以「没有运行时执行器」拒绝，两侧口径一致。
+   */
+  const protocolSelectOptions = useMemo(() => {
+    if (!values.protocol || protocolOptions.some((option) => option.value === values.protocol)) {
+      return protocolOptions;
+    }
+    return [...protocolOptions, { value: values.protocol, label: `${values.protocol}（已不可用）` }];
+  }, [protocolOptions, values.protocol]);
+
   const clearStaleTiers = () => {
     const current = getValues();
     const stale = staleTierUpstream(current, previousProviderModelKey);
@@ -141,7 +153,7 @@ export function ChannelModelForm({
         <ChannelModelBasicFields
           control={control}
           errors={errors}
-          protocolOptions={protocolOptions}
+          protocolOptions={protocolSelectOptions}
           onCapabilityChange={(value, onChange) => {
             onChange(value);
             setValue('protocol', '', { shouldDirty: true });

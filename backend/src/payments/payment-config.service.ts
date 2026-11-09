@@ -269,6 +269,7 @@ export class PaymentConfigService implements OnModuleInit {
           pid: process.env.ZPAY_PID ?? '',
           key: process.env.ZPAY_KEY ?? '',
           type: process.env.ZPAY_TYPE || 'alipay',
+          cid: process.env.ZPAY_CID ?? '',
         },
       },
     ];

@@ -199,6 +199,7 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'payment.zpay.pid', env: 'ZPAY_PID', type: 'string', def: '' },
   { key: 'payment.zpay.key', env: 'ZPAY_KEY', type: 'string', def: '' },
   { key: 'payment.zpay.type', env: 'ZPAY_TYPE', type: 'string', def: 'alipay' },
+  { key: 'payment.zpay.cid', env: 'ZPAY_CID', type: 'string', def: '' },
 
   // ── 日志（本文件引入的新配置面）────────────────────────────────────────
   { key: 'log.level', env: 'LOG_LEVEL', type: 'string', def: 'log', oneOf: LOG_LEVELS },

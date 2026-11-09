@@ -4,4 +4,5 @@
 
 export {
   useAdminResource,
+  useAdminUrlFilterSync,
 } from '../../../admin-ui/primitives';

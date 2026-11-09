@@ -374,6 +374,9 @@ c_ok "后端端口: $BACKEND_PORT"
 #   漏传就会用兜底的 dev.db —— 这正是「以为在测、实际改了开发库」的成因。
 if [ "$RUN_BACKEND" -eq 1 ] && [ "$SKIP_DB" -eq 0 ]; then
   step '初始化数据库（建表 + 账号 + 商品/会员/营销，幂等）'
+  # Prisma 7 的 db push 不再自动重新生成 client；schema 改动后不 generate，
+  # 种子与构建都会按旧类型工作（表现为 nest build 报字段不存在）。先单独生成一次。
+  ( cd "$BACKEND_DIR" && npm run --silent prisma:generate )
   ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent prisma:push )
   # 只跑 seed 会得到一个「有账号但没有任何在售商品」的库：积分商城空、首页
   # 套餐空、会员买不到。购买链路的种子是 commerce/membership/marketing 三份。

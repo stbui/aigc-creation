@@ -12,6 +12,7 @@ export { toCredits } from '../../../lib/microcredits';
 export {
   adminAssetHref,
   adminBillingOrdersHref,
+  adminChannelHref,
   adminCreditHref,
   adminModelCallsHref,
   adminOrderHref,

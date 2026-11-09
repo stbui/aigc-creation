@@ -1,6 +1,15 @@
+import { Link } from 'react-router-dom';
 import { ConfirmDialog, TextField } from '~/admin-ui/primitives';
 import { yuan } from './utils';
 import type { AdminOrderRefund, AdminOrderRow } from '../../../types/api';
+
+/**
+ * 退款规则入口（后台「系统设置 → 退款」分组深链）。
+ *
+ * 退款被规则拒绝时（时间窗 / 比例上限 / 已消耗积分），运营要改的是规则本身。
+ * 弹窗里直接给这个入口，省掉「先关弹窗、进设置、在八个页签里找『退款』」。
+ */
+export const REFUND_RULES_HREF = '/admin/settings?group=refund';
 
 export type RefundConfirmationTarget = {
   orderId: string;
@@ -101,6 +110,22 @@ export function OrderActionDialog({
                 maxLength={200}
               />
             </div>
+            {/*
+             * 退款规则入口：时间窗 / 比例上限 / 已消耗积分三条规则在后台
+             * 可配，被拒时运营要改的是规则而不是金额。直接把入口摆在弹窗里。
+             */}
+            <p className="text-[12px] leading-5 text-muted-foreground">
+              退款受
+              <Link
+                to={REFUND_RULES_HREF}
+                className="mx-0.5 text-brand hover:underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                退款规则
+              </Link>
+              约束（可退时间窗 / 比例上限 / 已消耗积分）。超出规则时会在提示里说明该调哪一条。
+            </p>
           </>
         ) : undefined
       }

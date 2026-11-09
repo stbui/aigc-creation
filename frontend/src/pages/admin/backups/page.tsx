@@ -1,17 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DatabaseBackup, Trash2 } from 'lucide-react';
 import { adminBackupsApi, adminRetentionApi } from './api';
 import {
   ActionButton,
   EmptyState,
+  FilterActions,
+  FilterBar,
   ListError,
   PageHeader,
   PageSkeleton,
   Panel,
+  SelectField,
   StaleError,
 } from '~/admin-ui/primitives';
-import { useAdmin, useAdminResource, useToast } from './hooks';
-import { DEFAULT_KEEP_COUNT } from './constants';
+import { useAdmin, useAdminResource, useAdminUrlFilterSync, useToast } from './hooks';
+import {
+  BACKUP_FILTER_LABELS,
+  BACKUP_FILTER_OPTIONS,
+  BACKUP_FILTER_PREDICATES,
+  DEFAULT_KEEP_COUNT,
+} from './constants';
 import { formatBytes } from './utils';
 import { BackupHealth } from './BackupHealth';
 import { BackupTable } from './BackupTable';
@@ -46,6 +55,28 @@ export function AdminBackupPage() {
   const [keepCount, setKeepCount] = useState(DEFAULT_KEEP_COUNT);
   const [runOpen, setRunOpen] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
+  /*
+   * 列表筛选。告警中心的四条备份告警都深链到 `?filter=` 某一类：
+   * 「最近一次备份失败」落到失败的那几行，「有备份尚未验证」落到未验证的
+   * 那几行 —— 否则点告警只是被丢到一个混着全部记录的列表里自己翻。
+   *
+   * 初值从地址栏取（深链进来的那一类），写回也用同一个键，两边同源。
+   */
+  const [searchParams] = useSearchParams();
+  const urlFilter = searchParams.get('filter');
+  const [filter, setFilter] = useState<string | undefined>(() => {
+    const value = searchParams.get('filter');
+    return value && value in BACKUP_FILTER_PREDICATES ? value : undefined;
+  });
+
+  /*
+   * 已在本页时也要响应地址栏变化：从告警中心点进「备份失败」时可能只换了
+   * query（`?filter=failed`），页面不重挂载，筛选态必须跟着 URL 走。
+   */
+  useEffect(() => {
+    const next = urlFilter && urlFilter in BACKUP_FILTER_PREDICATES ? urlFilter : undefined;
+    setFilter((prev) => (prev === next ? prev : next));
+  }, [urlFilter]);
 
   /*
    * 三个请求本来就绑定在同一份「备份现状」上, 拆开只会让页面出现
@@ -62,6 +93,20 @@ export function AdminBackupPage() {
   const rows = data?.rows ?? [];
   const stats = data?.stats ?? null;
   const logs = data?.logs ?? [];
+
+  /*
+   * 筛选写回地址栏：告警中心深链进来时地址栏已经有 `?filter=`，回显与
+   * 筛选态必须同源，否则「深链带着筛选来、页面却显示全部」会被当成
+   * 深链失效。初始值从地址栏取，写回用同一个键。
+   */
+  useAdminUrlFilterSync({ filter });
+
+  /* 筛选在客户端做：备份记录量级很小（保留份数个位数到几十），不必多打一次接口 */
+  const filteredRows = useMemo(() => {
+    if (!filter) return rows;
+    const predicate = BACKUP_FILTER_PREDICATES[filter];
+    return predicate ? rows.filter(predicate) : rows;
+  }, [rows, filter]);
 
   const runBackup = async () => {
     setBusy(true);
@@ -185,12 +230,45 @@ export function AdminBackupPage() {
       {error && <StaleError error={error} onRetry={() => void reload()} />}
 
       <Panel title="备份记录" note="未验证的备份视为无效，不可下载">
-        {rows.length === 0 ? (
+        <FilterBar>
+          <SelectField
+            ariaLabel="备份筛选"
+            value={filter}
+            onChange={(value) => setFilter(value)}
+            allowClear
+            clearLabel="全部记录"
+            placeholder="全部记录"
+            options={BACKUP_FILTER_OPTIONS.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+          />
+          <FilterActions>
+            {filter && (
+              <ActionButton variant="secondary" size="sm" onClick={() => setFilter(undefined)}>
+                清除筛选
+              </ActionButton>
+            )}
+          </FilterActions>
+        </FilterBar>
+        {filteredRows.length === 0 ? (
           <EmptyState
-            title="还没有任何备份记录"
-            description="备份是恢复能力的前提；先执行一次手动备份，再开启定时备份。"
+            title={
+              filter
+                ? `没有${BACKUP_FILTER_LABELS[filter] ?? ''}的备份记录`
+                : '还没有任何备份记录'
+            }
+            description={
+              filter
+                ? '清除筛选可查看全部备份记录。'
+                : '备份是恢复能力的前提；先执行一次手动备份，再开启定时备份。'
+            }
             action={
-              can('backup.run') ? (
+              filter ? (
+                <ActionButton variant="secondary" size="sm" onClick={() => setFilter(undefined)}>
+                  清除筛选
+                </ActionButton>
+              ) : can('backup.run') ? (
                 <ActionButton
                   variant="default"
                   size="sm"
@@ -204,7 +282,7 @@ export function AdminBackupPage() {
           />
         ) : (
           <BackupTable
-            rows={rows}
+            rows={filteredRows}
             loading={loading}
             error={error}
             onRetry={() => void reload()}

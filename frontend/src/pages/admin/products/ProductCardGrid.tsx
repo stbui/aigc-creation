@@ -14,9 +14,15 @@ import {
 } from '~/admin-ui/primitives';
 import { cn } from '~/admin-ui/lib/cn';
 import { adminProductOrdersHref } from '../../../lib/admin-links';
-import { GRANT_TYPE_LABELS, STATUS_LABELS } from './constants';
+import {
+  GRANT_TYPE_LABELS,
+  SALE_STATUS_LABELS,
+  SALE_STRATEGY_LABELS,
+  STATUS_LABELS,
+} from './constants';
 import {
   centsToYuanText,
+  currencySymbol,
   perCreditYuanText,
   validDaysText,
 } from './utils';
@@ -214,7 +220,9 @@ function ProductCard({
   const savingsCents = hasOriginalPrice
     ? (row.originalPriceCents as number) - row.priceCents
     : 0;
-  const perCredit = perCreditYuanText(row.priceCents, row.credits);
+  const perCredit = perCreditYuanText(row.priceCents, row.credits, row.currency);
+  const symbol = currencySymbol(row.currency);
+  const saleStatusLabel = SALE_STATUS_LABELS[row.saleStatus];
 
   return (
     <Card
@@ -283,6 +291,11 @@ function ProductCard({
               label={STATUS_LABELS[row.status]}
               showDot={active}
             />
+            {saleStatusLabel && (
+              <span className="rounded-sm border border-warn-border bg-warn-soft px-1.5 py-0.5 text-[12px] leading-4 whitespace-nowrap text-warn-text">
+                {saleStatusLabel}
+              </span>
+            )}
           </div>
         </div>
 
@@ -332,7 +345,7 @@ function ProductCard({
                     : 'border-border bg-muted text-muted-foreground',
                 )}
               >
-                省 ¥{centsToYuanText(savingsCents)}
+                省 {symbol}{centsToYuanText(savingsCents)}
               </span>
             )}
           </div>
@@ -345,7 +358,7 @@ function ProductCard({
                 : 'border-border/60 text-muted-foreground',
             )}
           >
-            <span className="text-[14px] leading-none font-semibold">¥</span>
+            <span className="text-[14px] leading-none font-semibold">{symbol}</span>
             <span className="truncate text-[22px] leading-none font-bold tracking-tight tabular-nums">
               {centsToYuanText(row.priceCents)}
             </span>
@@ -361,7 +374,7 @@ function ProductCard({
               <span className="shrink-0 text-[12px] leading-4 text-muted-foreground">
                 原价{' '}
                 <span className="tabular-nums line-through">
-                  ¥{centsToYuanText(row.originalPriceCents as number)}
+                  {symbol}{centsToYuanText(row.originalPriceCents as number)}
                 </span>
               </span>
             )}
@@ -393,6 +406,17 @@ function ProductCard({
           </div>
         </div>
       </div>
+
+      {/* 策略行：只在非「不限量」时出现，把库存/限购/窗口的实情摆在卡片上 */}
+      {row.saleStrategy !== 'unlimited' && (
+        <div className="pointer-events-none relative z-10 px-4 pt-1.5 text-[12px] leading-4 text-muted-foreground">
+          {SALE_STRATEGY_LABELS[row.saleStrategy]}
+          {row.saleStrategy === 'inventory' && ` · 剩余 ${row.stockRemaining} / ${row.stockTotal}`}
+          {row.saleStrategy === 'periodic' &&
+            ` · 每 ${row.periodDays} 天限购 ${row.periodPurchaseLimit} 次`}
+          {row.saleStrategy === 'timed' && row.saleEndAt && ` · 至 ${saleWindowEnd(row.saleEndAt)}`}
+        </div>
+      )}
 
       {(writable || deletable) && (
         <>
@@ -443,4 +467,17 @@ function ProductCard({
       )}
     </Card>
   );
+}
+
+/** 限时商品的结束时刻：后台同屏比较多个 SKU 时只需要日期与时分 */
+function saleWindowEnd(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }

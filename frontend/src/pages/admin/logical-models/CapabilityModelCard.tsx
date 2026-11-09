@@ -10,6 +10,7 @@ import {
   Type,
   Video,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import {
   ActionButton,
@@ -21,6 +22,7 @@ import {
 import { cn } from '../../../admin-ui/lib/cn';
 import type { AdminLogicalModelView } from '../../../types/model';
 import { MODE_LABELS } from '../../../lib/constants';
+import { adminChannelHref } from '../../../lib/admin-links';
 import { BILLING_MODE_LABELS, PRICE_POLICY_LABELS } from './constants';
 import type { CapabilityWorkspaceItem } from './workspace';
 
@@ -64,12 +66,16 @@ function capabilityStateOf(item: CapabilityWorkspaceItem, modelsReadable: boolea
 function ModelRow({
   model,
   writable,
+  canReadChannels,
+  canReadPlugins,
   onEdit,
   onSimulate,
   onArchive,
 }: {
   model: AdminLogicalModelView;
   writable: boolean;
+  canReadChannels: boolean;
+  canReadPlugins: boolean;
   onEdit: (model: AdminLogicalModelView) => void;
   onSimulate: (model: AdminLogicalModelView) => void;
   onArchive: (model: AdminLogicalModelView) => void;
@@ -133,7 +139,20 @@ function ModelRow({
               <span className="tabular-nums">
                 {availableRoutes} / {model.routes.length}
               </span>
-              {model.routes[0] ? ` · ${model.routes[0].channelName}` : ''}
+              {model.routes[0] &&
+                (canReadChannels ? (
+                  <>
+                    {' · '}
+                    <Link
+                      className="text-brand hover:underline"
+                      to={adminChannelHref(model.routes[0].channelId)}
+                    >
+                      {model.routes[0].channelName}
+                    </Link>
+                  </>
+                ) : (
+                  ` · ${model.routes[0].channelName}`
+                ))}
             </div>
           </div>
           <div>
@@ -173,8 +192,23 @@ function ModelRow({
       </div>
 
       {!archived && !model.available && (model.configurationError || model.availabilityError) && (
-        <div className="mt-1.5 truncate text-[12px] text-danger-text" title={model.configurationError || model.availabilityError}>
-          {model.configurationError || model.availabilityError}
+        <div className="mt-1.5 flex items-baseline gap-2 text-[12px]">
+          <span
+            className="min-w-0 truncate text-danger-text"
+            title={model.configurationError || model.availabilityError}
+          >
+            {model.configurationError || model.availabilityError}
+          </span>
+          {canReadChannels && (
+            <Link className="shrink-0 text-brand hover:underline" to={adminChannelHref()}>
+              渠道工作台
+            </Link>
+          )}
+          {canReadPlugins && (
+            <Link className="shrink-0 text-brand hover:underline" to="/admin/plugins">
+              插件
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -191,6 +225,8 @@ export function CapabilityModelCard({
   item,
   modelsReadable,
   modelsUnavailableReason,
+  canReadChannels,
+  canReadPlugins,
   capabilityWritable,
   modelWritable,
   capabilitySaving,
@@ -203,6 +239,8 @@ export function CapabilityModelCard({
   item: CapabilityWorkspaceItem;
   modelsReadable: boolean;
   modelsUnavailableReason: string;
+  canReadChannels: boolean;
+  canReadPlugins: boolean;
   capabilityWritable: boolean;
   modelWritable: boolean;
   capabilitySaving: boolean;
@@ -311,9 +349,22 @@ export function CapabilityModelCard({
 
         {/* 只在「为什么不可用」时铺开原因；可用状态的结论已由状态标签与线路计数表达 */}
         {item.runtime?.reason && state !== 'available' && (
-          <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
-            {item.runtime.reason}
-          </p>
+          <div className="mt-2 flex items-baseline gap-2">
+            <p className="line-clamp-2 min-w-0 text-[12px] leading-5 text-muted-foreground">
+              {item.runtime.reason}
+            </p>
+            {/* 下线是人工动作，不需要配置入口；无线路 / 未配置才指向供应侧 */}
+            {(state === 'unavailable' || state === 'unconfigured') && canReadChannels && (
+              <Link className="shrink-0 text-[12px] text-brand hover:underline" to={adminChannelHref()}>
+                渠道工作台
+              </Link>
+            )}
+            {(state === 'unavailable' || state === 'unconfigured') && canReadPlugins && (
+              <Link className="shrink-0 text-[12px] text-brand hover:underline" to="/admin/plugins">
+                插件
+              </Link>
+            )}
+          </div>
         )}
       </div>
 
@@ -354,6 +405,8 @@ export function CapabilityModelCard({
               key={model.id}
               model={model}
               writable={modelWritable}
+              canReadChannels={canReadChannels}
+              canReadPlugins={canReadPlugins}
               onEdit={onEditModel}
               onSimulate={onSimulateModel}
               onArchive={onArchiveModel}

@@ -17,7 +17,7 @@ export function BackupHealth({ stats }: { stats: AdminBackupStats | null }) {
           title="备份健康度需要处理"
           icon={<ShieldAlert className="size-4" aria-hidden />}
         >
-          {stats.stale && <div>超过 24 小时没有成功备份，请检查调度器是否运行。</div>}
+          {stats.stale && <div>超过 48 小时没有成功备份，请检查调度器是否运行。</div>}
           {stats.unverified > 0 && (
             <div>
               有 {stats.unverified} 份备份未经恢复验证，事故时可能无法使用，请尽快验证。

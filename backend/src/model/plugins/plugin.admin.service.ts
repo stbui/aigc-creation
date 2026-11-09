@@ -24,6 +24,7 @@ import { createManifestAdapter } from '../protocol/manifest-adapter';
 import { parsePluginPackage, validatePluginPackagePath } from '../protocol/package';
 import { PluginProtocolService } from '../protocol/plugin-protocols.service';
 import { ProtocolRegistry } from '../protocol/registry';
+import { ProtocolCatalogService } from '../protocol/protocol-catalog.service';
 import type { ManifestCapability, ManifestField, ManifestProvider } from '../protocol/types';
 import { PluginManifestStore, type LoadedPlugin } from './plugin-manifest.store';
 
@@ -119,6 +120,13 @@ export class PluginAdminService {
     private readonly protocols: PluginProtocolService,
     private readonly registry: ProtocolRegistry,
     private readonly catalogVersion: CatalogVersionService,
+    /*
+     * 协议目录（渠道模型表单的协议下拉 + 保存校验）是**进程内缓存**，
+     * 与路由目录各存一份。只失效 `catalogVersion` 不够：启停插件后
+     * 下拉仍显示已停用插件的协议、新装插件的协议要重启才出现，
+     * 运营会把「选得到但跑不通」当成模型故障去排查。
+     */
+    private readonly protocolCatalog: ProtocolCatalogService,
   ) {}
 
   async list(): Promise<PluginListResult> {
@@ -168,6 +176,7 @@ export class PluginAdminService {
       update: { enabled, updatedBy: actorUserId },
     });
     await this.protocols.registerAll();
+    this.protocolCatalog.invalidate();
     this.catalogVersion.invalidate();
     return this.get(plugin.manifest.metadata.id);
   }
@@ -225,6 +234,7 @@ export class PluginAdminService {
 
     this.manifests.scan();
     await this.protocols.registerAll();
+    this.protocolCatalog.invalidate();
     this.catalogVersion.invalidate();
     return this.get(id);
   }
@@ -257,6 +267,7 @@ export class PluginAdminService {
     await this.prisma.pluginPlatformState.deleteMany({ where: { pluginId: id } });
     this.manifests.scan();
     await this.protocols.registerAll();
+    this.protocolCatalog.invalidate();
     this.catalogVersion.invalidate();
     return { id, removed: true };
   }

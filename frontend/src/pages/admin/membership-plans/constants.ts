@@ -18,6 +18,13 @@ export interface PlanDraft {
   /** 100 = 无折扣 */
   discountPercent: string;
   sortOrder: string;
+  /**
+   * 会员等级映射的用户分组编码；空串 = 落 `default` 分组。
+   *
+   * 分组决定该等级用户可见的渠道与价格倍率。不配则所有等级都落默认组，
+   * 分组倍率与模型级覆盖形同虚设 —— 这是必须显式选的一项。
+   */
+  userGroupCode: string;
 }
 
 export const EMPTY_DRAFT: PlanDraft = {
@@ -31,4 +38,5 @@ export const EMPTY_DRAFT: PlanDraft = {
   maxConcurrent: '5',
   discountPercent: '100',
   sortOrder: '0',
+  userGroupCode: '',
 };

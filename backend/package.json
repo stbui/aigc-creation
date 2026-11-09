@@ -4,7 +4,7 @@
   "description": "货觉AI 后端 (NestJS + Prisma + SQLite + Jimp)",
   "private": true,
   "scripts": {
-    "build": "nest build",
+    "build": "prisma generate && nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start",
     "start:test": "NODE_ENV=test node dist/main.js",

@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   ActionButton,
   Drawer,
@@ -34,6 +35,8 @@ export function ModelFormDrawer({
   writable,
   capabilityOptions,
   channelModelOptions,
+  canReadChannels,
+  canReadPlugins,
   onClose,
   onChange,
   onAddRoute,
@@ -49,6 +52,8 @@ export function ModelFormDrawer({
   writable: boolean;
   capabilityOptions: Array<{ value: string; label: string }>;
   channelModelOptions: Array<{ value: string; label: string }>;
+  canReadChannels: boolean;
+  canReadPlugins: boolean;
   onClose: () => void;
   onChange: (patch: Partial<ModelDraft>) => void;
   onAddRoute: () => void;
@@ -261,9 +266,32 @@ export function ModelFormDrawer({
               添加服务来源
             </ActionButton>
           </div>
+          {channelModelOptions.length === 0 && (
+            <Notice tone="warn" title="没有可选的服务来源" className="mb-2">
+              服务来源来自渠道模型；若尚未配置，先到
+              {canReadChannels ? (
+                <Link className="mx-1 text-brand hover:underline" to="/admin/channels">
+                  渠道工作台
+                </Link>
+              ) : (
+                '「渠道工作台」'
+              )}
+              添加渠道与模型；协议由
+              {canReadPlugins ? (
+                <Link className="mx-1 text-brand hover:underline" to="/admin/plugins">
+                  插件
+                </Link>
+              ) : (
+                '「插件」'
+              )}
+              提供。
+            </Notice>
+          )}
           {draft.routes.length === 0 ? (
             <p className="py-3 text-center text-[12px] text-muted-foreground">
-              尚未添加服务来源，模型暂不可用。
+              {channelModelOptions.length === 0
+                ? '没有可选的渠道模型，暂时无法添加服务来源。'
+                : '尚未添加服务来源，模型暂不可用。'}
             </p>
           ) : (
             <div className="flex flex-col gap-2">

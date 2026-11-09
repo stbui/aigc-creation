@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ContextBanner, Notice, PageHeader, SavedViewBar } from '~/admin-ui/primitives';
 import { readAdminDone } from '../../../lib/admin-context-link';
-import { useAdmin, useAdminDetailParam, useDuty } from './hooks';
+import { useAdmin, useAdminDetailParam, useDuty, useSelectionPrune } from './hooks';
 import { TaskActionDialogs } from './TaskActionDialogs';
 import { TaskDetailDrawer } from './TaskDetailDrawer';
 import { TaskFailureGroups } from './TaskFailureGroups';
@@ -45,6 +45,9 @@ export function AdminTasksPage() {
   const done = readAdminDone(searchParams);
   const { data: duty } = useDuty();
   const list = filters.data?.result;
+  /* 换筛选与翻页都会清空勾选；再按当前页裁剪一次，兜住页大小与排序变化 */
+  const visibleTaskIds = useMemo(() => (list?.items ?? []).map((row) => row.id), [list]);
+  useSelectionPrune(setSelected, visibleTaskIds);
   const liveCongestion = duty?.congestion ?? filters.data?.congestion;
   const overloaded = (liveCongestion?.running ?? 0) > (liveCongestion?.runningThreshold ?? 50);
 
@@ -178,6 +181,7 @@ export function AdminTasksPage() {
         canDelete={can('task.delete')}
         canReadModelCalls={can('model.call_read')}
         canReadBilling={can('billing_order.read')}
+        canReadChannels={can('channel.read')}
         onClose={closeDetail}
         onAction={actions.openConfirm}
       />

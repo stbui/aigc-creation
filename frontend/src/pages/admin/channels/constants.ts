@@ -1,4 +1,5 @@
 import type { SelectFieldOption } from '~/admin-ui/primitives';
+import { BILLING_MODE_LABELS } from '../../../lib/billing-mode';
 
 /* ------------------------------------------------------------------------- */
 /* 渠道                                                                      */
@@ -97,10 +98,11 @@ export const ALL_MODELS_STATUS_OPTIONS: Array<{ value: AllModelsStatusFilter; la
 /** 跨渠道清单每页条数：数据已全量在内存，页大一点少翻页 */
 export const ALL_MODELS_PAGE_SIZE = 50;
 
+/** 价格档的计费方式下拉：基准文案取 `lib/billing-mode.ts`，仅时长补单位 */
 export const BILLING_MODE_OPTIONS = [
-  { value: 'fixed_request', label: '按次' },
-  { value: 'per_second', label: '按时长（秒）' },
-  { value: 'token', label: '按用量' },
+  { value: 'fixed_request', label: BILLING_MODE_LABELS.fixed_request },
+  { value: 'per_second', label: `${BILLING_MODE_LABELS.per_second}（秒）` },
+  { value: 'token', label: BILLING_MODE_LABELS.token },
 ];
 
 export const CURRENCY_OPTIONS = [

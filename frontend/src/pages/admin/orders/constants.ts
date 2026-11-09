@@ -1,3 +1,5 @@
+import type { TagTone } from '../../../components/admin/statusMeta';
+
 /**
  * 订单管理的状态、渠道与退款选项表。
  *
@@ -31,6 +33,40 @@ export const REFUND_STATUS_LABELS: Record<string, string> = {
   succeeded: '退款成功',
   processing: '渠道处理中',
   failed: '退款失败',
+};
+
+/**
+ * 退款状态聚合（与后端 `latestRefundState` 同规则）。
+ *
+ * 一笔订单可能有多笔退款单（部分退款按笔落库），同一笔退款的渠道重试是
+ * 同一行改状态。列上只显示一个值，取**最需要人管的那个**：处理中 > 失败 > 成功。
+ *
+ * 与筛选口径（`?refundState=failed` 用 `some` 命中任意一笔退款单）同源：
+ * 筛得到的行，列上一定看得到原因，不会出现「筛出来是空的」。
+ */
+export function aggregateRefundState(
+  statuses: string[],
+): 'processing' | 'failed' | 'succeeded' | null {
+  let state: 'processing' | 'failed' | 'succeeded' | null = null;
+  for (const status of statuses) {
+    if (status === 'processing') return 'processing';
+    if (status === 'failed') state = 'failed';
+    else if (status === 'succeeded' && !state) state = 'succeeded';
+  }
+  return state;
+}
+
+/**
+ * 退款状态 → 色调。
+ *
+ * 退款状态是独立状态机（`processing` / `failed` / `succeeded`），与任务状态
+ * 共用 `failed` / `succeeded` 两个词但语义不同 —— 任务失败是这次生成没成，
+ * 退款失败是钱没退回去，后者更重。因此色调在域内单独定，不查 `STATUS_META`。
+ */
+export const REFUND_STATE_TONES: Record<string, TagTone> = {
+  processing: 'warn',
+  failed: 'danger',
+  succeeded: 'success',
 };
 
 /** 退款状态筛选项。值必须与后端 `REFUND_STATES` 白名单一致 */

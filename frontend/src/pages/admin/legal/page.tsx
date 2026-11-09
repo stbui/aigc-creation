@@ -1,7 +1,14 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { SLUGS, SLUG_LABEL, STATUS_LABEL, STATUS_TONE_KEY } from './constants';
 import { fmt } from './utils';
-import { useAdminResource, useAdmin, useDiscardConfirm, useUnsavedGuard, useToast } from './hooks';
+import {
+  useAdminResource,
+  useAdmin,
+  useDiscardConfirm,
+  useSearchParams,
+  useUnsavedGuard,
+  useToast,
+} from './hooks';
 import {
   ActionButton,
   RefreshButton,
@@ -56,10 +63,35 @@ export function AdminLegalPage() {
   const { can } = useAdmin();
   const writable = can('legal.write');
 
-  const [slugFilter, setSlugFilter] = useState<string | undefined>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  /*
+   * 文档类别与版本预览都走地址栏：从告警、审计或聊天里发来的
+   * `/admin/legal?slug=privacy-policy&version=v2` 要能直接落到那一条。
+   * 非法 slug 视为「全部文档」，不把地址栏当输入校验的唯一入口。
+   */
+  const slugParam = searchParams.get('slug');
+  const slugFilter = SLUGS.some((item) => item.value === slugParam) ? slugParam! : undefined;
+  const versionParam = searchParams.get('version');
+
+  const setSlugFilter = useCallback(
+    (next?: string) => {
+      setSearchParams(
+        () => {
+          const params = new URLSearchParams(window.location.search);
+          if (next) params.set('slug', next);
+          else params.delete('slug');
+          // 换类别后旧的版本预览必然不成立，一并清掉
+          params.delete('version');
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   const [busy, setBusy] = useState(false);
 
-  const [preview, setPreview] = useState<AdminLegalDoc | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AdminLegalDoc | null>(null);
   const [form, setForm] = useState<FormState>({ slug: 'user-agreement', version: '', title: '', content: '' });
@@ -73,6 +105,39 @@ export function AdminLegalPage() {
    */
   const { data, loading, error, reload } = useAdminResource(() => adminLegalApi.versions(slugFilter), [slugFilter]);
   const rows = data ?? [];
+
+  /* 预览的那一版由 `?version=` 从当前列表里解析；行不存在（已删除 / 非法链接）就不弹 */
+  const preview = useMemo(() => {
+    if (!versionParam) return null;
+    return (
+      rows.find((row) => row.version === versionParam && (!slugFilter || row.slug === slugFilter)) ??
+      null
+    );
+  }, [rows, versionParam, slugFilter]);
+
+  const openPreview = (doc: AdminLegalDoc) => {
+    setSearchParams(
+      () => {
+        const params = new URLSearchParams(window.location.search);
+        params.set('slug', doc.slug);
+        params.set('version', doc.version);
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  const closePreview = (open: boolean) => {
+    if (open) return;
+    setSearchParams(
+      () => {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('version');
+        return params;
+      },
+      { replace: true },
+    );
+  };
 
   const formDirty = Boolean(formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase));
   useUnsavedGuard(formDirty);
@@ -183,7 +248,7 @@ export function AdminLegalPage() {
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
-          <ActionButton variant="ghost" size="sm" onClick={() => setPreview(row)}>
+          <ActionButton variant="ghost" size="sm" onClick={() => openPreview(row)}>
             查看
           </ActionButton>
           {writable && row.status !== 'published' && (
@@ -256,9 +321,7 @@ export function AdminLegalPage() {
       {/* 只读预览: 用 pre 保留正文换行, 不渲染 Markdown —— 后台看的是原文 */}
       <ModalDialog
         open={!!preview}
-        onOpenChange={(open) => {
-          if (!open) setPreview(null);
-        }}
+        onOpenChange={closePreview}
         title={preview ? `${SLUG_LABEL[preview.slug] ?? preview.slug} · ${preview.version}` : ''}
         description={
           preview ? `${preview.title} · ${STATUS_LABEL[preview.status]} · 更新于 ${fmt(preview.updatedAt)}` : undefined

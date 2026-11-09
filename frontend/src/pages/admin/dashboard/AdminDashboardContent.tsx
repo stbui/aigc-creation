@@ -5,6 +5,7 @@ import { useAdmin } from '../../../context/AdminContext';
 import { ExceptionPage } from '../../../components/ExceptionPage';
 import {
   ActionButton,
+  Button,
   RefreshButton,
   PageHeader,
   PageSkeleton,
@@ -166,7 +167,7 @@ export function AdminDashboardContent() {
         title="平台概览"
         description={`${isFinance ? '经营' : '生成与经营'} · 近 ${days} 天 · 截至 ${hhmm(
           data.generatedAt,
-        )} · 每 ${data.cacheTtlSeconds} 秒刷新`}
+        )} · 数据缓存 ${data.cacheTtlSeconds} 秒`}
         actions={
           <>
             {canSwitchView && (
@@ -190,6 +191,9 @@ export function AdminDashboardContent() {
                 label: `近 ${value} 天`,
               }))}
             />
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin/alerts">告警中心</Link>
+            </Button>
             <RefreshButton variant="outline" loading={loading} onRefresh={reload} />
           </>
         }
@@ -366,12 +370,26 @@ export function AdminDashboardContent() {
       )}
 
       <Fold>
-        <Panel title="收入" note={`近 ${days} 天 ¥${yuan(c.gmvWindowCents)} · 累计 ¥${yuan(c.gmvCents)}`}>
+        {/*
+         * 口径必须写在标题上：这里的「收入」是**订单实付**（元，Σ `Order.paidCents`），
+         * 而财务分析页的「净收入」是**账单口径**（积分，Σ 已结算账单金额）。
+         * 两个字指的是两笔账，页面上只写「收入」会让人把两处的数字对到一起，
+         * 对不上就以为其中一处坏了。标题带单位、备注写口径，并在两页之间给入口。
+         */}
+        <Panel
+          title="订单收入（元）"
+          note={`近 ${days} 天 ¥${yuan(c.gmvWindowCents)} · 累计 ¥${yuan(c.gmvCents)}`}
+          extra={
+            <Link className="text-xs text-brand hover:underline" to="/admin/finance">
+              财务口径的净收入（积分）
+            </Link>
+          }
+        >
           <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
             <div className="min-w-0">
-              <Subhead title="收入趋势" note="按支付时间 · 单位：元" />
+              <Subhead title="收入趋势" note="按支付时间 · 单位：元 · 订单实付口径" />
               <TrendBarChart
-                ariaLabel={`近 ${days} 天每日收入`}
+                ariaLabel={`近 ${days} 天每日订单收入`}
                 empty="所选窗口内没有支付记录"
                 valueFormatter={(value) => `¥${yuan(value, 0)}`}
                 items={c.revenueTrend.map((d) => ({

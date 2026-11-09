@@ -1109,8 +1109,9 @@ describe('支付 HTTP 集成', () => {
     expect(admin.status).toBe(200);
     expect(admin.body.data.items).toHaveLength(7);
 
-    const created = await api('post', '/api/v1/admin/payments/products', adminToken).send({
-      kind: 'credits',
+    // 商品已并入「商品管理」（`/admin/products`），支付域不再有独立商品接口
+    const created = await api('post', '/api/v1/admin/products', adminToken).send({
+      sku: `IT-NOAUDIT-${run}`,
       name: '无需审计原因商品',
       currency: 'CNY',
       priceCents: 100,

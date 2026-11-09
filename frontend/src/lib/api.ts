@@ -118,7 +118,6 @@ import type {
   AdminTicketDetail,
   AdminTicketAssignee,
   TicketStats,
-  AdminSearchResult,
   BatchSummary,
   CreditImportResult,
   ShoppableCarouselTemplatesResult,
@@ -126,15 +125,11 @@ import type {
 import type { AdminUserImpact } from "../types/admin-users";
 import type {
   AdminPageResult,
-  AdminPaymentOrderDetail,
-  AdminPaymentOrderRow,
-  AdminPaymentProductView,
   AdminPaymentProviderView,
   AdminPaymentSettings,
   AdminReconciliationItem,
   AdminReconciliationRun,
   PaymentCurrency,
-  PaymentProductInput,
   PaymentProviderConfigUpdate,
   PaymentProviderId,
 } from "../types/payment";
@@ -175,15 +170,29 @@ export class ApiError extends Error {
   requestId: string | null;
   /** 429 时后端给的等待秒数（Retry-After），供按钮做倒计时 */
   retryAfter: number | null;
+  /**
+   * 后端业务错误码（响应体 `code`），如 40001 / 40905 / 40906。
+   *
+   * 状态码只能分「400 参数错」与「409 冲突」，**分不清是哪条规则**：
+   * 退款金额超上限（40001 硬约束）和超出可配退款规则（40905/40906/40907）
+   * 在页面上同形，运营只能看到一句文案。带上业务码才能给出可执行的提示
+   * （去调规则 / 改金额）。
+   */
+  code: number | null;
   constructor(
     message: string,
     status = 0,
-    extra: { requestId?: string | null; retryAfter?: number | null } = {},
+    extra: {
+      requestId?: string | null;
+      retryAfter?: number | null;
+      code?: number | null;
+    } = {},
   ) {
     super(message);
     this.status = status;
     this.requestId = extra.requestId ?? null;
     this.retryAfter = extra.retryAfter ?? null;
+    this.code = extra.code ?? null;
     this.name = "ApiError";
   }
 }
@@ -319,6 +328,7 @@ export async function request<T>(
       requestId,
       retryAfter:
         Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
+      code: Number.isFinite(Number(bodyCode)) ? Number(bodyCode) : null,
     });
   }
 
@@ -1976,48 +1986,15 @@ export const adminPaymentProvidersApi = {
     }),
 };
 
-/** 充值商品 */
-export const adminPaymentProductsApi = {
-  list: () =>
-    request<{ items: AdminPaymentProductView[] }>("/admin/payments/products"),
+/** 充值商品已并入「商品管理」（`/admin/products`），不再有独立接口 */
 
-  create: (body: PaymentProductInput) =>
-    request<{ product: AdminPaymentProductView }>("/admin/payments/products", {
-      method: "POST",
-      body,
-    }),
-
-  update: (id: string, body: PaymentProductInput) =>
-    request<{ product: AdminPaymentProductView }>(
-      `/admin/payments/products/${id}`,
-      {
-        method: "PUT",
-        body,
-      },
-    ),
-};
-
-/** 支付订单 */
+/**
+ * 支付订单动作。
+ *
+ * 列表与详情已并入「订单管理」（`/admin/orders`）—— 两边读同一张 `Order` 表，
+ * 支付域只保留订单页要用的两个写动作。
+ */
 export const adminPaymentOrdersApi = {
-  list: (
-    params: {
-      status?: string;
-      keyword?: string;
-      providerId?: string;
-      timeField?: "created" | "paid" | "credited";
-      from?: string;
-      to?: string;
-      page?: number;
-      pageSize?: number;
-    } = {},
-  ) =>
-    request<AdminPageResult<AdminPaymentOrderRow>>(
-      `/admin/payments/orders${toQuery(params)}`,
-    ),
-
-  detail: (id: string) =>
-    request<{ order: AdminPaymentOrderDetail }>(`/admin/payments/orders/${id}`),
-
   /** 向渠道查单：已支付则立即入账，否则不动本地状态 */
   query: (id: string) =>
     request<{ order: { id: string; status: string }; view: unknown }>(
@@ -2036,17 +2013,6 @@ export const adminPaymentOrdersApi = {
       `/admin/payments/orders/${id}/close`,
       { method: "POST" },
     ),
-
-  exportCsv: (
-    params: {
-      status?: string;
-      keyword?: string;
-      providerId?: string;
-      timeField?: "created" | "paid" | "credited";
-      from?: string;
-      to?: string;
-    } = {},
-  ) => downloadCsv(`/admin/payments/orders/export.csv${toQuery(params)}`),
 };
 
 /** 支付对账 */
@@ -2327,17 +2293,6 @@ export const adminTicketsApi = {
   ) => downloadCsv(`/admin/tickets/export${toQuery(params)}`),
 };
 
-/**
- * 后台全局搜索。
- *
- * 每类只回前 5 条 + 该类总数：顶栏搜索的用途是「跳过去」，
- * 不是「在搜索结果里继续翻页」。单字符（<2）返回空组而不是报错。
- */
-export const adminSearchApi = {
-  search: (q: string, signal?: AbortSignal) =>
-    request<AdminSearchResult>(`/admin/search${toQuery({ q })}`, { signal }),
-};
-
 /* ══════════════════════ 渠道与模型域（`src/model/**`） ══════════════════════ */
 
 /**
@@ -2362,6 +2317,16 @@ export const adminChannelsApi = {
   /** 线路健康（一行 = 一条渠道模型，含进程内冷却快照） */
   health: () =>
     request<{ items: ChannelHealthRowView[] }>("/admin/channels/health"),
+
+  /**
+   * 解除本进程内全部线路冷却。
+   *
+   * 只清内存、不动数据库；多实例部署时只影响处理本次请求的实例。
+   */
+  resetHealth: () =>
+    request<{ cleared: number }>("/admin/channels/health/reset", {
+      method: "POST",
+    }),
 
   /** 可选协议目录；`capability` 用于按模态过滤（图像 / 文本 / 视频 / 音频） */
   protocols: (capability?: string) =>

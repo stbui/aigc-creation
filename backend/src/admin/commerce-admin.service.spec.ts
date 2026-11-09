@@ -32,6 +32,7 @@ describe('AdminCommerceService 商品删除', () => {
       prisma as never,
       {} as never,
       {} as never,
+      {} as never,
     );
   });
 
@@ -135,6 +136,7 @@ describe('AdminCommerceService 按商品筛订单', () => {
       prisma as never,
       {} as never,
       {} as never,
+      {} as never,
     );
   });
 
@@ -170,6 +172,7 @@ describe('AdminCommerceService 按商品筛订单', () => {
         user: { email: 'a@b.com' },
         items: [{ id: 'i-1', nameSnapshot: '体验包', skuSnapshot: 'PACK_TRIAL' }],
         payments: [{ id: 'pay-1' }],
+        refunds: [],
         membershipPlan: null,
       },
     ]);
@@ -177,6 +180,64 @@ describe('AdminCommerceService 按商品筛订单', () => {
 
     const page = await service.listOrders({ productId: 'p-1' });
     expect(page.items[0].items).toEqual([{ name: '体验包', sku: 'PACK_TRIAL' }]);
+  });
+
+  it('退款状态列与筛选同源: 命中任意一笔退款单就显示该状态', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: 'o-1',
+        orderNo: 'HJ001',
+        userId: 'u-1',
+        status: 'paid',
+        channel: 'sandbox',
+        totalCents: 990,
+        discountCents: 0,
+        paidCents: 990,
+        refundedCents: 0,
+        grantedCredits: 100,
+        createdAt: new Date('2026-01-01'),
+        paidAt: new Date('2026-01-01'),
+        user: { email: 'a@b.com' },
+        items: [],
+        payments: [{ id: 'pay-1' }],
+        // 部分退款：先成功退一笔，再有一笔失败。列上必须显示「失败」——
+        // 筛选 `?refundState=failed` 用的也是 some 命中任意一笔
+        refunds: [{ status: 'failed' }, { status: 'succeeded' }],
+        membershipPlan: null,
+      },
+    ]);
+    prisma.order.count.mockResolvedValue(1);
+
+    const page = await service.listOrders({ refundState: 'failed' });
+    expect(page.items[0].refundState).toBe('failed');
+  });
+
+  it('无退款单时退款状态为 null', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: 'o-1',
+        orderNo: 'HJ001',
+        userId: 'u-1',
+        status: 'paid',
+        channel: 'sandbox',
+        totalCents: 990,
+        discountCents: 0,
+        paidCents: 990,
+        refundedCents: 0,
+        grantedCredits: 100,
+        createdAt: new Date('2026-01-01'),
+        paidAt: new Date('2026-01-01'),
+        user: { email: 'a@b.com' },
+        items: [],
+        payments: [{ id: 'pay-1' }],
+        refunds: [],
+        membershipPlan: null,
+      },
+    ]);
+    prisma.order.count.mockResolvedValue(1);
+
+    const page = await service.listOrders({});
+    expect(page.items[0].refundState).toBeNull();
   });
 });
 
@@ -252,6 +313,7 @@ describe('AdminCommerceService 删除订单', () => {
     };
     service = new AdminCommerceService(
       prisma as never,
+      {} as never,
       {} as never,
       {} as never,
     );

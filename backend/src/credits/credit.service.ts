@@ -830,7 +830,15 @@ export function projectEntry(row: {
     amount: microcreditsToCredits(row.amountMicrocredits),
     balanceAfter: microcreditsToCredits(row.availableAfterMicrocredits),
     lotId: row.lotId || null,
-    orderId: row.paymentOrderId || row.billingOrderId || null,
+    /**
+     * 支付订单与生成账单分开下发。
+     *
+     * 合并成一个 `orderId` 后，后台只能显示一串裸 id：既分不清它属于哪个域，
+     * 也没法跳转（`/admin/orders` 与 `/admin/billing-orders` 是不同的页面）。
+     * 两者语义不同，不能共用同一个字段名。
+     */
+    paymentOrderId: row.paymentOrderId || null,
+    billingOrderId: row.billingOrderId || null,
     taskId: row.taskId || null,
     reason: row.note || null,
     operatorId: row.actorUserId || null,

@@ -323,6 +323,11 @@ function PlanCard({
           <span>会员 {row.memberCount}</span>
           <span aria-hidden className="h-3 w-px bg-border" />
           <span>订单 {row.orderCount}</span>
+          <span aria-hidden className="h-3 w-px bg-border" />
+          {/* 映射的分组决定该等级可见渠道与价格倍率；空 = 默认分组 */}
+          <span className="truncate" title="会员等级映射的用户分组">
+            分组 {row.userGroupCode || '默认'}
+          </span>
         </div>
       </CardContent>
 

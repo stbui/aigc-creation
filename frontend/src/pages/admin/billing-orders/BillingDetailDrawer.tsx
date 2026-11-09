@@ -1,6 +1,14 @@
+import { Link } from 'react-router-dom';
 import { ActionButton, Descriptions, Drawer, Notice, TextAreaField } from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS, REFUND_REASON_LABELS, STATUS_LABELS } from './constants';
-import { formatTime, toCredits, toCreditsInput } from './utils';
+import {
+  adminModelCallsHref,
+  adminTaskHref,
+  adminUserDetailHref,
+  formatTime,
+  toCredits,
+  toCreditsInput,
+} from './utils';
 import type { BillingOrderView } from '../../../types/model';
 
 interface BillingDetailDrawerProps {
@@ -69,12 +77,52 @@ export function BillingDetailDrawer({
           <Descriptions
             items={[
               { label: '状态', value: STATUS_LABELS[detail.status] ?? detail.status },
-              { label: '用户', value: `${detail.userEmail || '—'}（${detail.userId}）` },
-              { label: '任务', value: <span className="font-mono text-xs">{detail.taskId || '—'}</span> },
+              {
+                label: '用户',
+                value: detail.userId ? (
+                  <span className="flex items-center gap-2">
+                    <Link
+                      className="text-brand hover:underline"
+                      to={adminUserDetailHref(detail.userId)}
+                    >
+                      {detail.userEmail || detail.userId}
+                    </Link>
+                    <span className="text-[12px] text-muted-foreground">{detail.userId}</span>
+                  </span>
+                ) : (
+                  '—'
+                ),
+              },
+              {
+                label: '任务',
+                value: detail.taskId ? (
+                  <Link
+                    className="font-mono text-xs text-brand hover:underline"
+                    to={adminTaskHref(detail.taskId)}
+                  >
+                    {detail.taskId}
+                  </Link>
+                ) : (
+                  '—'
+                ),
+              },
               { label: '前台模型', value: detail.model || '—' },
               { label: '能力 / 场景', value: `${detail.capability}${detail.scene ? ` · ${detail.scene}` : ''}` },
               { label: '用户分组', value: detail.userGroup || 'default' },
-              { label: '渠道', value: `${detail.channelName || '—'}（${detail.channelId || '—'}）` },
+              {
+                label: '渠道',
+                value: detail.channelId ? (
+                  <Link
+                    className="text-brand hover:underline"
+                    to={adminModelCallsHref({ channelId: detail.channelId })}
+                    title="查看该渠道的上游调用记录"
+                  >
+                    {detail.channelName || detail.channelId}
+                  </Link>
+                ) : (
+                  '—'
+                ),
+              },
               { label: '渠道模型', value: detail.channelModelName || detail.channelModelId || '—' },
               { label: '价格档', value: detail.priceTierId || '—' },
               {

@@ -79,11 +79,13 @@ export class PaymentsController {
     @Body() dto: CreateIntentDto,
     @Req() req: Request,
   ) {
+    const userAgent = req.headers['user-agent'];
     return this.orders.createIntent({
       orderId,
       userId: user.id,
       providerId: dto.providerId,
       clientIp: normalizeClientIp(req.ip || req.socket?.remoteAddress),
+      clientUserAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent,
     });
   }
 

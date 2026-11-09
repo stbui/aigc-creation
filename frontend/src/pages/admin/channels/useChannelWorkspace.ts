@@ -301,12 +301,45 @@ export function useChannelWorkspace() {
 
   const orderChannel = orderFor ? (rows.find((row) => row.id === orderFor) ?? null) : null;
 
+  /**
+   * 当前冷却中的线路数。
+   *
+   * 冷却只对 401/403/404/429 这类明确可归因的失败写入，通常等它自然到期即可；
+   * 面板据此决定要不要给出「解除冷却」入口 —— 没有冷却时不摆一个点了没反应的按钮。
+   */
+  const coolingCount = health.rows.filter((row) => row.coolingUntil).length;
+  const { busy: resettingHealth, run: runResettingHealth } = useActionLock();
+  const resetCooling = async () => {
+    const confirmed = await confirm({
+      title: '解除全部线路冷却？',
+      description: `${coolingCount} 条线路正在冷却。解除后下一次任务会立即重新尝试这些线路；若上游尚未恢复，失败会重新写入冷却。只影响当前服务实例。`,
+      confirmText: '解除冷却',
+    });
+    if (confirmed === null) return;
+    await runResettingHealth(async () => {
+      try {
+        const result = await adminChannelsApi.resetHealth();
+        toast.success(
+          result.cleared > 0 ? `已解除 ${result.cleared} 条冷却` : '没有仍在冷却中的线路',
+        );
+        await health.reload();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : '解除冷却失败');
+      }
+    });
+  };
+
   return {
     view,
     setView,
     writable: can('channel.write'),
     modelWritable: can('channel.model_write'),
     canTest: can('channel.test'),
+    canReadCapabilities: can('capability.read') || can('logical_model.read'),
+    canReadPlugins: can('plugin.read'),
+    resetCooling,
+    coolingCount,
+    resettingHealth,
     rows,
     loading,
     error,

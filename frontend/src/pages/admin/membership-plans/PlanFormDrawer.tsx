@@ -3,6 +3,7 @@ import {
   Drawer,
   FormField,
   NumberField,
+  SelectField,
   SwitchField,
   TextField,
 } from '~/admin-ui/primitives';
@@ -15,6 +16,8 @@ interface PlanFormDrawerProps {
   draft: PlanDraft;
   formDirty: boolean;
   saving: boolean;
+  /** 可映射的用户分组；空数组时下拉只剩「默认分组」 */
+  groupChoices: Array<{ value: string; label: string }>;
   onPatch: (patch: Partial<PlanDraft>) => void;
   onClose: () => void;
   onSubmit: () => void;
@@ -24,6 +27,10 @@ interface PlanFormDrawerProps {
  * 会员套餐表单。
  *
  * 编码创建后禁用；新建默认下架 —— 确认权益与价格无误后再手动上架。
+ *
+ * 「会员分组」必须显式选：分组决定该等级用户可见的渠道与价格倍率。留空
+ * （默认分组）意味着所有等级共用同一套可见性与倍率，运营以为配了专属权益
+ * 却毫无效果 —— 所以这一项放在权益区，和快速通道、折扣放在一起。
  */
 export function PlanFormDrawer({
   open,
@@ -31,10 +38,27 @@ export function PlanFormDrawer({
   draft,
   formDirty,
   saving,
+  groupChoices,
   onPatch,
   onClose,
   onSubmit,
 }: PlanFormDrawerProps) {
+  /*
+   * 存量套餐可能指向已被删除的分组（后端只在保存时校验存在性）。
+   * 不回填一个占位项的话，radix Select 找不到匹配项会显示空白，看上去
+   * 像「默认分组」；实际仍是一个失效编码。这里显式标出来。
+   */
+  const groupSelectOptions =
+    draft.userGroupCode && !groupChoices.some((option) => option.value === draft.userGroupCode)
+      ? [
+          ...groupChoices,
+          {
+            value: draft.userGroupCode,
+            label: groupChoices.length > 0 ? `分组 ${draft.userGroupCode}（已失效）` : draft.userGroupCode,
+          },
+        ]
+      : groupChoices;
+
   return (
     <Drawer
       open={open}
@@ -155,6 +179,21 @@ export function PlanFormDrawer({
             />
           </FormField>
         </div>
+
+        <FormField
+          label="会员分组"
+          hint="决定该等级用户可见的渠道与价格倍率；留空 = 默认分组"
+        >
+          <SelectField
+            ariaLabel="会员分组"
+            placeholder="默认分组"
+            clearLabel="默认分组"
+            allowClear
+            value={draft.userGroupCode || undefined}
+            onChange={(value) => onPatch({ userGroupCode: value ?? '' })}
+            options={groupSelectOptions}
+          />
+        </FormField>
 
         <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
           <div>

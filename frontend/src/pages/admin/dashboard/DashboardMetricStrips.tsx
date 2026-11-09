@@ -48,7 +48,8 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
     },
     {
       key: 'gmv',
-      label: '营收',
+      /* 单位随数字一起出现：这个「营收」是订单实付（元），不是积分口径 */
+      label: '营收（元）',
       value: `¥${yuan(w.revenue.gmvCents)}`,
       delta: <Delta current={w.revenue.gmvCents} previous={cmp.gmvCents} />,
       hint: `上一窗口 ¥${yuan(cmp.gmvCents, 0)}`,
@@ -133,7 +134,7 @@ export function TotalsStrip({ data, isFinance }: { data: AdminOverview; isFinanc
       ? [
           {
             key: 'gmv',
-            label: '累计实收',
+            label: '累计实收（元）',
             value: `¥${yuan(data.commerce.gmvCents)}`,
             hint: `${data.commerce.orders.paid.toLocaleString('zh-CN')} 笔已支付订单`,
           },

@@ -13,7 +13,7 @@
 | 项 | 事实源 |
 | --- | --- |
 | 外壳组件 | `frontend/src/admin-ui/shell/AdminBoardLayout.tsx` |
-| 菜单数据 | `frontend/src/components/admin/adminNav.ts`（8 组 / 34 条） |
+| 菜单数据 | `frontend/src/components/admin/adminNav.ts`（8 组 / 32 条） |
 | 页面取用层 | `frontend/src/admin-ui/primitives/index.ts`（页面**只从这里**取件） |
 | 基础件 | `frontend/src/admin-ui/components/ui/`（shadcn CLI 生成，`scripts/post-shadcn.mjs` 后处理） |
 | 类名合并 | `frontend/src/admin-ui/lib/cn.ts`（官方 `cn` 包的 `createCn` + 项目 token 补登） |
@@ -423,5 +423,5 @@ Vite 把具名导入改写成对命名空间的属性访问，缺失的名字只
 - `npx tsc --noEmit`：后台 0 错；
 - `npx vitest run`：全量单测；
 - `npx playwright test --config=playwright.admin.config.ts`：后台 e2e；
-- `node scripts/sweep-admin.mjs`：34 条路由逐页打开，控制台错误 0；
+- `node scripts/sweep-admin.mjs`：33 条路由逐页打开，控制台错误 0；
 - `node scripts/shot-admin.mjs`：概览 / 设置 / 渠道 / 用户 / 订单 / 积分 / 告警截图落 `/tmp`。

@@ -100,7 +100,24 @@ export class RouteHealthService {
     return result.sort((left, right) => left.key.localeCompare(right.key));
   }
 
-  /** 清空（后台重置健康状态与验收脚本使用） */
+  /**
+   * 解除冷却：`key` 为空时清空全部，否则只删该键。
+   *
+   * 返回实际删掉的键数量 —— 后台「解除冷却」要如实告诉操作者清了几条：
+   * 「刚好都已自然到期」和「清掉了一批」是两种结果。
+   */
+  unblock(key: string | null = null, now = Date.now()): number {
+    // 先清掉已自然到期的项，避免把「本来就已经解封」的算进本次解除数量
+    this.snapshot(now);
+    if (!key) {
+      const count = this.blocked.size;
+      this.blocked.clear();
+      return count;
+    }
+    return this.blocked.delete(key) ? 1 : 0;
+  }
+
+  /** 清空（验收脚本使用；后台走 `unblock` 以便回报清掉的数量） */
   clear(): void {
     this.blocked.clear();
   }

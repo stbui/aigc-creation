@@ -4,4 +4,4 @@
 
 export { useToast } from '../../../admin-ui/providers/ToastProvider';
 export { useAdmin } from '../../../context/AdminContext';
-export { useAdminList, useAdminUrlFilterSync } from '../../../admin-ui/primitives';
+export { useAdminList, useAdminUrlFilterSync, useSelectionPrune } from '../../../admin-ui/primitives';

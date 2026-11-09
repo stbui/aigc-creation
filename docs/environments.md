@@ -63,6 +63,7 @@ PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付充值 → �
 | `ZPAY_API_BASE` | `https://zpayz.cn` | 同开发 | 同开发 | ZPay API 基址；适配器自动拼接 `/mapi.php` 与 `/api.php` |
 | `ZPAY_PID` / `ZPAY_KEY` | 空 | 空 | 按需 | ZPay 商户 ID 与商户密钥；密钥用于下单、回调验签以及查单/退款认证 |
 | `ZPAY_TYPE` | `alipay` | 同开发 | 同开发 | ZPay 支付方式：`alipay` 支付宝、`wxpay` 微信支付。后续可在后台渠道配置中修改 |
+| `ZPAY_CID` | 空 | 空 | 空 | ZPay 支付渠道 ID（可选），多个用英文逗号隔开；留空由渠道随机选择 |
 
 三条必须记住的规则（以及一条操作规则）：
 
@@ -99,6 +100,7 @@ ZPAY_API_BASE=https://zpayz.cn
 ZPAY_PID=<zpay-pid>
 ZPAY_KEY=<zpay-merchant-key>
 ZPAY_TYPE=alipay
+ZPAY_CID=
 ```
 
 ### 回调地址与渠道后台配置
@@ -117,7 +119,9 @@ https://域名/api/v1/payments/callback/zpay/{configId}
 - Stripe Webhook 至少订阅：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`。
 - PayPal 使用 Orders v2 `CAPTURE`：买家批准后订单只会到 `APPROVED`，结算页回跳或状态轮询会由服务端调用 capture 真正扣款；Webhook 至少订阅订单完成/作废与 capture 完成/失败事件，`PAYPAL_WEBHOOK_ID` 必须对应同一个 Webhook 配置。
 - 易支付采用 `epay.jylt.cc` 的 `createOrder` / `getOrder` 协议：异步通知是 **GET**，回调签名覆盖 `orderId + param + type + price + reallyPrice + key`；查单已支持，文档未提供关单和退款 API。
-- ZPay 下单走 `POST /mapi.php`（multipart form-data），必须由服务端注入用户真实 IP；查单走 `GET /api.php?act=order`，退款走 `POST /api.php?act=refund`。回调仅接受 `trade_status=TRADE_SUCCESS`，验签后还会主动查单复核，成功时必须返回纯文本 `success`。
+- ZPay 下单走 `POST /mapi.php`（multipart form-data），必须由服务端注入用户真实 IP，`device` 按请求 UA 判定（pc / mobile / qq / wechat / alipay），`cid` 可选、配置后才进签名；查单走 `GET /api.php?act=order`，退款走 `POST /api.php?act=refund`。回调仅接受 `trade_status=TRADE_SUCCESS`，验签通过后用独立的 3 秒超时主动查单核对状态 / 金额 / 渠道订单号，全部一致才返回纯文本 `success`（整段应答仍在渠道要求的 5 秒窗口内）；查单超时或未确认应答 `fail` 让渠道重试，入账阶段再校验回调金额与本地订单是否一致，不一致落对账差异并停止重试。
+- ZPay 下单响应按 `payurl` / `qrcode` / `img` 依次降级为跳转、扫码内容、二维码图片（`checkoutMode=qrcode-image`）；三者都没有则下单失败。
+- ZPay 文档的 `/mapi.php` **不支持 `return_url`**，支付完成不会自动回跳结算页；结果以异步通知与状态轮询为准。`submit.php` 页面跳转接口未启用 —— 它拿不到下单即返回的 `trade_no`，会丢掉「按渠道单据号匹配支付尝试」的对账依据。
 - ZPay 文档未提供关单接口，本地会明确返回不支持；退款按请求金额提交，但部分支付通道可能只支持全额退款，真实退款规则以商户后台和实际通道为准。
 - 旧变量 `EPAY_PID` / `EPAY_PAY_TYPE` 仅保留兼容读取，新部署请使用 `EPAY_MCH_ID` / `EPAY_TYPE`。
 - PayPal 不支持关闭未授权 Checkout Order；Stripe 通过 expire Checkout Session 关单。PayPal、Stripe、易支付与 ZPay 当前都**不参与自动渠道账单对账**。

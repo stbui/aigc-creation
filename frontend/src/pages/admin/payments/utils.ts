@@ -1,18 +1,14 @@
-import { formatYuanPlain } from '../../../admin-ui/lib/format';
-import type {
-  AdminPaymentProductView,
-  PaymentProductInput,
-  PaymentSaleStatus,
-  PaymentSaleStrategy,
-} from '../../../types/payment';
-import { PROVIDER_LABELS, type PaymentProductDraft } from './constants';
+import type { AdminPaymentProviderView, PaymentConfigField } from '../../../types/payment';
+import {
+  PROVIDER_LABELS,
+  type PaymentProviderState,
+} from './constants';
 
 /**
- * 支付域的纯函数：账单日期（上海时区）、商品展示派生、金额与时间换算。
+ * 支付域的纯函数：账单日期（上海时区）、金额格式化、渠道短名与配置草稿校验。
  *
- * **状态以服务端为准**：后端已按 `Asia/Shanghai` 判定并回 `saleStatus`，
- * 前端只做展示兜底 —— 浏览器时区与服务器不一致时，按本地时间算窗口会把
- * 「已开售」显示成「待发售」，比晚一分钟开卖更让人误判。
+ * 充值商品的展示与表单派生不在这里 —— 商品统一由「商品管理」（`/admin/products`）
+ * 维护，`payments/` 只处理渠道、订单、对账、异常四件事。
  */
 
 /**
@@ -50,204 +46,122 @@ export function providerLabel(id: string | null | undefined): string {
   return PROVIDER_LABELS[id] ?? id;
 }
 
-/** 积分文案：带千分位；有效期 0 = 永久 */
-export function creditsText(product: { credits: number; creditsValidDays: number }): string {
-  const base = `${product.credits.toLocaleString('zh-CN')} 积分`;
-  return product.creditsValidDays === 0 ? `${base}（永久有效）` : `${base}（${product.creditsValidDays} 天有效）`;
+/** 跨模块深链：订单管理（商品订单）/ 用户 / 商品订单清单 */
+export {
+  adminOrderDetailHref,
+  adminProductOrdersHref,
+  adminUserDetailHref,
+} from '../../../lib/admin-links';
+
+/**
+ * 渠道配置的**草稿态**必填项校验。
+ *
+ * 必须基于当前草稿，而不是已保存的值（`provider.missing`）：
+ *   · 用户刚补上必填项时，提示还挂着 → 误以为还没生效；
+ *   · 用户清空必填项时，提示不出现 → 点保存才报 400。
+ *
+ * 密字段留空表示「沿用上一版」，所以空白的密字段只要旧值存在就不算缺失。
+ *
+ * @returns 缺失的必填字段**标签**列表（空数组 = 可用）
+ */
+export function missingRequiredLabels(
+  fields: PaymentConfigField[],
+  draftValues: Record<string, string>,
+  secretConfigured: Record<string, boolean>,
+): string[] {
+  return fields
+    .filter((f) => f.required)
+    .filter((f) => {
+      const v = draftValues[f.name] ?? '';
+      if (v.trim()) return false;
+      return !(f.secret && secretConfigured[f.name]);
+    })
+    .map((f) => f.label);
 }
 
-/** 上架策略文案 */
-export function strategyText(product: {
-  saleStrategy: PaymentSaleStrategy;
-  periodDays: number;
-  periodPurchaseLimit: number;
-  stockTotal: number;
-  stockRemaining: number;
-  saleStartAt: string | null;
-  saleEndAt: string | null;
-}): string {
-  switch (product.saleStrategy) {
-    case 'periodic':
-      return `周期 ${product.periodDays} 天 · 限 ${product.periodPurchaseLimit} 次`;
-    case 'inventory':
-      return `库存 ${product.stockRemaining} / ${product.stockTotal}`;
-    case 'timed': {
-      const start = product.saleStartAt ? product.saleStartAt.slice(0, 10) : '—';
-      const end = product.saleEndAt ? product.saleEndAt.slice(0, 10) : '—';
-      return `限时 ${start} ~ ${end}`;
-    }
-    default:
-      return '不限量';
-  }
+/** 渠道当前是否「可发起支付」：必填齐全且已启用。 */
+export function providerReady(
+  provider: AdminPaymentProviderView,
+  draftValues: Record<string, string>,
+): boolean {
+  if (!provider.enabled) return false;
+  return (
+    missingRequiredLabels(
+      provider.configFields,
+      draftValues,
+      provider.secretConfigured,
+    ).length === 0
+  );
 }
 
 /**
- * 销售状态。
+ * 渠道的**阻断项**判定。
  *
- * 直接取后端 `saleStatus`；后端没给时（如本地兜底）按规则派生。
+ * 「能不能收钱」的条件不止「必填项齐全」一条。后端 `PaymentOrderService`
+ * 在发起支付时会因为下列任一情况抛 503：
+ *   · 必填项缺失（`validateConfig` 不通过）
+ *   · 真实渠道缺回调公网地址（`publicBaseUrl` 与 `PAYMENT_NOTIFY_BASE` 都没配）
+ *   · 生产环境缺 `PAYMENT_SECRET_KEY`（凭据无法解密）
+ *
+ * 后端已经把这些情况写进了 `provider.warnings`（`level: 'danger'`），所以
+ * **以它为准**，而不是前端自己重推一遍规则 —— 前端重推的规则一定会和后端
+ * 漂移（后端加一条判定，前端的「可用」就成了假话）。
+ *
+ * 这里只做一件事：把 danger 告警翻译成「这个渠道现在收不了钱」。
  */
-export function productSaleStatusOf(product: {
-  status: string;
-  saleStrategy: string;
-  saleStartAt: string | null;
-  saleEndAt: string | null;
-  stockRemaining: number;
-}): PaymentSaleStatus {
-  if (product.status !== 'active') return 'disabled';
-  if (product.saleStrategy === 'timed') {
-    const now = Date.now();
-    if (product.saleStartAt && now < new Date(product.saleStartAt).getTime()) return 'upcoming';
-    if (product.saleEndAt && now > new Date(product.saleEndAt).getTime()) return 'ended';
-  }
-  if (product.saleStrategy === 'inventory' && product.stockRemaining <= 0) return 'sold_out';
-  return 'on_sale';
-}
-
-/** 销售状态 → 文案与色调 */
-export const SALE_STATUS_META: Record<
-  PaymentSaleStatus,
-  { label: string; tone: 'success' | 'danger' | 'warn' | 'brand' | 'muted' }
-> = {
-  on_sale: { label: '销售中', tone: 'success' },
-  upcoming: { label: '待发售', tone: 'warn' },
-  ended: { label: '已结束', tone: 'muted' },
-  sold_out: { label: '已售罄', tone: 'danger' },
-  disabled: { label: '已停用', tone: 'muted' },
-};
-
-/** 商品列表行：展示状态一律走这里，避免各列各判一次 */
-export function saleStatusOf(product: AdminPaymentProductView): PaymentSaleStatus {
-  return product.saleStatus ?? productSaleStatusOf(product);
-}
-
-/** 分 → 表单里的元 / 美元文本，固定两位小数。 */
-export function paymentProductPriceText(cents: number): string {
-  return formatYuanPlain(cents);
-}
-
-/** 表单金额 → 整数分；非法输入返回 null，由调用方拦截。 */
-export function paymentProductPriceToCents(text: string): number | null {
-  const trimmed = text.trim();
-  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;
-  return Math.round(Number(trimmed) * 100);
+export function providerBlockingIssues(
+  provider: AdminPaymentProviderView,
+): string[] {
+  return provider.warnings
+    .filter((w) => w.level === 'danger')
+    .map((w) => w.message);
 }
 
 /**
- * UTC ISO → `datetime-local` 值。
+ * 渠道的可运营状态。
  *
- * 不能直接 slice ISO 字符串：后端存的是 UTC，`slice(0,16)` 会把 UTC 时间
- * 当成浏览器本地时间显示，每次编辑保存都会把限时窗口平移时区差。
+ * 判据是「能不能收钱」，不是「开关开没开」：
+ *   · 开关开 + 无阻断项 → usable（能收钱）
+ *   · 开关开 + 有阻断项 → misconfigured（**正在报错**：发起支付 503）
+ *   · 开关关 + 凭据缺 → unconfigured（启用前要补齐）
+ *   · 开关关 + 凭据齐 → disabled（随时可开）
+ *
+ * 开关与凭据必须分开看：只看 `enabled` 会把「开关开了但收不了钱」显示成
+ * 绿色可用，运营照着页面去收款时才撞上 503。
+ *
+ * 阻断项取自后端 danger 告警（见 {@link providerBlockingIssues}），不靠前端
+ * 复刻后端规则 —— 复刻出来的口径迟早与后端不一致，而不一致的方向永远是
+ * 前端显示「可用」、实际收不到钱。
  */
-export function isoToLocalDateTime(iso: string | null): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+export function providerState(
+  provider: AdminPaymentProviderView,
+): PaymentProviderState {
+  const configured =
+    missingRequiredLabels(
+      provider.configFields,
+      provider.values,
+      provider.secretConfigured,
+    ).length === 0;
+
+  if (!provider.enabled) return configured ? 'disabled' : 'unconfigured';
+
+  // 开关开着：后端报了 danger 就说明收不了钱（缺必填项 / 缺回调地址 / 缺密钥）
+  if (providerBlockingIssues(provider).length > 0) return 'misconfigured';
+  return configured ? 'usable' : 'misconfigured';
 }
 
-/** `datetime-local` → ISO；空串或非法值返回 null。 */
-export function localDateTimeToIso(value: string): string | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
-/** 商品视图 → 表单草稿。 */
-export function paymentProductToDraft(product: AdminPaymentProductView): PaymentProductDraft {
-  return {
-    name: product.name,
-    description: product.description,
-    currency: product.currency,
-    price: paymentProductPriceText(product.priceCents),
-    originalPrice: product.originalPriceCents === null ? '' : paymentProductPriceText(product.originalPriceCents),
-    credits: String(product.credits),
-    creditsValidDays: String(product.creditsValidDays),
-    grantType: product.grantType === 'manual' ? 'manual' : 'immediate',
-    saleStrategy: product.saleStrategy,
-    periodDays: String(product.periodDays || 30),
-    periodPurchaseLimit: String(product.periodPurchaseLimit || 1),
-    stockTotal: String(product.stockTotal || 0),
-    saleStartAt: isoToLocalDateTime(product.saleStartAt),
-    saleEndAt: isoToLocalDateTime(product.saleEndAt),
-    sortOrder: String(product.sortOrder),
-    enabled: product.status === 'active',
-  };
-}
-
-export type PaymentProductPayloadResult = { ok: true; payload: PaymentProductInput } | { ok: false; error: string };
-
-/** 表单草稿 → 商品保存入参；校验失败返回首条错误文案。 */
-export function buildPaymentProductPayload(
-  draft: PaymentProductDraft,
-  usdAvailable: boolean,
-): PaymentProductPayloadResult {
-  const priceCents = paymentProductPriceToCents(draft.price);
-  if (priceCents === null || priceCents <= 0) {
-    return { ok: false, error: '售价必须大于 0，请填两位小数的金额，如 9.90' };
-  }
-
-  let originalPriceCents: number | null = null;
-  if (draft.originalPrice.trim()) {
-    originalPriceCents = paymentProductPriceToCents(draft.originalPrice);
-    if (originalPriceCents === null) {
-      return { ok: false, error: '划线价格式不正确' };
-    }
-    if (originalPriceCents < priceCents) {
-      return { ok: false, error: '划线价不能低于售价' };
-    }
-  }
-
-  if (draft.saleStrategy === 'inventory' && (Number(draft.stockTotal) || 0) < 1) {
-    return { ok: false, error: '库存商品必须填写大于 0 的库存总量' };
-  }
-
-  const credits = Number(draft.credits);
-  if (!Number.isInteger(credits) || credits < 0) {
-    return { ok: false, error: '到账积分必须是非负整数' };
-  }
-
-  const validDays = Number(draft.creditsValidDays || '0');
-  if (!Number.isInteger(validDays) || validDays < 0 || validDays > 3650) {
-    return { ok: false, error: '积分有效期必须是 0–3650 之间的整数天' };
-  }
-
-  if (draft.enabled && draft.currency === 'USD' && !usdAvailable) {
-    return {
-      ok: false,
-      error: '当前没有已配置的美元支付渠道，无法上架美元商品',
-    };
-  }
-
-  return {
-    ok: true,
-    payload: {
-      // DTO 必填：当前只支持积分商品
-      kind: 'credits',
-      name: draft.name.trim(),
-      description: draft.description,
-      currency: draft.currency,
-      priceCents,
-      originalPriceCents,
-      credits,
-      creditsValidDays: validDays,
-      grantType: draft.grantType,
-      sortOrder: Number(draft.sortOrder) || 0,
-      saleStrategy: draft.saleStrategy,
-      ...(draft.saleStrategy === 'periodic'
-        ? {
-            periodDays: Number(draft.periodDays) || 30,
-            periodPurchaseLimit: Number(draft.periodPurchaseLimit) || 1,
-          }
-        : {}),
-      ...(draft.saleStrategy === 'inventory' ? { stockTotal: Number(draft.stockTotal) || 0 } : {}),
-      ...(draft.saleStrategy === 'timed'
-        ? {
-            saleStartAt: localDateTimeToIso(draft.saleStartAt),
-            saleEndAt: localDateTimeToIso(draft.saleEndAt),
-          }
-        : {}),
-      status: draft.enabled ? 'active' : 'offline',
-    },
-  };
+/**
+ * 渠道缺失的必填项**标签**（不是字段名）。
+ *
+ * 直接用 `provider.missing`（后端给的字段名）会把 `merchantPrivateKey` 这种
+ * 内部字段名暴露给运营。页面上要的是「应用私钥（PEM）」这种人话。
+ */
+export function providerMissingLabels(
+  provider: AdminPaymentProviderView,
+): string[] {
+  return missingRequiredLabels(
+    provider.configFields,
+    provider.values,
+    provider.secretConfigured,
+  );
 }

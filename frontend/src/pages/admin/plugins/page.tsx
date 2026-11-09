@@ -1,7 +1,16 @@
 import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { RefreshCw, Upload } from 'lucide-react';
 import { adminPluginsApi, adminProviderCatalogApi } from './api';
-import { ActionButton, Notice, PageHeader, Panel, SkeletonBody, StaleError } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  Button,
+  Notice,
+  PageHeader,
+  Panel,
+  SkeletonBody,
+  StaleError,
+} from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import { PluginStats } from './PluginStats';
 import { PluginTable } from './PluginTable';
@@ -165,6 +174,16 @@ export function AdminPluginsPage() {
         description="插件的启停会立即重注册协议；渠道模型可选的协议列表就是注册表的投影。"
         actions={
           <>
+            {can('channel.read') && (
+              <Button asChild variant="outline" size="sm">
+                <Link to="/admin/channels">渠道工作台</Link>
+              </Button>
+            )}
+            {(can('capability.read') || can('logical_model.read')) && (
+              <Button asChild variant="outline" size="sm">
+                <Link to="/admin/capabilities">能力与模型</Link>
+              </Button>
+            )}
             {/*
               文件选择框隐藏在外壳后面：上传动作必须由按钮触发，否则页头会出现
               一个突兀的浏览器控件。`data-testid` 是安装流程的 e2e 锚点。
