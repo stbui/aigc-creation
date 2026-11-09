@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ActionButton,
@@ -51,6 +51,89 @@ function RecordRow({
 }
 
 /**
+ * 把详情投影成列表行。
+ *
+ * 深链进入时目标订单不一定在当前筛选页里，不能用 `rows.find` 决定动作是否
+ * 可用；列表行只是动作弹窗需要的字段集合，详情里都有。
+ */
+function rowFromDetail(detail: AdminOrderDetail): AdminOrderRow {
+  return {
+    id: detail.id,
+    orderNo: detail.orderNo,
+    userId: detail.userId,
+    userEmail: detail.user.email,
+    status: detail.status,
+    channel: detail.channel,
+    totalCents: detail.totalCents,
+    discountCents: detail.discountCents,
+    paidCents: detail.paidCents,
+    refundedCents: detail.refundedCents,
+    grantedCredits: detail.grantedCredits,
+    itemCount: detail.items.length,
+    items: detail.items.map((item) => ({
+      name: item.nameSnapshot,
+      sku: item.skuSnapshot,
+    })),
+    paymentCount: detail.payments.length,
+    membershipPlanCode: detail.membershipPlan?.code ?? null,
+    membershipPlanName: detail.membershipPlan?.name ?? null,
+    createdAt: detail.createdAt,
+    paidAt: detail.paidAt,
+  };
+}
+
+/**
+ * 深链意图的自动打开器。
+ *
+ * 只打开弹窗、不提交；用 ref 防止详情刷新后重复弹出。
+ */
+function OrderIntentAutoOpen({
+  detail,
+  intent,
+  canMarkPaid,
+  canRefund,
+  onAction,
+  onConfirmRefund,
+}: {
+  detail: AdminOrderDetail;
+  intent: 'markPaid' | 'refund' | 'confirmRefund';
+  canMarkPaid: boolean;
+  canRefund: boolean;
+  onAction: (kind: 'markPaid' | 'refund', row: AdminOrderRow) => void;
+  onConfirmRefund: (orderId: string, refund: AdminOrderRefund) => void;
+}) {
+  const fired = useRef(false);
+
+  useEffect(() => {
+    if (fired.current) return;
+    if (intent === 'markPaid' && canMarkPaid && detail.status === 'pending') {
+      fired.current = true;
+      onAction('markPaid', rowFromDetail(detail));
+      return;
+    }
+    if (
+      intent === 'refund' &&
+      canRefund &&
+      (detail.status === 'paid' || detail.status === 'partial_refunded') &&
+      detail.paidCents > detail.refundedCents
+    ) {
+      fired.current = true;
+      onAction('refund', rowFromDetail(detail));
+      return;
+    }
+    if (intent === 'confirmRefund' && canRefund) {
+      const processing = detail.refunds.find((refund) => refund.status === 'processing');
+      if (processing) {
+        fired.current = true;
+        onConfirmRefund(detail.id, processing);
+      }
+    }
+  }, [canMarkPaid, canRefund, detail, intent, onAction, onConfirmRefund]);
+
+  return null;
+}
+
+/**
  * 订单详情抽屉。
  *
  * 从页面拆出：详情的数据获取与退款/核销入口和列表筛选是两套生命周期；
@@ -61,6 +144,7 @@ export function OrderDetailDrawer({
   rows,
   canMarkPaid,
   canRefund,
+  initialIntent,
   onClose,
   onAction,
   onConfirmRefund,
@@ -69,6 +153,8 @@ export function OrderDetailDrawer({
   rows: AdminOrderRow[];
   canMarkPaid: boolean;
   canRefund: boolean;
+  /** 从工单/工作台带 `intent` 进入时，详情加载后自动打开对应动作 */
+  initialIntent?: 'markPaid' | 'refund' | 'confirmRefund' | null;
   onClose: () => void;
   onAction: (kind: 'markPaid' | 'refund', row: AdminOrderRow) => void;
   onConfirmRefund: (
@@ -89,8 +175,7 @@ export function OrderDetailDrawer({
       onClose={onClose}
       fetcher={detailFetcher}
       footer={(d) => {
-        const row = rows.find((o) => o.id === d.id);
-        if (!row) return null;
+        const row = rows.find((o) => o.id === d.id) ?? rowFromDetail(d);
         const markPaid =
           canMarkPaid && d.status === 'pending';
         const refund =
@@ -121,6 +206,16 @@ export function OrderDetailDrawer({
     >
       {(d) => (
         <div className="flex flex-col gap-6">
+          {initialIntent && (
+            <OrderIntentAutoOpen
+              detail={d}
+              intent={initialIntent}
+              canMarkPaid={canMarkPaid}
+              canRefund={canRefund}
+              onAction={onAction}
+              onConfirmRefund={(orderId, refund) => onConfirmRefund(orderId, refund, 'succeeded')}
+            />
+          )}
           <DetailSection title="订单概要" note="金额以「分」存储，展示按「元」">
             <Descriptions
               columns={2}

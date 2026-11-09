@@ -10,6 +10,7 @@ import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExceptionPage } from '../../components/ExceptionPage';
 import { ActionButton, Skeleton } from '../../admin-ui/primitives';
 import { AdminDutyProvider } from '../../components/admin/DutyContext';
+import { AdminWorkbenchProvider } from '../../components/admin/WorkbenchContext';
 import { AdminDashboardContent } from './dashboard/AdminDashboardContent';
 import {
   AdminAlertsPage,
@@ -109,8 +110,9 @@ export function AdminShell() {
 
   return (
     <AdminUIProvider>
-      <AdminBoardLayout>
-        <ErrorBoundary resetKeys={[location.pathname]}>
+      <AdminWorkbenchProvider>
+        <AdminBoardLayout>
+          <ErrorBoundary resetKeys={[location.pathname]}>
           <Suspense fallback={<AdminLoading tip="加载页面…" />}>
             <Routes>
               {/*
@@ -197,7 +199,8 @@ export function AdminShell() {
             </Routes>
           </Suspense>
         </ErrorBoundary>
-      </AdminBoardLayout>
+        </AdminBoardLayout>
+      </AdminWorkbenchProvider>
     </AdminUIProvider>
   );
 }

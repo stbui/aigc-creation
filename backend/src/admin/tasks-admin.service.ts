@@ -65,6 +65,7 @@ export class TasksAdminService {
   private facetCache: {
     at: number;
     capabilities: Array<{ capability: string; count: number }>;
+    failureGroups: Array<{ errorCode: string; count: number }>;
   } | null = null;
   private static readonly FACET_TTL_MS = 60_000;
 
@@ -77,6 +78,7 @@ export class TasksAdminService {
       runningThreshold: number;
     };
     capabilities: Array<{ capability: string; count: number }>;
+    failureGroups: Array<{ errorCode: string; count: number }>;
   }> {
     const page = buildPage(query, [...SORTABLE], 'createdAt:desc');
     const where = this.listWhere(query);
@@ -142,6 +144,7 @@ export class TasksAdminService {
       ),
       congestion,
       capabilities: facets.capabilities,
+      failureGroups: facets.failureGroups,
     };
   }
 
@@ -152,21 +155,38 @@ export class TasksAdminService {
    */
   private async facets(): Promise<{
     capabilities: Array<{ capability: string; count: number }>;
+    failureGroups: Array<{ errorCode: string; count: number }>;
   }> {
     const cached = this.facetCache;
     if (cached && Date.now() - cached.at < TasksAdminService.FACET_TTL_MS) {
-      return { capabilities: cached.capabilities };
+      return {
+        capabilities: cached.capabilities,
+        failureGroups: cached.failureGroups,
+      };
     }
 
-    const capGroups = await this.prisma.generationTask.groupBy({
-      by: ['capability'],
-      _count: { _all: true },
-    });
+    const since = new Date(Date.now() - 24 * 3_600_000);
+    const [capGroups, failureGroups] = await Promise.all([
+      this.prisma.generationTask.groupBy({
+        by: ['capability'],
+        _count: { _all: true },
+      }),
+      this.prisma.generationTask.groupBy({
+        by: ['errorCode'],
+        where: { status: 'failed', createdAt: { gte: since }, errorCode: { not: null } },
+        _count: { _all: true },
+        orderBy: { _count: { errorCode: 'desc' } },
+        take: 12,
+      }),
+    ]);
 
     const facets = {
       capabilities: capGroups
         .map((g) => ({ capability: g.capability, count: g._count._all }))
         .sort((a, b) => b.count - a.count),
+      failureGroups: failureGroups
+        .map((g) => ({ errorCode: g.errorCode ?? '', count: g._count._all }))
+        .filter((g) => g.errorCode),
     };
     this.facetCache = { at: Date.now(), ...facets };
     return facets;
@@ -182,6 +202,7 @@ export class TasksAdminService {
     if (query.capability) where['capability'] = query.capability;
     if (query.userId) where['ownerId'] = query.userId;
     if (query.projectId) where['projectId'] = query.projectId;
+    if (query.errorCode) where['errorCode'] = query.errorCode;
     if (query.from || query.to) {
       const createdAt: Record<string, Date> = {};
       const from = parseDate(query.from);
@@ -390,6 +411,23 @@ export class TasksAdminService {
    * 用户可见的任务状态，事后必须能回答「这个失败任务是谁重跑的」。
    */
   async retry(id: string) {
+    /*
+     * 结果不明的账单必须先结清。`retryTask` 已拦 `errorCode=42206`，但超时/5xx
+     * 等失败也可能留下 `BillingOrder.status='uncertain'`；此时重试会再次真实
+     * 调用上游，而上游可能已经计费 —— 属于二次计费。
+     */
+    const uncertain = await this.prisma.billingOrder.findFirst({
+      where: { taskId: id, status: 'uncertain' },
+      select: { id: true },
+    });
+    if (uncertain) {
+      throw new AppError(
+        40901,
+        '任务账单结果不明，请先在「生成账单」中结算或退款后再重试',
+        409,
+      );
+    }
+
     const result = await this.generate.retryTask(id);
     this.logger.log(`任务 ${id} 重试为新任务 ${result.taskId}`);
     return result;

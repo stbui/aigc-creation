@@ -25,7 +25,9 @@
 | `40002` | 积分不足；生成链路转成 402 语义 | `credits/credit.service.ts` |
 | `40005` | 能力已下线，原因随响应下发 | `generate/generate.service.ts` |
 | `40301` | 无权访问 / 无权执行（越权、批量动作权限） | 多处（支付、发票、批量处理器等） |
-| `40302` | 第三方登录命中的本地账号非 `active` | `auth/oauth/` |
+| `40302` | 账号不可用（禁用 / 注销；含第三方登录命中的非 `active` 账号） | `common/jwt-auth.guard.ts` / `auth/oauth/` |
+| `40303` | 后台重置的临时密码尚未修改；仅放行 `GET /me` 与 `POST /me/password` | `common/jwt-auth.guard.ts` / `admin/admin.guard.ts` |
+| `40304` | 临时密码已过期，需联系管理员重新重置 | 同上 |
 | `40905` / `40906` / `40907` | 退款：超时间窗 / 超可退比例 / 积分已消耗且扣不回 | `orders/order.service.ts` |
 | `40908` | 该订单有退款仍在渠道处理中（`Refund.status='processing'`），不接受新的退款 | 同上 |
 | `40900` | 排序列表已变化：`expectedIds` 与库中不一致，整单拒绝，需重新加载后再保存 | `model/channels/channel.service.ts` |
@@ -100,7 +102,8 @@
 | --- | --- | --- |
 | GET | `/api/v1/admin/{me,overview,permissions}` | 后台身份 / 概览 / 权限点 |
 | GET | `/api/v1/admin/alerts` | 告警中心：按当前角色权限聚合待处理工单 / 失败任务 / 对账差异 / 退款卡单 / 备份 / 发票（只要求后台身份） |
-| GET/PATCH/POST/DELETE | `/api/v1/admin/users*`、`assets*`、`tasks*` | 用户 / 素材 / 任务管理 |
+| GET | `/api/v1/admin/workbench` | 角色工作台：按当前角色权限返回可动作实体行；仅 `admin` 可用 `?view=operator\|finance` 预览，视图不放大范围 |
+| GET/PATCH/POST/DELETE | `/api/v1/admin/users*`、`assets*`、`tasks*` | 用户 / 素材 / 任务管理。用户列表支持 `keyword`（邮箱/昵称/手机号/用户 ID）、`role`、`status`、`from`/`to`、`segment`（`never_login`/`inactive_30d`/`no_tasks`）、`membership`（`member`/`non_member`）；`GET /admin/users/stats` 返回同口径全站统计；导出响应带 `X-Export-Total`/`X-Export-Limit`/`X-Export-Truncated`；`POST /admin/users/:id/logout-all` 强制下线（`user.disable`）；重置密码返回 `mustChangePassword` 与 24 小时 `expiresAt` |
 | GET/PUT/POST/DELETE | `/api/v1/admin/{credit-prices,products,orders,payments,credits}*` | 交易与积分管理。商品删除（`DELETE /admin/products/:id`，`product.delete`）只允许没有历史订单的 SKU；已有订单返回 **409** 并提示改为下架（退款与积分回收要回查 SKU 原价与发放积分）。列表每项带 `orderCount` 供前端预检。订单列表 / 导出支持 `productId` 筛选（只回买过该商品的订单，商品卡「N 单」深链用），与 `status` / `orderNo` / `email` / `channel` / `refundState` / 时间范围同口径 |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/membership-plans*` | 会员套餐列表 / 新建 / 改价改权益 / 上下架 / 删除（`product.read` / `product.write`，写操作自动写审计）。删除只允许非 `free` 且没有会员、没有订单的套餐；否则返回 **409** 并提示改为下架，下架不影响存量会员 |
 | POST | `/api/v1/admin/orders/:id/refund` | 渠道退款（**先调渠道再改本地账**；渠道失败 `50302` 且订单/积分不变，在途退款 `40908`，`order.refund` 权限 + 必填原因 + 审计） |
@@ -139,7 +142,9 @@
 | GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架请求必须带原因（后台页面统一生成并下发 C 端），写需 `capability.write`（高危，走审计） |
 | GET/PUT | `/api/v1/admin/aigc-label` | 读 / 改角标样式（`setting.read` / `setting.write`，PUT 自动写审计 `aigc.label_update`） |
 | GET | `/api/v1/admin/tickets`、`/tickets/stats`、`/tickets/export` | 工单列表 / 状态计数 / CSV 导出 |
-| GET/POST/PATCH | `/api/v1/admin/tickets/:id`、`/tickets/:id/replies` | 工单详情与回复 / 改状态或指派（`ticket.handle`） |
+| GET/POST/PATCH | `/api/v1/admin/tickets/:id`、`/tickets/:id/replies` | 工单详情与回复 / 改状态或指派（`ticket.handle`）；回复可带 `visibility=internal`，内部备注不推送、不下发 C 端 |
+| GET | `/api/v1/admin/tickets/assignees` | 可指派的启用后台账号（`ticket.handle`） |
+| POST | `/api/v1/admin/tickets/:id/transfer` | 转交：内部备注 + 指派 + `processing`，不改订单 / 积分 / 退款（`ticket.handle`） |
 | GET | `/api/v1/admin/search?q=` | 全局搜索五组各前 5 条（`data.search`，`q` < 2 返回空） |
 | POST | `/api/v1/admin/{users,assets,tasks,orders}/batch` | 批量动作，逐条结果（≤ 100 条，使用各领域动作权限） |
 | GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,audit-logs,invoices,coupons,campaigns}/export` | CSV 导出（BOM，领域读权限 + `data.export`；上限 5000 行，筛选口径与列表一致）。调用记录是 `/admin/api-logs/export` |

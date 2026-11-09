@@ -50,16 +50,47 @@ export class AdminGuard implements CanActivate {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, role: true, status: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        status: true,
+        tokenVersion: true,
+        mustChangePassword: true,
+        tempPasswordExpiresAt: true,
+      },
     });
 
     if (!user) throw new AppError(40101, '令牌无效或已过期', 401);
+    /*
+     * 后台也必须比对 tokenVersion：此前只有 C 端 JwtAuthGuard 做这件事，
+     * 管理员改密 / 被重置密码后，旧后台 token 仍能继续调用管理接口 ——
+     * 「改密后所有旧会话失效」不能只在 C 端成立。
+     */
+    if ((payload.tv ?? 0) !== user.tokenVersion) {
+      throw new AppError(40102, '密码已变更，请重新登录', 401);
+    }
     if (user.status === 'disabled') throw new AppError(40302, '账号已被禁用', 403);
     if (user.status === 'deleted') throw new AppError(40302, '账号已注销', 403);
     if (!isAdminRole(user.role)) {
       // 用 warn 而非 debug: C 端用户误入后台是运营需要察觉的信号
       this.logger.warn(`非后台用户访问后台接口: ${user.email} (role=${user.role})`);
       throw new AppError(40301, '需要管理员权限', 403);
+    }
+
+    /*
+     * 后台账号被重置密码后同样必须先在 C 端 /me/password 改密。
+     * 全局强制改密弹窗不依赖后台外壳，因此这里拦下 /admin/* 不会让用户
+     * 无路可走；不拦则临时密码会变成长期有效的后台密码。
+     */
+    if (user.mustChangePassword) {
+      if (
+        user.tempPasswordExpiresAt &&
+        user.tempPasswordExpiresAt.getTime() <= Date.now()
+      ) {
+        throw new AppError(40304, '临时密码已过期，请联系管理员重新重置', 403);
+      }
+      throw new AppError(40303, '首次登录请先修改密码', 403);
     }
 
     request.adminUser = { id: user.id, email: user.email, role: user.role };

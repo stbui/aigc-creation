@@ -1,5 +1,6 @@
 import {
   ActionButton,
+  DateRangeField,
   ExportCsvButton,
   AppliedFilters,
   ClearableField,
@@ -8,8 +9,19 @@ import {
   SelectField,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
-import { ROLE_OPTIONS, SORT_OPTIONS, STATUS_OPTIONS } from './constants';
-import type { AdminUserRole, AdminUserStatus } from './types';
+import {
+  MEMBERSHIP_OPTIONS,
+  ROLE_OPTIONS,
+  SEGMENT_OPTIONS,
+  SORT_OPTIONS,
+  STATUS_OPTIONS,
+} from './constants';
+import type {
+  AdminUserMembershipFilter,
+  AdminUserRole,
+  AdminUserSegment,
+  AdminUserStatus,
+} from './types';
 
 interface UserFiltersProps {
   keyword: string;
@@ -18,6 +30,13 @@ interface UserFiltersProps {
   onRoleChange: (value: AdminUserRole | undefined) => void;
   status?: AdminUserStatus;
   onStatusChange: (value: AdminUserStatus | undefined) => void;
+  from: string;
+  to: string;
+  onDateRangeChange: (range: { from: string; to: string }) => void;
+  segment?: AdminUserSegment;
+  onSegmentChange: (value: AdminUserSegment | undefined) => void;
+  membership?: AdminUserMembershipFilter;
+  onMembershipChange: (value: AdminUserMembershipFilter | undefined) => void;
   appliedChips: AppliedFilter[];
   onApply: () => void;
   onReset: () => void;
@@ -36,6 +55,13 @@ export function UserFilters({
   onRoleChange,
   status,
   onStatusChange,
+  from,
+  to,
+  onDateRangeChange,
+  segment,
+  onSegmentChange,
+  membership,
+  onMembershipChange,
   appliedChips,
   onApply,
   onReset,
@@ -50,8 +76,8 @@ export function UserFilters({
       <FilterBar className="mb-2">
         <ClearableField
           className="w-full sm:w-64"
-          ariaLabel="按邮箱关键词搜索"
-          placeholder="输入邮箱关键词"
+          ariaLabel="按关键词搜索用户"
+          placeholder="邮箱 / 昵称 / 手机号 / 用户 ID"
           value={keyword}
           onChange={onKeywordChange}
           onEnter={onApply}
@@ -81,6 +107,41 @@ export function UserFilters({
             onStatusChange(next);
           }}
           options={STATUS_OPTIONS}
+        />
+        <SelectField
+          className="min-w-0 flex-1 sm:w-32 sm:flex-none"
+          ariaLabel="按运营分群筛选"
+          placeholder="分群"
+          allowClear
+          clearLabel="全部分群"
+          value={segment}
+          onChange={(value) => {
+            const next = SEGMENT_OPTIONS.find((option) => option.value === value)?.value;
+            onSegmentChange(next as AdminUserSegment | undefined);
+          }}
+          options={SEGMENT_OPTIONS}
+        />
+        <SelectField
+          className="min-w-0 flex-1 sm:w-32 sm:flex-none"
+          ariaLabel="按会员状态筛选"
+          placeholder="会员"
+          allowClear
+          clearLabel="全部会员"
+          value={membership}
+          onChange={(value) => {
+            const next = MEMBERSHIP_OPTIONS.find(
+              (option) => option.value === value,
+            )?.value;
+            onMembershipChange(next as AdminUserMembershipFilter | undefined);
+          }}
+          options={MEMBERSHIP_OPTIONS}
+        />
+        <DateRangeField
+          className="sm:w-52"
+          ariaLabel="按注册时间筛选"
+          from={from}
+          to={to}
+          onChange={onDateRangeChange}
         />
         <FilterActions className="basis-full justify-end sm:basis-auto">
           <ActionButton variant="default" onClick={onApply}>

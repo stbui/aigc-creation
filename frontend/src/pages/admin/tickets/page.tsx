@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ActionButton,
+  ContextBanner,
   ExportCsvButton,
   AppliedFilters,
   ClearableField,
@@ -9,10 +10,15 @@ import {
   FilterBar,
   PageHeader,
   Panel,
+  SavedViewBar,
   SelectField,
   StaleError,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
+import {
+  readAdminActionContext,
+  readAdminDone,
+} from '../../../lib/admin-context-link';
 import { adminTicketsApi } from './api';
 import {
   useAdmin,
@@ -36,7 +42,9 @@ import { transitionLabel } from './utils';
 import { TicketStatsCards } from './TicketStatsCards';
 import { TicketTable } from './TicketTable';
 import { TicketDetailDrawer } from './TicketDetailDrawer';
+import { TicketTransferDialog } from './TicketTransferDialog';
 import type {
+  AdminTicketAssignee,
   AdminTicketDetail,
   AdminTicketListResult,
   TicketStats,
@@ -77,6 +85,8 @@ export function AdminTicketsPage() {
 
   /** 顶栏搜索带 `?id=` 跳过来时直接展开该工单 */
   const [searchParams] = useSearchParams();
+  const done = readAdminDone(searchParams);
+  const actionContext = readAdminActionContext(searchParams);
   const rawUrlTicketStatus = searchParams.get('status');
   const urlTicketStatus =
     rawUrlTicketStatus && TICKET_STATUSES.includes(rawUrlTicketStatus as TicketStatus) ? rawUrlTicketStatus : undefined;
@@ -100,6 +110,8 @@ export function AdminTicketsPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
+  const [assignees, setAssignees] = useState<AdminTicketAssignee[]>([]);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -154,6 +166,22 @@ export function AdminTicketsPage() {
     loadStats();
   }, [loadStats]);
 
+  useEffect(() => {
+    if (!can('ticket.handle')) return;
+    let alive = true;
+    adminTicketsApi
+      .assignees()
+      .then((rows) => {
+        if (alive) setAssignees(rows);
+      })
+      .catch(() => {
+        /* 指派候选加载失败不影响列表；详情抽屉仍可认领自己 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [can]);
+
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
     setDetailError(null);
@@ -181,19 +209,23 @@ export function AdminTicketsPage() {
     loadStats();
   };
 
-  const sendReply = async () => {
+  const sendReply = async (visibility: 'public' | 'internal') => {
     if (!detail) return;
     const text = reply.trim();
     if (!text) {
-      toast.warning('请填写回复内容');
+      toast.warning(visibility === 'internal' ? '请填写内部备注' : '请填写回复内容');
       return;
     }
     setBusy(true);
     try {
-      await adminTicketsApi.reply(detail.id, text);
+      await adminTicketsApi.reply(detail.id, text, visibility);
       setReply('');
       await refresh(detail.id);
-      toast.success('已回复，用户会在站内消息里收到通知');
+      toast.success(
+        visibility === 'internal'
+          ? '内部备注已保存，仅后台可见'
+          : '已回复，用户会在站内消息里收到通知',
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '回复失败');
     } finally {
@@ -239,6 +271,48 @@ export function AdminTicketsPage() {
       toast.success('已取消指派');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '取消指派失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 列表行内认领：不打开抽屉，适合客服扫列表时快速接手 */
+  const claimRow = async (id: string) => {
+    if (!me) return;
+    try {
+      await adminTicketsApi.update(id, { assigneeId: me.id });
+      toast.success('已认领该工单');
+      reload();
+      loadStats();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '认领失败');
+    }
+  };
+
+  const assignTo = async (assigneeId: string) => {
+    if (!detail) return;
+    setBusy(true);
+    try {
+      await adminTicketsApi.update(detail.id, { assigneeId });
+      await refresh(detail.id);
+      toast.success('已指派处理人');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '指派失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const transferTicket = async (assigneeId: string, note: string) => {
+    if (!detail) return;
+    setBusy(true);
+    try {
+      await adminTicketsApi.transfer(detail.id, assigneeId, note);
+      setTransferOpen(false);
+      await refresh(detail.id);
+      toast.success('已转交；接收人可在工作台看到该工单');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '转交失败');
     } finally {
       setBusy(false);
     }
@@ -325,8 +399,36 @@ export function AdminTicketsPage() {
   useUnsavedGuard(replyDirty);
   const requestCloseDetail = useDiscardConfirm(replyDirty, () => setDetailId(null));
 
+  const listIds = (data?.items ?? []).map((item) => item.id);
+  const listIndex = detailId ? listIds.indexOf(detailId) : -1;
+  const openAdjacent = (offset: number) => {
+    const next = listIds[listIndex + offset];
+    if (next) setDetailId(next);
+  };
+
   return (
     <>
+      {done === 'refunded' && (
+        <ContextBanner
+          title="关联订单已退款"
+          detail="建议用回复模板告知用户，或先写一条内部备注留痕。"
+        />
+      )}
+
+      {actionContext.from && done !== 'refunded' && (
+        <ContextBanner
+          title={
+            actionContext.from === 'workbench'
+              ? '来自工作台待办'
+              : actionContext.from.startsWith('alert:')
+                ? '来自告警中心'
+                : '来自关联页面'
+          }
+          detail="打开工单详情处理；退款与积分动作仍在订单模块执行"
+          returnTo={actionContext.returnTo}
+        />
+      )}
+
       <PageHeader
         title="工单处理"
         description="用户提交的问题、投诉与咨询集中在这里。关联订单与素材只读展示，退款与积分补偿请回订单模块执行。"
@@ -422,6 +524,28 @@ export function AdminTicketsPage() {
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
+      <SavedViewBar
+        pageKey="tickets"
+        currentFilters={{
+          status: appliedStatus,
+          type: appliedType,
+          priority: appliedPriority,
+          assigneeId: appliedAssignee,
+          q: appliedQ || undefined,
+        }}
+        onApply={(filters) => {
+          appliedUrlStatus.current = filters.status;
+          setQDraft(filters.q ?? '');
+          setQuery({
+            status: filters.status,
+            type: filters.type,
+            priority: filters.priority,
+            assigneeId: filters.assigneeId,
+            q: filters.q,
+          });
+        }}
+      />
+
       <Panel title="工单列表" note="按状态、类型、优先级与关键字筛选">
         <TicketTable
           rows={data?.items ?? []}
@@ -434,6 +558,8 @@ export function AdminTicketsPage() {
           onRetry={reload}
           onResetFilters={resetFilters}
           onOpen={setDetailId}
+          canClaim={can('ticket.handle')}
+          onClaim={(id) => void claimRow(id)}
           onPageChange={(page, size) => setPage(page, size)}
         />
       </Panel>
@@ -446,18 +572,38 @@ export function AdminTicketsPage() {
         reply={reply}
         busy={busy}
         canHandle={can('ticket.handle')}
+        canRefund={can('order.refund')}
         replyDirty={replyDirty}
+        assignees={assignees}
+        hasPrev={listIndex > 0}
+        hasNext={listIndex >= 0 && listIndex < listIds.length - 1}
         onClose={requestCloseDetail}
         onRetry={() => {
           if (detailId) void loadDetail(detailId);
         }}
         onReplyChange={setReply}
-        onSendReply={() => void sendReply()}
+        onSendReply={(visibility) => void sendReply(visibility)}
         onChangeStatus={(to) => void changeStatus(to)}
         onChangePriority={(priority) => void changePriority(priority)}
+        onAssign={(assigneeId) => void assignTo(assigneeId)}
         onAssignSelf={() => void assignSelf()}
         onUnassign={() => void unassign()}
+        onOpenTransfer={() => setTransferOpen(true)}
+        onPrev={() => openAdjacent(-1)}
+        onNext={() => openAdjacent(1)}
       />
+
+      {detail && (
+        <TicketTransferDialog
+          open={transferOpen}
+          ticketNo={detail.ticketNo}
+          assignees={assignees}
+          defaultAssigneeId={detail.assigneeId}
+          loading={busy}
+          onCancel={() => setTransferOpen(false)}
+          onConfirm={(assigneeId, note) => void transferTicket(assigneeId, note)}
+        />
+      )}
     </>
   );
 }

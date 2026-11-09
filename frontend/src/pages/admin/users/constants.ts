@@ -20,10 +20,23 @@ export const STATUS_OPTIONS: Array<{ value: AdminUserStatus; label: string }> = 
   { value: 'deleted', label: '已注销' },
 ];
 
+export const SEGMENT_OPTIONS = [
+  { value: 'never_login', label: '从未登录' },
+  { value: 'inactive_30d', label: '30 天未登录' },
+  { value: 'no_tasks', label: '无可见任务' },
+];
+
+export const MEMBERSHIP_OPTIONS = [
+  { value: 'member', label: '生效中的会员' },
+  { value: 'non_member', label: '非会员' },
+];
+
 export const SORT_OPTIONS = [
   { value: 'createdAt:desc', label: '最新注册' },
   { value: 'createdAt:asc', label: '最早注册' },
   { value: 'lastLoginAt:desc', label: '最近登录' },
+  { value: 'name:asc', label: '昵称 A-Z' },
+  { value: 'name:desc', label: '昵称 Z-A' },
   { value: 'email:asc', label: '邮箱 A-Z' },
   { value: 'email:desc', label: '邮箱 Z-A' },
 ];
@@ -44,4 +57,5 @@ export const LOGIN_REASON_LABEL: Record<string, string> = {
   sms_code: '短信验证码错误',
   disabled: '账号已禁用',
   deleted: '账号已注销',
+  temp_password_expired: '临时密码已过期',
 };

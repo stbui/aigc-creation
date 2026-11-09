@@ -6,6 +6,7 @@ import { AdminProvider } from './context/AdminContext';
 import { CreditsProvider } from './context/CreditsContext';
 import { AppLayout } from './components/AppLayout';
 import { LoginModalHost } from './components/LoginModal';
+import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ExceptionPage, NotFoundPage } from './components/ExceptionPage';
 import { RouteExperience } from './components/RouteExperience';
@@ -422,6 +423,8 @@ export default function App() {
         {/* 登录弹窗宿主必须在 Router 之内: 卡片里的 useNavigate 依赖路由上下文。
             放在 AuthProvider 里 (Router 之外) 会让弹窗渲染即抛错、点登录毫无反应。 */}
         <LoginModalHost />
+        {/* 后台重置密码后的强制改密：不可关闭，改密成功即登出重登 */}
+        <ForcePasswordChangeModal />
         <RouteExperience />
         {/* AdminProvider 包在 BrowserRouter 内: useAdmin 依赖 useAuth 的 token,
             路由切到 /admin 时才加载身份, 不影响 C 端首屏 */}

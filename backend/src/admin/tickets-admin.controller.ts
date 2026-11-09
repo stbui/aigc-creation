@@ -22,6 +22,7 @@ import { TicketsService } from "../tickets/tickets.service";
 import {
   AdminTicketListQueryDto,
   AdminTicketReplyDto,
+  AdminTicketTransferDto,
   AdminTicketUpdateDto,
 } from "./dto/ticket.dto";
 
@@ -60,6 +61,18 @@ export class AdminTicketsController {
     sendCsv(res, "tickets", csv);
   }
 
+  /**
+   * 可指派的接收人（启用中的后台账号）。
+   *
+   * 运营/财务没有 `user.read`，不能借用用户列表接口筛后台角色；这里只暴露
+   * 指派需要的 id / 名称 / 邮箱 / 角色，不返回权限点或账号状态以外的信息。
+   */
+  @Get("assignees")
+  @RequirePermission(PERMISSIONS.ticketHandle)
+  assignees() {
+    return this.tickets.adminAssignees();
+  }
+
   @Get()
   @RequirePermission(PERMISSIONS.ticketRead)
   list(@Query() query: AdminTicketListQueryDto) {
@@ -81,7 +94,24 @@ export class AdminTicketsController {
     @Body() dto: AdminTicketReplyDto,
     @AdminUser() actor: AdminUserType,
   ) {
-    return this.tickets.adminReply(id, actor, dto.content);
+    return this.tickets.adminReply(id, actor, dto.content, dto.visibility ?? "public");
+  }
+
+  /**
+   * 转交财务。
+   *
+   * 与退款严格分开：这里只写内部备注、指派接收人并把状态推到 processing，
+   * 不改订单、积分或退款。退款仍由财务在订单模块执行。
+   */
+  @Post(":id/transfer")
+  @RequirePermission(PERMISSIONS.ticketHandle)
+  @AuditAction("ticket.transfer")
+  transfer(
+    @Param("id") id: string,
+    @Body() dto: AdminTicketTransferDto,
+    @AdminUser() actor: AdminUserType,
+  ) {
+    return this.tickets.adminTransfer(id, actor, dto.assigneeId, dto.note);
   }
 
   /** 状态流转 / 改优先级 / 指派 */

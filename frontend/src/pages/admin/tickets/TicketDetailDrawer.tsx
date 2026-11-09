@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
-import { Send, UserCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Send, Share2, UserCheck } from 'lucide-react';
 import {
   ActionButton,
   Descriptions,
@@ -10,6 +11,7 @@ import {
   SelectField,
   SkeletonBody,
   StatusTag,
+  SwitchField,
   TextAreaField,
 } from '~/admin-ui/primitives';
 import {
@@ -28,7 +30,9 @@ import {
   cn,
   transitionLabel,
 } from './utils';
-import type { AdminTicketDetail, TicketStatus } from '../../../types/api';
+import { TICKET_REPLY_TEMPLATES, fillTicketTemplate } from './reply-templates';
+import { buildAdminContextLink } from '../../../lib/admin-context-link';
+import type { AdminTicketAssignee, AdminTicketDetail, TicketStatus } from '../../../types/api';
 
 /** 对话气泡：客户在左、客服在右，避免一长串同色消息分不清谁说的 */
 function Message({
@@ -36,17 +40,23 @@ function Message({
   at,
   body,
   fromAdmin = false,
+  internal = false,
 }: {
   author: string;
   at: string;
   body: string;
   fromAdmin?: boolean;
+  internal?: boolean;
 }) {
   return (
     <div
       className={cn(
         'rounded-lg border px-3 py-2',
-        fromAdmin ? 'ml-10 border-brand/20 bg-accent' : 'border-border bg-card',
+        internal
+          ? 'ml-10 border-warn-soft bg-warn-soft/30'
+          : fromAdmin
+            ? 'ml-10 border-brand/20 bg-accent'
+            : 'border-border bg-card',
       )}
     >
       <div className="flex items-baseline justify-between gap-3">
@@ -73,15 +83,23 @@ export function TicketDetailDrawer({
   reply,
   busy,
   canHandle,
+  canRefund,
   replyDirty,
+  assignees,
+  hasPrev,
+  hasNext,
   onClose,
   onRetry,
   onReplyChange,
   onSendReply,
   onChangeStatus,
   onChangePriority,
+  onAssign,
   onAssignSelf,
   onUnassign,
+  onOpenTransfer,
+  onPrev,
+  onNext,
 }: {
   open: boolean;
   detail: AdminTicketDetail | null;
@@ -90,19 +108,43 @@ export function TicketDetailDrawer({
   reply: string;
   busy: boolean;
   canHandle: boolean;
+  canRefund: boolean;
   replyDirty: boolean;
+  assignees: AdminTicketAssignee[];
+  hasPrev: boolean;
+  hasNext: boolean;
   onClose: () => void;
   onRetry: () => void;
   onReplyChange: (value: string) => void;
-  onSendReply: () => void;
+  onSendReply: (visibility: 'public' | 'internal') => void;
   onChangeStatus: (to: TicketStatus) => void;
   onChangePriority: (priority: string) => void;
+  onAssign: (assigneeId: string) => void;
   onAssignSelf: () => void;
   onUnassign: () => void;
+  onOpenTransfer: () => void;
+  onPrev: () => void;
+  onNext: () => void;
 }) {
+  const [internal, setInternal] = useState(false);
+  // 切到下一条工单时回到「回复用户」，不把上一条的内部备注模式带过去
+  useEffect(() => {
+    setInternal(false);
+  }, [detail?.id]);
+  const location = useLocation();
   const nextStatuses = detail
     ? (TRANSITIONS[detail.status as TicketStatus] ?? [])
     : [];
+  const refundHref =
+    detail?.related.order && canRefund
+      ? buildAdminContextLink({
+          path: '/admin/orders',
+          id: detail.related.order.id,
+          intent: 'refund',
+          from: `ticket:${detail.id}`,
+          returnTo: `${location.pathname}${location.search}`,
+        })
+      : null;
 
   return (
     <Drawer
@@ -121,6 +163,67 @@ export function TicketDetailDrawer({
         <ListError error={error} onRetry={onRetry} />
       ) : detail ? (
         <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <ActionButton
+              variant="ghost"
+              size="sm"
+              icon={ChevronLeft}
+              disabled={!hasPrev || busy}
+              onClick={onPrev}
+            >
+              上一条
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
+              size="sm"
+              icon={ChevronRight}
+              disabled={!hasNext || busy}
+              onClick={onNext}
+            >
+              下一条
+            </ActionButton>
+            <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+            <span className="text-xs text-muted-foreground">指派给</span>
+            <SelectField
+              className="w-48"
+              ariaLabel="指派处理人"
+              placeholder="未指派"
+              allowClear
+              clearLabel="未指派"
+              value={detail.assigneeId ?? undefined}
+              disabled={!canHandle || busy}
+              onChange={(value) => {
+                if (value) onAssign(value);
+                else onUnassign();
+              }}
+              options={assignees.map((assignee) => ({
+                value: assignee.id,
+                label: `${assignee.name}（${assignee.role}）`,
+              }))}
+            />
+            {!detail.assigneeId && (
+              <ActionButton
+                variant="secondary"
+                size="sm"
+                icon={UserCheck}
+                disabled={!canHandle || busy}
+                onClick={onAssignSelf}
+              >
+                认领给我
+              </ActionButton>
+            )}
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              icon={Share2}
+              className="ml-auto"
+              disabled={!canHandle || busy}
+              onClick={onOpenTransfer}
+            >
+              转交
+            </ActionButton>
+          </div>
+
           <Descriptions
             columns={2}
             items={[
@@ -227,6 +330,14 @@ export function TicketDetailDrawer({
                             {detail.related.order.status} · ¥
                             {(detail.related.order.paidCents / 100).toFixed(2)}
                           </span>
+                          {refundHref && (
+                            <Link
+                              className="text-[12px] font-medium text-danger-text hover:underline"
+                              to={refundHref}
+                            >
+                              去退款
+                            </Link>
+                          )}
                         </span>
                       ),
                     },
@@ -268,7 +379,14 @@ export function TicketDetailDrawer({
                 <Message
                   key={r.id}
                   fromAdmin={r.authorType === 'admin'}
-                  author={r.authorType === 'admin' ? `客服 · ${r.authorName}` : r.authorName}
+                  internal={r.visibility === 'internal'}
+                  author={
+                    r.visibility === 'internal'
+                      ? `内部备注 · ${r.authorName}`
+                      : r.authorType === 'admin'
+                        ? `客服 · ${r.authorName}`
+                        : r.authorName
+                  }
                   at={new Date(r.createdAt).toLocaleString('zh-CN')}
                   body={r.content}
                 />
@@ -282,40 +400,68 @@ export function TicketDetailDrawer({
           </DetailSection>
 
           {canHandle ? (
-            <DetailSection title="回复用户">
+            <DetailSection title={internal ? '内部备注' : '回复用户'}>
+              <div className="mb-2 flex flex-wrap items-end gap-3">
+                <div className="min-w-[240px] flex-1">
+                  <span className="mb-1 block text-xs text-muted-foreground">回复模板</span>
+                  <SelectField
+                    ariaLabel="选择回复模板"
+                    placeholder="选择模板后仍可修改"
+                    value={undefined}
+                    disabled={busy}
+                    onChange={(value) => {
+                      const template = TICKET_REPLY_TEMPLATES.find((item) => item.id === value);
+                      if (!template) return;
+                      onReplyChange(
+                        fillTicketTemplate(template.content, {
+                          name: detail.user.name,
+                          ticketNo: detail.ticketNo,
+                          orderNo: detail.related.order?.orderNo,
+                        }),
+                      );
+                    }}
+                    options={TICKET_REPLY_TEMPLATES.map((template) => ({
+                      value: template.id,
+                      label: template.label,
+                    }))}
+                  />
+                </div>
+                <SwitchField
+                  checked={internal}
+                  disabled={busy}
+                  onChange={setInternal}
+                  label="内部备注（不发送给用户）"
+                  ariaLabel="内部备注"
+                />
+              </div>
               <TextAreaField
-                ariaLabel="回复内容"
+                ariaLabel={internal ? '内部备注内容' : '回复内容'}
                 rows={4}
                 maxLength={2000}
                 showCount
                 value={reply}
                 disabled={busy}
                 onChange={onReplyChange}
-                placeholder="说明处理结论或需要用户补充的信息。回复后用户会在站内消息里收到通知。"
+                placeholder={
+                  internal
+                    ? '写给同事的交接说明，例如：用户申请退款，订单已核实，请财务处理。'
+                    : '说明处理结论或需要用户补充的信息。回复后用户会在站内消息里收到通知。'
+                }
               />
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <ActionButton
                   variant="default"
                   icon={Send}
                   disabled={busy || !reply.trim()}
-                  onClick={onSendReply}
+                  onClick={() => onSendReply(internal ? 'internal' : 'public')}
                 >
-                  发送回复
+                  {internal ? '保存内部备注' : '发送回复'}
                 </ActionButton>
-                {!detail.assigneeId ? (
-                  <ActionButton
-                    variant="secondary"
-                    icon={UserCheck}
-                    disabled={busy}
-                    onClick={onAssignSelf}
-                  >
-                    认领
-                  </ActionButton>
-                ) : (
-                  <ActionButton variant="secondary" disabled={busy} onClick={onUnassign}>
-                    取消指派
-                  </ActionButton>
-                )}
+                <span className="text-xs text-muted-foreground">
+                  {internal
+                    ? '内部备注不推送、不出现在用户端。'
+                    : '发送后会推送站内消息给用户，并自动认领未指派工单。'}
+                </span>
               </div>
             </DetailSection>
           ) : (

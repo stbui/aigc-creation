@@ -27,6 +27,8 @@ export function TicketTable({
   onRetry,
   onResetFilters,
   onOpen,
+  canClaim = false,
+  onClaim,
   onPageChange,
 }: {
   rows: AdminTicketRow[];
@@ -39,6 +41,8 @@ export function TicketTable({
   onRetry: () => void;
   onResetFilters: () => void;
   onOpen: (id: string) => void;
+  canClaim?: boolean;
+  onClaim?: (id: string) => void;
   onPageChange: (page: number, pageSize?: number) => void;
 }) {
   const columns: Array<AdminColumn<AdminTicketRow>> = [
@@ -123,12 +127,19 @@ export function TicketTable({
     {
       key: 'ops',
       title: '',
-      width: 90,
+      width: 150,
       fixed: 'right',
       render: (row) => (
-        <ActionButton variant="ghost" size="sm" onClick={() => onOpen(row.id)}>
-          处理
-        </ActionButton>
+        <div className="flex items-center justify-end gap-1">
+          {canClaim && !row.assigneeId && onClaim && (
+            <ActionButton variant="secondary" size="sm" onClick={() => onClaim(row.id)}>
+              认领
+            </ActionButton>
+          )}
+          <ActionButton variant="ghost" size="sm" onClick={() => onOpen(row.id)}>
+            处理
+          </ActionButton>
+        </div>
       ),
     },
   ];

@@ -1,5 +1,6 @@
 import { AlertTriangle, ExternalLink, ShieldCheck } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { buildAdminContextLink } from '../../../lib/admin-context-link';
 import {
   Notice,
   StaleError,
@@ -96,6 +97,17 @@ function resolverLabel(resolvedBy: string): string {
 function BillingOrderItem({ order, index }: { order: BillingOrderView; index: number }) {
   const review = reviewMeta(order);
   const isSystemResolved = order.resolvedBy.startsWith('system:');
+  const location = useLocation();
+  const resolveHref =
+    order.status === 'uncertain' || order.reviewable
+      ? buildAdminContextLink({
+          path: '/admin/billing-orders',
+          id: order.id,
+          intent: 'settle',
+          from: `task:${order.taskId}`,
+          returnTo: `${location.pathname}${location.search}`,
+        })
+      : null;
 
   return (
     <article className="rounded-lg border border-border bg-card px-3 py-2.5">
@@ -177,7 +189,12 @@ function BillingOrderItem({ order, index }: { order: BillingOrderView; index: nu
         ) : (
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         )}
-        <span>{review.note}</span>
+        <span className="flex-1">{review.note}</span>
+        {resolveHref && (
+          <Link className="shrink-0 font-medium underline" to={resolveHref}>
+            去核对
+          </Link>
+        )}
       </div>
 
       {order.resolutionNote && (

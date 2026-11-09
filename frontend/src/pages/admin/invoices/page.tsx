@@ -18,6 +18,7 @@ import {
   PageHeader,
   Panel,
   RefreshButton,
+  SavedViewBar,
   SelectField,
   StatusTag,
   StaleError,
@@ -331,6 +332,20 @@ export function AdminInvoicesPage() {
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
+
+      <SavedViewBar
+        pageKey="invoices"
+        currentFilters={{
+          status: appliedStatus,
+          keyword: appliedKeyword || undefined,
+        }}
+        onApply={(next) => {
+          const nextStatus = next.status as InvoiceStatus | undefined;
+          setStatus(nextStatus);
+          setKeyword(next.keyword ?? '');
+          setQuery({ status: nextStatus, keyword: next.keyword });
+        }}
+      />
 
       <Panel
         title="开票申请"

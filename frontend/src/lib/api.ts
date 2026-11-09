@@ -9,6 +9,7 @@ import type {
   AdminMe,
   AdminOverview,
   AdminAlertsResult,
+  AdminWorkbench,
   AdminPasswordReset,
   AdminPermissionCatalog,
   AdminRoleItem,
@@ -20,6 +21,7 @@ import type {
   AdminUserDetail,
   AdminLoginLogResult,
   AdminUserListResult,
+  AdminUserStats,
   AdminAssetListResult,
   AdminAssetStats,
   AdminProjectListResult,
@@ -114,6 +116,7 @@ import type {
   CreateTicketPayload,
   AdminTicketListResult,
   AdminTicketDetail,
+  AdminTicketAssignee,
   TicketStats,
   AdminSearchResult,
   BatchSummary,
@@ -269,6 +272,22 @@ export async function request<T>(
      * 但所有请求都失败」的状态。按会话失效处理，清凭证并广播登出。
      */
     if (res.status === 403 && Number(bodyCode) === 40302 && getToken()) {
+      clearToken();
+      clearStoredEmail();
+      window.dispatchEvent(new Event("auth:unauthorized"));
+    }
+    /*
+     * 40303 = 后台重置的临时密码还没改。不是「没权限」，而是会话被限制在
+     * /me 与 /me/password；保留 token，广播事件让 AuthProvider 弹出强制改密框。
+     */
+    if (res.status === 403 && Number(bodyCode) === 40303) {
+      window.dispatchEvent(new Event("auth:password-change-required"));
+    }
+    /*
+     * 40304 = 临时密码已过期。此时连 /me/password 都不放行，保留会话只会
+     * 让用户停在一个所有请求都失败的状态；按会话失效处理，回登录页。
+     */
+    if (res.status === 403 && Number(bodyCode) === 40304 && getToken()) {
       clearToken();
       clearStoredEmail();
       window.dispatchEvent(new Event("auth:unauthorized"));
@@ -864,6 +883,14 @@ export const adminApi = {
 
   /** 顶栏告警。后端按当前角色权限过滤来源 */
   alerts: () => request<AdminAlertsResult>("/admin/alerts"),
+
+  /**
+   * 角色工作台待办。
+   *
+   * `view` 只允许管理员预览运营/财务首屏；权限过滤始终先执行，视图不放大范围。
+   */
+  workbench: (view?: "admin" | "operator" | "finance") =>
+    request<AdminWorkbench>(`/admin/workbench${view ? `?view=${view}` : ""}`),
 };
 
 export function toAbsoluteUrl(path?: string | null): string | undefined {
@@ -952,21 +979,28 @@ export const adminUsersApi = {
       keyword?: string;
       role?: string;
       status?: string;
+      from?: string;
+      to?: string;
+      segment?: string;
+      membership?: string;
       page?: number;
       pageSize?: number;
       sort?: string;
     } = {},
-  ) => {
-    const qs = new URLSearchParams();
-    if (params.keyword) qs.set("keyword", params.keyword);
-    if (params.role) qs.set("role", params.role);
-    if (params.status) qs.set("status", params.status);
-    if (params.page) qs.set("page", String(params.page));
-    if (params.pageSize) qs.set("pageSize", String(params.pageSize));
-    if (params.sort) qs.set("sort", params.sort);
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return request<AdminUserListResult>(`/admin/users${suffix}`);
-  },
+  ) => request<AdminUserListResult>(`/admin/users${toQuery(params)}`),
+
+  /** 全局统计，跟随当前筛选条件 */
+  stats: (
+    params: {
+      keyword?: string;
+      role?: string;
+      status?: string;
+      from?: string;
+      to?: string;
+      segment?: string;
+      membership?: string;
+    } = {},
+  ) => request<AdminUserStats>(`/admin/users/stats${toQuery(params)}`),
 
   detail: (id: string) => request<AdminUserDetail>(`/admin/users/${id}`),
   /** 最近登录记录。权限 audit.read —— 无权限时 403，前端按「不可见」处理 */
@@ -976,20 +1010,26 @@ export const adminUsersApi = {
   /** 删除前的连带影响预览, 供确认弹窗展示具体数量 */
   impact: (id: string) => request<AdminUserImpact>(`/admin/users/${id}/impact`),
 
-  changeStatus: (id: string, status: "active" | "disabled") =>
+  changeStatus: (id: string, status: "active" | "disabled", reason?: string) =>
     request<{ id: string; status: string }>(`/admin/users/${id}/status`, {
       method: "PATCH",
-      body: { status },
+      body: { status, ...(reason ? { reason } : {}) },
     }),
 
-  changeRole: (id: string, role: string) =>
+  changeRole: (id: string, role: string, reason?: string) =>
     request<{ id: string; role: string; roleLabel: string }>(
       `/admin/users/${id}/role`,
       {
         method: "PATCH",
-        body: { role },
+        body: { role, ...(reason ? { reason } : {}) },
       },
     ),
+
+  /** 强制下线：保留账号可用性，只让已签发 token 立即失效 */
+  logoutAll: (id: string) =>
+    request<{ id: string; revoked: boolean }>(`/admin/users/${id}/logout-all`, {
+      method: "POST",
+    }),
 
   /** 返回一次性临时密码明文 —— 关闭后不可再次查看 */
   resetPassword: (id: string) =>
@@ -1010,7 +1050,7 @@ export const adminUsersApi = {
       body: { confirm },
     }),
 
-  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
+  /** 导出当前筛选结果 (CSV, 上限 5000 行；截断时返回元数据) */
   exportCsv: (
     params: {
       keyword?: string;
@@ -1018,6 +1058,9 @@ export const adminUsersApi = {
       status?: string;
       from?: string;
       to?: string;
+      segment?: string;
+      membership?: string;
+      sort?: string;
     } = {},
   ) => downloadCsv(`/admin/users/export${toQuery(params)}`),
 
@@ -1087,6 +1130,7 @@ export const adminTasksApi = {
       capability?: string;
       userId?: string;
       projectId?: string;
+      errorCode?: string;
       from?: string;
       to?: string;
       sort?: string;
@@ -1110,6 +1154,7 @@ export const adminTasksApi = {
       capability?: string;
       userId?: string;
       projectId?: string;
+      errorCode?: string;
       from?: string;
       to?: string;
     } = {},
@@ -1565,7 +1610,10 @@ function toQuery<T extends object>(params: T): string {
  * 失败时后端仍返回 JSON 错误体 (权限不足 / 参数非法), 所以先按状态码分流
  * 再决定按 JSON 还是按 blob 读 —— 反过来的话, 一次 403 会存下一个 0 字节文件。
  */
-async function downloadCsv(path: string, filename?: string): Promise<void> {
+async function downloadCsv(
+  path: string,
+  filename?: string,
+): Promise<{ truncated: boolean; total: number; limit: number }> {
   const res = await fetch(`${API_ROOT}${path}`, {
     headers: { Authorization: `Bearer ${getToken() ?? ""}` },
   });
@@ -1573,6 +1621,13 @@ async function downloadCsv(path: string, filename?: string): Promise<void> {
     const body = await res.json().catch(() => ({}));
     throw new Error(extractErrorMessage(body, "导出失败"));
   }
+  // 后端在截断时通过响应头告知真实总数；浏览器下载 API 读不到响应体元数据，
+  // 只能由这里把头上抛给调用方做提示。
+  const exportMeta = {
+    truncated: res.headers.get("X-Export-Truncated") === "1",
+    total: Number(res.headers.get("X-Export-Total") ?? 0),
+    limit: Number(res.headers.get("X-Export-Limit") ?? 0),
+  };
   // 文件名以后端 Content-Disposition 为准, 没给才用调用方兜底。
   // 优先 filename*=UTF-8''...（RFC 5987，中文文件名正确解码），再退回 ASCII filename。
   const disposition = res.headers.get("Content-Disposition") ?? "";
@@ -1587,6 +1642,7 @@ async function downloadCsv(path: string, filename?: string): Promise<void> {
     : (asciiMatch?.[1] ?? filename ?? "export.csv");
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return exportMeta;
 }
 
 /**
@@ -2225,10 +2281,20 @@ export const adminTicketsApi = {
 
   detail: (id: string) => request<AdminTicketDetail>(`/admin/tickets/${id}`),
 
-  reply: (id: string, content: string) =>
+  /** 可指派的启用后台账号 */
+  assignees: () => request<AdminTicketAssignee[]>("/admin/tickets/assignees"),
+
+  reply: (id: string, content: string, visibility: "public" | "internal" = "public") =>
     request<AdminTicketDetail>(`/admin/tickets/${id}/replies`, {
       method: "POST",
-      body: { content },
+      body: { content, visibility },
+    }),
+
+  /** 转交：内部备注 + 指派 + processing；不改钱 */
+  transfer: (id: string, assigneeId: string, note?: string) =>
+    request<AdminTicketDetail>(`/admin/tickets/${id}/transfer`, {
+      method: "POST",
+      body: { assigneeId, ...(note?.trim() ? { note: note.trim() } : {}) },
     }),
 
   /**

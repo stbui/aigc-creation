@@ -26,6 +26,15 @@ export {
   StaleError,
 } from './layout';
 
+export {
+  WorkQueue,
+  WorkQueueSummary,
+  WorkQueueSection,
+} from './work-queue';
+
+export { ContextBanner } from './context-banner';
+export { SavedViewBar } from './saved-view-bar';
+
 export { ExportCsvButton, RefreshButton, type ExportCsvButtonProps, type RefreshButtonProps } from './actions';
 
 export {

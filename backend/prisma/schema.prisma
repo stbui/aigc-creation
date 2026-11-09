@@ -61,6 +61,11 @@ model User {
   // 不存「已失效 token 黑名单」: 黑名单需要按 TTL 清理且体积不可控, 而
   // 「一次性作废该用户的全部旧会话」用单调递增的版本号即可, O(1) 判定。
   tokenVersion    Int       @default(0)
+  /// 后台重置密码后置 true：登录仍成功，但在改密前只能访问 /me 与 /me/password。
+  /// 忘记密码自助重置、用户主动改密、下一次后台重置都会写回 false。
+  mustChangePassword    Boolean   @default(false)
+  /// 后台一次性临时密码的到期时间；到期后登录直接拒绝，需重新联系管理员重置。
+  tempPasswordExpiresAt DateTime?
   /// 手机号 —— 短信登录用。可空(存量账号无手机号), 非空时必须唯一
   phone           String?   @unique
   phoneVerifiedAt DateTime?
@@ -1577,6 +1582,9 @@ model TicketReply {
   /// 冗余当时的展示名：用户改昵称后，历史工单里客服看到的名字应保持原样
   authorName String
   content    String
+  /// public | internal。internal 只给后台看，不推送、不下发 C 端，
+  /// 用于工单转交财务时的交接备注。
+  visibility String   @default("public")
   createdAt  DateTime @default(now())
 
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)

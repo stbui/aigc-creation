@@ -138,6 +138,18 @@ async function bootstrap(): Promise<void> {
       'X-Canvas-Scene',
       'X-Idempotency-Key',
     ],
+    /*
+     * 跨域部署时浏览器默认读不到这些响应头：CSV 下载要靠 Content-Disposition
+     * 取文件名，导出截断提示与错误请求 ID 也都在自定义头里。不暴露的话，
+     * 同源开发一切正常，跨域后表现为「文件名变成 export.csv / 截断提示消失」。
+     */
+    exposedHeaders: [
+      'Content-Disposition',
+      'X-Export-Total',
+      'X-Export-Limit',
+      'X-Export-Truncated',
+      'X-Request-Id',
+    ],
   });
 
   /*

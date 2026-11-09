@@ -183,24 +183,28 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 | 方法 | 路径 | 权限 |
 | --- | --- | --- |
-| GET | `/admin/users?keyword&role&status&page&pageSize&sort` | `user.read` |
+| GET | `/admin/users?keyword&role&status&from&to&segment&membership&page&pageSize&sort` | `user.read` |
+| GET | `/admin/users/stats` | `user.read` |
 | GET | `/admin/users/:id` | `user.read` |
 | GET | `/admin/users/:id/logins` | `audit.read` |
-| GET | `/admin/users/:id/impact` | `user.read` |
+| GET | `/admin/users/:id/impact` | `user.delete` |
 | PATCH | `/admin/users/:id/status` | `user.disable` |
 | PATCH | `/admin/users/:id/role` | `user.write` |
 | POST | `/admin/users/:id/password` | `user.reset_password` |
+| POST | `/admin/users/:id/logout-all` | `user.disable` |
 | DELETE | `/admin/users/:id` | `user.delete` |
 | GET | `/admin/users/export` | `user.read + data.export` |
-| POST | `/admin/users/batch` | 对应用户动作权限 |
-| GET | `/admin/users/meta/roles` | `user.read` |
+| POST | `/admin/users/batch` | `user.disable`（仅启停） |
 
 ### 2.2 规则
 
-- **禁用立即生效**：`AdminGuard` 与 `JwtAuthGuard` 每次请求查库校验 `status`，不走 token 内快照。
-- **角色变更**：`user` / `admin` / `operator` / `finance` 四个值（`USER_ROLES`）；最后一个 `admin` 不可降级，服务层断言后返回 409。
-- **重置密码**：生成一次性强密码，只在本次响应里出现一次，不落库、不进审计 detail。
-- **删除**：走 `account-lifecycle.service.ts`，与 C 端自助注销同一份实现。清除作品 / 素材 / 项目 / 积分批次与对象存储文件，终止生效中的会员；保留订单 / 支付 / 退款 / 发票 / 积分流水（流水断开批次引用），账号匿名化并置 `deleted`。删除前用 `impact` 预览将清除与保留的量。
+- **禁用立即生效**：`AdminGuard` 与 `JwtAuthGuard` 每次请求查库校验 `status`，不走 token 内快照；两处同时比对 `tokenVersion`，改密/重置后旧后台 token 也立即失效。
+- **角色变更**：`user` / `admin` / `operator` / `finance` 四个值（`USER_ROLES`）；最后一个 `admin` 不可降级，服务层断言后返回 409。禁用与角色变更可带可选 `reason`（≤500），写入审计 detail。
+- **重置密码**：生成一次性强密码（24 小时有效），只在本次响应里出现一次，不落库、不进审计 detail。用户登录后 `mustChangePassword=true`，改密前只能访问 `/me` 与 `/me/password`；自助改密或邮件重置会清除该标记。
+- **强制下线**：`POST /:id/logout-all` 递增 `tokenVersion` 并清理扫码登录会话；账号仍可正常登录，与「禁用」区分。
+- **删除**：走 `account-lifecycle.service.ts`，与 C 端自助注销同一份实现。清除作品 / 素材 / 项目 / 积分批次与对象存储文件，终止生效中的会员；保留订单 / 支付 / 退款 / 发票 / 积分流水（流水断开批次引用），账号匿名化并置 `deleted`。删除前用 `impact` 预览将清除与保留的量；管理端固定走软注销，不提供批量删除。
+- **列表口径**：关键词与顶栏全局搜索一致（邮箱 / 昵称 / 手机号模糊 + 用户 ID 精确）；支持注册时间范围、从未登录 / 30 天未登录 / 无可见任务分群、会员状态筛选。顶部统计由 `GET /stats` 返回，跟随同一组筛选条件，不是当前页口径。
+- **导出**：跟随当前排序与全部筛选条件；超过 5000 行时截断，并通过 `X-Export-Total` / `X-Export-Limit` / `X-Export-Truncated` 响应头告知调用方。
 
 ---
 

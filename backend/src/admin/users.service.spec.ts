@@ -118,6 +118,9 @@ describe("AdminUsersService 用户生命周期与角色", () => {
           _count: { _all: 0 },
         }),
       },
+      order: { count: vi.fn().mockResolvedValue(0) },
+      ticket: { count: vi.fn().mockResolvedValue(0) },
+      invoice: { count: vi.fn().mockResolvedValue(0) },
       $transaction: vi.fn(
         async (work: (client: Record<string, any>) => unknown) => work(tx),
       ),
@@ -153,6 +156,26 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       {} as never,
       storage as never,
       membershipService as never,
+      {
+        balanceOf: vi.fn().mockResolvedValue({
+          balance: 0,
+          expiringSoon: 0,
+          totalEarned: 0,
+          totalConsumed: 0,
+          activeLots: 0,
+          nearestExpiry: null,
+        }),
+      } as never,
+      {
+        accessForUser: vi.fn().mockResolvedValue({
+          group: {
+            code: "default",
+            name: "默认分组",
+            ratioBasisPoints: 10_000,
+          },
+        }),
+      } as never,
+      { notify: vi.fn().mockResolvedValue(undefined) } as never,
     );
   });
 

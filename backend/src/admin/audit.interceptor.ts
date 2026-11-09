@@ -59,6 +59,10 @@ const ACTION_DETAIL_FIELDS: Record<string, readonly string[]> = {
   ],
   "billing_order.resolve": ["action", "reason"],
   "billing_order.batch_resolve": ["ids", "action", "reason"],
+  // 用户处置原因：有争议时「谁在何时点了按钮」不够，需要看到当时的依据。
+  "user.status_change": ["reason"],
+  "user.role_change": ["reason"],
+  "user.logout_all": ["reason"],
 };
 
 /** 绝不写进审计 detail 的字段名片段 (大小写不敏感) */
@@ -80,6 +84,7 @@ const AUDIT_REASON_LABELS: Record<string, string> = {
   "user.status_change": "变更用户账号状态",
   "user.role_change": "变更用户角色",
   "user.password_reset": "重置用户登录密码",
+  "user.logout_all": "强制用户下线",
   "user.delete": "删除用户账号",
   "task.batch": "批量变更任务",
   "task.delete": "删除任务及其产出",
@@ -159,6 +164,7 @@ const AUDIT_REASON_LABELS: Record<string, string> = {
   "billing_order.batch_resolve": "批量人工核对账单",
   "ticket.update": "更新工单",
   "ticket.reply": "回复工单",
+  "ticket.transfer": "转交工单",
   "notification.broadcast": "发送站内通知",
   "notification.template": "更新通知模板",
   "scheduler.run": "手动执行定时任务",

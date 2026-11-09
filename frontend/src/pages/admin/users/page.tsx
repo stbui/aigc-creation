@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '~/admin-ui/primitives';
 import { useAdmin, useAdminDetailParam } from './hooks';
 import { useAdminUserActions } from './useAdminUserActions';
@@ -6,7 +6,8 @@ import { useAdminUserFilters } from './useAdminUserFilters';
 import { UserDetailDrawer } from './UserDetailDrawer';
 import { UserDeleteConfirm } from './UserDeleteConfirm';
 import { UserFilters } from './UserFilters';
-import { UserListSection } from './UserListSection';
+import { UserListSection, type UserListView } from './UserListSection';
+import { UserLogoutConfirm } from './UserLogoutConfirm';
 import { UserRoleConfirm } from './UserRoleConfirm';
 import { UserStatusConfirm } from './UserStatusConfirm';
 import { TempPasswordDialog } from './TempPasswordDialog';
@@ -22,6 +23,8 @@ import { TempPasswordDialog } from './TempPasswordDialog';
 export function AdminUsersPage() {
   const { can } = useAdmin();
   const [detailId, setDetailId] = useAdminDetailParam();
+  const [view, setView] = useState<UserListView>('cards');
+  const [selected, setSelected] = useState<string[]>([]);
   const filters = useAdminUserFilters();
 
   const openUser = useCallback((id: string) => setDetailId(id), [setDetailId]);
@@ -30,6 +33,11 @@ export function AdminUsersPage() {
     reload: filters.reload,
     onDeleted: closeUser,
   });
+
+  // 筛选/排序变化后，上一页勾选的 id 不再与屏幕对应；清空避免误操作。
+  useEffect(() => {
+    setSelected([]);
+  }, [filters.params]);
 
   return (
     <div className="w-full">
@@ -47,6 +55,16 @@ export function AdminUsersPage() {
         onRoleChange={filters.setRole}
         status={filters.status}
         onStatusChange={filters.setStatus}
+        from={filters.from}
+        to={filters.to}
+        onDateRangeChange={({ from, to }) => {
+          filters.setFrom(from);
+          filters.setTo(to);
+        }}
+        segment={filters.segment}
+        onSegmentChange={filters.setSegment}
+        membership={filters.membership}
+        onMembershipChange={filters.setMembership}
         appliedChips={filters.appliedChips}
         onApply={filters.applyFilters}
         onReset={filters.resetFilters}
@@ -59,14 +77,27 @@ export function AdminUsersPage() {
 
       <UserListSection
         data={filters.data}
+        stats={filters.stats}
         loading={filters.loading}
         error={filters.error}
         hasFilter={filters.hasFilter}
+        view={view}
+        onViewChange={setView}
+        selected={selected}
+        onSelectedChange={setSelected}
+        canBatch={can('user.disable')}
+        onBatch={(action) => void actions.batchStatus(selected, action)}
+        batchBusy={actions.busy}
+        sort={filters.sort}
+        onSortChange={(sort) => filters.setQuery({ sort })}
         onRetry={filters.reload}
         onResetFilters={filters.resetFilters}
         onOpenUser={openUser}
         actionsFor={actions.rowActions}
-        onPageChange={filters.setPage}
+        onPageChange={(page, pageSize) => {
+          setSelected([]);
+          filters.setPage(page, pageSize);
+        }}
       />
 
       <UserDetailDrawer detailId={detailId} onClose={closeUser} />
@@ -76,7 +107,7 @@ export function AdminUsersPage() {
           target={actions.statusTarget}
           loading={actions.busy}
           onCancel={actions.closeStatus}
-          onConfirm={(next) => void actions.updateStatus(next)}
+          onConfirm={(next, reason) => void actions.updateStatus(next, reason)}
         />
       )}
 
@@ -85,7 +116,16 @@ export function AdminUsersPage() {
           target={actions.roleTarget}
           loading={actions.busy}
           onCancel={actions.closeRole}
-          onConfirm={(role) => void actions.updateRole(role)}
+          onConfirm={(role, reason) => void actions.updateRole(role, reason)}
+        />
+      )}
+
+      {actions.logoutTarget && (
+        <UserLogoutConfirm
+          target={actions.logoutTarget}
+          loading={actions.busy}
+          onCancel={actions.closeLogout}
+          onConfirm={() => void actions.confirmLogout()}
         />
       )}
 
@@ -100,7 +140,8 @@ export function AdminUsersPage() {
 
       {actions.tempPassword && (
         <TempPasswordDialog
-          password={actions.tempPassword}
+          password={actions.tempPassword.tempPassword}
+          expiresAt={actions.tempPassword.expiresAt}
           onClose={actions.closeTempPassword}
         />
       )}

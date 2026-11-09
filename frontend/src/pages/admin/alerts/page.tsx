@@ -4,7 +4,8 @@ import { readSeverity } from './utils';
 import { useAdminUrlFilterSync } from './hooks';
 import { Link, useSearchParams } from 'react-router-dom';
 
-import { ActionButton, EmptyState, ListError, PageHeader, Panel, SegmentedGroup, SkeletonBody, StatCard, StaleError, ToneBadge } from '~/admin-ui/primitives';
+import { ActionButton, EmptyState, ListError, PageHeader, Panel, SegmentedGroup, SkeletonBody, StatCard, StaleError, ToneBadge, WorkQueue, WorkQueueSection } from '~/admin-ui/primitives';
+import { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';
 import {
   ALERT_SEVERITY_META,
   AlertRefreshButton,
@@ -33,6 +34,12 @@ import type { AdminAlertSeverity } from '../../../types/api';
  */
 export function AdminAlertsPage() {
   const { data, loading, error, reload } = useAdminAlerts();
+  const {
+    data: workbench,
+    loading: workbenchLoading,
+    error: workbenchError,
+    reload: reloadWorkbench,
+  } = useAdminWorkbench();
   const [searchParams] = useSearchParams();
   const initialFilter = readSeverity(searchParams.get('severity'));
   const [filter, setFilter] = useState<SeverityFilter>(initialFilter);
@@ -75,6 +82,29 @@ export function AdminAlertsPage() {
       />
 
       {error && data && <StaleError error={error} onRetry={() => void reload()} />}
+
+      <WorkQueueSection
+        title="可处理实体"
+        description="每组只列前几条，点行直接带到目标页的对应动作；完整列表仍走各模块。"
+        actions={
+          <ActionButton
+            variant="secondary"
+            size="sm"
+            disabled={workbenchLoading}
+            onClick={() => void reloadWorkbench()}
+          >
+            刷新待办
+          </ActionButton>
+        }
+      >
+        <WorkQueue
+          groups={workbench?.groups ?? []}
+          loading={workbenchLoading}
+          error={workbenchError}
+          emptyTitle="当前没有可展开的实体待办"
+          emptyDescription="下方仍保留按来源聚合的告警计数。"
+        />
+      </WorkQueueSection>
 
       {/* 四张卡固定一行：数字之间要能横向比较「哪一级在涨」，折行就断了这层对照 */}
       <div className="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">

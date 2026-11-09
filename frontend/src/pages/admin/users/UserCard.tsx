@@ -5,6 +5,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  CheckboxField,
   Separator,
   StatusTag,
 } from '~/admin-ui/primitives';
@@ -26,12 +27,24 @@ export function UserCard({
   user,
   onOpen,
   actions,
+  selected = false,
+  selectable = false,
+  onToggleSelected,
 }: {
   user: AdminUserRow;
   onOpen: () => void;
   actions: UserCardAction[];
+  selected?: boolean;
+  selectable?: boolean;
+  onToggleSelected?: (next: boolean) => void;
 }) {
   const disabled = user.status === 'disabled';
+  const actionCols =
+    actions.length >= 5
+      ? 'grid-cols-5'
+      : actions.length === 4
+        ? 'grid-cols-4'
+        : 'grid-cols-3';
 
   return (
     <Card
@@ -51,7 +64,22 @@ export function UserCard({
         onClick={onOpen}
       />
 
-      <CardHeader className="pointer-events-none grid-cols-[minmax(0,1fr)_auto] items-start gap-2 px-4 pt-4 pb-3.5">
+      {selectable && (
+        <div className="absolute left-3 top-3.5 z-10">
+          <CheckboxField
+            checked={selected}
+            onChange={(next) => onToggleSelected?.(next)}
+            ariaLabel={`选择用户 ${user.email}`}
+          />
+        </div>
+      )}
+
+      <CardHeader
+        className={cn(
+          'pointer-events-none grid-cols-[minmax(0,1fr)_auto] items-start gap-2 pr-4 pt-4 pb-3.5',
+          selectable ? 'pl-10' : 'pl-4',
+        )}
+      >
         <CardTitle className="min-w-0 font-normal">
           <UserIdentityCell user={user} />
         </CardTitle>
@@ -87,7 +115,10 @@ export function UserCard({
         data-testid="admin-user-card-actions"
         role="group"
         aria-label="用户操作"
-        className="relative grid grid-cols-4 items-center gap-0 bg-muted/15 px-1.5 py-1.5"
+        className={cn(
+          'relative grid items-center gap-0 bg-muted/15 px-1.5 py-1.5',
+          actionCols,
+        )}
       >
         {actions.map((action) => (
           <ActionButton

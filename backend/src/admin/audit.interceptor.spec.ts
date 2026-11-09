@@ -109,7 +109,7 @@ describe("AuditInterceptor", () => {
     });
   });
 
-  it("按动作和状态自动生成原因，并忽略请求体 reason", async () => {
+  it("按动作和状态自动生成原因，并按动作白名单记录请求体 reason", async () => {
     reflector.get.mockImplementation((key: string) =>
       key === AUDIT_ACTION_KEY ? "user.status_change" : undefined,
     );
@@ -138,7 +138,11 @@ describe("AuditInterceptor", () => {
     );
     const data = prisma.adminAuditLog.create.mock.calls[0][0].data;
     expect(data.reason).toBe("禁用用户账号");
-    expect(JSON.parse(data.detail)).not.toHaveProperty("reason");
+    // 审计列 reason 仍由动作自动生成；detail 里额外留操作人填写的依据。
+    expect(JSON.parse(data.detail)).toHaveProperty(
+      "reason",
+      "请求体里的自由文本",
+    );
   });
 
   it("批量删除任务使用自动原因和结构化审计摘要", async () => {

@@ -236,7 +236,12 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
       if (mode === 'sms') {
         const res = await authApi.smsLogin({ phone: values.phone!, code: values.smsCode! });
         // 短信登录没有邮箱输入，用户身份以服务端返回为准
-        login(res.accessToken, res.user?.email ?? values.phone!, res.user?.role);
+        login(
+          res.accessToken,
+          res.user?.email ?? values.phone!,
+          res.user?.role,
+          res.user?.mustChangePassword,
+        );
         message.success('登录成功');
         onSuccess();
         return;
@@ -244,7 +249,12 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
 
       if (mode === 'login') {
         const res = await authApi.login({ email: values.email, password: values.password });
-        login(res.accessToken, values.email, res.user?.role);
+        login(
+          res.accessToken,
+          values.email,
+          res.user?.role,
+          res.user?.mustChangePassword,
+        );
         message.success('登录成功');
         onSuccess();
         return;

@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
+import { runBatch } from '../common/batch';
 import { NotificationsService } from '../notifications/notifications.service';
 
 /**
@@ -147,7 +148,15 @@ export class TicketsService {
         orderBy: { createdAt: 'desc' },
         skip,
         take,
-        include: { _count: { select: { replies: true } } },
+        /*
+         * 内部备注只给后台看，用户端的「回复数」也不能把它算进去 ——
+         * 否则用户会看到「3 条回复」，点进去只有 2 条。
+         */
+        include: {
+          _count: {
+            select: { replies: { where: { visibility: 'public' } } },
+          },
+        },
       }),
       this.prisma.ticket.count({ where }),
       // 筛选标签需要“全量各状态数量”，不能只统计当前页
@@ -169,7 +178,12 @@ export class TicketsService {
   async detailMine(userId: string, id: string) {
     const ticket = await this.prisma.ticket.findFirst({
       where: { id, userId },
-      include: { replies: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        replies: {
+          where: { visibility: 'public' },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
     // 用 findFirst + userId 而不是 findUnique 后再比对: 越权访问返回 404 而非 403,
     // 不泄露「这个 id 存在」这一事实
@@ -338,7 +352,12 @@ export class TicketsService {
     return { ...this.shape(ticket, true), user: ticket.user, related: { order, asset } };
   }
 
-  async adminReply(id: string, actor: { id: string; email: string }, content: string) {
+  async adminReply(
+    id: string,
+    actor: { id: string; email: string },
+    content: string,
+    visibility: 'public' | 'internal' = 'public',
+  ) {
     const ticket = await this.prisma.ticket.findUnique({ where: { id } });
     if (!ticket) throw new AppError(40400, '工单不存在', 404);
 
@@ -352,8 +371,16 @@ export class TicketsService {
         authorId: actor.id,
         authorName: actor.email,
         content: text,
+        visibility,
       },
     });
+
+    /*
+     * 内部备注是客服之间的交接记录，不是对用户的发言：
+     * 不推送、不改变状态、不自动认领。把它当成一次回复处理会让用户收到
+     * 「工单有新回复」却看不到内容。
+     */
+    if (visibility === 'internal') return this.adminDetail(id);
 
     /*
      * 客服回复即视为受理: open → processing。
@@ -382,6 +409,75 @@ export class TicketsService {
       link: '/tickets',
     });
 
+    return this.adminDetail(id);
+  }
+
+  /** 指派 / 转交可选的接收人：只返回启用中的后台账号 */
+  async adminAssignees() {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        role: { in: ['admin', 'operator', 'finance'] },
+        status: 'active',
+      },
+      orderBy: [{ role: 'asc' }, { email: 'asc' }],
+      select: { id: true, name: true, email: true, role: true },
+    });
+    return rows.map((row) => ({ ...row, name: row.name || row.email }));
+  }
+
+  /**
+   * 转交财务（或任意启用中的后台账号）。
+   *
+   * 只做三件事：写内部备注、指派接收人、把工单推到 processing。
+   * 不触碰订单/积分/退款；财务点进工单后再走订单模块的资金动作。
+   */
+  async adminTransfer(
+    id: string,
+    actor: { id: string; email: string },
+    assigneeId: string,
+    note?: string,
+  ) {
+    const ticket = await this.prisma.ticket.findUnique({ where: { id } });
+    if (!ticket) throw new AppError(40400, '工单不存在', 404);
+    if (ticket.status !== 'open' && ticket.status !== 'processing') {
+      throw new AppError(40001, '已解决或已关闭的工单不能转交，请先重新打开', 400);
+    }
+
+    const assignee = await this.prisma.user.findUnique({
+      where: { id: assigneeId },
+      select: { id: true, role: true, status: true, email: true },
+    });
+    if (!assignee || assignee.role === 'user' || assignee.status !== 'active') {
+      throw new AppError(40001, '只能转交给启用中的后台账号', 400);
+    }
+
+    const text = note?.trim().slice(0, 2000) || '';
+    await this.prisma.$transaction(async (tx) => {
+      if (text) {
+        await tx.ticketReply.create({
+          data: {
+            ticketId: id,
+            authorType: 'admin',
+            authorId: actor.id,
+            authorName: actor.email,
+            content: text,
+            visibility: 'internal',
+          },
+        });
+      }
+      await tx.ticket.update({
+        where: { id },
+        data: {
+          assigneeId,
+          status: 'processing',
+          resolvedAt: null,
+          closedAt: null,
+          updatedAt: new Date(),
+        },
+      });
+    });
+
+    this.logger.log(`工单 ${ticket.ticketNo} 转交给 ${assignee.email}`);
     return this.adminDetail(id);
   }
 
@@ -441,6 +537,32 @@ export class TicketsService {
       `工单 ${ticket.ticketNo} 由 ${actor.id} 更新: ${JSON.stringify(Object.keys(data))}`,
     );
     return this.adminDetail(id);
+  }
+
+  /**
+   * 批量指派 / 流转。
+   *
+   * 逐条走 `adminUpdate`：状态机、指派账号校验、审计都由单条路径兜底。
+   * 批量不包事务 —— 一条被状态机拒绝不应回滚其余 99 条，逐条结果才有用。
+   */
+  async adminBatch(
+    ids: string[],
+    action: 'assign' | 'status',
+    payload: { assigneeId?: string | null; status?: string },
+    actor: { id: string },
+  ) {
+    if (action === 'assign' && payload.assigneeId === undefined) {
+      throw new AppError(40001, '批量指派缺少接收人', 400);
+    }
+    if (action === 'status' && !payload.status) {
+      throw new AppError(40001, '批量流转缺少目标状态', 400);
+    }
+
+    return runBatch(ids, (id) =>
+      action === 'assign'
+        ? this.adminUpdate(id, { assigneeId: payload.assigneeId ?? null }, actor)
+        : this.adminUpdate(id, { status: payload.status }, actor),
+    );
   }
 
   /** 侧栏/看板用的各状态计数（与列表 counts 同源） */

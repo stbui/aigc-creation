@@ -13,7 +13,12 @@ import { csvFilename } from './csv';
  *   · 权限与审计不在这里处理: 调用方须挂 `data.export` 权限点与
  *     `@AuditAction('data.export')`, 导出即把用户数据带出系统。
  */
-export function sendCsv(res: Response, prefix: string, csv: string): void {
+export function sendCsv(
+  res: Response,
+  prefix: string,
+  csv: string,
+  headers: Record<string, string> = {},
+): void {
   const filename = csvFilename(prefix);
   /*
    * Node/HTTP 头只允许 ASCII。中文文件名直接塞进 Content-Disposition 会抛
@@ -26,5 +31,6 @@ export function sendCsv(res: Response, prefix: string, csv: string): void {
     'Content-Disposition',
     `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
   );
+  for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
   res.send(csv);
 }

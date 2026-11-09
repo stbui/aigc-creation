@@ -417,4 +417,4 @@ npm run e2e                 # Playwright
 | 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |
-| 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |
+| 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`admin-workflow-design.md`（P0 已实施）、`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |

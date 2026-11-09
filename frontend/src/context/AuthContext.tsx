@@ -17,8 +17,17 @@ interface AuthContextValue {
   email: string | null;
   /** 登录时缓存的角色, 供 AdminContext 决定是否请求后台身份。null = 未知或 C 端用户 */
   role: StoredRole | null;
-  login: (token: string, email: string, role?: string) => void;
+  login: (
+    token: string,
+    email: string,
+    role?: string,
+    mustChangePassword?: boolean,
+  ) => void;
   logout: () => void;
+  /** 强制改密完成后清除标记（改密会使 token 失效，通常紧接着 logout） */
+  clearMustChangePassword: () => void;
+  /** 后台重置的临时密码未修改前为 true，App 层据此弹出不可关闭的改密弹窗 */
+  mustChangePassword: boolean;
   /**
    * 打开登录弹窗 (2026-10-19「路由对外开放 + 登录挂在顶栏按钮」)。
    * 路由不再拦截未登录访问, 需要身份的动作一律调这个 —— 与参考站同构:
@@ -45,17 +54,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState<string | null>(() => getStoredEmail());
   const [role, setRole] = useState<StoredRole | null>(() => getStoredRole());
   const [loginOpen, setLoginOpen] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   // 登录成功后要让壳内页面重新拉数据 (统计/素材/作品), 这里递增一个版本号作为依赖
   const [authEpoch, setAuthEpoch] = useState(0);
 
   const openLogin = useCallback(() => setLoginOpen(true), []);
   const closeLogin = useCallback(() => setLoginOpen(false), []);
 
-  const login = (t: string, e: string, r?: string) => {
+  const login = (t: string, e: string, r?: string, mustChange = false) => {
     setToken(t);
     setStoredEmail(e);
     setTok(t);
     setEmail(e);
+    setMustChangePassword(mustChange);
     if (r) {
       setStoredRole(r);
       setRole(r === 'admin' || r === 'operator' || r === 'finance' ? r : null);
@@ -72,7 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTok(null);
     setEmail(null);
     setRole(null);
+    setMustChangePassword(false);
   };
+
+  const clearMustChangePassword = () => setMustChangePassword(false);
 
   // API 层发现 401 时广播该事件, 同步清空内存态 (路由已对外开放, 不再跳转登录页)
   useEffect(() => {
@@ -83,9 +97,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTok(null);
       setEmail(null);
       setRole(null);
+      setMustChangePassword(false);
     };
+    // 40303：后台重置的临时密码还没改。token 仍有效，只允许 /me 与改密接口。
+    const onPasswordChangeRequired = () => setMustChangePassword(true);
     window.addEventListener('auth:unauthorized', onUnauthorized);
-    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+    window.addEventListener(
+      'auth:password-change-required',
+      onPasswordChangeRequired,
+    );
+    return () => {
+      window.removeEventListener('auth:unauthorized', onUnauthorized);
+      window.removeEventListener(
+        'auth:password-change-required',
+        onPasswordChangeRequired,
+      );
+    };
   }, []);
 
   // guest 触发了需要身份的动作 (提交/上传): api 层广播该事件 → 打开登录弹窗。
@@ -98,7 +125,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ token, email, role, login, logout, openLogin, loginOpen, closeLogin, authEpoch }}
+      value={{
+        token,
+        email,
+        role,
+        login,
+        logout,
+        openLogin,
+        loginOpen,
+        closeLogin,
+        authEpoch,
+        mustChangePassword,
+        clearMustChangePassword,
+      }}
     >
       {children}
     </AuthContext.Provider>

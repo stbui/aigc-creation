@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { adminProductsApi } from './api';
@@ -167,6 +167,14 @@ export function AdminProductsPage() {
     setEditing(null);
     setCreating(true);
   };
+
+  /* 命令面板「新建商品」带 ?create=1 进入：只打开表单，不自动保存 */
+  const createIntentApplied = useRef(false);
+  useEffect(() => {
+    if (searchParams.get('create') !== '1' || createIntentApplied.current) return;
+    createIntentApplied.current = true;
+    openCreate();
+  }, [searchParams]);
 
   const openEdit = (p: AdminProduct) => {
     const next = toDraft(p);
