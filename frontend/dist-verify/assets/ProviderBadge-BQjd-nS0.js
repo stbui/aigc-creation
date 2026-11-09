@@ -1,1 +1,0 @@
-import{yt as e}from"./vendor-D9KETRnM.js";var t=e(),n={gateway:{text:`真实模型`,tone:`remote`,title:`本次由云端模型通道生成`},local:{text:`历史本地结果`,tone:`local`,title:`这是本地生成算法停用前的历史产出；新任务只使用模型通道`}};function r({provider:e,className:r}){let i=e?n[e]:void 0;return i?(0,t.jsx)(`span`,{className:`provider-badge is-${i.tone}${r?` ${r}`:``}`,title:i.title,children:i.text}):null}export{r as t};
