@@ -1,8 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError } from "../common/app.exception";
 import { OrderService } from "../orders/order.service";
+import { lockUserRow } from "../account/user-row-lock";
 import { PaymentConfigService } from "./payment-config.service";
+import { SettingsService } from "../common/settings.service";
 import { getAdapter } from "./adapters";
 import {
   PaymentAdapter,
@@ -10,6 +13,8 @@ import {
   PaymentCurrency,
   PaymentProviderId,
   ProviderPaymentResult,
+  VisiblePaymentMethod,
+  isVisiblePaymentMethod,
 } from "./adapters/types";
 import { paymentStatusOf } from "./payment-query";
 
@@ -29,6 +34,7 @@ interface AttemptContext {
   /** 对应 Payment 行；历史单可能没有，为 null */
   paymentId: string | null;
   providerId: PaymentProviderId;
+  providerInstanceId: string;
   /** 渠道侧下单返回的单据 id（PayPal order id / Stripe Checkout Session id 等） */
   providerRef?: string;
   /** 渠道侧支付流水号（PayPal capture id / Stripe PaymentIntent id 等） */
@@ -48,12 +54,13 @@ export interface PaymentIntentView {
   orderNo: string;
   amountCents: number;
   currency: string;
-  providerId: string;
+  providerId: VisiblePaymentMethod | "free";
   configId: string | null;
   configVersion: number | null;
   mode: string;
   payUrl?: string;
   codeUrl?: string;
+  schemeUrl?: string;
   checkoutValue: string | null;
   expiresAt: string;
   sandbox: boolean;
@@ -67,7 +74,8 @@ export interface PaymentOrderView {
   displayStatus: string;
   amountCents: number;
   currency: string;
-  providerId: string;
+  /** C 端只暴露支付宝 / 微信 / 免费单；真实渠道（如 epay）永不外泄。 */
+  providerId: VisiblePaymentMethod | "free" | "unknown";
   checkoutMode: string | null;
   checkoutValue: string | null;
   expiresAt: string;
@@ -78,7 +86,7 @@ export interface PaymentOrderView {
   payments: Array<{
     id: string;
     status: string;
-    providerId: string;
+    providerId: VisiblePaymentMethod | "free" | "unknown";
     providerRef: string | null;
     providerTradeNo: string | null;
     amountCents: number;
@@ -88,6 +96,22 @@ export interface PaymentOrderView {
 
 /** 查单节流窗口：2 秒内重复查询直接返回本地视图 */
 const QUERY_THROTTLE_MS = 2_000;
+
+/**
+ * 真实渠道 → C 端可见支付方式。
+ *
+ * 易支付是一套凭据承载支付宝/微信，只能在 Payment.providerMethod 已固化时
+ * 投影成对应按钮；没有历史支付方式的旧单一律 unknown，不能把 epay 暴露给 C 端。
+ */
+function visibleProviderId(
+  channel: string,
+  providerMethod: string | null | undefined,
+): PaymentOrderView["providerId"] {
+  if (isVisiblePaymentMethod(providerMethod)) return providerMethod;
+  if (isVisiblePaymentMethod(channel)) return channel;
+  if (channel === "free") return "free";
+  return "unknown";
+}
 /** 发起支付租约：渠道下单异常缓慢时，超过该时长允许新请求接管 */
 const INTENT_LEASE_MS = 5 * 60_000;
 
@@ -107,6 +131,7 @@ export class PaymentOrderService {
     private readonly prisma: PrismaService,
     private readonly orders: OrderService,
     private readonly configs: PaymentConfigService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -148,7 +173,7 @@ export class PaymentOrderService {
   }): Promise<PaymentIntentView> {
     let order = await this.prisma.order.findUnique({
       where: { id: input.orderId },
-      include: { items: true, payments: true },
+      include: { items: true, payments: true, membershipPlan: true },
     });
     if (!order) throw new AppError(40400, "订单不存在", 404);
     if (order.userId !== input.userId)
@@ -191,31 +216,44 @@ export class PaymentOrderService {
       throw new AppError(40901, "订单已超时关闭", 409);
     }
 
-    const available = await this.configs.available(currency);
-    if (available.length === 0) {
+    const paymentRules = await this.settings.paymentRules();
+    if (!paymentRules.enabled) {
+      throw new AppError(50301, "支付功能已关闭", 503);
+    }
+
+    /*
+     * 只解析一次。availableVisible() 再 resolveVisible() 会让轮询/最少金额
+     * 在“展示可用”和“真正下单”之间切换实例，甚至把订单写到未展示的实例。
+     */
+    const options = await this.configs.resolveVisibleOptions(currency, order.paidCents);
+    if (options.length === 0) {
       throw new AppError(
         50301,
-        "当前没有可用的支付渠道，请联系管理员配置",
+        "管理员尚未选择可用支付来源，请联系管理员配置",
         503,
       );
     }
-    let providerId = input.providerId;
-    if (!providerId) {
-      if (available.length > 1) {
+    let method: VisiblePaymentMethod;
+    if (!input.providerId) {
+      if (options.length > 1) {
         throw new AppError(
           40001,
-          "存在多个可用支付渠道，请指定 providerId",
+          "存在多个可用支付方式，请指定 providerId",
           400,
         );
       }
-      providerId = available[0].id;
+      method = options[0].view.id;
+    } else if (!isVisiblePaymentMethod(input.providerId)) {
+      throw new AppError(40001, `支付方式不可用: ${input.providerId}`, 400);
+    } else {
+      method = input.providerId;
     }
-    if (!available.some((p) => p.id === providerId)) {
-      throw new AppError(40001, `支付渠道不可用: ${providerId}`, 400);
+    const selectedOption = options.find((option) => option.view.id === method);
+    if (!selectedOption) {
+      throw new AppError(40001, `支付方式不可用: ${method}`, 400);
     }
-
-    const config = await this.configs.latest(providerId as PaymentProviderId);
-    if (!config) throw new AppError(50301, "支付渠道未完成配置", 503);
+    const resolved = selectedOption.resolved;
+    const { config, providerId } = resolved;
     const adapter = getAdapter(providerId);
     if (!adapter) throw new AppError(40001, `未知支付渠道: ${providerId}`, 400);
     if (!config.enabled) throw new AppError(50301, "支付渠道已停用", 503);
@@ -232,6 +270,9 @@ export class PaymentOrderService {
       providerId: config.providerId,
       configId: config.id,
       configVersion: config.version,
+      ...(resolved.providerMethod
+        ? { paymentMethod: resolved.providerMethod }
+        : {}),
       values: config.values,
     };
 
@@ -282,7 +323,7 @@ export class PaymentOrderService {
       // 旧快照里没有它的 Payment，直接用于关单会漏关。
       const fresh = await this.prisma.order.findUnique({
         where: { id: order.id },
-        include: { items: true, payments: true },
+        include: { items: true, payments: true, membershipPlan: true },
       });
       if (!fresh) throw new AppError(40400, "订单不存在", 404);
       if (fresh.status === "paid") throw new AppError(40901, "订单已支付", 409);
@@ -304,11 +345,13 @@ export class PaymentOrderService {
           orderId: order.id,
           userId: input.userId,
           channel: providerId,
+          providerMethod: resolved.method,
           amountCents: order.paidCents,
           currency,
           status: "pending",
           providerConfigId: config.id,
           providerConfigVersion: config.version,
+          providerInstanceId: config.instanceId,
         },
       });
 
@@ -328,7 +371,7 @@ export class PaymentOrderService {
           orderNo: order.orderNo,
           amountCents: order.paidCents,
           currency,
-          subject: `货觉AI 订单 ${order.orderNo}`,
+          subject: buildPaymentSubject(order, paymentRules.productNamePrefix, paymentRules.productNameSuffix),
           returnUrl: this.checkoutReturnUrl(order),
           notifyUrl: this.notifyUrl(
             config.providerId,
@@ -337,6 +380,8 @@ export class PaymentOrderService {
           ),
           clientIp: input.clientIp,
           clientUserAgent: input.clientUserAgent,
+          alipayMobilePrecreateDeepLink:
+            paymentRules.alipayMobilePrecreateDeepLink,
           expiresAt,
         });
       } catch (e) {
@@ -355,7 +400,7 @@ export class PaymentOrderService {
         throw new AppError(50302, `发起支付失败: ${message}`, 503);
       }
 
-      const checkoutValue = checkout.payUrl ?? checkout.codeUrl ?? "";
+      const checkoutValue = checkout.codeUrl ?? checkout.payUrl ?? "";
 
       // 先落渠道单据 id：即使随后订单状态已变化，也能定位并关闭本次渠道订单。
       if (checkout.providerRef) {
@@ -380,6 +425,7 @@ export class PaymentOrderService {
           channel: providerId,
           providerConfigId: config.id,
           providerConfigVersion: config.version,
+          providerInstanceId: config.instanceId,
           checkoutMode: checkout.mode,
           checkoutValue,
           checkoutExpiresAt: checkout.expiresAt,
@@ -417,7 +463,7 @@ export class PaymentOrderService {
       }
 
       this.logger.log(
-        `发起支付: 订单 ${order.orderNo} 渠道 ${providerId} v${config.version} 金额 ${order.paidCents} 分`,
+        `发起支付: 订单 ${order.orderNo} 方式 ${resolved.method} -> 渠道 ${providerId} v${config.version} 金额 ${order.paidCents} 分`,
       );
 
       return {
@@ -425,15 +471,16 @@ export class PaymentOrderService {
         orderNo: order.orderNo,
         amountCents: order.paidCents,
         currency,
-        providerId,
+        providerId: resolved.method,
         configId: config.id,
         configVersion: config.version,
         mode: checkout.mode,
         payUrl: checkout.payUrl,
         codeUrl: checkout.codeUrl,
+        schemeUrl: checkout.schemeUrl,
         checkoutValue,
         expiresAt: checkout.expiresAt.toISOString(),
-        sandbox: providerId === "sandbox",
+        sandbox: false,
         hint: checkout.hint ?? null,
       };
     } finally {
@@ -523,6 +570,7 @@ export class PaymentOrderService {
             providerId: attempt.providerId,
             configId: attempt.config.configId,
             paymentId: attempt.paymentId ?? undefined,
+            providerInstanceId: attempt.providerInstanceId,
             tradeNo: result.tradeNo ?? "",
             amountCents: result.amountCents ?? -1,
             currency: result.currency ?? (order.currency as PaymentCurrency),
@@ -613,6 +661,23 @@ export class PaymentOrderService {
     if (lease.count === 0)
       return this.view(await this.loadOrder(order.id, input.actor));
 
+    /*
+     * 取消频率额度必须在拿到关单租约之后、查单之前预留。
+     * 先抢租约可避免同一订单的并发取消重复占额度；额度不足时只需释放租约，
+     * 不应向渠道发起任何查单/关单请求。
+     */
+    let cancelEventId: string | null = null;
+    if (input.actor.kind === "user") {
+      try {
+        cancelEventId = await this.reserveCancelEvent(order.id, input.actor.userId);
+      } catch (e) {
+        await this.releaseCloseLease(order.id, undefined, { closeLeaseAt });
+        throw e;
+      }
+    }
+
+    let cancelFinalized = false;
+    try {
     // 抢到租约后必须重读：等待租约期间可能刚有支付尝试落库。
     const fresh = await this.loadOrder(order.id, input.actor);
     let attempts: AttemptContext[];
@@ -628,7 +693,11 @@ export class PaymentOrderService {
 
     // 从未发起过支付的空单：本地关闭即可
     if (attempts.length === 0) {
-      await this.localClose(order.id, closeLeaseAt);
+      cancelFinalized = await this.localClose(
+        order.id,
+        closeLeaseAt,
+        cancelEventId ?? undefined,
+      );
       this.logger.log(`订单已关闭: ${order.orderNo} by ${input.actor.kind}`);
       return this.view(await this.loadOrder(order.id, input.actor));
     }
@@ -704,9 +773,18 @@ export class PaymentOrderService {
       await this.closeAttempt(attempt.paymentId);
     }
 
-    await this.localClose(order.id, closeLeaseAt);
+    cancelFinalized = await this.localClose(
+      order.id,
+      closeLeaseAt,
+      cancelEventId ?? undefined,
+    );
     this.logger.log(`订单已关闭: ${order.orderNo} by ${input.actor.kind}`);
     return this.view(await this.loadOrder(order.id, input.actor));
+    } finally {
+      if (cancelEventId && !cancelFinalized) {
+        await this.releaseCancelReservation(cancelEventId);
+      }
+    }
   }
 
   /**
@@ -761,6 +839,8 @@ export class PaymentOrderService {
     providerRef?: string;
     /** 调用方已定位到的支付尝试；不传则按渠道取最新 pending */
     paymentId?: string;
+    /** 本次实际入账的服务商实例；不传时从支付尝试或订单恢复 */
+    providerInstanceId?: string;
   }): Promise<{ applied: boolean; idempotentHit: boolean }> {
     const order = await this.prisma.order.findUnique({
       where: { id: input.orderId },
@@ -815,7 +895,7 @@ export class PaymentOrderService {
 
     // 只更新**同一渠道**的 pending 尝试；否则跨渠道重试时会把另一笔尝试
     // 改成本次渠道的交易号，后台支付尝试记录会张冠李戴。
-    const paymentId =
+    const attempt =
       input.paymentId ??
       (
         await this.prisma.payment.findFirst({
@@ -825,9 +905,16 @@ export class PaymentOrderService {
             channel: input.providerId,
           },
           orderBy: { createdAt: "desc" },
-          select: { id: true },
+          select: { id: true, providerInstanceId: true },
         })
-      )?.id;
+      );
+    const paymentId =
+      typeof attempt === "string" ? attempt : attempt?.id;
+    const providerInstanceId =
+      input.providerInstanceId ??
+      (typeof attempt === "string" ? undefined : attempt?.providerInstanceId) ??
+      order.providerInstanceId ??
+      undefined;
 
     const result = await this.orders.markPaid({
       orderId: order.id,
@@ -836,6 +923,7 @@ export class PaymentOrderService {
       channel: input.providerId,
       currency: input.currency,
       providerConfigId: input.configId,
+      providerInstanceId,
       providerStatus: input.providerStatus,
       providerPaidAt: input.paidAt,
       paymentId,
@@ -856,12 +944,15 @@ export class PaymentOrderService {
   private async attemptContexts(order: {
     channel: string;
     providerConfigId: string | null;
+    providerInstanceId?: string | null;
     checkoutMode: string | null;
     payments: Array<{
       id: string;
       channel: string;
+      providerMethod: string | null;
       status: string;
       providerConfigId: string | null;
+      providerInstanceId: string | null;
       providerRef: string | null;
       payTransactionId: string | null;
     }>;
@@ -888,21 +979,30 @@ export class PaymentOrderService {
       const config = await this.configs.resolveForOrder({
         channel: payment.channel,
         providerConfigId: payment.providerConfigId,
+        providerInstanceId: payment.providerInstanceId,
       });
       const adapter = getAdapter(payment.channel);
       if (!config || !adapter) {
         // 不能跳过：跳过会让 close() 误以为所有尝试都已核对完毕
         throw new Error(`支付渠道 ${payment.channel} 的配置不可用`);
       }
+      const paymentMethod =
+        payment.providerMethod && isVisiblePaymentMethod(payment.providerMethod)
+          ? payment.providerMethod
+          : payment.channel === "alipay" || payment.channel === "wechat"
+            ? payment.channel
+            : undefined;
       contexts.push({
         paymentId: payment.id,
         providerId: config.providerId,
+        providerInstanceId: config.instanceId,
         providerRef: payment.providerRef ?? undefined,
         providerTradeNo: payment.payTransactionId ?? undefined,
         config: {
           providerId: config.providerId,
           configId: config.id,
           configVersion: config.version,
+          ...(paymentMethod ? { paymentMethod } : {}),
           values: config.values,
         },
         adapter,
@@ -917,6 +1017,7 @@ export class PaymentOrderService {
       const config = await this.configs.resolveForOrder({
         channel: order.channel,
         providerConfigId: order.providerConfigId,
+        providerInstanceId: order.providerInstanceId,
       });
       const adapter = getAdapter(order.channel);
       if (!config || !adapter)
@@ -924,12 +1025,16 @@ export class PaymentOrderService {
       contexts.push({
         paymentId: null,
         providerId: config.providerId,
+        providerInstanceId: config.instanceId,
         providerRef: undefined,
         providerTradeNo: undefined,
         config: {
           providerId: config.providerId,
           configId: config.id,
           configVersion: config.version,
+          ...(order.channel === "alipay" || order.channel === "wechat"
+            ? { paymentMethod: order.channel }
+            : {}),
           values: config.values,
         },
         adapter,
@@ -968,6 +1073,7 @@ export class PaymentOrderService {
         providerId: attempt.providerId,
         configId: attempt.config.configId,
         paymentId: attempt.paymentId ?? undefined,
+        providerInstanceId: attempt.providerInstanceId,
         tradeNo,
         amountCents: result.amountCents,
         currency: result.currency ?? "CNY",
@@ -1007,13 +1113,16 @@ export class PaymentOrderService {
       orderNo: string;
       channel: string;
       providerConfigId: string | null;
+      providerInstanceId?: string | null;
       providerTradeNo: string | null;
       checkoutMode: string | null;
       payments: Array<{
         id: string;
         channel: string;
+        providerMethod: string | null;
         status: string;
         providerConfigId: string | null;
+        providerInstanceId: string | null;
         providerRef: string | null;
         payTransactionId: string | null;
       }>;
@@ -1147,6 +1256,101 @@ export class PaymentOrderService {
   }
 
   /**
+   * 预留一次用户主动取消额度。
+   *
+   * 用户行锁把「计数 → 写入预留」串行化，避免并发取消同时读到旧计数。
+   * 同一订单已有 reserved/consumed 记录时直接复用，不重复计数。
+   */
+  private async reserveCancelEvent(
+    orderId: string,
+    userId: string,
+  ): Promise<string | null> {
+    const rules = await this.settings.paymentRules();
+    if (!rules.cancelLimitEnabled) return null;
+
+    const unitMs = rules.cancelWindowUnit === "hour" ? 60 * 60_000 : 60_000;
+    const windowMs = Math.max(1, rules.cancelWindowSize) * unitMs;
+    const now = new Date();
+    const fixedWindowStart = new Date(
+      Math.floor(now.getTime() / windowMs) * windowMs,
+    );
+    const rollingWindowStart = new Date(now.getTime() - windowMs);
+    const windowStart =
+      rules.cancelWindowMode === "fixed" ? fixedWindowStart : now;
+    const windowEnd = new Date(windowStart.getTime() + windowMs);
+
+    return this.prisma.$transaction(async (tx) => {
+      await lockUserRow(tx, userId);
+
+      const existing = await tx.orderCancelEvent.findUnique({
+        where: { orderId },
+        select: { id: true, status: true },
+      });
+      if (
+        existing &&
+        (existing.status === "reserved" || existing.status === "consumed")
+      ) {
+        return existing.id;
+      }
+
+      const where: Prisma.OrderCancelEventWhereInput = {
+        userId,
+        status: { in: ["reserved", "consumed"] },
+        NOT: { orderId },
+        ...(rules.cancelWindowMode === "fixed"
+          ? { windowStart: fixedWindowStart }
+          : { reservedAt: { gte: rollingWindowStart } }),
+      };
+      const used = await tx.orderCancelEvent.count({ where });
+      if (used >= rules.cancelLimitMax) {
+        throw new AppError(
+          42901,
+          `取消订单过于频繁，请稍后再试（${rules.cancelWindowSize} ${rules.cancelWindowUnit === "hour" ? "小时" : "分钟"}内最多 ${rules.cancelLimitMax} 次）`,
+          429,
+        );
+      }
+
+      if (existing) {
+        await tx.orderCancelEvent.update({
+          where: { id: existing.id },
+          data: {
+            status: "reserved",
+            windowMode: rules.cancelWindowMode,
+            windowStart,
+            windowEnd,
+            reservedAt: now,
+            consumedAt: null,
+            releasedAt: null,
+          },
+        });
+        return existing.id;
+      }
+
+      const created = await tx.orderCancelEvent.create({
+        data: {
+          orderId,
+          userId,
+          status: "reserved",
+          windowMode: rules.cancelWindowMode,
+          windowStart,
+          windowEnd,
+          reservedAt: now,
+        },
+        select: { id: true },
+      });
+      return created.id;
+    });
+  }
+
+  /** 关单未成功时归还预留额度；已被其他路径消费的记录保持 consumed。 */
+  private async releaseCancelReservation(eventId: string): Promise<void> {
+    await this.prisma.orderCancelEvent.updateMany({
+      where: { id: eventId, status: "reserved" },
+      data: { status: "released", releasedAt: new Date() },
+    });
+  }
+
+  /**
    * 本地关单：置 cancelled、关闭 pending 尝试、释放库存，全部同一事务。
    *
    * `closeLeaseAt` 是关单租约所有权。传了就只允许持锁者落终态；不传时用于
@@ -1157,8 +1361,9 @@ export class PaymentOrderService {
   private async localClose(
     orderId: string,
     closeLeaseAt?: Date,
-  ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    cancelEventId?: string,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.updateMany({
         where: {
           id: orderId,
@@ -1181,7 +1386,7 @@ export class PaymentOrderService {
         where: { id: orderId },
         select: { status: true },
       });
-      if (updated.count === 0 && current?.status !== "cancelled") return;
+      if (updated.count === 0 && current?.status !== "cancelled") return false;
 
       // 订单关闭后，未完成的支付尝试也必须收尾，否则后台会一直显示 pending。
       await tx.payment.updateMany({
@@ -1190,6 +1395,14 @@ export class PaymentOrderService {
       });
       // 必须复用同一事务，否则进程中断会留下“已取消但库存仍 reserved”。
       await this.orders.releaseReservation(orderId, tx);
+      // 只有订单真正落为 cancelled，取消额度才从 reserved 转为 consumed。
+      if (cancelEventId) {
+        await tx.orderCancelEvent.updateMany({
+          where: { id: cancelEventId, orderId, status: "reserved" },
+          data: { status: "consumed", consumedAt: new Date(), releasedAt: null },
+        });
+      }
+      return true;
     });
   }
 
@@ -1225,6 +1438,7 @@ export class PaymentOrderService {
       id: string;
       status: string;
       channel: string;
+      providerMethod: string | null;
       providerRef: string | null;
       payTransactionId: string | null;
       amountCents: number;
@@ -1249,7 +1463,7 @@ export class PaymentOrderService {
       displayStatus,
       amountCents: order.paidCents,
       currency: order.currency || "CNY",
-      providerId: order.channel,
+      providerId: visibleProviderId(order.channel, order.payments[0]?.providerMethod),
       checkoutMode: order.checkoutMode,
       checkoutValue: terminal ? "" : order.checkoutValue,
       expiresAt: order.expiresAt.toISOString(),
@@ -1262,7 +1476,7 @@ export class PaymentOrderService {
       payments: order.payments.map((p) => ({
         id: p.id,
         status: p.status,
-        providerId: p.channel,
+        providerId: visibleProviderId(p.channel, p.providerMethod),
         providerRef: p.providerRef,
         providerTradeNo: p.payTransactionId,
         amountCents: p.amountCents,
@@ -1305,4 +1519,28 @@ export class PaymentOrderService {
 
 function truncate(value: string, max: number): string {
   return value.length > max ? value.slice(0, max) : value;
+}
+
+function buildPaymentSubject(
+  order: {
+    orderNo: string;
+    items: Array<{ nameSnapshot?: string | null; quantity?: number | null }>;
+    membershipPlan?: { name?: string | null } | null;
+  },
+  prefix: string,
+  suffix: string,
+): string {
+  const itemNames = order.items
+    .map((item) => {
+      const name = item.nameSnapshot?.trim();
+      if (!name) return "";
+      const quantity = item.quantity ?? 1;
+      return quantity > 1 ? `${name} ×${quantity}` : name;
+    })
+    .filter(Boolean);
+  const planName = order.membershipPlan?.name?.trim();
+  const base = itemNames.length > 0
+    ? itemNames.join("、")
+    : planName || `订单 ${order.orderNo}`;
+  return truncate(`${prefix}${base}${suffix}`.trim(), 120);
 }

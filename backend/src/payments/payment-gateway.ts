@@ -27,6 +27,7 @@ export class PaymentGateway {
   async contextForOrder(order: {
     channel: string;
     providerConfigId: string | null;
+    providerInstanceId?: string | null;
   }): Promise<PaymentContext | null> {
     const config = await this.configs.resolveForOrder(order);
     if (!config) return null;
@@ -45,7 +46,11 @@ export class PaymentGateway {
    * 置 failed 并保留「结果未知」语义。凭据缺失同样返回 failed，绝不降级沙箱。
    */
   async refund(input: {
-    order: { channel: string; providerConfigId: string | null };
+    order: {
+      channel: string;
+      providerConfigId: string | null;
+      providerInstanceId?: string | null;
+    };
     orderNo: string;
     outRefundNo: string;
     amountCents: number;
@@ -57,15 +62,24 @@ export class PaymentGateway {
     const adapter = getAdapter(input.order.channel);
     if (!adapter) return { state: 'failed', error: `未知支付渠道: ${input.order.channel}` };
 
-    let config: PaymentContext | null;
+    let resolved: Awaited<ReturnType<PaymentConfigService['resolveForOrder']>>;
     try {
-      config = await this.contextForOrder(input.order);
+      resolved = await this.configs.resolveForOrder(input.order);
     } catch (e) {
       return { state: 'failed', error: `支付配置读取失败: ${(e as Error).message}` };
     }
-    if (!config) {
+    if (!resolved) {
       return { state: 'failed', error: `支付渠道 ${input.order.channel} 未完成配置，无法退款` };
     }
+    if (!resolved.refundEnabled) {
+      return { state: 'failed', error: '该支付实例已关闭退款' };
+    }
+    const config: PaymentContext = {
+      providerId: resolved.providerId,
+      configId: resolved.id,
+      configVersion: resolved.version,
+      values: resolved.values,
+    };
 
     const missing = adapter.validateConfig(config.values);
     if (missing.length > 0) {

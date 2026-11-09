@@ -29,14 +29,8 @@ import {
 import { ApiError, creditsApi, ordersApi, paymentsApi } from './api';
 import { blockedReasonOf, newIdempotencyKey } from './utils';
 import { notifyCreditsChanged } from '../../context/CreditsContext';
-import type {
-  CreditBalance,
-  MembershipPlan,
-  Order,
-  PaymentIntent,
-  PaymentProviderInfo,
-  Product,
-} from '../../types/api';
+import type { CreditBalance, MembershipPlan, Order, Product } from '../../types/api';
+import type { PaymentIntent, PaymentProviderInfo } from '../../types/payment';
 
 /** 余额变更通知: 支付成功 / 0 元领取后让顶导刷新积分 */
 export { notifyCreditsChanged };
@@ -81,8 +75,20 @@ export function useCheckoutPayment({
   const [selectedProviderId, setSelectedProviderId] = useState('');
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providersError, setProvidersError] = useState<string | null>(null);
+  const [helpImage, setHelpImage] = useState('');
+  const [helpText, setHelpText] = useState('');
 
   const pollRef = useRef<number | null>(null);
+  /**
+   * 支付宝 App 唤起后的二维码兜底。
+   *
+   * App 成功切到后台时不再闪出二维码；切回页面仍未支付时立即展示备用二维码。
+   * 定时器与监听器都挂在同一个 ref 上，轮询结束时统一清理，避免已进入结果页
+   * 后又被迟到的 visibilitychange 拉回扫码态。
+   */
+  const deepLinkTimerRef = useRef<number | null>(null);
+  const deepLinkVisibilityRef = useRef<(() => void) | null>(null);
+  const deepLinkQrRef = useRef<string | null>(null);
 
   /**
    * ⚠ 必须用 ref 而非 state: 重渲染会让 state 拿到新 key,
@@ -90,12 +96,49 @@ export function useCheckoutPayment({
    */
   const idemKeyRef = useRef<string>(newIdempotencyKey());
 
+  const clearDeepLinkAttempt = useCallback(() => {
+    if (deepLinkTimerRef.current !== null) {
+      window.clearTimeout(deepLinkTimerRef.current);
+      deepLinkTimerRef.current = null;
+    }
+    if (deepLinkVisibilityRef.current) {
+      document.removeEventListener('visibilitychange', deepLinkVisibilityRef.current);
+      deepLinkVisibilityRef.current = null;
+    }
+    deepLinkQrRef.current = null;
+  }, []);
+
   const stopPolling = useCallback(() => {
     if (pollRef.current !== null) {
       window.clearInterval(pollRef.current);
       pollRef.current = null;
     }
-  }, []);
+    clearDeepLinkAttempt();
+  }, [clearDeepLinkAttempt]);
+
+  /** App 唤起后仅在页面仍可见时展示二维码；后台切回时再补展示。 */
+  const armDeepLinkQrFallback = useCallback(
+    (dataUrl: string) => {
+      clearDeepLinkAttempt();
+      deepLinkQrRef.current = dataUrl;
+      const showIfVisible = () => {
+        if (!deepLinkQrRef.current) return;
+        if (document.visibilityState === 'visible') {
+          setQrDataUrl(deepLinkQrRef.current);
+        }
+      };
+      const onVisibilityChange = () => {
+        if (document.visibilityState === 'visible') showIfVisible();
+      };
+      deepLinkVisibilityRef.current = onVisibilityChange;
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      deepLinkTimerRef.current = window.setTimeout(() => {
+        deepLinkTimerRef.current = null;
+        showIfVisible();
+      }, 1200);
+    },
+    [clearDeepLinkAttempt],
+  );
 
   /** 渠道已确认到账：统一拉订单、刷新余额并切到结果页。 */
   const completePaidOrder = useCallback(
@@ -202,6 +245,26 @@ export function useCheckoutPayment({
       alive = false;
     };
   }, [token]);
+
+  /** 帮助信息是公开设置，不依赖登录态；加载失败时静默隐藏，不阻断支付。 */
+  useEffect(() => {
+    let alive = true;
+    paymentsApi
+      .settings()
+      .then((settings) => {
+        if (!alive) return;
+        setHelpImage(settings.helpImage || '');
+        setHelpText(settings.helpText || '');
+      })
+      .catch(() => {
+        if (!alive) return;
+        setHelpImage('');
+        setHelpText('');
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   /** 下单。重复调用复用同一 key, 后端返回同一订单 */
   const placeOrder = useCallback(async (): Promise<Order> => {
@@ -353,10 +416,24 @@ export function useCheckoutPayment({
       }
       if (intent.mode === 'qrcode' && intent.codeUrl) {
         const dataUrl = await QRCode.toDataURL(intent.codeUrl, { width: 220, margin: 1 });
-        setQrDataUrl(dataUrl);
         setOnlineIntent(intent);
         // 以渠道返回的订单过期时间为轮询截止，而不是固定的 5 分钟
         startPolling(o.id, intent.expiresAt);
+        if (intent.schemeUrl) {
+          /*
+           * 必须先把兜底与轮询装好，再同步尝试 App Scheme。App 成功接管时
+           * 页面进入后台，定时器到点不会弹二维码；用户切回未支付时监听器补弹。
+           */
+          armDeepLinkQrFallback(dataUrl);
+          try {
+            window.location.assign(intent.schemeUrl);
+          } catch {
+            // 浏览器拒绝自定义协议时直接展示二维码，轮询仍在继续。
+            setQrDataUrl(dataUrl);
+          }
+        } else {
+          setQrDataUrl(dataUrl);
+        }
         return;
       }
       if (intent.mode === 'qrcode-image' && intent.codeUrl) {
@@ -453,6 +530,8 @@ export function useCheckoutPayment({
     setSelectedProviderId,
     providersLoading,
     providersError,
+    helpImage,
+    helpText,
     stopPolling,
     refreshPaymentStatus,
     payOnline,

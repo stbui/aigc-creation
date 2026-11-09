@@ -89,8 +89,12 @@ export class AdminPaymentsService {
   }
 
   async settingsView() {
-    const currency = await this.settings.get<string>('payment.defaultCurrency');
-    return { defaultCurrency: currency };
+    const [defaultCurrency, alipaySource, wechatSource] = await Promise.all([
+      this.settings.get<string>('payment.defaultCurrency'),
+      this.settings.get<string>('payment.alipaySource'),
+      this.settings.get<string>('payment.wechatSource'),
+    ]);
+    return { defaultCurrency, alipaySource, wechatSource };
   }
 
   // ── 订单 ────────────────────────────────────────────────────────

@@ -1,4 +1,3 @@
-import type { AdminUserMembershipFields } from './admin-users';
 import type { AdminTaskRouteAttempt } from './task-route';
 /**
  * 能力标识。清单以后端 capability.registry 为准 (15 项), 前端不枚举 ——
@@ -708,63 +707,8 @@ export interface AdminLoginLogResult {
   total: number;
   failedLast30Days: number;
 }
-export interface AdminUserDetail extends AdminUserMembershipFields {
-  /** 绑定的手机号（未绑定为 null） */
-  phone?: string | null;
-  phoneVerifiedAt?: string | null;
-  id: string;
-  email: string;
-  name: string;
-  role: AdminRole | "user";
-  roleLabel: string;
-  status: UserStatus;
-  statusLabel: string;
-  createdAt: string;
-  lastLoginAt: string | null;
-  /** 当前可用积分与到期信息（与 C 端 /credits/balance 同源） */
-  credit?: {
-    balance: number;
-    expiringSoon: number;
-    activeLots: number;
-    nearestExpiry: string | null;
-  };
-  /** 计费分组（会员套餐映射，无有效会员落默认分组） */
-  group?: {
-    code: string;
-    name: string;
-    ratioBasisPoints: number;
-  };
-  stats: {
-    projects: number;
-    tasks: number;
-    assets: number;
-    orders: number;
-    tickets: number;
-    invoices: number;
-    taskStatus: {
-      succeeded: number;
-      failed: number;
-      running: number;
-      queued: number;
-    };
-  };
-  recentTasks: Array<{
-    id: string;
-    capability: string;
-    capabilityName: string;
-    mode: string;
-    status: TaskStatus;
-    createdAt: string;
-    thumbnailUrl: string | null;
-  }>;
-  recentAssets: Array<{
-    id: string;
-    sourceUrl: string;
-    kind: string;
-    width: number | null;
-    height: number | null;
-  }>;
-}
+/** 用户详情定义随用户域类型放在 `admin-users.ts`，此处保留出口避免调用方改路径 */
+export type { AdminUserDetail } from './admin-users';
 
 /** POST /api/v1/admin/users/:id/password */
 export interface AdminPasswordReset {
@@ -788,7 +732,7 @@ export interface AdminRoleItem {
 }
 
 /** 系统设置值。写入按 SETTING_DEFS 的 key 提交，后端负责类型与范围校验 */
-export type AdminSettingValue = string | number | boolean;
+export type AdminSettingValue = string | number | boolean | null;
 
 /** 系统设置写入载荷。`clears` 表示删除运行时覆盖、回落代码默认值 */
 export interface AdminSettingsUpdatePayload {
@@ -822,11 +766,17 @@ export interface AdminSettings {
       type: "string" | "number" | "boolean";
       value: AdminSettingValue;
       default: AdminSettingValue;
+      /** 数字项允许显式留空；null 表示“不限” */
+      nullable?: boolean;
       min?: number;
       max?: number;
       maxLength?: number;
       /** 允许取值的枚举；存在时渲染下拉而不是自由输入 */
       enum?: number[];
+      /** 字符串型可选值白名单；存在时渲染下拉而不是自由输入 */
+      options?: string[];
+      /** 字符串枚举值的展示文案；键为落库值 */
+      optionLabels?: Record<string, string>;
       /** 只读项：真实旋钮在别处，页面只展示当前值并给出跳转 */
       readOnly?: boolean;
       /** 只读项的跳转目标（后台路由） */
@@ -2009,120 +1959,6 @@ export interface AdminRetentionTarget {
 // ══════════════════════════════════════════════════════════════════════
 // 支付通道 / 发票 / 对账 (B3)
 // ══════════════════════════════════════════════════════════════════════
-
-/**
- * 发起支付的结果 (`POST /payments/:orderId/intent`)。
- *
- * `mode` 决定前端怎么拉起支付:
- *   redirect     → 跳 `payUrl` 到渠道收银台 (支付宝)
- *   qrcode       → 用 `codeUrl` 渲染二维码 (微信 Native)
- *   qrcode-image → `codeUrl` 是渠道给好的二维码图片地址, 直接展示
- *   sandbox      → 走站内沙箱模拟 (`POST /orders/:id/pay`)
- *   free         → 0 元订单已由后端直接入账，前端只需展示结果
- */
-/** GET /payments/providers 的可用支付渠道 */
-export interface PaymentProviderInfo {
-  id: string;
-  name: string;
-  icon: string | null;
-  /** redirect=跳转收银台 / qrcode=扫码 / qrcode-image=渠道二维码图片 / sandbox=站内模拟 */
-  checkoutMode: "redirect" | "qrcode" | "qrcode-image" | "sandbox";
-  supportedCurrencies: string[];
-  sandbox: boolean;
-}
-
-export interface PaymentIntent {
-  orderId: string;
-  orderNo: string;
-  amountCents: number;
-  currency: string;
-  /** 实际固定下来的渠道配置；0 元单为 free */
-  providerId:
-    | "sandbox"
-    | "alipay"
-    | "wechat"
-    | "paypal"
-    | "stripe"
-    | "epay"
-    | "zpay"
-    | "free";
-  configId: string | null;
-  configVersion: number | null;
-  mode: "redirect" | "qrcode" | "qrcode-image" | "sandbox" | "free";
-  payUrl?: string;
-  codeUrl?: string;
-  checkoutValue: string | null;
-  expiresAt: string;
-  hint?: string | null;
-  /** 沙箱通道: 界面必须显式标注「不产生真实扣款」 */
-  sandbox: boolean;
-}
-
-/** 支付状态轮询 (`GET /payments/:orderId/status` / `POST /payments/:orderId/query`) */
-export interface PaymentStatusResult {
-  orderId: string;
-  orderNo: string;
-  status: OrderStatus;
-  displayStatus: string;
-  amountCents: number;
-  currency: string;
-  providerId: string;
-  checkoutMode: string | null;
-  checkoutValue: string | null;
-  expiresAt: string;
-  providerPaidAt: string | null;
-  creditedAt: string | null;
-  closedAt: string | null;
-  lastError: string | null;
-  payments: Array<{
-    id: string;
-    status: string;
-    providerId: string;
-    providerRef: string | null;
-    providerTradeNo: string | null;
-    amountCents: number;
-    createdAt: string;
-  }>;
-}
-
-/** 'pending' 待开具 | 'issued' 已开具 | 'rejected' 已驳回 | 'red_flushed' 已冲红 */
-export type InvoiceStatus = "pending" | "issued" | "rejected" | "red_flushed";
-
-/** 发票 (C 端) */
-export interface Invoice {
-  id: string;
-  invoiceNo: string;
-  orderId: string;
-  orderNo: string | null;
-  amountCents: number;
-  kind: "personal" | "company";
-  title: string;
-  taxNo: string | null;
-  email: string | null;
-  content: string;
-  status: InvoiceStatus;
-  rejectReason: string | null;
-  issuedAt: string | null; redFlushedAt: string | null; redFlushedBy: string | null; redFlushReason: string | null;
-  createdAt: string;
-  /** 已开具时才有: 可打印 HTML 的地址 */
-  fileUrl: string | null;
-  hasStoredFile: boolean;
-}
-
-export interface CreateInvoicePayload {
-  orderId: string;
-  kind: "personal" | "company";
-  title: string;
-  taxNo?: string;
-  email?: string;
-  content?: string;
-}
-
-/** 后台发票行 (附带申请人信息) */
-export interface AdminInvoice extends Invoice {
-  userEmail: string | null;
-  userName: string | null;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 账户自助 / 法务 / 站内消息 (B4)

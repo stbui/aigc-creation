@@ -63,6 +63,7 @@ export const RECONCILIATION_EXPORT_LIMIT = 10_000;
 export interface RunView {
   id: string;
   providerId: string;
+  providerInstanceId: string;
   configId: string | null;
   billDate: string;
   attempt: number;
@@ -94,6 +95,7 @@ export interface ItemView {
 
 export interface ReconciliationListQuery {
   providerId?: string;
+  providerInstanceId?: string;
   status?: string;
   from?: string;
   to?: string;
@@ -123,6 +125,7 @@ export class PaymentReconciliationService {
 
   async run(input: {
     providerId: PaymentProviderId;
+    providerInstanceId: string;
     billDate: string;
     retryFailed?: boolean;
     actorId: string;
@@ -130,7 +133,11 @@ export class PaymentReconciliationService {
     this.assertBillDate(input.billDate);
 
     const latest = await this.prisma.paymentReconciliationRun.findFirst({
-      where: { providerId: input.providerId, billDate: input.billDate },
+      where: {
+        providerId: input.providerId,
+        providerInstanceId: input.providerInstanceId,
+        billDate: input.billDate,
+      },
       orderBy: { attempt: "desc" },
     });
     if (latest?.status === "running") {
@@ -152,12 +159,18 @@ export class PaymentReconciliationService {
       throw new AppError(40001, `渠道 ${input.providerId} 不支持自动对账`, 400);
     }
 
-    const config = await this.configs.latest(input.providerId);
-    if (!config) throw new AppError(50301, "渠道未完成配置，无法对账", 503);
+    const config = await this.configs.latestInstance(
+      input.providerId,
+      input.providerInstanceId,
+    );
+    if (!config) {
+      throw new AppError(40400, "支付服务商实例不存在", 404);
+    }
 
     const attempt = (latest?.attempt ?? 0) + 1;
     let run = await this.createRunRow({
       providerId: input.providerId,
+      providerInstanceId: input.providerInstanceId,
       configId: config.id,
       billDate: input.billDate,
       attempt,
@@ -187,7 +200,7 @@ export class PaymentReconciliationService {
         },
       });
       this.logger.error(
-        `对账账单下载失败 (${input.providerId} ${input.billDate}): ${(e as Error).message}`,
+        `对账账单下载失败 (${input.providerId}/${input.providerInstanceId} ${input.billDate}): ${(e as Error).message}`,
       );
       return { run: toRunView(run), reused: false };
     }
@@ -196,6 +209,7 @@ export class PaymentReconciliationService {
       run: await this.compare(
         run.id,
         input.providerId,
+        input.providerInstanceId,
         config.id,
         records,
         input.billDate,
@@ -206,6 +220,7 @@ export class PaymentReconciliationService {
 
   async importCsv(input: {
     providerId: PaymentProviderId;
+    providerInstanceId: string;
     billDate: string;
     file: Buffer;
     fileName: string;
@@ -226,9 +241,19 @@ export class PaymentReconciliationService {
     if (records.length === 0)
       throw new AppError(40001, "账单没有交易记录", 400);
 
-    const config = await this.configs.latest(input.providerId);
+    const config = await this.configs.latestInstance(
+      input.providerId,
+      input.providerInstanceId,
+    );
+    if (!config) {
+      throw new AppError(40400, "支付服务商实例不存在", 404);
+    }
     const latest = await this.prisma.paymentReconciliationRun.findFirst({
-      where: { providerId: input.providerId, billDate: input.billDate },
+      where: {
+        providerId: input.providerId,
+        providerInstanceId: input.providerInstanceId,
+        billDate: input.billDate,
+      },
       orderBy: { attempt: "desc" },
     });
     if (latest?.status === "running" && !(await this.recoverIfStale(latest))) {
@@ -237,7 +262,8 @@ export class PaymentReconciliationService {
 
     const run = await this.createRunRow({
       providerId: input.providerId,
-      configId: config?.id ?? null,
+      providerInstanceId: input.providerInstanceId,
+      configId: config.id,
       billDate: input.billDate,
       attempt: (latest?.attempt ?? 0) + 1,
       source: "csv",
@@ -249,7 +275,8 @@ export class PaymentReconciliationService {
     const compared = await this.compare(
       run.id,
       input.providerId,
-      config?.id ?? "",
+      input.providerInstanceId,
+      config.id,
       records,
       input.billDate,
     );
@@ -263,6 +290,9 @@ export class PaymentReconciliationService {
     const pageSize = query.pageSize ?? 30;
     const where: Record<string, unknown> = {};
     if (query.providerId) where.providerId = query.providerId;
+    if (query.providerInstanceId) {
+      where.providerInstanceId = query.providerInstanceId;
+    }
     if (query.status) {
       if (!["running", "completed", "failed"].includes(query.status)) {
         throw new AppError(40001, `对账状态非法: ${query.status}`, 400);
@@ -347,12 +377,17 @@ export class PaymentReconciliationService {
       where: { status: "completed" },
       orderBy: [{ billDate: "desc" }, { attempt: "desc" }],
       take: 500,
-      select: { id: true, providerId: true, billDate: true },
+      select: {
+        id: true,
+        providerId: true,
+        providerInstanceId: true,
+        billDate: true,
+      },
     });
     const seen = new Set<string>();
     const ids: string[] = [];
     for (const run of runs) {
-      const key = `${run.providerId}|${run.billDate}`;
+      const key = `${run.providerId}|${run.providerInstanceId}|${run.billDate}`;
       if (seen.has(key)) continue;
       seen.add(key);
       ids.push(run.id);
@@ -363,6 +398,9 @@ export class PaymentReconciliationService {
   async runsForExport(query: ReconciliationListQuery) {
     const where: Record<string, unknown> = {};
     if (query.providerId) where.providerId = query.providerId;
+    if (query.providerInstanceId) {
+      where.providerInstanceId = query.providerInstanceId;
+    }
     if (query.status) where.status = query.status;
     if (query.from || query.to) {
       where.AND = [
@@ -420,6 +458,7 @@ export class PaymentReconciliationService {
   private async compare(
     runId: string,
     providerId: PaymentProviderId,
+    providerInstanceId: string,
     configId: string,
     records: BillRecord[],
     billDate: string,
@@ -445,6 +484,7 @@ export class PaymentReconciliationService {
       const outcome = await this.compareOne(
         runId,
         providerId,
+        providerInstanceId,
         configId,
         record,
         previousTradeNo,
@@ -454,7 +494,12 @@ export class PaymentReconciliationService {
       else errors += 1;
     }
 
-    // 本地已支付但账单没有记录：不降级、不猜，只记录
+    // 本地已支付但账单没有记录：不降级、不猜，只记录。
+    // 老订单可能没有 providerInstanceId，但其 configId 仍属于当前实例版本链。
+    const instanceConfigIds = await this.instanceConfigIds(
+      providerId,
+      providerInstanceId,
+    );
     const localPaid = await this.prisma.order.findMany({
       where: {
         channel: providerId,
@@ -466,6 +511,14 @@ export class PaymentReconciliationService {
           ),
         },
         providerTradeNo: { not: null },
+        ...(instanceConfigIds.length > 0
+          ? {
+              OR: [
+                { providerInstanceId },
+                { providerConfigId: { in: instanceConfigIds } },
+              ],
+            }
+          : { providerInstanceId }),
       },
       select: {
         id: true,
@@ -516,14 +569,26 @@ export class PaymentReconciliationService {
       },
     });
     this.logger.log(
-      `对账完成 (${providerId} ${billDate}): 共 ${matched + recovered + errors} 笔, 一致 ${matched}, 补发 ${recovered}, 异常 ${errors}`,
+      `对账完成 (${providerId}/${providerInstanceId} ${billDate}): 共 ${matched + recovered + errors} 笔, 一致 ${matched}, 补发 ${recovered}, 异常 ${errors}`,
     );
     return toRunView(run);
+  }
+
+  private async instanceConfigIds(
+    providerId: PaymentProviderId,
+    providerInstanceId: string,
+  ): Promise<string[]> {
+    const rows = await this.prisma.paymentProviderConfig.findMany({
+      where: { providerId, instanceId: providerInstanceId },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
   }
 
   private async compareOne(
     runId: string,
     providerId: PaymentProviderId,
+    providerInstanceId: string,
     configId: string,
     record: BillRecord,
     previousTradeNo?: string,
@@ -712,9 +777,19 @@ export class PaymentReconciliationService {
       );
       return "credit_failed";
     }
-    const config = await this.configs.latest(providerId);
     const adapter = getAdapter(providerId);
-    if (!config || !adapter) {
+    let config;
+    try {
+      config = await this.configs.byId(configId);
+    } catch {
+      config = null;
+    }
+    if (
+      !config ||
+      !adapter ||
+      config.providerId !== providerId ||
+      config.instanceId !== providerInstanceId
+    ) {
       await this.exceptions.recordManual({
         providerId,
         orderId: order.id,
@@ -766,6 +841,7 @@ export class PaymentReconciliationService {
         orderId: order.id,
         providerId,
         configId: config.id,
+        providerInstanceId: config.instanceId,
         tradeNo: queried.tradeNo ?? record.providerTradeNo,
         amountCents: queried.amountCents ?? record.amountCents,
         currency: (queried.currency ?? record.currency) as PaymentCurrency,
@@ -797,11 +873,12 @@ export class PaymentReconciliationService {
 
   /**
    * 并发 claim 的兜底：两个请求同时通过 `latest` 检查时，唯一约束
-   * `(providerId, billDate, attempt)` 只会让一个成功；另一个返回 409
+   * `(providerId, providerInstanceId, billDate, attempt)` 只会让一个成功；另一个返回 409
    * 而不是 500。换 Postgres 多实例时仍建议改成行锁。
    */
   private async createRunRow(data: {
     providerId: string;
+    providerInstanceId: string;
     configId: string | null;
     billDate: string;
     attempt: number;
@@ -945,6 +1022,7 @@ function parseBillCsv(
 function toRunView(row: {
   id: string;
   providerId: string;
+  providerInstanceId: string;
   configId: string | null;
   billDate: string;
   attempt: number;
@@ -963,6 +1041,7 @@ function toRunView(row: {
   return {
     id: row.id,
     providerId: row.providerId,
+    providerInstanceId: row.providerInstanceId,
     configId: row.configId,
     billDate: row.billDate,
     attempt: row.attempt,

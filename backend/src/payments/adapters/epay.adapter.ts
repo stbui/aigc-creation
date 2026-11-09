@@ -77,15 +77,15 @@ export class EpayAdapter implements PaymentAdapter {
       },
       {
         name: 'type',
-        label: '支付类型',
+        label: '默认支付类型（兼容旧配置）',
         type: 'select',
-        required: true,
-        default: '2',
+        required: false,
+        default: '',
         options: [
           { value: '1', label: '微信支付' },
           { value: '2', label: '支付宝' },
         ],
-        description: '文档规定：微信为 1，支付宝为 2',
+        description: '新版前台按所选支付方式自动传入；仅未固化支付方式的历史订单使用此默认值',
       },
       {
         name: 'publicBaseUrl',
@@ -102,7 +102,8 @@ export class EpayAdapter implements PaymentAdapter {
     const invalid: string[] = [];
     if (!configMchId(values)) invalid.push('mchId');
     if (!values.key?.trim()) invalid.push('key');
-    if (!configType(values)) invalid.push('type');
+    const rawType = (values.type || values.payType || '').trim();
+    if (rawType && !configType(values)) invalid.push('type');
     const apiBase = values.apiBase?.trim();
     if (apiBase && !isAllowedPublicBase(apiBase)) invalid.push('apiBase');
     const publicBaseUrl = values.publicBaseUrl?.trim();
@@ -113,7 +114,9 @@ export class EpayAdapter implements PaymentAdapter {
   async createOrder(input: CreateOrderInput): Promise<PaymentCheckout> {
     const values = input.config.values;
     const mchId = configMchId(values);
-    const type = configType(values);
+    const type = input.config.paymentMethod
+      ? epayTypeForMethod(input.config.paymentMethod)
+      : configType(values);
     const key = values.key ?? '';
     if (!mchId || !type || !key) throw new Error('易支付商户 ID、通讯密钥或支付类型不完整');
     if (input.currency !== 'CNY') throw new Error('易支付仅支持 CNY');
@@ -261,7 +264,9 @@ export class EpayAdapter implements PaymentAdapter {
       return { ok: false, ackSuccess: false, reason: '易支付回调商户 ID 不匹配', rawPayload: raw };
     }
 
-    const expectedType = configType(input.config.values);
+    const expectedType = input.expectedPaymentMethod
+      ? epayTypeForMethod(input.expectedPaymentMethod)
+      : configType(input.config.values);
     if (!expectedType || values.type?.trim() !== expectedType) {
       return { ok: false, ackSuccess: false, reason: '易支付回调支付类型不匹配', rawPayload: raw };
     }
@@ -401,6 +406,10 @@ function configMchId(values: Readonly<Record<string, string>>): string {
 
 function configType(values: Readonly<Record<string, string>>): EpayType | '' {
   return normalizeEpayType(values.type || values.payType || '');
+}
+
+function epayTypeForMethod(method: 'alipay' | 'wechat'): EpayType {
+  return method === 'alipay' ? '2' : '1';
 }
 
 function normalizeEpayType(value: string): EpayType | '' {

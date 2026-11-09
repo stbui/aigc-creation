@@ -428,7 +428,7 @@ export class AdminCommerceService {
     status: string,
   ): Promise<void> {
     if (currency !== "USD" || status !== "active") return;
-    const available = await this.paymentConfigs.available("USD");
+    const available = await this.paymentConfigs.availableVisible("USD");
     if (available.length === 0) {
       throw new AppError(
         40001,

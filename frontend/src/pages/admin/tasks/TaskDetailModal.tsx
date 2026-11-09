@@ -1,9 +1,9 @@
-import { useCallback, type ReactNode } from 'react';
+import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Copy, ExternalLink, ImageOff, X } from 'lucide-react';
+import { Copy, ExternalLink, ImageOff } from 'lucide-react';
 import {
   ActionButton,
-  AdminDrawer,
+  AdminModal,
   Descriptions,
   DetailSection,
   Notice,
@@ -12,6 +12,7 @@ import {
 import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from './api';
 import { useToast } from './hooks';
 import { TaskFullChain } from './TaskFullChain';
+import { TaskTimeline } from './TaskTimeline';
 import {
   adminAssetHref,
   adminChannelHref,
@@ -20,7 +21,6 @@ import {
   adminTaskHref,
   adminTasksHref,
   adminUserDetailHref,
-  cn,
   fmtBytes,
   formatDuration,
   taskErrorLabel,
@@ -29,79 +29,16 @@ import type { AdminTask, AdminTaskDetail } from '../../../types/api';
 
 type Row = AdminTask;
 
-type StepState = 'done' | 'active' | 'pending' | 'failed' | 'cancelled';
-
 /**
- * 状态流转时间线。
+ * 任务详情弹窗。
  *
- * 新 primitives 层没有 Steps，这里按详情抽屉的需要本地实现：节点用序号 /
- * 对勾双编码，颜色仍走语义令牌（完成绿、进行中品牌紫、未开始灰）。
- */
-function Steps({
-  items,
-}: {
-  items: Array<{ title: string; state: StepState; description: ReactNode }>;
-}) {
-  return (
-    <ol className="flex flex-col gap-4">
-      {items.map((node, index) => (
-        <li key={index} className="relative flex gap-3">
-          {index < items.length - 1 && (
-            <span
-              aria-hidden
-              className="absolute top-5 left-[9.5px] h-[calc(100%+8px)] w-px bg-border"
-            />
-          )}
-          <span
-            className={cn(
-              'relative z-10 mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border text-[12px] tabular-nums',
-              node.state === 'done'
-                ? 'border-success-text bg-success-soft text-success-text'
-                : node.state === 'failed'
-                  ? 'border-danger-text bg-danger-soft text-danger-text'
-                  : node.state === 'active'
-                    ? 'border-brand bg-accent text-brand'
-                    : 'border-border bg-muted text-muted-foreground',
-            )}
-          >
-            {node.state === 'done' ? (
-              <Check className="size-3" aria-hidden />
-            ) : node.state === 'failed' || node.state === 'cancelled' ? (
-              <X className="size-3" aria-hidden />
-            ) : (
-              index + 1
-            )}
-          </span>
-          <div className="min-w-0">
-            <div
-              className={cn(
-                'text-sm',
-                node.state === 'failed'
-                  ? 'font-medium text-danger-text'
-                  : node.state === 'done' || node.state === 'active'
-                    ? 'font-medium text-foreground'
-                    : 'text-muted-foreground',
-              )}
-            >
-              {node.title}
-            </div>
-            <div className="mt-0.5 text-[12px] text-muted-foreground tabular-nums">
-              {node.description}
-            </div>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-/**
- * 任务详情抽屉。
+ * 从页面拆出：详情的取数、状态流转、全链路排障与列表筛选/批量操作是两套
+ * 生命周期，混在一个组件里会让列表重新渲染时详情跟着重算。
  *
- * 从页面拆出：抽屉的数据获取、状态流转与产出预览与列表筛选/批量操作是两套
- * 生命周期，混在一个组件里会让列表重新渲染时抽屉跟着重算。
+ * 用居中弹窗而不是抽屉：全链路要并排 5 段摘要、产出图要按原比例预览，
+ * 720px 的抽屉会把每一段都挤成两行。
  */
-export function TaskDetailDrawer({
+export function TaskDetailModal({
   detailId,
   rows,
   canRetry,
@@ -140,9 +77,11 @@ export function TaskDetailDrawer({
   };
 
   return (
-    <AdminDrawer<AdminTaskDetail>
+    <AdminModal<AdminTaskDetail>
       open={detailId !== null}
       title="任务详情"
+      description="按同一任务 ID 串联提交、线路派发、模型调用与账单终态。"
+      width={1120}
       onClose={onClose}
       fetcher={detailFetcher}
       footer={(d) => {
@@ -207,7 +146,7 @@ export function TaskDetailDrawer({
           <div className="flex flex-col gap-5">
             <section
               aria-labelledby="task-detail-heading"
-              className="rounded-xl border border-border bg-muted/30 p-4"
+              className="rounded-lg border border-border bg-muted/30 p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -219,15 +158,13 @@ export function TaskDetailDrawer({
                   </div>
                   <h2
                     id="task-detail-heading"
-                    className="mt-2 text-lg font-semibold text-foreground"
+                    className="mt-2 text-lg leading-7 font-semibold text-foreground"
                   >
                     {d.capabilityName}
                   </h2>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    创建于{' '}
-                    <time className="tabular-nums" dateTime={d.createdAt}>
-                      {createdAt}
-                    </time>
+                  <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+                    <span className="shrink-0">任务 ID</span>
+                    <code className="min-w-0 font-mono break-all text-foreground">{d.id}</code>
                   </p>
                 </div>
                 <ActionButton
@@ -239,15 +176,6 @@ export function TaskDetailDrawer({
                 >
                   复制 ID
                 </ActionButton>
-              </div>
-
-              <div className="mt-3 flex min-w-0 items-start gap-2 rounded-md border border-border bg-card px-3 py-2">
-                <span className="shrink-0 text-[12px] font-medium text-muted-foreground">
-                  任务 ID
-                </span>
-                <code className="min-w-0 break-all font-mono text-[12px] text-foreground">
-                  {d.id}
-                </code>
               </div>
             </section>
 
@@ -272,14 +200,14 @@ export function TaskDetailDrawer({
 
             <DetailSection title="任务概要">
               <Descriptions
-                columns={2}
+                columns={3}
                 items={[
                   {
                     label: '用户',
                     value: (
                       <span className="flex flex-col gap-1">
                         <Link
-                          className="text-brand hover:underline"
+                          className="truncate text-brand hover:underline"
                           to={adminUserDetailHref(d.user.id)}
                         >
                           {d.user.email}
@@ -315,7 +243,10 @@ export function TaskDetailDrawer({
                       </Link>
                     ),
                   },
-                  { label: '积分消耗', value: <span className="tabular-nums">{d.creditCost} 积分</span> },
+                  {
+                    label: '积分消耗',
+                    value: <span className="tabular-nums">{d.creditCost} 积分</span>,
+                  },
                   {
                     label: '耗时',
                     value: <span className="tabular-nums">{formatDuration(d.durationMs)}</span>,
@@ -365,7 +296,7 @@ export function TaskDetailDrawer({
                     : `总耗时 ${formatDuration(d.durationMs)}`
               }
             >
-              <Steps
+              <TaskTimeline
                 items={d.timeline.map((n) => ({
                   title: n.label,
                   state:
@@ -399,28 +330,40 @@ export function TaskDetailDrawer({
 
             <DetailSection title="产出图">
               {d.outputAsset ? (
-                <div className="flex flex-col gap-2.5">
+                <div className="flex flex-wrap items-start gap-5">
                   <Link
-                    className="flex max-h-[420px] items-center justify-center overflow-hidden"
+                    className="block max-w-full overflow-hidden rounded-lg border border-border bg-muted/20"
                     to={adminAssetHref(d.outputAsset.id)}
                     aria-label="在素材库查看产出图"
                   >
                     <img
-                      className="max-h-[420px] max-w-full object-contain"
+                      className="max-h-[480px] max-w-full object-contain"
                       src={toAbsoluteUrl(d.outputAsset.sourceUrl)}
                       alt="任务产出图"
                     />
                   </Link>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-muted-foreground">
-                    <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">
-                      {d.outputAsset.width && d.outputAsset.height
-                        ? `${d.outputAsset.width}×${d.outputAsset.height}`
-                        : '尺寸未知'}
-                    </span>
-                    <span>{d.outputAsset.format}</span>
-                    <span className="tabular-nums">{fmtBytes(d.outputAsset.sizeBytes)}</span>
+                  <div className="flex min-w-[168px] flex-col gap-3">
+                    <Descriptions
+                      items={[
+                        {
+                          label: '尺寸',
+                          value: (
+                            <span className="tabular-nums">
+                              {d.outputAsset.width && d.outputAsset.height
+                                ? `${d.outputAsset.width}×${d.outputAsset.height}`
+                                : '尺寸未知'}
+                            </span>
+                          ),
+                        },
+                        { label: '格式', value: d.outputAsset.format },
+                        {
+                          label: '文件大小',
+                          value: <span className="tabular-nums">{fmtBytes(d.outputAsset.sizeBytes)}</span>,
+                        },
+                      ]}
+                    />
                     <Link
-                      className="ml-auto inline-flex items-center gap-1 text-brand hover:underline"
+                      className="inline-flex items-center gap-1 text-[12px] text-brand hover:underline"
                       to={adminAssetHref(d.outputAsset.id)}
                     >
                       在素材库查看
@@ -445,7 +388,7 @@ export function TaskDetailDrawer({
                 title="输入素材"
                 note={`共 ${d.inputAssets.length} 张，按提交顺序排列`}
               >
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                   {d.inputAssets.map((a, i) => (
                     <div key={a.id} className="min-w-0">
                       <Link
@@ -498,6 +441,6 @@ export function TaskDetailDrawer({
           </div>
         );
       }}
-    </AdminDrawer>
+    </AdminModal>
   );
 }

@@ -9,7 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
-import type { Invoice, Order, OrderStatus } from '../types/api';
+import type { Order, OrderStatus } from '../types/api';
+import type { Invoice } from '../types/payment';
 import { useApp, Button, Input, Select } from '../ui';
 
 /**

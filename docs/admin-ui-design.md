@@ -202,11 +202,11 @@ SidebarInset（内容区）
 
 `AdminDataTable` 的表格骨架另走一路：`TableSkeleton` 用**真实的 `<table>` 结构**渲染，按 `columns` 的 `width` / `align` / `fixed` 出列宽，所以加载态与加载完成的表格列宽一致，不会横向跳。它同样带 `data-testid="admin-page-loading"` —— 两者不会同时出现（页面骨架时表格还没渲染）。
 
-### 3.5 详情抽屉
+### 3.5 详情浮层（抽屉 / 弹窗）
 
-一律 `AdminDrawer`，不跳独立路由。详情 id 与地址栏 `?id=` 同步，便于刷新与转发。
+默认用 `AdminDrawer`，不跳独立路由。详情 id 与地址栏 `?id=` 同步，便于刷新与转发。内容需要并排区块、宽表格或大图预览时用 `AdminModal`（默认 960，任务详情 1120）—— 两者共用同一套取数生命周期，只是浮层形态不同。
 
-`AdminDrawer` 自己拉数据（列表只带摘要字段），`children` 是**渲染函数**而不是元素：详情到达前根本不渲染空壳。关闭即清空 —— 下次打开的可能是另一条记录，留着上一条的数据会让第一次渲染闪一下旧内容。
+`AdminDrawer` / `AdminModal` 自己拉数据（列表只带摘要字段），`children` 是**渲染函数**而不是元素：详情到达前根本不渲染空壳。关闭即清空 —— 下次打开的可能是另一条记录，留着上一条的数据会让第一次渲染闪一下旧内容。
 
 抽屉内是「基本信息 → 关联数据 → 操作」三段，危险操作固定在底部，不与主要信息混排。可编辑抽屉关闭时若内容有改动，先确认「放弃修改 / 继续编辑」。
 
@@ -336,7 +336,7 @@ SidebarInset（内容区）
 | `fields.tsx` | `CheckboxField` / `FilePicker` / `HelpTip` / `IconButton` / `ColorField` / `RangeField` / `SuggestField` |
 | `table.tsx` | `AdminDataTable` |
 | `overlay.tsx` | `ModalDialog` / `Drawer` / `ConfirmDialog`（shadcn `AlertDialog` 组合壳）/ `RowMenu` |
-| `drawer.tsx` | `AdminDrawer`（懒加载详情抽屉） |
+| `DetailDialog.tsx` | `AdminDrawer` / `AdminModal`（懒加载详情浮层，共用取数生命周期） |
 | `duty-strip.tsx` / `duty-tower.tsx` | 概览首屏的值班条与值班塔 |
 | `chart.tsx` | `TrendBarChart`（Recharts） |
 

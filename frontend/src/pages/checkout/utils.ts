@@ -37,6 +37,27 @@ export function quoteErrorMessageOf(error: unknown, couponCode: string): string 
     : '优惠试算失败，当前按原价结算';
 }
 
+/**
+ * 帮助图片 URL 白名单。
+ *
+ * 只接受站内相对路径与 http(s) 绝对地址，拒绝 `javascript:` / `data:` /
+ * 协议相对 URL 与控制字符；后台设置可写任意字符串，渲染前必须再校验一次。
+ */
+export function safeHelpImageUrl(value: string | null | undefined): string | null {
+  const raw = value?.trim();
+  if (!raw || raw.startsWith('//') || raw.includes('\\')) return null;
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return null;
+
+  if (raw.startsWith('/')) return raw;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
 /* ── 订单可支付判定 ─────────────────────────────────────────────────────
  *
  * 页面（渲染「不能支付」提示）与支付状态机（真正发起支付前再拦一次）共用同一

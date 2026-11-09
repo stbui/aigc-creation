@@ -34,6 +34,7 @@ import {
 } from './constants';
 import { PaymentsProviderCard } from './PaymentsProviderCard';
 import { PaymentsProviderSummary } from './PaymentsProviderSummary';
+import { PaymentsVisibleMethodsCard } from './PaymentsVisibleMethodsCard';
 
 /**
  * 支付渠道标签。
@@ -171,6 +172,12 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
       {error && <StaleError error={error} onRetry={() => void reload()} />}
 
       <PaymentsProviderSummary providers={providers} />
+
+      <PaymentsVisibleMethodsCard
+        providers={providers}
+        writable={writable}
+        onSaved={() => void reload()}
+      />
 
       <div className="flex items-center justify-between gap-4 px-0.5">
         <div className="flex items-baseline gap-2">

@@ -5,7 +5,12 @@ import {
   epayCreateSign,
   verifyEpayCallbackSign,
 } from './epay.adapter';
-import type { CreateOrderInput, NotificationInput, PaymentContext } from './types';
+import type {
+  CreateOrderInput,
+  NotificationInput,
+  PaymentContext,
+  VisiblePaymentMethod,
+} from './types';
 
 const MCH_ID = '1547130349673';
 const KEY = '123123';
@@ -43,12 +48,26 @@ function createInput(): CreateOrderInput {
   };
 }
 
-function callbackInput(body: Record<string, unknown>): NotificationInput {
+function callbackInput(
+  body: Record<string, unknown>,
+  options: {
+    values?: Record<string, string>;
+    expectedPaymentMethod?: VisiblePaymentMethod;
+  } = {},
+): NotificationInput {
   return {
-    config: makeConfig(),
+    config: {
+      ...makeConfig(options.values),
+      ...(options.expectedPaymentMethod
+        ? { paymentMethod: options.expectedPaymentMethod }
+        : {}),
+    },
     headers: {},
     rawBody: Buffer.from(new URLSearchParams(body as Record<string, string>).toString()),
     body,
+    ...(options.expectedPaymentMethod
+      ? { expectedPaymentMethod: options.expectedPaymentMethod }
+      : {}),
   };
 }
 
@@ -144,6 +163,38 @@ describe('EpayAdapter.createOrder', () => {
     expect(checkout.providerRef).toBeUndefined();
   });
 
+  it('按前台固化方式使用支付宝 type=2，覆盖旧配置默认类型', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 1, data: 'https://epay.example.com/pay?id=ali' }),
+    );
+    const input = createInput();
+    input.config = { ...makeConfig({ type: '1' }), paymentMethod: 'alipay' };
+
+    await adapter.createOrder(input);
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get('type')).toBe('2');
+    expect(url.searchParams.get('sign')).toBe(
+      epayCreateSign(ORDER_NO, ORDER_NO, '2', '10.05', KEY),
+    );
+  });
+
+  it('按前台固化方式使用微信 type=1，覆盖旧配置默认类型', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 1, data: 'https://epay.example.com/pay?id=wx' }),
+    );
+    const input = createInput();
+    input.config = { ...makeConfig({ type: '2' }), paymentMethod: 'wechat' };
+
+    await adapter.createOrder(input);
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get('type')).toBe('1');
+    expect(url.searchParams.get('sign')).toBe(
+      epayCreateSign(ORDER_NO, ORDER_NO, '1', '10.05', KEY),
+    );
+  });
+
   it('兼容 data 为订单对象，并保存云端 orderId 与较短有效期', async () => {
     const createdAt = Date.now();
     fetchMock.mockResolvedValueOnce(
@@ -206,6 +257,46 @@ describe('EpayAdapter.verifyNotification', () => {
     await expect(
       adapter.verifyNotification(callbackInput(reallyPriceTampered)),
     ).resolves.toMatchObject({ ok: false, ackSuccess: false });
+  });
+
+  it('有固化支付方式时按支付宝/微信校验回调 type，而不是信任当前配置', async () => {
+    const alipay = await adapter.verifyNotification(
+      callbackInput(paidBody({ type: '2' }), {
+        values: { type: '1' },
+        expectedPaymentMethod: 'alipay',
+      }),
+    );
+    const wechat = await adapter.verifyNotification(
+      callbackInput(paidBody({ type: '1' }), {
+        values: { type: '2' },
+        expectedPaymentMethod: 'wechat',
+      }),
+    );
+
+    expect(alipay).toMatchObject({ ok: true, amountCents: 1005 });
+    expect(wechat).toMatchObject({ ok: true, amountCents: 1005 });
+  });
+
+  it('回调 type 与固化支付方式不一致时拒绝', async () => {
+    const result = await adapter.verifyNotification(
+      callbackInput(paidBody({ type: '2' }), {
+        expectedPaymentMethod: 'wechat',
+      }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      ackSuccess: false,
+      reason: expect.stringContaining('支付类型'),
+    });
+  });
+
+  it('历史订单没有固化方式时继续使用配置默认 type', async () => {
+    const result = await adapter.verifyNotification(
+      callbackInput(paidBody({ type: '1' }), { values: { type: '1' } }),
+    );
+
+    expect(result).toMatchObject({ ok: true, amountCents: 1005 });
   });
 
   it('mchId 或 type 与当前配置不一致时拒绝，即使签名本身正确', async () => {

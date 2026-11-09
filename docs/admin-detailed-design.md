@@ -119,9 +119,11 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 页面结构统一：`PageHeader`（标题 + 主操作）→ 筛选条 → 表格 → 分页。表格一律 `rowKey="id"`、`size="small"`。
 
-### 0.5 详情抽屉
+### 0.5 详情浮层
 
-`AdminDrawer` 统一宽度、标题、底部操作区与关闭行为。详情不跳独立路由——保留列表筛选态比省一层路由更重要。
+`AdminDrawer` 统一宽度、标题、底部操作区与关闭行为，详情不跳独立路由——保留列表筛选态比省一层路由更重要。
+
+`AdminModal` 与 `AdminDrawer` 共用同一套懒加载取数、竞态丢弃与失败重试，只换浮层形态：内容包含并排区块、宽表格或大图预览时改用居中弹窗（`width` 默认 960，任务详情 1120），避免抽屉把每一段都挤成两行。两者都在 `admin-ui/primitives/DetailDialog`，页面从 barrel 取件。
 
 ### 0.6 高危操作确认
 
@@ -231,7 +233,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 4.2 规则
 
-- **全链路详情**：抽屉按同一 `taskId` 集中展示用户提交、参数 / 输入素材、线路尝试、模型调用、产出和账单终态。`GET /admin/tasks/:id`（`task.read`）返回任务及按 `routeRun / attemptNumber` 排序的 `routeAttempts`；最近 20 次模型调用走 `/admin/api-logs?taskId=`（`model.call_read`），并深链 `/admin/model-calls?taskId=` 查看全部；账单走 `/admin/billing-orders?taskId=`（`billing_order.read`），并深链 `/admin/billing-orders?taskId=`。无对应权限时不请求，只显示权限边界。
+- **全链路详情**：宽弹窗按同一 `taskId` 集中展示用户提交、参数 / 输入素材、线路尝试、模型调用、产出和账单终态。`GET /admin/tasks/:id`（`task.read`）返回任务及按 `routeRun / attemptNumber` 排序的 `routeAttempts`；最近 20 次模型调用走 `/admin/api-logs?taskId=`（`model.call_read`），并深链 `/admin/model-calls?taskId=` 查看全部；账单走 `/admin/billing-orders?taskId=`（`billing_order.read`），并深链 `/admin/billing-orders?taskId=`。无对应权限时不请求，只显示权限边界。
 - **排障语义**：`dispatchState` 回答请求是否可能到达上游，账单终态回答钱是否已处理。建连前网络失败可安全切线；全部线路都未接单时任务以 `42204` 失败并自动退款。`refunded + system:preconnection-reconcile` 明确显示“无需人工复核”；只有 `reviewable=true` 才进入待核对队列。`submission_unknown` 且账单仍为 `reviewable` 时才需人工确认，不能把网络拒绝误判为上游已接单。
 - **重试不复用旧记录**：用原参数与原输入新建任务，再复用 `GenerateService.enqueue` 触发执行。原地复活会绕过 `GenerationTask.outputAssetId @unique` 的一产出约束。
 - **终止**把 `running` 置 `failed` + `cancelled_by_admin`，按任务快照退款。

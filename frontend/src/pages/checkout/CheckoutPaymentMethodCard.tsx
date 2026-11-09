@@ -1,15 +1,12 @@
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-import type { PaymentIntent, PaymentProviderInfo } from '../../types/api';
+import type { PaymentIntent, PaymentProviderInfo } from '../../types/payment';
 
 /**
  * 支付方式卡。
  *
- * 后端在可用渠道 > 1 时强制要求 `intent` 带 providerId（见
- * PaymentOrderService.createIntent）。本卡必须在发起支付前把渠道列出来，
- * 否则支付宝 + 微信同时配置时，所有非 0 元订单都会 400。
- *
- * 沙箱身份仍然明示：未配置真实商户号时走站内模拟，不产生真实扣款。
+ * 前台固定只展示「支付宝 / 微信支付」两种方式。每种方式背后是官方渠道
+ * 还是易支付由管理员选择，本组件不读取也不展示真实服务商身份。
  */
 export function CheckoutPaymentMethodCard({
   onlineIntent,
@@ -47,10 +44,10 @@ export function CheckoutPaymentMethodCard({
           <span className="co-pay-icon">!</span>
           <div className="co-pay-body">
             <div className="co-pay-name">
-              {providersError ? '支付渠道加载失败' : '暂无可用支付渠道'}
+              {providersError ? '支付方式加载失败' : '暂无可用支付方式'}
             </div>
             <div className="co-pay-desc">
-              {providersError ?? '后台尚未配置可用渠道，请联系管理员。'}
+              {providersError ?? '后台尚未选择可用支付来源，请联系管理员。'}
             </div>
           </div>
         </div>
@@ -71,11 +68,9 @@ export function CheckoutPaymentMethodCard({
                 <div className="co-pay-body">
                   <div className="co-pay-name">{provider.name}</div>
                   <div className="co-pay-desc">
-                    {provider.sandbox
-                      ? '站内沙箱模拟，不产生真实扣款'
-                      : provider.checkoutMode === 'qrcode'
-                        ? '扫码完成支付，到账后自动刷新'
-                        : '跳转渠道收银台完成支付'}
+                    {provider.checkoutMode === 'qrcode'
+                      ? '扫码完成支付，到账后自动刷新'
+                      : '跳转收银台完成支付'}
                   </div>
                 </div>
                 {active && <CheckCircle2 size={17} className="co-pay-check" aria-hidden />}
@@ -88,21 +83,14 @@ export function CheckoutPaymentMethodCard({
       <div className="co-notice">
         <AlertTriangle size={14} aria-hidden />
         <span>
-          {onlineIntent && !onlineIntent.sandbox ? (
+          {onlineIntent ? (
             <>
-              <strong>真实支付通道。</strong>
-              请按渠道页面提示完成支付，扣款以渠道结果为准；支付结果稍后同步到本页。
-            </>
-          ) : onlineIntent?.sandbox || selected?.sandbox ? (
-            <>
-              <strong>沙箱环境，不产生真实扣款。</strong>
-              支付在站内模拟，仅用于联调。
+              <strong>支付结果以服务商为准。</strong>
+              请按收银台提示完成支付，到账后本页会自动刷新。
             </>
           ) : (
             <>
-              支付方式由后台通道配置决定：
-              <strong>沙箱渠道会明确标注，且不产生真实扣款</strong>；真实渠道需在后台
-              「支付充值 → 支付渠道」启用并配齐商户凭据。
+              支付来源由管理员配置；如按钮不可用，请联系管理员检查对应服务商。
             </>
           )}
         </span>
@@ -111,18 +99,7 @@ export function CheckoutPaymentMethodCard({
   );
 }
 
-/**
- * 渠道图标：真实渠道暂时没有可用的品牌资源。
- * 后端 `icon` 是 'alipay' / 'wechat' / 'sandbox' 这类标识，不是可渲染图片，
- * 直接当文字会显示成英文 slug；这里按渠道 id 取短名，不伪造 logo。
- */
+/** 支付方式图标：暂不依赖外链品牌资源，按可见方式取短名。 */
 function providerIcon(provider: PaymentProviderInfo): string {
-  if (provider.sandbox) return '沙';
-  if (provider.id === 'alipay') return '支';
-  if (provider.id === 'wechat') return '微';
-  if (provider.id === 'paypal') return 'P';
-  if (provider.id === 'stripe') return 'S';
-  if (provider.id === 'epay') return '易';
-  if (provider.id === 'zpay') return 'Z';
-  return provider.name.slice(0, 1);
+  return provider.id === 'alipay' ? '支' : '微';
 }

@@ -11,13 +11,13 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id              String    @id @default(cuid())
+  email           String    @unique
   /// 邮箱归属验证时间。注册必须完成邮箱验证码；OAuth 仅在该字段有值时才视为已验证。
   emailVerifiedAt DateTime?
-  passwordHash String
-  name         String
-  createdAt    DateTime @default(now())
+  passwordHash    String
+  name            String
+  createdAt       DateTime  @default(now())
 
   // ── 后台权限与账号状态 (admin-prd.md §5.3) ──────────────────────
   // SQLite 无 enum, 取值由 DTO/service 层白名单约束:
@@ -40,12 +40,13 @@ model User {
   tasks    GenerationTask[]
 
   // 交易域关系
-  orders   Order[]
-  payments Payment[]
-  refunds  Refund[]
-  invoices Invoice[]
-  lots     CreditLot[]
-  ledger   CreditLedger[]
+  orders       Order[]
+  payments     Payment[]
+  cancelEvents OrderCancelEvent[]
+  refunds      Refund[]
+  invoices     Invoice[]
+  lots         CreditLot[]
+  ledger       CreditLedger[]
 
   // 会员体系关系
   memberships     Membership[]
@@ -60,15 +61,15 @@ model User {
   // 令牌版本: 改密 / 重置密码 / 注销时 +1, JwtAuthGuard 逐请求比对签发时的版本。
   // 不存「已失效 token 黑名单」: 黑名单需要按 TTL 清理且体积不可控, 而
   // 「一次性作废该用户的全部旧会话」用单调递增的版本号即可, O(1) 判定。
-  tokenVersion    Int       @default(0)
+  tokenVersion          Int       @default(0)
   /// 后台重置密码后置 true：登录仍成功，但在改密前只能访问 /me 与 /me/password。
   /// 忘记密码自助重置、用户主动改密、下一次后台重置都会写回 false。
   mustChangePassword    Boolean   @default(false)
   /// 后台一次性临时密码的到期时间；到期后登录直接拒绝，需重新联系管理员重置。
   tempPasswordExpiresAt DateTime?
   /// 手机号 —— 短信登录用。可空(存量账号无手机号), 非空时必须唯一
-  phone           String?   @unique
-  phoneVerifiedAt DateTime?
+  phone                 String?   @unique
+  phoneVerifiedAt       DateTime?
 
   /// 第三方 OAuth 身份（通用 OAuth 登录用，一个账号可绑定多个 provider）
   oauthIdentities OAuthIdentity[]
@@ -92,13 +93,13 @@ model User {
 // provider 如 'google' | 'github' | 'generic'，subject 为 provider 侧用户唯一 id。
 // (provider, subject) 唯一：防止同一第三方账号被同时建出两个本地账号。
 model OAuthIdentity {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
   /// 'google' | 'github' | 'generic' —— 取值由 OAuth registry 白名单约束
   provider    String
   /// provider 侧唯一 id（Google/GitHub 的数字 id 也按字符串存，避免跨平台溢出）
   subject     String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   lastLoginAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -110,19 +111,19 @@ model OAuthIdentity {
 /// OAuth 一次性挑战。state 与登录票都只落 HMAC，兑换后 CAS 作废。
 /// 这样即使浏览器历史、代理日志或前端 URL 泄露了原值，也无法重放第二次。
 model OAuthChallenge {
-  id        String    @id @default(cuid())
-  tokenHash String    @unique
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
   /// state | ticket
-  kind      String
-  provider  String
+  kind       String
+  provider   String
   /// 普通登录票的目标用户；linkUserId 只表示显式绑定发起人
-  userId    String?
+  userId     String?
   /// 发起绑定流程时的当前登录用户；普通登录为空
   linkUserId String?
-  returnTo  String?
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  returnTo   String?
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([kind, expiresAt])
 }
@@ -190,16 +191,16 @@ model Product {
   sortOrder Int    @default(0)
 
   /// CNY | USD
-  currency            String   @default("CNY")
+  currency            String    @default("CNY")
   /// credits（本轮唯一启用）| storage（后续）
-  kind                String   @default("credits")
+  kind                String    @default("credits")
   /// unlimited | periodic | inventory | timed
-  saleStrategy        String   @default("unlimited")
-  periodDays          Int      @default(0)
-  periodPurchaseLimit Int      @default(0)
-  stockTotal          Int      @default(0)
-  stockReserved       Int      @default(0)
-  stockSold           Int      @default(0)
+  saleStrategy        String    @default("unlimited")
+  periodDays          Int       @default(0)
+  periodPurchaseLimit Int       @default(0)
+  stockTotal          Int       @default(0)
+  stockReserved       Int       @default(0)
+  stockSold           Int       @default(0)
   saleStartAt         DateTime?
   saleEndAt           DateTime?
 
@@ -256,46 +257,49 @@ model Order {
   updatedAt DateTime  @updatedAt
 
   /// 订单币种；金额始终是最小单位（CNY 分 / USD 美分）
-  currency              String   @default("CNY")
+  currency String @default("CNY")
 
   /// 下单意图时固定的渠道配置版本。历史订单为空时回调按同渠道最新版兜底
   providerConfigId      String?
   providerConfigVersion Int?
+  /// 下单时选中的服务商实例；历史订单可为空，恢复仍以 providerConfigId 为准
+  providerInstanceId    String?
 
   /// 渠道交易号。回调/查单/对账均可反查；唯一约束是重复入账的第二道防线
-  providerTradeNo       String?  @unique
+  providerTradeNo String? @unique
   /// 渠道原始状态文本，仅展示与排障，不参与本地状态机
-  providerStatus        String?
+  providerStatus  String?
 
   /// redirect | qrcode | sandbox
-  checkoutMode          String?
+  checkoutMode      String?
   /// 跳转 URL 或二维码载荷。终态必须清空为 ''，避免页面把过期链接当可用
-  checkoutValue         String?  @default("")
-  checkoutExpiresAt     DateTime?
+  checkoutValue     String?   @default("")
+  checkoutExpiresAt DateTime?
   /// 最近一次向渠道查单的时间；用于 2 秒防抖与 worker 30 秒轮询
-  lastQueriedAt         DateTime?
+  lastQueriedAt     DateTime?
 
   /// 最近一次下单/查单/关单失败原因，截断 200 字；仅页面排障用
-  lastError             String?
+  lastError       String?
   /// 关单租约。条件更新抢占，防止用户手动关单与 worker 同时执行
-  closeStartedAt        DateTime?
+  closeStartedAt  DateTime?
   /// 发起支付租约。覆盖「关闭旧尝试 → 渠道下单 → 写回本地」全过程，
   /// 防止并发请求各自在渠道创建一笔可支付订单；超时后可被新请求接管。
-  intentStartedAt       DateTime?
-  closedAt              DateTime?
+  intentStartedAt DateTime?
+  closedAt        DateTime?
 
   /// 渠道侧支付时间；paidAt 仍是本地入账时间
-  providerPaidAt        DateTime?
+  providerPaidAt DateTime?
 
   /// 是否仍占用库存。库存性商品下单时 true，支付/取消时释放
-  stockReserved         Boolean  @default(false)
+  stockReserved Boolean @default(false)
 
-  user     User        @relation(fields: [userId], references: [id])
-  items    OrderItem[]
-  payments Payment[]
-  refunds  Refund[]
-  coupon   Coupon?     @relation(fields: [couponId], references: [id])
-  campaign Campaign?   @relation(fields: [campaignId], references: [id])
+  user        User              @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  payments    Payment[]
+  cancelEvent OrderCancelEvent?
+  refunds     Refund[]
+  coupon      Coupon?           @relation(fields: [couponId], references: [id])
+  campaign    Campaign?         @relation(fields: [campaignId], references: [id])
 
   // 会员体系: 一个订单可同时是"购买会员的订单"(SubscriptionOrder) 与
   // "使用会员折扣的商品订单"(PlanOrders)
@@ -315,18 +319,18 @@ model Order {
   /// 本订单实际兑换出的会员周期快照。续费同样复用 Membership 行, 因此
   /// 退款时不能从当前会员反推某笔历史订单买了哪一段时间。
   /// 权益与周期天数在下单时快照；后续运营改套餐只影响新订单。
-  membershipPeriodStartAt   DateTime?
-  membershipPeriodEndAt     DateTime?
-  membershipPerksSnapshot   String?
+  membershipPeriodStartAt          DateTime?
+  membershipPeriodEndAt            DateTime?
+  membershipPerksSnapshot          String?
   membershipMonthlyCreditsSnapshot Int?
-  membershipDurationDaysSnapshot Int?
+  membershipDurationDaysSnapshot   Int?
   /// 下单时套餐映射的用户分组编码。空串表示默认分组。
   /// 分组承载渠道可见性、价格倍率与兑换比例，必须与权益一起冻结；
   /// 否则运营改套餐映射会追溯改变已付费用户的可用渠道和计费倍率。
-  membershipUserGroupCodeSnapshot String?
+  membershipUserGroupCodeSnapshot  String?
   /// 全额退款撤销本周期的时间。为 null 且订单仍为 paid/partial_refunded
   /// 才代表该周期仍有效；保留字段用于退款后审计周期边界。
-  membershipPeriodRevokedAt DateTime?
+  membershipPeriodRevokedAt        DateTime?
 
   @@unique([userId, idempotencyKey])
   @@index([membershipPlanId])
@@ -344,8 +348,37 @@ model Order {
   @@index([providerPaidAt])
   @@index([status, expiresAt])
   @@index([providerConfigId])
+  @@index([providerInstanceId])
   @@index([paidAt])
   @@index([closedAt])
+}
+
+/// 用户主动取消订单的额度预留记录。
+///
+/// `reserved` / `consumed` 都占用取消次数；关单失败时置为 `released` 归还额度。
+/// 一个订单唯一一条记录，保证同一订单重试取消不会重复计数。
+model OrderCancelEvent {
+  id          String    @id @default(cuid())
+  orderId     String    @unique
+  userId      String
+  /// reserved | consumed | released
+  status      String    @default("reserved")
+  /// rolling | fixed，预留时冻结，后续设置变更不追溯已占用额度
+  windowMode  String
+  /// 本次计数窗口的起点。固定窗口按窗口长度对齐；滚动窗口取预留时间
+  windowStart DateTime
+  windowEnd   DateTime
+  reservedAt  DateTime  @default(now())
+  consumedAt  DateTime?
+  releasedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, windowStart])
+  @@index([userId, status, reservedAt])
 }
 
 /// 订单项 —— **全字段快照**。
@@ -356,15 +389,15 @@ model OrderItem {
   productId String
 
   // ── 快照字段 (下单时刻的值, 之后不再变化) ──
-  skuSnapshot        String
-  nameSnapshot       String
-  priceCentsSnapshot Int
-  creditsSnapshot    Int
-  validDaysSnapshot  Int
+  skuSnapshot           String
+  nameSnapshot          String
+  priceCentsSnapshot    Int
+  creditsSnapshot       Int
+  validDaysSnapshot     Int
   /// 下单时的发放方式快照。支付成功时只能按此字段发分，不能读取 Product
   /// 的实时值；否则运营在待支付窗口内切换 immediate/manual 会追溯改变订单。
   /// null 仅用于兼容加列前创建的历史订单。
-  grantTypeSnapshot  String?
+  grantTypeSnapshot     String?
   /// 下单时实际占用的库存数量。库存策略可能在待支付窗口内被后台修改，
   /// 支付/取消时必须按此快照归还或转已售，不能读取 Product.saleStrategy。
   /// 0 = 未占库存；null 仅用于兼容加列前创建的历史订单。
@@ -411,10 +444,12 @@ model Payment {
   updatedAt DateTime  @updatedAt
 
   /// 本次支付尝试的币种（必须与订单一致）
-  currency              String   @default("CNY")
+  currency              String    @default("CNY")
   /// 本次尝试固定的渠道配置版本；渠道配置轮换后仍可回溯
   providerConfigId      String?
   providerConfigVersion Int?
+  /// 本次尝试选中的服务商实例；历史记录可为空
+  providerInstanceId    String?
   /// 渠道侧下单返回的单据 id（PayPal order id / Stripe Checkout Session id 等）。
   /// 查单、关单和退款不能只依赖商户订单号，部分渠道必须用该 id 反查。
   providerRef           String?
@@ -432,6 +467,7 @@ model Payment {
   @@index([status, createdAt])
   @@index([userId])
   @@index([orderId, status])
+  @@index([providerInstanceId])
 }
 
 /// 退款单。
@@ -483,7 +519,7 @@ model CreditLot {
   totalMicrocredits     BigInt
   remainingMicrocredits BigInt
   /// 到期时间。**为空视为最晚到期** (FEFO 排序时排最后)
-  expireAt         DateTime?
+  expireAt              DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -519,9 +555,9 @@ model CreditLedger {
   balanceAfter Int
 
   /// 关联批次
-  lotId   String?
-  orderId String?
-  taskId  String?
+  lotId          String?
+  orderId        String?
+  taskId         String?
   /// 资金/积分动作幂等键。退款按 taskId 生成稳定键，重复调用只能落一条流水。
   idempotencyKey String? @unique
 
@@ -810,40 +846,40 @@ model Asset {
   // 1:1 反向关系: 该 Asset 是某个 GenerationTask 的输出
   outputOfTask GenerationTask? @relation("TaskOutputAsset")
 
+  @@unique([storageBackend, storageKey])
   @@index([projectId])
   @@index([ownerId])
   @@index([status])
   /// 素材库列表 / 计数热路径：owner + 可见状态 + 时间倒序
   @@index([ownerId, status, createdAt])
   @@index([storageBackend])
-  @@unique([storageBackend, storageKey])
   @@index([capability])
   @@index([createdAt])
 }
 
 model GenerationTask {
-  id            String  @id @default(cuid())
-  projectId     String
-  ownerId       String
-  capability    String // 'main_image' | 'detail_image' | 'matting'
+  id             String  @id @default(cuid())
+  projectId      String
+  ownerId        String
+  capability     String // 'main_image' | 'detail_image' | 'matting'
   /// 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
   ///
   /// `queued` 是「已预留积分、等待 worker 领取」；`running` 由 worker 以
   /// 条件更新领取时写入。终态只有 succeeded / failed / cancelled 三种。
-  status        String
-  inputAssetIds String // JSON 数组字符串
-  outputAssetId String? @unique // 1:1, 需 unique 约束
+  status         String
+  inputAssetIds  String // JSON 数组字符串
+  outputAssetId  String? @unique // 1:1, 需 unique 约束
   /// 多变体产出的有序素材 id 数组 (JSON)。首项与 outputAssetId 相同。
   /// 多图融合一次任务可产出 1-4 张真实变体；保留 outputAssetId 兼容既有
   /// 历史、后台和 1:1 关系，本字段只扩展“同一任务的其它产出”。
   outputAssetIds String?
-  params        String // JSON 对象字符串
+  params         String // JSON 对象字符串
   /// 历史供应商标识。新链路以 channelModelId / routeId 快照为准，本字段仅为
   /// 兼容存量数据保留，避免数据库升级时删除仍有审计价值的历史值。
-  provider      String?
-  errorCode     String?
+  provider       String?
+  errorCode      String?
   // 本次实际扣掉的积分数快照 (0 = 免费)。用于后台展示与退款核算
-  creditCost    Int     @default(0)
+  creditCost     Int     @default(0)
 
   /// 同一次生成的父任务 id。
   ///
@@ -853,9 +889,9 @@ model GenerationTask {
   ///
   /// 与 `retriedFromId` 同理不建外键: 父任务被删除后子任务仍要能读出
   /// 自己的批次归属, 加 FK 会让父任务一删就连带失败。
-  parentTaskId  String?
+  parentTaskId       String?
   /// 请求幂等键。与 ownerId 组成唯一约束，客户端重试不能重复建任务/扣费。
-  idempotencyKey String?
+  idempotencyKey     String?
   /// 原始生成请求的稳定指纹；同一 owner 的幂等键只能复用完全相同的请求
   requestFingerprint String?
 
@@ -896,26 +932,26 @@ model GenerationTask {
   routeRun               Int     @default(1)
 
   /// 账单 id（`BillingOrder.id`）。故障切换会替换账单，故这里存**当前**账单。
-  billingOrderId String?
+  billingOrderId    String?
   /// 上游返回的任务 id。异步协议轮询与人工核对都依赖它
   providerRequestId String?
   /// 轮询阶段的人类可读描述（如「候车 · 前面 3 条」），仅用于展示
-  pollStage String @default("")
+  pollStage         String    @default("")
   /// 下次回查上游的时间。为空表示当前 attempt 不需要轮询
-  nextPollAt DateTime?
+  nextPollAt        DateTime?
 
   /// 租约持有者（`hostname:pid:rand`）。空串 = 无人持有
-  leaseOwner String @default("")
+  leaseOwner                   String    @default("")
   /// 租约到期时间。过期即视为执行者已死，由 `task-recover` 按 dispatchState 分流
-  leaseUntil DateTime?
+  leaseUntil                   DateTime?
   /// 已创建的尝试次数（`RouteAttempt` 计数快照，用于后台展示）
-  attempts Int @default(0)
+  attempts                     Int       @default(0)
   /// 当前阶段（`dispatch` / `poll` / `recover`），后台进度展示用
-  stage    String @default("")
+  stage                        String    @default("")
   /// 0-100 的粗粒度进度；上游不报进度时停在 5（已领取）
-  progress Int    @default(0)
+  progress                     Int       @default(0)
   /// 本次授权的扣费上限（微积分）。0 = 未设置，结算按实际用量
-  authorizedChargeMicrocredits BigInt @default(0)
+  authorizedChargeMicrocredits BigInt    @default(0)
 
   /// 产物回收失败的原始原因（下载 / 落盘 / 标识）。**不影响计费**:
   /// 上游已产出时归 `mediaRecoveryError`，任务延后重试而不切线路不退款。
@@ -925,7 +961,7 @@ model GenerationTask {
   /// 上游返回公网地址 / 内联字节后，宿主还要下载、标识、写存储、登记素材；
   /// 这一步失败时**不能重新派发**（上游已计费），也不能丢弃结果 —— 先把结果
   /// 存在这里，worker 下一轮直接续做落盘，不再回上游要第二次。
-  pendingResult String?
+  pendingResult      String?
 
   /// AIGC 标识执行结果 (JSON 字符串)。与 Asset.aigcMeta 分开保存:
   /// 任务侧记的是「这次生成做了什么标识动作、失败原因」, 素材侧记的是
@@ -940,6 +976,7 @@ model GenerationTask {
   // outputAsset 为 1:1 关系, 反向字段声明在 Asset 侧
   outputAsset Asset?  @relation("TaskOutputAsset", fields: [outputAssetId], references: [id])
 
+  @@unique([ownerId, idempotencyKey])
   @@index([projectId])
   @@index([ownerId])
   @@index([status])
@@ -948,7 +985,6 @@ model GenerationTask {
   /// 后台任务监控高频组合: 状态 + 时间窗 / 用户 + 时间线
   @@index([status, createdAt])
   @@index([ownerId, createdAt])
-  @@unique([ownerId, idempotencyKey])
   // 孤儿任务回收按 (status, heartbeatAt) 扫描
   @@index([status, heartbeatAt])
   /// worker 领取与轮询回查: `status='queued'` 按 createdAt、`status='running'`
@@ -1170,26 +1206,26 @@ model AccountToken {
 /// 不依赖对账明细是否被某个运行批次带出。状态机:
 /// open -> auto_refund_pending -> refunded | manual_review -> closed
 model PaymentExceptionCase {
-  id               String    @id @default(cuid())
+  id              String    @id @default(cuid())
   /// 渠道事件指纹，回调/对账重复发现时只更新同一张单
-  fingerprint      String    @unique
-  providerId       String
-  orderId          String?
-  merchantOrderNo  String
-  providerTradeNo  String?
-  amountCents      Int
-  currency         String    @default("CNY")
-  kind             String
-  status           String    @default("open")
-  priority         String    @default("urgent")
-  ownerId          String?
-  slaDueAt         DateTime
-  refundId         String?   @unique
-  resolution       String?
-  lastError        String?
-  closedAt         DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  fingerprint     String    @unique
+  providerId      String
+  orderId         String?
+  merchantOrderNo String
+  providerTradeNo String?
+  amountCents     Int
+  currency        String    @default("CNY")
+  kind            String
+  status          String    @default("open")
+  priority        String    @default("urgent")
+  ownerId         String?
+  slaDueAt        DateTime
+  refundId        String?   @unique
+  resolution      String?
+  lastError       String?
+  closedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([status, priority, slaDueAt])
   @@index([providerId, merchantOrderNo])
@@ -1199,18 +1235,19 @@ model PaymentExceptionCase {
 /// 自动对账的按渠道/账单日状态。不要把「今天已触发」只放在进程内存里：
 /// 进程重启或多实例部署后，失败渠道会永久漏掉重试；成功渠道也会被重复下载账单。
 model PaymentAutoReconcileState {
-  id            String    @id @default(cuid())
-  providerId    String
-  billDate      String
+  id                 String   @id @default(cuid())
+  providerId         String
+  providerInstanceId String   @default("default")
+  billDate           String
   /// pending | succeeded | failed
-  status        String    @default("pending")
-  attempts      Int       @default(0)
-  nextAttemptAt DateTime  @default(now())
-  lastError     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  status             String   @default("pending")
+  attempts           Int      @default(0)
+  nextAttemptAt      DateTime @default(now())
+  lastError          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  @@unique([providerId, billDate])
+  @@unique([providerId, providerInstanceId, billDate])
   @@index([status, nextAttemptAt])
 }
 
@@ -1294,14 +1331,14 @@ model LoginSession {
 /// 金额取**开票时的可开票余额快照** (`paidCents - refundedCents`),
 /// 不按当前订单金额重算: 开票之后再退款, 票面金额必须还是当时那个数。
 model Invoice {
-  id        String @id @default(cuid())
+  id            String  @id @default(cuid())
   /// 发票号, 后台开具时生成 (前缀 + 日期 + 序号), 全局唯一
-  invoiceNo String @unique
-  orderId   String
+  invoiceNo     String  @unique
+  orderId       String
   /// 有效票占用键: 有效发票等于 orderId, 驳回后置空。
   /// 数据库唯一约束兜底多实例并发申请; 历史数据该字段可能为空, 仍由状态校验兼容。
   activeOrderId String? @unique
-  userId    String
+  userId        String
 
   /// 开票金额 (整数分), 开具时的快照
   amountCents Int
@@ -1541,28 +1578,28 @@ model CapabilityControl {
 /// 举证过的记录 —— 建级联外键会让「素材被删」把工单一起带走。订单本就不
 /// 物理删除, 但同理不引外键, 避免删除顺序耦合。
 model Ticket {
-  id       String @id @default(cuid())
+  id         String    @id @default(cuid())
   /// 对用户可见的工单号，形如 T20261021A1B2C3
-  ticketNo String @unique
-  userId   String
+  ticketNo   String    @unique
+  userId     String
   /// bug | complaint | consultation | invoice | other
-  type     String
-  subject  String
-  content  String
+  type       String
+  subject    String
+  content    String
   /// 流转: open → processing → resolved → closed
   /// SQLite 无 enum, 取值由 service 的状态机约束 (见 ticket.service.ts)
-  status   String @default("open")
+  status     String    @default("open")
   /// low | normal | high
-  priority String @default("normal")
+  priority   String    @default("normal")
   /// 关联订单 / 素材（可空）。只存 id 不建外键，理由见模型注释
-  orderId  String?
-  assetId  String?
+  orderId    String?
+  assetId    String?
   /// 指派的后台账号 id（null = 未指派，谁先处理谁认领）
   assigneeId String?
   resolvedAt DateTime?
   closedAt   DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   user    User          @relation(fields: [userId], references: [id])
   replies TicketReply[]
@@ -1639,35 +1676,35 @@ model AigcLabelConfig {
 
 /// 系统渠道（后台配置的上游连接）。凭证只存密文（`enc:v1:` 前缀），永不回显。
 model ModelChannel {
-  id String @id @default(cuid())
+  id     String @id @default(cuid())
   /// 归属用户；系统渠道为空串（保留字段以对齐参考实现的自建渠道）
   userId String @default("")
   /// 'system' 系统渠道 | 'user' 用户自建渠道
   scope  String @default("system")
 
-  enabled Boolean @default(true)
-  name    String
+  enabled   Boolean @default(true)
+  name      String
   /// 渠道排序：数字越小越靠前
-  sortOrder Int @default(0)
+  sortOrder Int     @default(0)
 
-  baseUrl String @default("")
+  baseUrl          String @default("")
   /// 密文；空串 = 未配置
-  apiKey    String @default("")
+  apiKey           String @default("")
   /// 密文；即梦等需要 AK/SK 双凭证的渠道使用
-  secretKey String @default("")
+  secretKey        String @default("")
   /// 请求格式（系统渠道固定 openai，实际协议由所选模型决定）
-  apiFormat String @default("openai")
+  apiFormat        String @default("openai")
   /// 0 = 使用全局并发上限
-  concurrencyLimit Int @default(0)
+  concurrencyLimit Int    @default(0)
   /// 渠道级出站代理：socks5:// / socks5h:// / http:// / https://；空 = 全局代理
-  proxyUrl String @default("")
+  proxyUrl         String @default("")
 
   /// 上游模型名清单（JSON 字符串数组），用于初始化渠道模型
-  modelsJson String @default("[]")
+  modelsJson        String @default("[]")
   /// 已被模型家族吸收的上游 SKU（JSON 字符串数组），目录拉取时不再重复建行
   retiredModelsJson String @default("[]")
   /// 自定义请求头（密文 JSON，可能含鉴权值）
-  headersJson String @default("")
+  headersJson       String @default("")
   /// 由哪个服务商目录一键接入；空 = 自定义渠道。仅用于来源展示
   catalogProviderId String @default("")
 
@@ -1685,20 +1722,20 @@ model ModelChannel {
 /// 渠道模型：渠道内的一个可执行上游 SKU。
 /// `modelKey` 是本站对外的模型标识，`providerModelKey` 是发给上游的键。
 model ChannelModel {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   channelId String
   modelKey  String
   /// 存活时 = modelKey（小写）；删除时置 null，以 `[channelId, activeKey]` 唯一
   activeKey String?
 
-  providerModelKey String  @default("")
-  displayName      String  @default("")
-  channelLabel     String  @default("")
+  providerModelKey String @default("")
+  displayName      String @default("")
+  channelLabel     String @default("")
   /// 标签 JSON：[{ text, color }]，最多 5 个
-  tags             String  @default("[]")
-  description      String  @default("")
-  sortOrder        Int     @default(0)
-  icon             String  @default("")
+  tags             String @default("[]")
+  description      String @default("")
+  sortOrder        Int    @default(0)
+  icon             String @default("")
 
   /// 'text' | 'image' | 'video' | 'audio'
   capability String
@@ -1706,16 +1743,16 @@ model ChannelModel {
   protocol   String
 
   /// 'fixed_request' | 'per_second' | 'token'；标量价只是历史兼容与摘要
-  billingMode                  String @default("fixed_request")
-  unitPriceMicrocredits        BigInt @default(0)
-  inputTokenPriceMicrocredits  BigInt @default(0)
-  outputTokenPriceMicrocredits BigInt @default(0)
-  cachedTokenPriceMicrocredits BigInt @default(0)
+  billingMode                  String  @default("fixed_request")
+  unitPriceMicrocredits        BigInt  @default(0)
+  inputTokenPriceMicrocredits  BigInt  @default(0)
+  outputTokenPriceMicrocredits BigInt  @default(0)
+  cachedTokenPriceMicrocredits BigInt  @default(0)
   /// 是否存在至少一个启用且已配置价格的有效档位
-  priceConfigured Boolean @default(false)
-  enabled         Boolean @default(true)
+  priceConfigured              Boolean @default(false)
+  enabled                      Boolean @default(true)
   /// 价格变更计数，批量调价用它做乐观并发校验
-  priceVersion Int @default(0)
+  priceVersion                 Int     @default(0)
 
   /// 'credits' | 'USD' | 'CNY'：价格档售价的单位
   priceCurrency String @default("credits")
@@ -1724,7 +1761,7 @@ model ChannelModel {
   capabilityConfigJson String @default("")
   capabilityVersion    Int    @default(0)
   /// 来自服务商目录的推荐模型 key（排查来源用）
-  catalogModelKey String @default("")
+  catalogModelKey      String @default("")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1740,7 +1777,7 @@ model ChannelModel {
 /// `selectorKey` 是规范化 JSON（如 {"operation":"text_to_image","quality":"2k"}），
 /// 是规格唯一性与匹配的唯一依据。
 model ChannelModelPriceTier {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   channelModelId String
   /// 存活时 = selectorKey；删除时置 null
   activeKey      String?
@@ -1763,10 +1800,10 @@ model ChannelModelPriceTier {
   costCachedTokenPriceMicrocredits BigInt  @default(0)
 
   // ── 售价 ──────────────────────────────────────────────────────────
-  unitPriceMicrocredits        BigInt @default(0)
-  inputTokenPriceMicrocredits  BigInt @default(0)
-  outputTokenPriceMicrocredits BigInt @default(0)
-  cachedTokenPriceMicrocredits BigInt @default(0)
+  unitPriceMicrocredits        BigInt  @default(0)
+  inputTokenPriceMicrocredits  BigInt  @default(0)
+  outputTokenPriceMicrocredits BigInt  @default(0)
+  cachedTokenPriceMicrocredits BigInt  @default(0)
   priceConfigured              Boolean @default(false)
   enabled                      Boolean @default(true)
   priceVersion                 Int     @default(0)
@@ -1783,32 +1820,32 @@ model ChannelModelPriceTier {
 /// 前台模型：C 端可售卖的 SKU。价格策略 `pricePolicy=unified` 用标量价，
 /// `channel` 跟随所选渠道模型的价格档（此时标量价只读）。
 model LogicalModel {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   code        String
   /// 存活且未归档时 = code 小写；归档/删除时置 null
   activeKey   String?
   name        String
-  icon        String @default("")
-  description String @default("")
+  icon        String  @default("")
+  description String  @default("")
   capability  String
   enabled     Boolean @default(true)
   sortOrder   Int     @default(0)
 
   /// 已分配的 revision 版本号，由数据库原子递增（update increment）
-  revisionSequence Int    @default(0)
-  activeRevisionId String @default("")
+  revisionSequence     Int    @default(0)
+  activeRevisionId     String @default("")
   /// 由哪个渠道模型投影而来（仅用于来源展示与重建）
   sourceChannelModelId String @default("")
 
   /// 'unified' 统一价 | 'channel' 跟随渠道价格档
-  pricePolicy        String @default("unified")
-  billingMode        String @default("fixed_request")
-  unitPriceMicrocredits        BigInt @default(0)
-  inputPriceMicrocredits       BigInt @default(0)
-  outputPriceMicrocredits      BigInt @default(0)
-  cachedPriceMicrocredits      BigInt @default(0)
+  pricePolicy             String @default("unified")
+  billingMode             String @default("fixed_request")
+  unitPriceMicrocredits   BigInt @default(0)
+  inputPriceMicrocredits  BigInt @default(0)
+  outputPriceMicrocredits BigInt @default(0)
+  cachedPriceMicrocredits BigInt @default(0)
   /// 旧 SKU 选择的无缝映射（JSON 字符串数组）
-  legacyModelIdsJson String @default("[]")
+  legacyModelIdsJson      String @default("[]")
 
   /// 归档后仅从可选目录隐藏；历史任务与审计仍可读取
   archivedAt DateTime?
@@ -1827,14 +1864,14 @@ model LogicalModel {
 
 /// 前台模型 revision：一次发布的能力合同与默认参数，创建后不可变。
 model LogicalModelRevision {
-  id             String @id @default(cuid())
-  logicalModelId String
-  version        Int
+  id                 String   @id @default(cuid())
+  logicalModelId     String
+  version            Int
   /// 能力合同 JSON（CapabilitySpec）
-  capabilitySpecJson String @default("{}")
+  capabilitySpecJson String   @default("{}")
   /// 默认参数 JSON
-  defaultOptionsJson String @default("{}")
-  createdBy          String @default("")
+  defaultOptionsJson String   @default("{}")
+  createdBy          String   @default("")
   createdAt          DateTime @default(now())
 
   @@unique([logicalModelId, version])
@@ -1843,12 +1880,12 @@ model LogicalModelRevision {
 
 /// 路线：前台模型 revision 可用的渠道模型，`priority` 硬分层、同层按 `weight` 加权。
 model LogicalModelRoute {
-  id                     String @id @default(cuid())
+  id                     String   @id @default(cuid())
   logicalModelRevisionId String
   channelModelId         String
-  enabled                Boolean @default(true)
-  priority               Int     @default(0)
-  weight                 Int     @default(100)
+  enabled                Boolean  @default(true)
+  priority               Int      @default(0)
+  weight                 Int      @default(100)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
@@ -1859,10 +1896,10 @@ model LogicalModelRoute {
 
 /// 路由尝试：一次任务在一条线路上的派发记录。`dispatchState` 决定能否安全切换。
 model RouteAttempt {
-  id        String @id @default(cuid())
-  taskId    String
+  id            String @id @default(cuid())
+  taskId        String
   /// 用户手动重试时 +1；故障切换不改
-  routeRun  Int
+  routeRun      Int
   attemptNumber Int
 
   logicalModelId         String @default("")
@@ -1872,7 +1909,7 @@ model RouteAttempt {
   channelId              String @default("")
 
   /// 'selected' | 'dispatching' | 'succeeded' | 'failed'
-  status String @default("selected")
+  status            String @default("selected")
   /// 'not_sent' | 'submission_unknown' | 'accepted' | 'rejected_no_job'
   dispatchState     String @default("not_sent")
   providerRequestId String @default("")
@@ -1897,8 +1934,8 @@ model RouteAttempt {
 /// 用户分组：统一倍率、货币兑换比例与可见渠道。
 /// `ratioBasisPoints` 10000 = 1.0；`pointsPerUsd/Cny` 以微积分表示 1 货币单位兑换的积分。
 model UserGroup {
-  id   String @id @default(cuid())
-  code String
+  id        String  @id @default(cuid())
+  code      String
   /// 存活时 = code 小写；删除时置 null
   activeKey String?
 
@@ -1909,16 +1946,16 @@ model UserGroup {
   badgeStyle  String @default("none")
   sortOrder   Int    @default(0)
 
-  ratioBasisPoints Int    @default(10000)
-  pointsPerUsd     BigInt @default(0)
-  pointsPerCny     BigInt @default(0)
+  ratioBasisPoints   Int     @default(10000)
+  pointsPerUsd       BigInt  @default(0)
+  pointsPerCny       BigInt  @default(0)
   /// true = 可使用全部系统渠道，不读 UserGroupChannel
   /// 可见全部系统渠道。默认 false —— 管理员新建分组时若漏传该字段，
   /// 不应默认获得全部渠道可见性（参考实现同样是 false；
   /// 默认分组由 `UserGroupService.ensureDefaultGroup` 显式置 true）。
-  allChannels Boolean @default(false)
+  allChannels        Boolean @default(false)
   /// 模型级覆盖 JSON：[{ modelKey, ratioBasisPoints, pointsPerUsd, pointsPerCny }]
-  modelOverridesJson String @default("[]")
+  modelOverridesJson String  @default("[]")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1942,52 +1979,52 @@ model UserGroupChannel {
 /// 生成账单：一次生成任务的扣费快照与状态机（reserved → running → settled/refunded/uncertain）。
 /// 与充值订单 `Order` 完全分离：本表只记「生成消耗」。
 model BillingOrder {
-  id     String @id @default(cuid())
-  userId String
+  id             String @id @default(cuid())
+  userId         String
   /// 幂等键：与 userId 组成唯一约束
   idempotencyKey String
 
-  taskId          String @default("")
-  channelId       String @default("")
-  channelModelId  String @default("")
-  priceTierId     String @default("")
-  priceTierVersion Int   @default(0)
+  taskId            String @default("")
+  channelId         String @default("")
+  channelModelId    String @default("")
+  priceTierId       String @default("")
+  priceTierVersion  Int    @default(0)
   priceSelectorJson String @default("{}")
 
   /// 下单时改写为前台模型 code（渠道策略下供应线路留在 channel* 字段）
-  model      String @default("")
-  capability String @default("")
-  scene      String @default("")
-  billingMode String @default("fixed_request")
-  priceVersion Int   @default(0)
+  model        String @default("")
+  capability   String @default("")
+  scene        String @default("")
+  billingMode  String @default("fixed_request")
+  priceVersion Int    @default(0)
 
-  unitPriceMicrocredits        BigInt @default(0)
-  multiplierBasisPoints        BigInt @default(10000)
+  unitPriceMicrocredits    BigInt @default(0)
+  multiplierBasisPoints    BigInt @default(10000)
   /// 下单时的分组与货币快照
   userGroup                String @default("")
   priceCurrency            String @default("")
   currencyRateMicrocredits BigInt @default(0)
 
-  quantity                   BigInt @default(1)
-  amountMicrocredits         BigInt @default(0)
-  reservedAmountMicrocredits BigInt @default(0)
+  quantity                   BigInt  @default(1)
+  amountMicrocredits         BigInt  @default(0)
+  reservedAmountMicrocredits BigInt  @default(0)
   /// true 表示显式授权上限（含授权为 0 的免费单）
-  chargeLimitSet          Boolean @default(false)
-  chargeLimitMicrocredits BigInt  @default(0)
-  actualAmountMicrocredits   BigInt @default(0)
-  refundedAmountMicrocredits BigInt @default(0)
+  chargeLimitSet             Boolean @default(false)
+  chargeLimitMicrocredits    BigInt  @default(0)
+  actualAmountMicrocredits   BigInt  @default(0)
+  refundedAmountMicrocredits BigInt  @default(0)
 
-  inputTokenPriceMicrocredits  BigInt @default(0)
-  outputTokenPriceMicrocredits BigInt @default(0)
-  cachedTokenPriceMicrocredits BigInt @default(0)
-  inputTokens  BigInt @default(0)
-  outputTokens BigInt @default(0)
-  cachedTokens BigInt @default(0)
+  inputTokenPriceMicrocredits  BigInt  @default(0)
+  outputTokenPriceMicrocredits BigInt  @default(0)
+  cachedTokenPriceMicrocredits BigInt  @default(0)
+  inputTokens                  BigInt  @default(0)
+  outputTokens                 BigInt  @default(0)
+  cachedTokens                 BigInt  @default(0)
   /// 视频公式用量（tokens），不含预授权余量
-  videoFormulaTokens BigInt @default(0)
+  videoFormulaTokens           BigInt  @default(0)
   /// 'provider'（上游 usage）| 'video_formula'（提交时公式快照）| ''
-  usageSource    String  @default("")
-  usageAvailable Boolean @default(false)
+  usageSource                  String  @default("")
+  usageAvailable               Boolean @default(false)
 
   // ── 成本快照（仅后台可见）─────────────────────────────────────────
   costConfigured                   Boolean @default(false)
@@ -2009,9 +2046,9 @@ model BillingOrder {
   /// 批量人工核对批次号。同一次批量操作写入同一个值，便于财务追溯
   reviewBatchId     String @default("")
 
-  startedAt  DateTime?
-  settledAt  DateTime?
-  refundedAt DateTime?
+  startedAt    DateTime?
+  settledAt    DateTime?
+  refundedAt   DateTime?
   /// 退款原因分类。决定这笔退款算「用户拿回钱」还是「平台内部换线路重预留」。
   ///
   /// `route_switch` = 线路切换：钱没有离开平台，只是从旧线路的预授权挪到新线路的
@@ -2021,9 +2058,9 @@ model BillingOrder {
   /// 其余取值：`failure`（任务失败/取消退款）、`manual`（人工核对退款）、
   /// `proxy_timeout`（中转超时退款）、`auto_sweep`（预留超时自动退款）、
   /// 空串 = 未分类（按真实退款计入「已退」）。
-  refundReason String @default("")
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  refundReason String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([userId, idempotencyKey])
   @@index([userId, status])
@@ -2040,13 +2077,13 @@ model BillingOrder {
 
 /// 积分账户：可用 / 预留余额的权威（批次 `CreditLot` 为批次维度权威）。
 model CreditAccount {
-  userId                String @id
-  availableMicrocredits BigInt @default(0)
-  reservedMicrocredits  BigInt @default(0)
+  userId                String   @id
+  availableMicrocredits BigInt   @default(0)
+  reservedMicrocredits  BigInt   @default(0)
   /// 乐观并发版本号
-  version   Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  version               Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 /// 微积分流水 —— 只追加。每条都记 available / reserved 的变动与变动后快照。
@@ -2054,7 +2091,7 @@ model CreditLedgerEntry {
   id     String @id @default(cuid())
   userId String
   /// 'grant' | 'purchase' | 'admin_adjust' | 'refund_reclaim' | 'reserve' | 'consume' | 'refund' | 'expire'
-  type String
+  type   String
 
   amountMicrocredits         BigInt
   availableDeltaMicrocredits BigInt @default(0)
@@ -2062,19 +2099,19 @@ model CreditLedgerEntry {
   availableAfterMicrocredits BigInt
   reservedAfterMicrocredits  BigInt
 
-  billingOrderId String @default("")
-  paymentOrderId String @default("")
+  billingOrderId String  @default("")
+  paymentOrderId String  @default("")
   /// 关联批次（grant / expire 这类只作用于单一批次的流水会写入，便于回查「这笔积分原本多少、何时过期」）
-  lotId          String @default("")
+  lotId          String  @default("")
   /// 生成任务 id（区别于充值订单；后台流水按任务排查时用）
-  taskId         String @default("")
-  actorUserId    String @default("")
-  model          String @default("")
-  channelId      String @default("")
-  scene          String @default("")
-  note           String @default("")
+  taskId         String  @default("")
+  actorUserId    String  @default("")
+  model          String  @default("")
+  channelId      String  @default("")
+  scene          String  @default("")
+  note           String  @default("")
   /// 幂等键（同一业务动作重复执行只落一条）
-  referenceKey String? @unique
+  referenceKey   String? @unique
 
   createdAt DateTime @default(now())
 
@@ -2098,55 +2135,52 @@ model CreditReservationItem {
 /// 上游调用记录 —— 只允许 INSERT。
 /// 请求/响应体在写入前截断并脱敏，密钥永不落库。
 model ApiCallLog {
-  id     String @id @default(cuid())
-  userId String @default("")
+  id        String @id @default(cuid())
+  userId    String @default("")
   traceId   String @default("")
   requestId String @default("")
 
-  channelId   String @default("")
-  channelName String @default("")
+  channelId      String @default("")
+  channelName    String @default("")
   /// 渠道模型 id：线路级健康指标（成功率 / P95）的归属键。
   /// 空串 = 该次调用没有落到具体渠道模型（如渠道级 `GET /models`）。
   channelModelId String @default("")
-  taskId      String @default("")
+  taskId         String @default("")
   billingOrderId String @default("")
 
-  source      String @default("")
-  capability  String @default("")
-  operation   String @default("")
+  source      String  @default("")
+  capability  String  @default("")
+  operation   String  @default("")
   /// 'proxy' | 'task'
-  requestKind String @default("")
+  requestKind String  @default("")
   billable    Boolean @default(false)
-  apiFormat   String @default("")
-  method      String @default("")
-  path        String @default("")
-  model       String @default("")
+  apiFormat   String  @default("")
+  method      String  @default("")
+  path        String  @default("")
+  model       String  @default("")
 
   /// 'success' | 'failed' | 'pending' | 'canceled'
-  status     String @default("")
-  statusCode Int    @default(0)
-  durationMs Int    @default(0)
-  pollCount  Int    @default(0)
-  providerStatus    String @default("")
-  inputTokens       BigInt @default(0)
-  outputTokens      BigInt @default(0)
-  cachedTokens      BigInt @default(0)
+  status            String  @default("")
+  statusCode        Int     @default(0)
+  durationMs        Int     @default(0)
+  pollCount         Int     @default(0)
+  providerStatus    String  @default("")
+  inputTokens       BigInt  @default(0)
+  outputTokens      BigInt  @default(0)
+  cachedTokens      BigInt  @default(0)
   usageAvailable    Boolean @default(false)
   mediaCount        Int     @default(0)
   videoSeconds      Int     @default(0)
   providerRequestId String  @default("")
 
-  /*
+  /**
    * 上游美元成本估算三列：**已废弃，恒为默认值**。
-   *
    * 参考实现有一张独立的「模型定价」表（`ModelPricing`，美元口径）来估算
    * 每次调用的上游成本。本仓的成本来源是**渠道模型价格档的成本价**（微积分口径），
    * 建单时随账单快照（见 `BillingOrder.cost*`），口径唯一且是真实值。
-   *
    * 这三列在全仓没有任何写入点，长期恒为 0 / false / ''。保留列是为了不做
    * 破坏性迁移（drop column 会丢历史数据）；但**接口层已不再下发它们**，
    * 以免日志页出现「有这一列却恒为空」的误导。
-   *
    * 若将来要恢复美元口径的上游成本估算，应新增独立定价表 + 写入点，
    * 而不是复活这三列。
    */
@@ -2154,13 +2188,13 @@ model ApiCallLog {
   costAvailable       Boolean @default(false)
   currency            String  @default("")
 
-  errorCode        String @default("")
-  error            String @default("")
-  concurrencyLimit Int    @default(0)
-  upstreamUrl      String @default("")
+  errorCode          String @default("")
+  error              String @default("")
+  concurrencyLimit   Int    @default(0)
+  upstreamUrl        String @default("")
   requestContentType String @default("")
-  requestBody      String @default("")
-  responseBody     String @default("")
+  requestBody        String @default("")
+  responseBody       String @default("")
 
   startedAt DateTime
   createdAt DateTime @default(now())
@@ -2178,13 +2212,13 @@ model ApiCallLog {
 
 /// 系统级插件可用性（管理员启停内置/上传插件）。
 model PluginPlatformState {
-  pluginId  String @id
+  pluginId   String   @id
   /// 'builtin' | 'uploaded'
-  source    String @default("builtin")
-  enabled   Boolean @default(true)
+  source     String   @default("builtin")
+  enabled    Boolean  @default(true)
   /// 最近一次校验结果（JSON）：{ ok, checkedAt, reason }
-  verifyJson String @default("{}")
-  updatedBy  String @default("")
+  verifyJson String   @default("{}")
+  updatedBy  String   @default("")
   updatedAt  DateTime @updatedAt
 }
 
@@ -2199,8 +2233,8 @@ model UserPluginState {
 
 /// 路由目录版本：后台写入后递增，多进程按版本号判断是否需要重载快照。
 model RouteCatalogVersion {
-  id      String @id @default("catalog")
-  version Int    @default(0)
+  id        String   @id @default("catalog")
+  version   Int      @default(0)
   updatedAt DateTime @updatedAt
 }
 
@@ -2208,12 +2242,26 @@ model RouteCatalogVersion {
 /// 订单与 Payment 固定 providerConfigId/version，历史订单回调验签必须还能取到当时的密钥。
 model PaymentProviderConfig {
   id                String   @id @default(cuid())
-  /// 适配器 id：sandbox | alipay | wechat
+  /// 适配器 id：sandbox | alipay | wechat | epay ...
   providerId        String
-  /// 渠道内单调递增版本，从 1 开始
+  /// 同一渠道下稳定的实例标识；服务端生成，不作为凭据
+  instanceId        String   @default("default")
+  /// 后台展示名；空时使用渠道名 + 实例序号
+  name              String?
+  /// 实例在渠道内的展示/选择顺序
+  sortOrder         Int      @default(0)
+  /// 实例内单调递增版本，从 1 开始
   version           Int
   enabled           Boolean  @default(false)
   closeAfterMinutes Int      @default(30)
+  /// 实例级限额（分）；null 表示不限制
+  minAmountCents    Int?
+  maxAmountCents    Int?
+  dailyLimitCents   Int?
+  /// 是否允许对该实例产生的支付发起退款
+  refundEnabled     Boolean  @default(true)
+  /// 实例支持的 C 端支付方式子集，JSON 数组字符串
+  paymentMethods    String   @default("[\"alipay\",\"wechat\"]")
   /// AES-256-GCM 密文；明文是 Record<string,string> 的 JSON，含密钥
   configCipher      String   @default("")
   /// 配置的规范化摘要（sha256），用于识别「无改动保存」
@@ -2222,13 +2270,24 @@ model PaymentProviderConfig {
   createdBy         String?
   createdAt         DateTime @default(now())
 
-  @@unique([providerId, version])
+  @@unique([providerId, instanceId, version])
+  @@index([providerId, instanceId, sortOrder])
   @@index([providerId, createdAt])
+}
+
+/// 持久化轮询游标；多进程部署也不能只放内存。
+model PaymentRoundRobinCursor {
+  providerId String
+  method     String
+  cursor     Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@id([providerId, method])
 }
 
 /// 渠道异步通知收件箱。验签通过后、入账前落库，保证进程重启不丢通知。
 model PaymentNotification {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   providerId       String
   /// 渠道事件 id；渠道不提供时用 sha256(providerId + ':' + rawBody)
   providerEventId  String
@@ -2239,17 +2298,17 @@ model PaymentNotification {
   /// sha256(rawBody)，用于排障与日志关联，不落明文
   payloadDigest    String
   /// 验签通过的原始报文 AES-256-GCM 密文
-  payloadCipher    String   @default("")
+  payloadCipher    String    @default("")
   /// 适配器归一化后的业务字段 JSON；不得含密钥，可含渠道交易字段
-  normalizedJson   String   @default("{}")
+  normalizedJson   String    @default("{}")
   /// pending | processing | processed | failed
-  status           String   @default("pending")
-  attempts         Int      @default(0)
+  status           String    @default("pending")
+  attempts         Int       @default(0)
   lastError        String?
-  nextAttemptAt    DateTime @default(now())
+  nextAttemptAt    DateTime  @default(now())
   processedAt      DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@unique([providerId, providerEventId])
   @@index([status, nextAttemptAt])
@@ -2259,33 +2318,34 @@ model PaymentNotification {
 
 /// 单次对账运行。失败可在同一账单日重跑，attempt 递增，历史运行不覆盖。
 model PaymentReconciliationRun {
-  id             String   @id @default(cuid())
-  providerId     String
+  id                 String    @id @default(cuid())
+  providerId         String
+  providerInstanceId String    @default("default")
   /// 运行时使用的配置版本；证据链不依赖「当前最新版」
-  configId       String?
-  billDate       String
+  configId           String?
+  billDate           String
   /// 同一渠道同一账单日的第几次运行，从 1 开始
-  attempt        Int      @default(1)
+  attempt            Int       @default(1)
   /// provider（渠道自动下载）| csv（人工上传兜底）
-  source         String   @default("provider")
-  fileName       String?
+  source             String    @default("provider")
+  fileName           String?
   /// running | completed | failed
-  status         String   @default("running")
-  totalItems     Int      @default(0)
-  matchItems     Int      @default(0)
-  recoveredItems Int      @default(0)
-  errorItems     Int      @default(0)
-  error          String?
-  startedBy      String?
-  startedAt      DateTime @default(now())
-  completedAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status             String    @default("running")
+  totalItems         Int       @default(0)
+  matchItems         Int       @default(0)
+  recoveredItems     Int       @default(0)
+  errorItems         Int       @default(0)
+  error              String?
+  startedBy          String?
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   items PaymentReconciliationItem[]
 
-  @@unique([providerId, billDate, attempt])
-  @@index([providerId, billDate, status])
+  @@unique([providerId, providerInstanceId, billDate, attempt])
+  @@index([providerId, providerInstanceId, billDate, status])
   @@index([status, createdAt])
 }
 

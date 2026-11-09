@@ -16,7 +16,9 @@ import {
 import { cn } from '~/admin-ui/lib/cn';
 import { adminUsersApi, assetThumbUrl } from './api';
 import { LOGIN_REASON_LABEL } from './constants';
+import { UserGenerationSection } from './UserGenerationSection';
 import { UserMembershipSection } from './UserMembershipSection';
+import { UserSpendingSection } from './UserSpendingSection';
 import {
   adminAssetHref,
   adminCreditHref,
@@ -163,7 +165,7 @@ export function UserDetailDrawer({
     <AdminDrawer<AdminUserDetail>
       open={detailId !== null}
       title="用户详情"
-      description="账号资料、登录活动与最近使用情况"
+      description="账号、会员、积分、消费与生成概览"
       onClose={onClose}
       fetcher={detailFetcher}
     >
@@ -245,6 +247,22 @@ export function UserDetailDrawer({
                 }
               />
               <InfoItem
+                label="累计获得"
+                value={
+                  <span className="tabular-nums">
+                    {d.credit?.totalEarned ?? '—'}
+                  </span>
+                }
+              />
+              <InfoItem
+                label="累计消耗"
+                value={
+                  <span className="tabular-nums">
+                    {d.credit?.totalConsumed ?? '—'}
+                  </span>
+                }
+              />
+              <InfoItem
                 label="计费分组"
                 value={
                   d.group
@@ -264,6 +282,14 @@ export function UserDetailDrawer({
             history={d.membershipHistory}
           />
 
+          <UserSpendingSection
+            spending={d.spending}
+            orders={d.recentOrders}
+            email={d.email}
+          />
+
+          <UserGenerationSection generation={d.generation} userId={d.id} />
+
           {/* 登录审计：权限点 audit.read，无权限时静默显示说明而非报错 */}
           <RecentLoginsSection userId={d.id} />
 
@@ -274,33 +300,6 @@ export function UserDetailDrawer({
                 <MiniStat label="任务" value={d.stats.tasks} />
                 <MiniStat label="素材" value={d.stats.assets} />
               </dl>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">任务状态</span>
-                <span>
-                  成功{' '}
-                  <strong className="font-semibold text-foreground tabular-nums">
-                    {d.stats.taskStatus.succeeded}
-                  </strong>
-                </span>
-                <span>
-                  失败{' '}
-                  <strong className="font-semibold text-foreground tabular-nums">
-                    {d.stats.taskStatus.failed}
-                  </strong>
-                </span>
-                <span>
-                  运行{' '}
-                  <strong className="font-semibold text-foreground tabular-nums">
-                    {d.stats.taskStatus.running}
-                  </strong>
-                </span>
-                <span>
-                  排队{' '}
-                  <strong className="font-semibold text-foreground tabular-nums">
-                    {d.stats.taskStatus.queued}
-                  </strong>
-                </span>
-              </div>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
               <Link

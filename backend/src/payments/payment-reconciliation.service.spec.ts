@@ -101,6 +101,9 @@ function makeHarness(order: Record<string, unknown>) {
       findUnique: vi.fn().mockResolvedValue(order),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    paymentProviderConfig: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     paymentReconciliationItem: {
       upsert: vi.fn(async ({ where, create, update }) => {
         const key = [
@@ -118,6 +121,7 @@ function makeHarness(order: Record<string, unknown>) {
       update: vi.fn(async ({ data }) => ({
         id: 'run-1',
         providerId: 'alipay',
+        providerInstanceId: 'default',
         configId: 'config-1',
         billDate: '2026-11-04',
         attempt: 1,
@@ -157,6 +161,7 @@ function compare(
   return (service as any).compare(
       'run-1',
       'alipay',
+      'default',
       'config-1',
       records,
       '2026-11-04',

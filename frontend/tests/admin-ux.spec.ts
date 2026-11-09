@@ -406,7 +406,7 @@ test.describe('后台高频动线', () => {
     await firstTask.click();
 
     await expect(page).toHaveURL(/\/admin\/tasks\?id=/);
-    await expect(drawer(page)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('admin-modal')).toBeVisible({ timeout: 15000 });
   });
 
   test('任务详情可带用户条件直达积分账本', async ({ page }) => {
@@ -481,7 +481,7 @@ test.describe('后台高频动线', () => {
 
     await projectLink.click();
     await expect(page).toHaveURL(new RegExp(`projectId=${encodeURIComponent(projectId!)}`));
-    await expect(drawer(page)).toHaveCount(0);
+    await expect(page.getByTestId('admin-modal')).toHaveCount(0);
     await expect(chips(page)).toContainText(`项目 ID：${projectId}`);
   });
 

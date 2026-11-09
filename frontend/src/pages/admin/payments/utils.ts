@@ -1,4 +1,11 @@
-import type { AdminPaymentProviderView, PaymentConfigField } from '../../../types/payment';
+import type {
+  AdminPaymentProviderInstanceView,
+  AdminPaymentProviderView,
+  PaymentConfigField,
+  PaymentCurrency,
+  PaymentSource,
+  VisiblePaymentMethod,
+} from '../../../types/payment';
 import {
   PROVIDER_LABELS,
   type PaymentProviderState,
@@ -79,89 +86,144 @@ export function missingRequiredLabels(
     .map((f) => f.label);
 }
 
-/** 渠道当前是否「可发起支付」：必填齐全且已启用。 */
-export function providerReady(
-  provider: AdminPaymentProviderView,
-  draftValues: Record<string, string>,
-): boolean {
-  if (!provider.enabled) return false;
-  return (
-    missingRequiredLabels(
-      provider.configFields,
-      draftValues,
-      provider.secretConfigured,
-    ).length === 0
-  );
+/** 实例展示名：自定义名优先；default 与自动生成 id 都有可读兜底。 */
+export function instanceLabel(
+  instance: Pick<AdminPaymentProviderInstanceView, 'instanceId' | 'name'>,
+): string {
+  const name = instance.name?.trim();
+  if (name) return name;
+  return instance.instanceId === 'default' ? '默认实例' : instance.instanceId;
 }
 
-/**
- * 渠道的**阻断项**判定。
- *
- * 「能不能收钱」的条件不止「必填项齐全」一条。后端 `PaymentOrderService`
- * 在发起支付时会因为下列任一情况抛 503：
- *   · 必填项缺失（`validateConfig` 不通过）
- *   · 真实渠道缺回调公网地址（`publicBaseUrl` 与 `PAYMENT_NOTIFY_BASE` 都没配）
- *   · 生产环境缺 `PAYMENT_SECRET_KEY`（凭据无法解密）
- *
- * 后端已经把这些情况写进了 `provider.warnings`（`level: 'danger'`），所以
- * **以它为准**，而不是前端自己重推一遍规则 —— 前端重推的规则一定会和后端
- * 漂移（后端加一条判定，前端的「可用」就成了假话）。
- *
- * 这里只做一件事：把 danger 告警翻译成「这个渠道现在收不了钱」。
- */
-export function providerBlockingIssues(
-  provider: AdminPaymentProviderView,
+/** 单个实例的阻断项。后端告警是唯一事实源。 */
+export function instanceBlockingIssues(
+  instance: Pick<AdminPaymentProviderInstanceView, 'warnings'>,
 ): string[] {
-  return provider.warnings
-    .filter((w) => w.level === 'danger')
-    .map((w) => w.message);
+  return instance.warnings
+    .filter((warning) => warning.level === 'danger')
+    .map((warning) => warning.message);
 }
 
 /**
- * 渠道的可运营状态。
+ * 单个实例的可运营状态。
  *
- * 判据是「能不能收钱」，不是「开关开没开」：
- *   · 开关开 + 无阻断项 → usable（能收钱）
- *   · 开关开 + 有阻断项 → misconfigured（**正在报错**：发起支付 503）
- *   · 开关关 + 凭据缺 → unconfigured（启用前要补齐）
- *   · 开关关 + 凭据齐 → disabled（随时可开）
- *
- * 开关与凭据必须分开看：只看 `enabled` 会把「开关开了但收不了钱」显示成
- * 绿色可用，运营照着页面去收款时才撞上 503。
- *
- * 阻断项取自后端 danger 告警（见 {@link providerBlockingIssues}），不靠前端
- * 复刻后端规则 —— 复刻出来的口径迟早与后端不一致，而不一致的方向永远是
- * 前端显示「可用」、实际收不到钱。
+ * 实例与渠道使用同一套状态词，便于列表中用同一枚 StatusTag。
+ * 后端 `configured` 已综合必填项校验，前端不再从 values 重推。
+ */
+export function instanceState(
+  instance: Pick<
+    AdminPaymentProviderInstanceView,
+    'enabled' | 'configured' | 'warnings'
+  >,
+): PaymentProviderState {
+  if (instance.enabled) {
+    return instanceBlockingIssues(instance).length > 0 || !instance.configured
+      ? 'misconfigured'
+      : 'usable';
+  }
+  return instance.configured ? 'disabled' : 'unconfigured';
+}
+
+/**
+ * 渠道状态按实例聚合：
+ *   · 至少一个实例可用 → usable（前台仍可收款）
+ *   · 没有可用实例，但有已启用实例报错 → misconfigured
+ *   · 全部停用，且至少一个配置完整 → disabled
+ *   · 其余 → unconfigured
  */
 export function providerState(
   provider: AdminPaymentProviderView,
 ): PaymentProviderState {
-  const configured =
-    missingRequiredLabels(
-      provider.configFields,
-      provider.values,
-      provider.secretConfigured,
-    ).length === 0;
-
-  if (!provider.enabled) return configured ? 'disabled' : 'unconfigured';
-
-  // 开关开着：后端报了 danger 就说明收不了钱（缺必填项 / 缺回调地址 / 缺密钥）
-  if (providerBlockingIssues(provider).length > 0) return 'misconfigured';
-  return configured ? 'usable' : 'misconfigured';
+  const states = provider.instances.map(instanceState);
+  if (states.includes('usable')) return 'usable';
+  if (states.includes('misconfigured')) return 'misconfigured';
+  if (states.includes('disabled')) return 'disabled';
+  return 'unconfigured';
 }
 
-/**
- * 渠道缺失的必填项**标签**（不是字段名）。
- *
- * 直接用 `provider.missing`（后端给的字段名）会把 `merchantPrivateKey` 这种
- * 内部字段名暴露给运营。页面上要的是「应用私钥（PEM）」这种人话。
- */
-export function providerMissingLabels(
+/** 渠道下所有实例的 danger 告警（去重，保留后端原文）。 */
+export function providerBlockingIssues(
   provider: AdminPaymentProviderView,
 ): string[] {
-  return missingRequiredLabels(
-    provider.configFields,
-    provider.values,
-    provider.secretConfigured,
+  return [...new Set(provider.instances.flatMap(instanceBlockingIssues))];
+}
+
+/** 渠道中真正可收款的实例数量。 */
+export function usableInstanceCount(provider: AdminPaymentProviderView): number {
+  return provider.instances.filter(
+    (instance) => instanceState(instance) === 'usable',
+  ).length;
+}
+
+/** 渠道中已启用的实例数量。 */
+export function enabledInstanceCount(provider: AdminPaymentProviderView): number {
+  return provider.instances.filter((instance) => instance.enabled).length;
+}
+
+/** 某来源下可作为指定前台按钮的实例。 */
+export function sourceAvailableInstances(
+  providers: AdminPaymentProviderView[],
+  currency: PaymentCurrency,
+  method: VisiblePaymentMethod,
+  source: PaymentSource,
+): { provider: AdminPaymentProviderView | null; instances: AdminPaymentProviderInstanceView[] } {
+  if (source === 'unset') return { provider: null, instances: [] };
+  const providerId = source === 'official' ? method : 'epay';
+  const provider = providers.find((item) => item.id === providerId) ?? null;
+  if (!provider || !provider.supportedCurrencies.includes(currency)) {
+    return { provider, instances: [] };
+  }
+  const instances = provider.instances.filter(
+    (instance) =>
+      instance.enabled &&
+      instance.configured &&
+      instance.paymentMethods.includes(method) &&
+      instanceBlockingIssues(instance).length === 0,
   );
+  return { provider, instances };
+}
+
+/** 前台某按钮的来源可用性；不可用时给出可操作的原因。 */
+export function sourceAvailability(
+  providers: AdminPaymentProviderView[],
+  currency: PaymentCurrency,
+  method: VisiblePaymentMethod,
+  source: PaymentSource,
+): { ok: boolean; reason: string } {
+  if (source === 'unset') return { ok: false, reason: '未选择支付来源' };
+
+  const providerId = source === 'official' ? method : 'epay';
+  const provider = providers.find((item) => item.id === providerId);
+  if (!provider) {
+    return {
+      ok: false,
+      reason: `尚未创建${source === 'official' ? '对应官方' : '易支付'}渠道`,
+    };
+  }
+  if (!provider.supportedCurrencies.includes(currency)) {
+    return { ok: false, reason: `${provider.name}不支持默认币种 ${currency}` };
+  }
+  if (provider.instances.length === 0) {
+    return { ok: false, reason: `${provider.name}尚未创建服务商实例` };
+  }
+
+  const candidates = provider.instances.filter((instance) =>
+    instance.paymentMethods.includes(method),
+  );
+  if (candidates.length === 0) {
+    return { ok: false, reason: `${provider.name}没有实例选择${method === 'alipay' ? '支付宝' : '微信支付'}` };
+  }
+  const enabled = candidates.filter((instance) => instance.enabled);
+  if (enabled.length === 0) {
+    return { ok: false, reason: `${provider.name}没有已启用的${method === 'alipay' ? '支付宝' : '微信支付'}实例` };
+  }
+  const configured = enabled.filter((instance) => instance.configured);
+  if (configured.length === 0) {
+    return { ok: false, reason: `${provider.name}的已启用实例配置不完整` };
+  }
+  const danger = configured
+    .flatMap(instanceBlockingIssues)
+    .find((message) => Boolean(message));
+  if (danger) return { ok: false, reason: danger };
+  return { ok: true, reason: '' };
 }

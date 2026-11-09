@@ -50,12 +50,30 @@ function renderControl({
     }
     return (
       <NumberField
-        value={Number(value)}
+        value={value === null ? undefined : Number(value)}
         min={item.min}
         max={item.max}
-        onChange={(next) => onChange(Number(next ?? item.default))}
+        onChange={(next) =>
+          onChange(item.nullable ? (next ?? null) : Number(next ?? item.default))
+        }
         disabled={!editable}
         ariaLabel={item.label}
+        className="w-40"
+      />
+    );
+  }
+
+  if (item.type === 'string' && item.options?.length) {
+    return (
+      <SelectField
+        value={String(value)}
+        onChange={(next) => next !== undefined && onChange(next)}
+        options={item.options.map((next) => ({
+          value: next,
+          label: item.optionLabels?.[next] ?? next,
+        }))}
+        ariaLabel={item.label}
+        disabled={!editable}
         className="w-40"
       />
     );

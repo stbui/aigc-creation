@@ -24,7 +24,12 @@ import { decodeCsvBuffer, parseCsv } from '../../common/csv';
 import { readFirstCsvFromZip } from '../../common/archive/zip-reader';
 
 /**
- * 支付宝（电脑网站支付）适配器 —— RSA2 签名，零新增依赖。
+ * 支付宝适配器 —— RSA2 签名，零新增依赖。
+ *
+ * 下单策略由编排层通过 `CreateOrderInput.alipayMobilePrecreateDeepLink` 显式传入：
+ *   · 移动端默认 `alipay.trade.wap.pay`；开关开启时改用当面付并返回 App Scheme；
+ *   · 桌面端优先当面付二维码，未开通时回退电脑网站支付；
+ *   · 桌面端回退时同时返回收银台链接，前端可渲染二维码或直接打开。
  *
  * 关键细节（每条都对应过真实故障）：
  *   · 签名串**不 URL 编码**，只去空值 + 去 sign/sign_type + 字典序 + `k=v&` 拼接；
@@ -93,10 +98,76 @@ export class AlipayAdapter implements PaymentAdapter {
   }
 
   async createOrder(input: CreateOrderInput): Promise<PaymentCheckout> {
+    const mobile = isMobileUserAgent(input.clientUserAgent);
+    const useMobilePrecreate = mobile && input.alipayMobilePrecreateDeepLink === true;
+
+    if (mobile && !useMobilePrecreate) {
+      return this.redirectCheckout(input, 'alipay.trade.wap.pay', {
+        quit_url: input.returnUrl,
+      });
+    }
+
+    try {
+      const precreate = await this.precreateCheckout(input, useMobilePrecreate);
+      return precreate;
+    } catch (e) {
+      /*
+       * 移动端开关开启时不能静默换成 WAP：管理员显式选择了「拉起 App」体验，
+       * 失败必须让用户看到真实原因。桌面端则按产品要求回退电脑网站支付。
+       */
+      if (mobile) throw e;
+      this.logger.warn(
+        `支付宝当面付不可用，回退电脑网站支付 订单 ${input.orderNo}: ${(e as Error).message}`,
+      );
+      return this.redirectCheckout(input, 'alipay.trade.page.pay');
+    }
+  }
+
+  /** 创建当面付动态二维码；桌面端额外附上电脑网站收银台链接作为手动兜底。 */
+  private async precreateCheckout(
+    input: CreateOrderInput,
+    includeScheme: boolean,
+  ): Promise<PaymentCheckout> {
+    const result = await this.callGateway(input.config, 'alipay.trade.precreate', {
+      out_trade_no: input.orderNo,
+      total_amount: centsToYuan(input.amountCents),
+      subject: input.subject.slice(0, 256),
+      timeout_express: minutesToExpress(input.expiresAt),
+    });
+    if (!result.ok) {
+      throw new Error(`${result.code}: ${result.message}`);
+    }
+    const codeUrl = String(result.node.qr_code ?? '').trim();
+    if (!codeUrl) throw new Error('当面付未返回 qr_code');
+
+    const pagePayUrl = this.redirectCheckout(input, 'alipay.trade.page.pay').payUrl;
+    return {
+      mode: 'qrcode',
+      codeUrl,
+      payUrl: pagePayUrl,
+      ...(includeScheme
+        ? {
+            schemeUrl: `alipays://platformapi/startapp?saId=10000007&qrcode=${encodeURIComponent(codeUrl)}`,
+          }
+        : {}),
+      providerRef: input.orderNo,
+      expiresAt: input.expiresAt,
+      hint: includeScheme
+        ? '正在尝试打开支付宝 App；未跳转时请扫描二维码或在支付宝中打开收银台'
+        : '请使用支付宝扫码支付',
+    };
+  }
+
+  /** 生成支付宝网关跳转 URL（电脑/手机网站支付共用同一签名流程）。 */
+  private redirectCheckout(
+    input: CreateOrderInput,
+    method: 'alipay.trade.page.pay' | 'alipay.trade.wap.pay',
+    extraBiz: Record<string, unknown> = {},
+  ): PaymentCheckout {
     const v = input.config.values;
     const params: Record<string, string> = {
       app_id: v.appId,
-      method: 'alipay.trade.page.pay',
+      method,
       format: 'JSON',
       charset: 'utf-8',
       sign_type: 'RSA2',
@@ -109,6 +180,7 @@ export class AlipayAdapter implements PaymentAdapter {
         total_amount: centsToYuan(input.amountCents),
         subject: input.subject.slice(0, 256),
         timeout_express: minutesToExpress(input.expiresAt),
+        ...extraBiz,
       }),
     };
     params.sign = signWithPrivateKey(buildSignContent(params), normalizePem(v.merchantPrivateKey));
@@ -443,6 +515,13 @@ function parseAlipayBillCsv(text: string): BillRecord[] {
     });
   }
   return out;
+}
+
+/** 与支付渠道共享的移动端判定；桌面端仍走二维码优先/电脑网站回退。 */
+export function isMobileUserAgent(userAgent?: string): boolean {
+  return /Android|iPhone|iPad|iPod|Mobile|HarmonyOS|Windows Phone/i.test(
+    userAgent ?? '',
+  );
 }
 
 function isAllowedGateway(url: string): boolean {

@@ -44,6 +44,7 @@ describe('OrderService.countUnreclaimableCredits', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(
@@ -62,6 +63,7 @@ describe('OrderService.transition', () => {
     };
     const service = new OrderService(
       prisma as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -95,6 +97,7 @@ describe('OrderService.cancelSandboxOrder', () => {
     };
     const service = new OrderService(
       prisma as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -154,6 +157,7 @@ describe('OrderService.markPaid 用户锁', () => {
     );
     const service = new OrderService(
       prisma as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

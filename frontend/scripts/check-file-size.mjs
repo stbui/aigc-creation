@@ -34,9 +34,9 @@ const VERBOSE = process.argv.includes('--verbose');
  */
 const BASELINE = {
   // 接口聚合层：按域拆分牵扯全部调用方，待「API 与类型层治理」批次统一处理
-  'src/lib/api.ts': 2651,
+  'src/lib/api.ts': 2493,
   // 后端契约类型声明（无运行期逻辑），随接口演进增长
-  'src/types/api.d.ts': 2342,
+  'src/types/api.d.ts': 2331,
   'src/types/model.ts': 928,
   'src/components/MattingResultEditor.tsx': 810,
 };

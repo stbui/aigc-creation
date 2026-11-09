@@ -1,5 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -14,6 +16,7 @@ import {
 import { PageQueryDto } from "./page-query.dto";
 import {
   PAYMENT_PROVIDER_IDS,
+  PAYMENT_SOURCES,
   PaymentProviderId,
 } from "../../payments/adapters/types";
 
@@ -29,11 +32,103 @@ export class PaymentProviderConfigUpdateDto {
 
   @IsObject()
   values!: Record<string, string>;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  name?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  @IsInt()
+  @Min(0)
+  minAmountCents?: number | null;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  @IsInt()
+  @Min(0)
+  maxAmountCents?: number | null;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  @IsInt()
+  @Min(0)
+  dailyLimitCents?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  refundEnabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(["alipay", "wechat"], { each: true })
+  paymentMethods?: Array<"alipay" | "wechat">;
+}
+
+export class PaymentProviderInstanceCreateDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  name?: string | null;
+
+  @IsOptional()
+  @IsObject()
+  values?: Record<string, string>;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(5)
+  @Max(1440)
+  closeAfterMinutes?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  @IsInt()
+  @Min(0)
+  minAmountCents?: number | null;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  @IsInt()
+  @Min(0)
+  maxAmountCents?: number | null;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  @IsInt()
+  @Min(0)
+  dailyLimitCents?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  refundEnabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(["alipay", "wechat"], { each: true })
+  paymentMethods?: Array<"alipay" | "wechat">;
+}
+
+export class PaymentProviderInstanceOrderDto {
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  instanceIds!: string[];
 }
 
 export class PaymentSettingsUpdateDto {
   @IsIn(["CNY", "USD"], { message: "币种只支持 CNY / USD" })
   defaultCurrency!: "CNY" | "USD";
+
+  @IsIn(PAYMENT_SOURCES, { message: "支付宝来源只支持 unset / official / epay" })
+  alipaySource!: "unset" | "official" | "epay";
+
+  @IsIn(PAYMENT_SOURCES, { message: "微信来源只支持 unset / official / epay" })
+  wechatSource!: "unset" | "official" | "epay";
 }
 
 export class PaymentOrderListQueryDto extends PageQueryDto {
@@ -96,6 +191,10 @@ export class ReconciliationRunDto {
   providerId!: PaymentProviderId;
 
   @IsString()
+  @MinLength(1)
+  providerInstanceId!: string;
+
+  @IsString()
   billDate!: string;
 
   @IsOptional()
@@ -107,6 +206,10 @@ export class ReconciliationListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsString()
   providerId?: string;
+
+  @IsOptional()
+  @IsString()
+  providerInstanceId?: string;
 
   @IsOptional()
   @IsString()
@@ -130,6 +233,10 @@ export class ReconciliationItemsQueryDto extends PageQueryDto {
 export class ReconciliationImportDto {
   @IsIn(PAYMENT_PROVIDER_IDS, { message: "渠道非法" })
   providerId!: PaymentProviderId;
+
+  @IsString()
+  @MinLength(1)
+  providerInstanceId!: string;
 
   @IsString()
   billDate!: string;

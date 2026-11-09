@@ -202,6 +202,200 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
   });
 });
 
+describe('PaymentNotificationService 易支付固化支付方式', () => {
+  const EPAY_CONFIG_ID = 'cfg_epay_1';
+  const EPAY_PROVIDER_REF = 'epay-trade-1';
+
+  function epayPaidResult(): NotificationResult {
+    return {
+      ok: true,
+      eventId: `epay:${EPAY_PROVIDER_REF}:paid`,
+      merchantOrderNo: ORDER_NO,
+      providerTradeNo: EPAY_PROVIDER_REF,
+      providerRef: EPAY_PROVIDER_REF,
+      amountCents: 1005,
+      currency: 'CNY',
+      state: 'paid',
+      providerStatus: 'PAY_SUCCESS',
+      ackSuccess: true,
+      rawPayload: '{}',
+    };
+  }
+
+  function makeEpayHarness(input: { providerMethod?: 'alipay' | 'wechat' | null } = {}) {
+    const notificationRow = {
+      id: NOTIFICATION_ID,
+      providerId: 'epay',
+      providerEventId: `epay:${EPAY_PROVIDER_REF}:paid`,
+      providerConfigId: EPAY_CONFIG_ID,
+      merchantOrderNo: ORDER_NO,
+      normalizedJson: '{}',
+      status: 'pending',
+      attempts: 0,
+      payloadCipher: 'cipher',
+      lastError: null,
+      nextAttemptAt: new Date(),
+      processedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const payment = {
+      id: 'pay_epay_1',
+      providerMethod: input.providerMethod === undefined ? 'alipay' : input.providerMethod,
+    };
+    const prisma = {
+      paymentNotification: {
+        findUnique: vi.fn(async ({ where }: { where: { id?: string } }) =>
+          where.id ? notificationRow : null,
+        ),
+        create: vi.fn().mockResolvedValue(notificationRow),
+        update: vi.fn().mockResolvedValue(notificationRow),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      order: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'order_epay_1' }),
+      },
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(payment),
+      },
+      paymentReconciliationRun: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        aggregate: vi.fn().mockResolvedValue({ _max: { attempt: null } }),
+        create: vi.fn().mockResolvedValue({ id: 'run_1' }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      paymentReconciliationItem: {
+        upsert: vi.fn().mockResolvedValue({}),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+    };
+    const cipher = {
+      encrypt: vi.fn().mockReturnValue('cipher'),
+      decrypt: vi.fn().mockReturnValue('{}'),
+    };
+    const configs = {
+      byId: vi.fn().mockResolvedValue({
+        id: EPAY_CONFIG_ID,
+        providerId: 'epay',
+        version: 1,
+        values: { mchId: 'epay-merchant', key: 'epay-secret' },
+      }),
+    };
+    const orders = {
+      applyPaymentResult: vi.fn().mockResolvedValue({ applied: true, idempotentHit: false }),
+    };
+    const exceptions = {
+      recordManual: vi.fn().mockResolvedValue({}),
+      autoRefundCancelledPayment: vi
+        .fn()
+        .mockResolvedValue({ case: {}, outcome: 'manual_review' }),
+    };
+    const service = new PaymentNotificationService(
+      prisma as never,
+      cipher as never,
+      configs as never,
+      orders as never,
+      exceptions as never,
+    );
+    return { service, prisma, orders };
+  }
+
+  function ingestEpay(service: PaymentNotificationService) {
+    const body = {
+      mchId: 'epay-merchant',
+      orderId: EPAY_PROVIDER_REF,
+      param: ORDER_NO,
+      type: '2',
+      price: '10.05',
+      reallyPrice: '10.05',
+      sign: 'signed',
+    };
+    return service.ingest({
+      providerId: 'epay',
+      configId: EPAY_CONFIG_ID,
+      headers: {},
+      rawBody: Buffer.from(new URLSearchParams(body).toString()),
+      body,
+    });
+  }
+
+  beforeEach(() => {
+    adapterMock.verifyNotification.mockReset();
+    adapterMock.ack.mockReset();
+    adapterMock.ack.mockImplementation((result: NotificationResult) => ({
+      status: result.ok && result.ackSuccess ? 200 : 400,
+      body: result.ok && result.ackSuccess ? 'success' : 'fail',
+      contentType: 'text/plain; charset=utf-8',
+    }));
+  });
+
+  it('找不到历史支付尝试时在验签前拒绝，且不落收件箱', async () => {
+    const { service, prisma } = makeEpayHarness();
+    prisma.order.findUnique.mockResolvedValue(null);
+
+    const ack = await ingestEpay(service);
+
+    expect(ack).toMatchObject({ status: 400, body: 'fail' });
+    expect(adapterMock.verifyNotification).not.toHaveBeenCalled();
+    expect(prisma.paymentNotification.create).not.toHaveBeenCalled();
+  });
+
+  it('历史 Payment 没有 providerMethod 时拒绝，不能按当前配置猜测', async () => {
+    const { service, prisma } = makeEpayHarness({ providerMethod: null });
+
+    const ack = await ingestEpay(service);
+
+    expect(ack).toMatchObject({ status: 400, body: 'fail' });
+    expect(adapterMock.verifyNotification).not.toHaveBeenCalled();
+    expect(prisma.paymentNotification.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['alipay', 'wechat'] as const)(
+    '历史支付方式为 %s 时把它作为期望 type 交给验签',
+    async (providerMethod) => {
+      const { service, prisma, orders } = makeEpayHarness({ providerMethod });
+      adapterMock.verifyNotification.mockResolvedValue(epayPaidResult());
+
+      const ack = await ingestEpay(service);
+
+      expect(ack).toMatchObject({ status: 200, body: 'success' });
+      expect(adapterMock.verifyNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedPaymentMethod: providerMethod }),
+      );
+      expect(prisma.paymentNotification.create).toHaveBeenCalledTimes(1);
+      expect(orders.applyPaymentResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerId: 'epay',
+          paymentId: 'pay_epay_1',
+          providerRef: EPAY_PROVIDER_REF,
+        }),
+      );
+    },
+  );
+
+  it('回调带云端 orderId 时按 providerRef 精确定位历史支付尝试', async () => {
+    const { service, prisma } = makeEpayHarness();
+    adapterMock.verifyNotification.mockResolvedValue({
+      ok: false,
+      ackSuccess: false,
+      reason: '测试提前结束',
+      rawPayload: '{}',
+    });
+
+    await ingestEpay(service);
+
+    const query = prisma.payment.findFirst.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(query.where).toMatchObject({
+      orderId: 'order_epay_1',
+      channel: 'epay',
+      providerConfigId: EPAY_CONFIG_ID,
+      providerRef: EPAY_PROVIDER_REF,
+    });
+  });
+});
+
 describe('PaymentNotificationService 收件箱并发闸', () => {
   beforeEach(() => {
     adapterMock.verifyNotification.mockReset();

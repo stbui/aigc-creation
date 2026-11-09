@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import type { MarketingQuote, MembershipPlan, Order, PaymentIntent } from '../../types/api';
+import type { MarketingQuote, MembershipPlan, Order } from '../../types/api';
+import type { PaymentIntent } from '../../types/payment';
 import { COUPON_MAX_LENGTH, IS_PROD } from './constants';
 import { formatYuan } from './utils';
 
@@ -153,8 +154,17 @@ export function CheckoutAmountCard({
         ) : qrDataUrl ? (
           <div className="co-qr">
             <img src={qrDataUrl} alt="支付二维码" width={210} height={210} />
-            <p className="co-hint">请使用对应渠道扫码支付，完成后本页会自动刷新结果</p>
+            <p className="co-hint">
+              {onlineIntent?.schemeUrl
+                ? '若未自动打开支付宝 App，请扫描下方二维码完成支付；完成后本页会自动刷新结果'
+                : '请使用对应渠道扫码支付，完成后本页会自动刷新结果'}
+            </p>
             <div className="co-pay-secondary-actions">
+              {onlineIntent?.schemeUrl && (
+                <a className="co-btn" href={onlineIntent.schemeUrl}>
+                  重新打开支付宝
+                </a>
+              )}
               <button
                 type="button"
                 className="co-btn is-primary"

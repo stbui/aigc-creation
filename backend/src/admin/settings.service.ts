@@ -8,6 +8,7 @@ import {
   findSettingDef,
   validateSettingValue,
   type SettingDef,
+  type SettingValue,
 } from "../common/setting-defs";
 import { unknownAllowedExts } from "../common/image-formats";
 
@@ -51,7 +52,7 @@ export class AdminSettingsService {
         label: string;
         items: Array<
           SettingDef & {
-            value: string | number | boolean;
+            value: SettingValue;
             overridden: boolean;
             updatedBy: string | null;
             updatedAt: string | null;
@@ -149,7 +150,7 @@ export class AdminSettingsService {
         const prev = beforeByKey.get(key);
         const prevValue = prev ? this.parseValue(prev.value, def) : def.default;
 
-        const data = { value: String(value), updatedBy: actorName };
+        const data = { value: value === null ? "" : String(value), updatedBy: actorName };
         if (prev) {
           await tx.systemSetting.update({ where: { key }, data });
         } else {
@@ -230,7 +231,7 @@ export class AdminSettingsService {
    *
    * 与读路径共用 `validateSettingValue` —— 读写的合法性判断必须一致。
    */
-  private validate(def: SettingDef, raw: unknown): string | number | boolean {
+  private validate(def: SettingDef, raw: unknown): SettingValue {
     if (def.key === "upload.allowedTypes") {
       // 允许类型是「后端认识的格式」的子集。写入一个后端不认识的格式
       // (如 gif) 会让页面显示「已允许 GIF」而上传依然被拒 —— 分叉。
@@ -250,7 +251,7 @@ export class AdminSettingsService {
   }
 
   /** 解析库里的字符串值为目标类型（坏值回落到代码默认值） */
-  private parseValue(raw: string, def: SettingDef): string | number | boolean {
+  private parseValue(raw: string, def: SettingDef): SettingValue {
     try {
       return validateSettingValue(def, raw);
     } catch {
@@ -263,8 +264,8 @@ export class AdminSettingsService {
 export interface SettingChange {
   key: string;
   label: string;
-  before: string | number | boolean;
-  after: string | number | boolean;
+  before: SettingValue;
+  after: SettingValue;
   /** update = 改为新值；clear = 恢复默认 */
   action: "update" | "clear";
 }

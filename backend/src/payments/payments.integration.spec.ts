@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { epayCallbackSign } from './adapters/epay.adapter';
 
 /*
  * 支付 HTTP 集成测试（L1.6+）。
@@ -72,29 +73,93 @@ async function createOrder(tag: string, token = userToken, targetProductId = pro
   return res.body.data as { id: string; orderNo: string; paidCents: number };
 }
 
+const EPAY_API_BASE = 'https://epay.example.com';
+const EPAY_MCH_ID = 'it-mch';
+const EPAY_KEY = 'it-secret';
+
 async function intend(orderId: string, token = userToken) {
   const res = await api('post', `/api/v1/payments/${orderId}/intent`, token).send({
-    providerId: 'sandbox',
+    providerId: 'alipay',
   });
   expect(res.status).toBe(201);
   expect(res.body.code).toBe(0);
-  return res.body.data as { configId: string; mode: string; sandbox: boolean };
+  return res.body.data as {
+    configId: string;
+    mode: string;
+    sandbox: boolean;
+    providerId: string;
+    payUrl?: string;
+    checkoutValue?: string;
+  };
 }
 
-function callback(orderNo: string, configId: string, tradeNo: string, amountCents: number) {
-  return api('post', `/api/v1/payments/callback/sandbox/${configId}`).send({
-    orderNo,
-    tradeNo,
-    amountCents,
+/**
+ * 易支付回调以 `Payment.providerRef` 作为渠道订单号；这里从历史支付尝试
+ * 反查，确保回调能精确命中当初固化的 providerMethod。
+ */
+async function paymentAttempt(orderNo: string, configId: string) {
+  const order = await prisma.order.findUnique({ where: { orderNo } });
+  if (!order) throw new Error(`测试订单不存在: ${orderNo}`);
+  const payment = await prisma.payment.findFirst({
+    where: { orderId: order.id, channel: 'epay', providerConfigId: configId },
+    orderBy: { createdAt: 'desc' },
   });
+  if (!payment?.providerRef) throw new Error(`测试支付尝试缺少 providerRef: ${orderNo}`);
+  return { order, payment, providerRef: String(payment.providerRef) };
 }
 
-function callbackGet(orderNo: string, configId: string, tradeNo: string, amountCents: number) {
-  return api('get', `/api/v1/payments/callback/sandbox/${configId}`).query({
-    orderNo,
-    tradeNo,
-    amountCents,
-  });
+function epayCallbackBody(
+  orderNo: string,
+  providerRef: string,
+  type: '1' | '2',
+  priceCents: number,
+  reallyPriceCents: number,
+) {
+  const price = (priceCents / 100).toFixed(2);
+  const reallyPrice = (reallyPriceCents / 100).toFixed(2);
+  return {
+    mchId: EPAY_MCH_ID,
+    orderId: providerRef,
+    param: orderNo,
+    type,
+    price,
+    reallyPrice,
+    sign: epayCallbackSign(providerRef, orderNo, type, price, reallyPrice, EPAY_KEY),
+  };
+}
+
+async function callback(
+  orderNo: string,
+  configId: string,
+  _tradeNo: string,
+  amountCents: number,
+) {
+  const { order, payment, providerRef } = await paymentAttempt(orderNo, configId);
+  const type = payment.providerMethod === 'wechat' ? '1' : '2';
+  return api('post', `/api/v1/payments/callback/epay/${configId}`).send(
+    epayCallbackBody(orderNo, providerRef, type, order.paidCents, amountCents),
+  );
+}
+
+async function callbackGet(
+  orderNo: string,
+  configId: string,
+  _tradeNo: string,
+  amountCents: number,
+) {
+  const { order, payment, providerRef } = await paymentAttempt(orderNo, configId);
+  const type = payment.providerMethod === 'wechat' ? '1' : '2';
+  return api('get', `/api/v1/payments/callback/epay/${configId}`).query(
+    epayCallbackBody(orderNo, providerRef, type, order.paidCents, amountCents),
+  );
+}
+
+/** 没有历史 Payment 的易支付回调：验签前就应被拒绝。 */
+function unknownCallback(orderNo: string, configId: string) {
+  const providerRef = `UNKNOWN-${orderNo}`;
+  return api('post', `/api/v1/payments/callback/epay/${configId}`).send(
+    epayCallbackBody(orderNo, providerRef, '2', 100, 100),
+  );
 }
 
 async function paidOrder(tag: string) {
@@ -102,7 +167,7 @@ async function paidOrder(tag: string) {
   const intent = await intend(order.id);
   const res = await callback(order.orderNo, intent.configId, `IT-PAID-${tag}-${run}`, order.paidCents);
   expect(res.status).toBe(200);
-  expect(res.body.success).toBe(true);
+  expect(res.text).toBe('success');
   return order;
 }
 
@@ -129,7 +194,7 @@ async function payOrder(order: { id: string; orderNo: string; paidCents: number 
     order.paidCents,
   );
   expect(paid.status).toBe(200);
-  expect(paid.body.success).toBe(true);
+  expect(paid.text).toBe('success');
   return order;
 }
 
@@ -247,9 +312,83 @@ beforeAll(async () => {
   });
   expect(adminLogin.status).toBe(201);
   adminToken = adminLogin.body.data.accessToken;
+
+  /*
+   * 集成测试走真实 EasyPay 协议链路，但把网络限制在本地 mock：
+   * createOrder 返回固定收银台，getOrder 统一返回已关闭（state=-1），
+   * 这样取消订单的“先查单再关单”路径可以完成本地关单。
+   */
+  const realFetch = globalThis.fetch;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const raw =
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const url = new URL(raw);
+      if (url.hostname === 'epay.example.com') {
+        if (url.pathname.endsWith('/api/createOrder')) {
+          const payId = url.searchParams.get('payId') ?? '';
+          return new Response(
+            JSON.stringify({
+              code: 1,
+              data: {
+                orderId: `EPAY-${payId}`,
+                payId,
+                state: 0,
+                price: url.searchParams.get('price') ?? '0.00',
+                payUrl: `https://epay.example.com/pay/${payId}`,
+              },
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
+        if (url.pathname.endsWith('/api/getOrder')) {
+          const providerRef = url.searchParams.get('orderId') ?? '';
+          const payId =
+            url.searchParams.get('payId') ??
+            (providerRef.startsWith('EPAY-') ? providerRef.slice(5) : providerRef);
+          return new Response(
+            JSON.stringify({
+              code: 1,
+              data: { orderId: providerRef || `EPAY-${payId}`, payId, state: -1 },
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
+        throw new Error(`未模拟的易支付端点: ${url.pathname}`);
+      }
+      return realFetch(input, init);
+    }),
+  );
+
+  const provider = await api(
+    'put',
+    '/api/v1/admin/payments/providers/epay/config',
+    adminToken,
+  ).send({
+    enabled: true,
+    closeAfterMinutes: 30,
+    values: { apiBase: EPAY_API_BASE, mchId: EPAY_MCH_ID, key: EPAY_KEY },
+  });
+  expect(provider.status).toBe(200);
+
+  const paymentSettings = await api(
+    'put',
+    '/api/v1/admin/payments/settings',
+    adminToken,
+  ).send({
+    defaultCurrency: 'CNY',
+    alipaySource: 'epay',
+    wechatSource: 'unset',
+  });
+  expect(paymentSettings.status).toBe(200);
+
+  // 易支付没有退款 API；退款编排测试只验证订单域，不验证上游协议。
+  paymentGateway.refund = vi.fn().mockResolvedValue({ state: 'succeeded' });
 }, 60_000);
 
 afterAll(async () => {
+  vi.unstubAllGlobals();
   await app?.close().catch(() => undefined);
   rmSync(DB_DIR, { recursive: true, force: true });
 });
@@ -259,34 +398,38 @@ describe('支付 HTTP 集成', () => {
     const settings = await api('get', '/api/v1/payments/settings');
     expect(settings.status).toBe(200);
     expect(settings.body.data.defaultCurrency).toBe('CNY');
-    expect(settings.body.data.providers.some((p: { id: string }) => p.id === 'sandbox')).toBe(true);
+    expect(settings.body.data.providers.map((p: { id: string }) => p.id)).toEqual(['alipay']);
 
     const anon = await api('get', '/api/v1/payments/providers');
     expect(anon.status).toBe(401);
   });
 
-  it('下单 → intent → 沙箱回调 → 入账，重复回调幂等', async () => {
+  it('下单 → intent → 易支付回调 → 入账，重复回调幂等', async () => {
     const order = await createOrder('paid');
     const intent = await intend(order.id);
-    expect(intent.mode).toBe('sandbox');
-    expect(intent.sandbox).toBe(true);
+    expect(intent.providerId).toBe('alipay');
+    expect(intent.mode).toBe('redirect');
+    expect(intent.sandbox).toBe(false);
 
     const tradeNo = `IT-TRADE-${run}`;
     const first = await callback(order.orderNo, intent.configId, tradeNo, order.paidCents);
     expect(first.status).toBe(200);
-    expect(first.body.success).toBe(true);
+    expect(first.text).toBe('success');
 
     const status = await api('get', `/api/v1/payments/${order.id}/status`, userToken);
     expect(status.body.data.status).toBe('paid');
-    expect(status.body.data.payments[0].providerTradeNo).toBe(tradeNo);
+    const attempt = await prisma.payment.findFirst({
+      where: { orderId: order.id, channel: 'epay' },
+    });
+    expect(status.body.data.payments[0].providerTradeNo).toBe(attempt.providerRef);
 
     const detail = await api('get', `/api/v1/orders/${order.id}`, userToken);
     expect(detail.body.data.grantedCredits).toBe(100);
-    expect(detail.body.data.channel).toBe('sandbox');
+    expect(detail.body.data.channel).toBe('epay');
 
     const dup = await callback(order.orderNo, intent.configId, tradeNo, order.paidCents);
     expect(dup.status).toBe(200);
-    expect(dup.body.success).toBe(true);
+    expect(dup.text).toBe('success');
     const balance = await api('get', '/api/v1/credits/balance', userToken);
     expect(balance.body.data.balance).toBe(100);
   });
@@ -301,18 +444,18 @@ describe('支付 HTTP 集成', () => {
       order.paidCents,
     );
     expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    expect(res.text).toBe('success');
 
     const status = await api('get', `/api/v1/payments/${order.id}/status`, userToken);
     expect(status.body.data.status).toBe('paid');
   });
 
-  it('金额不符/未知订单：业务终态 ack 成功并落对账差异', async () => {
+  it('金额不符落对账差异；无历史支付尝试的易支付回调直接拒绝', async () => {
     const order = await createOrder('mismatch');
     const intent = await intend(order.id);
     const bad = await callback(order.orderNo, intent.configId, `IT-BAD-${run}`, order.paidCents + 1);
     expect(bad.status).toBe(200);
-    expect(bad.body.success).toBe(true);
+    expect(bad.text).toBe('success');
 
     const status = await api('get', `/api/v1/payments/${order.id}/status`, userToken);
     expect(status.body.data.status).toBe('pending');
@@ -322,9 +465,14 @@ describe('支付 HTTP 集成', () => {
     });
     expect(item).toBeTruthy();
 
-    const ghost = await callback(`GHOST-${run}`, intent.configId, `IT-GHOST-${run}`, 100);
-    expect(ghost.status).toBe(200);
-    expect(ghost.body.success).toBe(true);
+    const ghost = await unknownCallback(`GHOST-${run}`, intent.configId);
+    expect(ghost.status).toBe(400);
+    expect(ghost.text).toBe('fail');
+    expect(
+      await prisma.paymentNotification.count({
+        where: { merchantOrderNo: `GHOST-${run}` },
+      }),
+    ).toBe(0);
   });
 
   it('同一商户订单号的多条渠道流水可在同次对账中分别留痕', async () => {
@@ -874,10 +1022,10 @@ describe('支付 HTTP 集成', () => {
 
   it('渠道退款调用失败后同金额重试复用原退款单号并最终成功', async () => {
     const order = await paidOrder('refund-channel-failed-retry');
-    const refundSpy = vi.spyOn(paymentGateway, 'refund').mockResolvedValueOnce({
-      state: 'failed',
-      error: '模拟渠道网络超时',
-    });
+    paymentGateway.refund.mockClear();
+    paymentGateway.refund
+      .mockResolvedValueOnce({ state: 'failed', error: '模拟渠道网络超时' })
+      .mockResolvedValue({ state: 'succeeded' });
 
     try {
       const first = await api(
@@ -909,14 +1057,15 @@ describe('支付 HTTP 集成', () => {
       expect(retried.body.data.state).toBe('succeeded');
       expect(retried.body.data.refundId).toBe(failed.id);
 
-      const calls = refundSpy.mock.calls.map((call: any[]) => call[0].outRefundNo);
+      const calls = paymentGateway.refund.mock.calls.map((call: any[]) => call[0].outRefundNo);
       expect(calls).toEqual([failed.id, failed.id]);
       expect(await prisma.refund.count({ where: { orderId: order.id } })).toBe(1);
       expect(
         await prisma.refund.count({ where: { orderId: order.id, status: 'succeeded' } }),
       ).toBe(1);
     } finally {
-      refundSpy.mockRestore();
+      paymentGateway.refund.mockClear();
+      paymentGateway.refund.mockResolvedValue({ state: 'succeeded' });
     }
   });
 
@@ -1233,7 +1382,7 @@ describe('支付 HTTP 集成', () => {
       payOrder.body.data.paidCents,
     );
     expect(paid.status).toBe(200);
-    expect(paid.body.success).toBe(true);
+    expect(paid.text).toBe('success');
     const paidProduct = await prisma.product.findUnique({ where: { id: payProduct.id } });
     expect(paidProduct.stockSold).toBe(1);
     expect(paidProduct.stockReserved).toBe(0);
@@ -1326,7 +1475,7 @@ describe('支付 HTTP 集成', () => {
       `IT-COUPON-FIRST-${run}`,
       first.body.data.paidCents,
     );
-    expect(firstPaid.body.success).toBe(true);
+    expect(firstPaid.text).toBe('success');
 
     const secondIntent = await intend(second.body.data.id, secondToken);
     const secondPaid = await callback(
@@ -1335,7 +1484,7 @@ describe('支付 HTTP 集成', () => {
       `IT-COUPON-SECOND-${run}`,
       second.body.data.paidCents,
     );
-    expect(secondPaid.body.success).toBe(true);
+    expect(secondPaid.text).toBe('success');
 
     const redeemed = await prisma.coupon.findUnique({ where: { id: coupon.id } });
     expect(redeemed.usedCount).toBe(1);
@@ -2066,8 +2215,8 @@ describe('支付 HTTP 集成', () => {
     ]);
     expect(firstPaid.status).toBe(200);
     expect(secondPaid.status).toBe(200);
-    expect(firstPaid.body.success).toBe(true);
-    expect(secondPaid.body.success).toBe(true);
+    expect(firstPaid.text).toBe('success');
+    expect(secondPaid.text).toBe('success');
 
     const periods = await prisma.order.findMany({
       where: { id: { in: [first.id, second.id] } },

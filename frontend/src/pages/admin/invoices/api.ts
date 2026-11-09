@@ -6,7 +6,7 @@ import {
   adminInvoicesApi as baseAdminInvoicesApi,
   request,
 } from '../../../lib/api';
-import type { AdminInvoice } from '../../../types/api';
+import type { AdminInvoice } from '../../../types/payment';
 
 export const adminInvoicesApi = {
   ...baseAdminInvoicesApi,

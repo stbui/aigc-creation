@@ -10,6 +10,8 @@
  * 金额一律整数分；`secret` 字段后端只回「是否已配置」，绝不回明文。
  */
 
+import type { OrderStatus } from "./api";
+
 /* ────────────────────────── 分页信封 ────────────────────────── */
 
 /** 后台列表统一分页信封 */
@@ -29,6 +31,126 @@ export type PaymentProviderId =
 /** 支持的结算币种 */
 export type PaymentCurrency = "CNY" | "USD";
 
+/** C 端固定展示的两种支付方式，与真实渠道解耦。 */
+export type VisiblePaymentMethod = "alipay" | "wechat";
+
+/** 管理员为某个可见支付按钮选择的唯一来源。 */
+export type PaymentSource = "unset" | "official" | "epay";
+
+/**
+ * 发起支付的结果（`POST /payments/:orderId/intent`）。
+ *
+ * `providerId` 是 C 端可见支付方式，不是真实渠道：易支付订单同样投影为
+ * `alipay` / `wechat`，不得向前端暴露 `epay`。
+ */
+export interface PaymentIntent {
+  orderId: string;
+  orderNo: string;
+  amountCents: number;
+  currency: string;
+  providerId: VisiblePaymentMethod | "free";
+  configId: string | null;
+  configVersion: number | null;
+  mode: "redirect" | "qrcode" | "qrcode-image" | "sandbox" | "free";
+  payUrl?: string;
+  codeUrl?: string;
+  /** 支付宝移动端当面付 Scheme；桌面端与微信订单为空 */
+  schemeUrl?: string;
+  checkoutValue: string | null;
+  expiresAt: string;
+  hint?: string | null;
+  sandbox: boolean;
+}
+
+/** `GET /payments/settings` 的公开视图。 */
+export interface PaymentSettingsView {
+  enabled: boolean;
+  defaultCurrency: string;
+  providers: PaymentProviderInfo[];
+  /** 充值页帮助图片地址；空串表示不展示 */
+  helpImage: string;
+  /** 充值页帮助文字；空串表示不展示 */
+  helpText: string;
+}
+
+/** `GET /payments/providers` 的可用支付方式。 */
+export interface PaymentProviderInfo {
+  id: VisiblePaymentMethod;
+  name: string;
+  icon: VisiblePaymentMethod;
+  checkoutMode: "redirect" | "qrcode" | "qrcode-image" | "sandbox";
+  supportedCurrencies: string[];
+  sandbox: false;
+}
+
+/** 支付状态轮询（`GET /payments/:orderId/status` / `POST /payments/:orderId/query`）。 */
+export interface PaymentStatusResult {
+  orderId: string;
+  orderNo: string;
+  status: OrderStatus;
+  displayStatus: string;
+  amountCents: number;
+  currency: string;
+  providerId: VisiblePaymentMethod | "free" | "unknown";
+  checkoutMode: string | null;
+  checkoutValue: string | null;
+  expiresAt: string;
+  providerPaidAt: string | null;
+  creditedAt: string | null;
+  closedAt: string | null;
+  lastError: string | null;
+  payments: Array<{
+    id: string;
+    status: string;
+    providerId: VisiblePaymentMethod | "free" | "unknown";
+    providerRef: string | null;
+    providerTradeNo: string | null;
+    amountCents: number;
+    createdAt: string;
+  }>;
+}
+
+/** 发票状态：待开具 | 已开具 | 已驳回 | 已冲红 */
+export type InvoiceStatus = "pending" | "issued" | "rejected" | "red_flushed";
+
+/** 发票（C 端） */
+export interface Invoice {
+  id: string;
+  invoiceNo: string;
+  orderId: string;
+  orderNo: string | null;
+  amountCents: number;
+  kind: "personal" | "company";
+  title: string;
+  taxNo: string | null;
+  email: string | null;
+  content: string;
+  status: InvoiceStatus;
+  rejectReason: string | null;
+  issuedAt: string | null;
+  redFlushedAt: string | null;
+  redFlushedBy: string | null;
+  redFlushReason: string | null;
+  createdAt: string;
+  fileUrl: string | null;
+  hasStoredFile: boolean;
+}
+
+export interface CreateInvoicePayload {
+  orderId: string;
+  kind: "personal" | "company";
+  title: string;
+  taxNo?: string;
+  email?: string;
+  content?: string;
+}
+
+/** 后台发票行（附带申请人信息） */
+export interface AdminInvoice extends Invoice {
+  userEmail: string | null;
+  userName: string | null;
+}
+
 /**
  * 渠道配置字段元数据。
  *
@@ -41,7 +163,7 @@ export interface PaymentConfigField {
   label: string;
   /** 密钥类字段：后端只回 `secretConfigured[name]`，不回明文 */
   secret?: boolean;
-  type?: "text" | "password" | "textarea" | "number" | "select";
+  type?: "text" | "password" | "textarea" | "number" | "url" | "select";
   required?: boolean;
   placeholder?: string;
   options?: Array<{ label: string; value: string }>;
@@ -50,12 +172,45 @@ export interface PaymentConfigField {
   default?: string;
   /** 后端给的字段说明（如「ZPay 商户后台的商户 ID」） */
   description?: string;
+  maxLength?: number;
+}
+
+/**
+ * 渠道下的一个可独立启停、限额和轮询的服务商实例。
+ *
+ * `instanceId` 是稳定身份；后台改名不会影响历史订单、回调、查单与退款。
+ * 金额单位均为分，`null` 表示不限。
+ */
+export interface AdminPaymentProviderInstanceView {
+  instanceId: string;
+  providerId: PaymentProviderId;
+  /** 管理员自定义实例名；null 时界面按 instanceId 兜底展示 */
+  name: string | null;
+  sortOrder: number;
+  enabled: boolean;
+  configured: boolean;
+  closeAfterMinutes: number;
+  version: number | null;
+  configId: string | null;
+  /** 只含非密字段；密字段只回 `secretConfigured` */
+  values: Record<string, string>;
+  secretConfigured: Record<string, boolean>;
+  minAmountCents: number | null;
+  maxAmountCents: number | null;
+  dailyLimitCents: number | null;
+  refundEnabled: boolean;
+  paymentMethods: VisiblePaymentMethod[];
+  identityLockedFields: string[];
+  hasOpenOrders: boolean;
+  updatedAt: string | null;
+  warnings: Array<{ level: "danger" | "warn"; message: string }>;
 }
 
 /**
  * 后台看到的支付渠道（只读视图）。
  *
- * `values` 只含非密字段；`secretConfigured` 只含「是否已配置」布尔。
+ * 顶层字段保留为 `default`/首个实例的兼容投影。新界面必须读取
+ * `instances[]`，不能仅凭顶层 `enabled/configured` 推断整个渠道状态。
  */
 export interface AdminPaymentProviderView {
   id: PaymentProviderId;
@@ -63,11 +218,12 @@ export interface AdminPaymentProviderView {
   icon: string;
   /** sandbox=站内模拟 | redirect=网站跳转 | qrcode=扫码支付 | qrcode-image=二维码图片 */
   checkoutMode: string;
+  /** 任一实例启用 */
   enabled: boolean;
-  /** 必填项齐全 = 凭据够用 */
+  /** 任一实例配置完整 */
   configured: boolean;
   closeAfterMinutes: number;
-  /** 配置版本号；null = 从未配置 */
+  /** 首个实例的配置版本；null = 从未配置 */
   version: number | null;
   configId: string | null;
   configEnabled: boolean;
@@ -76,25 +232,52 @@ export interface AdminPaymentProviderView {
   configFields: PaymentConfigField[];
   supportedCurrencies: PaymentCurrency[];
   supportsReconciliation: boolean;
-  /** 缺失的必填项名 */
+  /** 首个实例缺失的必填项名 */
   missing: string[];
-  /** 已被订单绑定、不可修改的字段名 */
+  /** 首个实例中已被订单绑定、不可修改的字段名 */
   identityLockedFields: string[];
   hasOpenOrders: boolean;
   updatedAt: string | null;
   warnings: Array<{ level: "danger" | "warn"; message: string }>;
+  /** 渠道下全部实例，按 sortOrder 升序 */
+  instances: AdminPaymentProviderInstanceView[];
 }
 
-/** 渠道配置保存入参 */
+/** 渠道实例配置保存入参 */
 export interface PaymentProviderConfigUpdate {
   enabled: boolean;
   closeAfterMinutes: number;
   values: Record<string, string>;
+  name?: string | null;
+  minAmountCents?: number | null;
+  maxAmountCents?: number | null;
+  dailyLimitCents?: number | null;
+  refundEnabled?: boolean;
+  paymentMethods?: VisiblePaymentMethod[];
+}
+
+/** 新建实例入参；新实例默认停用，补齐配置后再启用。 */
+export interface PaymentProviderInstanceCreate {
+  name?: string | null;
+  values?: Record<string, string>;
+  closeAfterMinutes?: number;
+  minAmountCents?: number | null;
+  maxAmountCents?: number | null;
+  dailyLimitCents?: number | null;
+  refundEnabled?: boolean;
+  paymentMethods?: VisiblePaymentMethod[];
+}
+
+/** 实例排序入参必须恰好包含当前渠道全部实例。 */
+export interface PaymentProviderInstanceOrder {
+  instanceIds: string[];
 }
 
 /** 站点支付设置 */
 export interface AdminPaymentSettings {
   defaultCurrency: PaymentCurrency;
+  alipaySource: PaymentSource;
+  wechatSource: PaymentSource;
 }
 
 /* ────────────────────────── 对账 ────────────────────────── */
@@ -108,6 +291,7 @@ export interface AdminPaymentSettings {
 export interface AdminReconciliationRun {
   id: string;
   providerId: string;
+  providerInstanceId: string;
   configId: string | null;
   billDate: string;
   /** 第几次执行（同一账单日重跑会递增） */

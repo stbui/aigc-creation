@@ -6,6 +6,7 @@ export { formatDateTime } from '../../../admin-ui/lib/format';
 export {
   adminAssetHref,
   adminCreditHref,
+  adminOrderDetailHref,
   adminOrderHref,
   adminTaskHref,
   adminTasksHref,

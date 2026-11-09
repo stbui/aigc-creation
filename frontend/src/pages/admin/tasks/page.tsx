@@ -4,7 +4,7 @@ import { ContextBanner, Notice, PageHeader, SavedViewBar } from '~/admin-ui/prim
 import { readAdminDone } from '../../../lib/admin-context-link';
 import { useAdmin, useAdminDetailParam, useDuty, useSelectionPrune } from './hooks';
 import { TaskActionDialogs } from './TaskActionDialogs';
-import { TaskDetailDrawer } from './TaskDetailDrawer';
+import { TaskDetailModal } from './TaskDetailModal';
 import { TaskFailureGroups } from './TaskFailureGroups';
 import { TaskFilters } from './TaskFilters';
 import { TaskListSection } from './TaskListSection';
@@ -53,7 +53,10 @@ export function AdminTasksPage() {
 
   return (
     <>
-      <PageHeader title="任务监控" />
+      <PageHeader
+        title="任务监控"
+        description="全站生成任务的运行水位与排障入口。失败任务按错误码聚合，可筛出同因批次后集中重试。"
+      />
 
       {(done === 'billing_settled' || done === 'billing_refunded') && (
         <ContextBanner
@@ -173,7 +176,7 @@ export function AdminTasksPage() {
         onExport={() => void filters.exportTasks()}
       />
 
-      <TaskDetailDrawer
+      <TaskDetailModal
         detailId={detailId}
         rows={list?.items ?? []}
         canRetry={can('task.retry')}

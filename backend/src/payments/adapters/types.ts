@@ -35,6 +35,10 @@ export const PAYMENT_CURRENCIES: PaymentCurrency[] = ['CNY', 'USD'];
 export type VisiblePaymentMethod = 'alipay' | 'wechat';
 export const VISIBLE_PAYMENT_METHODS: VisiblePaymentMethod[] = ['alipay', 'wechat'];
 
+export function isVisiblePaymentMethod(value: unknown): value is VisiblePaymentMethod {
+  return value === 'alipay' || value === 'wechat';
+}
+
 /** 管理员为每个可见支付方式选择的唯一来源。 */
 export type PaymentSource = 'unset' | 'official' | 'epay';
 export const PAYMENT_SOURCES: PaymentSource[] = ['unset', 'official', 'epay'];
@@ -92,6 +96,8 @@ export interface CreateOrderInput {
   clientIp?: string;
   /** 服务端从请求头提取的 User-Agent，用于渠道判定设备类型 */
   clientUserAgent?: string;
+  /** 仅支付宝官方：移动端是否调用当面付并返回 App 唤起 Scheme */
+  alipayMobilePrecreateDeepLink?: boolean;
   expiresAt: Date;
 }
 
@@ -99,6 +105,8 @@ export interface PaymentCheckout {
   mode: CheckoutMode;
   payUrl?: string;
   codeUrl?: string;
+  /** 支付宝移动端当面付 App Scheme；其他渠道/场景为空 */
+  schemeUrl?: string;
   providerRef?: string;
   expiresAt: Date;
   hint?: string;

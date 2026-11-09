@@ -10,7 +10,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { isIP } from 'node:net';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
@@ -21,12 +21,18 @@ import { PaymentOrderService } from './payment-order.service';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentNotificationService } from './payment-notification.service';
 import { getAdapter } from './adapters';
-import { PAYMENT_CURRENCIES, PaymentCurrency, PaymentProviderId } from './adapters/types';
+import {
+  PAYMENT_CURRENCIES,
+  PaymentCurrency,
+  PaymentProviderId,
+  VISIBLE_PAYMENT_METHODS,
+} from './adapters/types';
 
 export class CreateIntentDto {
-  /** 渠道 id。多个可用渠道时必传 */
+  /** C 端可见支付方式。多个可用方式时必传 */
   @IsOptional()
   @IsString()
+  @IsIn(VISIBLE_PAYMENT_METHODS, { message: '支付方式只支持 alipay / wechat' })
   @MaxLength(32)
   providerId?: string;
 }
@@ -55,10 +61,19 @@ export class PaymentsController {
    */
   @Get('settings')
   async settingsView() {
+    const rules = await this.settings.paymentRules();
     const currency = await this.settings.get<string>('payment.defaultCurrency');
     const target = this.normalizeCurrency(String(currency || 'CNY'));
-    const providers = await this.configs.available(target);
-    return { defaultCurrency: target, providers };
+    const providers = rules.enabled
+      ? await this.configs.availableVisible(target)
+      : [];
+    return {
+      enabled: rules.enabled,
+      defaultCurrency: target,
+      providers,
+      helpImage: rules.helpImage,
+      helpText: rules.helpText,
+    };
   }
 
   /** 可选支付渠道（按订单币种或指定币种过滤） */
@@ -66,7 +81,10 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   async providers(@Query('currency') currency?: string) {
     const target = this.normalizeCurrency(currency);
-    const items = await this.configs.available(target);
+    const rules = await this.settings.paymentRules();
+    const items = rules.enabled
+      ? await this.configs.availableVisible(target)
+      : [];
     return { items, total: items.length, page: 1, pageSize: items.length };
   }
 

@@ -24,7 +24,13 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       findMany: ReturnType<typeof vi.fn>;
     };
     membershipUsage: { aggregate: ReturnType<typeof vi.fn> };
-    order: { count: ReturnType<typeof vi.fn> };
+    order: {
+      count: ReturnType<typeof vi.fn>;
+      aggregate: ReturnType<typeof vi.fn>;
+      groupBy: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+    };
+    refund: { aggregate: ReturnType<typeof vi.fn> };
     ticket: { count: ReturnType<typeof vi.fn> };
     invoice: { count: ReturnType<typeof vi.fn> };
     $transaction: ReturnType<typeof vi.fn>;
@@ -121,7 +127,23 @@ describe("AdminUsersService 用户生命周期与角色", () => {
           _count: { _all: 0 },
         }),
       },
-      order: { count: vi.fn().mockResolvedValue(0) },
+      order: {
+        count: vi.fn().mockResolvedValue(0),
+        aggregate: vi.fn().mockResolvedValue({
+          _sum: { paidCents: null, refundedCents: null },
+          _count: { _all: 0 },
+          _min: { paidAt: null },
+          _max: { paidAt: null },
+        }),
+        groupBy: vi.fn().mockResolvedValue([]),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      refund: {
+        aggregate: vi.fn().mockResolvedValue({
+          _sum: { amountCents: null },
+          _count: { _all: 0 },
+        }),
+      },
       ticket: { count: vi.fn().mockResolvedValue(0) },
       invoice: { count: vi.fn().mockResolvedValue(0) },
       $transaction: vi.fn(
@@ -156,7 +178,9 @@ describe("AdminUsersService 用户生命周期与角色", () => {
     service = new AdminUsersService(
       prisma as never,
       lifecycle as never,
-      {} as never,
+      {
+        displayUrl: (url: string | null | undefined) => url ?? null,
+      } as never,
       storage as never,
       membershipService as never,
       {
@@ -349,10 +373,20 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       { ownerId: "user-1", _count: { _all: 1 } },
     ]);
     prisma.generationTask.groupBy.mockImplementation(
-      async (args: { by: string[] }) =>
-        args.by.includes("status")
+      async (args: { by: string[] }) => {
+        if (args.by.includes("capability")) {
+          return [
+            {
+              capability: "main_image",
+              status: "succeeded",
+              _count: { _all: 4 },
+            },
+          ];
+        }
+        return args.by.includes("status")
           ? [{ status: "succeeded", _count: { _all: 4 } }]
-          : [{ ownerId: "user-1", _count: { _all: 2 } }],
+          : [{ ownerId: "user-1", _count: { _all: 2 } }];
+      },
     );
     prisma.asset.groupBy.mockResolvedValue([
       { ownerId: "user-1", _count: { _all: 3 } },
@@ -397,6 +431,108 @@ describe("AdminUsersService 用户生命周期与角色", () => {
         },
       }),
     );
+  });
+
+  it("详情聚合消费、积分与生成概览", async () => {
+    const paidAt = new Date("2026-02-01T00:00:00.000Z");
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "user@example.com",
+      name: "用户",
+      role: "user",
+      status: "active",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      lastLoginAt: null,
+      phone: null,
+      phoneVerifiedAt: null,
+    });
+    prisma.order.aggregate.mockResolvedValue({
+      _sum: { paidCents: 9900, refundedCents: 1900 },
+      _count: { _all: 3 },
+      _min: { paidAt },
+      _max: { paidAt },
+    });
+    prisma.order.groupBy.mockResolvedValue([
+      { status: "paid", _count: { _all: 2 } },
+      { status: "refunded", _count: { _all: 1 } },
+      { status: "pending", _count: { _all: 1 } },
+    ]);
+    prisma.refund.aggregate.mockResolvedValue({
+      _sum: { amountCents: 500 },
+      _count: { _all: 1 },
+    });
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: "order-1",
+        orderNo: "NO-1",
+        status: "paid",
+        channel: "sandbox",
+        totalCents: 9900,
+        paidCents: 9900,
+        refundedCents: 0,
+        createdAt: paidAt,
+        paidAt,
+        items: [{ nameSnapshot: "积分包" }],
+      },
+    ]);
+    prisma.generationTask.groupBy.mockImplementation(
+      async (args: { by: string[] }) => {
+        if (args.by.includes("capability")) {
+          return [
+            {
+              capability: "main_image",
+              status: "succeeded",
+              _count: { _all: 4 },
+            },
+          ];
+        }
+        return [{ status: "succeeded", _count: { _all: 4 } }];
+      },
+    );
+    prisma.generationTask.findMany.mockResolvedValue([
+      {
+        id: "task-1",
+        capability: "main_image",
+        status: "succeeded",
+        createdAt: new Date(),
+        outputAsset: null,
+      },
+    ]);
+
+    const result = await service.detail("user-1");
+
+    expect(result.spending).toMatchObject({
+      paidCents: 9900,
+      refundedCents: 1900,
+      netCents: 8000,
+      paidOrders: 3,
+      refundingCents: 500,
+      refundingOrders: 1,
+      orderStatus: {
+        total: 4,
+        pending: 1,
+        paid: 2,
+        refunded: 1,
+      },
+    });
+    expect(result.recentOrders[0]).toMatchObject({
+      orderNo: "NO-1",
+      itemName: "积分包",
+      paidCents: 9900,
+    });
+    expect(result.generation).toMatchObject({
+      total: 4,
+      succeeded: 4,
+      failed: 0,
+      successRate: 100,
+      last30d: { total: 1, succeeded: 1, failed: 0, successRate: 100 },
+    });
+    expect(result.generation.byCapability[0]).toMatchObject({
+      capability: "main_image",
+      count: 4,
+      successRate: 100,
+    });
+    expect(result.credit).toMatchObject({ totalEarned: 0, totalConsumed: 0 });
   });
 
   it("详情返回有效会员，已取消续费但未到期仍视为会员", async () => {

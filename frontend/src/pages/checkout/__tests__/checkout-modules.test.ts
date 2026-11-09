@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { auditNamedImports, PROJECT_ROOT } from '../../../test/namedImportAudit';
+import { safeHelpImageUrl } from '../utils';
 
 /**
  * 结算页的具名导入 / 导出对账。
@@ -27,5 +28,19 @@ describe('结算页具名导入', () => {
     const failures = auditNamedImports(roots);
 
     expect(failures).toEqual([]);
+  });
+});
+
+describe('帮助图片 URL', () => {
+  it('只允许站内路径与 http(s) 地址', () => {
+    expect(safeHelpImageUrl('/uploads/help.png')).toBe('/uploads/help.png');
+    expect(safeHelpImageUrl('https://cdn.example.com/help.png')).toBe(
+      'https://cdn.example.com/help.png',
+    );
+    expect(safeHelpImageUrl('javascript:alert(1)')).toBeNull();
+    expect(safeHelpImageUrl('data:image/png;base64,abc')).toBeNull();
+    expect(safeHelpImageUrl('//evil.example.com/help.png')).toBeNull();
+    expect(safeHelpImageUrl('/uploads\\help.png')).toBeNull();
+    expect(safeHelpImageUrl('')).toBeNull();
   });
 });

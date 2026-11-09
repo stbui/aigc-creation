@@ -28,7 +28,7 @@ import {
   type AppliedFilter,
 } from '~/admin-ui/primitives';
 import { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';
-import type { AdminInvoice, InvoiceStatus } from '../../../types/api';
+import type { AdminInvoice, InvoiceStatus } from '../../../types/payment';
 
 /**
  * 发票审核与开具。

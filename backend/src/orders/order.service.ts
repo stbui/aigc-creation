@@ -6,6 +6,7 @@ import { formatCredits } from '../model/infra/microcredits';
 import { MembershipService, parsePerks } from '../membership/membership.service';
 import { MarketingService } from '../marketing/marketing.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../common/settings.service';
 import { PaymentGateway } from '../payments/payment-gateway';
 import { PaymentExceptionService } from '../payments/payment-exception.service';
 import { lockUserRow } from '../account/user-row-lock';
@@ -86,16 +87,8 @@ function parseJsonObject(raw: string): Record<string, unknown> {
   }
 }
 
-/** 订单未支付自动关闭时限: 30 分钟 */
-const ORDER_TTL_MINUTES = 30;
-
-/**
- * 单用户同时保留的未支付订单上限。
- *
- * 超限直接拒绝建单：库存商品会一直占着 reserved，「我的订单」也会被一堆
- * 待支付单淹没，真正的目标订单反而找不到。
- */
-const MAX_ACTIVE_PENDING_ORDERS = 5;
+/** 已支付事实（含退款）都占用每日充值额度。 */
+const DAILY_LIMIT_PAID_STATUSES = ['paid', 'partial_refunded', 'refunded'];
 
 /** 允许的状态迁移。key 是当前状态, value 是允许迁移到的状态 */
 const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -125,6 +118,7 @@ export class OrderService {
      */
     private readonly gateway: PaymentGateway,
     private readonly paymentExceptions: PaymentExceptionService,
+    private readonly settings: SettingsService,
   ) {}
 
   // ── 下单 ──────────────────────────────────────────────────────────
@@ -177,6 +171,8 @@ export class OrderService {
     if (existing) {
       return { ...this.toOrderView(existing), idempotentHit: true };
     }
+
+    const paymentRules = await this.settings.paymentRules();
 
     let totalCents = 0;
     let discountCents = 0;
@@ -351,7 +347,9 @@ export class OrderService {
       couponWarning = (discount.snapshot as any)?.couponWarning ?? null;
     }
 
-    const expiresAt = new Date(Date.now() + ORDER_TTL_MINUTES * 60 * 1000);
+    const expiresAt = new Date(
+      Date.now() + paymentRules.orderTtlMinutes * 60 * 1000,
+    );
 
     try {
       const outcome = await this.prisma.$transaction(async (tx) => {
@@ -359,7 +357,7 @@ export class OrderService {
          * 先锁用户行，再统计 pending 订单。
          *
          * 只在事务外 count 会被并发绕过：同一用户可以同时穿过检查，最终挂出
-         * 超过 5 笔未支付订单并占住库存。SQLite 的 BEGIN 是 deferred，仅把
+         * 超过设置上限的未支付订单并占住库存。SQLite 的 BEGIN 是 deferred，仅把
          * count 搬进事务仍不够，必须先做一次 no-op UPDATE 取得写锁，让同一
          * 用户的建单串行化。
          */
@@ -382,10 +380,10 @@ export class OrderService {
         const activeOrders = await tx.order.count({
           where: { userId: params.userId, status: 'pending' },
         });
-        if (activeOrders >= MAX_ACTIVE_PENDING_ORDERS) {
+        if (activeOrders >= paymentRules.maxPendingOrders) {
           throw new AppError(
             40001,
-            `最多同时保留 ${MAX_ACTIVE_PENDING_ORDERS} 笔未支付订单，请先完成或取消已有订单`,
+            `最多同时保留 ${paymentRules.maxPendingOrders} 笔未支付订单，请先完成或取消已有订单`,
             400,
           );
         }
@@ -419,6 +417,46 @@ export class OrderService {
           campaignId = authoritativeDiscount.campaignId;
           couponSnapshot = authoritativeDiscount.snapshot as Record<string, unknown>;
           couponWarning = (authoritativeDiscount.snapshot as any)?.couponWarning ?? null;
+        }
+
+        /*
+         * 支付金额规则只约束真实收费订单。0 元单由免费领取链路处理，
+         * 不应因为支付开关关闭或最低金额而失去领取入口。
+         *
+         * 这里位于用户锁与优惠权威重算之后：券/活动可能改变实付金额，
+         * 事务外的首轮计算不能作为最终依据。
+         */
+        if (paidCents > 0) {
+          if (!paymentRules.enabled) {
+            throw new AppError(50301, '支付功能已关闭', 503);
+          }
+          if (paidCents < paymentRules.minAmountCents) {
+            throw new AppError(
+              40001,
+              `单笔充值金额不得低于 ${formatYuan(paymentRules.minAmountCents)} 元`,
+              400,
+            );
+          }
+          if (
+            paymentRules.maxAmountCents !== null &&
+            paidCents > paymentRules.maxAmountCents
+          ) {
+            throw new AppError(
+              40001,
+              `单笔充值金额不得高于 ${formatYuan(paymentRules.maxAmountCents)} 元`,
+              400,
+            );
+          }
+          if (paymentRules.dailyLimitCents !== null) {
+            const usedToday = await this.dailyRechargeCents(tx, params.userId);
+            if (usedToday + paidCents > paymentRules.dailyLimitCents) {
+              throw new AppError(
+                40001,
+                `超出今日充值限额：已占用 ${formatYuan(usedToday)} 元，本日上限 ${formatYuan(paymentRules.dailyLimitCents)} 元`,
+                400,
+              );
+            }
+          }
         }
 
         /*
@@ -699,6 +737,8 @@ export class OrderService {
     currency?: string;
     providerConfigId?: string | null;
     providerConfigVersion?: number | null;
+    /** 本次实际入账的支付实例；老订单/老调用方可为空 */
+    providerInstanceId?: string | null;
     providerStatus?: string | null;
     providerPaidAt?: Date;
     /** intent 阶段已创建的 pending Payment; 有则原地更新, 不再新建 */
@@ -772,6 +812,8 @@ export class OrderService {
       currency: order.currency || 'CNY',
       providerConfigId: params.providerConfigId ?? order.providerConfigId ?? null,
       providerConfigVersion: params.providerConfigVersion ?? order.providerConfigVersion ?? null,
+      providerInstanceId:
+        params.providerInstanceId ?? order.providerInstanceId ?? null,
       providerStatus: params.providerStatus ?? null,
       lastError: null,
       closedAt: null,
@@ -842,6 +884,8 @@ export class OrderService {
             providerConfigId: params.providerConfigId ?? order.providerConfigId ?? null,
             providerConfigVersion:
               params.providerConfigVersion ?? order.providerConfigVersion ?? null,
+            providerInstanceId:
+              params.providerInstanceId ?? order.providerInstanceId ?? null,
             providerPaidAt: params.providerPaidAt ?? new Date(),
             // 终态必须清空 checkoutValue, 否则页面会把过期链接当可用
             checkoutValue: '',
@@ -1912,6 +1956,33 @@ export class OrderService {
    * 周期限购统计。调用方必须先取得商品行写锁，保证 count 与 create 之间
    * 不会被另一笔建单插入。
    */
+  /** 当日已占用充值额度：已支付事实 + 尚未过期的待支付预占。 */
+  private async dailyRechargeCents(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<number> {
+    const dayStart = startOfShanghaiDay(new Date());
+    const now = new Date();
+    const aggregate = await tx.order.aggregate({
+      where: {
+        userId,
+        OR: [
+          {
+            status: { in: DAILY_LIMIT_PAID_STATUSES },
+            paidAt: { gte: dayStart },
+          },
+          {
+            status: 'pending',
+            createdAt: { gte: dayStart },
+            expiresAt: { gt: now },
+          },
+        ],
+      },
+      _sum: { paidCents: true },
+    });
+    return aggregate._sum.paidCents ?? 0;
+  }
+
   private async assertPeriodicPurchaseLimit(
     tx: Pick<Prisma.TransactionClient, 'order'>,
     product: { id: string; name: string; periodDays: number; periodPurchaseLimit: number },
@@ -2208,4 +2279,20 @@ export class OrderService {
       })),
     };
   }
+}
+
+function startOfShanghaiDay(now: Date): Date {
+  const offsetMs = 8 * 60 * 60 * 1000;
+  const shifted = new Date(now.getTime() + offsetMs);
+  return new Date(
+    Date.UTC(
+      shifted.getUTCFullYear(),
+      shifted.getUTCMonth(),
+      shifted.getUTCDate(),
+    ) - offsetMs,
+  );
+}
+
+function formatYuan(cents: number): string {
+  return (cents / 100).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
 }

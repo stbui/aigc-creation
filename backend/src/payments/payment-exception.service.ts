@@ -232,16 +232,18 @@ export class PaymentExceptionService {
   /** 自动对账连续失败后落单，避免只在日志里留痕。 */
   async recordReconciliationFailure(input: {
     providerId: string;
+    providerInstanceId?: string;
     billDate: string;
     error: string;
   }) {
+    const instanceId = input.providerInstanceId ?? 'default';
     return this.recordManual({
       providerId: input.providerId,
-      merchantOrderNo: `auto-reconcile:${input.billDate}`,
+      merchantOrderNo: `auto-reconcile:${input.billDate}:${instanceId}`,
       amountCents: 0,
       currency: 'CNY',
       kind: 'auto_reconcile_failed',
-      detail: input.error,
+      detail: `服务商实例 ${instanceId}: ${input.error}`,
     });
   }
 

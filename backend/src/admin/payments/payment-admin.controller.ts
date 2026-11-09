@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -31,6 +32,8 @@ import {
   PaymentExceptionCloseDto,
   PaymentExceptionListQueryDto,
   PaymentProviderConfigUpdateDto,
+  PaymentProviderInstanceCreateDto,
+  PaymentProviderInstanceOrderDto,
   PaymentSettingsUpdateDto,
   ReconciliationImportDto,
   ReconciliationItemsQueryDto,
@@ -66,6 +69,7 @@ export class AdminPaymentConfigController {
     return { items, total: items.length, page: 1, pageSize: items.length };
   }
 
+  /** 兼容旧后台路径：保存默认实例。 */
   @Put("providers/:providerId/config")
   @RequirePermission(PERMISSIONS.paymentWrite)
   @AuditAction("payment.provider_config_save")
@@ -80,9 +84,78 @@ export class AdminPaymentConfigController {
         enabled: dto.enabled,
         closeAfterMinutes: dto.closeAfterMinutes,
         values: dto.values,
+        name: dto.name,
+        minAmountCents: dto.minAmountCents,
+        maxAmountCents: dto.maxAmountCents,
+        dailyLimitCents: dto.dailyLimitCents,
+        refundEnabled: dto.refundEnabled,
+        paymentMethods: dto.paymentMethods,
       },
       admin.id,
     );
+  }
+
+  @Post("providers/:providerId/instances")
+  @RequirePermission(PERMISSIONS.paymentWrite)
+  @AuditAction("payment.provider_instance_create")
+  async createInstance(
+    @Param("providerId") providerId: string,
+    @Body() dto: PaymentProviderInstanceCreateDto,
+    @AdminUser() admin: AdminUserType,
+  ) {
+    const instance = await this.configs.createInstance(
+      providerId,
+      {
+        name: dto.name,
+        values: dto.values,
+        closeAfterMinutes: dto.closeAfterMinutes,
+        minAmountCents: dto.minAmountCents,
+        maxAmountCents: dto.maxAmountCents,
+        dailyLimitCents: dto.dailyLimitCents,
+        refundEnabled: dto.refundEnabled,
+        paymentMethods: dto.paymentMethods,
+      },
+      admin.id,
+    );
+    return { instance };
+  }
+
+  @Put("providers/:providerId/instances/:instanceId/config")
+  @RequirePermission(PERMISSIONS.paymentWrite)
+  @AuditAction("payment.provider_instance_config_save")
+  saveInstance(
+    @Param("providerId") providerId: string,
+    @Param("instanceId") instanceId: string,
+    @Body() dto: PaymentProviderConfigUpdateDto,
+    @AdminUser() admin: AdminUserType,
+  ) {
+    return this.configs.saveInstanceVersion(
+      providerId,
+      instanceId,
+      {
+        enabled: dto.enabled,
+        closeAfterMinutes: dto.closeAfterMinutes,
+        values: dto.values,
+        name: dto.name,
+        minAmountCents: dto.minAmountCents,
+        maxAmountCents: dto.maxAmountCents,
+        dailyLimitCents: dto.dailyLimitCents,
+        refundEnabled: dto.refundEnabled,
+        paymentMethods: dto.paymentMethods,
+      },
+      admin.id,
+    );
+  }
+
+  @Patch("providers/:providerId/instances/order")
+  @RequirePermission(PERMISSIONS.paymentWrite)
+  @AuditAction("payment.provider_instance_reorder")
+  reorderInstances(
+    @Param("providerId") providerId: string,
+    @Body() dto: PaymentProviderInstanceOrderDto,
+    @AdminUser() admin: AdminUserType,
+  ) {
+    return this.configs.reorderInstances(providerId, dto.instanceIds, admin.id);
   }
 
   @Get("settings")
@@ -99,7 +172,11 @@ export class AdminPaymentConfigController {
     @AdminUser() admin: AdminUserType,
   ) {
     await this.settings.updateAll(
-      { "payment.defaultCurrency": dto.defaultCurrency },
+      {
+        "payment.defaultCurrency": dto.defaultCurrency,
+        "payment.alipaySource": dto.alipaySource,
+        "payment.wechatSource": dto.wechatSource,
+      },
       [],
       admin.id,
     );
@@ -240,6 +317,7 @@ export class AdminPaymentReconciliationController {
   ) {
     return this.reconciliation.run({
       providerId: dto.providerId,
+      providerInstanceId: dto.providerInstanceId,
       billDate: dto.billDate,
       retryFailed: dto.retryFailed,
       actorId: admin.id,
@@ -251,6 +329,7 @@ export class AdminPaymentReconciliationController {
   list(@Query() query: ReconciliationListQueryDto) {
     return this.reconciliation.list({
       providerId: query.providerId,
+      providerInstanceId: query.providerInstanceId,
       status: query.status,
       from: query.from,
       to: query.to,
@@ -268,6 +347,7 @@ export class AdminPaymentReconciliationController {
   ) {
     const rows = await this.reconciliation.runsForExport({
       providerId: query.providerId,
+      providerInstanceId: query.providerInstanceId,
       status: query.status,
       from: query.from,
       to: query.to,
@@ -276,6 +356,7 @@ export class AdminPaymentReconciliationController {
       [
         { label: "账单日期", value: (r) => r.billDate },
         { label: "渠道", value: (r) => r.providerId },
+        { label: "服务商实例", value: (r) => r.providerInstanceId },
         { label: "执行次数", value: (r) => r.attempt },
         { label: "状态", value: (r) => r.status },
         { label: "总笔数", value: (r) => r.totalItems },
@@ -348,6 +429,7 @@ export class AdminPaymentReconciliationController {
     }
     return this.reconciliation.importCsv({
       providerId: dto.providerId,
+      providerInstanceId: dto.providerInstanceId,
       billDate: dto.billDate,
       file: file.buffer,
       fileName: name,

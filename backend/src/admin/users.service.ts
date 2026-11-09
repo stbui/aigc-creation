@@ -26,6 +26,49 @@ import type {
 /** 用户列表可排序的列 */
 const SORTABLE = ["createdAt", "lastLoginAt", "email", "name"] as const;
 
+/** 计入实付/退款金额的订单状态。与平台概览的 GMV 口径一致 */
+const PAID_ORDER_STATUSES = ["paid", "partial_refunded", "refunded"];
+
+/** 成功率 (%)；无已结束任务时为 null 而非 0 —— 0% 会误导成「全挂了」 */
+function rateOf(succeeded: number, failed: number): number | null {
+  const finished = succeeded + failed;
+  return finished === 0
+    ? null
+    : Math.round((succeeded / finished) * 1000) / 10;
+}
+
+/** 按日聚合任务趋势；日期键与平台概览 `buildTrend` 保持同一口径 */
+function buildTaskTrend(
+  rows: Array<{ createdAt: Date; status: string }>,
+  days: number,
+): Array<{ date: string; total: number; succeeded: number; failed: number }> {
+  const key = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const map = new Map<
+    string,
+    { total: number; succeeded: number; failed: number }
+  >();
+  for (let i = days - 1; i >= 0; i -= 1) {
+    map.set(key(new Date(Date.now() - i * 24 * 3600 * 1000)), {
+      total: 0,
+      succeeded: 0,
+      failed: 0,
+    });
+  }
+  for (const row of rows) {
+    const cur = map.get(key(row.createdAt));
+    if (!cur) continue;
+    cur.total += 1;
+    if (row.status === "succeeded") cur.succeeded += 1;
+    if (row.status === "failed") cur.failed += 1;
+  }
+  return Array.from(map.entries()).map(([date, value]) => ({
+    date,
+    ...value,
+  }));
+}
+
 /** 重置密码时的随机字符集: 去掉易混淆的 0O / 1lI */
 const PASSWORD_ALPHABET =
   "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -202,9 +245,16 @@ export class AdminUsersService {
   }
 
   /**
-   * 用户详情: 基本信息 + 三项统计 + 最近任务 + 最近素材 + 会员权益。
+   * 用户详情: 账号 + 会员 + 积分 + 消费 + 生成 + 最近任务 / 素材 / 订单。
    *
-   * 只取最近 20 条而非全量 —— 抽屉是概览用途, 全量会把响应体撑大。
+   * 列表只取最近若干条而非全量 —— 抽屉是概览用途, 全量会把响应体撑大;
+   * 金额与任务量则给聚合值, 运营不用翻页自己加。
+   *
+   * 口径:
+   *   · 实付 / 退款取 `Order.paidCents` / `Order.refundedCents`, 且只算已支付状态,
+   *     与平台概览的 GMV 口径一致; 未支付订单计入订单状态分布但不计入金额。
+   *   · 积分获得 / 消耗复用 `CreditService.balanceOf()`, 不另算一套。
+   *   · 任务统计排除软删项目, 与用户列表的「任务数」同源。
    */
   async detail(id: string) {
     const user = await this.prisma.user.findUnique({
@@ -226,7 +276,6 @@ export class AdminUsersService {
     const [
       recentTasks,
       recentAssets,
-      taskStats,
       currentMembership,
       resolvedMembership,
       membershipHistory,
@@ -234,9 +283,14 @@ export class AdminUsersService {
       usageCounts,
       creditBalance,
       groupAccess,
-      orderCount,
       ticketCount,
       invoiceCount,
+      paidOrderAgg,
+      orderGroups,
+      refundingAgg,
+      recentOrders,
+      capabilityStats,
+      windowTasks,
     ] = await Promise.all([
       this.prisma.generationTask.findMany({
         where: { ownerId: id, project: { deletedAt: null } },
@@ -262,11 +316,6 @@ export class AdminUsersService {
           height: true,
         },
       }),
-      this.prisma.generationTask.groupBy({
-        by: ["status"],
-        where: { ownerId: id, project: { deletedAt: null } },
-        _count: { _all: true },
-      }),
       // 与 C 端 MembershipService.resolve() 保持同一口径:
       // cancelled 只表示关闭自动续费, 到期前仍享有已付费周期权益。
       this.prisma.membership.findFirst({
@@ -291,13 +340,126 @@ export class AdminUsersService {
       // 余额/分组复用 C 端服务，避免后台另算一套与账单口径漂移。
       this.credit.balanceOf(id),
       this.groups.accessForUser(id),
-      this.prisma.order.count({ where: { userId: id } }),
       this.prisma.ticket.count({ where: { userId: id } }),
       this.prisma.invoice.count({ where: { userId: id } }),
+      // 金额只算已支付订单：未支付单的 paidCents 是「应付」快照, 计进消费会虚高。
+      this.prisma.order.aggregate({
+        where: { userId: id, status: { in: PAID_ORDER_STATUSES } },
+        _sum: { paidCents: true, refundedCents: true },
+        _count: { _all: true },
+        _min: { paidAt: true },
+        _max: { paidAt: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ["status"],
+        where: { userId: id },
+        _count: { _all: true },
+      }),
+      // 处理中的退款尚未写回 Order.refundedCents, 单独展示, 避免运营以为钱已退回。
+      this.prisma.refund.aggregate({
+        where: { userId: id, status: "processing" },
+        _sum: { amountCents: true },
+        _count: { _all: true },
+      }),
+      this.prisma.order.findMany({
+        where: { userId: id },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          orderNo: true,
+          status: true,
+          channel: true,
+          totalCents: true,
+          paidCents: true,
+          refundedCents: true,
+          createdAt: true,
+          paidAt: true,
+          items: { select: { nameSnapshot: true }, take: 1 },
+        },
+      }),
+      // 按能力 + 状态分组: 既得到各项能力的生成量, 也能算出各自成功率。
+      this.prisma.generationTask.groupBy({
+        by: ["capability", "status"],
+        where: { ownerId: id, project: { deletedAt: null } },
+        _count: { _all: true },
+      }),
+      // 近 30 天趋势。单个用户的任务量远小于全站, 在 Node 侧按日聚合即可。
+      this.prisma.generationTask.findMany({
+        where: {
+          ownerId: id,
+          project: { deletedAt: null },
+          createdAt: { gte: new Date(Date.now() - 30 * 24 * 3600 * 1000) },
+        },
+        select: { createdAt: true, status: true },
+      }),
     ]);
 
     const statusCount: Record<string, number> = {};
-    for (const g of taskStats) statusCount[g.status] = g._count._all;
+    for (const g of capabilityStats) {
+      statusCount[g.status] = (statusCount[g.status] ?? 0) + g._count._all;
+    }
+    const taskTotal = Object.values(statusCount).reduce((sum, n) => sum + n, 0);
+    const taskSucceeded = statusCount["succeeded"] ?? 0;
+    const taskFailed = statusCount["failed"] ?? 0;
+
+    const orderStatus = {
+      total: 0,
+      pending: 0,
+      paid: 0,
+      cancelled: 0,
+      refunded: 0,
+      partialRefunded: 0,
+    };
+    for (const g of orderGroups) {
+      const n = g._count._all;
+      orderStatus.total += n;
+      if (g.status === "partial_refunded") orderStatus.partialRefunded += n;
+      else if (g.status === "pending") orderStatus.pending += n;
+      else if (g.status === "paid") orderStatus.paid += n;
+      else if (g.status === "cancelled") orderStatus.cancelled += n;
+      else if (g.status === "refunded") orderStatus.refunded += n;
+    }
+
+    const paidCents = paidOrderAgg._sum.paidCents ?? 0;
+    const refundedCents = paidOrderAgg._sum.refundedCents ?? 0;
+
+    const capabilityMap = new Map<
+      string,
+      { count: number; succeeded: number; failed: number }
+    >();
+    for (const g of capabilityStats) {
+      const cur = capabilityMap.get(g.capability) ?? {
+        count: 0,
+        succeeded: 0,
+        failed: 0,
+      };
+      cur.count += g._count._all;
+      if (g.status === "succeeded") cur.succeeded += g._count._all;
+      if (g.status === "failed") cur.failed += g._count._all;
+      capabilityMap.set(g.capability, cur);
+    }
+    const byCapability = Array.from(capabilityMap.entries())
+      .map(([capability, v]) => {
+        const def = getCapability(capability);
+        return {
+          capability,
+          capabilityName: def?.name ?? capability,
+          modality: def?.modality ?? "image",
+          count: v.count,
+          succeeded: v.succeeded,
+          failed: v.failed,
+          successRate: rateOf(v.succeeded, v.failed),
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    const window = { total: 0, succeeded: 0, failed: 0 };
+    for (const t of windowTasks) {
+      window.total += 1;
+      if (t.status === "succeeded") window.succeeded += 1;
+      if (t.status === "failed") window.failed += 1;
+    }
 
     return {
       id: user.id,
@@ -311,10 +473,12 @@ export class AdminUsersService {
       lastLoginAt: user.lastLoginAt,
       phone: user.phone,
       phoneVerifiedAt: user.phoneVerifiedAt,
-      /** 当前可用积分与到期信息；与 C 端 /credits/balance 同源 */
+      /** 当前可用积分 + 累计获得/消耗；与 C 端 /credits/balance 同源 */
       credit: {
         balance: creditBalance.balance,
         expiringSoon: creditBalance.expiringSoon,
+        totalEarned: creditBalance.totalEarned,
+        totalConsumed: creditBalance.totalConsumed,
         activeLots: creditBalance.activeLots,
         nearestExpiry: creditBalance.nearestExpiry,
       },
@@ -328,15 +492,61 @@ export class AdminUsersService {
         projects: usageCounts.projects,
         tasks: usageCounts.tasks,
         assets: usageCounts.assets,
-        orders: orderCount,
+        orders: orderStatus.total,
         tickets: ticketCount,
         invoices: invoiceCount,
         taskStatus: {
-          succeeded: statusCount["succeeded"] ?? 0,
-          failed: statusCount["failed"] ?? 0,
+          total: taskTotal,
+          succeeded: taskSucceeded,
+          failed: taskFailed,
           running: statusCount["running"] ?? 0,
           queued: statusCount["queued"] ?? 0,
+          cancelled: statusCount["cancelled"] ?? 0,
+          successRate: rateOf(taskSucceeded, taskFailed),
         },
+      },
+      /** 消费：金额一律整数分, 前端自行格式化 */
+      spending: {
+        paidCents,
+        refundedCents,
+        netCents: paidCents - refundedCents,
+        paidOrders: paidOrderAgg._count._all,
+        refundingCents: refundingAgg._sum.amountCents ?? 0,
+        refundingOrders: refundingAgg._count._all,
+        firstPaidAt: paidOrderAgg._min.paidAt,
+        lastPaidAt: paidOrderAgg._max.paidAt,
+        orderStatus,
+      },
+      recentOrders: recentOrders.map((o) => ({
+        id: o.id,
+        orderNo: o.orderNo,
+        status: o.status,
+        channel: o.channel,
+        totalCents: o.totalCents,
+        // 与订单列表一致: 未支付单展示应付金额, 已支付单展示实付金额
+        paidCents: o.paidCents > 0 ? o.paidCents : o.totalCents,
+        refundedCents: o.refundedCents,
+        itemName: o.items[0]?.nameSnapshot ?? null,
+        createdAt: o.createdAt,
+        paidAt: o.paidAt,
+      })),
+      /** 生成：全量状态分布 + 按能力拆分 + 近 30 天趋势 */
+      generation: {
+        total: taskTotal,
+        succeeded: taskSucceeded,
+        failed: taskFailed,
+        running: statusCount["running"] ?? 0,
+        queued: statusCount["queued"] ?? 0,
+        cancelled: statusCount["cancelled"] ?? 0,
+        successRate: rateOf(taskSucceeded, taskFailed),
+        last30d: {
+          total: window.total,
+          succeeded: window.succeeded,
+          failed: window.failed,
+          successRate: rateOf(window.succeeded, window.failed),
+        },
+        trend: buildTaskTrend(windowTasks, 30),
+        byCapability,
       },
       recentTasks: recentTasks.map((t) => {
         const def = getCapability(t.capability);

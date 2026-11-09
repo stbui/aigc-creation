@@ -104,7 +104,7 @@
 | GET | `/api/v1/admin/{me,overview,permissions}` | 后台身份 / 概览 / 权限点 |
 | GET | `/api/v1/admin/alerts` | 告警中心：按当前角色权限聚合待处理工单 / 失败任务 / 对账差异 / 退款卡单 / 备份 / 发票（只要求后台身份） |
 | GET | `/api/v1/admin/workbench` | 角色工作台：按当前角色权限返回可动作实体行；仅 `admin` 可用 `?view=operator\|finance` 预览，视图不放大范围 |
-| GET/PATCH/POST/DELETE | `/api/v1/admin/users*`、`assets*`、`tasks*` | 用户 / 素材 / 任务管理。用户列表支持 `keyword`（邮箱/昵称/手机号/用户 ID）、`role`、`status`、`from`/`to`、`segment`（`never_login`/`inactive_30d`/`no_tasks`）、`membership`（`member`/`non_member`）；`GET /admin/users/stats` 返回同口径全站统计；导出响应带 `X-Export-Total`/`X-Export-Limit`/`X-Export-Truncated`；`POST /admin/users/:id/logout-all` 强制下线（`user.disable`）；重置密码返回 `mustChangePassword` 与 24 小时 `expiresAt` |
+| GET/PATCH/POST/DELETE | `/api/v1/admin/users*`、`assets*`、`tasks*` | 用户 / 素材 / 任务管理。用户列表支持 `keyword`（邮箱/昵称/手机号/用户 ID）、`role`、`status`、`from`/`to`、`segment`（`never_login`/`inactive_30d`/`no_tasks`）、`membership`（`member`/`non_member`）；`GET /admin/users/stats` 返回同口径全站统计；`GET /admin/users/:id` 返回账号、会员、积分（含累计获得/消耗）、消费（实付/退款/净消费/最近订单）与生成（状态分布/按能力/近 30 天趋势）聚合；导出响应带 `X-Export-Total`/`X-Export-Limit`/`X-Export-Truncated`；`POST /admin/users/:id/logout-all` 强制下线（`user.disable`）；重置密码返回 `mustChangePassword` 与 24 小时 `expiresAt` |
 | GET/PUT/POST/DELETE | `/api/v1/admin/{credit-prices,products,orders,payments,credits}*` | 交易与积分管理。商品删除（`DELETE /admin/products/:id`，`product.delete`）只允许没有历史订单的 SKU；已有订单返回 **409** 并提示改为下架（退款与积分回收要回查 SKU 原价与发放积分）。列表每项带 `orderCount` 供前端预检。订单列表 / 导出支持 `productId` 筛选（只回买过该商品的订单，商品卡「N 单」深链用），与 `status` / `orderNo` / `email` / `channel` / `refundState` / 时间范围同口径。订单列表每项另带 `refundState`（`processing` / `failed` / `succeeded` / `null`）：退款状态挂在 `Refund` 上而非订单上，渠道异步退款时订单仍是 `paid`，此字段与 `refundState` 筛选**同源**（命中任意一笔退款单即显示最需要人管的那一个：处理中 > 失败 > 成功） |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/membership-plans*` | 会员套餐列表 / 新建 / 改价改权益 / 上下架 / 删除（`product.read` / `product.write`，写操作自动写审计）。删除只允许非 `free` 且没有会员、没有订单的套餐；否则返回 **409** 并提示改为下架，下架不影响存量会员 |
 | POST | `/api/v1/admin/orders/:id/refund` | 渠道退款（**先调渠道再改本地账**；渠道失败 `50302` 且订单/积分不变，在途退款 `40908`，`order.refund` 权限 + 必填原因 + 审计） |
@@ -159,11 +159,11 @@
 
 `GET /api/v1/admin/tasks/:id`（`task.read`）在任务基础字段、输入素材、参数、产出和状态时间线之外，返回 `routeAttempts`：按 `routeRun ASC, attemptNumber ASC` 排序的线路派发快照，包含逻辑模型、线路、渠道模型、`status`、`dispatchState`、上游请求号、失败码 / 失败原因和起止时间。该数组是任务排障数据，不包含账单金额或上游请求 / 响应正文。
 
-任务详情抽屉把分散在同一 `taskId` 下的数据组成集中排障页，但保留各自权限边界：
+任务详情弹窗把分散在同一 `taskId` 下的数据组成集中排障页，但保留各自权限边界：
 
 - `GET /admin/tasks/:id`：提交时间、任务状态、参数、线路尝试、产出，`task.read`。
-- `GET /admin/api-logs?taskId=`：模型调用摘要及全部调用深链，`model.call_read`；最近 20 条用于抽屉内定位，完整列表在 `/admin/model-calls?taskId=`。
-- `GET /admin/billing-orders?taskId=`：积分预留、结算、退款与人工核对结果，`billing_order.read`；详情抽屉最多加载 100 条，完整列表在 `/admin/billing-orders?taskId=`。
+- `GET /admin/api-logs?taskId=`：模型调用摘要及全部调用深链，`model.call_read`；最近 20 条用于弹窗内定位，完整列表在 `/admin/model-calls?taskId=`。
+- `GET /admin/billing-orders?taskId=`：积分预留、结算、退款与人工核对结果，`billing_order.read`；详情弹窗最多加载 100 条，完整列表在 `/admin/billing-orders?taskId=`。
 
 资金终态以 `BillingOrder` 为准，不能仅凭 `RouteAttempt.dispatchState` 判断是否需要人工复核：`reviewable=true` 才进入待核对队列；`refunded` 且 `resolvedBy=system:preconnection-reconcile` 表示建连前网络失败已由系统自动退款，应显示“无需人工复核”。`refundReason=route_switch` 是换线内部重预留，不计入真实退款。
 

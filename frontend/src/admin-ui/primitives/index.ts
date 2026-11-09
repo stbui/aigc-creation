@@ -132,7 +132,7 @@ export {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
-export { AdminDrawer } from './Drawer';
+export { AdminDrawer, AdminModal } from './DetailDialog';
 export { DutyChannelTower, earliestFailure } from './duty-tower';
 export { DutyStrip } from './duty-strip';
 export { TrendBarChart } from './chart';

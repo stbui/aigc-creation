@@ -7,7 +7,13 @@ import { PaymentConfigService } from './payment-config.service';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentExceptionService } from './payment-exception.service';
 import { getAdapter } from './adapters';
-import { NotificationResult, PaymentAck, PaymentProviderId } from './adapters/types';
+import {
+  NotificationResult,
+  PaymentAck,
+  PaymentProviderId,
+  VisiblePaymentMethod,
+  isVisiblePaymentMethod,
+} from './adapters/types';
 
 /** 重试退避：1min、5min、15min、1h，最多 8 次 */
 const BACKOFF_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000];
@@ -67,6 +73,26 @@ export class PaymentNotificationService {
 
     let result: NotificationResult;
     try {
+      /*
+       * 易支付同一套凭据承载支付宝/微信两种支付方式。验签前必须先由
+       * 商户订单号定位到当时固化的 Payment，读取 providerMethod 选择期望的
+       * type；不能拿渠道配置的当前值或回调 body 里的 type 自证。
+       *
+       * 定位不到 Payment 或历史记录没有 providerMethod 时直接拒绝，不落收件箱。
+       */
+      const expectedPaymentMethod =
+        input.providerId === 'epay'
+          ? await this.expectedPaymentMethodFor(input.body, input.configId)
+          : undefined;
+      if (input.providerId === 'epay' && !expectedPaymentMethod) {
+        this.logger.warn('易支付回调未匹配到已固化支付方式的支付尝试，拒绝落库');
+        return adapter.ack({
+          ok: false,
+          ackSuccess: false,
+          reason: '易支付回调未匹配到支付尝试',
+          rawPayload: '',
+        });
+      }
       result = await adapter.verifyNotification({
         config: {
           providerId: config.providerId,
@@ -77,6 +103,7 @@ export class PaymentNotificationService {
         headers: input.headers,
         rawBody: input.rawBody,
         body: input.body,
+        ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
       });
     } catch (e) {
       // 验签过程中的异常（解密失败等）同样不能落库，也不能 ack 成功
@@ -269,6 +296,38 @@ export class PaymentNotificationService {
 
   // ── 内部 ────────────────────────────────────────────────────────
 
+  /** 易支付回调的先验定位：商户订单号 + 渠道 + 配置版本 → 历史支付方式。 */
+  private async expectedPaymentMethodFor(
+    body: Record<string, unknown>,
+    configId: string,
+  ): Promise<VisiblePaymentMethod | null> {
+    const merchantOrderNo =
+      typeof body.param === 'string' ? body.param.trim() : '';
+    if (!merchantOrderNo) return null;
+
+    const order = await this.prisma.order.findUnique({
+      where: { orderNo: merchantOrderNo },
+      select: { id: true, providerInstanceId: true },
+    });
+    if (!order) return null;
+
+    const providerRef =
+      typeof body.orderId === 'string' ? body.orderId.trim() : '';
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        orderId: order.id,
+        channel: 'epay',
+        providerConfigId: configId,
+        ...(providerRef ? { providerRef } : {}),
+      },
+      ...(providerRef ? {} : { orderBy: { createdAt: 'desc' as const } }),
+      select: { providerMethod: true },
+    });
+    return payment?.providerMethod && isVisiblePaymentMethod(payment.providerMethod)
+      ? payment.providerMethod
+      : null;
+  }
+
   private async processNotification(
     notificationId: string,
     result: Extract<NotificationResult, { ok: true }>,
@@ -316,7 +375,7 @@ export class PaymentNotificationService {
         ...(providerRef ? { providerRef } : {}),
       },
       ...(providerRef ? {} : { orderBy: { createdAt: 'desc' as const } }),
-      select: { id: true },
+      select: { id: true, providerInstanceId: true },
     });
     if (providerRef && !attempt) {
       const detail = `回调渠道单据号 ${providerRef} 未匹配到支付尝试，禁止回落到最新支付记录`;
@@ -351,11 +410,15 @@ export class PaymentNotificationService {
     }
 
     try {
+      const providerInstanceId =
+        attempt?.providerInstanceId ??
+        (await this.configs.byId(row.providerConfigId)).instanceId;
       const applied = await this.orders.applyPaymentResult({
         orderId: order.id,
         providerId: row.providerId as PaymentProviderId,
         configId: row.providerConfigId,
         paymentId: attempt?.id,
+        providerInstanceId,
         tradeNo: result.providerTradeNo,
         amountCents: result.amountCents,
         currency: result.currency,

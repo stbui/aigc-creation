@@ -8,6 +8,7 @@ import { membershipApi, myMarketingApi, ordersApi, productsApi } from './api';
 import { blockedReasonOf, quoteErrorMessageOf } from './utils';
 import { useCheckoutPayment } from './hooks';
 import { CheckoutAmountCard } from './CheckoutAmountCard';
+import { CheckoutHelpCard } from './CheckoutHelpCard';
 import { CheckoutOrderCard } from './CheckoutOrderCard';
 import { CheckoutPaymentMethodCard } from './CheckoutPaymentMethodCard';
 import { CheckoutResultCard } from './CheckoutResultCard';
@@ -113,6 +114,8 @@ export function CheckoutPage() {
     setSelectedProviderId,
     providersLoading,
     providersError,
+    helpImage,
+    helpText,
     stopPolling,
     refreshPaymentStatus,
     payOnline,
@@ -368,6 +371,7 @@ export function CheckoutPage() {
             providersLoading={providersLoading}
             providersError={providersError}
           />
+          <CheckoutHelpCard helpImage={helpImage} helpText={helpText} />
         </div>
 
         <CheckoutAmountCard

@@ -21,7 +21,8 @@ function makeHarness() {
     order: { findMany: vi.fn().mockResolvedValue([]) },
     paymentAutoReconcileState: {
       upsert: vi.fn(async ({ where, create }: any) => {
-        const key = `${where.providerId_billDate.providerId}|${where.providerId_billDate.billDate}`;
+        const unique = where.providerId_providerInstanceId_billDate;
+        const key = `${unique.providerId}|${unique.providerInstanceId}|${unique.billDate}`;
         const existing = states.get(key);
         if (existing) return existing;
         const row = { id: `state-${states.size + 1}`, ...create };
@@ -55,7 +56,9 @@ function makeHarness() {
     }),
   };
   const configs = {
-    latest: vi.fn().mockResolvedValue({ enabled: true }),
+    listInstances: vi.fn().mockResolvedValue([
+      { instanceId: 'default', enabled: true },
+    ]),
   };
   const exceptions = { recordReconciliationFailure: vi.fn().mockResolvedValue({}) };
   const service = new PaymentWorkerService(
@@ -92,7 +95,7 @@ describe('PaymentWorkerService 自动对账重试', () => {
 
     vi.setSystemTime(new Date('2026-11-05T02:45:00.000Z'));
     const second = makeHarness();
-    second.states.set('alipay|2026-11-04', { ...state });
+    second.states.set('alipay|default|2026-11-04', { ...state });
     await runAutoReconcile(second.service);
     state = [...second.states.values()][0];
     expect(state).toMatchObject({ status: 'pending', attempts: 2 });
@@ -100,7 +103,7 @@ describe('PaymentWorkerService 自动对账重试', () => {
 
     vi.setSystemTime(new Date('2026-11-05T03:15:00.000Z'));
     const third = makeHarness();
-    third.states.set('alipay|2026-11-04', { ...state });
+    third.states.set('alipay|default|2026-11-04', { ...state });
     await runAutoReconcile(third.service);
     state = [...third.states.values()][0];
     expect(state).toMatchObject({ status: 'failed', attempts: 3 });
@@ -116,6 +119,13 @@ describe('PaymentWorkerService 自动对账重试', () => {
     await runAutoReconcile(service);
 
     expect(reconciliation.run).toHaveBeenCalledTimes(1);
+    expect(reconciliation.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerId: 'alipay',
+        providerInstanceId: 'default',
+        billDate: '2026-11-04',
+      }),
+    );
     expect([...states.values()][0]).toMatchObject({
       status: 'pending',
       attempts: 1,

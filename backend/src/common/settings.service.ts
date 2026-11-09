@@ -6,6 +6,7 @@ import {
   findSettingDef,
   parseSettingValue,
   type SettingDef,
+  type SettingValue,
 } from './setting-defs';
 
 /**
@@ -29,7 +30,7 @@ export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
 
   /** key → 生效值（已按 SettingDef 归一化） */
-  private cache = new Map<string, string | number | boolean>();
+  private cache = new Map<string, SettingValue>();
   /** key → 上次修改的操作人，供设置页显示「上次由 X 改」 */
   private actorCache = new Map<string, { updatedBy: string | null; updatedAt: Date | null }>();
   private cacheAt = 0;
@@ -49,7 +50,7 @@ export class SettingsService {
    * 未知键抛 404 —— 调用方传错键名时应当立刻暴露，而不是静默拿到 undefined
    * 然后在下游算出一个奇怪的值。
    */
-  async get<T = string | number | boolean>(key: string): Promise<T> {
+  async get<T = SettingValue>(key: string): Promise<T> {
     const def = findSettingDef(key);
     if (!def) throw new AppError(40400, `未知设置项: ${key}`, 404);
 
@@ -60,12 +61,27 @@ export class SettingsService {
     return (cached === undefined ? def.default : cached) as T;
   }
 
-  /** 读取数值型设置；值非法时回落定义里的默认值 */
+  /** 读取数值型设置；值非法或显式留空时回落定义里的默认值 */
   async getNumber(key: string): Promise<number> {
     const def = findSettingDef(key);
     const fallback = typeof def?.default === 'number' ? def.default : 0;
     try {
-      const v = await this.get<string | number>(key);
+      const v = await this.get<string | number | null>(key);
+      if (v === null) return fallback;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  /** 读取可空数值型设置；显式留空返回 null，未知/坏值回落代码默认值 */
+  async getNullableNumber(key: string): Promise<number | null> {
+    const def = findSettingDef(key);
+    const fallback = typeof def?.default === 'number' ? def.default : null;
+    try {
+      const v = await this.get<string | number | null>(key);
+      if (v === null || v === '') return def?.nullable ? null : fallback;
       const n = Number(v);
       return Number.isFinite(n) ? n : fallback;
     } catch {
@@ -87,11 +103,11 @@ export class SettingsService {
   }
 
   /** 一次性读全部设置项的生效值（含缓存） */
-  async getAll(): Promise<Record<string, string | number | boolean>> {
+  async getAll(): Promise<Record<string, SettingValue>> {
     if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
       await this.refresh();
     }
-    const out: Record<string, string | number | boolean> = {};
+    const out: Record<string, SettingValue> = {};
     for (const def of SETTING_DEFS) {
       const v = this.cache.get(def.key);
       out[def.key] = v === undefined ? def.default : v;
@@ -128,6 +144,76 @@ export class SettingsService {
   }
 
   /**
+   * 支付基本规则快照。
+   *
+   * 金额设置以元展示，业务侧统一使用分；可空项表示“不限”。
+   * 支付宝移动端当面付唤起允许部署环境变量强制开启（后台关闭时也可打开），
+   * 便于灰度环境在不动数据库的前提下验证真实唤起链路。
+   */
+  async paymentRules(): Promise<PaymentRules> {
+    const [
+      enabled,
+      productNamePrefix,
+      productNameSuffix,
+      minAmountYuan,
+      maxAmountYuan,
+      dailyLimitYuan,
+      orderTtlMinutes,
+      maxPendingOrders,
+      cancelLimitEnabled,
+      cancelWindowMode,
+      cancelWindowSize,
+      cancelWindowUnit,
+      cancelLimitMax,
+      loadBalancingStrategy,
+      alipayMobilePrecreateDeepLink,
+      helpImage,
+      helpText,
+    ] = await Promise.all([
+      this.get<boolean>('payment.enabled'),
+      this.get<string>('payment.productNamePrefix'),
+      this.get<string>('payment.productNameSuffix'),
+      this.getNumber('payment.minAmountYuan'),
+      this.getNullableNumber('payment.maxAmountYuan'),
+      this.getNullableNumber('payment.dailyLimitYuan'),
+      this.getNumber('payment.orderTtlMinutes'),
+      this.getNumber('payment.maxPendingOrders'),
+      this.getBoolean('payment.cancelLimitEnabled'),
+      this.get<string>('payment.cancelWindowMode'),
+      this.getNumber('payment.cancelWindowSize'),
+      this.get<string>('payment.cancelWindowUnit'),
+      this.getNumber('payment.cancelLimitMax'),
+      this.get<string>('payment.loadBalancingStrategy'),
+      this.get<boolean>('payment.alipayMobilePrecreateDeepLink'),
+      this.get<string>('payment.helpImage'),
+      this.get<string>('payment.helpText'),
+    ]);
+
+    return {
+      enabled,
+      productNamePrefix,
+      productNameSuffix,
+      minAmountCents: yuanToCents(minAmountYuan) ?? 0,
+      maxAmountCents: yuanToCents(maxAmountYuan),
+      dailyLimitCents: yuanToCents(dailyLimitYuan),
+      orderTtlMinutes: Math.max(1, Math.round(orderTtlMinutes)),
+      maxPendingOrders: Math.max(1, Math.round(maxPendingOrders)),
+      cancelLimitEnabled,
+      cancelWindowMode: cancelWindowMode === 'fixed' ? 'fixed' : 'rolling',
+      cancelWindowSize: Math.max(1, Math.round(cancelWindowSize)),
+      cancelWindowUnit: cancelWindowUnit === 'hour' ? 'hour' : 'minute',
+      cancelLimitMax: Math.max(1, Math.round(cancelLimitMax)),
+      loadBalancingStrategy:
+        loadBalancingStrategy === 'least-amount' ? 'least-amount' : 'round-robin',
+      alipayMobilePrecreateDeepLink:
+        alipayMobilePrecreateDeepLink ||
+        process.env.ALIPAY_MOBILE_PRECREATE_DEEP_LINK?.trim().toLowerCase() === 'true',
+      helpImage,
+      helpText,
+    };
+  }
+
+  /**
    * 刷新缓存：一次 findMany 覆盖全部设置项。
    *
    * 只取本模块定义的键 —— SystemSetting 表里还混着 `creditPrice.*`
@@ -136,7 +222,7 @@ export class SettingsService {
   private async refresh(): Promise<void> {
     const known = new Set(SETTING_DEFS.map((d) => d.key));
     const rows = await this.prisma.systemSetting.findMany();
-    const cache = new Map<string, string | number | boolean>();
+    const cache = new Map<string, SettingValue>();
     const actors = new Map<string, { updatedBy: string | null; updatedAt: Date | null }>();
 
     for (const row of rows) {
@@ -158,7 +244,31 @@ export class SettingsService {
    * 存量数据可能格式不合法 (手工改过库), 此时回退到代码默认值 ——
    * 一个坏配置不应让整页设置加载失败。
    */
-  private parseValue(raw: string, def: SettingDef): string | number | boolean {
+  private parseValue(raw: string, def: SettingDef): SettingValue {
     return parseSettingValue(raw, def);
   }
+}
+
+export interface PaymentRules {
+  enabled: boolean;
+  productNamePrefix: string;
+  productNameSuffix: string;
+  minAmountCents: number;
+  maxAmountCents: number | null;
+  dailyLimitCents: number | null;
+  orderTtlMinutes: number;
+  maxPendingOrders: number;
+  cancelLimitEnabled: boolean;
+  cancelWindowMode: 'rolling' | 'fixed';
+  cancelWindowSize: number;
+  cancelWindowUnit: 'minute' | 'hour';
+  cancelLimitMax: number;
+  loadBalancingStrategy: 'round-robin' | 'least-amount';
+  alipayMobilePrecreateDeepLink: boolean;
+  helpImage: string;
+  helpText: string;
+}
+
+function yuanToCents(yuan: number | null): number | null {
+  return yuan === null ? null : Math.round(yuan * 100);
 }

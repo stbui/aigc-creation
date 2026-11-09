@@ -310,6 +310,33 @@
   font-size: 12px;
 }
 
+/* ── 帮助信息 ─────────────────────────────────────────────────────────── */
+.co-help {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.co-help-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 21px;
+  color: var(--text-body);
+}
+
+.co-help-image {
+  display: block;
+  width: min(100%, 220px);
+  height: auto;
+  border: 1px solid var(--co-line-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  object-fit: contain;
+}
+
 /* ── 结算栏 ───────────────────────────────────────────────────────────── */
 .co-side {
   position: sticky;

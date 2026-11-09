@@ -157,68 +157,77 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
 
     for (const adapter of allAdapters()) {
       if (!adapter.descriptor.supportsReconciliation) continue;
-      const config = await this.configs.latest(adapter.descriptor.id);
-      if (!config?.enabled) continue;
-      const state = await this.prisma.paymentAutoReconcileState.upsert({
-        where: {
-          providerId_billDate: {
-            providerId: adapter.descriptor.id,
-            billDate,
+      const instances = (await this.configs.listInstances(adapter.descriptor.id)).filter(
+        (instance) => instance.enabled,
+      );
+      for (const instance of instances) {
+        const providerId = adapter.descriptor.id;
+        const providerInstanceId = instance.instanceId;
+        const state = await this.prisma.paymentAutoReconcileState.upsert({
+          where: {
+            providerId_providerInstanceId_billDate: {
+              providerId,
+              providerInstanceId,
+              billDate,
+            },
           },
-        },
-        create: {
-          providerId: adapter.descriptor.id,
-          billDate,
-          status: 'pending',
-          attempts: 0,
-          nextAttemptAt: now,
-        },
-        update: {},
-      });
-      if (state.status === 'succeeded') continue;
-      if (state.attempts >= AUTO_RECONCILE_MAX_ATTEMPTS) continue;
-      if (state.nextAttemptAt.getTime() > now.getTime()) continue;
+          create: {
+            providerId,
+            providerInstanceId,
+            billDate,
+            status: 'pending',
+            attempts: 0,
+            nextAttemptAt: now,
+          },
+          update: {},
+        });
+        if (state.status === 'succeeded') continue;
+        if (state.attempts >= AUTO_RECONCILE_MAX_ATTEMPTS) continue;
+        if (state.nextAttemptAt.getTime() > now.getTime()) continue;
 
-      try {
-        const result = await this.reconciliation.run({
-          providerId: adapter.descriptor.id,
-          billDate,
-          actorId: 'worker',
-        });
-        if (result.run.status !== 'completed') {
-          throw new Error(result.run.error || '对账任务未完成');
-        }
-        await this.prisma.paymentAutoReconcileState.update({
-          where: { id: state.id },
-          data: {
-            status: 'succeeded',
-            attempts: { increment: 1 },
-            lastError: null,
-          },
-        });
-      } catch (e) {
-        const attempts = state.attempts + 1;
-        const error = (e as Error).message;
-        const exhausted = attempts >= AUTO_RECONCILE_MAX_ATTEMPTS;
-        const delay = AUTO_RECONCILE_BACKOFF_MS[Math.min(attempts - 1, AUTO_RECONCILE_BACKOFF_MS.length - 1)];
-        await this.prisma.paymentAutoReconcileState.update({
-          where: { id: state.id },
-          data: {
-            status: exhausted ? 'failed' : 'pending',
-            attempts,
-            lastError: error.slice(0, 500),
-            nextAttemptAt: new Date(Date.now() + delay),
-          },
-        });
-        this.logger.error(
-          `自动对账失败 (${adapter.descriptor.id} ${billDate}, 第 ${attempts}/${AUTO_RECONCILE_MAX_ATTEMPTS} 次): ${error}`,
-        );
-        if (exhausted) {
-          await this.exceptions.recordReconciliationFailure({
-            providerId: adapter.descriptor.id,
+        try {
+          const result = await this.reconciliation.run({
+            providerId,
+            providerInstanceId,
             billDate,
-            error: `自动对账连续 ${attempts} 次失败: ${error}`,
+            actorId: 'worker',
           });
+          if (result.run.status !== 'completed') {
+            throw new Error(result.run.error || '对账任务未完成');
+          }
+          await this.prisma.paymentAutoReconcileState.update({
+            where: { id: state.id },
+            data: {
+              status: 'succeeded',
+              attempts: { increment: 1 },
+              lastError: null,
+            },
+          });
+        } catch (e) {
+          const attempts = state.attempts + 1;
+          const error = (e as Error).message;
+          const exhausted = attempts >= AUTO_RECONCILE_MAX_ATTEMPTS;
+          const delay = AUTO_RECONCILE_BACKOFF_MS[Math.min(attempts - 1, AUTO_RECONCILE_BACKOFF_MS.length - 1)];
+          await this.prisma.paymentAutoReconcileState.update({
+            where: { id: state.id },
+            data: {
+              status: exhausted ? 'failed' : 'pending',
+              attempts,
+              lastError: error.slice(0, 500),
+              nextAttemptAt: new Date(Date.now() + delay),
+            },
+          });
+          this.logger.error(
+            `自动对账失败 (${providerId}/${providerInstanceId} ${billDate}, 第 ${attempts}/${AUTO_RECONCILE_MAX_ATTEMPTS} 次): ${error}`,
+          );
+          if (exhausted) {
+            await this.exceptions.recordReconciliationFailure({
+              providerId,
+              providerInstanceId,
+              billDate,
+              error: `自动对账连续 ${attempts} 次失败: ${error}`,
+            });
+          }
         }
       }
     }

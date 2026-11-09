@@ -15,6 +15,8 @@ import { AppError } from './app.exception';
  * 「基准线」，它与代码里实际的兜底不一致时，页面就在骗人。
  * 本文件里的每个 `default` 都必须与对应运行时常量的兜底值逐字相等。
  */
+export type SettingValue = string | number | boolean | null;
+
 export interface SettingDef {
 
   /** 键名。点号分隔，`<分组>.<项>` —— 分组段必须与 `group` 一致 */
@@ -23,7 +25,9 @@ export interface SettingDef {
   description: string;
   type: 'string' | 'number' | 'boolean';
   /** 代码默认值。与运行时常量的兜底值必须一致 */
-  default: string | number | boolean;
+  default: SettingValue;
+  /** 数字项是否允许显式留空；留空表示“不限”，与恢复代码默认值不同 */
+  nullable?: boolean;
   min?: number;
   max?: number;
   maxLength?: number;
@@ -165,6 +169,170 @@ export const SETTING_DEFS: SettingDef[] = [
     public: true,
   },
   {
+    key: 'payment.enabled',
+    label: '启用支付',
+    description:
+      '关闭后 C 端不展示任何支付方式，也不能发起渠道支付。0 元订单的领取入口不受影响',
+    type: 'boolean',
+    default: false,
+    group: 'payment',
+  },
+  {
+    key: 'payment.productNamePrefix',
+    label: '商品名前缀',
+    description: '支付页面展示的商品名前缀，例如品牌名。留空表示不加前缀',
+    type: 'string',
+    default: '',
+    maxLength: 40,
+    group: 'payment',
+  },
+  {
+    key: 'payment.productNameSuffix',
+    label: '商品名后缀',
+    description: '支付页面展示的商品名后缀，例如“元”。留空表示不加后缀',
+    type: 'string',
+    default: '',
+    maxLength: 20,
+    group: 'payment',
+  },
+  {
+    key: 'payment.minAmountYuan',
+    label: '最低金额（元）',
+    description: '单笔充值允许的最低实付金额。订单金额以分为单位核算，本项按元填写',
+    type: 'number',
+    default: 1,
+    min: 0.01,
+    group: 'payment',
+  },
+  {
+    key: 'payment.maxAmountYuan',
+    label: '最高金额（元）',
+    description: '单笔充值允许的最高实付金额。留空表示不限制',
+    type: 'number',
+    default: null,
+    nullable: true,
+    min: 0.01,
+    group: 'payment',
+  },
+  {
+    key: 'payment.dailyLimitYuan',
+    label: '每日限额（元）',
+    description:
+      '每用户每个自然日（Asia/Shanghai）的累计充值上限；已支付与仍在等待支付的订单都会占用额度。留空表示不限制',
+    type: 'number',
+    default: null,
+    nullable: true,
+    min: 0.01,
+    group: 'payment',
+  },
+  {
+    key: 'payment.orderTtlMinutes',
+    label: '订单超时时间（分钟）',
+    description: '待支付订单超过该时长后由后台任务查单并关闭。至少 1 分钟',
+    type: 'number',
+    default: 30,
+    min: 1,
+    max: 1440,
+    group: 'payment',
+  },
+  {
+    key: 'payment.maxPendingOrders',
+    label: '最大待支付订单数',
+    description: '同一用户同时保留的待支付订单上限，超过后拒绝创建新订单',
+    type: 'number',
+    default: 3,
+    min: 1,
+    max: 100,
+    group: 'payment',
+  },
+  {
+    key: 'payment.cancelLimitEnabled',
+    label: '启用取消频率限制',
+    description: '启用后，用户主动取消待支付订单会占用窗口内额度；管理员与后台超时关单不计入',
+    type: 'boolean',
+    default: false,
+    group: 'payment',
+  },
+  {
+    key: 'payment.cancelWindowMode',
+    label: '取消窗口模式',
+    description: '滚动窗口按最近一段时间统计；固定窗口按时间单位对齐，窗口内次数达到上限后等待下一窗口',
+    type: 'string',
+    options: ['rolling', 'fixed'],
+    optionLabels: { rolling: '滚动窗口', fixed: '固定窗口' },
+    default: 'rolling',
+    group: 'payment',
+  },
+  {
+    key: 'payment.cancelWindowSize',
+    label: '取消时间窗口',
+    description: '取消频率统计窗口长度，与下一项“窗口单位”组合使用',
+    type: 'number',
+    default: 10,
+    min: 1,
+    max: 10080,
+    group: 'payment',
+  },
+  {
+    key: 'payment.cancelWindowUnit',
+    label: '取消窗口单位',
+    description: '取消频率统计窗口的时间单位',
+    type: 'string',
+    options: ['minute', 'hour'],
+    optionLabels: { minute: '分钟', hour: '小时' },
+    default: 'minute',
+    group: 'payment',
+  },
+  {
+    key: 'payment.cancelLimitMax',
+    label: '窗口内最大取消次数',
+    description: '单个用户在统计窗口内允许成功主动取消的订单数',
+    type: 'number',
+    default: 5,
+    min: 1,
+    max: 1000,
+    group: 'payment',
+  },
+  {
+    key: 'payment.loadBalancingStrategy',
+    label: '负载均衡策略',
+    description: '同一支付来源存在多个服务商实例时的选择策略',
+    type: 'string',
+    options: ['round-robin', 'least-amount'],
+    optionLabels: { 'round-robin': '轮询', 'least-amount': '最少金额' },
+    default: 'round-robin',
+    group: 'payment',
+  },
+  {
+    key: 'payment.alipayMobilePrecreateDeepLink',
+    label: '支付宝移动端当面付唤起',
+    description:
+      '仅对路由到支付宝官方的移动端订单生效：调用当面付获取动态二维码并尝试唤起支付宝 App，失败时展示二维码备用页。需先在支付宝应用开通当面付/扫码支付',
+    type: 'boolean',
+    default: false,
+    group: 'payment',
+  },
+  {
+    key: 'payment.helpImage',
+    label: '帮助图片',
+    description: '充值页面展示的客服二维码等图片地址。留空表示不展示',
+    type: 'string',
+    default: '',
+    maxLength: 500,
+    group: 'payment',
+    public: true,
+  },
+  {
+    key: 'payment.helpText',
+    label: '帮助文本',
+    description: '充值页面展示的说明文字。留空表示不展示',
+    type: 'string',
+    default: '',
+    maxLength: 1000,
+    group: 'payment',
+    public: true,
+  },
+  {
     key: 'payment.alipaySource',
     label: '支付宝前台来源',
     description:
@@ -295,10 +463,8 @@ export const PUBLIC_SETTING_KEYS = SETTING_DEFS.filter((d) => d.public).map((d) 
  *
  * 抛 `AppError(40001)`，由调用方转成响应。
  */
-export function validateSettingValue(
-  def: SettingDef,
-  raw: unknown,
-): string | number | boolean {
+export function validateSettingValue(def: SettingDef, raw: unknown): SettingValue {
+  if (def.nullable && (raw === null || raw === undefined)) return null;
   if (def.type === 'boolean') {
     if (typeof raw === 'boolean') return raw;
     if (raw === 'true') return true;
@@ -307,6 +473,13 @@ export function validateSettingValue(
   }
 
   if (def.type === 'number') {
+    if (typeof raw === 'string' && raw.trim() === '') {
+      if (def.nullable) return null;
+      throw new AppError(40001, `${def.label} 必须是数字`, 400);
+    }
+    if (raw === null || raw === undefined) {
+      throw new AppError(40001, `${def.label} 必须是数字`, 400);
+    }
     const n = Number(raw);
     if (!Number.isFinite(n)) {
       throw new AppError(40001, `${def.label} 必须是数字`, 400);
@@ -341,7 +514,7 @@ export function validateSettingValue(
  * 存量数据可能格式不合法 (手工改过库)，此时回退到代码默认值 ——
  * 一个坏配置不应让整页设置加载失败。
  */
-export function parseSettingValue(raw: string, def: SettingDef): string | number | boolean {
+export function parseSettingValue(raw: string, def: SettingDef): SettingValue {
   try {
     return validateSettingValue(def, raw);
   } catch {

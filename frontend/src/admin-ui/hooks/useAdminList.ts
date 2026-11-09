@@ -173,7 +173,7 @@ export function useAdminUrlFilterSync(applied: Record<string, UrlFilterValue>) {
 }
 
 /**
- * 详情抽屉与地址栏 `?id=` 的双向同步。
+ * 详情浮层与地址栏 `?id=` 的双向同步。
  *
  * 任务与工单原先只支持「带 id 进来」，从列表打开详情却不写回地址栏：刷新后
  * 详情消失、分享链接也打不开同一条记录。这里把 id 作为唯一真相，打开即写入、
