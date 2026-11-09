@@ -2,9 +2,8 @@
  * 素材库导入弹窗冒烟: 容器几何 / 共享组件行为 / 选择上限 / 空态语义。
  * 组件已换成 ui 兼容层 (Dropdown / Input / Button) 后的回归入口。
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const login = await fetch('http://127.0.0.1:4100/api/v1/auth/login', {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
@@ -12,7 +11,7 @@ const login = await fetch('http://127.0.0.1:4100/api/v1/auth/login', {
 }).then((r) => r.json());
 const token = login.data.accessToken;
 
-const b = await chromium.launch({ executablePath: EXEC, args: ['--no-proxy-server'] });
+const b = await launchChromium({ args: ['--no-proxy-server'] });
 const fail = [];
 const ok = (cond, msg) => {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${msg}`);

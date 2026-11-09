@@ -1,10 +1,6 @@
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 
-const CHROME =
-  process.env.CHROMIUM_PATH ??
-  '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
-
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 const page = await context.newPage();
 

@@ -1,8 +1,7 @@
 /** 参考站左栏逐区块实测（高度 / 间距 / 控件尺寸），用于逐项对拍。 */
-import { chromium } from 'playwright';
-const CHROME='/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
+import { launchChromium } from './browser.mjs';
 const URL='https://www.designkit.cn/shoppable-carousel?from=product_kit_web';
-const b=await chromium.launch({executablePath:CHROME,headless:true,args:['--no-proxy-server']});
+const b=await launchChromium({ args: ['--no-proxy-server'] });
 const p=await (await b.newContext({viewport:{width:1440,height:900},locale:'zh-CN'})).newPage();
 await p.goto(URL,{waitUntil:'domcontentloaded',timeout:60000});
 await p.waitForSelector('[class^="social-media-card-"]',{timeout:60000});

@@ -2,11 +2,10 @@
  * 多页面回归探针 —— 验证共用 ToolSettingsPopover / pk-* 布局的页面在 CSS 改动后无回归。
  * 用法: node probe-regression.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 
 // 共用 ToolSettingsPopover 的页面 (pk-* 布局 + 高级设置)
 const PATHS = [
@@ -37,7 +36,7 @@ const formOk = async (page) => {
   return null;
 };
 
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 let pass = 0, fail = 0;
 
 for (const path of PATHS) {

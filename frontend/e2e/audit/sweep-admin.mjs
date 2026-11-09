@@ -1,5 +1,4 @@
-import { chromium } from '@playwright/test';
-import { existsSync } from 'node:fs';
+import { launchChromium } from './browser.mjs';
 
 /**
  * 后台全路由巡检（2026-11-01，shadcn 迁移期）。
@@ -8,7 +7,6 @@ import { existsSync } from 'node:fs';
  * 迁移期用它替代「一页一页点」—— 白屏、样式丢失、key 冲突都会在这里冒出来。
  */
 
-const P = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 
 const ROUTES = [
   'alerts', 'users', 'roles', 'settings', 'audit-logs', 'backups', 'assets', 'storage',
@@ -21,7 +19,7 @@ const ROUTES = [
 
 const SHOTS = new Set(['roles', 'campaigns', 'marketing-rules', 'storage', 'scheduler', 'aigc-label', 'logical-models', 'tickets']);
 
-const browser = await chromium.launch({ executablePath: existsSync(P) ? P : undefined });
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`${current} :: ${m.text()}`); });

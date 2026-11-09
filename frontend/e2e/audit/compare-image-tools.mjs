@@ -7,12 +7,9 @@
  * 采集口径：关键节点 getBoundingClientRect + computed style，不做像素 diff。
  * 参考站 class 与本地 class 不同，因此按「同一语义节点」成对映射。
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const CHROME =
-  process.env.CHROMIUM_PATH ??
-  '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const OUT = '/tmp/aigc-image-tools-compare';
 const REF_BASE = 'https://ijihua.cn';
 const LOCAL_BASE = process.env.LOCAL_UI ?? 'http://127.0.0.1:5100';
@@ -56,7 +53,7 @@ const only = process.argv.slice(2);
 const selected = only.length ? ROUTES.filter((r) => only.some((p) => r.path.includes(p))) : ROUTES;
 
 await mkdir(OUT, { recursive: true });
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 
 async function measure(page, selector) {
   return page.evaluate((selector) => {

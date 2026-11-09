@@ -6,17 +6,16 @@
  *
  * 采集口径与参考站探针一致: DOM 骨架 + computed styles 实测值, 不做像素比对。
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const CHROME = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const LOCAL = 'http://localhost:5100/shoppable-carousel';
 const OUT_DIR = '/tmp/designkit-shoppable-carousel';
 const width = Number(process.argv[2] || 1440);
 const height = width === 1440 ? 900 : 1080;
 
 await mkdir(OUT_DIR, { recursive: true });
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 const context = await browser.newContext({ viewport: { width, height }, locale: 'zh-CN', deviceScaleFactor: 1 });
 const page = await context.newPage();
 

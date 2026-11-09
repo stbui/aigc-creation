@@ -1,7 +1,6 @@
 /** 验证模板回显 / 换一个 / AI 帮写 三处功能与参考站对齐。 */
-import { chromium } from 'playwright';
-const CHROME='/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
-const b=await chromium.launch({executablePath:CHROME,headless:true,args:['--no-proxy-server']});
+import { launchChromium } from './browser.mjs';
+const b=await launchChromium({ args: ['--no-proxy-server'] });
 const p=await (await b.newContext({viewport:{width:1440,height:900},locale:'zh-CN'})).newPage();
 await p.goto('http://localhost:5100/shoppable-carousel',{waitUntil:'domcontentloaded',timeout:60000});
 await p.waitForSelector('.sc-template-card',{timeout:60000});

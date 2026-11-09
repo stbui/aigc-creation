@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
+import { SettingsService } from '../common/settings.service';
 import { PaymentCipher } from './payment-cipher';
 import { allAdapters, getAdapter, requireAdapter } from './adapters';
 import {
@@ -10,6 +11,9 @@ import {
   PaymentCurrency,
   PaymentProviderId,
   PAYMENT_PROVIDER_IDS,
+  PaymentSource,
+  VisiblePaymentMethod,
+  VISIBLE_PAYMENT_METHODS,
 } from './adapters/types';
 
 /** 解密后的渠道配置（适配器唯一可用的凭据来源） */
@@ -54,6 +58,24 @@ export interface AvailableProviderView {
   sandbox: boolean;
 }
 
+/** C 端唯一可见的支付方式视图；不暴露真实渠道与来源。 */
+export interface VisiblePaymentProviderView {
+  id: VisiblePaymentMethod;
+  name: string;
+  icon: 'alipay' | 'wechat';
+  checkoutMode: string;
+  supportedCurrencies: PaymentCurrency[];
+  sandbox: false;
+}
+
+export interface ResolvedVisiblePayment {
+  method: VisiblePaymentMethod;
+  providerId: PaymentProviderId;
+  config: ResolvedPaymentConfig;
+  /** EasyPay 需要按 C 端支付方式下单与验签；官方渠道不填。 */
+  providerMethod?: VisiblePaymentMethod;
+}
+
 /**
  * 支付渠道配置服务。
  *
@@ -72,6 +94,7 @@ export class PaymentConfigService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cipher: PaymentCipher,
+    private readonly settings: SettingsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -143,6 +166,54 @@ export class PaymentConfigService implements OnModuleInit {
       });
     }
     return out;
+  }
+
+  /**
+   * C 端固定可见支付方式：只读取管理员明确选择的来源。
+   * 未选择、渠道停用、配置不完整、币种不支持时直接隐藏，绝不回退到另一来源。
+   */
+  async availableVisible(currency: PaymentCurrency): Promise<VisiblePaymentProviderView[]> {
+    const out: VisiblePaymentProviderView[] = [];
+    for (const method of VISIBLE_PAYMENT_METHODS) {
+      const resolved = await this.resolveVisible(method, currency);
+      if (!resolved) continue;
+      const descriptor = requireAdapter(resolved.providerId).descriptor;
+      out.push({
+        id: method,
+        name: method === 'alipay' ? '支付宝' : '微信支付',
+        icon: method,
+        checkoutMode: descriptor.checkoutMode,
+        supportedCurrencies: descriptor.supportedCurrencies,
+        sandbox: false,
+      });
+    }
+    return out;
+  }
+
+  /** 解析某个可见支付方式当前应走的唯一真实渠道与配置。 */
+  async resolveVisible(
+    method: VisiblePaymentMethod,
+    currency: PaymentCurrency,
+  ): Promise<ResolvedVisiblePayment | null> {
+    const source = await this.sourceOf(method);
+    if (source === 'unset') return null;
+
+    const providerId: PaymentProviderId = source === 'official' ? method : 'epay';
+    const adapter = getAdapter(providerId);
+    if (!adapter || !adapter.descriptor.supportedCurrencies.includes(currency)) return null;
+
+    const row = await this.latestRow(providerId);
+    if (!row || !row.enabled) return null;
+    const values = this.valuesFor(providerId, row);
+    if (adapter.validateConfig(values).length > 0) return null;
+
+    const config = this.toResolved(row);
+    return {
+      method,
+      providerId,
+      config,
+      ...(providerId === 'epay' ? { providerMethod: method } : {}),
+    };
   }
 
   /** 保存新版本；空密钥沿用上一版；摘要相同返回当前版本且 unchanged=true */
@@ -309,6 +380,11 @@ export class PaymentConfigService implements OnModuleInit {
       where: { providerId },
       orderBy: { version: 'desc' },
     });
+  }
+
+  private async sourceOf(method: VisiblePaymentMethod): Promise<PaymentSource> {
+    const raw = await this.settings.get<string>(`payment.${method}Source`);
+    return raw === 'official' || raw === 'epay' ? raw : 'unset';
   }
 
   private decode(row: { configCipher: string }): Record<string, string> {

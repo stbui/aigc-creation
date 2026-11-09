@@ -1,12 +1,7 @@
-import { chromium } from '@playwright/test';
-import { existsSync } from 'node:fs';
+import { launchChromium } from './browser.mjs';
 
-const LOCAL_CHROMIUM_PATH =
-  '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 
-const browser = await chromium.launch({
-  executablePath: existsSync(LOCAL_CHROMIUM_PATH) ? LOCAL_CHROMIUM_PATH : undefined,
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
 await page.goto('http://localhost:5100/login', { waitUntil: 'networkidle' });

@@ -1,5 +1,4 @@
-import { chromium } from '@playwright/test';
-import { existsSync } from 'node:fs';
+import { launchChromium } from './browser.mjs';
 
 /**
  * 后台浮层与交互态截图。
@@ -9,12 +8,8 @@ import { existsSync } from 'node:fs';
  * —— 浮层若还带旧的圆角或描边口径，就会与页面主体对不上。
  */
 
-const LOCAL_CHROMIUM_PATH =
-  '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 
-const browser = await chromium.launch({
-  executablePath: existsSync(LOCAL_CHROMIUM_PATH) ? LOCAL_CHROMIUM_PATH : undefined,
-});
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
 const errors = [];

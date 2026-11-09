@@ -2,15 +2,14 @@
  * 高级设置补充对拍: popover 内部间距链/ 比例卡与分辨率卡完整盒模型。
  * 用法: node probe-settings2.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const TARGETS = { ref: 'https://ijihua.cn/free-creation', local: 'http://localhost:5100/free-creation' };
 
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 
 for (const kind of ['ref', 'local']) {
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });

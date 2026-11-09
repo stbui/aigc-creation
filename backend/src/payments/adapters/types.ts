@@ -31,6 +31,14 @@ export const PAYMENT_PROVIDER_IDS: PaymentProviderId[] = [
 export type PaymentCurrency = 'CNY' | 'USD';
 export const PAYMENT_CURRENCIES: PaymentCurrency[] = ['CNY', 'USD'];
 
+/** C 端固定展示的两种支付方式，与真实渠道解耦。 */
+export type VisiblePaymentMethod = 'alipay' | 'wechat';
+export const VISIBLE_PAYMENT_METHODS: VisiblePaymentMethod[] = ['alipay', 'wechat'];
+
+/** 管理员为每个可见支付方式选择的唯一来源。 */
+export type PaymentSource = 'unset' | 'official' | 'epay';
+export const PAYMENT_SOURCES: PaymentSource[] = ['unset', 'official', 'epay'];
+
 /**
  * `qrcode` 由前端把 `codeUrl` 渲染成二维码；
  * `qrcode-image` 的 `codeUrl` 本身就是渠道给好的二维码图片地址，前端直接展示。
@@ -65,6 +73,8 @@ export interface PaymentContext {
   providerId: PaymentProviderId;
   configId: string;
   configVersion: number;
+  /** 本次尝试对应的 C 端支付方式；EasyPay 按此动态选择 type。 */
+  paymentMethod?: VisiblePaymentMethod;
   /** 已解密的配置；适配器不得读取 env */
   values: Readonly<Record<string, string>>;
 }
@@ -124,6 +134,8 @@ export interface NotificationInput {
   headers: Record<string, string | string[] | undefined>;
   rawBody: Buffer;
   body: Record<string, unknown>;
+  /** 该笔历史支付尝试固化的支付方式，用于渠道回调验签。 */
+  expectedPaymentMethod?: VisiblePaymentMethod;
 }
 
 export type NotificationResult =

@@ -1,7 +1,6 @@
 /** 参考站: 各工具页高级设置弹层里到底渲染了什么 (含分辨率组文案) */
-import { chromium } from 'playwright';
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
-const b = await chromium.launch({ executablePath: EXEC });
+import { launchChromium } from './browser.mjs';
+const b = await launchChromium();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 const page = await ctx.newPage();
 page.on('response', async (r) => {

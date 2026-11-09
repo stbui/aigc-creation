@@ -1,9 +1,8 @@
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const PAGE_URL = 'https://www.designkit.cn/shoppable-carousel?from=product_kit_web';
-const CHROME = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const ASSET_DIR = path.join(ROOT, 'public/templates/shoppable-carousel');
 const OUT_DIR = '/tmp/designkit-shoppable-carousel';
@@ -25,11 +24,7 @@ const CATEGORY_CODES = new Map([
 await mkdir(ASSET_DIR, { recursive: true });
 await mkdir(OUT_DIR, { recursive: true });
 
-const browser = await chromium.launch({
-  executablePath: CHROME,
-  headless: true,
-  args: ['--no-proxy-server'],
-});
+const browser = await launchChromium({ args: ['--no-proxy-server'], });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 const page = await context.newPage();
 

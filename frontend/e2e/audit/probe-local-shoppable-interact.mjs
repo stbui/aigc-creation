@@ -4,14 +4,13 @@
  * 覆盖: 模板选中态 / 分类切换 / 模式切换 / 步进器边界 / 生成按钮三态。
  * 输出: /tmp/designkit-shoppable-carousel/local-interact.json
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { writeFile } from 'node:fs/promises';
 
-const CHROME = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const LOCAL = 'http://localhost:5100/shoppable-carousel';
 const OUT = '/tmp/designkit-shoppable-carousel/local-interact.json';
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' })).newPage();
 await page.goto(LOCAL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForSelector('.sc-template-card', { timeout: 60000 });

@@ -4,15 +4,14 @@
  * 覆盖: 卡片文案结构 / 模式切换 / 选中态 / 数量步进范围 / 滚动归属 / 顶栏与历史。
  * 输出: /tmp/designkit-shoppable-carousel/interact.json
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const CHROME = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const URL = 'https://www.designkit.cn/shoppable-carousel?from=product_kit_web';
 const OUT_DIR = '/tmp/designkit-shoppable-carousel';
 await mkdir(OUT_DIR, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 const page = await context.newPage();
 await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });

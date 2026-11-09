@@ -9,7 +9,7 @@
  * 采集口径: 只取"树形骨架 + 关键节点 computed style", 不做像素比对。
  * 像素比对会被字体渲染/图片资源抖动弄红, 骨架+数值才是可复现事实。
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +17,6 @@ import { fileURLToPath } from 'node:url';
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
 mkdirSync(OUT, { recursive: true });
 
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 
 const TARGETS = {
   ref: 'https://ijihua.cn/free-creation',
@@ -116,7 +115,7 @@ const INVENTORY = () => {
 };
 
 async function capture(kind) {
-  const b = await chromium.launch({ executablePath: EXEC });
+  const b = await launchChromium();
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'zh-CN' });
   const page = await ctx.newPage();
   const errors = [];

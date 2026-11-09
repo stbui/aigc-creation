@@ -3595,7 +3595,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - `frontend`：`npx playwright test --config=playwright.admin.config.ts` 全绿
   （含新增 `tests/admin-payments.spec.ts` 8 条：标签切换 / 深链 / 旧路由重定向 /
   三适配器渲染 / 无退款入口 / 对账执行区 / 状态深链回显）。
-- `frontend`：`node scripts/sweep-admin.mjs` 35 条后台路由全部渲染，控制台零错误
+- `frontend`：`node e2e/audit/sweep-admin.mjs` 35 条后台路由全部渲染，控制台零错误
   （`payments` 已加入 `ROUTES`）。
 - `backend` 支付域仍无 spec，`scripts/smoke-payments.js` 仍测旧路径 —— 缺口未消。
 

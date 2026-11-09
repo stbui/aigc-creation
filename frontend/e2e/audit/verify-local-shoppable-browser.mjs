@@ -4,16 +4,15 @@
  * 覆盖五态里的「有结果」: 登录 → 上传真实图 → 选模板 → 提交 → 结果区出现批次行。
  * 截图落在 /tmp/designkit-shoppable-carousel/local-result-1440.png
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { writeFile } from 'node:fs/promises';
 
-const CHROME = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const LOCAL = 'http://localhost:5100/shoppable-carousel';
 const EMAIL = 'sc-e2e@test.local';
 const PASSWORD = 'Sctest123456';
 const OUT = '/tmp/designkit-shoppable-carousel';
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 const page = await context.newPage();
 const out = {};

@@ -2,14 +2,13 @@
  * 本仓三处弹层对拍: 素材库导入 / 手机上传 / 高级设置-分辨率。
  * 用法: node probe-local-modals.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 // 探针查的是某个具体账号下的数据, 凭据必须显式提供（项目已无内置演示账号）
 if (!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD) {
   console.error('缺少 E2E_EMAIL / E2E_PASSWORD: 这些探针依赖某个具体账号的素材, 请显式提供凭据。');
   process.exit(1);
 }
 
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const API = process.env.PROBE_API ?? 'http://127.0.0.1:4100/api/v1';
 const SITE = process.env.PROBE_SITE ?? 'http://localhost:5100';
 
@@ -22,7 +21,7 @@ const login = await fetch(`${API}/auth/login`, {
 const token = login?.data?.accessToken ?? login?.accessToken;
 if (!token) throw new Error('login failed: ' + JSON.stringify(login).slice(0, 300));
 
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 await ctx.addInitScript((t) => {
   localStorage.setItem('huojue_token', t);

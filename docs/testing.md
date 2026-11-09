@@ -316,7 +316,7 @@ C 端提交类用例挂住时，先分清是**环境缺线路**还是**代码回
 
 ### 5.3.2 两个后台页面的接口路径对不上（已修，2026-11-02）
 
-**现象**：`frontend/scripts/sweep-admin.mjs` 全路由巡检报出 `/admin/payment-channels`
+**现象**：`frontend/e2e/audit/sweep-admin.mjs` 全路由巡检报出 `/admin/payment-channels`
 与 `/admin/reconciliation` 两条 403。
 
 **根因**：不是权限问题，是**前端调的路径后端没有**。支付域重构（`505319c`）删掉了后端

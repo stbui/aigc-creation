@@ -423,5 +423,5 @@ Vite 把具名导入改写成对命名空间的属性访问，缺失的名字只
 - `npx tsc --noEmit`：后台 0 错；
 - `npx vitest run`：全量单测；
 - `npx playwright test --config=playwright.admin.config.ts`：后台 e2e；
-- `node scripts/sweep-admin.mjs`：33 条路由逐页打开，控制台错误 0；
-- `node scripts/shot-admin.mjs`：概览 / 设置 / 渠道 / 用户 / 订单 / 积分 / 告警截图落 `/tmp`。
+- `node e2e/audit/sweep-admin.mjs`：33 条路由逐页打开，控制台错误 0；
+- `node e2e/audit/shot-admin.mjs`：概览 / 设置 / 渠道 / 用户 / 订单 / 积分 / 告警截图落 `/tmp`。

@@ -5,15 +5,14 @@
  *   ③ 顶部 promo 条 / 侧边栏 hover guide 差异
  * 用法: node probe-extra.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const TARGETS = { ref: 'https://ijihua.cn/free-creation', local: 'http://localhost:5100/free-creation' };
 
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 
 for (const kind of ['ref', 'local']) {
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });

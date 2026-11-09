@@ -1,7 +1,6 @@
 /** 左栏 + 右栏逐节点对比: 参考站 vs 本站。 */
-import { chromium } from 'playwright';
-const CHROME='/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
-const b=await chromium.launch({executablePath:CHROME,headless:true,args:['--no-proxy-server']});
+import { launchChromium } from './browser.mjs';
+const b=await launchChromium({ args: ['--no-proxy-server'] });
 
 async function ref(){
   const p=await (await b.newContext({viewport:{width:1440,height:900},locale:'zh-CN'})).newPage();

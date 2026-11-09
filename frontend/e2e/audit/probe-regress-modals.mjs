@@ -2,14 +2,13 @@
  * 回归: 其他工具页的高级设置弹层 / 390 宽下的两个弹窗是否溢出。
  * 用法: PROBE_API=... PROBE_SITE=... node probe-regress-modals.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 // 探针查的是某个具体账号下的数据, 凭据必须显式提供（项目已无内置演示账号）
 if (!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD) {
   console.error('缺少 E2E_EMAIL / E2E_PASSWORD: 这些探针依赖某个具体账号的素材, 请显式提供凭据。');
   process.exit(1);
 }
 
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const API = process.env.PROBE_API ?? 'http://127.0.0.1:4200/api/v1';
 const SITE = process.env.PROBE_SITE ?? 'http://localhost:5200';
 
@@ -20,7 +19,7 @@ const login = await fetch(`${API}/auth/login`, {
 }).then((r) => r.json());
 const token = login?.data?.accessToken ?? login?.accessToken;
 
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 
 /* ── 1. 其他工具页: 高级设置弹层 ── */
 {

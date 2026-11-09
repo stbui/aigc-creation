@@ -2,15 +2,14 @@
  * 高级设置专项对拍 —— summary(收起态) + popover(展开态) 全量节点并排比对。
  * 用法: node probe-settings.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const TARGETS = { ref: 'https://ijihua.cn/free-creation', local: 'http://localhost:5100/free-creation' };
 
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 const R = {};
 
 for (const kind of ['ref', 'local']) {

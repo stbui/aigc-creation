@@ -2,10 +2,9 @@
  * 参考站「高级设置」弹层全量取证: 完整 HTML + 全部后代盒模型。
  * 用法: node probe-refpop.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 const page = await ctx.newPage();
 await page.goto('https://ijihua.cn/free-creation', { waitUntil: 'networkidle', timeout: 60000 });

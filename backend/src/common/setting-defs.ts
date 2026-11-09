@@ -31,6 +31,8 @@ export interface SettingDef {
   enum?: number[];
   /** 字符串型可选值白名单（如币种 CNY / USD）。命中时按枚举校验 */
   options?: string[];
+  /** 字符串枚举值的展示文案；仅影响后台，不改变落库值 */
+  optionLabels?: Record<string, string>;
   /** 分组, 前端按此渲染 Tab */
   group: SettingGroup;
   /** 只读项：真实旋钮在别处，页面上只作「配置地图」并给出跳转 */
@@ -161,6 +163,28 @@ export const SETTING_DEFS: SettingDef[] = [
     default: 'CNY',
     group: 'payment',
     public: true,
+  },
+  {
+    key: 'payment.alipaySource',
+    label: '支付宝前台来源',
+    description:
+      'C 端「支付宝」按钮唯一使用的服务商来源。未选择或所选渠道不可用时，前台隐藏该按钮，不会自动切换来源',
+    type: 'string',
+    options: ['unset', 'official', 'epay'],
+    optionLabels: { unset: '未选择', official: '支付宝官方', epay: '易支付' },
+    default: 'unset',
+    group: 'payment',
+  },
+  {
+    key: 'payment.wechatSource',
+    label: '微信前台来源',
+    description:
+      'C 端「微信支付」按钮唯一使用的服务商来源。未选择或所选渠道不可用时，前台隐藏该按钮，不会自动切换来源',
+    type: 'string',
+    options: ['unset', 'official', 'epay'],
+    optionLabels: { unset: '未选择', official: '微信官方', epay: '易支付' },
+    default: 'unset',
+    group: 'payment',
   },
 
   // ── 退款 ────────────────────────────────────────────────────────────

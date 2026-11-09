@@ -388,6 +388,9 @@ model Payment {
   /// 渠道交易号。**幂等去重键**: 已支付订单收到重复回调不重复发积分
   payTransactionId String? @unique
   channel          String  @default("sandbox")
+  /// 本次尝试对应的 C 端支付方式：alipay / wechat。
+  /// EasyPay 同一商户可承载两种方式，回调验签必须读取这笔历史尝试，而不是最新渠道配置。
+  providerMethod   String?
   amountCents      Int
 
   /// 'pending' | 'succeeded' | 'failed' | 'closed'

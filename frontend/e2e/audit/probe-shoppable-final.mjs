@@ -4,15 +4,14 @@
  * 覆盖: 比例下拉全量选项 / 空表单提交行为 / 模式切换时右栏可见性 / 顶栏内容 / 截图。
  * 输出: /tmp/designkit-shoppable-carousel/final.json + shot-1440.png + shot-1920.png
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const CHROME = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const URL = 'https://www.designkit.cn/shoppable-carousel?from=product_kit_web';
 const OUT_DIR = '/tmp/designkit-shoppable-carousel';
 await mkdir(OUT_DIR, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 const out = {};
 
 /** 打开第 idx 个 posterSelect，读取其可见下拉里的选项 */

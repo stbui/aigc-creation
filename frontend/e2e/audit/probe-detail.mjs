@@ -2,12 +2,11 @@
  * 精确 probe: ref 的 .primary-btn / 高级设置 summary / textarea / 上传标签 —— 与 local 同名 selector 对拍。
  * 用法: node probe-detail.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const TARGETS = { ref: 'https://ijihua.cn/free-creation', local: 'http://localhost:5100/free-creation' };
 
 const PICK = [
@@ -30,7 +29,7 @@ const PICK = [
   ['结果面板', ['.free-result-panel', '.pk-result-pane']],
 ];
 
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 const rows = {};
 
 for (const kind of ['ref', 'local']) {

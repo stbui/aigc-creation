@@ -6,10 +6,9 @@
  *
  * 口径: DOM 骨架 + computed styles 实测, 不做像素比对（字体/图片抖动会弄红）。
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const CHROME = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const URL = 'https://www.designkit.cn/shoppable-carousel?from=product_kit_web';
 const OUT_DIR = '/tmp/designkit-shoppable-carousel';
 
@@ -25,7 +24,7 @@ const PROPS = [
 ];
 
 await mkdir(OUT_DIR, { recursive: true });
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 const context = await browser.newContext({ viewport: { width, height }, locale: 'zh-CN', deviceScaleFactor: 1 });
 const page = await context.newPage();
 

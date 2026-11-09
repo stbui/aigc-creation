@@ -1,5 +1,7 @@
 node_modules
 dist
+# 构建验证产物 (vite --outDir dist-verify): 是构建快照, 不是任何脚本的输入
+dist-verify
 .DS_Store
 
 # ── 环境变量分档 (三环境体系, 见 docs/environments.md)────────────────────────
@@ -17,6 +19,9 @@ dist
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# e2e 探针产物 (由 e2e/audit/capture.mjs 等生成, 每次运行覆盖)
+/e2e/audit/out/
 
 # 本地临时 Playwright 配置 (指向本机已装浏览器的绝对路径, 换机器即失效)
 playwright.local.config.ts

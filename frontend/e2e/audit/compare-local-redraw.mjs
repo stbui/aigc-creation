@@ -1,9 +1,6 @@
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const CHROME =
-  process.env.CHROMIUM_PATH ??
-  '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const OUT = '/tmp/aigc-local-redraw-compare';
 const REFERENCE = 'https://ijihua.cn/local-redraw';
 const LOCAL = process.env.LOCAL_UI ?? 'http://127.0.0.1:5100/local-redraw';
@@ -51,7 +48,7 @@ const SELECTORS = [
 ];
 
 await mkdir(OUT, { recursive: true });
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-proxy-server'] });
+const browser = await launchChromium({ args: ['--no-proxy-server'] });
 
 async function snapshot(page, label, viewport) {
   await page.goto(label.url, { waitUntil: 'domcontentloaded', timeout: 60000 });

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# 构建验证产物 (tsc --outDir dist-verify): 是构建快照, 不是任何脚本的输入
+dist-verify
 *.log
 .DS_Store
 

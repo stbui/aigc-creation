@@ -2,15 +2,14 @@
  * 末轮 probe: 主按钮 enabled 态 / 分辨率卡片细节 / hover 态 / 空态插画 —— 补齐清单证据。
  * 用法: node probe-final.mjs
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
-const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
 const TARGETS = { ref: 'https://ijihua.cn/free-creation', local: 'http://localhost:5100/free-creation' };
 
-const b = await chromium.launch({ executablePath: EXEC });
+const b = await launchChromium();
 
 for (const kind of ['ref', 'local']) {
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
