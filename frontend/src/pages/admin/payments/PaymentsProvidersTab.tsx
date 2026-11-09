@@ -159,7 +159,7 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
       <SkeletonCards
         count={6}
         className="mt-0"
-        gridClassName="grid-cols-1 lg:grid-cols-2 xl:grid-cols-3"
+        gridClassName="grid-cols-1 lg:grid-cols-2"
       />
     );
   }
@@ -172,20 +172,13 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
 
       <PaymentsProviderSummary providers={providers} />
 
-      {/*
-        * 这里**不再有**汇总告警条。
-        *
-        * 原来把七个渠道的 warning 拍平成一个红块：沙箱那句「存在未完成订单」
-        * 和「生产环境未配置 PAYMENT_SECRET_KEY」并排出现，运营看不出哪条说的
-        * 是自己 —— 反而把整块当噪音。
-        *
-        * 现在每条告警都**挂在自己的卡片上**：阻断项在卡片里用红框列出原因，
-        * 未完成订单在卡片底部说明。页面顶部的汇总条只会把同一句话说第二遍，
-        * 而「说两遍」正是让人忽略告警的原因。
-        */}
-
-      <div className="flex items-end justify-between gap-4">
-        <h2 className="m-0 text-[13px] font-semibold text-foreground">渠道列表</h2>
+      <div className="flex items-center justify-between gap-4 px-0.5">
+        <div className="flex items-baseline gap-2">
+          <h2 className="m-0 text-[13px] font-semibold text-foreground">渠道列表</h2>
+          <span className="text-[12px] text-muted-foreground tabular-nums">
+            {visibleProviders.length} 个
+          </span>
+        </div>
         {filterOptions.length > 2 && (
           <SegmentedGroup
             value={stateFilter}
@@ -197,14 +190,11 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
       </div>
 
       {visibleProviders.length === 0 ? (
-        <EmptyState
-          title="没有该状态的渠道"
-          description="换一个状态筛选，或切到「全部」查看所有渠道。"
-        />
+        <EmptyState title="该状态下暂无渠道" />
       ) : (
         <div
           data-testid="admin-provider-grid"
-          className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2 xl:grid-cols-3"
+          className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2"
         >
           {visibleProviders.map((provider) => (
             <PaymentsProviderCard
