@@ -18,6 +18,7 @@ import type {
 } from '../../../types/payment';
 import { adminPaymentProvidersApi } from './api';
 import { useToast } from './hooks';
+import { sourceAvailability, sourceAvailableInstances } from './utils';
 
 const METHOD_LABELS: Record<VisiblePaymentMethod, string> = {
   alipay: '支付宝',
@@ -123,7 +124,18 @@ export function PaymentsVisibleMethodsCard({
         ) : settings ? (
           (['alipay', 'wechat'] as const).map((method) => {
             const source = method === 'alipay' ? settings.alipaySource : settings.wechatSource;
-            const availability = sourceAvailability(providers, settings.defaultCurrency, method, source);
+            const availability = sourceAvailability(
+              providers,
+              settings.defaultCurrency,
+              method,
+              source,
+            );
+            const available = sourceAvailableInstances(
+              providers,
+              settings.defaultCurrency,
+              method,
+              source,
+            );
             return (
               <div
                 key={method}
@@ -156,7 +168,7 @@ export function PaymentsVisibleMethodsCard({
                 <div className="pt-6">
                   {availability.ok ? (
                     <span className="text-[12px] text-muted-foreground">
-                      当前配置可用，前台会展示该按钮。
+                      当前配置可用（{available.instances.length} 个可用实例），前台会展示该按钮。
                     </span>
                   ) : (
                     <Notice tone="warn" className="mb-0">
@@ -174,25 +186,4 @@ export function PaymentsVisibleMethodsCard({
       </CardContent>
     </Card>
   );
-}
-
-function sourceAvailability(
-  providers: AdminPaymentProviderView[],
-  currency: AdminPaymentSettings['defaultCurrency'],
-  method: VisiblePaymentMethod,
-  source: PaymentSource,
-): { ok: boolean; reason: string } {
-  if (source === 'unset') return { ok: false, reason: '未选择支付来源' };
-
-  const providerId = source === 'official' ? method : 'epay';
-  const provider = providers.find((item) => item.id === providerId);
-  if (!provider) return { ok: false, reason: `尚未创建${SOURCE_LABELS[source]}渠道` };
-  if (!provider.enabled) return { ok: false, reason: `${provider.name}渠道已停用` };
-  if (!provider.configured) return { ok: false, reason: `${provider.name}渠道配置不完整` };
-  if (!provider.supportedCurrencies.includes(currency)) {
-    return { ok: false, reason: `${provider.name}不支持默认币种 ${currency}` };
-  }
-  const danger = provider.warnings.find((warning) => warning.level === 'danger');
-  if (danger) return { ok: false, reason: danger.message };
-  return { ok: true, reason: '' };
 }

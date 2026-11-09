@@ -248,6 +248,56 @@ test.describe('营销中心', () => {
     await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
     await expect.poll(() => saved).toBe(true);
   });
+
+  test('邀请关系与签到记录两张流水可切换', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/marketing-rules`);
+    const tabs = page.getByRole('tablist', { name: '邀请与签到标签' });
+    await expect(tabs.getByRole('tab', { name: '规则配置' })).toBeVisible({ timeout: 20000 });
+
+    await tabs.getByRole('tab', { name: '邀请关系' }).click();
+    await expect(page).toHaveURL(/tab=invites/);
+    await expect(page.getByRole('heading', { name: '邀请关系' })).toBeVisible();
+    await expect(page.getByLabel('按邀请码或邮箱搜索', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '查询', exact: true })).toBeVisible();
+
+    await tabs.getByRole('tab', { name: '签到记录' }).click();
+    await expect(page).toHaveURL(/tab=checkins/);
+    await expect(page.getByRole('heading', { name: '签到记录' })).toBeVisible();
+    await expect(page.getByLabel('按用户 ID 筛选', { exact: true })).toBeVisible();
+    // 有数据的环境必须真的渲染出流水行；空库只校验页面骨架在位
+    const rowCount = await page.getByTestId('admin-table-row').count();
+    if (rowCount > 0) {
+      await expect(page.getByTestId('admin-table-row').first()).toBeVisible();
+    }
+  });
+
+  test('流水标签与筛选可深链，非法标签回落规则页', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/marketing-rules?tab=invites&rewardStatus=pending`);
+    await expect(page.getByRole('heading', { name: '邀请关系' })).toBeVisible({ timeout: 20000 });
+    // 标签写在同一个 URL 上：筛选写回不得把 tab 冲掉
+    await expect(page).toHaveURL(/tab=invites/);
+    await expect(page).toHaveURL(/rewardStatus=pending/);
+
+    await page.goto(`${UI}/admin/marketing-rules?tab=nope`);
+    await expect(page.getByRole('heading', { name: '邀请分销规则' })).toBeVisible();
+  });
+
+  test('切到流水再切回来，规则草稿不丢', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/marketing-rules`);
+    const inviter = page.getByLabel('邀请人奖励积分', { exact: true });
+    await inviter.waitFor({ state: 'visible', timeout: 20000 });
+    await inviter.fill('997');
+
+    const tabs = page.getByRole('tablist', { name: '邀请与签到标签' });
+    await tabs.getByRole('tab', { name: '签到记录' }).click();
+    await tabs.getByRole('tab', { name: '规则配置' }).click();
+
+    await expect(inviter).toHaveValue('997');
+    await expect(page.getByRole('button', { name: '放弃变更', exact: true })).toBeVisible();
+  });
 });
 
 test.describe('营销中心权限', () => {

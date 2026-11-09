@@ -227,3 +227,58 @@ export function sourceAvailability(
   if (danger) return { ok: false, reason: danger };
   return { ok: true, reason: '' };
 }
+
+
+/** 某渠道允许配置的可见支付方式，与后端 `defaultMethods` 保持一致。 */
+export function allowedPaymentMethods(
+  providerId: string,
+): VisiblePaymentMethod[] {
+  if (providerId === 'alipay') return ['alipay'];
+  if (providerId === 'wechat') return ['wechat'];
+  return ['alipay', 'wechat'];
+}
+
+/**
+ * 切换实例支持的支付方式。
+ *
+ * 至少保留一个：服务商实例不绑定任何支付方式时既不能收款，也无法通过后端
+ * `normalizePaymentMethods` 的校验。官方渠道的跨渠道选项不在这里静默修正，
+ * 而是只允许传入 `allowedPaymentMethods(providerId)` 返回的子集。
+ */
+export function togglePaymentMethod(
+  methods: VisiblePaymentMethod[],
+  method: VisiblePaymentMethod,
+  allowed: VisiblePaymentMethod[],
+): VisiblePaymentMethod[] {
+  if (!allowed.includes(method)) return methods;
+  if (methods.includes(method)) {
+    if (methods.length <= 1) return methods;
+    return methods.filter((item) => item !== method);
+  }
+  return allowed.filter((item) => item === method || methods.includes(item));
+}
+
+/** 用变更后的实例列表重建渠道兼容投影，供本地卡片即时更新。 */
+export function providerWithInstances(
+  provider: AdminPaymentProviderView,
+  instances: AdminPaymentProviderInstanceView[],
+): AdminPaymentProviderView {
+  const sorted = [...instances].sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.instanceId.localeCompare(b.instanceId),
+  );
+  return {
+    ...provider,
+    instances: sorted,
+    enabled: sorted.some((instance) => instance.enabled),
+    configured: sorted.some((instance) => instance.configured),
+    closeAfterMinutes: sorted[0]?.closeAfterMinutes ?? 30,
+    configEnabled: sorted[0]?.enabled ?? false,
+    version: sorted[0]?.version ?? null,
+    configId: sorted[0]?.configId ?? null,
+    values: sorted[0]?.values ?? {},
+    secretConfigured: sorted[0]?.secretConfigured ?? {},
+    identityLockedFields: sorted[0]?.identityLockedFields ?? [],
+    hasOpenOrders: sorted.some((instance) => instance.hasOpenOrders),
+    warnings: sorted[0]?.warnings ?? [],
+  };
+}

@@ -118,13 +118,15 @@ export const RECONCILIATION_RUN_STATUS_OPTIONS = Object.entries(
 ).map(([value, meta]) => ({ value, label: meta.label }));
 
 /**
- * 对账页唯一一套查询条件：渠道 + 账单日 + 状态。
+ * 对账页唯一一套查询条件：渠道 + 服务商实例 + 账单日 + 状态。
  *
  * 渠道与账单日同时是「执行对账」的入参 —— 页面上不再另起一套执行区，避免
  * 同一屏出现两个渠道下拉、两个日期控件且口径可能不一致。
  */
 export type ReconciliationFilterValues = {
   providerId?: string;
+  /** 渠道下的具体实例；执行对账与导入必须精确到实例 */
+  providerInstanceId?: string;
   status?: string;
   /** 单日账单，空串表示不按账单日过滤（此时也不能执行对账） */
   billDate: string;
@@ -135,6 +137,7 @@ export type ReconciliationFilterKey = keyof ReconciliationFilterValues;
 /** 重置后的空条件。 */
 export const EMPTY_RECONCILIATION_FILTERS: ReconciliationFilterValues = {
   providerId: undefined,
+  providerInstanceId: undefined,
   status: undefined,
   billDate: '',
 };

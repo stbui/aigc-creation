@@ -15,7 +15,12 @@ import {
   PAYMENT_PROVIDER_STATE_META,
   type PaymentProviderState,
 } from './constants';
-import { providerBlockingIssues, providerState } from './utils';
+import {
+  enabledInstanceCount,
+  providerBlockingIssues,
+  providerState,
+  usableInstanceCount,
+} from './utils';
 
 /** 渠道图标：内联小方块，避免拉外链图片（后台不该有第三方资源依赖） */
 const PROVIDER_ACCENTS: Record<string, string> = {
@@ -74,11 +79,12 @@ export function PaymentsProviderCard({
   const meta = PAYMENT_PROVIDER_STATE_META[state];
   const danger = state === 'misconfigured';
   const usable = state === 'usable';
-  const blocking = providerBlockingIssues(provider).filter(
-    (message) => !message.includes('必填项'),
-  );
+  const blocking = providerBlockingIssues(provider);
   const fullMessage = blocking.join('；');
   const summary = blocking[0]?.split(/[：:]/, 1)[0];
+  const totalInstances = provider.instances.length;
+  const enabledInstances = enabledInstanceCount(provider);
+  const usableInstances = usableInstanceCount(provider);
 
   return (
     <Card
@@ -87,6 +93,9 @@ export function PaymentsProviderCard({
       data-provider-id={provider.id}
       data-usable={usable ? 'true' : 'false'}
       data-state={state}
+      data-instance-count={totalInstances}
+      data-enabled-instance-count={enabledInstances}
+      data-usable-instance-count={usableInstances}
       className={cn(
         'group relative h-full min-h-[146px] gap-0 overflow-hidden rounded-xl border bg-card py-0 shadow-card transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg',
         danger
@@ -121,17 +130,23 @@ export function PaymentsProviderCard({
       </CardHeader>
 
       <CardContent className="px-4 pb-0">
-        <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] divide-x divide-border/60 border-y border-border/60">
+        <div className="grid grid-cols-3 divide-x divide-border/60 border-y border-border/60">
           <div className="min-w-0 py-2.5 pr-3">
-            <div className="text-[12px] leading-4 text-muted-foreground">支持币种</div>
-            <div className="mt-0.5 truncate text-[12px] leading-4 font-medium text-foreground tabular-nums">
-              {provider.supportedCurrencies.join(' / ')}
+            <div className="text-[12px] leading-4 text-muted-foreground">实例总数</div>
+            <div className="mt-0.5 truncate text-[13px] leading-4 font-semibold text-foreground tabular-nums">
+              {totalInstances} 个
+            </div>
+          </div>
+          <div className="min-w-0 px-3 py-2.5">
+            <div className="text-[12px] leading-4 text-muted-foreground">已启用</div>
+            <div className="mt-0.5 truncate text-[13px] leading-4 font-semibold text-foreground tabular-nums">
+              {enabledInstances} 个
             </div>
           </div>
           <div className="min-w-0 py-2.5 pl-3">
-            <div className="text-[12px] leading-4 text-muted-foreground">超时关闭</div>
-            <div className="mt-0.5 truncate text-[12px] leading-4 font-medium text-foreground tabular-nums">
-              {provider.closeAfterMinutes} 分钟
+            <div className="text-[12px] leading-4 text-muted-foreground">可用实例</div>
+            <div className="mt-0.5 truncate text-[13px] leading-4 font-semibold text-foreground tabular-nums">
+              {usableInstances} 个
             </div>
           </div>
         </div>
@@ -147,23 +162,28 @@ export function PaymentsProviderCard({
       </CardContent>
 
       <CardFooter className="mt-auto flex items-center justify-between gap-3 px-4 pt-2 pb-3">
-        {provider.supportsReconciliation ? (
-          <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-muted-foreground">
-            <ListChecks className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden />
-            支持自动对账
-          </span>
-        ) : (
-          <span aria-hidden />
-        )}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+          <span className="truncate">支持 {provider.supportedCurrencies.join(' / ')}</span>
+          {provider.supportsReconciliation && (
+            <span className="flex items-center gap-1.5">
+              <ListChecks className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden />
+              自动对账
+            </span>
+          )}
+        </span>
         <ActionButton
           variant="ghost"
           size="xs"
           icon={Settings2}
           onClick={onConfigure}
-          ariaLabel={writable ? `配置${provider.name}` : `查看${provider.name}`}
+          ariaLabel={
+            writable
+              ? `管理${provider.name}的服务商实例`
+              : `查看${provider.name}的服务商实例`
+          }
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
-          {writable ? '配置' : '查看'}
+          {writable ? '管理实例' : '查看实例'}
         </ActionButton>
       </CardFooter>
     </Card>

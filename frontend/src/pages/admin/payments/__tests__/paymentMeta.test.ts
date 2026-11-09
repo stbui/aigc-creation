@@ -9,8 +9,23 @@ import {
   RECONCILIATION_RUN_STATUS_META,
   RECONCILIATION_RUN_STATUS_OPTIONS,
 } from '../constants';
-import { missingRequiredLabels, moneyText, providerLabel } from '../utils';
-import type { PaymentConfigField } from '../../../../types/payment';
+import {
+  allowedPaymentMethods,
+  instanceState,
+  missingRequiredLabels,
+  moneyText,
+  providerLabel,
+  providerState,
+  providerWithInstances,
+  sourceAvailability,
+  sourceAvailableInstances,
+  togglePaymentMethod,
+} from '../utils';
+import type {
+  AdminPaymentProviderInstanceView,
+  AdminPaymentProviderView,
+  PaymentConfigField,
+} from '../../../../types/payment';
 
 /**
  * 支付域（渠道 / 对账 / 异常）的展示口径。
@@ -128,5 +143,236 @@ describe('missingRequiredLabels', () => {
     expect(
       missingRequiredLabels(fields, { pid: '123', key: 'k' }, { key: true }),
     ).toEqual([]);
+  });
+});
+
+
+/**
+ * 多实例支付渠道的纯函数规则。
+ *
+ * 这里锁住两条最容易悄悄回归的产品语义：
+ *   1. 前台按钮只按选定来源判断，官方不可用时绝不能自动回退到易支付；
+ *   2. 渠道状态与可收款实例数量必须按 `instances[]` 聚合，不能只看顶层兼容字段。
+ */
+describe('多实例支付渠道规则', () => {
+  function instance(
+    overrides: Partial<AdminPaymentProviderInstanceView> = {},
+  ): AdminPaymentProviderInstanceView {
+    return {
+      instanceId: 'default',
+      providerId: 'alipay',
+      name: null,
+      sortOrder: 0,
+      enabled: true,
+      configured: true,
+      closeAfterMinutes: 30,
+      version: 1,
+      configId: 'cfg-1',
+      values: {},
+      secretConfigured: {},
+      minAmountCents: null,
+      maxAmountCents: null,
+      dailyLimitCents: null,
+      refundEnabled: true,
+      paymentMethods: ['alipay'],
+      identityLockedFields: [],
+      hasOpenOrders: false,
+      updatedAt: null,
+      warnings: [],
+      ...overrides,
+    };
+  }
+
+  function provider(
+    overrides: Partial<AdminPaymentProviderView> = {},
+  ): AdminPaymentProviderView {
+    const instances = overrides.instances ?? [instance()];
+    const first = instances[0];
+    return {
+      id: 'alipay',
+      name: '支付宝官方',
+      icon: 'alipay',
+      checkoutMode: 'qrcode',
+      enabled: instances.some((item) => item.enabled),
+      configured: instances.some((item) => item.configured),
+      closeAfterMinutes: first?.closeAfterMinutes ?? 30,
+      version: first?.version ?? null,
+      configId: first?.configId ?? null,
+      configEnabled: first?.enabled ?? false,
+      values: first?.values ?? {},
+      secretConfigured: first?.secretConfigured ?? {},
+      configFields: [],
+      supportedCurrencies: ['CNY'],
+      supportsReconciliation: false,
+      missing: [],
+      identityLockedFields: [],
+      hasOpenOrders: false,
+      updatedAt: null,
+      warnings: first?.warnings ?? [],
+      ...overrides,
+      instances,
+    };
+  }
+
+  it('实例状态按启用与配置完整性分为四档', () => {
+    expect(instanceState(instance())).toBe('usable');
+    expect(instanceState(instance({ configured: false }))).toBe('misconfigured');
+    expect(instanceState(instance({ enabled: false }))).toBe('disabled');
+    expect(
+      instanceState(instance({ enabled: false, configured: false })),
+    ).toBe('unconfigured');
+    expect(
+      instanceState(
+        instance({ warnings: [{ level: 'danger', message: '证书过期' }] }),
+      ),
+    ).toBe('misconfigured');
+  });
+
+  it('渠道状态按实例聚合，任一可用实例即可收款', () => {
+    expect(
+      providerState(
+        provider({
+          instances: [
+            instance({ instanceId: 'ready' }),
+            instance({
+              instanceId: 'disabled',
+              enabled: false,
+              configured: false,
+            }),
+          ],
+        }),
+      ),
+    ).toBe('usable');
+    expect(
+      providerState(
+        provider({
+          instances: [
+            instance({ configured: false }),
+            instance({ instanceId: 'off', enabled: false }),
+          ],
+        }),
+      ),
+    ).toBe('misconfigured');
+    expect(
+      providerState(
+        provider({
+          instances: [
+            instance({ instanceId: 'off', enabled: false }),
+            instance({
+              instanceId: 'empty',
+              enabled: false,
+              configured: false,
+            }),
+          ],
+        }),
+      ),
+    ).toBe('disabled');
+    expect(providerState(provider({ instances: [] }))).toBe('unconfigured');
+  });
+
+  it('前台实例只取当前来源内、启停/配置/支付方式都符合条件的实例', () => {
+    const ready = instance({ instanceId: 'ready' });
+    const result = sourceAvailableInstances(
+      [
+        provider({
+          instances: [
+            ready,
+            instance({ instanceId: 'off', enabled: false }),
+            instance({ instanceId: 'wechat-only', paymentMethods: ['wechat'] }),
+            instance({
+              instanceId: 'danger',
+              warnings: [{ level: 'danger', message: '密钥失效' }],
+            }),
+          ],
+        }),
+        provider({
+          id: 'epay',
+          name: '易支付',
+          instances: [instance({ providerId: 'epay', instanceId: 'epay-1' })],
+        }),
+      ],
+      'CNY',
+      'alipay',
+      'official',
+    );
+
+    expect(result.provider?.id).toBe('alipay');
+    expect(result.instances.map((item) => item.instanceId)).toEqual(['ready']);
+  });
+
+  it('未选择官方时不会跨来源回退到易支付', () => {
+    const epay = provider({
+      id: 'epay',
+      name: '易支付',
+      instances: [
+        instance({
+          providerId: 'epay',
+          instanceId: 'epay-1',
+          paymentMethods: ['alipay'],
+        }),
+      ],
+    });
+
+    expect(sourceAvailableInstances([epay], 'CNY', 'alipay', 'official')).toEqual({
+      provider: null,
+      instances: [],
+    });
+    expect(sourceAvailability([epay], 'CNY', 'alipay', 'official')).toEqual({
+      ok: false,
+      reason: '尚未创建对应官方渠道',
+    });
+
+    const official = provider();
+    expect(sourceAvailability([official], 'CNY', 'alipay', 'epay')).toEqual({
+      ok: false,
+      reason: '尚未创建易支付渠道',
+    });
+  });
+
+  it('来源选定但实例全部停用或配置不完整时不可用', () => {
+    const disabled = provider({
+      instances: [instance({ enabled: false })],
+    });
+    expect(sourceAvailability([disabled], 'CNY', 'alipay', 'official')).toEqual({
+      ok: false,
+      reason: '支付宝官方没有已启用的支付宝实例',
+    });
+
+    const missing = provider({
+      instances: [instance({ configured: false })],
+    });
+    expect(sourceAvailability([missing], 'CNY', 'alipay', 'official')).toEqual({
+      ok: false,
+      reason: '支付宝官方的已启用实例配置不完整',
+    });
+  });
+
+  it('支付方式至少保留一种，且官方实例不会获得跨渠道选项', () => {
+    expect(allowedPaymentMethods('alipay')).toEqual(['alipay']);
+    expect(allowedPaymentMethods('wechat')).toEqual(['wechat']);
+    expect(allowedPaymentMethods('epay')).toEqual(['alipay', 'wechat']);
+    expect(togglePaymentMethod(['alipay'], 'alipay', ['alipay'])).toEqual(['alipay']);
+    expect(togglePaymentMethod(['alipay'], 'wechat', ['alipay'])).toEqual(['alipay']);
+    expect(
+      togglePaymentMethod(['alipay'], 'wechat', ['alipay', 'wechat']),
+    ).toEqual(['alipay', 'wechat']);
+    expect(
+      togglePaymentMethod(['alipay', 'wechat'], 'alipay', ['alipay', 'wechat']),
+    ).toEqual(['wechat']);
+  });
+
+  it('本地保存实例后同步重建渠道兼容投影', () => {
+    const next = providerWithInstances(
+      provider({ instances: [instance({ instanceId: 'a' })] }),
+      [
+        instance({ instanceId: 'b', sortOrder: 20, enabled: false }),
+        instance({ instanceId: 'a', sortOrder: 10, name: '主实例' }),
+      ],
+    );
+
+    expect(next.instances.map((item) => item.instanceId)).toEqual(['a', 'b']);
+    expect(next.enabled).toBe(true);
+    expect(next.configured).toBe(true);
+    expect(next.closeAfterMinutes).toBe(30);
   });
 });

@@ -53,10 +53,7 @@ export function AdminTasksPage() {
 
   return (
     <>
-      <PageHeader
-        title="任务监控"
-        description="全站生成任务的运行水位与排障入口。失败任务按错误码聚合，可筛出同因批次后集中重试。"
-      />
+      <PageHeader title="任务监控" />
 
       {(done === 'billing_settled' || done === 'billing_refunded') && (
         <ContextBanner

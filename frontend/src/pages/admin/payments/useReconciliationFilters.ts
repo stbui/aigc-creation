@@ -17,12 +17,13 @@ import { useDraftList, type ListParams } from './useDraftList';
 /**
  * 对账列表的筛选、URL 同步与导出。
  *
- * 渠道与账单日既是筛选条件，也是「执行对账」的入参；执行成功后页面调用
- * `applyFilters()` 把列表切到本次执行的条件，不再另设一组重复控件。
+ * 渠道与实例、账单日既是筛选条件，也是「执行对账 / 导入 CSV」的入参。执行成功
+ * 后页面调用 `applyFilters()` 把列表切到本次执行的条件，不再另设一组重复控件。
  */
 
 type ReconciliationQuery = {
   providerId?: string;
+  providerInstanceId?: string;
   status?: string;
   billDate?: string;
 };
@@ -33,14 +34,18 @@ function readInitialReconciliationFilters(
   searchParams: URLSearchParams,
 ): ReconciliationFilterValues {
   const rawProvider = searchParams.get('providerId');
+  const rawInstance = searchParams.get('providerInstanceId');
   const rawStatus = searchParams.get('status');
   const rawBillDate = searchParams.get('billDate');
+  const providerId =
+    rawProvider && (RECONCILIATION_PROVIDER_IDS as readonly string[]).includes(rawProvider)
+      ? rawProvider
+      : undefined;
 
   return {
-    providerId:
-      rawProvider && (RECONCILIATION_PROVIDER_IDS as readonly string[]).includes(rawProvider)
-        ? rawProvider
-        : undefined,
+    providerId,
+    providerInstanceId:
+      providerId && rawInstance?.trim() ? rawInstance.trim() : undefined,
     status:
       rawStatus && Object.prototype.hasOwnProperty.call(RECONCILIATION_RUN_STATUS_META, rawStatus)
         ? rawStatus
@@ -53,6 +58,7 @@ function readInitialReconciliationFilters(
 function reconciliationQueryOf(values: ReconciliationFilterValues): ReconciliationQuery {
   return {
     providerId: values.providerId,
+    providerInstanceId: values.providerInstanceId,
     status: values.status,
     billDate: values.billDate || undefined,
   };
@@ -68,7 +74,15 @@ function reconciliationChips(
     chips.push({
       key: 'providerId',
       label: `渠道：${providerLabel(applied.providerId)}`,
-      onClear: () => clear(['providerId']),
+      // 渠道清空时一并清掉实例，避免留下不属于任何渠道的实例条件
+      onClear: () => clear(['providerId', 'providerInstanceId']),
+    });
+  }
+  if (applied.providerInstanceId) {
+    chips.push({
+      key: 'providerInstanceId',
+      label: `实例：${applied.providerInstanceId}`,
+      onClear: () => clear(['providerInstanceId']),
     });
   }
   if (applied.status) {
@@ -108,6 +122,7 @@ export function useReconciliationFilters() {
           page: params.page,
           pageSize: params.pageSize,
           providerId: params.providerId,
+          providerInstanceId: params.providerInstanceId,
           status: params.status,
           // 列表按账单日区间过滤；单日条件写成 from = to
           from: params.billDate,
@@ -120,6 +135,7 @@ export function useReconciliationFilters() {
     toQuery: reconciliationQueryOf,
     sync: (params) => ({
       providerId: params.providerId,
+      providerInstanceId: params.providerInstanceId,
       status: params.status,
       billDate: params.billDate,
     }),
@@ -133,6 +149,7 @@ export function useReconciliationFilters() {
       () =>
         adminPaymentReconciliationApi.exportCsv({
           providerId: list.applied.providerId,
+          providerInstanceId: list.applied.providerInstanceId,
           status: list.applied.status,
           from: list.applied.billDate || undefined,
           to: list.applied.billDate || undefined,
@@ -140,13 +157,22 @@ export function useReconciliationFilters() {
       '导出已开始下载',
     );
 
+  const updateFilter = useCallback(
+    (key: ReconciliationFilterKey, value: string | undefined) => {
+      if (key === 'providerId') {
+        list.updateFilter('providerId', value);
+        list.updateFilter('providerInstanceId', undefined);
+        return;
+      }
+      list.updateFilter(key, value);
+    },
+    [list.updateFilter],
+  );
+
   return {
     ...list,
     exporting,
     exportCsv,
-    updateFilter: list.updateFilter as (
-      key: ReconciliationFilterKey,
-      value: string | undefined,
-    ) => void,
+    updateFilter,
   };
 }

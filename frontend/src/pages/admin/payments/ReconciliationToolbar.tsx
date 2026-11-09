@@ -11,7 +11,7 @@ import {
 import type { ReconciliationFilterKey, ReconciliationFilterValues } from './constants';
 
 /**
- * 对账工具栏：渠道 + 账单日 + 状态是页面**唯一**一套条件。
+ * 对账工具栏：渠道 + 服务商实例 + 账单日 + 状态是页面**唯一**一套条件。
  *
  * 渠道与账单日同时喂给「执行对账」和列表筛选 —— 早期版本在执行区与筛选条各
  * 放一组渠道 + 日期，同一屏出现两个渠道下拉、两个日期控件，改了一处忘了另一处
@@ -23,6 +23,7 @@ import type { ReconciliationFilterKey, ReconciliationFilterValues } from './cons
 export function ReconciliationToolbar({
   values,
   providerOptions,
+  instanceOptions,
   statusOptions,
   minBillDate,
   maxBillDate,
@@ -39,6 +40,7 @@ export function ReconciliationToolbar({
 }: {
   values: ReconciliationFilterValues;
   providerOptions: Array<{ value: string; label: string }>;
+  instanceOptions: Array<{ value: string; label: string }>;
   statusOptions: Array<{ value: string; label: string }>;
   minBillDate: string;
   maxBillDate: string;
@@ -66,6 +68,17 @@ export function ReconciliationToolbar({
         ariaLabel="对账渠道"
       />
       <SelectField
+        value={values.providerInstanceId}
+        onChange={(value) => onChange('providerInstanceId', value)}
+        options={instanceOptions}
+        allowClear
+        clearLabel="选择实例"
+        placeholder={values.providerId ? '选择实例' : '先选渠道'}
+        className="w-[170px]"
+        ariaLabel="对账服务商实例"
+        disabled={!values.providerId}
+      />
+      <SelectField
         value={values.status}
         onChange={(value) => onChange('status', value)}
         options={statusOptions}
@@ -86,14 +99,24 @@ export function ReconciliationToolbar({
       <FilterActions>
         <ActionButton
           onClick={onRun}
-          disabled={!canReconcile || !values.providerId || !values.billDate}
+          disabled={
+            !canReconcile ||
+            !values.providerId ||
+            !values.providerInstanceId ||
+            !values.billDate
+          }
         >
           执行对账
         </ActionButton>
         <ActionButton
           variant="outline"
           onClick={onOpenImport}
-          disabled={!canReconcile || providerOptions.length === 0}
+          disabled={
+            !canReconcile ||
+            providerOptions.length === 0 ||
+            !values.providerId ||
+            !values.providerInstanceId
+          }
         >
           导入 CSV
         </ActionButton>

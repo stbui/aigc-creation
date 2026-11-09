@@ -22,12 +22,21 @@ import {
   useRefreshOnNonce,
   useToast,
 } from './hooks';
-import type { AdminReconciliationRun, PaymentProviderId } from '../../../types/payment';
+import type {
+  AdminPaymentProviderView,
+  AdminReconciliationRun,
+  PaymentProviderId,
+} from '../../../types/payment';
 import {
   RECONCILIATION_RUN_STATUS_META,
   RECONCILIATION_RUN_STATUS_OPTIONS,
 } from './constants';
-import { ninetyDaysAgo, providerLabel, yesterday } from './utils';
+import {
+  instanceLabel,
+  ninetyDaysAgo,
+  providerLabel,
+  yesterday,
+} from './utils';
 import { ReconciliationDetailDrawer } from './ReconciliationDetailDrawer';
 import { ReconciliationToolbar } from './ReconciliationToolbar';
 
@@ -80,6 +89,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
   // CSV / ZIP 兜底导入
   const [importOpen, setImportOpen] = useState(false);
   const [importProvider, setImportProvider] = useState<string>('');
+  const [importInstance, setImportInstance] = useState<string>('');
   const [importBillDate, setImportBillDate] = useState<string>(yesterday());
   const [importFile, setImportFile] = useState<File | null>(null);
 
@@ -88,20 +98,62 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
 
   const runs = data?.items ?? [];
   const runProvider = filterValues.providerId;
+  const runProviderInstance = filterValues.providerInstanceId;
   const runBillDate = filterValues.billDate;
   const runProviderLabel = runProvider ? providerLabel(runProvider) : '所选渠道';
 
-  /** 可参与对账的渠道：需已配置且渠道本身支持账单下载；沙箱没有渠道侧账单 */
-  const reconcilableProviders = useMemo(
+  /** 可参与对账的分组：渠道支持账单下载，且至少有一个配置完整的实例。 */
+  const reconcilableGroups = useMemo(
     () =>
       (providers.data?.items ?? [])
-        .filter((provider) => provider.supportsReconciliation && provider.configured)
+        .filter((provider) => provider.supportsReconciliation)
         .map((provider) => ({
-          value: provider.id,
-          label: providerLabel(provider.id),
-        })),
+          provider,
+          instanceOptions: provider.instances
+            .filter((instance) => instance.configured)
+            .map((instance) => ({
+              value: instance.instanceId,
+              label: `${instanceLabel(instance)}${instance.enabled ? '' : '（已停用）'}`,
+            })),
+        }))
+        .filter((group) => group.instanceOptions.length > 0),
     [providers.data],
   );
+
+  const reconcilableProviders = useMemo(
+    () =>
+      reconcilableGroups.map((group) => ({
+        value: group.provider.id,
+        label: providerLabel(group.provider.id),
+      })),
+    [reconcilableGroups],
+  );
+
+  const selectedReconcilableGroup = reconcilableGroups.find(
+    (group) => group.provider.id === runProvider,
+  );
+  const instanceOptions = selectedReconcilableGroup?.instanceOptions ?? [];
+  const runInstance = selectedReconcilableGroup?.provider.instances.find(
+    (instance) => instance.instanceId === runProviderInstance,
+  );
+  const runInstanceLabel = runInstance
+    ? instanceLabel(runInstance)
+    : (runProviderInstance ?? '所选实例');
+
+  const importGroup = reconcilableGroups.find(
+    (group) => group.provider.id === importProvider,
+  );
+  const importInstanceOptions = importGroup?.instanceOptions ?? [];
+
+  const runInstanceText = (row: AdminReconciliationRun): string => {
+    const provider = providers.data?.items.find(
+      (item: AdminPaymentProviderView) => item.id === row.providerId,
+    );
+    const instance = provider?.instances.find(
+      (item) => item.instanceId === row.providerInstanceId,
+    );
+    return instance ? instanceLabel(instance) : row.providerInstanceId;
+  };
 
   const columns: Array<AdminColumn<AdminReconciliationRun>> = [
     {
@@ -112,9 +164,19 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
     },
     {
       key: 'provider',
-      title: '渠道',
-      width: 100,
-      render: (row) => <span className="text-muted-foreground">{providerLabel(row.providerId)}</span>,
+      title: '渠道 / 实例',
+      width: 170,
+      render: (row) => (
+        <div className="min-w-0">
+          <div className="truncate text-foreground">{providerLabel(row.providerId)}</div>
+          <div
+            className="truncate text-[11px] text-muted-foreground"
+            title={`${runInstanceText(row)} · ${row.providerInstanceId}`}
+          >
+            {runInstanceText(row)}
+          </div>
+        </div>
+      ),
     },
     {
       key: 'status',
@@ -188,6 +250,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       <ReconciliationToolbar
         values={filterValues}
         providerOptions={reconcilableProviders}
+        instanceOptions={instanceOptions}
         statusOptions={RECONCILIATION_RUN_STATUS_OPTIONS}
         minBillDate={ninetyDaysAgo()}
         maxBillDate={yesterday()}
@@ -197,7 +260,16 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         onReset={resetFilters}
         onRun={() => setRunOpen(true)}
         onOpenImport={() => {
-          setImportProvider(runProvider ?? reconcilableProviders[0]?.value ?? '');
+          const defaultGroup =
+            selectedReconcilableGroup ?? reconcilableGroups[0];
+          setImportProvider(defaultGroup?.provider.id ?? '');
+          setImportInstance(
+            defaultGroup?.instanceOptions.find(
+              (option) => option.value === runProviderInstance,
+            )?.value ??
+              defaultGroup?.instanceOptions[0]?.value ??
+              '',
+          );
           setImportBillDate(runBillDate || yesterday());
           setImportFile(null);
           setImportOpen(true);
@@ -234,7 +306,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
               </ActionButton>
             ) : undefined
           }
-          minWidth={880}
+          minWidth={960}
           pagination={{
             current: data?.page ?? 1,
             pageSize: data?.pageSize ?? 30,
@@ -247,7 +319,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       <ConfirmDialog
         open={runOpen}
         title="执行对账"
-        description={`系统会向${runProviderLabel}下载 ${runBillDate || '—'} 的交易流水并与本地支付记录比对。若发现渠道已收款但本地未入账，会幂等补发积分。`}
+        description={`系统会向${runProviderLabel} / ${runInstanceLabel} 下载 ${runBillDate || '—'} 的交易流水并与本地支付记录比对。若发现渠道已收款但本地未入账，会幂等补发积分。`}
         impact={[
           '下载并比对渠道账单',
           '发现已支付未入账的订单会自动补发积分',
@@ -257,11 +329,12 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         loading={busy}
         onCancel={() => setRunOpen(false)}
         onConfirm={async () => {
-          if (!runProvider || !runBillDate) return;
+          if (!runProvider || !runProviderInstance || !runBillDate) return;
           setBusy(true);
           try {
             const result = await adminPaymentReconciliationApi.run({
               providerId: runProvider as PaymentProviderId,
+              providerInstanceId: runProviderInstance,
               billDate: runBillDate,
             });
             toast.success(
@@ -284,15 +357,18 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         description="渠道账单接口不可用时的兜底入口。导入后仍会逐笔核对，不一致的行进入差异列表。"
         impact={['按商户订单号与本地订单比对', '支付宝支持 ZIP 内的 CSV', '超过 10000 行会拒绝导出']}
         confirmText="确认导入"
-        confirmDisabled={!importFile || !importProvider || !importBillDate}
+        confirmDisabled={
+          !importFile || !importProvider || !importInstance || !importBillDate
+        }
         loading={busy}
         onCancel={() => setImportOpen(false)}
         onConfirm={async () => {
-          if (!importFile) return;
+          if (!importFile || !importProvider || !importInstance || !importBillDate) return;
           setBusy(true);
           try {
             await adminPaymentReconciliationApi.importCsv(importFile, {
               providerId: importProvider as PaymentProviderId,
+              providerInstanceId: importInstance,
               billDate: importBillDate,
             });
             toast.success('对账单已导入');
@@ -309,10 +385,23 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
             <FormField label="渠道" required>
               <SelectField
                 value={importProvider || undefined}
-                onChange={(value) => setImportProvider(value ?? '')}
+                onChange={(value) => {
+                  setImportProvider(value ?? '');
+                  setImportInstance('');
+                }}
                 options={reconcilableProviders}
                 placeholder="选择渠道"
                 ariaLabel="导入对账渠道"
+              />
+            </FormField>
+            <FormField label="服务商实例" required>
+              <SelectField
+                value={importInstance || undefined}
+                onChange={(value) => setImportInstance(value ?? '')}
+                options={importInstanceOptions}
+                placeholder={importProvider ? '选择实例' : '先选渠道'}
+                ariaLabel="导入对账服务商实例"
+                disabled={!importProvider}
               />
             </FormField>
             <FormField label="账单日期" required hint="最早 90 天前，最晚昨天">
