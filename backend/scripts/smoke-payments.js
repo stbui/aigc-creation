@@ -576,8 +576,9 @@ function shanghaiDate(offsetDays) {
   const closePaid = await call('POST', `/admin/payments/orders/${order1.id}/close`, TADMIN, {});
   check('已支付订单不可关闭 (409)', closePaid.httpStatus === 409, closePaid.message);
 
-  const productCreated = await call('POST', '/admin/payments/products', TADMIN, {
-    kind: 'credits',
+  // 充值商品已并入「商品管理」（/admin/products），不再是支付域的独立接口
+  const productCreated = await call('POST', '/admin/products', TADMIN, {
+    sku: `SMOKE-P-${RUN}`,
     name: `冒烟测试商品 ${RUN}`,
     currency: 'CNY',
     priceCents: 100,
@@ -585,23 +586,17 @@ function shanghaiDate(offsetDays) {
     status: 'offline',
     saleStrategy: 'unlimited',
   });
-  check('后台商品创建成功（kind 必填）', productCreated.code === 0, productCreated.message);
+  check('后台商品创建成功（sku 必填）', productCreated.code === 0, productCreated.message);
   if (productCreated.code === 0) {
-    const pid = productCreated.data.product.id;
-    const productUpdated = await call('PUT', `/admin/payments/products/${pid}`, TADMIN, {
-      kind: 'credits',
-      name: `冒烟测试商品 ${RUN}`,
-      currency: 'CNY',
+    const pid = productCreated.data.id;
+    const productUpdated = await call('PATCH', `/admin/products/${pid}`, TADMIN, {
       priceCents: 200,
-      credits: 10,
-      status: 'offline',
-      saleStrategy: 'unlimited',
     });
     check('后台商品更新成功', productUpdated.code === 0, productUpdated.message);
     await prisma.product.delete({ where: { id: pid } }).catch(() => undefined);
   }
-  const zeroStock = await call('POST', '/admin/payments/products', TADMIN, {
-    kind: 'credits',
+  const zeroStock = await call('POST', '/admin/products', TADMIN, {
+    sku: `SMOKE-P-ZERO-${RUN}`,
     name: `冒烟零库存 ${RUN}`,
     currency: 'CNY',
     priceCents: 100,
@@ -611,8 +606,8 @@ function shanghaiDate(offsetDays) {
     stockTotal: 0,
   });
   check('库存商品 0 库存被拒 (400)', zeroStock.code === 40001, zeroStock.message);
-  const badOriginal = await call('POST', '/admin/payments/products', TADMIN, {
-    kind: 'credits',
+  const badOriginal = await call('POST', '/admin/products', TADMIN, {
+    sku: `SMOKE-P-ORIG-${RUN}`,
     name: `冒烟划线价 ${RUN}`,
     currency: 'CNY',
     priceCents: 100,

@@ -8,7 +8,12 @@ import {
   StatusTag,
 } from '~/admin-ui/primitives';
 import { adminOrdersApi } from './api';
-import { CHANNEL_LABELS, REFUND_STATUS_LABELS, STATUS_LABEL_OVERRIDE } from './constants';
+import {
+  aggregateRefundState,
+  CHANNEL_LABELS,
+  REFUND_STATUS_LABELS,
+  STATUS_LABEL_OVERRIDE,
+} from './constants';
 import {
   adminCreditHref,
   adminTasksHref,
@@ -75,6 +80,11 @@ function rowFromDetail(detail: AdminOrderDetail): AdminOrderRow {
       sku: item.skuSnapshot,
     })),
     paymentCount: detail.payments.length,
+    /*
+     * 退款状态与列表列同源：命中任意一笔退款单即取最需要人管的那个。
+     * 详情里带了完整退款单列表，这里直接聚合。
+     */
+    refundState: aggregateRefundState(detail.refunds.map((refund) => refund.status)),
     membershipPlanCode: detail.membershipPlan?.code ?? null,
     membershipPlanName: detail.membershipPlan?.name ?? null,
     createdAt: detail.createdAt,
@@ -144,19 +154,24 @@ export function OrderDetailDrawer({
   rows,
   canMarkPaid,
   canRefund,
+  canPaymentOperate,
   initialIntent,
   onClose,
   onAction,
+  onPaymentAction,
   onConfirmRefund,
 }: {
   detailId: string | null;
   rows: AdminOrderRow[];
   canMarkPaid: boolean;
   canRefund: boolean;
+  /** `payment.operate`：渠道查单 / 关单 */
+  canPaymentOperate: boolean;
   /** 从工单/工作台带 `intent` 进入时，详情加载后自动打开对应动作 */
   initialIntent?: 'markPaid' | 'refund' | 'confirmRefund' | null;
   onClose: () => void;
   onAction: (kind: 'markPaid' | 'refund', row: AdminOrderRow) => void;
+  onPaymentAction: (kind: 'query' | 'close', row: AdminOrderRow) => void;
   onConfirmRefund: (
     orderId: string,
     refund: AdminOrderRefund,
@@ -182,13 +197,38 @@ export function OrderDetailDrawer({
           canRefund &&
           (d.status === 'paid' || d.status === 'partial_refunded') &&
           d.paidCents > d.refundedCents;
+        /*
+         * 查单/关单只对未支付订单成立（后端硬校验）。免费订单没有支付渠道可查，
+         * 仍可关闭 —— 与后端 `canQuery` 的口径一致。
+         */
+        const syncPayment =
+          canPaymentOperate && d.status === 'pending' && d.channel !== 'free';
+        const closePayment = canPaymentOperate && d.status === 'pending';
         // 无可执行动作时不渲染空页脚，避免详情底部留下无意义的空白操作条
-        if (!markPaid && !refund) return null;
+        if (!markPaid && !refund && !syncPayment && !closePayment) return null;
         return (
           <>
             {markPaid && (
               <ActionButton variant="default" size="sm" onClick={() => onAction('markPaid', row)}>
                 标记为已支付
+              </ActionButton>
+            )}
+            {syncPayment && (
+              <ActionButton
+                variant="secondary"
+                size="sm"
+                onClick={() => onPaymentAction('query', row)}
+              >
+                同步渠道状态
+              </ActionButton>
+            )}
+            {closePayment && (
+              <ActionButton
+                variant="secondary"
+                size="sm"
+                onClick={() => onPaymentAction('close', row)}
+              >
+                关闭订单
               </ActionButton>
             )}
             {refund && (

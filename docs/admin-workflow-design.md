@@ -13,7 +13,7 @@
 | 工单行内认领、回复模板、内部备注、转交、上一条/下一条 | 已实施 | `pages/admin/tickets/*`、`backend/src/tickets/tickets.service.ts` |
 | 上下文直达（工单 ↔ 订单、任务 ↔ 账单、告警 → 实体） | 已实施 | `frontend/src/lib/admin-context-link.ts`、各目标页 |
 | 保存视图（工单 / 任务 / 订单 / 生成账单 / 发票） | 已实施 | `frontend/src/lib/admin-saved-views.ts`、`primitives/saved-view-bar.tsx` |
-| 命令面板（导航 / 新建 / 视图） | 已实施 | `frontend/src/lib/admin-commands.ts`、`admin-ui/shell/GlobalSearch.tsx` |
+| 命令面板（导航 / 新建 / 视图） | 已移除（2026-11 外壳重建） | 后端 `GET /admin/search` 保留；前端 `GlobalSearch.tsx` / `admin-commands.ts` 已删除，入口未挂载 |
 | 任务 `uncertain` 账单禁止重试 | 已实施（后端硬校验） | `backend/src/admin/tasks-admin.service.ts` |
 | 告警页实体展开 | 已实施 | `pages/admin/alerts/page.tsx` + `WorkQueue` |
 | 对账保存视图、任务同因聚合、批量工单/发票/对账、渠道影响预览、用户 360、快捷键 | P1 / P2，未实施 | 见下文分期 |
@@ -38,7 +38,7 @@
 | 导航 | 8 个侧栏分组，按权限过滤；`ADMIN_MENU` 是单一事实源 | `frontend/src/components/admin/adminNav.ts:59` |
 | 概览 | 已按「有无 `task.read`」在任务视角与财务视角之间切换 | `frontend/src/pages/admin/dashboard/AdminDashboardContent.tsx:72` |
 | 告警 | 聚合工单/任务/对账/退款/备份/发票，按权限过滤，只报需要动作的状态 | `backend/src/admin/alerts.service.ts:75` |
-| 全局搜索 | `Cmd/Ctrl+K`，用户/订单/工单/任务/素材各前 5 条，点击直达详情 | `frontend/src/admin-ui/shell/GlobalSearch.tsx:41`、`backend/src/admin/search.service.ts:52` |
+| 全局搜索 | 后端接口保留；前端入口未挂载（2026-11 外壳重建移除） | `backend/src/admin/search.service.ts:52` |
 | 深链 | 详情抽屉与地址栏 `?id=` 双向同步；列表筛选写回 URL | `admin-console-design.md` §3.14 |
 | 批量 | 用户/素材/任务/订单支持 `≤100` 条串行批量，逐条返回 | `backend/src/admin/*.controller.ts` |
 | 值班带 | 任务视角/财务视角的常驻计数，30 秒轮询，外壳与页面共享快照 | `frontend/src/components/admin/DutyContext.tsx` |
@@ -296,6 +296,8 @@ interface AdminWorkGroup {
 ```
 
 ### 4.3 命令面板、保存视图与快捷键
+
+> **状态（2026-11-09）**：外壳重建后顶栏搜索与命令面板入口已移除，`GlobalSearch.tsx` 与 `lib/admin-commands.ts` 已删除。本节保留为重新接入时的设计依据，不代表当前界面；保存视图与深链部分仍为现状。
 
 **命令面板（在现有 GlobalSearch 上扩展，不新建第二套搜索）**
 

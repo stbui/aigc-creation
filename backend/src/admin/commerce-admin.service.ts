@@ -11,6 +11,7 @@ import { AppError } from "../common/app.exception";
 import { runBatch } from "../common/batch";
 import { buildPage, paginate, type PageQueryDto } from "./dto/page-query.dto";
 import { centsToYuan, parseCsv, toCsv, type CsvColumn } from "../common/csv";
+import { PaymentConfigService } from "../payments/payment-config.service";
 
 /** 商品写入字段。sku 只在创建时给 —— 改 sku 会让历史订单快照与商品对不上号 */
 export interface ProductCreateInput {
@@ -25,6 +26,15 @@ export interface ProductCreateInput {
   grantType?: "immediate" | "manual";
   status?: "active" | "offline";
   sortOrder?: number;
+  /** CNY | USD */
+  currency?: string;
+  /** unlimited | periodic | inventory | timed */
+  saleStrategy?: string;
+  periodDays?: number;
+  periodPurchaseLimit?: number;
+  stockTotal?: number;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
 }
 
 export interface ProductUpdateInput {
@@ -37,6 +47,13 @@ export interface ProductUpdateInput {
   grantType?: "immediate" | "manual";
   status?: "active" | "offline";
   sortOrder?: number;
+  currency?: string;
+  saleStrategy?: string;
+  periodDays?: number;
+  periodPurchaseLimit?: number;
+  stockTotal?: number;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
 }
 
 export interface OrderListQuery {
@@ -92,6 +109,29 @@ const ORDER_STATUSES = [
 /** `Refund.status` 的合法取值, 与退款落库路径保持一致 */
 const REFUND_STATES = ["processing", "failed", "succeeded"] as const;
 
+/**
+ * 一笔订单的退款状态（列表列展示用）。
+ *
+ * 一笔订单可能有多笔退款单（部分退款会按笔落库），同一笔退款的渠道重试
+ * 则是同一行改状态。列上只显示一个值，取**最需要人管的那个**：
+ * 处理中 > 失败 > 成功。
+ *
+ * 为什么不是「最新一笔」：筛选 `?refundState=failed` 用的是 `some` 命中任意
+ * 一笔退款单，列若只取最新一笔，运营按「退款失败」筛出来会看到空的列 ——
+ * 列与筛选条件不同源。取聚合值保证「筛得到的每一行，列上一定看得到原因」。
+ */
+function latestRefundState(
+  refunds: Array<{ status: string }>,
+): 'processing' | 'failed' | 'succeeded' | null {
+  let state: 'processing' | 'failed' | 'succeeded' | null = null;
+  for (const refund of refunds) {
+    if (refund.status === 'processing') return 'processing';
+    if (refund.status === 'failed') state = 'failed';
+    else if (refund.status === 'succeeded' && !state) state = 'succeeded';
+  }
+  return state;
+}
+
 const LEDGER_TYPES = [
   "purchase",
   "grant",
@@ -105,6 +145,8 @@ const LEDGER_TYPES = [
 
 const GRANT_TYPES = ["immediate", "manual"] as const;
 const PRODUCT_STATUSES = ["active", "offline"] as const;
+const PRODUCT_CURRENCIES = ["CNY", "USD"] as const;
+const SALE_STRATEGIES = ["unlimited", "periodic", "inventory", "timed"] as const;
 
 /**
  * 新建商品的默认排序权重。
@@ -146,6 +188,11 @@ export class AdminCommerceService {
     private readonly prisma: PrismaService,
     private readonly credit: CreditService,
     private readonly orders: OrderService,
+    /*
+     * 美元商品上架前要确认存在可用的 USD 收款渠道，否则用户下单才发现
+     * 「没有可用的支付方式」。判定按渠道配置实时读，不看缓存的商品状态。
+     */
+    private readonly paymentConfigs: PaymentConfigService,
   ) {}
 
   // ── 商品 ──────────────────────────────────────────────────────────
@@ -173,6 +220,12 @@ export class AdminCommerceService {
       input.credits,
       input.creditsValidDays,
     );
+    this.assertOriginalPrice(input.originalPriceCents ?? null, input.priceCents);
+    const sale = this.normalizeSaleFields(input, null);
+    await this.assertCurrencySellable(
+      String(sale.currency),
+      input.status ?? "offline",
+    );
     const exists = await this.prisma.product.findUnique({
       where: { sku: input.sku },
     });
@@ -191,6 +244,7 @@ export class AdminCommerceService {
         grantType: input.grantType ?? "immediate",
         status: input.status ?? "offline",
         sortOrder: input.sortOrder ?? PRODUCT_DEFAULT_SORT_ORDER,
+        ...sale,
       },
       include: { _count: { select: { orderItems: true } } },
     });
@@ -206,6 +260,17 @@ export class AdminCommerceService {
       input.priceCents ?? current.priceCents,
       input.credits ?? current.credits,
       input.creditsValidDays ?? current.creditsValidDays,
+    );
+    this.assertOriginalPrice(
+      input.originalPriceCents !== undefined
+        ? input.originalPriceCents
+        : current.originalPriceCents,
+      input.priceCents ?? current.priceCents,
+    );
+    const sale = this.normalizeSaleFields(input, current);
+    await this.assertCurrencySellable(
+      String(sale.currency),
+      input.status ?? current.status,
     );
 
     const product = await this.prisma.product.update({
@@ -232,10 +297,145 @@ export class AdminCommerceService {
         ...(input.sortOrder !== undefined
           ? { sortOrder: input.sortOrder }
           : {}),
+        ...sale,
       },
       include: { _count: { select: { orderItems: true } } },
     });
     return this.toProductView(product);
+  }
+
+  /**
+   * 上架策略 / 币种 / 库存 / 售卖窗口的归一化与校验。
+   *
+   * 创建时 `current` 为 null，全部走默认值；更新时未传的字段沿用库里现值 ——
+   * 只改名的请求不会因为库里是库存商品就被要求重填库存。
+   * 切换策略时清空旧策略的专属字段，避免「改成不限量后库存还挂在那里」。
+   */
+  private normalizeSaleFields(
+    input: ProductCreateInput | ProductUpdateInput,
+    current: {
+      currency: string;
+      saleStrategy: string;
+      periodDays: number;
+      periodPurchaseLimit: number;
+      stockTotal: number;
+      stockSold: number;
+      stockReserved: number;
+      saleStartAt: Date | null;
+      saleEndAt: Date | null;
+    } | null,
+  ): Record<string, unknown> {
+    const strategy = String(
+      input.saleStrategy ?? current?.saleStrategy ?? "unlimited",
+    );
+    if (!(SALE_STRATEGIES as readonly string[]).includes(strategy)) {
+      throw new AppError(40001, "上架策略非法", 400);
+    }
+    const currency = String(input.currency ?? current?.currency ?? "CNY");
+    if (!(PRODUCT_CURRENCIES as readonly string[]).includes(currency)) {
+      throw new AppError(40001, "币种只支持 CNY / USD", 400);
+    }
+
+    if (strategy === "periodic") {
+      const days = Number(input.periodDays ?? current?.periodDays ?? 0);
+      const limit = Number(
+        input.periodPurchaseLimit ?? current?.periodPurchaseLimit ?? 0,
+      );
+      if (days <= 0 || limit <= 0) {
+        throw new AppError(40001, "周期购买需要同时填写周期天数与限购次数", 400);
+      }
+      if (days > 365) throw new AppError(40001, "周期天数不能超过 365 天", 400);
+      if (limit > 999) {
+        throw new AppError(40001, "周期限购次数不能超过 999", 400);
+      }
+      return {
+        currency,
+        saleStrategy: strategy,
+        periodDays: days,
+        periodPurchaseLimit: limit,
+        stockTotal: 0,
+        saleStartAt: null,
+        saleEndAt: null,
+      };
+    }
+
+    if (strategy === "inventory") {
+      const total = Number(input.stockTotal ?? current?.stockTotal ?? 0);
+      /*
+       * 0 不是「不限量」：下单校验按 `stockTotal - stockSold - stockReserved`
+       * 计算，0 会让任何购买都报库存不足。库存商品必须显式填写正数，
+       * 且不能小于已售 + 已占用（否则等于把已发生的售卖算成超卖）。
+       */
+      if (total < 1) {
+        throw new AppError(40001, "库存商品必须填写大于 0 的库存总量", 400);
+      }
+      if (total > 1_000_000) {
+        throw new AppError(40001, "库存总量不能超过 1,000,000", 400);
+      }
+      if (current && total < current.stockSold + current.stockReserved) {
+        throw new AppError(40001, "库存总量不能小于已售 + 已占用", 400);
+      }
+      return {
+        currency,
+        saleStrategy: strategy,
+        periodDays: 0,
+        periodPurchaseLimit: 0,
+        stockTotal: total,
+        saleStartAt: null,
+        saleEndAt: null,
+      };
+    }
+
+    if (strategy === "timed") {
+      const start =
+        input.saleStartAt !== undefined
+          ? parseShanghai(input.saleStartAt)
+          : (current?.saleStartAt ?? null);
+      const end =
+        input.saleEndAt !== undefined
+          ? parseShanghai(input.saleEndAt)
+          : (current?.saleEndAt ?? null);
+      if (!start || !end) {
+        throw new AppError(40001, "限时商品必须填写开始与结束时间", 400);
+      }
+      if (start.getTime() >= end.getTime()) {
+        throw new AppError(40001, "开售时间必须早于结束时间", 400);
+      }
+      return {
+        currency,
+        saleStrategy: strategy,
+        periodDays: 0,
+        periodPurchaseLimit: 0,
+        stockTotal: 0,
+        saleStartAt: start,
+        saleEndAt: end,
+      };
+    }
+
+    return {
+      currency,
+      saleStrategy: "unlimited",
+      periodDays: 0,
+      periodPurchaseLimit: 0,
+      stockTotal: 0,
+      saleStartAt: null,
+      saleEndAt: null,
+    };
+  }
+
+  private async assertCurrencySellable(
+    currency: string,
+    status: string,
+  ): Promise<void> {
+    if (currency !== "USD" || status !== "active") return;
+    const available = await this.paymentConfigs.available("USD");
+    if (available.length === 0) {
+      throw new AppError(
+        40001,
+        "当前没有支持 USD 的可用支付渠道，不能上架美元商品",
+        400,
+      );
+    }
   }
 
   /**
@@ -304,13 +504,47 @@ export class AdminCommerceService {
     }
   }
 
+  /**
+   * 划线价只用于展示对比，但低于售价会显示成「省 -x 元」。
+   *
+   * 前端表单会拦一次；后端仍必须拦 —— 接口不只有后台页面这一个调用方。
+   */
+  private assertOriginalPrice(
+    originalPriceCents: number | null,
+    priceCents: number,
+  ): void {
+    if (originalPriceCents === null) return;
+    if (!Number.isInteger(originalPriceCents) || originalPriceCents < 0) {
+      throw new AppError(40001, "划线价必须是非负整数分", 400);
+    }
+    if (originalPriceCents < priceCents) {
+      throw new AppError(40001, "划线价不能低于售价", 400);
+    }
+  }
+
   private toProductView(p: any) {
+    const remaining = p.stockTotal - p.stockSold - p.stockReserved;
+    let saleStatus = "on_sale";
+    /*
+     * 售卖窗口按服务端时钟判定：前端按浏览器时区算会在跨时区运营时
+     * 把「已开售」显示成「未开始」，下单校验却按服务端走，两边打架。
+     */
+    if (p.status !== "active") saleStatus = "disabled";
+    else if (p.saleStrategy === "timed" && p.saleStartAt && Date.now() < p.saleStartAt.getTime()) {
+      saleStatus = "upcoming";
+    } else if (p.saleStrategy === "timed" && p.saleEndAt && Date.now() > p.saleEndAt.getTime()) {
+      saleStatus = "ended";
+    } else if (p.saleStrategy === "inventory" && remaining <= 0) {
+      saleStatus = "sold_out";
+    }
+
     return {
       id: p.id,
       sku: p.sku,
       name: p.name,
       description: p.description,
       type: p.type,
+      currency: p.currency,
       priceCents: p.priceCents,
       originalPriceCents: p.originalPriceCents,
       credits: p.credits,
@@ -318,6 +552,17 @@ export class AdminCommerceService {
       grantType: p.grantType,
       status: p.status,
       sortOrder: p.sortOrder,
+      saleStrategy: p.saleStrategy,
+      periodDays: p.periodDays,
+      periodPurchaseLimit: p.periodPurchaseLimit,
+      stockTotal: p.stockTotal,
+      stockReserved: p.stockReserved,
+      stockSold: p.stockSold,
+      stockRemaining: remaining,
+      saleStartAt: p.saleStartAt ? p.saleStartAt.toISOString() : null,
+      saleEndAt: p.saleEndAt ? p.saleEndAt.toISOString() : null,
+      saleStatus,
+      canPurchase: saleStatus === "on_sale",
       /** 历史订单数。> 0 时不可删除, 前台据此拦截并提示改为下架 */
       orderCount: p._count?.orderItems ?? 0,
       createdAt: p.createdAt,
@@ -375,6 +620,12 @@ export class AdminCommerceService {
           // 商品被删除或改名都不影响这里（快照是下单时的值）
           items: { select: { id: true, nameSnapshot: true, skuSnapshot: true } },
           payments: { select: { id: true } },
+          /*
+           * 退款单要带上状态：退款状态挂在 `Refund` 而不是订单上，
+           * 渠道异步退款时订单仍是 `paid`。列表若只给订单状态，运营
+           * 「筛得出却看不出是哪单」—— 状态列必须与筛选条件同源。
+           */
+          refunds: { select: { status: true } },
           membershipPlan: { select: { code: true, name: true } },
         },
       }),
@@ -401,6 +652,12 @@ export class AdminCommerceService {
           sku: i.skuSnapshot,
         })),
         paymentCount: o.payments.length,
+        /*
+         * 退款状态列：与筛选口径（`some` 命中任意一笔退款单）同源，
+         * 收敛成一个值 —— processing / failed / succeeded 都可能同时存在，
+         * 列上只显示最需要人管的那一个：处理中 > 失败 > 成功。
+         */
+        refundState: latestRefundState(o.refunds),
         membershipPlanCode: o.membershipPlan?.code ?? null,
         membershipPlanName: o.membershipPlan?.name ?? null,
         createdAt: o.createdAt,
@@ -1172,3 +1429,28 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   refunded: "已退款",
   partial_refunded: "部分退款",
 };
+
+/**
+ * 后台输入的时间按 Asia/Shanghai 解释，数据库存 UTC。
+ *
+ * 接受 `yyyy-mm-dd`、`yyyy-mm-ddTHH:mm`（datetime-local 的原生格式）与
+ * `yyyy-mm-dd HH:mm`；不带时区的值补 `+08:00`，不是交给 `new Date` 按
+ * 服务器本地时区猜 —— 容器通常在 UTC，猜出来会整体偏 8 小时。
+ */
+function parseShanghai(value: unknown): Date | null {
+  if (!value) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? `${text}T00:00:00+08:00`
+    : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)
+      ? `${text}:00+08:00`
+      : /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(text)
+        ? `${text.replace(" ", "T")}:00+08:00`
+        : text;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    throw new AppError(40001, `时间格式非法: ${text}`, 400);
+  }
+  return date;
+}

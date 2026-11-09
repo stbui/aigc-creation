@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { adminCapabilitiesApi, adminChannelModelsApi, adminChannelsApi, adminLogicalModelsApi } from './api';
 import {
   ActionButton,
   AppliedFilters,
+  Button,
   ClearableField,
   ConfirmDialog,
   EmptyState,
@@ -79,6 +80,9 @@ export function AdminLogicalModelsPage() {
   const modelReadable = can('logical_model.read');
   const modelWritable = can('logical_model.write');
   const pricingReadable = can('product.price');
+  // 供应侧入口：能力不可用时，「为什么没有线路」要靠渠道与插件两个页面回答
+  const canReadChannels = can('channel.read');
+  const canReadPlugins = can('plugin.read');
   const capabilityWorkspaceReadable = capabilityReadable || modelReadable;
   const capabilityCatalog = useCapabilities();
 
@@ -512,15 +516,29 @@ export function AdminLogicalModelsPage() {
         title={capabilityWorkspaceReadable ? '能力与模型' : '能力消耗价'}
         description={description}
         actions={
-          tab === 'capabilities' && modelWritable ? (
-            <ActionButton
-              variant="default"
-              size="sm"
-              icon={Plus}
-              onClick={() => openCreate()}
-            >
-              新建前台模型
-            </ActionButton>
+          tab === 'capabilities' ? (
+            <>
+              {canReadChannels && (
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/admin/channels">渠道工作台</Link>
+                </Button>
+              )}
+              {canReadPlugins && (
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/admin/plugins">插件</Link>
+                </Button>
+              )}
+              {modelWritable && (
+                <ActionButton
+                  variant="default"
+                  size="sm"
+                  icon={Plus}
+                  onClick={() => openCreate()}
+                >
+                  新建前台模型
+                </ActionButton>
+              )}
+            </>
           ) : undefined
         }
       />
@@ -671,6 +689,8 @@ export function AdminLogicalModelsPage() {
                         item={item}
                         modelsReadable={modelDataReadable}
                         modelsUnavailableReason={modelUnavailableReason}
+                        canReadChannels={canReadChannels}
+                        canReadPlugins={canReadPlugins}
                         capabilityWritable={capabilityWritable}
                         modelWritable={modelWritable}
                         capabilitySaving={capabilitySaving === item.capabilityId}
@@ -717,6 +737,8 @@ export function AdminLogicalModelsPage() {
         writable={modelWritable}
         capabilityOptions={capabilityOptions}
         channelModelOptions={channelModelOptions}
+        canReadChannels={canReadChannels}
+        canReadPlugins={canReadPlugins}
         onClose={requestCloseForm}
         onChange={patchDraft}
         onAddRoute={addRoute}

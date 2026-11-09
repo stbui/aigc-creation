@@ -6,7 +6,16 @@ import {
   TextAreaField,
   TextField,
 } from '~/admin-ui/primitives';
-import { GRANT_TYPE_OPTIONS, type ProductDraft } from './constants';
+import {
+  CURRENCY_OPTIONS,
+  GRANT_TYPE_OPTIONS,
+  SALE_STRATEGY_OPTIONS,
+  SALE_STRATEGY_LABELS,
+  type ProductCurrency,
+  type ProductDraft,
+  type ProductSaleStrategy,
+} from './constants';
+import { currencySymbol } from './utils';
 import type { AdminProduct } from '../../../types/api';
 
 interface ProductFormDrawerProps {
@@ -104,7 +113,15 @@ export function ProductFormDrawer({
         </FormField>
 
         <div className="grid grid-cols-2 gap-4">
-          <FormField label="售价（元）" hint="两位小数">
+          <FormField label="币种" hint="美元商品上架前必须有可用的美元收款渠道">
+            <SelectField
+              ariaLabel="币种"
+              value={draft.currency}
+              onChange={(value) => onPatch({ currency: (value as ProductCurrency) ?? 'CNY' })}
+              options={CURRENCY_OPTIONS}
+            />
+          </FormField>
+          <FormField label={`售价（${currencySymbol(draft.currency)}）`} hint="两位小数">
             <TextField
               ariaLabel="售价"
               inputMode="decimal"
@@ -113,13 +130,112 @@ export function ProductFormDrawer({
               placeholder="9.90"
             />
           </FormField>
-          <FormField label="划线价（元）" hint="仅用于展示对比，不参与结算">
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="划线价" hint="仅用于展示对比，不参与结算">
             <TextField
               ariaLabel="划线价"
               inputMode="decimal"
               value={draft.originalPriceYuan}
               onChange={(value) => onPatch({ originalPriceYuan: value })}
               placeholder="留空表示不展示"
+            />
+          </FormField>
+          <FormField label="上架策略">
+            <SelectField
+              ariaLabel="上架策略"
+              value={draft.saleStrategy}
+              onChange={(value) =>
+                onPatch({ saleStrategy: (value as ProductSaleStrategy) ?? 'unlimited' })
+              }
+              options={SALE_STRATEGY_OPTIONS}
+            />
+          </FormField>
+        </div>
+
+        {draft.saleStrategy === 'periodic' && (
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="周期天数" hint="1–365 天">
+              <TextField
+                ariaLabel="周期天数"
+                inputMode="numeric"
+                value={draft.periodDays}
+                onChange={(value) => onPatch({ periodDays: value })}
+                placeholder="30"
+              />
+            </FormField>
+            <FormField label="周期内限购次数" hint="1–999 次">
+              <TextField
+                ariaLabel="周期限购次数"
+                inputMode="numeric"
+                value={draft.periodPurchaseLimit}
+                onChange={(value) => onPatch({ periodPurchaseLimit: value })}
+                placeholder="1"
+              />
+            </FormField>
+          </div>
+        )}
+
+        {draft.saleStrategy === 'inventory' && (
+          <FormField
+            label="库存总量"
+            hint={`已售 ${editing?.stockSold ?? 0} · 已占用 ${editing?.stockReserved ?? 0}，总量不能小于两者之和`}
+          >
+            <TextField
+              ariaLabel="库存总量"
+              inputMode="numeric"
+              value={draft.stockTotal}
+              onChange={(value) => onPatch({ stockTotal: value })}
+              placeholder="100"
+            />
+          </FormField>
+        )}
+
+        {draft.saleStrategy === 'timed' && (
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="开售时间（北京时间）">
+              <TextField
+                ariaLabel="开售时间"
+                type="datetime-local"
+                value={draft.saleStartAt}
+                onChange={(value) => onPatch({ saleStartAt: value })}
+              />
+            </FormField>
+            <FormField label="结束时间（北京时间）">
+              <TextField
+                ariaLabel="结束时间"
+                type="datetime-local"
+                value={draft.saleEndAt}
+                onChange={(value) => onPatch({ saleEndAt: value })}
+              />
+            </FormField>
+          </div>
+        )}
+
+        {draft.saleStrategy !== 'unlimited' && (
+          <p className="text-[12px] leading-5 text-muted-foreground">
+            当前策略：{SALE_STRATEGY_LABELS[draft.saleStrategy]}。切换回「不限量」会清空库存与售卖窗口。
+          </p>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="赠送积分">
+            <TextField
+              ariaLabel="赠送积分"
+              inputMode="numeric"
+              value={draft.credits}
+              onChange={(value) => onPatch({ credits: value })}
+              placeholder="100"
+            />
+          </FormField>
+          <FormField label="积分有效期（天）" hint="0 表示永久有效，不参与到期回收">
+            <TextField
+              ariaLabel="积分有效期天数"
+              inputMode="numeric"
+              value={draft.creditsValidDays}
+              onChange={(value) => onPatch({ creditsValidDays: value })}
+              placeholder="0"
             />
           </FormField>
         </div>

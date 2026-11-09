@@ -5,7 +5,6 @@ https://maolong.da-ai.cc/toolbox/image-generation
 https://www.designkit.cn/agent-lib
 https://www.pixpix.com/zh-CN/tools/product-set
 
-
 https://thai.quantv.com/image-creation
 
 
@@ -27,33 +26,18 @@ todo：
 - agent
 - 无限画布 open-ai-canvas
 
+- 提示词稳定性
+系统升级、数据备份、数据迁移
+系统设置
+
+- 支持用户活跃数
+- 压测
 
 内容替换
 探店视频
 爆款复刻
 数字人
 模特服装展示
-
-
-
-systemctl status cloudcli      # 查看状态
-  systemctl restart cloudcli     # 重启
-  systemctl stop cloudcli        # 停止
-  journalctl -u cloudcli -f      # 实时日志
-
-
-提示词稳定性
-mock 数据
-模拟
-
-
-系统升级、数据备份、数据迁移
-
-模型配置页面改版
-
-系统设置
-
-
 
 支持：android
 tailwind-merge
@@ -66,16 +50,6 @@ API 定价目录
 https://www.seeany.com/developer/pricing
 https://www.seeany.com/tutorials
 https://www.seeany.com/vip
-
-复刻页面
-分析以下链接，将页面功能和设计完全复刻出来，页面样式适配项目
-https://www.designkit.cn/shoppable-carousel?from=product_kit_web
-
-
-
----
-
-
 
 
 提示词：

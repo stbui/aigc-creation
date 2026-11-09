@@ -217,6 +217,7 @@ export class AdminChannelsController {
     private readonly catalog: ModelCatalogService,
     private readonly protocols: ProtocolCatalogService,
     private readonly health: ChannelHealthService,
+    private readonly metrics: ChannelModelMetricsService,
   ) {}
 
   /* ── 渠道 ─────────────────────────────────────────────── */
@@ -275,6 +276,24 @@ export class AdminChannelsController {
   @RequirePermission(PERMISSIONS.channelRead)
   async healthSnapshot() {
     return { items: await this.health.list() };
+  }
+
+  /**
+   * 解除本进程内全部线路冷却。
+   *
+   * 冷却只在 401/403/404/429 这类明确可归因的失败上写入，正常情况下等它自然
+   * 到期即可。运维确认上游已恢复后手动解除，省掉「改完配置还要再等十分钟」。
+   * 多实例部署时只影响处理本次请求的实例，与冷却的进程内语义一致。
+   */
+  @Post("health/reset")
+  @RequirePermission(PERMISSIONS.channelWrite)
+  @AuditAction("channel.health_reset")
+  @AuditTarget("channel")
+  async resetHealth() {
+    const cleared = this.health.resetCooling();
+    // 指标列表缓存 30s，里面带着冷却快照；不失效的话刚解除完页面还会显示「冷却中」
+    this.metrics.invalidate();
+    return { cleared };
   }
 
   @Put("order")

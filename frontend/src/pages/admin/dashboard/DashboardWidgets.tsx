@@ -283,7 +283,12 @@ export function FinanceGrid({
   days: number;
 }) {
   const items: Array<{ label: string; value: string; tone?: 'danger' | 'warn' }> = [
-    { label: `近 ${days} 天营收`, value: `¥${yuan(commerce.gmvWindowCents)}` },
+    /*
+     * 口径写进标签：这里是**订单实付**（元，Σ `Order.paidCents`），
+     * 与财务分析页的「净收入（积分）」（已结算账单金额）不是同一笔账。
+     * 两个都叫「营收」会让人把两处数字对在一起，对不上就以为其中一处坏了。
+     */
+    { label: `近 ${days} 天营收（元）`, value: `¥${yuan(commerce.gmvWindowCents)}` },
     {
       label: '支付成功率',
       value: commerce.paymentSuccessRate === null ? '—' : `${commerce.paymentSuccessRate}%`,

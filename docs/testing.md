@@ -122,7 +122,7 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | `payments/payment-notification.service.spec.ts` | 回调带 `providerRef` 时只绑定对应 Payment；找不到时永久失败并记录 `credit_failed`，禁止回落到最新尝试；无 `providerRef` 保留历史兼容路径 |
 | `payments/adapters/stripe.adapter.spec.ts` | Stripe rawBody HMAC 验签、篡改与 300 秒时间窗拒绝；`completed + paid` 入账、`completed + unpaid` 保持 pending、`expired` 关闭 |
 | `payments/adapters/epay.adapter.spec.ts` | 易支付创建/回调 MD5 签名、GET 参数回调、篡改与商户/类型不匹配拒绝、`reallyPrice` 金额口径、查单状态映射（含 state=2 已支付）、ACK 文本、关单/退款明确 unsupported |
-| `payments/adapters/zpay.adapter.spec.ts` | ZPay ASCII 排序 MD5 签名、multipart `/mapi.php` 下单与 `clientip` 必填、GET 回调验签及主动查单复核、金额/单号不一致拒绝、查单状态映射、退款接口与 ACK 文本、关单明确 unsupported |
+| `payments/adapters/zpay.adapter.spec.ts` | ZPay ASCII 排序 MD5 签名、multipart `/mapi.php` 下单与 `clientip` 必填、`cid` 可选进签名、UA 到 `device` 的映射、`payurl`/`qrcode`/`img` 三种降级、GET 回调验签 + 短超时主动查单复核、篡改与商户/类型/状态/金额格式不符拒绝、查单未确认 / 金额不一致 / 渠道订单号不一致拒绝、查单状态映射、退款接口与 ACK 文本、关单明确 unsupported |
 | `payments/payments.integration.spec.ts` | 临时 SQLite + 真实 Nest HTTP：C 端设置/登录、intent、GET/POST 公开回调、幂等、并发回调只入账一次、金额不符、关单、全额退款、并发退款最多一笔、0 元单、库存并发不超卖、周期限购、订单上限、权限/DTO、CSV 导出 |
 | `common/csv.spec.ts` | UTF-8 / GB18030 解码、BOM、引号内逗号与换行、公式注入防护 |
 | `common/archive/zip-reader.spec.ts` | stored/deflate、路径穿越、符号链接/不支持压缩、ZIP 内无 CSV、条目数上限 |

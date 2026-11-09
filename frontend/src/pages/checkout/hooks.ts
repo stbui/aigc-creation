@@ -286,10 +286,11 @@ export function useCheckoutPayment({
   /**
    * 真实通道支付。
    *
-   * 三种 mode 的处理:
-   *   sandbox  → 当前环境没配真实通道, 如实走站内模拟 (并保留沙箱声明)
-   *   redirect → 直接跳渠道收银台 (支付宝网页支付)
-   *   qrcode   → 渲染二维码并开始轮询 (微信 Native)
+   * 四种 mode 的处理:
+   *   sandbox      → 当前环境没配真实通道, 如实走站内模拟 (并保留沙箱声明)
+   *   redirect     → 直接跳渠道收银台 (支付宝网页支付)
+   *   qrcode       → 用 codeUrl 渲染二维码并开始轮询 (微信 Native)
+   *   qrcode-image → codeUrl 本身就是二维码图片, 直接展示并开始轮询
    */
   const payOnline = async () => {
     setPaying(true);
@@ -355,6 +356,13 @@ export function useCheckoutPayment({
         setQrDataUrl(dataUrl);
         setOnlineIntent(intent);
         // 以渠道返回的订单过期时间为轮询截止，而不是固定的 5 分钟
+        startPolling(o.id, intent.expiresAt);
+        return;
+      }
+      if (intent.mode === 'qrcode-image' && intent.codeUrl) {
+        // 渠道直接给了二维码图片地址，不能再次编码成二维码
+        setQrDataUrl(intent.codeUrl);
+        setOnlineIntent(intent);
         startPolling(o.id, intent.expiresAt);
         return;
       }

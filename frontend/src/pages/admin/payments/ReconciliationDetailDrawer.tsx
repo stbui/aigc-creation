@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ActionButton,
   RefreshButton,
@@ -13,7 +14,7 @@ import {
 } from '~/admin-ui/primitives';
 import { adminPaymentReconciliationApi } from './api';
 import { useAdmin, useAdminResource, useToast } from './hooks';
-import { moneyText } from './utils';
+import { adminOrderDetailHref, moneyText } from './utils';
 import { RECONCILIATION_RESULT_LABELS, type AdminReconciliationItem } from '../../../types/payment';
 
 /** 对账明细抽屉 */
@@ -46,7 +47,18 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
       key: 'merchantOrderNo',
       title: '商户订单号',
       width: 200,
-      render: (row) => <code className="font-mono text-[12px]">{row.merchantOrderNo}</code>,
+      render: (row) =>
+        row.orderId ? (
+          <Link
+            className="font-mono text-[12px] text-brand hover:underline"
+            to={adminOrderDetailHref(row.orderId)}
+            title="在订单管理中打开"
+          >
+            {row.merchantOrderNo}
+          </Link>
+        ) : (
+          <code className="font-mono text-[12px]">{row.merchantOrderNo}</code>
+        ),
     },
     {
       key: 'providerTradeNo',
@@ -138,7 +150,11 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
         )}
 
         <Notice tone="info" title="本页不改钱">
-          对账发现「渠道已收款但本地未入账」时系统会自动补发积分；重复扣款等异常请到订单管理走退款流程。
+          对账发现「渠道已收款但本地未入账」时系统会自动补发积分；重复扣款等异常请到
+          <Link className="text-brand hover:underline" to="/admin/orders">
+            订单管理
+          </Link>
+          走退款流程。
         </Notice>
       </div>
     </Drawer>

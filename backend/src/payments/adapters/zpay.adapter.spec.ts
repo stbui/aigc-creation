@@ -174,6 +174,89 @@ describe('ZpayAdapter.createOrder', () => {
     });
   });
 
+  it('不发送 Accept: application/json，避免渠道返回二次编码的 JSON', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        code: 1,
+        msg: '成功',
+        O_id: '123456',
+        trade_no: TRADE_NO,
+        payurl: 'https://zpayz.cn/pay/wxpay/202010903/',
+      }),
+    );
+
+    await adapter.createOrder(createInput());
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toMatchObject({ Accept: '*/*' });
+  });
+
+  it('渠道返回二次编码的 JSON 时解一层再解析，不误报为格式错误', async () => {
+    // 实测 ZPay 在 Accept: application/json 下会把 JSON 再编码成字符串。
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        JSON.stringify({
+          code: 1,
+          msg: '成功',
+          O_id: '123456',
+          trade_no: TRADE_NO,
+          payurl: 'https://zpayz.cn/pay/wxpay/202010903/',
+        }),
+      ),
+    );
+
+    const checkout = await adapter.createOrder(createInput());
+
+    expect(checkout).toMatchObject({
+      mode: 'redirect',
+      payUrl: 'https://zpayz.cn/pay/wxpay/202010903/',
+      providerRef: TRADE_NO,
+    });
+  });
+
+  it('配置了 cid 时参与签名并随表单提交', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 1, trade_no: TRADE_NO, payurl: 'https://zpayz.cn/pay/1' }),
+    );
+
+    await adapter.createOrder(
+      createInput({ config: makeConfig({ cid: '1234,5678' }) }),
+    );
+
+    const form = formEntries((fetchMock.mock.calls[0][1] as RequestInit).body);
+    expect(form.cid).toBe('1234,5678');
+    expect(form.sign).toBe(zpaySign(form, KEY));
+  });
+
+  it('未配置 cid 时不下发空值，避免进入签名', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 1, trade_no: TRADE_NO, payurl: 'https://zpayz.cn/pay/1' }),
+    );
+
+    await adapter.createOrder(createInput());
+
+    const form = formEntries((fetchMock.mock.calls[0][1] as RequestInit).body);
+    expect(form).not.toHaveProperty('cid');
+  });
+
+  it.each([
+    ['wechat', 'Mozilla/5.0 MicroMessenger/8.0.40', 'wechat'],
+    ['alipay', 'Mozilla/5.0 AlipayClient/10.3.0', 'alipay'],
+    ['qq', 'Mozilla/5.0 MQQBrowser/14.0 Mobile', 'qq'],
+    ['mobile', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile', 'mobile'],
+    ['pc', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Chrome/120.0', 'pc'],
+    ['missing', undefined, 'pc'],
+  ])('UA 属于 %s 时提交 device=%s', async (_label, ua, expected) => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 1, trade_no: TRADE_NO, payurl: 'https://zpayz.cn/pay/1' }),
+    );
+
+    await adapter.createOrder(createInput({ clientUserAgent: ua }));
+
+    const form = formEntries((fetchMock.mock.calls[0][1] as RequestInit).body);
+    expect(form.device).toBe(expected);
+  });
+
   it('只有 qrcode 时返回扫码模式和二维码内容', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
@@ -187,6 +270,23 @@ describe('ZpayAdapter.createOrder', () => {
       mode: 'qrcode',
       payUrl: undefined,
       codeUrl: 'https://zpayz.cn/pay/wxpay/202010903/',
+      providerRef: TRADE_NO,
+    });
+  });
+
+  it('只有 img 时按二维码图片展示，不当作跳转地址', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        code: 1,
+        trade_no: TRADE_NO,
+        img: 'https://zpayz.cn/qrcode/123.jpg',
+      }),
+    );
+
+    await expect(adapter.createOrder(createInput())).resolves.toMatchObject({
+      mode: 'qrcode-image',
+      payUrl: undefined,
+      codeUrl: 'https://zpayz.cn/qrcode/123.jpg',
       providerRef: TRADE_NO,
     });
   });
@@ -234,6 +334,24 @@ describe('ZpayAdapter.verifyNotification', () => {
     expect(url.searchParams.get('pid')).toBe(PID);
     expect(url.searchParams.get('key')).toBe(KEY);
     expect(url.searchParams.get('out_trade_no')).toBe(ORDER_NO);
+  });
+
+  it('主动查单使用短超时，保证 5 秒内应答', async () => {
+    fetchMock.mockResolvedValueOnce(queryResponse());
+
+    await adapter.verifyNotification(notificationInput(paidCallback()));
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('回调金额格式非法时拒绝', async () => {
+    await expect(
+      adapter.verifyNotification(notificationInput(paidCallback({ money: '10.051' }))),
+    ).resolves.toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('金额格式无效'),
+    });
   });
 
   it('回调签名被篡改时拒绝，且不发起查单', async () => {

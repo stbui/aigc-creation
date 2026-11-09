@@ -21,7 +21,6 @@ export {
 } from '../../../admin-ui/primitives';
 export { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
 
-export { usePaymentOrderFilters } from './usePaymentOrderFilters';
 export { usePaymentExceptionFilters } from './usePaymentExceptionFilters';
 export { useReconciliationFilters } from './useReconciliationFilters';
 

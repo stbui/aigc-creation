@@ -33,6 +33,17 @@ export const REFUND_CRITICAL_HOURS = 24;
 /** 对账差异达到此笔数升为 critical */
 export const RECONCILIATION_CRITICAL_COUNT = 5;
 
+/**
+ * 结果不明账单（`42206`）达到此笔数升为 critical。
+ *
+ * 这类账单既不切线也不退款：上游可能已经把图生成了，自动退款会白送一次产出，
+ * 自动结算则可能多收钱。每一笔都占着用户的预授权额度，必须人工核对。
+ */
+export const UNCERTAIN_BILLING_CRITICAL_COUNT = 5;
+
+/** 结果不明账单挂账超过此小时数升为 critical（额度长期冻结同样构成事故） */
+export const UNCERTAIN_BILLING_CRITICAL_HOURS = 24;
+
 /** 工作台每类最多返回的实体行数 */
 export const WORKBENCH_ITEMS_PER_GROUP = 5;
 

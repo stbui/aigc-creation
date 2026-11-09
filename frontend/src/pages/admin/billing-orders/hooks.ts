@@ -6,6 +6,8 @@ export {
   useAdminDetailParam,
   useAdminList,
   useAdminResource,
+  useAdminUrlFilterSync,
+  useSelectionPrune,
 } from '../../../admin-ui/primitives';
 export { useAdmin } from '../../../context/AdminContext';
 export { useToast } from '../../../admin-ui/providers/ToastProvider';

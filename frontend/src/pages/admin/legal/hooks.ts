@@ -18,3 +18,7 @@ export {
 export {
   useToast,
 } from '../../../admin-ui/providers/ToastProvider';
+
+export {
+  useSearchParams,
+} from 'react-router-dom';

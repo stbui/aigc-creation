@@ -144,6 +144,7 @@ export class PaymentOrderService {
     userId: string;
     providerId?: string;
     clientIp?: string;
+    clientUserAgent?: string;
   }): Promise<PaymentIntentView> {
     let order = await this.prisma.order.findUnique({
       where: { id: input.orderId },
@@ -335,6 +336,7 @@ export class PaymentOrderService {
             config.values.publicBaseUrl,
           ),
           clientIp: input.clientIp,
+          clientUserAgent: input.clientUserAgent,
           expiresAt,
         });
       } catch (e) {

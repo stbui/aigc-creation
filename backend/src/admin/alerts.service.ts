@@ -3,12 +3,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminRoleService } from './admin-role.service';
 import { PERMISSIONS } from './permissions';
 import {
+  PaymentReconciliationService,
+  RECONCILIATION_OPEN_RESULTS,
+} from '../payments/payment-reconciliation.service';
+import {
   BACKUP_STALE_HOURS,
   FAILED_CRITICAL_THRESHOLD,
+  RECONCILIATION_CRITICAL_COUNT,
   REFUND_CRITICAL_HOURS,
   REFUND_STUCK_MINUTES,
   RUNNING_ALERT_THRESHOLD,
   TICKET_CRITICAL_HOURS,
+  UNCERTAIN_BILLING_CRITICAL_COUNT,
+  UNCERTAIN_BILLING_CRITICAL_HOURS,
 } from './alert-thresholds';
 
 /**
@@ -19,6 +26,7 @@ import {
  *   · 待处理工单（用户已经开口，没人回）
  *   · 近 24 小时失败任务 / 运行中积压
  *   · 对账差异未处置（涉及真实资金）
+ *   · 生成账单结果不明（既不结算也不退款，占用用户预授权额度）
  *   · 渠道异步退款卡在 processing（钱已受理、本地未落账）
  *   · 最近备份失败或超过 48 小时没有成功备份
  *   · 待开具发票
@@ -59,6 +67,7 @@ export class AdminAlertsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly roles: AdminRoleService,
+    private readonly reconciliations: PaymentReconciliationService,
   ) {}
 
   async list(role: string) {
@@ -70,6 +79,7 @@ export class AdminAlertsService {
     if (can(PERMISSIONS.taskRead)) jobs.push(this.taskAlerts());
     if (can(PERMISSIONS.paymentRead)) jobs.push(this.reconciliationAlerts());
     if (can(PERMISSIONS.orderRead)) jobs.push(this.refundAlerts());
+    if (can(PERMISSIONS.billingOrderRead)) jobs.push(this.billingAlerts());
     if (can(PERMISSIONS.backupRead)) jobs.push(this.backupAlerts());
     if (can(PERMISSIONS.invoiceWrite)) jobs.push(this.invoiceAlerts());
 
@@ -161,23 +171,69 @@ export class AdminAlertsService {
    * 对账差异告警（2026-11 支付重构）。
    *
    * 数据源从旧 `ReconciliationItem.status='open'` 改为新对账体系的
-   * `PaymentReconciliationItem.result NOT IN ('matched','recovered')`：
-   * 旧批次表只读保留，新差异全部落在 `PaymentReconciliationRun/Item`。
+   * `PaymentReconciliationRun/Item`：旧批次表只读保留，新差异全部落在新表。
+   *
+   * **只算每个「渠道 + 账单日」最新一次已完成对账**：重跑不会改写旧批次的
+   * 异常行，按全表计数会让数字只涨不落，红点永远消不掉。归零条件必须是
+   * 「最近一次对账没有待处置条目」。
    */
   private async reconciliationAlerts(): Promise<AdminAlert[]> {
+    const runIds = await this.reconciliations.openRunIds();
+    if (runIds.length === 0) return [];
     const open = await this.prisma.paymentReconciliationItem.count({
-      where: { result: { notIn: ['matched', 'recovered'] } },
+      where: {
+        runId: { in: runIds },
+        result: { in: [...RECONCILIATION_OPEN_RESULTS] },
+      },
     });
     if (open === 0) return [];
     return [
       {
         key: 'reconciliation-open',
-        severity: open >= 5 ? 'critical' : 'warning',
+        severity: open >= RECONCILIATION_CRITICAL_COUNT ? 'critical' : 'warning',
         category: 'finance',
         title: '对账差异待处置',
-        detail: '差异涉及真实资金，请到支付对账页逐笔核对',
+        detail: `最近一次对账有 ${open} 笔差异未闭环，涉及真实资金，请到支付对账页逐笔核对`,
         count: open,
         link: '/admin/payments?tab=reconciliation',
+      },
+    ];
+  }
+
+  /**
+   * 结果不明账单（`42206`）。
+   *
+   * 超时、5xx 与建连后中断一律落 `uncertain`：上游可能已经产出，切线会二次
+   * 计费，自动退款会白送一次产出。系统因此**不自动处理**，只能人工核对后
+   * 落结算或退款 —— 没人管就会永远挂在 `reserved` 冻结用户额度，所以必须
+   * 进告警中心，而不是只在账单页里等运气好翻到。
+   */
+  private async billingAlerts(): Promise<AdminAlert[]> {
+    const where = { status: 'uncertain' };
+    const [count, oldest] = await Promise.all([
+      this.prisma.billingOrder.count({ where }),
+      this.prisma.billingOrder.findFirst({
+        where,
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+    ]);
+    if (count === 0) return [];
+
+    const hours = oldest ? Math.floor((Date.now() - oldest.createdAt.getTime()) / 3_600_000) : 0;
+    const critical =
+      count >= UNCERTAIN_BILLING_CRITICAL_COUNT || hours >= UNCERTAIN_BILLING_CRITICAL_HOURS;
+    return [
+      {
+        key: 'billing-uncertain',
+        severity: critical ? 'critical' : 'warning',
+        category: 'finance',
+        title: '生成账单结果不明',
+        detail: `${count} 张账单既未结算也未退款，最早一笔已挂账 ${formatHours(
+          hours,
+        )}；上游可能已产出，需人工核对后落结算或退款`,
+        count,
+        link: '/admin/billing-orders?status=uncertain',
       },
     ];
   }
@@ -230,6 +286,11 @@ export class AdminAlertsService {
       this.prisma.backupRecord.count({ where: { status: 'succeeded', verified: false } }),
     ]);
 
+    /*
+     * 深链带上筛选维度：告警说「有备份失败」/「有备份未验证」，点进去就该
+     * 直接看到那几行，而不是一个混着全部记录的列表再自己找。
+     * 前端备份页的筛选参数名是 `filter`，取值见其 constants.ts。
+     */
     const items: AdminAlert[] = [];
     if (!latest) {
       items.push({
@@ -249,7 +310,7 @@ export class AdminAlertsService {
         title: '最近一次备份失败',
         detail: latest.errorMessage?.slice(0, 120) || '备份文件未生成，请检查磁盘空间与数据库路径',
         count: null,
-        link: '/admin/backups',
+        link: '/admin/backups?filter=failed',
       });
     } else {
       const hours = Math.floor((Date.now() - latest.createdAt.getTime()) / 3_600_000);
@@ -258,10 +319,10 @@ export class AdminAlertsService {
           key: 'backup-stale',
           severity: 'warning',
           category: 'backup',
-          title: '备份已超过 48 小时',
+          title: `备份已超过 ${BACKUP_STALE_HOURS} 小时`,
           detail: '建议立即执行一次备份，并完成恢复验证',
           count: null,
-          link: '/admin/backups',
+          link: '/admin/backups?filter=succeeded',
         });
       }
     }
@@ -274,7 +335,7 @@ export class AdminAlertsService {
         title: '有备份尚未通过恢复验证',
         detail: '未验证的备份不能确认可恢复，下载入口也保持禁用',
         count: unverified,
-        link: '/admin/backups',
+        link: '/admin/backups?filter=unverified',
       });
     }
     return items;
@@ -311,7 +372,7 @@ export class AdminAlertsService {
         title: '有退款后待处置的发票',
         detail: '订单已退款、退款处理中或票面超过剩余可开票金额，需核对后驳回或等待退款结果',
         count: blocked,
-        link: '/admin/invoices',
+        link: '/admin/invoices?status=pending',
       });
     }
 
@@ -324,7 +385,7 @@ export class AdminAlertsService {
         title: '有待开具发票',
         detail: '用户已提交开票申请，审核后会生成可下载的票据',
         count: awaitingIssue,
-        link: '/admin/invoices',
+        link: '/admin/invoices?status=pending',
       });
     }
     return alerts;

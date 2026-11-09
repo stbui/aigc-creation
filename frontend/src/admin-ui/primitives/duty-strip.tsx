@@ -15,8 +15,9 @@ import { formatDuration, tickHeight } from '../lib/format';
  *
  * 1. **刻度条**：最近 100 条任务的产出节拍，高度编码耗时，失败亮红。这是
  *    「机器刚才在不在转」的唯一时间维度读数，四个计数给不了。
- * 2. **四个计数**：等待 / 执行中 / 近 1 小时失败 / 冷却通道（财务模式换成
- *    待付 / 退款中 / 待开票 / 待对账），每个都能点进对应列表。
+ * 2. **计数**：任务模式四个（等待 / 执行中 / 近 1 小时失败 / 冷却通道），
+ *    财务模式五个（待付 / 退款中 / 账单待核对 / 待开票 / 待对账），
+ *    每个都能点进对应列表。
  * 3. **主动作**：有异常就「接手最早异常」直达那条任务，没有就给「查看最近
  *    产出」。按钮跟着数据走，不留一个点不动的按钮。
  *
@@ -53,7 +54,17 @@ export function DutyStrip() {
   const action = useMemo(() => {
     if (!data) return null;
     if (data.mode === 'finance') {
-      return { label: '处理待付订单', to: '/admin/orders?status=pending' };
+      /*
+       * 主动作跟着计数走：从非零计数里挑优先级最高的一个（结果不明账单 >
+       * 退款中 > 对账运行失败 > 待开票 > 待付）。写死「处理待付订单」会让
+       * 有退款压着的时候还把人送去翻待付列表。
+       */
+      const target =
+        [...data.counters]
+          .filter((counter) => (counter.value ?? 0) > 0)
+          .sort((left, right) => (right.actionPriority ?? 0) - (left.actionPriority ?? 0))[0] ??
+        data.counters[0];
+      return target ? { label: target.action ?? `处理${target.label}`, to: target.to } : null;
     }
     const earliest = earliestFailure(data.tasks);
     return earliest
@@ -127,7 +138,8 @@ export function DutyStrip() {
 
         <div
           className={cn(
-            'grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4',
+            'grid shrink-0 grid-cols-2 gap-2',
+            data?.mode === 'finance' ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-4',
             data?.mode === 'finance' && 'lg:flex-1',
           )}
         >

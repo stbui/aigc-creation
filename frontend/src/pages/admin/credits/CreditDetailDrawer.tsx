@@ -21,7 +21,17 @@ import {
 import { LEDGER_LABELS, LEDGER_OPTIONS, SOURCE_LABELS } from './constants';
 import { useCreditDetail, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { adminCreditsApi } from './api';
-import { adminOrderHref, adminTasksHref, adminUserDetailHref, cn, fmtTime, signed } from './utils';
+import {
+  adminBillingOrderDetailHref,
+  adminOrderDetailHref,
+  adminOrderHref,
+  adminTaskHref,
+  adminTasksHref,
+  adminUserDetailHref,
+  cn,
+  fmtTime,
+  signed,
+} from './utils';
 import type { AdminCreditLedgerRow, AdminCreditLotRow, AdminCreditRow } from '../../../types/api';
 
 /**
@@ -159,8 +169,38 @@ export function CreditDetailDrawer({
       render: (row) => (
         <span className="text-[12px] text-muted-foreground">
           {row.reason ?? '—'}
-          {row.taskId ? ` · 任务 ${row.taskId.slice(-8)}` : ''}
-          {row.orderId ? ` · 订单 ${row.orderId.slice(-8)}` : ''}
+          {row.paymentOrderId ? (
+            <>
+              {' · '}
+              <Link
+                className="text-brand hover:underline"
+                to={adminOrderDetailHref(row.paymentOrderId)}
+                title={row.paymentOrderId}
+              >
+                支付订单 {row.paymentOrderId.slice(-8)}
+              </Link>
+            </>
+          ) : null}
+          {row.billingOrderId ? (
+            <>
+              {' · '}
+              <Link
+                className="text-brand hover:underline"
+                to={adminBillingOrderDetailHref(row.billingOrderId)}
+                title={row.billingOrderId}
+              >
+                生成账单 {row.billingOrderId.slice(-8)}
+              </Link>
+            </>
+          ) : null}
+          {row.taskId ? (
+            <>
+              {' · '}
+              <Link className="text-brand hover:underline" to={adminTaskHref(row.taskId)} title={row.taskId}>
+                任务 {row.taskId.slice(-8)}
+              </Link>
+            </>
+          ) : null}
         </span>
       ),
     },

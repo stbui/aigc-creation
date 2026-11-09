@@ -1058,7 +1058,10 @@ export interface CreditLedgerEntry {
   amount: number;
   balanceAfter: number;
   lotId: string | null;
-  orderId: string | null;
+  /** 支付订单 id（充值 / 购买积分包），与生成账单不是同一张表 */
+  paymentOrderId: string | null;
+  /** 生成账单 id（任务扣费 / 退款） */
+  billingOrderId: string | null;
   taskId: string | null;
   reason: string | null;
   createdAt: string;
@@ -1715,6 +1718,7 @@ export interface AdminProduct {
   name: string;
   description: string;
   type: string;
+  currency: "CNY" | "USD";
   priceCents: number;
   originalPriceCents: number | null;
   credits: number;
@@ -1722,6 +1726,18 @@ export interface AdminProduct {
   grantType: "immediate" | "manual";
   status: "active" | "offline";
   sortOrder: number;
+  saleStrategy: "unlimited" | "periodic" | "inventory" | "timed";
+  periodDays: number;
+  periodPurchaseLimit: number;
+  stockTotal: number;
+  stockReserved: number;
+  stockSold: number;
+  stockRemaining: number;
+  saleStartAt: string | null;
+  saleEndAt: string | null;
+  /** 后端按服务端时钟派生的售卖状态 */
+  saleStatus: "disabled" | "on_sale" | "upcoming" | "ended" | "sold_out";
+  canPurchase: boolean;
   orderCount: number; // 历史订单数。> 0 时不可删除，删除前会被提示改为下架
   createdAt: string;
   updatedAt: string;
@@ -1731,6 +1747,7 @@ export interface CreateProductPayload {
   sku: string;
   name: string;
   description?: string;
+  currency?: "CNY" | "USD";
   priceCents: number;
   originalPriceCents?: number;
   credits: number;
@@ -1738,6 +1755,12 @@ export interface CreateProductPayload {
   grantType?: "immediate" | "manual";
   status?: "active" | "offline";
   sortOrder?: number;
+  saleStrategy?: "unlimited" | "periodic" | "inventory" | "timed";
+  periodDays?: number;
+  periodPurchaseLimit?: number;
+  stockTotal?: number;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
 }
 
 /**
@@ -1773,6 +1796,13 @@ export interface AdminMembershipPlan {
   perkLabels: string[];
   status: "active" | "offline";
   sortOrder: number;
+  /**
+   * 会员等级映射的用户分组编码；空串 = 落 `default` 分组。
+   *
+   * 分组决定该等级用户可见的渠道与价格倍率。不配的话所有等级都落默认组，
+   * 分组倍率与模型级覆盖在真实数据下永不生效，界面上却看不出任何异常。
+   */
+  userGroupCode: string;
   memberCount: number;
   orderCount: number;
   createdAt: string;
@@ -1791,6 +1821,8 @@ export interface AdminMembershipPlanPayload {
   monthlyCredits: number;
   perks: AdminMembershipPerks;
   sortOrder?: number;
+  /** 空串 = 落 `default` 分组；非空必须已存在的分组编码 */
+  userGroupCode?: string;
 }
 
 export interface CreateAdminMembershipPlanPayload extends AdminMembershipPlanPayload {
@@ -1813,6 +1845,12 @@ export interface AdminOrderRow {
   discountCents: number;
   paidCents: number;
   refundedCents: number;
+  /**
+   * 退款单状态（列表列）。渠道异步退款时订单仍是 `paid`，
+   * 只看订单状态看不出「钱在处理中」，因此单独给出这一列。
+   * 无退款单时为 null。
+   */
+  refundState: 'processing' | 'failed' | 'succeeded' | null;
   grantedCredits: number;
   itemCount: number;
   items: Array<{ name: string; sku: string }>; // 下单时的名称与 SKU 快照
@@ -1931,7 +1969,8 @@ export interface AdminCreditLedgerRow {
   amount: number;
   balanceAfter: number;
   lotId: string | null;
-  orderId: string | null;
+  paymentOrderId: string | null;
+  billingOrderId: string | null;
   taskId: string | null;
   reason: string | null;
   operatorId: string | null;
@@ -1975,18 +2014,19 @@ export interface AdminRetentionTarget {
  * 发起支付的结果 (`POST /payments/:orderId/intent`)。
  *
  * `mode` 决定前端怎么拉起支付:
- *   redirect → 跳 `payUrl` 到渠道收银台 (支付宝)
- *   qrcode   → 用 `codeUrl` 渲染二维码 (微信 Native)
- *   sandbox  → 走站内沙箱模拟 (`POST /orders/:id/pay`)
- *   free     → 0 元订单已由后端直接入账，前端只需展示结果
+ *   redirect     → 跳 `payUrl` 到渠道收银台 (支付宝)
+ *   qrcode       → 用 `codeUrl` 渲染二维码 (微信 Native)
+ *   qrcode-image → `codeUrl` 是渠道给好的二维码图片地址, 直接展示
+ *   sandbox      → 走站内沙箱模拟 (`POST /orders/:id/pay`)
+ *   free         → 0 元订单已由后端直接入账，前端只需展示结果
  */
 /** GET /payments/providers 的可用支付渠道 */
 export interface PaymentProviderInfo {
   id: string;
   name: string;
   icon: string | null;
-  /** redirect=跳转收银台 / qrcode=扫码 / sandbox=站内模拟 */
-  checkoutMode: "redirect" | "qrcode" | "sandbox";
+  /** redirect=跳转收银台 / qrcode=扫码 / qrcode-image=渠道二维码图片 / sandbox=站内模拟 */
+  checkoutMode: "redirect" | "qrcode" | "qrcode-image" | "sandbox";
   supportedCurrencies: string[];
   sandbox: boolean;
 }
@@ -2008,7 +2048,7 @@ export interface PaymentIntent {
     | "free";
   configId: string | null;
   configVersion: number | null;
-  mode: "redirect" | "qrcode" | "sandbox" | "free";
+  mode: "redirect" | "qrcode" | "qrcode-image" | "sandbox" | "free";
   payUrl?: string;
   codeUrl?: string;
   checkoutValue: string | null;
@@ -2317,28 +2357,6 @@ export interface TicketStats {
   closed: number;
   /** open + processing：真正"还没解决"的量 */
   pending: number;
-}
-
-/** `GET /admin/search?q=` 的单条结果 */
-export interface AdminSearchHit {
-  id: string;
-  title: string;
-  subtitle: string;
-  /** 后台站内路径，点击直接跳转 */
-  link: string;
-}
-
-export interface AdminSearchGroup {
-  key: "users" | "orders" | "tickets" | "tasks" | "assets";
-  label: string;
-  total: number;
-  items: AdminSearchHit[];
-}
-
-export interface AdminSearchResult {
-  query: string;
-  groups: AdminSearchGroup[];
-  total: number;
 }
 
 /** 批量操作逐条结果（后端 common/batch.ts） */

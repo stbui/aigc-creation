@@ -12,7 +12,16 @@ import type {
   UpdateProductPayload,
 } from '../../../types/api';
 import { formatYuanPlain } from '../../../admin-ui/lib/format';
-import { DEFAULT_SORT_ORDER, type ProductDraft } from './constants';
+import {
+  DEFAULT_SORT_ORDER,
+  type ProductCurrency,
+  type ProductDraft,
+} from './constants';
+
+/** 币种符号。商品只有 CNY / USD 两种，不做通用货币库 */
+export function currencySymbol(currency: ProductCurrency | string): string {
+  return currency === 'USD' ? '$' : '¥';
+}
 
 /** 分 → 元（输入框回填值；统一实现在 admin-ui/lib/format.ts） */
 export const centsToYuanText = formatYuanPlain;
@@ -39,9 +48,10 @@ export function validDaysText(days: number): string {
 export function perCreditYuanText(
   priceCents: number,
   credits: number,
+  currency: ProductCurrency | string = 'CNY',
 ): string | null {
   if (priceCents <= 0 || credits <= 0) return null;
-  return `¥${(priceCents / credits / 100).toFixed(4)}`;
+  return `${currencySymbol(currency)}${(priceCents / credits / 100).toFixed(4)}`;
 }
 
 /**
@@ -63,13 +73,36 @@ export function toDraft(p: AdminProduct): ProductDraft {
     sku: p.sku,
     name: p.name,
     description: p.description,
+    currency: p.currency,
     priceYuan: centsToYuanText(p.priceCents),
     originalPriceYuan: p.originalPriceCents === null ? '' : centsToYuanText(p.originalPriceCents),
     credits: String(p.credits),
     creditsValidDays: String(p.creditsValidDays),
     grantType: p.grantType,
     sortOrder: String(p.sortOrder),
+    saleStrategy: p.saleStrategy,
+    periodDays: String(p.periodDays || 30),
+    periodPurchaseLimit: String(p.periodPurchaseLimit || 1),
+    stockTotal: p.stockTotal > 0 ? String(p.stockTotal) : '',
+    saleStartAt: toDateTimeLocalText(p.saleStartAt),
+    saleEndAt: toDateTimeLocalText(p.saleEndAt),
   };
+}
+
+/**
+ * ISO 时间 → `datetime-local` 的输入值（北京时间）。
+ *
+ * 后端把不带时区的表单时间一律按 `Asia/Shanghai` 解释，所以这里也必须按
+ * +08:00 渲染，不能按浏览器本地时区：运营在海外打开后台时，回显与提交
+ * 各偏一次，限时窗口每保存一次就平移一次。
+ *
+ * `datetime-local` 只接受 `yyyy-mm-ddTHH:mm`；直接截 UTC ISO 会差 8 小时。
+ */
+export function toDateTimeLocalText(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() + 8 * 3600 * 1000).toISOString().slice(0, 16);
 }
 
 export type ProductPayloadResult =
@@ -112,6 +145,50 @@ export function buildProductPayload(
   }
   const sortOrder = rawSortOrder === '' ? Number(DEFAULT_SORT_ORDER) : parsedSortOrder;
 
+  /*
+   * 上架策略的专属字段：只提交当前策略用得上的键。
+   * 后端 DTO 对周期天数 / 库存总量设了下限，把 0 一起发过去会被判非法。
+   */
+  const strategy = draft.saleStrategy;
+  let periodDays: number | undefined;
+  let periodPurchaseLimit: number | undefined;
+  let stockTotal: number | undefined;
+  let saleStartAt: string | null | undefined;
+  let saleEndAt: string | null | undefined;
+
+  if (strategy === 'periodic') {
+    periodDays = Number(draft.periodDays || '0');
+    periodPurchaseLimit = Number(draft.periodPurchaseLimit || '0');
+    if (!Number.isInteger(periodDays) || periodDays < 1 || periodDays > 365) {
+      return { ok: false, error: '周期天数必须在 1–365 之间' };
+    }
+    if (!Number.isInteger(periodPurchaseLimit) || periodPurchaseLimit < 1 || periodPurchaseLimit > 999) {
+      return { ok: false, error: '周期限购次数必须在 1–999 之间' };
+    }
+  } else if (strategy === 'inventory') {
+    stockTotal = Number(draft.stockTotal || '0');
+    if (!Number.isInteger(stockTotal) || stockTotal < 1) {
+      return { ok: false, error: '库存商品必须填写大于 0 的库存总量' };
+    }
+  } else if (strategy === 'timed') {
+    if (!draft.saleStartAt || !draft.saleEndAt) {
+      return { ok: false, error: '限时商品必须填写开始与结束时间' };
+    }
+    if (new Date(draft.saleStartAt).getTime() >= new Date(draft.saleEndAt).getTime()) {
+      return { ok: false, error: '开售时间必须早于结束时间' };
+    }
+    saleStartAt = draft.saleStartAt;
+    saleEndAt = draft.saleEndAt;
+  }
+
+  const saleFields = {
+    currency: draft.currency,
+    saleStrategy: strategy,
+    ...(periodDays !== undefined ? { periodDays, periodPurchaseLimit } : {}),
+    ...(stockTotal !== undefined ? { stockTotal } : {}),
+    ...(saleStartAt ? { saleStartAt, saleEndAt } : {}),
+  };
+
   const update: UpdateProductPayload = {
     name: draft.name.trim(),
     description: draft.description,
@@ -120,6 +197,7 @@ export function buildProductPayload(
     credits,
     creditsValidDays: validDays,
     grantType: draft.grantType,
+    ...saleFields,
     ...(rawSortOrder === '' ? {} : { sortOrder }),
   };
 
@@ -135,6 +213,7 @@ export function buildProductPayload(
     grantType: draft.grantType,
     sortOrder,
     status: 'offline',
+    ...saleFields,
   };
 
   return { ok: true, create, update };

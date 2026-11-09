@@ -1,81 +1,21 @@
 import type {
-  PaymentCurrency,
-  PaymentDisplayStatus,
   PaymentExceptionStatus,
   PaymentProviderId,
-  PaymentSaleStrategy,
 } from '../../../types/payment';
 
 /**
- * 支付订单与渠道的状态文案 / 色调映射。
+ * 支付域（渠道 / 对账 / 异常）的展示文案与筛选白名单。
  *
- * 后端 `payment-query.ts` 的 `PAYMENT_DISPLAY_STATUSES` 是状态的唯一事实源 ——
- * 这里只负责**展示**：把后端给的状态值翻译成人话。
- *
- * 不在前端二次推导状态：展示状态含「关单租约过期」「重试成功」这类与时钟
- * 相关的判定，前端再算一遍会与后端不一致，翻页时同一单会忽绿忽灰。
+ * 支付订单的状态与筛选不在这里：订单页（`/admin/orders`）沿用订单自身的状态
+ * 口径，支付域只负责渠道、对账与异常。
  */
-export const PAYMENT_STATUS_META: Record<
-  PaymentDisplayStatus,
-  { label: string; tone: 'success' | 'danger' | 'warn' | 'brand' | 'muted' }
-> = {
-  created: { label: '待支付', tone: 'warn' },
-  pending: { label: '支付中', tone: 'brand' },
-  closing: { label: '关单中', tone: 'warn' },
-  create_failed: { label: '发起失败', tone: 'danger' },
-  closed: { label: '已关闭', tone: 'muted' },
-  credited: { label: '已入账', tone: 'success' },
-  refunded: { label: '已退款', tone: 'danger' },
-  partial_refunded: { label: '部分退款', tone: 'warn' },
-};
-
-/** 支付订单筛选状态；顺序与状态映射保持一致。 */
-export const PAYMENT_ORDER_STATUS_OPTIONS = (
-  Object.entries(PAYMENT_STATUS_META) as Array<
-    [PaymentDisplayStatus, (typeof PAYMENT_STATUS_META)[PaymentDisplayStatus]]
-  >
-).map(([value, meta]) => ({ value, label: meta.label }));
-
-/** 支付订单日期筛选口径。 */
-export const PAYMENT_ORDER_TIME_FIELD_OPTIONS = [
-  { value: 'created', label: '按下单时间' },
-  { value: 'paid', label: '按支付时间' },
-  { value: 'credited', label: '按入账时间' },
-];
-
-/**
- * 支付订单筛选草稿。
- *
- * 筛选条是「草稿 → 应用」两段式：输入期间只改草稿，点「查询」才写入查询
- * 参数与地址栏。类型放常量层是为了让 `hooks.ts` 与筛选条共用同一份形状，
- * 不必从组件反向取类型。
- */
-export type PaymentOrderFilterValues = {
-  keyword: string;
-  status?: PaymentDisplayStatus;
-  providerId?: string;
-  timeField?: string;
-  from: string;
-  to: string;
-};
-
-export type PaymentOrderFilterKey = keyof PaymentOrderFilterValues;
-
-/** 重置后的空条件。 */
-export const EMPTY_PAYMENT_ORDER_FILTERS: PaymentOrderFilterValues = {
-  keyword: '',
-  status: undefined,
-  providerId: undefined,
-  timeField: undefined,
-  from: '',
-  to: '',
-};
 
 /** 支付方式（checkoutMode）→ 中文 */
 export const CHECKOUT_MODE_LABELS: Record<string, string> = {
   sandbox: '站内模拟',
   redirect: '网站跳转',
   qrcode: '扫码支付',
+  'qrcode-image': '二维码图片',
 };
 
 /** 渠道 id → 中文名。后端也返回 name，那是展示用品牌名；这份是筛选下拉用的短名。 */
@@ -92,7 +32,52 @@ export const PROVIDER_LABELS: Record<string, string> = {
   free: '免费',
 };
 
-/** 支付订单可筛选的渠道；后端 assertProviderId 不接受 manual/free */
+/**
+ * 支付渠道的**可运营状态**。
+ *
+ * 「启用」不是状态，是开关。把开关直接当状态显示会掩盖真正危险的那一档：
+ * 渠道开关是开的、但必填项没配齐时，页面亮起绿色「启用」，实际发起支付直接
+ * 503。运营只会看到「启用」，看不到「启用 ≠ 能收钱」。
+ *
+ * 四档按**能不能收钱**划，而不是按开关划：
+ *   · usable        —— 开关开 + 凭据齐，能收钱
+ *   · misconfigured —— 开关开 + 凭据缺，正在报错（最危险，必须显眼）
+ *   · unconfigured  —— 开关关 + 凭据缺，启用前要补齐
+ *   · disabled      —— 开关关 + 凭据齐，随时可启用
+ */
+export type PaymentProviderState =
+  | 'usable'
+  | 'misconfigured'
+  | 'unconfigured'
+  | 'disabled';
+
+export const PAYMENT_PROVIDER_STATE_META: Record<
+  PaymentProviderState,
+  { label: string; tone: 'success' | 'danger' | 'warn' | 'muted'; hint: string }
+> = {
+  usable: {
+    label: '可用',
+    tone: 'success',
+    hint: '凭据齐全且已启用，可以发起支付',
+  },
+  misconfigured: {
+    label: '不可收款',
+    tone: 'danger',
+    hint: '开关已开但存在阻断项，发起支付会返回 503',
+  },
+  unconfigured: {
+    label: '待配置',
+    tone: 'warn',
+    hint: '凭据未填齐，启用前必须补齐必填项',
+  },
+  disabled: {
+    label: '已停用',
+    tone: 'muted',
+    hint: '凭据齐全但未启用，随时可以开启',
+  },
+};
+
+/** 异常单可筛选的渠道；后端 assertProviderId 不接受 manual/free */
 export const ORDER_PROVIDER_IDS: PaymentProviderId[] = [
   'sandbox',
   'alipay',
@@ -216,74 +201,4 @@ export const EMPTY_PAYMENT_EXCEPTION_FILTERS: PaymentExceptionFilterValues = {
   overdue: undefined,
 };
 
-/**
- * 订单状态 → 可执行动作。
- *
- * 与后端 `orderDetail()` 的 `actions` 同一口径：终态订单不再提供查单/关单，
- * 避免对着已入账订单点「关闭」这种自相矛盾的操作。
- */
-export function paymentActions(status: PaymentDisplayStatus): {
-  canQuery: boolean;
-  canClose: boolean;
-} {
-  const actionable = status === 'created' || status === 'pending' || status === 'create_failed' || status === 'closing';
-  return { canQuery: actionable, canClose: actionable };
-}
 
-/** 充值商品表单草稿。金额在表单里保留字符串，提交时才换算为整数分。 */
-export interface PaymentProductDraft {
-  name: string;
-  description: string;
-  currency: PaymentCurrency;
-  /** 元 / 美元，输入用小数，提交前换算成分 */
-  price: string;
-  originalPrice: string;
-  credits: string;
-  creditsValidDays: string;
-  grantType: 'immediate' | 'manual';
-  saleStrategy: PaymentSaleStrategy;
-  periodDays: string;
-  periodPurchaseLimit: string;
-  stockTotal: string;
-  saleStartAt: string;
-  saleEndAt: string;
-  sortOrder: string;
-  enabled: boolean;
-}
-
-export const EMPTY_PAYMENT_PRODUCT_DRAFT: PaymentProductDraft = {
-  name: '',
-  description: '',
-  currency: 'CNY',
-  price: '',
-  originalPrice: '',
-  credits: '',
-  creditsValidDays: '0',
-  grantType: 'immediate',
-  saleStrategy: 'unlimited',
-  periodDays: '30',
-  periodPurchaseLimit: '1',
-  stockTotal: '0',
-  saleStartAt: '',
-  saleEndAt: '',
-  sortOrder: '0',
-  enabled: false,
-};
-
-export const PAYMENT_PRODUCT_STRATEGY_OPTIONS: Array<{
-  value: PaymentSaleStrategy;
-  label: string;
-}> = [
-  { value: 'unlimited', label: '不限量' },
-  { value: 'periodic', label: '周期限购' },
-  { value: 'inventory', label: '库存' },
-  { value: 'timed', label: '限时' },
-];
-
-export const PAYMENT_CURRENCY_OPTIONS: Array<{
-  value: PaymentCurrency;
-  label: string;
-}> = [
-  { value: 'CNY', label: '人民币 CNY' },
-  { value: 'USD', label: '美元 USD' },
-];

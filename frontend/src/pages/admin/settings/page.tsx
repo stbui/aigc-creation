@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 import { RELATED_ENTRIES } from './constants';
@@ -55,6 +55,14 @@ export function AdminSettingsPage() {
 
   const [activeGroup, setActiveGroup] = useState<string>('');
   const [busy, setBusy] = useState(false);
+  /*
+   * 分组深链：`?group=refund` 直达某一组配置。
+   *
+   * 没有它时「去退款规则改比例上限」只能先进系统设置再在八个页签里找
+   * 那个叫「退款」的 —— 规则被拒时运营要的就是那一组本身。
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const groupParam = searchParams.get('group');
 
   /** key -> 新值。仅存被改动过的项 */
   const [draft, setDraft] = useState<Record<string, AdminSettingValue>>({});
@@ -65,14 +73,36 @@ export function AdminSettingsPage() {
   const { data: settings, loading, error, reload } = useAdminResource(() => adminSettingsApi.read());
 
   /*
-   * 首次拿到配置后落到第一个分组。必须放 effect 而不能塞进 fetcher：
+   * 首次拿到配置后落到首个分组。必须放 effect 而不能塞进 fetcher：
    * 保存后 `reload()` 会重新拉一次，塞进 fetcher 就会把用户当前停留的
    * 分组页签冲回第一组。
    */
   useEffect(() => {
     if (!settings) return;
-    setActiveGroup((prev) => prev || settings.groups[0]?.key || '');
-  }, [settings]);
+    const groups = settings.groups;
+    // URL 上的分组不存在（手改链接 / 分组被删）时回落到首个分组，不留空面板
+    const wanted = groupParam && groups.some((g) => g.key === groupParam) ? groupParam : groups[0]?.key || '';
+    setActiveGroup((prev) => {
+      // URL 指定的分组优先：深链进来必须落在那一组
+      if (groupParam) return wanted;
+      return prev || wanted;
+    });
+  }, [settings, groupParam]);
+
+  /*
+   * 分组写回地址栏：`replace` 避免每切一次页签压一条历史。
+   * 深链进来后分组是唯一的页内状态，不写回的话刷新就退回第一组。
+   *
+   * 写回用实时地址栏做基底（不能拿 hook 快照），否则会冲掉同一轮里
+   * 别的 hook 刚写进去的参数。
+   */
+  useEffect(() => {
+    if (!activeGroup) return;
+    const next = new URLSearchParams(window.location.search);
+    if (next.get('group') === activeGroup) return;
+    next.set('group', activeGroup);
+    setSearchParams(next, { replace: true });
+  }, [activeGroup, setSearchParams]);
 
   const changedKeys = useMemo(() => [...new Set([...Object.keys(draft), ...clears])], [draft, clears]);
   const dirtyCount = changedKeys.length;

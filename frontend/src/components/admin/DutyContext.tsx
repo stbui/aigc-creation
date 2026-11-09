@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  adminBillingOrdersApi,
   adminChannelsApi,
   adminInvoicesApi,
   adminOrdersApi,
@@ -24,9 +25,10 @@ import type { ChannelHealthRowView } from '../../types/model';
  *
  * ## 为什么做成 Context 而不是各页各拉
  *
- * 值班带常驻在 29 个页面的顶部，概览页的异常队列、机器状态、产出条又都
- * 源自同一批任务。若外壳与页面各拉一次，同一屏会出现两份「最近 100 条
- * 任务」，刷新节奏不同时还会互相打架（带子里异常 6、队列里 5）。
+ * 值班带只在概览首屏渲染（`AdminDashboardContent`），概览页的异常队列、
+ * 机器状态、产出条又都源自同一批任务。若带子与页面各拉一次，同一屏会
+ * 出现两份「最近 100 条任务」，刷新节奏不同时还会互相打架（带子里异常 6、
+ * 队列里 5）。
  * 这里只拉一次，带子与页面读同一份快照。
  *
  * ## 按角色裁剪
@@ -49,6 +51,10 @@ export interface DutyCounter {
   tone?: 'danger' | 'warn';
   /** 点计数进入对应列表 */
   to: string;
+  /** 主动作文案；带子从非零计数里按 actionPriority 挑一个，跟着数据走 */
+  action?: string;
+  /** 主动作优先级，数值越大越先接手；未声明视为 0 */
+  actionPriority?: number;
 }
 
 /** 值班带刻度用的任务快照，字段只保留画刻度与排异常队列需要的 */
@@ -113,6 +119,7 @@ export function AdminDutyProvider({ children }: { children: ReactNode }) {
   const canTasks = can('task.read');
   const canOrders = can('order.read');
   const canChannels = can('channel.read');
+  const canBilling = can('billing_order.read');
 
   const mode: DutyMode | null = canTasks ? 'tasks' : canOrders ? 'finance' : null;
 
@@ -130,7 +137,7 @@ export function AdminDutyProvider({ children }: { children: ReactNode }) {
         const next =
           mode === 'tasks'
             ? await fetchTaskDuty(canChannels)
-            : await fetchFinanceDuty(canChannels);
+            : await fetchFinanceDuty(canChannels, canBilling);
         if (current !== seq.current) return;
         setData(next);
         setError(null);
@@ -143,7 +150,7 @@ export function AdminDutyProvider({ children }: { children: ReactNode }) {
         if (current === seq.current && !silent) setLoading(false);
       }
     },
-    [mode, canChannels],
+    [mode, canChannels, canBilling],
   );
 
   useEffect(() => {
@@ -242,18 +249,30 @@ async function fetchTaskDuty(fetchChannels: boolean): Promise<DutyData> {
   };
 }
 
-async function fetchFinanceDuty(fetchChannels: boolean): Promise<DutyData> {
-  /*
-   * 四个计数各取一页 pageSize=1 / limit=1 的列表，只用返回的 total ——
-   * 不为四个数字扩展 overview 接口。待付订单额外取 6 条作为概览待办队列。
-   */
-  const [pendingOrders, refunding, invoices, reconcile, channelSnapshot] = await Promise.all([
-    adminOrdersApi.list({ status: 'pending', pageSize: 6, page: 1 }),
-    adminOrdersApi.list({ refundState: 'processing', pageSize: 1, page: 1 }),
-    adminInvoicesApi.list({ status: 'pending', limit: 1 }),
-    adminPaymentReconciliationApi.list({ status: 'failed', pageSize: 1, page: 1 }),
-    fetchChannels ? adminChannelsApi.health().catch(() => null) : Promise.resolve(null),
-  ]);
+/**
+ * 财务模式。
+ *
+ * 五个计数各取一页 `pageSize=1` 的列表，只用返回的 total —— 不为这几个
+ * 数字扩展 overview 接口。待付订单额外取 6 条作为概览待办队列。
+ *
+ * 「账单待核对」只有拿到 `billing_order.read` 才请求：自定义角色可能给了
+ * 订单读权却没有账单读权，无条件请求会让 403 把整条带子打掉。
+ */
+async function fetchFinanceDuty(
+  fetchChannels: boolean,
+  fetchBilling: boolean,
+): Promise<DutyData> {
+  const [pendingOrders, refunding, uncertainBills, invoices, reconcile, channelSnapshot] =
+    await Promise.all([
+      adminOrdersApi.list({ status: 'pending', pageSize: 6, page: 1 }),
+      adminOrdersApi.list({ refundState: 'processing', pageSize: 1, page: 1 }),
+      fetchBilling
+        ? adminBillingOrdersApi.list({ status: 'uncertain', pageSize: 1, page: 1 })
+        : Promise.resolve(null),
+      adminInvoicesApi.list({ status: 'pending', limit: 1 }),
+      adminPaymentReconciliationApi.list({ status: 'failed', pageSize: 1, page: 1 }),
+      fetchChannels ? adminChannelsApi.health().catch(() => null) : Promise.resolve(null),
+    ]);
 
   const channels = toDutyChannels(channelSnapshot);
 
@@ -265,6 +284,8 @@ async function fetchFinanceDuty(fetchChannels: boolean): Promise<DutyData> {
         label: '待付订单',
         value: pendingOrders.total,
         to: '/admin/orders?status=pending',
+        action: '处理待付订单',
+        actionPriority: 10,
       },
       {
         key: 'refunding',
@@ -273,7 +294,23 @@ async function fetchFinanceDuty(fetchChannels: boolean): Promise<DutyData> {
         value: refunding.total,
         tone: refunding.total > 0 ? 'warn' : undefined,
         to: '/admin/orders?refundState=processing',
+        action: '跟进出口退款',
+        actionPriority: 40,
       },
+      ...(uncertainBills
+        ? [
+            {
+              key: 'uncertainBills',
+              label: '账单待核对',
+              short: '待核对',
+              value: uncertainBills.total,
+              tone: (uncertainBills.total > 0 ? 'warn' : undefined) as 'warn' | undefined,
+              to: '/admin/billing-orders?status=uncertain',
+              action: '核对结果不明账单',
+              actionPriority: 50,
+            },
+          ]
+        : []),
       {
         key: 'invoices',
         label: '待开发票',
@@ -281,14 +318,18 @@ async function fetchFinanceDuty(fetchChannels: boolean): Promise<DutyData> {
         value: invoices.total,
         tone: invoices.total > 0 ? 'warn' : undefined,
         to: '/admin/invoices?status=pending',
+        action: '审核待开发票',
+        actionPriority: 20,
       },
       {
         key: 'reconcile',
-        label: '对账失败',
+        label: '对账运行失败',
         short: '对账失败',
         value: reconcile.total,
         tone: reconcile.total > 0 ? 'warn' : undefined,
         to: '/admin/payments?tab=reconciliation&status=failed',
+        action: '查看对账运行失败',
+        actionPriority: 30,
       },
     ],
     tasks: [],

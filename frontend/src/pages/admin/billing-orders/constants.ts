@@ -5,6 +5,8 @@
  * `BILLING_STATUSES`；这里只做展示映射，不新增或改变状态语义。
  */
 
+import { STATUS_META } from '../../../components/admin/statusMeta';
+
 export const STATUS_LABELS: Record<string, string> = {
   reserved: '已预留',
   running: '计费中',
@@ -13,12 +15,19 @@ export const STATUS_LABELS: Record<string, string> = {
   uncertain: '结果不明',
 };
 
+/**
+ * 色调取自 `STATUS_META`，只有 `refunded` 例外。
+ *
+ * 账单的 `refunded` 是终态（钱已退回、账已平），用 warn 提示「这笔没转成收入」；
+ * 订单的 `refunded` 是异常语义（用户拿回了钱），用 danger。同一个词在不同状态机
+ * 里含义不同，这里显式覆盖并写清原因，而不是复制整张表。
+ */
 export const STATUS_TONES: Record<string, 'success' | 'danger' | 'warn' | 'brand' | 'muted'> = {
-  reserved: 'brand',
-  running: 'brand',
-  settled: 'success',
+  reserved: STATUS_META.reserved.tone,
+  running: STATUS_META.running.tone,
+  settled: STATUS_META.settled.tone,
   refunded: 'warn',
-  uncertain: 'danger',
+  uncertain: STATUS_META.uncertain.tone,
 };
 
 /**
@@ -44,13 +53,5 @@ export const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label])
 /** 「待核对」是跨状态的队列口径（后端算），不是一个账单状态 */
 export const REVIEW_OPTION = { value: 'review', label: '待核对（需人工处置）' };
 
-export const BILLING_MODE_LABELS: Record<string, string> = {
-  fixed_request: '按次',
-  per_second: '按秒',
-  token: '按 Token',
-};
-
-export const BILLING_MODE_OPTIONS = Object.entries(BILLING_MODE_LABELS).map(([value, label]) => ({
-  value,
-  label,
-}));
+/** 计费方式文案与下拉：唯一事实源在 `lib/billing-mode.ts`，此处仅转出。 */
+export { BILLING_MODE_LABELS, BILLING_MODE_OPTIONS } from '../../../lib/billing-mode';

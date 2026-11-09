@@ -103,4 +103,15 @@ export class ChannelHealthService {
         left.channelName.localeCompare(right.channelName) || left.name.localeCompare(right.name),
     );
   }
+
+  /**
+   * 解除本进程内全部线路冷却，返回清掉的键数量。
+   *
+   * 冷却只对 401/403/404/429 这类明确可归因的失败生效，通常等它自然到期即可；
+   * 这里提供给「确认上游已恢复、不想再等十分钟」的运维动作。多实例部署时只
+   * 影响处理本次请求的实例 —— 与冷却本身的进程内语义一致，不假装跨实例。
+   */
+  resetCooling(): number {
+    return this.health.unblock();
+  }
 }

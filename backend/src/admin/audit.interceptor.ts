@@ -138,6 +138,7 @@ const AUDIT_REASON_LABELS: Record<string, string> = {
   "channel.export": "导出渠道",
   "channel.import": "导入渠道",
   "channel.order": "调整渠道排序",
+  "channel.health_reset": "解除线路冷却",
   "channel_model.create": "创建渠道模型",
   "channel_model.update": "更新渠道模型",
   "channel_model.delete": "删除渠道模型",

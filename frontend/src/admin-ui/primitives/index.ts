@@ -138,6 +138,7 @@ export { DutyStrip } from './duty-strip';
 export { TrendBarChart } from './chart';
 
 export { useAdminList, useAdminResource, useAdminUrlFilterSync, useAdminDetailParam } from '../hooks/useAdminList';
+export { useSelectionPrune } from '../hooks/useSelection';
 export { useAdminExport } from '../hooks/useAdminExport';
 
 export {

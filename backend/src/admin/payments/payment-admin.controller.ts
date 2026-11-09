@@ -30,7 +30,6 @@ import {
   PaymentOrderListQueryDto,
   PaymentExceptionCloseDto,
   PaymentExceptionListQueryDto,
-  PaymentProductSaveDto,
   PaymentProviderConfigUpdateDto,
   PaymentSettingsUpdateDto,
   ReconciliationImportDto,
@@ -106,32 +105,6 @@ export class AdminPaymentConfigController {
     );
     return this.admin.settingsView();
   }
-
-  @Get("products")
-  @RequirePermission(PERMISSIONS.productRead)
-  products() {
-    return this.admin.products();
-  }
-
-  @Post("products")
-  @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("payment.product_create")
-  createProduct(@Body() dto: PaymentProductSaveDto) {
-    return this.admin.saveProduct(
-      null,
-      dto as unknown as Record<string, unknown>,
-    );
-  }
-
-  @Put("products/:id")
-  @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("payment.product_update")
-  updateProduct(@Param("id") id: string, @Body() dto: PaymentProductSaveDto) {
-    return this.admin.saveProduct(
-      id,
-      dto as unknown as Record<string, unknown>,
-    );
-  }
 }
 
 /**
@@ -188,7 +161,6 @@ export class AdminPaymentOrdersController {
         { label: "币种", value: (r) => r.currency },
         { label: "权益(积分)", value: (r) => r.credits },
         { label: "状态", value: (r) => r.status },
-        { label: "配置版本", value: (r) => r.providerConfigVersion ?? "" },
         { label: "渠道交易号", value: (r) => r.providerTradeNo ?? "" },
         {
           label: "创建时间",

@@ -24,6 +24,7 @@ const EMPTY_RESULT: AdminTaskListResult = {
   result: { items: [], total: 0, page: 1, pageSize: 20 },
   congestion: { queued: 0, running: 0, failedLastHour: 0, runningThreshold: 50 },
   capabilities: [],
+  failureGroups: [],
 };
 
 function TestWrapper({ children }: PropsWithChildren) {

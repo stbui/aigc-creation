@@ -5,11 +5,17 @@
  * 转换只在 `toDraft`（回填）与 `buildProductPayload`（提交）两处发生。
  */
 
+import type { AdminProduct } from '../../../types/api';
+
+export type ProductCurrency = 'CNY' | 'USD';
+export type ProductSaleStrategy = 'unlimited' | 'periodic' | 'inventory' | 'timed';
+
 export interface ProductDraft {
   sku: string;
   name: string;
   description: string;
-  /** 元 */
+  currency: ProductCurrency;
+  /** 元 / 美元 */
   priceYuan: string;
   /** 元；空串 = 无划线价 */
   originalPriceYuan: string;
@@ -18,6 +24,13 @@ export interface ProductDraft {
   creditsValidDays: string;
   grantType: 'immediate' | 'manual';
   sortOrder: string;
+  saleStrategy: ProductSaleStrategy;
+  periodDays: string;
+  periodPurchaseLimit: string;
+  stockTotal: string;
+  /** datetime-local 值（yyyy-mm-ddTHH:mm）；空串 = 未设置 */
+  saleStartAt: string;
+  saleEndAt: string;
 }
 
 /**
@@ -33,12 +46,48 @@ export const EMPTY_DRAFT: ProductDraft = {
   sku: '',
   name: '',
   description: '',
+  currency: 'CNY',
   priceYuan: '',
   originalPriceYuan: '',
   credits: '',
   creditsValidDays: '0',
   grantType: 'immediate',
   sortOrder: DEFAULT_SORT_ORDER,
+  saleStrategy: 'unlimited',
+  periodDays: '30',
+  periodPurchaseLimit: '1',
+  stockTotal: '',
+  saleStartAt: '',
+  saleEndAt: '',
+};
+
+export const CURRENCY_OPTIONS: Array<{ value: ProductCurrency; label: string }> = [
+  { value: 'CNY', label: '人民币 CNY' },
+  { value: 'USD', label: '美元 USD' },
+];
+
+/** 上架策略：与后端 `SALE_STRATEGIES` 同源 */
+export const SALE_STRATEGY_OPTIONS: Array<{ value: ProductSaleStrategy; label: string }> = [
+  { value: 'unlimited', label: '不限量' },
+  { value: 'periodic', label: '周期限购' },
+  { value: 'inventory', label: '限量库存' },
+  { value: 'timed', label: '限时售卖' },
+];
+
+export const SALE_STRATEGY_LABELS: Record<ProductSaleStrategy, string> = {
+  unlimited: '不限量',
+  periodic: '周期限购',
+  inventory: '限量库存',
+  timed: '限时售卖',
+};
+
+/** 后端派生的售卖状态；`on_sale` 不额外标注，避免和在售标签重复 */
+export const SALE_STATUS_LABELS: Record<AdminProduct['saleStatus'], string> = {
+  disabled: '已下架',
+  on_sale: '',
+  upcoming: '未开售',
+  ended: '已结束',
+  sold_out: '已售罄',
 };
 
 /** 商品状态文案：表格、筛选 chip 与下拉共用一份 */

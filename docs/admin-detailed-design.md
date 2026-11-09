@@ -338,7 +338,13 @@ partial_refunded → refunded | partial_refunded
 
 列表支持按退款状态筛选（`?refundState=processing|failed|succeeded`）。退款状态挂在 `Refund` 行上，一笔订单可能多次部分退款；告警中心正是用它把「渠道已受理但本地未落账」的订单捞出来。
 
-### 10.3 退款顺序不可反
+**列表带「退款状态」列**（`refundState`）：渠道异步退款时订单仍是 `paid`，只看订单状态看不出「钱在处理中」——筛得到却看不出是哪单。列值与筛选口径**同源**（筛选用 `some` 命中任意一笔退款单，列取其中最需要人管的那个：处理中 > 失败 > 成功），保证「筛得到的行，列上一定看得到原因」。同一笔退款的渠道重试是同一行改状态，不会留下多行。
+
+### 10.3 退款被拒时的两类拒绝
+
+`40001`（金额超上限）是**硬约束**，只有改金额能解；`40905` / `40906` / `40907` 是**可配规则**（时间窗 / 比例上限 / 已消耗积分），要去「系统设置 → 退款」改规则。状态码只能分 400 与 409，分不出是哪条规则，因此前端 `ApiError` 带后端业务码（响应体 `code`），退款失败时按码给出可执行的下一步，并在退款弹窗里给出规则设置的深链入口（`/admin/settings?group=refund`）。**绝不允许两类拒绝在 UI 上同形** —— 运营只能反复改金额试。
+
+### 10.4 退款顺序不可反
 
 1. 硬约束校验：金额 ≤ 实付 − 已退（`40001`）。
 2. 可配规则：时间窗 `40905`、比例 `40906`、本次退款应回收份额已消耗且扣不回 `40907`。积分只从本订单批次回收，不跨订单挪用；部分退款按累计退款比例的本次份额校验。
@@ -354,16 +360,17 @@ partial_refunded → refunded | partial_refunded
 
 ### 11.1 支付充值 `/admin/payments`
 
-五标签共用一个页面（`frontend/src/pages/admin/payments/`）：**支付渠道 / 充值商品 / 支付订单 / 支付对账 / 支付异常**。URL 的 `?tab=` 是标签的事实源，非法值回落到「支付渠道」；旧路由 `/admin/payment-channels` 与 `/admin/reconciliation` 改为重定向。
+三标签共用一个页面（`frontend/src/pages/admin/payments/`）：**支付渠道 / 支付对账 / 支付异常**。URL 的 `?tab=` 是标签的事实源，非法值回落到「支付渠道」；旧路由 `/admin/payment-channels` 与 `/admin/reconciliation` 改为重定向。
+
+**商品与订单不在这里**：充值商品就是 `Product` 表，统一在「商品管理」（`/admin/products`）维护；支付订单就是 `Order` 表，统一在「订单管理」（`/admin/orders`）查看与操作。两边各有一套列表时字段与动作必然分叉，运营会按页面而不是按数据判断状态。
 
 | 标签 | 接口 | 规则 |
 | --- | --- | --- |
 | 支付渠道 | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | 每个适配器一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。保存写审计，不要求填写原因 |
-| 充值商品 | `GET/POST/PUT /admin/payments/products*` | 复用 `Order` / `Product`，**不新建** `TopupProduct` 表；售价按分存、周期 / 库存 / 限时策略随类型切换 |
-| 支付订单 | `GET /admin/payments/orders*` | 列表服务端分页（默认 30）；查单与关单使用 `payment.operate`，属于非高危写操作，自动写审计但不要求填写变更原因。关单前始终先向渠道查单；已入账订单关单返回 `409` |
 | 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分八类（含同一商户单多交易号的 `duplicate_charge`），已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |
+| 支付异常 | `GET/POST /admin/payments/exceptions*` | 真资金差异的认领、重试原路退款与人工结案，`finance.reconcile` |
 
-**本页不提供退款**：退款在订单管理，涉及积分与优惠券回滚，放在支付域会让人以为「关单 = 退款」。
+**查单 / 关单在订单管理**：`POST /admin/payments/orders/:id/query` 与 `/:id/close` 的入口在 `/admin/orders`（列表与详情抽屉），使用 `payment.operate`，自动写审计但不要求填写变更原因。关单前始终先向渠道查单；已入账订单关单返回 `409`。**本页与订单页都不把「关单」当退款**：退款在订单管理，涉及积分与优惠券回滚，放在支付域会让人以为「关单 = 退款」。
 
 对账运行状态只有 `running` / `completed` / `failed`；旧的 `imported` / `resolved` 语义已随新模型下线（人工处置走订单退款流程，不在页面上改钱）。
 
@@ -407,6 +414,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 - 只读项（`readOnly`）不渲染可编辑控件，只展示当前值并给出 `linkTo` 入口。
 - 退款规则的读取方是 `order.service.refund`，规则对象由后台控制器取好后传入，订单域不依赖 admin 层。
 - 保存自动写审计；`setting.write` 属高危，不要求填写变更原因。
+- **分组深链**：`?group=<分组键>` 直达某一组配置（如 `/admin/settings?group=refund`）。分组是本页唯一的页内状态，切换页签时用 `replace` 写回地址栏（不压历史），URL 上的分组不存在时回落到首个分组。退款规则被拒时运营要改的就是那一组，深链省掉「先进设置再在八个页签里找『退款』」。
 
 ### 14.1 角色权限 `/admin/roles`
 
@@ -478,6 +486,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 | 渠道列表 / 详情 / 创建 / 更新 / 删除 / 复制 | `GET /`、`GET /:id`、`POST /`、`PATCH /:id`、`DELETE /:id`、`POST /:id/duplicate` | `channel.read` / `channel.write` |
 | 排序、整包导出 / 导入 | `PUT /order`、`POST /export`、`POST /import` | `channel.write` |
 | 线路健康 | `GET /health` | `channel.read` |
+| 解除线路冷却（本进程） | `POST /health/reset` | `channel.write`，写审计 |
 | 协议下拉 | `GET /protocols` | `channel.model_read` |
 | 渠道模型 CRUD / 排序 / 启停 / 批量删除 | `GET|POST /:id/models*`、`PATCH /:id/models/:modelId*`、`DELETE /:id/models/:modelId`、`POST /:id/models/batch-delete` | `channel.model_read` / `channel.model_write` |
 | 上游模型目录读取与导入 | `POST /:id/models/fetch`、`POST /:id/models/import` | `channel.model_read` / `channel.model_write` |
@@ -549,6 +558,7 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 
 - 账单状态机：`reserved / running / settled / refunded / uncertain`。`uncertain`（超时、5xx、连接中断）不自动退款、不切线，只能人工 `settle` 或 `refund`，操作自动写审计。
 - 财务口径固定三条：实收 = 已结算账单实际金额；已退 = 订单退款金额；净收入 = 实收 − 已退。预留 / 运行 / 待核对单列为「挂账」，**不计入实收**。
+- **与概览页的「订单收入」不是同一笔账**：财务页单位是**积分**（内部计价单位，已结算账单口径），概览页「订单收入」单位是**元**（订单实付口径，Σ `Order.paidCents`）。两者都曾叫「收入 / 营收」，同名不同义会让人把两处的数字对在一起，对不上就以为其中一处坏了。概览页的营收标签带「（元）」、财务页的说明写明「与概览页的订单收入（元）不是同一笔账」，并在概览页给出财务页入口。**两个口径的差异是事实，不允许合并成一个数。**
 
 ---
 
@@ -580,6 +590,7 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 - 产物落 `BACKUP_DIR`，单份带 SHA-256 供校验。
 - 手动备份与保留份数裁剪均自动写审计，不要求填写变更原因；重复点击由前端 busy 状态防抖，不承诺跨请求幂等。
 - 到期数据清理与清理留痕统一走 `/admin/retention/*`，不在备份控制器保留第二套入口。
+- **列表筛选深链**：`?filter=failed|succeeded|unverified|verified`。告警中心的四条备份告警都带筛选维度（最近一次失败 → `failed`，过期 → `succeeded`，未验证 → `unverified`），点进去直接看到出问题的那几行，而不是一个混着全部记录的列表再自己翻。筛选在客户端做（备份记录量级小），筛选态写回地址栏。
 
 ### 20.2 保留期清理 `/admin/retention`
 
@@ -592,6 +603,8 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 ### 21.1 全局搜索
 
 `GET /admin/search?q=`（`data.search`）：用户 / 订单 / 工单 / 任务 / 素材五组各前 5 条 + 总数。`q` 长度 < 2 直接返回空组——否则五个 `LIKE` 会全表扫描。落点按「哪个界面能立刻看到它」定：工单 `/admin/tickets?id=`、素材 `/admin/assets?q=<id>`。
+
+**当前后台外壳未挂载前端入口**：2026-11 外壳重建时移除了顶栏搜索与命令面板，前端封装一并删除；后端接口与权限保留，后续重新接入时在顶栏挂回入口即可。
 
 ### 21.2 导出
 

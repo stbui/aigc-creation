@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { sqliteUrlToPath } from '../config/env-files';
+import { BACKUP_STALE_HOURS } from './alert-thresholds';
 
 /** 备份文件名前缀, 便于人工识别 */
 const FILE_PREFIX = 'huojue-dev';
@@ -367,8 +368,10 @@ export class BackupService {
       totalBytes,
       totalMb: Math.round((totalBytes / 1024 / 1024) * 100) / 100,
       lastSuccessAt: lastSuccess ?? null,
-      // 超过 24 小时没有成功备份即视为异常
-      stale: lastSuccess ? Date.now() - lastSuccess.getTime() > 24 * 3600 * 1000 : true,
+      // 与告警共用同一阈值；两处各写一份会出现「备份页说正常、铃铛说已过期」
+      stale: lastSuccess
+        ? Date.now() - lastSuccess.getTime() > BACKUP_STALE_HOURS * 3_600_000
+        : true,
     };
   }
 

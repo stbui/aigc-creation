@@ -12,4 +12,5 @@ export {
   useAdminList,
   useAdminResource,
   useAdminUrlFilterSync,
+  useSelectionPrune,
 } from '../../../admin-ui/primitives';

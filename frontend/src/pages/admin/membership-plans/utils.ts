@@ -12,6 +12,7 @@ import type {
   AdminMembershipPlanPayload,
   CreateAdminMembershipPlanPayload,
 } from '../../../types/api';
+import type { UserGroupView } from '../../../types/model';
 import { formatYuanPlain } from '../../../admin-ui/lib/format';
 import type { PlanDraft } from './constants';
 
@@ -30,6 +31,19 @@ export function bpsToPercent(bps: number): string {
   return String(Math.round(bps / 100));
 }
 
+/**
+ * 用户分组下拉选项。
+ *
+ * 默认分组单独标注：留空即落默认组，运营需要一眼看出「不配」与「配了默认组」
+ * 在界面上是同一件事，而不是两个选项。
+ */
+export function groupOptions(groups: UserGroupView[]): Array<{ value: string; label: string }> {
+  return groups.map((group) => ({
+    value: group.code,
+    label: group.isDefault ? `${group.name}（默认）` : `${group.name}（${group.code}）`,
+  }));
+}
+
 export function toDraft(plan: AdminMembershipPlan): PlanDraft {
   return {
     code: plan.code,
@@ -42,6 +56,7 @@ export function toDraft(plan: AdminMembershipPlan): PlanDraft {
     maxConcurrent: String(plan.perks.maxConcurrent),
     discountPercent: bpsToPercent(plan.perks.addonDiscountBps),
     sortOrder: String(plan.sortOrder),
+    userGroupCode: plan.userGroupCode || '',
   };
 }
 
@@ -106,6 +121,7 @@ export function buildPlanPayload(
     monthlyCredits,
     perks,
     sortOrder,
+    userGroupCode: draft.userGroupCode.trim().toLowerCase(),
   };
 
   return {

@@ -4,78 +4,24 @@ import {
   ORDER_PROVIDER_IDS,
   PAYMENT_EXCEPTION_STATUS_META,
   PAYMENT_EXCEPTION_STATUS_OPTIONS,
-  PAYMENT_STATUS_META,
   PROVIDER_LABELS,
   RECONCILIATION_PROVIDER_IDS,
   RECONCILIATION_RUN_STATUS_META,
   RECONCILIATION_RUN_STATUS_OPTIONS,
-  paymentActions,
 } from '../constants';
-import {
-  buildPaymentProductPayload,
-  creditsText,
-  moneyText,
-  paymentProductPriceToCents,
-  productSaleStatusOf,
-  providerLabel,
-  strategyText,
-} from '../utils';
-import { EMPTY_PAYMENT_PRODUCT_DRAFT } from '../constants';
+import { missingRequiredLabels, moneyText, providerLabel } from '../utils';
+import type { PaymentConfigField } from '../../../../types/payment';
 
 /**
- * 支付充值的展示口径。
+ * 支付域（渠道 / 对账 / 异常）的展示口径。
  *
- * 锁住三件事：
- *   1. 状态文案**只在服务端给的展示状态上翻译**，前端不再二次推导 ——
- *      推导一遍就会与后端不一致，翻页时同一单忽绿忽灰；
- *   2. 金额按分存、按元展示，USD 与 CNY 的符号不能错；
- *   3. 终态订单（已入账 / 已退款 / 已关闭）不再提供查单与关单 ——
- *      对着已入账订单点「关闭」是自相矛盾的操作。
+ * 锁住两件事：
+ *   1. 状态与筛选项的文案只维护一份，页面与钩子都从常量层取；
+ *   2. 金额按分存、按元展示，USD 与 CNY 的符号不能错。
+ *
+ * 支付订单与充值商品不在本模块：订单并入「订单管理」（`/admin/orders`），
+ * 商品并入「商品管理」（`/admin/products`）。
  */
-
-describe('PAYMENT_STATUS_META', () => {
-  it('覆盖后端给的全部展示状态', () => {
-    const statuses = [
-      'created',
-      'pending',
-      'closing',
-      'create_failed',
-      'closed',
-      'credited',
-      'refunded',
-      'partial_refunded',
-    ] as const;
-    for (const status of statuses) {
-      expect(PAYMENT_STATUS_META[status]).toBeTruthy();
-      expect(PAYMENT_STATUS_META[status].label).toBeTruthy();
-    }
-  });
-
-  it('已入账是成功色，已退款是危险色', () => {
-    expect(PAYMENT_STATUS_META.credited.tone).toBe('success');
-    expect(PAYMENT_STATUS_META.refunded.tone).toBe('danger');
-  });
-});
-
-describe('paymentActions', () => {
-  it('未终态订单可查单可关单', () => {
-    for (const status of ['created', 'pending', 'create_failed', 'closing'] as const) {
-      expect(paymentActions(status)).toEqual({
-        canQuery: true,
-        canClose: true,
-      });
-    }
-  });
-
-  it('终态订单两个动作都没有', () => {
-    for (const status of ['closed', 'credited', 'refunded', 'partial_refunded'] as const) {
-      expect(paymentActions(status)).toEqual({
-        canQuery: false,
-        canClose: false,
-      });
-    }
-  });
-});
 
 describe('标签映射', () => {
   it('七个支付适配器都有短名', () => {
@@ -140,212 +86,47 @@ describe('moneyText', () => {
   });
 });
 
-describe('creditsText', () => {
-  it('有效期 0 表示永久', () => {
-    expect(creditsText({ credits: 2000, creditsValidDays: 0 })).toBe('2,000 积分（永久有效）');
-  });
+/**
+ * 渠道配置的草稿态校验。
+ *
+ * 锁住一个真实 bug：必填项提示原先基于**已保存的配置**（`provider.missing`），
+ * 而不是当前草稿。后果是「刚补上必填项提示还挂着」「清空必填项提示不出现，
+ * 点保存才报 400」。
+ */
+describe('missingRequiredLabels', () => {
+  const fields: PaymentConfigField[] = [
+    { name: 'pid', label: '商户 ID（pid）', type: 'text', required: true },
+    {
+      name: 'key',
+      label: '商户密钥',
+      type: 'password',
+      required: true,
+      secret: true,
+    },
+    { name: 'cid', label: '支付渠道 ID（可选）', type: 'text', required: false },
+  ];
 
-  it('有有效期时写天数', () => {
-    expect(creditsText({ credits: 2000, creditsValidDays: 30 })).toBe('2,000 积分（30 天有效）');
-  });
-});
-
-describe('strategyText', () => {
-  it('不限量', () => {
+  it('必填项缺失时返回字段标签', () => {
     expect(
-      strategyText({
-        saleStrategy: 'unlimited',
-        periodDays: 0,
-        periodPurchaseLimit: 0,
-        stockTotal: 0,
-        stockRemaining: 0,
-        saleStartAt: null,
-        saleEndAt: null,
-      }),
-    ).toBe('不限量');
+      missingRequiredLabels(fields, { pid: '', key: '' }, { key: false }),
+    ).toEqual(['商户 ID（pid）', '商户密钥']);
   });
 
-  it('周期策略给天数与限购次数', () => {
+  it('草稿补齐后不再报缺失 —— 修的是「刚补上提示还挂着」', () => {
     expect(
-      strategyText({
-        saleStrategy: 'periodic',
-        periodDays: 30,
-        periodPurchaseLimit: 2,
-        stockTotal: 0,
-        stockRemaining: 0,
-        saleStartAt: null,
-        saleEndAt: null,
-      }),
-    ).toBe('周期 30 天 · 限 2 次');
+      missingRequiredLabels(fields, { pid: '123', key: '' }, { key: false }),
+    ).toEqual(['商户密钥']);
   });
 
-  it('库存策略给剩余与总量', () => {
+  it('密字段留空表示沿用旧值，旧值存在就不算缺失', () => {
     expect(
-      strategyText({
-        saleStrategy: 'inventory',
-        periodDays: 0,
-        periodPurchaseLimit: 0,
-        stockTotal: 100,
-        stockRemaining: 7,
-        saleStartAt: null,
-        saleEndAt: null,
-      }),
-    ).toBe('库存 7 / 100');
+      missingRequiredLabels(fields, { pid: '123', key: '' }, { key: true }),
+    ).toEqual([]);
   });
 
-  it('限时策略截到日期', () => {
+  it('非必填项不参与判定', () => {
     expect(
-      strategyText({
-        saleStrategy: 'timed',
-        periodDays: 0,
-        periodPurchaseLimit: 0,
-        stockTotal: 0,
-        stockRemaining: 0,
-        saleStartAt: '2026-11-01T00:00:00.000Z',
-        saleEndAt: '2026-11-30T00:00:00.000Z',
-      }),
-    ).toBe('限时 2026-11-01 ~ 2026-11-30');
-  });
-});
-
-describe('productSaleStatusOf', () => {
-  it('非 active 一律停用', () => {
-    expect(
-      productSaleStatusOf({
-        status: 'offline',
-        saleStrategy: 'unlimited',
-        saleStartAt: null,
-        saleEndAt: null,
-        stockRemaining: 10,
-      }),
-    ).toBe('disabled');
-  });
-
-  it('库存售罄', () => {
-    expect(
-      productSaleStatusOf({
-        status: 'active',
-        saleStrategy: 'inventory',
-        saleStartAt: null,
-        saleEndAt: null,
-        stockRemaining: 0,
-      }),
-    ).toBe('sold_out');
-  });
-
-  it('限时未开始与已结束分开', () => {
-    const future = new Date(Date.now() + 86400000).toISOString();
-    const past = new Date(Date.now() - 86400000).toISOString();
-    expect(
-      productSaleStatusOf({
-        status: 'active',
-        saleStrategy: 'timed',
-        saleStartAt: future,
-        saleEndAt: null,
-        stockRemaining: 10,
-      }),
-    ).toBe('upcoming');
-    expect(
-      productSaleStatusOf({
-        status: 'active',
-        saleStrategy: 'timed',
-        saleStartAt: null,
-        saleEndAt: past,
-        stockRemaining: 10,
-      }),
-    ).toBe('ended');
-  });
-
-  it('其余情况在售', () => {
-    expect(
-      productSaleStatusOf({
-        status: 'active',
-        saleStrategy: 'unlimited',
-        saleStartAt: null,
-        saleEndAt: null,
-        stockRemaining: 10,
-      }),
-    ).toBe('on_sale');
-  });
-});
-
-describe('paymentProductPriceToCents', () => {
-  it('元 / 美元文本按两位小数换算为整数分', () => {
-    expect(paymentProductPriceToCents('9.90')).toBe(990);
-    expect(paymentProductPriceToCents(' 9.9 ')).toBe(990);
-    expect(paymentProductPriceToCents('0.01')).toBe(1);
-  });
-
-  it('非法或超过两位小数的金额返回 null', () => {
-    expect(paymentProductPriceToCents('')).toBeNull();
-    expect(paymentProductPriceToCents('9.999')).toBeNull();
-    expect(paymentProductPriceToCents('-1')).toBeNull();
-    expect(paymentProductPriceToCents('abc')).toBeNull();
-  });
-});
-
-describe('buildPaymentProductPayload', () => {
-  it('按售卖策略只提交对应字段', () => {
-    const result = buildPaymentProductPayload(
-      {
-        ...EMPTY_PAYMENT_PRODUCT_DRAFT,
-        name: ' 2000 积分包 ',
-        price: '9.90',
-        originalPrice: '19.90',
-        credits: '2000',
-        saleStrategy: 'periodic',
-        periodDays: '30',
-        periodPurchaseLimit: '2',
-      },
-      true,
-    );
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.payload).toMatchObject({
-      name: '2000 积分包',
-      priceCents: 990,
-      originalPriceCents: 1990,
-      credits: 2000,
-      saleStrategy: 'periodic',
-      periodDays: 30,
-      periodPurchaseLimit: 2,
-      status: 'offline',
-    });
-    expect(result.payload).not.toHaveProperty('stockTotal');
-    expect(result.payload).not.toHaveProperty('saleStartAt');
-  });
-
-  it('库存策略必须填写正数库存', () => {
-    const result = buildPaymentProductPayload(
-      {
-        ...EMPTY_PAYMENT_PRODUCT_DRAFT,
-        price: '9.90',
-        credits: '100',
-        saleStrategy: 'inventory',
-        stockTotal: '0',
-      },
-      true,
-    );
-
-    expect(result).toEqual({
-      ok: false,
-      error: '库存商品必须填写大于 0 的库存总量',
-    });
-  });
-
-  it('没有美元渠道时允许保存下架商品，但不能上架', () => {
-    const draft = {
-      ...EMPTY_PAYMENT_PRODUCT_DRAFT,
-      price: '9.90',
-      credits: '100',
-      currency: 'USD' as const,
-    };
-
-    expect(buildPaymentProductPayload(draft, false).ok).toBe(true);
-    expect(buildPaymentProductPayload({ ...draft, enabled: true }, false)).toEqual({
-      ok: false,
-      error: '当前没有已配置的美元支付渠道，无法上架美元商品',
-    });
+      missingRequiredLabels(fields, { pid: '123', key: 'k' }, { key: true }),
+    ).toEqual([]);
   });
 });

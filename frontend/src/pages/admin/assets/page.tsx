@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
 import { adminAssetsApi } from './api';
-import { useAdmin, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
+import { useAdmin, useAdminList, useAdminUrlFilterSync, useSelectionPrune, useToast } from './hooks';
 import {
   BACKEND_LABEL,
   GRID_PAGE_SIZE,
@@ -94,6 +94,13 @@ export function AdminAssetsPage() {
     ...(initialBackend ? { backend: initialBackend } : {}),
   });
   const items = data?.items ?? [];
+
+  /*
+   * 翻页、换筛选、切网格/表格后，上一屏勾选的素材已不在屏幕上；裁剪到当前
+   * 可见集合，避免批量隐藏/删除作用到看不见的行。
+   */
+  const visibleAssetIds = useMemo(() => items.map((item) => item.id), [items]);
+  useSelectionPrune(setSelected, visibleAssetIds);
 
   const previewItems = useMemo(
     () =>

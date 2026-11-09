@@ -1,8 +1,10 @@
 /**
- * 支付域的前端类型（`/admin/payments` 四标签页）。
+ * 支付域的前端类型（`/admin/payments` 三个标签页：渠道 / 对账 / 异常）。
  *
  * 与 `types/api.d.ts` 分开放：那一份是旧接口的存量集合，本文件承载
- * `src/payments/**` 新后端的契约（渠道配置版本化、支付订单、T+1 对账）。
+ * `src/payments/**` 新后端的契约（渠道配置版本化、T+1 对账、异常单）。
+ * 支付订单本身与商品订单是同一张 `Order` 表，列表类型在 `types/api.d.ts`，
+ * 本文件不再重复定义一份投影。
  * 字段名与后端投影逐字一致 —— 两边改名不同步是这类后台最难查的错。
  *
  * 金额一律整数分；`secret` 字段后端只回「是否已配置」，绝不回明文。
@@ -46,6 +48,8 @@ export interface PaymentConfigField {
   /** 身份字段（如商户号）：已有订单绑定后不可改 */
   identity?: boolean;
   default?: string;
+  /** 后端给的字段说明（如「ZPay 商户后台的商户 ID」） */
+  description?: string;
 }
 
 /**
@@ -57,7 +61,7 @@ export interface AdminPaymentProviderView {
   id: PaymentProviderId;
   name: string;
   icon: string;
-  /** sandbox=站内模拟 | redirect=网站跳转 | qrcode=扫码支付 */
+  /** sandbox=站内模拟 | redirect=网站跳转 | qrcode=扫码支付 | qrcode-image=二维码图片 */
   checkoutMode: string;
   enabled: boolean;
   /** 必填项齐全 = 凭据够用 */
@@ -91,145 +95,6 @@ export interface PaymentProviderConfigUpdate {
 /** 站点支付设置 */
 export interface AdminPaymentSettings {
   defaultCurrency: PaymentCurrency;
-}
-
-/* ────────────────────────── 充值商品 ────────────────────────── */
-
-/** 商品销售策略 */
-export type PaymentSaleStrategy =
-  "unlimited" | "periodic" | "inventory" | "timed";
-
-/** 商品派生销售状态 */
-export type PaymentSaleStatus =
-  "disabled" | "on_sale" | "upcoming" | "ended" | "sold_out";
-
-export interface AdminPaymentProductView {
-  id: string;
-  sku: string;
-  name: string;
-  description: string;
-  kind: string;
-  currency: PaymentCurrency;
-  priceCents: number;
-  originalPriceCents: number | null;
-  credits: number;
-  /** 0 = 永久 */
-  creditsValidDays: number;
-  grantType: string;
-  status: string;
-  enabled: boolean;
-  sortOrder: number;
-  saleStrategy: PaymentSaleStrategy;
-  periodDays: number;
-  periodPurchaseLimit: number;
-  stockTotal: number;
-  stockReserved: number;
-  stockSold: number;
-  stockRemaining: number;
-  saleStartAt: string | null;
-  saleEndAt: string | null;
-  /** 后端派生的销售状态（列表以此为准，避免前端按浏览器时区误判窗口） */
-  saleStatus: PaymentSaleStatus;
-  canPurchase: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** 商品保存入参 */
-export interface PaymentProductInput {
-  sku?: string;
-  name: string;
-  description?: string;
-  kind?: string;
-  currency: PaymentCurrency;
-  priceCents: number;
-  originalPriceCents?: number | null;
-  credits: number;
-  creditsValidDays?: number;
-  grantType?: string;
-  status?: string;
-  sortOrder?: number;
-  saleStrategy?: PaymentSaleStrategy;
-  periodDays?: number;
-  periodPurchaseLimit?: number;
-  stockTotal?: number;
-  saleStartAt?: string | null;
-  saleEndAt?: string | null;
-}
-
-/* ────────────────────────── 支付订单 ────────────────────────── */
-
-/**
- * 支付订单展示状态。
- *
- * 与后端 `PAYMENT_DISPLAY_STATUSES` 逐字一致 —— 后端是唯一事实源，
- * 前端不再重复推导，避免两边时钟不同导致翻页时状态跳变。
- */
-export type PaymentDisplayStatus =
-  | "created"
-  | "pending"
-  | "closing"
-  | "create_failed"
-  | "closed"
-  | "credited"
-  | "refunded"
-  | "partial_refunded";
-
-export interface AdminPaymentOrderRow {
-  id: string;
-  orderNo: string;
-  productName: string;
-  productKind: string;
-  userId: string;
-  user: { id: string; name: string; email: string } | null;
-  providerId: string;
-  providerConfigVersion: number | null;
-  amountCents: number;
-  currency: string;
-  credits: number;
-  status: PaymentDisplayStatus;
-  rawOrderStatus: string;
-  providerStatus: string | null;
-  providerTradeNo: string | null;
-  checkout: {
-    mode: string | null;
-    value: string | null;
-    expiresAt: string | null;
-  };
-  expiresAt: string;
-  providerPaidAt: string | null;
-  creditedAt: string | null;
-  closedAt: string | null;
-  lastError: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AdminPaymentOrderDetail extends AdminPaymentOrderRow {
-  rawOrderStatus: string;
-  /** 成功支付尝试对应的渠道单据号（PayPal Order ID / Stripe Session ID / 易支付订单号） */
-  providerRef: string | null;
-  items: Array<{
-    id: string;
-    name: string;
-    sku: string;
-    priceCents: number;
-    credits: number;
-    quantity: number;
-  }>;
-  /** 历史支付尝试，只读；不含 rawPayload */
-  payments: Array<{
-    id: string;
-    status: string;
-    providerId: string;
-    providerConfigVersion: number | null;
-    providerRef: string | null;
-    payTransactionId: string | null;
-    amountCents: number;
-    createdAt: string;
-    paidAt: string | null;
-  }>;
-  actions: { canQuery: boolean; canClose: boolean };
 }
 
 /* ────────────────────────── 对账 ────────────────────────── */

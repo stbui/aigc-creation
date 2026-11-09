@@ -16,6 +16,8 @@ export function BillingStats({ counts }: { counts: Record<string, number> }) {
         key,
         label,
         value: counts[key] ?? 0,
+        // 计数按账单状态原样统计；线路切换的旧账单也是 refunded，但财务「已退」口径会剔除它
+        hint: key === 'refunded' ? '含线路切换（内部重预留）' : undefined,
         tone: key === 'uncertain' && (counts[key] ?? 0) > 0 ? 'danger' : undefined,
       }))}
     />

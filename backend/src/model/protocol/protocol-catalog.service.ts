@@ -74,12 +74,21 @@ export class ProtocolCatalogService {
   }
 
   /**
-   * 保存渠道模型时的协议校验：必须存在、必须是生成类、能力必须匹配。
-   * 返回协议元数据（含是否需要 Secret Key），由调用方做凭证校验。
+   * 保存渠道模型时的协议校验：必须存在、必须有运行时执行器、必须是生成类、
+   * 能力必须匹配。返回协议元数据（含是否需要 Secret Key），由调用方做凭证校验。
+   *
+   * 只查清单不够：插件被停用或后端是 `host:` 时清单仍在、执行器已摘除，
+   * 保存得进去的渠道模型永远跑不出结果（`channel_unavailable`）。这类配置
+   * 必须在保存时拒绝，而不是等用户任务失败退款。
    */
   require(id: string, capability: string): ProtocolCatalogEntry {
     const entry = this.get(id);
     if (!entry) throw new ModelDomainError(`未知的模型请求协议：${id}`);
+    if (!this.registry.has(entry.id)) {
+      throw new ModelDomainError(
+        `协议 ${entry.label} 没有运行时执行器（插件可能已停用或未安装），请先在插件页启用后再配置渠道模型`,
+      );
+    }
     if (entry.kind === 'processing') {
       throw new ModelDomainError('处理类协议不能作为生成渠道模型');
     }
@@ -114,7 +123,12 @@ export class ProtocolCatalogService {
         requiresSecretKey: Boolean(String(provider.auth?.secretField ?? '').trim()),
         source: 'manifest',
         pluginId: item.pluginId,
-        selectable: true,
+        /*
+         * 清单存在 ≠ 能执行：插件停用、`host:` 后端未内置引擎时，
+         * 协议仍在清单里但没有适配器。下拉不列出来，避免运营选了一个
+         * 保存得进去、跑起来必然 `channel_unavailable` 的协议。
+         */
+        selectable: this.registry.has(id),
         surfaces: [...(provider.scopes ?? [])],
         imageParameters: [...(provider.imageParameters ?? [])],
       });

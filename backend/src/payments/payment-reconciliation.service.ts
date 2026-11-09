@@ -35,6 +35,25 @@ export const RECONCILIATION_RESULTS = [
 
 export type ReconciliationResult = (typeof RECONCILIATION_RESULTS)[number];
 
+/**
+ * 仍待人工处置的对账结果。
+ *
+ * `matched`（一致）、`recovered`（查单确认后已补发）、`auto_refunded`（已自动
+ * 原路退款）是三种已经闭环的结果，剩下的每一种都意味着「钱和账对不上，且没人
+ * 处理过」。列表的 `abnormal` 筛选、告警、工作台都必须用这一份口径 ——
+ * 三处各写一份 `notIn` 必然分叉。
+ */
+export const RECONCILIATION_OPEN_RESULTS = [
+  "local_order_not_found",
+  "provider_record_missing",
+  "amount_mismatch",
+  "trade_no_mismatch",
+  "duplicate_charge",
+  "credit_failed",
+  "refund_processing",
+  "refund_failed",
+] as const satisfies readonly ReconciliationResult[];
+
 /** 对账运行超过该时长视为进程中断，允许重跑 */
 export const RECONCILIATION_RUN_STALE_MS = 30 * 60_000;
 
@@ -285,7 +304,7 @@ export class PaymentReconciliationService {
     const where: Record<string, unknown> = { runId };
     if (query.result && query.result !== "all") {
       if (query.result === "abnormal") {
-        where.result = { notIn: ["matched", "recovered", "auto_refunded"] };
+        where.result = { in: [...RECONCILIATION_OPEN_RESULTS] };
       } else if (
         (RECONCILIATION_RESULTS as readonly string[]).includes(query.result)
       ) {
@@ -311,6 +330,34 @@ export class PaymentReconciliationService {
       page,
       pageSize,
     };
+  }
+
+  /**
+   * 仍待处置对账差异所在的批次：每个「渠道 + 账单日」只取**最新一次已完成**的对账。
+   *
+   * 重跑会为新批次生成新明细，旧批次的异常行不会因重跑被改写或删除。若按
+   * 全表 `result NOT IN (...)` 计数，差异只会单调累加、永远不归零 —— 告警
+   * 会长期挂着红点，最后所有人都当它不存在。判定「还欠多少笔」必须按最新
+   * 批次算。
+   *
+   * 返回 run id 列表，调用方自行 count / aggregate（告警要数字，工作台还要金额与样本行）。
+   */
+  async openRunIds(): Promise<string[]> {
+    const runs = await this.prisma.paymentReconciliationRun.findMany({
+      where: { status: "completed" },
+      orderBy: [{ billDate: "desc" }, { attempt: "desc" }],
+      take: 500,
+      select: { id: true, providerId: true, billDate: true },
+    });
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const run of runs) {
+      const key = `${run.providerId}|${run.billDate}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      ids.push(run.id);
+    }
+    return ids;
   }
 
   async runsForExport(query: ReconciliationListQuery) {
@@ -350,7 +397,7 @@ export class PaymentReconciliationService {
     const where: Record<string, unknown> = { runId };
     if (result && result !== "all") {
       if (result === "abnormal")
-        where.result = { notIn: ["matched", "recovered", "auto_refunded"] };
+        where.result = { in: [...RECONCILIATION_OPEN_RESULTS] };
       else where.result = result;
     }
     const total = await this.prisma.paymentReconciliationItem.count({ where });

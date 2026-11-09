@@ -4,6 +4,10 @@ import { AdminRoleService } from './admin-role.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PERMISSIONS } from './permissions';
 import {
+  PaymentReconciliationService,
+  RECONCILIATION_OPEN_RESULTS,
+} from '../payments/payment-reconciliation.service';
+import {
   ALERT_CACHE_TTL_MS,
   BACKUP_STALE_HOURS,
   FAILED_CRITICAL_THRESHOLD,
@@ -12,6 +16,8 @@ import {
   REFUND_STUCK_MINUTES,
   RUNNING_ALERT_THRESHOLD,
   TICKET_CRITICAL_HOURS,
+  UNCERTAIN_BILLING_CRITICAL_COUNT,
+  UNCERTAIN_BILLING_CRITICAL_HOURS,
   WORKBENCH_ITEMS_PER_GROUP,
 } from './alert-thresholds';
 
@@ -79,6 +85,7 @@ export class AdminWorkbenchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly roles: AdminRoleService,
+    private readonly reconciliations: PaymentReconciliationService,
   ) {}
 
   async get(actor: Pick<AdminUser, 'id' | 'role'>, requestedView?: string): Promise<AdminWorkbench> {
@@ -275,8 +282,22 @@ export class AdminWorkbenchService {
     };
   }
 
+  /**
+   * 对账差异。
+   *
+   * 与告警中心同一口径：只看每个「渠道 + 账单日」最新一次已完成的对账，
+   * 否则重跑过的旧异常行会让待办数只涨不落。
+   *
+   * 行内跳转账单页的**对账批次详情**（`?runId=`），不是单条明细 ——
+   * 页面只支持按批次打开，`?item=` 会被静默忽略，点进去等于什么都没发生。
+   */
   private async reconciliationGroup(): Promise<WorkbenchGroup | null> {
-    const where = { result: { notIn: ['matched', 'recovered'] } };
+    const runIds = await this.reconciliations.openRunIds();
+    if (runIds.length === 0) return null;
+    const where = {
+      runId: { in: runIds },
+      result: { in: [...RECONCILIATION_OPEN_RESULTS] },
+    };
     const [count, sum, rows] = await Promise.all([
       this.prisma.paymentReconciliationItem.count({ where }),
       this.prisma.paymentReconciliationItem.aggregate({
@@ -289,6 +310,7 @@ export class AdminWorkbenchService {
         take: WORKBENCH_ITEMS_PER_GROUP,
         select: {
           id: true,
+          runId: true,
           merchantOrderNo: true,
           result: true,
           amountCents: true,
@@ -312,7 +334,7 @@ export class AdminWorkbenchService {
         subtitle: row.result,
         meta: [{ label: '差异', value: row.result, tone: 'warn' }],
         target: {
-          path: `/admin/payments?tab=reconciliation&item=${encodeURIComponent(row.id)}&from=workbench`,
+          path: `/admin/payments?tab=reconciliation&runId=${encodeURIComponent(row.runId)}&from=workbench`,
         },
       })),
     };
@@ -396,10 +418,15 @@ export class AdminWorkbenchService {
     ]);
     if (count === 0) return null;
 
+    // 与告警中心同一口径：笔数或挂账时长任一越线即升 critical
+    const hours = ageHours(rows[0]?.createdAt);
     return {
       key: 'billing',
       label: '生成账单结果不明',
-      severity: 'warning',
+      severity:
+        count >= UNCERTAIN_BILLING_CRITICAL_COUNT || hours >= UNCERTAIN_BILLING_CRITICAL_HOURS
+          ? 'critical'
+          : 'warning',
       count,
       oldestAt: rows[0]?.createdAt.toISOString(),
       link: '/admin/billing-orders?status=uncertain',

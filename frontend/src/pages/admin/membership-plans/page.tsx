@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { adminMembershipPlansApi } from './api';
+import { adminMembershipPlansApi, adminUserGroupsApi } from './api';
 import {
   ActionButton,
   EmptyState,
@@ -18,7 +18,7 @@ import {
   useUnsavedGuard,
 } from './hooks';
 import { EMPTY_DRAFT, type PlanDraft } from './constants';
-import { buildPlanPayload, toDraft } from './utils';
+import { buildPlanPayload, groupOptions, toDraft } from './utils';
 import { PlanCardGrid } from './PlanCardGrid';
 import { PlanDeleteConfirm } from './PlanDeleteConfirm';
 import { PlanFormDrawer } from './PlanFormDrawer';
@@ -49,6 +49,17 @@ export function AdminMembershipPlansPage() {
   const { data, loading, error, reload } = useAdminResource(() =>
     adminMembershipPlansApi.list(),
   );
+
+  /*
+   * 分组的读取权限与套餐写权限不是同一个权限点（`user_group.read` × `product.write`）。
+   * 没有读权限时下拉只剩「默认分组」占位，而不是报错：表单仍可用，只是不能改分组。
+   */
+  const canReadGroups = can('user_group.read');
+  const groups = useAdminResource(
+    () => (canReadGroups ? adminUserGroupsApi.list() : Promise.resolve([])),
+    [canReadGroups],
+  );
+  const groupChoices = groupOptions(groups.data ?? []);
 
   const [editing, setEditing] = useState<AdminMembershipPlan | null>(null);
   const [creating, setCreating] = useState(false);
@@ -248,6 +259,7 @@ export function AdminMembershipPlansPage() {
         draft={draft}
         formDirty={formDirty}
         saving={saving}
+        groupChoices={groupChoices}
         onPatch={patchDraft}
         onClose={requestCloseForm}
         onSubmit={() => void submit()}

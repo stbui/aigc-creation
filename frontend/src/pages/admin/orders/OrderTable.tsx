@@ -6,8 +6,9 @@ import {
   RowMenu,
   StatusTag,
   type AdminColumn,
+  type RowMenuItem,
 } from '~/admin-ui/primitives';
-import { CHANNEL_LABELS, STATUS_LABEL_OVERRIDE } from './constants';
+import { CHANNEL_LABELS, REFUND_STATE_TONES, REFUND_STATUS_LABELS, STATUS_LABEL_OVERRIDE } from './constants';
 import { adminOrderDetailHref, adminUserDetailHref, fmtTime, yuan } from './utils';
 import type { AdminOrderRow } from '../../../types/api';
 
@@ -29,6 +30,7 @@ export function OrderTable({
   canMarkPaid,
   canRefund,
   canDelete,
+  canPaymentOperate,
   busy,
   onRetry,
   onSelectedChange,
@@ -36,6 +38,7 @@ export function OrderTable({
   onOpenDetail,
   onAction,
   onDelete,
+  onPaymentAction,
   onBatchMarkPaid,
   onReset,
 }: {
@@ -50,6 +53,8 @@ export function OrderTable({
   canMarkPaid: boolean;
   canRefund: boolean;
   canDelete: boolean;
+  /** `payment.operate`：渠道查单 / 关单 */
+  canPaymentOperate: boolean;
   busy: boolean;
   onRetry: () => void;
   onSelectedChange: (keys: string[]) => void;
@@ -57,6 +62,7 @@ export function OrderTable({
   onOpenDetail: (id: string) => void;
   onAction: (kind: 'markPaid' | 'refund', row: AdminOrderRow) => void;
   onDelete: (row: AdminOrderRow) => void;
+  onPaymentAction: (kind: 'query' | 'close', row: AdminOrderRow) => void;
   onBatchMarkPaid: () => void;
   onReset: () => void;
 }) {
@@ -180,53 +186,98 @@ export function OrderTable({
         ),
     },
     {
+      /*
+       * 退款状态列：退款单状态与订单状态是两个维度 —— 渠道异步退款时订单
+       * 仍是「已支付」，不单列一列就「筛得出却看不出是哪单」。
+       */
+      key: 'refundState',
+      title: '退款状态',
+      width: 110,
+      render: (row) =>
+        row.refundState ? (
+          <StatusTag
+            status={`refund-${row.refundState}`}
+            tone={REFUND_STATE_TONES[row.refundState]}
+            label={REFUND_STATUS_LABELS[row.refundState]}
+          />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
       key: 'ops',
       title: '操作',
       width: 170,
       /* 固定在最右, 保证滚动时高频动作仍可见 */
       fixed: 'right',
-      render: (row) => (
-        <div className="flex items-center gap-1">
-          <ActionButton variant="ghost" size="sm" onClick={() => onOpenDetail(row.id)}>
-            详情
-          </ActionButton>
-          {/*
-           * 动作按状态出现而非置灰: 「未支付才能核销」「已支付才能退款」都是
-           * 后端硬校验, 给一个点不动的按钮只会让人反复试。
-           */}
-          {row.status === 'pending' && canMarkPaid && (
-            <ActionButton variant="ghost" size="sm" onClick={() => onAction('markPaid', row)}>
-              核销
+      render: (row) => {
+        /*
+         * 支付域的查单/关单只对未支付订单成立：查单以渠道事实为准（可能立即
+         * 入账），关单只停止继续等待支付。两者收进「更多」，避免操作列在
+         * 已有核销/退款时被挤到横向滚动区外。
+         */
+        const canQuery = row.status === 'pending' && row.channel !== 'free';
+        const canClose = row.status === 'pending';
+        const canRemove =
+          canDelete &&
+          (row.status === 'pending' || row.status === 'cancelled') &&
+          row.paymentCount === 0;
+
+        const moreItems: RowMenuItem[] = [];
+        if (canPaymentOperate && canQuery) {
+          moreItems.push({
+            key: 'query',
+            label: '同步状态',
+            onSelect: () => onPaymentAction('query', row),
+          });
+        }
+        if (canPaymentOperate && canClose) {
+          moreItems.push({
+            key: 'close',
+            label: '关闭订单',
+            danger: true,
+            onSelect: () => onPaymentAction('close', row),
+          });
+        }
+        if (canRemove) {
+          moreItems.push({
+            key: 'delete',
+            label: '删除',
+            danger: true,
+            separator: moreItems.length > 0,
+            onSelect: () => onDelete(row),
+          });
+        }
+
+        return (
+          <div className="flex items-center gap-1">
+            <ActionButton variant="ghost" size="sm" onClick={() => onOpenDetail(row.id)}>
+              详情
             </ActionButton>
-          )}
-          {(row.status === 'paid' || row.status === 'partial_refunded') &&
-            row.paidCents > row.refundedCents &&
-            canRefund && (
-              <ActionButton
-                variant="destructive"
-                size="sm"
-                onClick={() => onAction('refund', row)}
-              >
-                退款
+            {/*
+             * 动作按状态出现而非置灰: 「未支付才能核销」「已支付才能退款」都是
+             * 后端硬校验, 给一个点不动的按钮只会让人反复试。
+             */}
+            {row.status === 'pending' && canMarkPaid && (
+              <ActionButton variant="ghost" size="sm" onClick={() => onAction('markPaid', row)}>
+                核销
               </ActionButton>
             )}
-          {canDelete &&
-            (row.status === 'pending' || row.status === 'cancelled') &&
-            row.paymentCount === 0 && (
-              <RowMenu
-                label={`订单 ${row.orderNo} 更多操作`}
-                items={[
-                  {
-                    key: 'delete',
-                    label: '删除',
-                    danger: true,
-                    onSelect: () => onDelete(row),
-                  },
-                ]}
-              />
-            )}
-        </div>
-      ),
+            {(row.status === 'paid' || row.status === 'partial_refunded') &&
+              row.paidCents > row.refundedCents &&
+              canRefund && (
+                <ActionButton
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => onAction('refund', row)}
+                >
+                  退款
+                </ActionButton>
+              )}
+            <RowMenu label={`订单 ${row.orderNo} 更多操作`} items={moreItems} />
+          </div>
+        );
+      },
     },
   ];
 

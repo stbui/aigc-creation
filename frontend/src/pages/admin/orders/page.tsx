@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  ConfirmDialog,
   ContextBanner,
   ExportCsvButton,
   PageHeader,
@@ -14,8 +15,8 @@ import {
   readAdminDone,
   withAdminDone,
 } from '../../../lib/admin-context-link';
-import { adminOrdersApi } from './api';
-import { useAdmin, useAdminDetailParam, useToast } from './hooks';
+import { adminOrderPaymentApi, adminOrdersApi } from './api';
+import { useAdmin, useAdminDetailParam, useSelectionPrune, useToast } from './hooks';
 import { yuan, yuanToCents } from './utils';
 import { OrderDetailDrawer } from './OrderDetailDrawer';
 import { OrderFilterBar } from './OrderFilterBar';
@@ -28,6 +29,7 @@ import {
   type RefundConfirmationTarget,
 } from './OrderConfirmationDialogs';
 import { refundWarningMessage } from './refundResultMessage';
+import { refundRuleHint } from './refundRuleHint';
 import { useOrderFilters } from './useOrderFilters';
 import type { AdminOrderRefund, AdminOrderRow } from '../../../types/api';
 
@@ -76,9 +78,18 @@ export function AdminOrdersPage() {
     exportCsv,
   } = useOrderFilters({ onQueryChange: () => setSelected([]) });
 
+  /*
+   * 换筛选会清空勾选；翻页不经过 onQueryChange，因此再按当前页裁剪一次，
+   * 保证批量核销只作用于屏幕上可见的订单。
+   */
+  const visibleOrderIds = useMemo(() => (data?.items ?? []).map((row) => row.id), [data]);
+  useSelectionPrune(setSelected, visibleOrderIds);
+
   const [detailId, setDetailId] = useAdminDetailParam();
   const [action, setAction] = useState<{ kind: 'markPaid' | 'refund'; row: AdminOrderRow } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminOrderRow | null>(null);
+  /** 支付域动作：查单 / 关单。与退款共用同一套确认弹窗语义，但不退款 */
+  const [payAction, setPayAction] = useState<{ kind: 'query' | 'close'; row: AdminOrderRow } | null>(null);
   /** 退款金额（元）。打开弹窗时预填可退上限 */
   const [refundYuan, setRefundYuan] = useState('');
   const [refundReason, setRefundReason] = useState('');
@@ -172,7 +183,12 @@ export function AdminOrdersPage() {
       reload();
       returnToSource(action.kind === 'refund' ? 'refunded' : 'marked_paid');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '操作失败');
+      /*
+       * 退款被拒要分清「金额填错」与「规则要改」：两类过去同形，运营只能
+       * 反复改金额试。业务码翻译成下一步（见 refundRuleHint）。
+       */
+      const hint = refundRuleHint(e);
+      toast.error(hint ? `${(e as Error).message} ${hint}` : (e as Error).message || '操作失败');
     } finally {
       setBusy(false);
     }
@@ -202,6 +218,34 @@ export function AdminOrdersPage() {
       reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '删除订单失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * 查单 / 关单。
+   *
+   * 两者都只处理**未支付**订单：查单以渠道事实为准（已收款则立即入账并补发
+   * 积分），关单只停止继续等待支付。关单不退款 —— 已支付订单必须走退款流程，
+   * 否则「关闭」会被误读成「退钱」。
+   */
+  const runPayAction = async () => {
+    if (!payAction) return;
+    setBusy(true);
+    try {
+      if (payAction.kind === 'query') {
+        await adminOrderPaymentApi.query(payAction.row.id);
+        toast.success('已同步渠道状态');
+      } else {
+        await adminOrderPaymentApi.close(payAction.row.id);
+        toast.success(`订单 ${payAction.row.orderNo} 已关闭`);
+      }
+      setPayAction(null);
+      setDetailVersion((value) => value + 1);
+      reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '操作失败');
     } finally {
       setBusy(false);
     }
@@ -272,7 +316,7 @@ export function AdminOrdersPage() {
     <>
       <PageHeader
         title="订单管理"
-        description="订单、支付与退款。核销与退款会写入操作审计，并即时回收或发放积分。"
+        description="订单、支付与退款。核销、渠道查单、关单与退款都会写入操作审计；关单不退款。"
       />
 
       {(actionContext.from || done) && (
@@ -349,6 +393,7 @@ export function AdminOrdersPage() {
           canMarkPaid={can('order.mark_paid')}
           canRefund={can('order.refund')}
           canDelete={can('order.delete')}
+          canPaymentOperate={can('payment.operate')}
           busy={busy}
           onRetry={reload}
           onSelectedChange={setSelected}
@@ -356,6 +401,7 @@ export function AdminOrdersPage() {
           onOpenDetail={setDetailId}
           onAction={openAction}
           onDelete={requestDelete}
+          onPaymentAction={(kind, row) => setPayAction({ kind, row })}
           onBatchMarkPaid={() => setBatchOpen(true)}
           onReset={reset}
         />
@@ -367,6 +413,7 @@ export function AdminOrdersPage() {
         rows={data?.items ?? []}
         canMarkPaid={can('order.mark_paid')}
         canRefund={can('order.refund')}
+        canPaymentOperate={can('payment.operate')}
         initialIntent={
           actionContext.intent === 'refund' ||
           actionContext.intent === 'confirmRefund' ||
@@ -376,6 +423,7 @@ export function AdminOrdersPage() {
         }
         onClose={() => setDetailId(null)}
         onAction={openAction}
+        onPaymentAction={(kind, row) => setPayAction({ kind, row })}
         onConfirmRefund={openRefundConfirmation}
       />
 
@@ -399,6 +447,26 @@ export function AdminOrdersPage() {
         onProviderRefundIdChange={setRefundProviderId}
         onCancel={() => setRefundConfirmation(null)}
         onConfirm={() => void runRefundConfirmation()}
+      />
+
+      <ConfirmDialog
+        open={payAction !== null}
+        danger={payAction?.kind === 'close'}
+        title={payAction?.kind === 'close' ? '关闭支付订单' : '向渠道同步订单状态'}
+        description={
+          payAction?.kind === 'close'
+            ? '关闭后该订单不再等待支付。已支付的订单不会被关闭，请先同步状态确认。'
+            : '向渠道查一次订单状态；若渠道已收款，会立即入账并补发积分。'
+        }
+        impact={
+          payAction?.kind === 'close'
+            ? ['未支付订单将标记为已取消', '已支付订单会被拒绝关闭，请先同步状态', '关闭不会退款']
+            : ['若渠道已收款，积分会立即入账']
+        }
+        confirmText={payAction?.kind === 'close' ? '确认关闭' : '确认同步'}
+        loading={busy}
+        onCancel={() => setPayAction(null)}
+        onConfirm={() => void runPayAction()}
       />
 
       <OrderDeleteConfirm

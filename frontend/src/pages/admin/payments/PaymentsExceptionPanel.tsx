@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { adminPaymentExceptionsApi } from './api';
 import {
   ActionButton,
@@ -32,7 +33,7 @@ import {
   PAYMENT_EXCEPTION_STATUS_META,
   PAYMENT_EXCEPTION_STATUS_OPTIONS,
 } from './constants';
-import { moneyText, providerLabel } from './utils';
+import { adminOrderDetailHref, moneyText, providerLabel } from './utils';
 
 /**
  * 支付异常标签。
@@ -137,7 +138,17 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
       width: 220,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <code className="break-all font-mono text-xs">{row.merchantOrderNo}</code>
+          {row.orderId ? (
+            <Link
+              className="break-all font-mono text-xs text-brand hover:underline"
+              to={adminOrderDetailHref(row.orderId)}
+              title="在订单管理中打开"
+            >
+              {row.merchantOrderNo}
+            </Link>
+          ) : (
+            <code className="break-all font-mono text-xs">{row.merchantOrderNo}</code>
+          )}
           <code className="break-all font-mono text-[12px] text-muted-foreground">
             {row.providerTradeNo ?? '无渠道交易号'}
           </code>

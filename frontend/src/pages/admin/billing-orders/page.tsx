@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminBillingOrdersApi } from './api';
 import {
@@ -20,6 +20,8 @@ import {
   useAdminDetailParam,
   useAdminList,
   useAdminResource,
+  useAdminUrlFilterSync,
+  useSelectionPrune,
   useToast,
 } from './hooks';
 import { STATUS_LABELS, REVIEW_OPTION } from './constants';
@@ -55,13 +57,32 @@ export function AdminBillingOrdersPage() {
   const done = readAdminDone(searchParams);
   const resolvable = can('billing_order.resolve');
 
-  const [status, setStatus] = useState<string | undefined>(undefined);
-  const [billingMode, setBillingMode] = useState<string | undefined>(undefined);
-  const [model, setModel] = useState('');
-  const [userId, setUserId] = useState('');
-  const [taskId, setTaskId] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  /*
+   * 筛选条件从地址栏恢复。
+   *
+   * 任务页与工作台的「账单」入口都是带 `taskId` / `status` 深链过来的：
+   * 不读 URL 就等于把入口丢掉，点进来看到的永远是全量第一页。
+   * 读取放在 useState 初始化里同步完成，避免先按空条件查一次再查第二次。
+   */
+  const initial = {
+    status: searchParams.get('status') ?? undefined,
+    billingMode: searchParams.get('billingMode') ?? undefined,
+    model: searchParams.get('model') ?? '',
+    userId: searchParams.get('userId') ?? '',
+    taskId: searchParams.get('taskId') ?? '',
+    from: searchParams.get('from') ?? '',
+    to: searchParams.get('to') ?? '',
+  };
+
+  const [status, setStatus] = useState<string | undefined>(() => initial.status);
+  const [billingMode, setBillingMode] = useState<string | undefined>(
+    () => initial.billingMode,
+  );
+  const [model, setModel] = useState(initial.model);
+  const [userId, setUserId] = useState(initial.userId);
+  const [taskId, setTaskId] = useState(initial.taskId);
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -79,7 +100,20 @@ export function AdminBillingOrdersPage() {
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<BillingOrderListResult>(fetcher);
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<BillingOrderListResult>(fetcher, initial);
+  /*
+   * 已生效条件写回地址栏：刷新后条件还在，链接发给同事看到的是同一份数据。
+   * `id`（详情抽屉）由 `useAdminDetailParam` 自己维护，两者基于 URLSearchParams 合并。
+   */
+  useAdminUrlFilterSync({
+    status: params.status as string | undefined,
+    billingMode: params.billingMode as string | undefined,
+    model: params.model as string | undefined,
+    userId: params.userId as string | undefined,
+    taskId: params.taskId as string | undefined,
+    from: params.from as string | undefined,
+    to: params.to as string | undefined,
+  });
   const rows = data?.items ?? [];
   const statusCounts = data?.statusCounts ?? {};
 
@@ -95,6 +129,12 @@ export function AdminBillingOrdersPage() {
   const [resolving, setResolving] = useState(false);
   // 批量核对：勾选若干账单一次性处置，逐条结果回显
   const [selected, setSelected] = useState<string[]>([]);
+  /*
+   * 换筛选与翻页后，上一屏勾选的 id 已不在列表里；批量处置会让看不见的账单
+   * 也被结算/退款。按当前页裁剪，保证「已选 N 条」始终与屏幕一致。
+   */
+  const visibleBillingIds = useMemo(() => (data?.items ?? []).map((row) => row.id), [data]);
+  useSelectionPrune(setSelected, visibleBillingIds);
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchReason, setBatchReason] = useState('');

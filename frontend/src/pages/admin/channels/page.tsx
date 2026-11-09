@@ -1,5 +1,8 @@
 import { lazy, Suspense } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  ActionButton,
+  Button,
   StaleError,
   ConfirmDialog,
   PageHeader,
@@ -63,6 +66,11 @@ export function AdminChannelsPage() {
     writable,
     modelWritable,
     canTest,
+    canReadCapabilities,
+    canReadPlugins,
+    resetCooling,
+    coolingCount,
+    resettingHealth,
     rows,
     loading,
     error,
@@ -111,7 +119,22 @@ export function AdminChannelsPage() {
   } = useChannelWorkspace();
 
   const healthPanel = (
-    <Panel title="线路健康">
+    <Panel
+      title="线路健康"
+      extra={
+        writable && coolingCount > 0 ? (
+          // 冷却只对可归因失败写入；上游恢复后允许提前解除，省掉再等一个冷却周期
+          <ActionButton
+            variant="ghost"
+            size="xs"
+            disabled={resettingHealth}
+            onClick={() => void resetCooling()}
+          >
+            {resettingHealth ? '解除中…' : `解除冷却（${coolingCount}）`}
+          </ActionButton>
+        ) : undefined
+      }
+    >
       {health.error && health.rows.length === 0 ? (
         <StaleError error={health.error} onRetry={() => void health.reload()} />
       ) : (
@@ -124,6 +147,20 @@ export function AdminChannelsPage() {
     <>
       <PageHeader
         title="渠道工作台"
+        actions={
+          <>
+            {canReadCapabilities && (
+              <Button asChild variant="outline" size="sm">
+                <Link to="/admin/capabilities">能力与模型</Link>
+              </Button>
+            )}
+            {canReadPlugins && (
+              <Button asChild variant="outline" size="sm">
+                <Link to="/admin/plugins">插件</Link>
+              </Button>
+            )}
+          </>
+        }
       />
 
       <SegmentedGroup
