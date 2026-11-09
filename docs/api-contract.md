@@ -14,7 +14,7 @@
 | 场景 | 原因 |
 | --- | --- |
 | CSV 导出 `GET /admin/*/export` | 返回文件流；前端 `downloadCsv()` 独立于 `request()` |
-| 渠道回调 `GET/POST /payments/callback/:providerId/:configId` | 用 `@Res()` 直写渠道要求的回执格式，不能套 `{ code, data }`；易支付与 ZPay 走 GET |
+| 渠道回调 `/payment/webhook/*`、`/payments/callback/:providerId/:configId` | 用 `@Res()` 直写渠道要求的回执格式，不能套 `{ code, data }`；规范入口见下方支付路由说明 |
 
 ## 2. 跨模块错误码
 
@@ -79,7 +79,11 @@
 | GET | `/api/v1/products/:sku` | 商品详情（结算页用） |
 | GET | `/api/v1/orders/:id`、POST `/pay`、POST `/cancel` | 订单详情 / 发起沙箱支付 / 用户取消未支付订单（仅 `pending → cancelled`，幂等；已支付只能走退款） |
 | POST | `/api/v1/payments/:orderId/intent` | 发起真实渠道支付（返回 `redirect` 跳转或 `qrcode` 扫码） |
-| GET/POST | `/api/v1/payments/callback/:providerId/:configId` | **渠道异步回调（公开，无信封，`@Res()` 直写）**，验签 + 金额核对 + 幂等；易支付与 ZPay 使用 GET，PayPal/Stripe 使用 POST |
+| GET/POST | `/api/v1/payment/webhook/easypay` | 易支付固定回调入口（公开，无信封）；按历史 Payment 反查配置版本，验签 + 金额核对 + 幂等 |
+| POST | `/api/v1/payment/webhook/alipay` | 支付宝官方固定回调入口（公开，无信封）；按历史 Payment 反查配置版本 |
+| POST | `/api/v1/payment/webhook/wxpay` | 微信支付固定回调入口（公开，无信封）；先用历史 APIv3 密钥解密，再按历史配置验签 |
+| POST | `/api/v1/payment/webhook/stripe` | Stripe 固定回调入口（公开，无信封）；按 Checkout Session / 历史 Payment 反查配置版本 |
+| GET/POST | `/api/v1/payments/callback/:providerId/:configId` | **历史回调入口（公开，无信封，`@Res()` 直写）**；PayPal / ZPay 及已写入渠道后台的旧 URL 继续使用 |
 | GET | `/api/v1/payments/:orderId/status` | 支付状态轮询 |
 | POST/GET | `/api/v1/invoices`、`/invoices/:id/file` | 申请开票 / 列表 / 取可打印 HTML。同一订单保留完整申请历史；同一时刻最多一张有效票（服务层校验 + 数据库唯一占用键兜底），只有 `rejected` 可重新申请，`red_flushed` 不可重提 |
 | GET | `/api/v1/marketing/{popup,invites,checkin}` | 营销弹窗 / 邀请 / 签到 |

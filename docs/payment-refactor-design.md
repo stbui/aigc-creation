@@ -120,7 +120,7 @@ OrderService.create()                      订单快照 + 优惠 + 幂等键    
 | 商品 | `TopupProduct`（微积分） | 扩展 `Product`（整数积分） | 不复制商品域；`/admin/products` 仍是全量管理入口 |
 | 渠道 | 宿主插件 + `payment-plugins` | 适配器注册表 `payments/adapters/` | 本仓库没有支付插件运行时，模型插件是模型协议，不能混用 |
 | 配置 | `PaymentProviderConfig` 加密版本化 | 同名新表 | 语义一致 |
-| 回调 | `/api/payments/notify/:provider/:configId` | `/api/v1/payments/callback/:channel/:configId` | 回调必须能定位到下单时的配置版本 |
+| 回调 | `/api/payments/notify/:provider/:configId` | `/api/v1/payment/webhook/:channel` | 固定 URL 由订单历史 Payment 反查下单时的配置版本；旧带 `configId` 路由保留兼容 |
 | 后端 worker | 15s 独立循环 | 15s `PaymentWorkerService` | 不用 10 分钟的调度器 |
 | 对账 | `PaymentReconciliationRun/Item` | 同名新表，替换旧批次表 | 旧表只读保留一个版本周期 |
 | 后台 UI | antd + 自定义 admin-ui | shadcn + `admin-ui` | 视觉语言按本仓库，不引 antd |
@@ -240,15 +240,16 @@ interface PaymentAdapter {
 
 ### 4.5 回调收件箱与 worker
 
-回调路径改为 `POST /payments/callback/:channel/:configId`（`configId` 是下单时固定的配置行 id）：
+规范回调路径为 `GET/POST /payment/webhook/easypay`、`POST /payment/webhook/{alipay,wxpay,stripe}`。URL **不携带 `configId`**；PayPal / ZPay 及历史已下发地址继续使用 `GET/POST /payments/callback/:channel/:configId`。
 
-1. 按 `configId` 取配置，校验 `providerId` 与 `channel` 一致；不存在或已停用 → 失败响应。
-2. 适配器用该版本 `values` 验签；失败直接回渠道失败，不落库。
-3. 归一出 `merchantOrderNo / providerTradeNo / amountCents / currency / paid / closed / paidAt / providerStatus / eventId`。
-4. 按 `merchantOrderNo` 查订单；订单不存在、`Order.providerConfigId !== configId`、金额/币种不符 → 落 `PaymentNotification(status='failed')` + 对账差异，回渠道失败（让其重试）。
-5. 以 `(providerId, eventId)` 唯一写入 `PaymentNotification`（原始报文加密、摘要落库）。重复事件直接回成功。
-6. 立即尝试处理；失败保留 `pending`，worker 按指数退避重试。
-7. 应答格式由适配器 `ack()` 决定（支付宝纯文本 / 微信 JSON）。
+1. EasyPay / 支付宝 / Stripe 从明文商户订单号定位订单；Stripe 进一步用 Checkout Session id，EasyPay 用渠道订单号定位历史 Payment。微信通知正文加密，先用所有历史配置的 APIv3 密钥尝试解密，唯一得到商户订单号后再按历史配置验签。
+2. 从这些 Payment 收集 `providerConfigId`，逐个加载下单时的配置版本；订单不存在或没有任何历史支付尝试 → 失败响应，验签前拒绝。
+3. 适配器用历史 `values` 验签；多个配置同时验签通过时，必须由 `providerTradeNo` 唯一命中一条历史 Payment，否则拒绝处理。绝不回落到渠道最新配置。
+4. 归一出 `merchantOrderNo / providerTradeNo / amountCents / currency / paid / closed / paidAt / providerStatus / eventId`。
+5. 金额/币种不符 → 落 `PaymentNotification(status='failed')` + 对账差异，回渠道成功以停止无意义重试。
+6. 以 `(providerId, eventId)` 唯一写入 `PaymentNotification`（原始报文加密、摘要落库）。重复事件直接回成功。
+7. 立即尝试处理；失败保留 `pending`，worker 按指数退避重试。
+8. 应答格式由适配器 `ack()` 决定（支付宝纯文本 / 微信 JSON）。
 
 收件箱终态：
 
@@ -813,7 +814,7 @@ model PaymentReconciliationItem {
 ### Phase 1：渠道配置 + 支付渠道标签
 
 - 支付宝/微信适配器改接收 `values`，不再读 env；补 `queryOrder / closeOrder / verifyNotification(config)`。
-- 回调迁移到 `/payments/callback/:channel/:configId`；保留旧路由一版用于在途订单。
+- 回调迁移到固定 `/payment/webhook/:channel`（EasyPay / 支付宝 / 微信 / Stripe），保留旧 `/payments/callback/:channel/:configId` 用于 PayPal / ZPay 与在途订单。
 - 后台 `/admin/payments/providers`、`/settings`。
 - 前端 `AdminPaymentsPage` 骨架 + 支付渠道标签 + 配置抽屉 + 风险提示。
 - 闸口：`smoke-payments.js`（渠道状态、配置保存/掩码、回调）。
@@ -2090,10 +2091,13 @@ URL 与请求体不变，实现迁到 `OrderCancelController`。返回 C 端订�
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| POST | `/payments/callback/:providerId/:configId` | 新订单固定配置版本；必须与订单 `providerConfigId` 一致 |
-| POST | `/payments/callback/:providerId` | 迁移窗口兼容；按该渠道最新配置验签，处理成功日志 `warn` |
+| GET/POST | `/payment/webhook/easypay` | 易支付固定入口；按订单历史 Payment 反查配置版本 |
+| POST | `/payment/webhook/alipay` | 支付宝官方固定入口；按商户订单号反查历史配置 |
+| POST | `/payment/webhook/wxpay` | 微信支付固定入口；先解密，再按历史配置验签 |
+| POST | `/payment/webhook/stripe` | Stripe 固定入口；按 Checkout Session id 精确匹配历史 Payment |
+| GET/POST | `/payments/callback/:providerId/:configId` | PayPal / ZPay 与历史旧 URL 兼容入口 |
 
-通知 URL 由 `createOrder()` 传入：`${PAYMENT_NOTIFY_BASE}/api/v1/payments/callback/${providerId}/${configId}`。`configId` 是随机 cuid，不含密钥；公开可见但无法枚举出有用信息。
+EasyPay / 支付宝 / 微信 / Stripe 的通知 URL 由 `createOrder()` 传入固定地址，不随配置版本轮换；PayPal / ZPay 仍使用 `${PAYMENT_NOTIFY_BASE}/api/v1/payments/callback/${providerId}/${configId}`。`configId` 是随机 cuid，不含密钥，但新渠道不再把它暴露在 URL 中。
 
 `PaymentNotificationService.ingest()` 的响应必须由适配器的 `ack()` 生成：支付宝纯文本 `success/fail`，微信 JSON `{code,message}`，不能套统一信封。
 

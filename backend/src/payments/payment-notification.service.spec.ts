@@ -1,3 +1,4 @@
+import { createCipheriv, randomBytes } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { adapterMock } = vi.hoisted(() => ({
@@ -463,6 +464,321 @@ describe('PaymentNotificationService 收件箱并发闸', () => {
           status: 'failed',
           nextAttemptAt: expect.any(Date),
         }),
+      }),
+    );
+  });
+});
+
+describe('PaymentNotificationService 规范回调历史配置', () => {
+  const OLD_CONFIG_ID = 'cfg_old';
+  const NEW_CONFIG_ID = 'cfg_new';
+
+  function config(id: string, providerId: 'alipay' | 'wechat', values: Record<string, string>) {
+    return {
+      id,
+      providerId,
+      instanceId: `instance_${id}`,
+      name: id,
+      sortOrder: 0,
+      version: id === OLD_CONFIG_ID ? 1 : 2,
+      enabled: true,
+      closeAfterMinutes: 30,
+      minAmountCents: null,
+      maxAmountCents: null,
+      dailyLimitCents: null,
+      refundEnabled: true,
+      paymentMethods: ['alipay', 'wechat'],
+      values,
+    };
+  }
+
+  function makeCanonicalHarness(input: {
+    providerId: 'alipay' | 'wechat';
+    configs: ReturnType<typeof config>[];
+    payments: Array<{
+      providerConfigId: string;
+      providerMethod: string | null;
+      providerRef: string | null;
+      payTransactionId: string | null;
+    }>;
+    references?: Array<{ providerConfigId: string }>;
+  }) {
+    const notificationRow = {
+      id: NOTIFICATION_ID,
+      providerId: input.providerId,
+      providerEventId: 'evt_1',
+      providerConfigId: OLD_CONFIG_ID,
+      merchantOrderNo: ORDER_NO,
+      normalizedJson: '{}',
+      status: 'pending',
+      attempts: 0,
+      payloadCipher: 'cipher',
+      lastError: null,
+      nextAttemptAt: new Date(),
+      processedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const prisma = {
+      paymentNotification: {
+        findUnique: vi.fn(async ({ where }: { where: { id?: string } }) =>
+          where.id ? notificationRow : null,
+        ),
+        create: vi.fn().mockResolvedValue(notificationRow),
+        update: vi.fn().mockResolvedValue(notificationRow),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      order: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'order_canonical_1' }),
+      },
+      payment: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce(input.references ?? input.payments)
+          .mockResolvedValue(input.payments),
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'pay_canonical_old',
+          providerInstanceId: 'instance_old',
+        }),
+      },
+      paymentReconciliationRun: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        aggregate: vi.fn().mockResolvedValue({ _max: { attempt: null } }),
+        create: vi.fn().mockResolvedValue({ id: 'run_1' }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      paymentReconciliationItem: {
+        upsert: vi.fn().mockResolvedValue({}),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+    };
+    const byId = new Map(input.configs.map((item) => [item.id, item]));
+    const configs = {
+      byId: vi.fn(async (id: string) => {
+        const found = byId.get(id);
+        if (!found) throw new Error(`missing config ${id}`);
+        return found;
+      }),
+    };
+    const cipher = {
+      encrypt: vi.fn().mockReturnValue('cipher'),
+      decrypt: vi.fn().mockReturnValue('{}'),
+    };
+    const orders = {
+      applyPaymentResult: vi.fn().mockResolvedValue({ applied: true, idempotentHit: false }),
+    };
+    const exceptions = {
+      recordManual: vi.fn().mockResolvedValue({}),
+      autoRefundCancelledPayment: vi.fn().mockResolvedValue({ outcome: 'manual_review' }),
+    };
+    const service = new PaymentNotificationService(
+      prisma as never,
+      cipher as never,
+      configs as never,
+      orders as never,
+      exceptions as never,
+    );
+    return { service, prisma, configs, orders };
+  }
+
+  function alipayResult(providerTradeNo = 'ali_trade_1'): NotificationResult {
+    return {
+      ok: true,
+      eventId: `alipay:${providerTradeNo}`,
+      merchantOrderNo: ORDER_NO,
+      providerTradeNo,
+      amountCents: 1005,
+      currency: 'CNY',
+      state: 'paid',
+      providerStatus: 'TRADE_SUCCESS',
+      ackSuccess: true,
+      rawPayload: '{}',
+    };
+  }
+
+  function wechatBody(orderNo: string, apiV3Key: string) {
+    const nonce = randomBytes(6).toString('hex');
+    const associatedData = 'transaction';
+    const plain = JSON.stringify({
+      out_trade_no: orderNo,
+      transaction_id: 'wx_trade_1',
+      trade_state: 'SUCCESS',
+      success_time: '2026-11-09T10:00:00+08:00',
+      amount: { total: 1005 },
+    });
+    const cipher = createCipheriv(
+      'aes-256-gcm',
+      Buffer.from(apiV3Key, 'utf8'),
+      Buffer.from(nonce, 'utf8'),
+    );
+    cipher.setAAD(Buffer.from(associatedData, 'utf8'));
+    const encrypted = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+    const body = {
+      resource: {
+        algorithm: 'AEAD_AES_256_GCM',
+        ciphertext: Buffer.concat([encrypted, cipher.getAuthTag()]).toString('base64'),
+        nonce,
+        associated_data: associatedData,
+      },
+    };
+    return { body, rawBody: Buffer.from(JSON.stringify(body)) };
+  }
+
+  beforeEach(() => {
+    adapterMock.verifyNotification.mockReset();
+    adapterMock.ack.mockReset();
+    adapterMock.ack.mockImplementation((result: NotificationResult) => ({
+      status: result.ok && result.ackSuccess ? 200 : 400,
+      body: result.ok && result.ackSuccess ? 'success' : 'fail',
+      contentType: 'text/plain; charset=utf-8',
+    }));
+  });
+
+  it('配置轮换后规范回调只使用订单引用的历史配置验签', async () => {
+    const { service, prisma, configs } = makeCanonicalHarness({
+      providerId: 'alipay',
+      configs: [
+        config(OLD_CONFIG_ID, 'alipay', { appId: 'old-app' }),
+        config(NEW_CONFIG_ID, 'alipay', { appId: 'new-app' }),
+      ],
+      payments: [
+        {
+          providerConfigId: OLD_CONFIG_ID,
+          providerMethod: 'alipay',
+          providerRef: null,
+          payTransactionId: 'ali_trade_1',
+        },
+      ],
+    });
+    adapterMock.verifyNotification.mockResolvedValue(alipayResult());
+
+    const ack = await service.ingestCanonical({
+      providerId: 'alipay',
+      headers: {},
+      rawBody: Buffer.from('out_trade_no=HJ202611030001&trade_status=TRADE_SUCCESS'),
+      body: {
+        out_trade_no: ORDER_NO,
+        trade_no: 'ali_trade_1',
+        trade_status: 'TRADE_SUCCESS',
+      },
+    });
+
+    expect(ack).toMatchObject({ status: 200, body: 'success' });
+    expect(configs.byId).toHaveBeenCalledTimes(1);
+    expect(configs.byId).toHaveBeenCalledWith(OLD_CONFIG_ID);
+    expect(adapterMock.verifyNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ configId: OLD_CONFIG_ID }),
+      }),
+    );
+    expect(prisma.paymentNotification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ providerConfigId: OLD_CONFIG_ID }),
+      }),
+    );
+  });
+
+  it('多个历史配置同时验签通过且交易号无法唯一消歧时拒绝处理', async () => {
+    const { service, prisma } = makeCanonicalHarness({
+      providerId: 'alipay',
+      configs: [
+        config(OLD_CONFIG_ID, 'alipay', { appId: 'same-app' }),
+        config(NEW_CONFIG_ID, 'alipay', { appId: 'same-app' }),
+      ],
+      payments: [
+        {
+          providerConfigId: OLD_CONFIG_ID,
+          providerMethod: 'alipay',
+          providerRef: null,
+          payTransactionId: 'ali_trade_old',
+        },
+        {
+          providerConfigId: NEW_CONFIG_ID,
+          providerMethod: 'alipay',
+          providerRef: null,
+          payTransactionId: 'ali_trade_new',
+        },
+      ],
+    });
+    adapterMock.verifyNotification.mockResolvedValue(alipayResult('ali_trade_unknown'));
+
+    const ack = await service.ingestCanonical({
+      providerId: 'alipay',
+      headers: {},
+      rawBody: Buffer.from('out_trade_no=HJ202611030001&trade_status=TRADE_SUCCESS'),
+      body: {
+        out_trade_no: ORDER_NO,
+        trade_no: 'ali_trade_unknown',
+        trade_status: 'TRADE_SUCCESS',
+      },
+    });
+
+    expect(ack).toMatchObject({ status: 400, body: 'fail' });
+    expect(adapterMock.verifyNotification).toHaveBeenCalledTimes(2);
+    expect(prisma.paymentNotification.create).not.toHaveBeenCalled();
+  });
+
+  it('微信规范回调用历史 APIv3 密钥解密后，再用对应历史配置验签', async () => {
+    const oldKey = '0123456789abcdef0123456789abcdef';
+    const newKey = 'fedcba9876543210fedcba9876543210';
+    const encrypted = wechatBody(ORDER_NO, oldKey);
+    const { service, prisma, configs } = makeCanonicalHarness({
+      providerId: 'wechat',
+      configs: [
+        config(OLD_CONFIG_ID, 'wechat', {
+          apiV3Key: oldKey,
+          wechatPayPublicKeyId: 'PUB_KEY_ID_OLD',
+        }),
+        config(NEW_CONFIG_ID, 'wechat', {
+          apiV3Key: newKey,
+          wechatPayPublicKeyId: 'PUB_KEY_ID_NEW',
+        }),
+      ],
+      payments: [
+        {
+          providerConfigId: OLD_CONFIG_ID,
+          providerMethod: 'wechat',
+          providerRef: 'wx_ref_old',
+          payTransactionId: 'wx_trade_1',
+        },
+      ],
+      references: [
+        { providerConfigId: OLD_CONFIG_ID },
+        { providerConfigId: NEW_CONFIG_ID },
+      ],
+    });
+    adapterMock.verifyNotification.mockResolvedValue({
+      ok: true,
+      eventId: 'wx_trade_1',
+      merchantOrderNo: ORDER_NO,
+      providerTradeNo: 'wx_trade_1',
+      amountCents: 1005,
+      currency: 'CNY',
+      state: 'paid',
+      providerStatus: 'SUCCESS',
+      ackSuccess: true,
+      rawPayload: '{}',
+    });
+
+    const ack = await service.ingestCanonical({
+      providerId: 'wechat',
+      headers: { 'wechatpay-serial': 'PUB_KEY_ID_OLD' },
+      rawBody: encrypted.rawBody,
+      body: encrypted.body,
+    });
+
+    expect(ack).toMatchObject({ status: 200, body: 'success' });
+    expect(configs.byId).toHaveBeenCalledTimes(2);
+    expect(adapterMock.verifyNotification).toHaveBeenCalledTimes(1);
+    expect(adapterMock.verifyNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ configId: OLD_CONFIG_ID }),
+        headers: expect.objectContaining({ 'wechatpay-serial': 'PUB_KEY_ID_OLD' }),
+      }),
+    );
+    expect(prisma.paymentNotification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ providerConfigId: OLD_CONFIG_ID }),
       }),
     );
   });

@@ -263,7 +263,9 @@ PaymentsService（编排）
 | GET | `/orders`、`/orders/:id` | 我的订单 / 订单详情 |
 | POST | `/orders/:id/pay`、`/orders/:id/cancel` | 沙箱支付 / 取消未支付订单 |
 | POST | `/payments/:orderId/intent` | 发起真实渠道支付，返回 `redirect` 或 `qrcode` |
-| GET/POST | `/payments/callback/:providerId/:configId` | 渠道回调（公开、无信封、`@Res()` 直写；易支付 GET） |
+| GET/POST | `/payment/webhook/easypay` | 易支付固定回调（公开、无信封、`@Res()` 直写；按历史 Payment 反查配置） |
+| POST | `/payment/webhook/{alipay,wxpay,stripe}` | 支付宝 / 微信 / Stripe 固定回调（公开、无信封；验签后先落通知收件箱） |
+| GET/POST | `/payments/callback/:providerId/:configId` | 历史兼容回调（PayPal / ZPay 及已下发的旧 URL；公开、无信封） |
 | GET | `/payments/:orderId/status` | 支付状态轮询 |
 | GET/POST | `/invoices`、`/invoices/:id/file` | 申请开票 / 列表 / 可打印 HTML |
 | GET | `/marketing/popup`、`/marketing/invites`、`/marketing/checkin`、`/marketing/campaigns` | 营销 |

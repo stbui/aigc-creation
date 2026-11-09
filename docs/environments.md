@@ -47,9 +47,10 @@ PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付充值 → �
 | 变量 | 开发 | 测试 | 生产 | 说明 |
 |---|---|---|---|---|
 | `PAYMENT_SECRET_KEY` | 空 | 空 | **必填** | base64 编码的 32 字节密钥，AES-256-GCM 加密渠道凭据。开发留空会在 `data/.payment-secret-key` 生成持久化密钥；生产留空会拒绝加解密 |
-| `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址，拼成 `{base}/api/v1/payments/callback/{channel}/{configId}`。也可在单个渠道配置 `publicBaseUrl`；真实渠道两者都为空时发起支付返回 503 |
+| `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址。支付宝 / 微信 / 易支付 / Stripe 拼成固定地址 `{base}/api/v1/payment/webhook/{channel}`；PayPal / ZPay 仍拼成 `{base}/api/v1/payments/callback/{channel}/{configId}`。也可在单个渠道配置 `publicBaseUrl`；真实渠道两者都为空时发起支付返回 503 |
 | `ALIPAY_APP_ID` / `ALIPAY_PRIVATE_KEY` / `ALIPAY_PUBLIC_KEY` | 空 | 空 | 按需 | RSA2。私钥是**应用私钥**，公钥是**支付宝公钥**（不是应用公钥，填反表现为回调一律验签失败） |
 | `ALIPAY_GATEWAY` | 空 | 空 | 按需 | 空则用正式网关；沙箱联调用 `https://openapi-sandbox.dl.alipaydev.com/gateway.do` |
+| `ALIPAY_MOBILE_PRECREATE_DEEP_LINK` | 空 | 空 | 可选 | 设为 `true` 可强制开启支付宝移动端当面付唤起；未设置时使用后台 `payment.alipayMobilePrecreateDeepLink`。仅对路由到支付宝官方的移动端订单生效，且应用需开通当面付 / 扫码支付 |
 | `WECHAT_MCH_ID` / `WECHAT_APP_ID` / `WECHAT_API_V3_KEY` / `WECHAT_SERIAL_NO` / `WECHAT_PRIVATE_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY_ID` | 空 | 空 | 按需 | API v3。`API_V3_KEY` 必须 **32 字节**；`PLATFORM_PUBLIC_KEY` 用于验回调，`PLATFORM_PUBLIC_KEY_ID` 必须与回调/响应头 `Wechatpay-Serial` 完全一致 |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | 空 | 空 | 按需 | PayPal REST App 凭据。生产用 Live App，联调可用 Sandbox App |
 | `PAYPAL_WEBHOOK_ID` | 空 | 空 | 按需 | PayPal 开发者后台 Webhook 的 ID，不是 URL；回调通过 PayPal 官方 `verify-webhook-signature` 验签 |
@@ -105,17 +106,25 @@ ZPAY_CID=
 
 ### 回调地址与渠道后台配置
 
-后端生成并传给渠道的回调地址格式固定：
+后端生成并传给渠道的回调地址格式固定。EasyPay / 支付宝 / 微信官方 / Stripe 使用**不含 `configId` 的规范地址**，服务端按订单历史 `Payment.providerConfigId` 反查下单时的配置版本并验签：
+
+```text
+https://域名/api/v1/payment/webhook/easypay
+https://域名/api/v1/payment/webhook/alipay
+https://域名/api/v1/payment/webhook/wxpay
+https://域名/api/v1/payment/webhook/stripe
+```
+
+PayPal / ZPay 继续使用带配置版本 id 的历史地址：
 
 ```text
 https://域名/api/v1/payments/callback/paypal/{configId}
-https://域名/api/v1/payments/callback/stripe/{configId}
-https://域名/api/v1/payments/callback/epay/{configId}
 https://域名/api/v1/payments/callback/zpay/{configId}
 ```
 
-- `{configId}` 是渠道配置版本 id。轮换凭据会生成新的 `configId`，渠道后台 Webhook 地址也必须切到新地址；旧版本及旧回调地址要保留到历史订单全部结束，否则旧 `configId` 的回调无法用当时密钥验签。
-- 回调路由同时接受 GET 与 POST：PayPal / Stripe Webhook 使用 POST，易支付与 ZPay 异步通知使用 GET。
+- 规范地址无需随配置轮换而修改；历史订单按 Payment 引用的配置版本验签。多个历史配置同时验签通过时必须由渠道交易号唯一消歧，否则拒绝处理。
+- `{configId}` 是 PayPal / ZPay 的渠道配置版本 id。轮换凭据会生成新的 `configId`，这两个渠道后台的 Webhook 地址仍须同步切换；旧版本与旧地址至少保留到历史订单全部结束。
+- 规范回调中 EasyPay 同时接受 GET 与 POST；支付宝 / 微信 / Stripe 使用 POST。历史回调路由继续兼容 GET 与 POST。
 - Stripe Webhook 至少订阅：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`。
 - PayPal 使用 Orders v2 `CAPTURE`：买家批准后订单只会到 `APPROVED`，结算页回跳或状态轮询会由服务端调用 capture 真正扣款；Webhook 至少订阅订单完成/作废与 capture 完成/失败事件，`PAYPAL_WEBHOOK_ID` 必须对应同一个 Webhook 配置。
 - 易支付采用 `epay.jylt.cc` 的 `createOrder` / `getOrder` 协议：异步通知是 **GET**，回调签名覆盖 `orderId + param + type + price + reallyPrice + key`；查单已支持，文档未提供关单和退款 API。
