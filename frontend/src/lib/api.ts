@@ -1,5 +1,5 @@
 import { API_BASE } from "./constants";
-import { API_ROOT, extractErrorMessage, unwrapEnvelope } from "./http";
+import { API_ROOT, extractErrorMessage, formDataWithFile, unwrapEnvelope } from "./http";
 import { clearStoredEmail, clearToken, getToken } from "./auth";
 import type {
   AdminAuditListResult,
@@ -14,6 +14,7 @@ import type {
   AdminPermissionCatalog,
   AdminRoleItem,
   AdminSettings,
+  AdminSettingImageUpload,
   AdminSettingsUpdatePayload,
   AdminSettingsUpdateResult,
   AdminAigcLabel,
@@ -1042,11 +1043,9 @@ export const adminRolesApi = {
 /** 系统设置 (扁平结构提交, 字段名见后端 FIELD_TO_SETTING_KEY) */
 export const adminSettingsApi = {
   read: () => request<AdminSettings>("/admin/settings"),
+  uploadImage: (file: File) => request<AdminSettingImageUpload>("/admin/settings/upload", { method: "POST", body: formDataWithFile("file", file) }),
   update: (payload: AdminSettingsUpdatePayload) =>
-    request<AdminSettingsUpdateResult>("/admin/settings", {
-      method: "PATCH",
-      body: payload,
-    }),
+    request<AdminSettingsUpdateResult>("/admin/settings", { method: "PATCH", body: payload }),
 };
 
 /**

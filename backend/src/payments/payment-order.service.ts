@@ -97,6 +97,14 @@ export interface PaymentOrderView {
 /** 查单节流窗口：2 秒内重复查询直接返回本地视图 */
 const QUERY_THROTTLE_MS = 2_000;
 
+/** 规范回调入口；未列出的渠道继续使用带 configId 的旧回调地址。 */
+const CANONICAL_NOTIFY_PATHS: Partial<Record<PaymentProviderId, string>> = {
+  epay: "easypay",
+  alipay: "alipay",
+  wechat: "wxpay",
+  stripe: "stripe",
+};
+
 /**
  * 真实渠道 → C 端可见支付方式。
  *
@@ -135,7 +143,11 @@ export class PaymentOrderService {
   ) {}
 
   /**
-   * 渠道异步通知地址：带上 configId，回调才能定位到当时的密钥版本。
+   * 渠道异步通知地址。
+   *
+   * EasyPay / 支付宝 / 微信 / Stripe 使用固定公开入口，回调服务会按订单
+   * 引用的历史 Payment 反查下单时的配置版本；PayPal / ZPay / 沙箱仍保留
+   * 带 configId 的旧入口，兼容尚未迁移的适配器与已写入渠道后台的旧地址。
    *
    * 优先使用渠道配置里保存的 `publicBaseUrl`；没配才回落到全局
    * `PAYMENT_NOTIFY_BASE`，最后才是本机地址。这样多域名/反代部署时，
@@ -159,7 +171,10 @@ export class PaymentOrderService {
       configuredBase ||
       `http://${process.env.HOST || "127.0.0.1"}:${process.env.PORT || 4100}`
     ).replace(/\/$/, "");
-    return `${base}/api/v1/payments/callback/${providerId}/${configId}`;
+    const canonicalPath = CANONICAL_NOTIFY_PATHS[providerId];
+    return canonicalPath
+      ? `${base}/api/v1/payment/webhook/${canonicalPath}`
+      : `${base}/api/v1/payments/callback/${providerId}/${configId}`;
   }
 
   // ── 发起支付 ────────────────────────────────────────────────────

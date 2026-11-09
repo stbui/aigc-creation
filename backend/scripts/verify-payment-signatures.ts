@@ -80,13 +80,19 @@ function wechatNotifyPayload(key: Buffer, tradeState = 'SUCCESS') {
   return { nonce, body, raw: JSON.stringify(body) };
 }
 
-function wechatHeaders(raw: string, privateKey: string, timestamp = String(Math.floor(Date.now() / 1000))) {
+function wechatHeaders(
+  raw: string,
+  privateKey: string,
+  serial: string,
+  timestamp = String(Math.floor(Date.now() / 1000)),
+) {
   const nonce = randomBytes(16).toString('hex');
   const message = `${timestamp}\n${nonce}\n${raw}\n`;
   return {
     'wechatpay-timestamp': timestamp,
     'wechatpay-nonce': nonce,
     'wechatpay-signature': rsaSign(message, privateKey),
+    'wechatpay-serial': serial,
   };
 }
 
@@ -205,13 +211,14 @@ console.log('\n【微信支付 v3】');
     merchantPrivateKey: platform.privateKey,
     apiV3Key,
     wechatPayPublicKey: platform.publicKey,
+    wechatPayPublicKeyId: 'PUB_KEY_ID_TEST',
     apiBase: 'https://api.mch.weixin.qq.com',
   };
   const adapter = new WechatAdapter();
   const context = wechatContext(values);
 
   const payload = wechatNotifyPayload(Buffer.from(apiV3Key, 'utf8'));
-  const headers = wechatHeaders(payload.raw, platform.privateKey);
+  const headers = wechatHeaders(payload.raw, platform.privateKey, values.wechatPayPublicKeyId);
   const verified = await adapter.verifyNotification({
     config: context,
     headers,
@@ -237,6 +244,7 @@ console.log('\n【微信支付 v3】');
   const staleHeaders = wechatHeaders(
     payload.raw,
     platform.privateKey,
+    values.wechatPayPublicKeyId,
     String(Math.floor(Date.now() / 1000) - 600),
   );
   const stale = await adapter.verifyNotification({
@@ -257,7 +265,11 @@ console.log('\n【微信支付 v3】');
   ok('APIv3 密钥不匹配时解密失败', badKey.ok === false, badKey.reason);
 
   const closedPayload = wechatNotifyPayload(Buffer.from(apiV3Key, 'utf8'), 'CLOSED');
-  const closedHeaders = wechatHeaders(closedPayload.raw, platform.privateKey);
+  const closedHeaders = wechatHeaders(
+    closedPayload.raw,
+    platform.privateKey,
+    values.wechatPayPublicKeyId,
+  );
   const closed = await adapter.verifyNotification({
     config: context,
     headers: closedHeaders,

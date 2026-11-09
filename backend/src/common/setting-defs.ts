@@ -37,6 +37,8 @@ export interface SettingDef {
   options?: string[];
   /** 字符串枚举值的展示文案；仅影响后台，不改变落库值 */
   optionLabels?: Record<string, string>;
+  /** 后台控件覆盖；缺省为文本输入 */
+  control?: 'text' | 'image-upload';
   /** 分组, 前端按此渲染 Tab */
   group: SettingGroup;
   /** 只读项：真实旋钮在别处，页面上只作「配置地图」并给出跳转 */
@@ -315,10 +317,11 @@ export const SETTING_DEFS: SettingDef[] = [
   {
     key: 'payment.helpImage',
     label: '帮助图片',
-    description: '充值页面展示的客服二维码等图片地址。留空表示不展示',
+    description: '充值页面展示的客服二维码等图片，支持 PNG / JPEG / WebP。留空表示不展示',
     type: 'string',
     default: '',
     maxLength: 500,
+    control: 'image-upload',
     group: 'payment',
     public: true,
   },

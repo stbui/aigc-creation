@@ -1,5 +1,18 @@
-import { Body, Controller, Get, Patch, Query, Req } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { memoryStorage } from "multer";
 import type { Request } from "express";
+import { maxUploadBytes } from "../assets/image-validation";
 import { AuditAction, RequirePermission, AdminUser } from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
 import { AdminSettingsService } from "./settings.service";
@@ -92,6 +105,29 @@ export class AdminSettingsController {
   @RequirePermission(PERMISSIONS.settingRead)
   read() {
     return this.settings.readAll();
+  }
+
+  /** 上传帮助图片；返回稳定引用与签名预览地址，不直接修改设置值。 */
+  @Post("upload")
+  @RequirePermission(PERMISSIONS.settingWrite)
+  @AuditAction("setting.image_upload")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: memoryStorage(),
+      limits: { fileSize: maxUploadBytes(), files: 1 },
+    }),
+  )
+  async upload(
+    @UploadedFile() file: { buffer?: Buffer; originalname?: string } | undefined,
+    @Req() req: Request,
+  ) {
+    const result = await this.settings.uploadImage(file);
+    (req as Request & { auditExtra?: Record<string, unknown> }).auditExtra = {
+      fileName: file?.originalname ?? null,
+      settingKey: "payment.helpImage",
+      storageValue: result.value,
+    };
+    return result;
   }
 
   /**

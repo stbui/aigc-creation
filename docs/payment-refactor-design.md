@@ -1158,7 +1158,7 @@ AdminModule ──→ PaymentsModule ──→ OrdersModule ──→ PaymentCor
 | 适配器 | env → 配置字段 |
 | --- | --- |
 | `alipay` | `ALIPAY_APP_ID→appId`、`ALIPAY_PRIVATE_KEY→merchantPrivateKey`、`ALIPAY_PUBLIC_KEY→alipayPublicKey`、`ALIPAY_GATEWAY→gateway` |
-| `wechat` | `WECHAT_APP_ID→appId`、`WECHAT_MCH_ID→mchId`、`WECHAT_SERIAL_NO→merchantSerialNo`、`WECHAT_PRIVATE_KEY→merchantPrivateKey`、`WECHAT_API_V3_KEY→apiV3Key`、`WECHAT_PLATFORM_PUBLIC_KEY→wechatPayPublicKey` |
+| `wechat` | `WECHAT_APP_ID→appId`、`WECHAT_MCH_ID→mchId`、`WECHAT_SERIAL_NO→merchantSerialNo`、`WECHAT_PRIVATE_KEY→merchantPrivateKey`、`WECHAT_API_V3_KEY→apiV3Key`、`WECHAT_PLATFORM_PUBLIC_KEY→wechatPayPublicKey`、`WECHAT_PLATFORM_PUBLIC_KEY_ID→wechatPayPublicKeyId` |
 | `sandbox` | 无 |
 
 引导完成后再改 env 不生效；部署文档必须明确“改渠道请到后台保存新版本”。`PAYMENT_NOTIFY_BASE` 仍是部署配置，不进入后台可编辑字段，避免把回调地址改到不可达域名。
@@ -1335,7 +1335,7 @@ export interface PaymentAdapter {
 | --- | --- |
 | `sandbox` | 无必填 |
 | `alipay` | `appId`（必填、identity）、`sellerId`（可选、identity）、`merchantPrivateKey`（secret、PEM）、`alipayPublicKey`（secret、PEM）、`gateway`（url，默认官方网关，白名单校验） |
-| `wechat` | `appId`（必填、identity）、`mchId`（必填、identity）、`merchantSerialNo`（必填）、`merchantPrivateKey`（secret、PEM）、`apiV3Key`（secret、32 字节）、`wechatPayPublicKey`（secret、PEM）、`apiBase`（url，默认 `https://api.mch.weixin.qq.com`，仅允许官方域名） |
+| `wechat` | `appId`（必填、identity）、`mchId`（必填、identity）、`merchantSerialNo`（必填）、`merchantPrivateKey`（secret、PEM）、`apiV3Key`（secret、32 字节）、`wechatPayPublicKey`（secret、PEM）、`wechatPayPublicKeyId`（必填，必须与 `Wechatpay-Serial` 完全一致）、`apiBase`（url，默认 `https://api.mch.weixin.qq.com`，仅允许官方域名） |
 
 `validateConfig()` 返回缺失/非法字段名，不返回值。保存时再校验：
 

@@ -69,7 +69,9 @@ describe("GenerateService 任务读取与重试", () => {
       findMany: ReturnType<typeof vi.fn>;
       count: ReturnType<typeof vi.fn>;
       create: ReturnType<typeof vi.fn>;
+      deleteMany: ReturnType<typeof vi.fn>;
     };
+    billingOrder: { findMany: ReturnType<typeof vi.fn> };
     project: { findFirst: ReturnType<typeof vi.fn> };
     asset: { findMany: ReturnType<typeof vi.fn> };
   };
@@ -88,7 +90,9 @@ describe("GenerateService 任务读取与重试", () => {
         findMany: vi.fn(),
         count: vi.fn().mockResolvedValue(0),
         create: vi.fn().mockResolvedValue({ id: "task-next" }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
+      billingOrder: { findMany: vi.fn().mockResolvedValue([]) },
       project: {
         findFirst: vi.fn().mockResolvedValue({ id: "project-1" }),
       },
@@ -342,5 +346,98 @@ describe("GenerateService 任务读取与重试", () => {
 
     await expect(service.retryTask("task-1")).rejects.toBe(conflict);
     expect(worker.kick).not.toHaveBeenCalled();
+  });
+});
+
+describe("GenerateService 删除作品（整批）", () => {
+  let prisma: {
+    generationTask: {
+      findUnique: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      deleteMany: ReturnType<typeof vi.fn>;
+    };
+    billingOrder: { findMany: ReturnType<typeof vi.fn> };
+    asset: { findMany: ReturnType<typeof vi.fn> };
+  };
+  let service: GenerateService;
+
+  const batchRow = (overrides: Record<string, unknown> = {}) => ({
+    id: "task-1",
+    status: "failed",
+    outputAssetId: null,
+    outputAssetIds: null,
+    pendingResult: null,
+    mediaRecoveryError: null,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    prisma = {
+      generationTask: {
+        findUnique: vi.fn().mockResolvedValue(
+          task({
+            status: "failed",
+            outputAssetId: null,
+            outputAssetIds: null,
+          }),
+        ),
+        findMany: vi.fn().mockResolvedValue([batchRow()]),
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      billingOrder: { findMany: vi.fn().mockResolvedValue([]) },
+      asset: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    service = new GenerateService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+  });
+
+  it("同批兄弟任务账单待人工核对但已无可交付产出时，整批允许删除", async () => {
+    prisma.generationTask.findMany.mockResolvedValue([
+      batchRow({ id: "task-1", status: "failed" }),
+      batchRow({ id: "task-2", status: "cancelled" }),
+    ]);
+    prisma.billingOrder.findMany.mockResolvedValue([
+      { status: "refunded", updatedAt: new Date(), taskId: "task-1" },
+      { status: "uncertain", updatedAt: new Date(), taskId: "task-2" },
+    ]);
+
+    await expect(service.removeTask("user-1", "task-1")).resolves.toEqual({
+      id: "task-1",
+      removedAsset: false,
+    });
+    expect(prisma.generationTask.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["task-1", "task-2"] } },
+    });
+  });
+
+  it("预授权（reserved）账单失去任务行后永远不可核对，拒绝删除", async () => {
+    prisma.billingOrder.findMany.mockResolvedValue([
+      { status: "reserved", updatedAt: new Date(), taskId: "task-1" },
+    ]);
+
+    await expect(service.removeTask("user-1", "task-1")).rejects.toMatchObject({
+      code: 40901,
+    });
+    expect(prisma.generationTask.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("账单待核对但任务仍持有产出素材时拒绝删除，避免抹掉交付证据", async () => {
+    prisma.generationTask.findMany.mockResolvedValue([
+      batchRow({ id: "task-1", status: "succeeded", outputAssetId: "asset-1" }),
+    ]);
+    prisma.billingOrder.findMany.mockResolvedValue([
+      { status: "uncertain", updatedAt: new Date(), taskId: "task-1" },
+    ]);
+
+    await expect(service.removeTask("user-1", "task-1")).rejects.toMatchObject({
+      code: 40901,
+    });
+    expect(prisma.generationTask.deleteMany).not.toHaveBeenCalled();
   });
 });

@@ -44,7 +44,7 @@ let userGroupService: any;
 let paymentGateway: any;
 let run = '';
 
-function api(method: 'get' | 'post' | 'put', path: string, token?: string) {
+function api(method: 'get' | 'post' | 'put' | 'patch', path: string, token?: string) {
   // supertest 传 URL 字符串时不会自己 listen/close，并发请求不会互相关掉临时监听
   const req = request(baseUrl)[method](path);
   if (token) req.set('Authorization', `Bearer ${token}`);
@@ -137,6 +137,18 @@ async function callback(
   const { order, payment, providerRef } = await paymentAttempt(orderNo, configId);
   const type = payment.providerMethod === 'wechat' ? '1' : '2';
   return api('post', `/api/v1/payments/callback/epay/${configId}`).send(
+    epayCallbackBody(orderNo, providerRef, type, order.paidCents, amountCents),
+  );
+}
+
+async function canonicalCallback(
+  orderNo: string,
+  configId: string,
+  amountCents: number,
+) {
+  const { order, payment, providerRef } = await paymentAttempt(orderNo, configId);
+  const type = payment.providerMethod === 'wechat' ? '1' : '2';
+  return api('post', '/api/v1/payment/webhook/easypay').send(
     epayCallbackBody(orderNo, providerRef, type, order.paidCents, amountCents),
   );
 }
@@ -383,6 +395,13 @@ beforeAll(async () => {
   });
   expect(paymentSettings.status).toBe(200);
 
+  // 支付总开关默认关闭。集成测试要走真实支付链路，必须像运营一样显式开启，
+  // 否则公开渠道列表与 intent 都会按预期被拦截。
+  const enabledSettings = await api('patch', '/api/v1/admin/settings', adminToken).send({
+    settings: { 'payment.enabled': true },
+  });
+  expect(enabledSettings.status).toBe(200);
+
   // 易支付没有退款 API；退款编排测试只验证订单域，不验证上游协议。
   paymentGateway.refund = vi.fn().mockResolvedValue({ state: 'succeeded' });
 }, 60_000);
@@ -448,6 +467,22 @@ describe('支付 HTTP 集成', () => {
 
     const status = await api('get', `/api/v1/payments/${order.id}/status`, userToken);
     expect(status.body.data.status).toBe('paid');
+  });
+
+  it('固定 EasyPay Webhook 从历史 Payment 反查配置版本并完成入账', async () => {
+    const order = await createOrder('canonical-webhook');
+    const intent = await intend(order.id);
+
+    const res = await canonicalCallback(order.orderNo, intent.configId, order.paidCents);
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('success');
+
+    const status = await api('get', `/api/v1/payments/${order.id}/status`, userToken);
+    expect(status.body.data.status).toBe('paid');
+    const notification = await prisma.paymentNotification.findFirst({
+      where: { providerId: 'epay', merchantOrderNo: order.orderNo },
+    });
+    expect(notification?.providerConfigId).toBe(intent.configId);
   });
 
   it('金额不符落对账差异；无历史支付尝试的易支付回调直接拒绝', async () => {
@@ -1168,7 +1203,7 @@ describe('支付 HTTP 集成', () => {
     expect(lots[0].orderId).toBe(immediateOrder.id);
   });
 
-  it('每用户未支付订单上限 5 笔', async () => {
+  it('每用户未支付订单默认上限 3 笔', async () => {
     const otherToken = await register(`it-cap-${run}@test.local`);
     const capProduct = await prisma.product.create({
       data: {
@@ -1187,7 +1222,7 @@ describe('支付 HTTP 集成', () => {
       },
     });
     const created: string[] = [];
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       const res = await api('post', '/api/v1/orders', otherToken).send({
         productId: capProduct.id,
         quantity: 1,
@@ -1196,13 +1231,13 @@ describe('支付 HTTP 集成', () => {
       expect(res.body.code).toBe(0);
       created.push(res.body.data.id);
     }
-    const sixth = await api('post', '/api/v1/orders', otherToken).send({
+    const fourth = await api('post', '/api/v1/orders', otherToken).send({
       productId: capProduct.id,
       quantity: 1,
-      idempotencyKey: `it-cap-${run}-5`,
+      idempotencyKey: `it-cap-${run}-3`,
     });
-    expect(sixth.status).toBe(400);
-    expect(sixth.body.code).toBe(40001);
+    expect(fourth.status).toBe(400);
+    expect(fourth.body.code).toBe(40001);
     for (const id of created) {
       await api('post', `/api/v1/orders/${id}/cancel`, otherToken);
     }
@@ -1237,13 +1272,13 @@ describe('支付 HTTP 集成', () => {
       ),
     );
     const winners = responses.filter((res) => res.body.code === 0);
-    expect(winners).toHaveLength(5);
-    expect(responses.filter((res) => res.status === 400 && res.body.code === 40001)).toHaveLength(1);
+    expect(winners).toHaveLength(3);
+    expect(responses.filter((res) => res.status === 400 && res.body.code === 40001)).toHaveLength(3);
     expect(
       await prisma.order.count({
         where: { items: { some: { productId: capProduct.id } }, status: 'pending' },
       }),
-    ).toBe(5);
+    ).toBe(3);
 
     for (const res of winners) {
       await api('post', `/api/v1/orders/${res.body.data.id}/cancel`, otherToken);
@@ -1418,7 +1453,7 @@ describe('支付 HTTP 集成', () => {
         description: '',
         kind: 'credits',
         currency: 'CNY',
-        priceCents: 100,
+        priceCents: 200,
         credits: 1,
         creditsValidDays: 0,
         grantType: 'immediate',
@@ -1444,9 +1479,10 @@ describe('支付 HTTP 集成', () => {
         status: 'on',
       },
     });
+    const firstToken = await register(`it-coupon-first-${run}@test.local`);
     const secondToken = await register(`it-coupon-user-${run}@test.local`);
 
-    const first = await api('post', '/api/v1/orders', userToken).send({
+    const first = await api('post', '/api/v1/orders', firstToken).send({
       productId: couponProduct.id,
       quantity: 1,
       couponCode: coupon.code,
@@ -1454,7 +1490,7 @@ describe('支付 HTTP 集成', () => {
     });
     expect(first.body.code).toBe(0);
     expect(first.body.data.couponId).toBe(coupon.id);
-    expect(first.body.data.paidCents).toBe(50);
+    expect(first.body.data.paidCents).toBe(150);
 
     // 另一个用户在同一张限量券的名额被 pending 订单占用后，只能按原价下单。
     const second = await api('post', '/api/v1/orders', secondToken).send({
@@ -1465,10 +1501,10 @@ describe('支付 HTTP 集成', () => {
     });
     expect(second.body.code).toBe(0);
     expect(second.body.data.couponId).toBeNull();
-    expect(second.body.data.paidCents).toBe(100);
+    expect(second.body.data.paidCents).toBe(200);
     expect(second.body.data.couponWarning).toContain('领完');
 
-    const firstIntent = await intend(first.body.data.id, userToken);
+    const firstIntent = await intend(first.body.data.id, firstToken);
     const firstPaid = await callback(
       first.body.data.orderNo,
       firstIntent.configId,
@@ -1498,7 +1534,7 @@ describe('支付 HTTP 集成', () => {
         description: '',
         kind: 'credits',
         currency: 'CNY',
-        priceCents: 100,
+        priceCents: 200,
         credits: 1,
         creditsValidDays: 0,
         grantType: 'immediate',
@@ -1524,9 +1560,10 @@ describe('支付 HTTP 集成', () => {
         status: 'on',
       },
     });
+    const firstToken = await register(`it-coupon-release-first-${run}@test.local`);
     const secondToken = await register(`it-coupon-release-${run}@test.local`);
 
-    const first = await api('post', '/api/v1/orders', userToken).send({
+    const first = await api('post', '/api/v1/orders', firstToken).send({
       productId: couponProduct.id,
       quantity: 1,
       couponCode: coupon.code,
@@ -1536,7 +1573,7 @@ describe('支付 HTTP 集成', () => {
     const cancelled = await api(
       'post',
       `/api/v1/orders/${first.body.data.id}/cancel`,
-      userToken,
+      firstToken,
     );
     expect(cancelled.body.code).toBe(0);
 
@@ -1548,7 +1585,7 @@ describe('支付 HTTP 集成', () => {
     });
     expect(second.body.code).toBe(0);
     expect(second.body.data.couponId).toBe(coupon.id);
-    expect(second.body.data.paidCents).toBe(60);
+    expect(second.body.data.paidCents).toBe(160);
     await api('post', `/api/v1/orders/${second.body.data.id}/cancel`, secondToken);
   });
 

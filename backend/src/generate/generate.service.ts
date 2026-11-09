@@ -22,6 +22,7 @@ import { StorageService } from '../storage/storage.service';
 import { SignedUrlService } from '../common/signed-url.service';
 import { resolveUploadsDir } from '../config/env-files';
 import type { StorageBackend } from '../storage/storage.provider';
+import { isBillingOrderReviewable } from '../model/billing/billing.service';
 import { TaskAdmissionService } from '../model/tasks/task-admission.service';
 import { TaskLifecycleService, TASK_ERROR } from '../model/tasks/task-lifecycle.service';
 import { TaskWorkerService } from '../model/tasks/task-worker.service';
@@ -287,20 +288,31 @@ export class GenerateService {
      */
     const batch = await this.prisma.generationTask.findMany({
       where: { OR: [{ id: task.id }, { parentTaskId: task.id }] },
-      select: { id: true, status: true, outputAssetId: true, outputAssetIds: true },
+      select: {
+        id: true,
+        status: true,
+        outputAssetId: true,
+        outputAssetIds: true,
+        pendingResult: true,
+        mediaRecoveryError: true,
+      },
     });
     const targets = batch.length > 0 ? batch : [task];
 
     /*
      * 删除只允许发生在「任务与账单都已落定」之后。
      *
-     * 直接删任务行会让预授权账单失去任务归属：
-     *   · reserved 账单的 `isBillingOrderReviewable` 只有在任务 failed/cancelled
-     *     时才放行；任务行不存在后它永远不可核对，积分会永久冻结；
-     *   · running / uncertain 账单同样需要任务信息才能判断是否已交付。
+     * 判据不是账单状态等不等于某个值，而是**删掉任务行之后这张账单还能不能被
+     * 人工核对**（`isBillingOrderReviewable` 是唯一口径）：
+     *   · `reserved` 预授权账单要求任务处于 failed/cancelled 才可核对；任务行
+     *     不存在后它永远不可核对，积分会永久冻结 —— 必须拒绝；
+     *   · 任务还挂着可交付产出（产出素材 / 待落盘结果 / 运行中的补交付）时必须
+     *     拒绝：删任务等于抹掉「已交付」的证据，核对时会把出过的图当成可退款；
+     *   · `uncertain` / 超时 `running` 且没有可交付产出时，账单自身就足以核对，
+     *     任务行只是展示信息 —— 允许随任务一起删除。否则用户会永远删不掉一条
+     *     自己早已失败/取消的记录（同批兄弟任务被判结果不明时尤其明显）。
      *
-     * 因此 queued/running 一律拒绝（应先走终止流程），账单未结清或待人工
-     * 核对的也拒绝删除，避免把资金证据一起删掉。
+     * queued/running 任务一律拒绝：应先走终止流程，否则产出会在删除后才落盘。
      */
     const active = targets.filter((row) => row.status === 'queued' || row.status === 'running');
     if (active.length > 0) {
@@ -308,9 +320,26 @@ export class GenerateService {
     }
     const billingOrders = await this.prisma.billingOrder.findMany({
       where: { taskId: { in: targets.map((row) => row.id) } },
-      select: { status: true },
+      select: { status: true, updatedAt: true, taskId: true },
     });
-    if (billingOrders.some((order) => ['reserved', 'running', 'uncertain'].includes(order.status))) {
+    const taskById = new Map(targets.map((row) => [row.id, row]));
+    const blockedByBilling = billingOrders.some((order) => {
+      if (order.status === 'reserved') return true;
+      if (order.status === 'settled' || order.status === 'refunded') return false;
+      const row = taskById.get(order.taskId);
+      return !isBillingOrderReviewable(
+        order,
+        row
+          ? {
+              status: row.status,
+              outputAssetId: row.outputAssetId,
+              pendingResult: row.pendingResult,
+              mediaRecoveryError: row.mediaRecoveryError,
+            }
+          : null,
+      );
+    });
+    if (blockedByBilling) {
       throw new AppError(40901, '任务积分账单尚未结清或待人工核对，暂不能删除；请先处理账单', 409);
     }
 

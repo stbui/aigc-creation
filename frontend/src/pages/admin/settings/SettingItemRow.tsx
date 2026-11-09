@@ -1,8 +1,118 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ActionButton, NumberField, SelectField, SwitchField, TextField, ToneBadge } from '~/admin-ui/primitives';
+import { Image as ImageIcon, Loader2 } from 'lucide-react';
+import {
+  ActionButton,
+  FilePicker,
+  NumberField,
+  SelectField,
+  SwitchField,
+  TextField,
+  ToneBadge,
+} from '~/admin-ui/primitives';
 import type { AdminSettingValue } from '../../../types/api';
 import type { SettingItem } from './constants';
 import { displayValue } from './utils';
+import { adminSettingsApi } from '../../../lib/api';
+
+/** 帮助图片上传：选中即上传，上传成功后只把稳定引用写进本地草稿。 */
+function ImageUploadControl({
+  item,
+  value,
+  editable,
+  onChange,
+}: {
+  item: SettingItem;
+  value: AdminSettingValue;
+  editable: boolean;
+  onChange: (value: AdminSettingValue) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState<{ value: string; previewUrl: string } | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    // 设置重新加载后，服务端返回的预览地址才是当前基准；清掉仅属于旧草稿的本地地址。
+    setUploaded((current) =>
+      current && current.value !== String(value ?? '') ? null : current,
+    );
+  }, [value]);
+
+  const currentValue = String(value ?? '');
+  const previewUrl =
+    currentValue && uploaded?.value === currentValue
+      ? uploaded.previewUrl
+      : currentValue
+        ? item.previewUrl ?? null
+        : null;
+
+  const upload = async (next: File) => {
+    setFile(next);
+    setUploading(true);
+    setError('');
+    try {
+      const result = await adminSettingsApi.uploadImage(next);
+      setUploaded({ value: result.value, previewUrl: result.previewUrl });
+      onChange(result.value);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '图片上传失败');
+    } finally {
+      setUploading(false);
+      setFile(null);
+    }
+  };
+
+  return (
+    <div className="w-full space-y-2">
+      <div className="flex h-28 w-full items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40">
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt={`${item.label}预览`}
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <span className="flex flex-col items-center gap-1 text-[12px] text-muted-foreground">
+            <ImageIcon className="size-5" aria-hidden />
+            暂无图片
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <FilePicker
+          file={file}
+          accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+          onPick={(next) => void upload(next)}
+          onClear={() => setFile(null)}
+          disabled={!editable || uploading}
+          label={previewUrl ? '更换图片' : '上传图片'}
+          hint="PNG / JPEG / WebP"
+        />
+        {previewUrl && (
+          <ActionButton
+            variant="ghost"
+            size="xs"
+            disabled={!editable || uploading}
+            onClick={() => {
+              setUploaded(null);
+              onChange('');
+            }}
+          >
+            移除
+          </ActionButton>
+        )}
+      </div>
+      {uploading && (
+        <p className="flex items-center gap-1 text-[12px] text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          正在上传…
+        </p>
+      )}
+      {error && <p className="text-[12px] text-destructive">{error}</p>}
+    </div>
+  );
+}
 
 function renderControl({
   item,
@@ -21,6 +131,17 @@ function renderControl({
       <span className="inline-flex min-h-8 items-center text-right text-[13px] font-medium text-foreground">
         {displayValue(item.value, item.type)}
       </span>
+    );
+  }
+
+  if (item.control === 'image-upload') {
+    return (
+      <ImageUploadControl
+        item={item}
+        value={value}
+        editable={editable}
+        onChange={onChange}
+      />
     );
   }
 

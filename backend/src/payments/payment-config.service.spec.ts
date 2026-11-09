@@ -26,6 +26,7 @@ const WECHAT_VALUES = {
   merchantPrivateKey: '-----BEGIN PRIVATE KEY-----\nmerchant\n-----END PRIVATE KEY-----',
   apiV3Key: '12345678901234567890123456789012',
   wechatPayPublicKey: '-----BEGIN PUBLIC KEY-----\nwechat\n-----END PUBLIC KEY-----',
+  wechatPayPublicKeyId: 'PUB_KEY_ID_0000000000000000000000000000000000000000000000000000000000000000',
 };
 
 const EPAY_VALUES = {

@@ -777,6 +777,8 @@ export interface AdminSettings {
       options?: string[];
       /** 字符串枚举值的展示文案；键为落库值 */
       optionLabels?: Record<string, string>;
+      /** 控件覆盖；缺省为文本输入 */
+      control?: "text" | "image-upload";
       /** 只读项：真实旋钮在别处，页面只展示当前值并给出跳转 */
       readOnly?: boolean;
       /** 只读项的跳转目标（后台路由） */
@@ -785,8 +787,21 @@ export interface AdminSettings {
       group: string;
       updatedBy: string | null;
       updatedAt: string | null;
+      /** 图片项的带签名展示地址；保存值本身仍是稳定引用 */
+      previewUrl?: string | null;
     }>;
   }>;
+}
+
+/** POST /api/v1/admin/settings/upload */
+export interface AdminSettingImageUpload {
+  /** 稳定存储引用，保存到 payment.helpImage */
+  value: string;
+  /** 仅供当前页面预览的带签名地址 */
+  previewUrl: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
 }
 
 // ── AIGC 可见角标样式 (2026-10-21) ─────────────────────────────────

@@ -1094,7 +1094,7 @@ describe('PaymentOrderService.notifyUrl', () => {
     process.env.PAYMENT_NOTIFY_BASE = 'https://global.example.com';
     const { service } = makeHarness();
     expect(service.notifyUrl('alipay', 'cfg_1', 'https://pay.example.com/')).toBe(
-      'https://pay.example.com/api/v1/payments/callback/alipay/cfg_1',
+      'https://pay.example.com/api/v1/payment/webhook/alipay',
     );
   });
 
@@ -1102,7 +1102,26 @@ describe('PaymentOrderService.notifyUrl', () => {
     process.env.PAYMENT_NOTIFY_BASE = 'https://global.example.com';
     const { service } = makeHarness();
     expect(service.notifyUrl('wechat', 'cfg_2')).toBe(
-      'https://global.example.com/api/v1/payments/callback/wechat/cfg_2',
+      'https://global.example.com/api/v1/payment/webhook/wxpay',
+    );
+  });
+
+  it('EasyPay / Stripe 使用规范路径，历史 configId 不进入 URL', () => {
+    process.env.PAYMENT_NOTIFY_BASE = 'https://global.example.com';
+    const { service } = makeHarness();
+    expect(service.notifyUrl('epay', 'cfg_epay')).toBe(
+      'https://global.example.com/api/v1/payment/webhook/easypay',
+    );
+    expect(service.notifyUrl('stripe', 'cfg_stripe')).toBe(
+      'https://global.example.com/api/v1/payment/webhook/stripe',
+    );
+  });
+
+  it('尚未迁移的渠道继续使用带 configId 的旧路径', () => {
+    process.env.PAYMENT_NOTIFY_BASE = 'https://global.example.com';
+    const { service } = makeHarness();
+    expect(service.notifyUrl('zpay', 'cfg_zpay')).toBe(
+      'https://global.example.com/api/v1/payments/callback/zpay/cfg_zpay',
     );
   });
 

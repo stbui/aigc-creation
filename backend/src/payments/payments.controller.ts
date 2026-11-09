@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { AppError } from '../common/app.exception';
 import { SettingsService } from '../common/settings.service';
+import { SettingImageService } from '../common/setting-image.service';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentNotificationService } from './payment-notification.service';
@@ -51,6 +52,7 @@ export class PaymentsController {
     private readonly configs: PaymentConfigService,
     private readonly notifications: PaymentNotificationService,
     private readonly settings: SettingsService,
+    private readonly settingImages: SettingImageService,
   ) {}
 
   /**
@@ -71,7 +73,7 @@ export class PaymentsController {
       enabled: rules.enabled,
       defaultCurrency: target,
       providers,
-      helpImage: rules.helpImage,
+      helpImage: (await this.settingImages.displayUrl(rules.helpImage)) ?? '',
       helpText: rules.helpText,
     };
   }
@@ -207,6 +209,106 @@ export class PaymentsController {
     }
     return currency as PaymentCurrency;
   }
+}
+
+/**
+ * 支付渠道规范回调路由。
+ *
+ * URL 刻意不携带 configId：服务端会按明文订单号（微信则先解密）反查该订单
+ * 历史 Payment 引用的配置版本。旧 `/payments/callback/:provider/:configId`
+ * 保留在 PaymentsController，兼容历史渠道配置和尚未规范化的支付渠道。
+ */
+@Controller('payment')
+export class PaymentWebhookController {
+  constructor(private readonly notifications: PaymentNotificationService) {}
+
+  @Get('webhook/easypay')
+  easypayGet(
+    @Query() query: Record<string, unknown>,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    return this.handleGet('epay', query, req, res);
+  }
+
+  @Post('webhook/easypay')
+  easypayPost(
+    @Req() req: RawBodyRequest<Request>,
+    @Body() body: Record<string, unknown>,
+    @Res() res: Response,
+  ): Promise<void> {
+    return this.handlePost('epay', req, body, res);
+  }
+
+  @Post('webhook/alipay')
+  alipayPost(
+    @Req() req: RawBodyRequest<Request>,
+    @Body() body: Record<string, unknown>,
+    @Res() res: Response,
+  ): Promise<void> {
+    return this.handlePost('alipay', req, body, res);
+  }
+
+  @Post('webhook/wxpay')
+  wxpayPost(
+    @Req() req: RawBodyRequest<Request>,
+    @Body() body: Record<string, unknown>,
+    @Res() res: Response,
+  ): Promise<void> {
+    return this.handlePost('wechat', req, body, res);
+  }
+
+  @Post('webhook/stripe')
+  stripePost(
+    @Req() req: RawBodyRequest<Request>,
+    @Body() body: Record<string, unknown>,
+    @Res() res: Response,
+  ): Promise<void> {
+    return this.handlePost('stripe', req, body, res);
+  }
+
+  private async handleGet(
+    providerId: PaymentProviderId,
+    query: Record<string, unknown>,
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const body = query ?? {};
+    const ack = await this.notifications.ingestCanonical({
+      providerId,
+      headers: req.headers as Record<string, string | string[] | undefined>,
+      rawBody: Buffer.from(JSON.stringify(body)),
+      body,
+    });
+    writeAck(res, ack);
+  }
+
+  private async handlePost(
+    providerId: PaymentProviderId,
+    req: RawBodyRequest<Request>,
+    body: Record<string, unknown>,
+    res: Response,
+  ): Promise<void> {
+    const rawBody = req.rawBody
+      ? req.rawBody
+      : Buffer.from(typeof body === 'object' && body !== null ? JSON.stringify(body) : '');
+    const ack = await this.notifications.ingestCanonical({
+      providerId,
+      headers: req.headers as Record<string, string | string[] | undefined>,
+      rawBody,
+      body: body ?? {},
+    });
+    writeAck(res, ack);
+  }
+}
+
+function writeAck(
+  res: Response,
+  ack: { status: number; body: string; contentType: string },
+): void {
+  res.status(ack.status);
+  res.setHeader('Content-Type', ack.contentType);
+  res.send(ack.body);
 }
 
 /** ZPay 要求 clientip 必须来自服务端可验证的请求上下文，不能信任请求体。 */

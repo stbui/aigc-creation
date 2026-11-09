@@ -3,7 +3,11 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentCoreModule } from './payment-core.module';
-import { OrderCancelController, PaymentsController } from './payments.controller';
+import {
+  OrderCancelController,
+  PaymentWebhookController,
+  PaymentsController,
+} from './payments.controller';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentNotificationService } from './payment-notification.service';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
@@ -21,7 +25,11 @@ import { PaymentWorkerService } from './payment-worker.service';
  */
 @Module({
   imports: [ConfigModule, PrismaModule, OrdersModule, PaymentCoreModule],
-  controllers: [PaymentsController, OrderCancelController],
+  controllers: [
+    PaymentsController,
+    PaymentWebhookController,
+    OrderCancelController,
+  ],
   providers: [
     PaymentOrderService,
     PaymentNotificationService,

@@ -621,6 +621,7 @@ export class PaymentConfigService implements OnModuleInit {
           merchantPrivateKey: process.env.WECHAT_PRIVATE_KEY ?? '',
           apiV3Key: process.env.WECHAT_API_V3_KEY ?? '',
           wechatPayPublicKey: process.env.WECHAT_PLATFORM_PUBLIC_KEY ?? '',
+          wechatPayPublicKeyId: process.env.WECHAT_PLATFORM_PUBLIC_KEY_ID ?? '',
           apiBase: process.env.WECHAT_API_BASE ?? '',
         },
       },

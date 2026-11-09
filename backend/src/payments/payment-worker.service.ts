@@ -12,6 +12,8 @@ const TICK_MS = 15_000;
 const PROCESSING_STALE_MS = 5 * 60_000;
 /** 查单轮询：pending 订单上次查单超过 30 秒 */
 const QUERY_INTERVAL_MS = 30_000;
+/** 超时关单检查：规格要求每 60 秒执行一次 */
+const CLOSE_EXPIRED_INTERVAL_MS = 60_000;
 /** 自动对账时间（Asia/Shanghai） */
 const AUTO_RECONCILE_HOUR = 10;
 const AUTO_RECONCILE_MINUTE = 15;
@@ -31,6 +33,7 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentWorkerService.name);
   private timer: NodeJS.Timeout | null = null;
   private running = false;
+  private lastCloseExpiredCheckAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -74,7 +77,7 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
       await this.recycleStaleNotifications();
       await this.processDueNotifications();
       await this.reconciliation.recoverStaleRuns();
-      await this.closeExpiredOrders();
+      await this.closeExpiredOrdersIfDue();
       await this.queryPendingOrders();
       await this.autoReconcile();
     } finally {
@@ -111,6 +114,18 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
     // 不要在 worker 里直接 updateMany 改 cancelled（旧调度器正是这么漏掉已付款订单的）。
     const closed = await this.orders.closeExpired(50);
     if (closed > 0) this.logger.log(`超时订单已关闭: ${closed} 笔`);
+  }
+
+  private async closeExpiredOrdersIfDue(): Promise<void> {
+    const now = Date.now();
+    if (
+      this.lastCloseExpiredCheckAt > 0 &&
+      now - this.lastCloseExpiredCheckAt < CLOSE_EXPIRED_INTERVAL_MS
+    ) {
+      return;
+    }
+    this.lastCloseExpiredCheckAt = now;
+    await this.closeExpiredOrders();
   }
 
   private async queryPendingOrders(): Promise<void> {

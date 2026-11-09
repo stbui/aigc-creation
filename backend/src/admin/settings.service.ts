@@ -2,6 +2,9 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError } from "../common/app.exception";
 import { SettingsService } from "../common/settings.service";
+import { SettingImageService } from "../common/setting-image.service";
+import { StorageService } from "../storage/storage.service";
+import { inspectUploadedImage, maxUploadBytes, verifyDecodableImage } from "../assets/image-validation";
 import {
   SETTING_DEFS,
   SETTING_GROUP_LABELS,
@@ -38,6 +41,8 @@ export class AdminSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
+    private readonly storage: StorageService,
+    private readonly settingImages: SettingImageService,
   ) {}
 
   /** 分组读取全部设置项 + 当前生效值 */
@@ -56,6 +61,7 @@ export class AdminSettingsService {
             overridden: boolean;
             updatedBy: string | null;
             updatedAt: string | null;
+            previewUrl?: string | null;
           }
         >;
       }
@@ -70,16 +76,59 @@ export class AdminSettingsService {
         label: SETTING_GROUP_LABELS[def.group] ?? def.group,
         items: [],
       });
+      const value = overridden ? this.parseValue(row!.value, def) : def.default;
       group.items.push({
         ...def,
-        value: overridden ? this.parseValue(row!.value, def) : def.default,
+        value,
         overridden,
         updatedBy: row?.updatedBy ?? null,
         updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : null,
+        ...(def.control === "image-upload"
+          ? { previewUrl: await this.settingImages.displayUrl(String(value ?? "")) }
+          : {}),
       });
     }
 
     return { groups: Object.values(groups) };
+  }
+
+  /**
+   * 上传系统设置图片并返回可落库的稳定引用。
+   *
+   * 上传只负责把对象写入当前存储后端；运营仍需在设置页保存，才会把引用写入
+   * SystemSetting。先写对象再保存是刻意的：取消设置不会留下指向不存在的对象。
+   */
+  async uploadImage(file?: { buffer?: Buffer; originalname?: string }) {
+    const buffer = file?.buffer;
+    if (!buffer?.length) {
+      throw new AppError(40001, "请选择要上传的图片", 400);
+    }
+
+    const info = inspectUploadedImage(buffer, { maxBytes: maxUploadBytes() });
+    await verifyDecodableImage(buffer, info);
+
+    const provider = this.storage.getActive();
+    const key = this.storage.buildKey("settings", info.ext);
+    let stored = false;
+    try {
+      const object = await provider.put(key, buffer, info.mime);
+      stored = true;
+      const value = this.settingImages.toReference(provider.backend, key);
+      const previewUrl = await this.settingImages.displayUrl(value);
+      if (!previewUrl) {
+        throw new AppError(50001, "图片已上传但预览地址生成失败", 500);
+      }
+      return {
+        value,
+        previewUrl,
+        width: info.width,
+        height: info.height,
+        sizeBytes: object.sizeBytes,
+      };
+    } catch (error) {
+      if (stored) await provider.delete(key).catch(() => undefined);
+      throw error;
+    }
   }
 
   /**

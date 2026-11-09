@@ -175,8 +175,9 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'payment.wechat.apiV3Key', env: 'WECHAT_API_V3_KEY', type: 'string', def: '' },
   { key: 'payment.wechat.serialNo', env: 'WECHAT_SERIAL_NO', type: 'string', def: '' },
   { key: 'payment.wechat.privateKey', env: 'WECHAT_PRIVATE_KEY', type: 'string', def: '' },
-  // 回调验签用的是**微信支付平台证书公钥**，不是商户私钥
+  // 回调验签用的是**微信支付平台证书公钥**，不是商户私钥；ID 对应 Wechatpay-Serial
   { key: 'payment.wechat.platformPublicKey', env: 'WECHAT_PLATFORM_PUBLIC_KEY', type: 'string', def: '' },
+  { key: 'payment.wechat.platformPublicKeyId', env: 'WECHAT_PLATFORM_PUBLIC_KEY_ID', type: 'string', def: '' },
   // PayPal Orders v2（Webhook 通过官方 verify-webhook-signature 接口验签）
   { key: 'payment.paypal.clientId', env: 'PAYPAL_CLIENT_ID', type: 'string', def: '' },
   { key: 'payment.paypal.clientSecret', env: 'PAYPAL_CLIENT_SECRET', type: 'string', def: '' },

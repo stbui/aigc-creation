@@ -50,7 +50,7 @@ PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付充值 → �
 | `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址，拼成 `{base}/api/v1/payments/callback/{channel}/{configId}`。也可在单个渠道配置 `publicBaseUrl`；真实渠道两者都为空时发起支付返回 503 |
 | `ALIPAY_APP_ID` / `ALIPAY_PRIVATE_KEY` / `ALIPAY_PUBLIC_KEY` | 空 | 空 | 按需 | RSA2。私钥是**应用私钥**，公钥是**支付宝公钥**（不是应用公钥，填反表现为回调一律验签失败） |
 | `ALIPAY_GATEWAY` | 空 | 空 | 按需 | 空则用正式网关；沙箱联调用 `https://openapi-sandbox.dl.alipaydev.com/gateway.do` |
-| `WECHAT_MCH_ID` / `WECHAT_APP_ID` / `WECHAT_API_V3_KEY` / `WECHAT_SERIAL_NO` / `WECHAT_PRIVATE_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY` | 空 | 空 | 按需 | API v3。`API_V3_KEY` 必须 **32 字节**；`PLATFORM_PUBLIC_KEY` 用于验回调 |
+| `WECHAT_MCH_ID` / `WECHAT_APP_ID` / `WECHAT_API_V3_KEY` / `WECHAT_SERIAL_NO` / `WECHAT_PRIVATE_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY_ID` | 空 | 空 | 按需 | API v3。`API_V3_KEY` 必须 **32 字节**；`PLATFORM_PUBLIC_KEY` 用于验回调，`PLATFORM_PUBLIC_KEY_ID` 必须与回调/响应头 `Wechatpay-Serial` 完全一致 |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | 空 | 空 | 按需 | PayPal REST App 凭据。生产用 Live App，联调可用 Sandbox App |
 | `PAYPAL_WEBHOOK_ID` | 空 | 空 | 按需 | PayPal 开发者后台 Webhook 的 ID，不是 URL；回调通过 PayPal 官方 `verify-webhook-signature` 验签 |
 | `PAYPAL_API_BASE` | 空 | 空 | 按需 | 留空用 `https://api-m.paypal.com`；Sandbox 显式填 `https://api-m.sandbox.paypal.com` |

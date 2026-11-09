@@ -69,7 +69,7 @@ function makeHarness() {
     configs as never,
     exceptions as never,
   );
-  return { service, states, prisma, reconciliation, exceptions };
+  return { service, states, prisma, orders, reconciliation, exceptions };
 }
 
 async function runAutoReconcile(service: PaymentWorkerService) {
@@ -132,5 +132,31 @@ describe('PaymentWorkerService 自动对账重试', () => {
       lastError: '账单下载失败',
     });
     expect(exceptions.recordReconciliationFailure).not.toHaveBeenCalled();
+  });
+});
+
+describe('PaymentWorkerService 超时关单节流', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-05T02:30:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('超时关单每 60 秒执行一次，不跟随 15 秒主循环频率', async () => {
+    const { service, orders } = makeHarness();
+
+    await service.tick();
+    expect(orders.closeExpired).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(30_000);
+    await service.tick();
+    expect(orders.closeExpired).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(30_000);
+    await service.tick();
+    expect(orders.closeExpired).toHaveBeenCalledTimes(2);
   });
 });

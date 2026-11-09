@@ -31,6 +31,14 @@ import { parseCsv } from '../../common/csv';
  *
  * 回调必须校验时间戳新鲜度（5 分钟）：签名不含随机挑战，时间窗是防重放唯一截面。
  */
+export interface WechatNotificationPayload {
+  out_trade_no?: string;
+  transaction_id?: string;
+  trade_state?: string;
+  success_time?: string;
+  amount?: { total?: number };
+}
+
 export class WechatAdapter implements PaymentAdapter {
   private readonly logger = new Logger(WechatAdapter.name);
 
@@ -61,6 +69,14 @@ export class WechatAdapter implements PaymentAdapter {
         required: true,
         secret: true,
         description: '用于验签回调与网关响应',
+      },
+      {
+        name: 'wechatPayPublicKeyId',
+        label: '微信支付公钥 ID',
+        type: 'text',
+        required: true,
+        maxLength: 128,
+        description: '微信支付平台公钥 ID；必须与回调/响应头 Wechatpay-Serial 完全一致',
       },
       {
         name: 'apiBase',
@@ -170,14 +186,21 @@ export class WechatAdapter implements PaymentAdapter {
     const raw = input.rawBody.toString('utf8');
     const v = input.config.values;
     const h = (name: string): string => {
-      const val = input.headers?.[name];
+      const key = Object.keys(input.headers ?? {}).find(
+        (candidate) => candidate.toLowerCase() === name.toLowerCase(),
+      );
+      const val = key ? input.headers?.[key] : undefined;
       return Array.isArray(val) ? String(val[0] ?? '') : String(val ?? '');
     };
     const timestamp = h('wechatpay-timestamp');
     const nonce = h('wechatpay-nonce');
     const signature = h('wechatpay-signature');
-    if (!timestamp || !nonce || !signature) {
+    const serial = h('wechatpay-serial');
+    if (!timestamp || !nonce || !signature || !serial) {
       return { ok: false, ackSuccess: false, reason: '缺少微信回调签名头', rawPayload: raw };
+    }
+    if (serial !== v.wechatPayPublicKeyId?.trim()) {
+      return { ok: false, ackSuccess: false, reason: '回调公钥 ID 与配置不匹配', rawPayload: raw };
     }
     if (!isFresh(timestamp)) {
       return { ok: false, ackSuccess: false, reason: '回调时间戳超出 5 分钟窗口（疑似重放）', rawPayload: raw };
@@ -195,20 +218,14 @@ export class WechatAdapter implements PaymentAdapter {
     }
     if (!verified) return { ok: false, ackSuccess: false, reason: '回调验签失败', rawPayload: raw };
 
-    let payload: {
-      out_trade_no?: string;
-      transaction_id?: string;
-      trade_state?: string;
-      success_time?: string;
-      amount?: { total?: number };
-    };
+    let payload: WechatNotificationPayload;
     try {
       const body = input.body as { resource?: { ciphertext?: string; nonce?: string; associated_data?: string } };
       const resource = body.resource;
       if (!resource?.ciphertext || !resource?.nonce) {
         return { ok: false, ackSuccess: false, reason: '回调缺少 resource', rawPayload: raw };
       }
-      payload = decryptResource(v.apiV3Key, {
+      payload = decryptWechatResource(v.apiV3Key, {
         ciphertext: resource.ciphertext,
         nonce: resource.nonce,
         associated_data: resource.associated_data,
@@ -219,7 +236,7 @@ export class WechatAdapter implements PaymentAdapter {
 
     const orderNo = payload.out_trade_no ?? '';
     const tradeNo = payload.transaction_id ?? '';
-    const eventId = h('wechatpay-serial') ? `${tradeNo || orderNo}` : tradeNo || orderNo;
+    const eventId = tradeNo || orderNo;
     const state = mapTradeState(payload.trade_state);
 
     if (state === 'paid') {
@@ -374,7 +391,13 @@ export class WechatAdapter implements PaymentAdapter {
       err.code = code;
       throw err;
     }
-    verifyResponse(res.headers, text, normalizePem(values.wechatPayPublicKey), label);
+    verifyResponse(
+      res.headers,
+      text,
+      normalizePem(values.wechatPayPublicKey),
+      values.wechatPayPublicKeyId?.trim() ?? '',
+      label,
+    );
     return { text, headers: res.headers };
   }
 }
@@ -394,12 +417,22 @@ function signRequest(
   return signer.sign(privateKey, 'base64');
 }
 
-function verifyResponse(headers: Headers, body: string, publicKey: string, label: string): void {
+function verifyResponse(
+  headers: Headers,
+  body: string,
+  publicKey: string,
+  expectedSerial: string,
+  label: string,
+): void {
   const timestamp = headers.get('wechatpay-timestamp') ?? '';
   const nonce = headers.get('wechatpay-nonce') ?? '';
   const signature = headers.get('wechatpay-signature') ?? '';
-  if (!timestamp || !nonce || !signature) {
+  const serial = headers.get('wechatpay-serial') ?? '';
+  if (!timestamp || !nonce || !signature || !serial) {
     throw new Error(`${label}响应缺少验签头，无法确认来源`);
+  }
+  if (serial !== expectedSerial) {
+    throw new Error(`${label}响应公钥 ID 与配置不匹配`);
   }
   if (!isFresh(timestamp)) throw new Error(`${label}响应时间戳超出 5 分钟窗口（疑似重放）`);
 
@@ -416,16 +449,17 @@ function verifyResponse(headers: Headers, body: string, publicKey: string, label
   if (!verified) throw new Error(`${label}响应验签失败（公钥不匹配或报文被篡改）`);
 }
 
-function decryptResource(
+/**
+ * 解密微信 API v3 回调的 resource。
+ *
+ * 规范回调 URL 不携带 configId，通知服务必须先用历史 Payment 引用过的
+ * APIv3 密钥尝试解密，得到 out_trade_no 后才能定位订单；这里保留唯一一份
+ * AES-GCM 实现，避免配置定位层复制协议细节。
+ */
+export function decryptWechatResource(
   apiV3Key: string,
   resource: { ciphertext: string; nonce: string; associated_data?: string },
-): {
-  out_trade_no?: string;
-  transaction_id?: string;
-  trade_state?: string;
-  success_time?: string;
-  amount?: { total?: number };
-} {
+): WechatNotificationPayload {
   const key = Buffer.from(apiV3Key, 'utf8');
   if (key.length !== 32) throw new Error('APIv3 密钥必须是 32 字节');
   const raw = Buffer.from(resource.ciphertext, 'base64');

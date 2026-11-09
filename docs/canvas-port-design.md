@@ -1,8 +1,10 @@
 # 无限画布全量移植方案
 
-规划中（未实施）。最后更新 2026-11-06。
+规划中（未实施）。最后更新 2026-11-09。
 
 来源：`open-ai-canvas`（MIT，`https://github.com/ddcat-ai/open-ai-canvas`）。本方案的目标是把上游画布及其直接业务域**全量移植**到货觉，功能与业务规则对齐，技术栈按本仓改写。
+
+实现级细节（文件落点、数据结构、协议算法、边界条件、验收闸口）见 [`canvas-detailed-design.md`](canvas-detailed-design.md)；本文只保留范围、架构与工作分解。
 
 ## 1. 范围与口径
 
@@ -25,7 +27,7 @@
 
 ### 1.2 已定技术口径
 
-1. **数据库与缓存：PostgreSQL + Redis**。不保留 SQLite 双轨。
+1. **数据库与缓存：PostgreSQL + Redis**。不保留 SQLite 双轨。**Redis 是生产硬依赖**：`REDIS_URL` 非空、scheme 合法且连通才允许生产启动，`/health/ready` 纳入 Redis 探针；「单实例内存 Hub + 前端 2 秒轮询」降级仅允许 development / test。多实例下的全局限流、缓存失效广播、定时任务分布式锁一并收敛到 Redis。
 2. **前端：shadcn 重画**。不引入 antd，不保留两套 UI 体系。
 3. **Agent 与 3D 扩展排在最后实现**，但属于最终交付范围，不做功能裁剪。
 
@@ -59,7 +61,7 @@
 | 组件 | 用途 | 本仓落点 |
 | --- | --- | --- |
 | PostgreSQL 16 | 主库；行锁、advisory lock、JSON 文本、迁移 | Prisma `provider = "postgresql"` |
-| Redis 7 | 实时 pub/sub、presence 设备号、可选全局限流 | `backend/src/redis/**` |
+| Redis 7 | **生产硬依赖**：实时 pub/sub、presence 设备号、全局限流、缓存失效广播、定时任务分布式锁 | `backend/src/redis/**` + `REDIS_URL`（生产必填） |
 | Prisma Migrate | 生产迁移；不再使用 `db push` | `backend/prisma/migrations/**` |
 | pg_dump / pg_restore | 备份恢复 | 重写 `backend/src/admin/backup.service.ts` |
 
@@ -197,7 +199,8 @@ PostgreSQL + Prisma。所有表带 `ownerId`，所有查询必须带 `ownerId` �
 - 客户端只允许发送 `presence`（光标、拖拽节点），80 条/秒上限，读限制 32KB。
 - 15 秒心跳与身份复核；吊销账号或删除画布以 1008 关闭。
 - Redis 房间 key：`canvas:realtime:v1:<ownerId>:<canvasId>`；设备号 1..64 用 sorted set + Lua。
-- Redis 不可用时降级为单实例内存 Hub + 前端 2 秒轮询，**不得阻塞文档写入**。
+- 生产不启用降级：Redis 缺失或不可达由启动门禁 / 健康探针拦截；「单实例内存 Hub + 前端 2 秒轮询」降级仅允许 development / test。
+- **文档写入任何环境都不依赖 Redis**，实时链路故障不得阻塞 `PATCH /operations`。
 
 ### 6.5 分享
 
@@ -221,7 +224,8 @@ PostgreSQL + Prisma。所有表带 `ownerId`，所有查询必须带 `ownerId` �
 - 本地与生产 compose 增加 postgres / redis 服务、健康检查、持久卷。
 - 重写备份服务：`pg_dump --format=custom` + `pg_restore --list` 校验；Docker 镜像加入 postgresql-client。
 - 集成测试改为独立 Postgres schema；测试数据清理策略更新。
-- 环境变量：`DATABASE_URL`、`REDIS_URL` 加入 `ENV_SPECS`、`.env.example`、三档 env；生产门禁要求非开发值。
+- 环境变量：`DATABASE_URL`、`REDIS_URL` 加入 `ENV_SPECS`、`.env.example`、三档 env；生产门禁拒绝 `file:` 开头的 `DATABASE_URL`，要求 `REDIS_URL` 非空、scheme 合法且连通；`/health/ready` 增加 Redis 探针。
+- 多实例状态收敛：全局限流、目录/积分价缓存失效广播、定时任务分布式锁改走 Redis（现为进程内存，多实例下会放大配额与旧价窗口）。
 - 现有 SQLite 数据迁移脚本（若已有生产数据）：按外键顺序搬迁、行数与校验和比对；无数据则记录为空迁移。
 
 ### B1 后端画布内核（55–80 人日）
@@ -317,7 +321,7 @@ Agent 与 3D 扩展按要求排在最后；此前里程碑不减少最终功能�
 | 限流 | 写入按用户、租约 240 次/分、分享 120 次/分/IP、资源 300 次/分/IP |
 | 审计 | 后台画布设置、配额、存储切换写审计 |
 | 备份 | PostgreSQL 逻辑备份 + 恢复演练；上传目录单独备份 |
-| 高可用 | 多实例必须 Redis；WS 支持跨实例扇出；文档写入不依赖 Redis |
+| 高可用 | **生产必须 Redis**（`REDIS_URL` 启动门禁 + `/health/ready` 探针，不启用内存降级）；WS 支持跨实例扇出；文档写入不依赖 Redis |
 | 可观测 | 结构化日志、请求追踪、WS/冲突/快照指标 |
 | 安全 | HTML/SVG 节点沙箱、CSP、XSS 清洗、分享 token 哈希存储 |
 | 性能 | 渲染预算、空间索引、payload 上限、慢消费者断开 |
@@ -357,13 +361,13 @@ Agent 与 3D 扩展按要求排在最后；此前里程碑不减少最终功能�
 | 上游无历史 HTTP 接口 | 按新增接口排期，不按「已有历史」估 |
 | 生成链路两套模型 | 能力定义单一事实源，禁止画布私建 task |
 | Agent / 3D 域体量大 | 独立工作流，排在最后，画布核心不被绑死 |
-| Redis 故障影响编辑 | 实时降级轮询，文档写入不依赖 Redis |
+| Redis 故障影响编辑 | 生产硬依赖：启动期连通门禁 + 运行期探针，不静默降级（降级仅 development / test）；文档写入不依赖 Redis，故编辑写入不受影响 |
 | 公开分享泄露 | metadata 白名单 + 资源 allow-list + CSP + 限流 |
 | 单人排期失真 | 按工作流并行，M0–M3 至少 2 后端 + 2 前端 |
 
 ## 13. 第一批可执行任务
 
-1. 完成 P0：Prisma 切 Postgres、Redis 接入、备份重写、测试库改造。
+1. 完成 P0：Prisma 切 Postgres、Redis 接入（生产启动门禁 + 健康探针 + 多实例状态收敛）、备份重写、测试库改造。
 2. 建 7 张画布表与 baseline migration。
 3. 实现 `GET /canvas-projects`、`GET /:id`、`PATCH /:id/operations` 的 `create_canvas` + `create_node` 最小闭环，并补集成测试。
 4. 移植 `lib/canvas` 纯逻辑与 89 个测试，跑绿。

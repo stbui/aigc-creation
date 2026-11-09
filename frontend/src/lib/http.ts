@@ -32,3 +32,10 @@ export function extractErrorMessage(body: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+/** 构造单文件 FormData；浏览器会自行补 multipart boundary，调用方不要手工设 Content-Type。 */
+export function formDataWithFile(field: string, file: File): FormData {
+  const body = new FormData();
+  body.append(field, file);
+  return body;
+}
