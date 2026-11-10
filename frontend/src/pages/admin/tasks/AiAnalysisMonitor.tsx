@@ -146,7 +146,7 @@ const COLUMNS: Array<AdminColumn<ApiLogView>> = [
     width: 150,
     render: (row) => (
       <span
-        className="block truncate font-mono text-[11px] text-muted-foreground"
+        className="block truncate font-mono text-[12px] text-muted-foreground"
         title={row.requestId || row.traceId}
       >
         {row.requestId || row.traceId || '—'}

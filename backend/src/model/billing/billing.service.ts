@@ -936,18 +936,33 @@ export class BillingService {
    *   · `route_switch` —— 线路切换的内部重预留，钱没离开平台，
    *     **不计入「已退」**（否则一次 9 分换 4 分会显示净收入 −5）；
    *   · 其余（失败 / 人工 / 超时）—— 真实退款，计入「已退」。
+   *
+   * `resolution` 供自动退款扫描器把「处理人 / 处理说明」与退款写进同一事务。
+   * 分开两步写会出现「钱已退、账单仍显示未核对」，进程崩在中间时无法自愈；
+   * 这里复用已有 interactive transaction，不再在外层包一层（嵌套事务在 SQLite
+   * driver adapter 下会锁等待）。
    */
   async refund(
     billingOrderId: string,
     errorText = '',
     reason: RefundReason = 'failure',
+    resolution?: { resolvedBy: string; resolutionNote: string },
   ): Promise<BillingOrderRow> {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.billingOrder.findUnique({ where: { id: billingOrderId } });
       if (!order) throw new AppError(40400, '账单不存在', 404);
-      if (order.status === 'refunded') return order;
       if (order.status === 'settled') throw new AppError(40909, '已结算账单需人工退款', 409);
-      return this.refundInTransaction(tx, order, errorText, reason);
+      // 已退款账单不再动钱包，但仍要补写核对信息：扫描器原先就是先 refund()
+      // 再单独 updateMany()，对历史「已退但未核对」的行同样会补标记。
+      const refunded =
+        order.status === 'refunded' ? order : await this.refundInTransaction(tx, order, errorText, reason);
+      if (resolution) {
+        await tx.billingOrder.updateMany({
+          where: { id: order.id, resolvedBy: '' },
+          data: { resolvedBy: resolution.resolvedBy, resolutionNote: resolution.resolutionNote },
+        });
+      }
+      return refunded;
     });
   }
 

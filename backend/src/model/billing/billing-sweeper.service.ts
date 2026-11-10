@@ -211,11 +211,13 @@ export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
     for (const order of candidates) {
       if (protectedIds.has(order.taskId)) continue;
       try {
-        await this.billing.refund(order.id, '系统自动退回：冻结积分自动退回已开启', 'auto_sweep');
-        await this.prisma.billingOrder.updateMany({
-          where: { id: order.id, resolvedBy: '' },
-          data: { resolvedBy: 'system:auto-refund', resolutionNote: '冻结积分自动退回' },
-        });
+        // 退款与「已核对」标记在同一事务内落地，避免钱退了但账单仍显示待处理。
+        await this.billing.refund(
+          order.id,
+          '系统自动退回：冻结积分自动退回已开启',
+          'auto_sweep',
+          { resolvedBy: 'system:auto-refund', resolutionNote: '冻结积分自动退回' },
+        );
         refunded += 1;
       } catch (error) {
         this.log.warn(`任务账单自动退款失败（账单 ${order.id}）：${messageOf(error)}`);

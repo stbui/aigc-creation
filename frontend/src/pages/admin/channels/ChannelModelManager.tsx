@@ -241,7 +241,6 @@ export function ChannelModelManager({
          */
         const next = toModelDraft(saved);
         setDraft(next);
-        setDraftBase(next);
         setEditing(saved);
         setCreating(false);
         // 保存已完成，允许用户在测试期间取消关闭；测试结束由 finally 兜底

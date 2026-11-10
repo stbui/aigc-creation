@@ -661,6 +661,22 @@
   /* 零散部位 */
   --misc-text-danger: #c81e1e;
   --misc-text-success: #147d55;
+
+  /* 2026-11-10 页面裸色值收敛：以下令牌与替换前的字面值逐字等价，视觉零变化。
+     新增前已核对现有 377 个令牌，没有同值且语义合适者可复用，故按用途单点定义；
+     `--success-bg` 原先只在 image-to-video 的 var() fallback 里生效，一并收拢。
+     请勿继续扩散成同义簇，后续页面优先复用这里的语义名。 */
+  --mask-opaque: #000000;
+  --surface-gradient-top: #f8f6ff;
+  --brand-gradient-end: #7b5df1;
+  --success-bg: #edf9f1;
+  --success-solid-bg: #eaf8ef;
+  --success-solid-text: #168447;
+  --warning-solid-text: #9a6700;
+  --brand-chip-bg: #e9e5ff;
+  --surface-ink: #101116;
+  --overlay-mask-strong: #1c1e2d75;
+  --overlay-mask-soft: #14122180;
 }
 
 * {
@@ -5221,13 +5237,13 @@ img[data-broken='1'] {
   .ui-btn.is-primary {
     border-color: var(--brand);
     background: var(--brand);
-    color: #fff;
+    color: var(--on-brand);
   }
 
   .ui-btn.is-primary:hover:not(:disabled) {
     border-color: var(--brand-hover);
     background: var(--brand-hover);
-    color: #fff;
+    color: var(--on-brand);
   }
 
   .ui-btn.is-ghost {
@@ -5244,16 +5260,16 @@ img[data-broken='1'] {
   .ui-btn.is-danger {
     border-color: var(--danger-text);
     background: var(--danger-text);
-    color: #fff;
+    color: var(--on-brand);
   }
 
   /* 危险态必须显式覆盖通用 hover：`.ui-btn:hover:not(:disabled)` 的特异性
      3 > `.ui-btn.is-danger` 的 2，不写这条会让危险按钮 hover 时文字变品牌紫、
      压在红底上（删除确认里最容易被看到的一处）。 */
   .ui-btn.is-danger:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--danger-text) 86%, #000);
-    background: color-mix(in srgb, var(--danger-text) 86%, #000);
-    color: #fff;
+    border-color: color-mix(in srgb, var(--danger-text) 86%, var(--mask-opaque));
+    background: color-mix(in srgb, var(--danger-text) 86%, var(--mask-opaque));
+    color: var(--on-brand);
   }
 
   .ui-btn:disabled {
@@ -5397,7 +5413,7 @@ img[data-broken='1'] {
 
 .ui-radio-group.is-solid .ui-radio-button:has(input:checked) {
   background: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
 }
 
 .ui-radio-group.is-disabled {
@@ -5519,7 +5535,7 @@ img[data-broken='1'] {
   border: 0;
   border-radius: 50%;
   background: rgb(15 23 42 / 0.66);
-  color: #fff;
+  color: var(--on-brand);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
@@ -5545,7 +5561,7 @@ img[data-broken='1'] {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--danger-text);
-  color: #fff;
+  color: var(--on-brand);
   font-size: 12px;
   line-height: 16px;
   text-align: center;

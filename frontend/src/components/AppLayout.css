@@ -414,8 +414,8 @@
 /* macOS 的 overlay 滚动条默认会隐藏，截断处会像排版错误；用底部渐隐提示还有入口，
    滚到底（SideRail 的 has-more 判定）后撤掉，不遮住最后一个入口。 */
 .workspace-side-menu-sections.has-more {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - 28px), transparent);
 }
 
 /* Firefox 等仍按下面两条渲染常显细滚动条。 */
@@ -632,7 +632,7 @@
     height: 24px;
   }
   .app-sider-wrap .workspace-side-menu-btn .side-menu-label {
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 500;
     line-height: 14px;
     text-align: center;
@@ -1010,7 +1010,7 @@
 .app-user-avatar {
   flex: none;
   background: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1032,7 +1032,7 @@
   border-bottom: 1px solid var(--border-soft);
   background:
     radial-gradient(circle at 90% 0%, rgba(85, 70, 216, 0.1), transparent 42%),
-    linear-gradient(180deg, #f8f6ff 0%, #ffffff 100%);
+    linear-gradient(180deg, var(--surface-gradient-top) 0%, var(--card-bg) 100%);
 }
 
 .app-user-menu-identity {
@@ -1043,8 +1043,8 @@
 
 .app-user-menu-avatar {
   flex: none;
-  background: linear-gradient(145deg, var(--brand) 0%, #7b5df1 100%);
-  color: #fff;
+  background: linear-gradient(145deg, var(--brand) 0%, var(--brand-gradient-end) 100%);
+  color: var(--on-brand);
   font-size: 15px;
   font-weight: 700;
   box-shadow: 0 6px 16px rgba(85, 70, 216, 0.22);
@@ -1163,8 +1163,8 @@
 }
 
 .app-user-menu-plan-state.is-active {
-  background: #eaf8ef;
-  color: #168447;
+  background: var(--success-solid-bg);
+  color: var(--success-solid-text);
 }
 
 .app-user-menu-package-meta {
@@ -1203,7 +1203,7 @@
 
 .app-user-menu-package-note {
   margin: 9px 0 0;
-  color: #9a6700;
+  color: var(--warning-solid-text);
   font-size: 12px;
   line-height: 17px;
 }
@@ -1228,7 +1228,7 @@
 
 .app-user-menu-package-action:hover {
   border-color: var(--brand);
-  background: #e9e5ff;
+  background: var(--brand-chip-bg);
 }
 
 .app-user-dropdown.ui-dropdown-content .ui-dropdown-item {

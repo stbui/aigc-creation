@@ -149,7 +149,7 @@
   max-height: 100cqh;
   display: block;
   border-radius: 0;
-  background: #000;
+  background: var(--mask-opaque);
   object-fit: contain;
 }
 

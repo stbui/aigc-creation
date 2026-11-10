@@ -543,8 +543,8 @@
  * 同时不在视觉上把半截区块当成完整的。
  */
 .sc-form-scroll {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - 24px), transparent 100%);
 }
 
 /*
@@ -758,7 +758,7 @@
   padding: 0 4px;
   font-size: 12px;
   line-height: 16px;
-  color: #fff;
+  color: var(--on-brand);
   background: rgba(23, 26, 43, 0.72);
   border-radius: var(--radius-tag);
 }
@@ -869,7 +869,7 @@
 }
 
 .sc-form-footer .pk-primary-btn:hover:not(:disabled) {
-  background: #000;
+  background: var(--mask-opaque);
   background-image: none;
 }
 

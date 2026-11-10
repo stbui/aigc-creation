@@ -109,7 +109,8 @@ export class PaymentNotificationService {
    * 旧版带 configId 的回调入口。
    *
    * 历史订单、PayPal/ZPay 等尚未规范化的渠道，以及已写入渠道后台的旧 URL
-   * 都继续走这里。新渠道的规范入口见 `ingestCanonical()`。
+   * 都继续走这里。前置定位（byId + providerId 匹配）与规范入口不同，定位完成后
+   * 委托给 `ingestCanonical()` 的 legacy 分支，共用同一条验签 / 落库 / ack 链路。
    */
   async ingest(input: {
     providerId: PaymentProviderId;
@@ -147,11 +148,17 @@ export class PaymentNotificationService {
       });
     }
 
-    if (input.providerId === 'epay') {
-      return this.acceptEpayWithConfig(adapter, config, input);
-    }
-
-    return this.acceptWithConfig(adapter, config, input);
+    // 传 config 走 legacy 分支：这些渠道不在规范白名单里，且 configId 已经是
+    // 精确定位结果，再走历史反查反而可能把同一订单串到另一个配置实例。
+    return this.ingestCanonical(
+      {
+        providerId: input.providerId,
+        headers: input.headers,
+        rawBody: input.rawBody,
+        body: input.body,
+      },
+      config,
+    );
   }
 
   /**
@@ -224,8 +231,14 @@ export class PaymentNotificationService {
    * 规范回调入口：URL 不携带 configId，必须从订单引用的历史 Payment 反查
    * 当时的配置版本并逐个验签。绝不能回落到“该渠道最新配置”，否则轮换密钥后
    * 历史订单会验签失败，甚至可能把同一订单串到另一个实例。
+   *
+   * `legacyConfig` 由旧版 `ingest()` 传入：配置已按 configId 精确定位，跳过
+   * 白名单与反查，直接沿用旧渠道的验签方式，最终仍汇入 `persistVerified()`。
    */
-  async ingestCanonical(input: CanonicalNotificationInput): Promise<PaymentAck> {
+  async ingestCanonical(
+    input: CanonicalNotificationInput,
+    legacyConfig?: ResolvedPaymentConfig,
+  ): Promise<PaymentAck> {
     const adapter = getAdapter(input.providerId);
     if (!adapter) {
       return {
@@ -234,6 +247,13 @@ export class PaymentNotificationService {
         contentType: 'application/json; charset=utf-8',
       };
     }
+
+    if (legacyConfig) {
+      return input.providerId === 'epay'
+        ? this.acceptEpayWithConfig(adapter, legacyConfig, input)
+        : this.acceptWithConfig(adapter, legacyConfig, input);
+    }
+
     if (!CANONICAL_PROVIDER_IDS.includes(input.providerId)) {
       return adapter.ack({
         ok: false,

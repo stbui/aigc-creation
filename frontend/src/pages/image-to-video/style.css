@@ -63,8 +63,8 @@
   padding: 2px 7px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.68);
-  color: #fff;
-  font-size: 11px;
+  color: var(--on-brand);
+  font-size: 12px;
   line-height: 18px;
 }
 
@@ -227,7 +227,7 @@
 
 .image-to-video-prompt small {
   color: var(--text-desc);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 17px;
 }
 
@@ -245,7 +245,7 @@
 
 .image-to-video-param-head span {
   color: var(--text-desc);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 17px;
   text-align: right;
 }
@@ -303,7 +303,7 @@
 
 .image-to-video-eyebrow {
   color: var(--brand);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.13em;
   line-height: 14px;
@@ -325,7 +325,7 @@
   border-radius: 999px;
   background: var(--surface);
   color: var(--text-desc);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 24px;
 }
 
@@ -335,8 +335,8 @@
 }
 
 .image-to-video-status.is-success {
-  background: var(--success-bg, #edf9f1);
-  color: var(--success-text, #23834b);
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .image-to-video-idle,
@@ -465,7 +465,7 @@
   border-radius: 999px;
   background: var(--surface);
   color: var(--text-body);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 24px;
 }
 
@@ -552,7 +552,7 @@
   min-height: 260px;
   overflow: hidden;
   border-radius: 12px;
-  background: #101116;
+  background: var(--surface-ink);
 }
 
 .image-to-video-video-stage .result-media-aigc,
@@ -590,7 +590,7 @@
   padding: 0 14px;
   border-radius: 8px;
   background: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
   display: inline-flex;
   align-items: center;
   gap: 6px;

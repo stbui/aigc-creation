@@ -38,6 +38,14 @@ export default defineConfig({
     exclude: ['node_modules', 'dist', 'tests', 'e2e'],
     clearMocks: true,
     restoreMocks: true,
+    /*
+     * 全仓 23 个「具名导入对账」测试是同步 IO 密集型（递归 readFileSync/statSync）。
+     * vmThreads 的文件级并行会让它们互相阻塞：实测并发时单测 7~38.8s、全量约 275s
+     * 且 23 个撞 10s 超时；串行时单测约 1.6s、该批 60s 全通过。同一用例单跑仅
+     * 97ms，说明超时是调度争抢而非契约失败 —— 关掉文件级并行，不放宽 testTimeout
+     * 去掩盖问题。其余 83 个多为纯逻辑测试，串行开销可忽略。
+     */
+    fileParallelism: false,
     testTimeout: 10000,
     coverage: {
       provider: 'v8',

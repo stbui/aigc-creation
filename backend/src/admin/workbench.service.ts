@@ -3,6 +3,7 @@ import type { AdminUser } from './admin.decorator';
 import { AdminRoleService } from './admin-role.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PERMISSIONS } from './permissions';
+import { yuan } from './format';
 import {
   PaymentReconciliationService,
   RECONCILIATION_OPEN_RESULTS,
@@ -542,10 +543,6 @@ function priorityLabel(priority: string): string {
 
 function shortId(id: string): string {
   return id.slice(0, 8);
-}
-
-function yuan(cents: number): string {
-  return (cents / 100).toFixed(2);
 }
 
 function microToCredits(micro: bigint): string {

@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { PERMISSIONS } from "./permissions";
+import { yuan } from "./format";
 
 /**
  * 后台全局搜索。
@@ -324,7 +325,4 @@ function roleLabel(role: string): string {
 }
 function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status;
-}
-function yuan(cents: number): string {
-  return (cents / 100).toFixed(2);
 }

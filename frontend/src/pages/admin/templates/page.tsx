@@ -262,7 +262,7 @@ export function AdminTemplatesPage() {
       <PageHeader
         title="写真模板"
         description="维护 C 端 /template 的模板目录：一级分类（来源文章）→ 二级分类（风格/场景）→ 模板（图片 + 提示词 + 标签）。"
-        actions={<RefreshButton onClick={() => void reload()} loading={loading} />}
+        actions={<RefreshButton onRefresh={() => void reload()} loading={loading} />}
       />
 
       <div className="grid grid-cols-[minmax(220px,260px)_minmax(220px,280px)_minmax(0,1fr)] items-start gap-4">

@@ -102,7 +102,7 @@
   height: 5.6%;
   margin: 0;
   color: var(--card-bg);
-  font-size: clamp(8px, 2.35cqw, 12px);
+  font-size: 12px;
   line-height: 1.25;
   white-space: nowrap;
 }
@@ -159,7 +159,7 @@
 .guest-promo-benefits li {
   overflow: hidden;
   color: var(--shell-text-1);
-  font-size: clamp(10px, 3.15cqw, 15.75px);
+  font-size: clamp(12px, 3.15cqw, 15.75px);
   line-height: 4.4cqw;
   text-overflow: ellipsis;
   white-space: nowrap;

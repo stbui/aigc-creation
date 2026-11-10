@@ -361,7 +361,7 @@ export function AssetLibraryModal({
         body: { padding: 0 },
         // 参考站 backdrop: 背景 #1c1e2d75 + blur(3px)。antd 默认遮罩是 45% 纯黑,
         // 既更深又没有毛玻璃 —— 一眼能看出是两个站点的弹层。
-        mask: { background: '#1c1e2d75', backdropFilter: 'blur(3px)' },
+        mask: { background: 'var(--overlay-mask-strong)', backdropFilter: 'blur(3px)' },
       }}
       /*
        * ⚠️ `className` 是给**容器几何**用的, 不是给内容用的:

@@ -174,7 +174,7 @@ export function ProjectManagerDialog({
                             <div className="flex items-center gap-2">
                               <span className="truncate text-sm font-medium">{project.name}</span>
                               {currentProjectId === project.id && (
-                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">当前</span>
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[12px] text-primary">当前</span>
                               )}
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">
