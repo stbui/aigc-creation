@@ -24,7 +24,7 @@ interface AdminContextValue {
    */
   can: (permission: string) => boolean;
   canAny: (...permissions: string[]) => boolean;
-  /** 该权限点是否需要输入操作原因 (删除/退款/调价等高危动作) */
+  /** 是否为高危权限点 (用于风险分级展示) */
   isHighRisk: (permission: string) => boolean;
   refresh: () => void;
 }

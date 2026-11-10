@@ -53,7 +53,7 @@ interface FormState {
  * 版本化的三条硬约束不能因为换界面而松动：
  *   1. 已发布的版本不可原地覆盖 —— 编辑只对草稿与归档版本开放；
  *   2. 保存只建草稿，发布走独立接口（它负责归档同文档的旧版本）；
- *   3. 发布是高危动作，系统自动记录操作上下文并写审计。
+ *   3. 发布是高危动作，必须在确认后执行。
  *
  * 渲染层：读原文预览用 `ModalDialog`，编辑表单用 `Drawer` 原语（带固定操作区，
  * 长正文滚动时按钮不跑），未保存拦截与关闭确认沿用同一套 hook。
@@ -65,7 +65,7 @@ export function AdminLegalPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   /*
-   * 文档类别与版本预览都走地址栏：从告警、审计或聊天里发来的
+   * 文档类别与版本预览都走地址栏：从告警或聊天里发来的
    * `/admin/legal?slug=privacy-policy&version=v2` 要能直接落到那一条。
    * 非法 slug 视为「全部文档」，不把地址栏当输入校验的唯一入口。
    */
@@ -422,7 +422,7 @@ export function AdminLegalPage() {
         title="发布该版本"
         description={
           publishTarget
-            ? `发布后 ${SLUG_LABEL[publishTarget.slug] ?? publishTarget.slug} ${publishTarget.version} 将立即对全站生效，同文档的其他已发布版本自动归档。此操作会写入审计日志。`
+            ? `发布后 ${SLUG_LABEL[publishTarget.slug] ?? publishTarget.slug} ${publishTarget.version} 将立即对全站生效，同文档的其他已发布版本自动归档。`
             : ''
         }
         confirmText="发布"

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -27,18 +26,5 @@ describe('后台具名导入', () => {
     const failures = auditNamedImports(roots);
 
     expect(failures).toEqual([]);
-  });
-});
-
-describe('审计页交互边界', () => {
-  it('审计只留痕，不承载任何确认交互', () => {
-    const source = readFileSync(
-      resolve(PROJECT_ROOT, 'src/pages/admin/audit-logs/page.tsx'),
-      'utf8',
-    );
-
-    expect(source).not.toMatch(
-      /\b(?:ConfirmDialog|useConfirm|useDiscardConfirm|useUnsavedGuard|window\.confirm)\b/,
-    );
   });
 });

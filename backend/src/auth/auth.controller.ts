@@ -37,7 +37,7 @@ const RL_EMAIL_SEND: RateLimitOptions = { name: 'auth-email-send', limit: 3, win
  *
  * `req.ip` 默认是 socket 地址；本项目**默认不信任** `x-forwarded-for`
  * （见 B5 的 `RATE_LIMIT_TRUST_PROXY` 说明）—— 直接读该头等于让任何人
- * 伪造来源 IP，写进登录审计就是一条假证据。
+ * 伪造来源 IP，会污染登录记录与安全排障证据。
  */
 export function contextOf(req: Request): RequestContext {
   return {

@@ -263,7 +263,7 @@ export function AdminDashboardContent() {
           extra={
             !isFinance && can('channel.read') ? (
               <Link className="text-xs text-brand hover:underline" to="/admin/channels">
-                渠道工作台
+                模型商品
               </Link>
             ) : undefined
           }

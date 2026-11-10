@@ -18,6 +18,7 @@ export type RefundConfirmationResult =
       membershipTerminated: boolean;
       creditsReclaimed: number;
       creditsUnreclaimable: number;
+      creditsExpired: number;
       detail: Array<{ lotId: string; taken: number }>;
       invoiceFollowUp: {
         invoiceId: string;
@@ -62,7 +63,7 @@ export const adminOrdersApi = {
    * 异步退款最终人工核销。
    *
    * `succeeded` 会原子扣回积分并推进订单；`failed` 只关闭退款单，订单与
-   * 积分不变。两种结果都必须填写依据，供审计追溯。
+   * 积分不变。两种结果都必须填写依据，供事后追溯。
    */
   confirmRefund: (
     orderId: string,

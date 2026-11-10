@@ -46,6 +46,7 @@ export const PERMISSIONS = {
 
   // 项目与素材
   projectRead: "project.read",
+  projectWrite: "project.write",
   projectDelete: "project.delete",
   assetRead: "asset.read",
   assetHide: "asset.hide",
@@ -72,7 +73,7 @@ export const PERMISSIONS = {
   /** 删除从未产生支付、积分、会员等业务记录的待支付/已取消订单 */
   orderDelete: "order.delete",
   paymentRead: "payment.read",
-  /** 渠道配置写入。高危: 保存时写审计，但不要求填写 reason */
+  /** 渠道配置写入。高危权限，但不要求填写 reason */
   paymentWrite: "payment.write",
   /** 查单/关单。只推进渠道已发生的事实, 不能凭空造钱, 故非高危 */
   paymentOperate: "payment.operate",
@@ -107,7 +108,7 @@ export const PERMISSIONS = {
   // 它们的入口就是同一条 `PATCH`，拆成独立权限点却不在任何路由上校验，
   // 只会让人以为「没授予 secret_write 就改不了凭证」——实际能改。
   channelRead: "channel.read",
-  /** 写操作均审计；渠道删除保留业务确认但不要求原因 */
+  /** 渠道写权限；渠道删除保留业务确认但不要求原因 */
   channelWrite: "channel.write",
   channelModelRead: "channel.model_read",
   channelModelWrite: "channel.model_write",
@@ -138,7 +139,6 @@ export const PERMISSIONS = {
   settingWrite: "setting.write",
   roleRead: "role.read",
   roleWrite: "role.write",
-  auditRead: "audit.read",
 
   // 数据工具
   dataExport: "data.export",
@@ -159,7 +159,7 @@ export function isKnownPermission(p: string): p is Permission {
  * 内置角色的默认权限。
  *
  * 矩阵依据 docs/admin-prd.md §2.2:
- *   财务可改钱、运营可删数据, 两者不可合并 —— 权限合并后无法追责, 审计日志也失去意义。
+ *   财务可改钱、运营可删数据, 两者不可合并 —— 权限合并后无法区分职责。
  * 兜底默认拒: 未列出的权限点一律无权。
  */
 export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
@@ -169,6 +169,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.platformDashboard,
     PERMISSIONS.userRead,
     PERMISSIONS.projectRead,
+    PERMISSIONS.projectWrite,
     PERMISSIONS.projectDelete,
     PERMISSIONS.assetRead,
     PERMISSIONS.assetHide,
@@ -195,7 +196,6 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.ticketRead,
     PERMISSIONS.ticketHandle,
     PERMISSIONS.legalRead,
-    PERMISSIONS.auditRead,
     PERMISSIONS.settingRead,
     PERMISSIONS.roleRead,
     PERMISSIONS.dataExport,
@@ -230,7 +230,6 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.ticketRead,
     PERMISSIONS.ticketHandle,
     PERMISSIONS.legalRead,
-    PERMISSIONS.auditRead,
     PERMISSIONS.roleRead,
     PERMISSIONS.dataExport,
     PERMISSIONS.dataSearch,
@@ -240,7 +239,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
 /**
  * 高风险权限点，供权限展示与风险分级使用。
  * 是否为请求体要求 `reason` 由各业务 DTO 决定：该列表本身不构成页面门槛，
- * 删除等动作可以只做业务影响确认，审计仍会记录操作人、动作与结果。
+ * 删除等动作只做业务影响确认，不额外要求填写原因。
  */
 export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.userDelete,

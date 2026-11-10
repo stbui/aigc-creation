@@ -12,6 +12,7 @@ function makeConfig(): PaymentContext {
     configVersion: 1,
     values: {
       secretKey: 'sk_test_example',
+      publishableKey: 'pk_test_example',
       webhookSecret: WEBHOOK_SECRET,
       apiBase: 'https://api.stripe.com',
     },
@@ -87,6 +88,29 @@ function sessionEvent(
   };
 }
 
+function paymentIntentEvent(
+  type: string,
+  status: string,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: `evt_${type.replaceAll('.', '_')}`,
+    type,
+    created: Math.floor(Date.now() / 1000),
+    data: {
+      object: {
+        id: 'pi_test_1',
+        amount: 1005,
+        amount_received: status === 'succeeded' ? 1005 : 0,
+        currency: 'cny',
+        status,
+        metadata: { orderNo: 'HJ202611030001' },
+        ...overrides,
+      },
+    },
+  };
+}
+
 describe('verifyStripeSignature', () => {
   it('接受由 rawBody 与时间戳生成的 v1 签名', () => {
     const rawBody = '{"id":"evt_1","type":"checkout.session.completed"}';
@@ -127,37 +151,85 @@ describe('StripeAdapter API', () => {
     vi.unstubAllGlobals();
   });
 
-  it('创建 Checkout Session 时提交完整下单参数', async () => {
+  it('创建 PaymentIntent 时返回 Payment Element 所需参数', async () => {
     const input = createOrderInput();
     fetchMock.mockResolvedValue(
       jsonResponse({
-        id: 'cs_test_1',
-        url: 'https://checkout.stripe.com/c/pay/cs_test_1',
-        expires_at: Math.floor(input.expiresAt.getTime() / 1000),
+        id: 'pi_test_1',
+        client_secret: 'pi_test_1_secret_123',
+        status: 'requires_payment_method',
       }),
     );
 
     const checkout = await adapter.createOrder(input);
 
     expect(checkout).toMatchObject({
-      mode: 'redirect',
-      providerRef: 'cs_test_1',
-      payUrl: 'https://checkout.stripe.com/c/pay/cs_test_1',
+      mode: 'payment-element',
+      providerRef: 'pi_test_1',
+      clientSecret: 'pi_test_1_secret_123',
+      publishableKey: 'pk_test_example',
+      expiresAt: input.expiresAt,
     });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://api.stripe.com/v1/checkout/sessions');
+    expect(url).toBe('https://api.stripe.com/v1/payment_intents');
     expect(init.method).toBe('POST');
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer sk_test_example');
     const body = new URLSearchParams(String(init.body));
-    expect(body.get('mode')).toBe('payment');
-    expect(body.get('client_reference_id')).toBe(input.orderNo);
+    expect(body.get('amount')).toBe('1005');
+    expect(body.get('currency')).toBe('cny');
     expect(body.get('metadata[orderNo]')).toBe(input.orderNo);
-    expect(body.get('payment_intent_data[metadata][orderNo]')).toBe(input.orderNo);
-    expect(body.get('line_items[0][price_data][currency]')).toBe('cny');
-    expect(body.get('line_items[0][price_data][unit_amount]')).toBe('1005');
-    expect(body.get('success_url')).toBe(input.returnUrl);
-    expect(body.get('cancel_url')).toBe(input.returnUrl);
-    expect(body.get('expires_at')).toBe(String(Math.floor(input.expiresAt.getTime() / 1000)));
+    expect(body.get('automatic_payment_methods[enabled]')).toBe('true');
+  });
+
+  it('查 PaymentIntent 并映射已支付状态', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        id: 'pi_test_1',
+        status: 'succeeded',
+        amount: 1005,
+        amount_received: 1005,
+        currency: 'cny',
+      }),
+    );
+
+    const result = await adapter.queryOrder({
+      config: makeConfig(),
+      orderNo: 'HJ202611030001',
+      providerRef: 'pi_test_1',
+    });
+
+    expect(result).toMatchObject({
+      state: 'paid',
+      tradeNo: 'pi_test_1',
+      amountCents: 1005,
+      currency: 'CNY',
+      providerStatus: 'succeeded',
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.stripe.com/v1/payment_intents/pi_test_1');
+    expect(init.method).toBe('GET');
+  });
+
+  it('关 PaymentIntent 调用 cancel 接口', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        id: 'pi_test_1',
+        status: 'canceled',
+        amount: 1005,
+        currency: 'cny',
+      }),
+    );
+
+    const result = await adapter.closeOrder({
+      config: makeConfig(),
+      orderNo: 'HJ202611030001',
+      providerRef: 'pi_test_1',
+    });
+
+    expect(result.state).toBe('closed');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.stripe.com/v1/payment_intents/pi_test_1/cancel');
+    expect(init.method).toBe('POST');
   });
 
   it('查单展开 PaymentIntent 并映射已支付状态', async () => {
@@ -266,6 +338,65 @@ describe('StripeAdapter API', () => {
       'pi_from_session',
     );
   });
+
+  it('退款只拿到 PaymentIntent 单据号时直接退款，不反查 Session', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ id: 're_test_3', status: 'succeeded' }));
+
+    const result = await adapter.refund({
+      config: makeConfig(),
+      orderNo: 'HJ202611030001',
+      outRefundNo: 'RF202611030003',
+      amountCents: 500,
+      totalCents: 1005,
+      providerRef: 'pi_test_3',
+    });
+
+    expect(result).toMatchObject({ state: 'succeeded', providerRefundId: 're_test_3' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.stripe.com/v1/refunds');
+    expect(new URLSearchParams(String(init.body)).get('payment_intent')).toBe('pi_test_3');
+  });
+
+  it.each(['failed', 'canceled'])('退款状态 %s 属于渠道明确失败', async (status) => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ id: `re_${status}`, status }),
+    );
+
+    const result = await adapter.refund({
+      config: makeConfig(),
+      orderNo: 'HJ202611030001',
+      outRefundNo: `RF_${status}`,
+      amountCents: 1005,
+      totalCents: 1005,
+      providerRef: 'pi_test_1',
+    });
+
+    expect(result).toMatchObject({
+      state: 'failed',
+      failureKind: 'definitive',
+      providerRefundId: `re_${status}`,
+    });
+  });
+
+  it('退款网络异常时标记结果未知', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('socket timeout'));
+
+    const result = await adapter.refund({
+      config: makeConfig(),
+      orderNo: 'HJ202611030001',
+      outRefundNo: 'RF_unknown',
+      amountCents: 1005,
+      totalCents: 1005,
+      providerRef: 'pi_test_1',
+    });
+
+    expect(result).toMatchObject({
+      state: 'failed',
+      failureKind: 'unknown',
+      error: expect.stringContaining('socket timeout'),
+    });
+  });
 });
 
 describe('StripeAdapter.verifyNotification', () => {
@@ -345,5 +476,36 @@ describe('StripeAdapter.verifyNotification', () => {
     if (!result.ok) return;
     expect(result.state).toBe('closed');
     expect(result.providerRef).toBe('cs_test_1');
+  });
+
+  it('payment_intent.succeeded 映射为已支付，金额优先使用 amount_received', async () => {
+    const result = await adapter.verifyNotification(
+      notificationInput(paymentIntentEvent('payment_intent.succeeded', 'succeeded')),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result).toMatchObject({
+      state: 'paid',
+      merchantOrderNo: 'HJ202611030001',
+      providerRef: 'pi_test_1',
+      providerTradeNo: 'pi_test_1',
+      amountCents: 1005,
+      currency: 'CNY',
+      ackSuccess: true,
+    });
+  });
+
+  it('payment_intent.payment_failed 映射为失败', async () => {
+    const result = await adapter.verifyNotification(
+      notificationInput(
+        paymentIntentEvent('payment_intent.payment_failed', 'requires_payment_method'),
+      ),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state).toBe('failed');
+    expect(result.reason).toMatch(/PaymentIntent/);
   });
 });

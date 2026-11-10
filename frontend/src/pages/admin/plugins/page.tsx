@@ -176,7 +176,7 @@ export function AdminPluginsPage() {
           <>
             {can('channel.read') && (
               <Button asChild variant="outline" size="sm">
-                <Link to="/admin/channels">渠道工作台</Link>
+                <Link to="/admin/channels">模型商品</Link>
               </Button>
             )}
             {(can('capability.read') || can('logical_model.read')) && (

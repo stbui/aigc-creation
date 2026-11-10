@@ -311,5 +311,11 @@
   },
   "copyAddressFailed": {
     "message": "Impossible de copier l’URL de l’image"
+  },
+  "extensionReloadRequiredTitle": {
+    "message": "Extension mise à jour"
+  },
+  "extensionReloadRequiredMessage": {
+    "message": "Actualisez cette page, puis réessayez."
   }
 }

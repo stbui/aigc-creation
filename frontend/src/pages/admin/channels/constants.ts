@@ -1,5 +1,6 @@
 import type { SelectFieldOption } from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS } from '../../../lib/billing-mode';
+import type { ImageParameterDefinitionView } from './imageCapability';
 
 /* ------------------------------------------------------------------------- */
 /* 渠道                                                                      */
@@ -47,15 +48,15 @@ export interface ChannelHealthSummary {
   success: number;
 }
 
-/** 视图切换：`channels` = 按渠道配置，`models` = 跨渠道排查 */
+/** 视图切换：`models` = 商品台账（默认），`channels` = 按供应商配置 */
 export const CHANNEL_VIEW_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'channels', label: '按渠道' },
-  { value: 'models', label: '全部模型' },
+  { value: 'models', label: '商品台账' },
+  { value: 'channels', label: '供应商' },
 ];
 
 export const CHANNEL_STATUS_OPTIONS: SelectFieldOption[] = [
-  { value: 'enabled', label: '启用' },
-  { value: 'disabled', label: '停用' },
+  { value: 'enabled', label: '可用' },
+  { value: 'disabled', label: '已停用' },
 ];
 
 /* ------------------------------------------------------------------------- */
@@ -77,22 +78,50 @@ export const CAPABILITY_OPTIONS = [
  * 线路选用。导入上游目录后模型默认停用且未定价，这一档就是补价工作队列。
  */
 export const STATUS_FILTER_OPTIONS = [
-  { value: 'enabled', label: '模型启用' },
-  { value: 'disabled', label: '模型停用' },
-  { value: 'unpriced', label: '未定价' },
+  { value: 'enabled', label: '可用' },
+  { value: 'disabled', label: '已停用' },
+  { value: 'unpriced', label: '待定价' },
+  { value: 'unconfigured', label: '待配置' },
 ];
 
 export const PAGE_SIZE = 20;
 
-/** 「全部模型」视图的状态筛选：比单渠道清单多「不健康」一档 */
-export type AllModelsStatusFilter = 'all' | 'enabled' | 'disabled' | 'unhealthy' | 'unpriced';
+/**
+ * 上游导入后的批量基础配置。
+ *
+ * 只支持 image / text：这两种能力有可直接保存的默认合同；video / audio 的
+ * 参数组合差异太大，批量写默认值会把半成品推进路由目录，宁可让运营逐条配。
+ * `imageParameters` 只用于本地生成能力合同，不提交给后端。
+ */
+export interface BatchImportConfig {
+  capability: 'image' | 'text';
+  protocol: string;
+  billingMode: string;
+  unitPriceMicrocredits: number;
+  inputTokenPriceMicrocredits: number;
+  outputTokenPriceMicrocredits: number;
+  cachedTokenPriceMicrocredits: number;
+  imageParameters: ImageParameterDefinitionView[];
+}
+
+/** 「商品台账」的状态筛选：比单供应商清单多「不健康」一档 */
+export type AllModelsStatusFilter =
+  | 'all'
+  | 'enabled'
+  | 'disabled'
+  | 'unhealthy'
+  | 'unpriced'
+  | 'unconfigured'
+  | 'cooling';
 
 export const ALL_MODELS_STATUS_OPTIONS: Array<{ value: AllModelsStatusFilter; label: string }> = [
   { value: 'all', label: '全部' },
-  { value: 'enabled', label: '启用' },
-  { value: 'disabled', label: '停用（模型/渠道）' },
+  { value: 'enabled', label: '可用' },
+  { value: 'disabled', label: '已停用' },
   { value: 'unhealthy', label: '不健康' },
-  { value: 'unpriced', label: '未定价' },
+  { value: 'unpriced', label: '待定价' },
+  { value: 'unconfigured', label: '待配置' },
+  { value: 'cooling', label: '冷却中' },
 ];
 
 /** 跨渠道清单每页条数：数据已全量在内存，页大一点少翻页 */

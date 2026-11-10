@@ -74,9 +74,9 @@ export class WechatAdapter implements PaymentAdapter {
         name: 'wechatPayPublicKeyId',
         label: '微信支付公钥 ID',
         type: 'text',
-        required: true,
+        required: false,
         maxLength: 128,
-        description: '微信支付平台公钥 ID；必须与回调/响应头 Wechatpay-Serial 完全一致',
+        description: '可选；配置后回调/响应头 Wechatpay-Serial 必须与之一致，验签始终使用公钥',
       },
       {
         name: 'apiBase',
@@ -199,7 +199,8 @@ export class WechatAdapter implements PaymentAdapter {
     if (!timestamp || !nonce || !signature || !serial) {
       return { ok: false, ackSuccess: false, reason: '缺少微信回调签名头', rawPayload: raw };
     }
-    if (serial !== v.wechatPayPublicKeyId?.trim()) {
+    const expectedSerial = v.wechatPayPublicKeyId?.trim();
+    if (expectedSerial && serial !== expectedSerial) {
       return { ok: false, ackSuccess: false, reason: '回调公钥 ID 与配置不匹配', rawPayload: raw };
     }
     if (!isFresh(timestamp)) {
@@ -311,6 +312,7 @@ export class WechatAdapter implements PaymentAdapter {
       if (status === 'PROCESSING') return { state: 'processing', providerRefundId: json.refund_id, raw: text.slice(0, 1000) };
       return {
         state: 'failed',
+        failureKind: status === 'CLOSED' || status === 'ABNORMAL' ? 'definitive' : 'unknown',
         providerRefundId: json.refund_id,
         error: `微信退款状态: ${status || 'unknown'}`,
         raw: text.slice(0, 1000),
@@ -318,6 +320,7 @@ export class WechatAdapter implements PaymentAdapter {
     } catch (e) {
       return {
         state: 'failed',
+        failureKind: 'unknown',
         error: `请求未完成（${(e as Error).message}）—— 结果未知, 请用同一退款单号重试或到商户后台核对`,
       };
     }
@@ -431,7 +434,7 @@ function verifyResponse(
   if (!timestamp || !nonce || !signature || !serial) {
     throw new Error(`${label}响应缺少验签头，无法确认来源`);
   }
-  if (serial !== expectedSerial) {
+  if (expectedSerial && serial !== expectedSerial) {
     throw new Error(`${label}响应公钥 ID 与配置不匹配`);
   }
   if (!isFresh(timestamp)) throw new Error(`${label}响应时间戳超出 5 分钟窗口（疑似重放）`);

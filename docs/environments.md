@@ -56,6 +56,7 @@ PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付充值 → �
 | `PAYPAL_WEBHOOK_ID` | 空 | 空 | 按需 | PayPal 开发者后台 Webhook 的 ID，不是 URL；回调通过 PayPal 官方 `verify-webhook-signature` 验签 |
 | `PAYPAL_API_BASE` | 空 | 空 | 按需 | 留空用 `https://api-m.paypal.com`；Sandbox 显式填 `https://api-m.sandbox.paypal.com` |
 | `STRIPE_SECRET_KEY` | 空 | 空 | 按需 | `sk_live_...` 为生产，`sk_test_...` 为测试模式 |
+| `STRIPE_PUBLISHABLE_KEY` | 空 | 空 | 按需 | `pk_live_...` / `pk_test_...`，与 Secret Key 同模式；Payment Element 初始化必需 |
 | `STRIPE_WEBHOOK_SECRET` | 空 | 空 | 按需 | Stripe Webhook Endpoint 的 `whsec_...`，用于本地 HMAC 验签 |
 | `STRIPE_API_BASE` | 空 | 空 | 按需 | 留空使用 `https://api.stripe.com`；测试/生产模式由 Secret Key 决定，不靠切换域名 |
 | `EPAY_API_BASE` | `https://epay.jylt.cc` | 同开发 | 同开发 | 易支付 API 基址；适配器自动拼接 `/api/createOrder` 与 `/api/getOrder` |
@@ -89,6 +90,7 @@ PAYPAL_WEBHOOK_ID=<paypal-webhook-id>
 PAYPAL_API_BASE=https://api-m.paypal.com
 
 STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_API_BASE=https://api.stripe.com
 
@@ -125,7 +127,7 @@ https://域名/api/v1/payments/callback/zpay/{configId}
 - 规范地址无需随配置轮换而修改；历史订单按 Payment 引用的配置版本验签。多个历史配置同时验签通过时必须由渠道交易号唯一消歧，否则拒绝处理。
 - `{configId}` 是 PayPal / ZPay 的渠道配置版本 id。轮换凭据会生成新的 `configId`，这两个渠道后台的 Webhook 地址仍须同步切换；旧版本与旧地址至少保留到历史订单全部结束。
 - 规范回调中 EasyPay 同时接受 GET 与 POST；支付宝 / 微信 / Stripe 使用 POST。历史回调路由继续兼容 GET 与 POST。
-- Stripe Webhook 至少订阅：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`。
+- Stripe Webhook 至少订阅：`payment_intent.succeeded`、`payment_intent.payment_failed`、`payment_intent.canceled`。`checkout.session.*` 仅用于兼容历史 Checkout Session 订单。
 - PayPal 使用 Orders v2 `CAPTURE`：买家批准后订单只会到 `APPROVED`，结算页回跳或状态轮询会由服务端调用 capture 真正扣款；Webhook 至少订阅订单完成/作废与 capture 完成/失败事件，`PAYPAL_WEBHOOK_ID` 必须对应同一个 Webhook 配置。
 - 易支付采用 `epay.jylt.cc` 的 `createOrder` / `getOrder` 协议：异步通知是 **GET**，回调签名覆盖 `orderId + param + type + price + reallyPrice + key`；查单已支持，文档未提供关单和退款 API。
 - ZPay 下单走 `POST /mapi.php`（multipart form-data），必须由服务端注入用户真实 IP，`device` 按请求 UA 判定（pc / mobile / qq / wechat / alipay），`cid` 可选、配置后才进签名；查单走 `GET /api.php?act=order`，退款走 `POST /api.php?act=refund`。回调仅接受 `trade_status=TRADE_SUCCESS`，验签通过后用独立的 3 秒超时主动查单核对状态 / 金额 / 渠道订单号，全部一致才返回纯文本 `success`（整段应答仍在渠道要求的 5 秒窗口内）；查单超时或未确认应答 `fail` 让渠道重试，入账阶段再校验回调金额与本地订单是否一致，不一致落对账差异并停止重试。
@@ -133,7 +135,7 @@ https://域名/api/v1/payments/callback/zpay/{configId}
 - ZPay 文档的 `/mapi.php` **不支持 `return_url`**，支付完成不会自动回跳结算页；结果以异步通知与状态轮询为准。`submit.php` 页面跳转接口未启用 —— 它拿不到下单即返回的 `trade_no`，会丢掉「按渠道单据号匹配支付尝试」的对账依据。
 - ZPay 文档未提供关单接口，本地会明确返回不支持；退款按请求金额提交，但部分支付通道可能只支持全额退款，真实退款规则以商户后台和实际通道为准。
 - 旧变量 `EPAY_PID` / `EPAY_PAY_TYPE` 仅保留兼容读取，新部署请使用 `EPAY_MCH_ID` / `EPAY_TYPE`。
-- PayPal 不支持关闭未授权 Checkout Order；Stripe 通过 expire Checkout Session 关单。PayPal、Stripe、易支付与 ZPay 当前都**不参与自动渠道账单对账**。
+- PayPal 不支持关闭未授权 Checkout Order；Stripe 通过取消 PaymentIntent 关单，历史 Checkout Session 订单仍保留 expire 兼容路径。PayPal、Stripe、易支付与 ZPay 当前都**不参与自动渠道账单对账**。
 
 支付宝 / 微信的签名与解密实现有离线交叉校验脚本：
 `cd backend && npx ts-node -T scripts/verify-payment-signatures.ts`。Stripe HMAC、易支付 MD5 与 ZPay MD5

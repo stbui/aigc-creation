@@ -10,7 +10,6 @@ import { SettingsService } from '../common/settings.service';
 import { PaymentGateway } from '../payments/payment-gateway';
 import { PaymentExceptionService } from '../payments/payment-exception.service';
 import { lockUserRow } from '../account/user-row-lock';
-import type { RefundResult } from '../payments/adapters/types';
 import type { Prisma, Refund } from '@prisma/client';
 
 /**
@@ -56,6 +55,7 @@ interface RefundSettlementResult {
   membershipTerminated: boolean;
   creditsReclaimed: number;
   creditsUnreclaimable: number;
+  creditsExpired: number;
   detail: Array<{ lotId: string; taken: number }>;
   invoiceFollowUp: RefundInvoiceFollowUp | null;
 }
@@ -737,6 +737,8 @@ export class OrderService {
     currency?: string;
     providerConfigId?: string | null;
     providerConfigVersion?: number | null;
+    /** 本次入账对应的 C 端支付方式；EasyPay 历史空值由此回填 */
+    providerMethod?: string | null;
     /** 本次实际入账的支付实例；老订单/老调用方可为空 */
     providerInstanceId?: string | null;
     providerStatus?: string | null;
@@ -763,8 +765,23 @@ export class OrderService {
       if (dupPayment.orderId !== params.orderId) {
         throw new AppError(40901, '渠道交易号已绑定其他订单', 409);
       }
-      const order = await this.detail(params.orderId);
-      return { order, idempotentHit: true, message: '重复回调, 已忽略' };
+      if (dupPayment.status === 'succeeded') {
+        const order = await this.detail(params.orderId);
+        return { order, idempotentHit: true, message: '重复回调, 已忽略' };
+      }
+      /*
+       * 同一交易号可能先落在 failed/closed（沙箱失败、渠道超时后查单等），
+       * 之后渠道才把真实成功回调补回来。不能仅因“交易号已存在”就 ack，
+       * 否则订单会永久 pending。后续事务会把这个已存在的尝试原地提升为
+       * succeeded；若调用方指向另一条 Payment，则说明归属有歧义，直接拒绝。
+       */
+      if (params.paymentId && params.paymentId !== dupPayment.id) {
+        throw new AppError(
+          40901,
+          '渠道交易号已绑定另一支付尝试，禁止静默改挂',
+          409,
+        );
+      }
     }
 
     const order = await this.prisma.order.findUnique({
@@ -812,6 +829,9 @@ export class OrderService {
       currency: order.currency || 'CNY',
       providerConfigId: params.providerConfigId ?? order.providerConfigId ?? null,
       providerConfigVersion: params.providerConfigVersion ?? order.providerConfigVersion ?? null,
+      ...(params.providerMethod !== undefined
+        ? { providerMethod: params.providerMethod }
+        : {}),
       providerInstanceId:
         params.providerInstanceId ?? order.providerInstanceId ?? null,
       providerStatus: params.providerStatus ?? null,
@@ -906,15 +926,29 @@ export class OrderService {
          * 有 pending 尝试就原地更新 (保留本次支付尝试的创建时间与 id),
          * 否则新建。更新 0 行说明该尝试已被关单/并发入账, 回退为 create。
          */
+        const targetPaymentId = dupPayment?.id ?? params.paymentId;
         let updatedExisting = 0;
-        if (params.paymentId) {
+        if (targetPaymentId) {
           const result = await tx.payment.updateMany({
-            where: { id: params.paymentId, orderId: order.id, status: 'pending' },
+            where: {
+              id: targetPaymentId,
+              orderId: order.id,
+              ...(dupPayment
+                ? { status: { in: ['pending', 'failed', 'closed'] } }
+                : { status: 'pending' }),
+            },
             data: succeededFields,
           });
           updatedExisting = result.count;
         }
-        if (!params.paymentId || updatedExisting === 0) {
+        if (updatedExisting === 0 && dupPayment) {
+          throw new AppError(
+            40901,
+            '渠道交易号对应的支付尝试状态已变化，请重试',
+            409,
+          );
+        }
+        if (updatedExisting === 0) {
           await tx.payment.create({
             data: { orderId: order.id, userId: params.userId, ...succeededFields },
           });
@@ -1177,6 +1211,7 @@ export class OrderService {
               status: true,
               creditsReclaimed: true,
               creditsUnreclaimable: true,
+              creditsExpired: true,
             },
           },
         },
@@ -1213,6 +1248,13 @@ export class OrderService {
         );
       }
       const payment = fresh.payments[0];
+      if ((payment.channel || '').trim() === 'manual') {
+        throw new AppError(
+          40901,
+          '手工核销订单没有真实渠道资金，不能走原路退款；需线下退款并登记凭证后人工核销',
+          409,
+        );
+      }
 
       const latestFailed = await tx.refund.findFirst({
         where: {
@@ -1223,9 +1265,13 @@ export class OrderService {
         },
         orderBy: { createdAt: 'desc' },
       });
+      const failedDetail = latestFailed ? parseJsonObject(latestFailed.detail) : {};
+      // 旧数据没有 failureKind 时只能按 unknown 处理：无法证明渠道已明确拒绝，
+      // 换新退款单号可能造成第二笔退款。人工核销为 definitive 后才允许换号。
       const reusable =
         latestFailed &&
-        parseJsonObject(latestFailed.detail).confirmationOutcome !== 'failed'
+        failedDetail.failureKind !== 'definitive' &&
+        failedDetail.confirmationOutcome !== 'failed'
           ? latestFailed
           : null;
 
@@ -1256,6 +1302,7 @@ export class OrderService {
             // 积分回收要等渠道确认够不够真退了, 先记 0
             creditsReclaimed: 0,
             creditsUnreclaimable: 0,
+            creditsExpired: 0,
             reason,
             operatorId: params.operatorId,
             status: 'processing',
@@ -1274,31 +1321,25 @@ export class OrderService {
 
     const refund = claim.refund;
     const payment = claim.payment;
-    // `manual` 是后台「标记已支付」写入的通道, 没有真实资金进出, 不调渠道
     const channel = (payment.channel || 'sandbox').trim();
-    const manualMark = channel === 'manual';
-    let channelResult: RefundResult = {
-      state: 'succeeded',
-      raw: '手工标记已支付的订单，无渠道资金往来',
-    };
-    if (!manualMark) {
-      channelResult = await this.gateway.refund({
-        // 必须用**实际成功支付**的渠道与配置版本，不能用 Order.channel：
-        // 订单上记的是最后一次发起支付的渠道，跨渠道重试后两者可能不同。
-        order: {
-          channel: payment.channel,
-          providerConfigId: payment.providerConfigId ?? order.providerConfigId,
-        },
-        orderNo: order.orderNo,
-        outRefundNo: refund.id,
-        amountCents: params.amountCents,
-        // 微信 v3 要求同时给「原订单总额」; 历史订单 amountCents 为 0 时回落实付
-        totalCents: payment.amountCents > 0 ? payment.amountCents : claim.paidBase,
-        reason,
-        providerRef: payment.providerRef ?? undefined,
-        providerTradeNo: payment.payTransactionId ?? undefined,
-      });
-    }
+    const channelResult = await this.gateway.refund({
+      // 必须用**实际成功支付**的渠道与配置版本，不能用 Order.channel：
+      // 订单上记的是最后一次发起支付的渠道，跨渠道重试后两者可能不同。
+      order: {
+        channel: payment.channel,
+        providerConfigId: payment.providerConfigId ?? order.providerConfigId,
+        providerInstanceId:
+          payment.providerInstanceId ?? order.providerInstanceId,
+      },
+      orderNo: order.orderNo,
+      outRefundNo: refund.id,
+      amountCents: params.amountCents,
+      // 微信 v3 要求同时给「原订单总额」; 历史订单 amountCents 为 0 时回落实付
+      totalCents: payment.amountCents > 0 ? payment.amountCents : claim.paidBase,
+      reason,
+      providerRef: payment.providerRef ?? undefined,
+      providerTradeNo: payment.payTransactionId ?? undefined,
+    });
 
     if (channelResult.state === 'failed') {
       const marked = await this.prisma.refund.updateMany({
@@ -1306,7 +1347,11 @@ export class OrderService {
         data: {
           status: 'failed',
           providerRefundId: channelResult.providerRefundId ?? null,
-          detail: JSON.stringify({ error: channelResult.error ?? null, raw: channelResult.raw ?? null }),
+          detail: JSON.stringify({
+            failureKind: channelResult.failureKind,
+            error: channelResult.error,
+            raw: channelResult.raw ?? null,
+          }),
         },
       });
       if (marked.count === 0) {
@@ -1326,13 +1371,20 @@ export class OrderService {
         kind: 'refund_failed',
         detail: channelResult.error ?? '渠道退款失败',
       });
+      if (channelResult.failureKind === 'definitive') {
+        throw new AppError(
+          40901,
+          `渠道明确拒绝退款：${channelResult.error}（订单状态与积分未变更，可修正原因后重试，将生成新退款单号）`,
+          409,
+        );
+      }
       /*
-       * 50302 + HTTP 502: 钱没退成, 但这不是「参数错」也不是「规则拦」。
-       * 文案必须点明「订单状态与积分未变更」—— 否则运营会怀疑积分已经被扣回。
+       * 50302 + HTTP 502: 网络/验签/响应异常时无法确认渠道是否受理。
+       * 必须复用同一退款单号重试，且文案要明确订单状态与积分未变更。
        */
       throw new AppError(
         50302,
-        `渠道退款未完成：${channelResult.error || '未知原因'}（订单状态与积分未变更，可用同一退款单重试）`,
+        `退款结果未知：${channelResult.error}（订单状态与积分未变更，请用同一退款单号重试或核对渠道）`,
         502,
       );
     }
@@ -1378,6 +1430,7 @@ export class OrderService {
         membershipTerminated: false,
         creditsReclaimed: 0,
         creditsUnreclaimable: 0,
+        creditsExpired: 0,
         detail: [] as Array<{ lotId: string; taken: number }>,
         message:
           '渠道已受理退款但仍在异步处理中：订单状态与积分暂未变更，请到渠道商户后台确认最终结果',
@@ -1396,6 +1449,7 @@ export class OrderService {
     this.credit.warnIncompleteReclaim(params.orderId, {
       reclaimed: result.creditsReclaimed,
       unreclaimable: result.creditsUnreclaimable,
+      expiredUnused: result.creditsExpired,
       detail: result.detail,
     });
     return result;
@@ -1434,6 +1488,7 @@ export class OrderService {
       this.credit.warnIncompleteReclaim(params.orderId, {
         reclaimed: result.creditsReclaimed,
         unreclaimable: result.creditsUnreclaimable,
+        expiredUnused: result.creditsExpired,
         detail: result.detail,
       });
       this.logger.log(
@@ -1609,11 +1664,12 @@ export class OrderService {
        */
       const previousCredits = await tx.refund.aggregate({
         where: { orderId: order.id, status: 'succeeded', id: { not: refund.id } },
-        _sum: { creditsReclaimed: true, creditsUnreclaimable: true },
+        _sum: { creditsReclaimed: true, creditsUnreclaimable: true, creditsExpired: true },
       });
       const accountedCredits =
         (previousCredits._sum.creditsReclaimed ?? 0) +
-        (previousCredits._sum.creditsUnreclaimable ?? 0);
+        (previousCredits._sum.creditsUnreclaimable ?? 0) +
+        (previousCredits._sum.creditsExpired ?? 0);
       const cumulativeCreditTarget = paidBase > 0
         ? Number(
             (BigInt(order.grantedCredits) * BigInt(refundedCents)) /
@@ -1629,7 +1685,7 @@ export class OrderService {
             params.reason,
             creditsToReclaim,
           )
-        : { reclaimed: 0, unreclaimable: 0, detail: [] };
+        : { reclaimed: 0, unreclaimable: 0, expiredUnused: 0, detail: [] };
       const fullyRefunded = refundedCents >= paidBase;
       const bumped = await tx.order.updateMany({
         where: { id: order.id, refundedCents: order.refundedCents },
@@ -1657,6 +1713,7 @@ export class OrderService {
         data: {
           creditsReclaimed: credits.reclaimed,
           creditsUnreclaimable: credits.unreclaimable,
+          creditsExpired: credits.expiredUnused,
           detail: JSON.stringify({
             ...parseJsonObject(refund.detail),
             ...(params.detail ?? {}),
@@ -1690,6 +1747,7 @@ export class OrderService {
         membershipTerminated,
         creditsReclaimed: credits.reclaimed,
         creditsUnreclaimable: credits.unreclaimable,
+        creditsExpired: credits.expiredUnused,
         detail: credits.detail,
         invoiceFollowUp,
       };
@@ -1799,6 +1857,7 @@ export class OrderService {
         status: string;
         creditsReclaimed: number;
         creditsUnreclaimable: number;
+        creditsExpired: number;
       }>;
     };
     amountCents: number;
@@ -1880,7 +1939,7 @@ export class OrderService {
         .filter((refund) => refund.status === 'succeeded')
         .reduce(
           (sum, refund) =>
-            sum + refund.creditsReclaimed + refund.creditsUnreclaimable,
+            sum + refund.creditsReclaimed + refund.creditsUnreclaimable + refund.creditsExpired,
           0,
         );
       const cumulativeCreditTarget = paidBase > 0
@@ -2270,6 +2329,7 @@ export class OrderService {
         amountCents: r.amountCents,
         creditsReclaimed: r.creditsReclaimed,
         creditsUnreclaimable: r.creditsUnreclaimable,
+        creditsExpired: r.creditsExpired,
         reason: r.reason,
         status: r.status,
         providerRefundId: r.providerRefundId ?? null,

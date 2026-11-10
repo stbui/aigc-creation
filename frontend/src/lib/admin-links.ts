@@ -57,6 +57,8 @@ export function adminModelCallsHref(filters: {
   taskId?: string;
   channelId?: string;
   model?: string;
+  source?: string;
+  operation?: string;
 }): string {
   return href('/admin/model-calls', filters);
 }

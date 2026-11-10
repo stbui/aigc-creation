@@ -4,7 +4,7 @@ import { validate } from 'class-validator';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AdminRolesController } from './roles.controller';
-import { UpdateRolePermissionsDto } from './dto/audit.dto';
+import { UpdateRolePermissionsDto } from './dto/roles.dto';
 
 function instance(input: Record<string, unknown>): UpdateRolePermissionsDto {
   return plainToInstance(UpdateRolePermissionsDto, input);
@@ -49,7 +49,7 @@ describe('UpdateRolePermissionsDto', () => {
 });
 
 describe('AdminRolesController.updatePermissions', () => {
-  it('把逐角色权限差异写入审计上下文', async () => {
+  it('返回逐角色更新后的权限', async () => {
     const changes = [
       {
         code: 'operator',
@@ -63,27 +63,14 @@ describe('AdminRolesController.updatePermissions', () => {
       updatePermissions: vi.fn().mockResolvedValue(changes),
     };
     const controller = new AdminRolesController(roles as never);
-    const req: { auditExtra?: Record<string, unknown> } = {};
     const dto = instance(validPayload);
 
-    const result = await controller.updatePermissions(dto, req as never);
+    const result = await controller.updatePermissions(dto);
 
     expect(roles.updatePermissions).toHaveBeenCalledWith([
       { code: 'operator', permissions: ['user.read', 'ticket.handle'] },
       { code: 'finance', permissions: ['order.read'] },
     ]);
-    expect(req.auditExtra).toEqual({
-      roleCodes: ['operator'],
-      changes: [
-        {
-          code: 'operator',
-          added: ['ticket.handle'],
-          removed: [],
-          beforeCount: 1,
-          afterCount: 2,
-        },
-      ],
-    });
     expect(result).toEqual({
       roles: [{ code: 'operator', permissions: ['user.read', 'ticket.handle'] }],
     });

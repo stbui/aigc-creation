@@ -22,21 +22,17 @@ import {
 } from './hooks';
 import {
   draftFromInstance,
+  draftToConfigUpdate,
   instanceDraftChanged,
   PaymentsProviderInstanceEditor,
   type InstanceDraft,
 } from './PaymentsProviderInstanceEditor';
-import { PAYMENT_PROVIDER_STATE_META } from './constants';
+import { PAYMENT_METHOD_LABELS, PAYMENT_PROVIDER_STATE_META } from './constants';
 import {
   instanceLabel,
   instanceState,
   providerWithInstances,
 } from './utils';
-
-const METHOD_LABELS = {
-  alipay: '支付宝',
-  wechat: '微信支付',
-} as const;
 
 function sortedInstances(
   instances: AdminPaymentProviderInstanceView[],
@@ -218,20 +214,7 @@ export function PaymentsProviderInstancesDrawer({
       const result = await adminPaymentProvidersApi.saveInstance(
         currentProvider.id,
         selectedInstance.instanceId,
-        {
-          name: draft.name.trim() || null,
-          enabled: draft.enabled,
-          closeAfterMinutes: draft.closeAfterMinutes,
-          values: draft.values,
-          minAmountCents:
-            draft.minYuan == null ? null : Math.round(draft.minYuan * 100),
-          maxAmountCents:
-            draft.maxYuan == null ? null : Math.round(draft.maxYuan * 100),
-          dailyLimitCents:
-            draft.dailyYuan == null ? null : Math.round(draft.dailyYuan * 100),
-          refundEnabled: draft.refundEnabled,
-          paymentMethods: draft.paymentMethods,
-        },
+        draftToConfigUpdate(draft),
       );
       const nextInstances = sortedInstances(result.provider.instances);
       const saved = nextInstances.find(
@@ -408,11 +391,11 @@ export function PaymentsProviderInstancesDrawer({
                       <span className="block truncate text-[13px] font-medium text-foreground">
                         {instanceLabel(instance)}
                       </span>
-                      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted-foreground">
                         <code className="font-mono">{instance.instanceId}</code>
                         <span>
                           {instance.paymentMethods
-                            .map((method) => METHOD_LABELS[method])
+                            .map((method) => PAYMENT_METHOD_LABELS[method])
                             .join(' / ')}
                         </span>
                         {instance.version == null && <span>尚未保存</span>}
@@ -461,7 +444,7 @@ export function PaymentsProviderInstancesDrawer({
         ) : (
           !busy &&
           instances.length > 0 && (
-            <EmptyState title="选择左侧实例进行配置" />
+            <EmptyState title="选择上方实例进行配置" />
           )
         )}
       </div>

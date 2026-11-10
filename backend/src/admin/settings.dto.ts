@@ -30,8 +30,8 @@ export class UpdateSettingsDto {
    * 要恢复默认的键。删除 SystemSetting 行即回落代码默认值。
    *
    * 独立于 `settings` 而不是复用它传 undefined —— 「设置为默认值」与
-   * 「取消覆盖」在审计上是两件事（前者改了值，后者删了覆盖），
-   * 混在一个字段里会让审计的 before/after 语义含糊。
+   * 「取消覆盖」语义不同（前者改值，后者删除覆盖），
+   * 混在一个字段里会让 before/after 的变更语义含糊。
    */
   @IsOptional()
   @IsArray()

@@ -48,7 +48,6 @@ export function BackupPruneConfirm({
         `当前共 ${rowCount} 份备份`,
         `将保留最新 ${keepCount} 份已验证备份`,
         '失败与未验证的备份不在清理范围内',
-        '本次操作会写入操作审计',
       ]}
     />
   );

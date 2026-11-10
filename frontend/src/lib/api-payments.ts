@@ -79,12 +79,15 @@ export const paymentsApi = {
 /** 支付渠道与站点设置 */
 export const adminPaymentProvidersApi = {
   list: () =>
-    request<{ items: AdminPaymentProviderView[] }>("/admin/payments/providers"),
+    request<{
+      items: AdminPaymentProviderView[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }>("/admin/payments/providers"),
 
   /**
    * 保存渠道配置（追加新版本，历史订单继续用旧版本）。
-   *
-   * 高危动作：后端写审计日志，但不要求填写变更原因。
    */
   saveConfig: (providerId: string, body: PaymentProviderConfigUpdate) =>
     request<{ provider: AdminPaymentProviderView; unchanged: boolean }>(

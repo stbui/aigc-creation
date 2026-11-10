@@ -225,3 +225,51 @@ describe('PaypalAdapter.verifyNotification', () => {
     );
   });
 });
+
+describe('PaypalAdapter.refund', () => {
+  function refundInput() {
+    return {
+      config: makeConfig(),
+      orderNo: ORDER_NO,
+      outRefundNo: 'RF202611030001',
+      amountCents: 1005,
+      totalCents: 1005,
+      providerTradeNo: CAPTURE_ID,
+    } as const;
+  }
+
+  it.each(['FAILED', 'CANCELLED', 'DENIED'])(
+    '退款状态 %s 标记为渠道明确失败',
+    async (status) => {
+      const adapter = new PaypalAdapter();
+      fetchMock
+        .mockResolvedValueOnce(oauthResponse())
+        .mockResolvedValueOnce(jsonResponse(capture()))
+        .mockResolvedValueOnce(jsonResponse({ id: 'refund_1', status }));
+
+      const result = await adapter.refund(refundInput());
+
+      expect(result).toMatchObject({
+        state: 'failed',
+        failureKind: 'definitive',
+        providerRefundId: 'refund_1',
+      });
+    },
+  );
+
+  it('退款网络异常时标记为 unknown', async () => {
+    const adapter = new PaypalAdapter();
+    fetchMock
+      .mockResolvedValueOnce(oauthResponse())
+      .mockResolvedValueOnce(jsonResponse(capture()))
+      .mockRejectedValueOnce(new Error('socket timeout'));
+
+    const result = await adapter.refund(refundInput());
+
+    expect(result).toMatchObject({
+      state: 'failed',
+      failureKind: 'unknown',
+      error: expect.stringContaining('socket timeout'),
+    });
+  });
+});

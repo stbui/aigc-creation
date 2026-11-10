@@ -312,6 +312,7 @@ export class EpayAdapter implements PaymentAdapter {
   async refund(input: RefundInput): Promise<RefundResult> {
     return {
       state: 'failed',
+      failureKind: 'definitive',
       error: `当前易支付文档没有退款接口，订单 ${input.orderNo} 需在服务商后台退款后人工核对`,
     };
   }

@@ -87,10 +87,10 @@ export function ChannelModelRepriceDialog({
 
   /** 输入校验错误：任一行的售价不是合法金额就不能保存 */
   const validationError = useMemo(() => {
-    if (models.length === 0) return '请至少选择一个渠道模型';
-    if (models.length > MAX_REPRICE_MODELS) return `单次最多调整 ${MAX_REPRICE_MODELS} 个渠道模型`;
+    if (models.length === 0) return '请至少选择一个商品';
+    if (models.length > MAX_REPRICE_MODELS) return `单次最多调整 ${MAX_REPRICE_MODELS} 个商品`;
     if (blocking.length > 0) {
-      return `模型 ${blocking.map((item) => item.modelKey).join('、')} 存在未配置成本价或售价的已启用规格，请先在模型编辑里补齐`;
+      return `商品 ${blocking.map((item) => item.modelKey).join('、')} 存在未配置成本价或售价的已启用规格，请先在商品编辑里补齐`;
     }
     try {
       for (const row of rows) parseSaleInput(row.sale);
@@ -128,7 +128,7 @@ export function ChannelModelRepriceDialog({
     try {
       const payload = buildPayload(models, rows);
       const result = await adminChannelsApi.batchRepriceModels(channelId, payload);
-      toast.success(`已保存 ${result.updated} 个模型的售价`);
+      toast.success(`已保存 ${result.updated} 个商品的售价`);
       try {
         await onSaved();
       } catch {
@@ -148,7 +148,7 @@ export function ChannelModelRepriceDialog({
         if (!next && !saving) onClose();
       }}
       width={1080}
-      title={`统一调价 · ${models.length} 个模型`}
+      title={`统一调价 · ${models.length} 个商品`}
       description={`渠道 ${channelName}：只改已启用规格的售价，不改成本与启停状态`}
       footer={
         <>
@@ -235,7 +235,7 @@ export function ChannelModelRepriceDialog({
 /**
  * 组装提交体。
  *
- * 每个模型只提交「已启用」的价格档，且必须带上该档的全部售价字段 ——
+ * 每个商品只提交「已启用」的价格档，且必须带上该档的全部售价字段 ——
  * 少一个或多一个都会被后端整批拒绝（这是刻意的：半份价格会算错账）。
  */
 function buildPayload(
@@ -259,7 +259,7 @@ function buildPayload(
   });
 }
 
-/** 调价明细表：一个模型一格，格内按规格逐行列出成本与售价 */
+/** 调价明细表：一个商品一格，格内按规格逐行列出成本与售价 */
 function RepriceTable({
   rows,
   disabled,
@@ -282,7 +282,7 @@ function RepriceTable({
   if (rows.length === 0) {
     return (
       <p className="rounded-lg border border-border px-3 py-6 text-center text-xs text-muted-foreground">
-        所选模型没有已启用的价格方案，无法调价。
+        所选商品没有已启用的售价方案，无法调价。
       </p>
     );
   }

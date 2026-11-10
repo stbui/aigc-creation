@@ -324,7 +324,19 @@ export class AlipayAdapter implements PaymentAdapter {
       out_request_no: input.outRefundNo,
       ...(input.reason ? { refund_reason: input.reason.slice(0, 256) } : {}),
     });
-    if (!result.ok) return { state: 'failed', error: result.message, raw: result.raw };
+    if (!result.ok) {
+      const unknown =
+        result.code === 'BAD_JSON' ||
+        result.code === 'MISSING_SIGN' ||
+        result.code === 'BAD_SIGN' ||
+        result.code.startsWith('HTTP_');
+      return {
+        state: 'failed',
+        failureKind: unknown ? 'unknown' : 'definitive',
+        error: result.message,
+        raw: result.raw,
+      };
+    }
     const refundFee = String(result.node.refund_fee ?? '');
     return {
       state: 'succeeded',

@@ -1,6 +1,6 @@
 # 模型域逐文件对标清单（open-ai-canvas → aigc-creation）
 
-> 性质：只读静态审计，不改代码。结论均指到上游/本仓的文件、函数或字段，运行时行为仍需脚本/真机复核。
+> 性质：只读静态核对，不改代码。结论均指到上游/本仓的文件、函数或字段，运行时行为仍需脚本/真机复核。
 > 上游基线：`/Users/bright/github/open-ai-canvas`，commit `f83c35b`（2026-10-29）。
 > 本仓基线：`/Users/bright/github/aigc-creation`，`77c574c` + 当前未提交 WIP。
 > 范围：模型域（渠道 / 渠道模型 / 价格档 / 前台模型 / 路由 / 计费 / 任务 / 用户分组 / 协议插件 / 服务商目录 / 观测 / 代理中转 / 后台页面 / C 端选型）。
@@ -75,7 +75,7 @@
 | P1 | 前端 | C 端 `ModelPicker` 不按当前输入过滤兼容模型，默认按 `sortOrder` | 上游 `model-selection.ts:278-297`；本仓 `ModelPicker.tsx`、`lib/models.ts:100-128` | 用户可选到不兼容模型，默认可能更贵 |
 | P2 | 前端 | 用户分组倍率上限 100%（1 倍），上游支持 0.0001–100（最高 100 倍） | 上游 `user-group-editor.tsx:136-137`；本仓 `AdminUserGroupsPage.tsx:197-201` | 无法配置溢价倍率 |
 | P2 | 前端 | 渠道/模型列表筛选不写 URL，未选中渠道不回退首条 | 上游 `channels-page.tsx`、`channel-workspace-state.ts:11`；本仓 `page.tsx:101-148` | 排障视图无法分享；首屏右侧空白 |
-| P2 | 插件 | 缺插件包 registry/SHA256/状态/下载/覆盖升级/不可用占位/用户级启停 | 上游 `protocol_plugins.go`、`handler/plugin.go`；本仓目录扫描 + DB 启停 | 无法审计运行包；升级需先卸载；排障信息少 |
+| P2 | 插件 | 缺插件包 registry/SHA256/状态/下载/覆盖升级/不可用占位/用户级启停 | 上游 `protocol_plugins.go`、`handler/plugin.go`；本仓目录扫描 + DB 启停 | 无法核验运行包；升级需先卸载；排障信息少 |
 | P2 | 数据模型 | 无迁移版本账本与旧数据回填；部分索引缺失 | 上游 `database/migrations.go`；本仓 `prisma db push` | 携带旧数据升级时价格档 selector/线路外键/成本列不会自动补齐 |
 
 ### 0.4 有意差异（不应按缺陷计）
@@ -83,12 +83,12 @@
 1. Go → TypeScript、Gin → NestJS、GORM → Prisma/SQLite、可读前缀 ID → `cuid()`。
 2. 单实例部署：冷却、并发槽、目录快照为进程内存 + DB 版本号，无 Redis 跨实例协调。
 3. 服务商目录口径：本仓是插件包索引，不是“厂商推广 + 人民币成本/加价 + 一键建渠道”。
-4. 权限与审计更严：细粒度权限点、写操作 `@AuditAction`；退款、发票驳回、能力下架等确有业务语义的动作要求原因（但审计失败不阻断业务）。
+4. 权限更严：细粒度权限点；退款、发票驳回、能力下架等确有业务语义的动作要求原因。
 5. 匿名可浏览 `/models` 与 `/model-catalog`；上游要求登录后按分组投影。
 6. 渠道模型 `activeKey` 小写归一 + 软删唯一键；上游用 `WHERE deleted_at IS NULL` 部分唯一索引。
 7. 本仓多图产出按张建子任务、按张计费；上游一次任务一个结果。
 8. 本仓 C 端只暴露前台模型，不展示渠道/个人渠道；上游是“产品模型 → 渠道模型”两级选择。
-9. 本仓统一调价自动记录审计原因；渠道与渠道模型删除只做业务影响确认，不要求原因。
+9. 本仓渠道与渠道模型删除只做业务影响确认，不要求原因。
 10. 本仓把线路健康、财务分析做成独立面板/独立页；上游在单元格/分析面板内展示。
 
 ---
@@ -157,7 +157,7 @@
 | `repository/channel_order.go` | `src/model/channels/channel-model.repository.ts`（`saveChannelOrder`） | ✅ | 事务内取当前顺序、与 expectedIds 全量比较、逐条写 sort_order、模型级刷新 modelsJson 均对齐；上游 PG 分支 `SELECT ... FOR UPDATE` 后重读（`channel_order.go:27-36`）本仓以单写事务替代。 |
 | `repository/channel_presentation.go` | `src/model/channels/channel-model.repository.ts`、`channel.service.ts` | ⚠️ | `UpdateChannelModelSort`（校验存在、只写 sortOrder、刷新模型名）对齐；上游 `UpdateSystemChannelPresentation` 的“仅排序渠道”专用路径与 `UpdateSystemChannelCatalogProvider` 在本仓无独立实现（分别被通用 update 和服务商目录差异取代），无功能回归但缺少渠道行 `updated_at` 的显式 presentation 语义。 |
 | `repository/repository_channels_settings.go` | `src/model/channels/channel.service.ts` + `prisma/schema.prisma` | 🔀 | `SystemChannels/AdminSystemChannels/SystemChannel/AdminSystemChannel/DeleteSystemChannel` 均有等价实现。未移植：`HistoricalSystemChannelReferences`（历史日志按 id 回填已删除渠道名，`repository_channels_settings.go:24-28`）、`AdminSystemChannelReferences`（`channel_models.go` 之外的后台引用下拉，`:72-76`）、`CatalogProviderChannelCounts`（服务商目录已接入数，`:30-48`）。删除语义差异见 `admin_channels.go` 行。 |
-| `handler/admin_channel_routes.go` | `src/model/channels/channel.controller.ts` | 🔀 | 路由主体齐全；本仓新增 `GET :id`、`GET protocols`、`GET health`，并把 service 的 `RequireAdmin` 换成 JWT + 细粒度权限；普通写操作自动审计，删除/批量删除保留业务确认但不要求原因；响应包裹差异见 D 表；`/admin/provider-catalog/*` 同名但语义不同（见 B12）。 |
+| `handler/admin_channel_routes.go` | `src/model/channels/channel.controller.ts` | 🔀 | 路由主体齐全；本仓新增 `GET :id`、`GET protocols`、`GET health`，并把 service 的 `RequireAdmin` 换成 JWT + 细粒度权限；删除/批量删除保留业务确认但不要求原因；响应包裹差异见 D 表；`/admin/provider-catalog/*` 同名但语义不同（见 B12）。 |
 | `handler/channel_models.go` | `src/model/proxy/custom-relay.controller.ts`、`custom-relay.service.ts`（`POST /ai/models`） | ✅ | 用用户提供的 BaseURL/APIKey 拉目录、30 次/分限流（`custom-relay.controller.ts:30-33`）、返回 `{models: 目录项}` 与上游 `FetchChannelModelCatalog` 一致；本仓走同一 `ModelCatalogClient`，额外支持代理与统一出站。 |
 | `handler/channel_order.go` | `src/model/channels/channel.controller.ts`（`order`/`saveOrder`/`modelOrder`/`saveModelOrder`） | ✅ | 两条路径（渠道级、模型级）GET/PUT 均存在，GET 返回 `{items}` 一致；PUT 返回 `{saved:true}` → 本仓 `{ok:true}`（D 表）。 |
 | `handler/admin_channel_model_response.go` | `src/model/channels/channel.presentation.ts`（`channelModelView`） | ✅ | 后台模型投影都会带 `costPricing`（`channel.presentation.ts:193-214`），与上游包装类型一致；本仓投影缺 `catalogModelKey` 字段（Go 实体 JSON 含该字段，`model/models_channel.go:70`）。 |
@@ -199,7 +199,7 @@
 | C2 | `GET /admin/channels/protocols?capability=` 协议目录 | `channel.controller.ts:260-264` | 供渠道模型表单选协议并按能力过滤。 |
 | C3 | `GET /admin/channels/health` 运行态健康（启停、协议是否注册、渠道/模型冷却解封时间） | `channel.controller.ts:272-276`、`channel-health.service.ts:27-105` | 与历史成功率互补；上游无此后台端点。 |
 | C4 | 跨渠道模型列表支持 `channelId` / `includeDisabled=1` 查询 | `channel.controller.ts:485-499`、`channel-model.service.ts:108-135` | 上游 `/admin/channel-models` 无参数且总是含停用（`admin_channel_model_health.go:57-75`）。 |
-| C5 | 细粒度权限（channelRead/channelWrite/channelModelRead/channelModelWrite/channelTest）+ 写操作自动审计 | `channel.controller.ts:130-163,231-467` | 上游仅 `RequireAdmin`，审计仅启停显式记录（`admin_channel_model_health.go:237`）。 |
+| C5 | 细粒度权限（channelRead/channelWrite/channelModelRead/channelModelWrite/channelTest） | `channel.controller.ts:130-163,231-467` | 上游仅 `RequireAdmin`。 |
 | C6 | 连通性测试可带 `modelId`（以库内配置补全）、`waitForResult`、`timeoutMs`，返回状态/错误码/请求摘要/响应预览/logId，并写 `ApiCallLog(billable=false)` | `channel.controller.ts:98-111`、`protocol-test.service.ts:90-275` | 上游只返回 `{durationMs}`，日志依赖内部 analytics 上下文。 |
 | C7 | 上游目录拉取使用渠道级代理 | `model-catalog.service.ts:41` | 上游 `FetchChannelModels` 无 proxy 入参（`channel_models_catalog.go:25`）。 |
 | C8 | 批量删除同时接受 `ids` 与 `modelIds` 两种字段名 | `channel.controller.ts:130-146` | 兼容上游脚本与本仓前端。 |
@@ -219,7 +219,7 @@
 | `POST /admin/channels` | 同 | 上游 `data = {channel}`（`admin_channel_routes.go:48`），本仓 `data = PublicModelChannel` 本体（`channel.controller.ts:303-305`）。 |
 | `PATCH /admin/channels/:id` | 同 | 同上，`{channel}` → 渠道本体。 |
 | `POST /admin/channels/:id/duplicate` | 同 | `{channel}` → 渠道本体。 |
-| `DELETE /admin/channels/:id` | 同 | 上游与本仓均无请求体；本仓保留业务影响确认并自动写审计。 |
+| `DELETE /admin/channels/:id` | 同 | 上游与本仓均无请求体；本仓保留业务影响确认。 |
 | `POST /admin/channels/export` | 同 | 请求 `{ids?}`、响应导出对象一致。 |
 | `POST /admin/channels/import` | 同 | 请求/响应一致，但本仓受 100KB 全局 body 限制（见 B16）。 |
 | 无 | `GET /admin/channels/:id` | 仅本仓有。 |
@@ -230,7 +230,7 @@
 | `PATCH /admin/channels/:id/models/:modelId` | 同 | 同上，`{model}` → 模型视图本体。 |
 | `DELETE /admin/channels/:id/models/:modelId` | 同 | 上游 `{ok:true}`；本仓 `{ok:true,deleted}`，无原因字段。 |
 | `POST /admin/channels/:id/models/batch-delete` | 同 | 上游入参 `{modelIds}`、响应 `{deleted}`；本仓接受 `ids` 或 `modelIds`、响应 `{ok,deleted}`，无原因字段。 |
-| `POST /admin/channels/:id/models/batch-reprice` | 同 | 上游入参 `{models}`、响应 `{updated}`；本仓同结构，自动写审计。 |
+| `POST /admin/channels/:id/models/batch-reprice` | 同 | 上游入参 `{models}`、响应 `{updated}`；本仓同结构。 |
 | `PATCH /admin/channels/:id/models/:modelId/enabled` | 同 | 上游返回 `{model}`；本仓返回 `{ok:true}`，前端无法直接拿到更新后的模型。 |
 | `PATCH /admin/channels/:id/models/:modelId/sort` | 同 | 上游 `{updated:true}`；本仓 `{ok:true}`。 |
 | `POST /admin/channels/:id/models/fetch` | 同 | **契约不同**：上游 `data.models` 是 `string[]`（`PreviewAdminChannelModels` 返回 `[]string`，`channel_models_catalog.go:64-69`、`handler/finance.go:307-312`）；本仓是 `ChannelModelCatalogItem[]` 对象数组（`model-catalog.service.ts:34-43`、`channel.controller.ts:377`）。 |
@@ -269,7 +269,7 @@
 
 | 上游文件 | 本仓对应文件 | 状态 | 具体功能差异与证据 |
 |---|---|---|---|
-| `app/logical_models.go`（836 行：Admin CRUD / bundle 校验 / simulate / 价格展示） | `catalog/logical-model.admin.service.ts`、`catalog/admin-logical-model.controller.ts`、`catalog/catalog.service.ts`、`catalog/quote.service.ts` | 🔀 | ① 保存流程对齐：`buildBundle()` = 上游 `logicalModelBundle()`，同样 code 正则、name ≤120、pricePolicy∈{channel,unified}、channel 策略强制 `billing_mode=fixed_request` 且四价归零、routes 去重/权重/系统渠道/能力一致；`save()` 事务内 `revisionSequence` 原子递增（Prisma `increment`）并建 revision+routes，对齐上游 `SaveLogicalModelBundle`。② **能力语义是有意差异**：上游 `LogicalModel.Capability` 是模态（image/video/text），本仓存 C 端能力 id（`free_create` 等），用 `getCapability(capability).model.capability` 校验模态（`logical-model.admin.service.ts:307-313`，文件头 14-17 行注明）。③ **审计语义相反**：上游 `SaveAdminLogicalModel` 在事务内写审计、审计失败返回错误（`logical_models.go:311-314`）；本仓用 `@AuditAction` 拦截器且"审计失败不阻断业务"（`admin/audit.interceptor.ts:47-51`）。④ 列表投影：上游 `AdminLogicalModels` 遇到渠道模型缺失直接报错；本仓 `missingRoute=true` → `configurationError` 字符串（`logical-model.admin.service.ts:609-612,665-669`），且 `decodeLogicalDefaults` 失败被吞成 `{}`（656-664）而上游 fail-closed。⑤ 本仓 `adminPriceTiers()` 去重键只看 `JSON.stringify(selector)`（792-794），上游 `publicLogicalModelPriceTiers` 的键含 billingMode+四项价格（`logical_models_catalog.go:165`），同一 selector 不同计费/价格会被本仓折叠；且本仓未做 `validateImageParameterPriceSelector` 过滤。⑥ 路由排序：上游 `LogicalModelRoutes` `priority desc`，本仓 `buildViews` `priority asc`（514）。 |
+| `app/logical_models.go`（836 行：Admin CRUD / bundle 校验 / simulate / 价格展示） | `catalog/logical-model.admin.service.ts`、`catalog/admin-logical-model.controller.ts`、`catalog/catalog.service.ts`、`catalog/quote.service.ts` | 🔀 | ① 保存流程对齐：`buildBundle()` = 上游 `logicalModelBundle()`，同样 code 正则、name ≤120、pricePolicy∈{channel,unified}、channel 策略强制 `billing_mode=fixed_request` 且四价归零、routes 去重/权重/系统渠道/能力一致；`save()` 事务内 `revisionSequence` 原子递增（Prisma `increment`）并建 revision+routes，对齐上游 `SaveLogicalModelBundle`。② **能力语义是有意差异**：上游 `LogicalModel.Capability` 是模态（image/video/text），本仓存 C 端能力 id（`free_create` 等），用 `getCapability(capability).model.capability` 校验模态（`logical-model.admin.service.ts:307-313`，文件头 14-17 行注明）。③ 列表投影：上游 `AdminLogicalModels` 遇到渠道模型缺失直接报错；本仓 `missingRoute=true` → `configurationError` 字符串（`logical-model.admin.service.ts:609-612,665-669`），且 `decodeLogicalDefaults` 失败被吞成 `{}`（656-664）而上游 fail-closed。④ 本仓 `adminPriceTiers()` 去重键只看 `JSON.stringify(selector)`（792-794），上游 `publicLogicalModelPriceTiers` 的键含 billingMode+四项价格（`logical_models_catalog.go:165`），同一 selector 不同计费/价格会被本仓折叠；且本仓未做 `validateImageParameterPriceSelector` 过滤。⑤ 路由排序：上游 `LogicalModelRoutes` `priority desc`，本仓 `buildViews` `priority asc`（514）。 |
 | `app/logical_models_catalog.go`（公开目录投影 / 分组线路 / 价格档 / 能力画像） | `catalog/catalog.service.ts` | 🔀 | ① 分组过滤 + 价格换算结构对齐：`projectForGroup()` ≈ `groupLogicalModel()`，不可见渠道剔除、无可见线路返回 null、unified 只对行标量价打折、channel 逐档换算。② **换算顺序对齐但键不同**：两边都是"货币 → 微积分 → 分组倍率"（`catalog.service.ts:115-133` 注释"顺序反过来会把倍率乘进货币口径"），但本仓 `access.pricing(currency,[cached.code, channelModel.modelKey])` 且倍率恒用 `pricing('credits',[cached.code])`（102、110），上游 channel 档用 `channelModel.ModelKey`（`logical_models_catalog.go:69`、`finance.go:719`）。③ **本仓缺 product match 前置**：上游带 intent 时先 `MatchCapability(cached.ProductSpec, resolvedIntent)`，不匹配 `continue`（`logical_models_catalog.go:35-38`）；本仓 `computeAvailable()` 只判 `logicalModelCapabilityCovered` + `hasCompatibleRoute`（`catalog.service.ts:151-165`），产品合同更窄时会"列出可用、下单被拒"。④ **本仓缺图片价格档合法性过滤**：上游对 `route.CapabilitySpec.ImageParameters` 逐档 `validateImageParameterPriceSelector` 并跳过非法档、用 `model.CanonicalSKUSelector` 归一（`logical_models_catalog.go:154-169`）；本仓 `publicPriceTiers()` 只判 `enabled && priceConfigured`（218），非法档会出现在目录里，但选路 `pickPriceTier()` 会跳过 → 展示价与可成交价分叉。⑤ 旧档 selector 回退：上游用 `skuSelectorForTier(tier)`（空选择器回落到 `vquality/videoSeconds`），本仓非图参数档直接用 `tier.selector`（219）→ 旧式只填 `resolution` 列的档在目录里显示 `{}`。⑥ 缺货币比例时上游"跳过该线路"（`groupLogicalModel` 中 `skip=true; continue`），本仓 `access.pricing()` 直接 `badRequest` 抛错（`user-group.service.ts:116-119`）→ 单个分组缺 USD/CNY 比例会让整份 `/models` 失败。 |
 | `app/logical_models_coverage.go` | `intent/capability-spec.ts`（`validateProductSpecWithinRoutes` / `inputConstraintCovered` / `optionConstraintCovered` / `continuousOptionRangeCovered`） | ✅ | 逻辑逐行等价：operations 的 OR 覆盖（空 operations 表示不限制）、inputs 区间并集覆盖、options 值枚举/区间/步长、>10000 步长的"连续区间或步长整除"降级，错误文案一致（`capability-spec.ts:512-645`）。 |
 | `app/logical_model_quote.go` | `catalog/quote.service.ts` | 🔀 | ① 前台模型报价都走 `resolve` + 价格档 + 同一换算，`fixed_request/per_second` 金额公式一致。② **视频 Token 报价是有意差异**：上游按 `estimateTaskBillingTokens` 给出金额并带 `VideoTokenEstimate`（`logical_model_quote.go:105-116,167-169`）；本仓 `tokenQuote()` 对 video 返回 `amountMicrocredits:null, quantity:0` + note（`quote.service.ts:271-286`，文件头 P3 说明）。③ 渠道模型报价：上游走 `newBillingOrderWithPriceTier` 真建单（幂等键 `quote`）再 `quoteFromOrder`（`logical_model_quote.go:28-53`）；本仓 `quoteChannelModel` 纯计算、不建单（`quote.service.ts:179-202`）。④ 本仓响应多 `code/priceTierId/priceSelector/note`，少 `videoTokenEstimate`。⑤ 统一价 token：上游校验 `routed.ChannelModel.Capability==capability && supportsTokenBilling(...)` 且拒绝视频非 0 输入/缓存价；本仓 `tokenQuote` 只按 capability 判定（`capability!=='text'` 即拒，视频单独 pending），没有协议/线路校验。 |
@@ -284,8 +284,8 @@
 | `app/model_router.go`（602 行：快照装载/缓存/失效、resolve、硬分层、SKU 选择、加权、诊断） | `catalog/route-catalog.service.ts`、`routing/router.service.ts`、`routing/price-tier.service.ts`、`intent/model-intent.ts` | 🔀 | **核心算子逐条核对结果**：<br>• priority 硬分层：两边都在遍历中"发现更高 priority 就清空候选"，只保留最高层（`router.service.ts:161-173` ↔ `model_router.go:228-253`）✅<br>• 同层加权：`weightedRoute()` 均用 `crypto/randomBytes` + 拒绝采样（`threshold = 2^64 mod total`），≤0 回落首条，16 次退化为首条（`router.service.ts:291-311` ↔ `model_router.go:551-584`）✅<br>• SKU 选择器：`skuSelectorForIntent` 视频（video>image 归 video_to_video / imageCount/vquality/videoSeconds/videoGenerateAudio/fpsBand）、图片（原参数 + quality/resolution/size 旧键、像素→1k/1.5k/2k/4k）逐行等价（`model-intent.ts:316-373` ↔ `model_router.go:335-402`）✅；`skuSelectorForTier`（quality∈分辨率档时迁移为 resolution、空值回落 resolution/videoSeconds）等价（`selector.ts:539-554`）✅<br>• 1.5K 相邻档：`matchSkuSelector` 仅在 tier 期望 `1k/2k` 且请求 `1.5k` 时放行、且不计分（`selector.ts:560-577` ↔ `model_router.go:484-501`）；`imageResolutionTierForSize` 的 Seedream 1.5K 尺寸表与 2M/5M/8.29M 阈值也一致（`model-intent.ts:39-58`）✅<br>• 目录装载剔除规则等价：渠道/模型停用、unified+token 不支持、channel 无有效档、能力非法（`route-catalog.service.ts:176-209` ↔ `model_router.go:143-176`）✅<br>• **差异**：上游 `loadRouteCatalog` 只取 `enabled && weight>0` 的线路（repo 过滤），本仓 `where enabled:true` 后把 `weight` 可为 0 的线路也装入快照（153），仅在使用处过滤；`simulate` 会显示这些"快照里本不该存在"的线路。<br>• **差异**：本仓 `snapshotOrThrow()` 命中时只看 TTL（`route-catalog.service.ts:100-103`），版本号只在回源时读；上游每次取快照都比对 `currentRouteCatalogVersion()`（Redis，256ms 读缓存，`model_router.go:38-47,87-111`），跨进程改价可近实时生效，本仓最多滞后 30s TTL。<br>• **差异**：上游 `routeCatalogRefreshError/RetryAt/routeCatalogMaxStale` 与 Redis 协调器（`invalidateRouteCatalog` 里 `BumpRouteCatalogVersion`）在本仓改为 DB `RouteCatalogVersion` 表 + `CatalogVersionService`（`catalog-version.service.ts`），无 Redis 广播，属于单实例/DB 化的有意替换。<br>• **差异**：本仓渠道查询 `modelChannel.findMany({enabled,deletedAt:null})` 未加 `scope:'system'`（`route-catalog.service.ts:168-171`），上游 `SystemChannelsByIDs` 强带 `scope=system`（`repository/logical_models.go:97-107`）。 |
 | `app/model_router_attempts.go`（514 行：尝试状态机/切线/冷却/归档重试） | `tasks/task-attempt.service.ts`、`tasks/task-worker.service.ts`、`routing/route-health.service.ts` | 🔀 | ① 四态 dispatchState 与 CAS 语义对齐：`begin()` 的 not_sent→submission_unknown 条件更新、accepted→poll、rejected_no_job→switch、submission_unknown→uncertain（`task-attempt.service.ts:107-144` ↔ `model_router_attempts.go:38-104`）；`safeRouteRejection` 白名单一致（401/403/404/429 + 本仓 `channel_unavailable`）。② 冷却三键一致：`channel:<id>`(401/403=10min,429=30s)、`channel-model:<id>`(404=10min)、`route:<id>`（`route-health.service.ts:34-53,107-109` ↔ `model_router_attempts.go:328-360,503-538`）+ 冷却中线路从候选池剔除（`router.service.ts:162`）✅。③ **冷却差异**：本仓无 Redis/跨实例冷却（`route-health.service.ts:14-17`），429 固定 30s（`task-worker.service.ts:823`），上游优先用上游 `Retry-After`（`model_router_attempts.go:338-343`）。④ **归档重试缺口**：上游 `prepareLogicalTaskRetry` 对归档模型走 `resolveArchivedTaskRoute()`，用任务保存的 revision/route/channelModel 快照重试（`model_router_attempts.go:362-457`）；本仓 `task-worker.resolveRoute()` 遇到 `model.archivedAt!==null` 直接返回 null（`task-worker.service.ts:392-393`），归档模型的历史任务重试必然失败。⑤ 换线账单：上游 `SwitchTaskLogicalRoute` 同事务更新 task+账单并做"不扩大原授权上限"校验（`repository/logical_models.go:281-388`）；本仓 `replaceBilling()` 先退旧单再预留新单（`task-worker.service.ts:488-570`），效果等价但非单事务，中途失败依赖 `lifecycle.fail`。 |
 | `app/model_router_capability.go`（CapabilitySpec 解码/归一/匹配） | `intent/capability-spec.ts`、`intent/capability-match.ts`、`intent/model-intent.ts`、`intent/option-values.ts` | 🔀 | ① `NormalizeCapabilitySpec` 字段级等价：version=1、operations 去重小写、inputs min/max 校验、options 别名归一去重、values/range 互斥、step>0、图片参数校验（`capability-spec.ts:73-155`）。② `MatchCapability` 顺序与规则等价：图片参数（size 预设命中时从参数表剔除 size）→ 能力类型 → operation（spec 为空则不限）→ inputs 双向（缺声明且 count>0 报不支持；未传但 min>0 报最少）→ options（`inactiveCapabilityOptionValue` 跳过 auto/any/空/false/0）→ vquality 别名比较（`capability-match.ts:45-104`、`option-values.ts:82-152`）。③ **本仓新增** `restrictIntentToSpec()`（`model-intent.ts:211-235`）：准入前把意图里"合同未声明"的参数/输入**静默裁剪**，上游没有该步骤（上游会报"不支持参数"）。④ 本仓 `buildModelRequestIntent()` 严格校验 capability/inputs 白名单/0-128/options 必须是对象（`model-intent.ts:261-303`），上游 handler 直接 bind JSON。⑤ 错误结构：上游 `CapabilityIssue{Kind,Name,Reason}` + `ModelError` 字段级；本仓 issue 结构相同但上层只取 `reasons[0]`（见 `model_capability_argument.go` 行）。⑥ `normalizeImageSizeIntent` / `capabilityImageSizePresetMatches` 语义一致（`model-intent.ts:100-196`）。 |
-| `app/user_groups.go`（673 行：分组解析/可见性/定价/管理） | `user-groups/user-group.service.ts`、`user-groups/user-group.admin.service.ts`、`user-groups/user-group.controller.ts` | 🔀 | ① 可见性/定价算子对齐：`allowsChannel/requireChannel/pricing/combineMultiplierBPS` 语义一致（`user-group.service.ts:76-121` ↔ `user_groups.go:270-383`），倍率=分组×模型覆盖、货币 rate 取覆盖优先，`RateMicrocredits<=0`/`Multiplier<=0` 都拒绝。② **映射方式有意不同**：上游 `users.user_group` 列；本仓 `User → Membership(status active/grace) → MembershipPlan.userGroupCode`，无会员落 default（`user-group.service.ts:212-224`，文件头说明）。③ **缺全局积分策略倍率**：上游 `groupTierPrices()` 先 `combineMultiplierBPS(policy.DefaultMultiplierBPS, policy.ModelMultiplierBPS[modelKey], pricing.MultiplierBPS)`（`finance.go:714-745` + `credit_policy.go`），本仓全链路只有分组×覆盖（`billing.service.ts:206-222,237`），没有系统级/按模型倍率这一层。④ 覆写键：上游 channel 策略只看 `channelModel.ModelKey`，本仓 `[logicalModel.code, channelModel.modelKey]`（`billing.service.ts:206-209`、`catalog.service.ts:110`）。⑤ 默认分组：两边都启动补齐（`ensureDefaultGroup` vs `EnsureDefaultUserGroup`），倍率 10000、USD=7e6、CNY=1e6、allChannels=true 一致。⑥ 匿名访问差异：上游 `PublicLogicalModels/ModelCatalog` 必须登录（`currentUser`），本仓 `accessForUser(null)` → `systemAccess()`（bypassVisibility=true，`user-group.service.ts:199-209`），匿名可见全部渠道。⑦ 管理侧：上游 `RequireAdmin` + `appendAdminAudit` + 删除前 `UserGroupUserCounts/ErrUserGroupInUse`；本仓 `@RequirePermission(userGroupRead/Write)` + `@AuditAction`，删除改软删并检查 `MembershipPlan.userGroupCode` 引用（`user-group.admin.service.ts:173-191`），用户数按有效会员统计（315-341）。⑧ 覆写解码：本仓容忍 `pointsPerUsd`/`pointsPerUsdMicrocredits` 两种键，非法条目丢弃而不整表失败（`user-group.service.ts:272-294`）；上游任一条非法即整份快照报错（`user_groups.go:192-204`）。 |
-| `repository/logical_models.go` | `catalog/logical-model.admin.service.ts`（save/archive 事务）、`catalog/route-catalog.service.ts`（装载）、`channels/channel-model.repository.ts`（引用保护） | 🔀 | ① `SaveLogicalModelBundle` 事务（建/更新模型 → 原子递增 revision_sequence → 建 revision → 建 routes → 回写 active_revision_id）由本仓 `save()` 的 `$transaction` 等价实现（229-262）。② `ArchiveLogicalModel` 的"存在排队/执行任务则拒绝 + 归档写审计 + enabled=false"：本仓 `archive()` 校验 `generationTask.count(status in queued/running)` 后 `archivedAt/enabled=false/activeKey=null`（277-295），**无行锁**（上游 PostgreSQL `FOR UPDATE`，459-495），也**无同事务审计**。③ **缺** `requireActiveLogicalModelForTask`（任务写入时锁定模型行并校验 `enabled && archived_at is null && active_revision_id=task.revision`，`logical_models.go:497-519`）；本仓建任务只读内存快照 + 写前 `archivedAt/enabled` 检查（`task-admission.service.ts:157-163`），快照 30s 窗口内归档可与建单竞态。④ `LogicalModelsBySourceChannelModelID / LogicalModelsByOnlyActiveChannelModelID / DeleteLogicalModelRoute` 在上游无调用方（grep 仅定义处），本仓未实现属等价。⑤ 本仓新增渠道模型删除保护：仍有未归档前台 revision 引用或排队/执行任务时拒绝（`channel-model.repository.ts:178-198`）。 |
+| `app/user_groups.go`（673 行：分组解析/可见性/定价/管理） | `user-groups/user-group.service.ts`、`user-groups/user-group.admin.service.ts`、`user-groups/user-group.controller.ts` | 🔀 | ① 可见性/定价算子对齐：`allowsChannel/requireChannel/pricing/combineMultiplierBPS` 语义一致（`user-group.service.ts:76-121` ↔ `user_groups.go:270-383`），倍率=分组×模型覆盖、货币 rate 取覆盖优先，`RateMicrocredits<=0`/`Multiplier<=0` 都拒绝。② **映射方式有意不同**：上游 `users.user_group` 列；本仓 `User → Membership(status active/grace) → MembershipPlan.userGroupCode`，无会员落 default（`user-group.service.ts:212-224`，文件头说明）。③ **缺全局积分策略倍率**：上游 `groupTierPrices()` 先 `combineMultiplierBPS(policy.DefaultMultiplierBPS, policy.ModelMultiplierBPS[modelKey], pricing.MultiplierBPS)`（`finance.go:714-745` + `credit_policy.go`），本仓全链路只有分组×覆盖（`billing.service.ts:206-222,237`），没有系统级/按模型倍率这一层。④ 覆写键：上游 channel 策略只看 `channelModel.ModelKey`，本仓 `[logicalModel.code, channelModel.modelKey]`（`billing.service.ts:206-209`、`catalog.service.ts:110`）。⑤ 默认分组：两边都启动补齐（`ensureDefaultGroup` vs `EnsureDefaultUserGroup`），倍率 10000、USD=7e6、CNY=1e6、allChannels=true 一致。⑥ 匿名访问差异：上游 `PublicLogicalModels/ModelCatalog` 必须登录（`currentUser`），本仓 `accessForUser(null)` → `systemAccess()`（bypassVisibility=true，`user-group.service.ts:199-209`），匿名可见全部渠道。⑦ 管理侧：上游 `RequireAdmin` + 删除前 `UserGroupUserCounts/ErrUserGroupInUse`；本仓 `@RequirePermission(userGroupRead/Write)`，删除改软删并检查 `MembershipPlan.userGroupCode` 引用（`user-group.admin.service.ts:173-191`），用户数按有效会员统计（315-341）。⑧ 覆写解码：本仓容忍 `pointsPerUsd`/`pointsPerUsdMicrocredits` 两种键，非法条目丢弃而不整表失败（`user-group.service.ts:272-294`）；上游任一条非法即整份快照报错（`user_groups.go:192-204`）。 |
+| `repository/logical_models.go` | `catalog/logical-model.admin.service.ts`（save/archive 事务）、`catalog/route-catalog.service.ts`（装载）、`channels/channel-model.repository.ts`（引用保护） | 🔀 | ① `SaveLogicalModelBundle` 事务（建/更新模型 → 原子递增 revision_sequence → 建 revision → 建 routes → 回写 active_revision_id）由本仓 `save()` 的 `$transaction` 等价实现（229-262）。② `ArchiveLogicalModel` 的"存在排队/执行任务则拒绝 + enabled=false"：本仓 `archive()` 校验 `generationTask.count(status in queued/running)` 后 `archivedAt/enabled=false/activeKey=null`（277-295），**无行锁**（上游 PostgreSQL `FOR UPDATE`，459-495）。③ **缺** `requireActiveLogicalModelForTask`（任务写入时锁定模型行并校验 `enabled && archived_at is null && active_revision_id=task.revision`，`logical_models.go:497-519`）；本仓建任务只读内存快照 + 写前 `archivedAt/enabled` 检查（`task-admission.service.ts:157-163`），快照 30s 窗口内归档可与建单竞态。④ `LogicalModelsBySourceChannelModelID / LogicalModelsByOnlyActiveChannelModelID / DeleteLogicalModelRoute` 在上游无调用方（grep 仅定义处），本仓未实现属等价。⑤ 本仓新增渠道模型删除保护：仍有未归档前台 revision 引用或排队/执行任务时拒绝（`channel-model.repository.ts:178-198`）。 |
 | `repository/repository_user_groups.go` | `user-groups/user-group.service.ts`（快照）+ `user-group.admin.service.ts`（写） | 🔀 | ① 分组+渠道绑定同事务整体替换：`replaceChannels()` 对齐 `SaveUserGroupWithChannels`（删旧再建）。② 删除保护：上游按 `users.user_group` 计数；本仓按 `MembershipPlan.userGroupCode`（175-182）+ 软删 `deletedAt/activeKey=null`。③ 快照加载：上游 `UserGroups()+UserGroupChannels()` 后按 ID 绑渠道；本仓 `groups()` 同样一次取两表（`user-group.service.ts:242-268`），非法 overrides 上游整份报错、本仓逐条丢弃。 |
 | `handler/logical_models.go` | `catalog/models.controller.ts` + `catalog/admin-logical-model.controller.ts` | 🔀 | 路由集合基本一一对应；差异见**表D**（匿名可访问、响应包裹形状、新增 GET :id / includeArchived）。 |
 | `handler/model_catalog.go` | `catalog/model-catalog.controller.ts` | ✅ | 3 个端点、渠道+modelKey 报价语义一致；本仓额外接受嵌套 `intent` 对象（`ChannelModelQuoteBodyDto`），意图归一后行为一致。 |
@@ -322,7 +322,6 @@
 | B14 | 跨进程目录失效：Redis 版本号 + 每次快照请求比对（`model_router.go:18-111`） | DB 版本号 + 仅回源时读；命中只判 TTL（`route-catalog.service.ts:100-103`、`catalog-version.service.ts`） | 有意替代（单实例/无 Redis） | 多实例下"后台改价→前台生效"最长滞后 30s；同一实例内 `onChange` 立即失效。 |
 | B15 | 跨实例线路冷却（Redis `BlockRoute/RouteBlockedUntil`，`model_router.go:522-537`、`model_router_attempts.go:353-359`）与上游 `Retry-After` 自适应（`model_router_attempts.go:338-343`） | 进程内 Map（`route-health.service.ts:56-58`），429 固定 30s（`task-worker.service.ts:823`） | 有意替代（单实例） | 多实例各进程独立冷却，故障感知不同步；429 冷却时长可能与上游要求不符。 |
 | B16 | 建任务时对模型主体加行锁并校验 `enabled && archived_at is null && active_revision_id == task.revision`（`repository/logical_models.go:497-519`） | 无等价校验（`task-admission.service.ts:157-163` 只查内存快照字段） | 缺口 | 归档/发布新 revision 与建单竞态：快照 30s 内可能把新任务挂到刚归档/刚被替换的 revision 上。 |
-| B17 | 保存/归档审计与业务同事务，审计失败即失败（`logical_models.go:311-314,351-363`、`repository/logical_models.go:488-492`） | `@AuditAction` 拦截器"审计失败不阻断业务"（`admin/audit.interceptor.ts:47-51`） | 有意差异（已注明取舍） | 极端情况下出现"配置已改、无审计记录"；合规追溯弱于上游。 |
 | B18 | 后台列表对"线路引用的渠道模型/渠道已删除"直接返回错误（`logical_models.go:188-191`） | 转成 `configurationError` 文案继续返回（`logical-model.admin.service.ts:609-612,665-669`） | 语义差异 | 后台不再因脏数据整页 500（更好运维），但管理员可能忽略 `configurationError` 继续用坏模型。 |
 | B19 | 后台价格档去重键含计费方式与四项价格（`logical_models_catalog.go:165`） | 只按 selector 去重（`logical-model.admin.service.ts:792-794`） | 缺口（后台展示） | 同 selector 的多计费/多价档在后台详情里被折叠，管理员看不到完整价格。 |
 | B20 | 目录装载只包含 `enabled && weight>0` 线路（`repository/logical_models.go:69-76,177-180`） | 快照只按 `enabled` 过滤（`route-catalog.service.ts:152-155`），weight 在使用处过滤 | 语义差异 | `simulate` 会把 weight=0 的线路也列出来（不该出现在运行目录里），诊断噪音。 |
@@ -375,7 +374,7 @@
 | 渠道报价 | `POST /api/model-catalog/quote`，body=`{channelId,modelKey,intent:{...}}` | `POST /api/v1/model-catalog/quote`，同时接受平铺字段与嵌套 `intent`（`model-catalog.controller.ts:37-46`） | 本仓向后兼容两种载荷 |
 | 分组列表 | `GET /api/admin/user-groups` → `{groups}` | `GET /api/v1/admin/user-groups` → 裸数组 | 形状不同 |
 | 分组详情 | 无 | `GET /api/v1/admin/user-groups/:id` | ➕本仓 |
-| 分组增改删 | `POST /api/admin/user-groups`、`PATCH/DELETE /:id` | `POST /api/v1/admin/user-groups`、`PATCH/DELETE /:id` | 语义一致；本仓用权限点 + 审计拦截器，body 多 `reason` |
+| 分组增改删 | `POST /api/admin/user-groups`、`PATCH/DELETE /:id` | `POST /api/v1/admin/user-groups`、`PATCH/DELETE /:id` | 语义一致；本仓用权限点，body 多 `reason` |
 | 鉴权模型 | 会话 Cookie `currentUser`；后台 service 层 `RequireAdmin` | JWT（`OptionalJwtAuthGuard`）+ `@RequirePermission(PERMISSIONS.logicalModelRead/Write, userGroupRead/Write)` | 机制不同，权限粒度本仓更细 |
 
 ---
@@ -399,7 +398,7 @@
 
 - 上游（Go）：`/Users/bright/github/open-ai-canvas/backend`
 - 本仓（NestJS/Prisma）：`/Users/bright/github/aigc-creation/backend`
-- 审计方式：逐文件阅读 + 对 110 个 manifest 做脚本化统计/哈希比对（只读，未修改任何仓库文件）。
+- 核对方式：逐文件阅读 + 对 110 个 manifest 做脚本化统计/哈希比对（只读，未修改任何仓库文件）。
 - 范围：`internal/protocol`、`internal/providercatalog`、`internal/app` 的 plugin/provider/protocol/workflow 相关非测试文件、`handler/plugin.go`、`repository/plugin_states.go`、`model/models_plugin.go`、`plugin-packages/`；本仓 `src/model/protocol/**`、`src/model/plugins/**`、`src/model/catalog/**`、`backend/plugins/**`、任务执行宿主、`model.module.ts`、两个控制器。
 
 ### 0. 结论摘要（最重要 5 条）
@@ -465,7 +464,7 @@
 | `app/provider_error.go` | `tasks/task-executor.service.ts:upstreamErrorText` | 部分覆盖 | 能从 `error.message/message/msg/detail` 提取短错误并截断 500；差异：没有“业务 code + message”双提取、没有敏感词/内容审核专用 code、没有多帧 JSON 业务失败识别。 |
 | `app/provider_error_message.go` | 无 | 缺失 | 上游过滤 URL、余额/额度/密钥/token/堆栈/内部诊断等敏感片段后再返回用户；本仓直接截断上游原文，可能把 `api key`/`balance`/内部地址回显给用户或写入日志。 |
 | `app/provider_errors.go` | `task-executor.ts:failureCodeOf/safeFailure`、`task-lifecycle.ts:TASK_ERROR` | 部分覆盖 | 有 401/403/404/429/5xx/超时/连接中断归一与“只在上游明确未接时切线”；差异：没有 `providerPayloadErrorCategory`（真人肖像/安全审核/额度/模型权限/tool_choice 兼容）分类，没有 `Retry-After` 解析，用户文案仍是上游原文。 |
-| `app/provider_http_client.go` | `protocol/executor.ts` + `infra/outbound.ts` | 部分覆盖 | SSRF/DNS 固定/私网拦截/代理/超时/大小上限/重定向/自定义头/审计链路都有，能力不弱；差异：①上游在协议传输层做渠道熔断 + 并发槽 + `Retry-After`，本仓协议层无；②无流式消费回调；③无 `providerConnectionError` 的“连接提前关闭”专用文案；④无按运行时策略动态调整响应上限。 |
+| `app/provider_http_client.go` | `protocol/executor.ts` + `infra/outbound.ts` | 部分覆盖 | SSRF/DNS 固定/私网拦截/代理/超时/大小上限/重定向/自定义头/可观测链路都有，能力不弱；差异：①上游在协议传输层做渠道熔断 + 并发槽 + `Retry-After`，本仓协议层无；②无流式消费回调；③无 `providerConnectionError` 的“连接提前关闭”专用文案；④无按运行时策略动态调整响应上限。 |
 | `app/provider_request_types.go` | 无（类型自然内联） | 等价 | 只是 `requestAsMap` 类型断言 helper，模型域无独立语义。 |
 | `app/provider_submission.go` | `tasks/task-admission.service.ts`（任务级幂等） | 部分覆盖 | 本仓有任务级 `ownerId+idempotencyKey` 去重；但**没有把 key 注入 `request.extra.idempotencyKey`**，也没有 `withProviderSubmissionKey` 的宿主上下文；`coolhs-wan3-relay` 的 create body `id: $ref request.extra.idempotencyKey` 永远为空。 |
 | `app/provider_progress.go` | 无 | 缺失 | 上游从 `progress/percent/completion` 等键（含 `data/result/task/output/operation/response/meta/metadata` 容器）同步任务进度，仅观测不影响结果；本仓 `task-worker` 固定写 5/10/50，用户看不到上游真实进度。 |
@@ -552,7 +551,7 @@
 | C17 | Gemini Agent 显式缓存 | `provider_gemini_cache.go` | 无实现 | **中**：Agent 成本/首 token 延迟更高（Agent 本身也未接） |
 | C18 | 处理类 provider（kind=processing）完整链路 | `video_processing.go`；`protocol-catalog.service.ts` 上游对应逻辑在 `validateGenerationInterface`/`catalogModelProtocol` | `require()` 直接拒绝 processing | **中**：`volcengine-mediakit` 无法绑定渠道模型；画质增强/插帧类能力为零 |
 | C19 | 旧协议别名迁移 | `builtin.go` 的 `LegacyAliases` + `registry.Resolve` | `registerAlias()` 无调用 | **中**：存量渠道模型若用 `openai-video`/`claude-messages` 等旧 id，升级后“未知协议” |
-| C20 | 插件包完整性/状态/下载/升级 | `protocol_plugins.go`（registry/hash/status/package）、`handler/plugin.go:GET /plugins/:id/package`、install overwrite | 目录扫描 + DB 启停；`install()` 拒绝覆盖；无下载端点 | **中**：无法审计“运行的是哪份包”，插件升级只能先卸载再装（会短暂无协议）；无法给用户/前端下发原始包 |
+| C20 | 插件包完整性/状态/下载/升级 | `protocol_plugins.go`（registry/hash/status/package）、`handler/plugin.go:GET /plugins/:id/package`、install overwrite | 目录扫描 + DB 启停；`install()` 拒绝覆盖；无下载端点 | **中**：无法核验“运行的是哪份包”，插件升级只能先卸载再装（会短暂无协议）；无法给用户/前端下发原始包 |
 | C21 | 插件不可用占位（UnavailableAdapter） | `protocol_plugins.go:reload` 注册 `UnavailableAdapter` | 注册失败直接抛错/不注册 | **中**：运行期从“当前不可用（原因）”退化为“未知协议”，排障信息丢失 |
 | C22 | 插件平台可用 vs 用户启停双状态 | `plugin_management.go`、`PluginPlatformState`/`UserPluginState` | 只有平台 `enabled`；`UserPluginState` 未使用 | **中**：无法做“管理员下架/用户自行启用”的插件中心；自定义渠道的协议可见性无法按用户控制 |
 | C23 | 厂商推广目录 + Key 校验 + 推荐模型 + 人民币成本/加价 | `providercatalog/*` + `provider_catalog.go` | 完全无对应域 | **中高（业务）**：无法“选厂商→验 Key→勾模型→按加价一键接入”；运营成本核算链路缺失 |
@@ -572,7 +571,7 @@
 | D2 | 协议契约校验结果持久化到 `PluginPlatformState.verifyJson` | `plugin.admin.service.ts:268-284` | 上游无等价的“按 provider 记录 verify 结果”页面字段 |
 | D3 | 内置/上传双目录分离（`plugins/` 只读、`plugins-installed/` 可写） | `plugin-manifest.store.ts:63-71` | 避免上传包污染源码目录；上游用单一 `plugin_registry.json` + 包目录 |
 | D4 | 卸载前检查渠道模型引用 | `plugin.admin.service.ts:245-255` | 上游 `uninstall` 无该检查；本仓避免“删插件后部分路由静默失效” |
-| D5 | 禁止覆盖安装（先卸载再安装） | `plugin.admin.service.ts:199-201` | 审计更清晰（两次审计动作），代价是无热升级 |
+| D5 | 禁止覆盖安装（先卸载再安装） | `plugin.admin.service.ts:199-201` | 每次变更边界更清晰，代价是无热升级 |
 | D6 | 协议目录合并 manifest + registry 能力 | `protocol-catalog.service.ts:90-135` | 未注册/停用插件也能在后台看到其声明；上游 catalog 只读运行时 registry |
 | D7 | 插件可用性“人话原因” | `plugin.admin.service.ts:364-399` | 对 `host:`/无 provider/rpc 类插件显式说明“本环境不生效”，上游用 UnavailableReason 但无统一策略文案 |
 | D8 | 后台协议连通性测试（真实协议 + 真实凭证 + 轮询 + 调用日志） | `protocol-test.service.ts` | 上游有 `TestAdminChannelModel`，但本仓实现独立且带 `waitForResult`/`request` 摘要；属于本仓更完整的运维面 |
@@ -598,12 +597,11 @@
 | E9 | provider 目录接口 | `/plugins/catalog?scope=&capability=` 返回 `PluginProviderCatalogItem`（含 version/baseUrl/parameters/workflows） | `GET /admin/channels/protocols?capability=` 返回 `ProtocolCatalogEntry`（字段较少） | ⚠️ 路径、权限点（channelModelRead vs 插件中心）和返回字段都不同 |
 | E10 | 插件管理接口 | 用户 `/plugins/status`、`/plugins`、`/plugins/:id/package`、`/plugins/:id/activation`；管理员 `/admin/plugins`、`/availability`、安装/启停/卸载 | 仅 `/admin/plugins` list/get/PATCH/verify/install/uninstall；目录 `/admin/provider-catalog` | ⚠️ 无用户侧插件中心、无包下载、无用户激活 |
 | E11 | 插件状态模型 | 平台可用（管理员）+ 用户启用；`source` official/system/uploaded；`kind` protocol/application/payment/sms；`activationScope` system/user | 单表 `enabled` + `verifyJson` + `source` builtin/uploaded；无 kind/activation/config scope | ⚠️ 模型域够用，但插件中心语义弱化 |
-| E12 | 插件包生命周期 | registry JSON + SHA256 + status invalid + UnavailableAdapter + 覆盖升级 + 包缓存 | 目录扫描 + DB 启停 + 禁止覆盖 + 无 hash/status/包缓存 | ⚠️ 运维/审计差异 |
+| E12 | 插件包生命周期 | registry JSON + SHA256 + status invalid + UnavailableAdapter + 覆盖升级 + 包缓存 | 目录扫描 + DB 启停 + 禁止覆盖 + 无 hash/status/包缓存 | ⚠️ 运维/追踪差异 |
 | E13 | 服务商目录格式 | `schemaVersion:1`、tags、providers[rank/时间窗/connection/models/priceTiers] | 任意 `array` 或 `{items:[]}`：id/name/vendor/apiFormat/baseUrl/protocols/packageUrl | ❌ 不可互读，业务模型不同 |
 | E14 | 价格口径 | 人民币元 → microcredits（1 元=1 积分），加价率 basis points 向上取整，token 模式按每百万 token | 后台价格档按分组倍率/货币换算，无目录成本/加价链路 | ❌ 无对应 |
 | E15 | 宿主执行边界 | `Adapter` 接口 + `RequestAwareCreateParser`/`AgentAdapter`/`ResultAdapter`/`MediaUploadAdapter` 能力接口 | `ProtocolAdapter` 可选方法；无能力探测 | ⚠️ TS 无法区分“未声明”和“声明但空实现” |
 | E16 | 插件来源/保留 ID | `officialApplicationPolicies`、`systemPaymentPolicies`、保留 ID 拒绝、支付订单依赖 | 仅安装去重；无保留 ID、无支付订单检查 | ⚠️ 非模型域影响为主 |
-| E17 | admin 审计 | `appendAdminAudit` 多处（安装/卸载/可用性/Key 查询） | `@AuditAction` 装饰器覆盖 plugin.toggle/verify/install/uninstall、catalog refresh/install | ✅ 基本等价 |
 | E18 | 文档 | `docs/*.md` + 模板注入 | manifest.documentation 内嵌 | ✅ 等价（除 autodl） |
 
 ---
@@ -649,7 +647,7 @@
 | 安装 | 写 registry JSON；允许覆盖已装上传插件（保留 InstalledAt）；拒绝覆盖内置（支付插件例外）；缓存 zip 按 hash；失败回滚 registry | 解压到 `plugins-installed/<id>`；已存在 id 一律 409；失败删除临时目录 | 无热升级；无 zip 缓存/哈希；内置和上传都按 id 去重 |
 | 卸载 | 删除 registry 记录 + 包文件；内置拒绝；支付插件检查未完成订单；无渠道模型引用检查 | 删除目录 + DB state；内置拒绝；**检查 `channelModel.protocol in provider ids`** | 本仓依赖保护更强；但无支付订单检查（支付域排除） |
 | 启停 | 改 manifest `Metadata.Enabled` 写 registry，reload 后不注册/注册 Unavailable | DB `PluginPlatformState.enabled`，`registerAll` 读库并 `removeByPlugin` | 结果等价；本仓缺“不可用占位”和 per-user |
-| 状态 | `PluginView{source,status,error,sha256,package,installedAt}` | `PluginView{origin,removable,enabled,activeProtocols,availability,...}`，无 hash/status/error | 审计与排障信息少 |
+| 状态 | `PluginView{source,status,error,sha256,package,installedAt}` | `PluginView{origin,removable,enabled,activeProtocols,availability,...}`，无 hash/status/error | 追踪与排障信息少 |
 | 依赖引用保护 | 支付订单依赖；渠道模型引用无保护 | 渠道模型引用有保护；支付订单无 | 模型域本仓更安全 |
 | 失败策略 | 内置包/registry 损坏启动失败；单个 provider 注册失败标 invalid + Unavailable | 内置 manifest 坏 → 启动失败；上传坏 → 跳过；provider 注册失败 → 抛错 | 本仓“一个坏 provider 拖垮整次注册/启动”的风险更高 |
 | 来源/保留 ID | official/system/uploaded + 保留 ID 列表 | builtin/installed | 本仓无“官方应用/系统支付 ID 保留”概念（非模型域影响为主） |
@@ -695,7 +693,7 @@
 
 ### 6. 测试文件汇总（一句话）
 
-上游 `internal/protocol` 有 30 个 `_test.go`（expression/manifest/package/builtin/agnes/cangyuan/dashscope/dola/doubao/kacang/km-kemei/lxmone/minimax/metaso/official_catalog/payment/autodl 等），`internal/providercatalog` 另有 4 个测试文件；**本仓 `backend/src` 只有 5 个 spec（支付 3 个 + 通用 zip/csv 各 1 个），`protocol`/`plugins`/`catalog` 目录下没有任何单元测试**，与 `expression.ts` 头注释“改动前先看单测”不一致，是本次审计中最容易被忽视的回归风险。
+上游 `internal/protocol` 有 30 个 `_test.go`（expression/manifest/package/builtin/agnes/cangyuan/dashscope/dola/doubao/kacang/km-kemei/lxmone/minimax/metaso/official_catalog/payment/autodl 等），`internal/providercatalog` 另有 4 个测试文件；**本仓 `backend/src` 只有 5 个 spec（支付 3 个 + 通用 zip/csv 各 1 个），`protocol`/`plugins`/`catalog` 目录下没有任何单元测试**，与 `expression.ts` 头注释“改动前先看单测”不一致，是本次核对中最容易被忽视的回归风险。
 
 ---
 
@@ -716,7 +714,7 @@
 
 - 上游：`/Users/bright/github/open-ai-canvas/backend`（Go 1.x + GORM，单/多实例 + Redis 协调）
 - 本仓：`/Users/bright/github/aigc-creation/backend`（NestJS + Prisma/SQLite，单实例、进程内协调、微积分 BigInt）
-- 审计方式：只读阅读源码；结论均指向函数 / 字段 / 状态机分支（`文件:行`）。
+- 核对方式：只读阅读源码；结论均指向函数 / 字段 / 状态机分支（`文件:行`）。
 - 结论口径：✅ 对齐｜🔀 合并或重构（语义等价，位置/实现不同）｜⚠️ 有意差异（技术栈/产品设计导致）｜❌ 未移植（真实缺口或有影响的行为差异）｜➕ 仅本仓有。
 
 ---
@@ -799,7 +797,7 @@
 | B-13 | 音频能力与按秒实测结算：`AudioOutputDurationMs` 探针，缺失即失败转人工（`task_media_assets.go:46-62`；`finance_billing.go:371-443`） | 无 audio 能力；`durationOf` 直接取请求参数（`task-worker.service.ts:1103-1107`），无 ffprobe | 若接入音频：结算用的是“请求秒数”而非实测，预授权=实收，多退少补失效；无时长则成功后转 uncertain。视频处理类按秒同样无法按实测。 |
 | B-14 | 重试必须重新授权/计费并校验账单状态：`CheckRetryEligibility`（uncertain 拒绝）、`prepareLogicalTaskRetry`（重解析 revision/route）、`RetryTaskWithBilling`（新建账单+预留）（`task_lifecycle.go:33-106`） | `retryTask` 新建 `creditCost=0`、无账单任务，不做 uncertain/已提交上游检查、不重解析线路（`generate.service.ts:71-104`） | ①本次生成**免费**（收入损失）；②对“uncertain/可能已计费”的失败任务重试 → 上游二次计费风险；③模型/线路已变更时用旧快照执行。 |
 | B-15 | 上游取消：`requestProviderCancellation` + 持久化对账（`task_lifecycle.go:176-208`；`ClaimNextTaskProviderCancellation`） | `cancel` 只改本地状态并退/冻结账单（`task-lifecycle.service.ts:173-202`） | 上游继续生成并计费；用户已取消但平台持续付费。 |
-| B-16 | 取消来源/诊断字段（user/parent/worker，`CancellationSource/Actor/RequestedAt`）（`models_task.go:19-21`） | 无字段、无来源 | 事后无法回答“谁在什么时候取消的”，审计缺口。 |
+| B-16 | 取消来源/诊断字段（user/parent/worker，`CancellationSource/Actor/RequestedAt`）（`models_task.go:19-21`） | 无字段、无来源 | 事后无法回答“谁在什么时候取消的”，追踪缺口。 |
 | B-17 | 结果保存失败 → `uncertain`（绝不自动退款）（`task_terminal.go:195-221`） | 落盘重试 5 次后 `lifecycle.fail` → **退款**（`task-worker.service.ts:985-993`；`892-903` 大结果同样退款） | 上游已成功并计费，用户拿不到图但平台退款 → 双损；也可能出现“作品其实已生成、用户已退款”。 |
 | B-18 | 媒体 checkpoint 幂等 + 确定性对象 key + 分段续跑 + 管理员恢复（`task_media_recovery.go`） | `persist` 每次新建对象与 Asset（`task-media.service.ts:194-217`），无管理员恢复入口 | 重试产生重复素材/孤儿文件；存储成本与后台数据质量下降；用户无法“重试保存”。 |
 | B-19 | 对象存储本地兜底 + 补传任务 + 熔断（`task_media_fallback.go`） | 无 | 存储短暂故障即任务失败/退款，产物丢失。 |
@@ -936,11 +934,11 @@
 | `handler/custom_proxy.go` | `src/model/proxy/custom-relay.controller.ts` + `custom-relay.service.ts` + `proxy.http.ts` | 🔀重构，含 2 个真实缺口 | 上游路由 `ANY /ai/custom` 先 `RequireFeature(FeatureCustomChannels)` 再限流（custom_proxy.go:23-36）；本仓仅 `JwtAuthGuard` + `@RateLimit`（custom-relay.controller.ts:48-63），**功能开关缺失**。上游用 `Authorization: Bearer` 承载用户上游密钥（:71-75,252-259），本仓改用 `X-Canvas-Upstream-Key`（proxy.constants.ts:22），属有意（本系统 JWT 占用 Authorization）。上游附加头名为 `X-Canvas-Upstream-Headers`（outbound.go:28），本仓为 `X-Canvas-Headers`（proxy.constants.ts:24），**对旧 SDK 不兼容**。上游错误正文会走 `InterceptResponseText`（:182-185），本仓无响应拦截（见下）。其余：体积上限、GET 禁 body、并发槽、二进制/JSON/SSE 分流、密钥回显脱敏均对齐（custom-relay.service.ts:125-164,189-267；proxy.http.ts:275-309）。 |
 | `handler/security.go` | `src/model/proxy/proxy.paths.ts` | 🔀重构，含 1 个真实缺口 | `normalizeProxyPath`、`stripSecretQuery`、`authorizeCustomRelay`、`authorizeSystemProxy` 均已移植（proxy.paths.ts:151-167,341-348,361-453,260-316）。**缺口**：上游 `authorizeCustomRelay` 第一步就 `normalizedCustomRelayPath(target.EscapedPath())`（security.go:47-50,127-140），本仓调用方直接传 `target.pathname`（custom-relay.service.ts:99-105），没有解码/`\`+NUL 检查/2048 上限/`path.Clean` 不变形判定——本仓的 `normalizeProxyPath` 只被系统入口使用。另：系统入口端点判定上游是**精确匹配** `openAIPostEndpoints[requestPath]`（security.go:224-226），本仓用 `path===endpoint || path.endsWith(endpoint)`（proxy.paths.ts:312），更宽松（允许 `/任意/chat/completions`）。 |
 | `handler/routes.go`（任务路由文件；代理/模型注册实际在 `api.go`、`auth.go`、`cmd/server/main.go`） | `src/model/proxy/proxy.module.ts`、`system-proxy.controller.ts`、`app.module.ts`、`main.ts` | ⚠️有意差异 | 上游 `/api` 无版本段：显式入口 `RegisterSystemProxyRoutes` 注册 `r.Any("/ai/system/:channelId/*path")`（auth.go:264-278），短路径 `/api/{channelId}/{providerPath}` 放在 `NoRoute`（auth.go:280-301, cmd/server/main.go:130），保留前缀清单在 `isReservedAPIPathPrefix`（auth.go:325-332）。本仓全局前缀 `api/v1`（main.ts:139），短路径是**真实注册**的 catch-all `@All(':channelId/*path')`（system-proxy.controller.ts:71），靠 `ProxyModule` 最后导入（app.module.ts:88-93）+ 模块内控制器顺序（proxy.module.ts:32）保证业务路由优先。保留前缀清单已按本仓控制器重写（proxy.paths.ts:17-51），覆盖本仓全部顶级控制器；`isProxyRequestPath` 让中转路径跳过全局 100KB body-parser（main.ts:58-101）。风险：新增业务顶级路由若忘记加保留前缀，会被短路径 catch-all 接走；上游 `NoRoute` 不会抢已有路由。 |
-| `handler/response_interception.go`（+ `app/response_interception.go`） | 无 | ❌未移植 | 上游提供 `GET/PATCH /admin/settings/response-interception`（response_interception.go:11-45）、规则校验/持久化/审计（app/response_interception.go:36-173），并在自定义中转错误正文上生效（custom_proxy.go:182-185）。本仓全仓 grep `InterceptResponseText|response-interception` 无结果，**管理端配置与运行时替换都不存在**。影响：后台无法统一屏蔽/改写上游原始报错，自定义中转会把上游文案原样透给用户。 |
+| `handler/response_interception.go`（+ `app/response_interception.go`） | 无 | ❌未移植 | 上游提供 `GET/PATCH /admin/settings/response-interception`（response_interception.go:11-45）、规则校验/持久化（app/response_interception.go:36-173），并在自定义中转错误正文上生效（custom_proxy.go:182-185）。本仓全仓 grep `InterceptResponseText|response-interception` 无结果，**管理端配置与运行时替换都不存在**。影响：后台无法统一屏蔽/改写上游原始报错，自定义中转会把上游文案原样透给用户。 |
 | `outbound/outbound.go` | `src/model/infra/outbound.ts` | 🔀重构，含 4 个真实缺口 | 已对齐：http/https 限定、禁 URL 凭据（outbound.go:54-69 ↔ outbound.ts:93-109）；自定义地址 4096 上限/禁 fragment/HTTP 仅可信主机（:73-98 ↔ :112-139）；代理仅 socks5/socks5h/http/https（:102-122 ↔ :142-161）；5 次重定向且每跳复验（:124-160 ↔ :389-408，但本仓多放 1 跳，见 E-T8）；自定义不重定向（:168-176 ↔ :399-402）；32 头/16KB/保留头（:188-306 ↔ :257-326）；私网/回环/链路本地/组播判定与 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS` 语义（:415-507 ↔ :164-194,74-86）。**缺口**：①无 `HTTP(S)_PROXY` 环境代理与 `configuredProxyHost` 直连例外（:308-341,387-403）；②自定义渠道 IPv6 保留网段 `100::/64`、`2001:db8::/32` 未拦（:40-51,472-487 ↔ outbound.ts:235-244）；③`request.setTimeout` 只是 socket 空闲超时，不是上游 `http.Client.Timeout` 的总时限（outbound.ts:450-457 ↔ outbound.go:124-136）；④`agent:false` 无连接复用、无 H2（outbound.ts:427）。 |
 | `outbound/errors.go` | `src/model/infra/outbound.ts` `OutboundError` | ✅对齐 | 上游用稳定 `BadRequestError` 类型区分“出站校验失败”（errors.go:3-18）；本仓 `OutboundError.code`（invalid_url/blocked_host/dns_failed/proxy_invalid/timeout/network）承担同一职责，并在 `system-proxy.service.ts:503-513` 映射为 403/502 与日志原因。 |
 | `app/channel_outbound.go` | `proxy-channel.service.ts` + `channel-runtime.service.ts` + `infra/outbound.ts` | ✅对齐 | 上游两个薄封装：所有渠道 URL 走出站策略、渠道代理客户端（channel_outbound.go:9-19）。本仓系统中转先 `validateOutboundUrl`（system-proxy.service.ts:138-147），任务侧由 `outboundRequest` 内部复验（outbound.ts:389-392），代理从 `ModelChannel.proxyUrl` 读取并透传（proxy-channel.service.ts:75, system-proxy.service.ts:323）。本仓把“渠道装配”拆成中转/任务两套（有意，见 proxy-channel.service.ts:1-11 注释）。 |
-| `app/provider_http_client.go`（仅出站/超时/代理） | `src/model/protocol/executor.ts` + `tasks/task-worker.service.ts` + `infra/outbound.ts` | 🔀合并或重构 | 上游在统一 `doBinaryWithConsumer` 里做熔断检查、渠道槽、SSRF、超时、响应上限、状态码与审计（provider_http_client.go:242-368），响应上限取运行策略 `policy.Resource.GeneratedFileMB`（:266-272）。本仓把这些拆开：任务 worker 先查路由健康/拿渠道槽（task-worker.service.ts:619,729），再由 `ProtocolExecutor.send` 走 `outboundRequest`，响应上限是常量 64MB（executor.ts:20,296-299），没有上游那种“出站函数内读运行策略 + 熔断前置”的单一收口。属重构，但运行期可调上限与前置熔断能力弱于上游。 |
+| `app/provider_http_client.go`（仅出站/超时/代理） | `src/model/protocol/executor.ts` + `tasks/task-worker.service.ts` + `infra/outbound.ts` | 🔀合并或重构 | 上游在统一 `doBinaryWithConsumer` 里做熔断检查、渠道槽、SSRF、超时、响应上限、状态码与追踪（provider_http_client.go:242-368），响应上限取运行策略 `policy.Resource.GeneratedFileMB`（:266-272）。本仓把这些拆开：任务 worker 先查路由健康/拿渠道槽（task-worker.service.ts:619,729），再由 `ProtocolExecutor.send` 走 `outboundRequest`，响应上限是常量 64MB（executor.ts:20,296-299），没有上游那种“出站函数内读运行策略 + 熔断前置”的单一收口。属重构，但运行期可调上限与前置熔断能力弱于上游。 |
 | `kernel/error_codes.go` | `src/common/app.exception.ts` + `src/model/proxy/*` 字面量错误码 | ⚠️有意差异 | 上游 code 默认等于 HTTP 状态，需要细分时用 `status*100+n`、`42901` 限流（error_codes.go:5-24）；本仓全站是 5 位业务码（`AppError(code,message,status)`，app.exception.ts:3-9），中转发 `40001/40301/40401/42901/50201/50303`（system-proxy.service.ts:91-98,145,169,343）。语义等价、协议不兼容，属本仓 API 约定。 |
 | `model/models_channel.go`（凭证字段） | `prisma/schema.prisma` `ModelChannel/ChannelModel/ApiCallLog` | 🔀重构 | 凭证字段 `apiKey`/`secretKey`/`headersJson` 均在（schema.prisma:1507-1524）；上游只加密 `APIKey/SecretKey`（admin_channels.go:252-275），本仓额外把 `headersJson` 加密（channel.service.ts:689-716），更强。上游保留历史列 `PublicAlias`（models_channel.go:15-16），本仓无。上游 `ApiCallLog` 无 `ChannelModelID`，本仓新增并建索引（schema.prisma:1948-1950）；上游有 `CreatedAtEpoch`（SQLite 性能列），本仓无。详见 D 表。 |
 | `database/schema.go`（模型域） | `prisma/schema.prisma` | ⚠️有意差异（GORM→Prisma），含索引/唯一键缺口 | 表集合基本一致：ModelChannel/ChannelModel/ChannelModelPriceTier/LogicalModel(+Revision/Route/RouteAttempt)/UserGroup(+Channel)/BillingOrder/CreditAccount/CreditLedgerEntry/ApiCallLog 均有（schema.go:35-62 ↔ schema.prisma:1495-2017）。差异集中在索引、唯一约束与历史列，见 D 表。 |
@@ -1050,7 +1048,7 @@
 
 ## 6. 后台前端 / C 端选型逐文件对照
 
-审计范围：上游 `open-ai-canvas/web/src` 对照本仓 `aigc-creation/frontend/src`。只读分析，未修改任何仓库文件。
+核对范围：上游 `open-ai-canvas/web/src` 对照本仓 `aigc-creation/frontend/src`。只读分析，未修改任何仓库文件。
 
 本仓渠道页入口先读 `frontend/src/pages/admin/channels/index.ts`（仅导出 `AdminChannelsPage`），实际编排在 `channels/page.tsx`，因此下文把上游单文件 `channels-page.tsx` 对照到本仓 `page.tsx` + `ChannelListPanel` + `ChannelDetailPanel` + `ChannelFormDrawer` 的组合。
 
@@ -1060,7 +1058,7 @@
 
 ### 结论摘要
 
-1. 渠道主从工作台整体移植完整，且本仓在写操作审计、健康面板、连通性测试、未定价队列上更强；主要缺口在「模型编辑器的结构化能力/价格档」和「分享链接状态」。
+1. 渠道主从工作台整体移植完整，且本仓在健康面板、连通性测试、未定价队列上更强；主要缺口在「模型编辑器的结构化能力/价格档」和「分享链接状态」。
 2. 本仓模型价格档用自由文本 `selector` + 原始 JSON `capabilityConfig`，上游是结构化生成方式/分辨率/帧率/图片参数匹配与可视化能力合同编辑器；本仓还禁止视频 Token 计费，属于真实功能缺口。
 3. 前台模型（logical models）本仓允许选停用/跨能力线路、重复线路、启用但无线路，且不校验/重置能力合同；上游有来源能力合并、`capabilitySourceError`、启用前必须至少一条线路等硬校验。
 4. 调用记录详情缺请求/响应报文、按 id 深链、上游任务查询、视频转存、媒体恢复与计费拆解；账单处置缺批量结算/退款和自动退回开关（本地 API 也未封装）。
@@ -1094,8 +1092,8 @@
 | `pages/admin/components/billing-auto-refund-toggle.tsx` | 无对应，`lib/api.ts` 也无接口 | ❌ 未移植 | 上游有「冻结积分自动退回」开关、二次确认与分钟级自动退回说明（toggle:12-84），接口 `/admin/settings/billing-auto-refund`（wallet.ts:276-280）。本仓全仓 grep 无 `autoRefund/自动退回` 设置，账单页只能人工逐单处理。 |
 | `pages/admin/logical-models/logical-models-page.tsx` | `pages/admin/AdminLogicalModelsPage.tsx` | 🔀 重构（含多处缺口） | 列表、创建/编辑、归档、模拟、线路优先级/权重/启停均具备。差异：① 上游线路候选**按当前能力过滤并禁用停用渠道/模型**（logical:119、579-594、614-616），本仓 `channelModelOptions` 取全部渠道模型且只把停用写进 label、不 disabled（AdminLogicalModelsPage:198-205、787-793）；② 上游禁止重复选择同一渠道模型（:601-616），本仓可重复添加；③ 上游启用前强制至少一条线路并校验能力来源（:173-184），本仓只提示「没有线路会 42204」，仍可保存启用（:779-782，提交 :311-323 未拦截空线路）；④ 上游切换能力会清空线路/能力合同/默认参数（:481-485），本仓不改（:657-685）；⑤ 上游用结构化 `CapabilityScopeEditor`/`DefaultOptionsEditor`（:455-470），本仓是原始 JSON 文本域（:745-765）；⑥ 上游强制 `pricePolicy: channel` 并清零四个价格（:681-694、723-742），本仓提供「统一价/跟随渠道」并允许四个价格输入（:50-53、687-743），形成第二套价格源；⑦ 模拟：上游用 `CapabilityRequestEditor` 传 operation+inputs+options 并展示 productMatch 与候选池/冷却/低优先级原因（:512-542、749-767），本仓只有 operation+options JSON、无 inputs（:855-866），结果表有价格档与 eligible/reasons（:884-913），缺能力匹配结论。⑧ 本仓编码创建后禁用（:622），上游可提交修改；⑨ 本仓多「显示已归档」与 revision 列（:550-557、496-500），上游无。 |
 | `pages/admin/logical-models/model-routing-capabilities.tsx` | 无对应文件，仅原始 JSON | ❌ 未移植 | 上游 818 行实现能力范围编辑器、默认参数编辑器、请求模拟编辑器、能力摘要、从渠道模型推导能力合同、来源合并与覆盖校验（capability:86-260、280-537）。本仓 `AdminLogicalModelsPage` 只用两个 `TextAreaField` 承接 JSON（:745-765），无字段约束、无来源合并、无覆盖提示。直接后果：能力合同写错也能保存，线路匹配失败只能到线上暴露。 |
-| `pages/admin/plugins/plugins-page.tsx` | `pages/admin/AdminPluginsPage.tsx` | 🔀 重构 | 插件清单、启停、上传安装、卸载、内置不可卸载、启动状态均具备。本仓更强：契约校验、插件详情抽屉（Provider/配置项/界面位置/权限/最近校验）、当前环境可用性原因、协议生效数、服务商插件目录安装/校验/刷新、写操作自动审计（AdminPluginsPage:96-207、585-708）。缺口：① 上游按 application/protocol/payment/uploaded 分类过滤、按可用性过滤、搜索、分页（plugins:39-73、269-324），本仓无任何筛选/搜索/分页（页面仅表格 :523-545）；② 上游有「作用范围：用户自主启用/全局生效」和已启用用户数（:174-193），本仓 `PluginView` 无 `kind/activationScope/enabledUserCount` 字段（types/model.ts:549-595），无法管理用户级应用插件；③ 上游合并前端插件注册表（含官方应用插件，:369-386），本仓只展示后端插件清单；④ 上游上传有独立文档弹窗（:326），本仓是隐藏 file input + 确认框（:464-489）。 |
-| `pages/admin/user-groups/user-groups-page.tsx` | `pages/admin/AdminUserGroupsPage.tsx` | 🔀 重构 | 分组列表、倍率/汇率/可见渠道/模型覆盖/用户数/默认分组均具备。差异：① 上游删除在 `isDefault` 或 `userCount > 0` 时禁用（user-groups:157），本仓只禁用默认分组（AdminUserGroupsPage:379），有会员的分组仍可点删除并在确认框展示「该分组当前有 N 名有效会员」（:636-648）；② 上游倍率是小数 0.0001–100（即最高 100 倍，editor:136-137），本仓用百分比且上限 100%（:197-201），无法配置 1 倍以上倍率；③ 上游模型覆盖是从当前可用渠道模型的可搜索下拉选择（editor:47-55、164-166），本仓是自由文本模型编码（:582-605），拼错不会提示；④ 上游徽章有实时预览（editor:120-128），本仓无；⑤ 上游有刷新按钮（user-groups:175-177），本仓无；⑥ 本仓多默认分组提示、渠道复选框（:505-633），写操作自动审计。 |
+| `pages/admin/plugins/plugins-page.tsx` | `pages/admin/AdminPluginsPage.tsx` | 🔀 重构 | 插件清单、启停、上传安装、卸载、内置不可卸载、启动状态均具备。本仓更强：契约校验、插件详情抽屉（Provider/配置项/界面位置/权限/最近校验）、当前环境可用性原因、协议生效数、服务商插件目录安装/校验/刷新（AdminPluginsPage:96-207、585-708）。缺口：① 上游按 application/protocol/payment/uploaded 分类过滤、按可用性过滤、搜索、分页（plugins:39-73、269-324），本仓无任何筛选/搜索/分页（页面仅表格 :523-545）；② 上游有「作用范围：用户自主启用/全局生效」和已启用用户数（:174-193），本仓 `PluginView` 无 `kind/activationScope/enabledUserCount` 字段（types/model.ts:549-595），无法管理用户级应用插件；③ 上游合并前端插件注册表（含官方应用插件，:369-386），本仓只展示后端插件清单；④ 上游上传有独立文档弹窗（:326），本仓是隐藏 file input + 确认框（:464-489）。 |
+| `pages/admin/user-groups/user-groups-page.tsx` | `pages/admin/AdminUserGroupsPage.tsx` | 🔀 重构 | 分组列表、倍率/汇率/可见渠道/模型覆盖/用户数/默认分组均具备。差异：① 上游删除在 `isDefault` 或 `userCount > 0` 时禁用（user-groups:157），本仓只禁用默认分组（AdminUserGroupsPage:379），有会员的分组仍可点删除并在确认框展示「该分组当前有 N 名有效会员」（:636-648）；② 上游倍率是小数 0.0001–100（即最高 100 倍，editor:136-137），本仓用百分比且上限 100%（:197-201），无法配置 1 倍以上倍率；③ 上游模型覆盖是从当前可用渠道模型的可搜索下拉选择（editor:47-55、164-166），本仓是自由文本模型编码（:582-605），拼错不会提示；④ 上游徽章有实时预览（editor:120-128），本仓无；⑤ 上游有刷新按钮（user-groups:175-177），本仓无；⑥ 本仓多默认分组提示、渠道复选框（:505-633）。 |
 | `pages/admin/user-groups/user-group-editor.tsx` | `AdminUserGroupsPage.tsx` 的编辑 Drawer | 🔀 合并 | 基本信息/徽章/倍率/汇率/可见渠道/模型覆盖/排序均具备。缺失：徽章预览、渠道多选搜索、模型覆盖下拉校验（见上）。本仓编辑抽屉 700px 单页滚动，上游 640px 抽屉；两者都有未保存关闭确认（上游 editor:57-71；本仓 useDiscardConfirm :145）。 |
 | `pages/admin/user-groups/user-group-form.ts` | `AdminUserGroupsPage.tsx` 的 `toDraft`/`submit` | 🔀 合并 | 两边都把人类单位换算为 bps/微积分（上游 form:29-81；本仓 :93-115、187-252）。差异：本仓倍率按百分比输入并 `×100`，上游按小数输入并 `×10000`；默认值不同（本仓 100%/1/0.14，上游 1/7/1，constants/EMPTY_DRAFT），属产品口径差异；本仓名称限 40 字、描述 200 字（:463、482），上游 80/500（editor:113、117）。 |
 | `components/model-picker.tsx` | `components/ModelPicker.tsx` | 🔀 重构（多处真实缺口） | 上游两级选择（产品模型→渠道模型）、个人渠道、分组健康、按当前输入做能力兼容过滤、每项可用性徽章/最近 10 次/7 天趋势、每档价格与选中后精确报价、键盘方向键/Home/End/Escape（model-picker:75-182、246-289、628-724）。本仓是扁平前台模型按钮列表：只按服务端 `available` 置灰（ModelPicker:168-193），无兼容性判断、无不可用原因、无健康/可用性、无分组、无键盘漫游、每项只显示 `displayPrice/priceLabel`（:44-48），选中后 400ms 防抖报价（:114-149）。本仓有按能力 localStorage 记忆并跨组件事件同步（modelSelection.ts:27-51、ModelPicker:84-105），上游用全局配置 store。 |
@@ -1150,11 +1148,11 @@
 
 | # | 本仓能力/字段 | 证据 | 价值/备注 |
 |---|---|---|---|
-| C1 | 统一调价与删除均不要求人工填写变更原因，审计由后端自动记录 | ChannelModelRepriceDialog.tsx；ChannelModelTable.tsx；Manager:448-495 | 删除保留影响范围确认，不把审计变成页面门槛 |
+| C1 | 统一调价与删除均不要求人工填写变更原因 | ChannelModelRepriceDialog.tsx；ChannelModelTable.tsx；Manager:448-495 | 删除保留影响范围确认，不增加原因填写门槛 |
 | C2 | 渠道表单「排序值」 | ChannelFormDrawer.tsx；page.tsx | 上游排序走独立弹窗；双方均无变更原因 |
 | C3 | 独立「线路健康」面板：24h/7d/P95/均值/最近样本/协议未注册/冷却中 | ChannelModelHealthPanel.tsx:41-166；page.tsx:464-475 | 上游只在单元格 tooltip/渠道徽章展示 |
 | C4 | 渠道模型行级连通性测试 + 最近测试结果面板（含 logId、HTTP path、产出、responsePreview） | ChannelModelTable.tsx:241-248、473-509；Manager:278-296 | 上游测试只在编辑器内且不保留结果 |
-| C5 | 批量删除/统一调价的计数按钮；两者均不要求原因输入 | ChannelModelTable.tsx:374-391；Manager:448-477、482-495 | 操作后由后端统一写入审计原因，页面只负责确认影响范围 |
+| C5 | 批量删除/统一调价的计数按钮；两者均不要求原因输入 | ChannelModelTable.tsx:374-391；Manager:448-477、482-495 | 页面只负责确认影响范围 |
 | C6 | 「未定价」状态筛选与标签，作为补价队列 | constants.ts:80-84、89-97；AllChannelModelsPanel.tsx:319-328；ChannelModelTable.tsx:219-224 | 上游无此状态 |
 | C7 | 全部模型「编辑」跳回渠道并定位模型（focusModelId） | page.tsx:140-146；Manager:120-134；AllChannelModelsPanel.tsx:338-348 | 上游是原地内嵌编辑器 |
 | C8 | 渠道左列「未配置 Key」红字提醒、详情显示代理地址 | ChannelListPanel.tsx:226；ChannelDetailPanel.tsx:82 | 上游密钥状态只在详情 |
@@ -1181,10 +1179,10 @@
 | 全部模型视图 | 与「按渠道」并列，跨渠道表，健康/成本/渠道跳转，原地编辑，含停用项 | 同样并列，增加未定价队列与状态，编辑跳回渠道；分页固定 | 🔀 对齐且部分增强，编辑动线不同 |
 | 模型编辑弹窗 | 1120px 三 Tab，结构化协议/能力/价格，图标选择、展示名补全、未保存确认、可测未保存值 | 980px 单页长表单，原始 JSON 能力合同、自由文本图标/展示名/规格，保存后才能测，关闭不确认 | ⚠️/❌ 结构性能力与安全交互缺失 |
 | 价格档 | default/advanced，生成方式/分辨率/帧率/图片参数/画质/尺寸，结构化校验，视频 Token | 自由文本 selector、分辨率、视频秒数、8 个价格框，弱校验，禁止视频 Token，货币单位未反映到标签 | ❌ 真实能力缺口 |
-| 统一调价 | 按成本×（1+加价率），小数位、逐项手改、按模型分组、CAS 整批拒绝 | 同样算法（BigInt half-up）+ 自动审计 + 模型缺失成本/售价阻断 | ✅ 对齐，本仓更严 |
+| 统一调价 | 按成本×（1+加价率），小数位、逐项手改、按模型分组、CAS 整批拒绝 | 同样算法（BigInt half-up）+ 模型缺失成本/售价阻断 | ✅ 对齐，本仓更严 |
 | 上游导入 | 拉取上游→预览弹窗→搜索/全选匹配/取消匹配→默认勾选已存在、新模型不勾选→导入 | 拉取上游→对象化预览（含 displayName/已存在徽章）→默认勾选新模型→导入 | ✅ 对齐，默认选择策略本仓更合理 |
 | 排序 | 拖拽/上下移/输入位置；保存带 original ids CAS；全部条目不受筛选影响 | 同左，拆成渠道排序与模型排序两个 API 入口 | ✅ 对齐 |
-| 删除原因 | 删除只需确认，无原因；后端可能不要求 | 渠道/模型/批量删除均不要求原因，保留影响范围确认；后端审计仍记录操作人、动作与结果 | ✅ 对齐业务确认边界 |
+| 删除原因 | 删除只需确认，无原因；后端可能不要求 | 渠道/模型/批量删除均不要求原因，保留影响范围确认 | ✅ 对齐业务确认边界 |
 | 健康指标 | 24h 成功率+最近 10 次色块，tooltip 7d/P95/最近失败；渠道左列聚合徽章 | 同左，另有完整健康表；但 24h 无样本显示「无调用」会掩盖 7d 数据，同页两套阈值/格式不一致 | 🔀 大部分对齐，展示口径有瑕疵 |
 | 路由模拟 | 结构化 operation+inputs+options，展示能力匹配结论与候选线路 inPool/blocked/matched/低优先级及原因 | operation 文本+options JSON，无 inputs；结果显示候选数、选中线路、逐线 eligible/reason/价格档 | ⚠️ 可用但无法模拟输入约束，缺能力匹配结论 |
 | 分组编辑 | 编码/名称/说明/徽章+预览/小数倍率/汇率/全部渠道开关/渠道多选/模型覆盖下拉/排序；有会员禁删 | 编码/名称/说明/徽标（无预览）/百分比倍率（上限 1 倍）/汇率/渠道复选框/模型覆盖自由文本/排序；只禁默认分组删除 | 🔀 字段对齐，校验与上限退化 |
@@ -1211,7 +1209,7 @@
 
 1. 全部后台页面使用本仓 `admin-ui/primitives` + Tailwind，而不是上游 antd/自研 overlay；布局、表单控件、Modal/Drawer 外观不同但语义大多等价。
 2. 服务商目录三步向导（`provider-catalog-wizard.tsx`）与 `provider-catalog-pricing.ts` 不做；新增渠道走手填表单。代价是失去「目录带价一键接入」。
-3. 本仓统一调价与删除只保留业务影响确认，不要求人工填写原因；审计由后端自动被动留痕。
+3. 本仓统一调价与删除只保留业务影响确认，不要求人工填写原因。
 4. 本仓把「线路健康」做成独立面板、把「财务分析」做成独立页，属于信息架构重构，不是功能缺失。
 5. 本仓 C 端只暴露「前台模型」，不展示渠道/个人渠道，这是本仓产品架构（渠道信息不出 C 端），与上游「产品模型→渠道模型」两级选择不同；但分组展示、输入兼容与健康提示仍可按前台模型维度补齐。
 6. 本仓插件模型只有 builtin/installed 两种来源，没有 application/payment 分类与用户级启用；如果后端确实没有该概念，这是架构差异；若后端有而前端未接，则升级为真实缺口。
@@ -1246,10 +1244,10 @@
 
 1. **先复核 P0 的 10 条**：它们直接对应数据丢失、资金口径、二次计费、安全边界。每条都给出上游/本仓文件与行号，可逐条复现。
 2. **再复核契约类差异**：`fetch/import` 返回类型、健康指标字段、`GET /admin/channel-models` 默认是否含停用、`/models` 匿名可见性。这些会直接破坏按上游契约写的客户端。
-3. **最后复核“有意差异”**：服务商目录、单实例协调、匿名目录、多图产出、审计策略。需要产品确认是否接受，而不是当作 bug 修。
+3. **最后复核“有意差异”**：服务商目录、单实例协调、匿名目录、多图产出。需要产品确认是否接受，而不是当作 bug 修。
 4. **补测试的优先级**：渠道复制/导入、图片合同校验、价格档选择器、建单-预留原子性、换线财务口径、媒体落盘失败语义、代理路径规范化。建议先用上游同名测试的用例表做对照，再决定是本仓补 `.spec.ts` 还是继续扩 verify 脚本。
 
-## 9. 审计边界
+## 9. 核对边界
 
 - 本次是**静态代码对比**，没有启动服务、没有连数据库、没有调用真实厂商。运行时结论（尤其是并发、崩溃窗口、上游错误体差异）仍需脚本或真机验证。
 - 上游有少量“定义但无调用”的能力（如 `FetchAdminChannelModels`、`EnsureSystemChannelModels`、`LogicalModelPriceSKU`），本清单已标注，不按缺口计。

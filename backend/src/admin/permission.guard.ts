@@ -80,10 +80,6 @@ export class PermissionGuard implements CanActivate {
 
     const requiredPermissions = Array.isArray(required) ? required : [required];
 
-    // 供 getRequiredPermission()/getRequiredPermissions() 读取 (守卫之外拿不到 Reflector)
-    request.requiredPermissions = requiredPermissions;
-    request.requiredPermission = requiredPermissions[0];
-
     const adminUser = request.adminUser;
     if (!adminUser) {
       // AdminGuard 未执行或已失败 —— 守卫顺序被改动时兜底

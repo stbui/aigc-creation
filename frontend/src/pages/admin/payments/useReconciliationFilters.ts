@@ -6,12 +6,12 @@ import type { AdminPageResult, AdminReconciliationRun } from '../../../types/pay
 import { adminPaymentReconciliationApi } from './api';
 import {
   EMPTY_RECONCILIATION_FILTERS,
-  RECONCILIATION_PROVIDER_IDS,
+  ORDER_PROVIDER_IDS,
   RECONCILIATION_RUN_STATUS_META,
   type ReconciliationFilterKey,
   type ReconciliationFilterValues,
 } from './constants';
-import { providerLabel } from './utils';
+import { isValidReconciliationBillDate, providerLabel } from './utils';
 import { useDraftList, type ListParams } from './useDraftList';
 
 /**
@@ -28,8 +28,6 @@ type ReconciliationQuery = {
   billDate?: string;
 };
 
-const BILL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 function readInitialReconciliationFilters(
   searchParams: URLSearchParams,
 ): ReconciliationFilterValues {
@@ -38,7 +36,7 @@ function readInitialReconciliationFilters(
   const rawStatus = searchParams.get('status');
   const rawBillDate = searchParams.get('billDate');
   const providerId =
-    rawProvider && (RECONCILIATION_PROVIDER_IDS as readonly string[]).includes(rawProvider)
+    rawProvider && (ORDER_PROVIDER_IDS as readonly string[]).includes(rawProvider)
       ? rawProvider
       : undefined;
 
@@ -51,7 +49,8 @@ function readInitialReconciliationFilters(
         ? rawStatus
         : undefined,
     // 首次进入不预设任何筛选条件；账单日由用户显式选择（也是执行对账的前提）
-    billDate: rawBillDate && BILL_DATE_PATTERN.test(rawBillDate) ? rawBillDate : '',
+    billDate:
+      rawBillDate && isValidReconciliationBillDate(rawBillDate) ? rawBillDate : '',
   };
 }
 

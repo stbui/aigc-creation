@@ -300,7 +300,14 @@ export interface QrStatusResult {
 export interface Project {
   id: string;
   name: string;
-  createdAt?: string;
+  ownerId: string;
+  createdAt: string;
+}
+
+/** GET /projects：项目列表附带当前素材与历史任务计数。 */
+export interface ProjectListItem extends Project {
+  assetCount: number;
+  taskCount: number;
 }
 
 // 与后端 Prisma Asset 模型对齐 (backend/prisma/schema.prisma)
@@ -489,13 +496,14 @@ export interface AdminMe {
   roleLabel: string;
   /** 已授予的权限点, 如 'user.write'。前端 can() 的唯一依据 */
   permissions: string[];
-  /** 需输入操作原因的高危权限点 */
+  /** 高危权限点 */
   highRiskPermissions: string[];
 }
 
 /** GET /api/v1/admin/permissions — 权限点全集与内置角色 */
 export interface AdminPermissionCatalog {
   permissions: string[];
+  /** 高危权限点 */
   highRiskPermissions: string[];
   roles: Array<{ code: AdminRole; label: string; permissions: string[] }>;
 }
@@ -659,7 +667,7 @@ export interface AdminOverview {
 }
 
 /* ────────────────────────────────────────────────────────────────
-   后台: 用户与账户 / 角色权限 / 系统设置 / 审计
+   后台: 用户与账户 / 角色权限 / 系统设置
    ──────────────────────────────────────────────────────────────── */
 
 /** GET /api/v1/admin/users */
@@ -714,7 +722,7 @@ export type { AdminUserDetail } from './admin-users';
 export interface AdminPasswordReset {
   id: string;
   email: string;
-  /** 明文仅此一次返回, 不入库不入审计 */
+  /** 明文仅此一次返回, 不落库 */
   tempPassword: string;
   mustChangePassword: boolean;
   /** 临时密码有效期；过期后用户需重新联系管理员 */
@@ -740,7 +748,7 @@ export interface AdminSettingsUpdatePayload {
   clears?: string[];
 }
 
-/** 系统设置写入结果（含逐项 before/after，供审计与页面提示） */
+/** 系统设置写入结果（含逐项 before/after，供页面提示） */
 export interface AdminSettingsUpdateResult {
   updated: string[];
   cleared: string[];
@@ -864,28 +872,6 @@ export interface PublicAigcLabel {
   position: AigcLabelPosition;
 }
 
-/** GET /api/v1/admin/audit-logs */
-export interface AdminAuditListResult {
-  items: Array<{
-    id: string;
-    createdAt: string;
-    actorId: string;
-    actorEmail: string;
-    actorName: string;
-    actorRole: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    detail: Record<string, unknown>;
-    reason: string | null;
-    ip: string;
-    success: boolean;
-  }>;
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
 /**
  * 模态 —— 2026-10-20 起配置与路由的一等维度。
  *
@@ -946,8 +932,8 @@ export interface RefundView {
   amountCents: number;
   /** 实际扣回的积分 */
   creditsReclaimed: number;
-  /** 已消耗、无法追回的积分。必须如实展示, 不能吞掉 */
-  creditsUnreclaimable: number;
+  /** 已消耗、无法追回的积分；已过期未使用且无法扣回的积分。都必须如实分类展示 */
+  creditsUnreclaimable: number; creditsExpired: number;
   reason: string;
   createdAt: string;
 }
@@ -1313,19 +1299,17 @@ export interface AdminAssetStats {
 
 /** GET /api/v1/admin/projects */
 export interface AdminProjectListResult {
-  items: Array<{
-    id: string;
-    name: string;
-    ownerId: string;
-    ownerEmail: string;
-    ownerName: string;
-    assetCount: number;
-    taskCount: number;
-    createdAt: string;
-  }>;
+  items: AdminProject[];
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface AdminProject extends Project {
+  ownerEmail: string;
+  ownerName: string;
+  assetCount: number;
+  taskCount: number;
 }
 
 /** GET /api/v1/admin/storage/status */
@@ -1847,7 +1831,7 @@ export interface AdminOrderPayment {
 
 export interface AdminOrderRefund {
   id: string;
-  amountCents: number; creditsReclaimed: number; creditsUnreclaimable: number; providerRefundId: string | null;
+  amountCents: number; creditsReclaimed: number; creditsUnreclaimable: number; creditsExpired: number; providerRefundId: string | null;
   reason: string;
   status: string; detail: string;
   operatorId: string | null;
@@ -2289,4 +2273,38 @@ export interface ShoppableCarouselTemplatesResult {
   countRange: { min: number; max: number };
   categories: ShoppableCarouselCategory[];
   templates: ShoppableCarouselTemplate[];
+}
+
+/** 写真模板的一个分类。 */
+export interface PortraitTemplateCategory {
+  id: string;
+  label: string;
+}
+
+/**
+ * 一个写真模板。
+ *
+ * 模板是能力定义的一部分（决定提交给模型的风格提示词），事实源在后端
+ * `capabilities/definitions/template.templates.ts`，由
+ * `GET /template/templates` 整体下发 —— 前端不另存一份清单。
+ */
+export interface PortraitTemplate {
+  id: string;
+  name: string;
+  /** 所属分类（一个模板可同时属于多个） */
+  categoryIds: string[];
+  /** 列表展示、并作为模型提示词主体的风格描述 */
+  prompt: string;
+  /** 列表卡片预览图（本站静态资源相对路径） */
+  thumbFile: string;
+}
+
+/** GET /api/v1/template/templates */
+export interface PortraitTemplatesResult {
+  /** 来源站点（仅追溯用，运行时不会请求它） */
+  sourceUrl: string;
+  /** 抓取时间 */
+  capturedAt: string;
+  categories: PortraitTemplateCategory[];
+  templates: PortraitTemplate[];
 }

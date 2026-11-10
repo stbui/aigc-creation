@@ -81,7 +81,7 @@ Service Worker 侧的类型与载荷（content / popup → SW）：
 
 ## 依赖的后端能力
 
-- `POST /api/v1/assets/upload`：`file` + `projectId`（必填）+ 三个可选来源字段；仅 PNG / JPEG / WebP，≤10MB、≤4000 万像素。超出时由 `image-normalizer.js` 在扩展侧转码缩放，格式与体积校验与 `backend/src/assets/image-validation.ts` 保持一致。
+- `POST /api/v1/assets/upload`：`file` + `projectId`（必填）+ 三个可选来源字段；仅 PNG / JPEG / WebP，≤10MB、≤4000 万像素。超出时由 `image-normalizer.js` 在扩展侧转码缩放；WebP 会先转成 PNG，避开后端 Jimp 对 WebP 解码能力的限制。
 - `PATCH /api/v1/assets/move`：`{ids, projectId}`，一次最多 100 条。
 - `GET /api/v1/projects`、`POST /api/v1/projects`、`GET /api/v1/me`。
 

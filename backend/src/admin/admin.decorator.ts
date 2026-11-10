@@ -10,17 +10,6 @@ export const PERMISSION_KEY = "admin:permission";
 /** 「只要求后台身份」标记的元数据键 */
 export const IDENTITY_ONLY_KEY = "admin:identityOnly";
 
-/** 审计动作元数据键 */
-export const AUDIT_ACTION_KEY = "admin:auditAction";
-
-/** 审计对象元数据键 */
-export const AUDIT_TARGET_KEY = "admin:auditTarget";
-
-export interface AuditTargetMetadata {
-  targetType: string;
-  param: string;
-}
-
 /**
  * 声明端点所需权限点。
  *
@@ -49,49 +38,6 @@ export const RequireAllPermissions = (...permissions: string[]) =>
  * 否则真正的漏声明会被淹没在一片噪音里。
  */
 export const AdminIdentityOnly = () => SetMetadata(IDENTITY_ONLY_KEY, true);
-
-/**
- * 声明该端点产生的审计动作名。
- *
- * 为什么显式声明而不是从 URL 推断: 推断在 /admin/users/:id/disable 这类
- * 嵌套路径下会失真, 且资源名词与动作语义常常不一致 (POST /admin/roles/finance
- * 推断出的是 "roles" 而非实际动作 "role.permissions_update")。
- * 审计记录是事后追责与举证的依据, 动作名必须准确。
- *
- * 未声明时 AuditInterceptor 回退到 URL 推断, 保证审计条目不丢失。
- *
- * 用法: @AuditAction('user.disable')
- */
-export const AuditAction = (action: string) =>
-  SetMetadata(AUDIT_ACTION_KEY, action);
-
-/**
- * 声明审计对象类型与路由参数名。
- *
- * 嵌套路由不能只按 URL 第二段推断对象: 例如
- * `PATCH /admin/channels/c1/models/m2` 的实际对象是渠道模型 m2, 而不是渠道 c1。
- */
-export const AuditTarget = (targetType: string, param = "id") =>
-  SetMetadata(AUDIT_TARGET_KEY, {
-    targetType,
-    param,
-  } satisfies AuditTargetMetadata);
-
-/**
- * 取本次请求实际生效的权限点, 未声明返回 null。
- *
- * 值由 PermissionGuard 在放行时写入 `request.requiredPermission` ——
- * 守卫之外拿不到 Reflector, 直接用反射查会漏掉类级声明。
- * 未经过 PermissionGuard 的请求 (非 /admin 路径) 恒返回 null。
- */
-export function getRequiredPermission(ctx: ExecutionContext): string | null {
-  return ctx.switchToHttp().getRequest().requiredPermission ?? null;
-}
-
-/** 取本次请求实际生效的全部权限点; 未声明返回空数组。 */
-export function getRequiredPermissions(ctx: ExecutionContext): string[] {
-  return ctx.switchToHttp().getRequest().requiredPermissions ?? [];
-}
 
 /** 经守卫后注入的用户上下文 */
 export interface AdminUser {

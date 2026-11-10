@@ -189,7 +189,7 @@ export class PluginAdminService {
    * 半包会被扫描器当成有效插件（manifest 已写），卸载时又删不干净。
    *
    * 已存在的插件**不允许覆盖**：覆盖式安装会让「谁把这份包换掉了」无从追溯，
-   * 正确做法是先卸载再安装（两次操作各自留审计）。
+   * 正确做法是先卸载再安装。
    */
   async install(zip: Buffer, actorUserId: string): Promise<PluginView> {
     if (!zip || zip.length === 0) throw new AppError(40001, '请上传插件包文件（字段名 file）', 400);

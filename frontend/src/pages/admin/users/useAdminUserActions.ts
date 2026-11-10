@@ -43,20 +43,20 @@ export function useAdminUserActions({ reload, onDeleted }: Options) {
     }
   };
 
-  const updateStatus = async (next: 'active' | 'disabled', reason?: string) => {
+  const updateStatus = async (next: 'active' | 'disabled') => {
     if (!statusTarget) return;
     await run(async () => {
-      await adminUsersApi.changeStatus(statusTarget.id, next, reason);
+      await adminUsersApi.changeStatus(statusTarget.id, next);
       setStatusTarget(null);
       reload();
       toast.success(next === 'disabled' ? '账号已禁用，登录凭证立即失效' : '账号已启用');
     }, '操作失败');
   };
 
-  const updateRole = async (next: AdminUserRole, reason?: string) => {
+  const updateRole = async (next: AdminUserRole) => {
     if (!roleTarget) return;
     await run(async () => {
-      await adminUsersApi.changeRole(roleTarget.id, next, reason);
+      await adminUsersApi.changeRole(roleTarget.id, next);
       setRoleTarget(null);
       reload();
       toast.success('角色已变更');

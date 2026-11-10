@@ -51,6 +51,7 @@ export type LedgerDirection = 'income' | 'expense';
 export interface CreditReclaimResult {
   reclaimed: number;
   unreclaimable: number;
+  expiredUnused: number;
   detail: Array<{ lotId: string; taken: number }>;
 }
 
@@ -209,7 +210,7 @@ export class CreditService {
    *
    * 只读：本方法不修数。差额要人工判断是漏扣还是漏退，自动抹平等于掩盖资损。
    *
-   * @param limit 单次扫描的用户上限（按账户表分页），0 = 全量
+   * @param limit 每页账户数；方法会一直翻页直到扫完所有账户
    */
   async auditConsistency(
     limit = 500,
@@ -221,22 +222,36 @@ export class CreditService {
       lotsRemaining: number;
       diff: number;
     }>;
+    orphanLots: Array<{ userId: string; lotsRemaining: number }>;
+    orphanLotCount: number;
   }> {
-    const accounts = await this.prisma.creditAccount.findMany({
-      select: { userId: true, availableMicrocredits: true },
-      ...(limit > 0 ? { take: limit } : {}),
-      orderBy: { updatedAt: 'desc' },
-    });
-    if (accounts.length === 0) return { checked: 0, mismatched: [] };
+    const pageSize = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 500;
 
-    const ids = accounts.map((a) => a.userId);
+    // 一次扫全量活跃批次：既用于账户差额，也能发现「批次仍有余量但账户行不存在」
+    // 的孤儿批次。后者无法通过逐个账户循环发现，却同样会让账实等式失效。
     const lotSums = await this.prisma.creditLot.groupBy({
       by: ['userId'],
-      where: { userId: { in: ids }, remainingMicrocredits: { gt: 0n } },
+      where: { remainingMicrocredits: { gt: 0n } },
       _sum: { remainingMicrocredits: true },
     });
     const lotByUser = new Map(lotSums.map((r) => [r.userId, r._sum.remainingMicrocredits ?? 0n]));
 
+    const accounts: Array<{ userId: string; availableMicrocredits: bigint }> = [];
+    let cursor: string | undefined;
+    while (true) {
+      const page = await this.prisma.creditAccount.findMany({
+        select: { userId: true, availableMicrocredits: true },
+        take: pageSize,
+        orderBy: { userId: 'asc' },
+        ...(cursor ? { cursor: { userId: cursor }, skip: 1 } : {}),
+      });
+      accounts.push(...page);
+      if (page.length < pageSize) break;
+      cursor = page[page.length - 1]?.userId;
+      if (!cursor) break;
+    }
+
+    const accountIds = new Set(accounts.map((account) => account.userId));
     const mismatched: Array<{
       userId: string;
       accountAvailable: number;
@@ -262,12 +277,26 @@ export class CreditService {
         diff: microcreditsToCredits(actual - expected),
       });
     }
-    if (mismatched.length > 0) {
+
+    const orphanLots = lotSums
+      .filter((row) => !accountIds.has(row.userId))
+      .map((row) => ({
+        userId: row.userId,
+        lotsRemaining: microcreditsToCredits(row._sum.remainingMicrocredits ?? 0n),
+      }));
+
+    if (mismatched.length > 0 || orphanLots.length > 0) {
       this.logger.error(
-        `积分账实不一致: 扫描 ${accounts.length} 个账户, ${mismatched.length} 个差额 — 需人工核对`,
+        `积分账实异常: 扫描 ${accounts.length} 个账户, ${mismatched.length} 个差额, ` +
+          `${orphanLots.length} 个孤儿批次 — 需人工核对`,
       );
     }
-    return { checked: accounts.length, mismatched };
+    return {
+      checked: accounts.length,
+      mismatched,
+      orphanLots,
+      orphanLotCount: orphanLots.length,
+    };
   }
 
   /** 批次明细 (B-50) */
@@ -573,8 +602,7 @@ export class CreditService {
   /**
    * 人工增减积分。
    *
-   * 备注可选：未填写时生成稳定系统说明，操作人、目标与动作由审计日志记录。
-   * 不允许无痕调整，但「有审计」不等于「要求操作人重复填写审计原因」。
+   * 备注可选：未填写时生成稳定系统说明。
    *
    * `idempotencyKey` 为可选但**批量 / 导入场景必须传**：一次 500 行的导入
    * 超时后重试，没有幂等键就是全量双发，且账本无法区分首次与重试。
@@ -714,6 +742,31 @@ export class CreditService {
       toReclaim -= take;
     }
 
+    /*
+     * 未过期批次不足时，先把「本单剩余但已经过期」的份额单独归类。
+     * 这部分既没有可扣的可用余额，也不是用户消费掉的，混进 unreclaimable
+     * 会让运营误以为用户把积分用完了。过期批次不做回填或扣减，只记录事实。
+     */
+    let expiredUnused = 0n;
+    if (toReclaim > 0n) {
+      const expiredLots = await tx.creditLot.findMany({
+        where: {
+          userId: order.userId,
+          orderId,
+          remainingMicrocredits: { gt: 0n },
+          expireAt: { lte: now },
+        },
+        select: { id: true, remainingMicrocredits: true },
+        orderBy: [{ expireAt: 'asc' }, { createdAt: 'asc' }],
+      });
+      for (const lot of expiredLots) {
+        if (toReclaim <= 0n) break;
+        const take = lot.remainingMicrocredits < toReclaim ? lot.remainingMicrocredits : toReclaim;
+        expiredUnused += take;
+        toReclaim -= take;
+      }
+    }
+
     if (reclaimed > 0n) {
       // 批次已经逐笔扣过，这里只同步账户并写一条流水
       const balance = await this.wallet.debitAccountOnly(tx, order.userId, reclaimed);
@@ -736,6 +789,7 @@ export class CreditService {
     return {
       reclaimed: microcreditsToCredits(reclaimed),
       unreclaimable: microcreditsToCredits(toReclaim),
+      expiredUnused: microcreditsToCredits(expiredUnused),
       detail,
     };
   }
@@ -746,6 +800,11 @@ export class CreditService {
       this.logger.warn(
         `退款扣回不完整: order=${orderId} 实扣 ${result.reclaimed}，` +
           `${result.unreclaimable} 因已消耗无法追回`,
+      );
+    }
+    if (result.expiredUnused > 0) {
+      this.logger.warn(
+        `退款扣回含过期份额: order=${orderId}，${result.expiredUnused} 已过期作废`,
       );
     }
   }

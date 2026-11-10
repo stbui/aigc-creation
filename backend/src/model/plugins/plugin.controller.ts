@@ -24,11 +24,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 import { IsBoolean } from "class-validator";
 import { AppError } from "../../common/app.exception";
-import {
-  AdminUser,
-  AuditAction,
-  RequirePermission,
-} from "../../admin/admin.decorator";
+import { AdminUser, RequirePermission } from "../../admin/admin.decorator";
 import type { AdminUser as AdminUserContext } from "../../admin/admin.decorator";
 import { PERMISSIONS } from "../../admin/permissions";
 import { PLUGIN_PACKAGE_MAX_BYTES } from "../protocol/package";
@@ -57,7 +53,6 @@ export class AdminPluginsController {
 
   @Patch(":id")
   @RequirePermission(PERMISSIONS.pluginWrite)
-  @AuditAction("plugin.toggle")
   update(
     @Param("id") id: string,
     @Body() body: PluginUpdateBodyDto,
@@ -68,7 +63,6 @@ export class AdminPluginsController {
 
   @Post(":id/verify")
   @RequirePermission(PERMISSIONS.pluginWrite)
-  @AuditAction("plugin.verify")
   verify(@Param("id") id: string, @AdminUser() user: AdminUserContext) {
     return this.plugins.verify(id, user?.id ?? "");
   }
@@ -81,7 +75,6 @@ export class AdminPluginsController {
    */
   @Post("install")
   @RequirePermission(PERMISSIONS.pluginWrite)
-  @AuditAction("plugin.install")
   @UseInterceptors(
     FileInterceptor("file", {
       storage: memoryStorage(),
@@ -100,7 +93,6 @@ export class AdminPluginsController {
   /** 卸载上传安装的插件；内置插件拒绝（随代码发布，删了也会回来） */
   @Delete(":id")
   @RequirePermission(PERMISSIONS.pluginWrite)
-  @AuditAction("plugin.uninstall")
   async uninstall(
     @Param("id") id: string,
     @AdminUser() user: AdminUserContext,

@@ -7,4 +7,4 @@
  * 类型契约在 `src/types/api.ts`（纯类型模块，各文件可直接 `import type`）。
  */
 
-export { adminCreditsApi } from '../../../lib/api';
+export { adminCreditsApi, newIdempotencyKey } from '../../../lib/api';

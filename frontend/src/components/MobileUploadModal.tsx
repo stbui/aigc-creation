@@ -42,6 +42,8 @@ const POLL_MS = 1200;
 
 export interface MobileUploadModalProps {
   open: boolean;
+  /** 素材库当前选中的项目；为空时沿用 ensureProject() 的默认项目。 */
+  projectId?: string | null;
   /**
    * 手机端收到图片后回调。
    *
@@ -52,7 +54,7 @@ export interface MobileUploadModalProps {
   onCancel: () => void;
 }
 
-export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadModalProps) {
+export function MobileUploadModal({ open, projectId, onReceived, onCancel }: MobileUploadModalProps) {
   const { message } = useApp();
   const { ensureProject } = useProject();
 
@@ -114,8 +116,8 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
     setExpired(false);
     deliveredRef.current = false;
     try {
-      const projectId = await ensureProject();
-      const s = await mobileUploadApi.create(projectId);
+      const targetProjectId = projectId?.trim() || (await ensureProject());
+      const s = await mobileUploadApi.create(targetProjectId);
       // 用户在请求途中关闭了弹窗：作废会话，不再写状态
       if (!openedRef.current) {
         void mobileUploadApi.cancel(s.sessionId).catch(() => undefined);
@@ -143,7 +145,7 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
     } finally {
       if (openedRef.current) setLoading(false);
     }
-  }, [ensureProject, message, poll]);
+  }, [ensureProject, message, poll, projectId]);
 
   // 打开时建会话; 关闭时重置
   useEffect(() => {

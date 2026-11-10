@@ -349,11 +349,12 @@ export function useCheckoutPayment({
   /**
    * 真实通道支付。
    *
-   * 四种 mode 的处理:
+   * 五种 mode 的处理:
    *   sandbox      → 当前环境没配真实通道, 如实走站内模拟 (并保留沙箱声明)
    *   redirect     → 直接跳渠道收银台 (支付宝网页支付)
    *   qrcode       → 用 codeUrl 渲染二维码并开始轮询 (微信 Native)
    *   qrcode-image → codeUrl 本身就是二维码图片, 直接展示并开始轮询
+   *   payment-element → 展示 Stripe Payment Element，确认后继续轮询
    */
   const payOnline = async () => {
     setPaying(true);
@@ -439,6 +440,16 @@ export function useCheckoutPayment({
       if (intent.mode === 'qrcode-image' && intent.codeUrl) {
         // 渠道直接给了二维码图片地址，不能再次编码成二维码
         setQrDataUrl(intent.codeUrl);
+        setOnlineIntent(intent);
+        startPolling(o.id, intent.expiresAt);
+        return;
+      }
+      if (intent.mode === 'payment-element') {
+        if (!intent.clientSecret || !intent.publishableKey) {
+          setError('Stripe 支付参数不完整，请联系客服');
+          return;
+        }
+        setQrDataUrl(null);
         setOnlineIntent(intent);
         startPolling(o.id, intent.expiresAt);
         return;

@@ -24,7 +24,7 @@ import {
 import { Type } from "class-transformer";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError } from "../common/app.exception";
-import { AuditAction, RequirePermission } from "./admin.decorator";
+import { RequirePermission } from "./admin.decorator";
 import { PERMISSIONS } from "./permissions";
 import {
   MembershipService,
@@ -417,28 +417,24 @@ export class AdminMembershipPlansController {
 
   @Post()
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("membership-plan.create")
   create(@Body() dto: CreateMembershipPlanDto) {
     return this.plans.create(dto);
   }
 
   @Patch(":id")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("membership-plan.update")
   update(@Param("id") id: string, @Body() dto: UpdateMembershipPlanDto) {
     return this.plans.update(id, dto);
   }
 
   @Patch(":id/status")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("membership-plan.status")
   setStatus(@Param("id") id: string, @Body() dto: PlanStatusDto) {
     return this.plans.setStatus(id, dto);
   }
 
   @Delete(":id")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("membership-plan.delete")
   remove(@Param("id") id: string) {
     return this.plans.remove(id);
   }

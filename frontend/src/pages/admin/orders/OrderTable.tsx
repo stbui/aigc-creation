@@ -265,6 +265,7 @@ export function OrderTable({
             )}
             {(row.status === 'paid' || row.status === 'partial_refunded') &&
               row.paidCents > row.refundedCents &&
+              row.refundState !== 'processing' &&
               canRefund && (
                 <ActionButton
                   variant="destructive"

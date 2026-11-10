@@ -126,6 +126,7 @@ function makeHarness(order = makeOrder()) {
     },
     payment: {
       findFirst: vi.fn().mockResolvedValue({ id: 'pay_1' }),
+      findMany: vi.fn().mockResolvedValue([{ id: 'pay_1', providerInstanceId: 'default' }]),
       create: vi.fn().mockResolvedValue({ id: 'pay_new' }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
@@ -166,6 +167,35 @@ function makeHarness(order = makeOrder()) {
       closeAfterMinutes: 30,
       values: {},
     })),
+    claimVisibleSelection: vi.fn(async (resolved: unknown) => resolved),
+    releaseVisibleSelection: vi.fn().mockResolvedValue(undefined),
+    reserveVisiblePaymentAttempt: vi.fn(
+      async (input: {
+        method: 'alipay' | 'wechat';
+        currency: string;
+        amountCents: number;
+        orderId: string;
+        userId: string;
+        resolved?: ReturnType<typeof makeVisibleOption>['resolved'];
+      }) => {
+        const resolved = input.resolved ?? makeVisibleOption(input.method).resolved;
+        const payment = await prisma.payment.create({
+          data: {
+            orderId: input.orderId,
+            userId: input.userId,
+            channel: resolved.providerId,
+            providerMethod: input.method,
+            amountCents: input.amountCents,
+            currency: input.currency,
+            status: 'pending',
+            providerConfigId: resolved.config.id,
+            providerConfigVersion: resolved.config.version,
+            providerInstanceId: resolved.config.instanceId,
+          },
+        });
+        return { payment, resolved };
+      },
+    ),
   };
   const settings = {
     paymentRules: vi.fn().mockResolvedValue(makePaymentRules()),
@@ -521,6 +551,57 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
   });
 });
 
+describe('PaymentOrderService.applyPaymentResult', () => {
+  it('没有精确 paymentId 且存在多条待支付尝试时拒绝自动归属', async () => {
+    const { service, prisma, orders } = makeHarness();
+    prisma.payment.findMany.mockResolvedValue([
+      { id: 'pay_1', providerInstanceId: 'default' },
+      { id: 'pay_2', providerInstanceId: 'default' },
+    ]);
+
+    await expect(
+      service.applyPaymentResult({
+        orderId: ORDER_ID,
+        providerId: 'alipay',
+        configId: CONFIG_ID,
+        providerInstanceId: 'default',
+        tradeNo: 'TRADE-AMBIGUOUS',
+        amountCents: 1000,
+        currency: 'CNY',
+        paidAt: new Date(),
+        rawPayload: '{}',
+      }),
+    ).rejects.toThrow(/多条待支付尝试/);
+
+    expect(orders.markPaid).not.toHaveBeenCalled();
+  });
+
+  it('只有一条待支付尝试时才允许自动归属', async () => {
+    const { service, prisma, orders } = makeHarness();
+    prisma.payment.findMany.mockResolvedValue([
+      { id: 'pay_only', providerInstanceId: 'default' },
+    ]);
+
+    await expect(
+      service.applyPaymentResult({
+        orderId: ORDER_ID,
+        providerId: 'alipay',
+        configId: CONFIG_ID,
+        providerInstanceId: 'default',
+        tradeNo: 'TRADE-UNIQUE',
+        amountCents: 1000,
+        currency: 'CNY',
+        paidAt: new Date(),
+        rawPayload: '{}',
+      }),
+    ).resolves.toEqual({ applied: true, idempotentHit: false });
+
+    expect(orders.markPaid).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentId: 'pay_only', payTransactionId: 'TRADE-UNIQUE' }),
+    );
+  });
+});
+
 describe('PaymentOrderService.createIntent', () => {
   const previousWebBase = process.env.WEB_BASE_URL;
   const previousNotifyBase = process.env.PAYMENT_NOTIFY_BASE;
@@ -656,6 +737,47 @@ describe('PaymentOrderService.createIntent', () => {
     );
     expect(intent.providerId).toBe('alipay');
     expect(intent.configId).toBe(CONFIG_ID);
+  });
+
+  it('渠道下单失败时归还已领取的负载均衡槽位', async () => {
+    const { service, configs } = makeHarness();
+    adapterMock.createOrder.mockRejectedValue(new Error('upstream unavailable'));
+
+    await expect(
+      service.createIntent({
+        orderId: ORDER_ID,
+        userId: 'user_1',
+        providerId: 'alipay',
+      }),
+    ).rejects.toThrow(/发起支付失败/);
+
+    expect(configs.reserveVisiblePaymentAttempt).toHaveBeenCalledOnce();
+    expect(configs.releaseVisibleSelection).toHaveBeenCalledOnce();
+  });
+
+  it('订单写回因租约失效失败时归还负载均衡槽位', async () => {
+    const { service, prisma, configs } = makeHarness(
+      makeOrder({ payments: [] }),
+    );
+    prisma.order.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    adapterMock.createOrder.mockResolvedValue({
+      mode: 'qrcode',
+      codeUrl: 'https://qr.example.com/order_1',
+      providerRef: 'sbx_old',
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    });
+
+    await expect(
+      service.createIntent({
+        orderId: ORDER_ID,
+        userId: 'user_1',
+        providerId: 'alipay',
+      }),
+    ).rejects.toThrow(/订单状态已变化/);
+
+    expect(configs.releaseVisibleSelection).toHaveBeenCalledOnce();
   });
 
   it('另一笔支付正在发起时拒绝创建第二个渠道订单', async () => {

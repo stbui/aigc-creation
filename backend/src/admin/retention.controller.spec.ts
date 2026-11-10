@@ -7,7 +7,7 @@ import { RetentionCleanupDto, RetentionPreviewQueryDto } from './retention.contr
 describe('RetentionCleanupDto', () => {
   it('清理请求只包含目标与保留天数', async () => {
     const dto = plainToInstance(RetentionCleanupDto, {
-      target: 'AdminAuditLog',
+      target: 'ApiCallLog',
       retentionDays: 180,
     });
 
@@ -16,7 +16,7 @@ describe('RetentionCleanupDto', () => {
 
   it('限制保留天数与清理目标', async () => {
     const tooShort = plainToInstance(RetentionCleanupDto, {
-      target: 'AdminAuditLog',
+      target: 'ApiCallLog',
       retentionDays: 6,
     });
     const unknownTarget = plainToInstance(RetentionCleanupDto, {
@@ -32,11 +32,11 @@ describe('RetentionCleanupDto', () => {
 describe('RetentionPreviewQueryDto', () => {
   it('把 query 字符串转为天数并限制为 7–3650', async () => {
     const valid = plainToInstance(RetentionPreviewQueryDto, {
-      target: 'AdminAuditLog',
+      target: 'ApiCallLog',
       retentionDays: '30',
     });
     const tooSmall = plainToInstance(RetentionPreviewQueryDto, {
-      target: 'AdminAuditLog',
+      target: 'ApiCallLog',
       retentionDays: '6',
     });
 

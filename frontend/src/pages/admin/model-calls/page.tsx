@@ -1,5 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { REQUEST_KIND_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
+import {
+  CAPABILITY_LABELS,
+  OPERATION_LABELS,
+  REQUEST_KIND_LABELS,
+  SOURCE_LABELS,
+  STATUS_LABELS,
+  STATUS_TONES,
+} from './constants';
 import { useAdmin, useToast, useAdminDetailParam, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
 import { adminApiLogsApi } from '../../../lib/api';
@@ -48,6 +55,8 @@ export function AdminModelCallsPage() {
   const initial = {
     status: searchParams.get('status') ?? undefined,
     requestKind: searchParams.get('requestKind') ?? undefined,
+    source: searchParams.get('source') ?? undefined,
+    operation: searchParams.get('operation') ?? undefined,
     billable: searchParams.get('billable') ?? undefined,
     model: searchParams.get('model') ?? '',
     channelId: searchParams.get('channelId') ?? '',
@@ -59,6 +68,8 @@ export function AdminModelCallsPage() {
 
   const [status, setStatus] = useState<string | undefined>(initial.status);
   const [requestKind, setRequestKind] = useState<string | undefined>(initial.requestKind);
+  const [source, setSource] = useState<string | undefined>(initial.source);
+  const [operation, setOperation] = useState<string | undefined>(initial.operation);
   const [billable, setBillable] = useState<string | undefined>(initial.billable);
   const [model, setModel] = useState(initial.model);
   const [channelId, setChannelId] = useState(initial.channelId);
@@ -72,6 +83,8 @@ export function AdminModelCallsPage() {
       adminApiLogsApi.list({
         status: params.status as string | undefined,
         requestKind: params.requestKind as string | undefined,
+        source: params.source as string | undefined,
+        operation: params.operation as string | undefined,
         billable: params.billable as string | undefined,
         model: params.model as string | undefined,
         channelId: params.channelId as string | undefined,
@@ -90,6 +103,8 @@ export function AdminModelCallsPage() {
   useAdminUrlFilterSync({
     status: params.status as string | undefined,
     requestKind: params.requestKind as string | undefined,
+    source: params.source as string | undefined,
+    operation: params.operation as string | undefined,
     billable: params.billable as string | undefined,
     model: params.model as string | undefined,
     channelId: params.channelId as string | undefined,
@@ -103,6 +118,8 @@ export function AdminModelCallsPage() {
   const hasFilter = [
     params.status,
     params.requestKind,
+    params.source,
+    params.operation,
     params.billable,
     params.model,
     params.channelId,
@@ -123,6 +140,8 @@ export function AdminModelCallsPage() {
         adminApiLogsApi.exportCsv({
           status: params.status as string | undefined,
           requestKind: params.requestKind as string | undefined,
+          source: params.source as string | undefined,
+          operation: params.operation as string | undefined,
           billable: params.billable as string | undefined,
           model: params.model as string | undefined,
           channelId: params.channelId as string | undefined,
@@ -141,6 +160,8 @@ export function AdminModelCallsPage() {
     setQuery({
       status,
       requestKind,
+      source,
+      operation,
       billable,
       model: model.trim() || undefined,
       channelId: channelId.trim() || undefined,
@@ -153,6 +174,8 @@ export function AdminModelCallsPage() {
   const resetFilters = () => {
     setStatus(undefined);
     setRequestKind(undefined);
+    setSource(undefined);
+    setOperation(undefined);
     setBillable(undefined);
     setModel('');
     setChannelId('');
@@ -163,6 +186,8 @@ export function AdminModelCallsPage() {
     setQuery({
       status: undefined,
       requestKind: undefined,
+      source: undefined,
+      operation: undefined,
       billable: undefined,
       model: undefined,
       channelId: undefined,
@@ -203,6 +228,26 @@ export function AdminModelCallsPage() {
           onClear: () => {
             setRequestKind(undefined);
             setQuery({ requestKind: undefined });
+          },
+        }
+      : null,
+    params.source
+      ? {
+          key: 'source',
+          label: `来源：${SOURCE_LABELS[params.source as string] ?? params.source}`,
+          onClear: () => {
+            setSource(undefined);
+            setQuery({ source: undefined });
+          },
+        }
+      : null,
+    params.operation
+      ? {
+          key: 'operation',
+          label: `操作：${OPERATION_LABELS[params.operation as string] ?? params.operation}`,
+          onClear: () => {
+            setOperation(undefined);
+            setQuery({ operation: undefined });
           },
         }
       : null,
@@ -304,6 +349,22 @@ export function AdminModelCallsPage() {
             <span className={row.billable ? undefined : 'text-warn-text'}>
               {row.billable ? '计费' : '不计费'}
             </span>
+          </div>
+        ),
+      },
+      {
+        key: 'source',
+        title: '来源 / 操作',
+        width: 190,
+        render: (row) => (
+          <div className="min-w-0">
+            <div>{(SOURCE_LABELS[row.source] ?? row.source) || '—'}</div>
+            <div className="truncate" title={row.operation || undefined}>
+              {(OPERATION_LABELS[row.operation] ?? row.operation) || '—'}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {(CAPABILITY_LABELS[row.capability] ?? row.capability) || '—'}
+            </div>
           </div>
         ),
       },
@@ -411,6 +472,38 @@ export function AdminModelCallsPage() {
             className="w-32"
           />
           <SelectField
+            ariaLabel="调用来源"
+            placeholder="全部来源"
+            clearLabel="全部来源"
+            value={source}
+            options={[
+              { value: 'tool', label: '提示词工具' },
+              { value: 'task', label: '生成任务' },
+              { value: 'admin', label: '后台测试' },
+              { value: 'proxy', label: 'API 中转' },
+              { value: 'gateway', label: '网关' },
+            ]}
+            allowClear
+            onChange={setSource}
+            className="w-36"
+          />
+          <SelectField
+            ariaLabel="调用操作"
+            placeholder="全部操作"
+            clearLabel="全部操作"
+            value={operation}
+            options={[
+              { value: 'image_to_prompt', label: 'AI 分析 / 图片转提示词' },
+              { value: 'prompt_polish', label: '提示词润色' },
+              { value: 'image_to_image', label: '图生图' },
+              { value: 'text_to_image', label: '文生图' },
+              { value: 'admin_model_test', label: '后台模型测试' },
+            ]}
+            allowClear
+            onChange={setOperation}
+            className="w-52"
+          />
+          <SelectField
             ariaLabel="是否计费"
             placeholder="全部计费"
             clearLabel="全部计费"
@@ -507,7 +600,7 @@ export function AdminModelCallsPage() {
               </ActionButton>
             ) : undefined
           }
-          minWidth={1180}
+          minWidth={1380}
           pagination={{
             current: Number(params.page ?? 1),
             pageSize: Number(params.pageSize ?? 20),

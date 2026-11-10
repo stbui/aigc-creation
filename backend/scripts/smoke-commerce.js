@@ -203,12 +203,6 @@ function check(name, ok, detail = '') {
   const otherOrder = await call('GET', `/orders/${o1.data.id}`, OT);
   check('他人订单不可见', otherOrder.status === 403, otherOrder.message);
 
-  console.log('\n【审计留痕】');
-  const audit = await call('GET', '/admin/audit-logs?pageSize=30', AT);
-  const actions = audit.data?.result?.items?.map((i) => i.action) ?? [];
-  check('退款已记审计', actions.some((a) => a?.includes('refund') || a?.includes('order')),
-    actions.filter((a) => /order|credit|refund/.test(a ?? '')).slice(0, 3).join(', '));
-
   // 清理（积分数据由夹具按依赖顺序清）
   await clearCredits(prisma, user.id);
   await prisma.$transaction([

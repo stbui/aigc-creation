@@ -57,7 +57,10 @@ function createInput(
 }
 
 function gatewayResponse(
-  key: 'alipay_trade_precreate_response' | 'alipay_trade_query_response',
+  key:
+    | 'alipay_trade_precreate_response'
+    | 'alipay_trade_query_response'
+    | 'alipay_trade_refund_response',
   node: Record<string, unknown>,
 ) {
   const signed = JSON.stringify(node);
@@ -183,5 +186,56 @@ describe('AlipayAdapter.createOrder', () => {
       ),
     ).rejects.toThrow(/商户未开通当面付/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AlipayAdapter.refund', () => {
+  const adapter = new AlipayAdapter();
+
+  it('验签后的业务拒绝标记为渠道明确失败', async () => {
+    fetchMock.mockResolvedValueOnce(
+      gatewayResponse('alipay_trade_refund_response', {
+        code: '40004',
+        msg: 'Business Failed',
+        sub_code: 'ACQ.REFUND_AMT_NOT_EQUAL_TOTAL',
+        sub_msg: '退款金额不合法',
+      }),
+    );
+
+    await expect(
+      adapter.refund({
+        config: makeConfig(),
+        orderNo: ORDER_NO,
+        outRefundNo: 'RF202611090001',
+        amountCents: 1005,
+        totalCents: 1005,
+      }),
+    ).resolves.toMatchObject({
+      state: 'failed',
+      failureKind: 'definitive',
+      error: '退款金额不合法',
+    });
+  });
+
+  it('网关 HTTP 异常无法确认退款结果时标记为 unknown', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      text: vi.fn().mockResolvedValue('bad gateway'),
+    });
+
+    await expect(
+      adapter.refund({
+        config: makeConfig(),
+        orderNo: ORDER_NO,
+        outRefundNo: 'RF202611090002',
+        amountCents: 1005,
+        totalCents: 1005,
+      }),
+    ).resolves.toMatchObject({
+      state: 'failed',
+      failureKind: 'unknown',
+      error: expect.stringContaining('HTTP 502'),
+    });
   });
 });

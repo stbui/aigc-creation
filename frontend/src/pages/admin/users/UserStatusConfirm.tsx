@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import {
   AlertDialog,
@@ -9,15 +8,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  FormField,
-  TextAreaField,
 } from '~/admin-ui/primitives';
 import type { AdminUserRow } from './types';
 
 /**
  * 禁用 / 启用账号确认。
  *
- * 禁用会切断在线凭证；系统按操作上下文写入审计。
+ * 禁用会切断在线凭证。
  */
 export function UserStatusConfirm({
   target,
@@ -28,9 +25,8 @@ export function UserStatusConfirm({
   target: AdminUserRow;
   loading: boolean;
   onCancel: () => void;
-  onConfirm: (next: 'active' | 'disabled', reason?: string) => void;
+  onConfirm: (next: 'active' | 'disabled') => void;
 }) {
-  const [reason, setReason] = useState('');
   const next: 'active' | 'disabled' = target.status === 'active' ? 'disabled' : 'active';
   const disabling = next === 'disabled';
 
@@ -64,19 +60,6 @@ export function UserStatusConfirm({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="border-y border-border bg-muted/30 px-5 py-4">
-          <FormField label="操作原因（可选）">
-            <TextAreaField
-              ariaLabel="操作原因"
-              value={reason}
-              onChange={setReason}
-              placeholder="例如：用户投诉账号被盗、违规内容处置"
-              rows={2}
-              maxLength={500}
-            />
-          </FormField>
-        </div>
-
         <AlertDialogFooter className="border-t border-border bg-muted/40 px-5 py-3">
           <AlertDialogCancel size="sm" disabled={loading} onClick={onCancel}>
             取消
@@ -88,7 +71,7 @@ export function UserStatusConfirm({
             onClick={(event) => {
               // 请求结束后再由父级关闭，避免加载期间弹框提前消失。
               event.preventDefault();
-              onConfirm(next, reason.trim() || undefined);
+              onConfirm(next);
             }}
           >
             {loading ? '处理中…' : disabling ? '确认禁用' : '确认启用'}

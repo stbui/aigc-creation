@@ -454,6 +454,6 @@ describe('EpayAdapter 配置兼容与不支持的能力', () => {
         amountCents: 1005,
         totalCents: 1005,
       }),
-    ).resolves.toMatchObject({ state: 'failed' });
+    ).resolves.toMatchObject({ state: 'failed', failureKind: 'definitive' });
   });
 });

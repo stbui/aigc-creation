@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { validateImageCapabilityConfigJson } from './imageCapability';
+import { validateTextCapabilityConfigJson } from './textCapability';
 import { buildPriceTiers, validateModelTags } from './utils';
 
 const tierSchema = z.object({
@@ -29,14 +30,14 @@ const tierSchema = z.object({
  */
 export const modelDraftSchema = z
   .object({
-    modelKey: z.string().trim().min(1, '请填写模型编号'),
+    modelKey: z.string().trim().min(1, '请填写商品编号'),
     providerModelKey: z.string(),
     displayName: z.string(),
-    channelLabel: z.string().max(80, '渠道内名称最多 80 字'),
-    description: z.string().max(500, '模型介绍最多 500 字'),
+    channelLabel: z.string().max(80, '供应商内名称最多 80 字'),
+    description: z.string().max(500, '商品介绍最多 500 字'),
     icon: z.string(),
-    capability: z.string().min(1, '请选择能力类型'),
-    protocol: z.string().min(1, '请选择接口类型'),
+    capability: z.string().min(1, '请选择模型类型'),
+    protocol: z.string().min(1, '请选择接入方式'),
     priceCurrency: z.string().min(1, '请选择结算币种'),
     tags: z.array(
       z.object({
@@ -46,11 +47,20 @@ export const modelDraftSchema = z
     ),
     capabilityConfig: z.string(),
     enabled: z.boolean(),
-    tiers: z.array(tierSchema).min(1, '至少保留一个价格方案'),
+    tiers: z.array(tierSchema).min(1, '至少保留一个售价方案'),
   })
   .superRefine((draft, ctx) => {
     if (draft.capability === 'image') {
       const configError = validateImageCapabilityConfigJson(draft.capabilityConfig);
+      if (configError) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['capabilityConfig'],
+          message: configError,
+        });
+      }
+    } else if (draft.capability === 'text') {
+      const configError = validateTextCapabilityConfigJson(draft.capabilityConfig);
       if (configError) {
         ctx.addIssue({
           code: 'custom',

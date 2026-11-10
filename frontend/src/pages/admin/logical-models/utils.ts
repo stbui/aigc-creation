@@ -8,7 +8,7 @@ import type { ModelDraft, RouteDraft } from './constants';
 
 export { parseCredits, toCreditsInput };
 
-/** 新建模型时只需要能力清单里的路由元信息，不需要把完整能力定义带进表单。 */
+/** 添加商品时只需要能力清单里的路由元信息，不需要把完整能力定义带进表单。 */
 export interface CapabilityRoutingDefinition {
   modality?: string;
   inputs: number;

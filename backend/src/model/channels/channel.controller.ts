@@ -31,13 +31,7 @@ import {
   Max,
   Min,
 } from "class-validator";
-import {
-  AdminUser,
-  AuditAction,
-  AuditTarget,
-  RequireAllPermissions,
-  RequirePermission,
-} from "../../admin/admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission } from "../../admin/admin.decorator";
 import { AppError } from "../../common/app.exception";
 import {
   RateLimit,
@@ -287,8 +281,6 @@ export class AdminChannelsController {
    */
   @Post("health/reset")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction("channel.health_reset")
-  @AuditTarget("channel")
   async resetHealth() {
     const cleared = this.health.resetCooling();
     // 指标列表缓存 30s，里面带着冷却快照；不失效的话刚解除完页面还会显示「冷却中」
@@ -298,8 +290,6 @@ export class AdminChannelsController {
 
   @Put("order")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction("channel.order")
-  @AuditTarget("channel")
   async saveOrder(@Body() body: ChannelOrderBodyDto) {
     await this.channels.saveOrder("", body.ids ?? [], body.expectedIds ?? []);
     return { ok: true };
@@ -307,24 +297,18 @@ export class AdminChannelsController {
 
   @Post("export")
   @RequireAllPermissions(PERMISSIONS.channelRead, PERMISSIONS.dataExport)
-  @AuditAction("channel.export")
-  @AuditTarget("channel")
   export(@Body() body: ChannelExportBodyDto) {
     return this.channels.exportChannels(body?.ids ?? []);
   }
 
   @Post("import")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction("channel.import")
-  @AuditTarget("channel")
   import(@Body() body: ChannelImportBodyDto) {
     return this.channels.importChannels(body as unknown as SystemChannelExport);
   }
 
   @Post()
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction("channel.create")
-  @AuditTarget("channel")
   create(@Body() body: ChannelWriteBodyDto) {
     return this.channels.create(body as ChannelRequest);
   }
@@ -337,16 +321,12 @@ export class AdminChannelsController {
 
   @Patch(":id")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction("channel.update")
-  @AuditTarget("channel", "id")
   update(@Param("id") id: string, @Body() body: ChannelWriteBodyDto) {
     return this.channels.update(id, body as ChannelRequest);
   }
 
   @Delete(":id")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction("channel.delete")
-  @AuditTarget("channel", "id")
   async remove(@Param("id") id: string) {
     await this.channels.remove(id);
     return { ok: true };
@@ -354,8 +334,6 @@ export class AdminChannelsController {
 
   @Post(":id/duplicate")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction("channel.duplicate")
-  @AuditTarget("channel", "id")
   duplicate(@Param("id") id: string, @AdminUser() actor: AdminUser) {
     // 归属人写进渠道：复制出的渠道要能查到「是谁建的」
     return this.channels.duplicate(id, actor?.id ?? "");
@@ -379,8 +357,6 @@ export class AdminChannelsController {
 
   @Put(":id/models/order")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.order")
-  @AuditTarget("channel", "id")
   async saveModelOrder(
     @Param("id") id: string,
     @Body() body: ChannelOrderBodyDto,
@@ -391,8 +367,6 @@ export class AdminChannelsController {
 
   @Post(":id/models")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.create")
-  @AuditTarget("channel", "id")
   createModel(@Param("id") id: string, @Body() body: ChannelModelWriteBodyDto) {
     return this.channelModels.save(id, "", body as ChannelModelRequest);
   }
@@ -403,8 +377,6 @@ export class AdminChannelsController {
    */
   @Post(":id/models/fetch")
   @RequirePermission(PERMISSIONS.channelModelRead)
-  @AuditAction("channel_model.fetch")
-  @AuditTarget("channel", "id")
   @RateLimit(RL_CHANNEL_FETCH)
   async fetchModels(@Param("id") id: string) {
     return { models: await this.catalog.preview(id) };
@@ -413,8 +385,6 @@ export class AdminChannelsController {
   /** 导入勾选的上游模型：默认停用、待定价；能力与协议仍需管理员声明 */
   @Post(":id/models/import")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.import")
-  @AuditTarget("channel", "id")
   @RateLimit(RL_CHANNEL_IMPORT)
   importModels(
     @Param("id") id: string,
@@ -425,8 +395,6 @@ export class AdminChannelsController {
 
   @Patch(":id/models/:modelId")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.update")
-  @AuditTarget("channel_model", "modelId")
   updateModel(
     @Param("id") id: string,
     @Param("modelId") modelId: string,
@@ -437,8 +405,6 @@ export class AdminChannelsController {
 
   @Delete(":id/models/:modelId")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.delete")
-  @AuditTarget("channel_model", "modelId")
   async removeModel(
     @Param("id") id: string,
     @Param("modelId") modelId: string,
@@ -449,8 +415,6 @@ export class AdminChannelsController {
 
   @Post(":id/models/batch-delete")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.batch_delete")
-  @AuditTarget("channel", "id")
   async batchDeleteModels(
     @Param("id") id: string,
     @Body() body: ChannelBatchDeleteBodyDto,
@@ -470,8 +434,6 @@ export class AdminChannelsController {
    */
   @Post(":id/models/batch-reprice")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.batch_reprice")
-  @AuditTarget("channel", "id")
   async batchRepriceModels(
     @Param("id") id: string,
     @Body() body: ChannelModelRepriceBodyDto,
@@ -489,8 +451,6 @@ export class AdminChannelsController {
    */
   @Post(":id/models/test")
   @RequirePermission(PERMISSIONS.channelTest)
-  @AuditAction("channel_model.test")
-  @AuditTarget("channel", "id")
   @RateLimit(RL_CHANNEL_TEST)
   testModel(
     @Param("id") id: string,
@@ -506,8 +466,6 @@ export class AdminChannelsController {
 
   @Patch(":id/models/:modelId/enabled")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.enabled")
-  @AuditTarget("channel_model", "modelId")
   async setModelEnabled(
     @Param("id") id: string,
     @Param("modelId") modelId: string,
@@ -519,8 +477,6 @@ export class AdminChannelsController {
 
   @Patch(":id/models/:modelId/sort")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction("channel_model.sort")
-  @AuditTarget("channel_model", "modelId")
   async setModelSort(
     @Param("id") id: string,
     @Param("modelId") modelId: string,

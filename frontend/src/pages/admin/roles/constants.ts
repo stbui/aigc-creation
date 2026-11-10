@@ -10,6 +10,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   "user.delete": "删除用户",
   "user.reset_password": "重置用户密码",
   "project.read": "查看项目",
+  "project.write": "新建/编辑项目",
   "project.delete": "删除项目",
   "asset.read": "查看素材",
   "asset.hide": "下架/恢复素材",
@@ -65,7 +66,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   "setting.write": "修改系统设置",
   "role.read": "查看角色权限",
   "role.write": "调整角色权限",
-  "audit.read": "查看操作审计",
   "data.export": "导出数据",
   "data.search": "全局搜索",
   "backup.read": "查看备份",
@@ -99,7 +99,6 @@ export const MODULE_LABELS: Record<string, string> = {
   ticket: "工单",
   setting: "设置",
   role: "角色",
-  audit: "审计",
   data: "数据",
   backup: "备份",
 };

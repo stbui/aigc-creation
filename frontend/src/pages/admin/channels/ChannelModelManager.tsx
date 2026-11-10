@@ -1,12 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminChannelsApi } from './api';
 import { ConfirmDialog, Notice } from '~/admin-ui/primitives';
 import { useToast } from './hooks';
 import { ChannelModelDialogs } from './ChannelModelDialogs';
 import { ChannelModelTable } from './ChannelModelTable';
-import { EMPTY_MODEL_DRAFT, EMPTY_TIER, type ModelDraft } from './constants';
+import { createDefaultImageCapabilityConfigJson } from './imageCapability';
+import { createDefaultTextCapabilityConfigJson } from './textCapability';
+import {
+  EMPTY_MODEL_DRAFT,
+  EMPTY_TIER,
+  type BatchImportConfig,
+  type ModelDraft,
+} from './constants';
 import { buildPriceTiers, toModelDraft } from './utils';
 import { useChannelModelHealth, useChannelModels } from './useChannelModels';
+import { consumptionImpactText, type ProductConsumptionState } from './useProductConsumption';
 import type {
   AdminChannelModelView,
   AdminChannelView,
@@ -15,7 +23,7 @@ import type {
 } from '../../../types/model';
 
 /**
- * 渠道模型工作台（渠道工作台右侧详情区，跟随选中渠道内联渲染）。
+ * 商品工作台（供应商视图右侧详情区，跟随选中供应商内联渲染）。
  *
  * 一条渠道下可以有任意模态的模型，每个模型带自己的能力合同与价格档。
  * 三条不可省的行为：
@@ -38,6 +46,9 @@ export function ChannelModelManager({
   channel,
   writable,
   canTest = true,
+  consumption,
+  autoFetchUpstream = false,
+  onAutoFetchConsumed,
   onChanged,
   focusModelId,
   onFocusConsumed,
@@ -46,8 +57,12 @@ export function ChannelModelManager({
   writable: boolean;
   /** 是否可发起连通性测试（`channel.test` 权限，与改配置权限分开） */
   canTest?: boolean;
+  consumption: ProductConsumptionState;
+  /** 新建供应商后自动拉一次上游目录 */
+  autoFetchUpstream?: boolean;
+  onAutoFetchConsumed?: () => void;
   onChanged: () => void;
-  /** 从「全部模型」跳过来时要直接打开的模型 id；消费后由父级清空 */
+  /** 从「商品台账」跳过来时要直接打开的商品 id；消费后由父级清空 */
   focusModelId?: string | null;
   onFocusConsumed?: () => void;
 }) {
@@ -216,10 +231,10 @@ export function ChannelModelManager({
     try {
       if (editing) {
         await adminChannelsApi.updateModel(channelId, editing.id, body);
-        toast.success(`模型 ${modelKey} 已保存`);
+        toast.success(`商品 ${modelKey} 已保存`);
       } else {
         await adminChannelsApi.createModel(channelId, body);
-        toast.success(`模型 ${modelKey} 已创建`);
+        toast.success(`商品 ${modelKey} 已创建`);
       }
       closeForm();
       await load();
@@ -234,7 +249,7 @@ export function ChannelModelManager({
   const toggleModel = async (model: AdminChannelModelView, enabled: boolean) => {
     try {
       await adminChannelsApi.setModelEnabled(channelId, model.id, enabled);
-      toast.success(enabled ? `已启用 ${model.modelKey}` : `已停用 ${model.modelKey}`);
+      toast.success(enabled ? `已启用商品 ${model.modelKey}` : `已停用商品 ${model.modelKey}`);
       await load();
       onChanged();
     } catch (e) {
@@ -268,33 +283,146 @@ export function ChannelModelManager({
     }
   };
 
-  const fetchUpstream = async () => {
+  const autoFetchedRef = useRef(false);
+  const fetchUpstream = useCallback(async () => {
     setFetching(true);
     try {
       const res = await adminChannelsApi.fetchModels(channelId);
       setUpstream(res.models);
-      if (res.models.length === 0) toast.error('服务商没有返回可用模型，请检查服务地址与访问凭证');
+      if (res.models.length === 0) toast.error('供应商没有返回可用商品，请检查服务地址与访问凭证');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '同步服务商模型失败');
+      toast.error(e instanceof Error ? e.message : '同步供应商商品失败');
     } finally {
       setFetching(false);
     }
-  };
+  }, [channelId, toast]);
+
+  useEffect(() => {
+    if (!autoFetchUpstream || autoFetchedRef.current) return;
+    autoFetchedRef.current = true;
+    // 先消费标记，避免父级重渲染后再次触发
+    onAutoFetchConsumed?.();
+    void fetchUpstream();
+  }, [autoFetchUpstream, fetchUpstream, onAutoFetchConsumed]);
 
   const closeUpstream = () => {
     if (importing) return;
     setUpstream(null);
   };
 
-  const runImport = async (ids: string[]) => {
+  const runImport = async (ids: string[], config?: BatchImportConfig) => {
     if (ids.length === 0) {
-      toast.error('请勾选要导入的模型');
+      toast.error('请勾选要导入的商品');
       return;
     }
     setImporting(true);
     try {
+      /*
+       * 导入接口只建骨架行。带统一配置时，前端按「导入前后 id 差集」找出
+       * 本次新增的商品，再逐条调用既有保存接口补类型 / 接入方式 / 售价。
+       * 这样不新增后端契约，也不会误改用户同时勾选的已存在商品。
+       */
+      const before = config ? await adminChannelsApi.models(channelId) : null;
       const res = await adminChannelsApi.importModels(channelId, ids);
-      toast.success(`已导入 ${res.added} 个模型，默认停用；设置能力与价格后再启用`);
+
+      let configured = 0;
+      let skipped = 0;
+      const failures: string[] = [];
+      if (config && res.added === 0) {
+        toast.success('没有新增商品：所选商品都已存在');
+        setUpstream(null);
+        await load();
+        onChanged();
+        return;
+      }
+      if (config) {
+        const beforeIds = new Set((before?.models ?? []).map((model) => model.id));
+        const wanted = new Set(ids.map((id) => id.toLowerCase()));
+        let after: Awaited<ReturnType<typeof adminChannelsApi.models>>;
+        try {
+          after = await adminChannelsApi.models(channelId);
+        } catch {
+          // 导入已经成功；这里失败只是拿不到新行，不能让用户以为整次导入失败
+          toast.error(`已导入 ${res.added} 个商品，但读取新商品失败；请刷新后手动补配置`);
+          setUpstream(null);
+          await load();
+          onChanged();
+          return;
+        }
+        const targets = after.models.filter((model) => {
+          if (beforeIds.has(model.id)) return false;
+          const upstreamKey = (model.providerModelKey || model.modelKey).toLowerCase();
+          return wanted.has(upstreamKey) || wanted.has(model.modelKey.toLowerCase());
+        });
+        skipped = Math.max(0, res.added - targets.length);
+
+        for (const model of targets) {
+          try {
+            const upstream = res.models.find(
+              (item) =>
+                item.id.toLowerCase() ===
+                (model.providerModelKey || model.modelKey).toLowerCase(),
+            );
+            const capabilityConfig =
+              config.capability === 'image'
+                ? JSON.parse(
+                    createDefaultImageCapabilityConfigJson(
+                      config.imageParameters,
+                      model.providerModelKey || model.modelKey,
+                    ),
+                  )
+                : JSON.parse(createDefaultTextCapabilityConfigJson());
+            await adminChannelsApi.updateModel(channelId, model.id, {
+              modelKey: model.modelKey,
+              providerModelKey: model.providerModelKey || model.modelKey,
+              displayName:
+                upstream?.displayName ||
+                (model.displayName && model.displayName !== '未分类'
+                  ? model.displayName
+                  : model.modelKey),
+              capability: config.capability,
+              protocol: config.protocol,
+              capabilityConfig,
+              enabled: false,
+              priceTiers: [
+                {
+                  selector: {},
+                  resolution: '*',
+                  videoSeconds: 0,
+                  billingMode: config.billingMode,
+                  unitPriceMicrocredits: config.unitPriceMicrocredits,
+                  inputTokenPriceMicrocredits: config.inputTokenPriceMicrocredits,
+                  outputTokenPriceMicrocredits: config.outputTokenPriceMicrocredits,
+                  cachedTokenPriceMicrocredits: config.cachedTokenPriceMicrocredits,
+                  priceConfigured: true,
+                  enabled: true,
+                },
+              ],
+            });
+            configured += 1;
+          } catch (e) {
+            failures.push(
+              `${model.modelKey}：${e instanceof Error ? e.message : '统一配置失败'}`,
+            );
+          }
+        }
+      }
+
+      if (failures.length > 0) {
+        toast.error(
+          `已导入 ${res.added} 个商品，${failures.length} 个统一配置失败：${failures
+            .slice(0, 2)
+            .join('；')}`,
+        );
+      } else if (config) {
+        toast.success(
+          `已导入并配置 ${configured} 个商品${skipped > 0 ? `，${skipped} 个未匹配到新行` : ''}，默认停用；确认售价后启用`,
+        );
+      } else {
+        toast.success(
+          `已导入 ${res.added} 个商品，默认停用；设置类型、接入方式与售价后再启用`,
+        );
+      }
       setUpstream(null);
       await load();
       onChanged();
@@ -310,7 +438,7 @@ export function ChannelModelManager({
     setSaving(true);
     try {
       await adminChannelsApi.removeModel(channelId, deleteTarget.id);
-      toast.success(`已删除 ${deleteTarget.modelKey}`);
+      toast.success(`已删除商品 ${deleteTarget.modelKey}`);
       setDeleteTarget(null);
       await load();
       onChanged();
@@ -333,7 +461,7 @@ export function ChannelModelManager({
     setSaving(true);
     try {
       const result = await adminChannelsApi.batchDeleteModels(channelId, selectedIds);
-      toast.success(`已删除 ${result.deleted} 个模型`);
+      toast.success(`已删除 ${result.deleted} 个商品`);
       setBatchDeleteOpen(false);
       setSelectedIds([]);
       await load();
@@ -345,13 +473,17 @@ export function ChannelModelManager({
     }
   };
 
+  const batchImpactRefs = selectedIds.flatMap(
+    (id) => consumption.byModelId.get(id) ?? [],
+  );
+
   return (
     <>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-4">
           {/* 已有数据时保留旧清单并提示读取失败；空清单由表格自己的错误态给重试 */}
           {error && (models ?? []).length > 0 && (
-            <Notice tone="danger" title="模型清单刷新失败，显示的是上一次读取结果">
+            <Notice tone="danger" title="商品清单刷新失败，显示的是上一次读取结果">
               {error}
             </Notice>
           )}
@@ -361,6 +493,7 @@ export function ChannelModelManager({
             channelEnabled={channel.enabled}
             loading={loading}
             error={error}
+            consumption={consumption}
             healthById={healthById}
             healthLoading={healthLoading}
             selectedIds={selectedIds}
@@ -387,9 +520,15 @@ export function ChannelModelManager({
 
           <ConfirmDialog
             open={deleteTarget !== null}
-            title={`删除模型 ${deleteTarget?.modelKey ?? ''}？`}
-            description="删除后该模型将停止使用；历史账单与调用记录保留。"
-            impact={['该模型的价格方案一并作废', '使用该模型的前台服务需要重新配置来源']}
+            title={`删除商品 ${deleteTarget?.modelKey ?? ''}？`}
+            description="删除后该商品将停止使用；历史账单与调用记录保留。"
+            impact={[
+              consumptionImpactText(
+                consumption.byModelId.get(deleteTarget?.id ?? '') ?? [],
+              ),
+              '该商品的售价方案一并作废',
+              '消费该商品的能力需要重新选择来源',
+            ]}
             danger
             confirmText="确认删除"
             loading={saving}
@@ -399,11 +538,12 @@ export function ChannelModelManager({
 
           <ConfirmDialog
             open={batchDeleteOpen}
-            title={`批量删除 ${selectedIds.length} 个模型？`}
-            description="删除后所选模型将停止使用，价格方案一并作废；历史账单与调用记录保留。"
+            title={`批量删除 ${selectedIds.length} 个商品？`}
+            description="删除后所选商品将停止使用，售价方案一并作废；历史账单与调用记录保留。"
             impact={[
-              '任一模型仍被前台服务或进行中任务使用时，本次不会删除模型',
-              '使用这些模型的前台服务需要重新配置来源',
+              consumptionImpactText(batchImpactRefs),
+              '任一商品仍被消费它的能力或进行中任务使用时，本次不会删除商品',
+              '消费这些商品的能力需要重新选择来源',
             ]}
             danger
             confirmText="确认删除"
@@ -414,10 +554,13 @@ export function ChannelModelManager({
 
           <ConfirmDialog
             open={disableTarget !== null}
-            title={`停用模型 ${disableTarget?.modelKey ?? ''}？`}
-            description="停用后新任务不再使用该模型，前台服务会切换到其他可用模型；价格与配置保留，可随时重新启用。"
+            title={`停用商品 ${disableTarget?.modelKey ?? ''}？`}
+            description="停用后新任务不再使用该商品，消费它的能力会切换到其他可用商品；价格与配置保留，可随时重新启用。"
             impact={[
-              '该模型会立即停止接单',
+              consumptionImpactText(
+                consumption.byModelId.get(disableTarget?.id ?? '') ?? [],
+              ),
+              '该商品会立即停止接单',
               '进行中的任务不受影响',
             ]}
             danger
@@ -445,7 +588,7 @@ export function ChannelModelManager({
           previousProviderModelKey: editing?.providerModelKey ?? '',
           onTest: async () => {
             if (!editing) {
-              toast.error('请先保存模型，再测试服务连接');
+              toast.error('请先保存商品，再测试服务连接');
               return;
             }
             await runTest(editing);
@@ -458,7 +601,7 @@ export function ChannelModelManager({
           existingKeys: existingUpstreamKeys,
           importing,
           onClose: closeUpstream,
-          onImport: (ids) => void runImport(ids),
+          onImport: (ids, config) => void runImport(ids, config),
         }}
         reprice={{
           open: repriceOpen,

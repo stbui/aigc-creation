@@ -132,13 +132,13 @@ function check(name, ok, detail = '') {
   check('拒绝清理业务表 User', badTarget.status === 400, badTarget.message);
 
   const badDays = await call('POST', '/admin/retention/cleanup', T, {
-    target: 'AdminAuditLog', retentionDays: 0,
+    target: 'ApiCallLog', retentionDays: 0,
   });
   check('拒绝非法保留天数', badDays.status === 400, badDays.message);
 
   // 实际清理: 用极大天数, 不该删任何东西, 但会产生留痕
   const realClean = await call('POST', '/admin/retention/cleanup', T, {
-    target: 'AdminAuditLog', retentionDays: 1000,
+    target: 'ApiCallLog', retentionDays: 1000,
   });
   check('清理执行并返回计数', realClean.status === 200 || realClean.status === 201,
     `删除 ${realClean.data?.deleted ?? '?'} 条`);
@@ -147,12 +147,6 @@ function check(name, ok, detail = '') {
   check('清理动作已留痕',
     (logsAfter.data?.length ?? 0) > (cleanLogs.data?.length ?? 0),
     `${cleanLogs.data?.length ?? 0} → ${logsAfter.data?.length ?? 0} 条`);
-
-  console.log('\n【审计留痕】');
-  const audit = await call('GET', '/admin/audit-logs?pageSize=30', T);
-  const actions = audit.data.result.items.map(i => i.action);
-  check('备份动作已记入审计', actions.some(a => a.startsWith('backup.')),
-    actions.filter(a => a.startsWith('backup.')).join(', ') || '(无)');
 
   console.log('\n【越权: operator 无 backup 权限】');
   const bcrypt = require('bcryptjs');

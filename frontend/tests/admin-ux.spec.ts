@@ -91,7 +91,6 @@ test.describe('后台高频动线', () => {
 
   test('其余深链列表页同样回显已生效筛选', async ({ page }) => {
     const cases = [
-      ['/admin/audit-logs?action=user.delete&success=false', '操作审计', ['动作：删除用户', '结果：失败']],
       ['/admin/model-calls?status=failed&requestKind=poll', '调用记录', ['状态：失败', '类型：轮询']],
       ['/admin/invoices?status=pending&keyword=INV', '发票管理', ['状态：待开具', '关键词：INV']],
       ['/admin/coupons?type=full_cut&status=on', '优惠券', ['类型：满减', '状态：启用']],
@@ -215,8 +214,8 @@ test.describe('后台高频动线', () => {
       ['/admin/orders', '订单管理', 'admin-table-scroll', 'admin-table-row'],
       ['/admin/tasks', '任务监控', 'admin-table-scroll', 'admin-table-row'],
       ['/admin/model-calls', '调用记录', 'admin-table-scroll', 'admin-table-row'],
-      // 渠道工作台已改为左列渠道 + 右侧模型详情的主从布局，不再是表格。
-      ['/admin/channels', '渠道工作台', 'admin-channel-workspace', 'admin-channel-item'],
+      // 模型商品默认是商品台账；供应商视图仍是左列供应商 + 右侧商品详情的主从布局。
+      ['/admin/channels?view=channels', '模型商品', 'admin-channel-workspace', 'admin-channel-item'],
     ] as const) {
       await page.goto(`${UI}${path}`);
       await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 15000 });
@@ -541,5 +540,82 @@ test.describe('后台高频动线', () => {
 
     await page.reload();
     await expect(drawer(page)).toHaveCount(0);
+  });
+});
+
+test.describe('调用记录追踪', () => {
+  test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
+
+  test('AI 分析调用可按来源与操作深链定位，并显示业务名称', async ({ page }) => {
+    const rowsPayload = [
+      {
+        id: 'ai-analysis-log',
+        userId: 'u-1',
+        traceId: '',
+        requestId: 'req-ai-1',
+        channelId: 'ch-text-1',
+        channelName: 'inxk - 文本识图',
+        taskId: '',
+        billingOrderId: '',
+        source: 'tool',
+        capability: 'text',
+        operation: 'image_to_prompt',
+        requestKind: 'create',
+        billable: false,
+        apiFormat: 'openai.chat',
+        method: 'POST',
+        path: '/chat/completions',
+        model: 'deepseek-v4-pro',
+        status: 'success',
+        statusCode: 200,
+        durationMs: 18607,
+        pollCount: 0,
+        providerStatus: '',
+        inputTokens: 100,
+        outputTokens: 50,
+        cachedTokens: 0,
+        usageAvailable: true,
+        mediaCount: 0,
+        videoSeconds: 0,
+        providerRequestId: '',
+        errorCode: '',
+        error: '',
+        createdAt: '2026-11-10T02:26:09.000Z',
+      },
+    ];
+    let requestedUrl = '';
+    await page.route(/\/api\/v1\/admin\/api-logs(\?|$)/, (route) => {
+      requestedUrl = route.request().url();
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: {
+            items: rowsPayload,
+            total: rowsPayload.length,
+            page: 1,
+            pageSize: 20,
+            summary: { total: 1, success: 1, failed: 0, other: 0, avgDurationMs: 18607 },
+          },
+        }),
+      });
+    });
+
+    await page.goto(`${UI}/admin/model-calls?source=tool&operation=image_to_prompt`);
+    await expect(page.getByRole('heading', { name: '调用记录' })).toBeVisible({ timeout: 15000 });
+    await expect(chips(page)).toContainText('来源：提示词工具');
+    await expect(chips(page)).toContainText('操作：AI 分析 / 图片转提示词');
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page).first()).toContainText('提示词工具');
+    await expect(rows(page).first()).toContainText('AI 分析 / 图片转提示词');
+
+    const request = new URL(requestedUrl);
+    expect(request.searchParams.get('source')).toBe('tool');
+    expect(request.searchParams.get('operation')).toBe('image_to_prompt');
+
+    await rows(page).first().click();
+    await expect(drawer(page)).toContainText('请求号');
+    await expect(drawer(page)).toContainText('req-ai-1');
   });
 });

@@ -19,14 +19,14 @@
 | --- | --- | --- |
 | 总览 | 平台概览 / 告警中心 | `/admin` · `/admin/alerts` |
 | 运营 | 用户 / 素材 / 任务 / 工单 | `/admin/users` · `/admin/assets` · `/admin/tasks` · `/admin/tickets` |
-| 模型与渠道 | 渠道工作台 / 插件 / 能力与模型 / 用户分组 / 调用记录 | `/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` |
+| 模型与渠道 | 模型商品 / 插件 / 能力与模型 / 用户分组 / 调用记录 | `/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` |
 | 交易 | 商品 / 会员套餐 / 订单 / 积分账本 / 优惠券 / 限时活动 / 邀请与签到 | `/admin/products` 等 7 页 |
 | 财务 | 支付充值 / 发票管理 / 生成账单 / 财务分析 | `/admin/payments` · `/admin/invoices` · `/admin/billing-orders` · `/admin/finance` |
 | 内容与合规 | 法务文档 / 站内消息 / AI 标识 | `/admin/legal` · `/admin/notifications` · `/admin/aigc-label` |
-| 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 | `/admin/roles` 等 5 页 |
+| 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 | `/admin/roles` 等 4 页 |
 | 数据安全 | 数据备份 / 保留期清理 | `/admin/backups` · `/admin/retention` |
 
-合计 32 页、8 组。菜单项的 `permission` 字段决定可见性；单个权限点或权限数组（任一满足）均可作为菜单可见条件，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
+合计 31 页、8 组。菜单项的 `permission` 字段决定可见性；单个权限点或权限数组（任一满足）均可作为菜单可见条件，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
 
 ### 1.1 分组理由
 
@@ -64,17 +64,17 @@
 
 | 角色 | code | 定位 | 权限点数 |
 | --- | --- | --- | ---: |
-| 平台管理员 | `admin` | 全部权限 | 66 |
-| 运营 | `operator` | 用户/项目/素材/任务只读或受限写、营销、消息、工单、法务只读、模型侧只读 | 33 |
-| 财务 | `finance` | 商品/订单/退款/积分调整/发票/对账，模型成本与生成账单只读、账单可处置 | 27 |
+| 平台管理员 | `admin` | 全部权限 | 67 |
+| 运营 | `operator` | 用户/项目/素材/任务只读或受限写、营销、消息、工单、法务只读、模型侧只读 | 32 |
+| 财务 | `finance` | 商品/订单/退款/积分调整/发票/对账，模型成本与生成账单只读、账单可处置 | 28 |
 
-**为什么必须拆**：财务能退款 = 能改钱，运营能删用户 = 能毁数据。两种权限绑在一个布尔位上，出了事无法区分是谁做的，审计日志也失去意义。
+**为什么必须拆**：财务能退款 = 能改钱，运营能删用户 = 能毁数据。两种权限绑在一个布尔位上，出了事无法区分是谁做的，责任边界也失去意义。
 
 `operator` 的模型侧只有读权限（`channel.read` / `channel.model_read` / `logical_model.read` / `user_group.read` / `plugin.read` / `billing_order.read` / `model.analytics_read`）与调用记录 `model.call_read`；写渠道、渠道模型（含凭证与价格档）、前台模型、分组与插件一律拒绝。`channel.test` 同时覆盖存储 / 通知探测与模型渠道连通性测试，只探测、不写配置；渠道模型本身的编辑仍受 `channel.model_write` 管控。`finance` 额外持有 `billing_order.resolve`，可对 `uncertain` 账单人工结算或退款。
 
 ### 2.2 权限点
 
-66 个，命名格式 `<模块>.<动作>`，定义在 `backend/src/admin/permissions.ts` 的 `PERMISSIONS`，按角色存为 `AdminRole.permissions` 的 JSON 数组字符串。
+67 个，命名格式 `<模块>.<动作>`，定义在 `backend/src/admin/permissions.ts` 的 `PERMISSIONS`，按角色存为 `AdminRole.permissions` 的 JSON 数组字符串。
 
 | 模块 | 权限点 |
 | --- | --- |
@@ -93,7 +93,7 @@
 | 账单与台账 | `billing_order.read` / `billing_order.resolve` / `model.call_read` / `model.analytics_read` |
 | 增长与服务 | `marketing.write` / `message.write` / `ticket.read` / `ticket.handle` |
 | 法务 | `legal.read` / `legal.write` |
-| 系统 | `setting.read` / `setting.write` / `role.read` / `role.write` / `audit.read` |
+| 系统 | `setting.read` / `setting.write` / `role.read` / `role.write` |
 | 数据工具 | `data.export` / `data.search` / `backup.read` / `backup.run` |
 
 ### 2.3 强制规则
@@ -104,9 +104,9 @@
 | 孤儿权限点 | 权限点从清单移除后，角色里残留的值 `getPermissions()` 读取时过滤，比对不上即等同无权；过滤只在内存生效，不回写库（回写属管理动作，由角色页显式保存完成） |
 | 防提权 | 只有 `admin` 能授予 `admin`，否则 403 `40301`；不能变更自己的角色，否则 400 `40001` |
 | 最后一个 admin | 禁用与降级前统计 `status='active'` 的 admin 数，`≤1` 时返回 409 `40901` |
-| 高危动作留痕 | 写操作必须留痕；普通管理写操作由 `AuditInterceptor` 自动生成 `AdminAuditLog.reason`，只有退款、发票驳回、能力下架等确有业务语义的动作由 DTO 要求原因。前端只对业务操作做二次确认 |
+| 高危动作确认 | 退款、发票驳回、能力下架等确有业务语义的动作由 DTO 要求原因；前端只对业务操作做二次确认 |
 
-高危权限点：`user.delete` / `user.reset_password` / `asset.delete` / `project.delete` / `task.delete` / `product.delete` / `order.refund` / `credit.adjust` / `compliance.takedown` / `capability.write` / `channel.write` / `channel.model_write` / `logical_model.write` / `user_group.write` / `plugin.write` / `billing_order.resolve` / `setting.write` / `legal.write` / `role.write` / `backup.run`。审计链路：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落库）。
+高危权限点：`user.delete` / `user.reset_password` / `asset.delete` / `project.delete` / `task.delete` / `product.delete` / `order.refund` / `credit.adjust` / `compliance.takedown` / `capability.write` / `channel.write` / `channel.model_write` / `logical_model.write` / `user_group.write` / `plugin.write` / `billing_order.resolve` / `setting.write` / `legal.write` / `role.write` / `backup.run`。
 
 ---
 
@@ -117,7 +117,6 @@
 | 工单 | C 端 `/tickets` + 后台工单中心 | 状态机只在 `tickets.service.ts` 的 `TRANSITIONS` 定义；越权一律 404；客服回复即受理并自动认领 |
 | 站内消息 | `notifications`（`@Global()`） | `notify()` 永不抛异常；模板缺失回落内置文案；已接支付成功、任务失败退款、会员到期、工单回复四类事件 |
 | 法务文档 | `legal` | 四类固定 slug（`user-agreement` / `privacy-policy` / `minors-policy` / `account-rules`），按 `(slug, version)` 版本化，已发布版本不可原地覆盖，升版本才可改文本 |
-| 操作审计 | `AdminAuditLog` + `AuditInterceptor` | 写操作留审计；普通管理动作的原因由系统按动作与结果自动生成，只有退款、发票驳回、能力下架等真实业务原因由调用方提供；AI 标识、能力上下线、渠道 / 前台模型 / 价格写入、账单处置均落审计 |
 
 **与订单的边界**：工单是沟通与记录通道，退款等财务动作一律跳转到订单模块执行，避免两处都能改钱。
 
@@ -125,16 +124,16 @@
 
 ## 4. 数据模型分组
 
-`backend/prisma/schema.prisma` 共 43 个模型：
+`backend/prisma/schema.prisma` 共 65 个模型：
 
 | 域 | 模型 |
 | --- | --- |
-| 用户与权限 | `User` / `OAuthIdentity` / `AdminRole` / `AdminAuditLog` / `SystemSetting` |
+| 用户与权限 | `User` / `OAuthIdentity` / `OAuthChallenge` / `AdminRole` / `SystemSetting` |
 | 创作 | `Project` / `Asset` / `GenerationTask` |
-| 交易 | `Product` / `Order` / `OrderItem` / `Payment` / `Refund` |
-| 权益 | `CreditAccount` / `CreditLot` / `CreditLedgerEntry` / `CreditReservationItem` / `MembershipPlan` / `Membership` / `MembershipUsage` |
+| 交易 | `Product` / `Order` / `OrderCancelEvent` / `OrderItem` / `Payment` / `Refund` |
+| 权益 | `CreditAccount` / `CreditLot` / `CreditLedger` / `CreditLedgerEntry` / `CreditReservationItem` / `MembershipPlan` / `Membership` / `MembershipUsage` |
 | 增长 | `Coupon` / `Campaign` / `InviteRelation` / `InviteRewardRule` / `CheckinRecord` / `CheckinRule` |
-| 财务 | `Invoice` / `ReconciliationBatch` / `ReconciliationItem` |
+| 财务 | `Invoice` / `ReconciliationBatch` / `ReconciliationItem` / `PaymentProviderConfig` / `PaymentRoundRobinCursor` / `PaymentNotification` / `PaymentExceptionCase` / `PaymentAutoReconcileState` / `PaymentReconciliationRun` / `PaymentReconciliationItem` |
 | 身份安全 | `AccountToken` / `LoginLog` / `LoginSession` |
 | 内容与合规 | `LegalDocument` / `ConsentRecord` / `Notification` / `MessageTemplate` / `AigcLabelConfig` |
 | 服务 | `Ticket` / `TicketReply` |
@@ -172,7 +171,7 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 生成账单 `/admin/billing-orders*` | `model/billing/billing-admin.controller.ts`（`admin/billing-orders`） |
 | 财务分析 `/admin/analytics*` | `model/billing/analytics.controller.ts` |
 | 能力与模型 · 能力接口 `/admin/capabilities*` | `capability.controller.ts` |
-| 系统 `/admin/settings*`、`/admin/roles*`、`/admin/storage`、`/admin/scheduler*`、`/admin/backups*`、`/admin/retention*`、`/admin/audit-logs` | 对应 controller |
+| 系统 `/admin/settings*`、`/admin/roles*`、`/admin/storage`、`/admin/scheduler*`、`/admin/backups*`、`/admin/retention*` | 对应 controller |
 | 数据工具 `/admin/search`、批量、导出、导入 | `search.controller.ts` + 各列表 controller |
 
 ---
@@ -188,7 +187,7 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 侧栏 | 分组折叠菜单，图标 lucide 16px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页；`rowKey="id"`、`size="small"` |
 | 详情 | 一律浮层、不跳独立路由，便于保留筛选态；窄内容用右侧抽屉（720px），需要并排区块 / 大图预览用居中弹窗（≤1120px，任务详情即此） |
-| 危险操作 | `ConfirmDialog`（shadcn `AlertDialog` 阻塞式确认弹窗），写明影响条数；退款、发票驳回等确有业务依据要求的动作必须填原因，能力下架的下线提示由后台统一生成，普通管理写操作不要求填写审计原因 |
+| 危险操作 | `ConfirmDialog`（shadcn `AlertDialog` 阻塞式确认弹窗），写明影响条数；退款、发票驳回等确有业务依据要求的动作必须填原因，能力下架的下线提示由后台统一生成，普通管理写操作不要求填写原因 |
 | 空态 / 加载 | 空态给真实说明；列表 loading 与失败态走 `Skeleton` / `Result` |
 | 颜色 | 只用 `global.css` 已有 token，禁裸 hex |
 | 数字 | 金额内部存分、展示 `¥` 两位小数；积分整数千分位 |

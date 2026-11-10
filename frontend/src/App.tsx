@@ -73,6 +73,7 @@ const ShoppableCarouselPage = lazyRoute(
   () => import('./pages/shoppable-carousel'),
   'ShoppableCarouselPage',
 );
+const TemplatePage = lazyRoute('/template', () => import('./pages/template'), 'TemplatePage');
 const ProductDetailPage = lazyRoute('/product-detail', () => import('./pages/product-detail'), 'ProductDetailPage');
 const ViralClonePage = lazyRoute('/viral-clone', () => import('./pages/viral-clone'), 'ViralClonePage');
 const CreativeImagePage = lazyRoute(
@@ -221,6 +222,12 @@ function Shell() {
               path="/shoppable-carousel"
               element={
                   <ShoppableCarouselPage />
+              }
+            />
+            <Route
+              path="/template"
+              element={
+                  <TemplatePage />
               }
             />
             <Route

@@ -125,6 +125,7 @@ function OrderIntentAutoOpen({
       intent === 'refund' &&
       canRefund &&
       (detail.status === 'paid' || detail.status === 'partial_refunded') &&
+      !detail.refunds.some((refund) => refund.status === 'processing') &&
       detail.paidCents > detail.refundedCents
     ) {
       fired.current = true;
@@ -231,7 +232,7 @@ export function OrderDetailDrawer({
                 关闭订单
               </ActionButton>
             )}
-            {refund && (
+            {refund && !d.refunds.some((row) => row.status === 'processing') && (
               <ActionButton
                 variant="destructive"
                 size="sm"
@@ -463,6 +464,9 @@ export function OrderDetailDrawer({
                             {' '}· 回收积分 {r.creditsReclaimed}
                             {r.creditsUnreclaimable > 0
                               ? `，另有 ${r.creditsUnreclaimable} 已消耗无法回收`
+                              : ''}
+                            {r.creditsExpired > 0
+                              ? `，另有 ${r.creditsExpired} 已过期作废`
                               : ''}
                           </>
                         ) : null}

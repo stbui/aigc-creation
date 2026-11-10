@@ -6,12 +6,7 @@ import {
   IsString,
   MaxLength,
 } from "class-validator";
-import {
-  AdminUser,
-  AuditAction,
-  RequirePermission,
-  type AdminUser as AdminUserType,
-} from "./admin.decorator";
+import { AdminUser, RequirePermission, type AdminUser as AdminUserType } from "./admin.decorator";
 import { PERMISSIONS } from "./permissions";
 import {
   LEGAL_SLUGS,
@@ -45,7 +40,7 @@ class UpsertLegalDto {
 /**
  * 后台法务文档管理。
  *
- * 正文是**用户要举证的文本**，因此改动一律走审计，且已发布版本不可原地覆盖
+ * 正文是**用户要举证的文本**，因此已发布版本不可原地覆盖
  * （`LegalService.upsert` 会拒绝）。前端只能「新建版本 → 发布」，
  * 不能「改一下再点发布」—— 后者会让昨天同意过的人拿到一份不同的协议。
  */
@@ -63,14 +58,12 @@ export class AdminLegalController {
 
   @Put()
   @RequirePermission(PERMISSIONS.legalWrite)
-  @AuditAction("legal.upsert")
   upsert(@Body() dto: UpsertLegalDto, @AdminUser() admin: AdminUserType) {
     return this.legal.upsert(dto, admin.id);
   }
 
   @Post(":slug/:version/publish")
   @RequirePermission(PERMISSIONS.legalWrite)
-  @AuditAction("legal.publish")
   publish(@Param("slug") slug: string, @Param("version") version: string) {
     return this.legal.publish(slug, version);
   }

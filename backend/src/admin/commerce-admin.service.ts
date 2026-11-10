@@ -175,12 +175,12 @@ const IMPORT_LIMIT = 500;
  *   此前 commerce.controller 直接 `this.orders['prisma']` 穿透取 Prisma 实例,
  *   商品增改、订单筛选、导出这些逻辑只能写在 controller 里, 既没法被调度/脚本
  *   复用, 也让 controller 变成 300 行的"什么都有"的文件。
- *   现在 controller 只做权限/审计/参数, 查询与规则在本服务。
+ *   现在 controller 只做权限与参数处理, 查询与规则在本服务。
  *
  * 约定:
  *   · 所有金额是**整数分**, 只有导出 CSV 时转成元 (人要对账的是元)
  *   · 所有时间过滤的 `to` 含当天 —— 运营输入 10-21 期望包含 10-21 全天
- *   · 任何写操作都不在这里写审计, 审计由 controller 的 @AuditAction 负责
+ *   · 写操作只负责业务规则与持久化
  */
 @Injectable()
 export class AdminCommerceService {
@@ -428,7 +428,9 @@ export class AdminCommerceService {
     status: string,
   ): Promise<void> {
     if (currency !== "USD" || status !== "active") return;
-    const available = await this.paymentConfigs.availableVisible("USD");
+    // 商品币种能否上架取决于真实渠道能力，而不是 C 端两个可见按钮的
+    // 路由结果：PayPal / Stripe 支持 USD，但不属于可见方式解析链路。
+    const available = await this.paymentConfigs.available("USD");
     if (available.length === 0) {
       throw new AppError(
         40001,

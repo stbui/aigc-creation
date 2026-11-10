@@ -56,7 +56,7 @@
 
 ---
 
-## 2. 现状审计（已核对）
+## 2. 现状核对（已核对）
 
 ### 2.1 当前链路
 
@@ -196,7 +196,7 @@ interface PaymentAdapter {
 1. 校验 `enabled`、`closeAfterMinutes`（5–1440）、字段必填与格式（`validateConfig`）。
 2. 合并旧值：未提交的密钥字段沿用当前版本密文（参考页的「已配置，留空保持不变」）。
 3. 对整个 `values` JSON 加密（AES-256-GCM），落 `configCipher`；同时落 `configDigest`（sha256）用于判断是否重复保存。
-4. `version = max(version) + 1`；写审计 `payment.provider_config_save`。
+4. `version = max(version) + 1`。
 5. 读取时解密，只回传非密钥字段；密钥字段回 `secretConfigured: true` 与掩码，**永不回传明文**。
 
 `SecretCipher` 从 `model/infra/` 抽到 `common/security/`，做成全局模块；`ModelModule` 继续 re-export，模型域调用点不改。`MODEL_SECRET_KEY` 语义不变：模型与支付凭证共用该密钥，轮换会使两者密文同时失效（写进 `.env.example` 与 NOTICE）。
@@ -240,9 +240,9 @@ interface PaymentAdapter {
 
 ### 4.5 回调收件箱与 worker
 
-规范回调路径为 `GET/POST /payment/webhook/easypay`、`POST /payment/webhook/{alipay,wxpay,stripe}`。URL **不携带 `configId`**；PayPal / ZPay 及历史已下发地址继续使用 `GET/POST /payments/callback/:channel/:configId`。
+规范回调路径为 `GET/POST /api/v1/payment/webhook/easypay`、`POST /api/v1/payment/webhook/{alipay,wxpay,stripe}`。URL **不携带 `configId`**；PayPal / ZPay 及历史已下发地址继续使用 `GET/POST /api/v1/payments/callback/:channel/:configId`。
 
-1. EasyPay / 支付宝 / Stripe 从明文商户订单号定位订单；Stripe 进一步用 Checkout Session id，EasyPay 用渠道订单号定位历史 Payment。微信通知正文加密，先用所有历史配置的 APIv3 密钥尝试解密，唯一得到商户订单号后再按历史配置验签。
+1. EasyPay / 支付宝 / Stripe 从明文商户订单号定位订单；Stripe 以 PaymentIntent id 为主（历史 Checkout Session id 仅兼容旧单），EasyPay 用渠道订单号定位历史 Payment。微信通知正文加密，先用所有历史配置的 APIv3 密钥尝试解密，唯一得到商户订单号后再按历史配置验签。
 2. 从这些 Payment 收集 `providerConfigId`，逐个加载下单时的配置版本；订单不存在或没有任何历史支付尝试 → 失败响应，验签前拒绝。
 3. 适配器用历史 `values` 验签；多个配置同时验签通过时，必须由 `providerTradeNo` 唯一命中一条历史 Payment，否则拒绝处理。绝不回落到渠道最新配置。
 4. 归一出 `merchantOrderNo / providerTradeNo / amountCents / currency / paid / closed / paidAt / providerStatus / eventId`。
@@ -496,7 +496,7 @@ model PaymentReconciliationItem {
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
 | GET | `/providers` | `payment.read` | 渠道列表 + 当前配置版本 + 字段元数据 + `secretConfigured` |
-| PUT | `/providers/:id/config` | `payment.write` | 保存新版本；高危审计 |
+| PUT | `/providers/:id/config` | `payment.write` | 保存新版本；高危操作 |
 | GET | `/settings` | `payment.read` | 默认充值货币 |
 | PUT | `/settings` | `payment.write` | 修改默认货币 |
 | GET | `/products` | `product.read` | 充值商品列表（含上架状态计算） |
@@ -505,8 +505,8 @@ model PaymentReconciliationItem {
 | GET | `/orders` | `payment.read` | 支付订单分页：`status / keyword / providerId / timeField / from / to / page / pageSize` |
 | GET | `/orders/export.csv` | `payment.read + data.export` | 同筛选导出，上限 10000 |
 | GET | `/orders/:id` | `payment.read` | 支付订单详情 |
-| POST | `/orders/:id/query` | `payment.operate` | 空请求体；向渠道查单并应用结果，自动写审计 |
-| POST | `/orders/:id/close` | `payment.operate` | 空请求体；先查单，已支付则入账；否则关单，自动写审计 |
+| POST | `/orders/:id/query` | `payment.operate` | 空请求体；向渠道查单并应用结果 |
+| POST | `/orders/:id/close` | `payment.operate` | 空请求体；先查单，已支付则入账；否则关单 |
 | POST | `/reconciliations` | `finance.reconcile` | `{ providerId, billDate }`；唯一键冲突返回已有 run |
 | GET | `/reconciliations` | `payment.read` | 运行列表：`providerId / status / from / to / page / pageSize` |
 | GET | `/reconciliations/:id/items` | `payment.read` | 明细：`result / page / pageSize`；`result=abnormal` 表示所有非 matched/recovered |
@@ -715,7 +715,7 @@ model PaymentReconciliationItem {
 不可逆操作：
 
 - 关闭订单：`ConfirmDialog`，必须写明「先查单，已支付则入账，否则关单；不会退款」。
-- 保存渠道配置：高危权限，写审计日志，但不要求填写操作原因。
+- 保存渠道配置：高危权限，但不要求填写操作原因。
 - 对账补发：由系统执行，不在页面直接提供「补发」按钮；人工处理走订单流程。
 
 ---
@@ -766,7 +766,6 @@ model PaymentReconciliationItem {
 ### 9.6 安全
 
 - 渠道密钥只以密文落库；接口永不回传明文；日志不打印密钥。
-- 支付配置写入、关单、对账补发全部写审计。
 - 公开回调不挂 JWT，只信验签；原始报文必须用 `rawBody`。
 - 后台权限校验必须在后端；前端 `can()` 只隐藏按钮。
 - 生产环境沙箱通道强制不可用：即使配置启用，`availableProviders()` 也过滤。
@@ -814,7 +813,7 @@ model PaymentReconciliationItem {
 ### Phase 1：渠道配置 + 支付渠道标签
 
 - 支付宝/微信适配器改接收 `values`，不再读 env；补 `queryOrder / closeOrder / verifyNotification(config)`。
-- 回调迁移到固定 `/payment/webhook/:channel`（EasyPay / 支付宝 / 微信 / Stripe），保留旧 `/payments/callback/:channel/:configId` 用于 PayPal / ZPay 与在途订单。
+- 回调迁移到固定 `/api/v1/payment/webhook/:channel`（EasyPay / 支付宝 / 微信 / Stripe），保留旧 `/api/v1/payments/callback/:channel/:configId` 用于 PayPal / ZPay 与在途订单。
 - 后台 `/admin/payments/providers`、`/settings`。
 - 前端 `AdminPaymentsPage` 骨架 + 支付渠道标签 + 配置抽屉 + 风险提示。
 - 闸口：`smoke-payments.js`（渠道状态、配置保存/掩码、回调）。
@@ -977,7 +976,7 @@ npm run check
 
 | # | 修订 | 原因 |
 | --- | --- | --- |
-| A1 | 后台支付控制器放在 `backend/src/admin/payments/`，注册在 `AdminModule`；支付域服务由 `PaymentsModule` 导出 | 权限、审计、DTO 与其它后台控制器同层；支付域不反向依赖 admin 目录 |
+| A1 | 后台支付控制器放在 `backend/src/admin/payments/`，注册在 `AdminModule`；支付域服务由 `PaymentsModule` 导出 | 权限、DTO 与其它后台控制器同层；支付域不反向依赖 admin 目录 |
 | A2 | `POST /orders/:orderId/cancel` 的 URL 不变，但实现从 `OrdersController` 移到 `PaymentsModule` 的独立控制器 | 取消必须先查渠道；若让 `OrdersModule` 反向依赖 `PaymentsModule` 会形成循环依赖 |
 | A3 | `PaymentReconciliationRun` 增加 `attempt Int @default(1)`，唯一键改为 `(providerId, billDate, attempt)` | 失败账单必须可重跑；只保留 `(providerId, billDate)` 会让一次网络失败永久锁死该日期 |
 | A4 | 支付宝 ZIP 不引入 `fflate`；从现有 `backend/src/model/protocol/package.ts` 抽出通用只读 ZIP 解析器 | 已有 stored/deflate + 中央目录解析与测试；重复引依赖只会多一棵供应链 |
@@ -1080,10 +1079,10 @@ backend/src/
 
 | 文件 | 路由 | 权限 | 职责 |
 | --- | --- | --- | --- |
-| `payment-providers.controller.ts` | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | `payment.read` / `payment.write` | 渠道列表、动态字段、保存新版本；写审计 `payment.provider_config_save` |
+| `payment-providers.controller.ts` | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | `payment.read` / `payment.write` | 渠道列表、动态字段、保存新版本 |
 | `payment-settings.controller.ts` | `GET/PUT /admin/payments/settings` | `payment.read` / `payment.write` | 默认充值币种，写入现有 settings 服务 |
 | `payment-products.controller.ts` | `GET/POST /admin/payments/products`、`PUT /admin/payments/products/:id` | `product.read` / `product.write` | 复用 `AdminCommerceService`，增加支付商品字段与上架校验 |
-| `payment-orders.controller.ts` | `GET /admin/payments/orders`、`GET /admin/payments/orders/export.csv`、`GET /admin/payments/orders/:id`、`POST .../:id/query`、`POST .../:id/close` | `payment.read` / `payment.read + data.export` / `payment.operate` | 列表、详情、导出、查单、关单；导出审计 `data.export` |
+| `payment-orders.controller.ts` | `GET /admin/payments/orders`、`GET /admin/payments/orders/export.csv`、`GET /admin/payments/orders/:id`、`POST .../:id/query`、`POST .../:id/close` | `payment.read` / `payment.read + data.export` / `payment.operate` | 列表、详情、导出、查单、关单 |
 | `payment-reconciliation.controller.ts` | `POST/GET /admin/payments/reconciliations`、`GET .../:id/items`、两个 CSV、`POST .../import` | `finance.reconcile` / `payment.read` / `payment.read + data.export` | 执行、列表、明细、导出、CSV 兜底导入 |
 
 ### 17.5 模块接线
@@ -1936,7 +1935,7 @@ financeReconcile: 'finance.reconcile' // 已存在：执行对账/兜底导入
 | 财务 | ✅ | ❌（避免财务同时改收款通道与做账） | ✅ | ✅ |
 | 运营 | 默认 ❌（如业务确需排障，单独在角色页授予 `payment.read`） | ❌ | ❌ | ❌ |
 
-`payment.write` 加入 `HIGH_RISK_PERMISSIONS`，保存渠道配置仍自动写 `AdminAuditLog`，不要求填写 `reason`；同权限下的站点设置接口同样自动写审计。`payment.operate` 不是高危：它只推进渠道已经发生的事实，不能凭空造钱；但每次仍写普通审计。
+`payment.write` 加入 `HIGH_RISK_PERMISSIONS`，保存渠道配置不要求填写 `reason`。`payment.operate` 不是高危：它只推进渠道已经发生的事实，不能凭空造钱。
 
 `seed:roles` 会用代码中的 `ROLE_PERMISSIONS` 覆盖内置角色权限（见 `backend/scripts/seed-roles.ts`）。生产若已在角色页手工调过权限，先导出/核对再执行，避免覆盖自定义授权。
 
@@ -2091,11 +2090,11 @@ URL 与请求体不变，实现迁到 `OrderCancelController`。返回 C 端订�
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| GET/POST | `/payment/webhook/easypay` | 易支付固定入口；按订单历史 Payment 反查配置版本 |
-| POST | `/payment/webhook/alipay` | 支付宝官方固定入口；按商户订单号反查历史配置 |
-| POST | `/payment/webhook/wxpay` | 微信支付固定入口；先解密，再按历史配置验签 |
-| POST | `/payment/webhook/stripe` | Stripe 固定入口；按 Checkout Session id 精确匹配历史 Payment |
-| GET/POST | `/payments/callback/:providerId/:configId` | PayPal / ZPay 与历史旧 URL 兼容入口 |
+| GET/POST | `/api/v1/payment/webhook/easypay` | 易支付固定入口；按订单历史 Payment 反查配置版本 |
+| POST | `/api/v1/payment/webhook/alipay` | 支付宝官方固定入口；按商户订单号反查历史配置 |
+| POST | `/api/v1/payment/webhook/wxpay` | 微信支付固定入口；先解密，再按历史配置验签 |
+| POST | `/api/v1/payment/webhook/stripe` | Stripe 固定入口；以 PaymentIntent id 为主精确匹配历史 Payment，历史 Checkout Session 仅兼容旧单 |
+| GET/POST | `/api/v1/payments/callback/:providerId/:configId` | PayPal / ZPay 与历史旧 URL 兼容入口 |
 
 EasyPay / 支付宝 / 微信 / Stripe 的通知 URL 由 `createOrder()` 传入固定地址，不随配置版本轮换；PayPal / ZPay 仍使用 `${PAYMENT_NOTIFY_BASE}/api/v1/payments/callback/${providerId}/${configId}`。`configId` 是随机 cuid，不含密钥，但新渠道不再把它暴露在 URL 中。
 
@@ -2121,7 +2120,7 @@ interface AdminPaymentProviderView {
 
 #### `PUT /admin/payments/providers/:providerId/config`
 
-权限 `payment.write`，高危操作，写审计但不要求填写原因。请求体见 §18.5。响应：
+权限 `payment.write`，高危操作，但不要求填写原因。请求体见 §18.5。响应：
 
 ```json
 { "provider": { "id": "alipay", "version": 4, "configured": true }, "unchanged": false }
@@ -2131,7 +2130,7 @@ interface AdminPaymentProviderView {
 
 #### `GET/PUT /admin/payments/settings`
 
-权限分别 `payment.read / payment.write`。GET 返回 `{ "defaultCurrency": "CNY" }`；PUT 请求 `{ defaultCurrency }`，写现有 settings 服务并自动写审计。
+权限分别 `payment.read / payment.write`。GET 返回 `{ "defaultCurrency": "CNY" }`；PUT 请求 `{ defaultCurrency }`，写现有 settings 服务。
 
 #### `GET /admin/payments/products`
 
@@ -2223,7 +2222,7 @@ interface PaymentOrderDetail extends AdminPaymentOrderRow {
 
 #### `POST /admin/payments/orders/:id/query`
 
-权限 `payment.operate`。空请求体；调用 `PaymentOrderService.query({ actor: { kind:'admin', adminId } })`，自动写审计动作 `payment.order_query`。返回：
+权限 `payment.operate`。空请求体；调用 `PaymentOrderService.query({ actor: { kind:'admin', adminId } })`。返回：
 
 ```json
 { "order": { "id": "ord_x", "status": "credited" }, "view": { "orderId": "ord_x", "displayStatus": "credited" } }
@@ -2233,11 +2232,11 @@ interface PaymentOrderDetail extends AdminPaymentOrderRow {
 
 #### `POST /admin/payments/orders/:id/close`
 
-权限 `payment.operate`。空请求体；自动写审计动作 `payment.order_close`。顺序与 C 端取消一致；已支付时先入账再返回 `40901`，由前端刷新列表。已关闭返回幂等 200。
+权限 `payment.operate`。空请求体。顺序与 C 端取消一致；已支付时先入账再返回 `40901`，由前端刷新列表。已关闭返回幂等 200。
 
 #### `GET /admin/payments/orders/export.csv`
 
-权限 `payment.read + data.export`。筛选参数与列表完全一致，忽略 `page/pageSize`，上限 10000 行。`Content-Disposition` 文件名：`支付订单-YYYYMMDD-HHmmss.csv`。导出动作写审计 `data.export`，参数里不得含密钥。
+权限 `payment.read + data.export`。筛选参数与列表完全一致，忽略 `page/pageSize`，上限 10000 行。`Content-Disposition` 文件名：`支付订单-YYYYMMDD-HHmmss.csv`。导出参数里不得含密钥。
 
 ### 20.5 后台对账
 
@@ -3365,7 +3364,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - 多取 1 行判断截断，响应头 `X-Export-Truncated: true`；前端可在 toast 提示「已导出前 10000 行」。不要往 CSV 里插说明行，否则列数会错。
 - `sendCsv` 内部已处理 UTF-8 BOM、公式注入与文件名；不要再手写 `Content-Disposition`。
 - 导出列按 §20.6；金额用 `effectiveAmountCents`，状态用展示状态文案，时间按 `Asia/Shanghai` 格式化。
-- 必须同时挂 `@RequireAllPermissions('payment.read', 'data.export')` 与 `@AuditAction('data.export')`；审计记录筛选条件摘要，不记录密钥、checkout URL、完整用户邮箱列表。
+- 必须挂 `@RequireAllPermissions('payment.read', 'data.export')`；导出日志记录筛选条件摘要，不记录密钥、checkout URL、完整用户邮箱列表。
 - 前端在「草稿与应用值不同」时禁用导出，后端仍以实际 query 为准，不能信任前端。
 
 ### 23.9 查询层测试清单
@@ -3387,7 +3386,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 1. 先落 `payment-query.ts` 的纯函数与表驱动单测，不接控制器；确保 8 个展示状态与 where 一一对应。
 2. 再接 `GET /orders` 与 `count`，用手工 fixture 对比列表 id 与 `paymentStatusOf`；此时不接导出。
 3. 详情投影单独实现，确认 `payments` 只取最近 50 条且不含 `rawPayload`。
-4. 最后接导出，复用同一 builder；补 10001 行截断测试与审计断言。
+4. 最后接导出，复用同一 builder；补 10001 行截断测试与导出断言。
 5. 上线前跑 `PRAGMA index_list('Order')` 与 `EXPLAIN QUERY PLAN`，确认新索引真实生效；SQLite 不会因为 Prisma schema 写了索引就自动重建，必须实际执行 `db push`。
 
 ## 24. 页面复刻对照与偏差登记
@@ -3434,12 +3433,12 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 | E2 | 渠道状态去掉「插件已开放/停用」副行，空态去掉「插件」二字 | 本仓库支付是适配器注册表，没有宿主插件运行时 | 不影响操作 |
 | E3 | 积分显示整数，不显示 6 位小数微积分 | 本仓库积分域是整数（D6） | 金额/权益列格式 |
 | E4 | 存储扩容选项保留但禁用 | 没有配额子系统（D7） | 商品抽屉 |
-| E5 | 日期用两个原生 date，而非 RangePicker | 后台 35 页统一用原生 date；不引入 antd | 交互等价 |
+| E5 | 日期用两个原生 date，而非 RangePicker | 后台 31 页统一用原生 date；不引入 antd | 交互等价 |
 | E6 | 订单状态 8 个（增加已退款/部分退款） | 参考页没有退款态，但不映射会让退款单显示成已入账 | 状态筛选 |
 | E7 | 点用户跳 `/admin/users?id=`，不内嵌用户抽屉 | 用户详情抽屉目前内嵌在 `AdminUsersPage`，未抽成可复用组件；不为一个入口做跨页重构 | 多一次跳转 |
 | E8 | 订单详情增加 payments 历史、配置版本、失败原因 | 参考页缺少排障信息；本仓库有这些数据 | 详情更完整 |
 | E9 | 对账执行渠道只列 configured + supportsReconciliation | 参考页仍列出未配置项并置灰（不可选）；本方案直接不列，减少误操作。空列表要说明「没有可对账的渠道」 | 空列表需说明 |
-| E10 | 对账/关单收集原因，配置变更不收集 | 对账/关单需要业务依据；渠道配置保存仍写审计，但不增加操作门槛 | 部分操作多一步确认 |
+| E10 | 对账/关单收集原因，配置变更不收集 | 对账/关单需要业务依据；渠道配置保存不增加操作门槛 | 部分操作多一步确认 |
 | E11 | 订单筛选新增「重置」 | 参考页只能逐项清空 | 纯增强 |
 | E12 | 分页选项补 30 | 参考页 pageSize=30 但选项是 20/50/100，下拉值不在选项里 | 修正参考页缺陷 |
 
@@ -3599,7 +3598,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - `frontend`：`npx playwright test --config=playwright.admin.config.ts` 全绿
   （含新增 `tests/admin-payments.spec.ts` 8 条：标签切换 / 深链 / 旧路由重定向 /
   三适配器渲染 / 无退款入口 / 对账执行区 / 状态深链回显）。
-- `frontend`：`node e2e/audit/sweep-admin.mjs` 35 条后台路由全部渲染，控制台零错误
+- `frontend`：`node e2e/audit/sweep-admin.mjs` 32 条后台路由全部渲染，控制台零错误
   （`payments` 已加入 `ROUTES`）。
 - `backend` 支付域仍无 spec，`scripts/smoke-payments.js` 仍测旧路径 —— 缺口未消。
 

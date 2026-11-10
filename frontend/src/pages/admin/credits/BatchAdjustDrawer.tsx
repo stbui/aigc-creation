@@ -13,6 +13,7 @@ import {
 } from '~/admin-ui/primitives';
 import { adminCreditsApi } from './api';
 import { useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
+import { useStableIdempotencyKey } from './useStableIdempotencyKey';
 import type { BatchAdjustItem, BatchAdjustResult, BatchAdjustRow } from './constants';
 
 /**
@@ -37,11 +38,6 @@ export function BatchAdjustDrawer({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<BatchAdjustResult | null>(null);
-  /**
-   * 批次幂等键。打开抽屉时生成一次，重试时原样复用 ——
-   * 否则一次超时重试会把同一批积分发两遍。
-   */
-  const [batchKey, setBatchKey] = useState(() => newBatchKey());
   const dirty = !result && Boolean(text.trim() || reason.trim());
   useUnsavedGuard(open && dirty);
 
@@ -72,6 +68,12 @@ export function BatchAdjustDrawer({
     return { items, errors };
   }, [text]);
 
+  const requestFingerprint = useMemo(
+    () => JSON.stringify({ items: parsed.items, reason: reason.trim() }),
+    [parsed.items, reason],
+  );
+  const batchKey = useStableIdempotencyKey(open, requestFingerprint);
+
   const close = () => {
     if (busy) return;
     setText('');
@@ -84,8 +86,6 @@ export function BatchAdjustDrawer({
     setText('');
     setReason('');
     setResult(null);
-    // 本批已完成，下一批必须换新键 —— 复用会让下一批全被判定为重试
-    setBatchKey(newBatchKey());
     onDone();
   };
 
@@ -230,9 +230,4 @@ export function BatchAdjustDrawer({
       )}
     </Drawer>
   );
-}
-
-/** 批次幂等键：时间戳 + 随机串，一次打开抽屉生成一次 */
-function newBatchKey(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }

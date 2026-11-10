@@ -2,13 +2,12 @@
  * 运营数据清除工具（开发/测试环境）。
  *
  *   node scripts/clear-ops-data.js --dry-run                # 只看影响面，不删
- *   node scripts/clear-ops-data.js --yes                    # 全清（任务+素材+审计+uploads）
- *   node scripts/clear-ops-data.js --yes --only audit      # 只清操作审计
+ *   node scripts/clear-ops-data.js --yes                    # 全清（任务+素材+uploads）
  *   node scripts/clear-ops-data.js --yes --only tasks      # 只清任务监控
  *   node scripts/clear-ops-data.js --yes --only assets     # 只清素材管理
  *   node scripts/clear-ops-data.js --yes --keep-files      # 删库记录但保留磁盘图片
  *   node scripts/clear-ops-data.js --yes --backup          # 删除前先复制一份 .db
- *   node scripts/clear-ops-data.js --yes --audit-log        # 往 CleanupLog 写留痕
+ *   node scripts/clear-ops-data.js --yes --cleanup-log        # 往 CleanupLog 写留痕
  *
  * ── 为什么默认 dry-run ─────────────────────────────────────────────
  * 删除不可逆。首版脚本硬编码执行、范围写死，跑第二次才发现数据早被
@@ -33,7 +32,7 @@ loadEnvOnce();
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
 /**
- * 同时支持 `--only=audit` 与 `--only audit` 两种写法。
+ * 同时支持 `--only=tasks` 与 `--only tasks` 两种写法。
  *
  * ⚠️ 首版只认 `=` 形式，而帮助文本里两种写法混用 → 传 `--only bogus`
  * 时值被静默回落成 'all'，**非法参数按"全清"执行**。
@@ -50,35 +49,34 @@ const val = (f, dflt) => {
 const DRY_RUN = !has('--yes');
 const KEEP_FILES = has('--keep-files');
 const DO_BACKUP = has('--backup');
-const WRITE_AUDIT = has('--audit-log');
+const WRITE_CLEANUP_LOG = has('--cleanup-log');
 const ONLY = val('only', 'all').toLowerCase();
 
 /** 清空顺序即依赖顺序：GenerationTask.outputAssetId → Asset 是 FK，必须先删任务 */
 const GROUPS = {
   tasks: ['GenerationTask'],
   assets: ['Asset'],
-  audit: ['AdminAuditLog'],
 };
 // 用 hasOwnProperty 而非 GROUPS[ONLY] 判存在：否则 --only constructor
 // 会命中 Object 原型上的属性，拿到非数组值并绕过校验。
 const TARGET_TABLES =
   ONLY === 'all'
-    ? ['GenerationTask', 'Asset', 'AdminAuditLog']
+    ? ['GenerationTask', 'Asset']
     : Object.prototype.hasOwnProperty.call(GROUPS, ONLY)
       ? GROUPS[ONLY]
       : null;
 
 if (!TARGET_TABLES || !Array.isArray(TARGET_TABLES)) {
-  console.error(`✗ --only 取值非法: ${ONLY}（可选 all | tasks | assets | audit）`);
+  console.error(`✗ --only 取值非法: ${ONLY}（可选 all | tasks | assets）`);
   process.exit(1);
 }
 
 // 防御整串形态（如 zsh 下未加引号的 $c 会被当作单个 argv 传入
-// "--only audit"）：它既不是合法值也不是 all，静默回落成"全清"最危险。
+// "--only tasks"）：它既不是合法值也不是 all，静默回落成"全清"最危险。
 if (argv.some((a) => /^--[a-z-]+[ =].+$/.test(a))) {
   console.error(
     `✗ 检测到整串参数形态: ${JSON.stringify(argv.filter((a) => /^--[a-z-]+[ =].+$/.test(a)))}\n` +
-      '  本脚本的带值参数必须写成 `--only audit`（两个独立参数）或 `--only=audit`。\n' +
+      '  本脚本的带值参数必须写成 `--only tasks`（两个独立参数）或 `--only=tasks`。\n' +
       '  已中止，未做任何删除。',
   );
   process.exit(1);
@@ -106,7 +104,7 @@ console.log(`库         ${DB_PATH}`);
 console.log(`上传目录   ${UPLOADS}`);
 console.log(`清理范围   ${ONLY} → ${TARGET_TABLES.join(', ')}`);
 console.log(`磁盘文件   ${KEEP_FILES ? '保留' : '一并清空'}`);
-console.log(`留痕CleanupLog ${WRITE_AUDIT ? '写入' : '不写'}`);
+console.log(`留痕CleanupLog ${WRITE_CLEANUP_LOG ? '写入' : '不写'}`);
 console.log('═'.repeat(64));
 
 if (ENV === 'production') {
@@ -140,13 +138,6 @@ if (TARGET_TABLES.includes('Asset')) {
          FROM Asset GROUP BY kind, status, storageBackend`),
   );
 }
-if (TARGET_TABLES.includes('AdminAuditLog')) {
-  table(
-    '审计动作 top10',
-    q(`SELECT action, COUNT(*) AS n FROM AdminAuditLog
-       GROUP BY action ORDER BY n DESC LIMIT 10`),
-  );
-}
 if (TARGET_TABLES.includes('GenerationTask')) {
   table(
     '任务状态',
@@ -163,10 +154,7 @@ table(
          FROM pragma_foreign_key_list('GenerationTask')
         UNION ALL
        SELECT "table", "from", on_delete
-         FROM pragma_foreign_key_list('Asset')
-        UNION ALL
-       SELECT "table", "from", on_delete
-         FROM pragma_foreign_key_list('AdminAuditLog')`,
+         FROM pragma_foreign_key_list('Asset')`,
     )
     .all(),
 );
@@ -211,7 +199,7 @@ try {
   for (const t of TARGET_TABLES) {
     deleted[t] = db.prepare(`DELETE FROM "${t}"`).run().changes;
   }
-  if (WRITE_AUDIT) {
+  if (WRITE_CLEANUP_LOG) {
     db
       .prepare(
         `INSERT INTO CleanupLog (id, target, deletedCount, retentionDays, trigger, skippedCount, detail, success, createdAt)

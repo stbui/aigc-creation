@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   BarChart3,
   Brush,
+  Camera,
   ChevronUp,
   Eraser,
   Expand,
@@ -49,6 +50,7 @@ const SIDEBAR_ITEM_ORDER: Record<string, string[]> = {
     'multi_fusion',
     'sku_image',
     'shoppable_carousel',
+    'template',
   ],
   ai_retouch: [
     'local_redraw',
@@ -105,6 +107,7 @@ const ICONS: Record<string, LucideIcon> = {
   local_redraw: Brush,
   multi_fusion: Layers,
   free_create: LayoutGrid,
+  template: Camera,
 };
 
 export function CapabilityIcon({ id, size = 16 }: { id: string; size?: number }) {

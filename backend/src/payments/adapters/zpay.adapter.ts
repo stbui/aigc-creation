@@ -35,6 +35,9 @@ interface ZpayApiResponse extends Record<string, unknown> {
   msg?: unknown;
 }
 
+/** 渠道已返回合法 JSON 且明确拒绝；与网络/解析失败的资金语义不同。 */
+class ZpayApiRejectedError extends Error {}
+
 /**
  * ZPay 聚合支付适配器。
  *
@@ -345,7 +348,13 @@ export class ZpayAdapter implements PaymentAdapter {
     const values = input.config.values;
     const pid = configPid(values);
     const key = values.key?.trim() ?? '';
-    if (!pid || !key) return { state: 'failed', error: 'ZPay 缺少商户 ID 或商户密钥，无法退款' };
+    if (!pid || !key) {
+      return {
+        state: 'failed',
+        failureKind: 'definitive',
+        error: 'ZPay 缺少商户 ID 或商户密钥，无法退款',
+      };
+    }
 
     const tradeNo = input.providerTradeNo?.trim() || input.providerRef?.trim() || '';
     const params: Record<string, string> = {
@@ -361,7 +370,11 @@ export class ZpayAdapter implements PaymentAdapter {
       const response = await this.request(url, { method: 'POST', body: toFormData(params) });
       return { state: 'succeeded', raw: JSON.stringify(response) };
     } catch (e) {
-      return { state: 'failed', error: `ZPay 退款失败: ${(e as Error).message}` };
+      return {
+        state: 'failed',
+        failureKind: e instanceof ZpayApiRejectedError ? 'definitive' : 'unknown',
+        error: `ZPay 退款失败: ${(e as Error).message}`,
+      };
     }
   }
 
@@ -408,7 +421,9 @@ export class ZpayAdapter implements PaymentAdapter {
     }
     const code = asInteger(response.code);
     if (code !== 1) {
-      throw new Error(asString(response.msg) || `ZPay API 返回 code=${String(response.code)}`);
+      throw new ZpayApiRejectedError(
+        asString(response.msg) || `ZPay API 返回 code=${String(response.code)}`,
+      );
     }
     return response;
   }

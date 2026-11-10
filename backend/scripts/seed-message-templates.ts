@@ -34,8 +34,8 @@ const TEMPLATES = [
   {
     code: 'task_failed',
     channel: 'inapp',
-    subject: '生成失败，积分已退回',
-    body: '任务「{capability}」执行失败（{reason}），{credits} 积分已原额退回。',
+    subject: '生成失败',
+    body: '任务「{capability}」执行失败（{reason}），积分处理结果请查看任务账单。',
   },
   {
     code: 'membership_expired',

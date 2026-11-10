@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  PageHeader,
+  Panel,
+  SegmentedTabs,
+  StaleError,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
 import { adminAssetsApi } from './api';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useSelectionPrune, useToast } from './hooks';
 import {
@@ -17,6 +23,7 @@ import { AssetTable } from './AssetTable';
 import { AssetPreview } from './AssetPreview';
 import { AssetDeleteConfirm } from './AssetDeleteConfirm';
 import { AssetViewToolbar } from './AssetViewToolbar';
+import { ProjectsPanel } from './ProjectsPanel';
 import type { AdminAssetListResult, AssetStatus } from '../../../types/api';
 
 /**
@@ -48,7 +55,11 @@ export function AdminAssetsPage() {
   const toast = useToast();
   const { can } = useAdmin();
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const canReadProjects = can('project.read');
+  const initialSection: 'assets' | 'projects' =
+    searchParams.get('tab') === 'projects' && canReadProjects ? 'projects' : 'assets';
+  const [section, setSection] = useState<'assets' | 'projects'>(initialSection);
   const initialKeyword = searchParams.get('q') ?? '';
   const rawKind = searchParams.get('kind');
   const initialKind = rawKind === 'original' || rawKind === 'generated' ? rawKind : undefined;
@@ -72,6 +83,28 @@ export function AdminAssetsPage() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AssetDeleteTarget | null>(null);
   const appliedQ = useRef(initialKeyword);
+
+  useEffect(() => {
+    if (section !== 'projects' || canReadProjects) return;
+    setSection('assets');
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('tab');
+      return next;
+    }, { replace: true });
+  }, [canReadProjects, section, setSearchParams]);
+
+  const changeSection = (next: string) => {
+    if (next !== 'assets' && next !== 'projects') return;
+    if (next === 'projects' && !canReadProjects) return;
+    setSection(next);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (next === 'projects') params.set('tab', 'projects');
+      else params.delete('tab');
+      return params;
+    }, { replace: true });
+  };
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -340,6 +373,24 @@ export function AdminAssetsPage() {
     <>
       <PageHeader title="素材管理" />
 
+      {canReadProjects && (
+        <SegmentedTabs
+          value={section}
+          onChange={changeSection}
+          ariaLabel="素材管理与项目分类"
+          className="mb-4"
+          options={[
+            { value: 'assets', label: '素材' },
+            { value: 'projects', label: '项目分类' },
+          ]}
+        />
+      )}
+
+      {section === 'projects' ? (
+        <ProjectsPanel onDataChanged={reload} />
+      ) : (
+        <>
+
       {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
       {error && data && <StaleError error={error} onRetry={reload} />}
 
@@ -453,6 +504,8 @@ export function AdminAssetsPage() {
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => void confirmDelete()}
         />
+      )}
+        </>
       )}
     </>
   );

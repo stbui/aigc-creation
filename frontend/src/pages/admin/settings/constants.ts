@@ -20,8 +20,8 @@ export interface RelatedEntry {
 export const RELATED_ENTRIES: RelatedEntry[] = [
   {
     to: '/admin/channels',
-    label: '渠道工作台',
-    description: '上游渠道、渠道模型与协议',
+    label: '模型商品',
+    description: '供应商、模型商品与接入方式',
     permission: 'channel.read',
     icon: Network,
   },

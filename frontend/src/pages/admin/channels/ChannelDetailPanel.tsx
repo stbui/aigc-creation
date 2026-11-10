@@ -1,6 +1,7 @@
-import { Copy, Download, Pencil, Plus, Power, Trash2 } from 'lucide-react';
-import { ActionButton, EmptyState, Panel, StatusTag } from '~/admin-ui/primitives';
+import { Pencil, Plus } from 'lucide-react';
+import { ActionButton, EmptyState, Panel, RowMenu, StatusTag } from '~/admin-ui/primitives';
 import { ChannelModelManager } from './ChannelModelManager';
+import type { ProductConsumptionState } from './useProductConsumption';
 import type { AdminChannelView } from '../../../types/model';
 
 interface ChannelDetailPanelProps {
@@ -14,6 +15,10 @@ interface ChannelDetailPanelProps {
   canTest: boolean;
   saving: boolean;
   exporting: boolean;
+  consumption: ProductConsumptionState;
+  /** 新建供应商后自动打开上游导入 */
+  autoUpstream: boolean;
+  onAutoUpstreamConsumed: () => void;
   pendingModelId: string | null;
   onEdit: (channel: AdminChannelView) => void;
   onDuplicate: (channel: AdminChannelView) => void;
@@ -25,7 +30,7 @@ interface ChannelDetailPanelProps {
   onFocusConsumed: () => void;
 }
 
-/** 渠道工作台右侧：选中渠道的详情与模型管理 */
+/** 供应商视图右侧：选中供应商的详情与商品管理 */
 export function ChannelDetailPanel({
   selected,
   loading,
@@ -36,6 +41,9 @@ export function ChannelDetailPanel({
   canTest,
   saving,
   exporting,
+  consumption,
+  autoUpstream,
+  onAutoUpstreamConsumed,
   pendingModelId,
   onEdit,
   onDuplicate,
@@ -50,7 +58,7 @@ export function ChannelDetailPanel({
     <section
       id="admin-channel-detail"
       className="min-w-0"
-      aria-label={selected ? `${selected.name} 的模型管理` : '渠道模型管理'}
+      aria-label={selected ? `${selected.name} 的商品管理` : '商品管理'}
     >
       {selected ? (
         <Panel
@@ -63,7 +71,7 @@ export function ChannelDetailPanel({
                 <StatusTag
                   status={selected.enabled ? 'channel-enabled' : 'channel-disabled'}
                   tone={selected.enabled ? 'success' : 'muted'}
-                  label={selected.enabled ? '渠道已启用' : '渠道已停用'}
+                  label={selected.enabled ? '供应商已启用' : '供应商已停用'}
                 />
               </span>
             </span>
@@ -90,54 +98,40 @@ export function ChannelDetailPanel({
                 disabled={!writable || saving}
                 onClick={() => onEdit(selected)}
               >
-                编辑
+                编辑供应商
               </ActionButton>
-              <ActionButton
-                variant="ghost"
-                size="xs"
-                className="hover:bg-muted"
-                icon={Copy}
-                disabled={!writable || saving}
-                onClick={() => onDuplicate(selected)}
-              >
-                复制
-              </ActionButton>
-              <span title="导出该渠道（不含凭证）">
-                <ActionButton
-                  variant="ghost"
-                  size="xs"
-                  className="hover:bg-muted"
-                  icon={Download}
-                  disabled={exporting}
-                  onClick={() => onExport(selected)}
-                >
-                  导出
-                </ActionButton>
-              </span>
-              <ActionButton
-                variant="ghost"
-                size="xs"
-                className={
-                  selected.enabled
-                    ? 'text-danger-text hover:text-danger-text'
-                    : 'hover:bg-muted'
-                }
-                icon={Power}
-                disabled={!writable || saving}
-                onClick={() => onToggle(selected)}
-              >
-                {selected.enabled ? '停用渠道' : '启用渠道'}
-              </ActionButton>
-              <ActionButton
-                variant="ghost"
-                size="xs"
-                className="text-danger-text hover:text-danger-text"
-                icon={Trash2}
-                disabled={!writable || saving}
-                onClick={() => onDelete(selected)}
-              >
-                删除
-              </ActionButton>
+              <RowMenu
+                label={`供应商 ${selected.name} 更多操作`}
+                items={[
+                  {
+                    key: 'duplicate',
+                    label: '复制供应商',
+                    disabled: !writable || saving,
+                    onSelect: () => onDuplicate(selected),
+                  },
+                  {
+                    key: 'export',
+                    label: '导出配置（不含凭证）',
+                    disabled: exporting,
+                    onSelect: () => onExport(selected),
+                  },
+                  {
+                    key: 'toggle',
+                    label: selected.enabled ? '停用供应商' : '启用供应商',
+                    disabled: !writable || saving,
+                    danger: selected.enabled,
+                    onSelect: () => onToggle(selected),
+                  },
+                  {
+                    key: 'delete',
+                    label: '删除供应商',
+                    disabled: !writable || saving,
+                    danger: true,
+                    separator: true,
+                    onSelect: () => onDelete(selected),
+                  },
+                ]}
+              />
             </div>
           }
         >
@@ -146,27 +140,30 @@ export function ChannelDetailPanel({
             channel={selected}
             writable={modelWritable}
             canTest={canTest}
+            consumption={consumption}
+            autoFetchUpstream={autoUpstream}
+            onAutoFetchConsumed={onAutoUpstreamConsumed}
             onChanged={onChanged}
             focusModelId={pendingModelId}
             onFocusConsumed={onFocusConsumed}
           />
         </Panel>
       ) : (
-        <Panel title="渠道详情">
+        <Panel title="供应商详情">
           <EmptyState
             title={
               loading
-                ? '正在加载渠道'
+                ? '正在加载供应商'
                 : error
-                  ? '暂时无法读取渠道'
+                  ? '暂时无法读取供应商'
                   : hasFilters
-                    ? '没有匹配的渠道'
-                    : '请选择渠道'
+                    ? '没有匹配的供应商'
+                    : '请选择供应商'
             }
             action={
               !hasFilters && !loading && !error ? (
                 <ActionButton variant="default" size="sm" icon={Plus} disabled={!writable} onClick={onCreate}>
-                  新建渠道
+                  接入供应商
                 </ActionButton>
               ) : undefined
             }

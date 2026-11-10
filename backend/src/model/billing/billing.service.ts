@@ -528,7 +528,7 @@ export class BillingService {
     expectedLeaseOwner: string;
     idempotencyKey: string;
     draft: BillingDraft;
-    /** 限时免费等活动 id；换线后仍要留在新账单上供后续审计 */
+    /** 限时免费等活动 id；换线后仍要留在新账单上供后续追溯 */
     promotionId?: string;
     chargeLimitMicrocredits: bigint;
     afterSwap?: (

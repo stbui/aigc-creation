@@ -4,22 +4,25 @@ import {
   ORDER_PROVIDER_IDS,
   PAYMENT_EXCEPTION_STATUS_META,
   PAYMENT_EXCEPTION_STATUS_OPTIONS,
+  PAYMENT_METHOD_LABELS,
   PROVIDER_LABELS,
-  RECONCILIATION_PROVIDER_IDS,
   RECONCILIATION_RUN_STATUS_META,
   RECONCILIATION_RUN_STATUS_OPTIONS,
 } from '../constants';
 import {
   allowedPaymentMethods,
   instanceState,
+  isValidReconciliationBillDate,
   missingRequiredLabels,
   moneyText,
+  ninetyDaysAgo,
   providerLabel,
   providerState,
   providerWithInstances,
   sourceAvailability,
   sourceAvailableInstances,
   togglePaymentMethod,
+  yesterday,
 } from '../utils';
 import type {
   AdminPaymentProviderInstanceView,
@@ -49,9 +52,8 @@ describe('标签映射', () => {
     expect(PROVIDER_LABELS.zpay).toBe('ZPay');
   });
 
-  it('订单筛选包含七渠道，对账深链白名单仍只保留可自动对账渠道', () => {
+  it('订单筛选包含七个支付渠道', () => {
     expect(ORDER_PROVIDER_IDS).toEqual(['sandbox', 'alipay', 'wechat', 'paypal', 'stripe', 'epay', 'zpay']);
-    expect(RECONCILIATION_PROVIDER_IDS).toEqual(['sandbox', 'alipay', 'wechat']);
   });
 
   it('对账状态筛选项由状态映射派生，文案只维护一份', () => {
@@ -64,6 +66,7 @@ describe('标签映射', () => {
   });
 
   it('三种支付方式都有文案', () => {
+    expect(PAYMENT_METHOD_LABELS).toEqual({ alipay: '支付宝', wechat: '微信支付' });
     expect(CHECKOUT_MODE_LABELS.sandbox).toBe('站内模拟');
     expect(CHECKOUT_MODE_LABELS.redirect).toBe('网站跳转');
     expect(CHECKOUT_MODE_LABELS.qrcode).toBe('扫码支付');
@@ -98,6 +101,27 @@ describe('moneyText', () => {
     expect(moneyText(1000, 'USD')).toBe('$10.00');
     expect(moneyText(0, 'CNY')).toBe('¥0.00');
     expect(moneyText(5, 'CNY')).toBe('¥0.05');
+  });
+});
+
+describe('isValidReconciliationBillDate', () => {
+  const shiftDate = (value: string, days: number) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
+
+  it('仅接受今天之前 90 天内的真实日期', () => {
+    expect(isValidReconciliationBillDate(yesterday())).toBe(true);
+    expect(isValidReconciliationBillDate(ninetyDaysAgo())).toBe(true);
+    expect(isValidReconciliationBillDate(shiftDate(ninetyDaysAgo(), -1))).toBe(false);
+    expect(isValidReconciliationBillDate(shiftDate(yesterday(), 1))).toBe(false);
+  });
+
+  it('拒绝格式错误与不存在的日期', () => {
+    expect(isValidReconciliationBillDate('2026/01/01')).toBe(false);
+    expect(isValidReconciliationBillDate('2026-02-30')).toBe(false);
+    expect(isValidReconciliationBillDate('')).toBe(false);
   });
 });
 

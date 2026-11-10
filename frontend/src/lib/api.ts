@@ -2,7 +2,6 @@ import { API_BASE } from "./constants";
 import { API_ROOT, extractErrorMessage, formDataWithFile, unwrapEnvelope } from "./http";
 import { clearStoredEmail, clearToken, getToken } from "./auth";
 import type {
-  AdminAuditListResult,
   AdminBackup,
   AdminBackupStats,
   AdminCleanupLog,
@@ -72,6 +71,8 @@ import type {
   GenerateResponse,
   LoginRequest,
   Project,
+  ProjectListItem,
+  AdminProject,
   RegisterRequest,
   SmsLoginRequest,
   SmsPurpose,
@@ -115,6 +116,7 @@ import type {
   BatchSummary,
   CreditImportResult,
   ShoppableCarouselTemplatesResult,
+  PortraitTemplatesResult,
 } from "../types/api";
 import type { AdminUserImpact } from "../types/admin-users";
 import type {
@@ -426,10 +428,16 @@ export function oauthAuthorizeUrl(
 }
 
 export const projectsApi = {
-  list: () =>
-    request<TaskListResult>("/projects").then((r) => asList<Project>(r)),
+  list: () => request<ProjectListItem[]>("/projects"),
   create: (name: string) =>
     request<Project>("/projects", { method: "POST", body: { name } }),
+  update: (id: string, name: string) =>
+    request<Project>(`/projects/${id}`, { method: "PATCH", body: { name } }),
+  remove: (id: string, moveAssetsTo?: string) =>
+    request<{ id: string; deletedAt: string; movedAssets: number }>(
+      `/projects/${id}${moveAssetsTo ? `?moveAssetsTo=${encodeURIComponent(moveAssetsTo)}` : ""}`,
+      { method: "DELETE" },
+    ),
 };
 
 /** 采集来源元数据 (浏览器扩展上传时提交, 站点内上传不需要) */
@@ -560,6 +568,19 @@ export const statsApi = {
 export const shoppableCarouselApi = {
   templates: () =>
     request<ShoppableCarouselTemplatesResult>("/shoppable-carousel/templates"),
+};
+
+/**
+ * 写真模板清单 (公开, 免登录)。
+ *
+ * 模板是能力定义的一部分 (决定提交给模型的风格提示词), 事实源在后端
+ * `capabilities/definitions/template.templates.ts`。前端不另存一份清单 ——
+ * 两份清单漂移时, 用户选中的模板会与后端查不到的那份对不上。
+ *
+ * 缩略图是本仓库静态文件, 接口只给相对路径, 运行时不请求外部站点。
+ */
+export const templateApi = {
+  templates: () => request<PortraitTemplatesResult>("/template/templates"),
 };
 
 /**
@@ -710,7 +731,7 @@ export const adminCreditPricesApi = {
  * 能力上下线（后台「能力与模型」）。
  *
  * 后端要求下架时 reason 非空。页面统一生成一句对 C 端可读的下线提示并随请求
- * 下发（同时进入审计），不再让运营手填。
+ * 下发，不再让运营手填。
  */
 export const adminCapabilitiesApi = {
   list: () => request<AdminCapabilityControl[]>("/admin/capabilities"),
@@ -954,25 +975,25 @@ export const adminUsersApi = {
   ) => request<AdminUserStats>(`/admin/users/stats${toQuery(params)}`),
 
   detail: (id: string) => request<AdminUserDetail>(`/admin/users/${id}`),
-  /** 最近登录记录。权限 audit.read —— 无权限时 403，前端按「不可见」处理 */
+  /** 最近登录记录。权限 user.read —— 无权限时 403，前端按「不可见」处理 */
   logins: (id: string, limit = 50) =>
     request<AdminLoginLogResult>(`/admin/users/${id}/logins?limit=${limit}`),
 
   /** 删除前的连带影响预览, 供确认弹窗展示具体数量 */
   impact: (id: string) => request<AdminUserImpact>(`/admin/users/${id}/impact`),
 
-  changeStatus: (id: string, status: "active" | "disabled", reason?: string) =>
+  changeStatus: (id: string, status: "active" | "disabled") =>
     request<{ id: string; status: string }>(`/admin/users/${id}/status`, {
       method: "PATCH",
-      body: { status, ...(reason ? { reason } : {}) },
+      body: { status },
     }),
 
-  changeRole: (id: string, role: string, reason?: string) =>
+  changeRole: (id: string, role: string) =>
     request<{ id: string; role: string; roleLabel: string }>(
       `/admin/users/${id}/role`,
       {
         method: "PATCH",
-        body: { role, ...(reason ? { reason } : {}) },
+        body: { role },
       },
     ),
 
@@ -1143,40 +1164,6 @@ export const adminTasksApi = {
     }),
 };
 
-/** 操作审计 (只读, 后端无删除接口) */
-export const adminAuditApi = {
-  list: (
-    params: {
-      actorId?: string;
-      action?: string;
-      targetId?: string;
-      success?: boolean;
-      from?: string;
-      to?: string;
-      page?: number;
-      pageSize?: number;
-    } = {},
-  ) => {
-    const suffix = toQuery(params);
-    return request<{
-      result: AdminAuditListResult;
-      actions: Array<{ action: string; count: number }>;
-    }>(`/admin/audit-logs${suffix}`);
-  },
-
-  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
-  exportCsv: (
-    params: {
-      actorId?: string;
-      action?: string;
-      targetId?: string;
-      success?: boolean;
-      from?: string;
-      to?: string;
-    } = {},
-  ) => downloadCsv(`/admin/audit-logs/export${toQuery(params)}`),
-};
-
 /**
  * 数据备份与保留期。
  *
@@ -1260,7 +1247,7 @@ export const adminAssetsApi = {
       body: { status },
     }),
 
-  /** 批量下架。每条仍写审计 —— 批量不等于免审计 */
+  /** 批量下架。文件与记录都保留, 误操作可恢复。 */
   batchStatus: (ids: string[], status: AssetStatus) =>
     request<{ count: number; status: AssetStatus }>(
       "/admin/assets/batch-status",
@@ -1284,15 +1271,28 @@ export const adminAssetsApi = {
     return request<AdminProjectListResult>(`/admin/projects${suffix}`);
   },
 
-  /** @deprecated hard 参数仅为旧客户端兼容，后端始终只标记项目 deletedAt。 */
-  removeProject: (id: string, hard = false) =>
+  createProject: (payload: { name: string; ownerId: string }) =>
+    request<Project>("/admin/projects", {
+      method: "POST",
+      body: payload,
+    }),
+
+  updateProject: (id: string, name: string) =>
+    request<Project>(`/admin/projects/${id}`, {
+      method: "PATCH",
+      body: { name },
+    }),
+
+  /** 软删除项目；有素材时必须指定同用户的迁移目标。 */
+  removeProject: (id: string, moveAssetsTo?: string) =>
     request<{
       id: string;
       hard: boolean;
       deprecatedHard: true;
       deletedAt: string;
+      movedAssets: number;
       retained: { assets: number; tasks: number };
-    }>(`/admin/projects/${id}${hard ? "?hard=true" : ""}`, {
+    }>(`/admin/projects/${id}${moveAssetsTo ? `?moveAssetsTo=${encodeURIComponent(moveAssetsTo)}` : ""}`, {
       method: "DELETE",
     }),
 
@@ -1722,8 +1722,7 @@ export const adminOrdersApi = {
    *
    * 渠道失败时后端抛 502 (50302), 这里走 catch, 不会返回本结构。
    *
-   * 返回里区分 creditsReclaimed / creditsUnreclaimable —— 积分已被消耗的部分
-   * 扣不回来, 界面必须显示出来, 否则财务会以为"退款即已全额回收"。
+   * 返回里区分 creditsReclaimed / creditsUnreclaimable / creditsExpired：已消耗和已过期未使用的份额都扣不回来，必须分别展示。
    */
   refund: (id: string, amountCents: number, reason: string) =>
     request<{
@@ -1733,7 +1732,8 @@ export const adminOrdersApi = {
       refundedCents: number;
       fullyRefunded: boolean;
       creditsReclaimed: number;
-      creditsUnreclaimable: number; membershipTerminated: boolean;
+      creditsUnreclaimable: number; creditsExpired: number;
+      membershipTerminated: boolean;
       invoiceFollowUp: { invoiceId: string; invoiceNo: string; status: "pending" | "issued"; message: string } | null; message?: string;
     }>(`/admin/orders/${id}/refund`, {
       method: "POST",
@@ -1783,8 +1783,8 @@ export const adminCreditsApi = {
       `/admin/credits/${userId}/ledger${toQuery(params)}`,
     ),
 
-  /** 人工调整。备注可选；操作人与动作由后台审计自动留痕。 */
-  adjust: (payload: { userId: string; delta: number; reason?: string; validDays?: number }) =>
+  /** 人工调整。备注可选；流水会记录调整人、备注与余额变动。 */
+  adjust: (payload: { userId: string; delta: number; reason?: string; validDays?: number; idempotencyKey?: string }) =>
     request<{ userId: string; balance: number; delta: number }>(
       "/admin/credits/adjust",
       {
@@ -2177,8 +2177,7 @@ export const adminChannelsApi = {
   /**
    * 删除渠道（软删除）。
    *
-   * 删除是业务操作，保留前端确认；审计由后端按操作人、动作和结果记录。
-   * 渠道模型删除同样不要求填写原因。
+   * 删除是业务操作，保留前端确认。渠道模型删除同样不要求填写原因。
    */
   remove: (id: string) =>
     request<{ ok: boolean }>(`/admin/channels/${id}`, { method: "DELETE" }),
@@ -2219,7 +2218,7 @@ export const adminChannelsApi = {
   /**
    * 删除单条渠道模型（软删除）。
    *
-   * 删除保留业务确认；审计记录操作人、动作与结果，不要求填写原因。
+   * 删除保留业务确认，不要求填写原因。
    */
   removeModel: (id: string, modelId: string) =>
     request<{ deleted: number }>(`/admin/channels/${id}/models/${modelId}`, {
@@ -2229,7 +2228,7 @@ export const adminChannelsApi = {
   /**
    * 批量删除渠道模型（全有或全无）。
    *
-   * 删除保留业务确认；审计记录操作人、动作与结果，不要求填写原因。
+   * 删除保留业务确认，不要求填写原因。
    */
   batchDeleteModels: (id: string, ids: string[]) =>
     request<{ deleted: number }>(`/admin/channels/${id}/models/batch-delete`, {
@@ -2458,13 +2457,13 @@ export const adminBillingOrdersApi = {
 export interface AdminApiLogQuery {
   status?: string;
   requestKind?: string;
+  source?: string; operation?: string;
   channelId?: string;
   taskId?: string;
   userId?: string;
   model?: string;
   billable?: string;
-  from?: string;
-  to?: string;
+  from?: string; to?: string;
 }
 
 /** 上游调用记录（`ApiCallLog` 维度，含后台连通性测试的非计费调用） */

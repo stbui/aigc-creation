@@ -212,37 +212,6 @@ export async function removeAdminBusinessFixture(
   }
 }
 
-/**
- * 生成一条真实、可预期的后台审计记录。
- *
- * 商品状态变更是受权限守卫和审计拦截器共同覆盖的写操作；这里固定操作
- * E2E 商品并保持下架，不改变真实售卖状态。审计写入是响应后的异步落库，
- * 因此在返回前轮询确认记录已可查询。
- */
-export async function createAdminAuditFixture(): Promise<{
-  productId: string;
-  action: string;
-}> {
-  const token = await login();
-  const product = await ensureProduct(token);
-  await call('PATCH', `/admin/products/${product.id}/status`, token, { status: 'offline' });
-
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    const result = await call<{
-      result?: { items?: Array<{ id: string; action: string; targetId: string }> };
-    }>(
-      'GET',
-      `/admin/audit-logs?action=product.status_change&targetId=${encodeURIComponent(product.id)}&pageSize=1`,
-      token,
-    );
-    if (result.result?.items?.length) {
-      return { productId: product.id, action: 'product.status_change' };
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error('商品状态变更后未找到对应审计记录');
-}
-
 const TASK_FIXTURE_COUNT = 21;
 const TASK_BATCH_SIZE = 20;
 

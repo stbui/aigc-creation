@@ -4,9 +4,9 @@ import { BILLING_MODE_LABELS, PRICE_POLICY_LABELS } from './constants';
 import type { AdminLogicalModelView } from '../../../types/model';
 
 /**
- * 前台模型清单。
+ * 售卖单元清单（孤儿前台模型）。
  *
- * 「线路可用」与「已上架」是两件事：上架但路由不可用的模型照样会失败（42204），
+ * 「商品可用」与「售卖中」是两件事：售卖中但商品不可用的配置照样会失败（42204），
  * 所以两列分开展示，排障时能一眼看出卡在哪一层。
  */
 export function LogicalModelTable({
@@ -31,7 +31,7 @@ export function LogicalModelTable({
   const columns: Array<AdminColumn<AdminLogicalModelView>> = [
     {
       key: 'name',
-      title: '前台模型',
+      title: '售卖单元',
       width: 240,
       render: (row) => (
         <div className="min-w-0">
@@ -59,7 +59,7 @@ export function LogicalModelTable({
     },
     {
       key: 'price',
-      title: '价格',
+      title: '用户实付',
       width: 170,
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-[12px]">
@@ -68,7 +68,7 @@ export function LogicalModelTable({
             {BILLING_MODE_LABELS[row.billingMode] ?? row.billingMode}
           </span>
           <span className="tabular-nums text-muted-foreground">
-            {row.displayPrice === null ? '跟随服务价格' : `${row.displayPrice} 积分`}
+            {row.displayPrice === null ? '跟随商品售价' : `${row.displayPrice} 积分`}
             {row.priceTiers.length > 1 ? ` · ${row.priceTiers.length} 档` : ''}
           </span>
         </div>
@@ -76,7 +76,7 @@ export function LogicalModelTable({
     },
     {
       key: 'routes',
-      title: '服务来源',
+      title: '模型商品',
       width: 120,
       render: (row) => {
         const available = row.routes.filter((route) => route.available).length;
@@ -107,35 +107,26 @@ export function LogicalModelTable({
       render: (row) => (
         <div className="flex flex-col gap-1">
           {row.enabled ? (
-            <StatusTag status="enabled" tone="success" label="已上架" />
+            <StatusTag status="enabled" tone="success" label="售卖中" />
           ) : (
-            <StatusTag status="disabled" tone="muted" label="未上架" />
+            <StatusTag status="disabled" tone="muted" label="未售卖" />
           )}
           {row.available ? (
-            <StatusTag status="available" tone="success" label="路由可用" />
+            <StatusTag status="available" tone="success" label="商品可用" />
           ) : (
             <StatusTag
               status="unavailable"
               tone="danger"
-              label={row.configurationError ? '配置错误' : '路由不可用'}
+              label={row.configurationError ? '配置错误' : '商品不可用'}
             />
           )}
         </div>
       ),
     },
     {
-      key: 'revision',
-      title: 'Revision',
-      width: 90,
-      align: 'right',
-      render: (row) => (
-        <span className="tabular-nums text-muted-foreground">v{row.revisionVersion}</span>
-      ),
-    },
-    {
       key: 'ops',
       title: '操作',
-      width: 240,
+      width: 200,
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
@@ -153,7 +144,7 @@ export function LogicalModelTable({
             icon={FlaskConical}
             onClick={() => onSimulate(row)}
           >
-            模拟
+            测试消费
           </ActionButton>
           <ActionButton
             variant="ghost"
@@ -162,7 +153,7 @@ export function LogicalModelTable({
             disabled={!writable || !!row.archivedAt}
             onClick={() => onArchive(row)}
           >
-            归档
+            移除售卖
           </ActionButton>
         </div>
       ),
@@ -177,8 +168,8 @@ export function LogicalModelTable({
       loading={loading}
       error={rows.length === 0 ? error : null}
       onRetry={onRetry}
-      emptyText="还没有前台模型。先在「渠道工作台」配置渠道与模型，再在这里把能力暴露给用户。"
-      minWidth={1120}
+      emptyText="还没有售卖单元。先在「模型商品」配置供应商与商品，再在这里把能力暴露给用户。"
+      minWidth={1040}
     />
   );
 }

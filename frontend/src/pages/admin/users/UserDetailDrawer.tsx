@@ -62,8 +62,8 @@ function MiniStat({ label, value }: { label: string; value: ReactNode }) {
 /**
  * 详情抽屉里的「最近登录」区块。
  *
- * 单独取数（GET /admin/users/:id/logins，权限 audit.read）而不是并进 detail：
- * 只有运营 / 管理员持有 audit.read，塞进详情会让其他角色顺带看到全站登录 IP。
+ * 单独取数（GET /admin/users/:id/logins，权限 user.read）而不是并进 detail：
+ * 登录 IP / UA 属于安全数据，权限沿用用户读取，避免另设一套权限。
  * 403 时按「不可见」渲染说明 —— 这是权限边界，不是错误。
  */
 function RecentLoginsSection({ userId }: { userId: string }) {
@@ -83,7 +83,7 @@ function RecentLoginsSection({ userId }: { userId: string }) {
       })
       .catch((e: unknown) => {
         if (!alive) return;
-        // 403 = 没有 audit.read；其余错误如实标为加载失败，不伪装成空列表
+        // 403 = 没有 user.read；其余错误如实标为加载失败，不伪装成空列表
         const status = (e as { status?: number }).status;
         setState(status === 403 ? 'forbidden' : 'error');
       });
@@ -104,7 +104,7 @@ function RecentLoginsSection({ userId }: { userId: string }) {
       {state === 'loading' ? <SkeletonBody rows={3} /> : null}
       {state === 'forbidden' ? (
         <p className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-4 text-center text-xs leading-5 text-muted-foreground">
-          当前角色没有审计权限（audit.read），无法查看登录记录。
+          当前角色没有用户读取权限（user.read），无法查看登录记录。
         </p>
       ) : null}
       {state === 'error' ? (
@@ -290,7 +290,7 @@ export function UserDetailDrawer({
 
           <UserGenerationSection generation={d.generation} userId={d.id} />
 
-          {/* 登录审计：权限点 audit.read，无权限时静默显示说明而非报错 */}
+          {/* 登录记录：权限点 user.read，无权限时静默显示说明而非报错 */}
           <RecentLoginsSection userId={d.id} />
 
           <DetailSection title="资源统计">

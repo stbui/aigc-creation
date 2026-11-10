@@ -225,7 +225,7 @@ backend/src/model/
 | 账单与日志 | `GET /billing-orders`、`POST /billing-orders/:id/resolve`、`GET /api-logs`、`GET /analytics/finance` |
 | 服务商目录 | `GET /provider-catalog`、`POST /provider-catalog/refresh`、`POST /provider-catalog/:id/verify`、`POST /provider-catalog/:id/install` |
 
-所有写接口挂权限点（§9.3），高危动作写 `AdminAuditLog`。参考实现只有 `RequireAdmin` 粗粒度校验，本仓按现有权限体系细化——**这是移植时必须补强的一处**。
+所有写接口挂权限点（§9.3）。参考实现只有 `RequireAdmin` 粗粒度校验，本仓按现有权限体系细化——**这是移植时必须补强的一处**。
 
 **服务商目录的口径差异（有意为之，不是缺口）**：参考实现的目录（`catalog.go`，`schemaVersion 1`）携带 `providers[].models[]` + CNY 价格档 + `keyGuide`，`install` 直接建渠道并带模型与定价，前端因此有「选服务商 → 填 Key → 模型与定价」三步向导。本仓的目录是**插件包上游清单**（`ProviderCatalogEntry`：名称 / 厂商 / `apiFormat` / `baseUrl` / `protocols` / `packageUrl`），`install` 复用 `PluginAdminService.install` 安装协议插件，落在后台「插件」页；建渠道与定价仍在「渠道工作台」手工完成。移植向导需要先引入一整套外部的厂商模型目录与人民币价格档，而本仓没有任何订阅源（`MODEL_PROVIDER_CATALOG_URL` 三档均为空），内置一份假目录只会让人误以为「已经支持 N 家厂商」——因此不做。
 
@@ -510,7 +510,7 @@ model: {
 
 `channel.read / channel.write / channel.model_read / channel.model_write / logical_model.read / logical_model.write / user_group.read / user_group.write / plugin.read / plugin.write / billing_order.read / billing_order.resolve / model.analytics_read`
 
-高危（写操作留审计）：`channel.write`、`channel.model_write`、`logical_model.write`、`user_group.write`、`plugin.write`、`billing_order.resolve`。普通管理写操作由 `AuditInterceptor` 自动生成审计原因；删除渠道与渠道模型只保留业务影响确认，不要求填写原因。
+高危写操作：`channel.write`、`channel.model_write`、`logical_model.write`、`user_group.write`、`plugin.write`、`billing_order.resolve`。删除渠道与渠道模型只保留业务影响确认，不要求填写原因。
 
 （实施口径：凭证、价格档与渠道模型连通性测试都挂在 `channel.write` / `channel.model_write` 上；没有独立的 `secret_write` / `price_write` / `model_test` 权限点——它们不在任何路由上校验，留着只会制造「已收窄权限」的错觉。）
 
@@ -563,7 +563,7 @@ model: {
 | 插件包数量大、启动慢 | 启动只解析 manifest；运行时按需展开；缓存解析结果 |
 | 计费改造影响现有充值/退款 | `BillingOrder` 与 `Order` 分离；充值链路不动；退款规则仍作用于充值订单 |
 | 能力与模型契约漂移 | 装配期校验 + 目录按意图过滤；C 端控件只由模型能力合同渲染 |
-| 权限缺失（参考实现只有管理员判定） | 本仓补权限点与审计；写操作全部落 `AdminAuditLog` |
+| 权限缺失（参考实现只有管理员判定） | 本仓补权限点；所有写操作挂权限校验 |
 
 ## 13. 附录：源文件 → 目标文件对照
 

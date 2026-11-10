@@ -49,7 +49,7 @@ export interface AigcMeta {
   metadata: boolean;
   /** 显式标识（可见角标）是否合成成功；后台关闭角标时为 false */
   visible: boolean;
-  /** 写入方式，便于排障与审计回溯 */
+  /** 写入方式，便于排障回溯 */
   method: 'png-text+xmp' | 'jpeg-xmp' | 'visible-only' | 'unsupported' | 'api-only';
   /** 需要人工留意的说明：隐式标识失败、或可见角标被后台关闭 */
   warning?: string;

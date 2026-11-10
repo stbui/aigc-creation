@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
-import { AuditAction, RequirePermission } from './admin.decorator';
+import { RequirePermission } from './admin.decorator';
 import { AppError } from '../common/app.exception';
 import { SchedulerService } from './scheduler.service';
 import { PERMISSIONS } from './permissions';
@@ -46,7 +46,6 @@ export class AdminSchedulerController {
    */
   @Post('run')
   @RequirePermission(PERMISSIONS.settingWrite)
-  @AuditAction('scheduler.run')
   run(@Query('task') task: string) {
     if (!MANUALLY_RUNNABLE.includes(task)) {
       throw new AppError(

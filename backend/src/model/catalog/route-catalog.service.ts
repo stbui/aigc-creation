@@ -302,7 +302,7 @@ export function buildCachedChannelModel(input: {
   config: ModelCapabilityConfig | null;
   protocol?: string;
   priceTiers?: CachedPriceTier[];
-  /** 价格版本；缺省 0，仅影响账单审计字段 */
+  /** 价格版本；缺省 0，仅影响账单追溯字段 */
   priceVersion?: number;
 }): CachedChannelModel {
   return {

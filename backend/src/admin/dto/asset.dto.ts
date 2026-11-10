@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { STORAGE_BACKENDS, type StorageBackend } from '../../storage/storage.provider';
 import { PageQueryDto } from './page-query.dto';
 
@@ -60,4 +60,27 @@ export class ProjectListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsString()
   ownerId?: string;
+}
+
+
+/** 后台新建项目。项目必须归属到一个可用用户。 */
+export class CreateAdminProjectDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty({ message: '项目名称不能为空' })
+  @MaxLength(80, { message: '项目名称不能超过 80 个字符' })
+  name!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: '请选择所属用户' })
+  ownerId!: string;
+}
+
+/** 后台编辑项目。归属用户不随项目改名而变化。 */
+export class UpdateAdminProjectDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty({ message: '项目名称不能为空' })
+  @MaxLength(80, { message: '项目名称不能超过 80 个字符' })
+  name!: string;
 }

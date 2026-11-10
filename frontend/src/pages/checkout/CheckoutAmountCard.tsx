@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { MarketingQuote, MembershipPlan, Order } from '../../types/api';
 import type { PaymentIntent } from '../../types/payment';
+import { CheckoutStripePaymentElement } from './CheckoutStripePaymentElement';
 import { COUPON_MAX_LENGTH, IS_PROD } from './constants';
 import { formatYuan } from './utils';
 
@@ -178,6 +179,16 @@ export function CheckoutAmountCard({
               </button>
             </div>
           </div>
+        ) : onlineIntent?.mode === 'payment-element' &&
+          onlineIntent.clientSecret &&
+          onlineIntent.publishableKey &&
+          order ? (
+          <CheckoutStripePaymentElement
+            orderId={order.id}
+            clientSecret={onlineIntent.clientSecret}
+            publishableKey={onlineIntent.publishableKey}
+            returnUrl={onlineIntent.returnUrl}
+          />
         ) : (
           <>
             <button type="button" className="co-pay-btn" disabled={paying} onClick={onPayOnline}>

@@ -50,13 +50,13 @@ import {
 } from './workspace';
 import type { AdminCapabilityControl } from '../../../types/api';
 import type {
-  AdminChannelModelView,
+  AdminChannelModelListItem,
   AdminLogicalModelView,
   ChannelOrderItemView,
 } from '../../../types/model';
 import { RUNTIME_LABELS } from '../../../lib/constants';
 
-/** 下线原因由页面自动生成：既作为 C 端提示，也作为审计留痕。 */
+/** 下线原因由页面自动生成，同时作为 C 端提示与下线记录。 */
 const OFFLINE_REASON = '该能力已暂时下线，请稍后再试';
 
 type CapabilityTab = 'capabilities' | 'pricing';
@@ -64,13 +64,13 @@ type CapabilityTab = 'capabilities' | 'pricing';
 /**
  * 能力与模型（`/admin/capabilities`）。
  *
- * 以「能力」为主实体，把能力上下线与所属前台模型放在同一工作台：
- * 运营先判断能力此刻是否可收单，再下钻到模型、价格与线路。能力状态和模型
- * 配置是两个独立写操作，分别受 `capability.write` / `logical_model.write`
+ * 以「能力」为主实体，把能力上下线与它消费的模型商品放在同一工作台：
+ * 运营先判断能力此刻是否可收单，再下钻到商品、售价与可售状态。能力状态和
+ * 售卖配置是两个独立写操作，分别受 `capability.write` / `logical_model.write`
  * 控制，不使用一个混合保存按钮。
  *
- * 旧地址 `/admin/logical-models` 由后台外壳重定向到这里；模型表单、路由模拟、
- * 归档确认仍复用前台模型目录中的现有组件，避免复制 CRUD 编排。
+ * 旧地址 `/admin/logical-models` 由后台外壳重定向到这里；售卖表单、消费测试、
+ * 移除售卖确认仍复用前台模型目录中的现有组件，避免复制 CRUD 编排。
  */
 export function AdminLogicalModelsPage() {
   const { can } = useAdmin();
@@ -198,7 +198,16 @@ export function AdminLogicalModelsPage() {
     return Array.from(options, ([value, label]) => ({ value, label }));
   }, [definitions, workspace.items]);
 
-  const [channelModels, setChannelModels] = useState<AdminChannelModelView[]>([]);
+  /** 能力 id → 产出模态；商品选择器据此过滤兼容商品 */
+  const capabilityModalityById = useMemo<Map<string, string>>(
+    () =>
+      new Map(
+        definitions.map((item) => [item.id, item.modality ?? 'image'] as const),
+      ),
+    [definitions],
+  );
+
+  const [channelModels, setChannelModels] = useState<AdminChannelModelListItem[]>([]);
   const [channels, setChannels] = useState<ChannelOrderItemView[]>([]);
   useEffect(() => {
     if (!modelWritable) return;
@@ -366,7 +375,7 @@ export function AdminLogicalModelsPage() {
         weight: Number(route.weight) || 0,
       }));
     if (routes.length !== draft.routes.length) {
-      toast.error('有服务来源尚未选择具体模型');
+      toast.error('有模型商品尚未选择具体商品');
       return;
     }
 
@@ -390,10 +399,10 @@ export function AdminLogicalModelsPage() {
     try {
       if (editing) {
         await adminLogicalModelsApi.update(editing.id, body);
-        toast.success('模型配置已保存');
+        toast.success('售卖配置已保存');
       } else {
         await adminLogicalModelsApi.create(body);
-        toast.success('前台模型已创建，请确认服务来源可用后再上架');
+        toast.success('模型商品已添加，请确认商品可用后再上架');
       }
       resetForm();
       await reloadWorkspace();
@@ -409,11 +418,11 @@ export function AdminLogicalModelsPage() {
     setSaving(true);
     try {
       await adminLogicalModelsApi.archive(archiveTarget.id);
-      toast.success(`已归档「${archiveTarget.name}」，历史账单与调用记录仍可回溯`);
+      toast.success(`已移除售卖「${archiveTarget.name}」，历史账单与调用记录仍可回溯`);
       setArchiveTarget(null);
       await reloadWorkspace();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '归档失败');
+      toast.error(e instanceof Error ? e.message : '移除售卖失败');
     } finally {
       setSaving(false);
     }
@@ -499,12 +508,12 @@ export function AdminLogicalModelsPage() {
   const fatalErrors = [capabilityResource.error, modelResource.error].filter(Boolean);
   const description =
     tab === 'pricing'
-      ? '按能力维护运行时消耗价；改价、能力上下线与前台模型配置分别受独立权限控制。'
+      ? '按能力维护运行时消耗价；改价、能力上下线与售卖配置分别受独立权限控制。'
       : !capabilityReadable
-        ? '当前账号可查看前台模型与线路，但没有 capability.read，能力运行状态不可见。'
+        ? '当前账号可查看售卖配置与模型商品，但没有 capability.read，能力运行状态不可见。'
         : !modelReadable
-          ? '当前账号可查看能力状态并执行上下线，但没有 logical_model.read，模型与线路信息不可见。'
-          : '以能力为单位管理上下线、前台模型与线路可用性；能力开关和模型配置分别保存。';
+          ? '当前账号可查看能力状态并执行上下线，但没有 logical_model.read，模型商品信息不可见。'
+          : '以能力为单位管理上下线、消费的模型商品与可售状态；能力开关和售卖配置分别保存。';
 
   const tabs: Array<{ value: CapabilityTab; label: string }> = [];
   if (capabilityWorkspaceReadable) tabs.push({ value: 'capabilities', label: '能力与模型' });
@@ -520,7 +529,7 @@ export function AdminLogicalModelsPage() {
             <>
               {canReadChannels && (
                 <Button asChild variant="outline" size="sm">
-                  <Link to="/admin/channels">渠道工作台</Link>
+                  <Link to="/admin/channels">模型商品</Link>
                 </Button>
               )}
               {canReadPlugins && (
@@ -535,7 +544,7 @@ export function AdminLogicalModelsPage() {
                   icon={Plus}
                   onClick={() => openCreate()}
                 >
-                  新建前台模型
+                  添加商品
                 </ActionButton>
               )}
             </>
@@ -597,8 +606,8 @@ export function AdminLogicalModelsPage() {
           />
           <SwitchField
             checked={includeArchived}
-            label="显示已归档模型"
-            ariaLabel="显示已归档模型"
+            label="显示已移除售卖"
+            ariaLabel="显示已移除售卖"
             disabled={!modelReadable}
             onChange={setIncludeArchived}
           />
@@ -622,7 +631,7 @@ export function AdminLogicalModelsPage() {
         )}
         {capabilityCatalog.error && (
           <Notice tone="warn" title="能力定义加载失败">
-            {capabilityCatalog.error}。已有能力管控记录仍可展示，但新建模型时可能无法自动生成能力范围。
+            {capabilityCatalog.error}。已有能力管控记录仍可展示，但添加商品时可能无法自动生成能力范围。
           </Notice>
         )}
         {!capabilityReadable && (
@@ -658,13 +667,13 @@ export function AdminLogicalModelsPage() {
           <>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex flex-wrap items-baseline gap-2">
-                <span role="heading" aria-level={2} className="text-[13px] font-semibold text-foreground">能力与模型清单</span>
+                <span role="heading" aria-level={2} className="text-[13px] font-semibold text-foreground">能力与商品清单</span>
                 <span className="text-[12px] text-muted-foreground">
                   {hasFilter
                     ? `筛选出 ${filteredWorkspace.items.length} / ${workspace.items.length} 项能力`
                     : `共 ${workspace.items.length} 项能力`}
                   {filteredWorkspace.orphans.length > 0
-                    ? ` · ${filteredWorkspace.orphans.length} 个未归属模型`
+                    ? ` · ${filteredWorkspace.orphans.length} 个未归属售卖单元`
                     : ''}
                 </span>
               </div>
@@ -707,7 +716,7 @@ export function AdminLogicalModelsPage() {
             </div>
 
             {filteredWorkspace.orphans.length > 0 && (
-              <Panel title="未归属已知能力的模型" className="mt-4">
+              <Panel title="未归属已知能力的售卖单元" className="mt-4">
                 <LogicalModelTable
                   rows={filteredWorkspace.orphans}
                   loading={modelResource.loading}
@@ -737,6 +746,8 @@ export function AdminLogicalModelsPage() {
         writable={modelWritable}
         capabilityOptions={capabilityOptions}
         channelModelOptions={channelModelOptions}
+        products={channelModels}
+        capabilityModalityById={capabilityModalityById}
         canReadChannels={canReadChannels}
         canReadPlugins={canReadPlugins}
         onClose={requestCloseForm}
@@ -747,7 +758,7 @@ export function AdminLogicalModelsPage() {
         onSave={() => void submit()}
       />
 
-      {/* 按模型 id 重挂载，模拟抽屉内部状态随目标模型重新初始化 */}
+      {/* 按售卖单元 id 重挂载，消费测试抽屉内部状态随目标初始化 */}
       <RouteSimulateDrawer
         key={simulateFor?.id ?? 'none'}
         model={simulateFor}
@@ -772,10 +783,10 @@ export function AdminLogicalModelsPage() {
         description={
           <p className="text-xs text-muted-foreground">
             下架后 C 端会看到统一提示「{OFFLINE_REASON}」，该能力立即停止提交。
-            此操作会写入审计日志，不影响其它能力与模型线路。
+            此操作不影响其它能力与模型线路。
           </p>
         }
-        impact={['C 端停止提交该能力', 'C 端展示统一下线提示', '写操作审计（含操作人）']}
+        impact={['C 端停止提交该能力', 'C 端展示统一下线提示']}
       />
     </>
   );

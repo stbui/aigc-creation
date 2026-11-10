@@ -17,6 +17,10 @@ type MockPrisma = {
 
 describe('AdminCommerceService 商品删除', () => {
   let prisma: MockPrisma;
+  let paymentConfigs: {
+    available: ReturnType<typeof vi.fn>;
+    availableVisible: ReturnType<typeof vi.fn>;
+  };
   let service: AdminCommerceService;
 
   beforeEach(() => {
@@ -118,6 +122,10 @@ describe('AdminCommerceService 商品删除', () => {
 
 describe('AdminCommerceService 按商品筛订单', () => {
   let prisma: MockPrisma;
+  let paymentConfigs: {
+    available: ReturnType<typeof vi.fn>;
+    availableVisible: ReturnType<typeof vi.fn>;
+  };
   let service: AdminCommerceService;
 
   beforeEach(() => {
@@ -132,12 +140,32 @@ describe('AdminCommerceService 按商品筛订单', () => {
         count: vi.fn().mockResolvedValue(0),
       },
     };
+    paymentConfigs = {
+      available: vi.fn(),
+      availableVisible: vi.fn(),
+    };
     service = new AdminCommerceService(
       prisma as never,
       {} as never,
       {} as never,
-      {} as never,
+      paymentConfigs as never,
     );
+  });
+
+  it('USD 商品按真实渠道能力判断能否上架', async () => {
+    paymentConfigs.available.mockResolvedValue([
+      { id: 'stripe', name: 'Stripe' },
+    ]);
+
+    await expect(
+      (
+        service as unknown as {
+          assertCurrencySellable(currency: string, status: string): Promise<void>;
+        }
+      ).assertCurrencySellable('USD', 'active'),
+    ).resolves.toBeUndefined();
+    expect(paymentConfigs.available).toHaveBeenCalledWith('USD');
+    expect(paymentConfigs.availableVisible).not.toHaveBeenCalled();
   });
 
   it('productId 走明细行 some, 不是 SKU 快照字符串', async () => {

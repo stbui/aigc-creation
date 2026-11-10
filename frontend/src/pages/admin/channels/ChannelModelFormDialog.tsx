@@ -42,7 +42,7 @@ export function ChannelModelFormDialog({
         if (!next) onClose();
       }}
       width={980}
-      title={editing ? `编辑模型 · ${editing.modelKey}` : '新建渠道模型'}
+      title={editing ? `编辑商品 · ${editing.modelKey}` : '新建商品'}
       footer={
         <>
           <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={saving}>
@@ -55,7 +55,7 @@ export function ChannelModelFormDialog({
             size="sm"
             disabled={saving || !writable}
           >
-            {saving ? '保存中…' : '保存模型'}
+            {saving ? '保存中…' : '保存商品'}
           </ActionButton>
         </>
       }

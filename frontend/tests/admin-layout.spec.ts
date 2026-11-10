@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
-import { createAdminAuditFixture } from './support/admin-business-fixtures';
 
 /**
  * 后台布局回归。
@@ -24,7 +23,6 @@ const PAGES = [
   ['/admin/users', '用户管理'],
   ['/admin/roles', '角色权限'],
   ['/admin/settings', '系统设置'],
-  ['/admin/audit-logs', '操作审计'],
 ];
 
 const SIZES: Array<[number, number]> = [
@@ -35,13 +33,6 @@ const SIZES: Array<[number, number]> = [
 
 test.describe('后台布局', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
-
-  let auditFixture: Awaited<ReturnType<typeof createAdminAuditFixture>> | null = null;
-
-  test.beforeAll(async () => {
-    if (!HAS_ADMIN_CREDENTIALS) return;
-    auditFixture = await createAdminAuditFixture();
-  });
 
   for (const [w, h] of SIZES) {
     test(`${w}px 宽下内容区正确扣除侧栏宽度且无横向溢出`, async ({ page }) => {
@@ -235,28 +226,6 @@ test.describe('后台布局', () => {
 
     await drawer.getByRole('button', { name: '关闭' }).click();
     await expect(drawer).toHaveCount(0);
-  });
-
-  test('审计详情在行内展开，不使用抽屉或确认弹窗', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(
-      `${UI}/admin/audit-logs?action=${encodeURIComponent(auditFixture!.action)}&targetId=${encodeURIComponent(auditFixture!.productId)}`,
-    );
-    await page.waitForSelector('.adm-content', { timeout: 15000 });
-    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
-
-    const detailButton = page.getByRole('button', { name: '详情', exact: true }).first();
-    await expect(detailButton).toBeVisible();
-
-    await detailButton.click();
-    await expect(page.getByTestId('admin-table-expanded')).toBeVisible();
-    await expect(page.getByText('审计详情', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('admin-drawer')).toHaveCount(0);
-    await expect(page.getByTestId('admin-modal')).toHaveCount(0);
-    await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
-
-    await page.getByRole('button', { name: '收起', exact: true }).click();
-    await expect(page.getByTestId('admin-table-expanded')).toHaveCount(0);
   });
 
   test('窄版表单页的面板与保存条左对齐且同宽', async ({ page }) => {

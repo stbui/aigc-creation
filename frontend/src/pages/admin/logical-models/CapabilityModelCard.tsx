@@ -38,10 +38,10 @@ const STATE_META: Record<
   CapabilityState,
   { label: string; tone: 'success' | 'danger' | 'warn' | 'muted' }
 > = {
-  available: { label: '可用', tone: 'success' },
+  available: { label: '可售', tone: 'success' },
   disabled: { label: '已下线', tone: 'danger' },
-  unavailable: { label: '无可用线路', tone: 'danger' },
-  unconfigured: { label: '未配置模型', tone: 'warn' },
+  unavailable: { label: '无可用商品', tone: 'danger' },
+  unconfigured: { label: '未配置商品', tone: 'warn' },
   unknown: { label: '状态未知', tone: 'muted' },
 };
 
@@ -104,22 +104,22 @@ function ModelRow({
           {archived ? (
             <StatusTag status="archived" tone="muted" label="不可售" />
           ) : model.enabled ? (
-            <StatusTag status="enabled" tone="success" label="已上架" />
+            <StatusTag status="enabled" tone="success" label="售卖中" />
           ) : (
-            <StatusTag status="disabled" tone="muted" label="未上架" />
+            <StatusTag status="disabled" tone="muted" label="未售卖" />
           )}
-          {/* 线路正常时不重复打标：价格行右侧的「可用 / 总数」已经说明问题 */}
+          {/* 商品正常时不重复打标：价格行右侧的「可用 / 总数」已经说明问题 */}
           {!archived && !model.available && (
-            <StatusTag status="unavailable" tone="danger" label="线路不可用" />
+            <StatusTag status="unavailable" tone="danger" label="商品不可用" />
           )}
         </div>
       </div>
 
       <div className="mt-2 grid grid-cols-[1fr_auto] items-end gap-3">
-        <div className="grid min-w-0 grid-cols-3 gap-2 text-[12px]">
+        <div className="grid min-w-0 grid-cols-2 gap-2 text-[12px]">
           <div className="min-w-0">
-            <div className="text-muted-foreground">价格</div>
-            {/* 有数字时只报金额与计费方式；没有数字时用后端给的 priceLabel（按渠道规格计费 / 按 Token / 未配置） */}
+            <div className="text-muted-foreground">用户实付</div>
+            {/* 有数字时只报金额与计费方式；没有数字时用后端给的 priceLabel（跟随商品价 / 按 Token / 未配置） */}
             <div
               className="truncate text-foreground"
               title={`${PRICE_POLICY_LABELS[model.pricePolicy] ?? model.pricePolicy} · ${
@@ -134,30 +134,31 @@ function ModelRow({
             </div>
           </div>
           <div className="min-w-0">
-            <div className="text-muted-foreground">线路</div>
-            <div className="truncate text-foreground" title={model.routes.map((route) => `${route.channelName} / ${route.channelModelName}`).join('、')}>
+            <div className="text-muted-foreground">模型商品</div>
+            <div
+              className="truncate text-foreground"
+              title={model.routes.map((route) => `${route.channelName} / ${route.channelModelName || route.channelModelKey}`).join('、')}
+            >
               <span className="tabular-nums">
                 {availableRoutes} / {model.routes.length}
               </span>
-              {model.routes[0] &&
-                (canReadChannels ? (
-                  <>
-                    {' · '}
+              {model.routes[0] && (
+                <>
+                  {' · '}
+                  {canReadChannels ? (
                     <Link
                       className="text-brand hover:underline"
                       to={adminChannelHref(model.routes[0].channelId)}
                     >
-                      {model.routes[0].channelName}
+                      {model.routes[0].channelModelName || model.routes[0].channelModelKey}
                     </Link>
-                  </>
-                ) : (
-                  ` · ${model.routes[0].channelName}`
-                ))}
+                  ) : (
+                    model.routes[0].channelModelName || model.routes[0].channelModelKey
+                  )}
+                  {model.routes.length > 1 ? ` 等 ${model.routes.length} 个` : ''}
+                </>
+              )}
             </div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Revision</div>
-            <div className="tabular-nums text-foreground">v{model.revisionVersion}</div>
           </div>
         </div>
 
@@ -177,7 +178,7 @@ function ModelRow({
             icon={FlaskConical}
             onClick={() => onSimulate(model)}
           >
-            模拟
+            测试消费
           </ActionButton>
           <ActionButton
             variant="ghost"
@@ -186,7 +187,7 @@ function ModelRow({
             disabled={!writable || archived}
             onClick={() => onArchive(model)}
           >
-            归档
+            移除售卖
           </ActionButton>
         </div>
       </div>
@@ -201,7 +202,7 @@ function ModelRow({
           </span>
           {canReadChannels && (
             <Link className="shrink-0 text-brand hover:underline" to={adminChannelHref()}>
-              渠道工作台
+              模型商品
             </Link>
           )}
           {canReadPlugins && (
@@ -219,7 +220,7 @@ function ModelRow({
  * 单个能力的组合卡片：上半部分是能力开关与运行结论，下半部分是所属模型。
  *
  * 能力状态始终展示，不能只藏在筛选器里；模型不可用时相对地标出线路问题，
- * 避免运营看到「已上架」就误以为能够收单。
+ * 避免运营看到「售卖中」就误以为能够收单。
  */
 export function CapabilityModelCard({
   item,
@@ -331,7 +332,7 @@ export function CapabilityModelCard({
           )}
         </div>
 
-        {/* 分组是外层分组标题、模态是左侧图标、实现程度 17 项全为 real —— 都不在卡上重复 */}
+        {/* 分组是外层分组标题、模态是左侧图标、实现程度 18 项全为 real —— 都不在卡上重复 */}
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {item.mode !== 'real' && (
             <ToneBadge tone="warn">{MODE_LABELS[item.mode] ?? item.mode}</ToneBadge>
@@ -356,7 +357,7 @@ export function CapabilityModelCard({
             {/* 下线是人工动作，不需要配置入口；无线路 / 未配置才指向供应侧 */}
             {(state === 'unavailable' || state === 'unconfigured') && canReadChannels && (
               <Link className="shrink-0 text-[12px] text-brand hover:underline" to={adminChannelHref()}>
-                渠道工作台
+                模型商品
               </Link>
             )}
             {(state === 'unavailable' || state === 'unconfigured') && canReadPlugins && (
@@ -371,11 +372,11 @@ export function CapabilityModelCard({
       <div className="space-y-2 p-3">
         <div className="flex items-center justify-between gap-2 px-0.5">
           <div className="text-[12px] font-medium text-foreground">
-            所属前台模型
+            消费的模型商品
             {modelsReadable && (activeModels.length > 1 || archivedModels.length > 0) && (
               <span className="ml-1.5 font-normal text-muted-foreground">
                 {activeModels.length} 个
-                {archivedModels.length > 0 ? ` · ${archivedModels.length} 个已归档` : ''}
+                {archivedModels.length > 0 ? ` · ${archivedModels.length} 个已移除` : ''}
               </span>
             )}
           </div>
@@ -386,7 +387,7 @@ export function CapabilityModelCard({
               icon={Plus}
               onClick={() => onCreateModel(item.capabilityId)}
             >
-              新建模型
+              添加商品
             </ActionButton>
           )}
         </div>
@@ -397,7 +398,7 @@ export function CapabilityModelCard({
           </div>
         ) : item.models.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border px-3 py-5 text-center text-[12px] text-muted-foreground">
-            尚未为该能力配置前台模型，C 端无法生成。
+            尚未为该能力添加模型商品，C 端无法生成。
           </div>
         ) : (
           item.models.map((model) => (

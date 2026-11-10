@@ -9,7 +9,7 @@ import {
   Panel,
   RefreshButton,
   StaleError,
-  formatDateTime,
+  formatShanghaiDateTime,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { UserCell } from './UserCell';
@@ -95,7 +95,9 @@ export function CheckinRecordsTab() {
       title: '记录时间',
       width: 160,
       render: (row) => (
-        <span className="tabular-nums text-muted-foreground">{formatDateTime(row.createdAt)}</span>
+        <span className="tabular-nums text-muted-foreground">
+          {formatShanghaiDateTime(row.createdAt)}
+        </span>
       ),
     },
   ];

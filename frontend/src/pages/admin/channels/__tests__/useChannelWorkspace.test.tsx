@@ -140,33 +140,45 @@ describe('useChannelSelection', () => {
 });
 
 describe('useChannelView', () => {
+  it('默认落在商品台账，带 ?id= 的深链落到供应商视图', async () => {
+    const first = renderHook(() => useViewHarness(), {
+      wrapper: selectionWrapper('/admin/channels'),
+    });
+    expect(first.result.current.view).toBe('models');
+
+    const second = renderHook(() => useViewHarness(), {
+      wrapper: selectionWrapper('/admin/channels?id=c1'),
+    });
+    expect(second.result.current.view).toBe('channels');
+  });
+
   it('从地址栏读取视图，并跟随前进后退', async () => {
     const { result } = renderHook(() => useViewHarness(), {
       wrapper: selectionWrapper('/admin/channels'),
     });
-    expect(result.current.view).toBe('channels');
+    expect(result.current.view).toBe('models');
 
-    act(() => result.current.navigate('/admin/channels?view=models'));
-    await waitFor(() => expect(result.current.view).toBe('models'));
+    act(() => result.current.navigate('/admin/channels?view=channels'));
+    await waitFor(() => expect(result.current.view).toBe('channels'));
 
     act(() => result.current.navigate(-1));
-    await waitFor(() => expect(result.current.view).toBe('channels'));
+    await waitFor(() => expect(result.current.view).toBe('models'));
   });
 
-  it('切换视图写回地址栏，切回默认视图时移除冗余参数', async () => {
+  it('切换视图写回地址栏，切回商品台账时移除冗余参数', async () => {
     const { result } = renderHook(() => useViewHarness(), {
       wrapper: selectionWrapper('/admin/channels'),
     });
 
-    act(() => result.current.setView('models'));
-    await waitFor(() => expect(result.current.search).toBe('?view=models'));
-
     act(() => result.current.setView('channels'));
+    await waitFor(() => expect(result.current.search).toBe('?view=channels'));
+
+    act(() => result.current.setView('models'));
     await waitFor(() => expect(result.current.search).toBe(''));
   });
 
   it('同一轮写入选中的渠道与视图时不互相覆盖', async () => {
-    window.history.replaceState({}, '', '/admin/channels?view=models');
+    window.history.replaceState({}, '', '/admin/channels');
     const { result } = renderHook(() => useCombinedUrlHarness(), {
       wrapper: ({ children }: PropsWithChildren) => <BrowserRouter>{children}</BrowserRouter>,
     });
@@ -178,7 +190,7 @@ describe('useChannelView', () => {
 
     await waitFor(() => expect(result.current.view).toBe('channels'));
     expect(result.current.selectedId).toBe('c2');
-    expect(result.current.search).toBe('?id=c2');
+    expect(result.current.search).toBe('?id=c2&view=channels');
   });
 });
 

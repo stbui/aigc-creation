@@ -14,12 +14,7 @@
 import { Body, Controller, Get, Param, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { IsNotEmpty, IsString, MaxLength } from "class-validator";
-import {
-  AdminUser,
-  AuditAction,
-  RequireAllPermissions,
-  RequirePermission,
-} from "../../admin/admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission } from "../../admin/admin.decorator";
 import type { AdminUser as AdminUserContext } from "../../admin/admin.decorator";
 import { PERMISSIONS } from "../../admin/permissions";
 import { sendCsv } from "../../common/csv-response";
@@ -91,12 +86,11 @@ export class AdminBillingOrdersController {
   }
 
   /**
-   * 高危动作：写审计。
+   * 高危动作：需要明确处置结果与原因。
    * 金额口径完全由 `BillingService.resolve` 决定。
    */
   @Post(":id/resolve")
   @RequirePermission(PERMISSIONS.billingOrderResolve)
-  @AuditAction("billing_order.resolve")
   resolve(
     @Param("id") id: string,
     @Body() body: BillingResolveBodyDto,
@@ -118,7 +112,6 @@ export class AdminBillingOrdersController {
    */
   @Post("batch-resolve")
   @RequirePermission(PERMISSIONS.billingOrderResolve)
-  @AuditAction("billing_order.batch_resolve")
   async batchResolve(
     @Body() body: BillingBatchResolveBodyDto,
     @AdminUser() user: AdminUserContext,
@@ -149,12 +142,11 @@ export class AdminApiLogsController {
   /**
    * 导出调用记录（CSV）。
    *
-   * 导出把用户数据带出系统，用独立的 `data.export` 权限点并留审计 —— 与任务
+   * 导出把用户数据带出系统，使用独立的 `data.export` 权限点 —— 与任务
    * 导出同一口径。筛选与列表共用 `apiLogQueryOf`，不会出现两个口径。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.modelCallRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(
     @Query() raw: Record<string, string | undefined>,
     @Res() res: Response,
@@ -169,6 +161,8 @@ function apiLogQueryOf(raw: Record<string, string | undefined>): ApiLogQuery {
   return {
     status: raw.status,
     requestKind: raw.requestKind,
+    source: raw.source,
+    operation: raw.operation,
     channelId: raw.channelId,
     taskId: raw.taskId,
     userId: raw.userId,

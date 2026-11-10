@@ -8,7 +8,7 @@
  *   · `DELETE /admin/logical-models/:id`       归档
  *   · `POST   /admin/logical-models/:id/simulate` 路由模拟（只读）
  *
- * 语义校验在 `LogicalModelAdminService`；这里只做形状校验与权限 / 审计声明。
+ * 语义校验在 `LogicalModelAdminService`；这里只做形状校验与权限声明。
  * `PATCH` 按**全量提交**处理（与参考实现一致）—— 前端表单始终提交完整对象，
  * 缺省字段会按默认值落库，不要用它做「只改一个字段」的局部更新。
  */
@@ -33,11 +33,7 @@ import {
   Max,
   Min,
 } from "class-validator";
-import {
-  AdminUser,
-  AuditAction,
-  RequirePermission,
-} from "../../admin/admin.decorator";
+import { AdminUser, RequirePermission } from "../../admin/admin.decorator";
 import type { AdminUser as AdminUserContext } from "../../admin/admin.decorator";
 import { PERMISSIONS } from "../../admin/permissions";
 import { normalizeCapability } from "../domain/capability-config";
@@ -109,7 +105,6 @@ export class AdminLogicalModelsController {
 
   @Post()
   @RequirePermission(PERMISSIONS.logicalModelWrite)
-  @AuditAction("logical_model.create")
   create(
     @Body() body: LogicalModelWriteBodyDto,
     @AdminUser() user: AdminUserContext,
@@ -152,7 +147,6 @@ export class AdminLogicalModelsController {
 
   @Patch(":id")
   @RequirePermission(PERMISSIONS.logicalModelWrite)
-  @AuditAction("logical_model.update")
   update(
     @Param("id") id: string,
     @Body() body: LogicalModelWriteBodyDto,
@@ -163,7 +157,6 @@ export class AdminLogicalModelsController {
 
   @Delete(":id")
   @RequirePermission(PERMISSIONS.logicalModelWrite)
-  @AuditAction("logical_model.archive")
   async archive(@Param("id") id: string) {
     await this.models.archive(id);
     return { ok: true };

@@ -30,6 +30,12 @@ Thumbs.db
 # ── 临时与历史残留 ────────────────────────────────────────────────────────
 _trash_*/
 *.tgz
+/.workbuddy/
+/verify-portal*.mjs
+/shot-*.mjs
+/inspect-*.mjs
+/.tmp-task-detail.playwright.config.ts
+/frontend/e2e/local-redraw-audit/*.png
 # ── 第三方参考快照 (仅本地分析，不随产品构建) ───────────────────────────────
 reference/ijihua/index.js
 reference/ijihua/index.css

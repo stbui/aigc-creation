@@ -18,7 +18,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BillingService } from '../billing/billing.service';
-import { CreditService } from '../../credits/credit.service';
+import { CreditService, microcreditsToCredits } from '../../credits/credit.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { getCapability } from '../../capabilities/capability.registry';
 import { AppError } from '../../common/app.exception';
@@ -377,14 +377,31 @@ export class TaskLifecycleService {
       taskIds.push(...children.map((child) => child.id));
     }
     const orders = await this.prisma.billingOrder.findMany({
-      where: { taskId: { in: taskIds }, status: 'refunded' },
-      select: { refundedAmountMicrocredits: true, refundReason: true },
+      where: {
+        taskId: { in: taskIds },
+        status: 'refunded',
+        refundReason: { not: 'route_switch' },
+      },
+      select: { id: true },
     });
-    // 换线的旧账单退款不是「用户拿回钱」：那是预授权从旧线路挪到新线路，
-    // 算进通知金额会让用户看到「已退 N 分」但余额没变。
-    return orders
-      .filter((order) => order.refundReason !== 'route_switch')
-      .reduce((sum, order) => sum + Number(order.refundedAmountMicrocredits / 1_000_000n), 0);
+    /*
+     * 换线的旧账单退款不是「用户拿回钱」：那是预授权从旧线路挪到新线路，
+     * 算进通知金额会让用户看到「已退 N 分」但余额没变。
+     *
+     * 钱包退款会先记一条 refund（预留全额回填），命中过期批次时再记一条
+     * expire（立即作废）。通知必须取两条流水的净可用增量，而不是账单上的
+     * refundedAmount —— 后者会把已作废部分也算成用户拿到的积分。
+     */
+    const refundedOrderIds = orders.map((order) => order.id);
+    if (refundedOrderIds.length === 0) return 0;
+    const ledger = await this.prisma.creditLedgerEntry.aggregate({
+      where: {
+        billingOrderId: { in: refundedOrderIds },
+        type: { in: ['refund', 'expire'] },
+      },
+      _sum: { availableDeltaMicrocredits: true },
+    });
+    return microcreditsToCredits(ledger._sum.availableDeltaMicrocredits ?? 0n);
   }
 
   private async toUncertain(taskId: string, billingOrderId: string | null, message: string): Promise<void> {
@@ -409,12 +426,15 @@ export class TaskLifecycleService {
         ? getCapability(row.capability)?.name ?? row.capability
         : '生成任务';
       const credits = await this.refundedCreditsOf(task).catch(() => 0);
+      const refunded = credits > 0;
       await this.notifications.notify({
         userId: ownerId,
         type: 'task_failed',
         vars: { capability: capabilityName, credits, reason },
-        fallbackTitle: '生成失败，积分已退回',
-        fallbackBody: `任务「${capabilityName}」失败，${credits} 积分已原额退回。`,
+        fallbackTitle: refunded ? '生成失败，积分已退回' : '生成失败，积分未增加',
+        fallbackBody: refunded
+          ? `任务「${capabilityName}」失败，${credits} 积分已退回。`
+          : `任务「${capabilityName}」失败，未增加可用积分，过期部分已作废。`,
         link: '/works',
       });
     } catch (error) {

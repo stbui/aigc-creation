@@ -59,7 +59,7 @@ export function maskPhone(phone: string): string {
   return `${p.slice(0, 3)}****${p.slice(-4)}`;
 }
 
-/** 邮箱脱敏：ab***@example.com。用于审计与日志 */
+/** 邮箱脱敏：ab***@example.com。用于日志 */
 export function maskEmail(email: string): string {
   const s = String(email || '').trim();
   const at = s.indexOf('@');

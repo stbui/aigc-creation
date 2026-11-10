@@ -10,6 +10,7 @@ import {
 } from './capability-plugin.type';
 import { parseDetailSections } from './definitions/param-options';
 import { shoppableCarouselTemplate } from './definitions/shoppable_carousel';
+import { portraitTemplate } from './definitions/template.templates';
 import type { Modality } from '../common/modality';
 import { AppError } from '../common/app.exception';
 
@@ -260,6 +261,19 @@ export function validateCapabilityParams(
     const templateId = String(input.templateId ?? '').trim();
     if (!templateId || !shoppableCarouselTemplate(templateId)) {
       throw new AppError(40001, '请选择一个有效的模板', 400);
+    }
+  }
+
+  /*
+   * 写真模板的 `templateId` 同样是外部引用（模板库会持续扩充），
+   * 声明成 text 后 enum 白名单失效。这里补一道校验：提交必须带一个
+   * 真实存在的模板 id，否则提示词会落到兜底风格 —— 用户拿到的是
+   * 「不是我要的婚纱风格」却看不出原因，而且已经扣过费。
+   */
+  if (id === 'template') {
+    const templateId = String(input.templateId ?? '').trim();
+    if (!templateId || !portraitTemplate(templateId)) {
+      throw new AppError(40001, '请选择一个有效的写真模板', 400);
     }
   }
 }

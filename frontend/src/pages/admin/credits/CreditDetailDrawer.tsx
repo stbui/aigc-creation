@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ActionButton,
@@ -21,6 +21,7 @@ import {
 import { LEDGER_LABELS, LEDGER_OPTIONS, SOURCE_LABELS } from './constants';
 import { useCreditDetail, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { adminCreditsApi } from './api';
+import { useStableIdempotencyKey } from './useStableIdempotencyKey';
 import {
   adminBillingOrderDetailHref,
   adminOrderDetailHref,
@@ -58,7 +59,7 @@ export function CreditDetailDrawer({
 
   const [delta, setDelta] = useState('');
   const [validDays, setValidDays] = useState('');
-  /** 调整备注。可选；留空时后端写入系统说明，审计仍自动记录操作上下文 */
+  /** 调整备注。可选；留空时后端写入系统说明 */
   const [reason, setReason] = useState('');
 
   const [busy, setBusy] = useState(false);
@@ -72,6 +73,17 @@ export function CreditDetailDrawer({
   const adjustmentDirty = Boolean(delta.trim() || validDays.trim() || reason.trim());
   useUnsavedGuard(adjustmentDirty);
   const requestClose = useDiscardConfirm(adjustmentDirty, onClose);
+  const requestFingerprint = useMemo(
+    () =>
+      JSON.stringify({
+        userId: user.userId,
+        delta: parsedDelta,
+        reason: reason.trim(),
+        validDays: validDays.trim() ? Number(validDays) : undefined,
+      }),
+    [parsedDelta, reason, user.userId, validDays],
+  );
+  const idempotencyKey = useStableIdempotencyKey(true, requestFingerprint);
 
   const submitAdjust = async () => {
     if (!deltaValid) {
@@ -85,6 +97,7 @@ export function CreditDetailDrawer({
         delta: parsedDelta,
         ...(reason.trim() ? { reason: reason.trim() } : {}),
         ...(validDays.trim() ? { validDays: Number(validDays) } : {}),
+        idempotencyKey,
       });
       toast.success(`已调整 ${signed(parsedDelta)} 积分，当前余额 ${r.balance}`);
       setDelta('');
@@ -298,7 +311,7 @@ export function CreditDetailDrawer({
             <FormField
               label="调整备注（可选）"
               htmlFor="c-reason"
-              hint="写入积分流水；留空时由系统生成说明，操作审计仍会自动留痕。"
+              hint="写入积分流水；留空时由系统生成说明。"
             >
               <TextField
                 value={reason}

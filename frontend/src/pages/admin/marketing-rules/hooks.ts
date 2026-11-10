@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import {
   useAdminList,
@@ -65,6 +65,7 @@ export function useRuleDrafts(): RuleDrafts {
   const [inviteBase, setInviteBase] = useState<InviteRule | null>(null);
   const [checkinBase, setCheckinBase] = useState<CheckinRule | null>(null);
   const [busy, setBusy] = useState(false);
+  const dirtyRef = useRef({ invite: false, checkin: false });
 
   /*
    * 两条规则是同一次加载: 表单里常在两块之间来回对照(邀请奖励 vs 签到奖励),
@@ -75,24 +76,29 @@ export function useRuleDrafts(): RuleDrafts {
     [],
   );
 
-  /*
-   * 草稿依赖 data 而不是 invite/checkin: 后者是本页可编辑的副本,
-   * 把同步逻辑挂在自己的 state 上会边打字边被覆盖。
-   */
-  useEffect(() => {
-    if (!data) return;
-    setInvite(data[0]);
-    setCheckin(data[1]);
-    setInviteBase(data[0]);
-    setCheckinBase(data[1]);
-  }, [data]);
-
   const inviteDirty = Boolean(
     invite && inviteBase && JSON.stringify(invite) !== JSON.stringify(inviteBase),
   );
   const checkinDirty = Boolean(
     checkin && checkinBase && JSON.stringify(checkin) !== JSON.stringify(checkinBase),
   );
+  dirtyRef.current = { invite: inviteDirty, checkin: checkinDirty };
+
+  /*
+   * reload 只刷新没有未保存修改的一侧。脏草稿及它的旧 baseline 必须保留，
+   * 否则用户点刷新或后台重新取数时，正在编辑的内容会被静默覆盖。
+   */
+  useEffect(() => {
+    if (!data) return;
+    if (!dirtyRef.current.invite) {
+      setInvite(data[0]);
+      setInviteBase(data[0]);
+    }
+    if (!dirtyRef.current.checkin) {
+      setCheckin(data[1]);
+      setCheckinBase(data[1]);
+    }
+  }, [data]);
 
   const saveInvite = useCallback(() => {
     void (async () => {

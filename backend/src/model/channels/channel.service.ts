@@ -230,7 +230,7 @@ export class ChannelService {
 
   /**
    * 软删除渠道：清空凭证、停用并删除其渠道模型。
-   * 不物理删除 —— 账单、调用日志、审计都还引用这个 id。
+   * 不物理删除 —— 账单与调用日志仍引用这个 id。
    */
   async remove(id: string): Promise<void> {
     const channel = await this.requireChannel(id);
@@ -280,7 +280,7 @@ export class ChannelService {
     const created = await this.prisma.$transaction(async (tx) => {
       const channel = await tx.modelChannel.create({
         data: {
-          // 归属人 = 执行复制的管理员：审计与追责链要能查到「这条渠道是谁建的」
+          // 归属人 = 执行复制的管理员：追溯链要能查到「这条渠道是谁建的」
           userId: actorId,
           scope: CHANNEL_SCOPE_SYSTEM,
           enabled: source.enabled,

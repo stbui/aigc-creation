@@ -6,16 +6,16 @@
  */
 
 export const PRICE_POLICY_OPTIONS = [
-  { value: 'unified', label: '固定价格' },
-  { value: 'channel', label: '跟随服务价格' },
+  { value: 'unified', label: '固定售价' },
+  { value: 'channel', label: '跟随商品售价' },
 ];
 
 /** 计费方式文案与下拉：唯一事实源在 `lib/billing-mode.ts`，此处仅转出。 */
 export { BILLING_MODE_LABELS, BILLING_MODE_OPTIONS } from '../../../lib/billing-mode';
 
 export const PRICE_POLICY_LABELS: Record<string, string> = {
-  unified: '固定价格',
-  channel: '跟随服务价格',
+  unified: '固定售价',
+  channel: '跟随商品售价',
 };
 
 /** 表单里的单条线路草稿；`key` 只用于 React 列表定位，不提交后端 */

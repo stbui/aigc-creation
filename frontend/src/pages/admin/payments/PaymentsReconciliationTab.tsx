@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { adminPaymentProvidersApi, adminPaymentReconciliationApi } from './api';
 import {
   ActionButton,
@@ -7,6 +7,7 @@ import {
   DateField,
   FilePicker,
   FormField,
+  Notice,
   Panel,
   SelectField,
   StaleError,
@@ -25,7 +26,6 @@ import {
 import type {
   AdminPaymentProviderView,
   AdminReconciliationRun,
-  PaymentProviderId,
 } from '../../../types/payment';
 import {
   RECONCILIATION_RUN_STATUS_META,
@@ -70,6 +70,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
     updateFilter,
     applyFilters,
     resetFilters,
+    replaceFilters,
     draftChanged,
     appliedChips,
     exporting,
@@ -129,6 +130,35 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
     [reconcilableGroups],
   );
 
+  // URL 里的渠道 / 实例必须落在实时能力清单内；后端不支持对账或实例未配置时清掉。
+  useEffect(() => {
+    if (!providers.data || !filterValues.providerId) return;
+    const group = reconcilableGroups.find(
+      (item) => item.provider.id === filterValues.providerId,
+    );
+    if (!group) {
+      replaceFilters({
+        ...filterValues,
+        providerId: undefined,
+        providerInstanceId: undefined,
+      });
+      return;
+    }
+    if (
+      filterValues.providerInstanceId &&
+      !group.instanceOptions.some(
+        (option) => option.value === filterValues.providerInstanceId,
+      )
+    ) {
+      replaceFilters({ ...filterValues, providerInstanceId: undefined });
+    }
+  }, [
+    filterValues,
+    providers.data,
+    reconcilableGroups,
+    replaceFilters,
+  ]);
+
   const selectedReconcilableGroup = reconcilableGroups.find(
     (group) => group.provider.id === runProvider,
   );
@@ -170,7 +200,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         <div className="min-w-0">
           <div className="truncate text-foreground">{providerLabel(row.providerId)}</div>
           <div
-            className="truncate text-[11px] text-muted-foreground"
+            className="truncate text-[12px] text-muted-foreground"
             title={`${runInstanceText(row)} · ${row.providerInstanceId}`}
           >
             {runInstanceText(row)}
@@ -280,6 +310,23 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         appliedChips={appliedChips}
       />
 
+      {providers.error && (
+        <Notice tone="danger" title="支付渠道实例加载失败">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1">
+              {providers.error}。执行对账、导入与渠道筛选暂不可用。
+            </span>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              onClick={() => void providers.reload()}
+            >
+              重试
+            </ActionButton>
+          </div>
+        </Notice>
+      )}
+
       {draftChanged && (
         <p className="text-xs text-warn-text">筛选条件已修改，请点击「查询」以应用。</p>
       )}
@@ -329,11 +376,12 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         loading={busy}
         onCancel={() => setRunOpen(false)}
         onConfirm={async () => {
-          if (!runProvider || !runProviderInstance || !runBillDate) return;
+          const providerId = selectedReconcilableGroup?.provider.id;
+          if (!providerId || !runProviderInstance || !runBillDate) return;
           setBusy(true);
           try {
             const result = await adminPaymentReconciliationApi.run({
-              providerId: runProvider as PaymentProviderId,
+              providerId,
               providerInstanceId: runProviderInstance,
               billDate: runBillDate,
             });
@@ -355,7 +403,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         open={importOpen}
         title="导入对账单"
         description="渠道账单接口不可用时的兜底入口。导入后仍会逐笔核对，不一致的行进入差异列表。"
-        impact={['按商户订单号与本地订单比对', '支付宝支持 ZIP 内的 CSV', '超过 10000 行会拒绝导出']}
+        impact={['按商户订单号与本地订单比对', '支付宝支持 ZIP 内的 CSV', '超过 10000 行会拒绝导入']}
         confirmText="确认导入"
         confirmDisabled={
           !importFile || !importProvider || !importInstance || !importBillDate
@@ -363,11 +411,12 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         loading={busy}
         onCancel={() => setImportOpen(false)}
         onConfirm={async () => {
-          if (!importFile || !importProvider || !importInstance || !importBillDate) return;
+          const providerId = importGroup?.provider.id;
+          if (!importFile || !providerId || !importInstance || !importBillDate) return;
           setBusy(true);
           try {
             await adminPaymentReconciliationApi.importCsv(importFile, {
-              providerId: importProvider as PaymentProviderId,
+              providerId,
               providerInstanceId: importInstance,
               billDate: importBillDate,
             });

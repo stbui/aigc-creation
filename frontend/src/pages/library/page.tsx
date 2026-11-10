@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Download,
+  FolderInput,
+  FolderKanban,
   LayoutGrid,
   RefreshCw,
   Smartphone,
@@ -30,6 +32,8 @@ import {
   type LightboxItem,
 } from './components';
 import { AssetCard } from './AssetCard';
+import { MoveAssetsDialog } from './MoveAssetsDialog';
+import { ProjectManagerDialog } from './ProjectManagerDialog';
 import { assetsApi, assetSrc, projectsApi } from './api';
 import { useApp, useAuth, useCapabilities, useDocumentMeta, useProject } from './hooks';
 import {
@@ -51,16 +55,7 @@ import {
   isSupportedImageFile,
   toolPath,
 } from './utils';
-import type { Asset, MobileUploadAsset, Project } from '../../types/api';
-
-/**
- * 素材库页面。完整视觉与文案规范见 `docs/library-design.md`。
- *
- * 页面只通过 `../ui` 使用 shadcn / Radix 组合件；分组按已有的
- * projectId / capability / createdAt 在客户端聚合，不额外发明素材文件夹契约。
- * 图片网格使用直角纯图卡，上传原图带常驻标记，操作按钮在 hover、键盘聚焦
- * 和触屏环境显示。
- */
+import type { Asset, MobileUploadAsset, ProjectListItem } from '../../types/api';
 
 export function LibraryPage() {
   useDocumentMeta('素材库 · 货觉AI', '管理上传的原图与生成图，支持分组、下载与删除。');
@@ -87,6 +82,8 @@ export function LibraryPage() {
   const [uploading, setUploading] = useState(false);
   /** 手机扫码上传弹窗；素材由后端直落素材库，接收后只需刷新列表 */
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [projectManagerOpen, setProjectManagerOpen] = useState(false);
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   /** 大图查看器下标；null = 关闭。只收录图片素材，视频继续使用原生播放器。 */
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
@@ -94,14 +91,35 @@ export function LibraryPage() {
    * 外部入口: 浏览器扩展保存后跳 `/asset-library?projectId=xxx`，直接落在
    * 刚采集进的那个分组上。惰性初始化是为了首帧就分组，不闪一下「全部」。
    */
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectIdParam = searchParams.get('projectId');
 
   /** 分组依据与当前选中的分组（null = 全部分组） */
   const [groupBy, setGroupBy] = useState<GroupBy>(projectIdParam ? 'project' : 'none');
   const [groupKey, setGroupKey] = useState<string | null>(projectIdParam);
   /** 项目名映射：按项目分组时要显示名字，只有 id 的分组没人看得懂 */
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectListItem[]>([]);
+
+  /** 项目分组与 URL 同步，刷新/分享后仍能直接落到同一个项目。 */
+  const setProjectParam = useCallback(
+    (id: string | null) => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        if (id) next.set('projectId', id); else next.delete('projectId');
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+
+  const selectProjectGroup = useCallback(
+    (id: string | null) => {
+      setGroupBy('project');
+      setGroupKey(id);
+      setProjectParam(id);
+    },
+    [setProjectParam],
+  );
 
   /*
    * 切换维度/能力/分组后清空勾选：批量下载只应作用于当前可见集合，
@@ -111,23 +129,26 @@ export function LibraryPage() {
     setSelected([]);
   }, [kind, capability, groupBy, groupKey]);
 
-  // 项目列表只在真的要按项目分组时拉: 素材页的主路径是看图，不为一个辅助视图多发一次请求
+  /** 项目列表同时服务于项目分组、上传目标与项目管理弹窗。 */
+  const refreshProjects = useCallback(async () => {
+    if (!token) {
+      setProjects([]);
+      return [] as ProjectListItem[];
+    }
+    const list = await projectsApi.list();
+    setProjects(list);
+    return list;
+  }, [token]);
+
   useEffect(() => {
-    if (!token) return;
-    if (groupBy !== 'project' || projects.length > 0) return;
-    let alive = true;
-    projectsApi
-      .list()
-      .then((list) => {
-        if (alive) setProjects(list);
-      })
-      .catch(() => {
-        /* 拉不到项目名就用 id 兜底，不阻断素材浏览 */
-      });
-    return () => {
-      alive = false;
-    };
-  }, [groupBy, projects.length, token]);
+    if (!token) {
+      setProjects([]);
+      return;
+    }
+    void refreshProjects().catch(() => {
+      /* 拉不到项目名时分组仍用 id 兜底，不阻断素材浏览 */
+    });
+  }, [refreshProjects, token]);
 
   /*
    * 站内跳转 (已在素材库时再点扩展的通知) 不会重建组件，惰性初始化不生效，
@@ -233,6 +254,19 @@ export function LibraryPage() {
   const groups = useMemo(() => {
     if (groupBy === 'none') return [] as AssetGroup[];
     const map = new Map<string, AssetGroup>();
+
+    // 项目分组以项目列表为主：即使项目里没有素材，也要能在这里看到并进入。
+    if (groupBy === 'project') {
+      projects.forEach((project, index) => {
+        map.set(project.id, {
+          key: project.id,
+          label: project.name,
+          count: 0,
+          sort: index,
+        });
+      });
+    }
+
     for (const a of items) {
       const { key, label, sort } = groupOf(a);
       const hit = map.get(key);
@@ -242,10 +276,18 @@ export function LibraryPage() {
     return [...map.values()].sort(
       (x, y) => x.sort - y.sort || x.label.localeCompare(y.label, 'zh-CN'),
     );
-  }, [items, groupBy, groupOf]);
+  }, [items, groupBy, groupOf, projects]);
 
   // 分组不存在（换了分组依据 / 素材被删）时自动回到「全部」, 不留一个筛不出东西的选中态
   const activeGroup = groups.some((g) => g.key === groupKey) ? groupKey : null;
+  const selectedProjectId = groupBy === 'project' ? activeGroup : null;
+  const activeProject = selectedProjectId
+    ? projects.find((project) => project.id === selectedProjectId) ?? null
+    : null;
+  const moveTargetProjects = useMemo(
+    () => projects.filter((project) => project.id !== selectedProjectId),
+    [projects, selectedProjectId],
+  );
   const shown = useMemo(
     () => (activeGroup ? items.filter((a) => groupOf(a).key === activeGroup) : items),
     [items, activeGroup, groupOf],
@@ -260,7 +302,13 @@ export function LibraryPage() {
         description: '上传原图或生成图片后，可在这里统一筛选、预览和下载。',
         action: '登录并上传',
       }
-    : hasActiveFilters
+    : activeProject
+      ? {
+          title: `「${activeProject.name}」还没有素材`,
+          description: '把素材上传到这个项目，或在批量操作中把已有素材移动过来。',
+          action: '上传到该项目',
+        }
+      : hasActiveFilters
       ? {
           title: '没有符合条件的素材',
           description: '换个来源、能力或分组条件试试。',
@@ -343,10 +391,10 @@ export function LibraryPage() {
     }
     setUploading(true);
     try {
-      const projectId = await ensureProject();
-      for (const f of list) await assetsApi.upload(f, projectId);
+      const targetProjectId = selectedProjectId ?? (await ensureProject());
+      for (const f of list) await assetsApi.upload(f, targetProjectId);
       message.success(`已上传 ${list.length} 张素材`);
-      await load();
+      await Promise.all([refreshProjects(), load()]);
     } catch (e) {
       message.error((e as Error).message || '上传失败');
     } finally {
@@ -363,7 +411,7 @@ export function LibraryPage() {
   const receiveFromMobile = async (assets: MobileUploadAsset[]) => {
     setMobileOpen(false);
     message.success(`已从手机接收 ${assets.length} 张素材`);
-    await load();
+    await Promise.all([refreshProjects(), load()]);
   };
 
   const remove = async (id: string) => {
@@ -373,6 +421,7 @@ export function LibraryPage() {
       setTotal((t) => Math.max(0, t - 1));
       setSelected((prev) => prev.filter((x) => x !== id));
       message.success(res.removedTasks > 0 ? '已删除素材及其作品记录' : '已删除素材');
+      await refreshProjects();
     } catch (e) {
       message.error((e as Error).message || '删除失败');
     }
@@ -405,10 +454,15 @@ export function LibraryPage() {
       openLogin();
       return;
     }
+    if (activeProject) {
+      fileRef.current?.click();
+      return;
+    }
     if (hasActiveFilters) {
       setKind(DEFAULT_KIND);
       setCapability('all');
       setGroupKey(null);
+      setProjectParam(null);
       return;
     }
     fileRef.current?.click();
@@ -468,13 +522,27 @@ export function LibraryPage() {
         </header>
 
         {/* 分组面板: 客户端按项目 / 能力 / 日期真实聚合, 点选分组即筛选 */}
-        {token && items.length > 0 && (
+        {token && (
           <Surface className="asset-library-groups-panel gap-0">
             <SurfaceHeader className="asset-library-group-head px-0">
-              <SurfaceTitle className="asset-library-group-title">素材分组</SurfaceTitle>
-              <SurfaceDescription className="asset-library-group-desc">
-                按项目、能力或日期聚合素材，点选即可筛选
-              </SurfaceDescription>
+              <div className="min-w-0">
+                <SurfaceTitle className="asset-library-group-title">素材分组</SurfaceTitle>
+                <SurfaceDescription className="asset-library-group-desc">
+                  按项目、能力或日期聚合素材，点选即可筛选
+                </SurfaceDescription>
+              </div>
+              <Button
+                type="text"
+                size="small"
+                icon={<FolderKanban className="size-3.5" />}
+                className="ml-auto shrink-0"
+                onClick={() => {
+                  setGroupBy('project');
+                  setProjectManagerOpen(true);
+                }}
+              >
+                项目管理
+              </Button>
             </SurfaceHeader>
             <SurfaceContent className="px-0">
               <ToggleGroup
@@ -503,8 +571,10 @@ export function LibraryPage() {
                     setKind('all');
                     setCapability('all');
                   }
-                  setGroupBy(next as GroupBy);
-                  setGroupKey(null);
+                  const nextGroupBy = next as GroupBy;
+                  setGroupBy(nextGroupBy);
+                  setGroupKey(nextGroupBy === 'project' ? projectIdParam : null);
+                  if (nextGroupBy !== 'project') setProjectParam(null);
                 }}
               />
               {groups.length > 0 && (
@@ -535,7 +605,11 @@ export function LibraryPage() {
                     })),
                   ]}
                   onValueChange={(next) => {
-                    setGroupKey(next && next !== '__all__' ? next : null);
+                    if (groupBy === 'project') {
+                      selectProjectGroup(next && next !== '__all__' ? next : null);
+                    } else {
+                      setGroupKey(next && next !== '__all__' ? next : null);
+                    }
                   }}
                 />
               )}
@@ -556,6 +630,14 @@ export function LibraryPage() {
                 onClick={downloadSelected}
               >
                 下载所选
+              </Button>
+              <Button
+                type="text"
+                size="small"
+                icon={<FolderInput className="size-3" />}
+                onClick={() => setMoveDialogOpen(true)}
+              >
+                移动到项目
               </Button>
               <Button
                 type="text"
@@ -605,10 +687,10 @@ export function LibraryPage() {
             </EmptyStateHeader>
             <EmptyStateContent>
               <Button
-                type={hasActiveFilters && token ? 'default' : 'primary'}
-                icon={hasActiveFilters && token ? undefined : <Upload className="size-3.5" />}
+                type={(hasActiveFilters && token && !activeProject) ? 'default' : 'primary'}
+                icon={(hasActiveFilters && token && !activeProject) ? undefined : <Upload className="size-3.5" />}
                 className={
-                  hasActiveFilters && token
+                  (hasActiveFilters && token && !activeProject)
                     ? 'asset-library-button asset-library-empty-action'
                     : 'asset-library-button asset-library-button-primary asset-library-empty-action'
                 }
@@ -666,8 +748,47 @@ export function LibraryPage() {
         {/* 手机上传弹窗 (二维码方案): 手机扫码选图/拍照, 电脑端接收后刷新列表 */}
         <MobileUploadModal
           open={mobileOpen}
+          projectId={selectedProjectId}
           onReceived={(assets) => void receiveFromMobile(assets)}
           onCancel={() => setMobileOpen(false)}
+        />
+
+        <ProjectManagerDialog
+          open={projectManagerOpen}
+          projects={projects}
+          currentProjectId={selectedProjectId}
+          onClose={() => setProjectManagerOpen(false)}
+          onSelect={(id) => selectProjectGroup(id)}
+          onCreate={async (name) => {
+            await projectsApi.create(name);
+            await refreshProjects();
+          }}
+          onRename={async (id, name) => {
+            await projectsApi.update(id, name);
+            await refreshProjects();
+          }}
+          onDelete={async (project, moveAssetsTo) => {
+            await projectsApi.remove(project.id, moveAssetsTo);
+            if (project.id === selectedProjectId) {
+              setGroupKey(null);
+              setProjectParam(null);
+            }
+            await Promise.all([refreshProjects(), load()]);
+          }}
+        />
+
+        <MoveAssetsDialog
+          open={moveDialogOpen}
+          count={selected.length}
+          projects={moveTargetProjects}
+          onCancel={() => setMoveDialogOpen(false)}
+          onConfirm={async (projectId) => {
+            const result = await assetsApi.move(selected, projectId);
+            message.success(`已移动 ${result.moved} 个素材`);
+            setMoveDialogOpen(false);
+            setSelected([]);
+            await Promise.all([refreshProjects(), load()]);
+          }}
         />
       </div>
     </div>

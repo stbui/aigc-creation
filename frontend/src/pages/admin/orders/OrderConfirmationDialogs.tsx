@@ -78,13 +78,11 @@ export function OrderActionDialog({
               action.row.membershipPlanName
                 ? `激活会员：${action.row.membershipPlanName}`
                 : '不涉及会员',
-              '写操作审计（含操作人）',
             ]
           : [
               `退款金额 ¥ ${refundYuan || '未填'}`,
               '回收未消耗的积分（按批次剩余量）',
               '订单状态 → 已退款 / 部分退款',
-              '写操作审计（含操作人）',
             ]
       }
       extra={
@@ -195,13 +193,11 @@ export function RefundConfirmationDialog({
               '退款单 → 已成功',
               '扣回本单尚未消耗的积分',
               '更新订单已退金额与退款状态',
-              '写操作审计（含操作人、依据）',
             ]
           : [
               '退款单 → 已失败并关闭',
               '订单状态与金额保持不变',
               '积分保持不变',
-              '写操作审计（含操作人、依据）',
             ]
       }
       extra={
@@ -269,7 +265,6 @@ export function BatchMarkPaidDialog({
         `共 ${count} 笔订单`,
         '每笔会生成一条手工核销流水',
         '发放对应的积分或会员权益',
-        '写操作审计（含操作人）',
       ]}
     />
   );

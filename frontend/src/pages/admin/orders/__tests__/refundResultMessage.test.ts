@@ -8,6 +8,7 @@ describe('refundWarningMessage', () => {
       refundWarningMessage({
         creditsReclaimed: 100,
         creditsUnreclaimable: 0,
+        creditsExpired: 0,
         invoiceFollowUp: null,
         membershipTerminated: false,
       }),
@@ -19,6 +20,7 @@ describe('refundWarningMessage', () => {
       refundWarningMessage({
         creditsReclaimed: 60,
         creditsUnreclaimable: 40,
+        creditsExpired: 0,
         invoiceFollowUp: { message: '请到发票管理驳回该申请。' },
         membershipTerminated: false,
       }),
@@ -30,6 +32,7 @@ describe('refundWarningMessage', () => {
       refundWarningMessage({
         creditsReclaimed: 0,
         creditsUnreclaimable: 0,
+        creditsExpired: 0,
         invoiceFollowUp: { message: '请完成发票冲红登记。' },
         membershipTerminated: false,
       }),
@@ -41,6 +44,7 @@ describe('refundWarningMessage', () => {
       refundWarningMessage({
         creditsReclaimed: 25,
         creditsUnreclaimable: 0,
+        creditsExpired: 0,
         invoiceFollowUp: null,
         membershipTerminated: true,
       }),
@@ -50,9 +54,34 @@ describe('refundWarningMessage', () => {
       refundWarningMessage({
         creditsReclaimed: 25,
         creditsUnreclaimable: 0,
+        creditsExpired: 0,
         invoiceFollowUp: null,
         membershipTerminated: false,
       }),
     ).toBeNull();
+  });
+
+  it('仅有过期份额时明确说明已过期作废', () => {
+    expect(
+      refundWarningMessage({
+        creditsReclaimed: 0,
+        creditsUnreclaimable: 0,
+        creditsExpired: 30,
+        invoiceFollowUp: null,
+        membershipTerminated: false,
+      }),
+    ).toBe('回收积分 0，另有 30 积分已过期作废');
+  });
+
+  it('同时存在已消耗和已过期份额时分别说明', () => {
+    expect(
+      refundWarningMessage({
+        creditsReclaimed: 50,
+        creditsUnreclaimable: 20,
+        creditsExpired: 10,
+        invoiceFollowUp: { message: '请完成发票冲红登记。' },
+        membershipTerminated: false,
+      }),
+    ).toBe('回收积分 50，另有 20 积分已被消耗无法回收，10 积分已过期作废；请完成发票冲红登记。');
   });
 });

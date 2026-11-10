@@ -136,7 +136,7 @@ export class AdminSettingsService {
    *
    * @param settings 要设置的键值对。键必须是 SETTING_DEFS 里的键
    * @param clears   要恢复默认的键：删除 SystemSetting 行 → 回落代码默认值
-   * @param actor    操作人标识（写入 SystemSetting.updatedBy，供审计追溯）
+   * @param actor    操作人标识（写入 SystemSetting.updatedBy，供追溯）
    */
   async updateAll(
     settings: Record<string, unknown>,
@@ -184,7 +184,7 @@ export class AdminSettingsService {
       );
     }
 
-    // ── 记录改动前后的值（审计要的就是这个） ──────────────────────────
+    // ── 记录改动前后的值（用于返回变更摘要） ───────────────────────────
     const before = await this.prisma.systemSetting.findMany({
       where: { key: { in: [...normalized.map((n) => n.key), ...clearList] } },
     });
@@ -218,7 +218,7 @@ export class AdminSettingsService {
         const def = findSettingDef(key)!;
         const prev = beforeByKey.get(key);
         if (!prev) {
-          // 本来就是默认值 —— 无事可做，但要在审计里如实体现
+          // 本来就是默认值 —— 无事可做，但要在变更摘要里如实体现
           changes.push({
             key,
             label: def.label,
@@ -309,7 +309,7 @@ export class AdminSettingsService {
   }
 }
 
-/** 单项改动的前后对照 —— 写入审计 detail */
+/** 单项改动的前后对照 */
 export interface SettingChange {
   key: string;
   label: string;

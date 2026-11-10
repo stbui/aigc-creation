@@ -16,6 +16,7 @@ import {
 } from './hooks';
 import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants';
 import { normalizeChannelHeaders, toChannelDraft, validateChannelHeaders } from './utils';
+import { useProductConsumption } from './useProductConsumption';
 import type { AdminChannelView, SystemChannelExportView } from '../../../types/model';
 
 /** 导出文件下载：走 Blob，不经 `downloadCsv`（不是 CSV，且要保留 JSON 结构） */
@@ -45,6 +46,8 @@ export function useChannelWorkspace() {
   const { keyword, status, setKeyword, setStatus, visible, clearFilters, hasFilters } =
     useChannelFilters(rows);
   const health = useChannelHealth();
+  /** 商品被哪些能力消费：渠道侧只读，用于“这个商品能不能动”的判断 */
+  const consumption = useProductConsumption();
 
   /** 视图以地址栏为准：排障链接可直接分享，前进 / 后退也能正确切换。 */
   const [view, setView] = useChannelView();
@@ -64,12 +67,14 @@ export function useChannelWorkspace() {
   const [selectedId, setSelectedId] = useAdminDetailParam();
   /** 排序弹窗：`null` 关闭；有渠道 id = 排该渠道下的模型，空串 = 排渠道 */
   const [orderFor, setOrderFor] = useState<string | null>(null);
-  /** 从「全部模型」点编辑时要打开的模型 id：切回渠道视图后由模型工作台消费并清空 */
+  /** 从「商品台账」点编辑时要打开的商品 id：切回供应商视图后由商品工作台消费并清空 */
   const [pendingModelId, setPendingModelId] = useState<string | null>(null);
+  /** 新建成功后自动打开上游导入：把「接入供应商」接成两步，而不是建完再找入口 */
+  const [autoUpstreamFor, setAutoUpstreamFor] = useState<string | null>(null);
 
   useChannelSelection({ visible, loading, error, view, selectedId, setSelectedId });
 
-  /** 从「全部模型」跳回「按渠道」：清筛选，否则目标渠道可能不在可见列表里 */
+  /** 从「商品台账」跳回「供应商」：清筛选，否则目标供应商可能不在可见列表里 */
   const openChannel = useCallback(
     (channelId: string) => {
       clearFilters();
@@ -80,8 +85,8 @@ export function useChannelWorkspace() {
   );
 
   /**
-   * 从「全部模型」直接编辑某条线路：先切回该渠道，再把模型 id 交给模型工作台
-   * 打开编辑器 —— 跨渠道视图的编辑动线不该要求用户自己回去翻清单。
+   * 从「商品台账」直接编辑某个商品：先切回该供应商，再把商品 id 交给商品工作台
+   * 打开编辑器 —— 跨供应商视图的编辑动线不该要求用户自己回去翻清单。
    */
   const openChannelModel = useCallback(
     (channelId: string, modelId: string) => {
@@ -128,7 +133,7 @@ export function useChannelWorkspace() {
   const submit = async () => {
     const name = draft.name.trim();
     if (!name) {
-      toast.error('请填写渠道名称');
+      toast.error('请填写供应商名称');
       return;
     }
     if (!/^https?:\/\//i.test(draft.baseUrl.trim())) {
@@ -171,13 +176,17 @@ export function useChannelWorkspace() {
       try {
         if (editing) {
           await adminChannelsApi.update(editing.id, body);
-          toast.success('渠道已保存，新的配置将用于后续任务');
+          toast.success('供应商已保存，新的配置将用于后续任务');
         } else {
           const created = await adminChannelsApi.create(body);
-          toast.success('渠道已创建，请继续添加模型与价格');
+          toast.success('供应商已接入，请继续添加商品与售价');
           // 新建后清掉筛选并直接选中：下一步一定是配模型，不能被筛选挡在列表外
           clearFilters();
-          if (created?.id) setSelectedId(created.id);
+          if (created?.id) {
+            setSelectedId(created.id);
+            // 自动打开上游导入：运营建供应商的下一步就是拉商品
+            setAutoUpstreamFor(created.id);
+          }
         }
         resetForm();
         await reload();
@@ -191,7 +200,7 @@ export function useChannelWorkspace() {
     await runSaving(async () => {
       try {
         const copy = await adminChannelsApi.duplicate(channel.id);
-        toast.success(`已复制渠道「${channel.name}」，请确认访问凭证与模型后启用`);
+        toast.success(`已复制供应商「${channel.name}」，请确认访问凭证与商品后启用`);
         // 复制的目的是接着改副本：清筛选并选中它，省一次点击
         clearFilters();
         if (copy?.id) setSelectedId(copy.id);
@@ -207,7 +216,7 @@ export function useChannelWorkspace() {
     await runSaving(async () => {
       try {
         await adminChannelsApi.remove(deleteTarget.id);
-        toast.success(`已删除渠道「${deleteTarget.name}」，访问凭证已清除`);
+        toast.success(`已删除供应商「${deleteTarget.name}」，访问凭证已清除`);
         if (selectedId === deleteTarget.id) setSelectedId(null);
         setDeleteTarget(null);
         await reload();
@@ -247,7 +256,7 @@ export function useChannelWorkspace() {
       try {
         await adminChannelsApi.update(toggleTarget.id, { enabled: next });
         toast.success(
-          next ? `已启用渠道「${toggleTarget.name}」` : `已停用渠道「${toggleTarget.name}」`,
+          next ? `已启用供应商「${toggleTarget.name}」` : `已停用供应商「${toggleTarget.name}」`,
         );
         setToggleTarget(null);
         await reload();
@@ -272,23 +281,23 @@ export function useChannelWorkspace() {
         return;
       }
       const names = payload.channels.map((item) => item.name).filter(Boolean);
-      // 导入是按名称合并的覆盖式写入，先让用户看清会动到哪些渠道再执行
+      // 导入是按名称合并的覆盖式写入，先让用户看清会动到哪些供应商再执行
       const preview = `${names.slice(0, 8).join('、')}${names.length > 8 ? ` 等 ${names.length} 个` : ''}`;
       const confirmed = await confirm({
-        title: `导入 ${names.length} 个渠道？`,
-        description: `${preview}。按渠道名称合并：同名渠道保留现有访问凭证与启停状态，只更新服务地址、任务数与文件中的模型；新渠道创建为停用状态，填写访问凭证后再启用；文件中没有的模型保持不变。`,
+        title: `导入 ${names.length} 个供应商？`,
+        description: `${preview}。按供应商名称合并：同名供应商保留现有访问凭证与启停状态，只更新服务地址、任务数与文件中的商品；新供应商创建为停用状态，填写访问凭证后再启用；文件中没有的商品保持不变。`,
         confirmText: '开始导入',
       });
       if (confirmed === null) return;
 
       try {
         const result = await adminChannelsApi.importAll(payload);
-        const summary = `新建 ${result.createdChannels.length} 个、更新 ${result.updatedChannels.length} 个渠道、保存 ${result.savedModels} 个模型`;
+        const summary = `新建 ${result.createdChannels.length} 个、更新 ${result.updatedChannels.length} 个供应商、保存 ${result.savedModels} 个商品`;
         if (result.errors?.length) {
           toast.error(`${summary}；${result.errors.length} 条失败：${result.errors.slice(0, 3).join('；')}`);
         } else {
           toast.success(
-            result.createdChannels.length ? `${summary}；新渠道需填写访问凭证后启用` : summary,
+            result.createdChannels.length ? `${summary}；新供应商需填写访问凭证后启用` : summary,
           );
         }
         setImportFile(null);
@@ -352,6 +361,7 @@ export function useChannelWorkspace() {
     clearFilters,
     hasFilters,
     health,
+    consumption,
     selectedId,
     setSelectedId,
     selected,
@@ -385,5 +395,7 @@ export function useChannelWorkspace() {
     orderChannel,
     pendingModelId,
     setPendingModelId,
+    autoUpstreamFor,
+    setAutoUpstreamFor,
   };
 }

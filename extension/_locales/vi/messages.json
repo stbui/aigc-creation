@@ -311,5 +311,11 @@
   },
   "copyAddressFailed": {
     "message": "Không thể sao chép URL ảnh"
+  },
+  "extensionReloadRequiredTitle": {
+    "message": "Tiện ích đã được cập nhật"
+  },
+  "extensionReloadRequiredMessage": {
+    "message": "Tải lại trang này rồi thử lại."
   }
 }

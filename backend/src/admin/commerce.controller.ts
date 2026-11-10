@@ -29,12 +29,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
-import {
-  AuditAction,
-  AdminUser,
-  RequireAllPermissions,
-  RequirePermission,
-} from "./admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission } from "./admin.decorator";
 import { AppError } from "../common/app.exception";
 import { OrderService } from "../orders/order.service";
 import { CreditService } from "../credits/credit.service";
@@ -134,7 +129,7 @@ export class RefundConfirmDto {
  * amount 会被误解为「金额」或「绝对值」, 后者会让"扣减"无法表达。
  *
  * `reason` 可选：有具体业务依据时写入流水备注；未填写时由系统按增减方向
- * 生成稳定说明，操作人、目标用户和动作仍由审计日志自动记录。
+ * 生成稳定说明；操作人与目标用户随积分流水保存。
  */
 export class AdjustCreditDto {
   @IsString() userId!: string;
@@ -143,6 +138,8 @@ export class AdjustCreditDto {
   /** 调整备注。写入积分流水；留空时由服务端生成系统说明 */
   @IsOptional() @IsString() @MaxLength(200) reason?: string;
   @IsOptional() @IsInt() @Min(0) validDays?: number;
+  /** 幂等键：同一次调整的重试必须复用，避免超时后重复加减积分 */
+  @IsOptional() @IsString() @MaxLength(80) idempotencyKey?: string;
 }
 
 /**
@@ -240,7 +237,7 @@ function num(raw: string | undefined): number | undefined {
  *   credit.read/adjust  积分
  *   data.export         任何 CSV 导出 (导出即把用户数据带出系统)
  *
- * ⚠ 所有写操作都带 @AuditAction —— 交易域的每一次改动都必须可追责。
+ * 所有写操作都必须经过独立权限校验。
  * 查询与规则在 AdminCommerceService, 本控制器只做权限/参数/响应。
  */
 @Controller("admin")
@@ -271,11 +268,10 @@ export class AdminCommerceController {
   /**
    * 批量改价。逐项落库并即时失效缓存 —— 改完立刻生效, 不必等 3s TTL。
    *
-   * ⚠ 写审计: 定价是影响收入的关键操作, 必须能回答「这个价谁在什么时候改的」。
+   * 定价是影响收入的关键操作，必须使用独立权限。
    */
   @Put("credit-prices")
   @RequirePermission(PERMISSIONS.productPrice)
-  @AuditAction("credit.price_update")
   async updateCreditPrices(@Body() dto: UpdateCreditPricesDto) {
     if (!dto.items?.length) {
       throw new AppError(40001, "没有需要更新的消耗价", 400);
@@ -290,7 +286,6 @@ export class AdminCommerceController {
   /** 单项回落默认值 (删掉 SystemSetting 覆盖, 回到 registry) */
   @Post("credit-prices/:capabilityId/reset")
   @RequirePermission(PERMISSIONS.productPrice)
-  @AuditAction("credit.price_reset")
   resetCreditPrice(@Param("capabilityId") capabilityId: string) {
     return this.creditPrice.resetPrice(capabilityId);
   }
@@ -307,7 +302,6 @@ export class AdminCommerceController {
   /** 新建商品。默认下架, 确认无误后再上架 */
   @Post("products")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("product.create")
   createProduct(@Body() dto: ProductCreateDto) {
     return this.commerce.createProduct(dto);
   }
@@ -319,7 +313,6 @@ export class AdminCommerceController {
    */
   @Patch("products/:id")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("product.update")
   updateProduct(@Param("id") id: string, @Body() dto: ProductUpdateDto) {
     return this.commerce.updateProduct(id, dto);
   }
@@ -327,7 +320,6 @@ export class AdminCommerceController {
   /** 上架/ 下架 (B-36)。下架不影响历史订单 */
   @Patch("products/:id/status")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction("product.status_change")
   async setProductStatus(
     @Param("id") id: string,
     @Body() dto: ProductStatusDto,
@@ -346,7 +338,6 @@ export class AdminCommerceController {
    */
   @Delete("products/:id")
   @RequirePermission(PERMISSIONS.productDelete)
-  @AuditAction("product.delete")
   deleteProduct(@Param("id") id: string) {
     return this.commerce.deleteProduct(id);
   }
@@ -398,7 +389,6 @@ export class AdminCommerceController {
    */
   @Get("orders/export")
   @RequireAllPermissions(PERMISSIONS.orderRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async exportOrders(
     @Res() res: Response,
     @Query("status") status?: string,
@@ -436,15 +426,13 @@ export class AdminCommerceController {
    */
   @Delete("orders/:id")
   @RequirePermission(PERMISSIONS.orderDelete)
-  @AuditAction("order.delete")
   deleteOrder(@Param("id") id: string) {
     return this.commerce.deleteOrder(id);
   }
 
-  /** 手工核销 (B-42): 标记已支付, 须写审计 */
+  /** 手工核销 (B-42): 标记已支付 */
   @Post("orders/:id/mark-paid")
   @RequirePermission(PERMISSIONS.orderMarkPaid)
-  @AuditAction("order.mark_paid")
   async markPaid(@Param("id") id: string, @AdminUser() actor: AdminUser) {
     const order = await this.commerce.orderDetail(id);
     return this.orders.markPaid({
@@ -464,7 +452,6 @@ export class AdminCommerceController {
    */
   @Post("orders/batch")
   @RequirePermission(PERMISSIONS.orderMarkPaid)
-  @AuditAction("order.batch")
   batchMarkPaid(@Body() dto: OrderBatchDto, @AdminUser() actor: AdminUser) {
     return this.commerce.batchMarkPaid(dto.ids, actor.id);
   }
@@ -478,7 +465,6 @@ export class AdminCommerceController {
    */
   @Post("orders/:id/refund")
   @RequirePermission(PERMISSIONS.orderRefund)
-  @AuditAction("order.refund")
   async refund(
     @Param("id") id: string,
     @Body() dto: RefundDto,
@@ -502,7 +488,6 @@ export class AdminCommerceController {
    */
   @Post("orders/:id/refunds/:refundId/confirm")
   @RequirePermission(PERMISSIONS.orderRefund)
-  @AuditAction("order.refund_confirm")
   confirmRefund(
     @Param("id") id: string,
     @Param("refundId") refundId: string,
@@ -539,7 +524,6 @@ export class AdminCommerceController {
 
   @Get("payments/export")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async exportPayments(
     @Res() res: Response,
     @Query("status") status?: string,
@@ -572,7 +556,6 @@ export class AdminCommerceController {
   /** 积分总览导出 (CSV) */
   @Get("credits/export")
   @RequireAllPermissions(PERMISSIONS.creditRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async exportCredits(
     @Res() res: Response,
     @Query("userId") userId?: string,
@@ -596,7 +579,8 @@ export class AdminCommerceController {
   @RequirePermission(PERMISSIONS.creditRead)
   auditCredits(@Query("limit") limit?: string) {
     const n = num(limit);
-    return this.credit.auditConsistency(n !== undefined && n > 0 ? Math.min(n, 5000) : 500);
+    const pageSize = n !== undefined ? Math.min(Math.max(Math.floor(n), 1), 5000) : 500;
+    return this.credit.auditConsistency(pageSize);
   }
 
   /** 某用户的批次明细 (B-50) */
@@ -628,10 +612,9 @@ export class AdminCommerceController {
     });
   }
 
-  /** 人工增减积分 (B-52)。备注可选，动作与操作人由审计自动留痕。 */
+  /** 人工增减积分 (B-52)。备注可选，操作人随积分流水保存。 */
   @Post("credits/adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
-  @AuditAction("credit.adjust")
   adjust(@Body() dto: AdjustCreditDto, @AdminUser() actor: AdminUser) {
     return this.credit.adminAdjust({
       userId: dto.userId,
@@ -639,6 +622,7 @@ export class AdminCommerceController {
       reason: dto.reason,
       operatorId: actor.id,
       validDays: dto.validDays,
+      idempotencyKey: dto.idempotencyKey,
     });
   }
 
@@ -651,7 +635,6 @@ export class AdminCommerceController {
    */
   @Post("credits/batch-adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
-  @AuditAction("credit.batch_adjust")
   batchAdjust(@Body() dto: BatchAdjustDto, @AdminUser() actor: AdminUser) {
     return this.commerce.batchAdjust(dto.items, {
       operatorId: actor.id,
@@ -676,7 +659,6 @@ export class AdminCommerceController {
    */
   @Post("credits/import")
   @RequirePermission(PERMISSIONS.creditAdjust)
-  @AuditAction("credit.import")
   @UseInterceptors(
     FileInterceptor("file", {
       storage: memoryStorage(),

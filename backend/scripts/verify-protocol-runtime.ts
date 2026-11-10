@@ -325,10 +325,6 @@ async function main() {
     });
     ok('重复导入不新增', reimported.code === 0 && reimported.data?.added === 0, reimported);
 
-    const auditActions = await prisma.adminAuditLog.findMany({ where: { targetId: channelId }, select: { action: true } });
-    for (const action of ['channel_model.test', 'channel_model.fetch', 'channel_model.import']) {
-      ok(`审计记录 ${action}`, auditActions.some((row: any) => row.action === action), auditActions.map((row: any) => row.action));
-    }
   } finally {
     if (channelId) {
       try {

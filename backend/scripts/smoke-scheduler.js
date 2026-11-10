@@ -190,12 +190,6 @@ function check(name, ok, detail = '') {
   check('累计执行次数 > 0', orderTask.totalRuns >= 1, `${orderTask.totalRuns} 次`);
   check('无连续失败', orderTask.consecutiveFailures === 0 && creditTask.consecutiveFailures === 0);
 
-  console.log('\n【审计留痕】');
-  const audit = await call('GET', '/admin/audit-logs?pageSize=20', T);
-  const actions = audit.data?.result?.items?.map((i) => i.action) ?? [];
-  check('手动触发已记审计', actions.includes('scheduler.run'),
-    actions.filter((a) => a === 'scheduler.run').length + ' 条');
-
   console.log('\n【越权】');
   const finEmail = `sch-fin-${Date.now()}@test.com`;
   await prisma.user.create({

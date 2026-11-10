@@ -8,11 +8,7 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
-import {
-  AuditAction,
-  RequireAllPermissions,
-  RequirePermission,
-} from "./admin.decorator";
+import { RequireAllPermissions, RequirePermission } from "./admin.decorator";
 import { BackupService } from "./backup.service";
 import { PERMISSIONS } from "./permissions";
 import { IsInt, Max, Min } from "class-validator";
@@ -67,7 +63,6 @@ export class AdminBackupController {
    */
   @Post()
   @RequirePermission(PERMISSIONS.backupRun)
-  @AuditAction("backup.run")
   run() {
     return this.backup.run("manual");
   }
@@ -80,7 +75,6 @@ export class AdminBackupController {
    */
   @Post(":id/verify")
   @RequirePermission(PERMISSIONS.backupRun)
-  @AuditAction("backup.verify")
   verify(@Param("id") id: string) {
     return this.backup.verify(id);
   }
@@ -92,7 +86,6 @@ export class AdminBackupController {
    */
   @Get(":id/download")
   @RequireAllPermissions(PERMISSIONS.backupRead, PERMISSIONS.dataExport)
-  @AuditAction("backup.download")
   async download(@Param("id") id: string, @Res() res: Response) {
     const { filename, buffer } = await this.backup.readForDownload(id);
     res.setHeader("Content-Type", "application/octet-stream");
@@ -103,7 +96,6 @@ export class AdminBackupController {
   /** 删除备份 (保留至少一份已验证备份) */
   @Delete(":id")
   @RequirePermission(PERMISSIONS.backupRun)
-  @AuditAction("backup.delete")
   remove(@Param("id") id: string) {
     return this.backup.remove(id);
   }
@@ -115,7 +107,6 @@ export class AdminBackupController {
    */
   @Post("prune")
   @RequirePermission(PERMISSIONS.backupRun)
-  @AuditAction("backup.prune")
   prune(@Body() dto: PruneBackupDto) {
     return this.backup.prune(dto.keepCount);
   }

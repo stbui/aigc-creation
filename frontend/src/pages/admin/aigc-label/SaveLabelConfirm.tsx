@@ -5,8 +5,7 @@ import type { AigcLabelSpec } from '../../../types/api';
 /**
  * 保存确认。
  *
- * 改的是全站每张产出图上的法定标识，因此对照展示「从什么变成什么」；
- * 审计原因由页面按操作上下文自动生成。
+ * 改的是全站每张产出图上的法定标识，因此对照展示「从什么变成什么」。
  */
 export function SaveLabelConfirm({
   open,

@@ -237,6 +237,16 @@ export interface ProtocolCatalogEntryView {
   surfaces: string[];
   /** 协议声明的图片参数合同，作为渠道模型能力配置的默认值 */
   imageParameters: import('./imageCapability').ImageParameterDefinitionView[];
+  /** 清单声明的默认 Base URL；空 = 需手工填写 */
+  baseUrl: string;
+  /** 鉴权类型（bearer / aws-sigv4 / ...） */
+  authType: string;
+  /** 主凭证字段名（通常是 apiKey） */
+  credentialField: string;
+  /** 副凭证字段名（如 secretKey）；空 = 不需要 */
+  secretField: string;
+  /** 插件清单声明的配置字段，用于渠道表单的 label / required */
+  configuration: PluginManifestFieldView[];
 }
 
 /* ────────────────────────── 渠道模型 ────────────────────────── */

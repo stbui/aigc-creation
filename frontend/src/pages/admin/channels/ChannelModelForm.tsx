@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ActionButton, Notice, Panel } from '~/admin-ui/primitives';
 import { ChannelModelBasicFields } from './ChannelModelFormFields';
 import { ChannelModelContractField } from './ChannelModelContractField';
+import { createDefaultTextCapabilityConfigJson } from './textCapability';
 import { ChannelModelImageCapabilityField } from './ChannelModelImageCapabilityField';
 import { ChannelModelPriceTierEditor } from './ChannelModelPriceTierEditor';
 import { ChannelModelTestPanel } from './ChannelModelTestPanel';
@@ -20,15 +21,15 @@ export const CHANNEL_MODEL_FORM_ID = 'channel-model-form';
 const EMPTY_IMAGE_PARAMETERS: ImageParameterDefinitionView[] = [];
 
 const MODEL_FIELD_LABELS: Array<[keyof ModelDraft, string]> = [
-  ['modelKey', '模型编号'],
-  ['capability', '能力类型'],
-  ['protocol', '接口类型'],
+  ['modelKey', '商品编号'],
+  ['capability', '模型类型'],
+  ['protocol', '接入方式'],
   ['priceCurrency', '结算币种'],
   ['tags', '展示标签'],
-  ['description', '模型介绍'],
-  ['channelLabel', '渠道内名称'],
-  ['capabilityConfig', '图片能力参数'],
-  ['tiers', '价格方案'],
+  ['description', '商品介绍'],
+  ['channelLabel', '供应商内名称'],
+  ['capabilityConfig', '能力配置'],
+  ['tiers', '售价方案'],
 ];
 
 function firstFormErrorMessage(errors: FieldErrors<ModelDraft>): string | null {
@@ -59,7 +60,7 @@ interface ChannelModelFormProps {
 }
 
 /**
- * 渠道模型表单：基础信息 + 价格方案 + 能力配置。
+ * 商品表单：基础信息 + 售价方案 + 能力配置。
  *
  * 表单状态完全由 react-hook-form 持有，父级只提供打开弹窗时的初始值和最终
  * 提交值。校验统一走 zod schema，错误就近落到 Field；父级不再保存每次按键。
@@ -121,18 +122,30 @@ export function ChannelModelForm({
       shouldDirty: true,
       shouldValidate: true,
     });
-    toast.success(`已清除 ${stale.length} 个方案的服务商模型名，改为跟随模型`);
+    toast.success(`已清除 ${stale.length} 个方案的上游模型名，改为跟随商品`);
   };
 
   const focusFirstInvalidField = () => {
-    window.requestAnimationFrame(() => {
+    /*
+     * 高级区默认折叠：错误控件可能藏在 details 里。先把所有含无效控件的
+     * details 展开，再滚动/聚焦，否则用户只看到 toast，找不到要改的字段。
+     */
+    formRef.current?.querySelectorAll('details').forEach((details) => {
+      if (details.querySelector('[aria-invalid="true"]')) details.open = true;
+    });
+    /*
+     * 用 setTimeout(0) 而不是 requestAnimationFrame：jsdom 下 rAF 在密集
+     * 断言里可能迟迟不触发，导致「错误已出、焦点还没到」的偶发失败。
+     * 下一个宏任务已经晚于 React 的错误状态提交，行为与用户可见结果一致。
+     */
+    window.setTimeout(() => {
       const firstInvalid = formRef.current?.querySelector<HTMLElement>(
         'input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"], button[aria-invalid="true"], [role="combobox"][aria-invalid="true"]',
       );
       if (!firstInvalid) return;
       firstInvalid.scrollIntoView({ block: 'center' });
       firstInvalid.focus({ preventScroll: true });
-    });
+    }, 0);
   };
 
   return (
@@ -144,19 +157,27 @@ export function ChannelModelForm({
       onSubmit={handleSubmit(
         (next) => onSubmit(next),
         (formErrors) => {
-          toast.error('无法保存模型', firstFormErrorMessage(formErrors) ?? '请检查标红的字段');
+          toast.error('无法保存商品', firstFormErrorMessage(formErrors) ?? '请检查标红的字段');
           focusFirstInvalidField();
         },
       )}
     >
-      <Panel title="基础信息">
+      <Panel title="商品信息">
         <ChannelModelBasicFields
           control={control}
           errors={errors}
           protocolOptions={protocolSelectOptions}
           onCapabilityChange={(value, onChange) => {
+            const previousCapability = getValues('capability');
             onChange(value);
             setValue('protocol', '', { shouldDirty: true });
+            if (previousCapability !== value) {
+              setValue(
+                'capabilityConfig',
+                value === 'text' ? createDefaultTextCapabilityConfigJson() : '',
+                { shouldDirty: true, shouldValidate: false },
+              );
+            }
           }}
         />
       </Panel>
@@ -166,26 +187,36 @@ export function ChannelModelForm({
         tierError={errors.tiers?.root?.message}
       />
 
-      {values.capability === 'image' ? (
-        <ChannelModelImageCapabilityField
-          control={control}
-          protocol={values.protocol}
-          protocolLabel={selectedProtocol?.label}
-          protocolLoading={protocolLoading}
-          definitions={imageParameterDefinitions}
-          model={values.providerModelKey.trim() || values.modelKey.trim()}
-          setValue={setValue}
-        />
-      ) : (
-        <ChannelModelContractField control={control} />
-      )}
+      <details className="group rounded-xl border border-border bg-muted/20">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <span className="text-xs font-semibold text-foreground">高级：能力参数</span>
+          <span className="text-[12px] text-muted-foreground">
+            参考素材限制、可用参数与响应格式；默认使用推荐值
+          </span>
+        </summary>
+        <div className="border-t border-border p-3">
+          {values.capability === 'image' ? (
+            <ChannelModelImageCapabilityField
+              control={control}
+              protocol={values.protocol}
+              protocolLabel={selectedProtocol?.label}
+              protocolLoading={protocolLoading}
+              definitions={imageParameterDefinitions}
+              model={values.providerModelKey.trim() || values.modelKey.trim()}
+              setValue={setValue}
+            />
+          ) : (
+            <ChannelModelContractField control={control} capability={values.capability} />
+          )}
+        </div>
+      </details>
 
       {staleTiers.length > 0 && (
-        <Notice tone="warn" title={`${staleTiers.length} 个价格方案仍使用旧的服务商模型名`}>
+        <Notice tone="warn" title={`${staleTiers.length} 个售价方案仍使用旧的上游模型名`}>
           <div className="flex flex-wrap items-center gap-2">
             <span>
-              模型的服务商模型名已改为「{values.providerModelKey}」，但这些方案仍使用旧名称
-              （{previousProviderModelKey}），保存后请求仍会发到旧供应商模型。
+              商品的上游模型名已改为「{values.providerModelKey}」，但这些方案仍使用旧名称
+              （{previousProviderModelKey}），保存后请求仍会发到旧上游模型。
             </span>
             <ActionButton variant="secondary" size="xs" onClick={clearStaleTiers}>
               清除并跟随模型

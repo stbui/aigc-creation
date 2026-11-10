@@ -92,6 +92,16 @@ export function useDraftList<
     setQuery(toQuery(empty));
   }, [empty, setQuery, toQuery]);
 
+  /** 用 URL / 后端能力清单清洗后的条件整体替换草稿与已生效值。 */
+  const replaceFilters = useCallback(
+    (next: TValues) => {
+      setValues(next);
+      setApplied(next);
+      setQuery(toQuery(next));
+    },
+    [setQuery, toQuery],
+  );
+
   const clearFilters = useCallback(
     (keys: Array<keyof TValues>) => {
       // 按 key 逐个覆盖：union key 直接写入会被 TS 收窄成 never，这里用字典中转
@@ -122,6 +132,7 @@ export function useDraftList<
     updateFilter,
     applyFilters,
     resetFilters,
+    replaceFilters,
     clearFilters,
     draftChanged,
     appliedChips,

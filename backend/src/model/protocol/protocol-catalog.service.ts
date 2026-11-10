@@ -16,7 +16,12 @@ import { Injectable } from '@nestjs/common';
 import { ModelDomainError } from '../domain/json';
 import { PluginManifestStore } from '../plugins/plugin-manifest.store';
 import { ProtocolRegistry } from './registry';
-import type { ManifestCapability, ManifestImageParameter, ManifestProvider } from './types';
+import type {
+  ManifestCapability,
+  ManifestField,
+  ManifestImageParameter,
+  ManifestProvider,
+} from './types';
 
 /** 后台渠道可挂载的表面（参考实现 `ManifestSurface`） */
 export const ADMIN_SURFACE = 'admin.system-channel';
@@ -41,6 +46,16 @@ export interface ProtocolCatalogEntry {
   surfaces: string[];
   /** 协议声明的图片参数合同（渠道模型默认能力配置的来源） */
   imageParameters: ManifestImageParameter[];
+  /** 清单声明的默认 Base URL；空 = 需手工填写 */
+  baseUrl: string;
+  /** 鉴权类型（bearer / aws-sigv4 / ...）；仅用于表单提示 */
+  authType: string;
+  /** 主凭证字段名（通常是 apiKey） */
+  credentialField: string;
+  /** 副凭证字段名（如 secretKey）；空 = 不需要 */
+  secretField: string;
+  /** 插件清单声明的配置字段，用于渠道表单的 label / required */
+  configuration: ManifestField[];
 }
 
 @Injectable()
@@ -131,6 +146,11 @@ export class ProtocolCatalogService {
         selectable: this.registry.has(id),
         surfaces: [...(provider.scopes ?? [])],
         imageParameters: [...(provider.imageParameters ?? [])],
+        baseUrl: String(provider.baseUrl ?? '').trim(),
+        authType: String(provider.auth?.type ?? '').trim(),
+        credentialField: String(provider.auth?.field ?? '').trim(),
+        secretField: String(provider.auth?.secretField ?? '').trim(),
+        configuration: [...(item.manifest.configuration?.fields ?? [])],
       });
     }
 
@@ -149,6 +169,11 @@ export class ProtocolCatalogService {
         selectable: true,
         surfaces: existing?.surfaces ?? [],
         imageParameters: metadata.imageParameters ?? existing?.imageParameters ?? [],
+        baseUrl: existing?.baseUrl ?? '',
+        authType: existing?.authType ?? '',
+        credentialField: existing?.credentialField ?? '',
+        secretField: existing?.secretField ?? '',
+        configuration: existing?.configuration ?? [],
       });
     }
 

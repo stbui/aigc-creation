@@ -332,7 +332,11 @@ export class PaypalAdapter implements PaymentAdapter {
     try {
       const capture = await this.resolveCapture(input);
       if (!capture.id) {
-        return { state: 'failed', error: '未找到可退款的 PayPal capture id' };
+        return {
+          state: 'failed',
+          failureKind: 'definitive',
+          error: '未找到可退款的 PayPal capture id',
+        };
       }
       const result = await this.request(
         input.config,
@@ -359,12 +363,20 @@ export class PaypalAdapter implements PaymentAdapter {
       }
       return {
         state: 'failed',
+        failureKind:
+          status === 'FAILED' || status === 'CANCELLED' || status === 'DENIED'
+            ? 'definitive'
+            : 'unknown',
         providerRefundId: id,
         error: `PayPal 退款状态: ${status || 'unknown'}`,
         raw: safeJson(result),
       };
     } catch (e) {
-      return { state: 'failed', error: `PayPal 退款失败: ${(e as Error).message}` };
+      return {
+        state: 'failed',
+        failureKind: 'unknown',
+        error: `PayPal 退款失败: ${(e as Error).message}`,
+      };
     }
   }
 

@@ -14,13 +14,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 import type { Response } from "express";
-import {
-  AdminUser,
-  AuditAction,
-  RequireAllPermissions,
-  RequirePermission,
-  type AdminUser as AdminUserType,
-} from "../admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission, type AdminUser as AdminUserType } from "../admin.decorator";
 import { PERMISSIONS } from "../permissions";
 import { AdminPaymentsService } from "./payment-admin.service";
 import { PaymentOrderService } from "../../payments/payment-order.service";
@@ -30,6 +24,7 @@ import { AdminSettingsService } from "../settings.service";
 import {
   PaymentOrderListQueryDto,
   PaymentExceptionCloseDto,
+  PaymentExceptionConfirmRefundDto,
   PaymentExceptionListQueryDto,
   PaymentProviderConfigUpdateDto,
   PaymentProviderInstanceCreateDto,
@@ -51,7 +46,7 @@ import { formatShanghai } from "../../payments/payment-query";
  *
  * 权限口径：
  *   · 读取  `payment.read`
- *   · 保存渠道配置 `payment.write`（高危，写审计）
+ *   · 保存渠道配置 `payment.write`（高危）
  *   · 商品编辑 `product.write`
  */
 @Controller("admin/payments")
@@ -72,7 +67,6 @@ export class AdminPaymentConfigController {
   /** 兼容旧后台路径：保存默认实例。 */
   @Put("providers/:providerId/config")
   @RequirePermission(PERMISSIONS.paymentWrite)
-  @AuditAction("payment.provider_config_save")
   saveProvider(
     @Param("providerId") providerId: string,
     @Body() dto: PaymentProviderConfigUpdateDto,
@@ -97,7 +91,6 @@ export class AdminPaymentConfigController {
 
   @Post("providers/:providerId/instances")
   @RequirePermission(PERMISSIONS.paymentWrite)
-  @AuditAction("payment.provider_instance_create")
   async createInstance(
     @Param("providerId") providerId: string,
     @Body() dto: PaymentProviderInstanceCreateDto,
@@ -122,7 +115,6 @@ export class AdminPaymentConfigController {
 
   @Put("providers/:providerId/instances/:instanceId/config")
   @RequirePermission(PERMISSIONS.paymentWrite)
-  @AuditAction("payment.provider_instance_config_save")
   saveInstance(
     @Param("providerId") providerId: string,
     @Param("instanceId") instanceId: string,
@@ -149,7 +141,6 @@ export class AdminPaymentConfigController {
 
   @Patch("providers/:providerId/instances/order")
   @RequirePermission(PERMISSIONS.paymentWrite)
-  @AuditAction("payment.provider_instance_reorder")
   reorderInstances(
     @Param("providerId") providerId: string,
     @Body() dto: PaymentProviderInstanceOrderDto,
@@ -166,17 +157,22 @@ export class AdminPaymentConfigController {
 
   @Put("settings")
   @RequirePermission(PERMISSIONS.paymentWrite)
-  @AuditAction("payment.settings_save")
   async saveSettings(
     @Body() dto: PaymentSettingsUpdateDto,
     @AdminUser() admin: AdminUserType,
   ) {
+    const updates: Record<string, string> = {};
+    if (dto.defaultCurrency !== undefined) {
+      updates["payment.defaultCurrency"] = dto.defaultCurrency;
+    }
+    if (dto.alipaySource !== undefined) {
+      updates["payment.alipaySource"] = dto.alipaySource;
+    }
+    if (dto.wechatSource !== undefined) {
+      updates["payment.wechatSource"] = dto.wechatSource;
+    }
     await this.settings.updateAll(
-      {
-        "payment.defaultCurrency": dto.defaultCurrency,
-        "payment.alipaySource": dto.alipaySource,
-        "payment.wechatSource": dto.wechatSource,
-      },
+      updates,
       [],
       admin.id,
     );
@@ -188,7 +184,7 @@ export class AdminPaymentConfigController {
  * 后台「支付订单」—— 列表、详情、查单、关单、导出。
  *
  * 查单/关单用 `payment.operate`：它只推进渠道已经发生的事实，不能凭空造钱，
- * 因此不是高危权限；但每次仍写普通审计。
+ * 因此不是高危权限。
  */
 @Controller("admin/payments/orders")
 export class AdminPaymentOrdersController {
@@ -215,7 +211,6 @@ export class AdminPaymentOrdersController {
 
   @Get("export.csv")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(@Query() query: PaymentOrderListQueryDto, @Res() res: Response) {
     const rows = await this.admin.ordersForExport({
       status: query.status,
@@ -274,7 +269,6 @@ export class AdminPaymentOrdersController {
 
   @Post(":id/query")
   @RequirePermission(PERMISSIONS.paymentOperate)
-  @AuditAction("payment.order_query")
   async query(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
     const view = await this.orders.query({
       orderId: id,
@@ -288,7 +282,6 @@ export class AdminPaymentOrdersController {
 
   @Post(":id/close")
   @RequirePermission(PERMISSIONS.paymentOperate)
-  @AuditAction("payment.order_close")
   async close(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
     const view = await this.orders.close({
       orderId: id,
@@ -310,7 +303,6 @@ export class AdminPaymentReconciliationController {
 
   @Post()
   @RequirePermission(PERMISSIONS.financeReconcile)
-  @AuditAction("payment.reconciliation_run")
   async run(
     @Body() dto: ReconciliationRunDto,
     @AdminUser() admin: AdminUserType,
@@ -340,7 +332,6 @@ export class AdminPaymentReconciliationController {
 
   @Get("export.csv")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async exportRuns(
     @Query() query: ReconciliationListQueryDto,
     @Res() res: Response,
@@ -374,7 +365,6 @@ export class AdminPaymentReconciliationController {
 
   @Get(":id/items/export.csv")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async exportItems(
     @Param("id") id: string,
     @Query("result") result: string | undefined,
@@ -407,7 +397,6 @@ export class AdminPaymentReconciliationController {
 
   @Post("import")
   @RequirePermission(PERMISSIONS.financeReconcile)
-  @AuditAction("payment.reconciliation_import")
   @UseInterceptors(
     FileInterceptor("file", {
       storage: memoryStorage(),
@@ -442,7 +431,7 @@ export class AdminPaymentReconciliationController {
  * 支付异常补偿单。
  *
  * 对账差异和退款失败不能只停留在某次运行明细里；这张工作台负责把真实资金
- * 差异交给财务认领、重试或人工结案。所有状态变更都写审计。
+ * 差异交给财务认领、重试或人工结案。状态变更必须保留业务处置原因。
  */
 @Controller("admin/payments/exceptions")
 export class AdminPaymentExceptionsController {
@@ -462,21 +451,32 @@ export class AdminPaymentExceptionsController {
 
   @Post(":id/claim")
   @RequirePermission(PERMISSIONS.financeReconcile)
-  @AuditAction("payment.exception_claim")
   claim(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
     return this.exceptions.claim(id, admin.id);
   }
 
   @Post(":id/retry-refund")
   @RequirePermission(PERMISSIONS.financeReconcile)
-  @AuditAction("payment.exception_retry_refund")
   retryRefund(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
     return this.exceptions.retryAutoRefund(id, admin.id);
   }
 
+  @Post(":id/confirm-refund")
+  @RequirePermission(PERMISSIONS.financeReconcile)
+  confirmRefund(
+    @Param("id") id: string,
+    @Body() dto: PaymentExceptionConfirmRefundDto,
+    @AdminUser() admin: AdminUserType,
+  ) {
+    return this.exceptions.confirmAutoRefund(id, admin.id, {
+      outcome: dto.outcome,
+      providerRefundId: dto.providerRefundId,
+      reason: dto.reason,
+    });
+  }
+
   @Post(":id/close")
   @RequirePermission(PERMISSIONS.financeReconcile)
-  @AuditAction("payment.exception_close")
   close(
     @Param("id") id: string,
     @Body() dto: PaymentExceptionCloseDto,

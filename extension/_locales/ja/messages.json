@@ -311,5 +311,11 @@
   },
   "copyAddressFailed": {
     "message": "画像 URL をコピーできません"
+  },
+  "extensionReloadRequiredTitle": {
+    "message": "拡張機能を更新しました"
+  },
+  "extensionReloadRequiredMessage": {
+    "message": "このページを再読み込みしてから、もう一度お試しください。"
   }
 }

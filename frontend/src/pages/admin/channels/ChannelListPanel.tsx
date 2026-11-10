@@ -108,7 +108,7 @@ export function ChannelListPanel({
     <Panel
       title={
         <span className="flex items-baseline gap-2">
-          渠道
+          供应商
           <span className="text-xs font-normal text-muted-foreground tabular-nums">
             {hasFilters ? `${visible.length} / ${rows.length} 个` : `共 ${rows.length} 个`}
           </span>
@@ -123,20 +123,20 @@ export function ChannelListPanel({
             onPick={onPickImportFile}
             onClear={onClearImportFile}
             disabled={!writable || importing}
-            label="导入渠道"
-            hint="渠道导出文件"
+            label="导入供应商"
+            hint="供应商导出文件"
           />
           <IconButton
             icon={Download}
             size="xs"
-            label="导出全部渠道"
+            label="导出全部供应商"
             disabled={exporting || rows.length === 0}
             onClick={onExportAll}
           />
           <IconButton
             icon={ListOrdered}
             size="xs"
-            label="调整渠道顺序"
+            label="调整供应商顺序"
             disabled={!writable}
             onClick={onReorder}
           />
@@ -153,7 +153,7 @@ export function ChannelListPanel({
           disabled={!writable}
           onClick={onCreate}
         >
-          新建渠道
+          接入供应商
         </ActionButton>
         {importFile && (
           <div className="rounded-md border border-border bg-muted/50 p-2">
@@ -205,7 +205,7 @@ export function ChannelListPanel({
           )}
           {!loading && !error && visible.length === 0 && (
             <EmptyState
-              title={hasFilters ? '没有匹配的渠道' : '暂无渠道'}
+              title={hasFilters ? '没有匹配的供应商' : '暂无供应商'}
               action={
                 hasFilters ? (
                   <ActionButton variant="secondary" size="sm" onClick={onClearFilters}>
@@ -266,7 +266,7 @@ export function ChannelListPanel({
                         {row.enabled ? '启用' : '停用'}
                       </span>
                       <span className="text-border" aria-hidden>·</span>
-                      <span className="tabular-nums">{row.modelCosts?.length ?? 0} 个模型</span>
+                      <span className="tabular-nums">{row.modelCosts?.length ?? 0} 个在售</span>
                     </span>
                     {rate !== null && (
                       <span

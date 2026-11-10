@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard)
@@ -18,5 +19,24 @@ export class ProjectsController {
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.projectsService.list(user.id);
+  }
+
+  @Patch(':id')
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateProjectDto,
+  ) {
+    return this.projectsService.update(user.id, id, dto.name);
+  }
+
+  /** 删除项目；有素材时必须通过 moveAssetsTo 指定迁移目标。 */
+  @Delete(':id')
+  remove(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query('moveAssetsTo') moveAssetsTo?: string,
+  ) {
+    return this.projectsService.remove(user.id, id, moveAssetsTo);
   }
 }

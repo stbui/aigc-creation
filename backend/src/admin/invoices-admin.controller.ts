@@ -1,13 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { IsNotEmpty, IsString, MaxLength } from "class-validator";
-import {
-  AdminUser,
-  AuditAction,
-  RequireAllPermissions,
-  RequirePermission,
-  type AdminUser as AdminUserType,
-} from "./admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission, type AdminUser as AdminUserType } from "./admin.decorator";
 import { PERMISSIONS } from "./permissions";
 import { sendCsv } from "../common/csv-response";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -54,14 +48,12 @@ export class AdminInvoicesController {
 
   @Post(":id/issue")
   @RequirePermission(PERMISSIONS.invoiceWrite)
-  @AuditAction("invoice.issue")
   issue(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
     return this.invoices.issue(id, admin.id);
   }
 
   @Post(":id/reject")
   @RequirePermission(PERMISSIONS.invoiceWrite)
-  @AuditAction("invoice.reject")
   reject(
     @Param("id") id: string,
     @Body() dto: RejectInvoiceDto,
@@ -72,7 +64,6 @@ export class AdminInvoicesController {
 
   @Post(":id/red-flush")
   @RequirePermission(PERMISSIONS.invoiceWrite)
-  @AuditAction("invoice.red_flush")
   redFlush(
     @Param("id") id: string,
     @Body() dto: RedFlushInvoiceDto,
@@ -84,12 +75,11 @@ export class AdminInvoicesController {
   /**
    * 导出发票 (CSV)。
    *
-   * 导出把用户抬头与税号带出系统，用独立的 `data.export` 权限点并留审计；
+   * 导出把用户抬头与税号带出系统，使用独立的 `data.export` 权限点；
    * 列出口径与列表完全一致（同一 status / keyword）。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.invoiceWrite, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(
     @Res() res: Response,
     @Query("status") status?: string,

@@ -159,7 +159,8 @@ describe('CreditService 退款扣回只使用本单批次', () => {
         findMany: vi
           .fn()
           // 本单批次只剩 60；用户另有 500 积分也不得被本单退款挪用。
-          .mockResolvedValueOnce([{ id: 'own-1', remainingMicrocredits: 60_000_000n }]),
+          .mockResolvedValueOnce([{ id: 'own-1', remainingMicrocredits: 60_000_000n }])
+          .mockResolvedValueOnce([]),
         updateMany: vi.fn().mockImplementation(({ where, data }) => {
           taken.push({ id: where.id, micro: data.remainingMicrocredits.decrement });
           return { count: 1 };
@@ -184,8 +185,48 @@ describe('CreditService 退款扣回只使用本单批次', () => {
     expect(taken).toEqual([{ id: 'own-1', micro: 60_000_000n }]);
     expect(result.reclaimed).toBe(60);
     expect(result.unreclaimable).toBe(40);
-    expect(tx.creditLot.findMany).toHaveBeenCalledTimes(1);
+    expect(result.expiredUnused).toBe(0);
+    expect(tx.creditLot.findMany).toHaveBeenCalledTimes(2);
     expect(tx.creditLot.findMany.mock.calls[0][0].where).toMatchObject({ orderId: 'o-1' });
+  });
+
+  it('本单未过期批次不足时，把已过期未使用份额单独归类', async () => {
+    const taken: Array<{ id: string; micro: bigint }> = [];
+    const tx = {
+      order: {
+        findUnique: vi.fn().mockResolvedValue({ userId: 'u1', grantedCredits: 100 }),
+      },
+      creditLot: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([{ id: 'active-1', remainingMicrocredits: 60_000_000n }])
+          .mockResolvedValueOnce([{ id: 'expired-1', remainingMicrocredits: 30_000_000n }]),
+        updateMany: vi.fn().mockImplementation(({ where, data }) => {
+          taken.push({ id: where.id, micro: data.remainingMicrocredits.decrement });
+          return { count: 1 };
+        }),
+      },
+      creditLedgerEntry: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const wallet = {
+      debitAccountOnly: vi.fn().mockResolvedValue({
+        availableMicrocredits: 400_000_000n,
+        reservedMicrocredits: 0n,
+      }),
+    };
+    const prisma = {
+      order: tx.order,
+      $transaction: vi.fn().mockImplementation((fn: never) => (fn as never as Function)(tx)),
+    };
+    const service = new CreditService(prisma as never, wallet as never);
+
+    const result = await service.reclaimForOrder('o-1', 'admin', '退款');
+
+    expect(taken).toEqual([{ id: 'active-1', micro: 60_000_000n }]);
+    expect(result).toMatchObject({ reclaimed: 60, expiredUnused: 30, unreclaimable: 10 });
+    // 过期批次只做事实分类，不扣批次、不写流水，避免把已作废积分重复扣一次。
+    expect(tx.creditLot.updateMany).toHaveBeenCalledTimes(1);
+    expect(wallet.debitAccountOnly).toHaveBeenCalledWith(tx, 'u1', 60_000_000n);
   });
 
   it('本单批次足够时只扣本单批次', async () => {
@@ -431,5 +472,73 @@ describe('CreditService 账实核对', () => {
     expect(result.mismatched).toEqual([
       { userId: 'u1', accountAvailable: 100, lotsRemaining: 70, diff: -30 },
     ]);
+  });
+
+  it('按 userId 游标翻页扫描全部账户，而不是只扫第一页', async () => {
+    const prisma = {
+      creditAccount: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([
+            { userId: 'u1', availableMicrocredits: 10_000_000n },
+            { userId: 'u2', availableMicrocredits: 20_000_000n },
+          ])
+          .mockResolvedValueOnce([{ userId: 'u3', availableMicrocredits: 30_000_000n }]),
+      },
+      creditLot: {
+        groupBy: vi.fn().mockResolvedValue([
+          { userId: 'u1', _sum: { remainingMicrocredits: 10_000_000n } },
+          { userId: 'u2', _sum: { remainingMicrocredits: 20_000_000n } },
+          { userId: 'u3', _sum: { remainingMicrocredits: 30_000_000n } },
+        ]),
+      },
+    };
+    const service = new CreditService(prisma as never, {} as never);
+
+    const result = await service.auditConsistency(2);
+
+    expect(result.checked).toBe(3);
+    expect(result.mismatched).toEqual([]);
+    expect(prisma.creditAccount.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ take: 2, orderBy: { userId: 'asc' } }),
+    );
+    expect(prisma.creditAccount.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        take: 2,
+        orderBy: { userId: 'asc' },
+        cursor: { userId: 'u2' },
+        skip: 1,
+      }),
+    );
+    expect(prisma.creditLot.groupBy).toHaveBeenCalledWith({
+      by: ['userId'],
+      where: { remainingMicrocredits: { gt: 0n } },
+      _sum: { remainingMicrocredits: true },
+    });
+  });
+
+  it('批次仍有余量但账户不存在时报告孤儿批次', async () => {
+    const prisma = {
+      creditAccount: {
+        findMany: vi.fn().mockResolvedValue([
+          { userId: 'u1', availableMicrocredits: 10_000_000n },
+        ]),
+      },
+      creditLot: {
+        groupBy: vi.fn().mockResolvedValue([
+          { userId: 'u1', _sum: { remainingMicrocredits: 10_000_000n } },
+          { userId: 'orphan', _sum: { remainingMicrocredits: 7_000_000n } },
+        ]),
+      },
+    };
+    const service = new CreditService(prisma as never, {} as never);
+
+    const result = await service.auditConsistency();
+
+    expect(result.orphanLots).toEqual([{ userId: 'orphan', lotsRemaining: 7 }]);
+    expect(result.orphanLotCount).toBe(1);
+    expect(result.mismatched).toEqual([]);
   });
 });

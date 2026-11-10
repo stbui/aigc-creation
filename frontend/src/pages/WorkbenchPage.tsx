@@ -25,6 +25,10 @@ const WORKBENCH_ART: Record<string, { image: string; icon: string }> = {
   enhance: { image: '/workbench/cpjx.webp', icon: '/workbench/icons/m_cpjx.svg' },
   recolor: { image: '/workbench/sphs.webp', icon: '/workbench/icons/m_sphs.svg' },
   rotate: { image: '/workbench/xzjd.webp', icon: '/workbench/icons/m_jdxz.svg' },
+  template: {
+    image: '/templates/wedding/longfeng-01-red-wall-fan.webp',
+    icon: '/workbench/icons/m_cyst.svg',
+  },
 };
 
 /**

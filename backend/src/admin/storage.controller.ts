@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
-import { AuditAction, RequirePermission } from './admin.decorator';
+import { RequirePermission } from './admin.decorator';
 import { AppError } from '../common/app.exception';
 import { StorageService } from '../storage/storage.service';
 import { PERMISSIONS } from './permissions';
@@ -32,7 +32,6 @@ export class AdminStorageController {
   /** 连通性测试 (B-62): 发真实请求, 返回耗时与结果 */
   @Post('probe')
   @RequirePermission(PERMISSIONS.channelTest)
-  @AuditAction('storage.probe')
   async probe(@Query('backend') backend?: string) {
     if (backend !== undefined && !isStorageBackend(backend)) {
       throw new AppError(40001, '非法后端', 400);
@@ -52,7 +51,6 @@ export class AdminStorageController {
    */
   @Post('active')
   @RequirePermission(PERMISSIONS.settingWrite)
-  @AuditAction('storage.switch')
   setActive(@Query('backend') backend: string) {
     if (backend !== 'local' && backend !== 'oss' && backend !== 'minio') {
       throw new AppError(40001, '非法后端', 400);

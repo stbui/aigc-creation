@@ -65,42 +65,104 @@ export class AdminAssetsService {
     );
   }
 
+  /** 后台新建项目：归属用户必须存在且处于正常状态。 */
+  async createProject(name: string, ownerId: string) {
+    const owner = await this.prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { id: true, status: true },
+    });
+    if (!owner || owner.status !== 'active') {
+      throw new AppError(40001, '所属用户不存在或不可用', 400);
+    }
+    return this.prisma.project.create({
+      data: { name: name.trim(), ownerId },
+    });
+  }
+
+  /** 后台编辑项目名。归属用户不在这里变更，避免与素材 ownerId 脱节。 */
+  async updateProject(id: string, name: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!project) throw new AppError(40400, '项目不存在', 404);
+    return this.prisma.project.update({
+      where: { id },
+      data: { name: name.trim() },
+    });
+  }
+
   /**
-   * 删除项目 (B-22): **只标记 Project.deletedAt**。
+   * 删除项目 (B-22): 软删除，不物理删除素材、任务或文件。
    *
-   * 项目是用户资产的归档容器，删除项目不能连带破坏历史任务、素材记录或对象
-   * 存储文件。素材可见性由项目生命周期决定，不再把 Asset.status 改成 hidden，
-   * 否则恢复项目时无法区分「随项目下架」与运营主动下架。
-   *
-   * `hard` 参数仅为兼容旧客户端保留，已废弃且会被忽略。重复删除按幂等成功
-   * 处理，不重复覆盖首次删除时间。
+   * 项目下仍有素材时，必须用 `moveAssetsTo` 指定同一用户的另一个未删除项目；
+   * 素材迁移只改 Asset.projectId，GenerationTask.projectId 保留历史归属。
+   * 重复删除按幂等成功处理，不覆盖首次删除时间。
    */
-  async removeProject(id: string, _hard = false) {
+  async removeProject(id: string, moveAssetsTo?: string) {
     const project = await this.prisma.project.findUnique({
       where: { id },
       select: {
         id: true,
+        ownerId: true,
         deletedAt: true,
         _count: { select: { assets: true, tasks: true } },
       },
     });
     if (!project) throw new AppError(40400, '项目不存在', 404);
 
-    const deletedAt = project.deletedAt ?? new Date();
-    if (!project.deletedAt) {
-      await this.prisma.project.update({
+    // 已删除项目直接返回首次删除结果，重复操作不覆盖时间。
+    if (project.deletedAt) {
+      return {
+        id,
+        hard: false,
+        deprecatedHard: true,
+        deletedAt: project.deletedAt,
+        movedAssets: 0,
+        retained: { assets: project._count.assets, tasks: project._count.tasks },
+      };
+    }
+
+    const targetId = moveAssetsTo?.trim() || undefined;
+    if (project._count.assets > 0 && !targetId) {
+      throw new AppError(40901, '项目下还有素材，请选择迁移目标项目', 409);
+    }
+    if (targetId === id) {
+      throw new AppError(40001, '迁移目标不能是当前项目', 400);
+    }
+
+    const deletedAt = new Date();
+    let movedAssets = 0;
+    await this.prisma.$transaction(async (tx) => {
+      if (project._count.assets > 0 && targetId) {
+        const target = await tx.project.findFirst({
+          where: { id: targetId, ownerId: project.ownerId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!target) {
+          throw new AppError(40001, '迁移目标项目不存在或不可用', 400);
+        }
+        const moved = await tx.asset.updateMany({
+          where: { projectId: id, ownerId: project.ownerId },
+          data: { projectId: targetId },
+        });
+        movedAssets = moved.count;
+      }
+
+      await tx.project.update({
         where: { id },
         data: { deletedAt },
       });
-    }
+    });
 
     return {
       id,
       hard: false,
       deprecatedHard: true,
       deletedAt,
+      movedAssets,
       retained: {
-        assets: project._count.assets,
+        assets: Math.max(0, project._count.assets - movedAssets),
         tasks: project._count.tasks,
       },
     };
@@ -275,7 +337,7 @@ export class AdminAssetsService {
     return { id, status };
   }
 
-  /** 兼容旧入口的批量下架/恢复；逐条返回结果，供审计落到每个素材。 */
+  /** 兼容旧入口的批量下架/恢复；逐条返回结果。 */
   async setStatusMany(ids: string[], status: 'visible' | 'hidden') {
     const summary = await runBatch(ids, (id) => this.setStatus(id, status));
     return { ...summary, count: summary.succeeded, status };

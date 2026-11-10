@@ -19,7 +19,6 @@ test('后台五页截图', async ({ page }) => {
     ['/admin/users', '02-users'],
     ['/admin/roles', '03-roles'],
     ['/admin/settings', '04-settings'],
-    ['/admin/audit-logs', '05-audit'],
   ];
 
   for (const [path, name] of pages) {

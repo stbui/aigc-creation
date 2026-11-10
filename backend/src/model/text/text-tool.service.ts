@@ -22,6 +22,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppError } from '../../common/app.exception';
+import { currentRequestId } from '../../common/request-context';
 import {
   ChannelRuntimeService,
   ChannelUnavailableError,
@@ -254,6 +255,7 @@ export class TextToolService {
       await this.prisma.apiCallLog.create({
         data: {
           userId: input.call.userId ?? '',
+          requestId: currentRequestId() ?? '',
           channelId: input.channel.channelId,
           channelName: input.channel.channelName,
           channelModelId: input.channel.channelModelId,
@@ -284,7 +286,7 @@ export class TextToolService {
         },
       });
     } catch (error) {
-      // 记录写不进去不该打断业务：用户要的是提示词，不是审计的完整性
+      // 调用记录写不进去不该打断业务：用户要的是提示词，不是日志完整性
       this.log.warn(`文本调用记录写入失败 channel-model=${input.channel.channelModelId}: ${messageOf(error)}`);
     }
   }

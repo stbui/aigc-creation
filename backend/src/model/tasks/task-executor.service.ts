@@ -273,7 +273,7 @@ export class TaskExecutorService {
     };
   }
 
-  /** 落一条调用记录。日志失败不影响任务本身（不能因为审计写不进去就让生成失败）。 */
+  /** 落一条调用记录。记录失败不影响任务本身。 */
   async logCall(input: CallLogInput): Promise<void> {
     const outcome = input.outcome;
     const usage = extractUsage(outcome.result?.usage);

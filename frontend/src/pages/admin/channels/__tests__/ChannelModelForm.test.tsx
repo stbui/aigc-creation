@@ -57,10 +57,10 @@ function renderForm(onSubmit = vi.fn(), overrides: Partial<ModelDraft> = {}) {
 describe('ChannelModelForm', () => {
   it('校验失败时在字段旁提示且不提交', async () => {
     const { form, onSubmit } = renderForm();
-    fireEvent.change(screen.getByLabelText('模型编号'), { target: { value: '   ' } });
+    fireEvent.change(screen.getByLabelText('商品编号'), { target: { value: '   ' } });
     fireEvent.submit(form);
 
-    expect(await screen.findByText('请填写模型编号')).toBeVisible();
+    expect(await screen.findByText('请填写商品编号')).toBeVisible();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -81,9 +81,9 @@ describe('ChannelModelForm', () => {
     fireEvent.submit(form);
 
     expect(await screen.findByTestId('admin-toast')).toHaveTextContent(
-      '接口类型：请选择接口类型',
+      '接入方式：请选择接入方式',
     );
-    await waitFor(() => expect(screen.getByLabelText('接口类型')).toHaveFocus());
+    await waitFor(() => expect(screen.getByLabelText('接入方式')).toHaveFocus());
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

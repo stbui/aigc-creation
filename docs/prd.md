@@ -73,7 +73,7 @@
 | A-10 | 法务文档版本化（用户协议 / 隐私政策 / 未成年人保护 / 账号规则） | 已实现 |
 | A-11 | 同意留痕（版本号 + 时间） | 已实现 |
 | A-12 | 站内消息：支付成功、任务失败退款、会员到期、工单回复、全站广播 | 已实现 |
-| A-13 | 登录日志与扫码登录审计 | 已实现 |
+| A-13 | 登录日志与扫码登录记录 | 已实现 |
 | A-14 | 第三方登录：标准 OAuth2 / OIDC（内置 Google、GitHub，另有 generic 可接任意合规 provider）；凭据齐全且列入 `OAUTH_ENABLED` 才在登录页显示按钮 | 已实现 |
 
 **硬约束**：
@@ -81,7 +81,7 @@
 - 扫码票据只存 SHA-256；扫码不等于授权，必须手机端确认；兑换一次性（`confirmed → consumed`）。
 - 法务已发布版本不可原地覆盖；改文本须升版本号再发布。
 - 注销说明必须写明订单留存 3 年，否则构成告知不准确。
-- 第三方登录：`state` 绑定 provider 且 10 分钟过期（防 CSRF 与跨 provider 复用）；只有 provider 明确确权（`emailVerified`）的邮箱才自动绑定已有账号，其余一律新建本地账号；`accessToken` 不进 URL，回调只回传 60 秒短时票据，由前端换取正式会话；登录审计记 `reason=oauth:<provider>`。
+- 第三方登录：`state` 绑定 provider 且 10 分钟过期（防 CSRF 与跨 provider 复用）；只有 provider 明确确权（`emailVerified`）的邮箱才自动绑定已有账号，其余一律新建本地账号；`accessToken` 不进 URL，回调只回传 60 秒短时票据，由前端换取正式会话；登录记录记 `reason=oauth:<provider>`。
 
 ### 4.2 创作与资产
 
@@ -156,27 +156,27 @@
 
 ### 4.6 后台管理
 
-后台 32 个页面，权限点定义在 `backend/src/admin/permissions.ts`；侧栏分组唯一事实源是 `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU`。
+后台 31 个页面，权限点定义在 `backend/src/admin/permissions.ts`；侧栏分组唯一事实源是 `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU`。
 
 | 分组 | 页面 |
 | --- | --- |
 | 总览 | 平台概览 / 告警中心 |
 | 运营 | 用户管理 / 素材管理 / 任务监控 / 工单处理 |
-| 模型与渠道 | 渠道工作台 / 插件 / 能力与模型 / 用户分组 / 调用记录 |
+| 模型与渠道 | 模型商品 / 插件 / 能力与模型 / 用户分组 / 调用记录 |
 | 交易 | 商品管理 / 会员套餐 / 订单管理 / 积分账本 / 优惠券 / 限时活动 / 邀请与签到 |
 | 财务 | 支付充值 / 发票管理 / 生成账单 / 财务分析 |
 | 内容与合规 | 法务文档 / 站内消息 / AI 标识 |
-| 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 |
+| 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 |
 | 数据安全 | 数据备份 / 保留期清理 |
 
 核心能力：
 
 | ID | 需求 | 状态 |
 | --- | --- | --- |
-| B-01 | 角色与权限点；写操作写审计，确有业务依据要求的动作填写原因 | 已实现 |
+| B-01 | 角色与权限点；确有业务依据要求的动作填写原因 | 已实现 |
 | B-02 | 用户管理：列表、详情、禁用/启用、角色变更、重置密码、注销 | 已实现 |
 | B-03 | 素材/任务管理：列表、下架、删除、任务监控与终止 | 已实现 |
-| B-04 | 能力上下线；下架原因统一生成（C 端可见），写入审计 | 已实现 |
+| B-04 | 能力上下线；下架原因统一生成（C 端可见）并保存在能力状态中 | 已实现 |
 | B-05 | 模型线路 CRUD、排序、启停、连通性测试、模型清单拉取 | 已实现 |
 | B-06 | 能力调价、限时活动、退款规则、站点设置 | 已实现 |
 | B-07 | 工单中心：状态机、指派、回复、统计、导出 | 已实现 |
@@ -201,11 +201,11 @@
 
 ## 5. 数据模型
 
-43 个 Prisma 模型，按域分组：
+65 个 Prisma 模型，按域分组：
 
 | 域 | 模型 |
 | --- | --- |
-| 用户与权限 | `User` / `AdminRole` / `AdminAuditLog` / `SystemSetting` |
+| 用户与权限 | `User` / `AdminRole` / `SystemSetting` |
 | 创作 | `Project` / `Asset` / `GenerationTask` |
 | 交易 | `Product` / `Order` / `OrderItem` / `Payment` / `Refund` |
 | 权益 | `CreditAccount` / `CreditLot` / `CreditLedgerEntry` / `CreditReservationItem` / `MembershipPlan` / `Membership` / `MembershipUsage` |

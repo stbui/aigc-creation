@@ -12,15 +12,18 @@ import { freezeAnimatedImageFirstFrame } from "./animated-image.js";
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const MAX_UPLOAD_PIXELS = 40_000_000;
 
-const SUPPORTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+// 上传接口虽声明支持 WebP，但后端 Jimp 1.6.1 没有 WebP 解码器；
+// WebP 原样上传会在 verifyDecodableImage 阶段被当成损坏文件拒绝。
+const PASSTHROUGH_TYPES = new Set(["image/png", "image/jpeg"]);
 const JPEG_QUALITY = 0.9;
 const MAX_SCALE_ATTEMPTS = 6;
 
 /**
  * 把任意可解码图片变成「站点一定收得下」的 Blob。
  *
- * 已经合规的 PNG/JPEG/WebP **原样返回**，不重新编码 —— 重编码会掉画质、
+ * 已经合规的 PNG/JPEG **原样返回**，不重新编码 —— 重编码会掉画质、
  * 也会悄悄丢掉 PNG 的透明通道，用户拿到的就不再是他采集的那张图了。
+ * WebP 即使本身合规也要转码：后端 Jimp 目前只能可靠解码 PNG/JPEG。
  */
 export async function prepareImageForUpload(blob) {
   const frozen = await freezeAnimatedImageFirstFrame(blob);
@@ -34,7 +37,7 @@ export async function prepareImageForUpload(blob) {
     }
 
     const alreadyCompatible =
-      SUPPORTED_TYPES.has(normalizeMimeType(frozen.type)) &&
+      PASSTHROUGH_TYPES.has(normalizeMimeType(frozen.type)) &&
       frozen.size <= MAX_UPLOAD_BYTES &&
       width * height <= MAX_UPLOAD_PIXELS;
 
@@ -51,7 +54,12 @@ export async function prepareImageForUpload(blob) {
 
 /** 生成上传文件名（服务端不信任扩展名，只按字节魔数判定，这里仅为可读性） */
 export function buildUploadFileName(mimeType, prefix = "capture") {
-  const extension = normalizeMimeType(mimeType) === "image/png" ? "png" : "jpg";
+  const normalizedType = normalizeMimeType(mimeType);
+  const extension = normalizedType === "image/png"
+    ? "png"
+    : normalizedType === "image/webp"
+      ? "webp"
+      : "jpg";
   const suffix = Math.random().toString(36).slice(2, 8);
   return `${prefix}-${Date.now()}-${suffix}.${extension}`;
 }

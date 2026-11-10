@@ -47,7 +47,12 @@ export const PAYMENT_SOURCES: PaymentSource[] = ['unset', 'official', 'epay'];
  * `qrcode` 由前端把 `codeUrl` 渲染成二维码；
  * `qrcode-image` 的 `codeUrl` 本身就是渠道给好的二维码图片地址，前端直接展示。
  */
-export type CheckoutMode = 'redirect' | 'qrcode' | 'qrcode-image' | 'sandbox';
+export type CheckoutMode =
+  | 'redirect'
+  | 'qrcode'
+  | 'qrcode-image'
+  | 'payment-element'
+  | 'sandbox';
 
 export interface PaymentConfigField {
   name: string;
@@ -107,6 +112,9 @@ export interface PaymentCheckout {
   codeUrl?: string;
   /** 支付宝移动端当面付 App Scheme；其他渠道/场景为空 */
   schemeUrl?: string;
+  /** Stripe Payment Element 初始化所需的 client secret 与可公开密钥 */
+  clientSecret?: string;
+  publishableKey?: string;
   providerRef?: string;
   expiresAt: Date;
   hint?: string;
@@ -192,12 +200,33 @@ export interface RefundInput {
   providerTradeNo?: string;
 }
 
-export interface RefundResult {
-  state: 'succeeded' | 'processing' | 'failed';
-  providerRefundId?: string;
-  error?: string;
-  raw?: string;
-}
+/**
+ * 退款失败的资金语义。
+ *
+ * - `definitive`：渠道已明确拒绝，本次未退款；修正后可换新退款单号重试。
+ * - `unknown`：网络中断、超时、响应无法验签/解析等，**不能确认渠道是否受理**；
+ *   必须复用原退款单号重试或到商户后台核对，禁止直接换号发起第二笔退款。
+ */
+export type RefundFailureKind = 'definitive' | 'unknown';
+
+export type RefundResult =
+  | {
+      state: 'succeeded';
+      providerRefundId?: string;
+      raw?: string;
+    }
+  | {
+      state: 'processing';
+      providerRefundId?: string;
+      raw?: string;
+    }
+  | {
+      state: 'failed';
+      failureKind: RefundFailureKind;
+      providerRefundId?: string;
+      error: string;
+      raw?: string;
+    };
 
 export interface PaymentAck {
   status: number;

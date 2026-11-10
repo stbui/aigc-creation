@@ -48,6 +48,7 @@
 | --- | --- | --- |
 | GET | `/api/v1/capabilities` | 能力清单（公开免登录），前端全部渲染依据 |
 | GET | `/api/v1/shoppable-carousel/templates` | AI 带货图文模板清单（公开免登录）：10 个业务分类 + 49 个模板（三拍文案 / 结构化提示词片段 / 静态缩略图路径）+ 张数区间 6–10 |
+| GET | `/api/v1/template/templates` | 写真模板清单（公开免登录）：4 个分类（婚纱写真 / 纯色棚拍 / 室内布景 / 户外庭院）+ 10 个龙凤褂模板（预览图路径 / 风格提示词）；前端不另存清单 |
 | POST | `/api/v1/auth/register` | 注册，**直接返回 `accessToken`**（注册即登录） |
 | POST | `/api/v1/auth/login` | 登录，返回 `{ accessToken, user }` |
 | POST/GET | `/api/v1/auth/qr/create`、`/auth/qr/status` | 扫码登录：桌面建码 / 轮询换 token（公开，`status` 首次兑换即作废） |
@@ -71,7 +72,7 @@
 | POST | `/api/v1/models/:id/quote` | 前台模型报价，返回 `{ quote: { amountMicrocredits, billingMode, estimated, ... } }`；`estimated=true` 表示按估算用量报价 |
 | GET | `/api/v1/model-catalog` | 渠道模型目录（供应视角）：`models` 恒为空数组，模型在 `channels[].models` 内；渠道名恒为空串，不带凭证 |
 | POST | `/api/v1/model-catalog/available` | 按请求意图筛选可用的渠道模型 |
-| POST | `/api/v1/model-catalog/quote` | 渠道模型报价（`channelId` + `modelKey` + 意图），供渠道工作台预览价格 |
+| POST | `/api/v1/model-catalog/quote` | 渠道模型报价（`channelId` + `modelKey` + 意图），供「模型商品」预览价格 |
 | GET | `/api/v1/channels/system` | 系统渠道连接信息（匿名可读）。**非管理员视角只给「有哪些渠道、怎么连」**：`name` / `userId` / `catalogProviderId` 固定空串（渠道名会泄漏供应商与中转站身份），`baseUrl` 改写为中转入口 `/api/v1/ai/system/{channelId}`，`apiKey` 恒为 `'system'`（服务端注入真实凭证），`concurrencyLimit` / `hasApiKey` / `hasSecretKey` 恒为 0 / false。**管理员**（实时查库判角色）额外拿到渠道真实名称与上游地址，但凭证任何情况都不下发 |
 | GET | `/api/v1/credits/{balance,lots,ledger}` | 积分余额 / 批次 / 流水 |
 | GET | `/api/v1/membership/plans`、`/me` | 会员套餐 / 我的会员 |
@@ -82,7 +83,7 @@
 | GET/POST | `/api/v1/payment/webhook/easypay` | 易支付固定回调入口（公开，无信封）；按历史 Payment 反查配置版本，验签 + 金额核对 + 幂等 |
 | POST | `/api/v1/payment/webhook/alipay` | 支付宝官方固定回调入口（公开，无信封）；按历史 Payment 反查配置版本 |
 | POST | `/api/v1/payment/webhook/wxpay` | 微信支付固定回调入口（公开，无信封）；先用历史 APIv3 密钥解密，再按历史配置验签 |
-| POST | `/api/v1/payment/webhook/stripe` | Stripe 固定回调入口（公开，无信封）；按 Checkout Session / 历史 Payment 反查配置版本 |
+| POST | `/api/v1/payment/webhook/stripe` | Stripe 固定回调入口（公开，无信封）；以 PaymentIntent 为主反查配置版本，历史 Checkout Session 仅兼容旧单 |
 | GET/POST | `/api/v1/payments/callback/:providerId/:configId` | **历史回调入口（公开，无信封，`@Res()` 直写）**；PayPal / ZPay 及已写入渠道后台的旧 URL 继续使用 |
 | GET | `/api/v1/payments/:orderId/status` | 支付状态轮询 |
 | POST/GET | `/api/v1/invoices`、`/invoices/:id/file` | 申请开票 / 列表 / 取可打印 HTML。同一订单保留完整申请历史；同一时刻最多一张有效票（服务层校验 + 数据库唯一占用键兜底），只有 `rejected` 可重新申请，`red_flushed` 不可重提 |
@@ -110,54 +111,62 @@
 | GET | `/api/v1/admin/workbench` | 角色工作台：按当前角色权限返回可动作实体行；仅 `admin` 可用 `?view=operator\|finance` 预览，视图不放大范围 |
 | GET/PATCH/POST/DELETE | `/api/v1/admin/users*`、`assets*`、`tasks*` | 用户 / 素材 / 任务管理。用户列表支持 `keyword`（邮箱/昵称/手机号/用户 ID）、`role`、`status`、`from`/`to`、`segment`（`never_login`/`inactive_30d`/`no_tasks`）、`membership`（`member`/`non_member`）；`GET /admin/users/stats` 返回同口径全站统计；`GET /admin/users/:id` 返回账号、会员、积分（含累计获得/消耗）、消费（实付/退款/净消费/最近订单）与生成（状态分布/按能力/近 30 天趋势）聚合；导出响应带 `X-Export-Total`/`X-Export-Limit`/`X-Export-Truncated`；`POST /admin/users/:id/logout-all` 强制下线（`user.disable`）；重置密码返回 `mustChangePassword` 与 24 小时 `expiresAt` |
 | GET/PUT/POST/DELETE | `/api/v1/admin/{credit-prices,products,orders,payments,credits}*` | 交易与积分管理。商品删除（`DELETE /admin/products/:id`，`product.delete`）只允许没有历史订单的 SKU；已有订单返回 **409** 并提示改为下架（退款与积分回收要回查 SKU 原价与发放积分）。列表每项带 `orderCount` 供前端预检。订单列表 / 导出支持 `productId` 筛选（只回买过该商品的订单，商品卡「N 单」深链用），与 `status` / `orderNo` / `email` / `channel` / `refundState` / 时间范围同口径。订单列表每项另带 `refundState`（`processing` / `failed` / `succeeded` / `null`）：退款状态挂在 `Refund` 上而非订单上，渠道异步退款时订单仍是 `paid`，此字段与 `refundState` 筛选**同源**（命中任意一笔退款单即显示最需要人管的那一个：处理中 > 失败 > 成功） |
-| GET/POST/PATCH/DELETE | `/api/v1/admin/membership-plans*` | 会员套餐列表 / 新建 / 改价改权益 / 上下架 / 删除（`product.read` / `product.write`，写操作自动写审计）。删除只允许非 `free` 且没有会员、没有订单的套餐；否则返回 **409** 并提示改为下架，下架不影响存量会员 |
-| POST | `/api/v1/admin/orders/:id/refund` | 渠道退款（**先调渠道再改本地账**；渠道失败 `50302` 且订单/积分不变，在途退款 `40908`，`order.refund` 权限 + 必填原因 + 审计） |
-| POST | `/api/v1/admin/orders/:id/refunds/:refundId/confirm` | 异步退款最终人工核销：`{ outcome: 'succeeded' \| 'failed', providerRefundId?, reason }`。`succeeded` 原子回收积分并推进订单；`failed` 只关闭退款单，订单与积分不变；两者均要求原因、写审计，`order.refund` |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/membership-plans*` | 会员套餐列表 / 新建 / 改价改权益 / 上下架 / 删除（`product.read` / `product.write`）。删除只允许非 `free` 且没有会员、没有订单的套餐；否则返回 **409** 并提示改为下架，下架不影响存量会员 |
+| POST | `/api/v1/admin/orders/:id/refund` | 渠道退款（**先调渠道再改本地账**；渠道失败 `50302` 且订单/积分不变，在途退款 `40908`，`order.refund` 权限 + 必填原因） |
+| POST | `/api/v1/admin/orders/:id/refunds/:refundId/confirm` | 异步退款最终人工核销：`{ outcome: 'succeeded' \| 'failed', providerRefundId?, reason }`。`succeeded` 原子回收积分并推进订单；`failed` 只关闭退款单，订单与积分不变；两者均要求原因，`order.refund` |
 | GET/PUT/POST/DELETE | `/api/v1/admin/{coupons,campaigns,marketing-rules}*` | 营销管理。券/活动删除只允许没有关联订单的记录；已有订单返回 **409**，券提示改为停用、活动提示改为下线 |
-| GET/POST | `/api/v1/admin/invoices*` | 发票列表 / 开具 / 驳回；`POST /:id/red-flush` 登记已开具发票冲红，请求体 `{ reason }`（必填）。读 / 写统一使用 `invoice.write`，冲红保留历史并写审计 |
+| GET/POST | `/api/v1/admin/invoices*` | 发票列表 / 开具 / 驳回；`POST /:id/red-flush` 登记已开具发票冲红，请求体 `{ reason }`（必填）。读 / 写统一使用 `invoice.write`，冲红保留历史 |
 | GET | `/api/v1/admin/payments/providers` | 支付适配器视图列表（沙箱 / 支付宝 / 微信）：启用状态、是否配置齐、缺哪几项、checkoutMode、关单分钟、配置版本、字段元数据、风险告警。**只回配置状态不回密钥明文**（`secretConfigured` 只给布尔），`payment.read` |
-| PUT | `/api/v1/admin/payments/providers/:id/config` | 保存支付适配器配置（版本化 + 加密 + 追加写）。请求体 `{ enabled, closeAfterMinutes, values }`，保存写审计但不要求填写原因；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
-| GET/PUT | `/api/v1/admin/payments/settings` | 后台默认币种设置，读 `payment.read` / 写 `payment.write`，写操作自动写审计 |
+| PUT | `/api/v1/admin/payments/providers/:id/config` | 保存支付适配器配置（版本化 + 加密 + 追加写）。请求体 `{ enabled, closeAfterMinutes, values }`，保存不要求填写原因；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
+| POST | `/api/v1/admin/payments/providers/:providerId/instances` | 新建服务商实例；可选名称、凭据、关单分钟、实例限额、退款开关与支付方式子集，`payment.write` |
+| PUT | `/api/v1/admin/payments/providers/:providerId/instances/:instanceId/config` | 保存指定实例的新版本配置；字段同旧版配置保存接口，`payment.write` |
+| PATCH | `/api/v1/admin/payments/providers/:providerId/instances/order` | 按 `{ instanceIds }` 调整实例排序，`payment.write` |
+| POST | `/api/v1/admin/settings/upload` | 上传设置图片（multipart 字段 `file`），返回 `{ value, previewUrl, width, height, sizeBytes }`；`setting.write` |
+| GET/PUT | `/api/v1/admin/payments/settings` | 支付设置：`defaultCurrency` / `alipaySource` / `wechatSource`，字段均可选，PUT 只更新实际提交项；读 `payment.read` / 写 `payment.write` |
 | GET | `/api/v1/admin/payments/orders` | 支付订单列表（服务端分页，默认 30）：筛选 `status` / `providerId` / `keyword` / `timeField` / `from` / `to` / `sort`，`payment.read` |
 | GET | `/api/v1/admin/payments/orders/:id` | 订单详情（含最近 50 次支付尝试），`payment.read` |
-| POST | `/api/v1/admin/payments/orders/:id/query` | 向渠道查单并同步状态（关单前必先查单），`payment.operate`，写操作自动写审计 |
-| POST | `/api/v1/admin/payments/orders/:id/close` | 关闭未支付订单（**不等于退款**），已入账返回 `409`；`payment.operate`，写操作自动写审计 |
-| GET | `/api/v1/admin/payments/orders/export.csv` | 支付订单导出（`payment.read` + `data.export` + 审计） |
-| GET/POST | `/api/v1/admin/payments/reconciliations` | 对账运行列表 / 手动执行。列表筛 `providerId` / `status`（`running` / `completed` / `failed`）/ `from` / `to`；执行请求体 `{ providerId, billDate, retryFailed? }`，`finance.reconcile`，写操作自动写审计 |
+| POST | `/api/v1/admin/payments/orders/:id/query` | 向渠道查单并同步状态（关单前必先查单），`payment.operate` |
+| POST | `/api/v1/admin/payments/orders/:id/close` | 关闭未支付订单（**不等于退款**），已入账返回 `409`；`payment.operate` |
+| GET | `/api/v1/admin/payments/orders/export.csv` | 支付订单导出（`payment.read` + `data.export`） |
+| GET/POST | `/api/v1/admin/payments/reconciliations` | 对账运行列表 / 手动执行。列表筛 `providerId` / `providerInstanceId` / `status`（`running` / `completed` / `failed`）/ `from` / `to`；执行请求体 `{ providerId, providerInstanceId, billDate, retryFailed? }`，`finance.reconcile` |
 | GET | `/api/v1/admin/payments/reconciliations/:id/items` | 对账差异明细（按 `result` 筛，默认 50 条/页），`payment.read` |
-| POST | `/api/v1/admin/payments/reconciliations/import` | 渠道账单 CSV 兜底导入（multipart `file` + `providerId` / `billDate`），`finance.reconcile`，写操作自动写审计 |
-| GET | `/api/v1/admin/payments/reconciliations/export.csv`、`/:id/items/export.csv` | 对账汇总 / 明细导出（`payment.read` + `data.export` + 审计） |
-| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。渠道与渠道模型删除（含单删、批量删除）保留业务确认，但不要求原因；审计仍记录操作人、动作与结果 |
+| POST | `/api/v1/admin/payments/reconciliations/import` | 渠道账单兜底导入（multipart `file` + `providerId` / `providerInstanceId` / `billDate`）；支持 CSV，支付宝另支持 ZIP 内的 CSV，`finance.reconcile` |
+| GET | `/api/v1/admin/payments/reconciliations/export.csv`、`/:id/items/export.csv` | 对账汇总 / 明细导出（`payment.read` + `data.export`） |
+| GET | `/api/v1/admin/payments/exceptions`、`/:id` | 支付异常单列表 / 详情；返回绑定的退款状态、`refundFailureKind`（`definitive` / `unknown` / `null`）与渠道退款单号，`payment.read` |
+| POST | `/api/v1/admin/payments/exceptions/:id/retry-refund` | 重试自动原路退款。`unknown`（含历史无标记失败）必须复用原退款单号；`definitive` 才新建退款单号；调用前重新核对订单、成功支付流水、金额与币种，`finance.reconcile` |
+| POST | `/api/v1/admin/payments/exceptions/:id/confirm-refund` | 人工核销自动退款，请求体 `{ outcome: 'succeeded' \| 'failed', providerRefundId?, reason }`。仅允许 `cancelled_but_paid` 异常单；只更新退款与异常单，不改订单状态、不回收/恢复积分，`finance.reconcile` |
+| POST | `/api/v1/admin/payments/exceptions/:id/close` | 人工结案，请求体 `{ resolution }`；只关闭异常单，不改订单与积分，`finance.reconcile` |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。渠道与渠道模型删除（含单删、批量删除）保留业务确认，但不要求原因 |
 | GET | `/api/v1/admin/channel-models?channelId=&includeDisabled=` | 跨渠道模型视图（一行 = 一条渠道模型，条目带 `channelName` / `channelEnabled`）。`includeDisabled=1` 含已停用线路 —— 后台「全部模型」视图要用；不传时只给启用线路（前台模型的线路选择器用，停用线路进了下拉会让人以为选了就能用），`channel.model_read` |
-| GET/PUT | `/api/v1/admin/channels/order`、`/api/v1/admin/channels/:id/models/order` | 渠道排序 / 渠道内模型排序。`GET` 返回当前顺序的 id 数组；`PUT` 请求体 `{ ids, expectedIds }` —— `expectedIds` 是**读取时看到的顺序**，与库中不一致说明期间有人改过，整单拒绝 **409**（`code 40900`，「排序列表已变化，请重新加载后再保存」），不做部分落库。权限 `channel.write` / `channel.model_write`，写审计 `channel.order` / `channel_model.order` |
-| GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；渠道模型表单的协议来源，`channel.model_read` |
-| GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔与渠道工作台共用，`channel.read` |
-| POST | `/api/v1/admin/channels/health/reset` | 解除本进程内全部线路冷却，返回 `{ cleared }`；只清内存不动数据库，多实例部署只影响处理本次请求的实例，`channel.write`，写审计 `channel.health_reset` |
+| GET/PUT | `/api/v1/admin/channels/order`、`/api/v1/admin/channels/:id/models/order` | 渠道排序 / 渠道内模型排序。`GET` 返回当前顺序的 id 数组；`PUT` 请求体 `{ ids, expectedIds }` —— `expectedIds` 是**读取时看到的顺序**，与库中不一致说明期间有人改过，整单拒绝 **409**（`code 40900`，「排序列表已变化，请重新加载后再保存」），不做部分落库。权限 `channel.write` / `channel.model_write`， |
+| GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；同时下发清单声明的 `baseUrl`、鉴权字段与配置字段，供渠道表单做服务商预设；`channel.model_read` |
+| GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔与「模型商品」共用，`channel.read` |
+| POST | `/api/v1/admin/channels/health/reset` | 解除本进程内全部线路冷却，返回 `{ cleared }`；只清内存不动数据库，多实例部署只影响处理本次请求的实例，`channel.write`， |
 | GET | `/api/v1/admin/channel-models/health?channelId=` | 线路**历史表现**：一行 = 一条渠道模型，给 24h / 7d 两个窗口的成功率与 P95 耗时 + 最近 10 条终态样本，`channel.model_read`。与 `/admin/channels/health` 的分工：后者是「现在」（启停 / 协议 / 冷却），本端点是「过去」（成功率 / 耗时），值班时两个都要看。成功率 = `success` ÷ 终态次数（`pending` / `canceled` 不计入分母），**无终态样本时为 `null`**（不是 0 ——「没数据」与「全失败」要分得开）；P95 用最近邻法（不插值），样本被采样上限截断时 `sampled=true` |
-| POST | `/api/v1/admin/channels/:id/models/batch-reprice` | 批量调价：只改**已启用规格的售价**，不动成本价 / 启停 / 上游键。请求体 `{ models: [{ modelId, priceVersion, priceTiers: [{ id, priceVersion, prices }] }] }`，单次 ≤ 100 个模型。`priceVersion` 是乐观并发令牌：任一模型或规格版本过期 → **整批拒绝**（40001，不部分落库）；`prices` 必须恰好是当前计费方式的全部售价字段（按次/按时长 → `unitPriceMicrocredits`；Token 非视频 → 输入/输出/缓存三项；Token 视频 → 仅输出），少一项或多夹一项都拒绝；规格缺成本价或售价未配置时拒绝。成功返回 `{ updated }`，自动写审计 `channel_model.batch_reprice`，`channel.model_write` |
+| POST | `/api/v1/admin/channels/:id/models/batch-reprice` | 批量调价：只改**已启用规格的售价**，不动成本价 / 启停 / 上游键。请求体 `{ models: [{ modelId, priceVersion, priceTiers: [{ id, priceVersion, prices }] }] }`，单次 ≤ 100 个模型。`priceVersion` 是乐观并发令牌：任一模型或规格版本过期 → **整批拒绝**（40001，不部分落库）；`prices` 必须恰好是当前计费方式的全部售价字段（按次/按时长 → `unitPriceMicrocredits`；Token 非视频 → 输入/输出/缓存三项；Token 视频 → 仅输出），少一项或多夹一项都拒绝；规格缺成本价或售价未配置时拒绝。成功返回 `{ updated }`，`channel.model_write` |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/logical-models*` | 前台模型列表 / 保存（新 revision + 线路重建）/ 归档；`logical_model.read` / `logical_model.write` |
 | POST | `/api/v1/admin/logical-models/:id/simulate` | 路由模拟（只读）：返回产品能力匹配结果与逐条线路的判定原因；需 `logical_model.read`。入参 `capability` 是**模态**（`image` / `video` / `text`），不是产品能力 id（`expand` / `main_image`）——两层命名空间不能混；省略时**按模型自己的能力合同取模态**，传了产品能力 id 也按省略处理（模型是权威源，客户端不该改） |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/user-groups*` | 用户分组（倍率 / 可见渠道 / 按模型覆盖）；`user_group.read` / `user_group.write`，`code` 创建后不可改 |
-| GET/PATCH/POST/DELETE | `/api/v1/admin/plugins*`、`/plugins/:id/verify`、`/plugins/install` | 插件清单 / 启停（立即重注册协议）/ 契约校验 / 上传安装（multipart `file`，`origin='installed'`）/ 卸载（内置包 40001，仍被渠道模型引用 40909）；`plugin.read` / `plugin.write`，装卸写审计。清单每项带 `availability: { available, reason }`：本环境不可用时 `reason` 是**人话**说明（停用 / 声明了本仓未内置的 `host:<engine>` 引擎 / 只贡献支付短信等非模型能力而本仓独立实现），不允许「插件列在那里但就是不工作」这种静默缺失 |
+| GET/PATCH/POST/DELETE | `/api/v1/admin/plugins*`、`/plugins/:id/verify`、`/plugins/install` | 插件清单 / 启停（立即重注册协议）/ 契约校验 / 上传安装（multipart `file`，`origin='installed'`）/ 卸载（内置包 40001，仍被渠道模型引用 40909）；`plugin.read` / `plugin.write`。清单每项带 `availability: { available, reason }`：本环境不可用时 `reason` 是**人话**说明（停用 / 声明了本仓未内置的 `host:<engine>` 引擎 / 只贡献支付短信等非模型能力而本仓独立实现），不允许「插件列在那里但就是不工作」这种静默缺失 |
 | GET/POST | `/api/v1/admin/provider-catalog`、`/refresh`、`/:id/{verify,install}` | 服务商目录（插件包上游清单）：未配置 `MODEL_PROVIDER_CATALOG_URL` 时返回空态与原因；安装走与上传安装同一套校验；`plugin.read` / `plugin.write` |
 | GET | `/api/v1/admin/analytics/finance?from&to` | 财务汇总：实收 = 已结算 `actualAmountMicrocredits`，已退 = `refundedAmountMicrocredits`，净收入 = 实收 − 已退；预留 / 运行 / 待核对单列挂账**不计入实收**；区间默认 30 天、上限 366 天，`model.analytics_read`。**单位是积分**，与概览页的「订单收入（元）」（订单实付）不是同一笔账 |
-| GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve`、`/billing-orders/batch-resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`）。单条与批量请求均必须带 `reason`（≤ 500 字），批量同一次操作共享 `reviewBatchId`；写操作自动写审计，`billing_order.read` / `billing_order.resolve`；列表支持 `?status=review`「待核对」队列口径；批量核对逐条独立处置并回显失败原因 |
-| GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read` |
-| GET | `/api/v1/admin/api-logs/export` | 调用记录 CSV（与列表同筛选口径，上限 5000 行；**不含请求体 / 响应体**），`model.call_read + data.export` + 审计 |
-| GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架请求必须带原因（后台页面统一生成并下发 C 端），写需 `capability.write`（高危，走审计） |
-| GET/PUT | `/api/v1/admin/aigc-label` | 读 / 改角标样式（`setting.read` / `setting.write`，PUT 自动写审计 `aigc.label_update`） |
+| GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve`、`/billing-orders/batch-resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`）。单条与批量请求均必须带 `reason`（≤ 500 字），批量同一次操作共享 `reviewBatchId`；`billing_order.read` / `billing_order.resolve`；列表支持 `?status=review`「待核对」队列口径；批量核对逐条独立处置并回显失败原因 |
+| GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 来源 / 操作 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read` |
+| GET | `/api/v1/admin/api-logs/export` | 调用记录 CSV（与列表同筛选口径，上限 5000 行；**不含请求体 / 响应体**），`model.call_read + data.export` |
+| GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架请求必须带原因（后台页面统一生成并下发 C 端），写需 `capability.write`（高危，下架需填写业务原因） |
+| GET/PUT | `/api/v1/admin/aigc-label` | 读 / 改角标样式（`setting.read` / `setting.write`） |
 | GET | `/api/v1/admin/tickets`、`/tickets/stats`、`/tickets/export` | 工单列表 / 状态计数 / CSV 导出 |
 | GET/POST/PATCH | `/api/v1/admin/tickets/:id`、`/tickets/:id/replies` | 工单详情与回复 / 改状态或指派（`ticket.handle`）；回复可带 `visibility=internal`，内部备注不推送、不下发 C 端 |
 | GET | `/api/v1/admin/tickets/assignees` | 可指派的启用后台账号（`ticket.handle`） |
 | POST | `/api/v1/admin/tickets/:id/transfer` | 转交：内部备注 + 指派 + `processing`，不改订单 / 积分 / 退款（`ticket.handle`） |
 | GET | `/api/v1/admin/search?q=` | 全局搜索五组各前 5 条（`data.search`，`q` < 2 返回空） |
 | POST | `/api/v1/admin/{users,assets,tasks,orders}/batch` | 批量动作，逐条结果（≤ 100 条，使用各领域动作权限） |
-| GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,audit-logs,invoices,coupons,campaigns}/export` | CSV 导出（BOM，领域读权限 + `data.export`；上限 5000 行，筛选口径与列表一致）。调用记录是 `/admin/api-logs/export` |
+| GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,invoices,coupons,campaigns}/export` | CSV 导出（BOM，领域读权限 + `data.export`；上限 5000 行，筛选口径与列表一致）。调用记录是 `/admin/api-logs/export` |
 | POST | `/api/v1/admin/credits/import` | 积分 CSV 导入（multipart，按邮箱匹配，`credit.adjust`） |
-| GET/PUT/POST | `/api/v1/admin/legal*` | 法务版本列表 / 新建草稿 / 发布（`legal.write`，写操作自动写审计） |
+| GET/PUT/POST | `/api/v1/admin/legal*` | 法务版本列表 / 新建草稿 / 发布（`legal.write`） |
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`） |
 | GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`provider` / `delivers` / `configured`，不含凭据；`message.write`） |
-| GET/POST | `/api/v1/admin/{storage,scheduler,backups,audit-logs,roles,settings}*` | 系统管理 |
+| GET/POST | `/api/v1/admin/{storage,scheduler,backups,roles,settings}*` | 系统管理 |
 
 #### 任务全链路查询口径
 

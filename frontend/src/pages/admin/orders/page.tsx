@@ -45,7 +45,7 @@ import type { AdminOrderRefund, AdminOrderRow } from '../../../types/api';
  * ## 核销与退款都是「钱的动作」
  *
  * 核销造一条 channel=manual 的支付流水 (交易号带管理员 id), 退款写 Refund 记录
- * 并回收积分。两者都进操作审计，审计原因由系统按操作上下文生成。
+ * 并回收积分。两者都保留完整业务记录，金额与依据可追溯。
  *
  * ## 模块划分
  *
@@ -316,7 +316,7 @@ export function AdminOrdersPage() {
     <>
       <PageHeader
         title="订单管理"
-        description="订单、支付与退款。核销、渠道查单、关单与退款都会写入操作审计；关单不退款。"
+        description="订单、支付与退款。核销、渠道查单、关单与退款均保留业务记录；关单不退款。"
       />
 
       {(actionContext.from || done) && (

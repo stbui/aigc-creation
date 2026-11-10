@@ -3,13 +3,13 @@ import { launchChromium } from './browser.mjs';
 /**
  * 后台全路由巡检（2026-11-01，shadcn 迁移期）。
  *
- * 逐条打开 33 个后台路由，收集控制台错误与页面异常，并对重点页截图。
+ * 逐条打开后台路由，收集控制台错误与页面异常，并对重点页截图。
  * 迁移期用它替代「一页一页点」—— 白屏、样式丢失、key 冲突都会在这里冒出来。
  */
 
 
 const ROUTES = [
-  'alerts', 'users', 'roles', 'settings', 'audit-logs', 'backups', 'assets', 'storage',
+  'alerts', 'users', 'roles', 'settings', 'backups', 'assets', 'storage',
   'coupons', 'campaigns', 'marketing-rules', 'scheduler', 'channels', 'logical-models',
   'user-groups', 'plugins', 'billing-orders', 'finance', 'model-calls', 'capabilities',
   'tasks', 'tickets', 'credit-prices', 'products', 'membership-plans', 'orders', 'credits',

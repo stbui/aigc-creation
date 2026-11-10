@@ -311,5 +311,11 @@
   },
   "copyAddressFailed": {
     "message": "이미지 URL을 복사할 수 없습니다"
+  },
+  "extensionReloadRequiredTitle": {
+    "message": "확장 프로그램이 업데이트되었습니다"
+  },
+  "extensionReloadRequiredMessage": {
+    "message": "이 페이지를 새로고침한 후 다시 시도해 주세요."
   }
 }

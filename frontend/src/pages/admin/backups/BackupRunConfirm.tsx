@@ -9,7 +9,7 @@ interface BackupRunConfirmProps {
   onConfirm: () => void;
 }
 
-/** 手动备份确认：审计原因由页面按操作上下文生成 */
+/** 手动备份确认：执行前说明快照范围与占用影响。 */
 export function BackupRunConfirm({
   open,
   busy,
@@ -38,7 +38,6 @@ export function BackupRunConfirm({
           ? `当前已备份 ${stats.total} 份，占用 ${stats.totalMb} MB`
           : '将在备份完成后重新统计占用',
         '新备份初始状态为「未验证」，需再做一次恢复验证才能下载',
-        '本次操作会写入操作审计',
       ]}
     />
   );

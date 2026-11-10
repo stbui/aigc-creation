@@ -514,7 +514,26 @@ describe('ZpayAdapter 退款与关单', () => {
       }),
     ).resolves.toMatchObject({
       state: 'failed',
+      failureKind: 'definitive',
       error: expect.stringContaining('通道不支持退款'),
+    });
+  });
+
+  it('退款网络异常时标记结果未知', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('socket timeout'));
+
+    await expect(
+      adapter.refund({
+        config: makeConfig(),
+        orderNo: ORDER_NO,
+        outRefundNo: 'refund_1',
+        amountCents: 1005,
+        totalCents: 1005,
+      }),
+    ).resolves.toMatchObject({
+      state: 'failed',
+      failureKind: 'unknown',
+      error: expect.stringContaining('socket timeout'),
     });
   });
 

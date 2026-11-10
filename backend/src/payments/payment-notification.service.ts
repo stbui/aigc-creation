@@ -36,16 +36,45 @@ export interface CanonicalNotificationInput {
 type VerifiedNotification = Extract<NotificationResult, { ok: true }>;
 
 interface HistoricalPaymentRef {
-  providerConfigId: string;
+  id: string;
+  providerConfigId: string | null;
+  providerInstanceId: string | null;
   providerMethod: string | null;
   providerRef: string | null;
   payTransactionId: string | null;
+  status: string;
+  createdAt: Date;
+}
+
+interface PaymentAttemptRef extends HistoricalPaymentRef {
+  orderId: string;
+  channel: string;
+  providerConfigVersion: number | null;
+}
+
+interface ResolvedHistoricalPayment {
+  payment: HistoricalPaymentRef;
+  config: ResolvedPaymentConfig;
 }
 
 interface ResolvedCanonicalCallback {
   config: ResolvedPaymentConfig;
   result: VerifiedNotification;
   expectedPaymentMethod?: VisiblePaymentMethod;
+  /** 验签后精确定位的 Payment，用于把历史空配置/空支付方式回填。 */
+  payment?: HistoricalPaymentRef;
+}
+
+interface NotificationMetadata {
+  paymentId?: string;
+  providerConfigVersion?: number;
+  providerInstanceId?: string;
+  expectedPaymentMethod?: VisiblePaymentMethod;
+}
+
+interface PaymentAttemptResolution {
+  payment?: PaymentAttemptRef;
+  error?: string;
 }
 
 interface VerifiedCandidate extends ResolvedCanonicalCallback {
@@ -118,19 +147,28 @@ export class PaymentNotificationService {
       });
     }
 
-    /*
-     * 易支付同一套凭据承载支付宝/微信两种支付方式。验签前必须先由
-     * 商户订单号定位到当时固化的 Payment，读取 providerMethod 选择期望的
-     * type；不能拿渠道配置的当前值或回调 body 里的 type 自证。
-     *
-     * 定位不到 Payment 或历史记录没有 providerMethod 时直接拒绝，不落收件箱。
-     */
-    const expectedPaymentMethod =
-      input.providerId === 'epay'
-        ? await this.expectedPaymentMethodFor(input.body, input.configId)
-        : undefined;
-    if (input.providerId === 'epay' && !expectedPaymentMethod) {
-      this.logger.warn('易支付回调未匹配到已固化支付方式的支付尝试，拒绝落库');
+    if (input.providerId === 'epay') {
+      return this.acceptEpayWithConfig(adapter, config, input);
+    }
+
+    return this.acceptWithConfig(adapter, config, input);
+  }
+
+  /**
+   * EasyPay 旧版入口。
+   *
+   * 商户订单号 + 固定配置 + 渠道单据号必须先精确定位到历史上的 Payment。
+   * 历史行的 providerMethod 可能为空，此时仅用 alipay/wechat 分别验签，
+   * 由参与 MD5 的 type 决定哪个成功；绝不直接信任回调 body.type。
+   */
+  private async acceptEpayWithConfig(
+    adapter: PaymentAdapter,
+    config: ResolvedPaymentConfig,
+    input: CanonicalNotificationInput,
+  ): Promise<PaymentAck> {
+    const payment = await this.historicalEpayPaymentFor(input.body, config.id);
+    if (!payment) {
+      this.logger.warn('易支付回调未精确匹配到历史支付尝试，拒绝落库');
       return adapter.ack({
         ok: false,
         ackSuccess: false,
@@ -139,7 +177,47 @@ export class PaymentNotificationService {
       });
     }
 
-    return this.acceptWithConfig(adapter, config, input, expectedPaymentMethod);
+    const methods: VisiblePaymentMethod[] =
+      payment.providerMethod && isVisiblePaymentMethod(payment.providerMethod)
+        ? [payment.providerMethod]
+        : ['alipay', 'wechat'];
+    let lastFailure: NotificationResult | undefined;
+    for (const expectedPaymentMethod of methods) {
+      let result: NotificationResult;
+      try {
+        result = await adapter.verifyNotification({
+          config: this.contextOf(config),
+          headers: input.headers,
+          rawBody: input.rawBody,
+          body: input.body,
+          expectedPaymentMethod,
+        });
+      } catch (e) {
+        this.logger.error(
+          `易支付回调处理异常 (${config.id}/${expectedPaymentMethod}): ${(e as Error).message}`,
+        );
+        continue;
+      }
+      if (!result.ok) {
+        lastFailure = result;
+        continue;
+      }
+      return this.persistVerified(
+        adapter,
+        { config, result, payment, expectedPaymentMethod },
+        input,
+      );
+    }
+
+    this.logger.warn(`易支付回调未通过验签 (${config.id})`);
+    return adapter.ack(
+      lastFailure ?? {
+        ok: false,
+        ackSuccess: false,
+        reason: '易支付回调验签失败',
+        rawPayload: '',
+      },
+    );
   }
 
   /**
@@ -182,7 +260,7 @@ export class PaymentNotificationService {
       });
     }
 
-    return this.persistVerified(adapter, resolved.config, input, resolved.result);
+    return this.persistVerified(adapter, resolved, input);
   }
 
   private async acceptWithConfig(
@@ -216,16 +294,24 @@ export class PaymentNotificationService {
       return adapter.ack(result);
     }
 
-    return this.persistVerified(adapter, config, input, result);
+    return this.persistVerified(
+      adapter,
+      {
+        config,
+        result,
+        ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
+      },
+      input,
+    );
   }
 
   /** 验签通过后的唯一落库与同步处理路径。 */
   private async persistVerified(
     adapter: PaymentAdapter,
-    config: ResolvedPaymentConfig,
+    resolved: ResolvedCanonicalCallback,
     input: CanonicalNotificationInput,
-    result: VerifiedNotification,
   ): Promise<PaymentAck> {
+    const { config, result, payment, expectedPaymentMethod } = resolved;
     const digest = sha256(input.rawBody.toString('utf8'));
     const eventId = result.eventId || sha256(`${input.providerId}:${input.rawBody.toString('utf8')}`);
 
@@ -249,7 +335,12 @@ export class PaymentNotificationService {
               amountCents: result.amountCents,
               currency: result.currency,
               providerStatus: result.providerStatus,
+              reason: result.reason ?? null,
               paidAt: result.paidAt ? result.paidAt.toISOString() : null,
+              paymentId: payment?.id ?? null,
+              providerConfigVersion: config.version,
+              providerInstanceId: config.instanceId,
+              expectedPaymentMethod: expectedPaymentMethod ?? null,
             }),
             status: 'pending',
           },
@@ -265,6 +356,16 @@ export class PaymentNotificationService {
 
     if (row?.status === 'processed') {
       return adapter.ack(result);
+    }
+
+    // 历史 Payment 没有 providerConfigId 时，验签后已经解析出实际配置；
+    // 收件箱必须同步成该配置，worker 重试时才能继续精确匹配。
+    if (row && row.providerConfigId !== config.id) {
+      await this.prisma.paymentNotification.update({
+        where: { id: row.id },
+        data: { providerConfigId: config.id },
+      });
+      row = { ...row, providerConfigId: config.id };
     }
 
     /*
@@ -369,28 +470,31 @@ export class PaymentNotificationService {
 
     const order = await this.prisma.order.findUnique({
       where: { orderNo: merchantOrderNo },
-      select: { id: true },
+      select: { id: true, providerInstanceId: true },
     });
     if (!order) throw new AppError(40001, '订单不存在，拒绝处理', 400);
 
+    // 历史 Payment 可能没有 providerConfigId：保留这些候选，按它自己的实例
+    // 解析到同渠道最新配置，绝不能因此跨渠道或跨实例试配置。
     const loaded = (await this.prisma.payment.findMany({
       where: {
         orderId: order.id,
         channel: input.providerId,
-        providerConfigId: { not: null },
       },
       select: {
+        id: true,
         providerConfigId: true,
+        providerInstanceId: true,
         providerMethod: true,
         providerRef: true,
         payTransactionId: true,
+        status: true,
+        createdAt: true,
       },
       orderBy: { createdAt: 'asc' },
-    })) as Array<HistoricalPaymentRef & { providerConfigId: string | null }>;
+    })) as HistoricalPaymentRef[];
 
-    let payments = loaded.filter(
-      (payment): payment is HistoricalPaymentRef => Boolean(payment.providerConfigId),
-    );
+    let payments = loaded;
     if (input.providerId === 'epay' || input.providerId === 'stripe') {
       payments = payments.filter((payment) => payment.providerRef === providerRef);
     }
@@ -398,18 +502,24 @@ export class PaymentNotificationService {
       throw new AppError(40001, '未找到对应的历史支付尝试，拒绝处理', 400);
     }
 
-    const configs = await this.loadConfigs(
+    const resolvedPayments = await this.resolveHistoricalPayments(
+      payments,
       input.providerId,
-      Array.from(new Set(payments.map((payment) => payment.providerConfigId))),
+      order.providerInstanceId,
     );
+    if (resolvedPayments.length === 0) {
+      throw new AppError(40001, '历史支付尝试无法解析到同渠道配置，拒绝处理', 400);
+    }
+
+    const configs = uniqueResolvedConfigs(resolvedPayments);
     const successes: VerifiedCandidate[] = [];
     for (const config of configs) {
-      const configPayments = payments.filter(
-        (payment) => payment.providerConfigId === config.id,
-      );
+      const configPayments = resolvedPayments
+        .filter((item) => item.config.id === config.id)
+        .map((item) => item.payment);
       if (configPayments.length === 0) continue;
 
-      const methods = Array.from(
+      const knownMethods = Array.from(
         new Set(
           configPayments
             .map((payment) => payment.providerMethod)
@@ -418,28 +528,39 @@ export class PaymentNotificationService {
             ),
         ),
       );
-      if (input.providerId === 'epay' && methods.length !== 1) continue;
-      const expectedPaymentMethod = input.providerId === 'epay' ? methods[0] : undefined;
+      /*
+       * EasyPay 的历史 providerMethod 可能为空。此时用同一配置分别尝试
+       * alipay/wechat；channel type 参与 MD5，错误 type 会自然验签失败，
+       * 绝不信任回调 body 的 type 自证。
+       */
+      const expectedMethods: Array<VisiblePaymentMethod | undefined> =
+        input.providerId !== 'epay'
+          ? [undefined]
+          : knownMethods.length > 0
+            ? knownMethods
+            : ['alipay', 'wechat'];
 
-      try {
-        const result = await adapter.verifyNotification({
-          config: this.contextOf(config),
-          headers: input.headers,
-          rawBody: input.rawBody,
-          body: input.body,
-          ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
-        });
-        if (!result.ok || result.merchantOrderNo !== merchantOrderNo) continue;
-        successes.push({
-          config,
-          result,
-          payments: configPayments,
-          ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
-        });
-      } catch (e) {
-        this.logger.warn(
-          `规范回调候选配置验签异常 (${input.providerId}/${config.id}): ${(e as Error).message}`,
-        );
+      for (const expectedPaymentMethod of expectedMethods) {
+        try {
+          const result = await adapter.verifyNotification({
+            config: this.contextOf(config),
+            headers: input.headers,
+            rawBody: input.rawBody,
+            body: input.body,
+            ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
+          });
+          if (!result.ok || result.merchantOrderNo !== merchantOrderNo) continue;
+          successes.push({
+            config,
+            result,
+            payments: configPayments,
+            ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
+          });
+        } catch (e) {
+          this.logger.warn(
+            `规范回调候选配置验签异常 (${input.providerId}/${config.id}): ${(e as Error).message}`,
+          );
+        }
       }
     }
 
@@ -460,19 +581,40 @@ export class PaymentNotificationService {
     const resource = wechatResourceOf(input.body);
     if (!resource) throw new AppError(40001, '微信回调缺少 resource，拒绝处理', 400);
 
+    /*
+     * 历史 Payment 可能没有 providerConfigId。先保留全部微信支付尝试，
+     * 各自按 providerInstanceId → Order.providerInstanceId → default 解析配置，
+     * 再尝试用对应 APIv3 密钥解密。未配置 ID 的 Payment 不能再被过滤掉。
+     */
     const references = (await this.prisma.payment.findMany({
-      where: { channel: 'wechat', providerConfigId: { not: null } },
-      select: { providerConfigId: true },
-      distinct: ['providerConfigId'],
-    })) as Array<{ providerConfigId: string | null }>;
-    const configIds = references
-      .map((reference) => reference.providerConfigId)
-      .filter((id): id is string => Boolean(id));
-    if (configIds.length === 0) {
+      where: { channel: 'wechat' },
+      select: {
+        id: true,
+        providerConfigId: true,
+        providerInstanceId: true,
+        providerMethod: true,
+        providerRef: true,
+        payTransactionId: true,
+        status: true,
+        createdAt: true,
+        order: { select: { providerInstanceId: true } },
+      },
+    })) as Array<HistoricalPaymentRef & { order?: { providerInstanceId: string | null } }>;
+    const referenceResolutions: ResolvedHistoricalPayment[] = [];
+    for (const payment of references) {
+      referenceResolutions.push(
+        ...(await this.resolveHistoricalPayments(
+          [payment],
+          'wechat',
+          payment.order?.providerInstanceId ?? null,
+        )),
+      );
+    }
+    const configs = uniqueResolvedConfigs(referenceResolutions);
+    if (configs.length === 0) {
       throw new AppError(40001, '微信回调查不到历史支付配置，拒绝处理', 400);
     }
 
-    const configs = await this.loadConfigs('wechat', configIds);
     const decrypted: Array<{ config: ResolvedPaymentConfig; orderNo: string }> = [];
     for (const config of configs) {
       try {
@@ -494,35 +636,41 @@ export class PaymentNotificationService {
     const merchantOrderNo = orderNos[0];
     const order = await this.prisma.order.findUnique({
       where: { orderNo: merchantOrderNo },
-      select: { id: true },
+      select: { id: true, providerInstanceId: true },
     });
     if (!order) throw new AppError(40001, '订单不存在，拒绝处理', 400);
 
-    const decryptedConfigIds = Array.from(
-      new Set(decrypted.map((item) => item.config.id)),
-    );
+    const decryptedConfigIds = new Set(decrypted.map((item) => item.config.id));
     const loaded = (await this.prisma.payment.findMany({
       where: {
         orderId: order.id,
         channel: 'wechat',
-        providerConfigId: { in: decryptedConfigIds },
       },
       select: {
+        id: true,
         providerConfigId: true,
+        providerInstanceId: true,
         providerMethod: true,
         providerRef: true,
         payTransactionId: true,
+        status: true,
+        createdAt: true,
       },
-    })) as Array<HistoricalPaymentRef & { providerConfigId: string | null }>;
-    const payments = loaded.filter(
-      (payment): payment is HistoricalPaymentRef => Boolean(payment.providerConfigId),
-    );
+      orderBy: { createdAt: 'asc' },
+    })) as HistoricalPaymentRef[];
+    const resolvedPayments = (
+      await this.resolveHistoricalPayments(
+        loaded,
+        'wechat',
+        order.providerInstanceId,
+      )
+    ).filter((item) => decryptedConfigIds.has(item.config.id));
 
     const successes: VerifiedCandidate[] = [];
     for (const item of decrypted) {
-      const configPayments = payments.filter(
-        (payment) => payment.providerConfigId === item.config.id,
-      );
+      const configPayments = resolvedPayments
+        .filter((resolved) => resolved.config.id === item.config.id)
+        .map((resolved) => resolved.payment);
       if (configPayments.length === 0) continue;
       try {
         const result = await adapter.verifyNotification({
@@ -545,6 +693,33 @@ export class PaymentNotificationService {
     }
 
     return this.chooseUniqueCandidate('wechat', successes);
+  }
+
+  private async resolveHistoricalPayments(
+    payments: HistoricalPaymentRef[],
+    providerId: PaymentProviderId,
+    orderProviderInstanceId: string | null,
+  ): Promise<ResolvedHistoricalPayment[]> {
+    const out: ResolvedHistoricalPayment[] = [];
+    for (const payment of payments) {
+      try {
+        const config = payment.providerConfigId
+          ? await this.configs.byId(payment.providerConfigId)
+          : await this.configs.resolveForOrder({
+              channel: providerId,
+              providerConfigId: null,
+              providerInstanceId:
+                payment.providerInstanceId ?? orderProviderInstanceId ?? 'default',
+            });
+        if (!config || config.providerId !== providerId) continue;
+        out.push({ payment, config });
+      } catch (e) {
+        this.logger.warn(
+          `历史支付配置无法读取 (${providerId}/${payment.id}): ${(e as Error).message}`,
+        );
+      }
+    }
+    return out;
   }
 
   private async loadConfigs(
@@ -572,7 +747,9 @@ export class PaymentNotificationService {
     if (successes.length === 0) {
       throw new AppError(40001, '回调未通过任何历史配置验签，拒绝处理', 400);
     }
-    if (successes.length === 1) return successes[0];
+    if (successes.length === 1) {
+      return this.withMatchedPayment(successes[0]);
+    }
 
     /*
      * 配置轮换但凭据未变时，同一通知可能被多个历史版本验签通过。
@@ -586,12 +763,45 @@ export class PaymentNotificationService {
           (payment) => payment.payTransactionId === candidate.result.providerTradeNo,
         ),
     );
-    if (byTradeNo.length === 1) return byTradeNo[0];
+    if (byTradeNo.length === 1) {
+      return this.withMatchedPayment(byTradeNo[0]);
+    }
     throw new AppError(
       40001,
       `${providerId} 回调匹配到多个历史支付配置，拒绝处理`,
       400,
     );
+  }
+
+  /**
+   * 验签后把回调锁定到唯一 Payment。providerRef / 交易号能精确命中的优先；
+   * 微信与支付宝回调没有 providerRef 时，只允许在同一个已验签配置内
+   * 唯一命中。仍有多条候选时不在这里按时间猜，交给后续对账转人工。
+   */
+  private withMatchedPayment(candidate: VerifiedCandidate): ResolvedCanonicalCallback {
+    const resultRef = candidate.result.providerRef?.trim();
+    let candidates = candidate.payments;
+    if (resultRef) {
+      candidates = candidates.filter((payment) => payment.providerRef === resultRef);
+    }
+    const tradeNo = candidate.result.providerTradeNo;
+    const exactTrade = tradeNo
+      ? candidates.filter((payment) => payment.payTransactionId === tradeNo)
+      : [];
+    if (exactTrade.length === 1) candidates = exactTrade;
+    if (exactTrade.length > 1) return candidate;
+    if (candidate.expectedPaymentMethod) {
+      const methodMatches = candidates.filter(
+        (payment) =>
+          payment.providerMethod === null ||
+          payment.providerMethod === candidate.expectedPaymentMethod,
+      );
+      if (methodMatches.length > 0) candidates = methodMatches;
+    }
+    const pending = candidates.filter((payment) => payment.status === 'pending');
+    const pool = pending.length > 0 ? pending : candidates;
+    if (pool.length !== 1) return candidate;
+    return { ...candidate, payment: pool[0] };
   }
 
   /** worker 重试：claim 成功才处理 */
@@ -613,18 +823,16 @@ export class PaymentNotificationService {
     let result: NotificationResult;
     try {
       const normalized = JSON.parse(row.normalizedJson || '{}') as {
-        state?: string;
+        state?: 'paid' | 'closed' | 'pending' | 'failed';
         providerTradeNo?: string;
         providerRef?: string | null;
         amountCents?: number;
         currency?: string;
         providerStatus?: string;
+        reason?: string | null;
         paidAt?: string | null;
       };
-      if (normalized.state !== 'paid') {
-        await this.markProcessed(notificationId);
-        return 'processed';
-      }
+      if (!normalized.state) throw new Error('收件箱缺少归一化支付状态');
       result = {
         ok: true,
         eventId: row.providerEventId,
@@ -633,10 +841,11 @@ export class PaymentNotificationService {
         providerRef: normalized.providerRef ?? undefined,
         amountCents: normalized.amountCents ?? -1,
         currency: (normalized.currency as 'CNY' | 'USD') ?? 'CNY',
-        state: 'paid',
-        paidAt: normalized.paidAt ? new Date(normalized.paidAt) : new Date(),
+        state: normalized.state,
+        ...(normalized.paidAt ? { paidAt: new Date(normalized.paidAt) } : {}),
         providerStatus: normalized.providerStatus ?? 'SUCCESS',
         ackSuccess: true,
+        ...(normalized.reason ? { reason: normalized.reason } : {}),
         rawPayload: this.cipher.decrypt(row.payloadCipher),
       };
     } catch (e) {
@@ -644,7 +853,21 @@ export class PaymentNotificationService {
       return 'dead';
     }
 
-    const outcome = await this.processNotification(notificationId, result);
+    let outcome: { ok: boolean; permanent?: boolean; reason?: string };
+    try {
+      outcome = await this.processNotification(notificationId, result);
+    } catch (e) {
+      // 行已被 claim 成 processing，不能让未预期异常把它锁死到租约回收。
+      const message = ((e as Error)?.message ?? String(e)).slice(0, 200);
+      this.logger.error(`通知重试异常 ${notificationId}: ${message}`);
+      await this.prisma.paymentNotification
+        .updateMany({
+          where: { id: notificationId, status: 'processing' },
+          data: { status: 'failed', nextAttemptAt: new Date(), lastError: message },
+        })
+        .catch(() => undefined);
+      return 'retry';
+    }
     if (outcome.ok) return 'processed';
     if (outcome.permanent) {
       await this.markFailed(notificationId, outcome.reason ?? '永久失败');
@@ -655,36 +878,225 @@ export class PaymentNotificationService {
 
   // ── 内部 ────────────────────────────────────────────────────────
 
-  /** 易支付回调的先验定位：商户订单号 + 渠道 + 配置版本 → 历史支付方式。 */
-  private async expectedPaymentMethodFor(
+  /** 易支付旧入口的先验定位：订单号 + 固定配置 + 渠道单据号 → 历史 Payment。 */
+  private async historicalEpayPaymentFor(
     body: Record<string, unknown>,
     configId: string,
-  ): Promise<VisiblePaymentMethod | null> {
+  ): Promise<HistoricalPaymentRef | null> {
     const merchantOrderNo =
       typeof body.param === 'string' ? body.param.trim() : '';
     if (!merchantOrderNo) return null;
 
     const order = await this.prisma.order.findUnique({
       where: { orderNo: merchantOrderNo },
-      select: { id: true, providerInstanceId: true },
+      select: { id: true },
     });
     if (!order) return null;
 
     const providerRef =
       typeof body.orderId === 'string' ? body.orderId.trim() : '';
-    const payment = await this.prisma.payment.findFirst({
+    if (!providerRef) return null;
+    return this.prisma.payment.findFirst({
       where: {
         orderId: order.id,
         channel: 'epay',
         providerConfigId: configId,
+        providerRef,
+      },
+      select: {
+        id: true,
+        providerConfigId: true,
+        providerInstanceId: true,
+        providerMethod: true,
+        providerRef: true,
+        payTransactionId: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  private notificationMetadata(normalizedJson: string): NotificationMetadata {
+    const raw = safeJson(normalizedJson);
+    const paymentId =
+      typeof raw.paymentId === 'string' && raw.paymentId.trim()
+        ? raw.paymentId.trim()
+        : undefined;
+    const providerConfigVersion =
+      typeof raw.providerConfigVersion === 'number' &&
+      Number.isInteger(raw.providerConfigVersion)
+        ? raw.providerConfigVersion
+        : undefined;
+    const providerInstanceId =
+      typeof raw.providerInstanceId === 'string' && raw.providerInstanceId.trim()
+        ? raw.providerInstanceId.trim()
+        : undefined;
+    const expectedPaymentMethod = isVisiblePaymentMethod(
+      raw.expectedPaymentMethod,
+    )
+      ? raw.expectedPaymentMethod
+      : undefined;
+    return {
+      ...(paymentId ? { paymentId } : {}),
+      ...(providerConfigVersion !== undefined ? { providerConfigVersion } : {}),
+      ...(providerInstanceId ? { providerInstanceId } : {}),
+      ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
+    };
+  }
+
+  /**
+   * 收件箱只保存验签后的元数据，worker 重试时也不能重新猜测 Payment。
+   * 优先使用验签时锁定的 paymentId；旧记录则按订单、渠道、配置版本、
+   * providerRef 与实例/支付方式精确筛选。多个候选无法消歧时永久拒绝。
+   */
+  private async resolvePaymentAttempt(
+    orderId: string,
+    providerId: string,
+    providerConfigId: string,
+    result: Extract<NotificationResult, { ok: true }>,
+    metadata: NotificationMetadata,
+  ): Promise<PaymentAttemptResolution> {
+    const select = {
+      id: true,
+      orderId: true,
+      channel: true,
+      providerConfigId: true,
+      providerConfigVersion: true,
+      providerInstanceId: true,
+      providerMethod: true,
+      providerRef: true,
+      payTransactionId: true,
+      status: true,
+      createdAt: true,
+    } as const;
+    const providerRef = result.providerRef?.trim() || undefined;
+
+    if (metadata.paymentId) {
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: metadata.paymentId },
+        select,
+      });
+      if (!payment) {
+        return { error: `回执锁定的支付尝试 ${metadata.paymentId} 不存在` };
+      }
+      return this.validatePaymentAttempt(
+        payment,
+        orderId,
+        providerId,
+        providerConfigId,
+        providerRef,
+        result.providerTradeNo,
+        metadata,
+      );
+    }
+
+    const candidates = await this.prisma.payment.findMany({
+      where: {
+        orderId,
+        channel: providerId,
+        OR: [
+          { providerConfigId },
+          { providerConfigId: null },
+        ],
         ...(providerRef ? { providerRef } : {}),
       },
-      ...(providerRef ? {} : { orderBy: { createdAt: 'desc' as const } }),
-      select: { providerMethod: true },
+      orderBy: { createdAt: 'desc' },
+      select,
     });
-    return payment?.providerMethod && isVisiblePaymentMethod(payment.providerMethod)
-      ? payment.providerMethod
-      : null;
+    if (candidates.length === 0) {
+      return {
+        error: providerRef
+          ? `回调渠道单据号 ${providerRef} 未匹配到支付尝试，禁止回落到最新支付记录`
+          : '回调未匹配到同订单、渠道和配置版本的支付尝试',
+      };
+    }
+
+    const validated = candidates
+      .map((payment) =>
+        this.validatePaymentAttempt(
+          payment,
+          orderId,
+          providerId,
+          providerConfigId,
+          providerRef,
+          result.providerTradeNo,
+          metadata,
+        ),
+      )
+      .filter((item): item is { payment: PaymentAttemptRef } => Boolean(item.payment));
+    if (validated.length === 0) {
+      return { error: '支付尝试的配置版本、实例或支付方式与验签结果不一致' };
+    }
+
+    const exactTrade = result.providerTradeNo
+      ? validated.filter(
+          (item) => item.payment.payTransactionId === result.providerTradeNo,
+        )
+      : [];
+    if (exactTrade.length === 1) return exactTrade[0];
+    if (exactTrade.length > 1) {
+      return { error: '渠道交易号匹配到多个支付尝试，拒绝处理' };
+    }
+
+    const pending = validated.filter((item) => item.payment.status === 'pending');
+    if (pending.length === 1) return pending[0];
+    if (pending.length > 1) {
+      return { error: '回调匹配到多个待支付尝试，无法安全确定归属' };
+    }
+    if (validated.length === 1) return validated[0];
+    return { error: '回调匹配到多个历史支付尝试，无法安全确定归属' };
+  }
+
+  private validatePaymentAttempt(
+    payment: PaymentAttemptRef,
+    orderId: string,
+    providerId: string,
+    providerConfigId: string,
+    providerRef: string | undefined,
+    providerTradeNo: string,
+    metadata: NotificationMetadata,
+  ): PaymentAttemptResolution {
+    if (payment.orderId !== orderId || payment.channel !== providerId) {
+      return { error: '支付尝试与回调订单或渠道不一致' };
+    }
+    if (
+      payment.providerConfigId !== null &&
+      payment.providerConfigId !== providerConfigId
+    ) {
+      return { error: '支付尝试与回调配置版本不一致' };
+    }
+    if (
+      metadata.providerConfigVersion !== undefined &&
+      payment.providerConfigVersion !== null &&
+      payment.providerConfigVersion !== metadata.providerConfigVersion
+    ) {
+      return { error: '支付尝试与回调配置版本不一致' };
+    }
+    if (
+      metadata.providerInstanceId &&
+      payment.providerInstanceId &&
+      payment.providerInstanceId !== metadata.providerInstanceId
+    ) {
+      return { error: '支付尝试与回调服务商实例不一致' };
+    }
+    if (
+      metadata.expectedPaymentMethod &&
+      payment.providerMethod &&
+      payment.providerMethod !== metadata.expectedPaymentMethod
+    ) {
+      return { error: '支付尝试与回调支付方式不一致' };
+    }
+    if (providerRef && payment.providerRef !== providerRef) {
+      return { error: '支付尝试与回调渠道单据号不一致' };
+    }
+    if (
+      payment.payTransactionId &&
+      providerTradeNo &&
+      payment.payTransactionId !== providerTradeNo
+    ) {
+      return { error: '支付尝试与回调渠道交易号不一致' };
+    }
+    return { payment };
   }
 
   private async processNotification(
@@ -693,17 +1105,29 @@ export class PaymentNotificationService {
   ): Promise<{ ok: boolean; permanent?: boolean; reason?: string }> {
     const row = await this.prisma.paymentNotification.findUnique({ where: { id: notificationId } });
     if (!row) return { ok: false, permanent: true, reason: '收件箱记录不存在' };
+    const metadata = this.notificationMetadata(row.normalizedJson);
+    const exceptionInstanceId = metadata.providerInstanceId ?? 'default';
 
     if (result.state !== 'paid') {
-      // 已确认非成功（用户关单等）：处理完毕，ack 成功让渠道停止重试
-      await this.markProcessed(notificationId, { state: result.state });
-      return { ok: true };
+      try {
+        return await this.applyNonPaidResult(
+          notificationId,
+          row,
+          result,
+          metadata,
+        );
+      } catch (e) {
+        const message = (e as Error)?.message ?? String(e);
+        await this.scheduleRetry(notificationId, message);
+        return { ok: false, reason: message };
+      }
     }
 
     const order = await this.prisma.order.findUnique({ where: { orderNo: row.merchantOrderNo } });
     if (!order) {
       await this.recordException({
         providerId: row.providerId,
+        providerInstanceId: exceptionInstanceId,
         merchantOrderNo: row.merchantOrderNo,
         providerTradeNo: result.providerTradeNo,
         amountCents: result.amountCents,
@@ -726,20 +1150,21 @@ export class PaymentNotificationService {
      * 否则旧 Session 的回调会被记到新 Session 上，查单和退款随后都会串单。
      */
     const providerRef = result.providerRef?.trim() || undefined;
-    const attempt = await this.prisma.payment.findFirst({
-      where: {
-        orderId: order.id,
-        channel: row.providerId,
-        providerConfigId: row.providerConfigId,
-        ...(providerRef ? { providerRef } : {}),
-      },
-      ...(providerRef ? {} : { orderBy: { createdAt: 'desc' as const } }),
-      select: { id: true, providerInstanceId: true },
-    });
-    if (providerRef && !attempt) {
-      const detail = `回调渠道单据号 ${providerRef} 未匹配到支付尝试，禁止回落到最新支付记录`;
+    const attemptResolution = await this.resolvePaymentAttempt(
+      order.id,
+      row.providerId,
+      row.providerConfigId,
+      result,
+      metadata,
+    );
+    const attempt = attemptResolution.payment;
+    if (!attempt) {
+      const detail =
+        attemptResolution.error ??
+        '回调未精确匹配到支付尝试，禁止回落到同渠道最新支付记录';
       await this.recordException({
         providerId: row.providerId,
+        providerInstanceId: exceptionInstanceId,
         orderId: order.id,
         merchantOrderNo: row.merchantOrderNo,
         providerTradeNo: result.providerTradeNo,
@@ -751,32 +1176,27 @@ export class PaymentNotificationService {
       await this.markFailed(notificationId, detail);
       return { ok: false, permanent: true, reason: detail };
     }
-    const configMatchesOrder =
-      !order.providerConfigId || order.providerConfigId === row.providerConfigId;
-    if (!configMatchesOrder && !attempt) {
-      await this.recordException({
-        providerId: row.providerId,
-        orderId: order.id,
-        merchantOrderNo: row.merchantOrderNo,
-        providerTradeNo: result.providerTradeNo,
-        amountCents: result.amountCents,
-        currency: result.currency,
-        result: 'credit_failed',
-        detail: '回调配置版本与订单及其支付尝试均不匹配',
-      });
-      await this.markFailed(notificationId, '回调配置版本与订单不一致');
-      return { ok: false, permanent: true, reason: '回调配置版本与订单不一致' };
-    }
-
     try {
       const providerInstanceId =
-        attempt?.providerInstanceId ??
+        attempt.providerInstanceId ??
+        metadata.providerInstanceId ??
         (await this.configs.byId(row.providerConfigId)).instanceId;
+      const providerConfigVersion =
+        metadata.providerConfigVersion ??
+        attempt.providerConfigVersion ??
+        (await this.configs.byId(row.providerConfigId)).version;
+      const providerMethod =
+        metadata.expectedPaymentMethod ??
+        (attempt?.providerMethod && isVisiblePaymentMethod(attempt.providerMethod)
+          ? attempt.providerMethod
+          : undefined);
       const applied = await this.orders.applyPaymentResult({
         orderId: order.id,
         providerId: row.providerId as PaymentProviderId,
-        configId: row.providerConfigId,
-        paymentId: attempt?.id,
+        configId: attempt.providerConfigId ?? row.providerConfigId,
+        providerConfigVersion,
+        paymentMethod: providerMethod,
+        paymentId: attempt.id,
         providerInstanceId,
         tradeNo: result.providerTradeNo,
         amountCents: result.amountCents,
@@ -786,6 +1206,17 @@ export class PaymentNotificationService {
         rawPayload: result.rawPayload,
         providerRef,
       });
+      if (attempt) {
+        await this.prisma.payment.update({
+          where: { id: attempt.id },
+          data: {
+            providerConfigId: attempt.providerConfigId ?? row.providerConfigId,
+            providerConfigVersion,
+            providerInstanceId,
+            ...(providerMethod ? { providerMethod } : {}),
+          },
+        });
+      }
       await this.markProcessed(notificationId, { applied: applied.applied, idempotentHit: applied.idempotentHit });
       await this.prisma.paymentNotification.update({
         where: { id: notificationId },
@@ -804,6 +1235,10 @@ export class PaymentNotificationService {
             : 'credit_failed';
         await this.recordException({
           providerId: row.providerId,
+          providerInstanceId:
+            attempt.providerInstanceId ??
+            metadata.providerInstanceId ??
+            'default',
           orderId: order.id,
           merchantOrderNo: row.merchantOrderNo,
           providerTradeNo: result.providerTradeNo,
@@ -819,6 +1254,79 @@ export class PaymentNotificationService {
       await this.scheduleRetry(notificationId, message);
       return { ok: false, reason: message };
     }
+  }
+
+  /**
+   * 非成功结果只更新对应支付尝试，不动订单终态，也不触发入账。
+   * 支付尝试仍保持 pending 时允许用户重新发起；已成功的 Payment 绝不被
+   * 迟到的 failed/closed 事件覆盖。
+   */
+  private async applyNonPaidResult(
+    notificationId: string,
+    row: {
+      providerId: string;
+      providerConfigId: string;
+      merchantOrderNo: string;
+    },
+    result: VerifiedNotification,
+    metadata: NotificationMetadata,
+  ): Promise<{ ok: boolean; permanent?: boolean; reason?: string }> {
+    const order = await this.prisma.order.findUnique({
+      where: { orderNo: row.merchantOrderNo },
+      select: { id: true, status: true },
+    });
+    if (!order) {
+      await this.markProcessed(notificationId, { state: result.state });
+      return { ok: true };
+    }
+
+    const attemptResolution = await this.resolvePaymentAttempt(
+      order.id,
+      row.providerId,
+      row.providerConfigId,
+      result,
+      metadata,
+    );
+    const attempt = attemptResolution.payment;
+    if (!attempt) {
+      // 非资金事件无法定位尝试时不制造异常单，但保留日志和回执状态。
+      this.logger.warn(
+        `非成功回调未匹配到支付尝试 (${row.providerId}/${row.merchantOrderNo}/${result.state}): ${attemptResolution.error ?? 'unknown'}`,
+      );
+      await this.markProcessed(notificationId, {
+        state: result.state,
+        paymentMatched: false,
+      });
+      return { ok: true };
+    }
+
+    if (result.state !== 'pending' && attempt.status === 'pending') {
+      const reason =
+        result.reason ??
+        (result.state === 'failed' ? '渠道确认支付失败' : '渠道确认支付已关闭');
+      await this.prisma.payment.updateMany({
+        where: { id: attempt.id, status: 'pending' },
+        data: {
+          status: result.state === 'failed' ? 'failed' : 'closed',
+          providerStatus: result.providerStatus,
+          rawPayload: result.rawPayload,
+          lastError: reason,
+          message: reason,
+          ...(result.state === 'closed' ? { closedAt: new Date() } : {}),
+        },
+      });
+      await this.prisma.order.updateMany({
+        where: { id: order.id, status: 'pending' },
+        data: { lastError: reason, lastQueriedAt: new Date() },
+      });
+    }
+
+    await this.markProcessed(notificationId, {
+      state: result.state,
+      paymentId: attempt.id,
+      paymentStatus: result.state === 'pending' ? attempt.status : result.state,
+    });
+    return { ok: true };
   }
 
   private async markProcessed(id: string, extra: Record<string, unknown> = {}): Promise<void> {
@@ -868,6 +1376,7 @@ export class PaymentNotificationService {
   /** 回调侧的差异落到新对账体系，让财务在「支付对账」页能看见 */
   private async recordException(input: {
     providerId: string;
+    providerInstanceId?: string;
     orderId?: string;
     merchantOrderNo: string;
     providerTradeNo: string;
@@ -877,19 +1386,27 @@ export class PaymentNotificationService {
     detail: string;
   }): Promise<void> {
     try {
+      const providerInstanceId = input.providerInstanceId || 'default';
       const billDate = shanghaiDate(new Date());
       let run = await this.prisma.paymentReconciliationRun.findFirst({
-        where: { providerId: input.providerId, billDate, source: 'notification', status: 'completed' },
+        where: {
+          providerId: input.providerId,
+          providerInstanceId,
+          billDate,
+          source: 'notification',
+          status: 'completed',
+        },
         orderBy: { attempt: 'desc' },
       });
       if (!run) {
         const max = await this.prisma.paymentReconciliationRun.aggregate({
-          where: { providerId: input.providerId, billDate },
+          where: { providerId: input.providerId, providerInstanceId, billDate },
           _max: { attempt: true },
         });
         run = await this.prisma.paymentReconciliationRun.create({
           data: {
             providerId: input.providerId,
+            providerInstanceId,
             billDate,
             attempt: (max._max.attempt ?? 0) + 1,
             source: 'notification',
@@ -965,10 +1482,22 @@ export class PaymentNotificationService {
         },
       });
     } catch (e) {
-      // 差异落库失败不阻断回调处理, 但必须留日志
+      // 差异落库是保障资金可追踪的关键路径。吞掉异常会让渠道停止重试，
+      // 却留下没有异常单/退款任务的真实扣款，因此必须向上游抛出让其重试。
       this.logger.error(`回调差异写入失败 (${input.providerId}/${input.merchantOrderNo}): ${(e as Error).message}`);
+      throw e;
     }
   }
+}
+
+function uniqueResolvedConfigs(
+  payments: ResolvedHistoricalPayment[],
+): ResolvedPaymentConfig[] {
+  const byId = new Map<string, ResolvedPaymentConfig>();
+  for (const item of payments) {
+    if (!byId.has(item.config.id)) byId.set(item.config.id, item.config);
+  }
+  return Array.from(byId.values());
 }
 
 function plainCallbackOrderNo(

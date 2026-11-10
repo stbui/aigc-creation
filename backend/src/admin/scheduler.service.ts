@@ -16,7 +16,6 @@ const ALLOWED_FREQUENCIES = [1, 7, 30] as const;
 
 const SETTING_BACKUP_FREQUENCY = 'backup.frequencyDays';
 const SETTING_BACKUP_KEEP = 'backup.keepCount';
-const SETTING_AUDIT_RETENTION = 'retention.auditLogDays';
 
 /**
  * 备份与清理调度器。
@@ -34,10 +33,11 @@ const TASK_LABELS: Record<string, string> = {
   'order-expire': '订单超时关闭',
   'credit-expire': '积分到期回收',
   membership: '会员到期与月度积分',
+  'credit-audit': '积分账实核对',
   backup: '数据备份',
   cleanup: '数据保留期清理',
   'campaign-expire': '活动到期收尾',
-  'task-recover': '中断任务与会员补发',
+  'task-recover': '中断任务、会员与邀请奖励补发',
 };
 
 interface TaskState {
@@ -65,7 +65,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
    * 任务执行状态。
    *
    * ⚠ **放内存而非 DB**: 这类运行时指标每秒都在变, 落库会把
-   * 「最近的调度状态」和「需要长期留存的任务审计」混为一谈。
+   * 「最近的调度状态」和「需要长期留存的任务结果」混为一谈。
    * 需要长期留痕的任务自身会写表(如 CleanupLog)。
    */
   private readonly taskStates = new Map<string, TaskState>();
@@ -120,8 +120,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.runTask('order-expire', () => this.maybeCancelExpiredOrders());
       await this.runTask('credit-expire', () => this.maybeExpireCredits());
+      await this.runTask('credit-audit', () => this.maybeAuditCredits());
       await this.runTask('backup', () => this.maybeBackup());
-      await this.runTask('cleanup', () => this.maybeCleanup());
       await this.runTask('campaign-expire', () => this.maybeExpireCampaigns());
       await this.runTask('membership', () => this.maybeRunMembership());
       await this.runTask('task-recover', () => this.maybeRecoverInterrupted());
@@ -204,6 +204,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         case 'credit-expire':
           await this.runTask(name, () => this.doExpireCredits());
           break;
+        case 'credit-audit':
+          await this.runTask(name, () => this.doAuditCredits());
+          break;
         case 'membership':
           // runSchedulerTasks 返回统计对象, 但 runTask 的契约是「任务自身不返回值」,
           // 统计结果已由 MembershipService 落日志, 这里显式丢弃以保持契约一致
@@ -266,6 +269,26 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // ── 每日积分账实核对 ─────────────────────────────────────────────
+
+  /** 每日全量核对账户可用余额与批次剩余；发现差额只告警，不自动修数。 */
+  private async maybeAuditCredits(): Promise<void> {
+    if (!this.shouldRun('credit-audit', 24 * 60 * 60 * 1000)) return;
+    await this.doAuditCredits();
+  }
+
+  private async doAuditCredits(): Promise<void> {
+    const result = await this.credit.auditConsistency(500);
+    if (result.mismatched.length > 0 || result.orphanLotCount > 0) {
+      this.logger.error(
+        `积分账实核对异常: 扫描 ${result.checked} 个账户, ${result.mismatched.length} 个差额, ` +
+          `${result.orphanLotCount} 个孤儿批次 — 需人工核对`,
+      );
+      return;
+    }
+    this.logger.log(`积分账实核对通过: ${result.checked} 个账户`);
+  }
+
   // ── 会员调度: 到期处理 + 月度积分发放 ─────────────────────────────
 
   /**
@@ -282,7 +305,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   // ── 中断补偿: 孤儿任务 + 会员未发放 ───────────────────────────────
 
   /**
-   * 回收心跳已停的孤儿生成任务, 并补发「已支付但会员未激活」的订单。
+   * 回收心跳已停的孤儿生成任务, 补发「已支付但会员未激活」的订单,
+   * 并重试因瞬时故障停在 pending 的注册邀请奖励。
    *
    * 两者同属**中断补偿**: 都是"一次本该完成的动作因为进程/网络中断掉了"。
    * 放在同一个任务里, 是因为它们都需要在故障恢复后尽快跑一轮, 且都必须幂等。
@@ -296,6 +320,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     if (!force && !this.shouldRun('task-recover', 5 * 60 * 1000)) return;
     await this.generate.recoverOrphanTasks();
     await this.orders.retryPendingMembershipActivation();
+    await this.marketing.retryPendingRegisterRewards(100);
   }
 
   /** 节流判定: 距上次执行是否已超过最小间隔 */
@@ -333,17 +358,6 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     await this.backup.run('scheduled');
   }
 
-  /** 到期则清理运行痕迹 */
-  private async maybeCleanup(): Promise<void> {
-    const keepDays = await this.readNumber(SETTING_AUDIT_RETENTION, 180);
-    if (keepDays < 30) return; // 少于 30 天不自动清理, 避免误配导致数据快速流失
-
-    const recent = await this.hasRecentCleanup('AdminAuditLog', keepDays);
-    if (recent) return;
-
-    await this.backup.cleanupExpired('AdminAuditLog', keepDays, 'scheduled');
-  }
-
   /** 读数值型设置, 失败回落默认值 */
   private async readNumber(key: string, fallback: number): Promise<number> {
     try {
@@ -365,15 +379,5 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     return ok[0] ?? null;
   }
 
-  /** 避免同一天重复清理 */
-  private async hasRecentCleanup(target: string, retentionDays: number): Promise<boolean> {
-    const logs = await this.backup.cleanupLogs(20);
-    const since = Date.now() - retentionDays * 24 * 3600 * 1000;
-    return logs.some(
-      (l) =>
-        l.target === target &&
-        l.success &&
-        new Date(l.createdAt).getTime() > since - 24 * 3600 * 1000,
-    );
-  }
+
 }

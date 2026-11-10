@@ -36,6 +36,7 @@ import {
   type ModelDraft,
   type TierDraft,
 } from './constants';
+import { createDefaultTextCapabilityConfigJson } from './textCapability';
 
 /* 外部工具转出：目录内文件不直接引 `src/lib/*` */
 export {
@@ -59,6 +60,39 @@ export {
   type OrderItem,
   type RepriceRow,
 };
+
+/* ------------------------------------------------------------------------- */
+/* 商品状态                                                                  */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * 商品对运营的三个结论，外加“还没配完”。
+ *
+ * 优先级刻意是「待配置 > 已停用 > 待定价 > 可用」：上游导入的骨架行同时
+ * 满足“停用”和“缺能力 / 协议”，先报「待配置」才能把人带到要补的字段，
+ * 而不是让他去点一个没有意义的启用开关。
+ */
+export type ProductState = 'available' | 'unpriced' | 'unconfigured' | 'disabled';
+
+export const PRODUCT_STATE_META: Record<
+  ProductState,
+  { label: string; tone: 'success' | 'warn' | 'muted' }
+> = {
+  available: { label: '可用', tone: 'success' },
+  unpriced: { label: '待定价', tone: 'warn' },
+  unconfigured: { label: '待配置', tone: 'warn' },
+  disabled: { label: '已停用', tone: 'muted' },
+};
+
+export function productStateOf(
+  model: Pick<AdminChannelModelView, 'capability' | 'protocol' | 'enabled' | 'priceConfigured'>,
+  channelEnabled = true,
+): ProductState {
+  if (!model.capability.trim() || !model.protocol.trim()) return 'unconfigured';
+  if (!model.enabled || !channelEnabled) return 'disabled';
+  if (!model.priceConfigured) return 'unpriced';
+  return 'available';
+}
 
 /* ------------------------------------------------------------------------- */
 /* 自定义请求头校验                                                          */
@@ -200,7 +234,7 @@ export function validateModelTiers(
   tiers: Array<{ selector: string; billingMode: string; enabled: boolean; output: string }>,
 ): string | null {
   const active = tiers.filter((tier) => tier.enabled);
-  if (active.length === 0) return '至少保留一个启用的价格方案';
+  if (active.length === 0) return '至少保留一个启用的售价方案';
 
   const wildcards = active.filter((tier) => tier.selector.trim() === '');
   if (wildcards.length > 1) {
@@ -262,28 +296,47 @@ export function buildPriceTiers(
   try {
     const tiers = draft.tiers
       .filter((tier) => tier.enabled || tier.unit !== '0' || tier.output !== '0')
-      .map((tier) => ({
-        selector: parseSelector(tier.selector),
-        resolution: tier.resolution.trim() || '*',
-        videoSeconds: Number(tier.videoSeconds) || 0,
-        providerModelKey: tier.providerModelKey.trim() || draft.providerModelKey.trim() || modelKey,
-        billingMode: tier.billingMode,
-        unitPriceMicrocredits: priceOf(tier.unit, '价格'),
-        inputTokenPriceMicrocredits: priceOf(tier.input, '输入用量价格'),
-        outputTokenPriceMicrocredits: priceOf(tier.output, '输出用量价格'),
-        cachedTokenPriceMicrocredits: priceOf(tier.cached, '缓存内容价格'),
-        priceConfigured: tier.priceConfigured,
-        enabled: tier.enabled,
-        costPricing: tier.costConfigured
-          ? {
-              configured: true,
-              unitPriceMicrocredits: priceOf(tier.costUnit, '成本单价'),
-              inputTokenPriceMicrocredits: priceOf(tier.costInput, '输入用量成本'),
-              outputTokenPriceMicrocredits: priceOf(tier.costOutput, '输出用量成本'),
-              cachedTokenPriceMicrocredits: priceOf(tier.costCached, '缓存内容成本'),
-            }
-          : null,
-      }));
+      .map((tier) => {
+        /*
+         * 填了非零售价即视为已定价，不再要求额外勾“价格已核对”。
+         * 0 积分免费商品由高级区的「按 0 积分免费提供」显式声明；
+         * 这样漏勾只会让免费商品保持未定价，不会让正常售价静默失效。
+         */
+        const priceConfigured =
+          tier.priceConfigured ||
+          hasNonZeroCredit(tier.unit) ||
+          hasNonZeroCredit(tier.input) ||
+          hasNonZeroCredit(tier.output) ||
+          hasNonZeroCredit(tier.cached);
+        const costConfigured =
+          tier.costConfigured ||
+          hasNonZeroCredit(tier.costUnit) ||
+          hasNonZeroCredit(tier.costInput) ||
+          hasNonZeroCredit(tier.costOutput) ||
+          hasNonZeroCredit(tier.costCached);
+        return {
+          selector: parseSelector(tier.selector),
+          resolution: tier.resolution.trim() || '*',
+          videoSeconds: Number(tier.videoSeconds) || 0,
+          providerModelKey: tier.providerModelKey.trim() || draft.providerModelKey.trim() || modelKey,
+          billingMode: tier.billingMode,
+          unitPriceMicrocredits: priceOf(tier.unit, '价格'),
+          inputTokenPriceMicrocredits: priceOf(tier.input, '输入用量价格'),
+          outputTokenPriceMicrocredits: priceOf(tier.output, '输出用量价格'),
+          cachedTokenPriceMicrocredits: priceOf(tier.cached, '缓存内容价格'),
+          priceConfigured,
+          enabled: tier.enabled,
+          costPricing: costConfigured
+            ? {
+                configured: true,
+                unitPriceMicrocredits: priceOf(tier.costUnit, '成本单价'),
+                inputTokenPriceMicrocredits: priceOf(tier.costInput, '输入用量成本'),
+                outputTokenPriceMicrocredits: priceOf(tier.costOutput, '输出用量成本'),
+                cachedTokenPriceMicrocredits: priceOf(tier.costCached, '缓存内容成本'),
+              }
+            : null,
+        };
+      });
     return { tiers };
   } catch (e) {
     return { error: e instanceof Error ? e.message : '价格格式不正确' };
@@ -303,7 +356,11 @@ export function toModelDraft(model: AdminChannelModelView): ModelDraft {
     protocol: model.protocol,
     priceCurrency: model.priceCurrency || 'credits',
     tags: (model.tags ?? []).map((tag) => ({ text: tag.text, color: tag.color })),
-    capabilityConfig: model.capabilityConfig ? JSON.stringify(model.capabilityConfig, null, 2) : '',
+    capabilityConfig: model.capabilityConfig
+      ? JSON.stringify(model.capabilityConfig, null, 2)
+      : model.capability === 'text'
+        ? createDefaultTextCapabilityConfigJson()
+        : '',
     enabled: model.enabled,
     tiers:
       model.priceTiers.length > 0
@@ -401,6 +458,12 @@ export function priceOf(text: string, label: string): number {
   const value = parseCredits(text);
   if (value === null) throw new Error(`${label}格式不正确，请填积分，最多 6 位小数`);
   return value;
+}
+
+/** 输入框里有正的积分值；空串 / 0 / 非法值都算“没填” */
+export function hasNonZeroCredit(text: string): boolean {
+  const value = parseCredits(text);
+  return value !== null && value > 0;
 }
 
 /* ------------------------------------------------------------------------- */

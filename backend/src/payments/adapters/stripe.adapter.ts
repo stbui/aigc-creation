@@ -22,11 +22,11 @@ const DEFAULT_API_BASE = 'https://api.stripe.com';
 const WEBHOOK_TOLERANCE_SECONDS = 300;
 
 /**
- * Stripe Checkout 适配器。
+ * Stripe Payment Element 适配器。
  *
- * Checkout Session 既能承载一次性支付，也能把支付方式交给 Stripe 托管，
- * 因此这里不需要处理卡号等敏感信息。查单、关单、退款都以 Session 或
- * PaymentIntent 的渠道 id 为准，商户订单号只用于业务关联。
+ * 新订单创建 PaymentIntent，由前端 Payment Element 收集支付信息并确认；
+ * 服务端不接触卡号等敏感信息。历史 Checkout Session 仍可查单、关单、退款，
+ * 确保切换前创建的订单能够正常闭环。
  */
 export class StripeAdapter implements PaymentAdapter {
   private readonly logger = new Logger(StripeAdapter.name);
@@ -35,7 +35,7 @@ export class StripeAdapter implements PaymentAdapter {
     id: 'stripe',
     name: 'Stripe',
     icon: 'stripe',
-    checkoutMode: 'redirect',
+    checkoutMode: 'payment-element',
     supportedCurrencies: ['CNY', 'USD'],
     supportsReconciliation: false,
     configFields: [
@@ -47,6 +47,14 @@ export class StripeAdapter implements PaymentAdapter {
         secret: true,
         maxLength: 512,
         description: 'Stripe Secret Key（sk_live_... 或 sk_test_...）',
+      },
+      {
+        name: 'publishableKey',
+        label: 'Publishable Key',
+        type: 'text',
+        required: true,
+        maxLength: 512,
+        description: 'Stripe 可公开密钥（pk_live_... 或 pk_test_...）',
       },
       {
         name: 'webhookSecret',
@@ -79,6 +87,7 @@ export class StripeAdapter implements PaymentAdapter {
   validateConfig(values: Record<string, string>): string[] {
     const invalid: string[] = [];
     if (!values.secretKey?.trim()) invalid.push('secretKey');
+    if (!values.publishableKey?.trim()) invalid.push('publishableKey');
     if (!values.webhookSecret?.trim()) invalid.push('webhookSecret');
     const apiBase = values.apiBase?.trim();
     if (apiBase && apiBase.replace(/\/$/, '') !== DEFAULT_API_BASE) invalid.push('apiBase');
@@ -89,47 +98,49 @@ export class StripeAdapter implements PaymentAdapter {
 
   async createOrder(input: CreateOrderInput): Promise<PaymentCheckout> {
     const params = new URLSearchParams();
-    params.set('mode', 'payment');
-    params.set('client_reference_id', input.orderNo);
+    params.set('amount', String(input.amountCents));
+    params.set('currency', input.currency.toLowerCase());
     params.set('metadata[orderNo]', input.orderNo);
-    params.set('payment_intent_data[metadata][orderNo]', input.orderNo);
-    params.set('line_items[0][quantity]', '1');
-    params.set('line_items[0][price_data][currency]', input.currency.toLowerCase());
-    params.set('line_items[0][price_data][unit_amount]', String(input.amountCents));
-    params.set('line_items[0][price_data][product_data][name]', input.subject.slice(0, 127));
-    params.set('success_url', input.returnUrl);
-    params.set('cancel_url', input.returnUrl);
+    params.set('automatic_payment_methods[enabled]', 'true');
 
-    // Stripe 要求 expires_at 至少比当前时间晚 30 分钟；不足时交给 Stripe 默认有效期。
-    const expiresSeconds = Math.floor(input.expiresAt.getTime() / 1000);
-    if (expiresSeconds >= Math.floor(Date.now() / 1000) + 30 * 60) {
-      params.set('expires_at', String(expiresSeconds));
-    }
-
-    const session = await this.request(input.config, 'POST', '/v1/checkout/sessions', params);
-    const id = asString(session.id);
-    const payUrl = asString(session.url);
-    if (!id) throw new Error('Stripe 下单未返回 Checkout Session id');
-    if (!payUrl) throw new Error('Stripe 下单未返回收银台地址');
+    const paymentIntent = await this.request(
+      input.config,
+      'POST',
+      '/v1/payment_intents',
+      params,
+    );
+    const id = asString(paymentIntent.id);
+    const clientSecret = asString(paymentIntent.client_secret);
+    const publishableKey = input.config.values.publishableKey?.trim();
+    if (!id) throw new Error('Stripe 下单未返回 PaymentIntent id');
+    if (!clientSecret) throw new Error('Stripe 下单未返回 client secret');
+    if (!publishableKey) throw new Error('Stripe Publishable Key 未配置');
 
     return {
-      mode: 'redirect',
-      payUrl,
+      mode: 'payment-element',
+      clientSecret,
+      publishableKey,
       providerRef: id,
-      expiresAt: numberOrUndefined(session.expires_at)
-        ? new Date(numberOrUndefined(session.expires_at)! * 1000)
-        : input.expiresAt,
-      hint: '请在 Stripe 收银台完成支付；Webhook 需订阅 checkout.session.* 事件。',
+      expiresAt: input.expiresAt,
+      hint: '请使用 Stripe Payment Element 完成支付；Webhook 需订阅 payment_intent.* 事件。',
     };
   }
 
   async queryOrder(input: QueryOrderInput): Promise<ProviderPaymentResult> {
     const providerRef = input.providerRef?.trim();
     if (!providerRef) {
-      return failed(input.orderNo, '缺少 Stripe Checkout Session id，无法查单；请重新发起支付');
+      return failed(input.orderNo, '缺少 Stripe PaymentIntent id，无法查单；请重新发起支付');
     }
 
     try {
+      if (isPaymentIntentId(providerRef)) {
+        const paymentIntent = await this.request(
+          input.config,
+          'GET',
+          `/v1/payment_intents/${encodeURIComponent(providerRef)}`,
+        );
+        return mapPaymentIntent(input.orderNo, paymentIntent);
+      }
       const params = new URLSearchParams();
       params.append('expand[]', 'payment_intent');
       const session = await this.request(
@@ -147,10 +158,18 @@ export class StripeAdapter implements PaymentAdapter {
   async closeOrder(input: CloseOrderInput): Promise<ProviderPaymentResult> {
     const providerRef = input.providerRef?.trim();
     if (!providerRef) {
-      return failed(input.orderNo, '缺少 Stripe Checkout Session id，无法关闭');
+      return failed(input.orderNo, '缺少 Stripe PaymentIntent id，无法关闭');
     }
 
     try {
+      if (isPaymentIntentId(providerRef)) {
+        const paymentIntent = await this.request(
+          input.config,
+          'POST',
+          `/v1/payment_intents/${encodeURIComponent(providerRef)}/cancel`,
+        );
+        return mapPaymentIntent(input.orderNo, paymentIntent);
+      }
       const session = await this.request(
         input.config,
         'POST',
@@ -177,26 +196,30 @@ export class StripeAdapter implements PaymentAdapter {
     const eventType = asString(event.type);
     const eventId = asString(event.id) || `stripe:${hash(raw)}`;
     const data = asObject(event.data);
-    const session = asObject(data?.object);
-    if (!session) {
-      return { ok: false, ackSuccess: false, reason: 'Stripe 事件缺少 session 数据', rawPayload: raw };
+    const object = asObject(data?.object);
+    if (!object) {
+      return { ok: false, ackSuccess: false, reason: 'Stripe 事件缺少数据对象', rawPayload: raw };
+    }
+
+    if (eventType.startsWith('payment_intent.')) {
+      return this.verifyPaymentIntentNotification(event, eventType, eventId, object, raw);
     }
 
     const merchantOrderNo =
-      asString(session.client_reference_id) ||
-      asString(asObject(session.metadata)?.orderNo);
-    const providerRef = asString(session.id);
-    const providerTradeNo = paymentIntentId(session.payment_intent) || providerRef;
-    const amountCents = numberOrUndefined(session.amount_total);
-    const currency = currencyOf(session.currency);
-    const providerStatus = `${eventType}:${asString(session.payment_status) || asString(session.status)}`;
+      asString(object.client_reference_id) ||
+      asString(asObject(object.metadata)?.orderNo);
+    const providerRef = asString(object.id);
+    const providerTradeNo = paymentIntentId(object.payment_intent) || providerRef;
+    const amountCents = numberOrUndefined(object.amount_total);
+    const currency = currencyOf(object.currency);
+    const providerStatus = `${eventType}:${asString(object.payment_status) || asString(object.status)}`;
 
     if (!merchantOrderNo) {
       return { ok: false, ackSuccess: false, reason: 'Stripe 回调缺少商户订单号', rawPayload: raw };
     }
 
     if (eventType === 'checkout.session.completed' || eventType === 'checkout.session.async_payment_succeeded') {
-      const paymentStatus = asString(session.payment_status);
+      const paymentStatus = asString(object.payment_status);
       const paid = paymentStatus === 'paid' || paymentStatus === 'no_payment_required';
       if (paid) {
         if (!providerTradeNo || amountCents === undefined || !currency) {
@@ -290,18 +313,27 @@ export class StripeAdapter implements PaymentAdapter {
     try {
       let paymentIntent = input.providerTradeNo?.trim() || '';
       if (!paymentIntent && input.providerRef?.trim()) {
-        const params = new URLSearchParams();
-        params.append('expand[]', 'payment_intent');
-        const session = await this.request(
-          input.config,
-          'GET',
-          `/v1/checkout/sessions/${encodeURIComponent(input.providerRef.trim())}`,
-          params,
-        );
-        paymentIntent = paymentIntentId(session.payment_intent);
+        const providerRef = input.providerRef.trim();
+        if (isPaymentIntentId(providerRef)) {
+          paymentIntent = providerRef;
+        } else if (providerRef.startsWith('cs_')) {
+          const params = new URLSearchParams();
+          params.append('expand[]', 'payment_intent');
+          const session = await this.request(
+            input.config,
+            'GET',
+            `/v1/checkout/sessions/${encodeURIComponent(providerRef)}`,
+            params,
+          );
+          paymentIntent = paymentIntentId(session.payment_intent);
+        }
       }
       if (!paymentIntent) {
-        return { state: 'failed', error: '缺少 Stripe PaymentIntent id，无法退款' };
+        return {
+          state: 'failed',
+          failureKind: 'definitive',
+          error: '缺少 Stripe PaymentIntent id，无法退款',
+        };
       }
 
       const params = new URLSearchParams();
@@ -319,13 +351,103 @@ export class StripeAdapter implements PaymentAdapter {
       }
       return {
         state: 'failed',
+        failureKind: status === 'failed' || status === 'canceled' ? 'definitive' : 'unknown',
         providerRefundId: id,
         error: `Stripe 退款状态: ${status || 'unknown'}`,
         raw: safeJson(result),
       };
     } catch (e) {
-      return { state: 'failed', error: `Stripe 退款失败: ${(e as Error).message}` };
+      return {
+        state: 'failed',
+        failureKind: 'unknown',
+        error: `Stripe 退款失败: ${(e as Error).message}`,
+      };
     }
+  }
+
+  private verifyPaymentIntentNotification(
+    event: Record<string, unknown>,
+    eventType: string,
+    eventId: string,
+    paymentIntent: Record<string, unknown>,
+    raw: string,
+  ): NotificationResult {
+    const merchantOrderNo = asString(asObject(paymentIntent.metadata)?.orderNo);
+    const providerRef = asString(paymentIntent.id);
+    const amountCents =
+      numberOrUndefined(paymentIntent.amount_received) ??
+      numberOrUndefined(paymentIntent.amount);
+    const currency = currencyOf(paymentIntent.currency);
+    const status = asString(paymentIntent.status);
+    const providerStatus = `${eventType}:${status}`;
+
+    if (!merchantOrderNo) {
+      return { ok: false, ackSuccess: false, reason: 'Stripe 回调缺少商户订单号', rawPayload: raw };
+    }
+    if (!providerRef) {
+      return { ok: false, ackSuccess: false, reason: 'Stripe 回调缺少 PaymentIntent id', rawPayload: raw };
+    }
+
+    if (eventType === 'payment_intent.succeeded' || status === 'succeeded') {
+      if (amountCents === undefined || !currency) {
+        return { ok: false, ackSuccess: false, reason: 'Stripe 支付回调字段不完整', rawPayload: raw };
+      }
+      return {
+        ok: true,
+        eventId,
+        merchantOrderNo,
+        providerTradeNo: providerRef,
+        providerRef,
+        amountCents,
+        currency,
+        state: 'paid',
+        paidAt: eventCreatedAt(event),
+        providerStatus,
+        ackSuccess: true,
+        rawPayload: raw,
+      };
+    }
+
+    if (eventType === 'payment_intent.payment_failed' || status === 'requires_payment_method') {
+      return {
+        ok: true,
+        eventId,
+        merchantOrderNo,
+        providerTradeNo: providerRef,
+        providerRef,
+        amountCents: amountCents ?? 0,
+        currency: currency ?? 'CNY',
+        state: 'failed',
+        providerStatus,
+        ackSuccess: true,
+        reason: 'Stripe PaymentIntent 支付失败',
+        rawPayload: raw,
+      };
+    }
+
+    if (eventType === 'payment_intent.canceled' || status === 'canceled') {
+      return {
+        ok: true,
+        eventId,
+        merchantOrderNo,
+        providerTradeNo: providerRef,
+        providerRef,
+        amountCents: amountCents ?? 0,
+        currency: currency ?? 'CNY',
+        state: 'closed',
+        providerStatus,
+        ackSuccess: true,
+        reason: 'Stripe PaymentIntent 已取消',
+        rawPayload: raw,
+      };
+    }
+
+    return {
+      ok: false,
+      ackSuccess: false,
+      reason: `Stripe 事件未处理: ${eventType || 'unknown'}`,
+      rawPayload: raw,
+    };
   }
 
   private async request(
@@ -428,6 +550,74 @@ function mapSession(orderNo: string, session: Record<string, unknown>): Provider
     error: `Stripe 未知状态: ${sessionStatus || 'unknown'}/${paymentStatus || 'unknown'}`,
     rawPayload: raw,
   };
+}
+
+function mapPaymentIntent(
+  orderNo: string,
+  paymentIntent: Record<string, unknown>,
+): ProviderPaymentResult {
+  const raw = safeJson(paymentIntent);
+  const status = asString(paymentIntent.status);
+  const amountCents =
+    numberOrUndefined(paymentIntent.amount_received) ??
+    numberOrUndefined(paymentIntent.amount);
+  const currency = currencyOf(paymentIntent.currency);
+  const tradeNo = asString(paymentIntent.id) || undefined;
+  const providerStatus = status || 'UNKNOWN';
+
+  if (status === 'succeeded') {
+    return {
+      state: 'paid',
+      orderNo,
+      tradeNo,
+      amountCents,
+      currency: currency ?? undefined,
+      providerStatus,
+      rawPayload: raw,
+    };
+  }
+  if (status === 'canceled') {
+    return {
+      state: 'closed',
+      orderNo,
+      tradeNo,
+      amountCents,
+      currency: currency ?? undefined,
+      providerStatus,
+      rawPayload: raw,
+    };
+  }
+  if (
+    status === 'requires_payment_method' ||
+    status === 'requires_confirmation' ||
+    status === 'requires_action' ||
+    status === 'processing' ||
+    status === 'requires_capture'
+  ) {
+    return {
+      state: 'pending',
+      orderNo,
+      tradeNo,
+      amountCents,
+      currency: currency ?? undefined,
+      providerStatus,
+      rawPayload: raw,
+    };
+  }
+  return {
+    state: 'failed',
+    orderNo,
+    tradeNo,
+    amountCents,
+    currency: currency ?? undefined,
+    providerStatus,
+    error: `Stripe 未知状态: ${status || 'unknown'}`,
+    rawPayload: raw,
+  };
+}
+
+function isPaymentIntentId(value: string): boolean {
+  return value.startsWith('pi_');
 }
 
 function paymentIntentId(value: unknown): string {

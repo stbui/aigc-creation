@@ -311,5 +311,11 @@
   },
   "copyAddressFailed": {
     "message": "Bild-URL kann nicht kopiert werden"
+  },
+  "extensionReloadRequiredTitle": {
+    "message": "Erweiterung aktualisiert"
+  },
+  "extensionReloadRequiredMessage": {
+    "message": "Lade diese Seite neu und versuche es dann erneut."
   }
 }

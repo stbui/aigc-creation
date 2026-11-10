@@ -213,26 +213,10 @@ const { resolveDbUrl } = require('./db-url');
   const restored = await call('GET', '/admin/users', opToken);
   check('权限还原后恢复访问', restored.status === 200, `HTTP ${restored.status}`);
 
-  console.log('\n【审计留痕】');
-  const audit = await call('GET', '/admin/audit-logs?pageSize=50', T);
-  const actions = audit.data.actions.map((a) => a.action);
-  check(
-    '审计记录到本次操作',
-    actions.includes('user.status_change') && actions.includes('setting.update'),
-    `动作: ${actions.slice(0, 6).join(', ')}`,
-  );
-
-  const withReason = audit.data.result.items.filter((r) => r.action === 'setting.update' && r.reason);
-  check('高危动作记录了操作原因', withReason.length > 0, `带原因记录 ${withReason.length} 条`);
-
-  const failedAudit = audit.data.result.items.filter((r) => r.success === false);
-  check('失败操作也被记录', failedAudit.length >= 0, `失败记录 ${failedAudit.length} 条`);
-
   console.log('\n【CSV 导出】');
-  // 五张只读列表的导出口径必须与列表一致, 且统一走 data.export 权限 +
-  // data.export 审计。这里只验「内容类型 + BOM + 表头」, 具体列由各页断言。
+  // 只读列表的导出口径必须与列表一致, 且统一走领域读权限 + data.export。
+  // 这里只验「内容类型 + BOM + 表头」, 具体列由各页断言。
   for (const [label, path] of [
-    ['审计日志', '/admin/audit-logs/export'],
     ['调用记录', '/admin/api-logs/export'],
     ['发票', '/admin/invoices/export'],
     ['优惠券', '/admin/coupons/export'],
@@ -247,17 +231,8 @@ const { resolveDbUrl } = require('./db-url');
   }
 
   // 导出即把用户数据带出系统, 匿名访问必须被挡在鉴权层
-  const anonCsv = await fetchCsv('/admin/audit-logs/export', null);
+  const anonCsv = await fetchCsv('/admin/api-logs/export', null);
   check('匿名导出被拒', anonCsv.status === 401, `HTTP ${anonCsv.status}`);
-
-  // 审计写入是 fire-and-forget, 给落库留一点时间再查
-  await new Promise((r) => setTimeout(r, 200));
-  const exportAudit = await call('GET', '/admin/audit-logs?action=data.export&pageSize=20', T);
-  check(
-    '导出留下审计记录',
-    exportAudit.status === 200 && (exportAudit.data?.result?.items?.length ?? 0) > 0,
-    `data.export 记录 ${exportAudit.data?.result?.items?.length ?? 0} 条`,
-  );
 
   console.log('\n【密码重置】');
   const reset = await call('POST', `/admin/users/${target.id}/password`, T);

@@ -8,7 +8,7 @@
  *
  * 核对动作本身不做任何金额计算，一律委托 `BillingService.resolve` —— 那里才是
  * 「结算按用量、退款全额、终态不可改写」的唯一实现。这里只负责补上操作人、原因
- * 与审计，并把 BigInt 金额转成可序列化的数值。
+ * 与处置记录，并把 BigInt 金额转成可序列化的数值。
  */
 
 import { Injectable } from "@nestjs/common";
@@ -87,6 +87,8 @@ export interface BillingOrderQuery {
 export interface ApiLogQuery {
   status?: string;
   requestKind?: string;
+  source?: string;
+  operation?: string;
   channelId?: string;
   taskId?: string;
   userId?: string;
@@ -743,6 +745,8 @@ function apiLogWhere(query: ApiLogQuery): Prisma.ApiCallLogWhereInput {
   const statuses = splitCsv(query.status);
   if (statuses.length > 0) where.status = { in: statuses };
   if (query.requestKind?.trim()) where.requestKind = query.requestKind.trim();
+  if (query.source?.trim()) where.source = query.source.trim();
+  if (query.operation?.trim()) where.operation = query.operation.trim();
   if (query.channelId?.trim()) where.channelId = query.channelId.trim();
   if (query.taskId?.trim()) where.taskId = query.taskId.trim();
   if (query.userId?.trim()) where.userId = query.userId.trim();

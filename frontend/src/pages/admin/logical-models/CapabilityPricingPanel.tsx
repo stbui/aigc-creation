@@ -17,9 +17,9 @@ import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';
 /**
  * 能力消耗价面板（原 `/admin/credit-prices`）。
  *
- * 合并进「能力与模型」后仍保持独立数据源、独立权限（`product.price`）和
- * 独立审计动作。这里只负责页面内的一块工作区，不把能力上下线或前台模型
- * 配置混进同一个保存流程。
+ * 合并进「能力与模型」后仍保持独立数据源与独立权限（`product.price`）。
+ * 这里只负责页面内的一块工作区，不把能力上下线或前台模型配置混进同一个
+ * 保存流程。
  */
 export function CapabilityPricingPanel() {
   const toast = useToast();
@@ -158,7 +158,7 @@ export function CapabilityPricingPanel() {
             />
           </HelpTip>
         ) : row.source === 'setting' ? (
-          <HelpTip tip="后台覆盖中。仅对「统一固定价」模型生效；渠道价与按量计费仍以模型价格档为准。回落默认后恢复为 registry 的值">
+          <HelpTip tip="后台覆盖中。仅对「固定售价」的售卖配置生效；跟随商品售价与按量计费仍以模型商品售价为准。回落默认后恢复为 registry 的值">
             <StatusTag status="setting" tone="warn" label="后台设置" />
           </HelpTip>
         ) : (

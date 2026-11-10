@@ -11,12 +11,7 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 import { ArrayMaxSize, IsArray, IsIn, IsString } from "class-validator";
-import {
-  AdminUser,
-  AuditAction,
-  RequireAllPermissions,
-  RequirePermission,
-} from "./admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission } from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
 import { AdminUsersService } from "./users.service";
 import { PERMISSIONS } from "./permissions";
@@ -48,7 +43,7 @@ export class UserBatchDto {
 /**
  * 用户与账户管理。
  *
- * 动作命名约定: `<资源>.<动作>` (user.* / account.*), 与 AdminAuditLog.action 对齐。
+ * 动作命名约定: `<资源>.<动作>` (user.* / account.*)。
  * 高危动作 (删除/重置密码) 走 @RequirePermission 的独立权限点,
  * 便于运营单独回收这些权限而不必撤销整个模块。
  */
@@ -73,7 +68,6 @@ export class AdminUsersController {
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.userRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(@Query() query: UserListQueryDto, @Res() res: Response) {
     const result = await this.users.exportCsv(query);
     sendCsv(res, "users", result.csv, {
@@ -105,7 +99,6 @@ export class AdminUsersController {
    */
   @Post("batch")
   @RequirePermission(PERMISSIONS.userRead)
-  @AuditAction("user.batch")
   async batch(@Body() dto: UserBatchDto, @AdminUser() actor: AdminUser) {
     if (!(await this.roles.hasPermission(actor.id, PERMISSIONS.userDisable))) {
       throw new AppError(40301, "没有批量启停账号的权限", 403);
@@ -127,12 +120,11 @@ export class AdminUsersController {
   /**
    * 最近登录记录。
    *
-   * 单独成端点而不是塞进 detail 的原因：登录 IP/UA 属于**安全审计数据**，
-   * 权限点与用户管理不同（audit.read），只有运营/管理员角色默认持有。
-   * 塞进 detail 会让仅有 user.read 的角色顺手看到全站登录 IP。
+   * 单独成端点而不是塞进 detail 的原因：登录 IP/UA 属于安全数据，
+   * 与用户详情共用 user.read 权限，但保持独立取数和失败边界。
    */
   @Get(":id/logins")
-  @RequirePermission(PERMISSIONS.auditRead)
+  @RequirePermission(PERMISSIONS.userRead)
   logins(@Param("id") id: string, @Query("limit") limit?: string) {
     return this.users.recentLogins(id, Number(limit) || 50);
   }
@@ -152,7 +144,6 @@ export class AdminUsersController {
    */
   @Patch(":id/status")
   @RequirePermission(PERMISSIONS.userDisable)
-  @AuditAction("user.status_change")
   changeStatus(
     @Param("id") id: string,
     @Body() dto: ChangeUserStatusDto,
@@ -168,7 +159,6 @@ export class AdminUsersController {
    */
   @Patch(":id/role")
   @RequirePermission(PERMISSIONS.userWrite)
-  @AuditAction("user.role_change")
   changeRole(
     @Param("id") id: string,
     @Body() dto: ChangeUserRoleDto,
@@ -177,10 +167,9 @@ export class AdminUsersController {
     return this.users.changeRole(id, dto, actor);
   }
 
-  /** 重置密码: 返回一次性临时密码, 明文不入库不入审计 */
+  /** 重置密码: 返回一次性临时密码, 明文不入库、不落日志 */
   @Post(":id/password")
   @RequirePermission(PERMISSIONS.userResetPassword)
-  @AuditAction("user.password_reset")
   resetPassword(@Param("id") id: string) {
     return this.users.resetPassword(id);
   }
@@ -193,7 +182,6 @@ export class AdminUsersController {
    */
   @Post(":id/logout-all")
   @RequirePermission(PERMISSIONS.userDisable)
-  @AuditAction("user.logout_all")
   logoutAll(@Param("id") id: string, @AdminUser() actor: AdminUser) {
     return this.users.logoutAll(id, actor.id);
   }
@@ -206,7 +194,6 @@ export class AdminUsersController {
    */
   @Delete(":id")
   @RequirePermission(PERMISSIONS.userDelete)
-  @AuditAction("user.delete")
   remove(
     @Param("id") id: string,
     @Query("hard") hard: string,

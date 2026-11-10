@@ -14,6 +14,7 @@ vi.mock('./adapters', () => ({
 
 import { PaymentNotificationService } from './payment-notification.service';
 import type { NotificationResult } from './adapters/types';
+import { AppError } from '../common/app.exception';
 
 const ORDER_NO = 'HJ202611030001';
 const CONFIG_ID = 'cfg_stripe_1';
@@ -35,7 +36,25 @@ function paidResult(providerRef?: string): NotificationResult {
   };
 }
 
+function stateResult(state: 'failed' | 'closed'): NotificationResult {
+  return {
+    ok: true,
+    eventId: `evt_${state}`,
+    merchantOrderNo: ORDER_NO,
+    providerTradeNo: 'pi_1',
+    providerRef: 'cs_old',
+    amountCents: 0,
+    currency: 'CNY',
+    state,
+    providerStatus: `stripe.${state}`,
+    ackSuccess: true,
+    reason: state === 'failed' ? 'Stripe PaymentIntent 支付失败' : 'Stripe PaymentIntent 已取消',
+    rawPayload: `{"state":"${state}"}`,
+  };
+}
+
 function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
+  const paymentRef = notification.ok ? notification.providerRef ?? null : null;
   const notificationRow = {
     id: NOTIFICATION_ID,
     providerId: 'stripe',
@@ -57,15 +76,51 @@ function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
       findUnique: vi.fn(async ({ where }: { where: { id?: string } }) =>
         where.id ? notificationRow : null,
       ),
-      create: vi.fn().mockResolvedValue(notificationRow),
-      update: vi.fn().mockResolvedValue(notificationRow),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        Object.assign(notificationRow, data);
+        return notificationRow;
+      }),
+      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        Object.assign(notificationRow, data);
+        return notificationRow;
+      }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     order: {
       findUnique: vi.fn().mockResolvedValue({ id: 'order_1' }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     payment: {
-      findFirst: vi.fn().mockResolvedValue({ id: 'pay_old' }),
+      findUnique: vi.fn().mockResolvedValue({
+        id: 'pay_old',
+        orderId: 'order_1',
+        channel: 'stripe',
+        providerConfigId: CONFIG_ID,
+        providerConfigVersion: 1,
+        providerInstanceId: 'default',
+        providerMethod: 'alipay',
+        providerRef: paymentRef,
+        payTransactionId: null,
+        status: 'pending',
+        createdAt: new Date(),
+      }),
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: 'pay_old',
+          orderId: 'order_1',
+          channel: 'stripe',
+          providerConfigId: CONFIG_ID,
+          providerConfigVersion: 1,
+          providerInstanceId: 'default',
+          providerMethod: 'alipay',
+          providerRef: paymentRef,
+          payTransactionId: null,
+          status: 'pending',
+          createdAt: new Date(),
+        },
+      ]),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     paymentReconciliationRun: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -113,7 +168,7 @@ function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
     orders as never,
     exceptions as never,
   );
-  return { service, prisma, orders, exceptions, notificationRow };
+  return { service, prisma, configs, orders, exceptions, notificationRow };
 }
 
 async function ingest(service: PaymentNotificationService) {
@@ -137,17 +192,17 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
 
     await ingest(service);
 
-    const query = prisma.payment.findFirst.mock.calls[0][0] as {
+    const query = prisma.payment.findMany.mock.calls[0][0] as {
       where: Record<string, unknown>;
       orderBy?: unknown;
     };
     expect(query.where).toMatchObject({
       orderId: 'order_1',
       channel: 'stripe',
-      providerConfigId: CONFIG_ID,
+      OR: [{ providerConfigId: CONFIG_ID }, { providerConfigId: null }],
       providerRef: 'cs_old',
     });
-    expect(query.orderBy).toBeUndefined();
+    expect(query.orderBy).toEqual({ createdAt: 'desc' });
     expect(orders.applyPaymentResult).toHaveBeenCalledWith(
       expect.objectContaining({ paymentId: 'pay_old', providerRef: 'cs_old' }),
     );
@@ -160,16 +215,16 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
 
   it('providerRef 找不到 Payment 时永久失败并记录差异，绝不回落到最新尝试', async () => {
     const { service, prisma, orders } = makeHarness(paidResult('cs_missing'));
-    prisma.payment.findFirst.mockResolvedValue(null);
+    prisma.payment.findMany.mockResolvedValue([]);
 
     await ingest(service);
 
-    const query = prisma.payment.findFirst.mock.calls[0][0] as {
+    const query = prisma.payment.findMany.mock.calls[0][0] as {
       where: Record<string, unknown>;
       orderBy?: unknown;
     };
     expect(query.where).toMatchObject({ providerRef: 'cs_missing' });
-    expect(query.orderBy).toBeUndefined();
+    expect(query.orderBy).toEqual({ createdAt: 'desc' });
     expect(orders.applyPaymentResult).not.toHaveBeenCalled();
     expect(prisma.paymentReconciliationItem.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -186,12 +241,12 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
     );
   });
 
-  it('无 providerRef 的历史回调保留按同渠道最新 Payment 匹配的兼容逻辑', async () => {
+  it('无 providerRef 的历史回调只按订单、渠道和配置唯一匹配 Payment', async () => {
     const { service, prisma, orders } = makeHarness(paidResult());
 
     await ingest(service);
 
-    const query = prisma.payment.findFirst.mock.calls[0][0] as {
+    const query = prisma.payment.findMany.mock.calls[0][0] as {
       where: Record<string, unknown>;
       orderBy?: unknown;
     };
@@ -199,6 +254,130 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
     expect(query.orderBy).toEqual({ createdAt: 'desc' });
     expect(orders.applyPaymentResult).toHaveBeenCalledWith(
       expect.objectContaining({ paymentId: 'pay_old' }),
+    );
+  });
+
+  it('同一配置存在多个待支付尝试时不按创建时间猜测归属', async () => {
+    const { service, prisma, configs, orders, exceptions } = makeHarness(paidResult());
+    configs.byId.mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'alipay',
+      version: 1,
+      instanceId: 'default',
+      values: {},
+    });
+    const attempts = [
+      {
+        id: 'pay_old',
+        orderId: 'order_1',
+        channel: 'alipay',
+        providerConfigId: CONFIG_ID,
+        providerConfigVersion: 1,
+        providerInstanceId: 'default',
+        providerMethod: 'alipay',
+        providerRef: null,
+        payTransactionId: null,
+        status: 'pending',
+        createdAt: new Date('2026-11-03T01:00:00.000Z'),
+      },
+      {
+        id: 'pay_new',
+        orderId: 'order_1',
+        channel: 'alipay',
+        providerConfigId: CONFIG_ID,
+        providerConfigVersion: 1,
+        providerInstanceId: 'default',
+        providerMethod: 'alipay',
+        providerRef: null,
+        payTransactionId: null,
+        status: 'pending',
+        createdAt: new Date('2026-11-03T02:00:00.000Z'),
+      },
+    ];
+    prisma.payment.findMany.mockResolvedValue(attempts);
+    prisma.payment.findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) =>
+        attempts.find((payment) => payment.id === where.id) ?? null,
+    );
+
+    const ack = await service.ingestCanonical({
+      providerId: 'alipay',
+      headers: {},
+      rawBody: Buffer.from('{"out_trade_no":"HJ202611030001","trade_no":"trade_1"}'),
+      body: { out_trade_no: ORDER_NO, trade_no: 'trade_1' },
+    });
+
+    expect(ack).toMatchObject({ status: 200 });
+    expect(orders.applyPaymentResult).not.toHaveBeenCalled();
+    expect(exceptions.recordManual).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: expect.stringContaining('多个待支付尝试') }),
+    );
+  });
+
+  it.each([
+    ['failed', 'failed'],
+    ['closed', 'closed'],
+  ] as const)('非成功的 %s 回调落对应 Payment 状态但不入账', async (state, paymentStatus) => {
+    const { service, prisma, orders } = makeHarness(stateResult(state));
+
+    const ack = await ingest(service);
+
+    expect(ack).toMatchObject({ status: 200 });
+    expect(orders.applyPaymentResult).not.toHaveBeenCalled();
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pay_old', status: 'pending' },
+      data: expect.objectContaining({
+        status: paymentStatus,
+        providerStatus: `stripe.${state}`,
+        rawPayload: `{"state":"${state}"}`,
+      }),
+    });
+    expect(prisma.paymentNotification.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'processed' }),
+      }),
+    );
+  });
+
+  it('已取消订单的迟到成功回调走自动原路退款', async () => {
+    const { service, prisma, orders, exceptions } = makeHarness(paidResult('cs_old'));
+    orders.applyPaymentResult.mockRejectedValue(
+      new AppError(40901, '订单当前状态不可支付: cancelled', 409),
+    );
+    prisma.order.findUnique
+      .mockResolvedValueOnce({ id: 'order_1' })
+      .mockResolvedValueOnce({ status: 'cancelled' });
+
+    const ack = await ingest(service);
+
+    expect(ack).toMatchObject({ status: 200 });
+    expect(exceptions.autoRefundCancelledPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        merchantOrderNo: ORDER_NO,
+        providerTradeNo: 'pi_1',
+        amountCents: 1005,
+      }),
+    );
+    expect(exceptions.recordManual).not.toHaveBeenCalled();
+  });
+
+  it('自动退款落单失败时让渠道重试，不能静默 ACK 成功', async () => {
+    const { service, prisma, orders, exceptions } = makeHarness(paidResult('cs_old'));
+    orders.applyPaymentResult.mockRejectedValue(
+      new AppError(40901, '订单当前状态不可支付: cancelled', 409),
+    );
+    prisma.order.findUnique
+      .mockResolvedValueOnce({ id: 'order_1' })
+      .mockResolvedValueOnce({ status: 'cancelled' });
+    exceptions.autoRefundCancelledPayment.mockRejectedValue(new Error('refund db down'));
+
+    const ack = await ingest(service);
+
+    expect(ack).toMatchObject({ status: 400 });
+    expect(prisma.paymentNotification.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'failed' }),
+      }),
     );
   });
 });
@@ -242,15 +421,30 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
     };
     const payment = {
       id: 'pay_epay_1',
+      orderId: 'order_epay_1',
+      channel: 'epay',
+      providerConfigId: EPAY_CONFIG_ID,
+      providerConfigVersion: 1,
+      providerInstanceId: 'default',
       providerMethod: input.providerMethod === undefined ? 'alipay' : input.providerMethod,
+      providerRef: EPAY_PROVIDER_REF,
+      payTransactionId: null,
+      status: 'pending',
+      createdAt: new Date(),
     };
     const prisma = {
       paymentNotification: {
         findUnique: vi.fn(async ({ where }: { where: { id?: string } }) =>
           where.id ? notificationRow : null,
         ),
-        create: vi.fn().mockResolvedValue(notificationRow),
-        update: vi.fn().mockResolvedValue(notificationRow),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          Object.assign(notificationRow, data);
+          return notificationRow;
+        }),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          Object.assign(notificationRow, data);
+          return notificationRow;
+        }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       order: {
@@ -258,6 +452,9 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
       },
       payment: {
         findFirst: vi.fn().mockResolvedValue(payment),
+        findMany: vi.fn().mockResolvedValue([payment]),
+        findUnique: vi.fn().mockResolvedValue(payment),
+        update: vi.fn().mockResolvedValue({}),
       },
       paymentReconciliationRun: {
         findFirst: vi.fn().mockResolvedValue(null),
@@ -341,14 +538,34 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
     expect(prisma.paymentNotification.create).not.toHaveBeenCalled();
   });
 
-  it('历史 Payment 没有 providerMethod 时拒绝，不能按当前配置猜测', async () => {
+  it('历史 Payment 没有 providerMethod 时分别用两种 type 验签，只接受签名通过的一种', async () => {
     const { service, prisma } = makeEpayHarness({ providerMethod: null });
+    adapterMock.verifyNotification
+      .mockResolvedValueOnce({
+        ok: false,
+        ackSuccess: false,
+        reason: 'type 不匹配',
+        rawPayload: '{}',
+      })
+      .mockResolvedValueOnce(epayPaidResult());
 
     const ack = await ingestEpay(service);
 
-    expect(ack).toMatchObject({ status: 400, body: 'fail' });
-    expect(adapterMock.verifyNotification).not.toHaveBeenCalled();
-    expect(prisma.paymentNotification.create).not.toHaveBeenCalled();
+    expect(ack).toMatchObject({ status: 200, body: 'success' });
+    expect(adapterMock.verifyNotification).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ expectedPaymentMethod: 'alipay' }),
+    );
+    expect(adapterMock.verifyNotification).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ expectedPaymentMethod: 'wechat' }),
+    );
+    expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'pay_epay_1' },
+        data: expect.objectContaining({ providerMethod: 'wechat' }),
+      }),
+    );
   });
 
   it.each(['alipay', 'wechat'] as const)(
@@ -467,6 +684,39 @@ describe('PaymentNotificationService 收件箱并发闸', () => {
       }),
     );
   });
+
+  it('worker 重试遇到未预期异常时也把行退回可重试状态', async () => {
+    const { service, prisma, notificationRow } = makeHarness();
+    prisma.paymentNotification.findUnique.mockImplementation(
+      async ({ where }: { where: { id?: string } }) =>
+        where.id
+          ? {
+              ...notificationRow,
+              status: 'processing',
+              normalizedJson: JSON.stringify({
+                state: 'paid',
+                providerTradeNo: 'pi_1',
+                providerRef: 'cs_old',
+                amountCents: 1005,
+                currency: 'CNY',
+                providerStatus: 'paid',
+              }),
+            }
+          : null,
+    );
+    prisma.order.findUnique.mockRejectedValue(new Error('db down'));
+
+    await expect(service.retry(NOTIFICATION_ID)).resolves.toBe('retry');
+
+    expect(prisma.paymentNotification.updateMany).toHaveBeenLastCalledWith({
+      where: { id: NOTIFICATION_ID, status: 'processing' },
+      data: {
+        status: 'failed',
+        nextAttemptAt: expect.any(Date),
+        lastError: 'db down',
+      },
+    });
+  });
 });
 
 describe('PaymentNotificationService 规范回调历史配置', () => {
@@ -503,6 +753,22 @@ describe('PaymentNotificationService 规范回调历史配置', () => {
     }>;
     references?: Array<{ providerConfigId: string }>;
   }) {
+    const normalizedPayments = input.payments.map((payment, index) => ({
+      id: `pay_canonical_${index}`,
+      orderId: 'order_canonical_1',
+      channel: input.providerId,
+      providerConfigVersion: 1,
+      providerInstanceId: `instance_${payment.providerConfigId}`,
+      status: 'pending',
+      createdAt: new Date(Date.now() - index * 1000),
+      ...payment,
+    }));
+    const normalizedReferences = (input.references ?? input.payments).map(
+      (payment, index) => ({
+        ...normalizedPayments[index],
+        ...payment,
+      }),
+    );
     const notificationRow = {
       id: NOTIFICATION_ID,
       providerId: input.providerId,
@@ -524,8 +790,14 @@ describe('PaymentNotificationService 规范回调历史配置', () => {
         findUnique: vi.fn(async ({ where }: { where: { id?: string } }) =>
           where.id ? notificationRow : null,
         ),
-        create: vi.fn().mockResolvedValue(notificationRow),
-        update: vi.fn().mockResolvedValue(notificationRow),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          Object.assign(notificationRow, data);
+          return notificationRow;
+        }),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          Object.assign(notificationRow, data);
+          return notificationRow;
+        }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       order: {
@@ -534,12 +806,14 @@ describe('PaymentNotificationService 规范回调历史配置', () => {
       payment: {
         findMany: vi
           .fn()
-          .mockResolvedValueOnce(input.references ?? input.payments)
-          .mockResolvedValue(input.payments),
+          .mockResolvedValueOnce(normalizedReferences)
+          .mockResolvedValue(normalizedPayments),
         findFirst: vi.fn().mockResolvedValue({
           id: 'pay_canonical_old',
           providerInstanceId: 'instance_old',
         }),
+        findUnique: vi.fn().mockResolvedValue(normalizedPayments[0]),
+        update: vi.fn().mockResolvedValue({}),
       },
       paymentReconciliationRun: {
         findFirst: vi.fn().mockResolvedValue(null),
@@ -768,7 +1042,7 @@ describe('PaymentNotificationService 规范回调历史配置', () => {
     });
 
     expect(ack).toMatchObject({ status: 200, body: 'success' });
-    expect(configs.byId).toHaveBeenCalledTimes(2);
+    expect(configs.byId).toHaveBeenCalledTimes(3);
     expect(adapterMock.verifyNotification).toHaveBeenCalledTimes(1);
     expect(adapterMock.verifyNotification).toHaveBeenCalledWith(
       expect.objectContaining({

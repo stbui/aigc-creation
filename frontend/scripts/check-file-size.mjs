@@ -1,9 +1,9 @@
 /**
  * 文件体积守卫 —— 防止拆分后的巨型文件回潮。
  *
- * 背景：`docs/frontend-slim-audit.md` 记录了三批瘦身（`AdminDashboardPage` /
- * `ToolShell` / `works/page`）。拆分本身不难，难的是不再长回去 —— 一个人往
- * 已经 700 行的页面里再塞 60 行，谁都不会觉得有问题。
+ * 背景：历史三批瘦身（`AdminDashboardPage` / `ToolShell` / `works/page`）已完成。
+ * 拆分本身不难，难的是不再长回去 —— 一个人往已经 700 行的页面里再塞 60 行，
+ * 谁都不会觉得有问题。
  *
  * 规则：
  *   - 单文件 > 500 行：告警（提示该按 `docs/frontend-module-conventions.md` 分层）
@@ -34,9 +34,9 @@ const VERBOSE = process.argv.includes('--verbose');
  */
 const BASELINE = {
   // 接口聚合层：按域拆分牵扯全部调用方，待「API 与类型层治理」批次统一处理
-  'src/lib/api.ts': 2493,
+  'src/lib/api.ts': 2477,
   // 后端契约类型声明（无运行期逻辑），随接口演进增长
-  'src/types/api.d.ts': 2331,
+  'src/types/api.d.ts': 2276,
   'src/types/model.ts': 928,
   'src/components/MattingResultEditor.tsx': 810,
 };

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   ActionButton,
@@ -5,6 +6,7 @@ import {
   IconButton,
   ListError,
   NumberField,
+  Notice,
   PageSkeleton,
   Panel,
   SelectField,
@@ -12,6 +14,7 @@ import {
   SwitchField,
 } from '~/admin-ui/primitives';
 import type { RuleDrafts } from './hooks';
+import { checkinRuleError } from './utils';
 
 /**
  * 单条全局规则的保存条。
@@ -26,6 +29,7 @@ function RuleActions({
   onDiscard,
   onSave,
   saveText,
+  invalid = false,
 }: {
   hint: string;
   dirty: boolean;
@@ -33,6 +37,7 @@ function RuleActions({
   onDiscard: () => void;
   onSave: () => void;
   saveText: string;
+  invalid?: boolean;
 }) {
   return (
     <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
@@ -49,7 +54,7 @@ function RuleActions({
         variant="default"
         size="sm"
         /* 没有改动时保存按钮不可点：可点却什么都不改变，会让人以为「已经保存过」 */
-        disabled={busy || !dirty}
+        disabled={busy || !dirty || invalid}
         onClick={onSave}
       >
         {busy ? '保存中…' : saveText}
@@ -90,6 +95,26 @@ export function MarketingRulesTab({
     saveInvite,
     saveCheckin,
   } = drafts;
+
+  const bonusKeySeq = useRef(0);
+  const [bonusKeys, setBonusKeys] = useState<string[]>([]);
+  const checkinError = checkin ? checkinRuleError(checkin) : null;
+
+  // 数组索引不能作为可增删档位的 key：删除中间项会让后续输入控件错误复用。
+  useEffect(() => {
+    const count = checkin?.bonusRules.length ?? 0;
+    setBonusKeys((previous) => {
+      if (previous.length === count) return previous;
+      if (previous.length > count) return previous.slice(0, count);
+      return [
+        ...previous,
+        ...Array.from(
+          { length: count - previous.length },
+          () => `bonus-${(bonusKeySeq.current += 1)}`,
+        ),
+      ];
+    });
+  }, [checkin?.bonusRules.length]);
 
   /*
    * 只有完全没有数据时才塌**正文**; 已有草稿时保留表单, 由下方 stale 提示交代刷新失败。
@@ -180,6 +205,7 @@ export function MarketingRulesTab({
               <NumberField
                 ariaLabel="每日基础积分"
                 className="w-[180px]"
+                max={100000}
                 value={checkin.baseCredits}
                 disabled={!writable}
                 onChange={(value) => setCheckin({ ...checkin, baseCredits: value ?? 0 })}
@@ -191,6 +217,7 @@ export function MarketingRulesTab({
                 <NumberField
                   ariaLabel="连续签到封顶天数"
                   min={0}
+                  max={3650}
                   value={checkin.maxStreak}
                   disabled={!writable}
                   onChange={(value) => setCheckin({ ...checkin, maxStreak: value ?? 0 })}
@@ -200,6 +227,7 @@ export function MarketingRulesTab({
                 <NumberField
                   ariaLabel="每日签到积分上限"
                   min={0}
+                  max={1000000}
                   value={checkin.dailyCap}
                   disabled={!writable}
                   onChange={(value) => setCheckin({ ...checkin, dailyCap: value ?? 0 })}
@@ -214,17 +242,21 @@ export function MarketingRulesTab({
               </p>
               <div className="flex flex-col gap-2">
                 {checkin.bonusRules.map((b, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div
+                    key={bonusKeys[i] ?? `bonus-fallback-${i}`}
+                    className="flex items-center gap-2"
+                  >
                     <span className="text-xs text-muted-foreground">连续</span>
                     <NumberField
                       ariaLabel={`第 ${i + 1} 档连续天数`}
                       className="w-[90px]"
-                      min={1}
+                      min={2}
+                      max={3650}
                       value={b.day}
                       disabled={!writable}
                       onChange={(value) => {
                         const next = [...checkin.bonusRules];
-                        next[i] = { ...b, day: value ?? 1 };
+                        next[i] = { ...b, day: value ?? 2 };
                         setCheckin({ ...checkin, bonusRules: next });
                       }}
                     />
@@ -233,6 +265,7 @@ export function MarketingRulesTab({
                       ariaLabel={`第 ${i + 1} 档加成积分`}
                       className="w-[90px]"
                       min={0}
+                      max={100000}
                       value={b.bonus}
                       disabled={!writable}
                       onChange={(value) => {
@@ -248,12 +281,15 @@ export function MarketingRulesTab({
                         size="sm"
                         label={`删除第 ${i + 1} 档加成`}
                         className="border-0 bg-transparent text-muted-foreground hover:text-danger-text"
-                        onClick={() =>
+                        onClick={() => {
+                          setBonusKeys((previous) =>
+                            previous.filter((_, index) => index !== i),
+                          );
                           setCheckin({
                             ...checkin,
                             bonusRules: checkin.bonusRules.filter((_, j) => j !== i),
-                          })
-                        }
+                          });
+                        }}
                       />
                     )}
                   </div>
@@ -265,12 +301,17 @@ export function MarketingRulesTab({
                   size="sm"
                   icon={Plus}
                   className="mt-1 self-start"
-                  onClick={() =>
+                  disabled={checkin.bonusRules.length >= 50}
+                  onClick={() => {
+                    setBonusKeys((previous) => [
+                      ...previous,
+                      `bonus-${(bonusKeySeq.current += 1)}`,
+                    ]);
                     setCheckin({
                       ...checkin,
                       bonusRules: [...checkin.bonusRules, { day: 7, bonus: 10 }],
-                    })
-                  }
+                    });
+                  }}
                 >
                   添加加成档位
                 </ActionButton>
@@ -284,6 +325,8 @@ export function MarketingRulesTab({
               label={checkin.enabled ? '启用签到' : '停用签到'}
             />
 
+            {checkinError && <Notice tone="danger">{checkinError}</Notice>}
+
             {writable && (
               <RuleActions
                 hint={`基础 ${checkin.baseCredits} 分/天 · 连签封顶 ${checkin.maxStreak || '不限'} · 日上限 ${checkin.dailyCap || '不限'} · ${checkin.bonusRules.length} 个加成档位`}
@@ -292,6 +335,7 @@ export function MarketingRulesTab({
                 onDiscard={() => setCheckin(checkinBase)}
                 onSave={() => void saveCheckin()}
                 saveText="保存签到规则"
+                invalid={Boolean(checkinError)}
               />
             )}
           </div>

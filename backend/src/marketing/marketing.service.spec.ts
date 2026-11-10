@@ -23,6 +23,7 @@ describe('MarketingService 邀请绑定与奖励幂等', () => {
     };
     prisma = {
       inviteRewardRule: { findUnique: vi.fn().mockResolvedValue(null) },
+      inviteRelation: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: vi.fn(async (work: (client: Record<string, any>) => unknown) => work(tx)),
     };
     credit = { grant: vi.fn().mockResolvedValue({}) };
@@ -107,6 +108,81 @@ describe('MarketingService 邀请绑定与奖励幂等', () => {
       expect.objectContaining({ idempotencyKey: 'invite:relation-1:invitee' }),
       tx,
     );
+  });
+
+  it('注册奖励 pending 关系会由补偿任务重新发放', async () => {
+    prisma.inviteRewardRule.findUnique.mockResolvedValue({
+      id: 'default',
+      valid: true,
+      triggerOn: 'register',
+      inviterCredits: 20,
+      inviteeCredits: 10,
+    });
+    prisma.inviteRelation.findMany.mockResolvedValue([
+      { id: 'relation-1' },
+      { id: 'relation-2' },
+    ]);
+    vi.spyOn(service, 'grantInviteReward')
+      .mockResolvedValueOnce({ granted: true, credits: 30 })
+      .mockResolvedValueOnce({ granted: true, credits: 30 });
+
+    await expect(service.retryPendingRegisterRewards(100)).resolves.toEqual({
+      attempted: 2,
+      granted: 2,
+      failed: 0,
+    });
+    expect(prisma.inviteRelation.findMany).toHaveBeenCalledWith({
+      where: { rewardStatus: 'pending' },
+      select: { id: true },
+      orderBy: { boundAt: 'asc' },
+      take: 100,
+    });
+    expect(service.grantInviteReward).toHaveBeenNthCalledWith(1, 'relation-1');
+    expect(service.grantInviteReward).toHaveBeenNthCalledWith(2, 'relation-2');
+  });
+
+  it('单条补发失败不阻塞后续 pending 关系', async () => {
+    prisma.inviteRewardRule.findUnique.mockResolvedValue({
+      id: 'default',
+      valid: true,
+      triggerOn: 'register',
+      inviterCredits: 20,
+      inviteeCredits: 10,
+    });
+    prisma.inviteRelation.findMany.mockResolvedValue([
+      { id: 'relation-fail' },
+      { id: 'relation-ok' },
+    ]);
+    vi.spyOn(service, 'grantInviteReward')
+      .mockRejectedValueOnce(new Error('database is locked'))
+      .mockResolvedValueOnce({ granted: true, credits: 30 });
+
+    await expect(service.retryPendingRegisterRewards()).resolves.toEqual({
+      attempted: 2,
+      granted: 1,
+      failed: 1,
+    });
+    expect(service.grantInviteReward).toHaveBeenCalledTimes(2);
+    expect(service.grantInviteReward).toHaveBeenLastCalledWith('relation-ok');
+  });
+
+  it('非 register 规则不扫描 pending，已 granted 关系不会被重复发放', async () => {
+    prisma.inviteRewardRule.findUnique.mockResolvedValue({
+      id: 'default',
+      valid: true,
+      triggerOn: 'first_pay',
+      inviterCredits: 20,
+      inviteeCredits: 10,
+    });
+    const grant = vi.spyOn(service, 'grantInviteReward');
+
+    await expect(service.retryPendingRegisterRewards()).resolves.toEqual({
+      attempted: 0,
+      granted: 0,
+      failed: 0,
+    });
+    expect(prisma.inviteRelation.findMany).not.toHaveBeenCalled();
+    expect(grant).not.toHaveBeenCalled();
   });
 });
 

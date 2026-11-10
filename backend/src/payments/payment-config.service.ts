@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
+import type { Payment, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { SettingsService } from '../common/settings.service';
@@ -109,6 +110,31 @@ export interface ResolvedVisiblePayment {
   config: ResolvedPaymentConfig;
   /** EasyPay 需要按 C 端支付方式下单与验签；官方渠道不填。 */
   providerMethod?: VisiblePaymentMethod;
+  /** 轮询下单快照；创建渠道订单前必须原子领取游标。 */
+  roundRobin?: {
+    providerId: PaymentProviderId;
+    method: VisiblePaymentMethod;
+    cursor: number;
+    eligibleInstances: Array<{
+      instanceId: string;
+      config: ResolvedPaymentConfig;
+    }>;
+  };
+}
+
+export interface ReserveVisiblePaymentAttemptInput {
+  method: VisiblePaymentMethod;
+  currency: PaymentCurrency;
+  amountCents: number;
+  orderId: string;
+  userId: string;
+  /** 展示阶段已解析的路由；仅用于发现来源切换，最终实例与版本会在事务内重读。 */
+  resolved?: ResolvedVisiblePayment;
+}
+
+export interface ReservedVisiblePaymentAttempt {
+  payment: Payment;
+  resolved: ResolvedVisiblePayment;
 }
 
 export interface VisiblePaymentOption {
@@ -251,7 +277,7 @@ export class PaymentConfigService implements OnModuleInit {
     currency: PaymentCurrency,
     amountCents?: number,
   ): Promise<VisiblePaymentProviderView[]> {
-    const options = await this.resolveVisibleOptions(currency, amountCents, false);
+    const options = await this.resolveVisibleOptions(currency, amountCents);
     return options.map((option) => option.view);
   }
 
@@ -262,11 +288,16 @@ export class PaymentConfigService implements OnModuleInit {
   async resolveVisibleOptions(
     currency: PaymentCurrency,
     amountCents?: number,
-    advanceCursor = true,
+    options?: { includeDailyLimitExceeded?: boolean },
   ): Promise<VisiblePaymentOption[]> {
     const out: VisiblePaymentOption[] = [];
     for (const method of VISIBLE_PAYMENT_METHODS) {
-      const resolved = await this.resolveVisible(method, currency, amountCents, advanceCursor);
+      const resolved = await this.resolveVisible(
+        method,
+        currency,
+        amountCents,
+        options,
+      );
       if (!resolved) continue;
       const descriptor = requireAdapter(resolved.providerId).descriptor;
       out.push({
@@ -289,7 +320,7 @@ export class PaymentConfigService implements OnModuleInit {
     method: VisiblePaymentMethod,
     currency: PaymentCurrency,
     amountCents?: number,
-    advanceCursor = true,
+    options?: { includeDailyLimitExceeded?: boolean },
   ): Promise<ResolvedVisiblePayment | null> {
     const source = await this.sourceOf(method);
     if (source === 'unset') return null;
@@ -333,26 +364,272 @@ export class PaymentConfigService implements OnModuleInit {
       providerId,
       eligible.map((item) => item.row.instanceId),
     );
-    const withinDailyLimit = eligible.filter(({ row }) => {
-      if (row.dailyLimitCents == null) return true;
-      const used = usage.get(row.instanceId) ?? 0;
-      if (amountCents === undefined) return used < row.dailyLimitCents;
-      return used + Math.max(0, amountCents) <= row.dailyLimitCents;
-    });
+    const withinDailyLimit = options?.includeDailyLimitExceeded
+      ? eligible
+      : eligible.filter(({ row }) => {
+          if (row.dailyLimitCents == null) return true;
+          const used = usage.get(row.instanceId) ?? 0;
+          if (amountCents === undefined) return used < row.dailyLimitCents;
+          return used + Math.max(0, amountCents) <= row.dailyLimitCents;
+        });
     if (withinDailyLimit.length === 0) return null;
 
     const strategy = await this.settings.get<string>('payment.loadBalancingStrategy');
-    const selected =
-      strategy === 'least-amount'
-        ? this.leastAmountInstance(withinDailyLimit, usage)
-        : await this.roundRobinInstance(providerId, method, withinDailyLimit, advanceCursor);
+    let selected: { row: { instanceId: string }; config: ResolvedPaymentConfig };
+    let roundRobin: ResolvedVisiblePayment['roundRobin'];
+    if (strategy === 'least-amount') {
+      selected = this.leastAmountInstance(withinDailyLimit, usage);
+    } else {
+      const rotation = await this.roundRobinInstance(
+        providerId,
+        method,
+        withinDailyLimit,
+      );
+      selected = rotation.selected;
+      roundRobin = rotation.snapshot;
+    }
 
     return {
       method,
       providerId,
       config: selected.config,
       ...(providerId === 'epay' ? { providerMethod: method } : {}),
+      ...(roundRobin ? { roundRobin } : {}),
     };
+  }
+
+  /**
+   * 原子预占一笔支付尝试。
+   *
+   * 只在 resolveVisible() 里看日限额不够：展示与发起支付之间可能已有并发订单
+   * 占用额度。这里在一个事务内重新读取来源和实例最新版本、锁定候选配置行、
+   * 汇总当日用量，并在同一事务写入 pending Payment。后到事务会等待前一笔
+   * 提交后再读取用量，因此两个并发请求不能同时越过同一实例的日限额。
+   */
+  async reserveVisiblePaymentAttempt(
+    input: ReserveVisiblePaymentAttemptInput,
+  ): Promise<ReservedVisiblePaymentAttempt> {
+    if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
+      throw new AppError(40001, '支付金额必须为正整数（分）', 400);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const source = await this.sourceOf(input.method);
+      if (source === 'unset') {
+        throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
+      }
+      const providerId: PaymentProviderId = source === 'official' ? input.method : 'epay';
+      if (input.resolved && input.resolved.providerId !== providerId) {
+        throw new AppError(50301, '支付来源已变更，请刷新页面后重试', 503);
+      }
+      const adapter = getAdapter(providerId);
+      if (!adapter || !adapter.descriptor.supportedCurrencies.includes(input.currency)) {
+        throw new AppError(50301, '当前支付方式不支持该币种', 503);
+      }
+
+      const preliminary = (await this.latestRowsByInstance(
+        providerId,
+        tx.paymentProviderConfig,
+      )).sort(compareInstanceRows);
+      if (preliminary.length === 0) {
+        throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
+      }
+
+      /*
+       * SQLite 的交互式事务是 deferred，先读后写仍可能让两个事务读到同一份
+       * 用量。no-op UPDATE 会先取得实例配置行写锁；锁按 instanceId 固定排序，
+       * 避免多实例并发时形成反向加锁。锁后再重读最新版本，防止用旧配置建单。
+       */
+      const instanceIds = preliminary
+        .map((row) => row.instanceId)
+        .sort((a, b) => a.localeCompare(b));
+      for (const instanceId of instanceIds) {
+        await tx.$executeRaw`
+          UPDATE "PaymentProviderConfig"
+          SET "version" = "version"
+          WHERE "providerId" = ${providerId}
+            AND "instanceId" = ${instanceId}
+        `;
+      }
+
+      const rows = (await this.latestRowsByInstance(
+        providerId,
+        tx.paymentProviderConfig,
+      )).sort(compareInstanceRows);
+      const eligible: Array<{
+        row: (typeof rows)[number];
+        config: ResolvedPaymentConfig;
+      }> = [];
+      for (const row of rows) {
+        if (!row.enabled) continue;
+        if (!paymentMethodsOf(row, row.providerId).includes(input.method)) continue;
+        if (row.minAmountCents != null && input.amountCents < row.minAmountCents) continue;
+        if (row.maxAmountCents != null && input.amountCents > row.maxAmountCents) continue;
+        let values: Record<string, string>;
+        try {
+          values = this.valuesFor(providerId, row);
+        } catch {
+          continue;
+        }
+        const missing = adapter.validateConfig(values);
+        if (missing.length > 0) continue;
+        if (
+          this.providerWarnings(adapter.descriptor, row, values, missing).some(
+            (warning) => warning.level === 'danger',
+          )
+        ) {
+          continue;
+        }
+        eligible.push({ row, config: this.toResolved(row, values) });
+      }
+      if (eligible.length === 0) {
+        throw new AppError(50301, '支付渠道未完成配置或当前金额不在可支付范围内', 503);
+      }
+
+      const strategy = await this.settings.get<string>('payment.loadBalancingStrategy');
+      let claimedCursor: number | null = null;
+      if (strategy !== 'least-amount') {
+        const cursor = await tx.paymentRoundRobinCursor.upsert({
+          where: { providerId_method: { providerId, method: input.method } },
+          create: { providerId, method: input.method, cursor: 1 },
+          update: { cursor: { increment: 1 } },
+          select: { cursor: true },
+        });
+        claimedCursor = Math.max(1, cursor.cursor);
+      }
+
+      const usage = await this.dailyInstanceUsage(
+        providerId,
+        eligible.map((item) => item.row.instanceId),
+        tx.payment,
+      );
+      const withinDailyLimit = eligible.filter(({ row }) => {
+        if (row.dailyLimitCents == null) return true;
+        return (usage.get(row.instanceId) ?? 0) + input.amountCents <= row.dailyLimitCents;
+      });
+      if (withinDailyLimit.length === 0) {
+        throw new AppError(50301, '支付实例已达每日限额，请稍后重试或更换支付方式', 503);
+      }
+
+      const selected = strategy === 'least-amount'
+        ? this.leastAmountInstance(withinDailyLimit, usage)
+        : withinDailyLimit[
+            claimedCursor == null
+              ? 0
+              : (claimedCursor - 1) % withinDailyLimit.length
+          ];
+      if (!selected) {
+        throw new AppError(50301, '支付负载均衡暂不可用，请稍后重试', 503);
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          orderId: input.orderId,
+          userId: input.userId,
+          channel: providerId,
+          providerMethod: input.method,
+          amountCents: input.amountCents,
+          currency: input.currency,
+          status: 'pending',
+          providerConfigId: selected.config.id,
+          providerConfigVersion: selected.config.version,
+          providerInstanceId: selected.config.instanceId,
+        },
+      });
+
+      return {
+        payment,
+        resolved: {
+          method: input.method,
+          providerId,
+          config: selected.config,
+          ...(providerId === 'epay' ? { providerMethod: input.method } : {}),
+          ...(claimedCursor == null
+            ? {}
+            : {
+                roundRobin: {
+                  providerId,
+                  method: input.method,
+                  cursor: claimedCursor,
+                  eligibleInstances: eligible.map((item) => ({
+                    instanceId: item.row.instanceId,
+                    config: item.config,
+                  })),
+                },
+              }),
+        },
+      };
+    });
+  }
+
+  /**
+   * 创建渠道订单前原子领取轮询槽位。
+   *
+   * 先读 cursor 再在下单后提交会让并发请求读到同一个值并命中同一实例。
+   * 这里用单条 upsert 完成「读取并递增」，再按领取到的序号确定实例；
+   * 渠道失败时通过 releaseVisibleSelection() 做条件回滚，只有没有后续
+   * 领取者时才归还槽位，绝不会把游标减到已分配序号之前。
+   */
+  async claimVisibleSelection(
+    resolved: ResolvedVisiblePayment,
+  ): Promise<ResolvedVisiblePayment> {
+    const snapshot = resolved.roundRobin;
+    if (!snapshot || snapshot.eligibleInstances.length === 0) return resolved;
+    const delegate = (this.prisma as unknown as {
+      paymentRoundRobinCursor?: {
+        upsert(args: unknown): Promise<{ cursor: number }>;
+      };
+    }).paymentRoundRobinCursor;
+    if (!delegate) return resolved;
+
+    try {
+      const claimed = await delegate.upsert({
+        where: {
+          providerId_method: {
+            providerId: snapshot.providerId,
+            method: snapshot.method,
+          },
+        },
+        create: { providerId: snapshot.providerId, method: snapshot.method, cursor: 1 },
+        update: { cursor: { increment: 1 } },
+        select: { cursor: true },
+      });
+      const selected = snapshot.eligibleInstances[
+        (Math.max(1, claimed.cursor) - 1) % snapshot.eligibleInstances.length
+      ];
+      return {
+        ...resolved,
+        config: selected.config,
+        roundRobin: { ...snapshot, cursor: claimed.cursor },
+      };
+    } catch (e) {
+      this.logger.error(`支付轮询游标领取失败: ${(e as Error).message}`);
+      throw new AppError(50301, '支付负载均衡暂不可用，请稍后重试', 503);
+    }
+  }
+
+  /** 本次领取尚未产生渠道订单时归还槽位；已被后续请求越过则保持不回滚。 */
+  async releaseVisibleSelection(resolved: ResolvedVisiblePayment): Promise<void> {
+    const snapshot = resolved.roundRobin;
+    if (!snapshot) return;
+    const delegate = (this.prisma as unknown as {
+      paymentRoundRobinCursor?: {
+        updateMany(args: unknown): Promise<{ count: number }>;
+      };
+    }).paymentRoundRobinCursor;
+    if (!delegate) return;
+    try {
+      await delegate.updateMany({
+        where: {
+          providerId: snapshot.providerId,
+          method: snapshot.method,
+          cursor: snapshot.cursor,
+        },
+        data: { cursor: { decrement: 1 } },
+      });
+    } catch (e) {
+      this.logger.warn(`支付轮询游标回滚失败: ${(e as Error).message}`);
+    }
   }
 
   // ── 写入 ────────────────────────────────────────────────────────
@@ -388,7 +665,7 @@ export class PaymentConfigService implements OnModuleInit {
     const rows = await this.latestRowsByInstance(adapter.descriptor.id);
     const instanceId = `pi_${randomUUID().replace(/-/g, '').slice(0, 20)}`;
     const sortOrder = rows.reduce((max, row) => Math.max(max, row.sortOrder), -10) + 10;
-    const defaults = this.defaultMethods(adapter.descriptor.id);
+    const defaults = defaultPaymentMethods(adapter.descriptor.id);
     const paymentMethods = this.normalizePaymentMethods(
       adapter.descriptor.id,
       input.paymentMethods ?? defaults,
@@ -513,7 +790,10 @@ export class PaymentConfigService implements OnModuleInit {
     const refundEnabled = input.refundEnabled ?? current?.refundEnabled ?? true;
     const paymentMethods = this.normalizePaymentMethods(
       adapter.descriptor.id,
-      input.paymentMethods ?? (current ? paymentMethodsOf(current) : this.defaultMethods(adapter.descriptor.id)),
+      input.paymentMethods ??
+        (current
+          ? paymentMethodsOf(current)
+          : defaultPaymentMethods(adapter.descriptor.id)),
     );
 
     const digest = digestOfConfig(
@@ -638,6 +918,7 @@ export class PaymentConfigService implements OnModuleInit {
         id: 'stripe',
         values: {
           secretKey: process.env.STRIPE_SECRET_KEY ?? '',
+          publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? '',
           webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
           apiBase: process.env.STRIPE_API_BASE ?? '',
         },
@@ -674,7 +955,7 @@ export class PaymentConfigService implements OnModuleInit {
       const values = Object.fromEntries(Object.entries(seed.values).filter(([, v]) => v !== ''));
       const complete = adapter.validateConfig(values).length === 0;
       const enabled = seed.id === 'sandbox' ? process.env.NODE_ENV !== 'production' : complete;
-      const paymentMethods = this.defaultMethods(seed.id);
+      const paymentMethods = defaultPaymentMethods(seed.id);
       await this.prisma.paymentProviderConfig.create({
         data: {
           providerId: seed.id,
@@ -713,27 +994,11 @@ export class PaymentConfigService implements OnModuleInit {
 
   // ── 内部 ────────────────────────────────────────────────────────
 
-  private async latestRowsByInstance(providerId: string): Promise<Array<{
-    id: string;
-    providerId: string;
-    instanceId: string;
-    name: string | null;
-    sortOrder: number;
-    version: number;
-    enabled: boolean;
-    closeAfterMinutes: number;
-    minAmountCents: number | null;
-    maxAmountCents: number | null;
-    dailyLimitCents: number | null;
-    refundEnabled: boolean;
-    paymentMethods: string;
-    configCipher: string;
-    configDigest: string;
-    createdAt: Date;
-  }>> {
-    const delegate = this.prisma.paymentProviderConfig as typeof this.prisma.paymentProviderConfig & {
-      findMany?: typeof this.prisma.paymentProviderConfig.findMany;
-    };
+  private async latestRowsByInstance(
+    providerId: string,
+    delegate: Prisma.TransactionClient['paymentProviderConfig'] =
+      this.prisma.paymentProviderConfig,
+  ) {
     if (typeof delegate.findMany !== 'function') {
       const row = await this.latestRow(providerId, 'default');
       return row ? [row] : [];
@@ -1019,12 +1284,10 @@ export class PaymentConfigService implements OnModuleInit {
   private async dailyInstanceUsage(
     providerId: string,
     instanceIds: string[],
+    delegate: Prisma.TransactionClient['payment'] = this.prisma.payment,
   ): Promise<Map<string, number>> {
     const usage = new Map<string, number>();
     if (instanceIds.length === 0) return usage;
-    const delegate = (this.prisma as unknown as {
-      payment?: { findMany?: typeof this.prisma.payment.findMany };
-    }).payment;
     if (typeof delegate?.findMany !== 'function') return usage;
     const today = shanghaiDateKey(new Date());
     const rows = await delegate.findMany({
@@ -1034,9 +1297,30 @@ export class PaymentConfigService implements OnModuleInit {
         status: { in: ['pending', 'succeeded'] },
         createdAt: { gte: startOfShanghaiDay(today) },
       },
-      select: { providerInstanceId: true, amountCents: true },
+      select: {
+        id: true,
+        orderId: true,
+        providerInstanceId: true,
+        amountCents: true,
+        status: true,
+        createdAt: true,
+      },
     });
+    const byOrder = new Map<string, typeof rows>();
     for (const row of rows) {
+      const group = byOrder.get(row.orderId) ?? [];
+      group.push(row);
+      byOrder.set(row.orderId, group);
+    }
+    for (const orderRows of byOrder.values()) {
+      const succeeded = orderRows
+        .filter((row) => row.status === 'succeeded')
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+      const pending = orderRows
+        .filter((row) => row.status === 'pending')
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+      const row = succeeded ?? pending;
+      if (!row) continue;
       if (!row.providerInstanceId) continue;
       usage.set(
         row.providerInstanceId,
@@ -1062,15 +1346,17 @@ export class PaymentConfigService implements OnModuleInit {
     providerId: string,
     method: VisiblePaymentMethod,
     eligible: Array<{ row: { instanceId: string }; config: ResolvedPaymentConfig }>,
-    advanceCursor: boolean,
-  ): Promise<{ row: { instanceId: string }; config: ResolvedPaymentConfig }> {
+  ): Promise<{
+    selected: { row: { instanceId: string }; config: ResolvedPaymentConfig };
+    snapshot?: ResolvedVisiblePayment['roundRobin'];
+  }> {
     const delegate = (this.prisma as unknown as {
       paymentRoundRobinCursor?: {
         upsert(args: unknown): Promise<{ cursor: number }>;
         updateMany(args: unknown): Promise<{ count: number }>;
       };
     }).paymentRoundRobinCursor;
-    if (!delegate) return eligible[0];
+    if (!delegate) return { selected: eligible[0] };
     let cursor = 0;
     try {
       const row = await delegate.upsert({
@@ -1081,16 +1367,21 @@ export class PaymentConfigService implements OnModuleInit {
       });
       cursor = row.cursor;
       const selected = eligible[cursor % eligible.length];
-      if (advanceCursor) {
-        await delegate.updateMany({
-          where: { providerId, method, cursor },
-          data: { cursor: { increment: 1 } },
-        });
-      }
-      return selected;
+      return {
+        selected,
+        snapshot: {
+          providerId: providerId as PaymentProviderId,
+          method,
+          cursor,
+          eligibleInstances: eligible.map((item) => ({
+            instanceId: item.row.instanceId,
+            config: item.config,
+          })),
+        },
+      };
     } catch (e) {
-      this.logger.warn(`支付轮询游标读取失败，退回首个实例: ${(e as Error).message}`);
-      return eligible[0];
+      this.logger.error(`支付轮询游标读取失败: ${(e as Error).message}`);
+      throw new AppError(50301, '支付负载均衡暂不可用，请稍后重试', 503);
     }
   }
 
@@ -1125,7 +1416,7 @@ export class PaymentConfigService implements OnModuleInit {
     providerId: string,
     methods: VisiblePaymentMethod[],
   ): VisiblePaymentMethod[] {
-    const allowed = this.defaultMethods(providerId);
+    const allowed = defaultPaymentMethods(providerId);
     const unique = [...new Set(methods)].filter((method) => allowed.includes(method));
     if (unique.length === 0 || unique.length !== new Set(methods).size) {
       throw new AppError(40001, `该渠道支持的支付方式为: ${allowed.join(', ')}`, 400);
@@ -1133,11 +1424,6 @@ export class PaymentConfigService implements OnModuleInit {
     return VISIBLE_PAYMENT_METHODS.filter((method) => unique.includes(method));
   }
 
-  private defaultMethods(providerId: string): VisiblePaymentMethod[] {
-    if (providerId === 'alipay') return ['alipay'];
-    if (providerId === 'wechat') return ['wechat'];
-    return ['alipay', 'wechat'];
-  }
 }
 
 function compareInstanceRows(

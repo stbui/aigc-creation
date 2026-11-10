@@ -133,7 +133,7 @@ export function ChannelOrderDialog({
         if (!next && !saving && !loading) onClose();
       }}
       width={640}
-      title={channelId ? `自定义模型排序 · ${channelName ?? ''}` : '调整渠道顺序'}
+      title={channelId ? `自定义商品排序 · ${channelName ?? ''}` : '调整供应商顺序'}
       description="拖拽或用上下箭头调整顺序，也可输入目标位置。这里包含全部条目，不受列表筛选和分页影响。"
       footer={
         <>
@@ -155,7 +155,7 @@ export function ChannelOrderDialog({
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1">
             <SelectField
-              ariaLabel={channelId ? '选择要排序的模型' : '选择要排序的渠道'}
+              ariaLabel={channelId ? '选择要排序的商品' : '选择要排序的供应商'}
               value={targetId}
               onChange={(value) => {
                 setTargetId(value);
@@ -167,7 +167,7 @@ export function ChannelOrderDialog({
                 }
               }}
               options={options}
-              placeholder={channelId ? '搜索并选择模型' : '搜索并选择渠道'}
+              placeholder={channelId ? '搜索并选择商品' : '搜索并选择供应商'}
               disabled={loading || saving || items.length === 0}
               className="w-full"
             />

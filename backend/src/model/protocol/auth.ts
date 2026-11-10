@@ -3,7 +3,7 @@
  *
  * 移植自 open-ai-canvas `internal/app/provider_protocol_auth.go`。清单只能声明
  * 「用哪种鉴权 + 凭据字段」，**签名与凭证注入全部由宿主执行** —— 插件拿不到
- * 明文凭据，也无法自定义签名算法绕过渠道审计。
+ * 明文凭据，也无法自定义签名算法绕过渠道安全校验。
  *
  * 支持的驱动与清单声明一一对应：
  *   none / bearer / header(api-key) / query / basic / anthropic /

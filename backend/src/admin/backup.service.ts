@@ -22,7 +22,6 @@ const FILE_SUFFIX = '.db';
  * 本期只清理「运行痕迹」类数据 —— 它们不影响业务连续性但会无限增长。
  */
 const CLEANUP_TABLES = [
-  'AdminAuditLog',
   'CleanupLog',
   'BackupRecord',
   // 调用记录 (任务 / 中转 / 文本工具共用) 是排障数据, 不承载交易事实,
@@ -214,7 +213,7 @@ export class BackupService {
           (r) => r.name,
         ),
       );
-      const REQUIRED = ['User', 'Project', 'Asset', 'GenerationTask', 'AdminRole', 'AdminAuditLog'];
+      const REQUIRED = ['User', 'Project', 'Asset', 'GenerationTask', 'AdminRole'];
       const missing = REQUIRED.filter((t) => !tables.has(t));
       if (missing.length > 0) {
         integrityOk = false;
@@ -397,21 +396,38 @@ export class BackupService {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        const count = await tx[target as 'AdminAuditLog'].count({ where: { createdAt: { lt: before } } });
-        const del = await tx[target as 'AdminAuditLog'].deleteMany({ where: { createdAt: { lt: before } } });
+        const table = target as (typeof CLEANUP_TABLES)[number];
+        const where = { createdAt: { lt: before } };
+        let count: number;
+        let deleted: number;
+
+        switch (table) {
+          case 'CleanupLog':
+            count = await tx.cleanupLog.count({ where });
+            deleted = (await tx.cleanupLog.deleteMany({ where })).count;
+            break;
+          case 'BackupRecord':
+            count = await tx.backupRecord.count({ where });
+            deleted = (await tx.backupRecord.deleteMany({ where })).count;
+            break;
+          case 'ApiCallLog':
+            count = await tx.apiCallLog.count({ where });
+            deleted = (await tx.apiCallLog.deleteMany({ where })).count;
+            break;
+        }
 
         // 清理自身也要留痕, 但不能清理自己的记录
         await tx.cleanupLog.create({
           data: {
             target,
-            deletedCount: del.count,
+            deletedCount: deleted,
             retentionDays,
             trigger,
             detail: JSON.stringify({ cutoff: before.toISOString(), matched: count }),
             success: true,
           },
         });
-        return { count, deleted: del.count };
+        return { count, deleted };
       });
 
       this.logger.log(`清理 ${target}: 删除 ${result.deleted} 条 (保留 ${retentionDays} 天)`);

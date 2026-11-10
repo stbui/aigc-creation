@@ -4,8 +4,8 @@ import type { PluginView } from '../../../types/model';
 /**
  * 插件的三个写操作确认：启停、上传安装、卸载。
  *
- * 审计原因由页面按操作上下文生成；启停与卸载都会立即影响协议注册表，因此确认框里
- * 直接列出影响面，而不是等用户点完再看后端报错。
+ * 启停与卸载都会立即影响协议注册表，因此确认框里直接列出影响面，而不是等
+ * 用户点完再看后端报错。
  */
 export function TogglePluginConfirm({
   target,
@@ -85,7 +85,7 @@ export function UninstallPluginConfirm({
       description="只会删除上传安装的包；内置插件随代码发布，不能卸载。"
       impact={[
         `该插件当前生效 ${target?.activeProtocols ?? 0} 个协议`,
-        '仍有渠道模型引用这些协议时会被拒绝（先去渠道工作台改协议）',
+        '仍有渠道模型引用这些协议时会被拒绝（先去模型商品改接入方式）',
         '卸载后协议从注册表移除，引用它的模型调用会失败并退款',
       ]}
       danger

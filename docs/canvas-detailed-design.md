@@ -76,7 +76,7 @@ npx prisma migrate deploy                # 之后所有环境
 
 5. 现有 `db push` 流程全部改为 `migrate deploy`：`backend/Dockerfile`、`docker-compose.yml`、`docker-compose.production.yml`、`start.sh`、`scripts/db-reset*`。
 
-**JSON 字段口径**：现有业务表的 JSON 都是 `String`，画布表继续用 `String @db.Text`，不引入 `Json` 类型。理由是：本仓的读写路径、审计与迁移脚本都按字符串处理；混用 `Json` 会让 `Prisma.JsonValue` 与字符串解析在两套类型间来回转换。
+**JSON 字段口径**：现有业务表的 JSON 都是 `String`，画布表继续用 `String @db.Text`，不引入 `Json` 类型。理由是：本仓的读写路径与迁移脚本都按字符串处理；混用 `Json` 会让 `Prisma.JsonValue` 与字符串解析在两套类型间来回转换。
 
 **BigInt**：`CanvasProject.revision` 用 `BigInt`。API 输出前统一 `Number(revision)`；前端类型用 `number`。不要直接把 `BigInt` 交给 `JSON.stringify`——会抛 `Do not know how to serialize a BigInt`。
 
@@ -821,7 +821,7 @@ admission.admit({
 ```
 
 - `before` 里的 `metadata.taskId` 是围栏：只有节点仍指向该任务时才允许回填。用户已经换任务 / 删节点时，迟到回写不会覆盖。
-- 服务端受信任写入（Agent / creation-runs / 修复）走 `TrustedServerMutation` 分支，跳过客户端媒体校验但仍写审计与任务围栏；不能因为「受信任」就跳过 revision CAS。
+- 服务端受信任写入（Agent / creation-runs / 修复）走 `TrustedServerMutation` 分支，跳过客户端媒体校验但仍校验任务围栏；不能因为「受信任」就跳过 revision CAS。
 - 文本结果：当前 `task-worker` 的 `collectReferences` 只收 `images/videos/audios`，`text` 结果没有落盘路径。实施 `canvas_text` 前必须补：
   - `ProtocolResult.text` → `Buffer.from(text, 'utf8')`，`format = 'text/plain; charset=utf-8'`，扩展名 `.txt`；
   - `TaskMediaService.persist` 对 `text/*` 跳过硬编码图片的 AIGC 角标（或写文本侧隐式标识），不能走 Jimp 分支；
@@ -995,7 +995,7 @@ canvasShareRead: 'canvas.share_read',
 - `canvas.read`：画布列表、项目、快照、分享状态只读。
 - `canvas.write`：画布设置、强制下线、清理快照、存储只读开关。
 - `canvas.quota`：配额与保留策略。
-- `canvas.shareRead`：分享链接与访问审计（不返回 token 明文给非所有者角色，除非同时有 `canvas.write`）。
+- `canvas.shareRead`：分享链接与访问控制（不返回 token 明文给非所有者角色，除非同时有 `canvas.write`）。
 
 ### 13.2 页面与菜单
 
@@ -1029,14 +1029,6 @@ canvasShareRead: 'canvas.share_read',
 
 设置值运行时通过 `SettingsService` 读取；不要在画布代码里写死默认值。`SETTING_DEFS` 是唯一事实源，`docs/admin-detailed-design.md` 同批更新（若该文档仍写死列表）。
 
-### 13.4 审计
-
-- `canvas.settings_update`：设置变更，写 `detail`（字段级旧值/新值）。
-- `canvas.project_delete`：后台删除画布，写影响统计。
-- `canvas.snapshot_prune`：清理快照，写数量与释放字节。
-- `canvas.storage_readonly`：切换只读，写原因（如有）。
-- 审计走现有 `AuditInterceptor` + `@Audit()`；不要为画布另写审计表。
-
 ## 14. 安全、限流、可观测与部署
 
 ### 14.1 多租户
@@ -1044,7 +1036,7 @@ canvasShareRead: 'canvas.share_read',
 - 所有画布查询必须带 `ownerId`；`CanvasProject` 的读写按 `(id, ownerId)` 双条件。
 - 关联表（snapshot / share / lease / receipt）即使有 `canvasId`，也要带 `ownerId` 或先校验画布归属；不要只按 `canvasId` 查。
 - 公开分享只走投影；投影不包含 `ownerId`、`storageKey`、任务字段。
-- 后台列表可以跨用户，但必须挂 `canvas.read` 并写审计。
+- 后台列表可以跨用户，但必须挂 `canvas.read`。
 
 ### 14.2 XSS / SVG / HTML
 
@@ -1137,7 +1129,7 @@ canvasShareRead: 'canvas.share_read',
 2. 短剧项目联动、TapNow / LibTV 导入。
 3. 后台画布设置、配额、存储只读。
 
-**闸口**：轮换失效、过期失效、metadata 清洗、Range 请求、XSS 用例、后台审计。
+**闸口**：轮换失效、过期失效、metadata 清洗、Range 请求、XSS 用例、后台权限。
 
 ### 15.7 M6 Agent 与 3D（8–10 周）
 

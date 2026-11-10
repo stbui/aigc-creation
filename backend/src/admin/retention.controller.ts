@@ -1,9 +1,8 @@
 import { Body, Controller, Get, Post, Query } from "@nestjs/common";
 import { Transform, Type } from "class-transformer";
 import { IsIn, IsInt, Max, Min } from "class-validator";
-import { AuditAction, RequirePermission } from "./admin.decorator";
+import { RequirePermission } from "./admin.decorator";
 import { BackupService } from "./backup.service";
-import { AdminSettingsService } from "./settings.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError } from "../common/app.exception";
 import { PERMISSIONS } from "./permissions";
@@ -31,12 +30,6 @@ interface RetentionTarget {
 }
 
 const TARGETS: RetentionTarget[] = [
-  {
-    table: "AdminAuditLog",
-    label: "后台操作审计",
-    defaultDays: 180,
-    note: "合规要求可追溯, 默认保留半年; 实际天数取系统设置 retention.auditLogDays",
-  },
   {
     table: "ApiCallLog",
     label: "调用记录",
@@ -88,7 +81,6 @@ export class AdminRetentionController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly backup: BackupService,
-    private readonly settings: AdminSettingsService,
   ) {}
 
   /**
@@ -100,15 +92,7 @@ export class AdminRetentionController {
   @Get("targets")
   @RequirePermission(PERMISSIONS.backupRead)
   async targets() {
-    const auditDays =
-      Number(await this.settings.get("retention.auditLogDays")) || 180;
-
-    return Promise.all(
-      TARGETS.map(async (t) => {
-        const days = t.table === "AdminAuditLog" ? auditDays : t.defaultDays;
-        return this.previewTarget(t, days);
-      }),
-    );
+    return Promise.all(TARGETS.map((target) => this.previewTarget(target, target.defaultDays)));
   }
 
   /** 确认清理前按用户当前天数重新估算，避免拿页面上过期数字做不可逆操作 */
@@ -142,7 +126,6 @@ export class AdminRetentionController {
    */
   @Post("cleanup")
   @RequirePermission(PERMISSIONS.backupRun)
-  @AuditAction("data.cleanup")
   cleanup(@Body() dto: RetentionCleanupDto) {
     if (!TABLE_NAMES.includes(dto.target)) {
       throw new AppError(40001, `不支持清理该目标: ${dto.target}`, 400);
@@ -175,7 +158,7 @@ export class AdminRetentionController {
   }
 }
 
-/** `AdminAuditLog` → `adminAuditLog`, Prisma 委托名首字母小写 */
+/** Prisma 模型名 → 委托名首字母小写 */
 function delegateName(table: string): string {
   return table.charAt(0).toLowerCase() + table.slice(1);
 }

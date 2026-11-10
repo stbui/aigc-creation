@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -18,10 +19,19 @@ import {
   type ModelDraft,
   type RouteDraft,
 } from './constants';
-import type { AdminLogicalModelView } from '../../../types/model';
+import type { AdminChannelModelListItem, AdminLogicalModelView } from '../../../types/model';
+
+/** 从能力 id + 商品编号生成一个后端能接受的上架编号 */
+function productCode(capability: string, modelKey: string): string {
+  const raw = `${capability}-${modelKey}`
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return (raw || 'model').slice(0, 80);
+}
 
 /**
- * 新建 / 编辑前台模型。
+ * 新建 / 编辑售卖配置。
  *
  * 全量提交：未填字段按默认值落库，保存即生成新 revision 并重建线路。
  * 因此这里不做字段级脏标记，整张表单共用一个 dirty 判定，关闭前统一确认。
@@ -35,6 +45,8 @@ export function ModelFormDrawer({
   writable,
   capabilityOptions,
   channelModelOptions,
+  products,
+  capabilityModalityById,
   canReadChannels,
   canReadPlugins,
   onClose,
@@ -52,6 +64,10 @@ export function ModelFormDrawer({
   writable: boolean;
   capabilityOptions: Array<{ value: string; label: string }>;
   channelModelOptions: Array<{ value: string; label: string }>;
+  /** 商品台账（可用于新建售卖配置时一键带入） */
+  products: AdminChannelModelListItem[];
+  /** 能力 id → 产出模态；用于过滤兼容商品 */
+  capabilityModalityById: Map<string, string>;
   canReadChannels: boolean;
   canReadPlugins: boolean;
   onClose: () => void;
@@ -61,9 +77,50 @@ export function ModelFormDrawer({
   onRemoveRoute: (key: string) => void;
   onSave: () => void;
 }) {
+  const [advancedRoutes, setAdvancedRoutes] = useState(false);
+  const [pickedId, setPickedId] = useState('');
+  const routeGrid = advancedRoutes
+    ? 'grid-cols-[minmax(0,1fr)_72px_72px_96px_32px]'
+    : 'grid-cols-[minmax(0,1fr)_96px_32px]';
   const unavailableReasons = editing
     ? [editing.configurationError, editing.availabilityError].filter(Boolean)
     : [];
+
+  const modality = capabilityModalityById.get(draft.capability) ?? '';
+  const compatibleProducts = useMemo(
+    () =>
+      products.filter(
+        (product) =>
+          (!modality || product.capability === modality) &&
+          product.enabled &&
+          product.channelEnabled &&
+          product.priceConfigured,
+      ),
+    [modality, products],
+  );
+
+  const pickProduct = (id: string) => {
+    const product = compatibleProducts.find((item) => item.id === id);
+    if (!product) return;
+    setPickedId(id);
+    onChange({
+      code: productCode(draft.capability, product.modelKey),
+      name: product.displayName || product.modelKey,
+      icon: product.icon,
+      description: product.description,
+      pricePolicy: 'channel',
+      capabilitySpecText: '',
+      routes: [
+        {
+          key: `picked-${product.id}`,
+          channelModelId: product.id,
+          enabled: true,
+          priority: '100',
+          weight: '100',
+        },
+      ],
+    });
+  };
 
   return (
     <Drawer
@@ -72,7 +129,7 @@ export function ModelFormDrawer({
         if (!next) onClose();
       }}
       width={760}
-      title={editing ? `编辑 · ${editing.name}` : '新建前台模型'}
+      title={editing ? `编辑售卖配置 · ${editing.name}` : '添加模型商品'}
       description={dirty ? '有未保存修改' : undefined}
       footer={
         <>
@@ -92,7 +149,7 @@ export function ModelFormDrawer({
     >
       <div className="flex flex-col gap-4">
         {unavailableReasons.length > 0 && (
-          <Notice tone="warn" title="模型暂不可用">
+          <Notice tone="warn" title="商品暂不可售">
             <ul className="mt-1 list-disc pl-4">
               {unavailableReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
@@ -101,16 +158,49 @@ export function ModelFormDrawer({
           </Notice>
         )}
 
+        {!editing && (
+          <section className="flex flex-col gap-2 rounded-lg border border-brand/20 bg-brand-bg/40 p-3">
+            <div>
+              <div className="text-xs font-semibold text-foreground">从商品台账选择</div>
+              <div className="text-[12px] text-muted-foreground">
+                选择后自动带入名称、上架编号、图标与服务来源；也可继续手动填写。
+              </div>
+            </div>
+            {!draft.capability ? (
+              <p className="text-[12px] text-muted-foreground">
+                先选择「所属能力」，再挑一个兼容的模型商品。
+              </p>
+            ) : compatibleProducts.length === 0 ? (
+              <p className="text-[12px] text-muted-foreground">
+                当前能力没有可售的模型商品；先到「模型商品」接入并定价。
+              </p>
+            ) : (
+              <SelectField
+                ariaLabel="选择模型商品"
+                value={pickedId || undefined}
+                options={compatibleProducts.map((product) => ({
+                  value: product.id,
+                  label: `${product.channelName || product.channelId} / ${
+                    product.displayName || product.modelKey
+                  }`,
+                }))}
+                placeholder="选择模型商品"
+                onChange={(value) => value && pickProduct(value)}
+              />
+            )}
+          </section>
+        )}
+
         <section className="flex flex-col gap-3">
-          <div className="text-xs font-semibold text-foreground">模型信息</div>
+          <div className="text-xs font-semibold text-foreground">售卖信息</div>
           <div className="grid grid-cols-3 gap-3">
             <FormField
-              label="模型编号"
+              label="上架编号"
               required
               hint={editing ? '创建后不可修改' : undefined}
             >
               <TextField
-                ariaLabel="模型编号"
+                ariaLabel="上架编号"
                 value={draft.code}
                 onChange={(value) => onChange({ code: value })}
                 placeholder="例如：ecom-image-pro"
@@ -118,18 +208,18 @@ export function ModelFormDrawer({
                 maxLength={80}
               />
             </FormField>
-            <FormField label="模型名称" required>
+            <FormField label="展示名称" required>
               <TextField
-                ariaLabel="模型名称"
+                ariaLabel="展示名称"
                 value={draft.name}
                 onChange={(value) => onChange({ name: value })}
                 placeholder="例如：电商主图 Pro"
                 maxLength={60}
               />
             </FormField>
-            <FormField label="模型图标">
+            <FormField label="商品图标">
               <TextField
-                ariaLabel="模型图标"
+                ariaLabel="商品图标"
                 value={draft.icon}
                 onChange={(value) => onChange({ icon: value })}
                 placeholder="🎨"
@@ -138,9 +228,9 @@ export function ModelFormDrawer({
             </FormField>
           </div>
 
-          <FormField label="模型描述">
+          <FormField label="商品描述">
             <TextAreaField
-              ariaLabel="模型描述"
+              ariaLabel="商品描述"
               value={draft.description}
               onChange={(value) => onChange({ description: value })}
               rows={2}
@@ -151,7 +241,7 @@ export function ModelFormDrawer({
         </section>
 
         <section className="flex flex-col gap-3">
-          <div className="text-xs font-semibold text-foreground">上架设置</div>
+          <div className="text-xs font-semibold text-foreground">售卖设置</div>
           <div className="grid grid-cols-3 gap-3">
             <FormField label="所属能力" required>
               <SelectField
@@ -170,11 +260,11 @@ export function ModelFormDrawer({
                 onChange={(value) => onChange({ sortOrder: String(value ?? 0) })}
               />
             </FormField>
-            <FormField label="上架状态">
+            <FormField label="售卖状态">
               <div className="flex h-8 items-center">
                 <SwitchField
                   checked={draft.enabled}
-                  label={draft.enabled ? '已上架' : '未上架'}
+                  label={draft.enabled ? '售卖中' : '未售卖'}
                   ariaLabel="上架状态"
                   onChange={(checked) => onChange({ enabled: checked })}
                 />
@@ -184,9 +274,9 @@ export function ModelFormDrawer({
         </section>
 
         <div className="rounded-lg border border-border p-3">
-          <div className="mb-2 text-xs font-semibold text-foreground">价格设置</div>
+          <div className="mb-2 text-xs font-semibold text-foreground">售价设置</div>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="定价方式">
+            <FormField label="价格来源">
               <SelectField
                 ariaLabel="定价方式"
                 value={draft.pricePolicy}
@@ -249,34 +339,44 @@ export function ModelFormDrawer({
         </div>
 
         <div className="rounded-lg border border-border p-3">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold text-foreground">服务来源</div>
+              <div className="text-xs font-semibold text-foreground">模型商品</div>
               <div className="text-[12px] text-muted-foreground">
-                优先顺位数值越小，越先使用；同一顺位按比例分流
+                {advancedRoutes
+                  ? '优先顺位数值越小，越先使用；同一顺位按比例分流'
+                  : '默认一个商品；需要主用 / 备用或分流时再打开高级分流'}
               </div>
             </div>
-            <ActionButton
-              variant="secondary"
-              size="xs"
-              icon={Plus}
-              disabled={!writable}
-              onClick={onAddRoute}
-            >
-              添加服务来源
-            </ActionButton>
+            <div className="flex shrink-0 items-center gap-2">
+              <SwitchField
+                checked={advancedRoutes}
+                label="高级分流"
+                ariaLabel="高级分流"
+                onChange={setAdvancedRoutes}
+              />
+              <ActionButton
+                variant="secondary"
+                size="xs"
+                icon={Plus}
+                disabled={!writable}
+                onClick={onAddRoute}
+              >
+                添加商品
+              </ActionButton>
+            </div>
           </div>
           {channelModelOptions.length === 0 && (
-            <Notice tone="warn" title="没有可选的服务来源" className="mb-2">
-              服务来源来自渠道模型；若尚未配置，先到
+            <Notice tone="warn" title="没有可选的模型商品" className="mb-2">
+              模型商品来自供应商的商品清单；若尚未配置，先到
               {canReadChannels ? (
                 <Link className="mx-1 text-brand hover:underline" to="/admin/channels">
-                  渠道工作台
+                  模型商品
                 </Link>
               ) : (
-                '「渠道工作台」'
+                '「模型商品」'
               )}
-              添加渠道与模型；协议由
+              添加供应商与商品；接入方式由
               {canReadPlugins ? (
                 <Link className="mx-1 text-brand hover:underline" to="/admin/plugins">
                   插件
@@ -290,51 +390,62 @@ export function ModelFormDrawer({
           {draft.routes.length === 0 ? (
             <p className="py-3 text-center text-[12px] text-muted-foreground">
               {channelModelOptions.length === 0
-                ? '没有可选的渠道模型，暂时无法添加服务来源。'
-                : '尚未添加服务来源，模型暂不可用。'}
+                ? '没有可用的模型商品，暂时无法添加。'
+                : '尚未添加模型商品，暂不可售。'}
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              <div className="grid grid-cols-[minmax(0,1fr)_72px_72px_96px_32px] gap-2 px-1 text-[12px] text-muted-foreground">
-                <span>服务来源</span>
-                <span>优先顺位</span>
-                <span>分流比例</span>
+              <div
+                className={`grid ${routeGrid} gap-2 px-1 text-[12px] text-muted-foreground`}
+              >
+                <span>模型商品</span>
+                {advancedRoutes && (
+                  <>
+                    <span>优先顺位</span>
+                    <span>分流比例</span>
+                  </>
+                )}
                 <span>状态</span>
                 <span />
               </div>
               {draft.routes.map((route) => (
-                <div
-                  key={route.key}
-                  className="grid grid-cols-[minmax(0,1fr)_72px_72px_96px_32px] items-end gap-2"
-                >
+                <div key={route.key} className={`grid ${routeGrid} items-end gap-2`}>
                   <SelectField
-                    ariaLabel="服务来源"
+                    ariaLabel="模型商品"
                     value={route.channelModelId || undefined}
                     options={channelModelOptions}
                     onChange={(value) => onUpdateRoute(route.key, { channelModelId: value ?? '' })}
-                    placeholder="选择服务来源"
+                    placeholder="选择模型商品"
                   />
-                  <NumberField
-                    ariaLabel="服务来源优先顺位"
-                    value={Number(route.priority) || 0}
-                    min={0}
-                    onChange={(value) => onUpdateRoute(route.key, { priority: String(value ?? 0) })}
-                  />
-                  <NumberField
-                    ariaLabel="服务来源分流比例"
-                    value={Number(route.weight) || 0}
-                    min={0}
-                    onChange={(value) => onUpdateRoute(route.key, { weight: String(value ?? 0) })}
-                  />
+                  {advancedRoutes && (
+                    <>
+                      <NumberField
+                        ariaLabel="模型商品优先顺位"
+                        value={Number(route.priority) || 0}
+                        min={0}
+                        onChange={(value) =>
+                          onUpdateRoute(route.key, { priority: String(value ?? 0) })
+                        }
+                      />
+                      <NumberField
+                        ariaLabel="模型商品分流比例"
+                        value={Number(route.weight) || 0}
+                        min={0}
+                        onChange={(value) =>
+                          onUpdateRoute(route.key, { weight: String(value ?? 0) })
+                        }
+                      />
+                    </>
+                  )}
                   <SwitchField
                     checked={route.enabled}
                     label={route.enabled ? '已启用' : '已停用'}
-                    ariaLabel="服务来源状态"
+                    ariaLabel="模型商品状态"
                     onChange={(checked) => onUpdateRoute(route.key, { enabled: checked })}
                   />
                   <IconButton
                     icon={Trash2}
-                    label="删除服务来源"
+                    label="删除模型商品"
                     size="xs"
                     onClick={() => onRemoveRoute(route.key)}
                   />
@@ -347,7 +458,7 @@ export function ModelFormDrawer({
         {editing && (
           <details className="rounded-lg border border-border p-3">
             <summary className="cursor-pointer text-xs font-semibold text-foreground">
-              更多设置
+              高级（一般无需修改）
             </summary>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <FormField label="能力范围" hint="限制可提供的服务与规格">

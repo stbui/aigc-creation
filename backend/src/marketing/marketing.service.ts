@@ -1601,6 +1601,48 @@ export class MarketingService {
     return result;
   }
 
+  /**
+   * 补偿注册邀请奖励。
+   *
+   * 绑定关系与发奖之间存在进程崩溃/瞬时数据库故障窗口：关系已经 pending，
+   * 但立即发放没有成功。调度器定期捞出 pending 关系并复用 grantInviteReward
+   * 的 pending → granted CAS，已发放的不会被重复处理。
+   */
+  async retryPendingRegisterRewards(
+    limit = 100,
+  ): Promise<{ attempted: number; granted: number; failed: number }> {
+    const rule = await this.getInviteRule();
+    if (!rule.configured || !rule.valid || rule.triggerOn !== 'register') {
+      return { attempted: 0, granted: 0, failed: 0 };
+    }
+
+    const take = Math.min(Math.max(Math.floor(Number(limit) || 100), 1), 500);
+    const pending = await this.prisma.inviteRelation.findMany({
+      where: { rewardStatus: 'pending' },
+      select: { id: true },
+      orderBy: { boundAt: 'asc' },
+      take,
+    });
+
+    let granted = 0;
+    let failed = 0;
+    for (const relation of pending) {
+      try {
+        const result = await this.grantInviteReward(relation.id);
+        if (result.granted) granted += 1;
+      } catch (error) {
+        failed += 1;
+        this.log.warn(
+          `邀请奖励补发失败 relation=${relation.id}: ${(error as Error).message}`,
+        );
+      }
+    }
+    if (granted > 0 || failed > 0) {
+      this.log.log(`邀请奖励补发: 待处理 ${pending.length}, 成功 ${granted}, 失败 ${failed}`);
+    }
+    return { attempted: pending.length, granted, failed };
+  }
+
   /** 支付成功后触发: 首次付费的被邀请人, 关系转granted */
   async onOrderPaid(userId: string): Promise<void> {
     const relation = await this.prisma.inviteRelation.findUnique({

@@ -240,18 +240,18 @@ function phoneTail() {
   const replay = await call('POST', '/auth/sms/login', null, { phone, code: loginCode });
   check('验证码不能重复使用', replay.status === 400, `status=${replay.status}`);
 
-  console.log('\n【登录审计】');
+  console.log('\n【登录记录】');
   const failed = await prisma.loginLog.findFirst({
     where: { email, success: false },
     orderBy: { createdAt: 'desc' },
   });
-  check('失败登录已落审计', Boolean(failed), failed ? failed.reason : '无记录');
+  check('失败登录已记录', Boolean(failed), failed ? failed.reason : '无记录');
 
   const okLog = await prisma.loginLog.findFirst({
     where: { email, success: true },
     orderBy: { createdAt: 'desc' },
   });
-  check('成功登录已落审计', Boolean(okLog), okLog ? okLog.reason : '无记录');
+  check('成功登录已记录', Boolean(okLog), okLog ? okLog.reason : '无记录');
 
   const smsLog = await prisma.loginLog.findFirst({
     where: { userId: phoneUser?.id, success: true, reason: 'sms' },

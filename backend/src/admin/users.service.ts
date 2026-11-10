@@ -714,7 +714,7 @@ export class AdminUsersService {
     return {
       id,
       email: user.email,
-      // 明文只在这里出现一次, 不入库、不落盘、不入审计
+      // 明文只在这里出现一次, 不入库、不落盘、不写日志
       tempPassword: password,
       mustChangePassword: true,
       expiresAt,
@@ -900,7 +900,7 @@ export class AdminUsersService {
         await tx.loginSession.deleteMany({ where: { userId: id } });
         await tx.notification.deleteMany({ where: { userId: id } });
         // 账号安全域的子表: 令牌 / OAuth 身份 / 插件状态随人走;
-        // 登录、同意与上游调用审计断开关联但**保留**记录，避免删除后失去举证链。
+        // 登录、同意与上游调用记录断开关联但**保留**数据，避免删除后失去举证链。
         await tx.accountToken.deleteMany({ where: { userId: id } });
         await tx.oAuthIdentity.deleteMany({ where: { userId: id } });
         await tx.userPluginState.deleteMany({ where: { userId: id } });

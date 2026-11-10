@@ -63,7 +63,7 @@ Product (SKU) ──下单──> Order ──支付──> Payment ──回调
 - 跨批次扣减，余额不足**整体回滚**并报 `40002`（前端按 402 语义处理）。
 - 并发用条件更新 `updateMany({ where: { availableMicrocredits: { gte: amount } } })`，不引入行锁：自研 adapter 只支持 SERIALIZABLE，SQLite 本身单写者。
 - 每次变动写 `availableAfter` / `reservedAfter`，流水可独立还原任意时刻余额。
-- 人工增减**备注可选**（填写时落进流水 `note`，留空时写系统说明），落 `admin_adjust` 并由审计自动记录操作人与动作。
+- 人工增减**备注可选**（填写时落进流水 `note`，留空时写系统说明），落 `admin_adjust`。
 - 批量调整 / CSV 导入**必须带幂等键**，键内包含行号：同一批重试不会二次发放。
 
 ### 2.3 到期回收
@@ -132,7 +132,7 @@ PaymentsService（编排）
 
 `ackSuccess` 与 `ok` 语义不同：非成功交易状态也回执成功，以停止渠道重试。
 
-原始报文存 `Payment.rawPayload`：对账申诉时这是唯一能自证的凭据，只落库，不进审计与接口响应。
+原始报文存 `Payment.rawPayload`：对账申诉时这是唯一能自证的凭据，只落库，不进入接口响应。
 
 ### 5.3 通道状态
 
@@ -153,23 +153,33 @@ PaymentsService（编排）
 
 1. 退款事务先对订单执行 no-op 条件更新取得行锁，再重读最新订单、成功支付、成功退款记录与累计退款金额；金额/时间窗/比例/积分规则必须在锁内完整重跑，事务外首轮校验只用于快速失败。
 2. 校验通过后落 `Refund(status='processing')`，用它的 id 作渠道幂等键 `outRefundNo`。已有 `processing` 退款时必须在同一锁内拒绝第二笔；失败退款单复用也必须以 `status='failed'` 条件更新，抢不到即返回 409。
-3. 调渠道：失败置 `failed` 并抛 `50302`，**订单状态与积分都不变**。渠道结果未知时同金额重试复用原退款号；运营已在渠道后台确认失败的单是明确终态，重试必须新建退款单。
+3. 调渠道：失败置 `failed` 并抛 `50302`，**订单状态与积分都不变**。失败结果必须写入资金语义 `failureKind`：
+   - `definitive`：渠道已明确拒绝，本次没有退款；修正原因后可新建退款单号重试。
+   - `unknown`：网络中断、超时、响应无法验签/解析等，不能确认渠道是否已受理；必须复用原退款单号重试或到商户后台核对，禁止直接换号造成第二笔退款。
+   历史失败退款没有 `failureKind` 时按 `unknown` 处理。运营在渠道后台人工核销为失败时，才把该退款单视为明确终态，后续重试生成新退款单号。
 4. 渠道成功才按**累计退款比例**回收积分、迁移订单状态、累加 `refundedCents`；渠道调用必须使用锁内重新查出的实际成功 `Payment.channel/providerConfigId`。
    第 N 笔退款的回收目标为 `floor(本单发放积分 × 累计已退金额 / 实付金额)`，
    再减去此前退款单已经记录的“已回收 + 无法回收”份额。这样多次部分退款不会在首笔
    就扣完整单积分，也不会在后续退款重复或漏扣；最后一笔退完时累计份额恰好等于发放量。
 
-微信返回 `PROCESSING` 时保持 `processing`，本地账不动，需人工到商户后台确认。`channel='manual'`（后台标记已支付）不调渠道。
+微信返回 `PROCESSING` 时保持 `processing`，本地账不动，需人工到商户后台确认。`channel='manual'`（后台标记已支付）没有真实渠道资金，禁止走原路退款，只能线下退款并登记凭证。
+
+自动退款只用于「订单已取消、但渠道仍确认扣款」且能精确匹配本订单成功支付流水的异常单。自动退款成功后只把异常单置为 `refunded`，**不得修改已取消订单状态，也不得回收或恢复积分**。渠道结果未知时保留原退款号等待同号重试；运营到渠道后台确认后，通过异常单人工核销成功或失败，同样不触碰订单与积分。
 
 **绝不允许「只改库、假装退过钱」。**
 
 ### 6.3 回收积分的两种缺口
 
-`Refund.creditsReclaimed` 记录实际扣回数，`creditsUnreclaimable` 记录因已消耗而扣不回的数量。后者必须如实记录，否则对账会以为系统丢了积分。
+`Refund.creditsReclaimed` 记录实际扣回数，`creditsUnreclaimable` 记录因已消耗而扣不回的
+数量，`creditsExpired` 记录本单积分已过期且未被使用的数量。后两者都必须如实记录：
+前者证明积分由用户消费，后者证明积分已按到期规则作废；混在一起会让对账和客服
+误判用户是否真的用掉了积分。累计退款份额始终为
+`creditsReclaimed + creditsUnreclaimable + creditsExpired`。
 
-退款只回收**本订单产生的积分批次**，按本单批次到期时间 FEFO 扣减；本单批次不足时，
-缺口记入 `creditsUnreclaimable`，不能转而扣用户其它订单的积分。否则一笔退款会实际
-没收另一笔仍有效的付费权益。`refund.allowConsumedTask=false` 时，`40907` 检查的是
+退款只回收**本订单产生的未过期积分批次**，按本单批次到期时间 FEFO 扣减；本单未过期
+批次不足时，先把仍有剩余量的过期批次份额记入 `creditsExpired`，剩余缺口才记入
+`creditsUnreclaimable`，且不能转而扣用户其它订单的积分。否则一笔退款会实际没收
+另一笔仍有效的付费权益。`refund.allowConsumedTask=false` 时，`40907` 检查的是
 **本次退款按累计比例应回收份额**，不是整单发放量：部分退款只要本单剩余批次覆盖本次
 份额即可通过，后续退款再按同一累计口径计算。
 
@@ -177,7 +187,7 @@ PaymentsService（编排）
 退未来一期不影响当前周期；退当前有效一期会立即结束当下权益，但仍保留之后
 已经付费的周期；没有当前或未来周期后才整条失效。只有**实际终止当前有效会员**
 时响应 `membershipTerminated=true`。订单上的 `membershipPeriodStartAt/EndAt` 保存
-不可覆盖的周期快照，`membershipPeriodRevokedAt` 保存退款审计边界。
+不可覆盖的周期快照，`membershipPeriodRevokedAt` 保存退款核验边界。
 
 ### 6.4 退款与发票联动
 
@@ -218,7 +228,7 @@ PaymentsService（编排）
 
 ### 9.1 发票
 
-同一订单保留完整申请历史，但同一时刻最多一张有效票（`activeOrderId @unique`，`pending / issued / red_flushed` 占用，驳回后释放）。金额取申请时 `paidCents - refundedCents` 快照；输出可打印 HTML，零 PDF 依赖。开具自动写审计；驳回要求填写原因，原因会回显给用户并写入审计。冲红只登记台账并保留原件。
+同一订单保留完整申请历史，但同一时刻最多一张有效票（`activeOrderId @unique`，`pending / issued / red_flushed` 占用，驳回后释放）。金额取申请时 `paidCents - refundedCents` 快照；输出可打印 HTML，零 PDF 依赖。开具记录业务状态；驳回要求填写原因，原因会回显给用户并保存在发票记录中。冲红只登记台账并保留原件。
 
 ### 9.2 对账
 
@@ -272,7 +282,7 @@ PaymentsService（编排）
 
 ### 11.2 后台
 
-见 `docs/admin-detailed-design.md` §9–§13。统一约束：退款、人工调价、积分调整、发票开具、会员套餐变更属高危动作，自动写审计。
+见 `docs/admin-detailed-design.md` §9–§13。统一约束：退款、人工调价、积分调整、发票开具、会员套餐变更属高危动作，须二次确认；原因按真实业务语义收集。
 
 积分相关端点：
 
@@ -283,7 +293,7 @@ PaymentsService（编排）
 | GET | `/admin/credits/audit` | `credit.read` | **账实核对**（只读） |
 | GET | `/admin/credits/:userId/lots` | `credit.read` | 批次明细 |
 | GET | `/admin/credits/:userId/ledger` | `credit.read` | 流水 |
-| POST | `/admin/credits/adjust` | `credit.adjust` | 单条调整，`reason` 可选，审计自动留痕 |
+| POST | `/admin/credits/adjust` | `credit.adjust` | 单条调整，`reason` 可选 |
 | POST | `/admin/credits/batch-adjust` | `credit.adjust` | 批量调整，`reason` 可选 + 建议 `idempotencyKey` |
 | POST | `/admin/credits/import` | `credit.adjust` | CSV 导入，`importKey` 幂等 |
 

@@ -311,5 +311,11 @@
   },
   "copyAddressFailed": {
     "message": "無法複製圖片網址"
+  },
+  "extensionReloadRequiredTitle": {
+    "message": "擴充功能已更新"
+  },
+  "extensionReloadRequiredMessage": {
+    "message": "請重新整理目前頁面後再試一次。"
   }
 }

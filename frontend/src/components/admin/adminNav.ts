@@ -26,7 +26,6 @@ import {
   Puzzle,
   ReceiptText,
   Scale,
-  ScrollText,
   Settings,
   Share2,
   ShieldCheck,
@@ -110,7 +109,7 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
       // 供应侧 → 产品侧 → 协议 → 能力与模型 → 人群 → 排障
       {
         path: "/admin/channels",
-        label: "渠道工作台",
+        label: "模型商品",
         icon: Network,
         permission: "channel.read",
       },
@@ -267,12 +266,6 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         label: "定时任务",
         icon: Clock,
         permission: "setting.read",
-      },
-      {
-        path: "/admin/audit-logs",
-        label: "操作审计",
-        icon: ScrollText,
-        permission: "audit.read",
       },
     ],
   },

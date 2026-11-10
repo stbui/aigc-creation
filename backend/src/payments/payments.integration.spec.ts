@@ -1059,7 +1059,11 @@ describe('支付 HTTP 集成', () => {
     const order = await paidOrder('refund-channel-failed-retry');
     paymentGateway.refund.mockClear();
     paymentGateway.refund
-      .mockResolvedValueOnce({ state: 'failed', error: '模拟渠道网络超时' })
+      .mockResolvedValueOnce({
+        state: 'failed',
+        failureKind: 'unknown',
+        error: '模拟渠道网络超时',
+      })
       .mockResolvedValue({ state: 'succeeded' });
 
     try {
@@ -1078,7 +1082,10 @@ describe('支付 HTTP 集成', () => {
         where: { orderId: order.id },
       });
       expect(failed.status).toBe('failed');
-      expect(JSON.parse(failed.detail)).toMatchObject({ error: '模拟渠道网络超时' });
+      expect(JSON.parse(failed.detail)).toMatchObject({
+        failureKind: 'unknown',
+        error: '模拟渠道网络超时',
+      });
 
       const retried = await api(
         'post',
@@ -1285,7 +1292,100 @@ describe('支付 HTTP 集成', () => {
     }
   });
 
-  it('权限与 DTO：普通用户 403，审计原因不属于商品契约', async () => {
+  it('实例每日限额：并发发起支付最多只有一笔能占用额度', async () => {
+    const created = await api(
+      'post',
+      '/api/v1/admin/payments/providers/epay/instances',
+      adminToken,
+    ).send({
+      name: `并发限额实例 ${run}`,
+      values: { apiBase: EPAY_API_BASE, mchId: EPAY_MCH_ID, key: EPAY_KEY },
+      closeAfterMinutes: 30,
+      dailyLimitCents: 1000,
+      paymentMethods: ['alipay'],
+    });
+    expect(created.status).toBe(201);
+    const instanceId = created.body.data.instance.instanceId as string;
+
+    try {
+      const disableDefault = await api(
+        'put',
+        '/api/v1/admin/payments/providers/epay/instances/default/config',
+        adminToken,
+      ).send({
+        enabled: false,
+        closeAfterMinutes: 30,
+        values: { apiBase: EPAY_API_BASE, mchId: EPAY_MCH_ID, key: EPAY_KEY },
+        paymentMethods: ['alipay', 'wechat'],
+      });
+      expect(disableDefault.status).toBe(200);
+
+      const enableLimited = await api(
+        'put',
+        `/api/v1/admin/payments/providers/epay/instances/${instanceId}/config`,
+        adminToken,
+      ).send({
+        enabled: true,
+        closeAfterMinutes: 30,
+        values: { apiBase: EPAY_API_BASE, mchId: EPAY_MCH_ID, key: EPAY_KEY },
+        dailyLimitCents: 1000,
+        paymentMethods: ['alipay'],
+      });
+      expect(enableLimited.status).toBe(200);
+
+      const orders = await Promise.all([
+        createOrder(`daily-limit-a-${run}`),
+        createOrder(`daily-limit-b-${run}`),
+      ]);
+      const responses = await Promise.all(
+        orders.map((order) =>
+          api('post', `/api/v1/payments/${order.id}/intent`, userToken).send({
+            providerId: 'alipay',
+          }),
+        ),
+      );
+
+      expect(responses.filter((res) => res.status === 201)).toHaveLength(1);
+      expect(
+        responses.filter(
+          (res) => res.status === 503 && /每日限额/.test(res.body.message),
+        ),
+      ).toHaveLength(1);
+      expect(
+        await prisma.payment.count({
+          where: { providerInstanceId: instanceId, status: 'pending' },
+        }),
+      ).toBe(1);
+
+      for (const order of orders) {
+        await api('post', `/api/v1/orders/${order.id}/cancel`, userToken);
+      }
+    } finally {
+      await api(
+        'put',
+        `/api/v1/admin/payments/providers/epay/instances/${instanceId}/config`,
+        adminToken,
+      ).send({
+        enabled: false,
+        closeAfterMinutes: 30,
+        values: { apiBase: EPAY_API_BASE, mchId: EPAY_MCH_ID, key: EPAY_KEY },
+        dailyLimitCents: 1000,
+        paymentMethods: ['alipay'],
+      });
+      await api(
+        'put',
+        '/api/v1/admin/payments/providers/epay/instances/default/config',
+        adminToken,
+      ).send({
+        enabled: true,
+        closeAfterMinutes: 30,
+        values: { apiBase: EPAY_API_BASE, mchId: EPAY_MCH_ID, key: EPAY_KEY },
+        paymentMethods: ['alipay', 'wechat'],
+      });
+    }
+  });
+
+  it('权限与 DTO：普通用户 403，商品创建不需要额外原因', async () => {
     const forbidden = await api('get', '/api/v1/admin/payments/providers', userToken);
     expect(forbidden.status).toBe(403);
 
@@ -1296,7 +1396,7 @@ describe('支付 HTTP 集成', () => {
     // 商品已并入「商品管理」（`/admin/products`），支付域不再有独立商品接口
     const created = await api('post', '/api/v1/admin/products', adminToken).send({
       sku: `IT-NOAUDIT-${run}`,
-      name: '无需审计原因商品',
+      name: '普通商品',
       currency: 'CNY',
       priceCents: 100,
       credits: 10,

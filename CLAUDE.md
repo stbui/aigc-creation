@@ -2,8 +2,7 @@
 
 本文件是 Claude Code 在本仓库的作业上下文。定位：**坐标 + 硬约束 + 踩坑**；实现细节指路到代码与 `docs/`，不在此复述。
 
-三句话记住这个仓库：
-
+**三句话记住这个仓库**：
 1. 模型调用只有 `backend/src/model/**` 一条链路。
 2. 能力清单只在 `capabilities/definitions/` 定义。
 3. 后台组件只有 shadcn 一套，页面只从 `admin-ui/primitives` 取件。
@@ -20,7 +19,7 @@
 | 权限点 | `backend/src/admin/permissions.ts` |
 | 退款与站点设置默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
-| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（运行时生效 **107 个包 / 115 个 provider**；目录共 110 个，另 3 个 `src-*` 源目录镜像 —— `src-a6api` / `src-antigravity-proxy` / `src-metaso-h3` 由 `plugin-manifest.store.ts` 跳过，不计入可用包）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
+| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
 | 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「能力与模型」「用户分组」）—— 代码里没有默认线路表 |
 | 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
@@ -34,10 +33,10 @@
 
 | 数字 | 事实源 | 易错排除项 |
 | --- | --- | --- |
-| 107 包 / 115 provider | `backend/plugins/*/manifest.json` 的 `contributes.providers` | 3 个 `src-*` 镜像目录由 `plugin-manifest.store.ts` 跳过；含它们的目录总数是 110 / 119 |
-| 17 能力 / 13 进工作台 / 16 image + 1 video | `definitions/index.ts` 的 `CAPABILITY_PLUGINS` | `*.spec.ts`、`*-options.ts`、`*.templates.ts` 同目录但不是能力定义 |
-| 32 页 / 8 分组 | `adminNav.ts` 的 `ADMIN_MENU` | `AdminShell.tsx`、`dashboard/AdminDashboardContent.tsx`、`__tests__/` 不算菜单页 |
-| 30 条壳内路由 | `App.tsx` 的 `Shell()` 内 `<Routes>` | catch-all 与另两组 `<Routes>`（3 条裸外壳页 / 6 条独立页）不计入 |
+| 107 包 / 115 provider | `backend/plugins/*/manifest.json` 的 `contributes.providers` | 3 个 `src-*` 镜像目录由 `plugin-manifest.store.ts` 跳过（`src-a6api` / `src-antigravity-proxy` / `src-metaso-h3`），不计入可用包；含它们的目录总数是 110 / 119 |
+| 18 能力 / 14 进工作台 / 17 image + 1 video | `definitions/index.ts` 的 `CAPABILITY_PLUGINS` | `*.spec.ts`、`*-options.ts`、`*.templates.ts` 同目录但不是能力定义 |
+| 31 页 / 8 分组 | `adminNav.ts` 的 `ADMIN_MENU` | `AdminShell.tsx`、`dashboard/AdminDashboardContent.tsx`、`__tests__/` 不算菜单页 |
+| 34 条壳内路由 | `App.tsx` 的 `Shell()` 内 `<Routes>` | catch-all 与另两组 `<Routes>`（3 条裸外壳页 / 6 条独立页）不计入 |
 
 ## 账号
 
@@ -60,9 +59,9 @@
 
 当前形态 = **C 端创作站 + 独立后台管理端 + 商业运营域 + 账户合规/服务域**：
 
-- **17 项能力**（全部 `real`，0 `mock` / 0 `planned`；16 项 image + 1 项 video；13 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
+- **C 端创作站**：18 项能力（全部 `real`；17 image + 1 video；14 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
 - **生成通道**：唯一链路是 `src/model/**` —— 渠道 → 渠道模型 → 前台模型 revision/线路 → 路由/冷却 → 任务执行 → 账单。建任务必带 `logicalModelId`（来自 `GET /models`）；协议来自 `plugins/` 内置插件清单，代码里没有手写协议实现。旧三层（`src/providers/**`、`GATEWAY_*`、`ModelCallLog`、`/admin/model-config`）已整体删除，**不存在并存期**。
-- **后台管理端**（`/admin`）32 个页面、8 个侧栏分组，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
+- **后台管理端**（`/admin`）：31 个页面、8 个侧栏分组，权限点 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 支付对账。
 - **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单、后台全局搜索、批量动作与 CSV 导入导出。
@@ -131,9 +130,9 @@ aigc-creation/
 │       ├── model/            # 模型层唯一实现：channels / catalog / routing / intent / protocol
 │       │                     # tasks / billing / user-groups / plugins / proxy / media
 │       ├── generate/         # 建任务入口（controller + DTO）+ 任务查询，实现落在 model/tasks
-│       ├── admin/            # 后台：guards / 权限点 / 审计 / 调度 / 备份 / 各管理 controller
+│       ├── admin/            # 后台：guards / 权限点 / 调度 / 备份 / 各管理 controller
 │       ├── payments/         # 支付三层：沙箱 / 支付宝 RSA2 / 微信 v3 + 回调
-│       ├── account/ legal/ aigc-label/ notifications/ tickets/ channels/ health/
+│       ├── account/ legal/ aigc-label/ notifications/ channels/ health/
 │       │                     # ↑ channels 是通知出口（sms / email），不是模型渠道
 │       ├── auth/ projects/ assets/ stats/ storage/ invoices/ prompt-tools/ mobile-upload/
 │       └── credits/ orders/ membership/ marketing/ products/
@@ -142,11 +141,11 @@ aigc-creation/
     ├── nginx.conf.template   # SPA 回退 + /api 反代 + /uploads 直出（envsubst 模板）
     ├── .env.development / .env.test / .env.production.example
     └── src/
-        ├── App.tsx           # 30 条壳内路由（两组别名：/asset-library→/library、/my-works→/works）+ 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
+        ├── App.tsx           # 34 条壳内路由（两组别名：/asset-library→/library、/my-works→/works）+ 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
         ├── admin-ui/         # 后台 UI：components/ui（shadcn 原子件）· primitives（页面唯一取用层）· shell · providers · hooks · lib
         ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
         ├── pages/            # 15 个单文件页面（登录 / 工作台 / 订单 / 工单 / 工具页 / 法务 …）
-        │   ├── admin/        # 后台 32 页：按域目录组织，含 AdminDashboardPage.tsx
+        │   ├── admin/        # 后台 31 页：按域目录组织，含 AdminDashboardPage.tsx
         │   └── <域>/          # 21 个 C 端域目录，按 index / page / components / api / hooks / utils / constants 分层
         │                     #   product-kit / shoppable-carousel / product-detail / viral-clone / library / account …
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / money / poll / zip
@@ -209,7 +208,7 @@ npm run e2e                 # Playwright
 **一次提交出 N 张 → 声明 `outputPlan`，由准入层拆任务**：不声明 = 一次生成一张。声明后 `model/tasks/task-admission.service.ts` 按返回值把一次提交拆成 N 个独立任务，**每张各建一张账单、各扣一份 `creditCost`**，失败 / 取消各自按账单退款，共享 `batchId / batchIndex / batchSize`，前端按批次聚合成「一次生成」。当前 `detail_image`（按勾选模块数）与 `shoppable_carousel`（按张数 6–10）用到。一个任务只调一次上游、产不出不同版式 —— 要多样版式必须拆任务，不要试图用提示词拼多图。
 
 - `mode`（实现程度）：`real` 已接真实模型；`mock` / `planned` 保留枚举但当前 0 项。
-- `modality`（产出介质），与 `mode` 正交：当前 **16 项 `image` + 1 项 `video`**（合计 17）；`text` 用于提示词工具等非能力项。
+- `modality`（产出介质），与 `mode` 正交：当前 **17 项 `image` + 1 项 `video`**（合计 18）；`text` 用于提示词工具等非能力项。
 - 新任务 `status` 初值 `queued`；单次实际线路以任务快照的 `routeId` / `channelModelId` 为准。
 - 新增能力时按实际实现程度声明 `mode`：未实现写 `planned`，不得补本地占位或伪模型结果。
 
@@ -233,7 +232,7 @@ npm run e2e                 # Playwright
 > 完整分层、请求时序、选路规则、失败语义、计费口径见 **`docs/model-architecture.md`**；
 > 设计动机见 `docs/channel-model-design.md`。本节只留必须记住的约束。
 
-**四张表就是四个事实源**：`ModelChannel`（渠道，凭证加密）→ `ChannelModel` + `ChannelModelPriceTier`（供应侧线路 + 价格档）→ `LogicalModel` + `LogicalModelRevision` + `LogicalModelRoute`（C 端可见身份 + 发布快照 + 线路）。**代码里没有任何内置线路**，零配置 = 能力 `unavailable`。
+**四张表就是四个事实源**：`ModelChannel`（渠道，凭证加密）→ `ChannelModel` + `ChannelModelPriceTier`（供应侧线路 + 模型价格档）→ `LogicalModel` + `LogicalModelRevision` + `LogicalModelRoute`（C 端可见身份 + 发布快照 + 线路）。**代码里没有任何内置线路**，零配置 = 能力 `unavailable`。
 
 **命名空间必须分清**：`ChannelModel.capability` 是供应侧模态（`image/text/video/audio`）；`LogicalModel.capability` 是 C 端能力 id（`free_create` / `expand` / …）。混用表现为「有这个能力的模型，但模型不可用」。
 
@@ -262,7 +261,7 @@ npm run e2e                 # Playwright
 ### 计费与钱包
 
 - **建任务 + 建单 + 预留同一事务**：先建任务后预留失败会留下永远不结算的账单与「排队但无账单」的任务。扣费在**建任务时**，任务快照 `creditCost` 与账单金额同源。
-- 已结算账单不许自动退款、已退款账单不许再结算。**`uncertain` 只能人工 `settle` / `refund`**，必须填原因并写审计。
+- 已结算账单不许自动退款、已退款账单不许再结算。**`uncertain` 只能人工 `settle` / `refund`**，必须填原因。
 - Token 结算以上游 usage 为准；上游没给用量时，视频按提交时的公式快照，其余显式失败转人工 —— **绝不按预授权金额静默结清**。
 - `CreditAccount.available == Σ CreditLot.remaining` 恒成立；退款按 `CreditReservationItem` **原路**退回原批次（保留原到期时间），不造新批次。
 - 用户分组倍率与货币换算在同一处折算，**目录展示价与账单必须用同一组因子**。
@@ -290,18 +289,18 @@ npm run e2e                 # Playwright
 
 独立外壳（`AdminShell` 鉴权链 + `admin-ui/shell/AdminBoardLayout`），与 C 端 `AppLayout` 完全分离：C 端侧栏/顶导/促销条都是消费级语义，不能复用。
 
-**权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落 `AdminAuditLog`）。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
+**权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-32 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
+31 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
-- 高危动作一律写审计（`HIGH_RISK_PERMISSIONS`）；退款、手动调整积分、权限与系统设置、调价等确有业务依据要求的动作再要求填写原因。删除渠道 / 渠道模型只保留业务影响确认，不要求原因，审计仍记录操作人、动作与结果。
+- 退款、手动调整积分、权限与系统设置、调价等确有业务依据要求的动作需填写原因；删除渠道 / 渠道模型只保留业务影响确认，不要求原因。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
 - CSV 统一走 `common/csv.ts`（BOM + RFC4180 + 公式注入前导 `'`）；前端 `downloadCsv()` 不走 JSON 信封。
 - **后台组件是一套 shadcn**（2026-11-02 推倒重建：旧组件套件 / kit / 转发层全部删除，无并存、无开关、无回滚）。
   - **底座是 radix（`radix-ui` 统一包 1.8.1），官方 `new-york` 风格**。`frontend/components.json` 决定底座与别名：`style: "new-york"`、`ui → ~/admin-ui/components/ui`、`utils → ~/admin-ui/lib/cn`。`shadcn add` 会连同底座一起装；**不要引回 `@base-ui/react`**。
   - 组合写法是 radix 的 `asChild`（不是 Base UI 的 `render={<button/>}`）。Base UI 专属的 `indeterminate: boolean` / TooltipProvider `delay` / 无 `PopoverAnchor` 等差异已不适用。
   - **类名合并只走 `admin-ui/lib/cn.ts`**：实现是官方 npm 包 `cn` 的 `createCn`，在默认合并表上补登本项目 `@theme` 自造 token（`shadow-card`、`brand` / `success-*` / `warn-*` / `danger-*` 颜色组）。改 `styles/admin.css` 的 `@theme inline` 时必须同步补登，否则 `shadow-none` 盖不掉 `shadow-card`。`shadcn add` 之后必须跑 `scripts/post-shadcn.mjs`，它统一把组件的 `import { cn } from 'cn'` 改写成本文件。
-  - **页面只从 `admin-ui/primitives` 取件**（barrel：`primitives/index.ts`），不直连 `components/ui`。原子件（`components/ui/*`）只被 primitives 引用。
+  - **页面只从 `admin-ui/primitives` 取件**（barrel：`primitives/index.ts`），不直连 `components/ui`。原子件（`components/ui/*` 只被 primitives 引用）。
   - **没有转发层**：`admin-ui/shadcn`、`admin-ui/controls`、`admin-ui/widgets`、`admin-ui/primitives/DataTable|Dialog`、`components/admin/PageHeader|AdminWidgets` 均已删除。新增控件按用途落进 `primitives/layout|form|display|table|overlay|fields`，再从 barrel 导出。
   - 颜色仍只在一处定义：`styles/global.css` 的 `:root` 是令牌源，`styles/admin.css` 的 `@theme inline` 把 shadcn 语义变量（`--background` / `--primary` / `--ring` …）桥接到那些令牌；改品牌色不改 shadcn 侧。页面只写 shadcn 类（`bg-card` / `text-muted-foreground` / `border-border` / `bg-accent` / `text-brand` / `bg-warn-soft`），旧套件那套 `text-text-tertiary` / `border-border-table` 词汇已随 vendor 一并删除。
   - Tailwind 只引 `theme.css` + `utilities.css`，**没有 preflight**：裸 `border` 会退回 `currentColor`，故兜底写在 `styles/admin.css` 的 `@layer base`（unlayered 规则会压过所有 `@layer`，`border-transparent` 就失效）。
@@ -408,7 +407,7 @@ npm run e2e                 # Playwright
 
 ## 文档索引
 
-文档分五类（需求 / 产品 / 技术 / 测试 / 规划；下表「流程」在 `docs/README.md` 归技术类），**分类地图与命名放置规范见 `docs/README.md`**。标记：**现行** = 与代码同步维护；**规划** = 未实施，不得写成现状。`docs/` 下另有 `e2e-failures-2026-11-04.md` / `frontend-slim-audit.md` 两份一次性审计报告（过程产物，按 `docs/README.md` §6.2 不属分类文档），**不得当作现行事实源**。
+文档分五类（需求 / 产品 / 技术 / 测试 / 规划；下表「流程」在 `docs/README.md` 归技术类），**分类地图与命名放置规范见 `docs/README.md`**。标记：**现行** = 与代码同步维护；**规划** = 未实施，不得写成现状。
 
 | 类别 | 文档 |
 | --- | --- |

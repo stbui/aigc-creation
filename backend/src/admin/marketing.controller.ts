@@ -12,12 +12,7 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 import { IsOptional, IsString, MaxLength } from "class-validator";
-import {
-  AuditAction,
-  AdminUser,
-  RequireAllPermissions,
-  RequirePermission,
-} from "./admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission } from "./admin.decorator";
 import { AppError } from "../common/app.exception";
 import { sendCsv } from "../common/csv-response";
 import { MarketingService } from "../marketing/marketing.service";
@@ -105,11 +100,10 @@ export class AdminCouponsController {
    * 导出优惠券 (CSV)。
    *
    * ⚠️ 路由必须声明在 `:id` 之前，否则 `export` 会被当成券 id。
-   * 导出把券的发行与核销数据带出系统，用独立的 `data.export` 权限点并留审计。
+   * 导出把券的发行与核销数据带出系统，使用独立的 `data.export` 权限点。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.marketingWrite, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(@Query() query: CouponListQueryDto, @Res() res: Response) {
     const csv = await this.marketing.exportCoupons(query);
     sendCsv(res, "coupons", csv);
@@ -121,27 +115,23 @@ export class AdminCouponsController {
   }
 
   @Post()
-  @AuditAction("coupon.create")
   create(@Body() dto: UpsertCouponDto) {
     return this.marketing.createCoupon(dto);
   }
 
   @Patch(":id")
-  @AuditAction("coupon.update")
   update(@Param("id") id: string, @Body() dto: UpsertCouponDto) {
     return this.marketing.updateCoupon(id, dto);
   }
 
   /** 启停切换。停用不影响已核销订单 */
   @Patch(":id/toggle")
-  @AuditAction("coupon.toggle")
   toggle(@Param("id") id: string) {
     return this.marketing.disableCoupon(id);
   }
 
   /** 只允许删除没有关联订单的券；有订单时改为停用 */
   @Delete(":id")
-  @AuditAction("coupon.delete")
   remove(@Param("id") id: string) {
     return this.marketing.deleteCoupon(id);
   }
@@ -166,35 +156,30 @@ export class AdminCampaignsController {
     });
   }
 
-  /** 导出限时活动 (CSV)。筛选口径与列表一致，独立 `data.export` 权限并留审计 */
+  /** 导出限时活动 (CSV)。筛选口径与列表一致，使用独立 `data.export` 权限 */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.marketingWrite, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(@Query() query: CampaignListQueryDto, @Res() res: Response) {
     const csv = await this.marketing.exportCampaigns(query);
     sendCsv(res, "campaigns", csv);
   }
 
   @Post()
-  @AuditAction("campaign.create")
   create(@Body() dto: UpsertCampaignDto) {
     return this.marketing.createCampaign(dto);
   }
 
   @Patch(":id")
-  @AuditAction("campaign.update")
   update(@Param("id") id: string, @Body() dto: UpsertCampaignDto) {
     return this.marketing.updateCampaign(id, dto);
   }
 
   @Patch(":id/toggle")
-  @AuditAction("campaign.toggle")
   toggle(@Param("id") id: string) {
     return this.marketing.disableCampaign(id);
   }
 
   @Delete(":id")
-  @AuditAction("campaign.delete")
   remove(@Param("id") id: string) {
     return this.marketing.deleteCampaign(id);
   }
@@ -220,7 +205,6 @@ export class AdminInvitesController {
   }
 
   @Put("rules")
-  @AuditAction("invite.rule_update")
   updateRules(@Body() dto: UpdateInviteRuleDto) {
     return this.marketing.updateInviteRule(dto);
   }
@@ -242,7 +226,6 @@ export class AdminInvitesController {
    */
   @Post(":id/grant")
   @RequirePermission(PERMISSIONS.creditAdjust)
-  @AuditAction("invite.reward_grant")
   grant(@Param("id") id: string) {
     if (!id) throw new AppError(40001, "缺少关系 id", 400);
     return this.marketing.grantInviteRewardById(id);
@@ -260,7 +243,6 @@ export class AdminCheckinController {
   }
 
   @Put("rules")
-  @AuditAction("checkin.rule_update")
   updateRules(@Body() dto: UpdateCheckinRuleDto) {
     return this.marketing.updateCheckinRule(dto);
   }

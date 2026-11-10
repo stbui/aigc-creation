@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-import { AuditAction, RequirePermission } from './admin.decorator';
+import { RequirePermission } from './admin.decorator';
 import { PERMISSIONS } from './permissions';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../channels/email/email.service';
@@ -51,8 +51,8 @@ class UpsertTemplateDto {
 /**
  * 后台站内消息：全站广播 + 模板管理。
  *
- * 广播是**不可撤回**的写扩散（每个活跃用户一行），因此要审计；
- * 模板改动影响所有后续通知，同样审计。
+ * 广播是**不可撤回**的写扩散（每个活跃用户一行）；
+ * 模板改动影响所有后续通知，因此两者都使用独立写权限。
  */
 @Controller('admin/notifications')
 export class AdminNotificationsController {
@@ -80,7 +80,6 @@ export class AdminNotificationsController {
 
   @Post('broadcast')
   @RequirePermission(PERMISSIONS.messageWrite)
-  @AuditAction('notification.broadcast')
   broadcast(@Body() dto: BroadcastDto) {
     return this.notifications.broadcast(dto.title, dto.body, dto.link);
   }
@@ -93,7 +92,6 @@ export class AdminNotificationsController {
 
   @Post('templates')
   @RequirePermission(PERMISSIONS.messageWrite)
-  @AuditAction('notification.template')
   upsertTemplate(@Body() dto: UpsertTemplateDto) {
     return this.notifications.upsertTemplate(dto);
   }

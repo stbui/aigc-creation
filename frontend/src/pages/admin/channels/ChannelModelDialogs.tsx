@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import type { ModelDraft } from './constants';
+import type { BatchImportConfig, ModelDraft } from './constants';
 import type {
   AdminChannelModelView,
   ProtocolTestResultView,
@@ -53,7 +53,7 @@ interface ChannelModelDialogsProps {
     existingKeys: Set<string>;
     importing: boolean;
     onClose: () => void;
-    onImport: (ids: string[]) => void;
+    onImport: (ids: string[], config?: BatchImportConfig) => void;
   };
   reprice: {
     open: boolean;

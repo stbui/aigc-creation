@@ -35,7 +35,7 @@ import type { AdminSettingValue } from '../../../types/api';
  * 提交格式与后端 `UpdateSettingsDto` 一致：`{ settings, clears }`。
  * `settings` 用 `SETTING_DEFS` 的点号键（如 `upload.maxSizeMb`）；
  * `clears` 表示删除运行时覆盖、回落代码默认值 —— 与「把值改成默认值」在
- * 审计上是两件事，不能混用。
+ * 语义上是两件事，不能混用。
  *
  * ## 草稿模型
  *
@@ -408,7 +408,7 @@ export function AdminSettingsPage() {
           <p className="text-[12px] font-medium text-foreground">生效规则</p>
           <ul className="mt-2 flex flex-col gap-2 text-[12px] leading-5 text-muted-foreground">
             <li>点击“保存变更”并确认后，配置立即对全站生效。</li>
-            <li>“恢复默认”会删除运行时覆盖，并保留审计记录。</li>
+            <li>“恢复默认”会删除运行时覆盖并回落代码默认值。</li>
             <li>存在未保存修改时，离开页面会先要求确认。</li>
           </ul>
         </aside>

@@ -9,12 +9,7 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
-import {
-  AdminUser,
-  AuditAction,
-  RequireAllPermissions,
-  RequirePermission,
-} from "./admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission } from "./admin.decorator";
 import type { AdminUser as AdminUserType } from "./admin.decorator";
 import { PERMISSIONS } from "./permissions";
 import { sendCsv } from "../common/csv-response";
@@ -55,7 +50,6 @@ export class AdminTicketsController {
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.ticketRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(@Query() query: AdminTicketListQueryDto, @Res() res: Response) {
     const csv = await this.tickets.exportCsv(query);
     sendCsv(res, "tickets", csv);
@@ -88,7 +82,6 @@ export class AdminTicketsController {
   /** 客服回复。回复即受理，会推送站内消息给用户 */
   @Post(":id/replies")
   @RequirePermission(PERMISSIONS.ticketHandle)
-  @AuditAction("ticket.reply")
   reply(
     @Param("id") id: string,
     @Body() dto: AdminTicketReplyDto,
@@ -105,7 +98,6 @@ export class AdminTicketsController {
    */
   @Post(":id/transfer")
   @RequirePermission(PERMISSIONS.ticketHandle)
-  @AuditAction("ticket.transfer")
   transfer(
     @Param("id") id: string,
     @Body() dto: AdminTicketTransferDto,
@@ -117,7 +109,6 @@ export class AdminTicketsController {
   /** 状态流转 / 改优先级 / 指派 */
   @Patch(":id")
   @RequirePermission(PERMISSIONS.ticketHandle)
-  @AuditAction("ticket.update")
   update(
     @Param("id") id: string,
     @Body() dto: AdminTicketUpdateDto,

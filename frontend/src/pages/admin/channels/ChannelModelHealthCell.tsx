@@ -121,10 +121,13 @@ export function ChannelModelHealthCell({
 export function ChannelModelCostSummary({
   model,
   tiers,
+  saleOnly = false,
 }: {
   /** 只读这两项：单渠道与跨渠道视图共用同一份摘要 */
   model: Pick<AdminChannelModelListItem, 'capability' | 'priceCurrency'>;
   tiers: ChannelModelPriceTierView[];
+  /** 列表默认只露售价，成本与加价率放在 title 里；调价弹窗仍看完整口径 */
+  saleOnly?: boolean;
 }) {
   const lines = tierPriceLines(model.capability, tiers);
   if (lines.length === 0) {
@@ -151,10 +154,14 @@ export function ChannelModelCostSummary({
           >
             <span className="min-w-0 truncate text-muted-foreground">{line.specLabel}</span>
             <span className="ml-auto flex shrink-0 items-baseline gap-1">
-              <span className="text-muted-foreground">{cost}</span>
-              <span className="text-muted-foreground" aria-hidden>
-                →
-              </span>
+              {!saleOnly && (
+                <>
+                  <span className="text-muted-foreground">{cost}</span>
+                  <span className="text-muted-foreground" aria-hidden>
+                    →
+                  </span>
+                </>
+              )}
               <span className="font-medium text-foreground">{sale}</span>
               {model.priceCurrency && model.priceCurrency !== 'credits' ? (
                 /*
@@ -163,9 +170,9 @@ export function ChannelModelCostSummary({
                  * 会被误读成同一单位的两个数。
                  */
                 <span className="text-muted-foreground">
-                  积分 → {model.priceCurrency}
+                  {saleOnly ? model.priceCurrency : `积分 → ${model.priceCurrency}`}
                 </span>
-              ) : (
+              ) : saleOnly ? null : (
                 <span
                   className={
                     percent === null
@@ -199,8 +206,12 @@ export function ChannelModelCostSummary({
               >
                 <span className="min-w-0 truncate">{line.specLabel}</span>
                 <span className="ml-auto flex shrink-0 items-baseline gap-1">
-                  <span>{formatAmount(line.cost)}</span>
-                  <span aria-hidden>→</span>
+                  {!saleOnly && (
+                    <>
+                      <span>{formatAmount(line.cost)}</span>
+                      <span aria-hidden>→</span>
+                    </>
+                  )}
                   <span className="font-medium">{formatAmount(line.sale)}</span>
                 </span>
               </div>

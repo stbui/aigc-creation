@@ -4,6 +4,7 @@ import { PricingModule } from '../credits/pricing.module';
 import { ModelModule } from '../model/model.module';
 import { CapabilitiesController } from './capabilities.controller';
 import { ShoppableCarouselController } from './shoppable-carousel.controller';
+import { TemplateCatalogController } from './template-catalog.controller';
 import { CapabilityAvailabilityService } from './capability-availability.service';
 
 /**
@@ -20,7 +21,7 @@ import { CapabilityAvailabilityService } from './capability-availability.service
  */
 @Module({
   imports: [CreditsModule, PricingModule, ModelModule],
-  controllers: [CapabilitiesController, ShoppableCarouselController],
+  controllers: [CapabilitiesController, ShoppableCarouselController, TemplateCatalogController],
   providers: [CapabilityAvailabilityService],
   exports: [CapabilityAvailabilityService],
 })

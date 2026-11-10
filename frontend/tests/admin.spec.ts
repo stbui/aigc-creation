@@ -220,12 +220,6 @@ test.describe('后台管理端', () => {
     await expect(panel.locator('input').first()).toBeVisible();
   });
 
-  test('操作审计页渲染表格', async ({ page }) => {
-    await page.goto(`${UI}/admin/audit-logs`);
-    await expect(page.getByRole('heading', { name: '操作审计' })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('admin-filter').first()).toBeVisible();
-  });
-
   /*
    * 常驻确认层回归。
    *

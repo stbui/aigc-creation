@@ -13,19 +13,24 @@ function setup() {
       findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    billingOrder: { findMany: vi.fn().mockResolvedValue([]) },
+    creditLedgerEntry: {
+      aggregate: vi.fn().mockResolvedValue({ _sum: { availableDeltaMicrocredits: 0n } }),
+    },
   };
   const billing = {
     settle: vi.fn().mockResolvedValue({}),
     refund: vi.fn().mockResolvedValue({}),
     markUncertain: vi.fn().mockResolvedValue(undefined),
   };
+  const notifications = { notify: vi.fn().mockResolvedValue(undefined) };
   const service = new TaskLifecycleService(
     prisma as never,
     billing as never,
     { grant: vi.fn() } as never,
-    { notify: vi.fn() } as never,
+    notifications as never,
   );
-  return { service, prisma, billing };
+  return { service, prisma, billing, notifications };
 }
 
 const runningTask = {
@@ -112,6 +117,72 @@ describe('TaskLifecycleService 失败退款', () => {
       'failure',
     );
     expect(billing.markUncertain).not.toHaveBeenCalled();
+  });
+
+  it('通知按 refund + expire 的净可用增量展示，不把过期作废算作退回', async () => {
+    const { service, prisma, notifications } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue({
+      ...runningTask,
+      capability: 'image.generate',
+    });
+    prisma.billingOrder.findMany.mockResolvedValue([{ id: 'billing-order-1' }]);
+    prisma.creditLedgerEntry.aggregate.mockResolvedValue({
+      _sum: { availableDeltaMicrocredits: 6_000_000n },
+    });
+
+    await service.fail('task-1', {
+      errorCode: '42204',
+      errorMessage: '生成失败',
+      reason: 'generation_failed',
+    });
+
+    expect(prisma.billingOrder.findMany).toHaveBeenCalledWith({
+      where: {
+        taskId: { in: ['task-1'] },
+        status: 'refunded',
+        refundReason: { not: 'route_switch' },
+      },
+      select: { id: true },
+    });
+    expect(prisma.creditLedgerEntry.aggregate).toHaveBeenCalledWith({
+      where: {
+        billingOrderId: { in: ['billing-order-1'] },
+        type: { in: ['refund', 'expire'] },
+      },
+      _sum: { availableDeltaMicrocredits: true },
+    });
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vars: expect.objectContaining({ credits: 6 }),
+        fallbackBody: expect.stringContaining('6 积分已退回'),
+      }),
+    );
+  });
+
+  it('净可用增量为 0 时明确说明过期作废，不宣称原额退回', async () => {
+    const { service, prisma, notifications } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue(runningTask);
+    prisma.billingOrder.findMany.mockResolvedValue([{ id: 'billing-order-1' }]);
+    prisma.creditLedgerEntry.aggregate.mockResolvedValue({
+      _sum: { availableDeltaMicrocredits: 0n },
+    });
+
+    await service.fail('task-1', {
+      errorCode: '42204',
+      errorMessage: '生成失败',
+      reason: 'generation_failed',
+    });
+
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vars: expect.objectContaining({ credits: 0 }),
+        fallbackTitle: '生成失败，积分未增加',
+        fallbackBody: expect.stringContaining('过期部分已作废'),
+      }),
+    );
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.not.objectContaining({ fallbackBody: expect.stringContaining('原额退回') }),
+    );
   });
 });
 

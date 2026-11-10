@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
-import { AdminUser, AuditAction, RequirePermission } from './admin.decorator';
+import { AdminUser, RequirePermission } from './admin.decorator';
 import { PERMISSIONS } from './permissions';
 import { CapabilityAvailabilityService } from '../capabilities/capability-availability.service';
 
@@ -19,8 +19,8 @@ export class CapabilityToggleDto {
  * 而不是等下一次发版。没有这个开关时唯一手段是下掉整条模型线路 ——
  * 那会连带影响所有能力，把局部故障放大成全站故障。
  *
- * 权限与审计：读 `capability.read`、写 `capability.write`（属高危集合，
- * AuditInterceptor 要求填写原因）。下架原因同时展示给 C 端用户 ——
+ * 权限：读 `capability.read`、写 `capability.write`（属高危集合，
+ * 下架时必须填写原因）。下架原因同时展示给 C 端用户 ——
  * 只说「已下线」会让用户去问客服，写清原因才是可自助的。
  */
 @Controller('admin/capabilities')
@@ -41,7 +41,6 @@ export class AdminCapabilitiesController {
    */
   @Put(':id')
   @RequirePermission(PERMISSIONS.capabilityWrite)
-  @AuditAction('capability.toggle')
   async set(@Param('id') id: string, @Body() dto: CapabilityToggleDto, @AdminUser() user: AdminUser) {
     const row = await this.availability.setEnabled(id, dto.enabled, dto.reason, user.email);
     return { capabilityId: row.capabilityId, enabled: row.enabled, reason: row.reason };

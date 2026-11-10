@@ -17,13 +17,9 @@ import type {
   VisiblePaymentMethod,
 } from '../../../types/payment';
 import { adminPaymentProvidersApi } from './api';
-import { useToast } from './hooks';
+import { PAYMENT_METHOD_LABELS } from './constants';
+import { useToast, useUnsavedGuard } from './hooks';
 import { sourceAvailability, sourceAvailableInstances } from './utils';
-
-const METHOD_LABELS: Record<VisiblePaymentMethod, string> = {
-  alipay: '支付宝',
-  wechat: '微信支付',
-};
 
 const SOURCE_LABELS: Record<PaymentSource, string> = {
   unset: '未选择',
@@ -48,6 +44,7 @@ export function PaymentsVisibleMethodsCard({
 }) {
   const toast = useToast();
   const [settings, setSettings] = useState<AdminPaymentSettings | null>(null);
+  const [baseline, setBaseline] = useState<AdminPaymentSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +57,7 @@ export function PaymentsVisibleMethodsCard({
       .then((next) => {
         if (alive) {
           setSettings(next);
+          setBaseline(next);
           setError(null);
         }
       })
@@ -73,6 +71,11 @@ export function PaymentsVisibleMethodsCard({
       alive = false;
     };
   }, []);
+
+  const dirty = Boolean(
+    settings && baseline && JSON.stringify(settings) !== JSON.stringify(baseline),
+  );
+  useUnsavedGuard(writable && dirty);
 
   const updateSource = (method: VisiblePaymentMethod, source: PaymentSource) => {
     setSettings((current) =>
@@ -91,6 +94,7 @@ export function PaymentsVisibleMethodsCard({
     try {
       const next = await adminPaymentProvidersApi.saveSettings(settings);
       setSettings(next);
+      setBaseline(next);
       setError(null);
       toast.success('前台支付来源已保存');
       onSaved();
@@ -112,7 +116,10 @@ export function PaymentsVisibleMethodsCard({
             用户始终只看到「支付宝 / 微信支付」两个按钮。请为每个按钮选择唯一来源；未选择时前台隐藏。
           </p>
         </div>
-        <ActionButton onClick={() => void save()} disabled={!writable || !settings || saving}>
+        <ActionButton
+          onClick={() => void save()}
+          disabled={!writable || !settings || saving || !dirty}
+        >
           {saving ? '保存中…' : '保存来源'}
         </ActionButton>
       </CardHeader>
@@ -142,9 +149,9 @@ export function PaymentsVisibleMethodsCard({
                 className="grid grid-cols-[140px_minmax(0,220px)_minmax(0,1fr)] items-start gap-4 border-b border-border/70 pb-3 last:border-b-0 last:pb-0"
               >
                 <div className="pt-2 text-[13px] font-medium text-foreground">
-                  {METHOD_LABELS[method]}
+                  {PAYMENT_METHOD_LABELS[method]}
                 </div>
-                <FormField label={`${METHOD_LABELS[method]}来源`} className="gap-1">
+                <FormField label={`${PAYMENT_METHOD_LABELS[method]}来源`} className="gap-1">
                   <SelectField
                     value={source}
                     onChange={(value) => {
@@ -161,7 +168,7 @@ export function PaymentsVisibleMethodsCard({
                             : '微信官方'
                           : SOURCE_LABELS[value],
                     }))}
-                    ariaLabel={`${METHOD_LABELS[method]}支付来源`}
+                    ariaLabel={`${PAYMENT_METHOD_LABELS[method]}支付来源`}
                     disabled={!writable || saving}
                   />
                 </FormField>

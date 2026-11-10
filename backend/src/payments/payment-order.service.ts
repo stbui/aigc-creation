@@ -4,7 +4,10 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AppError } from "../common/app.exception";
 import { OrderService } from "../orders/order.service";
 import { lockUserRow } from "../account/user-row-lock";
-import { PaymentConfigService } from "./payment-config.service";
+import {
+  PaymentConfigService,
+  type ResolvedVisiblePayment,
+} from "./payment-config.service";
 import { SettingsService } from "../common/settings.service";
 import { getAdapter } from "./adapters";
 import {
@@ -61,6 +64,9 @@ export interface PaymentIntentView {
   payUrl?: string;
   codeUrl?: string;
   schemeUrl?: string;
+  clientSecret?: string;
+  publishableKey?: string;
+  returnUrl?: string;
   checkoutValue: string | null;
   expiresAt: string;
   sandbox: boolean;
@@ -240,7 +246,11 @@ export class PaymentOrderService {
      * 只解析一次。availableVisible() 再 resolveVisible() 会让轮询/最少金额
      * 在“展示可用”和“真正下单”之间切换实例，甚至把订单写到未展示的实例。
      */
-    const options = await this.configs.resolveVisibleOptions(currency, order.paidCents);
+    const options = await this.configs.resolveVisibleOptions(
+      currency,
+      order.paidCents,
+      { includeDailyLimitExceeded: true },
+    );
     if (options.length === 0) {
       throw new AppError(
         50301,
@@ -268,11 +278,13 @@ export class PaymentOrderService {
       throw new AppError(40001, `支付方式不可用: ${method}`, 400);
     }
     const resolved = selectedOption.resolved;
-    const { config, providerId } = resolved;
-    const adapter = getAdapter(providerId);
-    if (!adapter) throw new AppError(40001, `未知支付渠道: ${providerId}`, 400);
-    if (!config.enabled) throw new AppError(50301, "支付渠道已停用", 503);
-    const missing = adapter.validateConfig(config.values);
+    const { config: initialConfig, providerId: initialProviderId } = resolved;
+    const initialAdapter = getAdapter(initialProviderId);
+    if (!initialAdapter) {
+      throw new AppError(40001, `未知支付渠道: ${initialProviderId}`, 400);
+    }
+    if (!initialConfig.enabled) throw new AppError(50301, "支付渠道已停用", 503);
+    const missing = initialAdapter.validateConfig(initialConfig.values);
     if (missing.length > 0) {
       throw new AppError(
         50301,
@@ -280,16 +292,6 @@ export class PaymentOrderService {
         503,
       );
     }
-
-    const context: PaymentContext = {
-      providerId: config.providerId,
-      configId: config.id,
-      configVersion: config.version,
-      ...(resolved.providerMethod
-        ? { paymentMethod: resolved.providerMethod }
-        : {}),
-      values: config.values,
-    };
 
     /*
      * 发起支付租约必须覆盖「关闭旧尝试 → 渠道下单 → 写回本地」全过程。
@@ -333,6 +335,8 @@ export class PaymentOrderService {
       throw new AppError(40901, "该订单正在发起另一笔支付，请稍后刷新重试", 409);
     }
 
+    let claimedSelection: ResolvedVisiblePayment | undefined;
+    let intentSucceeded = false;
     try {
       // 拿到租约后重新读取：上一笔 intent 可能刚好在本请求等待期间提交，
       // 旧快照里没有它的 Payment，直接用于关单会漏关。
@@ -355,20 +359,34 @@ export class PaymentOrderService {
        */
       await this.closePendingAttemptsBeforeRetry(order, intentLeaseAt);
 
-      const payment = await this.prisma.payment.create({
-        data: {
-          orderId: order.id,
-          userId: input.userId,
-          channel: providerId,
-          providerMethod: resolved.method,
-          amountCents: order.paidCents,
-          currency,
-          status: "pending",
-          providerConfigId: config.id,
-          providerConfigVersion: config.version,
-          providerInstanceId: config.instanceId,
-        },
+      /*
+       * 实例选择、最新配置校验、日限额检查和 pending Payment 写入必须在同一
+       * 事务内完成。仅在这里 claim 轮询槽位仍不够：两个订单可能选中同一实例，
+       * 各自在事务外读到相同用量，随后同时越过实例日限额。
+       */
+      const reserved = await this.configs.reserveVisiblePaymentAttempt({
+        method: resolved.method,
+        currency,
+        amountCents: order.paidCents,
+        orderId: order.id,
+        userId: input.userId,
+        resolved,
       });
+      claimedSelection = reserved.resolved;
+      const providerId = claimedSelection.providerId;
+      const config = claimedSelection.config;
+      const adapter = getAdapter(providerId);
+      if (!adapter) throw new AppError(40001, `未知支付渠道: ${providerId}`, 400);
+      const context: PaymentContext = {
+        providerId: config.providerId,
+        configId: config.id,
+        configVersion: config.version,
+        ...(claimedSelection.providerMethod
+          ? { paymentMethod: claimedSelection.providerMethod }
+          : {}),
+        values: config.values,
+      };
+      const payment = reserved.payment;
 
       const now = Date.now();
       const expiresAt = new Date(
@@ -415,7 +433,8 @@ export class PaymentOrderService {
         throw new AppError(50302, `发起支付失败: ${message}`, 503);
       }
 
-      const checkoutValue = checkout.codeUrl ?? checkout.payUrl ?? "";
+      const checkoutValue =
+        checkout.codeUrl ?? checkout.payUrl ?? checkout.clientSecret ?? "";
 
       // 先落渠道单据 id：即使随后订单状态已变化，也能定位并关闭本次渠道订单。
       if (checkout.providerRef) {
@@ -477,6 +496,8 @@ export class PaymentOrderService {
         throw new AppError(40901, "订单状态已变化，请刷新后重试", 409);
       }
 
+      intentSucceeded = true;
+
       this.logger.log(
         `发起支付: 订单 ${order.orderNo} 方式 ${resolved.method} -> 渠道 ${providerId} v${config.version} 金额 ${order.paidCents} 分`,
       );
@@ -493,12 +514,24 @@ export class PaymentOrderService {
         payUrl: checkout.payUrl,
         codeUrl: checkout.codeUrl,
         schemeUrl: checkout.schemeUrl,
+        clientSecret: checkout.clientSecret,
+        publishableKey: checkout.publishableKey,
+        returnUrl: this.checkoutReturnUrl(order),
         checkoutValue,
         expiresAt: checkout.expiresAt.toISOString(),
         sandbox: false,
         hint: checkout.hint ?? null,
       };
     } finally {
+      if (claimedSelection && !intentSucceeded) {
+        await this.configs
+          .releaseVisibleSelection(claimedSelection)
+          .catch((e) => {
+            this.logger.warn(
+              `回滚支付轮询槽位失败 订单 ${order.orderNo}: ${(e as Error).message}`,
+            );
+          });
+      }
       await this.prisma.order
         .updateMany({
           where: { id: order.id, intentStartedAt: intentLeaseAt },
@@ -844,6 +877,8 @@ export class PaymentOrderService {
     orderId: string;
     providerId: PaymentProviderId;
     configId: string;
+    providerConfigVersion?: number;
+    paymentMethod?: VisiblePaymentMethod;
     tradeNo: string;
     amountCents: number;
     currency: string;
@@ -910,19 +945,33 @@ export class PaymentOrderService {
 
     // 只更新**同一渠道**的 pending 尝试；否则跨渠道重试时会把另一笔尝试
     // 改成本次渠道的交易号，后台支付尝试记录会张冠李戴。
-    const attempt =
-      input.paymentId ??
-      (
-        await this.prisma.payment.findFirst({
-          where: {
-            orderId: order.id,
-            status: "pending",
-            channel: input.providerId,
-          },
-          orderBy: { createdAt: "desc" },
-          select: { id: true, providerInstanceId: true },
-        })
-      );
+    //
+    // 对账补单等调用方可能无法提供 paymentId。此时只有在候选唯一时才能
+    // 自动归属；同一订单在同一渠道/实例下有多条 pending 尝试时，任何
+    // “取最新一条”都会把成功流水挂到错误单据上，必须转人工确认。
+    let pendingAttempts: Array<{ id: string; providerInstanceId: string | null }> = [];
+    if (!input.paymentId) {
+      pendingAttempts = await this.prisma.payment.findMany({
+        where: {
+          orderId: order.id,
+          status: "pending",
+          channel: input.providerId,
+          ...(input.providerInstanceId
+            ? { providerInstanceId: input.providerInstanceId }
+            : {}),
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, providerInstanceId: true },
+      });
+      if (pendingAttempts.length > 1) {
+        throw new AppError(
+          40901,
+          `订单存在多条待支付尝试（${pendingAttempts.length} 条），无法确定本次渠道流水归属，请人工核对`,
+          409,
+        );
+      }
+    }
+    const attempt = input.paymentId ?? pendingAttempts[0];
     const paymentId =
       typeof attempt === "string" ? attempt : attempt?.id;
     const providerInstanceId =
@@ -938,6 +987,8 @@ export class PaymentOrderService {
       channel: input.providerId,
       currency: input.currency,
       providerConfigId: input.configId,
+      providerConfigVersion: input.providerConfigVersion,
+      providerMethod: input.paymentMethod,
       providerInstanceId,
       providerStatus: input.providerStatus,
       providerPaidAt: input.paidAt,

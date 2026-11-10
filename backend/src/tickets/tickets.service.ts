@@ -542,7 +542,7 @@ export class TicketsService {
   /**
    * 批量指派 / 流转。
    *
-   * 逐条走 `adminUpdate`：状态机、指派账号校验、审计都由单条路径兜底。
+   * 逐条走 `adminUpdate`：状态机与指派账号校验都由单条路径兜底。
    * 批量不包事务 —— 一条被状态机拒绝不应回滚其余 99 条，逐条结果才有用。
    */
   async adminBatch(

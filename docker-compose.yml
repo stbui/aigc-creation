@@ -87,12 +87,6 @@ services:
       LOG_CONSOLE: "1"
       LOG_ERROR_FILE: "1"
 
-      # ---- 图像网关（不配则全走本地 Jimp）----
-      GATEWAY_BASE_URL: ${GATEWAY_BASE_URL:-}
-      GATEWAY_TOKEN: ${GATEWAY_TOKEN:-}
-      GATEWAY_MODEL: ${GATEWAY_MODEL:-}
-      GATEWAY_ENABLED: ${GATEWAY_ENABLED:-}
-
       # ---- 存储后端 ----
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       OSS_REGION: ${OSS_REGION:-}

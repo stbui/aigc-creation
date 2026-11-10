@@ -25,21 +25,20 @@ describe('PermissionGuard', () => {
     guard = new PermissionGuard(reflector as never, roles as never);
   });
 
-  it('复合权限全部满足时放行并记录本次权限点', async () => {
+  it('复合权限全部满足时放行', async () => {
     reflector.getAllAndOverride.mockImplementation((key: string) =>
       key === PERMISSION_KEY ? ['user.read', 'data.export'] : undefined,
     );
-    roles.getPermissions.mockResolvedValue(['user.read', 'data.export', 'audit.read']);
-    const request = {
-      originalUrl: '/api/v1/admin/users/export',
-      adminUser: { id: 'admin-1', email: 'admin@example.com', role: 'operator' },
-    };
+    roles.getPermissions.mockResolvedValue(['user.read', 'data.export']);
 
-    await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
-    expect(request).toMatchObject({
-      requiredPermissions: ['user.read', 'data.export'],
-      requiredPermission: 'user.read',
-    });
+    await expect(
+      guard.canActivate(
+        makeContext({
+          originalUrl: '/api/v1/admin/users/export',
+          adminUser: { id: 'admin-1', email: 'admin@example.com', role: 'operator' },
+        }),
+      ),
+    ).resolves.toBe(true);
   });
 
   it('缺少任意一个复合权限即拒绝', async () => {

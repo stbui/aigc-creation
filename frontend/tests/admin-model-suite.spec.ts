@@ -12,7 +12,7 @@ import {
  *
  * 覆盖「配置 → 选型 → 报价 → 生成 → 账单核对」整条链路：
  *
- *   1. 后台模型页：渠道工作台、能力与模型、用户分组、插件、生成账单、调用记录；
+ *   1. 后台模型页：模型商品、能力与模型、用户分组、插件、生成账单、调用记录；
  *   2. C 端 `ModelPicker`：工具页高级设置里选出模型后，报价随之变化；
  *   3. 端到端：管理员给新账号发积分 → C 端按目录报价 → 建任务 → 轮询 →
  *      后台按任务 ID 查到账单并打开详情。
@@ -27,7 +27,7 @@ const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 const API = process.env.E2E_API ?? 'http://localhost:4100';
 
 const rows = (page: Page) => page.getByTestId('admin-table-row');
-/** 渠道工作台左列的渠道条目（主从布局，不再是表格行） */
+/** 模型商品「供应商」视图左列的供应商条目（主从布局，不再是表格行） */
 const channelItems = (page: Page) => page.getByTestId('admin-channel-item');
 
 async function login(page: Page) {
@@ -85,31 +85,31 @@ test.describe('渠道与模型 P5', () => {
     await removeModelSuiteFixture(fixture);
   });
 
-  test('渠道工作台：左列渠道导航与右侧内联模型管理', async ({ page }) => {
+  test('模型商品：左列供应商导航与右侧内联商品管理', async ({ page }) => {
     await login(page);
-    await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await page.goto(`${UI}/admin/channels?view=channels`);
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
 
     // 必填校验在提交前拦下：名称 → 服务地址，两次都要给出人话原因
-    await page.getByRole('button', { name: '新建渠道' }).first().click();
+    await page.getByRole('button', { name: '接入供应商' }).first().click();
     await expect(page.getByTestId('admin-drawer')).toBeVisible();
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByTestId('admin-toast').last()).toContainText('请填写渠道名称');
+    await page.getByRole('button', { name: '接入', exact: true }).click();
+    await expect(page.getByTestId('admin-toast').last()).toContainText('请填写供应商名称');
 
-    await page.getByLabel('渠道名称').fill('e2e-未保存渠道');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
+    await page.getByLabel('供应商名称').fill('e2e-未保存渠道');
+    await page.getByRole('button', { name: '接入', exact: true }).click();
     await expect(page.getByTestId('admin-toast').last()).toContainText('服务地址');
 
-    // 新建渠道没有访问凭证无法调用服务
+    // 接入供应商没有访问凭证无法调用服务
     await page.getByLabel('服务地址').fill('https://example.com');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
+    await page.getByRole('button', { name: '接入', exact: true }).click();
     await expect(page.getByTestId('admin-toast').last()).toContainText('请填写访问凭证');
 
     // 高级设置里的附加信息在提交前就拦下，并指出是哪一行
     await page.getByText('高级设置', { exact: true }).click();
     await page.getByRole('button', { name: '添加附加信息' }).click();
     await page.getByLabel('附加信息 1 名称').fill('authorization');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
+    await page.getByRole('button', { name: '接入', exact: true }).click();
     await expect(page.getByTestId('admin-toast').last()).toContainText('由系统管理');
     await page.getByRole('button', { name: '删除附加信息 1' }).click();
 
@@ -120,7 +120,7 @@ test.describe('渠道与模型 P5', () => {
     await expect(page.getByTestId('admin-drawer')).toHaveCount(0);
 
     /*
-     * 模型不再弹抽屉：选中左列渠道后，右侧详情区直接渲染该渠道的模型清单。
+     * 模型不再弹抽屉：选中左列渠道后，右侧详情区直接渲染该渠道的商品清单。
      * 选中态落在 `aria-pressed`（辅助技术读得到），右侧标题跟着换成渠道名。
      */
     await expect
@@ -136,7 +136,7 @@ test.describe('渠道与模型 P5', () => {
 
     const detail = page.locator('#admin-channel-detail');
     await expect(detail).toContainText(channelName);
-    await expect(detail).toContainText('模型清单');
+    await expect(detail).toContainText('商品清单');
     // 详情区常驻，不再有承载模型的抽屉
     await expect(page.getByTestId('admin-drawer')).toHaveCount(0);
 
@@ -154,42 +154,44 @@ test.describe('渠道与模型 P5', () => {
     }
   });
 
-  test('渠道详情：编辑/复制/导出/启停/删除都在头部，停用需二次确认', async ({ page }) => {
+  test('供应商详情：编辑 + 更多收敛动作，停用需二次确认', async ({ page }) => {
     await login(page);
-    await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await page.goto(`${UI}/admin/channels?view=channels`);
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
 
     await expect
       .poll(async () => channelItems(page).count(), { timeout: 15000, message: '左列至少有一个渠道' })
       .toBeGreaterThan(0);
     await channelItems(page).first().click();
 
-    // 渠道级动作全部外露：编辑、复制、导出、启停、删除
+    // 供应商级动作：编辑直显，复制 / 导出 / 启停 / 删除收进「更多」
     const detail = page.locator('#admin-channel-detail');
-    for (const name of ['编辑', '复制', '导出', '删除']) {
-      await expect(detail.getByRole('button', { name, exact: true })).toBeVisible();
+    await expect(detail.getByRole('button', { name: '编辑供应商', exact: true })).toBeVisible();
+    await detail.getByRole('button', { name: /^供应商 .+ 更多操作$/ }).click();
+    for (const name of ['复制供应商', '导出配置（不含凭证）', '删除供应商']) {
+      await expect(page.getByRole('menuitem', { name, exact: true })).toBeVisible();
     }
-    const toggle = detail.getByRole('button', { name: /^(停用|启用)渠道$/ });
+    const toggle = page.getByRole('menuitem', { name: /^(停用|启用)供应商$/ });
     await expect(toggle).toBeVisible();
-    const disabling = (await toggle.innerText()).trim() === '停用渠道';
+    const disabling = (await toggle.innerText()).trim() === '停用供应商';
 
-    // 停用会让整条渠道退出路由目录：确认弹窗必须讲清后果，取消不写库
+    // 停用会让整条供应商退出路由目录：确认弹窗必须讲清后果，取消不写库
     await toggle.click();
     const confirm = page.getByTestId('admin-confirm-action');
     await expect(confirm).toBeVisible();
     await expect(confirm).toContainText(
       disabling
-        ? '停用后新任务不会使用该渠道；配置会保留，可随时重新启用。'
-        : '启用后，配置完整的模型会恢复使用。',
+        ? '停用后新任务不会使用该供应商；配置会保留，可随时重新启用。'
+        : '启用后，配置完整的商品会恢复使用。',
     );
     await confirm.getByRole('button', { name: '取消', exact: true }).click();
     await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
   });
 
-  test('线路健康：渠道工作台展示按线路统计的成功率与耗时', async ({ page, request }) => {
+  test('线路健康：模型商品展示按线路统计的成功率与耗时', async ({ page, request }) => {
     await login(page);
-    await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await page.goto(`${UI}/admin/channels?view=channels`);
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
 
     // 健康面板与「当前状态」是两份数据：面板给过去 24h / 7d 的成功率与 P95
     await expect(page.getByRole('heading', { name: '线路健康' })).toBeVisible();
@@ -218,8 +220,8 @@ test.describe('渠道与模型 P5', () => {
 
   test('统一调价：勾选模型 → 按成本算价 → 保存售价', async ({ page, request }) => {
     await login(page);
-    await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await page.goto(`${UI}/admin/channels?view=channels`);
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
 
     /*
      * 表头可见不代表数据到了：列表是异步拉的。刚进页面就数行数会数到 0，
@@ -238,7 +240,7 @@ test.describe('渠道与模型 P5', () => {
         ?.data?.models ?? []
     ) as Array<any>;
     const fixtureModel = fixtureModels.find((item: any) => item.modelKey === suite.channelModelKey);
-    expect(fixtureModel, '夹具渠道模型未出现在管理员模型清单').toBeTruthy();
+    expect(fixtureModel, '夹具渠道模型未出现在管理员商品清单').toBeTruthy();
     const tier = (fixtureModel.priceTiers ?? []).find(
       (item: any) => item.enabled && item.priceConfigured && item.costPricing?.configured,
     );
@@ -254,13 +256,13 @@ test.describe('渠道与模型 P5', () => {
       },
     };
 
-    // 选中目标渠道：模型清单在右侧详情区内联渲染
+    // 选中目标渠道：商品清单在右侧详情区内联渲染
     await channelItems(page).filter({ hasText: target.channelName }).first().click();
     await expect(page.locator('#admin-channel-detail')).toContainText(target.channelName);
 
-    // 勾选目标模型（复选框的可访问名是「选择模型 {modelKey}」）
+    // 勾选目标商品（复选框的可访问名是「选择商品 {modelKey}」）
     // 勾选框的可视元素会挡住指针，这里用键盘操作，也更贴近无障碍真实路径。
-    const modelCheckbox = page.getByRole('checkbox', { name: `选择模型 ${target.modelKey}` });
+    const modelCheckbox = page.getByRole('checkbox', { name: `选择商品 ${target.modelKey}` });
     await modelCheckbox.focus();
     await page.keyboard.press('Space');
     await expect(modelCheckbox).toBeChecked();
@@ -302,7 +304,7 @@ test.describe('渠道与模型 P5', () => {
     await dialog.getByLabel('加价率').fill(String(markup));
     await dialog.getByRole('button', { name: '按成本重算' }).click();
 
-    // 审计原因由系统生成，页面不再要求人工填写
+    // 页面不再额外要求人工填写变更原因
     await expect(dialog.getByLabel('变更原因')).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: /保存售价/ })).toBeEnabled();
 
@@ -341,7 +343,7 @@ test.describe('渠道与模型 P5', () => {
     await priceInput.fill(draft);
     await page.getByRole('tab', { name: '能力与模型' }).click();
     await expect(page).toHaveURL(`${UI}/admin/capabilities`);
-    await expect(page.getByRole('heading', { name: '能力与模型清单' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '能力与商品清单' })).toBeVisible();
     await page.getByRole('tab', { name: '能力消耗价' }).click();
     await expect(page).toHaveURL(`${UI}/admin/capabilities?tab=pricing`);
     await expect(priceInput).toHaveValue(draft);
@@ -352,26 +354,26 @@ test.describe('渠道与模型 P5', () => {
     await expect(page).toHaveURL(`${UI}/admin/capabilities`);
   });
 
-  test('能力与模型：旧地址重定向、清单与路由模拟', async ({ page }) => {
+  test('能力与模型：旧地址重定向、清单与消费测试', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/logical-models`);
     await expect(page).toHaveURL(`${UI}/admin/capabilities`);
     await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({
       timeout: 20000,
     });
-    await expect(page.getByRole('heading', { name: '能力与模型清单' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '能力与商品清单' })).toBeVisible();
 
     // 同样是异步列表：等第一行真的出现再决定要不要跳过
     await expect
       .poll(async () => rows(page).count(), { timeout: 15000, message: '前台模型列表应至少有一行' })
       .toBeGreaterThan(0);
 
-    await rows(page).first().getByRole('button', { name: '模拟', exact: true }).click();
-    await expect(page.getByTestId('admin-drawer')).toContainText('路由模拟 · ');
-    await page.getByRole('button', { name: '开始模拟' }).click();
+    await rows(page).first().getByRole('button', { name: '测试消费', exact: true }).click();
+    await expect(page.getByTestId('admin-drawer')).toContainText('消费测试 · ');
+    await page.getByRole('button', { name: '开始测试' }).click();
 
-    // 模拟是只读：要么给出候选/选中线路，要么给出「为什么没落」
-    await expect(page.getByTestId('admin-drawer')).toContainText('候选线路', { timeout: 15000 });
+    // 消费测试是只读：要么给出候选/选中商品，要么给出「为什么没落」
+    await expect(page.getByTestId('admin-drawer')).toContainText('候选商品', { timeout: 15000 });
     await expect(page.getByTestId('admin-drawer')).toContainText('结论');
   });
 
@@ -532,8 +534,8 @@ test.describe('渠道与模型 P5', () => {
 
   test('渠道排序：弹窗可开合、顺序变了才允许保存', async ({ page, request }) => {
     await login(page);
-    await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await page.goto(`${UI}/admin/channels?view=channels`);
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
 
     // 库里有渠道才谈得上排序
     const token = await adminToken(request);
@@ -544,10 +546,10 @@ test.describe('渠道与模型 P5', () => {
     expect(order.length, '夹具至少创建两条渠道供排序').toBeGreaterThanOrEqual(2);
 
     // 排序入口收在左列标题栏，页头只留视图切换
-    await page.getByRole('button', { name: '调整渠道顺序' }).click();
+    await page.getByRole('button', { name: '调整供应商顺序' }).click();
     const dialog = page.getByTestId('admin-modal');
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText('调整渠道顺序');
+    await expect(dialog).toContainText('调整供应商顺序');
     // 排序是全局的：条目数必须等于接口给的条数，不受列表筛选/分页影响
     await expect(dialog.getByRole('listitem')).toHaveCount(order.length);
 
@@ -596,10 +598,10 @@ test.describe('渠道与模型 P5', () => {
     expect((await okRes.json()).data.ok).toBe(true);
   });
 
-  test('模型详情区：排序弹窗与批量删除入口按权限/勾选状态给出', async ({ page, request }) => {
+  test('商品详情区：排序弹窗与批量删除入口按勾选状态给出', async ({ page, request }) => {
     await login(page);
-    await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await page.goto(`${UI}/admin/channels?view=channels`);
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
     await expect
       .poll(async () => channelItems(page).count(), { timeout: 15000, message: '左列至少有一个渠道' })
       .toBeGreaterThan(0);
@@ -615,17 +617,18 @@ test.describe('渠道与模型 P5', () => {
 
     // 排序入口常驻；批量删除/统一调价在未勾选时禁用
     await expect(detail.getByRole('button', { name: '排序', exact: true })).toBeVisible();
-    await expect(detail.getByRole('button', { name: '批量删除', exact: true })).toBeDisabled();
-    await expect(detail.getByRole('button', { name: '统一调价', exact: true })).toBeDisabled();
+    // 批量动作只在勾选后出现，未勾选时不占首屏
+    await expect(detail.getByRole('button', { name: '批量删除', exact: true })).toHaveCount(0);
+    await expect(detail.getByRole('button', { name: '统一调价', exact: true })).toHaveCount(0);
 
-    // 勾选一个模型后，批量删除与统一调价解禁并带上计数
+    // 勾选一个商品后，批量删除与统一调价出现并带上计数
     const checkbox = detail.getByRole('checkbox').first();
     await checkbox.focus();
     await page.keyboard.press('Space');
     await expect(checkbox).toBeChecked();
     await expect(detail.getByRole('button', { name: /批量删除（\d+）/ })).toBeEnabled();
 
-    // 批量删除是高危动作：审计原因由系统生成，页面不再要求人工填写
+    // 批量删除是高危动作，但页面不再额外要求人工填写原因
     await detail.getByRole('button', { name: /批量删除（\d+）/ }).click();
     const confirm = page.getByTestId('admin-confirm-action');
     await expect(confirm).toBeVisible();
@@ -636,19 +639,19 @@ test.describe('渠道与模型 P5', () => {
     await confirm.getByRole('button', { name: '取消', exact: true }).click();
     await expect(confirm).toHaveCount(0);
 
-    // 模型排序弹窗与详情区平级渲染（两个 React Aria 模态嵌套会互相抢焦点）
+    // 商品排序弹窗与详情区平级渲染（两个 React Aria 模态嵌套会互相抢焦点）
     await detail.getByRole('button', { name: '排序', exact: true }).click();
     const orderDialog = page.getByTestId('admin-modal');
     await expect(orderDialog).toBeVisible();
-    await expect(orderDialog).toContainText('自定义模型排序');
+    await expect(orderDialog).toContainText('自定义商品排序');
     await orderDialog.getByRole('button', { name: '取消' }).click();
     await expect(orderDialog).toHaveCount(0);
   });
 
-  test('模型清单：筛选与检索、复制预填、停用需确认', async ({ page, request }) => {
+  test('商品清单：筛选与检索、复制预填、停用需确认', async ({ page, request }) => {
     await login(page);
-    await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await page.goto(`${UI}/admin/channels?view=channels`);
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
     await expect
       .poll(async () => channelItems(page).count(), { timeout: 15000, message: '左列至少有一个渠道' })
       .toBeGreaterThan(0);
@@ -668,24 +671,24 @@ test.describe('渠道与模型 P5', () => {
     const modelRows = () => detail.getByTestId('admin-table-row');
     await expect.poll(async () => modelRows().count(), { timeout: 10000 }).toBeGreaterThan(0);
 
-    // 渠道内也带 24h 稳定性：与「全部模型」同源，排障不必来回切视图
-    await expect(detail).toContainText('稳定性（24h）');
+    // 供应商内也带 24h 健康：与「商品台账」同源，排障不必来回切视图
+    await expect(detail).toContainText('健康');
 
-    // 检索：无命中时给「没有匹配的模型」，不是空白
-    await detail.getByLabel('搜索模型').fill('__e2e_no_such_model__');
-    await expect(detail.getByText('没有匹配的模型')).toBeVisible();
+    // 检索：无命中时给「没有匹配的商品」，不是空白
+    await detail.getByLabel('搜索商品').fill('__e2e_no_such_model__');
+    await expect(detail.getByText('没有匹配的商品')).toBeVisible();
     await expect(modelRows()).toHaveCount(0);
-    await detail.getByLabel('搜索模型').fill('');
+    await detail.getByLabel('搜索商品').fill('');
     await expect.poll(async () => modelRows().count(), { timeout: 10000 }).toBeGreaterThan(0);
 
     // 状态筛选：停用项计数来自与列表同一份数据（分页后总数仍在页脚）
     const disabledCount = models.filter((item) => !item.enabled).length;
-    await detail.getByRole('combobox', { name: '模型状态' }).click();
-    await page.getByRole('option', { name: '模型停用', exact: true }).click();
+    await detail.getByRole('combobox', { name: '商品状态' }).click();
+    await page.getByRole('option', { name: '已停用', exact: true }).click();
     if (disabledCount > 0) {
-      await expect(detail.getByText(`共 ${disabledCount} 个模型`)).toBeVisible();
+      await expect(detail.getByText(`共 ${disabledCount} 个商品`)).toBeVisible();
     } else {
-      await expect(detail.getByText('没有匹配的模型')).toBeVisible();
+      await expect(detail.getByText('没有匹配的商品')).toBeVisible();
     }
     await detail.getByRole('button', { name: '重置' }).click();
     await expect.poll(async () => modelRows().count(), { timeout: 10000 }).toBeGreaterThan(0);
@@ -693,31 +696,26 @@ test.describe('渠道与模型 P5', () => {
     // 复制：新标识带 -copy 后缀，且默认停用（半配置的副本不许直接进路由）
     const first = models[0];
     const firstRow = modelRows().filter({ hasText: first.modelKey }).first();
-    await expect(firstRow.getByRole('button', { name: `编辑模型 ${first.modelKey}` })).toBeVisible();
-    await expect(firstRow.getByRole('button', { name: `测试模型 ${first.modelKey}` })).toBeVisible();
-    await expect(
-      firstRow.getByRole('button', {
-        name: `${first.enabled ? '停用' : '启用'}模型 ${first.modelKey}`,
-      }),
-    ).toBeVisible();
-    await expect(firstRow.getByRole('button', { name: `复制模型 ${first.modelKey}` })).toBeVisible();
-    await expect(firstRow.getByRole('button', { name: `删除模型 ${first.modelKey}` })).toBeVisible();
-    await firstRow.getByRole('button', { name: `复制模型 ${first.modelKey}` }).click();
+    await expect(firstRow.getByRole('button', { name: `编辑商品 ${first.modelKey}` })).toBeVisible();
+    const firstMore = firstRow.getByRole('button', { name: `商品 ${first.modelKey} 更多操作` });
+    await expect(firstMore).toBeVisible();
+    await firstMore.click();
+    await expect(page.getByRole('menuitem', { name: '测试连通' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: '复制商品' })).toBeVisible();
+    await page.getByRole('menuitem', { name: '复制商品' }).click();
     const modal = page.getByTestId('admin-modal');
     await expect(modal).toBeVisible();
-    await expect(modal.getByLabel('模型编号')).toHaveValue(`${first.modelKey}-copy`);
-    await expect(modal.getByRole('switch', { name: '启用该模型' })).not.toBeChecked();
-    const modalBody = modal.getByTestId('admin-modal-body');
-    const modalBodyMetrics = await modalBody.evaluate((element) => ({
-      clientHeight: element.clientHeight,
-      scrollHeight: element.scrollHeight,
-    }));
-    expect(modalBodyMetrics.scrollHeight).toBeGreaterThan(modalBodyMetrics.clientHeight);
-    await expect(modal.getByRole('button', { name: '保存模型' })).toBeVisible();
-    // Footer 的保存按钮在 form 外，靠 form 属性提交；空模型编号应留在弹窗内做字段级提示
-    await modal.getByLabel('模型编号').fill('');
-    await modal.getByRole('button', { name: '保存模型' }).click();
-    await expect(modal.getByText('请填写模型编号')).toBeVisible();
+    await expect(modal.getByLabel('商品编号')).toHaveValue(`${first.modelKey}-copy`);
+    await expect(modal.getByRole('switch', { name: '启用该商品' })).not.toBeChecked();
+    // 表单分层后默认内容可在一屏内读完，不再断言必然出现滚动条
+    await expect(modal.getByTestId('admin-modal-body')).toBeVisible();
+    await expect(modal.getByRole('button', { name: '保存商品' })).toBeVisible();
+    // Footer 的保存按钮在 form 外，靠 form 属性提交；空商品编号应留在弹窗内做字段级提示
+    await modal.getByLabel('商品编号').fill('');
+    await modal.getByRole('button', { name: '保存商品' }).click();
+    await expect(modal.getByText('请填写商品编号')).toBeVisible();
+    // 能力参数默认收在高级区，展开后再核对内容
+    await modal.getByText('高级：能力参数', { exact: true }).click();
     if (first.capability === 'image') {
       await expect(modal.getByRole('heading', { name: '图片能力参数' })).toBeVisible();
       await expect(modal.getByLabel('提示词最大字符数')).toBeVisible();
@@ -737,7 +735,10 @@ test.describe('渠道与模型 P5', () => {
     const enabledModel = models.find((item) => item.enabled);
     if (enabledModel) {
       const enabledRow = modelRows().filter({ hasText: enabledModel.modelKey }).first();
-      await enabledRow.getByRole('button', { name: `停用模型 ${enabledModel.modelKey}` }).click();
+      await enabledRow
+        .getByRole('button', { name: `商品 ${enabledModel.modelKey} 更多操作` })
+        .click();
+      await page.getByRole('menuitem', { name: '停用商品' }).click();
       const confirm = page.getByTestId('admin-confirm-action');
       await expect(confirm).toBeVisible();
       await expect(confirm).toContainText('影响范围');
@@ -745,19 +746,20 @@ test.describe('渠道与模型 P5', () => {
       await expect(confirm).toHaveCount(0);
     }
 
-    // 删除从行内按钮进入；确认弹窗出现时必须立即可见
-    await firstRow.getByRole('button', { name: `删除模型 ${first.modelKey}` }).click();
+    // 删除从行内「更多」进入；确认弹窗出现时必须立即可见
+    await firstRow.getByRole('button', { name: `商品 ${first.modelKey} 更多操作` }).click();
+    await page.getByRole('menuitem', { name: '删除商品' }).click();
     const deleteConfirm = page.getByTestId('admin-confirm-action');
     await expect(deleteConfirm).toBeVisible();
-    await expect(deleteConfirm).toContainText(`删除模型 ${first.modelKey}`);
+    await expect(deleteConfirm).toContainText(`删除商品 ${first.modelKey}`);
     await deleteConfirm.getByRole('button', { name: '取消', exact: true }).click();
     await expect(deleteConfirm).toHaveCount(0);
   });
 
-  test('上游目录导入：弹窗内搜索、已存在标记与只导入新模型', async ({ page, request }) => {
+  test('上游目录导入：弹窗内搜索、已存在标记与只导入新商品', async ({ page, request }) => {
     await login(page);
-    await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await page.goto(`${UI}/admin/channels?view=channels`);
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
     await expect
       .poll(async () => channelItems(page).count(), { timeout: 15000, message: '左列至少有一个渠道' })
       .toBeGreaterThan(0);
@@ -771,10 +773,10 @@ test.describe('渠道与模型 P5', () => {
     ) as Array<{ modelKey: string }>;
     expect(localModels.length, '夹具渠道必须包含模型').toBeGreaterThan(0);
     const existingKey = localModels.find((item) => item.modelKey === channel.channelModelKey)?.modelKey;
-    expect(existingKey, '夹具渠道模型未出现在管理员模型清单').toBeTruthy();
+    expect(existingKey, '夹具渠道模型未出现在管理员商品清单').toBeTruthy();
 
     // 上游目录由服务端用库内凭证拉取，这里桩一份固定目录：
-    // 一个本地已存在的模型 + 两个新模型，够验证「已存在标记」与「只导入新模型」
+    // 一个本地已存在的商品 + 两个新商品，够验证「已存在标记」与「只导入新商品」
     await page.route('**/api/v1/admin/channels/*/models/fetch', (route) =>
       route.fulfill({
         status: 200,
@@ -797,47 +799,46 @@ test.describe('渠道与模型 P5', () => {
     const detail = page.locator('#admin-channel-detail');
     await expect(detail).toContainText(channel.channelName);
 
-    await detail.getByRole('button', { name: '同步服务商模型' }).click();
+    await detail.getByRole('button', { name: '从供应商同步商品' }).click();
     const modal = page.getByTestId('admin-modal');
     await expect(modal).toBeVisible();
-    await expect(modal.getByText('导入服务商模型')).toBeVisible();
+    await expect(modal.getByText('导入供应商商品')).toBeVisible();
 
     // 已存在的模型默认不勾选，且行上有「已存在」标记
     await expect(modal.getByText('已存在').first()).toBeVisible();
     await expect(
-      modal.getByRole('checkbox', { name: `选择服务商模型 ${existingKey}` }),
+      modal.getByRole('checkbox', { name: `选择供应商商品 ${existingKey}` }),
     ).not.toBeChecked();
-    await expect(modal.getByRole('checkbox', { name: '选择服务商模型 __e2e_new_a__' })).toBeChecked();
+    await expect(modal.getByRole('checkbox', { name: '选择供应商商品 __e2e_new_a__' })).toBeChecked();
 
     // 导入按钮只数新模型
-    await expect(modal.getByRole('button', { name: '导入 2 个新模型' })).toBeEnabled();
+    await expect(modal.getByRole('button', { name: '导入 2 个新商品' })).toBeEnabled();
 
     // 搜索后只剩匹配项；「取消选中匹配的」只作用于匹配项
-    await modal.getByLabel('搜索服务商模型').fill('__e2e_new_b__');
-    await expect(modal.getByRole('checkbox', { name: '选择服务商模型 __e2e_new_a__' })).toHaveCount(0);
-    await expect(modal.getByRole('checkbox', { name: '选择服务商模型 __e2e_new_b__' })).toBeChecked();
+    await modal.getByLabel('搜索供应商商品').fill('__e2e_new_b__');
+    await expect(modal.getByRole('checkbox', { name: '选择供应商商品 __e2e_new_a__' })).toHaveCount(0);
+    await expect(modal.getByRole('checkbox', { name: '选择供应商商品 __e2e_new_b__' })).toBeChecked();
     await modal.getByRole('button', { name: '取消选中匹配的' }).click();
-    await expect(modal.getByRole('checkbox', { name: '选择服务商模型 __e2e_new_b__' })).not.toBeChecked();
-    await expect(modal.getByRole('button', { name: '导入 1 个新模型' })).toBeEnabled();
+    await expect(modal.getByRole('checkbox', { name: '选择供应商商品 __e2e_new_b__' })).not.toBeChecked();
+    await expect(modal.getByRole('button', { name: '导入 1 个新商品' })).toBeEnabled();
 
     // 「全选匹配的」把匹配项加回来
     await modal.getByRole('button', { name: /全选匹配的 1 个/ }).click();
-    await expect(modal.getByRole('checkbox', { name: '选择服务商模型 __e2e_new_b__' })).toBeChecked();
-    await expect(modal.getByRole('button', { name: '导入 2 个新模型' })).toBeEnabled();
+    await expect(modal.getByRole('checkbox', { name: '选择供应商商品 __e2e_new_b__' })).toBeChecked();
+    await expect(modal.getByRole('button', { name: '导入 2 个新商品' })).toBeEnabled();
 
     // 不真的导入：落库会污染线路数
     await modal.getByRole('button', { name: '取消', exact: true }).click();
     await expect(modal).toHaveCount(0);
   });
 
-  test('全部模型视图：跨渠道列出线路并按状态筛选', async ({ page, request }) => {
+  test('商品台账：跨供应商列出商品并按状态筛选', async ({ page, request }) => {
     await login(page);
     await page.goto(`${UI}/admin/channels`);
-    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
 
-    // 「按渠道 / 全部模型」是同一份数据的两种组织方式
-    await page.getByRole('radio', { name: '全部模型' }).click();
-    await expect(page.getByRole('heading', { name: '全部模型' })).toBeVisible();
+    // 商品台账是默认视图；同一份数据可切到「供应商」组织
+    await expect(page.getByRole('heading', { name: '商品台账' })).toBeVisible();
 
     const token = await adminToken(request);
     const auth = { Authorization: `Bearer ${token}` };
@@ -855,16 +856,16 @@ test.describe('渠道与模型 P5', () => {
     }>;
     if (all.length === 0) {
       // 没有线路时表格给空态，不是空白
-      await expect(page.getByText('暂无渠道模型')).toBeVisible();
+      await expect(page.getByText('暂无商品')).toBeVisible();
       return;
     }
 
-    // 表格行数 = 全部模型数（含停用项）
+    // 表格行数 = 全部商品数（含停用项）
     // 同页的「线路健康」也是一张表，按容器取行，否则会把它的行数算进来
     const allModelRows = () => page.getByTestId('admin-all-models').getByTestId('admin-table-row');
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(all.length);
 
-    // 排序：同一模型在不同渠道的行相邻（用户端名称 → 模型编号 → 渠道名）
+    // 排序：同一模型在不同渠道的行相邻（展示名称 → 商品编号 → 渠道名）
     const expectedOrder = [...all].sort(
       (left, right) =>
         (left.displayName || left.modelKey).localeCompare(right.displayName || right.modelKey, 'zh-CN') ||
@@ -877,53 +878,53 @@ test.describe('渠道与模型 P5', () => {
 
     // 计数口径：总条数 + 真正可用的条数（模型与渠道都启用），与参考实现一致
     await expect(
-      page.getByTestId('admin-filter').getByText(/^\d+ 个模型 · \d+ 个可用$/),
+      page.getByTestId('admin-filter').getByText(/^\d+ 个商品 · \d+ 个可用$/),
     ).toBeVisible();
 
     await expect(allModelRows().first()).toContainText(expectedOrder[0].modelKey);
 
-    // 停用筛选只留停用项（模型停用或渠道停用都算停用）
-    await page.getByRole('combobox', { name: '模型状态' }).click();
-    await page.getByRole('option', { name: '停用（模型/渠道）', exact: true }).click();
+    // 停用筛选只留停用项（已停用或渠道停用都算停用）
+    await page.getByRole('combobox', { name: '商品状态' }).click();
+    await page.getByRole('option', { name: '已停用', exact: true }).click();
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(
       all.filter((item) => !item.enabled || !item.channelEnabled).length,
     );
 
     // 切回全部后恢复
-    await page.getByRole('combobox', { name: '模型状态' }).click();
+    await page.getByRole('combobox', { name: '商品状态' }).click();
     await page.getByRole('option', { name: '全部', exact: true }).click();
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(all.length);
 
-    // 停用不是纯展示开关：跨渠道视图同样要二次确认，取消不改库
-    await page.getByRole('combobox', { name: '模型状态' }).click();
-    await page.getByRole('option', { name: '启用', exact: true }).click();
+    // 停用不是纯展示开关：商品台账同样要二次确认，取消不改库
+    await page.getByRole('combobox', { name: '商品状态' }).click();
+    await page.getByRole('option', { name: '可用', exact: true }).click();
     const usable = all.filter((item) => item.enabled && item.channelEnabled);
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(usable.length);
     if (usable.length > 0) {
-      await allModelRows().first().getByRole('button', { name: '停用模型' }).click();
+      await allModelRows().first().getByRole('button', { name: '停用商品' }).click();
       const confirmDialog = page.getByRole('dialog', { name: /^停用 .+ 的 / });
-      await expect(confirmDialog).toContainText('引用它的前台模型会切换到其他可用线路');
+      await expect(confirmDialog).toContainText('消费它的能力会切换到其他可用商品');
       await confirmDialog.getByRole('button', { name: '取消' }).click();
       await expect(confirmDialog).toHaveCount(0);
       await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(usable.length);
     }
-    await page.getByRole('combobox', { name: '模型状态' }).click();
+    await page.getByRole('combobox', { name: '商品状态' }).click();
     await page.getByRole('option', { name: '全部', exact: true }).click();
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(all.length);
 
-    // 编辑动线：跨渠道视图直接打开该模型的编辑器，不必先回渠道翻清单
+    // 编辑动线：商品台账直接打开该商品的编辑器，不必先回供应商翻清单
     await allModelRows().first().getByRole('button', { name: '编辑' }).click();
-    await expect(page.getByRole('radio', { name: '按渠道' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('radio', { name: '供应商' })).toHaveAttribute('aria-checked', 'true');
     const editor = page.getByTestId('admin-modal');
-    await expect(editor).toContainText(`编辑模型 · ${expectedOrder[0].modelKey}`);
+    await expect(editor).toContainText(`编辑商品 · ${expectedOrder[0].modelKey}`);
     await editor.getByRole('button', { name: '取消' }).click();
     await expect(editor).toHaveCount(0);
-    await page.getByRole('radio', { name: '全部模型' }).click();
-    await expect(page.getByRole('heading', { name: '全部模型' })).toBeVisible();
+    await page.getByRole('radio', { name: '商品台账' }).click();
+    await expect(page.getByRole('heading', { name: '商品台账' })).toBeVisible();
 
-    // 排障动线收口：点渠道名一步跳回「按渠道」并选中该渠道，不用自己找
-    await allModelRows().first().getByTitle('在渠道中查看').click();
-    await expect(page.getByRole('radio', { name: '按渠道' })).toHaveAttribute('aria-checked', 'true');
+    // 排障动线收口：点供应商名一步跳回「供应商」并选中该供应商，不用自己找
+    await allModelRows().first().getByTitle('在供应商中查看').click();
+    await expect(page.getByRole('radio', { name: '供应商' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#admin-channel-detail')).toContainText(expectedOrder[0].channelName);
   });
 });

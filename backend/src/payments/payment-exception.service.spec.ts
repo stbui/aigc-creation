@@ -22,12 +22,14 @@ function makeHarness(options: {
         currency: 'CNY',
         paidCents: 100,
         providerConfigId: 'cfg-1',
+        providerInstanceId: 'order-instance-1',
         payments: [
           {
             id: 'payment-1',
             status: 'succeeded',
             channel: 'alipay',
             providerConfigId: 'cfg-1',
+            providerInstanceId: 'payment-instance-1',
             payTransactionId: 'TRADE-1',
             amountCents: 100,
             providerRef: null,
@@ -44,7 +46,7 @@ function makeHarness(options: {
       return row[key] === expected;
     });
 
-  const prisma = {
+  const prisma: Row = {
     paymentExceptionCase: {
       findUnique: vi.fn(async ({ where }: { where: Row }) => {
         for (const row of cases.values()) {
@@ -83,7 +85,10 @@ function makeHarness(options: {
       findMany: vi.fn(async () => [...cases.values()]),
       count: vi.fn(async () => cases.size),
     },
-    order: { findUnique: vi.fn().mockResolvedValue(order) },
+    order: {
+      findUnique: vi.fn().mockResolvedValue(order),
+      update: vi.fn().mockResolvedValue(order),
+    },
     refund: {
       findUnique: vi.fn(async ({ where }: { where: Row }) => refunds.get(where.id) ?? null),
       findFirst: vi.fn(async () => null),
@@ -113,6 +118,18 @@ function makeHarness(options: {
       findMany: vi.fn(async () => [...refunds.values()]),
     },
   };
+  let transactionTail = Promise.resolve();
+  prisma.$executeRaw = vi.fn().mockResolvedValue(1);
+  prisma.$transaction = vi.fn(
+    (work: (tx: typeof prisma) => Promise<unknown>) => {
+      const result = transactionTail.then(() => work(prisma));
+      transactionTail = result.then(
+        () => undefined,
+        () => undefined,
+      );
+      return result;
+    },
+  );
   const gateway = {
     refund: vi.fn(options.gatewayRefund ?? (async () => ({
       state: 'succeeded',
@@ -238,11 +255,330 @@ describe('PaymentExceptionService 自动退款补偿', () => {
     expect(result.outcome).toBe('manual_review');
     expect([...refunds.values()][0]).toMatchObject({
       status: 'failed',
-      detail: expect.stringContaining('network timeout'),
+      detail: expect.stringContaining('"failureKind":"unknown"'),
     });
     expect([...cases.values()][0]).toMatchObject({
       status: 'manual_review',
       lastError: expect.stringContaining('network timeout'),
     });
   });
+  it('退款处理中断后重试复用原退款单号，不重复建单', async () => {
+    let calls = 0;
+    const { service, gateway, refunds } = makeHarness({
+      gatewayRefund: async () => {
+        calls += 1;
+        return calls === 1
+          ? { state: 'processing', providerRefundId: 'provider-processing', raw: {} }
+          : { state: 'succeeded', providerRefundId: 'provider-success', raw: {} };
+      },
+    });
+
+    const first = await service.autoRefundCancelledPayment({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'TRADE-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+    expect(first.outcome).toBe('refund_processing');
+    const refundId = first.case.refundId;
+    expect(refundId).toBeTruthy();
+
+    const retried = await service.retryAutoRefund(first.case.id, 'admin-1');
+
+    expect(retried.outcome).toBe('refunded');
+    expect(retried.case.refundId).toBe(refundId);
+    expect(refunds.size).toBe(1);
+    expect(
+      (gateway.refund.mock.calls as Array<[{ outRefundNo: string }]>).map(
+        ([call]) => call.outRefundNo,
+      ),
+    ).toEqual([
+      refundId,
+      refundId,
+    ]);
+  });
+
+  it('结果未知的退款失败重试必须复用原退款单号', async () => {
+    let calls = 0;
+    const { service, gateway, refunds, cases } = makeHarness({
+      gatewayRefund: async () => {
+        calls += 1;
+        return calls === 1
+          ? { state: 'failed', failureKind: 'unknown', error: 'socket timeout' }
+          : { state: 'succeeded', providerRefundId: 'provider-success', raw: {} };
+      },
+    });
+
+    const first = await service.autoRefundCancelledPayment({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'TRADE-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+    expect(first.outcome).toBe('manual_review');
+    const refundId = first.case.refundId;
+    expect([...cases.values()][0]).toMatchObject({ status: 'manual_review' });
+
+    const retried = await service.retryAutoRefund(first.case.id, 'admin-1');
+
+    expect(retried.outcome).toBe('refunded');
+    expect(retried.case.refundId).toBe(refundId);
+    expect(refunds.size).toBe(1);
+    expect(
+      (gateway.refund.mock.calls as Array<[{ outRefundNo: string }]>).map(
+        ([call]) => call.outRefundNo,
+      ),
+    ).toEqual([
+      refundId,
+      refundId,
+    ]);
+  });
+
+  it('渠道明确拒绝后才允许新建退款单号重试', async () => {
+    let calls = 0;
+    const { service, gateway, refunds } = makeHarness({
+      gatewayRefund: async () => {
+        calls += 1;
+        return calls === 1
+          ? { state: 'failed', failureKind: 'definitive', error: '参数错误' }
+          : { state: 'succeeded', providerRefundId: 'provider-success', raw: {} };
+      },
+    });
+
+    const first = await service.autoRefundCancelledPayment({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'TRADE-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+    const rejectedRefundId = first.case.refundId;
+    expect(first.outcome).toBe('manual_review');
+
+    const retried = await service.retryAutoRefund(first.case.id, 'admin-1');
+
+    expect(retried.outcome).toBe('refunded');
+    expect(retried.case.refundId).not.toBe(rejectedRefundId);
+    expect(refunds.size).toBe(2);
+    expect(
+      (gateway.refund.mock.calls as Array<[{ outRefundNo: string }]>).map(
+        ([call]) => call.outRefundNo,
+      ),
+    ).toEqual([
+      rejectedRefundId,
+      retried.case.refundId,
+    ]);
+  });
+
+  it('渠道退款使用成功支付流水上的服务商实例', async () => {
+    const { service, gateway } = makeHarness();
+
+    await service.autoRefundCancelledPayment({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'TRADE-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+
+    expect(gateway.refund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        order: {
+          channel: 'alipay',
+          providerConfigId: 'cfg-1',
+          providerInstanceId: 'payment-instance-1',
+        },
+      }),
+    );
+  });
+
+  it('自动退款成功只闭环异常单，不修改订单状态或积分', async () => {
+    const { service, prisma, refunds, cases } = makeHarness();
+
+    const result = await service.autoRefundCancelledPayment({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'TRADE-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+
+    expect(result.outcome).toBe('refunded');
+    expect([...refunds.values()][0].status).toBe('succeeded');
+    expect([...cases.values()][0].status).toBe('refunded');
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.order.findUnique).toHaveBeenCalled();
+  });
+
+  it('手工核销支付没有真实渠道资金，不得自动退款', async () => {
+    const { service, gateway, refunds } = makeHarness({
+      order: {
+        id: 'order-1',
+        orderNo: 'HJ-1',
+        userId: 'user-1',
+        status: 'cancelled',
+        currency: 'CNY',
+        paidCents: 100,
+        providerConfigId: 'cfg-1',
+        payments: [
+          {
+            id: 'payment-manual',
+            status: 'succeeded',
+            channel: 'manual',
+            providerConfigId: 'cfg-1',
+            payTransactionId: 'MANUAL-1',
+            amountCents: 100,
+          },
+        ],
+      },
+    });
+
+    const result = await service.autoRefundCancelledPayment({
+      providerId: 'manual',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'MANUAL-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+
+    expect(result.outcome).toBe('manual_review');
+    expect(result.case.lastError).toContain('手工标记支付');
+    expect(gateway.refund).not.toHaveBeenCalled();
+    expect(refunds.size).toBe(0);
+  });
+
+  it('人工确认渠道退款成功后只更新退款单与异常单', async () => {
+    const { service, prisma, refunds, cases } = makeHarness({
+      gatewayRefund: async () => ({
+        state: 'processing',
+        providerRefundId: 'provider-processing',
+        raw: {},
+      }),
+    });
+    const pending = await service.autoRefundCancelledPayment({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'TRADE-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+
+    const confirmed = await service.confirmAutoRefund(pending.case.id, 'admin-1', {
+      outcome: 'succeeded',
+      providerRefundId: 'console-refund-1',
+      reason: '渠道商户后台显示退款成功',
+    });
+
+    expect(confirmed.status).toBe('refunded');
+    expect([...refunds.values()][0]).toMatchObject({
+      status: 'succeeded',
+      providerRefundId: 'console-refund-1',
+    });
+    expect([...cases.values()][0].status).toBe('refunded');
+    expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      '失败',
+      { state: 'failed', failureKind: 'definitive', error: 'late definitive failure', raw: {} },
+    ],
+    [
+      '处理中',
+      { state: 'processing', providerRefundId: 'late-processing', raw: {} },
+    ],
+  ])('人工确认成功后，晚到的渠道%s结果不得覆盖终态', async (_label, lateResult) => {
+    let release!: (value: unknown) => void;
+    const gatewayResult = new Promise((resolve) => {
+      release = resolve;
+    });
+    const { service, gateway, refunds, cases } = makeHarness({
+      gatewayRefund: () => gatewayResult,
+    });
+
+    const automatic = service.autoRefundCancelledPayment({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'TRADE-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+    await vi.waitFor(() => expect(gateway.refund).toHaveBeenCalledTimes(1));
+
+    const confirmed = await service.confirmAutoRefund([...cases.keys()][0], 'admin-1', {
+      outcome: 'succeeded',
+      providerRefundId: 'console-refund-1',
+      reason: '渠道商户后台显示退款成功',
+    });
+    expect(confirmed.status).toBe('refunded');
+
+    release(lateResult);
+    const settled = await automatic;
+
+    expect(settled.outcome).toBe('refunded');
+    expect([...refunds.values()][0]).toMatchObject({
+      status: 'succeeded',
+      providerRefundId: 'console-refund-1',
+      detail: expect.stringContaining('"manualConfirmed":true'),
+    });
+    expect([...cases.values()][0]).toMatchObject({
+      status: 'refunded',
+      resolution: expect.stringContaining('人工核对渠道后确认退款成功'),
+    });
+  });
+
+  it('人工确认渠道退款失败后转回人工队列并标记为明确失败', async () => {
+    const { service, refunds, cases } = makeHarness({
+      gatewayRefund: async () => ({
+        state: 'processing',
+        providerRefundId: 'provider-processing',
+        raw: {},
+      }),
+    });
+    const pending = await service.autoRefundCancelledPayment({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-1',
+      providerTradeNo: 'TRADE-1',
+      amountCents: 100,
+      detail: '已取消订单仍扣款',
+    });
+
+    const confirmed = await service.confirmAutoRefund(pending.case.id, 'admin-1', {
+      outcome: 'failed',
+      providerRefundId: 'console-refund-failed',
+      reason: '渠道商户后台显示退款失败',
+    });
+
+    expect(confirmed.status).toBe('manual_review');
+    expect(confirmed.refundFailureKind).toBe('definitive');
+    expect([...refunds.values()][0]).toMatchObject({
+      status: 'failed',
+      detail: expect.stringContaining('"failureKind":"definitive"'),
+    });
+    expect([...cases.values()][0]).toMatchObject({
+      status: 'manual_review',
+      lastError: expect.stringContaining('渠道退款已确认失败'),
+    });
+  });
+
+  it('人工确认退款只允许自动退款异常单', async () => {
+    const { service } = makeHarness();
+    const row = await service.recordManual({
+      providerId: 'alipay',
+      merchantOrderNo: 'HJ-MANUAL',
+      amountCents: 100,
+      kind: 'refund_failed',
+      detail: '普通退款失败',
+    });
+
+    await expect(
+      service.confirmAutoRefund(row.id, 'admin-1', {
+        outcome: 'succeeded',
+        reason: '渠道商户后台显示退款成功',
+      }),
+    ).rejects.toThrow('不是已取消订单扣款');
+  });
+
 });

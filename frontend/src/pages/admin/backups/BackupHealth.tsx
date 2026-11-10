@@ -23,7 +23,7 @@ export function BackupHealth({ stats }: { stats: AdminBackupStats | null }) {
               有 {stats.unverified} 份备份未经恢复验证，事故时可能无法使用，请尽快验证。
             </div>
           )}
-          {stats.failed > 0 && <div>有 {stats.failed} 次备份失败，请在操作审计中查看原因。</div>}
+          {stats.failed > 0 && <div>有 {stats.failed} 次备份失败，请检查最近失败的备份记录。</div>}
         </Notice>
       )}
 

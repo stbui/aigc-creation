@@ -81,7 +81,6 @@ export function AssetDeleteConfirm({
         '对象存储文件同步删除，不可恢复',
         '引用该素材的任务记录会被连带清理',
         '用户端素材库立即不可见',
-        '写操作审计（含操作人）',
       ]}
       extra={
         target.kind === 'single' ? (

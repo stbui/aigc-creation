@@ -2,7 +2,7 @@
  * 工单回复模板。
  *
  * 只做高频句式的快捷输入，不替代客服判断：选中后仍可在输入框里修改，
- * 发送前也仍走同一条 `POST /admin/tickets/:id/replies` 与审计。
+ * 发送前也仍走同一条 `POST /admin/tickets/:id/replies`。
  *
  * 变量只支持 `{name}` / `{ticketNo}` / `{orderNo}` 三种 —— 都是工单详情里
  * 已经存在的字段，不做第二套模板引擎。

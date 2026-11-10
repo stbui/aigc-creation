@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { OrdersModule } from '../orders/orders.module';
@@ -9,7 +9,6 @@ import { MembershipModule } from '../membership/membership.module';
 import { AdminController } from './admin.controller';
 import { AdminUsersController } from './users.controller';
 import { AdminRolesController, AdminSettingsController } from './roles.controller';
-import { AdminAuditController } from './audit.controller';
 import { AdminBackupController } from './backup.controller';
 import { AdminAssetsController } from './assets-admin.controller';
 import { AdminStorageController } from './storage.controller';
@@ -54,12 +53,10 @@ import {
 } from './marketing.controller';
 import { AdminGuard } from './admin.guard';
 import { PermissionGuard } from './permission.guard';
-import { AuditInterceptor } from './audit.interceptor';
 import { AdminRoleService } from './admin-role.service';
 import { AdminOverviewService } from './overview.service';
 import { AdminUsersService } from './users.service';
 import { AdminSettingsService } from './settings.service';
-import { AdminAuditService } from './audit.service';
 import { BackupService } from './backup.service';
 import { AdminAssetsService } from './assets-admin.service';
 import { TasksAdminService } from './tasks-admin.service';
@@ -71,12 +68,12 @@ import { SchedulerService } from './scheduler.service';
 /**
  * 后台模块。
  *
- * 守卫与拦截器在本模块内以 APP_GUARD / APP_INTERCEPTOR 注册 —— NestJS 中
- * 无论在哪个模块注册都是全局生效, 但放在本模块内才能正确解析 AdminRoleService
- * 等依赖 (若注册在 AppModule, AppModule 需导出 AdminRoleService, 徒增耦合)。
+ * 守卫在本模块内以 APP_GUARD 注册 —— NestJS 中无论在哪个模块注册都是
+ * 全局生效, 但放在本模块内才能正确解析 AdminRoleService 等依赖 (若注册在
+ * AppModule, AppModule 需导出 AdminRoleService, 徒增耦合)。
  *
- * 三者内部都对非 /admin 路径直接放行, 因此 C 端链路不受影响。
- * 执行顺序: AdminGuard (身份) → PermissionGuard (权限点) → controller → AuditInterceptor。
+ * 守卫内部对非 /admin 路径直接放行, 因此 C 端链路不受影响。
+ * 执行顺序: AdminGuard (身份) → PermissionGuard (权限点) → controller。
  *
  * CreditsModule / OrdersModule: 商品订单页需要它们提供的 service。
  * MarketingCoreModule: 营销判定(券/活动)被后台配置、下单核销与 C 端试算共用。
@@ -119,7 +116,6 @@ import { SchedulerService } from './scheduler.service';
     AdminUsersController,
     AdminRolesController,
     AdminSettingsController,
-    AdminAuditController,
     AdminBackupController,
     AdminAssetsController,
     AdminStorageController,
@@ -164,7 +160,6 @@ import { SchedulerService } from './scheduler.service';
     AdminOverviewService,
     AdminUsersService,
     AdminSettingsService,
-    AdminAuditService,
     BackupService,
     AdminAssetsService,
     AdminCommerceService,
@@ -176,7 +171,6 @@ import { SchedulerService } from './scheduler.service';
     SchedulerService,
     { provide: APP_GUARD, useClass: AdminGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
-    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
   // 供后续批次的子服务复用角色判定 (如订单退款前校验操作者)
   exports: [AdminRoleService, AdminAssetsService],

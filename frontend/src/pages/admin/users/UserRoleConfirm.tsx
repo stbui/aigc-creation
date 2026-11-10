@@ -11,7 +11,6 @@ import {
   FormField,
   SelectField,
   StatusTag,
-  TextAreaField,
 } from '~/admin-ui/primitives';
 import { ROLE_OPTIONS } from './constants';
 import type { AdminUserRole, AdminUserRow } from './types';
@@ -31,10 +30,9 @@ export function UserRoleConfirm({
   target: AdminUserRow;
   loading: boolean;
   onCancel: () => void;
-  onConfirm: (role: AdminUserRole, reason?: string) => void;
+  onConfirm: (role: AdminUserRole) => void;
 }) {
   const [next, setNext] = useState<AdminUserRole>(target.role);
-  const [reason, setReason] = useState('');
 
   return (
     <AlertDialog
@@ -69,16 +67,6 @@ export function UserRoleConfirm({
               options={ROLE_OPTIONS}
             />
           </FormField>
-          <FormField label="操作原因（可选）">
-            <TextAreaField
-              ariaLabel="操作原因"
-              value={reason}
-              onChange={setReason}
-              placeholder="例如：岗位调整、职责变更"
-              rows={2}
-              maxLength={500}
-            />
-          </FormField>
         </div>
 
         <AlertDialogFooter className="bg-muted/40 px-5 py-3">
@@ -91,7 +79,7 @@ export function UserRoleConfirm({
             onClick={(event) => {
               // 请求结束后再由父级关闭，避免加载期间弹框提前消失。
               event.preventDefault();
-              onConfirm(next, reason.trim() || undefined);
+              onConfirm(next);
             }}
           >
             {loading ? '变更中…' : '确认变更'}

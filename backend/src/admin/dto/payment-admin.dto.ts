@@ -121,14 +121,17 @@ export class PaymentProviderInstanceOrderDto {
 }
 
 export class PaymentSettingsUpdateDto {
+  @IsOptional()
   @IsIn(["CNY", "USD"], { message: "币种只支持 CNY / USD" })
-  defaultCurrency!: "CNY" | "USD";
+  defaultCurrency?: "CNY" | "USD";
 
+  @IsOptional()
   @IsIn(PAYMENT_SOURCES, { message: "支付宝来源只支持 unset / official / epay" })
-  alipaySource!: "unset" | "official" | "epay";
+  alipaySource?: "unset" | "official" | "epay";
 
+  @IsOptional()
   @IsIn(PAYMENT_SOURCES, { message: "微信来源只支持 unset / official / epay" })
-  wechatSource!: "unset" | "official" | "epay";
+  wechatSource?: "unset" | "official" | "epay";
 }
 
 export class PaymentOrderListQueryDto extends PageQueryDto {
@@ -183,6 +186,21 @@ export class PaymentExceptionCloseDto {
   @MinLength(2)
   @MaxLength(500)
   resolution!: string;
+}
+
+export class PaymentExceptionConfirmRefundDto {
+  @IsIn(["succeeded", "failed"], { message: "核销结果只支持 succeeded / failed" })
+  outcome!: "succeeded" | "failed";
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  providerRefundId?: string;
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(500)
+  reason!: string;
 }
 
 

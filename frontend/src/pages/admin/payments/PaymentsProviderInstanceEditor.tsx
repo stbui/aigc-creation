@@ -19,7 +19,7 @@ import type {
   PaymentProviderConfigUpdate,
   VisiblePaymentMethod,
 } from '../../../types/payment';
-import { PAYMENT_PROVIDER_STATE_META } from './constants';
+import { PAYMENT_METHOD_LABELS, PAYMENT_PROVIDER_STATE_META } from './constants';
 import {
   allowedPaymentMethods,
   instanceLabel,
@@ -27,11 +27,6 @@ import {
   missingRequiredLabels,
   togglePaymentMethod,
 } from './utils';
-
-const METHOD_LABELS: Record<VisiblePaymentMethod, string> = {
-  alipay: '支付宝',
-  wechat: '微信支付',
-};
 
 /** 实例编辑草稿。金额在 UI 中使用「元」，提交时再转回整数分。 */
 export interface InstanceDraft {
@@ -321,7 +316,7 @@ export function PaymentsProviderInstanceEditor({
                       key={method}
                       checked={checked}
                       onChange={() => toggleMethod(method)}
-                      label={METHOD_LABELS[method]}
+                      label={PAYMENT_METHOD_LABELS[method]}
                       disabled={
                         !writable ||
                         saving ||

@@ -44,38 +44,6 @@ const controlNames = await page.evaluate(() => {
 console.log('=== 设置项控件 ===');
 console.log(JSON.stringify(controlNames, null, 2));
 
-/* ② 弹层里的「变更原因」输入：FormField 的 label 必须真的关联到它 */
-/* 先改一个值，「保存变更」才可点（无变更时按钮是禁用的） */
-const firstNumber = page.locator('input[type="number"]').first();
-await firstNumber.fill('12');
-await page.waitForTimeout(400);
-await page.getByRole('button', { name: '保存变更' }).click();
-await page.waitForTimeout(800);
-
-const reasonInfo = await page.evaluate(() => {
-  const el = document.querySelector('#adm-setting-reason');
-  if (!el) return { found: false };
-  return {
-    found: true,
-    id: el.id,
-    labels: Array.from(el.labels ?? []).map((l) => l.textContent?.trim()),
-    ariaLabel: el.getAttribute('aria-label'),
-    // 浏览器实际算出来的可访问名
-    accessibleName: el.labels?.[0]?.textContent?.trim() ?? null,
-  };
-});
-console.log('=== 变更原因输入 ===');
-console.log(JSON.stringify(reasonInfo, null, 2));
-
-/* ③ Playwright 自己的 getByLabel 能不能命中 */
-try {
-  const byLabel = page.getByLabel('变更原因（写入审计）');
-  const count = await byLabel.count();
-  console.log(`getByLabel('变更原因（写入审计）') 命中 ${count} 个`);
-} catch (e) {
-  console.log(`getByLabel 失败: ${e.message}`);
-}
-
 console.log('=== console errors ===');
 console.log(errors.length ? errors.join('\n') : '(无)');
 

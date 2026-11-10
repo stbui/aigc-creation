@@ -38,8 +38,8 @@ const FALLBACK: Record<string, { title: string; body: string; link?: string }> =
   payment_success: { title: '支付成功', body: '订单 {orderNo} 已支付，积分已到账。', link: '/orders' },
   credit_granted: { title: '积分到账', body: '本次获得 {credits} 积分。', link: '/credits' },
   task_failed: {
-    title: '生成失败，积分已退回',
-    body: '任务「{capability}」执行失败，{credits} 积分已原额退回。',
+    title: '生成失败',
+    body: '任务「{capability}」执行失败，积分处理结果请查看任务账单。',
     link: '/works',
   },
   membership_expired: { title: '会员已到期', body: '你的会员已于 {date} 到期。', link: '/packages' },

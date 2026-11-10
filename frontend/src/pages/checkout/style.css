@@ -527,6 +527,24 @@
   gap: 8px;
 }
 
+.co-stripe {
+  margin-top: 14px;
+}
+
+.co-stripe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.co-stripe-form .co-pay-btn {
+  margin-top: 2px;
+}
+
+.co-stripe-form .co-hint {
+  margin: 0;
+}
+
 .co-refresh-payment {
   width: 100%;
   margin-top: 10px;

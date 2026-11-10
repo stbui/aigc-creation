@@ -1,201 +1,83 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ContextBanner, Notice, PageHeader, SavedViewBar } from '~/admin-ui/primitives';
-import { readAdminDone } from '../../../lib/admin-context-link';
-import { useAdmin, useAdminDetailParam, useDuty, useSelectionPrune } from './hooks';
-import { TaskActionDialogs } from './TaskActionDialogs';
-import { TaskDetailModal } from './TaskDetailModal';
-import { TaskFailureGroups } from './TaskFailureGroups';
-import { TaskFilters } from './TaskFilters';
-import { TaskListSection } from './TaskListSection';
-import { TaskStats } from './TaskStats';
-import { useTaskActions } from './useTaskActions';
-import { useTaskFilters } from './useTaskFilters';
-import { useTaskTableColumns } from './TaskTableColumns';
+import { PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from '~/admin-ui/primitives';
+import { AiAnalysisMonitor } from './AiAnalysisMonitor';
+import { GenerationTasksTab } from './GenerationTasksTab';
+import { useAdmin } from './hooks';
+
+const TABS = [
+  { value: 'tasks', label: '生成任务' },
+  { value: 'ai-analysis', label: 'AI 分析' },
+] as const;
+
+type TabValue = (typeof TABS)[number]['value'];
+
+function isTab(value: string | null): value is TabValue {
+  return TABS.some((tab) => tab.value === value);
+}
 
 /**
  * 任务监控 (admin-prd.md B-28~B-33)。
  *
- * 页面只做编排：筛选生命周期、表格列、列表工具栏与写操作分别由独立模块
- * 承载。批量动作不按状态预筛勾选，后端逐条返回结果，避免前端静默丢行。
+ * 「生成任务」与「AI 分析」共用值班入口，但数据模型不同：前者是异步
+ * GenerationTask，后者是同步文字调用（只有 ApiCallLog，没有任务）。因此
+ * AI 分析只读展示真实上游调用，不伪造任务行，也不提供重试 / 终止。
  */
 export function AdminTasksPage() {
   const { can } = useAdmin();
-  const [selected, setSelected] = useState<string[]>([]);
-  const clearSelection = useCallback(() => setSelected([]), []);
-  const filters = useTaskFilters({ onQueryChange: clearSelection });
-  const [detailId, setDetailId] = useAdminDetailParam();
-  const closeDetail = useCallback(() => setDetailId(null), [setDetailId]);
-  const openDetail = useCallback((id: string) => setDetailId(id), [setDetailId]);
+  const canReadModelCalls = can('model.call_read');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const tab: TabValue =
+    requestedTab === 'ai-analysis' && canReadModelCalls ? 'ai-analysis' : 'tasks';
+  const tabs = TABS.filter((item) => item.value !== 'ai-analysis' || canReadModelCalls);
 
-  const actions = useTaskActions({
-    reload: filters.reload,
-    onDeleted: closeDetail,
-    selected,
-    onSelectionChange: setSelected,
-  });
-
-  const columns = useTaskTableColumns({
-    can,
-    onOpenDetail: openDetail,
-    onAction: actions.openConfirm,
-  });
-
-  const [searchParams] = useSearchParams();
-  const done = readAdminDone(searchParams);
-  const { data: duty } = useDuty();
-  const list = filters.data?.result;
-  /* 换筛选与翻页都会清空勾选；再按当前页裁剪一次，兜住页大小与排序变化 */
-  const visibleTaskIds = useMemo(() => (list?.items ?? []).map((row) => row.id), [list]);
-  useSelectionPrune(setSelected, visibleTaskIds);
-  const liveCongestion = duty?.congestion ?? filters.data?.congestion;
-  const overloaded = (liveCongestion?.running ?? 0) > (liveCongestion?.runningThreshold ?? 50);
+  const switchTab = useCallback(
+    (next: string) => {
+      if (!isTab(next)) return;
+      if (next === 'ai-analysis' && !canReadModelCalls) return;
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (next === 'tasks') params.delete('tab');
+          else params.set('tab', next);
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [canReadModelCalls, setSearchParams],
+  );
 
   return (
     <>
-      <PageHeader title="任务监控" />
-
-      {(done === 'billing_settled' || done === 'billing_refunded') && (
-        <ContextBanner
-          title={done === 'billing_refunded' ? '关联账单已退款' : '关联账单已结算'}
-          detail="账单终态已更新；如需重试，请重新发起并确认扣费影响。"
-        />
-      )}
-
-      <TaskStats
-        total={list?.total ?? null}
-        congestion={liveCongestion ?? null}
-        hasFilter={filters.hasFilter}
-        loading={filters.loading}
+      <PageHeader
+        title="任务监控"
+        description="生成任务的生命周期与同步 AI 分析调用；两类数据分开呈现，避免把同步调用伪装成任务。"
       />
 
-      <TaskFailureGroups
-        groups={filters.data?.failureGroups ?? []}
-        activeErrorCode={filters.errorCode || undefined}
-        onSelect={(errorCode) => {
-          clearSelection();
-          filters.setStatus('failed');
-          filters.setErrorCode(errorCode);
-          filters.setQuery({ status: 'failed', errorCode });
-        }}
-        onClear={() => {
-          filters.setErrorCode('');
-          filters.setQuery({ errorCode: undefined });
-        }}
-      />
+      <Tabs value={tab} onValueChange={switchTab} className="gap-3">
+        <TabsList aria-label="任务监控标签" className="h-9 gap-1 p-1">
+          {tabs.map((item) => (
+            <TabsTrigger
+              key={item.value}
+              value={item.value}
+              className="h-7 px-3 text-sm font-medium"
+            >
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {/* 超阈值只在真的超了才出现：常亮的阈值提示会变成装饰。 */}
-      {overloaded && (
-        <Notice
-          tone="warn"
-          title={`执行中 ${liveCongestion?.running} 已超阈值 ${liveCongestion?.runningThreshold}`}
-        >
-          通道可能跟不上提交速度，先看概览页的线路状态与冷却通道。
-        </Notice>
-      )}
-
-      <TaskFilters
-        status={filters.status}
-        onStatusChange={filters.setStatus}
-        capability={filters.capability}
-        onCapabilityChange={filters.setCapability}
-        owner={filters.owner}
-        onOwnerChange={filters.setOwner}
-        project={filters.project}
-        onProjectChange={filters.setProject}
-        errorCode={filters.errorCode}
-        onErrorCodeChange={filters.setErrorCode}
-        from={filters.from}
-        onFromChange={filters.setFrom}
-        to={filters.to}
-        onToChange={filters.setTo}
-        capabilityOptions={filters.capOptions}
-        appliedChips={filters.appliedChips}
-        onApply={filters.applyFilters}
-        onReset={filters.resetFilters}
-      />
-
-      <SavedViewBar
-        pageKey="tasks"
-        currentFilters={{
-          status: filters.status,
-          capability: filters.capability,
-          userId: filters.owner || undefined,
-          projectId: filters.project || undefined,
-          errorCode: filters.errorCode || undefined,
-          from: filters.from || undefined,
-          to: filters.to || undefined,
-        }}
-        onApply={(next) => {
-          filters.setStatus(next.status);
-          filters.setCapability(next.capability);
-          filters.setOwner(next.userId ?? '');
-          filters.setProject(next.projectId ?? '');
-          filters.setErrorCode(next.errorCode ?? '');
-          filters.setFrom(next.from ?? '');
-          filters.setTo(next.to ?? '');
-          filters.setQuery({
-            status: next.status,
-            capability: next.capability,
-            userId: next.userId,
-            projectId: next.projectId,
-            errorCode: next.errorCode,
-            from: next.from,
-            to: next.to,
-          });
-        }}
-      />
-
-      <TaskListSection
-        data={filters.data}
-        columns={columns}
-        loading={filters.loading}
-        error={filters.error}
-        hasFilter={filters.hasFilter}
-        sort={filters.sort}
-        selected={selected}
-        busy={actions.busy}
-        exporting={filters.exporting}
-        canRetry={can('task.retry')}
-        canCancel={can('task.cancel')}
-        canDelete={can('task.delete')}
-        canExport={can('data.export')}
-        onSelectedChange={setSelected}
-        onBatchAction={actions.openBatch}
-        onSortChange={(sort) => filters.setQuery({ sort: sort ?? 'createdAt:desc' }, false)}
-        onRetry={filters.reload}
-        onResetFilters={filters.resetFilters}
-        onOpenDetail={openDetail}
-        onPageChange={(page, pageSize) => {
-          clearSelection();
-          filters.setPage(page, pageSize);
-        }}
-        onExport={() => void filters.exportTasks()}
-      />
-
-      <TaskDetailModal
-        detailId={detailId}
-        rows={list?.items ?? []}
-        canRetry={can('task.retry')}
-        canCancel={can('task.cancel')}
-        canDelete={can('task.delete')}
-        canReadModelCalls={can('model.call_read')}
-        canReadBilling={can('billing_order.read')}
-        canReadChannels={can('channel.read')}
-        onClose={closeDetail}
-        onAction={actions.openConfirm}
-      />
-
-      <TaskActionDialogs
-        confirm={actions.confirm}
-        batchKind={actions.batchKind}
-        selectedCount={selected.length}
-        busy={actions.busy}
-        onCloseConfirm={actions.closeConfirm}
-        onCloseBatch={actions.closeBatch}
-        onConfirm={actions.runConfirm}
-        onRunBatch={actions.runBatch}
-      />
+        <TabsContent value="tasks">
+          <GenerationTasksTab />
+        </TabsContent>
+        {canReadModelCalls && (
+          <TabsContent value="ai-analysis">
+            <AiAnalysisMonitor />
+          </TabsContent>
+        )}
+      </Tabs>
     </>
   );
 }

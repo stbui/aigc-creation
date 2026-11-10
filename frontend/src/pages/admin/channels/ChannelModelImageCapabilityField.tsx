@@ -106,7 +106,7 @@ export function ChannelModelImageCapabilityField({
   return (
     <Panel title="图片能力参数" note="设置参考素材范围与可用参数；尺寸、分辨率、质量和输出数量会自动更新">
       {!protocol ? (
-        <Notice tone="info">请先选择接口类型，再配置图片能力参数。</Notice>
+        <Notice tone="info">请先选择接入方式，再配置图片能力参数。</Notice>
       ) : protocolLoading ? (
         <Notice tone="info">正在读取可用参数…</Notice>
       ) : (
@@ -167,7 +167,7 @@ export function ChannelModelImageCapabilityField({
                 </div>
 
                 {protocolChanged && (
-                  <Notice tone="warn" title="接口类型已变更">
+                  <Notice tone="warn" title="接入方式已变更">
                     <div className="flex flex-wrap items-center gap-2">
                       <span>当前配置仍保留上一个接口的参数，可切换为新接口的推荐值。</span>
                       <ActionButton variant="secondary" size="xs" onClick={reset}>
@@ -285,7 +285,7 @@ export function ChannelModelImageCapabilityField({
                                       <ToneBadge tone="warn">必填</ToneBadge>
                                     )}
                                     {definition.pricing && (
-                                        <ToneBadge tone="brand">参与价格方案计价</ToneBadge>
+                                        <ToneBadge tone="brand">参与售价方案计价</ToneBadge>
                                     )}
                                   </div>
                                   {definition.description && (

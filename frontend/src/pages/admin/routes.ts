@@ -21,7 +21,6 @@ function lazyAdminPage<T extends Record<string, ComponentType<any>>>(
 export const AdminUsersPage = lazyAdminPage(() => import('./users'), 'AdminUsersPage');
 export const AdminRolesPage = lazyAdminPage(() => import('./roles'), 'AdminRolesPage');
 export const AdminSettingsPage = lazyAdminPage(() => import('./settings'), 'AdminSettingsPage');
-export const AdminAuditPage = lazyAdminPage(() => import('./audit-logs'), 'AdminAuditPage');
 export const AdminBackupPage = lazyAdminPage(() => import('./backups'), 'AdminBackupPage');
 export const AdminAssetsPage = lazyAdminPage(() => import('./assets'), 'AdminAssetsPage');
 export const AdminStoragePage = lazyAdminPage(() => import('./storage'), 'AdminStoragePage');

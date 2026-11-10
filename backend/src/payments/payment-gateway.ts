@@ -42,8 +42,8 @@ export class PaymentGateway {
   /**
    * 原路退款。
    *
-   * 契约：**不抛异常**，失败一律以 `state:'failed'` 返回，让调用方把退款单
-   * 置 failed 并保留「结果未知」语义。凭据缺失同样返回 failed，绝不降级沙箱。
+   * 契约：**不抛异常**。调用前即可确定的错误返回 `definitive`；适配器执行中
+   * 抛错（网络中断、超时等）返回 `unknown`。凭据缺失同样失败，绝不降级沙箱。
    */
   async refund(input: {
     order: {
@@ -60,19 +60,37 @@ export class PaymentGateway {
     providerTradeNo?: string;
   }): Promise<RefundResult> {
     const adapter = getAdapter(input.order.channel);
-    if (!adapter) return { state: 'failed', error: `未知支付渠道: ${input.order.channel}` };
+    if (!adapter) {
+      return {
+        state: 'failed',
+        failureKind: 'definitive',
+        error: `未知支付渠道: ${input.order.channel}`,
+      };
+    }
 
     let resolved: Awaited<ReturnType<PaymentConfigService['resolveForOrder']>>;
     try {
       resolved = await this.configs.resolveForOrder(input.order);
     } catch (e) {
-      return { state: 'failed', error: `支付配置读取失败: ${(e as Error).message}` };
+      return {
+        state: 'failed',
+        failureKind: 'unknown',
+        error: `支付配置读取失败，无法确认渠道退款状态: ${(e as Error).message}`,
+      };
     }
     if (!resolved) {
-      return { state: 'failed', error: `支付渠道 ${input.order.channel} 未完成配置，无法退款` };
+      return {
+        state: 'failed',
+        failureKind: 'definitive',
+        error: `支付渠道 ${input.order.channel} 未完成配置，无法退款`,
+      };
     }
     if (!resolved.refundEnabled) {
-      return { state: 'failed', error: '该支付实例已关闭退款' };
+      return {
+        state: 'failed',
+        failureKind: 'definitive',
+        error: '该支付实例已关闭退款',
+      };
     }
     const config: PaymentContext = {
       providerId: resolved.providerId,
@@ -83,7 +101,11 @@ export class PaymentGateway {
 
     const missing = adapter.validateConfig(config.values);
     if (missing.length > 0) {
-      return { state: 'failed', error: `支付渠道 ${input.order.channel} 配置不完整（缺少 ${missing.join(', ')}）` };
+      return {
+        state: 'failed',
+        failureKind: 'definitive',
+        error: `支付渠道 ${input.order.channel} 配置不完整（缺少 ${missing.join(', ')}）`,
+      };
     }
 
     const payload: RefundInput = {
@@ -99,7 +121,11 @@ export class PaymentGateway {
     try {
       return await adapter.refund(payload);
     } catch (e) {
-      return { state: 'failed', error: `渠道退款调用异常: ${(e as Error).message || e}` };
+      return {
+        state: 'failed',
+        failureKind: 'unknown',
+        error: `渠道退款调用异常，结果未知: ${(e as Error).message || e}`,
+      };
     }
   }
 }

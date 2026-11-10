@@ -31,6 +31,9 @@ describe('admin-links', () => {
     expect(adminModelCallsHref({ taskId: 'task/1' })).toBe(
       '/admin/model-calls?taskId=task%2F1',
     );
+    expect(adminModelCallsHref({ source: 'tool', operation: 'image_to_prompt' })).toBe(
+      '/admin/model-calls?source=tool&operation=image_to_prompt',
+    );
     expect(adminModelCallsHref({})).toBe('/admin/model-calls');
     expect(adminAssetHref('asset 1')).toBe('/admin/assets?q=asset+1');
   });

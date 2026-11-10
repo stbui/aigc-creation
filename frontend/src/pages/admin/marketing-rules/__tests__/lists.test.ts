@@ -6,7 +6,13 @@ import {
   TAB_OPTIONS,
   type RewardStatus,
 } from '../constants';
-import { checkinSummaryNote, inviteSummaryNote, resolveTab, userLabel } from '../utils';
+import {
+  checkinRuleError,
+  checkinSummaryNote,
+  inviteSummaryNote,
+  resolveTab,
+  userLabel,
+} from '../utils';
 
 /**
  * 邀请与签到两张流水表的展示口径（`/admin/marketing-rules?tab=invites|checkins`）。
@@ -70,5 +76,37 @@ describe('用户与摘要文案', () => {
     expect(checkinSummaryNote({ count: 40, creditsIssued: 260 })).toBe(
       '累计 40 次签到 · 累计发放 260 积分',
     );
+  });
+});
+
+describe('签到规则提交前校验', () => {
+  const valid = {
+    baseCredits: 10,
+    maxStreak: 0,
+    dailyCap: 0,
+    bonusRules: [{ day: 7, bonus: 20 }],
+    enabled: true,
+    updatedAt: null,
+    configured: true,
+  };
+
+  it('接受与后端边界一致的合法规则', () => {
+    expect(checkinRuleError(valid)).toBeNull();
+  });
+
+  it('拒绝后端会拒绝的越界与重复档位', () => {
+    expect(checkinRuleError({ ...valid, baseCredits: 100001 })).toContain('0–100000');
+    expect(
+      checkinRuleError({ ...valid, bonusRules: [{ day: 1, bonus: 20 }] }),
+    ).toContain('2–3650');
+    expect(
+      checkinRuleError({
+        ...valid,
+        bonusRules: [
+          { day: 7, bonus: 20 },
+          { day: 7, bonus: 30 },
+        ],
+      }),
+    ).toContain('重复');
   });
 });

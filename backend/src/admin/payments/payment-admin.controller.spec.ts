@@ -1,14 +1,40 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import {
-  AUDIT_ACTION_KEY,
-  PERMISSION_KEY,
-} from "../admin.decorator";
+import { PERMISSION_KEY } from "../admin.decorator";
 import { PERMISSIONS } from "../permissions";
 import {
+  AdminPaymentConfigController,
   AdminPaymentExceptionsController,
   AdminPaymentOrdersController,
 } from "./payment-admin.controller";
+
+describe("AdminPaymentConfigController 支付设置保存", () => {
+  it("只写入请求实际提交的字段，避免覆盖未提交的来源", async () => {
+    const settings = {
+      updateAll: vi.fn().mockResolvedValue({ updated: [], cleared: [] }),
+    };
+    const admin = {
+      settingsView: vi.fn().mockResolvedValue({ defaultCurrency: "USD" }),
+    };
+    const controller = new AdminPaymentConfigController(
+      admin as never,
+      {} as never,
+      settings as never,
+    );
+
+    await controller.saveSettings(
+      { defaultCurrency: "USD" },
+      { id: "admin-1" } as never,
+    );
+
+    expect(settings.updateAll).toHaveBeenCalledWith(
+      { "payment.defaultCurrency": "USD" },
+      [],
+      "admin-1",
+    );
+    expect(admin.settingsView).toHaveBeenCalledOnce();
+  });
+});
 
 describe("AdminPaymentOrdersController 权限口径", () => {
   it("支付订单列表、详情与导出统一使用支付域读权限", () => {
@@ -30,15 +56,9 @@ describe("AdminPaymentOrdersController 权限口径", () => {
         AdminPaymentOrdersController.prototype.export,
       ),
     ).toEqual([PERMISSIONS.paymentRead, PERMISSIONS.dataExport]);
-    expect(
-      Reflect.getMetadata(
-        AUDIT_ACTION_KEY,
-        AdminPaymentOrdersController.prototype.export,
-      ),
-    ).toBe("data.export");
   });
 
-  it("查单与关单均使用支付操作权限并写入审计", () => {
+  it("查单与关单均使用支付操作权限", () => {
     expect(
       Reflect.getMetadata(
         PERMISSION_KEY,
@@ -47,22 +67,10 @@ describe("AdminPaymentOrdersController 权限口径", () => {
     ).toBe(PERMISSIONS.paymentOperate);
     expect(
       Reflect.getMetadata(
-        AUDIT_ACTION_KEY,
-        AdminPaymentOrdersController.prototype.query,
-      ),
-    ).toBe("payment.order_query");
-    expect(
-      Reflect.getMetadata(
         PERMISSION_KEY,
         AdminPaymentOrdersController.prototype.close,
       ),
     ).toBe(PERMISSIONS.paymentOperate);
-    expect(
-      Reflect.getMetadata(
-        AUDIT_ACTION_KEY,
-        AdminPaymentOrdersController.prototype.close,
-      ),
-    ).toBe("payment.order_close");
   });
 });
 
@@ -80,19 +88,18 @@ describe("AdminPaymentExceptionsController 权限口径", () => {
         AdminPaymentExceptionsController.prototype.detail,
       ),
     ).toBe(PERMISSIONS.paymentRead);
-    for (const action of ["claim", "retryRefund", "close"] as const) {
+    for (const action of [
+      "claim",
+      "retryRefund",
+      "confirmRefund",
+      "close",
+    ] as const) {
       expect(
         Reflect.getMetadata(
           PERMISSION_KEY,
           AdminPaymentExceptionsController.prototype[action],
         ),
       ).toBe(PERMISSIONS.financeReconcile);
-      expect(
-        Reflect.getMetadata(
-          AUDIT_ACTION_KEY,
-          AdminPaymentExceptionsController.prototype[action],
-        ),
-      ).toMatch(/^payment\.exception_/);
     }
   });
 });

@@ -12,7 +12,7 @@ import {
   SelectField,
   StaleError,
   StatusTag,
-  formatDateTime,
+  formatShanghaiDateTime,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { marketingApi } from './api';
@@ -46,7 +46,9 @@ export function InviteRelationsTab() {
   const initialKeyword = searchParams.get('keyword') ?? '';
   const rawStatus = searchParams.get('rewardStatus');
   const initialStatus =
-    rawStatus && rawStatus in REWARD_STATUS_META ? (rawStatus as RewardStatus) : undefined;
+    rawStatus && Object.prototype.hasOwnProperty.call(REWARD_STATUS_META, rawStatus)
+      ? (rawStatus as RewardStatus)
+      : undefined;
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [rewardStatus, setRewardStatus] = useState<RewardStatus | undefined>(initialStatus);
@@ -126,7 +128,9 @@ export function InviteRelationsTab() {
       title: '绑定时间',
       width: 160,
       render: (row) => (
-        <span className="tabular-nums text-muted-foreground">{formatDateTime(row.boundAt)}</span>
+        <span className="tabular-nums text-muted-foreground">
+          {formatShanghaiDateTime(row.boundAt)}
+        </span>
       ),
     },
     {

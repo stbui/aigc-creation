@@ -503,6 +503,8 @@ export function OrdersPage() {
                       扣回 {r.creditsReclaimed} 积分
                       {r.creditsUnreclaimable > 0 &&
                         `（${r.creditsUnreclaimable} 已消耗无法追回）`}
+                      {r.creditsExpired > 0 &&
+                        `（${r.creditsExpired} 已过期作废）`}
                       {' · '}
                       {r.reason} · {formatDateTime(r.createdAt)}
                     </span>

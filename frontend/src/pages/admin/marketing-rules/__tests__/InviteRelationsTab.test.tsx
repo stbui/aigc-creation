@@ -98,10 +98,14 @@ describe('InviteRelationsTab', () => {
     expect(await screen.findByText('ABCD1234')).toBeInTheDocument();
     expect(screen.getByText('WXYZ9876')).toBeInTheDocument();
     // 人这一列是两行：姓名 + 可点的邮箱（跳用户页）
-    expect(screen.getByText('邀请人')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'inviter@example.com' }),
-    ).toHaveAttribute('href', '/admin/users?q=inviter%40example.com');
+    const [inviterLink] = screen.getAllByRole('link', {
+      name: 'inviter@example.com',
+    });
+    expect(inviterLink).toHaveAttribute(
+      'href',
+      '/admin/users?q=inviter%40example.com',
+    );
+    expect(inviterLink.closest('td')).toHaveTextContent('邀请人');
     expect(screen.getByText('待发放')).toBeInTheDocument();
     expect(screen.getByText('已发放')).toBeInTheDocument();
     expect(screen.getByText(/全量待发放 1 · 全量已发放 1/)).toBeInTheDocument();

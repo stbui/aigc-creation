@@ -141,9 +141,6 @@ model AdminRole {
   updatedAt   DateTime @updatedAt
 }
 
-// ── 操作审计 (admin-detailed-design.md §16.2) ─────────────────────
-// 只允许 INSERT: 后端不提供删除接口, 表设计上亦不设 updatedAt。
-// 已知限制: 管理员仍可直接操作数据库删除, 彻底解决需独立存储或哈希链。
 // ── 运行时配置 (admin-detailed-design.md §0.7) ──────────────────────
 // 站点名/上传上限/生成参数/安全策略等可后台调整项。
 // 优先级链: 代码默认值 (settings.dto.ts 的 SETTING_DEFS) → 本表的运行时覆盖。
@@ -329,7 +326,7 @@ model Order {
   /// 否则运营改套餐映射会追溯改变已付费用户的可用渠道和计费倍率。
   membershipUserGroupCodeSnapshot  String?
   /// 全额退款撤销本周期的时间。为 null 且订单仍为 paid/partial_refunded
-  /// 才代表该周期仍有效；保留字段用于退款后审计周期边界。
+  /// 才代表该周期仍有效；保留字段用于记录退款周期边界。
   membershipPeriodRevokedAt        DateTime?
 
   @@unique([userId, idempotencyKey])
@@ -436,7 +433,7 @@ model Payment {
   ///
   /// 对账差异申诉时, 这是唯一能自证的原始凭据 —— 事后渠道侧改口径、
   /// 或本地订单被误改, 都只能靠它还原「当时收到的到底是什么」。
-  /// 报文里可能含渠道侧的敏感字段, 故**只落库, 不进审计 detail 与接口响应**。
+  /// 报文里可能含渠道侧的敏感字段, 故**只落库, 不在接口响应中返回**。
   rawPayload      String  @default("")
 
   paidAt    DateTime?
@@ -483,6 +480,8 @@ model Refund {
   creditsReclaimed     Int @default(0)
   /// 因已消耗而无法扣回的积分数。必须如实记录, 否则对账会以为系统丢积分
   creditsUnreclaimable Int @default(0)
+  /// 本单积分已过期且未使用，不能扣回但也不是被用户消耗
+  creditsExpired       Int @default(0)
 
   status           String   @default("succeeded")
   reason           String
@@ -561,7 +560,7 @@ model CreditLedger {
   /// 资金/积分动作幂等键。退款按 taskId 生成稳定键，重复调用只能落一条流水。
   idempotencyKey String? @unique
 
-  /// 人工调整备注。可选；留空时写系统说明，操作审计另行自动记录
+  /// 人工调整备注。可选；留空时写系统说明
   reason     String?
   operatorId String?
 
@@ -750,25 +749,6 @@ model CleanupLog {
   @@index([createdAt])
 }
 
-model AdminAuditLog {
-  id         String   @id @default(cuid())
-  actorId    String
-  actorRole  String
-  action     String // 'user.disable' | 'order.refund' | 'credit.adjust' ...
-  targetType String
-  targetId   String
-  detail     String   @default("{}") // JSON: 操作前后的关键字段
-  reason     String? // 高危动作的操作原因
-  ip         String
-  success    Boolean  @default(true)
-  createdAt  DateTime @default(now())
-
-  @@index([actorId])
-  @@index([action])
-  @@index([targetType, targetId])
-  @@index([createdAt])
-}
-
 model Project {
   id        String    @id @default(cuid())
   ownerId   String
@@ -875,7 +855,7 @@ model GenerationTask {
   outputAssetIds String?
   params         String // JSON 对象字符串
   /// 历史供应商标识。新链路以 channelModelId / routeId 快照为准，本字段仅为
-  /// 兼容存量数据保留，避免数据库升级时删除仍有审计价值的历史值。
+  /// 兼容存量数据保留，避免数据库升级时删除仍有历史价值的值。
   provider       String?
   errorCode      String?
   // 本次实际扣掉的积分数快照 (0 = 免费)。用于后台展示与退款核算
@@ -1422,7 +1402,7 @@ model ReconciliationBatch {
 ///   missing_channel  本地有、渠道账单没有 (本地记了未到账, 或渠道漏单)
 ///   duplicate        同一交易号在账单里出现多次
 ///
-/// 处置**只标记不改钱** (`status`), 退款/补单仍回订单模块走各自的审计链路 ——
+/// 处置**只标记不改钱** (`status`), 退款/补单仍回订单模块走各自业务链路 ——
 /// 对账工具直接改资金状态会让「谁改的、为什么」失去唯一入口。
 model ReconciliationItem {
   id      String @id @default(cuid())
@@ -1546,7 +1526,7 @@ model MessageTemplate {
 ///
 /// 为什么不复用 `SystemSetting`：能力的开关是**每项一行**的结构化状态，
 /// 存成 JSON 会让「当前哪些能力被下线、因为什么、谁改的」在数据库里不可查询，
-/// 排障时只能捞一整条大 JSON 比对。单独建表也让审计与唯一约束落在能力 id 上。
+/// 排障时只能捞一整条大 JSON 比对。单独建表也让可追溯性与唯一约束落在能力 id 上。
 ///
 /// 语义：**没有行 = 启用**（默认全开），只有显式关停才落行。这样新增能力
 /// 无需先插一行，也不会因为漏插而「新能力默认不可用」。
@@ -1555,7 +1535,7 @@ model CapabilityControl {
   enabled      Boolean  @default(true)
   /// 对用户展示的原因（关停时必填）
   reason       String?
-  /// 操作人（管理员 id / 邮箱），审计日志另有完整一份
+  /// 操作人（管理员 id / 邮箱）
   updatedBy    String?
   updatedAt    DateTime @updatedAt
   createdAt    DateTime @default(now())
@@ -1847,7 +1827,7 @@ model LogicalModel {
   /// 旧 SKU 选择的无缝映射（JSON 字符串数组）
   legacyModelIdsJson      String @default("[]")
 
-  /// 归档后仅从可选目录隐藏；历史任务与审计仍可读取
+  /// 归档后仅从可选目录隐藏；历史任务仍可读取
   archivedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -2205,6 +2185,7 @@ model ApiCallLog {
   @@index([model, createdAt])
   @@index([taskId])
   @@index([status, createdAt])
+  @@index([source, operation, createdAt])
   @@index([createdAt])
   /// 可用率统计按「请求类型 + 状态 + 时间窗」过滤
   @@index([requestKind, status, createdAt])

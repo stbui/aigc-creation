@@ -311,5 +311,11 @@
   },
   "copyAddressFailed": {
     "message": "无法复制图片地址"
+  },
+  "extensionReloadRequiredTitle": {
+    "message": "扩展已更新"
+  },
+  "extensionReloadRequiredMessage": {
+    "message": "请刷新当前页面后重试。"
   }
 }

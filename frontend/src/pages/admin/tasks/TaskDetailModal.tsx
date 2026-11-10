@@ -191,7 +191,7 @@ export function TaskDetailModal({
                   {/* 42204 无可用线路 / 42205 无遮罩编辑线路：原因在供应侧，给一键入口 */}
                   {(d.errorCode === '42204' || d.errorCode === '42205') && canReadChannels && (
                     <Link className="text-brand hover:underline" to={adminChannelHref()}>
-                      前往渠道工作台检查线路
+                      前往模型商品检查线路
                     </Link>
                   )}
                 </div>

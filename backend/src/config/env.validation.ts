@@ -132,7 +132,7 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'channel.sms.template', env: 'SMS_TEMPLATE', type: 'string', def: '' },
 
   // 阿里云短信 / 邮件凭据（SMS_PROVIDER=aliyun / EMAIL_PROVIDER=aliyun 时才必需）。
-  // AccessKeySecret 只在签名时使用，不落日志、不进审计、不入库。
+  // AccessKeySecret 只在签名时使用，不落日志、不入库。
   { key: 'channel.aliyun.accessKeyId', env: 'ALIYUN_ACCESS_KEY_ID', type: 'string', def: '' },
   { key: 'channel.aliyun.accessKeySecret', env: 'ALIYUN_ACCESS_KEY_SECRET', type: 'string', def: '' },
   /** 短信签名（控制台已审核通过的签名名，不是「短信标题」） */
@@ -183,8 +183,9 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'payment.paypal.clientSecret', env: 'PAYPAL_CLIENT_SECRET', type: 'string', def: '' },
   { key: 'payment.paypal.webhookId', env: 'PAYPAL_WEBHOOK_ID', type: 'string', def: '' },
   { key: 'payment.paypal.apiBase', env: 'PAYPAL_API_BASE', type: 'string', def: '' },
-  // Stripe Checkout（测试/生产由 Secret Key 前缀决定）
+  // Stripe Payment Element（测试/生产由 Secret Key 前缀决定）
   { key: 'payment.stripe.secretKey', env: 'STRIPE_SECRET_KEY', type: 'string', def: '' },
+  { key: 'payment.stripe.publishableKey', env: 'STRIPE_PUBLISHABLE_KEY', type: 'string', def: '' },
   { key: 'payment.stripe.webhookSecret', env: 'STRIPE_WEBHOOK_SECRET', type: 'string', def: '' },
   { key: 'payment.stripe.apiBase', env: 'STRIPE_API_BASE', type: 'string', def: '' },
   // 易支付（epay.jylt.cc）：微信 type=1、支付宝 type=2

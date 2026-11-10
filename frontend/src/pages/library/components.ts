@@ -26,6 +26,8 @@ export {
   EmptyStateHeader,
   EmptyStateMedia,
   EmptyStateTitle,
+  Input,
+  Modal,
   Popconfirm,
   Select,
   StatusBadge,

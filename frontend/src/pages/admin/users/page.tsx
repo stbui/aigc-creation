@@ -107,7 +107,7 @@ export function AdminUsersPage() {
           target={actions.statusTarget}
           loading={actions.busy}
           onCancel={actions.closeStatus}
-          onConfirm={(next, reason) => void actions.updateStatus(next, reason)}
+          onConfirm={(next) => void actions.updateStatus(next)}
         />
       )}
 
@@ -116,7 +116,7 @@ export function AdminUsersPage() {
           target={actions.roleTarget}
           loading={actions.busy}
           onCancel={actions.closeRole}
-          onConfirm={(role, reason) => void actions.updateRole(role, reason)}
+          onConfirm={(role) => void actions.updateRole(role)}
         />
       )}
 

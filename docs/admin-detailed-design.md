@@ -18,11 +18,10 @@
 
 ```
 backend/src/admin/
-├── admin.module.ts                  # 模块装配（守卫/拦截器在此注册）
+├── admin.module.ts                  # 模块装配（守卫在此注册）
 ├── admin.guard.ts                   # 后台身份 + 账号状态（每次查库）
 ├── permission.guard.ts              # 权限点校验
-├── admin.decorator.ts               # @RequirePermission / @AuditAction
-├── audit.interceptor.ts             # 写操作自动审计
+├── admin.decorator.ts               # @RequirePermission
 ├── permissions.ts                   # 权限点单一事实源
 ├── admin-role.service.ts            # 角色读取、权限过滤、hasPermission
 ├── admin.controller.ts              # /admin/me /overview /permissions
@@ -40,7 +39,6 @@ backend/src/admin/
 ├── roles.controller.ts / settings.service.ts / ../common/setting-defs.ts
 ├── storage.controller.ts / scheduler.controller.ts / scheduler.service.ts
 ├── backup.controller.ts / backup.service.ts / retention.controller.ts
-├── audit.controller.ts / audit.service.ts
 └── search.controller.ts / search.service.ts
 ```
 
@@ -61,40 +59,23 @@ frontend/src/components/admin/
 ├── DutyContext.tsx                 # 概览首屏值班塔的数据轮询
 └── statusMeta.ts                   # 状态 → 文案 / 色调映射
 
-frontend/src/pages/admin/            # 32 个页面 + channels/、payments/ 子目录
+frontend/src/pages/admin/            # 31 个页面 + channels/、payments/ 子目录
 ```
 
-### 0.2 守卫链与审计
-
-```ts
-// admin.module.ts
-providers: [
-  { provide: APP_GUARD, useClass: AdminGuard },
-  { provide: APP_GUARD, useClass: PermissionGuard },
-  { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
-]
-```
+### 0.2 守卫链
 
 | 环节 | 职责 | 拒绝响应 |
 | --- | --- | --- |
 | `AdminGuard` | 解 Bearer token 后**查库**取 `role` / `status` | 401 `40101`；`disabled` / `deleted` → 403 `40302`；非后台角色 → 403 `40301` |
 | `PermissionGuard` | 读 `@RequirePermission` 元数据，比对 `AdminRole.permissions` | 403 `40301`（不回显所需权限名；端点漏声明权限点时**拒绝**而非放行） |
-| `AuditInterceptor` | 写操作自动审计；显式声明 `@AuditAction` 的 GET 导出 / 下载也审计 | 不阻断业务，写失败只 WARN |
 
-执行顺序：`AdminGuard` → `PermissionGuard` → controller → `AuditInterceptor`。三者内部对非 `/admin` 路径直接放行，C 端链路不受影响。
+执行顺序：`AdminGuard` → `PermissionGuard` → controller。两者内部对非 `/admin` 路径直接放行，C 端链路不受影响。
 
 **为什么每次查库**：token TTL 7 天，若只信 token 内的角色，降权或禁用后旧 token 仍可用 7 天。SQLite 单文件、admin 接口低频，开销可忽略。
 
-**审计口径**：
-
-- 写操作一律记录；GET 导出 / 下载只有显式声明 `@AuditAction` 时才记录。
-- `detail` 只取白名单字段（`status` / `role` / `name` / `priceCents` 等），命中 `password|token|secret|hash|credential` 的字段一律不写。
-- 普通管理写操作由 `AuditInterceptor` 按动作与结果自动生成稳定原因并落 `AdminAuditLog.reason`；只有退款、发票驳回、能力下架等真实业务语义需要由调用方提供原因。审计原因不作为页面确认门槛。
-- 审计失败**不阻断业务**：让它阻断等于把审计变成单点故障，反而降低可追溯性。
-
 ### 0.3 权限点命名
 
-`<模块>.<动作>`，66 个，完整清单见 `permissions.ts` 的 `PERMISSIONS`（分组表见 `docs/admin-suite-design.md` §2.2）。三条约束：
+`<模块>.<动作>`，67 个，完整清单见 `permissions.ts` 的 `PERMISSIONS`（分组表见 `docs/admin-suite-design.md` §2.2）。三条约束：
 
 1. 权限点从清单移除后，角色里残留的值比对不上即等同无权（兜底默认拒），`AdminRoleService.getPermissions()` 读取时过滤；过滤只在内存生效，不回写库。
 2. 三个内置角色不可删除，但权限点均可调整（含 `admin`）：批量更新会校验未知权限点与角色是否存在，不阻止裁剪；整批写入在同一事务中完成，改动因守卫每次请求查库而立即生效。
@@ -127,7 +108,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 0.6 高危操作确认
 
-`ConfirmDialog`（shadcn `AlertDialog` 组合壳，`admin-ui/primitives/overlay`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写审计原因。审计始终在操作后由系统自动留痕，不反向要求用户确认审计。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
+`ConfirmDialog`（shadcn `AlertDialog` 组合壳，`admin-ui/primitives/overlay`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写原因。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 
@@ -188,7 +169,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 | GET | `/admin/users?keyword&role&status&from&to&segment&membership&page&pageSize&sort` | `user.read` |
 | GET | `/admin/users/stats` | `user.read` |
 | GET | `/admin/users/:id` | `user.read` |
-| GET | `/admin/users/:id/logins` | `audit.read` |
+| GET | `/admin/users/:id/logins` | `user.read` |
 | GET | `/admin/users/:id/impact` | `user.delete` |
 | PATCH | `/admin/users/:id/status` | `user.disable` |
 | PATCH | `/admin/users/:id/role` | `user.write` |
@@ -201,8 +182,8 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 ### 2.2 规则
 
 - **禁用立即生效**：`AdminGuard` 与 `JwtAuthGuard` 每次请求查库校验 `status`，不走 token 内快照；两处同时比对 `tokenVersion`，改密/重置后旧后台 token 也立即失效。
-- **角色变更**：`user` / `admin` / `operator` / `finance` 四个值（`USER_ROLES`）；最后一个 `admin` 不可降级，服务层断言后返回 409。禁用与角色变更可带可选 `reason`（≤500），写入审计 detail。
-- **重置密码**：生成一次性强密码（24 小时有效），只在本次响应里出现一次，不落库、不进审计 detail。用户登录后 `mustChangePassword=true`，改密前只能访问 `/me` 与 `/me/password`；自助改密或邮件重置会清除该标记。
+- **角色变更**：`user` / `admin` / `operator` / `finance` 四个值（`USER_ROLES`）；最后一个 `admin` 不可降级，服务层断言后返回 409。禁用与角色变更不要求填写原因。
+- **重置密码**：生成一次性强密码（24 小时有效），只在本次响应里出现一次，不落库。用户登录后 `mustChangePassword=true`，改密前只能访问 `/me` 与 `/me/password`；自助改密或邮件重置会清除该标记。
 - **强制下线**：`POST /:id/logout-all` 递增 `tokenVersion` 并清理扫码登录会话；账号仍可正常登录，与「禁用」区分。
 - **删除**：走 `account-lifecycle.service.ts`，与 C 端自助注销同一份实现。清除作品 / 素材 / 项目 / 积分批次与对象存储文件，终止生效中的会员；保留订单 / 支付 / 退款 / 发票 / 积分流水（流水断开批次引用），账号匿名化并置 `deleted`。删除前用 `impact` 预览将清除与保留的量；管理端固定走软注销，不提供批量删除。
 - **列表口径**：关键词与顶栏全局搜索一致（邮箱 / 昵称 / 手机号模糊 + 用户 ID 精确）；支持注册时间范围、从未登录 / 30 天未登录 / 无可见任务分群、会员状态筛选。顶部统计由 `GET /stats` 返回，跟随同一组筛选条件，不是当前页口径。
@@ -231,6 +212,8 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 `GET /admin/tasks`、`/admin/tasks/stats`、`/admin/tasks/capabilities`、`/admin/tasks/export`、`/admin/tasks/:id`、`POST /admin/tasks/:id/retry`、`POST /admin/tasks/:id/cancel`、`POST /admin/tasks/batch`。
 
+AI 分析标签查询 `GET /admin/api-logs?source=tool&operation=image_to_prompt`（`model.call_read`），不需要新增任务接口。
+
 ### 4.2 规则
 
 - **全链路详情**：宽弹窗按同一 `taskId` 集中展示用户提交、参数 / 输入素材、线路尝试、模型调用、产出和账单终态。`GET /admin/tasks/:id`（`task.read`）返回任务及按 `routeRun / attemptNumber` 排序的 `routeAttempts`；最近 20 次模型调用走 `/admin/api-logs?taskId=`（`model.call_read`），并深链 `/admin/model-calls?taskId=` 查看全部；账单走 `/admin/billing-orders?taskId=`（`billing_order.read`），并深链 `/admin/billing-orders?taskId=`。无对应权限时不请求，只显示权限边界。
@@ -238,9 +221,10 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 - **重试不复用旧记录**：用原参数与原输入新建任务，再复用 `GenerateService.enqueue` 触发执行。原地复活会绕过 `GenerationTask.outputAssetId @unique` 的一产出约束。
 - **终止**把 `running` 置 `failed` + `cancelled_by_admin`，按任务快照退款。
 - 统计条显示各状态计数，积压（`pending` / `running`）超阈值标红。
-- **导出** CSV 与列表共用 `listWhere`，筛什么导什么，上限 5000 行，需 `task.read + data.export` 并留审计。
+- **导出** CSV 与列表共用 `listWhere`，筛什么导什么，上限 5000 行，需 `task.read + data.export`。
 - **性能**：能力筛选项的全表 `groupBy` 缓存 60 秒；拥堵指标仍实时查询。`GenerationTask` 增加 `[status, createdAt]` 与 `[ownerId, createdAt]` 组合索引，服务「状态 + 时间窗」和用户详情时间线。
 - 告警链接 `?status=failed|running` 会作为列表初始筛选；页面已打开时 URL 变化也会同步过去。
+- **AI 分析是同步调用，不是任务**：图片转提示词只写 `ApiCallLog`（`source=tool`、`operation=image_to_prompt`、`billable=false`），没有轮询、任务状态、重试或取消。`?tab=ai-analysis` 下按状态 / 用户 / 时间筛选真实上游调用，展示耗时、Token、错误与请求号；无 `model.call_read` 时不显示标签也不发请求，并深链 `/admin/model-calls?source=tool&operation=image_to_prompt` 查看完整记录。
 
 ---
 
@@ -269,7 +253,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 - 按 `(slug, version)` 版本化；已发布版本**不可原地覆盖**（`upsert` 返回 409），改文本须升版本号。
 - 发布时同 slug 的其他已发布版本自动 `archived`，保证 `current()` 唯一。
 - 前台 `GET /legal/:slug` 只读最新已发布版本，读不到时 `LegalPage` 用内置文本兜底。
-- 读 `legal.read`、写 `legal.write`；发布自动写审计，不要求填写变更原因。
+- 读 `legal.read`、写 `legal.write`；发布不要求填写变更原因。
 
 ---
 
@@ -368,17 +352,19 @@ partial_refunded → refunded | partial_refunded
 
 | 标签 | 接口 | 规则 |
 | --- | --- | --- |
-| 支付渠道 | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | 每个适配器一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。保存写审计，不要求填写原因 |
+| 支付渠道 | `GET /admin/payments/providers`、`GET/PUT /admin/payments/settings`、`POST /admin/payments/providers/:providerId/instances`、`PUT /admin/payments/providers/:providerId/instances/:instanceId/config`、`PATCH /admin/payments/providers/:providerId/instances/order`、旧兼容入口 `PUT /admin/payments/providers/:id/config` | 每个服务商实例一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。支付设置包含 `defaultCurrency` / `alipaySource` / `wechatSource`，字段均可选，PUT 只更新实际提交项。保存不要求填写原因 |
 | 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分八类（含同一商户单多交易号的 `duplicate_charge`），已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |
-| 支付异常 | `GET/POST /admin/payments/exceptions*` | 真资金差异的认领、重试原路退款与人工结案，`finance.reconcile` |
+| 支付异常 | `GET/POST /admin/payments/exceptions*` | 真资金差异的认领、重试原路退款、人工核销与结案，`finance.reconcile` |
 
-**查单 / 关单在订单管理**：`POST /admin/payments/orders/:id/query` 与 `/:id/close` 的入口在 `/admin/orders`（列表与详情抽屉），使用 `payment.operate`，自动写审计但不要求填写变更原因。关单前始终先向渠道查单；已入账订单关单返回 `409`。**本页与订单页都不把「关单」当退款**：退款在订单管理，涉及积分与优惠券回滚，放在支付域会让人以为「关单 = 退款」。
+支付异常面板必须把退款失败拆成两种资金语义：`definitive` 表示渠道已明确拒绝，可新建退款单重试；`unknown` 或历史数据无 `failureKind` 表示结果未知，只能复用原退款单号重试或到渠道后台核对。自动退款处于 `auto_refund_pending` 时展示「确认退款成功 / 确认退款失败」；只有运营到渠道商户后台核实后才能核销，核销依据必填，渠道退款单号可选。成功后异常单置 `refunded`，失败后保留 `manual_review`，两者都**不改已取消订单状态，也不回收/恢复积分**。普通订单的 `processing` 退款只允许在订单详情走人工核销，不展示再次发起退款入口。
+
+**查单 / 关单在订单管理**：`POST /admin/payments/orders/:id/query` 与 `/:id/close` 的入口在 `/admin/orders`（列表与详情抽屉），使用 `payment.operate`，不要求填写变更原因。关单前始终先向渠道查单；已入账订单关单返回 `409`。**本页与订单页都不把「关单」当退款**：退款在订单管理，涉及积分与优惠券回滚，放在支付域会让人以为「关单 = 退款」。
 
 对账运行状态只有 `running` / `completed` / `failed`；旧的 `imported` / `resolved` 语义已随新模型下线（人工处置走订单退款流程，不在页面上改钱）。
 
 ### 11.2 发票
 
-`/admin/invoices`（`invoice.write`）。同一订单保留历史但最多一张有效票（`activeOrderId @unique`），金额取申请时 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具自动写审计；驳回要求填写原因，原因会回显给用户并写入审计。存在 `processing` 退款时禁止开具；开具事务内重新校验订单状态和剩余可开票余额，退款后票面超余额必须驳回重提。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`invoice.write + data.export` + 审计）。
+`/admin/invoices`（`invoice.write`）。同一订单保留历史但最多一张有效票（`activeOrderId @unique`），金额取申请时 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具不要求填写原因；驳回要求填写原因，原因会回显给用户。存在 `processing` 退款时禁止开具；开具事务内重新校验订单状态和剩余可开票余额，退款后票面超余额必须驳回重提。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`invoice.write + data.export`）。
 
 ---
 
@@ -388,7 +374,7 @@ partial_refunded → refunded | partial_refunded
 
 - 余额 = `CreditLot` 未用完且未过期的批次之和。
 - 消耗按 **FEFO**（先到期先扣，`NULL` 视为最晚到期）跨批次扣减；余额不足整体回滚并报 `40002`（前端按 402 语义处理）。
-- 流水类型：`purchase` / `grant` / `consume` / `admin_adjust` / `expire` / `refund_reclaim`。人工增减落 `admin_adjust` 并自动写审计，不要求填写审计原因。
+- 流水类型：`purchase` / `grant` / `consume` / `admin_adjust` / `expire` / `refund_reclaim`。人工增减落 `admin_adjust`，不要求填写原因。
 - CSV 导入按**邮箱**匹配用户，逐行返回结果（匹配不到、格式错误都单独报，不整批回滚）。
 
 ---
@@ -397,8 +383,8 @@ partial_refunded → refunded | partial_refunded
 
 | 页面 | 接口 | 规则 |
 | --- | --- | --- |
-| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；限量名额由 pending 订单预占、支付时核销、取消/超时释放，核销走 `Order.couponId`；无关联订单可删除，有订单只能停用；`GET /admin/coupons/export` 按同一筛选导出 CSV（`marketing.write + data.export` + 审计，路由在 `:id` 之前） |
-| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的免活动让 `resolve()` 返回 0；到期由调度任务收尾；无关联订单可删除，有订单只能下线；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`marketing.write + data.export` + 审计） |
+| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；限量名额由 pending 订单预占、支付时核销、取消/超时释放，核销走 `Order.couponId`；无关联订单可删除，有订单只能停用；`GET /admin/coupons/export` 按同一筛选导出 CSV（`marketing.write + data.export`，路由在 `:id` 之前） |
+| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的免活动让 `resolve()` 返回 0；到期由调度任务收尾；无关联订单可删除，有订单只能下线；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`marketing.write + data.export`） |
 | 邀请与签到 | `/admin/invites*`、`/admin/checkin*` | 邀请奖励在被邀请人**首次付费**才触发；签到规则含基础积分与连签加成 |
 
 C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns` 只回真正更便宜且在售的活动）。
@@ -409,25 +395,27 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 `GET|PATCH /admin/settings`（`setting.read` / `setting.write`）。默认值与键名只在 `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` 定义，包括：站点信息、上传限制、生成超时与轮询、退款规则（`refund.windowDays` / `refund.maxRatioBps` / `refund.allowConsumedTask`）、备份频次与保留份数。
 
+设置图片先走 `POST /admin/settings/upload`（multipart 字段 `file`，`setting.write`）：服务端校验图片、写入当前存储后端并返回 `{ value, previewUrl, width, height, sizeBytes }`。`value` 是稳定存储引用，只有用户保存设置时才写入 `payment.helpImage`，上传动作本身不改配置。
+
 规则：
 
 - 写入载荷为 `{ settings: Record<key, value>, clears?: string[] }`；`settings` 用点号键，`clears` 删除运行时覆盖并回落代码默认值。
 - 写入前按 `SETTING_DEFS` 做类型与范围校验，非法值整体拒绝；同一键不能同时出现在 `settings` 与 `clears`。
 - 只读项（`readOnly`）不渲染可编辑控件，只展示当前值并给出 `linkTo` 入口。
 - 退款规则的读取方是 `order.service.refund`，规则对象由后台控制器取好后传入，订单域不依赖 admin 层。
-- 保存自动写审计；`setting.write` 属高危，不要求填写变更原因。
+- 保存不要求填写变更原因。
 - **分组深链**：`?group=<分组键>` 直达某一组配置（如 `/admin/settings?group=refund`）。分组是本页唯一的页内状态，切换页签时用 `replace` 写回地址栏（不压历史），URL 上的分组不存在时回落到首个分组。退款规则被拒时运营要改的就是那一组，深链省掉「先进设置再在八个页签里找『退款』」。
 
 ### 14.1 角色权限 `/admin/roles`
 
-`GET /admin/roles`（`role.read`）返回三个内置角色的**库内实际权限点**（不是代码默认值，否则页面显示与实际不符）；`PATCH /admin/roles`（`role.write`，高危，`AuditAction('role.permissions_update')`）批量保存本次页面改动。
+`GET /admin/roles`（`role.read`）返回三个内置角色的**库内实际权限点**（不是代码默认值，否则页面显示与实际不符）；`PATCH /admin/roles`（`role.write`，高危）批量保存本次页面改动。
 
 规则：
 
 - 角色不可增删改名，`builtIn` 恒为 `true`；三个角色的权限点都能改，包括 `admin`。
-- 请求体为 `{ roles: [{ code, permissions }] }`；写操作自动记录审计原因。
+- 请求体为 `{ roles: [{ code, permissions }] }`。
 - 未知权限点整体拒绝（400 `40001`），不静默丢弃 —— 否则调用方会以为保存成功。
-- 多角色改动在一个事务中写入，避免部分角色已生效、部分失败的半保存状态；审计记录每个角色新增 / 移除的权限点。
+- 多角色改动在一个事务中写入，避免部分角色已生效、部分失败的半保存状态。
 - 改动立即生效：`AdminGuard` / `PermissionGuard` 每次请求查库，不需要重启或重新登录。操作者把自己权限改没了也会当场生效（可由其他 admin 恢复）。
 - 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 67 个权限点分组勾选，高危权限点单独标注。
 
@@ -460,35 +448,33 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 - 单轮检查里**每个任务独立 try/catch**：一个任务抛错不该连累其它任务（早期用一个大 try 包住全部，备份失败会连带跳过订单超时关闭）。
 - 有重入保护：上一轮未结束不重复触发。
-- 执行状态（上次时间、耗时、是否成功、连续失败次数）放内存，不落库——运行时指标与需要长期留痕的任务审计是两件事。
+- 执行状态（上次时间、耗时、是否成功、连续失败次数）放内存，不落库。
 - 手动触发只允许幂等任务。
 
 ---
 
-## 17. 操作审计 `/admin/audit-logs`
+## 17. 模型层后台
 
-`GET /admin/audit-logs`、`/admin/audit-logs/:id`（`audit.read`）。按操作人 / 动作 / 时间筛选，详情含原因、IP、请求 ID。**只读，无删除接口**。
+模型层后台共 7 页，按「供应侧 → 协议 → 能力与模型 → 人群 → 排障」排列：`/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` · `/admin/billing-orders` · `/admin/finance`。能力与模型页同时承载能力上下线与模型商品消费配置，旧地址 `/admin/logical-models` 重定向到 `/admin/capabilities`。接口实现分布在 `backend/src/model/**` 与 `backend/src/admin/capability.controller.ts`。
 
-`GET /admin/audit-logs/export`（`audit.read + data.export` + 审计）导出同一筛选口径的 CSV，详情列为 JSON；上限 5000 行。路由必须声明在 `:id` 之前。
+### 17.1 模型商品（原渠道工作台） `/admin/channels`
 
-导出与备份下载是 GET，但显式声明了 `@AuditAction`，`AuditInterceptor` 同样落审计 —— 把数据带出系统必须能回答「谁、何时、导了哪类数据」。
+默认进入「商品台账」：把渠道模型作为商品跨供应商展示，行上直接标出消费它的能力；「供应商」视图通过 `?view=channels` 进入，保留凭证、端点、并发、代理与线路健康配置。底层仍是渠道（凭证加密存储）+ 渠道模型（模态 / 接入方式 / 权重 / 优先级 / 售价）。
 
----
+新建供应商支持「服务商预设」：选协议后自动带出 Base URL 与凭证字段名；保存后自动打开上游导入，形成「接入供应商 → 选商品并统一配置」两步；
 
-## 18. 模型层后台
+商品台账支持勾选后批量上架 / 下架（逐条调用启停接口，缺类型 / 接入方式 / 售价的会被跳过）；
 
-模型层后台共 7 页，按「供应侧 → 协议 → 能力与模型 → 人群 → 排障」排列：`/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` · `/admin/billing-orders` · `/admin/finance`。能力与模型页同时承载能力上下线与前台模型配置，旧地址 `/admin/logical-models` 重定向到 `/admin/capabilities`。接口实现分布在 `backend/src/model/**` 与 `backend/src/admin/capability.controller.ts`。
+停用 / 删除商品或供应商的确认框会显示受影响的能力（按消费关系反查）；
 
-### 18.1 渠道工作台 `/admin/channels`
-
-供应侧配置：渠道（凭证加密存储）+ 渠道模型（模态 / 协议 / 权重 / 优先级 / 价格档）。
+上游导入支持「导入后统一配置」：勾选商品后可选填类型、接入方式与售价，前端按导入前后 id 差集逐条调用保存接口补默认合同；不填则只建骨架行。批量配置只支持图像与文本，视频 / 音频仍需逐条配置。
 
 | 能力 | 接口（前缀 `/admin/channels`） | 权限点 |
 | --- | --- | --- |
 | 渠道列表 / 详情 / 创建 / 更新 / 删除 / 复制 | `GET /`、`GET /:id`、`POST /`、`PATCH /:id`、`DELETE /:id`、`POST /:id/duplicate` | `channel.read` / `channel.write` |
 | 排序、整包导出 / 导入 | `PUT /order`、`POST /export`、`POST /import` | `channel.write` |
 | 线路健康 | `GET /health` | `channel.read` |
-| 解除线路冷却（本进程） | `POST /health/reset` | `channel.write`，写审计 |
+| 解除线路冷却（本进程） | `POST /health/reset` | `channel.write` |
 | 协议下拉 | `GET /protocols` | `channel.model_read` |
 | 渠道模型 CRUD / 排序 / 启停 / 批量删除 | `GET|POST /:id/models*`、`PATCH /:id/models/:modelId*`、`DELETE /:id/models/:modelId`、`POST /:id/models/batch-delete` | `channel.model_read` / `channel.model_write` |
 | 上游模型目录读取与导入 | `POST /:id/models/fetch`、`POST /:id/models/import` | `channel.model_read` / `channel.model_write` |
@@ -498,14 +484,14 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 规则：
 
 - `ChannelModel.protocol` 存**插件声明的 provider id**（如 `openai-image`），不是插件 id（`openai-images`）；下拉读协议注册表，手写库或导入时才可能写错，表现为派发报 `channel_unavailable`。
-- 凭证只以密文落库（`MODEL_SECRET_KEY` 派生密钥）；读取接口只回显掩码。上游模型目录与连通性测试都在服务端使用已保存凭证发请求，密钥不进浏览器、不落审计。
+- 凭证只以密文落库（`MODEL_SECRET_KEY` 派生密钥）；读取接口只回显掩码。上游模型目录与连通性测试都在服务端使用已保存凭证发请求，密钥不进浏览器。
 - 连通性测试走与正式任务相同的协议、出站策略与鉴权，差异只有「不建任务、不扣费」；结果写 `ApiCallLog`（`billable=false`），后台「调用记录」页可查。
 - 写入后主动失效目录快照（`CatalogVersionService`），不等 TTL 自然过期。
 - `channel.write` / `channel.model_write` 覆盖渠道凭证与价格档：后端没有「只改线路不改价」的独立权限点，前端也不宣称有。
 
-### 18.2 能力与模型中的前台模型配置 `/admin/capabilities`
+### 17.2 能力与模型中的消费配置 `/admin/capabilities`
 
-C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+ 线路（`LogicalModelRoute`）。
+页面语言以「能力消费模型商品」为主：能力卡片下直接列它消费的模型商品、用户实付与售卖状态。底层仍是 C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+ 线路（`LogicalModelRoute`），运营不需要理解这三层；新建售卖配置时可从商品台账选择可用商品，自动带入名称、编号与服务来源。
 
 页面入口统一为 `/admin/capabilities`；旧地址 `/admin/logical-models` 重定向并保留 query/hash。能力上下线与模型 CRUD 共用同一个卡片工作台，但写操作分别受 `capability.write` / `logical_model.write` 控制。
 
@@ -521,7 +507,7 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 - 图像能力的遮罩支持声明在 `capabilityConfig.maskSupported`，下发为 `inputs.mask`；未声明的模型收到遮罩请求返回 `42205`。
 - `simulate` 用系统分组身份跑一遍真实选路，返回命中线路与原因，不建任务、不扣费。
 
-### 18.3 用户分组 `/admin/user-groups`
+### 17.3 用户分组 `/admin/user-groups`
 
 | 能力 | 接口 | 权限点 |
 | --- | --- | --- |
@@ -532,7 +518,7 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 - 本仓没有 `users.user_group` 列：分组由会员套餐的 `userGroupCode` 映射，没有有效会员的用户落在 `default`，默认分组不可删除。
 - 写入必须同时失效分组缓存与目录快照，否则出现「展示按新倍率、扣费按旧倍率」。
 
-### 18.4 插件 `/admin/plugins`
+### 17.4 插件 `/admin/plugins`
 
 | 能力 | 接口 | 权限点 |
 | --- | --- | --- |
@@ -544,40 +530,40 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 - 插件是协议来源：启停即重建协议注册表，渠道模型可选的协议列表随之变化。
 - 内置插件在 `backend/plugins/`（107 个可用包 / 115 个 provider，另有 3 个 `src-*` 源目录镜像不参与运行），后台上传安装的落在 `MODEL_PLUGIN_INSTALL_DIR`。
 
-### 18.5 调用记录 `/admin/api-logs`
+### 17.5 调用记录 `/admin/api-logs`
 
 `GET /admin/api-logs`（`model.call_read`）记录每次上游调用：`requestKind`（task / tool / test / proxy）、渠道、模型、协议、耗时、结果、`RouteAttempt.failureCode` 与错误摘要，可按状态 / 类型 / 渠道 / 任务 / 用户 / 模型筛选。用于回答「这次扣的是谁、走的是哪条线路、为什么失败」。
 
-`GET /admin/api-logs/export`（`model.call_read + data.export` + 审计）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。
+`GET /admin/api-logs/export`（`model.call_read + data.export`）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。
 
-### 18.6 生成账单 `/admin/billing-orders` 与财务分析 `/admin/finance`
+### 17.6 生成账单 `/admin/billing-orders` 与财务分析 `/admin/finance`
 
 | 能力 | 接口 | 权限点 |
 | --- | --- | --- |
 | 账单列表 / 详情 | `GET /admin/billing-orders`、`/:id` | `billing_order.read` |
-| 人工核对 | `POST /admin/billing-orders/:id/resolve`（`action: settle \| refund`，高危，自动审计） | `billing_order.resolve` |
+| 人工核对 | `POST /admin/billing-orders/:id/resolve`（`action: settle \| refund`，高危） | `billing_order.resolve` |
 | 财务汇总 | `GET /admin/analytics/finance` | `model.analytics_read` |
 
-- 账单状态机：`reserved / running / settled / refunded / uncertain`。`uncertain`（超时、5xx、连接中断）不自动退款、不切线，只能人工 `settle` 或 `refund`，操作自动写审计。
+- 账单状态机：`reserved / running / settled / refunded / uncertain`。`uncertain`（超时、5xx、连接中断）不自动退款、不切线，只能人工 `settle` 或 `refund`。
 - 财务口径固定三条：实收 = 已结算账单实际金额；已退 = 订单退款金额；净收入 = 实收 − 已退。预留 / 运行 / 待核对单列为「挂账」，**不计入实收**。
 - **与概览页的「订单收入」不是同一笔账**：财务页单位是**积分**（内部计价单位，已结算账单口径），概览页「订单收入」单位是**元**（订单实付口径，Σ `Order.paidCents`）。两者都曾叫「收入 / 营收」，同名不同义会让人把两处的数字对在一起，对不上就以为其中一处坏了。概览页的营收标签带「（元）」、财务页的说明写明「与概览页的订单收入（元）不是同一笔账」，并在概览页给出财务页入口。**两个口径的差异是事实，不允许合并成一个数。**
 
 ---
 
-## 19. 能力上下线接口 `/admin/capabilities`
+## 18. 能力上下线接口 `/admin/capabilities`
 
 `GET /admin/capabilities`（`capability.read`）、`PUT /admin/capabilities/:id`（`capability.write`，高危）。
 
-- 17 项能力的上下线与原因；列表按分组渲染为卡片网格（卡片展示实现程度与开关状态，运行结论仅用于筛选），`CapabilityControl` 无行 = 启用。
+- 18 项能力的上下线与原因；列表按分组渲染为卡片网格（卡片展示实现程度与开关状态，运行结论仅用于筛选），`CapabilityControl` 无行 = 启用。
 - 下架后 C 端 `runtime.effective='disabled'`；`generate.service` 在**扣费之前**拦截并返回 `40005`，原因原样透传到 C 端。
 - 只覆盖「上下线」这一层：能力的名称、分组、参数、默认价仍以 `definitions/<id>.ts` 为准，后台不能改代码里的 `mode`。
 - 保存即 `invalidate()`，无需等缓存过期。
 
 ---
 
-## 20. 数据备份与保留期清理
+## 19. 数据备份与保留期清理
 
-### 20.1 备份 `/admin/backups`
+### 19.1 备份 `/admin/backups`
 
 | 接口 | 说明 |
 | --- | --- |
@@ -587,56 +573,56 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 | `POST /admin/backups/:id/verify` | SHA-256 校验 |
 | `GET /admin/backups/:id/download` | 下载 |
 | `DELETE /admin/backups/:id` | 删除单份 |
-| `POST /admin/backups/prune` | 按份数裁剪（自动写审计） |
+| `POST /admin/backups/prune` | 按份数裁剪 |
 
 - 产物落 `BACKUP_DIR`，单份带 SHA-256 供校验。
-- 手动备份与保留份数裁剪均自动写审计，不要求填写变更原因；重复点击由前端 busy 状态防抖，不承诺跨请求幂等。
+- 手动备份与保留份数裁剪不要求填写变更原因；重复点击由前端 busy 状态防抖，不承诺跨请求幂等。
 - 到期数据清理与清理留痕统一走 `/admin/retention/*`，不在备份控制器保留第二套入口。
 - **列表筛选深链**：`?filter=failed|succeeded|unverified|verified`。告警中心的四条备份告警都带筛选维度（最近一次失败 → `failed`，过期 → `succeeded`，未验证 → `unverified`），点进去直接看到出问题的那几行，而不是一个混着全部记录的列表再自己翻。筛选在客户端做（备份记录量级小），筛选态写回地址栏。
 
-### 20.2 保留期清理 `/admin/retention`
+### 19.2 保留期清理 `/admin/retention`
 
 `GET /admin/retention/targets`（各目标默认可清理量）、`GET /admin/retention/preview?target=&retentionDays=`（按用户当前草稿天数重新计数）、`GET /admin/retention/logs`、`POST /admin/retention/cleanup`。执行结果落 `CleanupLog`；确认前必须按实际天数重新预览，避免「以为删的是过期日志，实际删了活跃文件」。
 
 ---
 
-## 21. 数据工具
+## 20. 数据工具
 
-### 21.1 全局搜索
+### 20.1 全局搜索
 
 `GET /admin/search?q=`（`data.search`）：用户 / 订单 / 工单 / 任务 / 素材五组各前 5 条 + 总数。`q` 长度 < 2 直接返回空组——否则五个 `LIKE` 会全表扫描。落点按「哪个界面能立刻看到它」定：工单 `/admin/tickets?id=`、素材 `/admin/assets?q=<id>`。
 
 **当前后台外壳未挂载前端入口**：2026-11 外壳重建时移除了顶栏搜索与命令面板，前端封装一并删除；后端接口与权限保留，后续重新接入时在顶栏挂回入口即可。
 
-### 21.2 导出
+### 20.2 导出
 
 `/admin/{users,assets,tickets,orders,payments,credits}/export`（领域读权限 + `data.export`）。CSV 走 `common/csv.ts`，前端独立下载不走信封。
 
-### 21.3 导入
+### 20.3 导入
 
 `POST /admin/credits/import`（`credit.adjust`，multipart）。按邮箱匹配用户，逐行报结果。
 
-### 21.4 批量
+### 20.4 批量
 
 `/admin/{users,assets,tasks,orders}/batch`（使用各领域对应的动作权限），规则见 §0.7。
 
 ---
 
-## 22. 后台与基础设施的交界
+## 21. 后台与基础设施的交界
 
 | 项 | 关系 |
 | --- | --- |
 | 健康检查 | `/health` 与 `/health/ready` 免登录，不经过后台守卫 |
 | 限流 | 后台接口不额外限流；登录 / 注册的限流在 `RateLimitGuard` |
-| 请求追踪 | 审计记录与日志都带 `requestId`，可用它串起「谁在什么时候点了什么」 |
+| 请求追踪 | 日志带 `requestId`，可用它串起一次请求的完整处理链路 |
 | 日志 | `AppFileLogger` 落盘并脱敏，后台排障看 `.run` 之外的 `backend/logs/` |
 | 环境 | 后台所有凭据类页面只读，改配置走 env（见 `docs/environments.md`） |
 
 ---
 
-## 23. 告警中心 `/admin/alerts`
+## 22. 告警中心 `/admin/alerts`
 
-### 23.1 数据源与口径
+### 22.1 数据源与口径
 
 `GET /admin/alerts`（只要求后台身份，来源在 service 内按角色权限过滤）。返回 `generatedAt`、`total` 与 `items[]`（`key` / `severity` / `category` / `title` / `detail` / `count` / `link`）。
 
@@ -651,7 +637,7 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 | 备份未验证 | `succeeded && !verified` > 0 | — | `backup.read` |
 | 发票 | `status='pending'` > 0 | — | `invoice.write` |
 
-### 23.2 交互
+### 22.2 交互
 
 - 顶栏铃铛显示待处理**条目数**（不是底层记录数），点击展开前 5 条，底部进完整页面；每 60 秒轮询，页面隐藏时跳过。
 - 不引入「已读」状态：计数即「当前待处理数」，事项处理后自然消失，避免「点过就算解决」。
@@ -661,14 +647,13 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 
 ---
 
-## 24. 明确不做
+## 23. 明确不做
 
 | 项 | 原因 |
 | --- | --- |
 | 第三方内容安全送审台账 | 未接入就如实显示「未接入」，不做假审核记录；`content.read` 为预留权限点 |
 | 公告中心 | 站内消息只覆盖定向通知与广播，不建公告定时发布与撤回 |
 | 工单 SLA 计时 | 无客服排班与工时口径，建了只会给出假指标 |
-| 独立审计存储 / hash 链 | 当前审计只读无删除接口，防篡改需独立存储，非本期范围 |
 | 自定义角色 | 三个内置角色覆盖实际分工，权限点可调、角色不新增 |
 | 数据分析看板 | 无漏斗 / 留存 / LTV 页面，概览只做现有表聚合 |
 | 多租户与席位 | 单轨制，`User` 不加 `orgId` |

@@ -8,14 +8,20 @@ describe('AdminAssetsService 删除顺序', () => {
     asset: {
       findUnique: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
+      updateMany: ReturnType<typeof vi.fn>;
       findMany: ReturnType<typeof vi.fn>;
     };
     generationTask: { findMany: ReturnType<typeof vi.fn> };
     project: {
       findUnique: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      count: ReturnType<typeof vi.fn>;
+      create: ReturnType<typeof vi.fn>;
       delete: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
     };
+    user: { findUnique: ReturnType<typeof vi.fn> };
     $transaction: ReturnType<typeof vi.fn>;
   };
   let storage: { get: ReturnType<typeof vi.fn> };
@@ -24,13 +30,18 @@ describe('AdminAssetsService 删除顺序', () => {
 
   beforeEach(() => {
     prisma = {
-      asset: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+      asset: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
       generationTask: { findMany: vi.fn() },
       project: {
         findUnique: vi.fn(),
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+        count: vi.fn(),
+        create: vi.fn(),
         delete: vi.fn(),
         update: vi.fn(),
       },
+      user: { findUnique: vi.fn() },
       $transaction: vi.fn(),
     };
     provider = { delete: vi.fn().mockResolvedValue(undefined) };
@@ -160,47 +171,162 @@ describe('AdminAssetsService 删除顺序', () => {
     });
   });
 
-  it('项目删除只写 deletedAt，硬删参数不再删除任务、素材或文件', async () => {
+  it('后台项目列表返回所属用户与素材/任务计数', async () => {
+    const createdAt = new Date('2026-01-02T03:04:05.000Z');
+    prisma.project.findMany.mockResolvedValue([
+      {
+        id: 'project-1',
+        name: '项目一',
+        ownerId: 'user-1',
+        owner: { id: 'user-1', email: 'user@example.com', name: '用户一' },
+        createdAt,
+        _count: { assets: 3, tasks: 2 },
+      },
+    ]);
+    prisma.project.count.mockResolvedValue(1);
+
+    await expect(service.listProjects({ page: 1, pageSize: 20 })).resolves.toEqual({
+      items: [
+        {
+          id: 'project-1',
+          name: '项目一',
+          ownerId: 'user-1',
+          ownerEmail: 'user@example.com',
+          ownerName: '用户一',
+          assetCount: 3,
+          taskCount: 2,
+          createdAt,
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
+  });
+
+  it('后台新建项目校验所属用户状态并去掉名称空白', async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'active' });
+    prisma.project.create.mockResolvedValue({ id: 'project-1' });
+
+    await expect(service.createProject('  新项目  ', 'user-1')).resolves.toEqual({
+      id: 'project-1',
+    });
+    expect(prisma.project.create).toHaveBeenCalledWith({
+      data: { name: '新项目', ownerId: 'user-1' },
+    });
+  });
+
+  it('后台新建项目拒绝不存在或已禁用用户', async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'disabled' });
+
+    await expect(service.createProject('新项目', 'user-1')).rejects.toMatchObject({ code: 40001 });
+    expect(prisma.project.create).not.toHaveBeenCalled();
+  });
+
+  it('后台重命名项目只更新名称', async () => {
+    prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
+    prisma.project.update.mockResolvedValue({ id: 'project-1', name: '改名' });
+
+    await expect(service.updateProject('project-1', '  改名  ')).resolves.toEqual({
+      id: 'project-1',
+      name: '改名',
+    });
+    expect(prisma.project.update).toHaveBeenCalledWith({
+      where: { id: 'project-1' },
+      data: { name: '改名' },
+    });
+  });
+
+  it('项目有素材但未指定迁移目标时返回 40901', async () => {
     prisma.project.findUnique.mockResolvedValue({
       id: 'project-1',
+      ownerId: 'user-1',
       deletedAt: null,
       _count: { assets: 1, tasks: 2 },
     });
-    prisma.project.update.mockResolvedValue({});
 
-    await expect(service.removeProject('project-1', true)).resolves.toEqual({
+    await expect(service.removeProject('project-1')).rejects.toMatchObject({ code: 40901 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('项目删除迁移素材后只写 deletedAt，不删除任务或文件', async () => {
+    prisma.project.findUnique.mockResolvedValue({
+      id: 'project-1',
+      ownerId: 'user-1',
+      deletedAt: null,
+      _count: { assets: 2, tasks: 3 },
+    });
+    const targetFindFirst = vi.fn().mockResolvedValue({ id: 'project-2' });
+    const updateMany = vi.fn().mockResolvedValue({ count: 2 });
+    const projectUpdate = vi.fn().mockResolvedValue({});
+    prisma.$transaction.mockImplementation(async (work: (tx: unknown) => unknown) =>
+      work({
+        project: { findFirst: targetFindFirst, update: projectUpdate },
+        asset: { updateMany },
+      }),
+    );
+
+    await expect(service.removeProject('project-1', 'project-2')).resolves.toEqual({
       id: 'project-1',
       hard: false,
       deprecatedHard: true,
       deletedAt: expect.any(Date),
-      retained: { assets: 1, tasks: 2 },
+      movedAssets: 2,
+      retained: { assets: 0, tasks: 3 },
     });
-    expect(prisma.project.update).toHaveBeenCalledWith({
+    expect(targetFindFirst).toHaveBeenCalledWith({
+      where: { id: 'project-2', ownerId: 'user-1', deletedAt: null },
+      select: { id: true },
+    });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { projectId: 'project-1', ownerId: 'user-1' },
+      data: { projectId: 'project-2' },
+    });
+    expect(projectUpdate).toHaveBeenCalledWith({
       where: { id: 'project-1' },
       data: { deletedAt: expect.any(Date) },
     });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.generationTask.findMany).not.toHaveBeenCalled();
-    expect(prisma.asset.update).not.toHaveBeenCalled();
     expect(storage.get).not.toHaveBeenCalled();
+  });
+
+  it('空项目删除直接软删除，不要求迁移目标', async () => {
+    prisma.project.findUnique.mockResolvedValue({
+      id: 'project-1',
+      ownerId: 'user-1',
+      deletedAt: null,
+      _count: { assets: 0, tasks: 2 },
+    });
+    const projectUpdate = vi.fn().mockResolvedValue({});
+    prisma.$transaction.mockImplementation(async (work: (tx: unknown) => unknown) =>
+      work({ project: { update: projectUpdate }, asset: { updateMany: vi.fn() } }),
+    );
+
+    await expect(service.removeProject('project-1')).resolves.toMatchObject({
+      movedAssets: 0,
+      retained: { assets: 0, tasks: 2 },
+    });
+    expect(projectUpdate).toHaveBeenCalledOnce();
   });
 
   it('重复删除项目幂等返回首次删除时间', async () => {
     const deletedAt = new Date('2026-01-02T03:04:05.000Z');
     prisma.project.findUnique.mockResolvedValue({
       id: 'project-1',
+      ownerId: 'user-1',
       deletedAt,
-      _count: { assets: 3, tasks: 4 },
+      _count: { assets: 0, tasks: 4 },
     });
 
-    await expect(service.removeProject('project-1', false)).resolves.toEqual({
+    await expect(service.removeProject('project-1')).resolves.toEqual({
       id: 'project-1',
       hard: false,
       deprecatedHard: true,
       deletedAt,
-      retained: { assets: 3, tasks: 4 },
+      movedAssets: 0,
+      retained: { assets: 0, tasks: 4 },
     });
-    expect(prisma.project.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(storage.get).not.toHaveBeenCalled();
   });
 

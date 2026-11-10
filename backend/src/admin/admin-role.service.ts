@@ -104,7 +104,7 @@ export class AdminRoleService {
     /*
      * 多角色保存必须原子提交。前端一次点击可能同时改动 admin / operator，
      * 若逐条 update，第二条失败会留下「页面显示保存失败，但部分权限已收紧」。
-     * 读取也放进事务，确保审计里的 before/after 对应同一次写入。
+     * 读取也放进事务，确保返回的 before/after 对应同一次写入。
      */
     return this.prisma.$transaction(async (tx) => {
       const records = await tx.adminRole.findMany({

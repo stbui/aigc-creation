@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PaymentConfigService } from './payment-config.service';
+import {
+  PaymentConfigService,
+  type ResolvedPaymentConfig,
+  type ResolvedVisiblePayment,
+} from './payment-config.service';
 import type { PaymentProviderId } from './adapters/types';
 
 type ProviderRow = {
@@ -11,6 +15,17 @@ type ProviderRow = {
   configCipher: string;
   configDigest: string;
   createdAt: Date;
+};
+
+type InstanceRow = ProviderRow & {
+  instanceId: string;
+  name: string | null;
+  sortOrder: number;
+  minAmountCents: number | null;
+  maxAmountCents: number | null;
+  dailyLimitCents: number | null;
+  refundEnabled: boolean;
+  paymentMethods: string;
 };
 
 const ALIPAY_VALUES = {
@@ -59,6 +74,10 @@ function makeService(input: {
   sources?: Partial<Record<'alipay' | 'wechat', string>>;
   rows?: Partial<Record<PaymentProviderId, ProviderRow>>;
   decrypt?: (cipherText: string) => string;
+  cursorDelegate?: {
+    upsert?: (args: unknown) => Promise<{ cursor: number }>;
+    updateMany?: (args: unknown) => Promise<{ count: number }>;
+  };
 }) {
   const prisma = {
     paymentProviderConfig: {
@@ -69,6 +88,7 @@ function makeService(input: {
     order: {
       count: vi.fn().mockResolvedValue(0),
     },
+    paymentRoundRobinCursor: input.cursorDelegate,
   };
   const cipher = {
     decrypt: vi.fn((cipherText: string) =>
@@ -88,6 +108,69 @@ function makeService(input: {
     settings as never,
   );
   return { service, prisma, cipher, settings };
+}
+
+function instanceRow(
+  providerId: PaymentProviderId,
+  values: Record<string, string>,
+  overrides: Partial<InstanceRow> = {},
+): InstanceRow {
+  return {
+    ...row(providerId, values),
+    instanceId: 'default',
+    name: null,
+    sortOrder: 0,
+    minAmountCents: null,
+    maxAmountCents: null,
+    dailyLimitCents: null,
+    refundEnabled: true,
+    paymentMethods: JSON.stringify(['alipay', 'wechat']),
+    ...overrides,
+  };
+}
+
+function makeReserveService(input: {
+  rows: InstanceRow[];
+  usage?: Array<Record<string, unknown>>;
+  sources?: Partial<Record<'alipay' | 'wechat', string>>;
+}) {
+  const cursor = {
+    upsert: vi.fn().mockResolvedValue({ cursor: 1 }),
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+  };
+  const prisma: Record<string, any> = {
+    $executeRaw: vi.fn().mockResolvedValue(1),
+    paymentProviderConfig: {
+      findMany: vi.fn(async () => input.rows),
+      findFirst: vi.fn(async () => input.rows[0] ?? null),
+    },
+    payment: {
+      findMany: vi.fn().mockResolvedValue(input.usage ?? []),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: 'payment-created',
+        ...data,
+      })),
+    },
+    paymentRoundRobinCursor: cursor,
+  };
+  prisma.$transaction = vi.fn(
+    async (work: (tx: Record<string, any>) => unknown) => work(prisma),
+  );
+  const settings = {
+    get: vi.fn(async (key: string) => {
+      if (key === 'payment.alipaySource') return input.sources?.alipay ?? 'official';
+      if (key === 'payment.wechatSource') return input.sources?.wechat ?? 'unset';
+      if (key === 'payment.loadBalancingStrategy') return 'round-robin';
+      return null;
+    }),
+  };
+  const cipher = { decrypt: vi.fn((cipherText: string) => cipherText) };
+  const service = new PaymentConfigService(
+    prisma as never,
+    cipher as never,
+    settings as never,
+  );
+  return { service, prisma, cursor, settings };
 }
 
 beforeEach(() => {
@@ -234,5 +317,227 @@ describe('PaymentConfigService.availableVisible', () => {
     const visible = await service.availableVisible('CNY');
 
     expect(visible.map((item) => item.id)).toEqual(['wechat']);
+  });
+});
+
+describe('PaymentConfigService.claimVisibleSelection', () => {
+  function resolvedSelection(configs: ResolvedPaymentConfig[]): ResolvedVisiblePayment {
+    return {
+      method: 'alipay',
+      providerId: 'alipay',
+      config: configs[0],
+      roundRobin: {
+        providerId: 'alipay',
+        method: 'alipay',
+        cursor: 0,
+        eligibleInstances: configs.map((config) => ({
+          instanceId: config.instanceId,
+          config,
+        })),
+      },
+    };
+  }
+
+  it('用原子 upsert 领取序号并按新序号选择实例', async () => {
+    const upsert = vi
+      .fn()
+      .mockResolvedValueOnce({ cursor: 1 })
+      .mockResolvedValueOnce({ cursor: 2 });
+    const { service } = makeService({
+      cursorDelegate: { upsert, updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    });
+    const configs = [
+      { ...row('alipay', ALIPAY_VALUES), instanceId: 'instance_a' },
+      { ...row('alipay', ALIPAY_VALUES, { id: 'cfg_alipay_v2' }), instanceId: 'instance_b' },
+    ].map((item) => ({
+      id: item.id,
+      providerId: item.providerId,
+      instanceId: item.instanceId,
+      name: null,
+      sortOrder: 0,
+      version: item.version,
+      enabled: true,
+      closeAfterMinutes: item.closeAfterMinutes,
+      minAmountCents: null,
+      maxAmountCents: null,
+      dailyLimitCents: null,
+      refundEnabled: true,
+      paymentMethods: ['alipay'] as ResolvedPaymentConfig['paymentMethods'],
+      values: ALIPAY_VALUES,
+    }));
+
+    const first = await service.claimVisibleSelection(resolvedSelection([...configs]));
+    const second = await service.claimVisibleSelection(first);
+
+    expect(first.config.instanceId).toBe('instance_a');
+    expect(second.config.instanceId).toBe('instance_b');
+    expect(upsert).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        create: { providerId: 'alipay', method: 'alipay', cursor: 1 },
+        update: { cursor: { increment: 1 } },
+        select: { cursor: true },
+      }),
+    );
+  });
+
+  it('只有当前领取仍是游标末尾时才条件回滚', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const { service } = makeService({
+      cursorDelegate: {
+        upsert: vi.fn().mockResolvedValue({ cursor: 2 }),
+        updateMany,
+      },
+    });
+    const config = {
+      id: 'cfg_alipay_v1',
+      providerId: 'alipay' as const,
+      instanceId: 'instance_a',
+      name: null,
+      sortOrder: 0,
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      minAmountCents: null,
+      maxAmountCents: null,
+      dailyLimitCents: null,
+      refundEnabled: true,
+      paymentMethods: ['alipay' as const],
+      values: ALIPAY_VALUES,
+    };
+
+    const claimed = await service.claimVisibleSelection(resolvedSelection([config]));
+    await service.releaseVisibleSelection(claimed);
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { providerId: 'alipay', method: 'alipay', cursor: 2 },
+      data: { cursor: { decrement: 1 } },
+    });
+  });
+});
+
+describe('PaymentConfigService.reserveVisiblePaymentAttempt', () => {
+  it('在限额检查前先领取串行锁，并拒绝会突破每日限额的新支付', async () => {
+    const limited = instanceRow('alipay', ALIPAY_VALUES, {
+      dailyLimitCents: 1000,
+    });
+    const { service, prisma, cursor } = makeReserveService({
+      rows: [limited],
+      usage: [
+        {
+          id: 'pay-existing',
+          orderId: 'order-existing',
+          providerInstanceId: 'default',
+          amountCents: 950,
+          status: 'pending',
+          createdAt: new Date(),
+        },
+      ],
+    });
+
+    await expect(
+      service.reserveVisiblePaymentAttempt({
+        method: 'alipay',
+        currency: 'CNY',
+        amountCents: 100,
+        orderId: 'order-new',
+        userId: 'user-new',
+      }),
+    ).rejects.toThrow(/每日限额/);
+
+    expect(cursor.upsert).toHaveBeenCalledOnce();
+    expect(cursor.upsert.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.payment.findMany.mock.invocationCallOrder[0],
+    );
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('创建 Payment 时重新读取最新实例配置，不使用旧 resolve 快照', async () => {
+    const rows = [instanceRow('alipay', ALIPAY_VALUES)];
+    const { service, prisma } = makeReserveService({ rows });
+
+    const stale = await service.resolveVisible('alipay', 'CNY', 100);
+    expect(stale?.config.version).toBe(1);
+
+    rows[0] = instanceRow('alipay', ALIPAY_VALUES, {
+      id: 'cfg_alipay_v2',
+      version: 2,
+      dailyLimitCents: 5000,
+    });
+
+    const reserved = await service.reserveVisiblePaymentAttempt({
+      method: 'alipay',
+      currency: 'CNY',
+      amountCents: 100,
+      orderId: 'order-new',
+      userId: 'user-new',
+    });
+
+    expect(reserved.resolved.config).toMatchObject({
+      id: 'cfg_alipay_v2',
+      version: 2,
+      dailyLimitCents: 5000,
+    });
+    expect(prisma.payment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        providerConfigId: 'cfg_alipay_v2',
+        providerConfigVersion: 2,
+      }),
+    });
+  });
+
+  it('展示后支付来源被切换时拒绝旧路由并提示刷新', async () => {
+    const rows = [instanceRow('alipay', ALIPAY_VALUES)];
+    const { service, prisma, settings } = makeReserveService({
+      rows,
+      sources: { alipay: 'official' },
+    });
+    const stale = await service.resolveVisible('alipay', 'CNY', 100);
+    expect(stale?.providerId).toBe('alipay');
+
+    settings.get.mockImplementation(async (key: string) => {
+      if (key === 'payment.alipaySource') return 'epay';
+      if (key === 'payment.loadBalancingStrategy') return 'round-robin';
+      return null;
+    });
+
+    await expect(
+      service.reserveVisiblePaymentAttempt({
+        method: 'alipay',
+        currency: 'CNY',
+        amountCents: 100,
+        orderId: 'order-new',
+        userId: 'user-new',
+        resolved: stale!,
+      }),
+    ).rejects.toThrow(/支付来源已变更/);
+
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('实例金额范围在创建支付尝试时再次校验', async () => {
+    const rows = [instanceRow('alipay', ALIPAY_VALUES)];
+    const { service, prisma } = makeReserveService({ rows });
+    const stale = await service.resolveVisible('alipay', 'CNY', 100);
+    expect(stale).not.toBeNull();
+
+    rows[0] = instanceRow('alipay', ALIPAY_VALUES, {
+      id: 'cfg_alipay_v2',
+      version: 2,
+      maxAmountCents: 50,
+    });
+
+    await expect(
+      service.reserveVisiblePaymentAttempt({
+        method: 'alipay',
+        currency: 'CNY',
+        amountCents: 100,
+        orderId: 'order-new',
+        userId: 'user-new',
+        resolved: stale!,
+      }),
+    ).rejects.toThrow(/金额不在可支付范围/);
+
+    expect(prisma.payment.create).not.toHaveBeenCalled();
   });
 });

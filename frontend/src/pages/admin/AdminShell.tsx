@@ -15,7 +15,6 @@ import { AdminDashboardContent } from './dashboard/AdminDashboardContent';
 import {
   AdminAlertsPage,
   AdminAssetsPage,
-  AdminAuditPage,
   AdminAigcLabelPage,
   AdminBackupPage,
   AdminBillingOrdersPage,
@@ -131,7 +130,6 @@ export function AdminShell() {
               <Route path="users" element={<AdminUsersPage />} />
               <Route path="roles" element={<AdminRolesPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />
-              <Route path="audit-logs" element={<AdminAuditPage />} />
               <Route path="backups" element={<AdminBackupPage />} />
               <Route path="assets" element={<AdminAssetsPage />} />
               <Route path="storage" element={<AdminStoragePage />} />

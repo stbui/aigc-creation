@@ -51,11 +51,22 @@ export interface PaymentIntent {
   providerId: VisiblePaymentMethod | "free";
   configId: string | null;
   configVersion: number | null;
-  mode: "redirect" | "qrcode" | "qrcode-image" | "sandbox" | "free";
+  mode:
+    | "redirect"
+    | "qrcode"
+    | "qrcode-image"
+    | "payment-element"
+    | "sandbox"
+    | "free";
   payUrl?: string;
   codeUrl?: string;
+  /** Stripe Payment Element 初始化参数 */
+  clientSecret?: string;
+  publishableKey?: string;
   /** 支付宝移动端当面付 Scheme；桌面端与微信订单为空 */
   schemeUrl?: string;
+  /** 渠道支付完成后回跳地址；旧后端可能不返回 */
+  returnUrl?: string;
   checkoutValue: string | null;
   expiresAt: string;
   hint?: string | null;
@@ -78,7 +89,12 @@ export interface PaymentProviderInfo {
   id: VisiblePaymentMethod;
   name: string;
   icon: VisiblePaymentMethod;
-  checkoutMode: "redirect" | "qrcode" | "qrcode-image" | "sandbox";
+  checkoutMode:
+    | "redirect"
+    | "qrcode"
+    | "qrcode-image"
+    | "payment-element"
+    | "sandbox";
   supportedCurrencies: string[];
   sandbox: false;
 }
@@ -342,6 +358,8 @@ export interface AdminPaymentException {
   overdue: boolean;
   refundId: string | null;
   refundStatus: string | null;
+  /** 失败退款是渠道明确拒绝，还是结果未知；仅 failed 时有值 */
+  refundFailureKind: 'definitive' | 'unknown' | null;
   providerRefundId: string | null;
   resolution: string | null;
   lastError: string | null;

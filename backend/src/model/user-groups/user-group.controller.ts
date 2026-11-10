@@ -8,7 +8,7 @@
  *   · `DELETE /admin/user-groups/:id`   删除
  *
  * 语义校验（编码规则、倍率区间、渠道归属、套餐占用）在 `UserGroupAdminService`；
- * 这里只做形状校验与权限 / 审计声明。`code` 创建后不可改 —— 会员套餐按编码映射分组，
+ * 这里只做形状校验与权限声明。`code` 创建后不可改 —— 会员套餐按编码映射分组，
  * 改编码等于把存量会员整体换组。
  */
 
@@ -31,7 +31,7 @@ import {
   Max,
   Min,
 } from "class-validator";
-import { AuditAction, RequirePermission } from "../../admin/admin.decorator";
+import { RequirePermission } from "../../admin/admin.decorator";
 import { PERMISSIONS } from "../../admin/permissions";
 import {
   UserGroupAdminService,
@@ -72,21 +72,18 @@ export class AdminUserGroupsController {
 
   @Post()
   @RequirePermission(PERMISSIONS.userGroupWrite)
-  @AuditAction("user_group.create")
   create(@Body() body: UserGroupWriteBodyDto) {
     return this.groups.create(body as UserGroupRequest);
   }
 
   @Patch(":id")
   @RequirePermission(PERMISSIONS.userGroupWrite)
-  @AuditAction("user_group.update")
   update(@Param("id") id: string, @Body() body: UserGroupWriteBodyDto) {
     return this.groups.update(id, body as UserGroupRequest);
   }
 
   @Delete(":id")
   @RequirePermission(PERMISSIONS.userGroupWrite)
-  @AuditAction("user_group.delete")
   async remove(@Param("id") id: string) {
     await this.groups.remove(id);
     return { ok: true };

@@ -17,13 +17,7 @@ import {
   IsOptional,
   IsString,
 } from "class-validator";
-import {
-  AdminUser,
-  AuditAction,
-  RequireAllPermissions,
-  RequirePermission,
-  type AdminUser as AdminUserType,
-} from "./admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission, type AdminUser as AdminUserType } from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
 import { AdminAssetsService } from "./assets-admin.service";
 import { PERMISSIONS } from "./permissions";
@@ -31,7 +25,12 @@ import { AppError } from "../common/app.exception";
 import { sendCsv } from "../common/csv-response";
 // 必须用运行时导入: `import type` 会让 Nest 的 design:paramtypes 退化成
 // Object/Function, ValidationPipe 无法转换 pageSize, 分页会静默退回默认 20。
-import { AssetListQueryDto, ProjectListQueryDto } from "./dto/asset.dto";
+import {
+  AssetListQueryDto,
+  CreateAdminProjectDto,
+  ProjectListQueryDto,
+  UpdateAdminProjectDto,
+} from "./dto/asset.dto";
 
 /** 下架/恢复 */
 export class AssetStatusDto {
@@ -82,17 +81,29 @@ export class AdminAssetsController {
     return this.assets.listProjects(query);
   }
 
+  @Post("projects")
+  @RequirePermission(PERMISSIONS.projectWrite)
+  createProject(@Body() dto: CreateAdminProjectDto) {
+    return this.assets.createProject(dto.name, dto.ownerId);
+  }
+
+  @Patch("projects/:id")
+  @RequirePermission(PERMISSIONS.projectWrite)
+  updateProject(@Param("id") id: string, @Body() dto: UpdateAdminProjectDto) {
+    return this.assets.updateProject(id, dto.name);
+  }
+
   /**
-   * 删除项目 (B-22)。
-   * 仅标记项目 deletedAt，任务、素材记录与文件全部保留。
-   * `?hard=true` 仅为旧客户端兼容，已废弃且不再执行物理删除。
+   * 删除项目 (B-22)：软删除，不物理删除素材、任务与文件。
+   * 有素材时必须用 `moveAssetsTo` 指定同一用户的迁移目标。
    */
   @Delete("projects/:id")
   @RequirePermission(PERMISSIONS.projectDelete)
-  @AuditAction("project.delete")
-  removeProject(@Param("id") id: string, @Query("hard") hard?: string) {
-    // hard 参数保留在路由契约中，但业务层有意忽略，避免旧客户端触发破坏性删除。
-    return this.assets.removeProject(id, hard === "true");
+  removeProject(
+    @Param("id") id: string,
+    @Query("moveAssetsTo") moveAssetsTo?: string,
+  ) {
+    return this.assets.removeProject(id, moveAssetsTo);
   }
 
   // ── 素材 ──────────────────────────────────────────────────────────
@@ -122,15 +133,13 @@ export class AdminAssetsController {
    */
   @Patch("assets/:id/status")
   @RequirePermission(PERMISSIONS.assetHide)
-  @AuditAction("asset.status_change")
   setStatus(@Param("id") id: string, @Body() dto: AssetStatusDto) {
     return this.assets.setStatus(id, dto.status);
   }
 
-  /** 批量下架 (B-87): 每条仍写审计 —— 批量不等于免审计 */
+  /** 批量下架 (B-87): 逐条执行并返回各自结果 */
   @Post("assets/batch-status")
   @RequirePermission(PERMISSIONS.assetHide)
-  @AuditAction("asset.batch_status")
   batchStatus(@Body() dto: AssetBatchStatusDto) {
     return this.assets.setStatusMany(dto.ids ?? [], dto.status);
   }
@@ -143,7 +152,6 @@ export class AdminAssetsController {
    */
   @Post("assets/batch")
   @RequirePermission(PERMISSIONS.assetRead)
-  @AuditAction("asset.batch")
   async batch(@Body() dto: AssetBatchDto, @AdminUser() actor: AdminUserType) {
     const needed =
       dto.action === "delete" ? PERMISSIONS.assetDelete : PERMISSIONS.assetHide;
@@ -156,7 +164,6 @@ export class AdminAssetsController {
   /** 素材导出 (CSV) */
   @Get("assets/export")
   @RequireAllPermissions(PERMISSIONS.assetRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(@Query() query: AssetListQueryDto, @Res() res: Response) {
     const csv = await this.assets.exportCsv(query);
     sendCsv(res, "assets", csv);
@@ -165,7 +172,6 @@ export class AdminAssetsController {
   /** 删除素材 (B-27): 连带磁盘文件与产出任务, 不可逆 */
   @Delete("assets/:id")
   @RequirePermission(PERMISSIONS.assetDelete)
-  @AuditAction("asset.delete")
   remove(@Param("id") id: string) {
     return this.assets.remove(id);
   }

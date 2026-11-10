@@ -135,6 +135,32 @@ describe('WechatAdapter.verifyNotification', () => {
     });
   });
 
+  it('未配置公钥 ID 时仍接受有效签名，但缺少 Wechatpay-Serial 仍拒绝', async () => {
+    const config = makeConfig({ wechatPayPublicKeyId: '' });
+    await expect(adapter.verifyNotification(notificationInput({ config }))).resolves.toMatchObject({
+      ok: true,
+      merchantOrderNo: ORDER_NO,
+      amountCents: 990,
+    });
+
+    await expect(
+      adapter.verifyNotification(notificationInput({ config, serial: null })),
+    ).resolves.toMatchObject({
+      ok: false,
+      reason: '缺少微信回调签名头',
+    });
+  });
+
+  it('未配置公钥 ID 时篡改签名仍拒绝回调', async () => {
+    const input = notificationInput({ config: makeConfig({ wechatPayPublicKeyId: '' }) });
+    input.headers['wechatpay-signature'] = Buffer.from('tampered').toString('base64');
+
+    await expect(adapter.verifyNotification(input)).resolves.toMatchObject({
+      ok: false,
+      reason: '回调验签失败',
+    });
+  });
+
   it('缺少 Wechatpay-Serial 时拒绝回调', async () => {
     await expect(
       adapter.verifyNotification(notificationInput({ serial: null })),
@@ -168,6 +194,36 @@ describe('WechatAdapter 网关响应验签', () => {
     });
   });
 
+  it('未配置公钥 ID 时仍接受有效响应签名', async () => {
+    fetchMock.mockResolvedValueOnce(
+      signedGatewayResponse(
+        { code_url: 'weixin://wxpay/bizpayurl?pr=test' },
+        'UNCONFIGURED_PUB_KEY_ID',
+      ),
+    );
+
+    await expect(
+      adapter.createOrder(
+        createOrderInput({ config: makeConfig({ wechatPayPublicKeyId: '' }) }),
+      ),
+    ).resolves.toMatchObject({
+      mode: 'qrcode',
+      codeUrl: 'weixin://wxpay/bizpayurl?pr=test',
+    });
+  });
+
+  it('未配置公钥 ID 时篡改响应签名仍拒绝', async () => {
+    const response = signedGatewayResponse({ code_url: 'weixin://wxpay/bizpayurl?pr=test' });
+    response.headers.set('wechatpay-signature', Buffer.from('tampered').toString('base64'));
+    fetchMock.mockResolvedValueOnce(response);
+
+    await expect(
+      adapter.createOrder(
+        createOrderInput({ config: makeConfig({ wechatPayPublicKeyId: '' }) }),
+      ),
+    ).rejects.toThrow('响应验签失败');
+  });
+
   it('响应 Wechatpay-Serial 与配置不一致时拒绝', async () => {
     fetchMock.mockResolvedValueOnce(
       signedGatewayResponse(
@@ -179,5 +235,49 @@ describe('WechatAdapter 网关响应验签', () => {
     await expect(adapter.createOrder(createOrderInput())).rejects.toThrow(
       '微信预下单响应公钥 ID 与配置不匹配',
     );
+  });
+});
+
+describe('WechatAdapter.refund', () => {
+  const adapter = new WechatAdapter();
+
+  it('渠道退款关闭时标记为渠道明确失败', async () => {
+    fetchMock.mockResolvedValueOnce(
+      signedGatewayResponse({ refund_id: '503000000020261109000001', status: 'CLOSED' }),
+    );
+
+    await expect(
+      adapter.refund({
+        config: makeConfig(),
+        orderNo: ORDER_NO,
+        outRefundNo: 'RF202611090001',
+        amountCents: 990,
+        totalCents: 990,
+        providerTradeNo: TRANSACTION_ID,
+      }),
+    ).resolves.toMatchObject({
+      state: 'failed',
+      failureKind: 'definitive',
+      providerRefundId: '503000000020261109000001',
+    });
+  });
+
+  it('网络异常时保留 unknown，要求同号重试或核对渠道', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('socket timeout'));
+
+    await expect(
+      adapter.refund({
+        config: makeConfig(),
+        orderNo: ORDER_NO,
+        outRefundNo: 'RF202611090002',
+        amountCents: 990,
+        totalCents: 990,
+        providerTradeNo: TRANSACTION_ID,
+      }),
+    ).resolves.toMatchObject({
+      state: 'failed',
+      failureKind: 'unknown',
+      error: expect.stringContaining('同一退款单号'),
+    });
   });
 });

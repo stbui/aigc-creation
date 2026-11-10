@@ -25,6 +25,12 @@ const TOAST_ACTIONS_CLASS = "huojue-toast__actions";
 const TOAST_COPY_CLASS = "huojue-toast__copy";
 const TOAST_UPLOAD_CLASS = "huojue-toast__upload";
 const DEBUG_LOG_ENABLED = false;
+// 扩展重新加载后，旧页面里的 content script 会失去 chrome.runtime。
+// 在启动阶段先缓存文案，失效时仍能给出可操作的提示。
+const EXTENSION_RELOAD_NOTICE = {
+  title: t("extensionReloadRequiredTitle"),
+  message: t("extensionReloadRequiredMessage")
+};
 const TOAST_SAVE_ERROR_CLASS = "huojue-toast--save-error";
 const CREATE_PROJECT_MESSAGE = "huojue:create-project";
 const GET_PROJECTS_MESSAGE = "huojue:get-projects";
@@ -461,6 +467,43 @@ function revealSaveResult() {
   revealToast();
 }
 
+function hasLiveExtensionContext() {
+  try {
+    return Boolean(chrome?.runtime?.id);
+  } catch {
+    return false;
+  }
+}
+
+function isExtensionContextInvalidError(error) {
+  return error instanceof Error &&
+    /extension context invalidated/i.test(error.message);
+}
+
+function showExtensionReloadNotice() {
+  hideBatchBackdrop();
+  hideSingleSaveProgress();
+  uploadRequestId += 1;
+  uploading = false;
+  lastUploadSucceeded = false;
+  toast.dataset.state = "error";
+  toast.classList.remove(
+    "huojue-toast--batch",
+    "huojue-toast--batch-success"
+  );
+  toast.classList.add(TOAST_SAVE_ERROR_CLASS);
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-label", EXTENSION_RELOAD_NOTICE.title);
+  setGroupPanelExpanded(false);
+  toastSeparator.hidden = true;
+  toastActions.hidden = true;
+  toastTitle.textContent = EXTENSION_RELOAD_NOTICE.title;
+  toastStatus.textContent = EXTENSION_RELOAD_NOTICE.message;
+  toastUrl.textContent = "";
+  revealSaveResult();
+  cancelToastHide();
+}
+
 function showBatchBackdrop() {
   document.documentElement.append(batchBackdrop, toast);
   toast.setAttribute("role", "dialog");
@@ -683,6 +726,10 @@ saveButton.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
 
+  if (!hasLiveExtensionContext()) {
+    showExtensionReloadNotice();
+    return;
+  }
   if (!activeImage) {
     return;
   }
@@ -1700,6 +1747,10 @@ copyButton.addEventListener("click", async (event) => {
 uploadButton.addEventListener("click", async (event) => {
   event.preventDefault();
   event.stopPropagation();
+  if (!hasLiveExtensionContext()) {
+    showExtensionReloadNotice();
+    return;
+  }
   if (lastUploadSucceeded) {
     await saveSelectedGroup();
   } else {
@@ -1708,6 +1759,10 @@ uploadButton.addEventListener("click", async (event) => {
 });
 
 async function uploadCurrentImage() {
+  if (!hasLiveExtensionContext()) {
+    showExtensionReloadNotice();
+    return;
+  }
   if (uploading) {
     return;
   }
@@ -1780,6 +1835,10 @@ async function uploadCurrentImage() {
     });
   } catch (error) {
     if (requestId !== uploadRequestId) {
+      return;
+    }
+    if (!hasLiveExtensionContext() || isExtensionContextInvalidError(error)) {
+      showExtensionReloadNotice();
       return;
     }
 
@@ -2053,8 +2112,9 @@ function normalizeItemTitle(value) {
 }
 
 function handleContextMenuResult(message) {
-  if (message.traceId !== currentContextMenuTraceId &&
-      (currentContextMenuTraceId || message.ok || message.imageUrl)) return;
+  // 进度消息可能先于 content script 就绪而丢失；结果消息本身足以展示最终状态。
+  // 仅在页面仍跟踪另一条保存任务时，才丢弃不匹配的旧结果。
+  if (currentContextMenuTraceId && message.traceId !== currentContextMenuTraceId) return;
   const sourceUrl = message.imageUrl || currentSourceUrl || "";
   showToast(sourceUrl, message.sourceTitle, message.sourcePageUrl, {
     mode: "hidden"

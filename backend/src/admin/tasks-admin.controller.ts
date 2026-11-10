@@ -11,13 +11,7 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { ArrayMaxSize, IsArray, IsIn, IsString } from "class-validator";
-import {
-  AdminUser,
-  AuditAction,
-  RequireAllPermissions,
-  RequirePermission,
-  type AdminUser as AdminUserType,
-} from "./admin.decorator";
+import { AdminUser, RequireAllPermissions, RequirePermission, type AdminUser as AdminUserType } from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
 import { TasksAdminService } from "./tasks-admin.service";
 import { PERMISSIONS } from "./permissions";
@@ -80,16 +74,7 @@ export class AdminTasksController {
    */
   @Post("batch")
   @RequirePermission(PERMISSIONS.taskRead)
-  @AuditAction("task.batch")
-  async batch(
-    @Body() dto: TaskBatchDto,
-    @AdminUser() actor: AdminUserType,
-    @Req() req: Request & { auditExtra?: Record<string, unknown> },
-  ) {
-    if (dto.action === "delete") {
-      req.auditExtra = { batchAction: "delete", taskIds: dto.ids };
-    }
-
+  async batch(@Body() dto: TaskBatchDto, @AdminUser() actor: AdminUserType) {
     const needed =
       dto.action === "retry"
         ? PERMISSIONS.taskRetry
@@ -113,11 +98,10 @@ export class AdminTasksController {
    * 导出任务 (CSV)。
    *
    * 路由必须声明在 `:id` 之前，否则 `export` 会被当成任务 id。
-   * 导出把用户数据带出系统，用独立的 `data.export` 权限点并留审计。
+   * 导出把用户数据带出系统，使用独立的 `data.export` 权限点。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.taskRead, PERMISSIONS.dataExport)
-  @AuditAction("data.export")
   async export(@Query() query: TaskListQueryDto, @Res() res: Response) {
     const csv = await this.tasks.exportCsv(query);
     sendCsv(res, "tasks", csv);
@@ -138,7 +122,6 @@ export class AdminTasksController {
    */
   @Delete(":id")
   @RequirePermission(PERMISSIONS.taskDelete)
-  @AuditAction("task.delete")
   remove(@Param("id") id: string) {
     return this.tasks.remove(id);
   }
@@ -146,11 +129,10 @@ export class AdminTasksController {
   /**
    * 失败重试 (B-32): 用原参数与输入新建任务。
    *
-   * 挂审计 —— 重试触发真实生成, 会消耗模型额度, 事后必须可追溯。
+   * 重试触发真实生成, 会消耗模型额度, 因此必须走独立权限校验。
    */
   @Post(":id/retry")
   @RequirePermission(PERMISSIONS.taskRetry)
-  @AuditAction("task.retry")
   retry(@Param("id") id: string) {
     return this.tasks.retry(id);
   }
@@ -158,11 +140,10 @@ export class AdminTasksController {
   /**
    * 终止运行中任务 (B-33): 作废排队与产出, 用户端立即可见失败。
    *
-   * 终止是作废用户已提交的动作, 属高危, 必须留审计。
+   * 终止会作废用户已提交的动作, 属高危, 因此必须走独立权限校验。
    */
   @Post(":id/cancel")
   @RequirePermission(PERMISSIONS.taskCancel)
-  @AuditAction("task.cancel")
   cancel(@Param("id") id: string) {
     return this.tasks.cancel(id);
   }

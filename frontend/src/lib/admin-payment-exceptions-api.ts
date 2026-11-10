@@ -43,6 +43,19 @@ export const adminPaymentExceptionsApi = {
       { method: 'POST' },
     ),
 
+  confirmRefund: (
+    id: string,
+    payload: {
+      outcome: 'succeeded' | 'failed';
+      providerRefundId?: string;
+      reason: string;
+    },
+  ) =>
+    request<AdminPaymentException>(
+      `/admin/payments/exceptions/${id}/confirm-refund`,
+      { method: 'POST', body: payload },
+    ),
+
   close: (id: string, resolution: string) =>
     request<AdminPaymentException>(`/admin/payments/exceptions/${id}/close`, {
       method: 'POST',

@@ -11,17 +11,23 @@ import {
   FilterBar,
   SelectField,
   StatusTag,
+  useSelectionPrune,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
+import { ProductConsumptionCell } from './ProductConsumptionCell';
+import { ProductStatusStrip, type ProductStatusCounts } from './ProductStatusStrip';
+import { consumptionImpactText } from './useProductConsumption';
 import { useConfirm, useToast, useAdminUrlFilterSync } from './hooks';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
+import { PRODUCT_STATE_META, productStateOf } from './utils';
 import {
   ALL_MODELS_PAGE_SIZE,
   ALL_MODELS_STATUS_OPTIONS,
   CAPABILITY_OPTIONS,
   type AllModelsStatusFilter,
 } from './constants';
+import type { ProductConsumptionState } from './useProductConsumption';
 import type {
   AdminChannelModelListItem,
   ChannelModelHealthRowView,
@@ -29,24 +35,25 @@ import type {
 } from '../../../types/model';
 
 /**
- * 跨渠道「全部模型」视图。
+ * 跨供应商「商品台账」视图，也是页面默认视图。
  *
  * ## 为什么要这个视图
  *
- * 渠道工作台是「按渠道」组织的：看到某条线不对，要先知道它在哪个渠道，
- * 再选中那条渠道才能看价格与健康。但排障时的第一个问题往往是「**哪家**的
- * 模型在挂」—— 跨渠道看才答得上来。参考实现也把它做成与「按渠道」并列的
- * 第二个视图，而不是藏在单条渠道的详情里。
+ * 供应商视图是「按渠道」组织的：看到某条线不对，要先知道它在哪个渠道，
+ * 再选中那条渠道才能看价格与健康。但运营的第一问题往往是「**哪个商品**
+ * 能卖、被谁消费」—— 跨供应商看才答得上来。
  *
  * ## 筛选口径
  *
- * · **状态**分五档：全部 / 启用 / 停用 / 不健康 / 未定价。
- *   「启用」= 模型自身启用 **且** 所属渠道启用（两者都为真才进路由）；
- *   「停用」= 其一不满足；展示时会继续区分模型停用、渠道停用，
- *   以及两者同时停用，避免把影响范围不同的开关混成一个状态；
+ * · **状态**分七档：全部 / 可用 / 已停用 / 不健康 / 待定价 / 待配置 / 冷却中。
+ *   「可用」= 商品自身启用、所属供应商启用、已定价且声明了类型与接入方式；
+ *   「已停用」= 商品或供应商其一停用；具体是谁停用放在状态悬停里，
+ *   列表上不再并排两枚胶囊；
  *   「不健康」= 24h 成功率低于 80%（**无样本不算不健康** ——
  *   「没调用过」与「在挂」是两件事，混在一起会让刚上线的线全部标红）；
- *   「未定价」= 没有任何已配置价格档（补价工作队列）。
+ *   「待定价」= 没有任何已配置价格档（补价工作队列）；
+ *   「待配置」= 上游导入的骨架行还没声明类型或接入方式；
+ *   「冷却中」= 明确可归因失败后的临时退避，与商品状态正交。
  *
  * ## 一次取回全部，前端筛选
  *
@@ -59,15 +66,17 @@ const UNHEALTHY_RATE = 0.8;
 
 export function AllChannelModelsPanel({
   writable,
+  consumption,
   onChanged,
   onOpenChannel,
   onEditModel,
 }: {
   writable: boolean;
+  consumption: ProductConsumptionState;
   onChanged: () => void;
-  /** 点渠道名跳回「按渠道」视图并选中该渠道；不传则渠道名只是文本 */
+  /** 点供应商名跳回「按供应商」视图并选中该供应商；不传则名称只是文本 */
   onOpenChannel?: (channelId: string) => void;
-  /** 点「编辑」跳回该渠道并直接打开这条模型的编辑器 */
+  /** 点「编辑」跳回该供应商并直接打开这条商品的编辑器 */
   onEditModel?: (channelId: string, modelId: string) => void;
 }) {
   const toast = useToast();
@@ -79,6 +88,8 @@ export function AllChannelModelsPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [batchBusy, setBatchBusy] = useState(false);
 
   /*
    * 筛选从地址栏初始化：把「不健康 + 某渠道」视图发给同事要能直达。
@@ -173,17 +184,21 @@ export function AllChannelModelsPanel({
         }
         if (capability && item.capability !== capability) return false;
         if (channelFilter && item.channelId !== channelFilter) return false;
-        const usable = item.enabled && item.channelEnabled;
-        if (status === 'enabled' && !usable) return false;
-        if (status === 'disabled' && usable) return false;
+        const state = productStateOf(item, item.channelEnabled);
+        if (status === 'enabled' && state !== 'available') return false;
+        if (status === 'disabled' && state !== 'disabled') return false;
         if (status === 'unhealthy') {
           const stats = healthByModelId.get(item.id);
           const rate = stats?.windows.day.successRate;
           // 无样本不算不健康
           if (rate === null || rate === undefined || rate >= UNHEALTHY_RATE) return false;
         }
-        // 未定价：模型存在但没有任何可用价格档 —— 补价工作队列
-        if (status === 'unpriced' && item.priceConfigured) return false;
+        // 待定价：商品存在但没有任何可用价格档 —— 补价工作队列
+        if (status === 'unpriced' && state !== 'unpriced') return false;
+        // 待配置：上游导入的骨架行还没声明能力 / 接入方式
+        if (status === 'unconfigured' && state !== 'unconfigured') return false;
+        // 冷却：明确可归因失败后的临时退避，与商品状态正交
+        if (status === 'cooling' && !healthByModelId.get(item.id)?.coolingUntil) return false;
         return true;
       })
       .sort(
@@ -198,6 +213,8 @@ export function AllChannelModelsPanel({
     () => filtered.slice((page - 1) * ALL_MODELS_PAGE_SIZE, page * ALL_MODELS_PAGE_SIZE),
     [filtered, page],
   );
+  const visibleIds = useMemo(() => paged.map((row) => row.id), [paged]);
+  useSelectionPrune(setSelectedIds, visibleIds);
 
   const applyEnabled = async (item: AdminChannelModelListItem, enabled: boolean) => {
     setTogglingId(item.id);
@@ -209,7 +226,7 @@ export function AllChannelModelsPanel({
       toast.success(enabled ? `已启用 ${item.modelKey}` : `已停用 ${item.modelKey}`);
       onChanged();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '更新模型状态失败');
+      toast.error(e instanceof Error ? e.message : '更新商品状态失败');
     } finally {
       setTogglingId(null);
     }
@@ -224,15 +241,81 @@ export function AllChannelModelsPanel({
       await applyEnabled(item, true);
       return;
     }
+    const impact = consumptionImpactText(consumption.byModelId.get(item.id) ?? []);
     const confirmed = await confirm({
-      title: `停用 ${item.channelName || channelNameById.get(item.channelId) || '该渠道'} 的 ${item.displayName || item.modelKey}？`,
-      description:
-        '停用后新任务不再使用这个渠道的该模型，引用它的前台模型会切换到其他可用线路；配置保留，可随时重新启用。',
+      title: `停用 ${item.channelName || channelNameById.get(item.channelId) || '该供应商'} 的 ${item.displayName || item.modelKey}？`,
+      description: `停用后新任务不再使用这个供应商的该商品，消费它的能力会切换到其他可用商品；配置保留，可随时重新启用。${impact}。`,
       confirmText: '确认停用',
       danger: true,
     });
     if (confirmed === null) return;
     await applyEnabled(item, false);
+  };
+
+  /** 批量上架 / 下架：逐条调用既有启停接口，逐条返回失败 */
+  const runBatchToggle = async (enabled: boolean) => {
+    const selected = rows.filter((row) => selectedIds.includes(row.id));
+    const targets = selected.filter((row) => row.enabled !== enabled);
+    if (targets.length === 0) {
+      toast.warning(`所选商品都已经是${enabled ? '启用' : '停用'}状态`);
+      return;
+    }
+
+    let eligible = targets;
+    if (enabled) {
+      eligible = targets.filter(
+        (row) =>
+          Boolean(row.capability) &&
+          Boolean(row.protocol) &&
+          row.priceConfigured &&
+          row.channelEnabled,
+      );
+      if (eligible.length === 0) {
+        toast.error('所选商品都未配置完整（类型 / 接入方式 / 售价），无法上架');
+        return;
+      }
+    }
+
+    const skipped = targets.length - eligible.length;
+    const confirmed = await confirm({
+      title: enabled
+        ? `批量上架 ${eligible.length} 个商品？`
+        : `批量下架 ${eligible.length} 个商品？`,
+      description: enabled
+        ? `${skipped > 0 ? `${skipped} 个商品因缺类型 / 接入方式 / 售价或供应商停用会被跳过。` : ''}上架后可被能力选用。`
+        : '下架后新任务不再使用这些商品；消费它们的售卖配置会切换到其他可用商品。配置与售价保留，可随时重新上架。',
+      confirmText: enabled ? '确认上架' : '确认下架',
+      danger: !enabled,
+    });
+    if (confirmed === null) return;
+
+    setBatchBusy(true);
+    const failures: string[] = [];
+    try {
+      for (const row of eligible) {
+        try {
+          await adminChannelsApi.setModelEnabled(row.channelId, row.id, enabled);
+        } catch (e) {
+          failures.push(
+            `${row.modelKey}：${e instanceof Error ? e.message : '操作失败'}`,
+          );
+        }
+      }
+      if (failures.length > 0) {
+        toast.error(
+          `已处理 ${eligible.length - failures.length} 个，${failures.length} 个失败：${failures
+            .slice(0, 2)
+            .join('；')}`,
+        );
+      } else {
+        toast.success(`已${enabled ? '上架' : '下架'} ${eligible.length} 个商品`);
+      }
+      setSelectedIds([]);
+      await load();
+      onChanged();
+    } finally {
+      setBatchBusy(false);
+    }
   };
 
   /** 任一筛选生效时，空表要区分「筛没了」与「本来就没有」 */
@@ -244,13 +327,31 @@ export function AllChannelModelsPanel({
     setPage(1);
   };
 
-  const enabledCount = filtered.filter((item) => item.enabled && item.channelEnabled).length;
+  const availableCount = filtered.filter(
+    (item) => productStateOf(item, item.channelEnabled) === 'available',
+  ).length;
+
+  /** 状态条按全量商品统计，不受当前筛选影响 */
+  const statusCounts = useMemo<ProductStatusCounts>(() => {
+    const counts: ProductStatusCounts = {
+      available: 0,
+      unpriced: 0,
+      unconfigured: 0,
+      disabled: 0,
+      cooling: 0,
+    };
+    for (const row of rows) {
+      counts[productStateOf(row, row.channelEnabled)] += 1;
+      if (healthByModelId.get(row.id)?.coolingUntil) counts.cooling += 1;
+    }
+    return counts;
+  }, [healthByModelId, rows]);
 
   const columns: Array<AdminColumn<AdminChannelModelListItem>> = useMemo(
     () => [
       {
         key: 'model',
-        title: '模型',
+        title: '商品',
         width: 230,
         render: (row) => (
           <div className="min-w-0">
@@ -266,8 +367,8 @@ export function AllChannelModelsPanel({
       },
       {
         key: 'channel',
-        title: '渠道',
-        width: 160,
+        title: '供应商',
+        width: 140,
         render: (row) => {
           const name = row.channelName || channelNameById.get(row.channelId) || '—';
           return (
@@ -277,7 +378,7 @@ export function AllChannelModelsPanel({
                 <button
                   type="button"
                   className="block max-w-full truncate text-brand hover:underline"
-                  title="在渠道中查看"
+                  title="在供应商中查看"
                   onClick={() => onOpenChannel(row.channelId)}
                 >
                   {name}
@@ -294,36 +395,55 @@ export function AllChannelModelsPanel({
       },
       {
         key: 'capability',
-        title: '能力',
+        title: '类型',
         width: 76,
         render: (row) => <ChannelModelCapabilityTag capability={row.capability} />,
       },
       {
+        key: 'consumption',
+        title: '消费能力',
+        width: 170,
+        render: (row) => (
+          <ProductConsumptionCell
+            refs={consumption.byModelId.get(row.id)}
+            loading={consumption.loading}
+            available={consumption.available}
+          />
+        ),
+      },
+      {
         key: 'health',
-        title: '稳定性（24h）',
-        width: 160,
+        title: '健康',
+        width: 140,
         render: (row) => (
           <ChannelModelHealthCell health={healthByModelId.get(row.id)} loading={loading} />
         ),
       },
       {
         key: 'cost',
-        title: '成本价 / 销售价',
-        width: 300,
-        render: (row) => <ChannelModelCostSummary model={row} tiers={row.priceTiers} />,
+        title: '售价',
+        width: 220,
+        render: (row) => <ChannelModelCostSummary model={row} tiers={row.priceTiers} saleOnly />,
       },
       {
         key: 'status',
         title: '状态',
-        width: 126,
+        width: 100,
         render: (row) => {
-          if (!row.channelEnabled && !row.enabled) {
-            return <StatusTag status="channel-model-disabled" tone="warn" label="渠道/模型停用" />;
-          }
-          if (!row.channelEnabled) return <StatusTag status="channel-disabled" tone="warn" label="渠道停用" />;
-          if (!row.enabled) return <StatusTag status="disabled" tone="muted" label="模型停用" />;
-          if (!row.priceConfigured) return <StatusTag status="unpriced" tone="warn" label="未定价" />;
-          return <StatusTag status="enabled" tone="success" label="启用" />;
+          const state = productStateOf(row, row.channelEnabled);
+          const meta = PRODUCT_STATE_META[state];
+          // 状态已收敛成四值，供应商 / 商品谁停用放到悬停里
+          const detail =
+            state === 'disabled' && !row.channelEnabled
+              ? '所属供应商已停用'
+              : state === 'disabled'
+                ? '商品已停用'
+                : undefined;
+          return (
+            <span title={detail}>
+              <StatusTag status={`product-${state}`} tone={meta.tone} label={meta.label} />
+            </span>
+          );
         },
       },
       {
@@ -357,7 +477,7 @@ export function AllChannelModelsPanel({
               disabled={!writable || togglingId !== null}
               onClick={() => void toggleEnabled(row)}
             >
-              {row.enabled ? '停用模型' : '启用模型'}
+              {row.enabled ? '停用商品' : '启用商品'}
             </ActionButton>
           </div>
         ),
@@ -375,49 +495,54 @@ export function AllChannelModelsPanel({
 
   return (
     <div className="flex flex-col gap-3">
+      <ProductStatusStrip
+        counts={statusCounts}
+        active={status}
+        onChange={(next) => updateFilter(() => setStatus(next))}
+      />
       <FilterBar className="mb-0">
         <ClearableField
-          ariaLabel="搜索模型"
+          ariaLabel="搜索商品"
           value={keyword}
           onChange={(value) => updateFilter(() => setKeyword(value))}
-          placeholder="搜索模型编号、用户端名称或渠道"
+          placeholder="搜索商品编号、名称或供应商"
           className="w-64"
         />
         <SelectField
-          ariaLabel="模型能力"
+          ariaLabel="商品类型"
           value={capability}
           onChange={(value) => updateFilter(() => setCapability(value))}
           options={CAPABILITY_OPTIONS}
-          placeholder="全部能力"
-          clearLabel="全部能力"
+          placeholder="全部类型"
+          clearLabel="全部类型"
           allowClear
           className="w-32"
         />
         <SelectField
-          ariaLabel="模型状态"
+          ariaLabel="商品状态"
           value={status === 'all' ? undefined : status}
           onChange={(value) => updateFilter(() => setStatus((value as AllModelsStatusFilter) ?? 'all'))}
           options={ALL_MODELS_STATUS_OPTIONS.filter((item) => item.value !== 'all')}
           placeholder="全部状态"
           // 复位项就叫「全部」：它是「不按状态筛」的通用说法，各页统一，
-          // 运营不用逐页记这一格叫「全部状态」还是「全部模型」。
+          // 运营不用逐页记这一格叫「全部状态」还是「全部商品」。
           clearLabel="全部"
           allowClear
-          className="w-44"
+          className="w-40"
         />
         <SelectField
-          ariaLabel="所属渠道"
+          ariaLabel="所属供应商"
           value={channelFilter}
           onChange={(value) => updateFilter(() => setChannelFilter(value))}
           options={channelOptions}
-          placeholder="全部渠道"
-          clearLabel="全部渠道"
+          placeholder="全部供应商"
+          clearLabel="全部供应商"
           allowClear
           className="w-40"
         />
         <FilterActions>
           <span className="text-xs tabular-nums text-muted-foreground">
-            {loading ? '读取中…' : `${filtered.length} 个模型 · ${enabledCount} 个可用`}
+            {loading ? '读取中…' : `${filtered.length} 个商品 · ${availableCount} 个可用`}
           </span>
           <ActionButton
             variant="secondary"
@@ -435,6 +560,41 @@ export function AllChannelModelsPanel({
         </FilterActions>
       </FilterBar>
 
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            已选 {selectedIds.length} 个商品
+          </span>
+          <ActionButton
+            variant="secondary"
+            size="xs"
+            disabled={batchBusy || togglingId !== null}
+            onClick={() => void runBatchToggle(true)}
+          >
+            批量上架
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            size="xs"
+            disabled={batchBusy || togglingId !== null}
+            onClick={() => void runBatchToggle(false)}
+          >
+            批量下架
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
+            size="xs"
+            disabled={batchBusy}
+            onClick={() => setSelectedIds([])}
+          >
+            取消选择
+          </ActionButton>
+          {batchBusy && (
+            <span className="text-xs text-muted-foreground">处理中…</span>
+          )}
+        </div>
+      )}
+
       {error && rows.length === 0 && <StaleError error={error} onRetry={() => void load()} />}
 
       <AdminDataTable<AdminChannelModelListItem>
@@ -444,9 +604,13 @@ export function AllChannelModelsPanel({
         loading={loading}
         error={error}
         onRetry={() => void load()}
-        emptyText={hasFilters ? '没有匹配的模型' : '暂无渠道模型'}
+        selectable
+        selected={selectedIds}
+        onSelectedChange={setSelectedIds}
+        rowSelectLabel={(row) => `选择商品 ${row.modelKey}`}
+        emptyText={hasFilters ? '没有匹配的商品' : '暂无商品'}
         density="compact"
-        minWidth={1080}
+        minWidth={1240}
         pagination={{
           current: page,
           pageSize: ALL_MODELS_PAGE_SIZE,

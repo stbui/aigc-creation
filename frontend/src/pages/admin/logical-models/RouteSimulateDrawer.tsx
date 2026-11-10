@@ -19,7 +19,7 @@ type SimulatedRoute = SimulateResultView['routes'][number];
 const ROUTE_COLUMNS: Array<AdminColumn<SimulatedRoute>> = [
   {
     key: 'channelModel',
-    title: '线路',
+    title: '模型商品',
     render: (route) => (
       <span className="font-mono">{route.channelModelKey || route.channelModelId}</span>
     ),
@@ -38,7 +38,7 @@ const ROUTE_COLUMNS: Array<AdminColumn<SimulatedRoute>> = [
   },
   {
     key: 'priceTierId',
-    title: '价格档',
+    title: '售价',
     render: (route) => route.priceTierId || '—',
   },
   {
@@ -56,10 +56,10 @@ const ROUTE_COLUMNS: Array<AdminColumn<SimulatedRoute>> = [
 ];
 
 /**
- * 路由模拟抽屉。
+ * 消费测试抽屉。
  *
- * 只读：按给定参数算一遍「会落到哪条线路、为什么没落」，不扣费、不建任务。
- * 上线新模型前用它确认能力合同与线路优先级是否符合预期，比真发一单便宜得多。
+ * 只读：按给定参数算一遍「会落到哪个模型商品、为什么没落」，不扣费、不建任务。
+ * 上线新商品前用它确认能力合同与商品优先级是否符合预期，比真发一单便宜得多。
  *
  * 组件由页面按模型 id 做 key 重挂载，因此内部状态可以按目标模型直接初始化。
  */
@@ -100,7 +100,7 @@ export function RouteSimulateDrawer({
       });
       setResult(next);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '模拟失败');
+      toast.error(e instanceof Error ? e.message : '测试失败');
     } finally {
       setSimulating(false);
     }
@@ -113,15 +113,15 @@ export function RouteSimulateDrawer({
         if (!next) onClose();
       }}
       width={720}
-      title={`路由模拟 · ${model?.name ?? ''}`}
-      description="只读模拟路由结果，不扣费、不创建任务"
+      title={`消费测试 · ${model?.name ?? ''}`}
+      description="只读测试消费落点，不扣费、不创建任务"
       footer={
         <>
           <ActionButton variant="secondary" size="sm" onClick={onClose}>
             关闭
           </ActionButton>
           <ActionButton variant="default" size="sm" disabled={simulating} onClick={run}>
-            {simulating ? '模拟中…' : '开始模拟'}
+            {simulating ? '测试中…' : '开始测试'}
           </ActionButton>
         </>
       }
@@ -143,9 +143,9 @@ export function RouteSimulateDrawer({
           <div className="flex flex-col gap-3">
             <Descriptions
               items={[
-                { label: '候选线路', value: String(result.candidates) },
+                { label: '候选商品', value: String(result.candidates) },
                 {
-                  label: '选中线路',
+                  label: '选中商品',
                   value:
                     result.routes.find((route) => route.selectedTier)?.channelModelKey ||
                     result.selectedRouteId ||
@@ -161,7 +161,7 @@ export function RouteSimulateDrawer({
                 columns={ROUTE_COLUMNS}
                 rowKey={(route) => `${route.routeId}-${route.priceTierId}`}
                 density="compact"
-                emptyText="没有候选线路。"
+                emptyText="没有候选商品。"
               />
             </div>
           </div>

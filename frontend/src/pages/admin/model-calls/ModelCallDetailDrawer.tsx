@@ -1,6 +1,12 @@
 import { ActionButton, Descriptions, Drawer, Notice, formatDateTimeLoose, formatDuration } from '~/admin-ui/primitives';
 import type { ApiLogView } from '../../../types/model';
-import { REQUEST_KIND_LABELS, STATUS_LABELS } from './constants';
+import {
+  CAPABILITY_LABELS,
+  OPERATION_LABELS,
+  REQUEST_KIND_LABELS,
+  SOURCE_LABELS,
+  STATUS_LABELS,
+} from './constants';
 
 export function ModelCallDetailDrawer({
   detailId,
@@ -43,13 +49,16 @@ export function ModelCallDetailDrawer({
                 label: '请求类型',
                 value: `${REQUEST_KIND_LABELS[detail.requestKind] ?? detail.requestKind}${detail.billable ? '（计费）' : '（不计费）'}`,
               },
-              { label: '来源', value: detail.source || '—' },
+              {
+                label: '来源',
+                value: (SOURCE_LABELS[detail.source] ?? detail.source) || '—',
+              },
               { label: '渠道', value: `${detail.channelName || '—'}（${detail.channelId || '—'}）` },
               { label: '模型', value: <span className="font-mono text-xs">{detail.model || '—'}</span> },
               { label: '协议 / 格式', value: detail.apiFormat || '—' },
               {
                 label: '能力 / 操作',
-                value: `${detail.capability || '—'} · ${detail.operation || '—'}`,
+                value: `${CAPABILITY_LABELS[detail.capability] ?? detail.capability ?? '—'} · ${OPERATION_LABELS[detail.operation] ?? detail.operation ?? '—'}`,
               },
               {
                 label: '耗时',
@@ -77,6 +86,10 @@ export function ModelCallDetailDrawer({
                 value: <span className="font-mono text-xs">{detail.billingOrderId || '—'}</span>,
               },
               { label: '用户', value: detail.userId || '—' },
+              {
+                label: '请求号',
+                value: <span className="font-mono text-xs">{detail.requestId || '—'}</span>,
+              },
               {
                 label: '追踪号',
                 value: <span className="font-mono text-xs">{detail.traceId || '—'}</span>,

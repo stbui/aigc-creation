@@ -13,7 +13,7 @@ import type { AdminCleanupLog, AdminRetentionTarget } from '../../../types/api';
  *
  * ## 为什么只给这几个目标
  *
- * 可清理的只有**运行痕迹**: 审计、模型调用记录、备份记录、清理日志。
+ * 可清理的只有**运行痕迹**: 模型调用记录、备份记录、清理日志。
  * 订单、积分流水、素材、任务一律不在此列 —— 《电子商务法》要求交易信息
  * 保存三年, 且它们是对账的唯一凭据。删了不是"省空间", 是让历史无法还原。
  *
@@ -254,7 +254,7 @@ export function AdminRetentionPage() {
 
       <Panel
         title="清理目标"
-        note="每次清理都写入清理日志与操作审计"
+        note="每次清理都会写入清理日志"
         extra={
           writable && dirtyCount > 0 ? (
             <ActionButton variant="ghost" size="sm" onClick={() => setDays({ ...daysBase })}>
@@ -308,7 +308,7 @@ export function AdminRetentionPage() {
           impact={[
             `保留 ${days[pending.table] ?? pending.retentionDays} 天，之前记录全部删除`,
             `按 ${pending.retentionDays} 天估算将删除 ${pending.expiring} 条`,
-            '写入清理日志与操作审计',
+            '写入清理日志',
           ]}
         />
       )}

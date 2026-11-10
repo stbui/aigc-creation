@@ -140,6 +140,8 @@ export function toolPath(id: string): string {
   // 漏这行会让侧栏 / 顶导 / 工作台 / 首页全部指向通用工具页 (/tools/<id>),
   // 用户看到的是通用表单而不是复刻页面。
   if (id === 'shoppable_carousel') return '/shoppable-carousel';
+  // 2026-11-10: 写真模板同样是独立工作台（左上传 + 右模板 + 底部历史）。
+  if (id === 'template') return '/template';
   return `/tools/${id}`;
 }
 

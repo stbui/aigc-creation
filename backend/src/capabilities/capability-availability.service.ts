@@ -88,7 +88,7 @@ export class CapabilityAvailabilityService {
   /**
    * 快照内的「能力 id → 前台模型」索引，按快照引用懒构建。
    *
-   * `runtimeAll()` 会对 17 项能力逐个调用 `remoteOf`，每次都从
+   * `runtimeAll()` 会对 18 项能力逐个调用 `remoteOf`，每次都从
    * `snapshot.ordered` 全量扫描一遍；模型数量增长后这是 17 × N 的无谓重复。
    * 按能力分桶后每项只看自己的模型，判定逻辑与逐条扫描完全一致。
    */
@@ -244,7 +244,7 @@ export class CapabilityAvailabilityService {
    *
    * 两条硬规则：
    * 1. **下架必须填原因** —— 用户在工作台看到的是一句「已下线」，没有原因
-   *    就只能去问客服；原因同时进审计。
+   *    就只能去问客服。
    * 2. 未知能力 id 直接拒绝（不做「先建行后校验」），否则一个拼写错误会在表里
    *    留下一条永远不生效的记录。
    */

@@ -1,7 +1,10 @@
-import { IsString, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class CreateProjectDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MinLength(1)
-  name: string;
+  @IsNotEmpty({ message: '项目名称不能为空' })
+  @MaxLength(80, { message: '项目名称不能超过 80 个字符' })
+  name!: string;
 }

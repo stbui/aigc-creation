@@ -11,7 +11,7 @@
  */
 
 import { Controller, Get, Param, Post } from '@nestjs/common';
-import { AdminUser, AuditAction, RequirePermission } from '../../admin/admin.decorator';
+import { AdminUser, RequirePermission } from '../../admin/admin.decorator';
 import type { AdminUser as AdminUserContext } from '../../admin/admin.decorator';
 import { PERMISSIONS } from '../../admin/permissions';
 import { ProviderCatalogService } from './provider-catalog.service';
@@ -26,10 +26,9 @@ export class AdminProviderCatalogController {
     return this.catalog.list();
   }
 
-  /** 写动作：拉取远端目录会产生出站请求，按高危动作留审计 */
+  /** 写动作：拉取远端目录会产生出站请求，因此使用独立写权限 */
   @Post('refresh')
   @RequirePermission(PERMISSIONS.pluginWrite)
-  @AuditAction('provider_catalog.refresh')
   refresh() {
     return this.catalog.refresh();
   }
@@ -42,7 +41,6 @@ export class AdminProviderCatalogController {
 
   @Post(':id/install')
   @RequirePermission(PERMISSIONS.pluginWrite)
-  @AuditAction('provider_catalog.install')
   install(@Param('id') id: string, @AdminUser() user: AdminUserContext) {
     return this.catalog.install(id, user?.id ?? '');
   }

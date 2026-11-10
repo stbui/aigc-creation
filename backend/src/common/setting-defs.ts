@@ -401,17 +401,6 @@ export const SETTING_DEFS: SettingDef[] = [
     enum: [1, 7, 30],
     group: 'backup',
   },
-  {
-    key: 'retention.auditLogDays',
-    label: '操作日志保留天数',
-    description:
-      '超过此天数的操作日志会被清理。订单与用户素材不参与清理（《电子商务法》要求交易信息保存 3 年）',
-    type: 'number',
-    default: 180,
-    min: 30,
-    max: 1095,
-    group: 'retention',
-  },
 
   // ── 安全 ────────────────────────────────────────────────────────────
   {

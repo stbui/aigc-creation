@@ -1,6 +1,7 @@
 import type {
   PaymentExceptionStatus,
   PaymentProviderId,
+  VisiblePaymentMethod,
 } from '../../../types/payment';
 
 /**
@@ -16,6 +17,12 @@ export const CHECKOUT_MODE_LABELS: Record<string, string> = {
   redirect: '网站跳转',
   qrcode: '扫码支付',
   'qrcode-image': '二维码图片',
+};
+
+/** C 端两个可见支付按钮的统一文案。 */
+export const PAYMENT_METHOD_LABELS: Record<VisiblePaymentMethod, string> = {
+  alipay: '支付宝',
+  wechat: '微信支付',
 };
 
 /** 渠道 id → 中文名。后端也返回 name，那是展示用品牌名；这份是筛选下拉用的短名。 */
@@ -91,16 +98,6 @@ export const ORDER_PROVIDERS = ORDER_PROVIDER_IDS.map((id) => ({
   value: id,
   label: PROVIDER_LABELS[id],
 }));
-
-/**
- * 对账深链允许的渠道 id。
- *
- * 页面上的渠道下拉取自 `GET /admin/payments/providers` 的实时能力（支持对账且
- * 已配置），这份静态清单只用于校验 URL 里的 `?providerId=`，避免手改地址栏
- * 注入任意字符串。PayPal / Stripe / 易支付 / ZPay 不参与自动渠道账单下载，
- * 不放进白名单。
- */
-export const RECONCILIATION_PROVIDER_IDS: PaymentProviderId[] = ['sandbox', 'alipay', 'wechat'];
 
 /** 对账运行状态 → 展示文案 / 色调。 */
 export const RECONCILIATION_RUN_STATUS_META: Record<

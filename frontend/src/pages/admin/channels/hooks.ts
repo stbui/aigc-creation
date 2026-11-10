@@ -30,6 +30,7 @@ export {
   useToast,
   useUnsavedGuard,
 };
+export { useCapabilities } from '../../../hooks/useCapabilities';
 
 export type ChannelView = 'channels' | 'models';
 
@@ -37,12 +38,16 @@ export type ChannelView = 'channels' | 'models';
  * 渠道工作台视图与地址栏的双向同步。
  *
  * 视图直接由 `?view=` 派生，而不是复制进 `useState`：刷新、分享链接以及浏览器
- * 前进 / 后退都会走同一份真相，不会出现地址栏已是「全部模型」、页面仍停在
- * 「按渠道」的割裂状态。默认视图不写冗余参数，切到全量视图才落 `view=models`。
+ * 前进 / 后退都会走同一份真相，不会出现地址栏已是「供应商」、页面仍停在
+ * 「商品台账」的割裂状态。默认视图不写冗余参数，切到供应商视图才落 `view=channels`。
+ *
+ * 带 `?id=` 的深链（来自任务详情、能力卡、调用记录）一律按供应商视图处理：
+ * 这些入口的目标是“看某条渠道”，切到商品台账会把目标藏起来。
  */
 export function useChannelView() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const view: ChannelView = searchParams.get('view') === 'models' ? 'models' : 'channels';
+  const view: ChannelView =
+    searchParams.get('view') === 'channels' || searchParams.get('id') ? 'channels' : 'models';
 
   const setView = useCallback(
     (next: ChannelView) => {
@@ -50,8 +55,13 @@ export function useChannelView() {
         () => {
           // 同一轮里详情也可能刚写过 `?id=`；必须基于实时地址栏合并，不能用旧快照
           const params = new URLSearchParams(window.location.search);
-          if (next === 'models') params.set('view', 'models');
-          else params.delete('view');
+          if (next === 'channels') {
+            params.set('view', 'channels');
+          } else {
+            // 商品台账不绑定某条渠道；留着 `?id=` 会让视图推导又落回供应商
+            params.delete('view');
+            params.delete('id');
+          }
           return params;
         },
         { replace: true },

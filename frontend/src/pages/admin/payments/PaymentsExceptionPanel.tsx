@@ -14,6 +14,7 @@ import {
   SelectField,
   StaleError,
   StatusTag,
+  TextField,
   TextAreaField,
   formatShanghaiDateTime,
   type AdminColumn,
@@ -55,7 +56,7 @@ function statusMeta(status: string) {
   );
 }
 
-type ConfirmAction = 'retry' | 'close';
+type ConfirmAction = 'retry' | 'close' | 'confirm-succeeded' | 'confirm-failed';
 
 export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number }) {
   const toast = useToast();
@@ -84,12 +85,20 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
     row: AdminPaymentException;
   } | null>(null);
   const [resolution, setResolution] = useState('');
+  const [providerRefundId, setProviderRefundId] = useState('');
 
   const rows = data?.items ?? [];
 
+  const openConfirm = (kind: ConfirmAction, row: AdminPaymentException) => {
+    setResolution('');
+    setProviderRefundId('');
+    setConfirm({ kind, row });
+  };
+
   const run = async (row: AdminPaymentException, kind: ConfirmAction) => {
-    if (kind === 'close' && resolution.trim().length < 2) {
-      toast.error('请填写人工结案依据');
+    const needsReason = kind !== 'retry';
+    if (needsReason && resolution.trim().length < 2) {
+      toast.error(kind === 'close' ? '请填写人工结案依据' : '请填写人工核销依据');
       return;
     }
     setBusyId(row.id);
@@ -104,12 +113,25 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
         } else {
           toast.success('自动退款已完成');
         }
+      } else if (kind === 'confirm-succeeded' || kind === 'confirm-failed') {
+        const outcome = kind === 'confirm-succeeded' ? 'succeeded' : 'failed';
+        await adminPaymentExceptionsApi.confirmRefund(row.id, {
+          outcome,
+          reason: resolution.trim(),
+          ...(providerRefundId.trim() ? { providerRefundId: providerRefundId.trim() } : {}),
+        });
+        if (outcome === 'succeeded') {
+          toast.success('已确认渠道退款成功；订单状态和积分未变更');
+        } else {
+          toast.warning('已确认渠道退款失败，异常单仍需继续人工处理');
+        }
       } else {
         await adminPaymentExceptionsApi.close(row.id, resolution.trim());
         toast.success('异常单已结案');
       }
       setConfirm(null);
       setResolution('');
+      setProviderRefundId('');
       await reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '操作失败');
@@ -221,13 +243,26 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
     {
       key: 'refundStatus',
       title: '退款状态',
-      width: 120,
+      width: 170,
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-xs">
           <span>{row.refundStatus ?? '无退款单'}</span>
           <code className="break-all font-mono text-[12px] text-muted-foreground">
             {row.providerRefundId ?? '—'}
           </code>
+          {row.refundStatus === 'failed' && (
+            <span
+              className={
+                row.refundFailureKind === 'definitive'
+                  ? 'text-danger-text'
+                  : 'text-warn-text'
+              }
+            >
+              {row.refundFailureKind === 'definitive'
+                ? '渠道明确拒绝，可新建退款单重试'
+                : '结果未知，必须同号重试或核对渠道'}
+            </span>
+          )}
         </div>
       ),
     },
@@ -247,6 +282,18 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
       width: 230,
       render: (row) => {
         const actionable = row.status === 'open' || row.status === 'manual_review';
+        const autoRefund = row.kind === 'cancelled_but_paid';
+        const confirmProcessing =
+          canOperate && autoRefund && row.status === 'auto_refund_pending' && row.refundStatus === 'processing';
+        const failedRetry =
+          canOperate && autoRefund && row.status === 'manual_review' && row.refundStatus === 'failed';
+        const retryRefund =
+          canOperate &&
+          autoRefund &&
+          !confirmProcessing &&
+          (row.status === 'open' ||
+            (row.status === 'manual_review' &&
+              (row.refundStatus === null || row.refundStatus === 'failed')));
         return (
           <div className="flex flex-wrap gap-1">
             {actionable && !row.ownerId && canOperate && (
@@ -259,16 +306,37 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
                 {busyId === row.id ? '处理中…' : '认领'}
               </ActionButton>
             )}
-            {actionable && row.kind === 'cancelled_but_paid' && canOperate && (
+            {confirmProcessing && (
+              <>
+                <ActionButton
+                  size="sm"
+                  disabled={busyId === row.id}
+                  onClick={() => openConfirm('confirm-succeeded', row)}
+                >
+                  确认退款成功
+                </ActionButton>
+                <ActionButton
+                  size="sm"
+                  variant="ghost"
+                  disabled={busyId === row.id}
+                  onClick={() => openConfirm('confirm-failed', row)}
+                >
+                  确认退款失败
+                </ActionButton>
+              </>
+            )}
+            {retryRefund && (
               <ActionButton
                 size="sm"
+                variant={failedRetry ? 'secondary' : 'default'}
                 disabled={busyId === row.id}
-                onClick={() => {
-                  setResolution('');
-                  setConfirm({ kind: 'retry', row });
-                }}
+                onClick={() => openConfirm('retry', row)}
               >
-                重试退款
+                {failedRetry
+                  ? row.refundFailureKind === 'definitive'
+                    ? '新建退款单重试'
+                    : '同号重试'
+                  : '重试退款'}
               </ActionButton>
             )}
             {actionable && canOperate && (
@@ -276,10 +344,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
                 size="sm"
                 variant="ghost"
                 disabled={busyId === row.id}
-                onClick={() => {
-                  setResolution('');
-                  setConfirm({ kind: 'close', row });
-                }}
+                onClick={() => openConfirm('close', row)}
               >
                 结案
               </ActionButton>
@@ -375,15 +440,32 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
 
       <ConfirmDialog
         open={confirm !== null}
-        title={confirm?.kind === 'retry' ? '重试自动原路退款' : '人工结案'}
-        confirmText={confirm?.kind === 'retry' ? '确认重试' : '确认结案'}
-        danger={confirm?.kind === 'close'}
+        title={
+          confirm?.kind === 'retry'
+            ? '重试自动原路退款'
+            : confirm?.kind === 'confirm-succeeded'
+              ? '确认渠道退款成功'
+              : confirm?.kind === 'confirm-failed'
+                ? '确认渠道退款失败'
+                : '人工结案'
+        }
+        confirmText={
+          confirm?.kind === 'retry'
+            ? '确认重试'
+            : confirm?.kind === 'confirm-succeeded'
+              ? '确认成功'
+              : confirm?.kind === 'confirm-failed'
+                ? '确认失败'
+                : '确认结案'
+        }
+        danger={confirm?.kind === 'close' || confirm?.kind === 'confirm-failed'}
         loading={busyId === confirm?.row.id}
-        confirmDisabled={confirm?.kind === 'close' && resolution.trim().length < 2}
+        confirmDisabled={confirm?.kind !== 'retry' && resolution.trim().length < 2}
         onCancel={() => {
           if (!busyId) {
             setConfirm(null);
             setResolution('');
+            setProviderRefundId('');
           }
         }}
         onConfirm={() => {
@@ -392,27 +474,49 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
         description={
           confirm?.kind === 'retry' ? (
             <p>
-              系统会再次核验订单、成功支付流水、金额和币种后调用渠道退款；任一条件不满足会自动转人工，
-              不会猜测交易关系。
+              {confirm.row.refundFailureKind === 'definitive'
+                ? '渠道已明确拒绝上一笔退款，本次会生成新的退款单号后重新发起。'
+                : '系统会复用原退款单号再次调用渠道，避免结果未知时产生第二笔退款。'}
+              调用前会重新核验订单、成功支付流水、金额和币种。
             </p>
+          ) : confirm?.kind === 'confirm-succeeded' ? (
+            <p>仅代表已到渠道商户后台核对退款成功；不会修改订单状态，也不会回收或恢复积分。</p>
+          ) : confirm?.kind === 'confirm-failed' ? (
+            <p>确认失败后异常单会保留在人工队列，仍需继续核对或处置，不会自动改订单或积分。</p>
           ) : (
             <p>结案只代表财务已核对处置，不会自动改订单或积分。请填写可追溯的处置依据。</p>
           )
         }
         extra={
-          confirm?.kind === 'close' ? (
-            <FormField label="结案依据" hint="至少 2 个字符，最多 500 字符">
-              <TextAreaField
-                value={resolution}
-                onChange={setResolution}
-                rows={4}
-                maxLength={500}
-                ariaLabel="结案依据"
-              />
-            </FormField>
+          confirm && confirm.kind !== 'retry' ? (
+            <>
+              {confirm.kind !== 'close' && (
+                <FormField label="渠道退款单号" hint="可选；请从渠道商户后台复制完整单号">
+                  <TextField
+                    value={providerRefundId}
+                    onChange={setProviderRefundId}
+                    maxLength={200}
+                    ariaLabel="渠道退款单号"
+                  />
+                </FormField>
+              )}
+              <FormField
+                label={confirm.kind === 'close' ? '结案依据' : '核销依据'}
+                hint="至少 2 个字符，最多 500 字符"
+              >
+                <TextAreaField
+                  value={resolution}
+                  onChange={setResolution}
+                  rows={4}
+                  maxLength={500}
+                  showCount
+                  ariaLabel={confirm.kind === 'close' ? '结案依据' : '核销依据'}
+                />
+              </FormField>
+            </>
           ) : undefined
         }
-        impact={[`异常单：${confirm?.row.merchantOrderNo ?? ''}`, '操作会写入管理员审计日志']}
+        impact={[`异常单：${confirm?.row.merchantOrderNo ?? ''}`, '操作会记录处理依据']}
       />
     </div>
   );

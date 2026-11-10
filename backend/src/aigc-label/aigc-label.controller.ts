@@ -15,11 +15,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { AigcLabelService } from "./aigc-label.service";
-import {
-  AdminUser,
-  AuditAction,
-  RequirePermission,
-} from "../admin/admin.decorator";
+import { AdminUser, RequirePermission } from "../admin/admin.decorator";
 import { PERMISSIONS } from "../admin/permissions";
 import { AIGC_LABEL_POSITIONS } from "../common/aigc-label.config";
 
@@ -112,7 +108,6 @@ export class AdminAigcLabelController {
 
   @Put()
   @RequirePermission(PERMISSIONS.settingWrite)
-  @AuditAction("aigc.label_update")
   async update(@Body() dto: UpdateAigcLabelDto, @AdminUser() user: AdminUser) {
     await this.label.save(
       { spec: dto.spec, badgePngBase64: dto.badgePngBase64 },

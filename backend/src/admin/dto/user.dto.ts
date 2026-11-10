@@ -46,11 +46,6 @@ export class ChangeUserStatusDto {
   @IsIn(["active", "disabled"], { message: "只能设为正常或禁用" })
   status!: "active" | "disabled";
 
-  /** 可选操作原因；写入审计 detail，便于事后追责（≤500 字） */
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  reason?: string;
 }
 
 /** 角色变更 */
@@ -58,11 +53,6 @@ export class ChangeUserRoleDto {
   @IsIn(USER_ROLES, { message: "role 取值非法" })
   role!: UserRole;
 
-  /** 可选操作原因；写入审计 detail（≤500 字） */
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  reason?: string;
 }
 
 /** 物理删除 */

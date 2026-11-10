@@ -17,7 +17,7 @@
  *
  * 合并规则：
  *   - 订单/支付/退款/发票/积分/会员/项目/素材/任务/消息/工单等归属改为目标账号。
- *   - 旧账号作为操作人的审计与操作记录改为目标账号，合并动作本身再写一条审计。
+ *   - 旧账号作为操作人的业务记录改为目标账号。
  *   - 旧账号的登录令牌与扫码会话直接删除，不继承登录态。
  *   - 会员、订单幂等键、任务幂等键、签到日、被邀请关系存在冲突时拒绝执行。
  */
@@ -83,7 +83,6 @@ async function collectMoveCounts(db, ids) {
   for (const [name, delegate, where] of specs) counts[name] = await delegate.count({ where });
   counts.inviteRelationsAsInviter = await db.inviteRelation.count({ where: { inviterId: { in: ids } } });
   counts.inviteRelationsAsInvitee = await db.inviteRelation.count({ where: { inviteeId: { in: ids } } });
-  counts.adminAuditLogsAsActor = await db.adminAuditLog.count({ where: { actorId: { in: ids } } });
   counts.accountTokens = await db.accountToken.count({ where: { userId: { in: ids } } });
   counts.loginSessions = await db.loginSession.count({ where: { userId: { in: ids } } });
   return counts;
@@ -144,9 +143,6 @@ async function main() {
     if (conflicts.length) throw new Error(`预检失败\n- ${conflicts.join('\n- ')}`);
 
     const moveCounts = await collectMoveCounts(prisma, sourceIds);
-    const sourceAuditTargets = await prisma.adminAuditLog.count({
-      where: { targetType: 'users', targetId: { in: sourceIds } },
-    });
     const operatorReferences = {
       refundOperators: await prisma.refund.count({ where: { operatorId: { in: sourceIds } } }),
       ledgerOperators: await prisma.creditLedgerEntry.count({ where: { actorUserId: { in: sourceIds } } }),
@@ -160,7 +156,6 @@ async function main() {
     console.log(`来源账号: ${sources.map((user) => `${user.email} (${user.id})`).join(', ')}`);
     console.log('迁移数量:', JSON.stringify(moveCounts, null, 2));
     console.log('操作人引用:', JSON.stringify(operatorReferences, null, 2));
-    console.log('审计目标引用:', sourceAuditTargets);
     console.log(`登录令牌/扫码会话将删除: ${moveCounts.accountTokens + moveCounts.loginSessions}`);
 
     if (!apply) {
@@ -218,13 +213,6 @@ async function main() {
       moved.accountTokensDeleted = (await tx.accountToken.deleteMany({ where: { userId: sourceFilter } })).count;
       moved.loginSessionsDeleted = (await tx.loginSession.deleteMany({ where: { userId: sourceFilter } })).count;
 
-      await moveWhere('adminAuditLogsAsActor', tx.adminAuditLog, { actorId: sourceFilter }, { actorId: target.id });
-      await moveWhere(
-        'adminAuditLogsAsTarget',
-        tx.adminAuditLog,
-        { targetType: 'users', targetId: sourceFilter },
-        { targetId: target.id },
-      );
       await moveWhere('refundOperators', tx.refund, { operatorId: sourceFilter }, { operatorId: target.id });
       await moveWhere('ledgerOperators', tx.creditLedgerEntry, { actorUserId: sourceFilter }, { actorUserId: target.id });
       await moveWhere('invoiceIssuers', tx.invoice, { issuedBy: sourceFilter }, { issuedBy: target.id });
@@ -256,26 +244,6 @@ async function main() {
 
       const deletedUsers = await tx.user.deleteMany({ where: { id: sourceFilter } });
       moved.deletedUsers = deletedUsers.count;
-
-      await tx.adminAuditLog.create({
-        data: {
-          actorId: target.id,
-          actorRole: 'admin',
-          action: 'user.merge_accounts',
-          targetType: 'users',
-          targetId: target.id,
-          detail: JSON.stringify({
-            targetEmail: target.email,
-            sourceUsers: sources.map((user) => ({ id: user.id, email: user.email })),
-            moveCounts,
-            operatorReferences,
-            sourceAuditTargets,
-          }),
-          reason: '合并旧管理员账号数据',
-          ip: 'system-script',
-          success: true,
-        },
-      });
 
       return moved;
     });

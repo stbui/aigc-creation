@@ -38,7 +38,7 @@ import type { AdminInvoice, InvoiceStatus } from '../../../types/payment';
  * 1. **一单一张有效票** —— 发票号在申请时就已占用, 驳回后重提会生成新票号。
  *    列表按发票行展示并保留完整历史, 同一订单同一时刻最多一张有效票。
  * 2. **开具不可逆** —— 票号与抬头一旦印出无法回收, 因此「开具」走高风险确认弹窗。
- *    已开具发票只能做冲红登记, 且必须填写原因并写入操作审计。
+ *    已开具发票只能做冲红登记, 且必须填写原因并保留冲红记录。
  * 3. **金额是快照** —— 展示的是申请时算出的 `paidCents - refundedCents`,
  *    不随后续退款变化。冲红登记只固化台账, 线下税务手续仍由财务完成。
  */
@@ -300,7 +300,7 @@ export function AdminInvoicesPage() {
     <>
       <PageHeader
         title="发票管理"
-        description="审核并开具用户申请的开票。保留历史记录，已开具发票只能登记冲红，操作全程写入审计。"
+        description="审核并开具用户申请的开票。保留历史记录，已开具发票只能登记冲红。"
       />
 
       <FilterBar>
@@ -420,20 +420,19 @@ export function AdminInvoicesPage() {
           }
           impact={
             action.kind === 'issue'
-              ? [`发票 ${action.row.invoiceNo} → 已开具`, '生成可打印文件', '写操作审计（含操作人）']
+              ? [`发票 ${action.row.invoiceNo} → 已开具`, '生成可打印文件']
               : action.kind === 'reject'
-                ? [`发票 ${action.row.invoiceNo} → 已驳回`, '用户可重新申请', '写操作审计（含操作人）']
+                ? [`发票 ${action.row.invoiceNo} → 已驳回`, '用户可重新申请']
                 : [
                     `发票 ${action.row.invoiceNo} → 已冲红`,
                     '保留开具与冲红历史，不可重新申请',
-                    '写操作审计（含操作人、时间与原因）',
                   ]
           }
           extra={
             action.kind !== 'issue' ? (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="adm-invoice-reason" className="text-xs text-muted-foreground">
-                  {action.kind === 'reject' ? '驳回原因（会展示给用户）：' : '冲红原因（写入审计与冲红记录）：'}
+                  {action.kind === 'reject' ? '驳回原因（会展示给用户）：' : '冲红原因（写入冲红记录）：'}
                 </label>
                 <TextField
                   id="adm-invoice-reason"
