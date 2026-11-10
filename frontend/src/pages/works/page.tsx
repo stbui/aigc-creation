@@ -25,6 +25,7 @@ import { useWorksFilters, type WorksTab } from './useWorksFilters';
 import { WorksToolbar } from './WorksToolbar';
 import { WorksGrid } from './WorksGrid';
 import { WorksGuestState, WorksNoWorksState } from './WorksEmptyStates';
+import { triggerDownload } from '../../lib/download';
 import type { Task } from '../../types/api';
 
 /**
@@ -333,10 +334,7 @@ export function WorksPage() {
       // 扩展名跟着产出的真实格式走: 视频是 mp4/webm, 写死 jpg 会让下载的文件打不开
       const ext = outputExtension(t);
       window.setTimeout(() => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${t.capability}-${t.id.slice(-6)}.${ext}`;
-        a.click();
+        triggerDownload(url, `${t.capability}-${t.id.slice(-6)}.${ext}`);
       }, i * 220);
     });
     message.success(`已下载 ${list.length} 个文件`);

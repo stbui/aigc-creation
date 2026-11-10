@@ -2355,3 +2355,63 @@ model PaymentReconciliationItem {
   @@index([result])
   @@index([providerId, merchantOrderNo])
 }
+
+/// 写真模板一级分类（对应一篇来源文章 / 一个主题）。
+/// C 端「写真模板」页的顶部 tab 由这里驱动；后台可增删改查。
+model TemplateCategory {
+  id          String   @id @default(cuid())
+  /// 稳定标识；后台新建时校验唯一，改动会影响外部链接/bookmark
+  slug        String   @unique
+  name        String
+  /// 来源文章（仅追溯用，运行时不请求）
+  sourceUrl   String   @default("")
+  description String   @default("")
+  /// 排序权重，小的靠前
+  sortOrder   Int      @default(0)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  groups TemplateGroup[]
+
+  @@index([enabled, sortOrder])
+}
+
+/// 写真模板二级分类（一级分类下的风格/场景分组）。
+model TemplateGroup {
+  id         String   @id @default(cuid())
+  categoryId String
+  /// 同一一级分类内唯一
+  slug       String
+  name       String
+  sortOrder  Int      @default(0)
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category TemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  items    TemplateItem[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, enabled, sortOrder])
+}
+
+/// 写真模板条目：一张预览图 + 提示词 + 标签。
+model TemplateItem {
+  id        String   @id @default(cuid())
+  groupId   String
+  name      String
+  prompt    String
+  /// 图片引用：站内静态路径 `/templates/...` 或 `storage://<backend>/<key>`
+  imageUrl  String
+  /// 标签 JSON 数组字符串，例如 `["龙凤褂","纯色棚拍","中式"]`
+  tags      String   @default("[]")
+  sortOrder Int      @default(0)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group TemplateGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, enabled, sortOrder])
+}

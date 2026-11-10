@@ -209,6 +209,45 @@
   font-weight: 600;
 }
 
+/* 二级分类：一级分类下的风格/场景分组 */
+.tpl-subcategories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px 10px;
+}
+
+.tpl-subcategory {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text-body);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.tpl-subcategory:hover {
+  color: var(--brand);
+  border-color: var(--border-brand);
+}
+
+.tpl-subcategory.is-active {
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-color: var(--border-brand);
+  font-weight: 600;
+}
+
+.tpl-subcategory-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-desc);
+}
+
 .tpl-template-scroll {
   flex: 1;
   min-height: 0;
@@ -369,6 +408,29 @@
   overflow: visible;
 }
 
+.tpl-template-tags,
+.tpl-selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tpl-selected-tags {
+  margin-bottom: 2px;
+}
+
+.tpl-template-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-body);
+  white-space: nowrap;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+
 .tpl-template-prompt-toggle {
   justify-self: start;
   padding: 0;
@@ -381,32 +443,6 @@
 
 .tpl-template-prompt-toggle:hover {
   color: var(--brand-hover);
-}
-
-.tpl-template-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.tpl-template-use {
-  justify-self: end;
-  padding: 5px 14px;
-  font-size: 13px;
-  color: var(--card-bg);
-  background: var(--brand);
-  border: none;
-  border-radius: var(--radius-control);
-  cursor: pointer;
-}
-
-.tpl-template-use:hover {
-  background: var(--brand-hover);
-}
-
-.tpl-template-card.is-selected .tpl-template-use {
-  background: var(--brand-hover);
 }
 
 /* ── 底部历史条 ── */

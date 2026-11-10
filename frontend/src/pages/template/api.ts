@@ -16,4 +16,9 @@ export { templateApi } from '../../lib/api';
 /** 前台模型目录数据层：建任务必须解析出 `logicalModelId` */
 export { resolveModelId } from '../../lib/models';
 
-export type { PortraitTemplate, PortraitTemplatesResult } from '../../types/api';
+export type {
+  PortraitTemplatesResult,
+  TemplateCatalogCategory,
+  TemplateCatalogGroup,
+  TemplateCatalogItem,
+} from '../../types/api';

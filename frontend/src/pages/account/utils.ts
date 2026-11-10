@@ -41,19 +41,5 @@ export function exportFilenameOf(profileId: string | undefined): string {
   return `huojue-account-${profileId ?? 'me'}-${new Date().toISOString().slice(0, 10)}.json`;
 }
 
-/**
- * 把导出数据落成 JSON 下载。
- *
- * 用一次性 object URL：点击后立即 revoke，避免长页面常驻时累积未释放的 blob。
- */
-export function downloadJson(data: unknown, filename: string): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
+/** JSON 下载不是账户页专属能力，统一由 `lib/download.ts` 提供；此处保留出口，调用方路径不变。 */
+export { downloadJson } from '../../lib/download';

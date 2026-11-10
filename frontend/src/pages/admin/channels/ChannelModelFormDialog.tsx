@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { ActionButton, ModalDialog } from '~/admin-ui/primitives';
 import {
   CHANNEL_MODEL_FORM_ID,
@@ -14,9 +15,9 @@ interface ChannelModelFormDialogProps {
   testing: boolean;
   saving: boolean;
   writable: boolean;
-  onTest: () => Promise<void>;
+  onTest: (draft: ModelDraft) => Promise<void>;
   onClose: () => void;
-  onSubmit: (draft: ModelDraft) => void;
+  onSubmit: (draft: ModelDraft, intent: 'save' | 'test') => void;
   /** 编辑前的模型级上游键（用于检测仍指向旧上游的档位） */
   previousProviderModelKey?: string;
 }
@@ -35,6 +36,13 @@ export function ChannelModelFormDialog({
   onSubmit,
   previousProviderModelKey,
 }: ChannelModelFormDialogProps) {
+  const intentRef = useRef<'save' | 'test'>('save');
+  const submitWithIntent = (draft: ModelDraft) => {
+    const intent = intentRef.current;
+    intentRef.current = 'save';
+    onSubmit(draft, intent);
+  };
+
   return (
     <ModalDialog
       open={open}
@@ -51,9 +59,24 @@ export function ChannelModelFormDialog({
           <ActionButton
             type="submit"
             form={CHANNEL_MODEL_FORM_ID}
+            variant="secondary"
+            size="sm"
+            disabled={saving || testing || !writable}
+            onClick={() => {
+              intentRef.current = 'test';
+            }}
+          >
+            {saving ? '保存中…' : testing ? '测试中…' : '保存并测试'}
+          </ActionButton>
+          <ActionButton
+            type="submit"
+            form={CHANNEL_MODEL_FORM_ID}
             variant="default"
             size="sm"
-            disabled={saving || !writable}
+            disabled={saving || testing || !writable}
+            onClick={() => {
+              intentRef.current = 'save';
+            }}
           >
             {saving ? '保存中…' : '保存商品'}
           </ActionButton>
@@ -66,7 +89,10 @@ export function ChannelModelFormDialog({
         testResult={testResult}
         testing={testing}
         onTest={onTest}
-        onSubmit={onSubmit}
+        onSubmit={submitWithIntent}
+        onInvalid={() => {
+          intentRef.current = 'save';
+        }}
         previousProviderModelKey={previousProviderModelKey}
       />
     </ModalDialog>

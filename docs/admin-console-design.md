@@ -23,7 +23,7 @@
 
 ## 2. 信息架构
 
-8 组 31 页，菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
+8 组 32 页，菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
 
 | 组 | 页面 |
 | --- | --- |
@@ -206,7 +206,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | --- | --- |
 | 路由 | `/admin/*` 在 `App.tsx` 中必须注册在 catch-all 之前，否则会被 C 端 `Shell` 吞掉 |
 | 外壳 | `admin-ui/shell/AdminBoardLayout.tsx` + `components/admin/adminNav.ts`（菜单单一事实源） |
-| 页面 | `pages/admin/` 31 个页面 + `channels/`、`payments/` 子目录 |
+| 页面 | `pages/admin/` 32 个页面 + `channels/`、`payments/` 子目录 |
 | 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
 | 类型 | `types/api.d.ts` 的 `Admin*` 段 |
 | 组件 | 通用骨架走 `admin-ui/primitives`（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），底层是 shadcn 原子件；后台树内不引 antd，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |

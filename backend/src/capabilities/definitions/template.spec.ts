@@ -29,19 +29,22 @@ describe('template 模板数据', () => {
     expect(portraitTemplate('')).toBeUndefined();
   });
 
-  it('包含 10 套龙凤褂模板，提示词互不重复', () => {
-    const longfeng = PORTRAIT_TEMPLATES.filter((template) => template.id.startsWith('longfeng-'));
-    expect(longfeng).toHaveLength(10);
-    expect(new Set(longfeng.map((template) => template.prompt)).size).toBe(10);
-    longfeng.forEach((template) => {
-      expect(template.prompt.length).toBeGreaterThan(100);
-      expect(template.thumbFile).toContain('/templates/wedding/longfeng-');
-    });
+  it('包含 30 套模板，三批来源各 10 套且提示词互不重复', () => {
+    expect(PORTRAIT_TEMPLATES).toHaveLength(30);
+    for (const prefix of ['longfeng-', 'flower-', 'campus-']) {
+      const batch = PORTRAIT_TEMPLATES.filter((template) => template.id.startsWith(prefix));
+      expect(batch).toHaveLength(10);
+      expect(new Set(batch.map((template) => template.prompt)).size).toBe(10);
+      batch.forEach((template) => {
+        expect(template.prompt.length).toBeGreaterThan(100);
+        expect(template.thumbFile).toContain(`/templates/wedding/${prefix}`);
+      });
+    }
   });
 
   it('每个模板都归属婚纱写真与一个场景分组', () => {
     const groupIds = new Set(TEMPLATE_CATEGORIES.map((category) => category.id));
-    const sceneIds = new Set(['studio', 'interior', 'outdoor']);
+    const sceneIds = new Set(['studio', 'interior', 'outdoor', 'flower', 'campus']);
 
     for (const template of PORTRAIT_TEMPLATES) {
       expect(template.categoryIds).toContain('wedding');
@@ -49,6 +52,8 @@ describe('template 模板数据', () => {
       template.categoryIds.forEach((id) => expect(groupIds.has(id)).toBe(true));
     }
     expect([...new Set(PORTRAIT_TEMPLATES.flatMap((t) => t.categoryIds))].sort()).toEqual([
+      'campus',
+      'flower',
       'interior',
       'outdoor',
       'studio',

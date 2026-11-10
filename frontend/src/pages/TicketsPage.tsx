@@ -89,6 +89,8 @@ export function TicketsPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
+  /** 已发起详情请求的工单 id：写 URL 会让 effect 重跑，用它挡住第二次请求 */
+  const requestedDetailIdRef = useRef<string | null>(null);
 
   /** 新建表单 */
   const [composing, setComposing] = useState(false);
@@ -155,6 +157,9 @@ export function TicketsPage() {
 
   const openDetail = useCallback(
     async (id: string) => {
+      // 先标记再写 URL：openDetail 会改 searchParams 触发下面的 effect 重跑，
+      // 此刻详情尚未返回、detail?.id 还是 null，只能靠这个 ref 防止重复请求。
+      requestedDetailIdRef.current = id;
       setActiveId(id);
       // 把 id 写进 URL: 刷新后仍停在同一张工单, 也便于站内消息直接链接过来
       const next = new URLSearchParams(searchParams);
@@ -176,10 +181,16 @@ export function TicketsPage() {
   /** 站内消息 / 外部链接带 ?id= 进来时直接展开 */
   useEffect(() => {
     const id = searchParams.get('id');
-    if (!id || !token) return;
-    if (detail?.id === id) return;
+    if (!id) {
+      // 关闭详情时复位，保证再次点开同一张工单仍能正常加载
+      requestedDetailIdRef.current = null;
+      return;
+    }
+    if (!token) return;
+    // 详情已加载、或本轮已发起过请求，都不再发第二次。
+    // openDetail 依赖 searchParams，放进依赖会在写 URL 后重复触发 —— 只按 id 变化触发
+    if (detail?.id === id || requestedDetailIdRef.current === id) return;
     void openDetail(id);
-    // openDetail 依赖 searchParams, 放进依赖会在写 URL 后重复触发 —— 只按 id 变化触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, token]);
 

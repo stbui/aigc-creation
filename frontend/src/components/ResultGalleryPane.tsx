@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { toAbsoluteUrl } from '../lib/api';
+import { triggerDownload } from '../lib/download';
 import { ImageLightbox } from './ImageLightbox';
 import { assetThumbUrl } from '../lib/api';
 import { ImageContextMenu, type ImageMenuItem } from './ImageContextMenu';
@@ -295,10 +296,7 @@ export function ResultGalleryPane({
   const downloadImage = (item: GalleryItem) => {
     // 扩展名跟真实格式走: 厂商返回的链接常常没有后缀, 猜后缀会把 PNG 存成 .jpg
     const ext = (item.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
-    const a = document.createElement('a');
-    a.href = item.url;
-    a.download = `${downloadNamePrefix}-${item.id.slice(-6)}.${ext}`;
-    a.click();
+    triggerDownload(item.url, `${downloadNamePrefix}-${item.id.slice(-6)}.${ext}`);
   };
 
   const isEmpty = items.length === 0 && pending.length === 0;

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   getToken,
   setToken,
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const openLogin = useCallback(() => setLoginOpen(true), []);
   const closeLogin = useCallback(() => setLoginOpen(false), []);
 
-  const login = (t: string, e: string, r?: string, mustChange = false) => {
+  const login = useCallback((t: string, e: string, r?: string, mustChange = false) => {
     setToken(t);
     setStoredEmail(e);
     setTok(t);
@@ -74,9 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 身份变化 → 壳内页面的统计数据/素材/作品需要重新拉取
     setAuthEpoch((n) => n + 1);
     setLoginOpen(false);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     clearToken();
     clearStoredEmail();
     clearStoredRole();
@@ -84,9 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEmail(null);
     setRole(null);
     setMustChangePassword(false);
-  };
+  }, []);
 
-  const clearMustChangePassword = () => setMustChangePassword(false);
+  const clearMustChangePassword = useCallback(() => setMustChangePassword(false), []);
 
   // API 层发现 401 时广播该事件, 同步清空内存态 (路由已对外开放, 不再跳转登录页)
   useEffect(() => {
@@ -123,25 +123,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('auth:required', onRequired);
   }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        token,
-        email,
-        role,
-        login,
-        logout,
-        openLogin,
-        loginOpen,
-        closeLogin,
-        authEpoch,
-        mustChangePassword,
-        clearMustChangePassword,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  // 全站 Provider：value 必须是稳定引用，否则 loginOpen / authEpoch 等任一 state
+  // 变化都会让所有 useAuth() 消费者连带重渲染（同仓其余 Context 均已 memo）。
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      token,
+      email,
+      role,
+      login,
+      logout,
+      openLogin,
+      loginOpen,
+      closeLogin,
+      authEpoch,
+      mustChangePassword,
+      clearMustChangePassword,
+    }),
+    [
+      token,
+      email,
+      role,
+      login,
+      logout,
+      openLogin,
+      loginOpen,
+      closeLogin,
+      authEpoch,
+      mustChangePassword,
+      clearMustChangePassword,
+    ],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

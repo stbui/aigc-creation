@@ -194,10 +194,13 @@ export function AdminDataTable<T>({
     () => Object.fromEntries(selected.map((key) => [key, true])),
     [selected],
   );
-  const paginationState: PaginationState = {
-    pageIndex: Math.max(0, (pagination?.current ?? 1) - 1),
-    pageSize: pagination?.pageSize ?? 20,
-  };
+  const paginationState = useMemo<PaginationState>(
+    () => ({
+      pageIndex: Math.max(0, (pagination?.current ?? 1) - 1),
+      pageSize: pagination?.pageSize ?? 20,
+    }),
+    [pagination?.current, pagination?.pageSize],
+  );
   /** 隐藏列：默认全可见；调用方传 key 列表才隐藏 */
   const columnVisibility = useMemo<ColumnVisibilityState>(() => {
     const hidden = new Set(hiddenColumns ?? []);

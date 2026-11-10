@@ -44,9 +44,9 @@ interface ChannelModelDialogsProps {
     saving: boolean;
     writable: boolean;
     previousProviderModelKey: string;
-    onTest: () => Promise<void>;
+    onTest: (draft: ModelDraft) => Promise<void>;
     onClose: () => void;
-    onSubmit: (draft: ModelDraft) => void;
+    onSubmit: (draft: ModelDraft, intent: 'save' | 'test') => void;
   };
   upstream: {
     models: UpstreamModelPreview[] | null;

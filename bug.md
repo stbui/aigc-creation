@@ -1,5 +1,6 @@
 
 # 
+https://nextshot.cn/image?tab=local_transfer
 
 https://maolong.da-ai.cc/toolbox/image-generation
 https://www.designkit.cn/agent-lib

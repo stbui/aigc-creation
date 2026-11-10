@@ -6,7 +6,7 @@
 > 后台曾先后经历 antd、自建组件套件、shadcn 三轮换装，**前两轮的组件与样式已全部删除**，
 > 仓库内不再有残留引用。历史决策过程见 `docs/README.md`；本文只写现状。
 >
-> 后台 31 个页面全部走 shadcn 原子件（`admin-ui/components/ui/*`），经 `admin-ui/primitives/*`
+> 后台 32 个页面全部走 shadcn 原子件（`admin-ui/components/ui/*`），经 `admin-ui/primitives/*`
 > 这一层组合件供给页面。C 端（前台）不复用这套组合件，页面只从 `frontend/src/ui` 兼容层取件；
 > 该层底层同样复用 `admin-ui/components/ui` 的 shadcn/radix 原子件，**antd 已从依赖与源码中移除**。
 
@@ -245,7 +245,7 @@ SidebarInset（内容区）
 
 ## 4. 页面原型
 
-31 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
+32 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
 
 | 原型 | 页面 | 结构 |
 | --- | --- | --- |

@@ -2,7 +2,7 @@ import { memo, useState } from 'react';
 import { Check, Eye } from 'lucide-react';
 
 import { ImageLightbox, type LightboxItem } from './components';
-import type { PortraitTemplate } from './api';
+import type { TemplateEntry } from './utils';
 
 /**
  * 写真模板网格（右栏主内容）。
@@ -13,10 +13,10 @@ import type { PortraitTemplate } from './api';
  */
 
 export interface TemplateGalleryProps {
-  templates: PortraitTemplate[];
+  templates: TemplateEntry[];
   /** 当前选中的模板 id */
   selectedId: string | null;
-  onSelect: (template: PortraitTemplate) => void;
+  onSelect: (template: TemplateEntry) => void;
   /** 模板清单加载失败 */
   error?: string | null;
   loading?: boolean;
@@ -24,13 +24,13 @@ export interface TemplateGalleryProps {
   onRetry?: () => void;
 }
 
-function lightboxItemOf(template: PortraitTemplate): LightboxItem {
+function lightboxItemOf(template: TemplateEntry): LightboxItem {
   return {
     id: template.id,
     url: template.thumbFile,
     alt: `${template.name} 模板预览`,
     prompt: template.prompt,
-    meta: [template.name],
+    meta: [template.categoryName, template.groupName, template.name],
   };
 }
 
@@ -42,7 +42,7 @@ function TemplateGalleryImpl({
   loading,
   onRetry,
 }: TemplateGalleryProps) {
-  const [preview, setPreview] = useState<PortraitTemplate | null>(null);
+  const [preview, setPreview] = useState<TemplateEntry | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (error) {
@@ -116,26 +116,23 @@ function TemplateGalleryImpl({
                 >
                   {template.prompt}
                 </p>
-                <div className="tpl-template-actions">
-                  <button
-                    type="button"
-                    className="tpl-template-prompt-toggle"
-                    aria-expanded={expandedId === template.id}
-                    onClick={() =>
-                      setExpandedId((current) => (current === template.id ? null : template.id))
-                    }
-                  >
-                    {expandedId === template.id ? '收起提示词' : '展开提示词'}
-                  </button>
-                  <button
-                    type="button"
-                    className="tpl-template-use"
-                    aria-label={selected ? `已选用模板${template.name}` : `选用模板${template.name}`}
-                    onClick={() => onSelect(template)}
-                  >
-                    {selected ? '已选用' : '选用'}
-                  </button>
+                <div className="tpl-template-tags" aria-label="模板标签">
+                  {template.tags.map((tag) => (
+                    <span key={tag} className="tpl-template-tag">
+                      {tag}
+                    </span>
+                  ))}
                 </div>
+                <button
+                  type="button"
+                  className="tpl-template-prompt-toggle"
+                  aria-expanded={expandedId === template.id}
+                  onClick={() =>
+                    setExpandedId((current) => (current === template.id ? null : template.id))
+                  }
+                >
+                  {expandedId === template.id ? '收起提示词' : '展开提示词'}
+                </button>
               </div>
             </article>
           );

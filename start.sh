@@ -383,7 +383,8 @@ if [ "$RUN_BACKEND" -eq 1 ] && [ "$SKIP_DB" -eq 0 ]; then
   ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent seed \
     && NODE_ENV="$NODE_ENV" npm run --silent seed:commerce \
     && NODE_ENV="$NODE_ENV" npm run --silent seed:membership \
-    && NODE_ENV="$NODE_ENV" npm run --silent seed:marketing )
+    && NODE_ENV="$NODE_ENV" npm run --silent seed:marketing \
+    && NODE_ENV="$NODE_ENV" npm run --silent seed:templates )
   # development / test 使用固定后台预设账号，启动时自动补齐角色与管理员；
   # production 不自动创建账号，仍由部署者显式执行 seed:admin 并保存随机密码。
   if [ "$APP_ENV" != production ]; then

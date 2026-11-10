@@ -2,9 +2,8 @@ import { memo, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 import { ImageLightbox, type LightboxItem } from './components';
-import { assetThumbUrl, emptyResultLabel, templateIdOf } from './utils';
+import { assetThumbUrl, emptyResultLabel, templateIdOf, type TemplateEntry } from './utils';
 import type { GalleryItem } from './hooks';
-import type { PortraitTemplate } from './api';
 import { Spin } from '../../ui';
 
 /**
@@ -15,7 +14,7 @@ import { Spin } from '../../ui';
  */
 export interface TemplateHistoryProps {
   items: GalleryItem[];
-  templates: PortraitTemplate[];
+  templates: TemplateEntry[];
   loading: boolean;
   error?: string | null;
   onRefresh: () => void;

@@ -48,8 +48,11 @@ interface ChannelModelFormProps {
   draft: ModelDraft;
   testResult: ProtocolTestResultView | null;
   testing: boolean;
-  onTest: () => Promise<void>;
+  /** 测试当前表单配置（含未保存修改），不要求先保存 */
+  onTest: (draft: ModelDraft) => Promise<void>;
   onSubmit: (draft: ModelDraft) => void;
+  /** 校验失败时回调；调用方可据此清理“保存并测试”的意图 */
+  onInvalid?: () => void;
   /**
    * 编辑前的模型级上游键。
    *
@@ -72,6 +75,7 @@ export function ChannelModelForm({
   testing,
   onTest,
   onSubmit,
+  onInvalid,
   previousProviderModelKey = '',
 }: ChannelModelFormProps) {
   const toast = useToast();
@@ -157,6 +161,7 @@ export function ChannelModelForm({
       onSubmit={handleSubmit(
         (next) => onSubmit(next),
         (formErrors) => {
+          onInvalid?.();
           toast.error('无法保存商品', firstFormErrorMessage(formErrors) ?? '请检查标红的字段');
           focusFirstInvalidField();
         },
@@ -228,7 +233,7 @@ export function ChannelModelForm({
       <ChannelModelTestPanel
         testResult={testResult}
         testing={testing}
-        onTest={onTest}
+        onTest={() => onTest(getValues())}
       />
     </form>
   );

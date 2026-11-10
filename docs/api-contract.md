@@ -48,7 +48,7 @@
 | --- | --- | --- |
 | GET | `/api/v1/capabilities` | 能力清单（公开免登录），前端全部渲染依据 |
 | GET | `/api/v1/shoppable-carousel/templates` | AI 带货图文模板清单（公开免登录）：10 个业务分类 + 49 个模板（三拍文案 / 结构化提示词片段 / 静态缩略图路径）+ 张数区间 6–10 |
-| GET | `/api/v1/template/templates` | 写真模板清单（公开免登录）：4 个分类（婚纱写真 / 纯色棚拍 / 室内布景 / 户外庭院）+ 10 个龙凤褂模板（预览图路径 / 风格提示词）；前端不另存清单 |
+| GET | `/api/v1/template/templates` | 写真模板目录（公开免登录）：3 个一级分类（龙凤褂 / 花海婚纱 / 校园操场）→ 8 个二级分类 → 30 个模板（预览图路径 / 提示词 / 标签）；数据由后台「写真模板」页维护 |
 | POST | `/api/v1/auth/register` | 注册，**直接返回 `accessToken`**（注册即登录） |
 | POST | `/api/v1/auth/login` | 登录，返回 `{ accessToken, user }` |
 | POST/GET | `/api/v1/auth/qr/create`、`/auth/qr/status` | 扫码登录：桌面建码 / 轮询换 token（公开，`status` 首次兑换即作废） |
@@ -165,6 +165,7 @@
 | POST | `/api/v1/admin/credits/import` | 积分 CSV 导入（multipart，按邮箱匹配，`credit.adjust`） |
 | GET/PUT/POST | `/api/v1/admin/legal*` | 法务版本列表 / 新建草稿 / 发布（`legal.write`） |
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`） |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/templates/*` | 写真模板目录：`catalog` 读取；`categories` / `groups` / `items` 三层 CRUD；`upload` 上传预览图。读需 `template.read`，写需 `template.write` |
 | GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`provider` / `delivers` / `configured`，不含凭据；`message.write`） |
 | GET/POST | `/api/v1/admin/{storage,scheduler,backups,roles,settings}*` | 系统管理 |
 

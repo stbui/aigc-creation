@@ -8,19 +8,61 @@
 export { assetThumbUrl } from '../../lib/api';
 
 import type { GalleryItem } from './hooks';
+import type { TemplateCatalogCategory } from './api';
+
+/** 展平后的模板条目：带上所属一级/二级分类，供网格与历史回显使用。 */
+export interface TemplateEntry {
+  id: string;
+  name: string;
+  prompt: string;
+  thumbFile: string;
+  tags: string[];
+  categoryId: string;
+  categoryName: string;
+  groupId: string;
+  groupName: string;
+}
+
+/** 把分类树展平成一维模板列表。 */
+export function flattenCatalog(categories: readonly TemplateCatalogCategory[]): TemplateEntry[] {
+  return categories.flatMap((category) =>
+    category.groups.flatMap((group) =>
+      group.items.map((item) => ({
+        ...item,
+        categoryId: category.id,
+        categoryName: category.name,
+        groupId: group.id,
+        groupName: group.name,
+      })),
+    ),
+  );
+}
 
 /**
- * 按分类筛选模板。
+ * 按一级/二级分类筛选。
  *
- * `categoryId` 为空表示「全部模板」—— 页面级筛选态，不来自后端。
- * 一个模板可跨分类，命中任一即入选。
+ * `categoryId` 为空 = 全部模板；`groupId` 为空 = 该一级分类下的全部分组。
  */
-export function filterTemplatesByCategory<T extends { categoryIds: readonly string[] }>(
-  templates: readonly T[],
+export function filterCatalog(
+  categories: readonly TemplateCatalogCategory[],
   categoryId: string,
-): T[] {
-  if (!categoryId) return [...templates];
-  return templates.filter((template) => template.categoryIds.includes(categoryId));
+  groupId: string,
+): TemplateEntry[] {
+  if (!categoryId) return flattenCatalog(categories);
+  const category = categories.find((item) => item.id === categoryId);
+  if (!category) return [];
+  const groups = groupId
+    ? category.groups.filter((group) => group.id === groupId)
+    : category.groups;
+  return groups.flatMap((group) =>
+    group.items.map((item) => ({
+      ...item,
+      categoryId: category.id,
+      categoryName: category.name,
+      groupId: group.id,
+      groupName: group.name,
+    })),
+  );
 }
 
 /** 任务参数里的模板 id（历史卡片据此回显模板名）。 */

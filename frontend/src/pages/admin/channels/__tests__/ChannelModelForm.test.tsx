@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { ToastProvider } from '../../../../admin-ui/providers/ToastProvider';
 import { ChannelModelForm } from '../ChannelModelForm';
 import { EMPTY_MODEL_DRAFT, type ModelDraft } from '../constants';
@@ -37,14 +37,18 @@ function draft() {
   };
 }
 
-function renderForm(onSubmit = vi.fn(), overrides: Partial<ModelDraft> = {}) {
+function renderForm(
+  onSubmit: Mock<(draft: ModelDraft) => void> = vi.fn<(draft: ModelDraft) => void>(),
+  overrides: Partial<ModelDraft> = {},
+  onTest: Mock<(draft: ModelDraft) => Promise<void>> = vi.fn<(draft: ModelDraft) => Promise<void>>(async () => {}),
+) {
   const view = render(
     <ToastProvider>
       <ChannelModelForm
         draft={{ ...draft(), ...overrides }}
         testResult={null}
         testing={false}
-        onTest={async () => {}}
+        onTest={onTest}
         onSubmit={onSubmit}
       />
     </ToastProvider>,
@@ -64,6 +68,18 @@ describe('ChannelModelForm', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it('测试当前配置时把表单值交给父级，不要求先保存', async () => {
+    const onTest = vi.fn<(draft: ModelDraft) => Promise<void>>(async () => {});
+    renderForm(vi.fn<(draft: ModelDraft) => void>(), {}, onTest);
+
+    fireEvent.click(screen.getByRole('button', { name: '测试服务连通' }));
+
+    await waitFor(() => expect(onTest).toHaveBeenCalledTimes(1));
+    const tested = onTest.mock.calls[0][0] as ModelDraft;
+    expect(tested.modelKey.trim()).toBe('seedream-4.0');
+    expect(tested.protocol).toBe('openai.images');
+  });
+
   it('价格档错误显示在价格档区域', async () => {
     const { form, onSubmit } = renderForm();
     fireEvent.change(screen.getByLabelText('方案 1 价格'), { target: { value: 'abc' } });
@@ -74,7 +90,7 @@ describe('ChannelModelForm', () => {
   });
 
   it('提交失败时给出具体字段错误并聚焦首个无效控件', async () => {
-    const { form, onSubmit } = renderForm(vi.fn(), {
+    const { form, onSubmit } = renderForm(vi.fn<(draft: ModelDraft) => void>(), {
       protocol: '',
       capabilityConfig: '',
     });

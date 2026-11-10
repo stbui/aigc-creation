@@ -2,8 +2,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { auditNamedImports, PROJECT_ROOT } from '../../../test/namedImportAudit';
-import { emptyResultLabel, filterTemplatesByCategory, templateIdOf } from '../utils';
+import { emptyResultLabel, filterCatalog, flattenCatalog, templateIdOf } from '../utils';
 import type { GalleryItem } from '../hooks';
+import type { TemplateCatalogCategory } from '../api';
 import { CAPABILITY_ID, DEFAULT_RATIO, DEFAULT_SIZE, MAX_IMAGES } from '../constants';
 
 /**
@@ -32,32 +33,68 @@ describe('写真模板页具名导入', () => {
 });
 
 describe('写真模板页纯函数', () => {
-  const templates = [
-    { id: 'a', categoryIds: ['wedding'] },
-    { id: 'b', categoryIds: ['wedding', 'other'] },
-    { id: 'c', categoryIds: ['other'] },
+  const item = (id: string) => ({
+    id,
+    name: `模板 ${id}`,
+    prompt: `提示词 ${id}`,
+    thumbFile: `/templates/${id}.webp`,
+    tags: ['标签'],
+  });
+  const catalog: TemplateCatalogCategory[] = [
+    {
+      id: 'longfeng',
+      slug: 'longfeng',
+      name: '龙凤褂',
+      description: '',
+      sourceUrl: 'https://example.com/longfeng',
+      groups: [
+        { id: 'studio', slug: 'studio', name: '纯色棚拍', items: [item('a'), item('b')] },
+        { id: 'interior', slug: 'interior', name: '室内布景', items: [item('c')] },
+      ],
+    },
+    {
+      id: 'flower',
+      slug: 'flower',
+      name: '花海婚纱',
+      description: '',
+      sourceUrl: 'https://example.com/flower',
+      groups: [{ id: 'lawn', slug: 'lawn', name: '草坪花海', items: [item('d')] }],
+    },
   ];
 
-  it('空分类 = 全部模板', () => {
-    expect(filterTemplatesByCategory(templates, '')).toHaveLength(3);
+  it('展平时补齐一级/二级分类信息', () => {
+    const flat = flattenCatalog(catalog);
+    expect(flat.map((entry) => entry.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(flat[0]).toMatchObject({ categoryName: '龙凤褂', groupName: '纯色棚拍' });
   });
 
-  it('跨分类模板命中任一分类即入选，且不修改入参', () => {
-    const before = templates.map((template) => template.id);
-    expect(filterTemplatesByCategory(templates, 'other').map((template) => template.id)).toEqual([
+  it('一级分类为空 = 全部模板', () => {
+    expect(filterCatalog(catalog, '', '')).toHaveLength(4);
+  });
+
+  it('按一级分类 / 二级分类逐层筛选，且不修改入参', () => {
+    const before = catalog.map((category) => category.id);
+    expect(filterCatalog(catalog, 'longfeng', '').map((entry) => entry.id)).toEqual([
+      'a',
       'b',
       'c',
     ]);
-    expect(templates.map((template) => template.id)).toEqual(before);
+    expect(filterCatalog(catalog, 'longfeng', 'studio').map((entry) => entry.id)).toEqual([
+      'a',
+      'b',
+    ]);
+    expect(filterCatalog(catalog, 'longfeng', 'missing')).toEqual([]);
+    expect(filterCatalog(catalog, 'missing', '')).toEqual([]);
+    expect(catalog.map((category) => category.id)).toEqual(before);
   });
 
   it('模板 id 只从字符串参数里取', () => {
-    const item = {
+    const task = {
       id: 'task-1',
       url: '',
       params: { templateId: ' longfeng-01 ' },
     } as GalleryItem;
-    expect(templateIdOf(item)).toBe('longfeng-01');
+    expect(templateIdOf(task)).toBe('longfeng-01');
     expect(templateIdOf({ id: 'task-2', url: '', params: {} } as GalleryItem)).toBeUndefined();
   });
 

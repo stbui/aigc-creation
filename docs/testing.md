@@ -276,7 +276,7 @@ node scripts/verify-deps.js --quiet   # 仅结论，有致命问题 exit 1
 | 工作台 / 素材库 | — | — | workspace-pages、sidebar |
 | 局部重绘遮罩（`42205`） | tool-contracts | 暂无自动化闸口（见 5.1） | — |
 | AI 带货图文（`shoppable_carousel`） | capability-bootstrap、tool-contracts、credit-deduction | `frontend/e2e/audit/verify-shoppable-generation.mjs`（真接口 + 仿真网关：一次提交 → outputPlan 拆 6 张 → 逐张计费 → 余额核对） | `frontend/e2e/audit/{probe-local-shoppable,probe-local-shoppable-interact,verify-local-shoppable-browser}.mjs`（布局实测 / 交互态 / 浏览器内完整生成） |
-| 写真模板（`template`） | capability-bootstrap、`template.spec.ts`（模板数据 / 提示词 / 模板 id 校验） | 暂无自动化闸口（需后台配置图像线路后走真实生成） | — |
+| 写真模板（`template`） | capability-bootstrap、`template.spec.ts`（模板数据 / 提示词 / 模板 id 校验）、`template-catalog.service.spec.ts`（标签归一） | 暂无自动化闸口（需后台配置图像线路后走真实生成） | 后台 `/admin/templates` 三层 CRUD 已手工验证（分类 / 分组 / 模板 + 图片上传） |
 
 L1.5 / L1.6 不按功能域铺矩阵：前端覆盖清单见 3.2，后端纯逻辑 / service 用例见 3.2.1。新增纯逻辑、共享 hook、状态组件或可 mock 的 service 逻辑时优先补 Vitest；需要真实后端、事务或浏览器的场景归 L3/L4。
 

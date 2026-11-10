@@ -193,7 +193,7 @@ export function ChannelModelManager({
     setTestResult(null);
   };
 
-  const submit = async (draft: ModelDraft) => {
+  const submit = async (draft: ModelDraft, intent: 'save' | 'test' = 'save') => {
     if (!channelId) return;
     const modelKey = draft.modelKey.trim();
     let capabilityConfig: unknown = null;
@@ -229,13 +229,29 @@ export function ChannelModelManager({
     };
     setSaving(true);
     try {
-      if (editing) {
-        await adminChannelsApi.updateModel(channelId, editing.id, body);
-        toast.success(`商品 ${modelKey} 已保存`);
-      } else {
-        await adminChannelsApi.createModel(channelId, body);
-        toast.success(`商品 ${modelKey} 已创建`);
+      const saved = editing
+        ? await adminChannelsApi.updateModel(channelId, editing.id, body)
+        : await adminChannelsApi.createModel(channelId, body);
+      toast.success(editing ? `商品 ${modelKey} 已保存` : `商品 ${modelKey} 已创建`);
+
+      if (intent === 'test') {
+        /*
+         * 保存并测试：把表单切到已保存的模型，保持弹窗打开，让测试结果
+         * 直接出现在同一个面板里。下一次保存走 update，而不是再建一条。
+         */
+        const next = toModelDraft(saved);
+        setDraft(next);
+        setDraftBase(next);
+        setEditing(saved);
+        setCreating(false);
+        // 保存已完成，允许用户在测试期间取消关闭；测试结束由 finally 兜底
+        setSaving(false);
+        await load();
+        onChanged();
+        await runTest(saved);
+        return;
       }
+
       closeForm();
       await load();
       onChanged();
@@ -271,6 +287,48 @@ export function ChannelModelManager({
         modelId: model.id,
         capability: model.capability,
         protocol: model.protocol,
+        waitForResult: true,
+      });
+      setTestResult(result);
+      if (result.status === 'succeeded') toast.success('服务连接正常');
+      else toast.error(result.error || result.message || '服务连接失败');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '测试失败');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  /**
+   * 测试当前表单配置：不要求先保存。
+   *
+   * 协议测试接口本来就接受草稿字段；这里把表单值原样送过去，运营调完协议 /
+   * 能力参数可以立刻验证，不必先落库再回来点测试。
+   */
+  const runDraftTest = async (draft: ModelDraft) => {
+    const modelKey = draft.modelKey.trim();
+    if (!modelKey || !draft.capability || !draft.protocol) {
+      toast.error('请先填写商品编号、模型类型与接入方式');
+      return;
+    }
+    let capabilityConfig: unknown = null;
+    if (draft.capabilityConfig.trim()) {
+      try {
+        capabilityConfig = JSON.parse(draft.capabilityConfig);
+      } catch {
+        toast.error('能力配置格式不正确');
+        return;
+      }
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await adminChannelsApi.testModel(channelId, {
+        modelKey,
+        providerModelKey: draft.providerModelKey.trim() || modelKey,
+        capability: draft.capability,
+        protocol: draft.protocol,
+        capabilityConfig,
         waitForResult: true,
       });
       setTestResult(result);
@@ -586,15 +644,9 @@ export function ChannelModelManager({
           saving,
           writable,
           previousProviderModelKey: editing?.providerModelKey ?? '',
-          onTest: async () => {
-            if (!editing) {
-              toast.error('请先保存商品，再测试服务连接');
-              return;
-            }
-            await runTest(editing);
-          },
+          onTest: runDraftTest,
           onClose: closeForm,
-          onSubmit: (next) => void submit(next),
+          onSubmit: (next, intent) => void submit(next, intent),
         }}
         upstream={{
           models: upstream,

@@ -1,10 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
+  BILLABLE_OPTIONS,
   CAPABILITY_LABELS,
   OPERATION_LABELS,
+  OPERATION_OPTIONS,
   REQUEST_KIND_LABELS,
+  REQUEST_KIND_OPTIONS,
   SOURCE_LABELS,
+  SOURCE_OPTIONS,
   STATUS_LABELS,
+  STATUS_OPTIONS,
   STATUS_TONES,
 } from './constants';
 import { useAdmin, useToast, useAdminDetailParam, useAdminList, useAdminUrlFilterSync } from './hooks';
@@ -447,11 +452,7 @@ export function AdminModelCallsPage() {
             placeholder="全部状态"
             clearLabel="全部状态"
             value={status}
-            options={[
-              { value: 'success', label: '成功' },
-              { value: 'failed', label: '失败' },
-              { value: 'canceled', label: '已取消' },
-            ]}
+            options={STATUS_OPTIONS}
             allowClear
             onChange={setStatus}
             className="w-28"
@@ -461,12 +462,7 @@ export function AdminModelCallsPage() {
             placeholder="全部类型"
             clearLabel="全部类型"
             value={requestKind}
-            options={[
-              { value: 'create', label: '创建' },
-              { value: 'poll', label: '轮询' },
-              { value: 'task', label: '连通性测试' },
-              { value: 'proxy', label: '中转' },
-            ]}
+            options={REQUEST_KIND_OPTIONS}
             allowClear
             onChange={setRequestKind}
             className="w-32"
@@ -476,13 +472,7 @@ export function AdminModelCallsPage() {
             placeholder="全部来源"
             clearLabel="全部来源"
             value={source}
-            options={[
-              { value: 'tool', label: '提示词工具' },
-              { value: 'task', label: '生成任务' },
-              { value: 'admin', label: '后台测试' },
-              { value: 'proxy', label: 'API 中转' },
-              { value: 'gateway', label: '网关' },
-            ]}
+            options={SOURCE_OPTIONS}
             allowClear
             onChange={setSource}
             className="w-36"
@@ -492,13 +482,7 @@ export function AdminModelCallsPage() {
             placeholder="全部操作"
             clearLabel="全部操作"
             value={operation}
-            options={[
-              { value: 'image_to_prompt', label: 'AI 分析 / 图片转提示词' },
-              { value: 'prompt_polish', label: '提示词润色' },
-              { value: 'image_to_image', label: '图生图' },
-              { value: 'text_to_image', label: '文生图' },
-              { value: 'admin_model_test', label: '后台模型测试' },
-            ]}
+            options={OPERATION_OPTIONS}
             allowClear
             onChange={setOperation}
             className="w-52"
@@ -508,10 +492,7 @@ export function AdminModelCallsPage() {
             placeholder="全部计费"
             clearLabel="全部计费"
             value={billable}
-            options={[
-              { value: 'true', label: '计费' },
-              { value: 'false', label: '不计费' },
-            ]}
+            options={BILLABLE_OPTIONS}
             allowClear
             onChange={setBillable}
             className="w-32"

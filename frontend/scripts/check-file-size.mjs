@@ -33,11 +33,9 @@ const VERBOSE = process.argv.includes('--verbose');
  * 「谁都可以加一行豁免」。
  */
 const BASELINE = {
-  // 接口聚合层：按域拆分牵扯全部调用方，待「API 与类型层治理」批次统一处理
-  'src/lib/api.ts': 2477,
-  // 后端契约类型声明（无运行期逻辑），随接口演进增长
-  'src/types/api.d.ts': 2276,
-  'src/types/model.ts': 928,
+  // 2026-11-10：`lib/api.ts`、`types/api.d.ts`、`types/model.ts` 已按域拆分为
+  // 聚合出口 + 域文件（api-tools / api-admin-* / api-account / admin-* / model-admin），
+  // 三者均回落到 800 行以内，移除基线，回归通用守卫；后续新增代码仍受棘轮约束。
   'src/components/MattingResultEditor.tsx': 810,
 };
 

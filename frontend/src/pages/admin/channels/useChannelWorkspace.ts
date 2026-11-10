@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { adminChannelsApi } from './api';
+import { downloadJson } from '../../../lib/download';
 import {
   useActionLock,
   useAdmin,
@@ -18,17 +19,6 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants';
 import { normalizeChannelHeaders, toChannelDraft, validateChannelHeaders } from './utils';
 import { useProductConsumption } from './useProductConsumption';
 import type { AdminChannelView, SystemChannelExportView } from '../../../types/model';
-
-/** 导出文件下载：走 Blob，不经 `downloadCsv`（不是 CSV，且要保留 JSON 结构） */
-function downloadJson(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
 
 /**
  * 渠道工作台的状态与写操作。
@@ -235,8 +225,8 @@ export function useChannelWorkspace() {
           : await adminChannelsApi.exportAll();
         const stamp = new Date().toISOString().slice(0, 10);
         downloadJson(
-          target ? `system-channel-${target.name}-${stamp}.json` : `system-channels-${stamp}.json`,
           payload,
+          target ? `system-channel-${target.name}-${stamp}.json` : `system-channels-${stamp}.json`,
         );
         toast.success(`已导出 ${payload.channels?.length ?? 0} 个渠道（不含凭证）`);
       } catch (e) {

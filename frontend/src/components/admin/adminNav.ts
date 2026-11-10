@@ -233,6 +233,12 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         permission: "message.write",
       },
       {
+        path: "/admin/templates",
+        label: "写真模板",
+        icon: Images,
+        permission: "template.read",
+      },
+      {
         path: "/admin/aigc-label",
         label: "AI 标识",
         icon: Tag,

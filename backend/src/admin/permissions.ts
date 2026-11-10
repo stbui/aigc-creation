@@ -92,6 +92,10 @@ export const PERMISSIONS = {
   complianceTakedown: "compliance.takedown",
   contentRead: "content.read",
 
+  // 写真模板目录（C 端 /template 的内容维护）
+  templateRead: "template.read",
+  templateWrite: "template.write",
+
   // 能力与通道
   capabilityRead: "capability.read",
   capabilityWrite: "capability.write",
@@ -180,6 +184,8 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.taskDelete,
     PERMISSIONS.complianceRead,
     PERMISSIONS.contentRead,
+    PERMISSIONS.templateRead,
+    PERMISSIONS.templateWrite,
     PERMISSIONS.capabilityRead,
     PERMISSIONS.modelCallRead,
     PERMISSIONS.channelRead,

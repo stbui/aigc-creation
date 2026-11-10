@@ -72,4 +72,8 @@ export const AdminAigcLabelPage = lazyAdminPage(
   () => import('./aigc-label'),
   'AdminAigcLabelPage',
 );
+export const AdminTemplatesPage = lazyAdminPage(
+  () => import('./templates'),
+  'AdminTemplatesPage',
+);
 export const AdminAlertsPage = lazyAdminPage(() => import('./alerts'), 'AdminAlertsPage');

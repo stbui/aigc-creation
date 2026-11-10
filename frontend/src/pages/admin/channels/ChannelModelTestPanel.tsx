@@ -24,7 +24,7 @@ export function ChannelModelTestPanel({
           {testing ? '测试中…' : '测试服务连通'}
         </ActionButton>
         <span className="text-[12px] text-muted-foreground">
-          使用已保存的访问凭证向服务商发起一次最小请求，可能产生费用；不会创建任务或扣除用户积分。
+          使用当前表单配置与已保存的访问凭证发起一次最小请求，未保存的修改也会被测试；可能产生费用，但不会创建任务或扣除用户积分。
         </span>
       </div>
 

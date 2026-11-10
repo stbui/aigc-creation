@@ -36,13 +36,15 @@ import {
   newIdempotencyKey,
   resolveModelId,
   templateApi,
-  type PortraitTemplate,
+  type TemplateCatalogCategory,
 } from './api';
-import { filterTemplatesByCategory } from './utils';
+import { filterCatalog, flattenCatalog, type TemplateEntry } from './utils';
 import { Modal, useApp } from '../../ui';
 
 /** 分类 tab 的「全部」项（纯前端筛选态，不来自后端） */
 const ALL_CATEGORY = '';
+/** 二级分类的「全部分组」项 */
+const ALL_GROUP = '';
 
 /**
  * `POST /generate` 的失败是否「结果不明」。
@@ -76,11 +78,11 @@ export function TemplatePage() {
   const { token } = useAuth();
 
   // ── 模板清单（来自后端，前端不存副本） ──
-  const [templates, setTemplates] = useState<PortraitTemplate[]>([]);
-  const [categories, setCategories] = useState<Array<{ id: string; label: string }>>([]);
+  const [catalog, setCatalog] = useState<TemplateCatalogCategory[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [categoryId, setCategoryId] = useState(ALL_CATEGORY);
+  const [groupId, setGroupId] = useState(ALL_GROUP);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   const loadTemplates = useCallback(async () => {
@@ -88,8 +90,7 @@ export function TemplatePage() {
     setTemplatesError(null);
     try {
       const result = await templateApi.templates();
-      setTemplates(result.templates);
-      setCategories(result.categories);
+      setCatalog(result.categories);
     } catch (e) {
       setTemplatesError((e as Error).message || '模板清单加载失败');
     } finally {
@@ -161,20 +162,34 @@ export function TemplatePage() {
     return modelQuoteCredits == null ? `本次消耗 ${unit} 积分` : `本次约 ${unit} 积分（按所选模型）`;
   }, [unitCreditCost, modelQuoteCredits]);
 
+  /** 全量展平：模板选择、历史回显与名称查找共用 */
+  const allTemplates = useMemo(() => flattenCatalog(catalog), [catalog]);
+
   const selectedTemplate = useMemo(
-    () => templates.find((template) => template.id === selectedTemplateId) ?? null,
-    [templates, selectedTemplateId],
+    () => allTemplates.find((template) => template.id === selectedTemplateId) ?? null,
+    [allTemplates, selectedTemplateId],
+  );
+
+  const activeCategory = useMemo(
+    () => catalog.find((category) => category.id === categoryId) ?? null,
+    [catalog, categoryId],
   );
 
   const formValid = images.length > 0 && Boolean(selectedTemplateId);
 
-  const selectTemplate = useCallback((template: PortraitTemplate) => {
+  const selectTemplate = useCallback((template: TemplateEntry) => {
     setSelectedTemplateId(template.id);
   }, []);
 
+  /** 切换一级分类时回到「全部分组」，避免上一个分类的二级筛选残留 */
+  const selectCategory = useCallback((nextCategoryId: string) => {
+    setCategoryId(nextCategoryId);
+    setGroupId(ALL_GROUP);
+  }, []);
+
   const visibleTemplates = useMemo(
-    () => filterTemplatesByCategory(templates, categoryId),
-    [templates, categoryId],
+    () => filterCatalog(catalog, categoryId, groupId),
+    [catalog, categoryId, groupId],
   );
 
   // ── 生成 ──
@@ -293,6 +308,13 @@ export function TemplatePage() {
                     <div className="tpl-selected-copy">
                       <strong>{selectedTemplate.name}</strong>
                       <p title={selectedTemplate.prompt}>{selectedTemplate.prompt}</p>
+                      <div className="tpl-selected-tags">
+                        {selectedTemplate.tags.map((tag) => (
+                          <span key={tag} className="tpl-template-tag">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                       <button
                         type="button"
                         className="tpl-selected-clear"
@@ -355,22 +377,47 @@ export function TemplatePage() {
               type="button"
               aria-pressed={categoryId === ALL_CATEGORY}
               className={`tpl-category${categoryId === ALL_CATEGORY ? ' is-active' : ''}`}
-              onClick={() => setCategoryId(ALL_CATEGORY)}
+              onClick={() => selectCategory(ALL_CATEGORY)}
             >
               全部模板
             </button>
-            {categories.map((category) => (
+            {catalog.map((category) => (
               <button
                 key={category.id}
                 type="button"
                 aria-pressed={categoryId === category.id}
                 className={`tpl-category${categoryId === category.id ? ' is-active' : ''}`}
-                onClick={() => setCategoryId(category.id)}
+                onClick={() => selectCategory(category.id)}
               >
-                {category.label}
+                {category.name}
               </button>
             ))}
           </nav>
+
+          {activeCategory && activeCategory.groups.length > 0 && (
+            <nav className="tpl-subcategories" aria-label="模板二级分类">
+              <button
+                type="button"
+                aria-pressed={groupId === ALL_GROUP}
+                className={`tpl-subcategory${groupId === ALL_GROUP ? ' is-active' : ''}`}
+                onClick={() => setGroupId(ALL_GROUP)}
+              >
+                全部分组
+              </button>
+              {activeCategory.groups.map((group) => (
+                <button
+                  key={group.id}
+                  type="button"
+                  aria-pressed={groupId === group.id}
+                  className={`tpl-subcategory${groupId === group.id ? ' is-active' : ''}`}
+                  onClick={() => setGroupId(group.id)}
+                >
+                  {group.name}
+                  <span className="tpl-subcategory-count">{group.items.length}</span>
+                </button>
+              ))}
+            </nav>
+          )}
 
           <div className="tpl-template-scroll">
             <TemplateGallery
@@ -385,7 +432,7 @@ export function TemplatePage() {
 
           <TemplateHistory
             items={gallery.items}
-            templates={templates}
+            templates={allTemplates}
             loading={gallery.loading}
             error={gallery.error}
             onRefresh={refreshGallery}

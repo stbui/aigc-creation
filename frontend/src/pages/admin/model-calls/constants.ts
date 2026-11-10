@@ -45,3 +45,43 @@ export const STATUS_TONES: Record<string, 'success' | 'danger' | 'warn' | 'brand
   failed: 'danger',
   canceled: 'muted',
 };
+
+/**
+ * 筛选下拉选项。提到模块级：内联字面量会让页面任一 state 变化（筛选、分页、
+ * 轮询刷新）都重建数组，带着 5 个 SelectField 一起重渲染。
+ */
+type SelectOption = { value: string; label: string };
+
+export const STATUS_OPTIONS: SelectOption[] = [
+  { value: 'success', label: '成功' },
+  { value: 'failed', label: '失败' },
+  { value: 'canceled', label: '已取消' },
+];
+
+export const REQUEST_KIND_OPTIONS: SelectOption[] = [
+  { value: 'create', label: '创建' },
+  { value: 'poll', label: '轮询' },
+  { value: 'task', label: '连通性测试' },
+  { value: 'proxy', label: '中转' },
+];
+
+export const SOURCE_OPTIONS: SelectOption[] = [
+  { value: 'tool', label: '提示词工具' },
+  { value: 'task', label: '生成任务' },
+  { value: 'admin', label: '后台测试' },
+  { value: 'proxy', label: 'API 中转' },
+  { value: 'gateway', label: '网关' },
+];
+
+export const OPERATION_OPTIONS: SelectOption[] = [
+  { value: 'image_to_prompt', label: 'AI 分析 / 图片转提示词' },
+  { value: 'prompt_polish', label: '提示词润色' },
+  { value: 'image_to_image', label: '图生图' },
+  { value: 'text_to_image', label: '文生图' },
+  { value: 'admin_model_test', label: '后台模型测试' },
+];
+
+export const BILLABLE_OPTIONS: SelectOption[] = [
+  { value: 'true', label: '计费' },
+  { value: 'false', label: '不计费' },
+];

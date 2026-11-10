@@ -59,7 +59,7 @@ frontend/src/components/admin/
 ├── DutyContext.tsx                 # 概览首屏值班塔的数据轮询
 └── statusMeta.ts                   # 状态 → 文案 / 色调映射
 
-frontend/src/pages/admin/            # 31 个页面 + channels/、payments/ 子目录
+frontend/src/pages/admin/            # 32 个页面 + channels/、payments/ 子目录
 ```
 
 ### 0.2 守卫链
@@ -417,7 +417,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 - 未知权限点整体拒绝（400 `40001`），不静默丢弃 —— 否则调用方会以为保存成功。
 - 多角色改动在一个事务中写入，避免部分角色已生效、部分失败的半保存状态。
 - 改动立即生效：`AdminGuard` / `PermissionGuard` 每次请求查库，不需要重启或重新登录。操作者把自己权限改没了也会当场生效（可由其他 admin 恢复）。
-- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 67 个权限点分组勾选，高危权限点单独标注。
+- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 69 个权限点分组勾选，高危权限点单独标注。
 
 ---
 
@@ -485,7 +485,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 - `ChannelModel.protocol` 存**插件声明的 provider id**（如 `openai-image`），不是插件 id（`openai-images`）；下拉读协议注册表，手写库或导入时才可能写错，表现为派发报 `channel_unavailable`。
 - 凭证只以密文落库（`MODEL_SECRET_KEY` 派生密钥）；读取接口只回显掩码。上游模型目录与连通性测试都在服务端使用已保存凭证发请求，密钥不进浏览器。
-- 连通性测试走与正式任务相同的协议、出站策略与鉴权，差异只有「不建任务、不扣费」；结果写 `ApiCallLog`（`billable=false`），后台「调用记录」页可查。
+- 连通性测试走与正式任务相同的协议、出站策略与鉴权，差异只有「不建任务、不扣费」；结果写 `ApiCallLog`（`billable=false`），后台「调用记录」页可查。测试接受未保存的表单草稿，不必先保存再回来点测试；编辑弹窗另提供「保存并测试」，一次完成落库与连通性验证。
 - 写入后主动失效目录快照（`CatalogVersionService`），不等 TTL 自然过期。
 - `channel.write` / `channel.model_write` 覆盖渠道凭证与价格档：后端没有「只改线路不改价」的独立权限点，前端也不宣称有。
 

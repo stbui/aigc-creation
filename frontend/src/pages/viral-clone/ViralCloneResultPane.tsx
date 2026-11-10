@@ -38,6 +38,7 @@ import {
 } from './components';
 import type { GalleryItem, ResultGallery } from './hooks';
 import { downloadExtension, splitCloneInputs, taskErrorText } from './utils';
+import { triggerDownload } from '../../lib/download';
 
 type CompareState = 'ready' | 'generating' | 'failed' | 'idle';
 
@@ -197,10 +198,7 @@ export function ViralCloneResultPane({
     const item = row.item;
     if (!item?.url) return;
     const ext = downloadExtension(item.format);
-    const link = document.createElement('a');
-    link.href = toAbsoluteUrl(item.url) ?? item.url;
-    link.download = `viral-clone-${item.id.slice(-6)}.${ext}`;
-    link.click();
+    triggerDownload(toAbsoluteUrl(item.url) ?? item.url, `viral-clone-${item.id.slice(-6)}.${ext}`);
   };
 
   return (

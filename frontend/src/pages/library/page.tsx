@@ -345,6 +345,9 @@ export function LibraryPage() {
     [shown],
   );
 
+  // id→查看器下标：卡片渲染时 O(1) 取值，取代对每张图的全量 findIndex。
+  const lightboxIndexById = useMemo(() => new Map(lightboxItems.map((item, index) => [item.id, index])), [lightboxItems]);
+
   // 筛选/分组切换或删除素材后，当前下标可能已失效；收敛到最近一张，列表为空则关闭。
   useEffect(() => {
     setPreviewIndex((prev) => {
@@ -712,7 +715,7 @@ export function LibraryPage() {
                   previewIndex={
                     modalityOfFormat(a.format) === 'video'
                       ? -1
-                      : lightboxItems.findIndex((item) => item.id === a.id)
+                      : lightboxIndexById.get(a.id) ?? -1
                   }
                   onToggle={toggle}
                   onPreview={setPreviewIndex}

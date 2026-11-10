@@ -40,6 +40,7 @@ import {
   AdminSettingsPage,
   AdminStoragePage,
   AdminTasksPage,
+  AdminTemplatesPage,
   AdminTicketsPage,
   AdminUserGroupsPage,
   AdminUsersPage,
@@ -190,6 +191,7 @@ export function AdminShell() {
               />
               <Route path="legal" element={<AdminLegalPage />} />
               <Route path="notifications" element={<AdminNotificationsPage />} />
+              <Route path="templates" element={<AdminTemplatesPage />} />
               {/* AI 标识样式 */}
               <Route path="aigc-label" element={<AdminAigcLabelPage />} />
               {/* 未实现的模块：显式提示而非静默跳回概览 */}
