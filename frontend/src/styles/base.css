@@ -1,0 +1,85 @@
+/**
+ * 基础层：盒模型、根节点、字体与滚动条、跳转链接、路由过渡、chrome 高度变量。
+ *
+ * 由 global.css 入口 @import；只放真正全站生效的规则，页面样式不得回流到本文件。
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+  body,
+  #root {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  /* 不用 stable gutter: 无滚动条的页面会永久在右侧留下约 15px 空白。
+     弹窗锁定滚动时由 useBodyScrollLock 补 padding, 同样能避免内容横向跳动。 */
+  scrollbar-gutter: auto;
+}
+
+body {
+  /* 字体栈与参考站一致: Noto Sans SC 优先, 回退 PingFang SC / Microsoft YaHei */
+  font-family: 'Noto Sans SC', 'Inter', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes route-progress {
+  from { transform: translateX(-105%); }
+  to { transform: translateX(365%); }
+}
+@keyframes route-shimmer {
+  from { background-position: 110% 0; }
+  to { background-position: -110% 0; }
+}
+
+[data-route-stage].is-route-entering {
+  animation: route-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes route-enter {
+  from {
+    opacity: 0.55;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Keyboard bypass block: reachable only when focused, then returns to normal flow. */
+.skip-to-content {
+  position: fixed;
+  z-index: 2100;
+  top: 10px;
+  left: 12px;
+  padding: 9px 14px;
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(31, 41, 55, 0.18);
+  transform: translateY(-160%);
+  transition: transform 0.18s ease;
+}
+
+.skip-to-content:focus-visible {
+  outline: 2px solid var(--card-bg);
+  outline-offset: 2px;
+  transform: translateY(0);
+}
+
+/* ≤900px 移动态: 顶栏 54px */
+@media (max-width: 900px) {
+  :root {
+    --workspace-topbar-height: 54px;
+    --mif-workspace-topbar-height: 54px;
+  }
+}

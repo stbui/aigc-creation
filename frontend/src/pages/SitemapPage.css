@@ -6,6 +6,19 @@
  */
 
 /* ───────── 网站地图页 (复刻 ijihua.cn/sitemap.html: hero 1100 / h1 68px / 双列 + 四色编号) ───────── */
+
+@media (max-width: 900px) {
+  .sitemap-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .sitemap-hero h1 {
+    font-size: 40px;
+    line-height: 44px;
+  }
+}
+
 .sitemap-page {
   min-height: 100vh;
   background: var(--card-bg);

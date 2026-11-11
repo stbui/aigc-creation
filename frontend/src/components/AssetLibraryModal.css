@@ -308,7 +308,7 @@
 }
 
 .alp-sidebar > strong,
-.alp-sidebar-section > strong {
+  .alp-sidebar-section > strong {
   display: flex;
   align-items: center;
   gap: 8px;

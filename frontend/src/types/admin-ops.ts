@@ -311,6 +311,8 @@ export interface AdminCampaign {
    */
   effective: "draft" | "live" | "scheduled" | "ended" | "off";
   audience: { onlyNewUsers?: boolean }; orderCount: number;
+  /** 引用该活动的限时免费账单数（BillingOrder.promotionId），删除预检需与订单合并 */
+  billingCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -514,6 +516,8 @@ export interface PromoCampaign {
   priceCents?: number;
   /** 限时免费覆盖的能力 id */
   capabilityIds?: string[];
+  /** 仅新用户专享：匿名展示时不能承诺「0 积分」，落地页需标注 */
+  onlyNewUsers?: boolean;
 }
 
 /* ────────────────────────────────────────────────────────────────

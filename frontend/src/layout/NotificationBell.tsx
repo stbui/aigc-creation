@@ -1,3 +1,4 @@
+import './NotificationBell.css';
 import { useState } from 'react';
 import { Badge, Button, Empty, Popover, Spin } from '../ui';
 import { Bell, CheckCheck } from 'lucide-react';

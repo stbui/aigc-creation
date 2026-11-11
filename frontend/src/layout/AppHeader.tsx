@@ -1,3 +1,4 @@
+import './AppHeader.css';
 import { useMemo, useState } from 'react';
 import { Button, Dropdown } from '../ui';
 import { ChevronDown, Menu, Wallet } from 'lucide-react';

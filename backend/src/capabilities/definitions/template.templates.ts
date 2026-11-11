@@ -11,7 +11,14 @@
  *   · `campus-*`（10）：校园操场情侣。
  *
  * 来源记录见 `docs/template-design.md` §5。
+ *
+ * 2026-11-11 扩充：`portrait-templates.import.ts` 另有 516 套按分类整理的模板。
+ * 初始 30 套保持原样（种子脚本与既有测试依赖它），扩充模板只并入下方
+ * `TEMPLATE_BY_ID` 查找表 —— 生成与参数校验都能按 id 查回提示词，
+ * C 端目录本身仍由数据库下发。
  */
+import { IMPORTED_PORTRAIT_TEMPLATES } from './portrait-templates.import';
+
 /** 最近一批模板的来源（接口回显用；每条模板自身仍带 `sourceUrl`）。 */
 export const TEMPLATE_SOURCE_URL = 'https://mp.weixin.qq.com/s/MP_FQuppTPvVCkPznfyt8g';
 export const TEMPLATE_CAPTURED_AT = '2026-11-10T00:00:00.000Z';
@@ -314,8 +321,15 @@ export const PORTRAIT_TEMPLATES = [
   },
 ] as const satisfies readonly PortraitTemplate[];
 
+/*
+ * 初始 30 套 + 扩充 516 套共用一个查找表。
+ * 扩充数据的 `categoryIds` 是字符串数组，与这里的字面量联合类型等价但不被
+ * TS 自动收窄，故整段做一次类型断言；字段形状在导入文件里逐条对齐。
+ */
 const TEMPLATE_BY_ID = new Map<string, PortraitTemplate>(
-  PORTRAIT_TEMPLATES.map((template) => [template.id, template]),
+  [...PORTRAIT_TEMPLATES, ...(IMPORTED_PORTRAIT_TEMPLATES as unknown as PortraitTemplate[])].map(
+    (template) => [template.id, template],
+  ),
 );
 
 /** 模板 id → 模板对象；查不到返回 `undefined`（提交会在准入前被参数校验拦下）。 */

@@ -19,7 +19,7 @@ export function TemplatePreviewDialog({
       }}
       title={item?.name ?? '模板预览'}
       description={item ? `排序 ${item.sortOrder} · ${item.enabled ? '启用' : '已停用'}` : undefined}
-      width={860}
+      width={1160}
       footer={
         <ActionButton variant="outline" onClick={onClose}>
           关闭
@@ -27,12 +27,12 @@ export function TemplatePreviewDialog({
       }
     >
       {item && (
-        <div className="grid gap-5 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-          <div className="overflow-hidden rounded-md border border-border bg-muted">
+        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
+          <div className="flex items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
             <img
               src={item.thumbFile}
               alt={`${item.name}大图`}
-              className="max-h-[62vh] w-full object-contain"
+              className="max-h-[calc(100dvh-13rem)] w-full object-contain"
             />
           </div>
           <div className="min-w-0 space-y-3">

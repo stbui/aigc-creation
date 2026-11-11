@@ -1,0 +1,695 @@
+/**
+ * 设计令牌 · 三层结构
+ *
+ * 1. 基础层（Primitive）—— 原子值与几何：圆角档、阴影。只允许通用层引用。
+ * 2. 通用层（Semantic）—— 跨页面语义：品牌、文字、边框、表面、状态、效果。
+ *    页面与组件只引用这一层；历史 `--color-*` 等兼容名集中在 2.1，新代码不要再新增。
+ * 3. 组件层（Component）—— 页面/组件专属的精确值：外壳、工具页、工作台、
+ *    多图融合、商品 SKU、素材库、手机上传、认证、首页、网站地图。
+ *    只能由同名组件引用；跨组件复用即提升为通用层。
+ *
+ * 命名：基础 `--<类别>-<刻度>`；通用 `--<语义>-<角色>`；组件 `--<缩写>-<语义>`。
+ * 组件层仍在 :root 声明，保证 portal 弹层可继承；隔离靠前缀约定，不靠作用域。
+ * 规则与新增流程见 docs/design-tokens.md。
+ */
+
+:root {
+  /* ═════════ 1.1 几何与阴影（Primitive） ═════════ */
+  /* --radius 为历史名，与新 --radius-card 同值；新代码用五档语义名。 */
+  --radius: 12px;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
+  --radius-tag: 4px; /* 小标签 */
+  --radius-control: 8px; /* 输入框 / chip / 小按钮 */
+  --radius-card: 12px; /* 卡片 / 面板 */
+  --radius-panel: 16px; /* 大面板 / 主视觉卡 */
+  --radius-hero: 24px; /* 大卡片 (landing / 业务卡) */
+  --radius-pill: 999px;
+
+  /* ═════════ 2.1 兼容别名（历史名，新代码不要新增） ═════════ */
+  /* 下列名称保留给存量引用；新代码使用 2.2–2.6 的语义名，清理后再删除。 */
+  /* 2026-10-18 去蓝: 原为 #2563eb 蓝系 (与全站紫系冲突, 10-17 审计标记的 bug, 外壳 9 处引用已全部改字面值, 定义同步归位品牌紫防复发) */
+  --color-primary: #5546d8;
+  /* 橙 / 绿各分「填充」与「文字」两版 (2026-11-03)
+       原 --color-cta / --color-success 同时当背景与文字用。作背景没问题,
+       作文字在同色 12% 淡底上只有 3.07/2.89:1 —— 浅底上还要再压深才读得出。
+       现在: --color-cta / --color-success 保持原值, 只用于填充;
+             --color-cta-text / --color-success-text 是压深后的文字版 (≥4.6:1)。 */
+  --color-cta: #ea580c;
+  --color-cta-text: #b94509;
+  --color-cta-hover: #c2410c;
+  --color-bg: #f6f7fb;
+  --color-card: #ffffff;
+  --color-border: #e2e8f0;
+  /* 参考站外壳描边实测 #f2f3f5, 比全局边框色更浅 —— 仅用于顶栏/侧栏等外壳分隔线 */
+  --color-border-soft: #f2f3f5;
+  --color-text: #0f172a;
+  --color-text-secondary: #475569;
+  /* 参考站实测文本色: hero 副标题 #667085 / 卡片描述 #86909C */
+  --color-success: #16a34a;
+  --color-success-text: #117c39;
+  --color-slate-100: #f1f5f9;
+  /* 原 #94a3b8 在白底只有 2.56:1, 收到 #627693 后 4.63:1 */
+  --color-slate-400: #5b6e89;
+  /* 兼容旧名: 全部指向收拢后的三态, 保证语义不丢 */
+  --brand-strong: var(--brand);
+  --brand-active: var(--brand-hover);
+  --brand-accent: var(--brand);
+  --brand-grad-end: var(--brand);
+
+  /* ═════════ 2.2 品牌 ═════════ */
+  /* ────────────────────────────────────────────────────────────────
+       设计令牌 · 品牌紫（2026-10-17 收拢）
+       参考站本身有 7 个近似紫 (#5546D8/#5B4BD7/#5D47EA/#625DF5/#6C5CE7/#8064F6/#9358EF),
+       肉眼几乎无差别却分散全站 —— 按用户要求「紫色 + 中性色全收拢」,
+       收敛为 1 个主色 + 1 个浅端(仅用于渐变)+ 1 个交互态 + 1 个底色。
+       ──────────────────────────────────────────────────────────────── */
+  --brand: #5546d8; /* 唯一主色: 实心按钮/链接/强调/选中 */
+  --brand-light: #6c5ce7; /* 仅用于渐变浅端与需要"更亮"的实心块 */
+  --brand-hover: #5b4bd7; /* hover / active / 强调态 */
+  --brand-bg: #f1efff; /* 唯一激活底色 */
+  /* ── 后台补白的语义 token (2026-10-23) ────────────────────────────────
+       此前全站有 44 处裸 hex, 其中的 #fff / #fafbfd 各重复十几次, 想调一次底色
+       就得全文搜 hex。下面两个是这几处裸 hex 的语义归属。
+       （同批的 --brand-bg-tint / --brand-border-soft / --info-text / --info-border
+        只服务 antd 后台，2026-10-30 后台改版后已无消费者，一并删除。） */
+  --on-brand: #ffffff; /* 实心色块 (品牌紫/危险红) 上的文字与图标 */
+  --brand-gradient-end: #7b5df1;
+  --brand-chip-bg: #e9e5ff;
+
+  /* ═════════ 2.3 文字 ═════════ */
+  /* 原 --brand-light(渐变起点 #8064F6) 归入 --brand-light 浅端 */
+  /* ────────────────────────────────────────────────────────────────
+       中性色 · 单一体系（2026-10-17 收拢）
+       原参考站分冷灰(工作台/工具页) 与暖灰(我的作品/素材库) 两族,
+       视觉差异极小却让页面跳变 —— 现统一为一族, 全站共用。
+       ──────────────────────────────────────────────────────────────── */
+  --text-strong: #171a2b; /* 标题 */
+  --text-body: #4e5969; /* 正文 */
+  /* 次要文字。原 #667085 在最浅灰底 --alp-surface-1(#e7e9ef) 上只有 4.10:1,
+       不满足小字号 4.5:1; 收到 #5b6474 后在全部浅底上 ≥4.91:1。
+       层级改由字号与字重承担 —— 颜色只保证可读。 */
+  --text-muted: #5b6474;
+  /* 描述 / 路径类小字。与 --text-muted 同值 (2026-11-03 压到 AA)。 */
+  --text-desc: var(--text-muted);
+  --placeholder-text: var(--text-muted);
+  --text-brand-1: #493bc4;
+  --text-brand-2: #5b4df5;
+  --text-1: #1d2129;
+  --text-2: #292839;
+  --text-3: #475467;
+  --text-4: #526077;
+  --text-5: #596273;
+  --text-6: #646d80;
+  --text-7: #706a79;
+  /* 弱尾三级 (2026-11-03): 原 #8b94a3/#9aa1ad/#b6bcc8 在白底只有
+       3.06/2.60/1.91:1, 且三级之间 ΔE<14、末级与边框灰同色 —— 视觉上
+       已是"装饰灰"而非"文字灰"。三级改为指向 --text-muted (色值只定义一处),
+       层级交给字号/字重, 不再靠继续压暗区分。 */
+  --text-8: var(--text-muted);
+  --text-9: var(--text-muted);
+  --text-10: var(--text-muted);
+
+  /* ═════════ 2.4 边框与表面 ═════════ */
+  --border: #e5e7ef; /* 常规边框 */
+  --border-soft: #e4e7ef; /* 次级边框 (与常规同族) */
+  --surface: #f2f4f7; /* 灰底块 */
+  /* 页面底与卡片 */
+  --page-bg: #f6f7fb;
+  --card-bg: #ffffff;
+  /* 圆点/虚线描边色 —— 只作边框 (2026-11-03 拆名)
+       原 --border-dot 同时承担描边与 placeholder 文字两种角色:
+       描边要浅 (#c9cdd4), 而 placeholder 文字用同一个值在白底只有
+       1.59:1, 远低于 4.5:1。现拆成两个令牌:
+         --border-dot  描边 (保持原值不变)
+         --placeholder-text  placeholder 文字 (收到 --text-muted 档, 白底 4.65:1) */
+  --border-dot: #c9cdd4;
+  --border-row: #eff0f4;
+  --border-hover: #c9cddb;
+  --surface-soft: #f7f8fa; /* 胶囊 (筛选器/状态) */
+  --surface-tint: #fafbfd; /* 表头底 / 表格行悬停底 (比 --surface 更浅一档) */
+  /* ── 历史裸 hex 收口 (2026-11-02) ──────────────────────────────────────
+       此前 :root 之外有 800+ 处裸 hex。下面按「作用域 + 用途 + 明度」编号建 token：
+       编号一律由暗到亮 (-1 最深)，页面族令牌只服务该族，共享值提升为全局令牌。 */
+  /* 全局共享色 */
+  --border-brand: #cfc8ff;
+  --border-1: #dfe3eb;
+  --border-2: #e5e7f0;
+  --border-3: #f0f1f5;
+  --surface-brand-1: #493bc4;
+  --surface-brand-2: #765ce7;
+  --surface-brand-3: #8064f6;
+  --surface-brand-4: #f2efff;
+  --surface-brand-5: #f7f6ff;
+  --surface-1: #e9eaf0;
+  --surface-2: #eef1f5;
+  --surface-3: #f3f4f8;
+  --surface-4: #f4f5f8;
+  --surface-5: #f6f7f9;
+  --surface-6: #fafbfc;
+  --surface-gradient-top: #f8f6ff;
+  --surface-ink: #101116;
+
+  /* ═════════ 2.5 状态 ═════════ */
+  /* 参考站 own 强调 */
+  /* 必填星号 / 失败。2026-11-03 压到 AA: 原 #eb5757 在白底只有 3.48:1。 */
+  --danger-ref: #cb1c1c;
+  /* 状态与提示色（收拢后集中定义, 各页不再散写） */
+  --warn-bg: #fdf6e3;
+  --warn-border: #f0dfa8;
+  --warn-text: #b45309;
+  --accent-amber: #f59e0b;
+  --accent-orange: #ff7a45;
+  --cta-text: #f7593a;
+  --danger-soft-bg: #fff1f2;
+  /* 2026-11-03 压到 AA: 原 #ef4444 在 --danger-soft-bg 上 3.43:1、白底 3.76:1 */
+  --danger-soft-text: #c5221f;
+  --danger-text: #d81c45;
+  --success-soft-bg: #eaf7f2;
+  /* 2026-11-03 压到 AA: 原 #2f8f6b 在 --success-soft-bg 上 3.63:1、白底 3.99:1 */
+  --success-text: #27795a;
+  /* 成功态描边 (2026-10-20 新增;
+       色相取 success-text 的浅调, 与 success-soft-bg 搭配不刺眼) */
+  --success-border: #bfe6d6;
+  --info-soft-bg: #93c5fd;
+  /* 零散部位 */
+  --misc-text-danger: #c81e1e;
+  --misc-text-success: #147d55;
+  --success-bg: #edf9f1;
+  --success-solid-bg: #eaf8ef;
+  --success-solid-text: #168447;
+  --warning-solid-text: #9a6700;
+
+  /* ═════════ 2.6 效果（遮罩 / 渐变 / 插画） ═════════ */
+  --hero-grad-1: #dcecff;
+  --hero-grad-2: #e2edff;
+  --hero-grad-3: #eaf3ff;
+  /* 插画专用色 (2026-10-20 新增)
+       此前 ToolEmptyIllustration 内联 7 处裸 hex, 违反「不写裸 hex」。
+       这两个淡紫没有语义等价 token (不是品牌色, 也不是中性色),
+       故单列插画专用 token; 字面值与原图一致 —— 换 token 不改视觉。 */
+  --illus-sun: #c7d2fe; /* 插画里的"太阳"圆点 */
+  --illus-mountain: #a5b4fc; /* 插画里的山峦 */
+  /* 2026-11-10 页面裸色值收敛：以下令牌与替换前的字面值逐字等价，视觉零变化。
+       新增前已核对现有 377 个令牌，没有同值且语义合适者可复用，故按用途单点定义；
+       `--success-bg` 原先只在 image-to-video 的 var() fallback 里生效，一并收拢。
+       请勿继续扩散成同义簇，后续页面优先复用这里的语义名。 */
+  --mask-opaque: #000000;
+  --overlay-mask-strong: #1c1e2d75;
+  --overlay-mask-soft: #14122180;
+
+  /* ═════════ 3.1 外壳与 chrome 高度（shell） ═════════ */
+  /* 外壳 / 顶栏 / 侧栏 */
+  --shell-surface-brand-1: #8a63ff;
+  --shell-surface-brand-2: #7b8bff;
+  --shell-surface-info: #66c6ff;
+  --shell-surface-1: #e8ecf3;
+  --shell-surface-2: #f9fafc;
+  --shell-text-danger: #ffe4e6;
+  --shell-text-1: #24212e;
+  --shell-text-2: #676d79;
+
+  /* ═════════ 3.1 外壳与 chrome 高度（续：chrome 高度） ═════════ */
+  /* 外壳 chrome 高度 = 顶栏 64px（≤900px 54px，见 base.css）。
+     侧栏 top/height、工具页与 pk 工作区的 calc 都读这个变量。 */
+  --workspace-topbar-height: 64px;
+
+  /* ═════════ 3.2 工作台（wb-*） ═════════ */
+  /* ────────────────────────────────────────────────────────────────
+       工作台专属精确值（参考站 wb-* 规则字面值, 2026-10-17 严格 1:1）
+       用户要求 workbench「不偏移、没有差异」, 故此页不走全局收拢后的 token,
+       单独以参考站产物 CSS 的字面值锁定, 逐条可追溯:
+         .wb-workflow-banner p   → 17px / 31px / margin-top 24 / #667085
+         .wb-tool-copy           → 固定高 108 / padding 40 16 24
+         .wb-tool-copy strong    → 14px/600 #171A2B lh16 ; span → 12px #86909C lh20 mt8
+         .wb-tool-icon           → 40x40 radius8, left15 **bottom88**, shadow 0 2 6 #6B72804D
+         .wb-tool-visual         → aspect-ratio 2 / 占位底 #C9C9C9（空态 #C7C7C7）
+         .wb-tool-card:hover     → shadow 0 7 20 #21234114 + 标题转 #5546D8
+         .wb-tool-title em       → 角标 #FFF on #F00024 radius8 padding 1 5 10px/500 lh14
+         .wb-data-layout         → minmax(0,2fr) minmax(300px,1fr) gap16 margin 16px 0
+         .wb-panel               → #FFF radius12 ; .wb-recent radius16 ; padding 24
+         .wb-panel-title strong  → 16px/600 #333 lh22 ; button 12px #667085 gap3
+         .wb-account-metrics     → 1fr 1fr 1.35fr gap16 ; 块 #F2F4F7 radius8 padding 20 24
+         .wb-account-metrics b   → 22px/600 #333 lh27 margin 8 0 ; span → 13px #667085 lh18
+         .wb-flow-head           → margin 24 0 12 / 14px
+         .wb-account th          → #4E5564 / bg #F2F4F7 / padding 9 12 / 500
+         .wb-account td          → #4E5564 / border-bottom #EFF0F4 / padding 9 12
+         .wb-flow-type           → radius4 padding 2 7 11px/15px ; income #6254ED on #F0EDFF
+         .wb-job-thumb           → 80x80 flex 0 0 80px radius8 #F2F3F7 / 缺图字色 #AFB5C1
+         .wb-job-copy b          → 14px/400 lh16 ; >span → #86909C mt8 12px lh20
+         .wb-job-status          → flex 0 0 80px width 80 14px/16px
+                                   completed #24A36D · processing #6254ED · failed #F53F3F
+         .wb-jobs-empty          → #98A0AF center padding 100px 0 13px
+         .wb-dashboard-stats     → repeat(6,minmax(0,1fr)) gap16 mt24 ; 块 #F2F4F7 radius8 padding 24
+         .wb-dashboard-head span → chip #E5E7EF radius14 padding 7 12 12px #667085
+         .wb-chart-title         → margin 24 0 12 / 13px ; .wb-trend-chart 100% x 210
+       ──────────────────────────────────────────────────────────────── */
+  --wb-text: #333333;
+  --wb-text-hero: #000000;
+  --wb-text-strong: #171a2b;
+  --wb-text-body: #4e5564;
+  --wb-text-muted: #636d82;
+  --wb-text-desc: var(--text-desc);
+  --wb-border: #e5e7ef;
+  --wb-border-row: #eff0f4;
+  --wb-surface: #f2f4f7;
+  --wb-thumb-bg: #f2f3f7;
+  --wb-thumb-fg: #696d74;
+  --wb-visual-bg: #c9c9c9;
+  --wb-visual-empty: #c7c7c7;
+  --wb-brand: #5546d8;
+  --wb-brand-bg: #f1efff;
+  --wb-flow-income-fg: #6254ed;
+  --wb-flow-income-bg: #f0edff;
+  --wb-flow-expense-fg: #686c79;
+  --wb-flow-expense-bg: #f2f3f5;
+  --wb-badge-bg: #f00024;
+  --wb-status-completed: #1b7b53;
+  --wb-status-processing: #6254ed;
+  --wb-status-failed: #c93434;
+  --wb-empty: #686d77;
+  --wb-hover-shadow: 0 7px 20px rgba(33, 35, 65, 0.08);
+  --wb-icon-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
+  /* 工作台 */
+  --wb-surface-brand: #fafaff;
+  --wb-surface-warning: #f0b969;
+
+  /* ═════════ 3.3 多图融合（mif-*） ═════════ */
+  /* ────────────────────────────────────────────────────────────────
+       多图融合专属精确值（参考站 multi-image-fusion-* 规则字面值, 2026-10-17 严格 1:1）
+       依据 docs/multi-image-fusion-spec.md §6。本页不走全局收拢后的 token, 因为全局值与参考站
+       本页字面值大面积冲突（--text-strong #171a2b vs 本页 #26253d、--radius-card 12px vs 本页 18px、
+       --brand-light #6c5ce7 vs 本页渐变浅端 #8472ee）。规则来源逐条可追溯：
+         .multi-image-fusion-page                    → width min(100%,1480px) padding 26px 32px 42px #24243b
+         .multi-image-fusion-scene-card             → 1px #E2E3EB radius14 padding11 #2D2F5009 阴影
+         .multi-image-fusion-scene-visual           → #F1F2F6 radius9 min-height86 13px/700
+         .multi-image-fusion-layout                 → minmax(360px,410px) minmax(0,1fr) gap20
+         .multi-image-fusion-card                   → #FFFFFFF0 1px #EBEAF3 radius18 阴影 0 10 30 #3733640B
+         .multi-image-fusion-upload-empty           → #FBFAFF 虚线 1px #D8D4EE radius13 min-height138
+         .multi-image-fusion-analyze-button         → 渐变 135deg #6658DC→#8472EE radius9 h36
+         .multi-image-fusion-submit-button          → 渐变 135deg #6658DC→#8472EE radius11 h43
+         .multi-image-fusion-result-panel           → 渐变 145deg #FFFFFFF7→#F9F8FFF0 radius18 padding22
+         .multi-image-fusion-result-empty           → 棋盘格 #F3F1FA 16px 底 #FBFAFF radius15
+         .multi-image-fusion-variant-options button → h34 11px radius8 选中 #F1EFFF/#5D50C5
+       ──────────────────────────────────────────────────────────────── */
+  /* 文本色阶（参考站本页自有冷灰紫族，与全局中性色族不同） */
+  --mif-text-page: #24243b; /* .multi-image-fusion-page 正文基色 */
+  --mif-text-title: #26253d; /* h1 / h2 标题 */
+  --mif-text-title-2: #2d2e42; /* 场景分组 h2 */
+  --mif-text-card: #292a3e; /* 场景卡文字 / 场景名 strong */
+  --mif-text-label: #46455d; /* 字段标签 */
+  --mif-text-sub: #6b6b7d; /* 场景卡描述 / 工作区副标题 */
+  --mif-text-dim: #6c6b79; /* 结果卡副标题 */
+  --mif-text-dim-2: #6d6b78; /* 结果空态正文 */
+  --mif-text-dim-3: #6c6b76; /* 字段标签右侧 small */
+  --mif-text-dim-4: #6d6b75; /* 上传空态最弱提示 */
+  --mif-text-on-accent: #6157a7; /* 上传空态主文案 */
+  --mif-text-accent: #6b5fc2; /* 上传图标 */
+  --mif-text-accent-3: #5d50c5; /* 选中项文字 */
+  --mif-text-accent-4: #5546d8; /* hover / focus 强调 */
+  --mif-text-muted-btn: #6c6a7f; /* 未选中选项按钮 */
+  --mif-text-muted-btn-2: #6c6a81; /* 结果区次按钮 */
+  --mif-text-back: #3e4055; /* 返回按钮 */
+  --mif-text-on-dark: #67647b; /* 预览区文字 */
+  --mif-text-on-dark-2: #6d6b76; /* 生成中文案弱化 */
+  --mif-text-art: #6d64a8; /* 空态插画图标 */
+  --mif-text-art-2: #685bd0; /* 空态插画中间层 */
+  --mif-text-count: #6d6b76; /* 计数器 */
+  --mif-text-count-2: #6d6b79; /* 上传空态容器色 */
+  /* 表面 / 背景 */
+  --mif-surface-card: #fffffff0; /* .multi-image-fusion-card 底 */
+  --mif-surface-panel: #ffffff; /* 结果区按钮底 */
+  --mif-surface-panel-80: #ffffffb8; /* 返回按钮底 */
+  --mif-surface-checker: #fbfaff; /* 棋盘格底 / 上传空态底 */
+  --mif-surface-image: #f5f4fa; /* 已上传图容器底 */
+  --mif-surface-scene-visual: #f1f2f6; /* 场景卡图区底 */
+  --mif-surface-selected: #f1efff; /* 选中项底 */
+  --mif-surface-icon: #eeebff; /* 上传图标底 */
+  --mif-surface-art: #ffffffd6; /* 空态插画卡片底 */
+  --mif-surface-art-2: #f1efff; /* 空态插画中间层底 */
+  --mif-surface-submit: #ffffff; /* 提交区底（共享类覆盖后） */
+  --mif-surface-drag: #f8f6ff; /* 拖拽悬停底 */
+  --mif-surface-back-hover: #f7f5ff; /* 返回按钮 hover 底 */
+  --mif-surface-thumb: #f1eff8; /* 缩略图底 */
+  --mif-surface-success: #157b5b; /* 消息 success 文字 */
+  --mif-surface-info: #6f63a7; /* 消息 info 文字 */
+  --mif-surface-error: #b24a5d; /* 消息 error 文字 */
+  --mif-surface-remove-hover: #ee6b83;
+  /* 结果状态徽标：文字提供语义，颜色只做辅助区分 */
+  --mif-status-generating-text: #5d50c5;
+  --mif-status-generating-bg: #f1efff;
+  --mif-status-generating-border: #dcd7ff;
+  --mif-status-complete-text: #157e5d;
+  --mif-status-complete-bg: #eaf8f2;
+  --mif-status-complete-border: #c9ebdf;
+  --mif-status-partial-text: #9a6213;
+  --mif-status-partial-bg: #fff6e3;
+  --mif-status-partial-border: #f1ddb0;
+  --mif-status-failed-text: #bc4159;
+  --mif-status-failed-bg: #fff0f3;
+  --mif-status-failed-border: #f1ccd4;
+  /* 描边 */
+  --mif-border-card: #ebeaf3; /* 卡片描边 */
+  --mif-border-scene: #e2e3eb; /* 场景卡描边 */
+  --mif-border-back: #e0e1e9; /* 返回按钮描边 */
+  --mif-border-dashed: #d8d4ee; /* 上传槽虚线 */
+  --mif-border-option: #e8e6ef; /* 选项按钮 */
+  --mif-border-option-hover: #aaa0ef; /* 选项 hover */
+  --mif-border-stage: #e7e5f1; /* 预览舞台 */
+  --mif-border-art: #ddd9f1; /* 空态插画 */
+  --mif-border-result-btn: #e5e3ef; /* 结果区按钮 */
+  --mif-border-result-btn-hover: #a69be9;
+  --mif-border-checker: #e7e5f0; /* 已上传图容器 */
+  --mif-border-transparent: #0000;
+  --mif-border-drag: #887be0; /* 拖拽态 / focus 态 */
+  --mif-border-scene-back-hover: #8e83e8;
+  --mif-border-thumb-selected: #7465dc;
+  --mif-focus-ring: #5d4ddb6b; /* 全页统一 focus-visible */
+  --mif-focus-ring-strong: #5b4cda52; /* 场景卡 focus-visible */
+  /* 渐变（同色系深紫→浅紫，非紫→粉，不触 P0-2） */
+  --mif-gradient-cta: linear-gradient(135deg, #6658dc, #8472ee);
+  --mif-gradient-panel: linear-gradient(145deg, #fffffff7, #f9f8fff0);
+  /* 棋盘格（透明底占位纹理，四层 45deg 渐变） */
+  --mif-checker:
+      linear-gradient(45deg, #f3f1fa 25%, #0000 25%),
+      linear-gradient(-45deg, #f3f1fa 25%, #0000 25%),
+      linear-gradient(45deg, #0000 75%, #f3f1fa 75%),
+      linear-gradient(-45deg, #0000 75%, #f3f1fa 75%),
+      none;
+  --mif-checker-size: 16px 16px;
+  --mif-checker-pos: 0 0, 0 8px, 8px -8px, -8px 0;
+  /* 阴影 */
+  --mif-shadow-card: 0 10px 30px #3733640b;
+  --mif-shadow-scene: 0 5px 16px #2d2f5009;
+  --mif-shadow-scene-hover: 0 10px 22px #594bbf21;
+  --mif-shadow-cta: 0 8px 18px #6658dc2e;
+  --mif-shadow-cta-hover: 0 11px 22px #6658dc42;
+  --mif-shadow-art: 0 8px 16px #5d4fa914;
+  /* 圆角（参考站本页共 9 档，超出全局 5 档） */
+  --mif-radius-card: 18px; /* 卡片 / 结果面板 */
+  --mif-radius-scene: 14px; /* 场景卡 / 搭配图网格 */
+  --mif-radius-stage: 15px; /* 预览舞台 / 结果空态 */
+  --mif-radius-upload: 13px; /* 上传槽 / 已上传图容器 */
+  --mif-radius-option: 8px; /* 选项按钮 / 移除按钮 / 返回按钮 */
+  --mif-radius-cta: 11px; /* 主 CTA */
+  --mif-radius-upload-sm: 11px; /* 搭配图槽内上传槽 */
+  --mif-radius-scene-visual: 9px; /* 场景卡图区 */
+  --mif-radius-icon: 11px; /* 上传图标底 */
+  --mif-radius-icon-sm: 9px; /* 搭配图槽内上传图标底 */
+  --mif-radius-art: 12px; /* 空态插画卡片 */
+  --mif-radius-badge: 6px; /* 缩略图序号 */
+  --mif-radius-remove: 7px; /* 移除按钮 */
+  --mif-radius-panel: 16px; /* 提交区容器 / 高级设置浮层 (.image-tool-submit-area / -popover) */
+  --mif-radius-pill: 999px; /* 尺寸胶囊 / header-mark */
+  /* 间距（按区块归组，避免散写） */
+  --mif-gap-layout: 20px; /* 桌面端两列间距 */
+  --mif-gap-control: 10px; /* 901-1366px 控制列间距 */
+  --mif-gap-section: 18px; /* 上传分区间距 */
+  --mif-gap-heading: 12px; /* 卡片标题内部间距 */
+  --mif-gap-option: 7px; /* 选项网格间距 */
+  --mif-gap-option-wide: 10px; /* 比例网格间距 */
+  --mif-gap-field: 12px; /* 字段标签内部间距 */
+  --mif-gap-tight: 5px; /* 上传空态图文间距 / 描述区 */
+  --mif-gap-result: 18px; /* 结果标题内部间距 */
+  --mif-gap-actions: 7px; /* 结果按钮间距 */
+  /* 字号 / 行高 / 字重（参考站本页自有阶梯） */
+  --mif-h2-size: 18px;
+  --mif-h2-lh: 25px;
+  --mif-h2-weight: 700; /* 结果卡标题 */
+  --mif-h2b-size: 18px;
+  --mif-h2b-lh: 24px;
+  --mif-h2b-weight: 750;
+  --mif-h2b-tracking: -.02em; /* 工作区标题 */
+  --mif-h3-size: 15px;
+  --mif-h3-lh: 22px;
+  --mif-h3-weight: 700; /* 卡片标题 */
+  --mif-h4-size: 14px;
+  --mif-h4-lh: 20px;
+  --mif-h4-weight: 700; /* 场景分组 h2 */
+  --mif-body-size: 13px; /* [已清理 2026-10-19] --mif-body-lh: 18px 未被引用 */
+  --mif-body-strong-size: 13px;
+  --mif-body-strong-weight: 600; /* 空态 strong */
+  --mif-label-size: 12px;
+  --mif-label-weight: 700; /* [已清理 2026-10-19] --mif-label-lh: 22px 未被引用 */
+  --mif-sub-size: 12px;
+  --mif-sub-lh: 19px;
+  --mif-sub-lh-2: 18px; /* 工作区副标题 */
+  /* 全站最小字号 12px (docs/typography.md), 参考站的 11px 不沿用 */
+  --mif-small-size: 12px; /* [已清理 2026-10-19] --mif-small-lh: 17px 未被引用 */
+  --mif-tiny-size: 12px;
+  --mif-tiny-lh: 17px;
+  /* 布局尺寸 */
+  --mif-col-min: 360px;
+  --mif-col-max: 410px;
+  --mif-col-narrow: 216px; /* 901-1366px 侧栏压缩宽度 */
+  --mif-col-narrow-max: 432px; /* ≥1367px 控制列上限 */
+  --mif-page-max: 1480px;
+  --mif-panel-min-height: 660px;
+  --mif-stage-min-height: 400px;
+  --mif-upload-min-height: 138px;
+  --mif-upload-min-height-sm: 108px; /* 搭配图槽 */
+  --mif-image-h: 138px; /* 已上传主体图高 */
+  --mif-image-h-sm: 108px; /* 已上传搭配图高 */
+  --mif-cta-h: 43px; /* 主 CTA 高 */
+  --mif-analyze-h: 36px; /* AI 分析按钮高 */
+  --mif-option-h: 34px; /* 变体按钮高 */
+  --mif-result-btn-h: 32px; /* 结果区按钮高 */
+  --mif-back-size: 30px; /* 返回按钮 */
+  --mif-icon-size: 36px; /* 上传图标 */
+  --mif-icon-size-sm: 29px; /* 搭配图槽图标 */
+  --mif-remove-size: 22px; /* 移除按钮 */
+  --mif-thumb-badge: 17px; /* 缩略图序号 */
+  /* 动效（参考站统一 .18s / .24s，本页专属，不受全局动效 token 收拢影响） */
+  --mif-motion-fast: .18s;
+  --mif-motion-img: .24s;
+  --mif-motion-pop: .2s;
+  /* 共享组件 .image-output-settings-* 的字面值（参考站 §5.12） */
+  --mif-settings-summary: #656d7e; /* 高级设置摘要按钮文字 */
+  --mif-settings-summary-label: #454c59; /* 「高级设置」文字 */
+  --mif-settings-chip: #48505e; /* 「比例 1:1」/「画质 1K」胶囊 */
+  --mif-settings-chip-border: #e4e7ef;
+  --mif-settings-caret: #636d80; /* 展开箭头图标 */
+  --mif-settings-group-label: #4e5563; /* 比例/画质分组标题 */
+  --mif-settings-popover-shadow: 0 8px 24px #3d425633;
+  --mif-settings-ratio-option: #5d47ea; /* 画质选中态文字+描边 */
+  --mif-resolution-option: #5d6472; /* 画质未选中态文字 */
+  --mif-resolution-option-border: #e4e6ef;
+  --mif-resolution-option-sub: #666d79; /* 画质副文案 */
+  --mif-option-hover-text: #6255c5; /* 选项按钮 hover 文字 */
+  --mif-result-btn-hover-text: #5f51c6; /* 结果区按钮 hover 文字 */
+  --mif-surface-result-btn: #fffc; /* 结果区按钮半透明白底 */
+  --mif-surface-uploading: #ffffffad; /* 上传中遮罩 */
+  --mif-surface-remove: #27243e9e; /* 图片移除按钮底 */
+  --mif-surface-preview-size: #25223e8f; /* 预览尺寸胶囊底 */
+  --mif-surface-thumb-badge: #24223b9e; /* 缩略图序号底 */
+  --mif-shadow-scene-visual-text: 0 1px 3px #272b4f1f;
+  --mif-text-on-brand: #ffffffd1; /* 主 CTA 副文案 */
+  --mif-surface-submit-ref: #f6f7fb; /* 参考站被覆盖前的 multi-* 提交区底(留档) */
+  --mif-scrollbar-thumb: #d1d5db;
+  --mif-scrollbar-thumb-hover: #9ca3af;
+  --mif-scrollbar-width: 6px;
+  /* mif 页沿用同一口径 (保留旧变量名, 其 5 处 calc 引用不动) */
+  --mif-workspace-topbar-height: var(--workspace-topbar-height);
+  /* 多图融合页 */
+  --mif-border: #e6e4ee;
+  --mif-text-1: #45435b;
+  --mif-text-2: #59616e;
+  --mif-text-3: #6c6a82;
+  --mif-text-4: #6d6b77;
+
+  /* ═════════ 3.4 商品 SKU（sku-*） ═════════ */
+  /* 商品 SKU 页 */
+  --sku-border-brand-1: #604bf0;
+  --sku-border-brand-2: #604bf1;
+  --sku-border-brand-3: #b9aef7;
+  --sku-border-brand-4: #c8bee9;
+  --sku-border-brand-5: #d9d2fb;
+  --sku-border-danger: #ff4d4f;
+  --sku-border-1: #dadde6;
+  --sku-border-2: #d9ddea;
+  --sku-border-3: #dfe2ea;
+  --sku-border-4: #eef0f4;
+  --sku-shadow-brand: #b9aef7;
+  --sku-surface-brand-1: #5744e7;
+  --sku-surface-brand-2: #604bf1;
+  --sku-surface-brand-3: #e9e4ff;
+  --sku-surface-brand-4: #efebff;
+  --sku-surface-brand-5: #f0effd;
+  --sku-surface-brand-6: #f5f2ff;
+  --sku-surface-danger: #fff3f2;
+  --sku-surface-1: #cbd0db;
+  --sku-surface-2: #d9dde6;
+  --sku-surface-3: #eceef4;
+  --sku-surface-4: #f0f2f5;
+  --sku-surface-5: #f1f3f6;
+  --sku-surface-6: #f3f5f8;
+  --sku-text-brand-1: #5b45ee;
+  --sku-text-brand-2: #5d49ed;
+  --sku-text-brand-3: #604bf1;
+  --sku-text-brand-4: #6954e4;
+  --sku-text-danger: #d42c1f;
+  --sku-text-1: #282739;
+  --sku-text-2: #30313e;
+  --sku-text-3: #333a49;
+  --sku-text-4: #3e4755;
+  --sku-text-5: #414759;
+  --sku-text-6: #424958;
+  --sku-text-7: #424b5b;
+  --sku-text-8: #454b59;
+  --sku-text-9: #505869;
+  --sku-text-10: #596374;
+  --sku-text-11: #596678;
+  --sku-text-12: #616b7c;
+  --sku-text-13: #626c7d;
+  --sku-text-14: #676d79;
+  --sku-text-15: #676c77;
+  --sku-text-16: #676d77;
+  --sku-text-17: #676d77;
+  --sku-text-18: #686d75;
+  --sku-text-19: #686d75;
+  --sku-text-20: #686d74;
+  --sku-text-21: #696c74;
+  --sku-text-22: #696d73;
+
+  /* ═════════ 3.5 工具页族（tool-*） ═════════ */
+  /* 工具页族 (pk-* / fc-* / vc-* …) */
+  --tool-border-brand-1: #6b4eff;
+  --tool-border-brand-2: #8b73ff;
+  --tool-border-brand-3: #9888ef;
+  --tool-border-brand-4: #a89bff;
+  --tool-border-brand-5: #d8d0ff;
+  --tool-border-danger: #e5484d;
+  --tool-border-1: #a9a4b2;
+  --tool-border-2: #b8b4c1;
+  --tool-border-3: #dedbea;
+  --tool-border-4: #d9dee8;
+  --tool-border-5: #e1e5ed;
+  --tool-border-6: #e3e6ed;
+  --tool-border-7: #e6e8ef;
+  --tool-border-8: #f0eff5;
+  --tool-border-9: #edf0f5;
+  --tool-surface-brand-1: #e4deff;
+  --tool-surface-brand-2: #fafbfe;
+  --tool-surface-danger: #c26f78;
+  --tool-surface-1: #d5d9e0;
+  --tool-surface-2: #dedce5;
+  --tool-surface-3: #e3e5ee;
+  --tool-surface-4: #e5e7eb;
+  --tool-surface-5: #eceaf0;
+  --tool-surface-6: #eceef3;
+  --tool-surface-7: #eceef5;
+  --tool-surface-8: #edf0f5;
+  --tool-surface-9: #f3f4f9;
+  --tool-surface-10: #f5f4f7;
+  --tool-surface-11: #f5f6fa;
+  --tool-surface-12: #fafafa;
+  --tool-text-brand-1: #5b3ff2;
+  --tool-text-brand-2: #694dfa;
+  --tool-text-danger: #d22e34;
+  --tool-text-1: #1f2430;
+  --tool-text-2: #636d7e;
+  --tool-text-3: #666d7b;
+  --tool-text-4: #656d7a;
+  --tool-text-5: #666d7a;
+  --tool-text-6: #6f6a7c;
+  --tool-text-7: #b8bec8;
+
+  /* ═════════ 3.6 素材库（alp-*） ═════════ */
+  /* 素材库页 */
+  --alp-border-brand-1: #6353eb;
+  --alp-border-brand-2: #7668ef;
+  --alp-border-brand-3: #8275ef;
+  --alp-border-brand-4: #9c91f1;
+  --alp-border-brand-5: #a69bef;
+  --alp-border-brand-6: #d8d1ff;
+  --alp-border-1: #c7cbd8;
+  --alp-border-2: #d8dbe5;
+  --alp-border-3: #d9dce8;
+  --alp-border-4: #e2e5ed;
+  --alp-border-6: #e3e6ee;
+  --alp-border-7: #e5e8f0;
+  --alp-border-8: #eef0f5;
+  --alp-shadow-brand: #8275ef;
+  --alp-surface-brand-1: #4738c5;
+  --alp-surface-brand-2: #6353eb;
+  --alp-surface-brand-3: #efeffa;
+  --alp-surface-brand-4: #f4f2ff;
+  --alp-surface-brand-6: #f7f8fd;
+  --alp-surface-info: #fbfcfe;
+  --alp-surface-1: #e7e9ef;
+  --alp-surface-2: #f3f4f7;
+  --alp-text-brand-1: #5545d7;
+  --alp-text-brand-2: #5848da;
+  --alp-text-1: #30364a;
+  --alp-text-2: #343b50;
+  --alp-text-3: #4b556a;
+  --alp-text-4: #4d5568;
+  --alp-text-5: #5f687b;
+  --alp-text-6: #5f687d;
+  --alp-text-7: #636d82;
+  --alp-text-8: #656d7d;
+  --alp-text-9: #676c7a;
+  --alp-text-10: #676d79;
+  --alp-text-11: #676d77;
+  --alp-text-12: #686c75;
+  --alp-text-13: #686d75;
+
+  /* ═════════ 3.7 手机上传（mup-* / mum-*） ═════════ */
+  /* 手机上传页 */
+  --mup-border-brand: #bdb4e8;
+  --mup-surface-brand-1: #5e48c7;
+  --mup-surface-brand-2: #eeeaff;
+  --mup-surface-brand-3: #f1edff;
+  --mup-surface-brand-4: #f6f4fb;
+  --mup-surface-brand-5: #faf9ff;
+  --mup-surface-danger: #fff0f1;
+  --mup-surface-info: #eef7ff;
+  --mup-surface: #f3f2f6;
+  --mup-surface-success: #edf8f1;
+  --mup-text-brand-1: #6d55dc;
+  --mup-text-brand-2: #6f5ace;
+  --mup-text-danger-1: #bd3540;
+  --mup-text-danger-2: #bb4854;
+  --mup-text-1: #282431;
+  --mup-text-2: #292533;
+  --mup-text-3: #706b78;
+  --mup-text-4: #6f697f;
+  --mup-text-5: #6f6a77;
+  --mup-text-success-1: #227c47;
+  --mup-text-success-2: #227c47;
+  /* 手机上传合并页 */
+  --mum-border: #ebe8f4;
+  --mum-surface-brand-1: #6849d8;
+  --mum-surface-brand-2: #faf9fd;
+  --mum-surface: #f4f4f7;
+  --mum-text-brand: #6550c9;
+  --mum-text-danger: #c33c45;
+  --mum-text-1: #24212f;
+  --mum-text-2: #666666;
+  --mum-text-3: #6e6b76;
+
+  /* ═════════ 3.8 认证（login-*） ═════════ */
+  /* 登录页 */
+  --login-border-brand: #c3bdf5;
+  --login-surface-brand-1: #4a3ac0;
+  --login-surface-brand-2: #a49ee6;
+  --login-surface-brand-3: #b9b2f7;
+  --login-surface-brand-4: #e6e0ff;
+  --login-surface-brand-5: #efeaff;
+  --login-surface-brand-6: #f6f2ff;
+
+  /* ═════════ 3.9 首页（lp-*） ═════════ */
+  /* 首页 */
+  --lp-border-brand: #d8d2ff;
+  --lp-text-1: #1f2329;
+  --lp-text-2: #676d79;
+
+  /* ═════════ 3.10 网站地图（sitemap-*） ═════════ */
+  /* 网站地图四组的编号色 (2026-11-03 从页面内联 hex 收到令牌)
+       第一组直接用品牌紫 —— 原 #625DF5 是 2026-10-17 已收拢的近似紫之一, 不再单列。
+       其余三色是分类色 (不是品牌 / 状态色), 原值在白底只有 2.64–2.95:1,
+       按 12px 文字压到 4.98:1; 在 --page-bg / --surface 上也均 ≥4.5:1。 */
+  --sitemap-accent-1: var(--brand);
+  --sitemap-accent-2: #1f7a8c;
+  --sitemap-accent-3: #bf4a1e;
+  --sitemap-accent-4: #287d66;
+}

@@ -14,7 +14,6 @@ import type { TemplateCatalogCategory } from './api';
 export interface TemplateEntry {
   id: string;
   name: string;
-  prompt: string;
   thumbFile: string;
   tags: string[];
   categoryId: string;

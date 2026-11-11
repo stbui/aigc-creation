@@ -19,7 +19,7 @@
 - 不是 C 端账号设置页（那是 `/account` `/works` `/library` `/stats` 的职责）。
 - 不是公开 UGC 审核平台：素材库按 `ownerId` 私有，无公开内容流。
 - 不是支付凭据的查看台：后台可维护支付适配器的版本化配置，但密钥明文永不回显，只给「是否已配置」。
-- 不复用 C 端外壳：`AppLayout` / `SideRail` / `PromoBar` 都是消费级语义，后台用独立外壳 `admin-ui/shell/AdminBoardLayout`。
+- 不复用 C 端外壳：`AppLayout` / `SideRail` 都是消费级语义，后台用独立外壳 `admin-ui/shell/AdminBoardLayout`。
 
 ## 2. 信息架构
 
@@ -210,7 +210,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
 | 类型 | `types/api.d.ts` 的 `Admin*` 段 |
 | 组件 | 通用骨架走 `admin-ui/primitives`（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），底层是 shadcn 原子件；后台树内不引 antd，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |
-| 样式 | 只用 `global.css` 的 token，禁裸 hex；不做移动端适配 |
+| 样式 | 只用 `tokens.css` 的 token，禁裸 hex；不做移动端适配 |
 
 ## 7. 明确不做
 

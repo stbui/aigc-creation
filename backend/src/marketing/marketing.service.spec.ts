@@ -294,6 +294,8 @@ describe('MarketingService 优惠券与活动删除', () => {
         findUnique: vi.fn(),
         delete: vi.fn(),
       },
+      // 删除预检还要数限时免费账单（BillingOrder.promotionId）
+      billingOrder: { count: vi.fn().mockResolvedValue(0) },
     };
     service = new MarketingService(prisma as never, { grant: vi.fn() } as never);
   });

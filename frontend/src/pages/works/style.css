@@ -18,6 +18,33 @@
    - 卡片 = 方形缩略图 + 白底文案脚注, 能力名 / 时间 / 尺寸移到图片下方, 网格行高一致;
    - 所有颜色回落设计令牌 (--brand / --border / --surface / --text-*), 不写裸 hex。
    ───────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
+  .my-works-filter-popover,
+  .my-works-filter-popover.my-works-business-popover,
+  .my-works-filter-popover.my-works-date-popover,
+  .my-works-filter-popover.my-works-status-popover,
+  .my-works-filter-popover.my-works-task-popover {
+    position: fixed;
+    top: auto;
+    right: auto;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(342px, calc(100vw - 24px));
+    max-height: min(70vh, 540px);
+    overflow-y: auto;
+  }
+
+  .my-works-custom-date .my-works-date-fields {
+    flex-wrap: wrap;
+  }
+
+  .my-works-custom-date .my-works-date-fields input {
+    min-width: 0;
+  }
+}
+
 .my-works-page {
   display: flex;
   flex-direction: column;
@@ -174,7 +201,7 @@
 
 /* 展开与「已选筛选」共用一个激活态: 品牌色描边 + 品牌淡底, 不再混入参考站的蓝色系 */
 .my-works-filter-trigger.active,
-.my-works-filter-trigger.is-open {
+  .my-works-filter-trigger.is-open {
   border-color: var(--brand);
   background: var(--brand-bg);
   color: var(--brand);
@@ -293,16 +320,16 @@
 }
 
 .my-works-option-chips,
-.my-works-date-pills,
-.my-works-status-pills {
+  .my-works-date-pills,
+  .my-works-status-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .my-works-option-chip,
-.my-works-date-pills button,
-.my-works-status-pills button {
+  .my-works-date-pills button,
+  .my-works-status-pills button {
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -315,15 +342,15 @@
 }
 
 .my-works-option-chip:hover,
-.my-works-date-pills button:hover,
-.my-works-status-pills button:hover {
+  .my-works-date-pills button:hover,
+  .my-works-status-pills button:hover {
   border-color: var(--border-hover);
   color: var(--text-body);
 }
 
 .my-works-option-chip.selected,
-.my-works-date-pills button.selected,
-.my-works-status-pills button.selected {
+  .my-works-date-pills button.selected,
+  .my-works-status-pills button.selected {
   border-color: var(--brand);
   background: var(--brand-bg);
   color: var(--brand);
@@ -787,7 +814,7 @@
 }
 
 .my-work-card:hover .my-work-hover-actions,
-.my-work-card:focus-within .my-work-hover-actions {
+  .my-work-card:focus-within .my-work-hover-actions {
   opacity: 1;
 }
 
@@ -797,7 +824,7 @@
 }
 
 .my-work-hover-top,
-.my-work-hover-bottom {
+  .my-work-hover-bottom {
   display: flex;
   gap: 6px;
   /* 容器本身也不吃点击, 否则底部长条会盖住图片下半部分的「看大图 / 播放」 */
@@ -865,14 +892,14 @@
 }
 
 .my-work-card:hover .my-work-check span,
-.my-work-check:hover span {
+  .my-work-check:hover span {
   border-color: rgba(23, 26, 43, 0.22);
   background: rgba(255, 255, 255, 0.96);
 }
 
 /* 选中态要压过上面的悬停白底 (选择器权重比 .my-work-card:hover 高一级) */
 .my-work-card .my-work-check input:checked + span,
-.my-work-card:hover .my-work-check input:checked + span {
+  .my-work-card:hover .my-work-check input:checked + span {
   border-color: var(--brand);
   background: var(--brand);
 }

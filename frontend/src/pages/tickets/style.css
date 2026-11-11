@@ -2,12 +2,48 @@
  * 我的工单页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
  *
  * 只放本页独占选择器；共享组件（AppLayout / 登录弹窗 / SideRail 等）
- * 与设计令牌仍留在 `styles/global.css`。
+ * 与设计令牌（`styles/tokens.css`）仍留在全局样式层。
  */
 
 /* ───────── 我的工单 (B7) ───────── */
 
 /* 状态胶囊: 前置圆点跟随文字色, 四态只换底色不改形状 */
+
+.ticket-load-more {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 8px;
+}
+
+@media (max-width: 900px) {
+  .ticket-compose {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .ticket-compose label.is-full {
+    grid-column: auto;
+  }
+
+  .ticket-compose-actions {
+    grid-column: auto;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .ticket-reply-actions .ui-btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .ticket-compose-actions .ui-btn {
+    flex: 1 1 auto;
+  }
+}
+
 .ticket-status {
   display: inline-flex;
   align-items: center;
@@ -154,7 +190,7 @@
 /* 字数统计默认绝对定位在输入框下沿, 会压到按钮行上; 改常规流内右对齐。
    兼容壳输出的是 .login-textarea-count（.ant-input-data-count 已随 antd 移除）。 */
 .ticket-compose .login-textarea-count,
-.ticket-reply .login-textarea-count {
+  .ticket-reply .login-textarea-count {
   position: static;
   display: block;
   padding: 2px 2px 0;

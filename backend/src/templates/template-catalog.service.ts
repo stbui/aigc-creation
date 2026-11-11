@@ -287,7 +287,14 @@ export class TemplateCatalogService {
     if (!buffer?.length) throw new AppError(40001, '请选择要上传的图片', 400);
 
     const info = inspectUploadedImage(buffer, { maxBytes: maxUploadBytes() });
-    await verifyDecodableImage(buffer, info);
+    /*
+     * Jimp 1.6 没有内置 WebP 解码器；WebP 已经过文件头、尺寸与像素上限校验，
+     * 存储与浏览器展示不依赖服务端解码，故跳过 Jimp 二次解码。
+     * PNG / JPEG 仍保持完整解码校验。
+     */
+    if (info.mime !== 'image/webp') {
+      await verifyDecodableImage(buffer, info);
+    }
 
     const provider = this.storage.getActive();
     const key = this.storage.buildKey('templates', info.ext);
@@ -313,17 +320,22 @@ export class TemplateCatalogService {
 
   // ── 内部 ──
 
+  /**
+   * C 端目录条目：**不下发 prompt**。
+   *
+   * `/template/templates` 是免登录公开接口，提示词是模板的商业资产，
+   * 前端只传 `templateId`，生成侧由 `Template.buildPrompt` 按 id 查回风格描述。
+   * 后台编辑仍通过 `adminItem()` 拿到完整 prompt。
+   */
   private async publicItem(item: {
     id: string;
     name: string;
-    prompt: string;
     imageUrl: string;
     tags: string;
   }) {
     return {
       id: item.id,
       name: item.name,
-      prompt: item.prompt,
       thumbFile: (await this.settingImages.displayUrl(item.imageUrl)) ?? item.imageUrl,
       tags: parseTemplateTags(item.tags),
     };

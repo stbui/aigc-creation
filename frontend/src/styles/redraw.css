@@ -55,63 +55,11 @@
   display: none;
 }
 
-.redraw-mask-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.redraw-mask-brush {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-body);
-}
-
-.redraw-mask-brush input[type='range'] {
-  width: 96px;
-  accent-color: var(--brand);
-}
-
-.redraw-toolbar-sep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--border);
-}
-
 .redraw-zoom-value {
   min-width: 40px;
   text-align: center;
   font-size: 12px;
   color: var(--text-body);
-}
-
-.redraw-desc-editor {
-  align-items: flex-start;
-}
-
-.redraw-desc-editor + .redraw-desc-editor {
-  margin-top: 8px;
-}
-
-.redraw-desc-label {
-  flex: 0 0 auto;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--brand-active);
-  padding-top: 8px;
-}
-
-.redraw-desc-label.is-pending {
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.redraw-desc-label.is-marked {
-  color: var(--brand-active);
 }
 
 /* 局部重绘标注卡：每条标注 = 标题行 + 描述 + 区域缩略图 + 参考图上传 */
@@ -127,14 +75,6 @@
 
 .redraw-prompt + .redraw-prompt {
   margin-top: 8px;
-}
-
-.redraw-prompt-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 20px;
 }
 
 .redraw-prompt-label {
@@ -160,13 +100,6 @@
 
 .redraw-prompt .pk-desc-expand {
   position: static;
-}
-
-.redraw-prompt-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px;
-  gap: 8px;
-  align-items: stretch;
 }
 
 .redraw-prompt textarea {
@@ -196,99 +129,7 @@
   margin-top: 6px;
 }
 
-.redraw-prompt-ref {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--card-bg);
-  color: var(--text-desc);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.redraw-prompt-ref:hover {
-  color: var(--brand);
-  border-color: var(--brand-light);
-}
-
-.redraw-prompt-ref:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.redraw-prompt-ref-preview {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-
-.redraw-prompt-ref-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.redraw-prompt-ref-preview button {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 14px;
-  height: 14px;
-  padding: 0;
-  border: 0;
-  border-radius: 0 0 0 6px;
-  background: rgba(0, 0, 0, 0.62);
-  color: var(--card-bg);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
 /* 对比弹窗 */
-.redraw-compare-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.redraw-compare-grid figure {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.redraw-compare-grid img,
-.redraw-compare-missing {
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: contain;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tag);
-}
-
-.redraw-compare-missing {
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.redraw-compare-grid figcaption {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-  text-align: center;
-}
 
 /* 未上传图片时的中栏引导：与参考站同款的演示视频 (自托管 /static/mp4/)。
  * 视频必须落本地并静音, 否则浏览器自动播放策略会停在首帧。 */
@@ -326,40 +167,6 @@
   font-size: 12px;
   line-height: 20px;
   color: var(--text-muted);
-}
-
-.redraw-intro-steps {
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-}
-
-.redraw-intro-steps li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: var(--brand-bg);
-  color: var(--text-body);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.redraw-intro-steps b {
-  width: 18px;
-  height: 18px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--brand);
-  color: var(--card-bg);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 /* 上传后的画布舞台 */
@@ -689,7 +496,7 @@
 }
 
 .pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-transform,
-.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-bg {
+  .pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-bg {
   width: 100%;
   height: 100%;
 }
@@ -703,8 +510,8 @@
 /* 提交期间画布保持可见（避免 402 等确定性拒绝后丢标注），
  * 但锁住指针交互，反馈由提交按钮的「生成中…」承担。 */
 .pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-canvas-wrap,
-.pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-canvas-footer,
-.pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-toolbar {
+  .pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-canvas-footer,
+  .pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-toolbar {
   pointer-events: none;
   opacity: 0.72;
 }
@@ -722,7 +529,7 @@
 }
 
 .pk-workspace.local-redraw-page .redraw-result-stage .stage-actions button,
-.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions a {
+  .pk-workspace.local-redraw-page .redraw-result-stage .stage-actions a {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -741,7 +548,7 @@
 }
 
 .pk-workspace.local-redraw-page .redraw-result-stage .stage-actions button:hover:not(:disabled),
-.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions a:hover {
+  .pk-workspace.local-redraw-page .redraw-result-stage .stage-actions a:hover {
   background: var(--brand-bg);
 }
 
@@ -786,7 +593,7 @@
 }
 
 .pk-workspace.local-redraw-page .redraw-result-download:hover,
-.pk-workspace.local-redraw-page .redraw-result-download:focus-visible {
+  .pk-workspace.local-redraw-page .redraw-result-download:focus-visible {
   background: var(--brand);
   outline: none;
   transform: translateY(-1px);
@@ -1067,6 +874,6 @@
 }
 
 .pk-workspace.local-redraw-page .redraw-mask-overlay.tool-brush,
-.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-eraser {
+  .pk-workspace.local-redraw-page .redraw-mask-overlay.tool-eraser {
   cursor: none;
 }

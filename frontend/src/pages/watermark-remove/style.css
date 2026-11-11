@@ -5,6 +5,157 @@
  * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
  */
 
+/* 局部重绘 / 去水印：左输入 / 中画布 / 右历史 */
+
+.pk-workspace.watermark-removal-page {
+  box-sizing: border-box;
+  height: calc(100vh - var(--workspace-topbar-height));
+  min-height: 0;
+  max-height: calc(100vh - var(--workspace-topbar-height));
+  padding: 16px;
+  gap: 16px;
+  grid-template-columns: 432px minmax(560px, 1fr) 192px;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  color: var(--wb-text);
+  background: var(--page-bg);
+  overflow: hidden;
+}
+
+.pk-workspace.watermark-removal-page .pk-input-pane,
+  .pk-workspace.watermark-removal-page .pk-result-pane {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 1500px) {
+  .pk-workspace.watermark-removal-page {
+    grid-template-columns: 390px minmax(520px, 1fr) 176px;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1366px) {
+  .pk-workspace.watermark-removal-page {
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr) 192px;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-section-title {
+    font-size: 12px;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-upload-prompt small {
+    font-size: 12px;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-upload-title-row {
+    gap: 4px;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-upload-title-actions {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .pk-workspace.watermark-removal-page {
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+  }
+
+  .pk-workspace.watermark-removal-page > .redraw-history-pane {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.watermark-removal-page {
+    box-sizing: border-box;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    margin: -16px -10px -24px;
+    padding: 16px;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    align-content: start;
+    overflow: visible;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-input-pane,
+  .pk-workspace.watermark-removal-page .pk-result-pane {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-result-pane {
+    min-height: 720px;
+  }
+}
+
+/* 上传区底色与虚线边：参考站 .local-redraw-source-upload 实测
+   #f6f7f9 / #d9dee8，不能沿用商品主图页的 --surface #f2f4f7。 */
+
+.pk-workspace.watermark-removal-page .pk-dropzone {
+  background: var(--surface-5);
+  border-color: var(--tool-border-4);
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.watermark-removal-page .pk-form-card {
+    height: auto;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-form-scroll {
+    flex: none;
+    overflow: visible;
+  }
+}
+
+/* 上传区内部留白：参考站桌面 .local-redraw-source-upload 为 padding:0，
+ * 产品系移动端再补回 16px；不能统一沿用商品主图页的 16px。 */
+
+.pk-workspace.watermark-removal-page .pk-dropzone {
+  padding: 0;
+  gap: 8px;
+}
+
+.pk-workspace.watermark-removal-page .pk-thumb-grid-single {
+  width: 160px;
+  max-width: 100%;
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.watermark-removal-page .pk-input-pane,
+  .pk-workspace.watermark-removal-page .pk-form-card {
+    display: block;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-form-scroll {
+    display: grid;
+    margin-bottom: 10px;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-input-pane {
+    height: max-content;
+  }
+
+  .pk-workspace.watermark-removal-page {
+    height: auto;
+    max-height: none;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-form-scroll {
+    margin-bottom: 12px;
+  }
+
+  .pk-workspace.watermark-removal-page .pk-submit-actions {
+    padding: 12px 14px 14px;
+  }
+}
+
 .annotation-mark-preview {
   position: relative;
   width: 64px;
@@ -195,7 +346,7 @@
 }
 
 .pk-workspace.watermark-removal-page .annotation-remove:hover,
-.pk-workspace.watermark-removal-page .annotation-remove:focus-visible {
+  .pk-workspace.watermark-removal-page .annotation-remove:focus-visible {
   background: rgba(31, 35, 41, 0.92);
   outline: none;
 }

@@ -139,12 +139,13 @@ aigc-creation/
         ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
         ├── pages/              # 35 个 C 端页面 + pages/admin/ 34 个后台页面
         ├── admin-ui/           # 后台 UI：components/ui（shadcn 原子件）/ primitives（页面唯一取用层）/ shell / providers / hooks / lib
-        ├── layout/             # C 端外壳：AppLayout（组合）/ AppHeader / AppSidebar / SideRail / PromoBar
+        ├── layout/             # C 端外壳：AppLayout（组合）/ AppHeader / AppSidebar / SideRail
         │                       #   NotificationBell / UserAccountMenu / GuestPromoDialog / RouteExperience / hooks.ts
         ├── components/         # ToolShell / 共享弹窗与页面片段；admin/（adminNav、AlertCenter、DutyContext、statusMeta）
         ├── lib/                # api.ts（拆信封）/ http.ts / auth.ts / capabilities.ts / constants.ts
         ├── context/ hooks/     # AuthContext / AdminContext（权限点）/ CreditsContext；共享 hook（index.ts 统一出口）
-        └── styles/             # global.css（★ 设计令牌）+ admin.css（后台 Tailwind 入口，无 preflight）
+        └── styles/             # global.css（分层入口）+ tokens.css（★ 设计令牌）+ base.css
+                                # + tool-workspace.css / ui-compat.css + admin.css（后台 Tailwind 入口，无 preflight）
 ```
 
 逐模块注释的完整目录树见 `CLAUDE.md`「目录结构」。

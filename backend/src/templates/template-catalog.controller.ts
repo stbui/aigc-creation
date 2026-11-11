@@ -8,6 +8,9 @@ import { TemplateCatalogService } from './template-catalog.service';
  * 数据源是数据库里的 `TemplateCategory → TemplateGroup → TemplateItem`，
  * 由后台「写真模板」页维护。这里只下发启用中的分类/分组/模板，
  * 图片地址在服务端解析成当前可访问的预览地址。
+ *
+ * 不下发 `prompt`：提示词是模板的商业资产，且本接口免登录；
+ * 生成时由服务端按 `templateId` 查回，无需客户端持有。
  */
 @Controller('template')
 export class TemplateCatalogController {

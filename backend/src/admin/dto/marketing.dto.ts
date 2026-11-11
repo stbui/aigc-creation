@@ -38,6 +38,8 @@ export const COUPON_STATUSES = ['on', 'off'] as const;
 export const CAMPAIGN_TYPES = ['limited_price', 'limited_free', 'popup'] as const;
 /** 活动状态 */
 export const CAMPAIGN_STATUSES = ['draft', 'active', 'ended', 'off'] as const;
+/** 活动派生生效态（后台列表/筛选展示口径，与人工 status 分开） */
+export const CAMPAIGN_EFFECTIVES = ['draft', 'live', 'scheduled', 'ended', 'off'] as const;
 /** 邀请奖励触发时机 */
 export const INVITE_TRIGGERS = ['first_pay', 'register'] as const;
 
@@ -133,9 +135,15 @@ export class CampaignListQueryDto extends PageQueryDto {
   @IsIn(CAMPAIGN_TYPES, { message: 'type 取值非法' })
   type?: string;
 
+  /** 人工开关状态。保留给旧深链/API 调用方；页面筛选改用 effective */
   @IsOptional()
   @IsIn(CAMPAIGN_STATUSES, { message: 'status 取值非法' })
   status?: string;
+
+  /** 派生生效态，与后台列表「状态」列同口径 */
+  @IsOptional()
+  @IsIn(CAMPAIGN_EFFECTIVES, { message: 'effective 取值非法' })
+  effective?: string;
 
   @IsOptional()
   @IsString()

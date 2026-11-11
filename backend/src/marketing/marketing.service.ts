@@ -5,6 +5,7 @@ import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { CreditService } from '../credits/credit.service';
 import { Prisma } from '@prisma/client';
 import { lockUserRow } from '../account/user-row-lock';
+import { getCapability } from '../capabilities/capability.registry';
 
 /**
  * 营销中心 (M11 · admin-prd.md B-64~B-67 / admin-detailed-design.md §12)。
@@ -663,6 +664,7 @@ export class MarketingService {
     pageSize?: number;
     type?: string;
     status?: string;
+    effective?: string;
     keyword?: string;
   }) {
     const page = Math.max(1, query.page ?? 1);
@@ -670,6 +672,7 @@ export class MarketingService {
     const skip = (page - 1) * pageSize;
 
     const where = this.campaignWhere(query);
+    const now = new Date();
 
     const [rows, total, activeCount] = await Promise.all([
       this.prisma.campaign.findMany({
@@ -682,13 +685,28 @@ export class MarketingService {
       this.prisma.campaign.count({ where }),
       // 进行中数量单独算: 它取决于**当前时间**而非 status 字段, 列表页要如实反映
       this.prisma.campaign.count({
-        where: { status: 'active', startAt: { lte: new Date() }, endAt: { gte: new Date() } },
+        where: { status: 'active', startAt: { lte: now }, endAt: { gte: now } },
       }),
     ]);
 
-    const now = new Date();
+    /*
+     * 限时免费活动不走 Order.campaignId，而是把活动 id 写进 BillingOrder.promotionId。
+     * 只数订单会让「已被大量使用过的免费活动」显示可删除，删完 0 积分账单归因悬空。
+     */
+    const billingRows =
+      rows.length > 0
+        ? await this.prisma.billingOrder.groupBy({
+            by: ['promotionId'],
+            where: { promotionId: { in: rows.map((c) => c.id) } },
+            _count: { _all: true },
+          })
+        : [];
+    const billingByCampaign = new Map(
+      billingRows.map((r) => [r.promotionId, r._count._all] as const),
+    );
+
     return {
-      items: rows.map((c) => this.toCampaignView(c, now)),
+      items: rows.map((c) => this.toCampaignView(c, now, billingByCampaign.get(c.id) ?? 0)),
       total,
       page,
       pageSize,
@@ -707,6 +725,7 @@ export class MarketingService {
   async exportCampaigns(query: {
     type?: string;
     status?: string;
+    effective?: string;
     keyword?: string;
   }): Promise<string> {
     const rows = await this.prisma.campaign.findMany({
@@ -732,21 +751,44 @@ export class MarketingService {
     );
   }
 
-  /** 活动列表与导出共用的筛选条件 */
+  /**
+   * 活动列表与导出共用的筛选条件。
+   *
+   * `status` 是人工开关（保留给旧深链与 API 调用方），`effective` 是列表实际
+   * 展示的派生生效态。两者可单独使用；同时传入时按 AND 收窄，不做隐式覆盖。
+   * 派生条件必须与 `toCampaignView` 的分支一一对应，否则「筛出来的和看到的不一致」。
+   */
   private campaignWhere(query: {
     type?: string;
     status?: string;
+    effective?: string;
     keyword?: string;
   }): Prisma.CampaignWhereInput {
+    const now = new Date();
+    const effectiveWhere: Prisma.CampaignWhereInput =
+      query.effective === 'live'
+        ? { status: 'active', startAt: { lte: now }, endAt: { gte: now } }
+        : query.effective === 'scheduled'
+          ? { status: 'active', startAt: { gt: now } }
+          : query.effective === 'ended'
+            ? { OR: [{ status: 'ended' }, { status: 'active', endAt: { lt: now } }] }
+            : query.effective === 'draft'
+              ? { status: 'draft' }
+              : query.effective === 'off'
+                ? { status: 'off' }
+                : {};
     return {
       ...(query.type ? { type: query.type } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...effectiveWhere,
       ...(query.keyword ? { name: { contains: query.keyword } } : {}),
     };
   }
 
   async createCampaign(dto: any) {
     this.validateCampaign(dto);
+    // 直接以 active 落库等同于立即投放，配置不可执行时不能静默上线
+    if ((dto.status ?? 'draft') === 'active') await this.assertCampaignExecutable(dto);
     const created = await this.prisma.campaign.create({
       data: {
         name: dto.name.trim(),
@@ -772,6 +814,9 @@ export class MarketingService {
       payload: dto.payload ?? this.parseJson<Record<string, unknown>>(existing.payload, {}),
     };
     this.validateCampaign(merged);
+    if ((dto.status ?? existing.status) === 'active') {
+      await this.assertCampaignExecutable({ type: merged.type, payload: merged.payload });
+    }
 
     const updated = await this.prisma.campaign.update({
       where: { id },
@@ -790,12 +835,31 @@ export class MarketingService {
     return this.toCampaignView(updated, new Date());
   }
 
-  async disableCampaign(id: string) {
+  /**
+   * 启停切换：active → off（下线），其余 draft / ended / off → active（上线）。
+   *
+   * 旧实现是「off ↔ 非 off 一律 off」的翻转：草稿活动点「下线」要先变 off，
+   * 再点一次才投放；已过期的活动「上线」后 C 端按时间窗仍然不展示，
+   * 下一轮调度又把它打回 ended —— toast 说「状态已切换」，实际什么都没发生。
+   */
+  async toggleCampaign(id: string) {
     const existing = await this.prisma.campaign.findUnique({ where: { id } });
     if (!existing) throw new AppError(40400, '活动不存在', 404);
+    const next = existing.status === 'active' ? 'off' : 'active';
+
+    if (next === 'active') {
+      if (existing.endAt.getTime() <= Date.now()) {
+        throw new AppError(40001, '活动结束时间已过，请先在编辑里延长活动周期再上线', 400);
+      }
+      await this.assertCampaignExecutable({
+        type: existing.type,
+        payload: this.parseJson<Record<string, unknown>>(existing.payload, {}),
+      });
+    }
+
     const updated = await this.prisma.campaign.update({
       where: { id },
-      data: { status: existing.status === 'off' ? 'active' : 'off' },
+      data: { status: next },
     });
     return this.toCampaignView(updated, new Date());
   }
@@ -819,12 +883,18 @@ export class MarketingService {
     if (!existing) throw new AppError(40400, '活动不存在', 404);
 
     const orderCount = existing._count.orders;
-    if (orderCount > 0) {
-      throw new AppError(
-        40901,
-        `该活动已有 ${orderCount} 笔关联订单，不能删除；请改为下线`,
-        409,
-      );
+    // 限时免费不写 Order.campaignId，只把活动 id 落在 BillingOrder.promotionId 上
+    const billingCount = await this.prisma.billingOrder.count({
+      where: { promotionId: id },
+    });
+    if (orderCount + billingCount > 0) {
+      const parts = [
+        orderCount > 0 ? `${orderCount} 笔关联订单` : '',
+        billingCount > 0 ? `${billingCount} 笔限时免费账单` : '',
+      ]
+        .filter(Boolean)
+        .join('、');
+      throw new AppError(40901, `该活动已有 ${parts}，不能删除；请改为下线`, 409);
     }
 
     try {
@@ -878,6 +948,54 @@ export class MarketingService {
   }
 
   /**
+   * 上线前的可执行性校验。字段齐全 ≠ 活动能生效：商品不存在/已下架、
+   * 活动价不低于原价、能力 id 拼错，C 端 `activeCampaigns` 与结算链路都会
+   * 静默跳过，后台却显示「进行中」。这类配置必须在投放前拦下来。
+   *
+   * 只在「落库即为 active」或「切到 active」时执行，草稿/已下线仍可自由编辑，
+   * 免得运营连修正历史配置都保存不了。
+   */
+  private async assertCampaignExecutable(dto: {
+    type: string;
+    payload?: Record<string, unknown>;
+  }): Promise<void> {
+    const payload = dto.payload ?? {};
+    if (dto.type === 'limited_price') {
+      const productId = String(payload.productId ?? '');
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: { priceCents: true, status: true },
+      });
+      if (!product) {
+        throw new AppError(40001, `目标商品不存在（${productId}），活动上线后不会生效`, 400);
+      }
+      if (product.status !== 'active') {
+        throw new AppError(
+          40001,
+          `目标商品当前为「${product.status}」，活动上线后不会生效；请先上架商品`,
+          400,
+        );
+      }
+      const priceCents = payload.priceCents;
+      if (typeof priceCents !== 'number' || priceCents >= product.priceCents) {
+        throw new AppError(
+          40001,
+          `活动价必须低于商品原价（¥${(product.priceCents / 100).toFixed(2)}），否则 C 端不会展示`,
+          400,
+        );
+      }
+    } else if (dto.type === 'limited_free') {
+      const ids = Array.isArray(payload.capabilityIds)
+        ? (payload.capabilityIds as unknown[]).map(String)
+        : [];
+      const unknown = ids.filter((id) => !getCapability(id));
+      if (unknown.length > 0) {
+        throw new AppError(40001, `未知能力 ID：${unknown.join(', ')}`, 400);
+      }
+    }
+  }
+
+  /**
    * 找出当前对指定商品生效的限时价活动。
    *
    * 多个限时价同时命中同一商品时取**最低价** —— 与券的"不叠加取更优"同一取向。
@@ -918,7 +1036,7 @@ export class MarketingService {
     return best;
   }
 
-  /** 当前生效的弹窗活动 (C 端 PromoBar / 落地页弹窗位) */
+  /** 当前生效的弹窗活动 (C 端游客新人弹窗 / 落地页弹窗位) */
   async activePopupCampaign(userId?: string): Promise<{
     id: string;
     title: string;
@@ -984,6 +1102,8 @@ export class MarketingService {
       product?: { id: string; sku: string; name: string; priceCents: number };
       priceCents?: number;
       capabilityIds?: string[];
+      /** 定向新客活动：匿名展示时必须标注，不能承诺「0 积分」 */
+      onlyNewUsers?: boolean;
     }>
   > {
     const now = new Date();
@@ -1021,11 +1141,16 @@ export class MarketingService {
       product?: { id: string; sku: string; name: string; priceCents: number };
       priceCents?: number;
       capabilityIds?: string[];
+      /** 定向新客活动：匿名展示时必须标注，不能承诺「0 积分」 */
+      onlyNewUsers?: boolean;
     }> = [];
 
     for (const c of rows) {
       // 匿名访问保留“仅新用户”活动用于拉新；已登录用户则必须按真实新客状态过滤。
       if (!this.audienceMatches(c.audience, eligibleNewUser)) continue;
+      const onlyNewUsers = Boolean(
+        this.parseJson<{ onlyNewUsers?: boolean }>(c.audience, {}).onlyNewUsers,
+      );
       if (c.type === 'limited_price') {
         const payload = this.parseJson<{ productId?: string; priceCents?: number }>(c.payload, {});
         const product = payload.productId ? productById.get(payload.productId) : undefined;
@@ -1052,6 +1177,7 @@ export class MarketingService {
           startAt: c.startAt.toISOString(),
           endAt: c.endAt.toISOString(),
           capabilityIds,
+          ...(onlyNewUsers ? { onlyNewUsers: true } : {}),
         });
       }
     }
@@ -1094,16 +1220,29 @@ export class MarketingService {
     return res.count;
   }
 
-  private toCampaignView(c: any, now: Date) {
+  private toCampaignView(c: any, now: Date, billingCount = 0) {
     const payload = this.parseJson<Record<string, unknown>>(c.payload, {});
     const notStarted = now < new Date(c.startAt);
     const expired = now > new Date(c.endAt);
-    const live = c.status === 'active' && !notStarted && !expired;
 
-    // 生效态独立于 status 字段: status='active' 但时间窗未到, 对用户就是不生效。
-    // 后台列表必须分开显示, 否则运营会以为活动已在跑
+    /*
+     * 人工状态优先，只有 active 才按时间窗派生生效态。
+     * 旧实现把时间窗判断放在 status 之前：人工置为 ended 的活动（仍在窗内）
+     * 会显示「草稿」，draft 且窗未到会显示「未开始」——运营从列表看不出
+     * 自己设的状态，也无法把「未开始」和「草稿」区分开。
+     */
     const effective: 'draft' | 'live' | 'scheduled' | 'ended' | 'off' =
-      c.status === 'off' ? 'off' : notStarted ? 'scheduled' : expired ? 'ended' : live ? 'live' : 'draft';
+      c.status === 'off'
+        ? 'off'
+        : c.status === 'draft'
+          ? 'draft'
+          : c.status === 'ended'
+            ? 'ended'
+            : notStarted
+              ? 'scheduled'
+              : expired
+                ? 'ended'
+                : 'live';
 
     return {
       id: c.id,
@@ -1118,6 +1257,8 @@ export class MarketingService {
       effective,
       audience: this.parseJson<Record<string, unknown>>(c.audience, {}),
       orderCount: c._count?.orders ?? 0,
+      /** 限时免费账单引用数（BillingOrder.promotionId），删除预检要和订单一起算 */
+      billingCount,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
     };

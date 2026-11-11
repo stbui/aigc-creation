@@ -4,7 +4,6 @@ import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { useMobileNav } from './hooks';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
-import { PromoBar } from './PromoBar';
 import { GuestPromoDialog } from './GuestPromoDialog';
 
 interface Props {
@@ -16,8 +15,8 @@ interface Props {
 /**
  * C 端应用外壳。
  *
- * 只负责组合：推广条 / 顶部导航（`AppHeader`）/ 左侧导航（`AppSidebar`）/
- * 主内容区。移动抽屉的开关状态由 `useMobileNav` 托管，顶栏负责唤起、侧栏负责关闭。
+ * 只负责组合：顶部导航（`AppHeader`）/ 左侧导航（`AppSidebar`）/ 主内容区。
+ * 移动抽屉的开关状态由 `useMobileNav` 托管，顶栏负责唤起、侧栏负责关闭。
  */
 export function AppLayout({ groups, items, children }: Props) {
   const { mobileOpen, openMobileNav, closeMobileNav } = useMobileNav();
@@ -28,7 +27,6 @@ export function AppLayout({ groups, items, children }: Props) {
       <a className="skip-to-content" href="#main-content">
         跳到主要内容
       </a>
-      <PromoBar />
       <GuestPromoDialog />
       <AppHeader
         groups={groups}

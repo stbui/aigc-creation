@@ -36,7 +36,6 @@ describe('写真模板页纯函数', () => {
   const item = (id: string) => ({
     id,
     name: `模板 ${id}`,
-    prompt: `提示词 ${id}`,
     thumbFile: `/templates/${id}.webp`,
     tags: ['标签'],
   });

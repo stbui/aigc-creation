@@ -10,6 +10,43 @@
    右栏 padding 32px 40px / 内层 340; tab 81.3x63; input 340x48 radius 8 bg #f2f3f5;
    submit 340x48 渐变 90deg #8064f6→#5546d8 14px/600; 协议行 12px #86909c。
    诚实差异: 扫码/短信 tab 置灰 (无通道), 左栏插画为自绘内联 SVG (不引参考站位图)。 */
+
+/* * 生成设置的紧凑控件：参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
+ *
+ * 兼容壳 Input 的 DOM 是 <input class="ant-input ui-input">，Select 的触发器是
+ * <button class="ui-select-trigger">（尺寸见文件末尾「表单控件」适配层）；
+ * 此处只覆盖 Input，原生控件（若再引入）走下面的通用规则。 */
+
+.pk-field .login-input-inner {
+  height: 32px;
+  padding: 5px 12px;
+  border-color: var(--border);
+  border-radius: var(--radius-tag);
+  font-size: 14px;
+  color: var(--wb-text);
+}
+
+.pk-field input:not(.ui-input):not(.login-input-inner)::placeholder {
+  color: var(--placeholder-text);
+}
+
+.pk-field input:not(.ui-input):not(.login-input-inner) {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tag);
+  padding: 5px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--wb-text);
+  background: var(--card-bg);
+  outline: none;
+}
+
+.pk-field input:not(.ui-input):not(.login-input-inner):focus {
+  border-color: var(--brand-light);
+}
+
 .login-page {
   position: relative;
   min-height: 100vh;
@@ -523,11 +560,6 @@
 }
 
 /* 验证码行: 输入框自适应 + 固定宽度的「获取验证码」按钮 */
-.login-code-row {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-}
 
 .login-code-btn {
   flex: 0 0 auto;
@@ -543,7 +575,7 @@
 }
 
 .login-code-btn:hover:not(:disabled),
-.login-code-btn:focus-visible:not(:disabled) {
+  .login-code-btn:focus-visible:not(:disabled) {
   background: var(--brand-bg);
   color: var(--brand-hover);
   border-color: var(--brand);

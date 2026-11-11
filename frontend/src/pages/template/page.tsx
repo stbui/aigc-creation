@@ -64,10 +64,11 @@ function isUncertainSubmitError(error: unknown): boolean {
  *
  * 页面结构对齐 AI 带货图文（`/shoppable-carousel`）：
  *   左配置栏（上传人像照片 + 已选模板回显 + 高级设置 + 提交）
- *   + 右侧模板区（分类 tab + 模板网格：图片 + 提示词），底部常驻「最近生成」。
+ *   + 右侧模板区（分类 tab + 模板网格：图片 + 名称），底部常驻「最近生成」。
  *
  * 生成规则：至少上传 1 张人物照片；提交的参数只有模板 id，服务端按模板
- * 查回提示词，与上传照片一起组成模型请求。模板清单由后端下发，前端不存副本。
+ * 查回提示词，与上传照片一起组成模型请求。模板清单由后端下发，前端不存副本；
+ * 提示词不下发到 C 端，页面也不展示。
  */
 export function TemplatePage() {
   useDocumentMeta('婚纱写真模板 · 货觉AI', '上传人物照片，选择模板，生成同款婚纱写真');
@@ -307,14 +308,6 @@ export function TemplatePage() {
                     />
                     <div className="tpl-selected-copy">
                       <strong>{selectedTemplate.name}</strong>
-                      <p title={selectedTemplate.prompt}>{selectedTemplate.prompt}</p>
-                      <div className="tpl-selected-tags">
-                        {selectedTemplate.tags.map((tag) => (
-                          <span key={tag} className="tpl-template-tag">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
                       <button
                         type="button"
                         className="tpl-selected-clear"

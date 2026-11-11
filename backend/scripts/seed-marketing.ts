@@ -117,7 +117,7 @@ async function seedCampaigns(): Promise<void> {
     {
       name: '弹窗促销位示例',
       type: 'popup',
-      // PromoBar 读取此活动; ctaUrl 限站内相对路径 (后端校验拒绝外链)
+      // C 端游客新人弹窗读取此活动; ctaUrl 限站内相对路径 (后端校验拒绝外链)
       payload: {
         title: '新人首单立减',
         body: '限时活动, 数量有限',

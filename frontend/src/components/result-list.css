@@ -7,6 +7,24 @@
 /* ── 自由创作: 右侧「全部生成图」(2026-10-21) ──────────────────────
    结果栏从「只展示最近一单」改为网格展示本页能力的全部成功产出。
    缩略图统一方形裁切（生成图比例不一, 方形网格最整齐）, 点开预览看原始比例。 */
+
+@keyframes fc-result-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (max-width: 720px) {
+
+  .fc-result-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 .fc-result-loading {
   flex: 1;
   display: grid;
@@ -231,7 +249,7 @@
 }
 
 .fc-result-item:hover .fc-result-item-mask,
-.fc-result-item:focus-visible .fc-result-item-mask {
+  .fc-result-item:focus-visible .fc-result-item-mask {
   opacity: 1;
 }
 

@@ -6,7 +6,6 @@ export { AppLayout } from './AppLayout';
 export { AppHeader } from './AppHeader';
 export { AppSidebar } from './AppSidebar';
 export { CapabilityIcon, SideRail } from './SideRail';
-export { PromoBar } from './PromoBar';
 export { GuestPromoDialog } from './GuestPromoDialog';
 export { NotificationBell } from './NotificationBell';
 export { UserAccountMenu } from './UserAccountMenu';

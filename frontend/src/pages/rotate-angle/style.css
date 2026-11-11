@@ -6,6 +6,25 @@
  */
 
 /* ───────── 滑杆 (参考站 rotate-angle-range; --range-progress 驱动填充) ───────── */
+
+@media (max-width: 900px) {
+
+  .pk-workspace.rotate-angle-page .pk-result-pane:has(> .rotate-angle-result) {
+    flex: none;
+    height: auto;
+    min-height: 402px;
+    max-height: none;
+  }
+
+  .pk-workspace.rotate-angle-page .pk-form-scroll {
+    margin-bottom: 12px;
+  }
+
+  .pk-workspace.rotate-angle-page .rotate-angle-result {
+    height: auto;
+  }
+}
+
 .rotate-angle-range {
   display: grid;
   gap: 8px;

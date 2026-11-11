@@ -58,6 +58,7 @@ export function AdminTemplatesPage() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<AdminTemplateItem | null>(null);
 
   const [categoryDrawer, setCategoryDrawer] = useState<{
@@ -119,6 +120,22 @@ export function AdminTemplatesPage() {
     [categories],
   );
 
+  /** 模板编辑可能发生在「全部模板 / 一级分类」视图：此时 selectedGroup 为空，
+   *  必须按条目自身的 groupId 找回所属分组，否则编辑抽屉会被条件渲染吞掉。 */
+  const groupById = useMemo(
+    () =>
+      new Map(
+        categories.flatMap((category) =>
+          category.groups.map((group) => [group.id, group] as const),
+        ),
+      ),
+    [categories],
+  );
+
+  const itemDrawerGroup = itemDrawer?.target
+    ? (groupById.get(itemDrawer.target.groupId) ?? null)
+    : selectedGroup;
+
   const formItems = useMemo(() => {
     if (selectedGroup) return selectedGroup.items;
     if (selectedCategory) return selectedCategory.groups.flatMap((group) => group.items);
@@ -132,12 +149,13 @@ export function AdminTemplatesPage() {
     return formItems.filter((item) => {
       if (statusFilter === 'enabled' && !item.enabled) return false;
       if (statusFilter === 'disabled' && item.enabled) return false;
+      if (tagFilter && !item.tags.includes(tagFilter)) return false;
       if (!keyword) return true;
       return [item.name, item.prompt, ...item.tags].some((value) =>
         value.toLowerCase().includes(keyword),
       );
     });
-  }, [formItems, search, statusFilter]);
+  }, [formItems, search, statusFilter, tagFilter]);
 
   const panelTitle = selectedGroup
     ? `${selectedCategory?.name ?? ''} / ${selectedGroup.name}`
@@ -146,8 +164,8 @@ export function AdminTemplatesPage() {
       : '全部模板';
 
   const emptyText = useMemo(() => {
-    if (search.trim() || statusFilter !== 'all') {
-      return { title: '没有匹配的模板', desc: '换一个关键词，或把状态筛选切回「全部」。' };
+    if (search.trim() || statusFilter !== 'all' || tagFilter) {
+      return { title: '没有匹配的模板', desc: '换一个关键词、清除标签筛选，或把状态筛选切回「全部」。' };
     }
     if (selectedGroup) {
       return { title: '该分组下还没有模板', desc: '点击右上角「新建模板」添加图片、提示词与标签。' };
@@ -159,7 +177,7 @@ export function AdminTemplatesPage() {
       };
     }
     return { title: '还没有模板分类', desc: '点击左侧「新建」开始搭建目录。' };
-  }, [search, statusFilter, selectedCategory, selectedGroup]);
+  }, [search, statusFilter, tagFilter, selectedCategory, selectedGroup]);
 
   const categoryInitial = useMemo(
     () => (categoryDrawer?.target ? toCategoryDraft(categoryDrawer.target) : EMPTY_CATEGORY),
@@ -234,8 +252,11 @@ export function AdminTemplatesPage() {
   };
 
   const saveItem = async (draft: typeof EMPTY_ITEM) => {
-    const group = selectedGroup;
-    if (!group) return;
+    const group = itemDrawerGroup;
+    if (!group) {
+      toast.error('模板所属分组不存在，请刷新后重试');
+      return;
+    }
     const payload = buildItemPayload(draft);
     if (!payload.ok) {
       toast.error(payload.error ?? '请检查表单');
@@ -352,14 +373,17 @@ export function AdminTemplatesPage() {
           onSelectAll={() => {
             setCategoryId(null);
             setGroupId(null);
+            setTagFilter(null);
           }}
           onSelectCategory={(nextCategoryId) => {
             setCategoryId(nextCategoryId);
             setGroupId(null);
+            setTagFilter(null);
           }}
           onSelectGroup={(nextCategoryId, nextGroupId) => {
             setCategoryId(nextCategoryId);
             setGroupId(nextGroupId);
+            setTagFilter(null);
           }}
           onCreateCategory={() => setCategoryDrawer({ mode: 'create' })}
           onEditCategory={(category) =>
@@ -385,9 +409,12 @@ export function AdminTemplatesPage() {
           showGroupName={!selectedGroup}
           onSearchChange={setSearch}
           onStatusChange={setStatusFilter}
+          tagFilter={tagFilter}
+          onTagFilter={setTagFilter}
           onClearFilters={() => {
             setSearch('');
             setStatusFilter('all');
+            setTagFilter(null);
           }}
           onCreateGroup={() => setGroupDrawer({ mode: 'create' })}
           onCreateItem={() => setItemDrawer({ mode: 'create' })}
@@ -416,10 +443,10 @@ export function AdminTemplatesPage() {
           onSubmit={(draft) => void saveGroup(draft)}
         />
       )}
-      {itemDrawer && selectedGroup && (
+      {itemDrawer && itemDrawerGroup && (
         <ItemFormDrawer
           mode={itemDrawer.mode}
-          groupName={selectedGroup.name}
+          groupName={itemDrawerGroup.name}
           initial={itemInitial}
           saving={saving}
           onClose={() => setItemDrawer(null)}

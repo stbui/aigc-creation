@@ -528,12 +528,10 @@ export interface ShoppableCarouselTemplatesResult {
   templates: ShoppableCarouselTemplate[];
 }
 
-/** 写真模板条目：一张预览图 + 提示词 + 标签。 */
+/** C 端写真模板条目：预览图 + 名称 + 标签；不含 prompt（商业资产，生成时服务端按 templateId 查回）。 */
 export interface TemplateCatalogItem {
   id: string;
   name: string;
-  /** 作为模型提示词主体的风格描述 */
-  prompt: string;
   /** 已解析的预览图地址（静态路径或签名/云端地址） */
   thumbFile: string;
   tags: string[];

@@ -12,7 +12,6 @@ import {
   MessageCircle,
 } from 'lucide-react';
 
-import { PromoBar } from './components';
 import { NAV_ICONS } from './constants';
 import { useAuth, useCapabilities } from './hooks';
 import { isCapabilityVisible, toolPath } from './utils';
@@ -68,7 +67,6 @@ export function LandingHeader() {
 
   return (
     <>
-      <PromoBar />
       <header className="landing-topbar">
         <Link to="/" className="landing-brand">
           {/* 品牌标记: 货觉AI「觉眼」logo (2026-10-19, 见 docs/brand/brand-basics.md) */}

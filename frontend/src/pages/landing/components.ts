@@ -6,6 +6,3 @@
  *
  * 第三方 UI 库 (lucide-react) 不经本文件 —— 它们不是本项目的共享控件。
  */
-
-/** 顶部促销条 (限时活动横幅) */
-export { PromoBar } from '../../layout';

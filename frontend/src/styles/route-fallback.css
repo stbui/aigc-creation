@@ -44,7 +44,7 @@
 }
 
 .route-skeleton-line,
-.route-skeleton-card {
+  .route-skeleton-card {
   display: block;
   background: linear-gradient(100deg, var(--shell-surface-1) 20%, var(--shell-surface-2) 38%, var(--shell-surface-1) 56%);
   background-size: 220% 100%;

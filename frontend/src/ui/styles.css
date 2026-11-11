@@ -182,11 +182,6 @@
   margin-right: 10px;
 }
 
-.login-code-row > .login-input-wrap {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .login-input-suffix {
   display: inline-flex;
   align-items: center;

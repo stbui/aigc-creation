@@ -22,6 +22,16 @@
    .pkg-sandbox-btn / .pkg-result-actions / .pkg-result-btn 仍被 OrdersPage
    的订单抽屉复用, 只在此处改成直接引用令牌, 不改变结构与尺寸。 */
 
+@media (max-width: 900px) {
+  .co-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .co-side {
+    position: static;
+  }
+}
+
 .pkg-checkout-page {
   --co-line: var(--border);
   --co-line-soft: var(--border-row);

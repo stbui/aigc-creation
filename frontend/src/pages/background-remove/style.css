@@ -5,6 +5,267 @@
  * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
  */
 
+.matting-result-editor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  background: var(--card-bg);
+}
+
+.background-result-canvas,
+  .background-original-compare img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.background-original-compare img {
+  object-fit: contain;
+}
+
+.background-original-compare {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.background-before-label,
+  .background-after-label {
+  position: absolute;
+  top: 14px;
+  z-index: 4;
+  padding: 4px 9px;
+  border-radius: 12px;
+  background: rgba(38, 42, 52, 0.58);
+  color: var(--card-bg);
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.background-before-label {
+  left: 14px;
+}
+
+.background-after-label {
+  right: 14px;
+}
+
+.background-compare-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 2px;
+  background: var(--card-bg);
+  box-shadow: 0 0 0 1px rgba(38, 42, 52, 0.14), 0 0 10px rgba(0, 0, 0, 0.22);
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+.background-compare-line::after {
+  content: '‹›';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--brand);
+  font-size: 17px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transform: translate(-50%, -50%);
+}
+
+.background-compare-range {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: ew-resize;
+}
+
+.background-zoom-target {
+  display: flex;
+  height: 26px;
+  padding: 2px;
+  border-radius: 5px;
+  background: var(--color-border-soft);
+}
+
+.matting-editor-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text-desc);
+  font-size: 12px;
+  text-align: center;
+}
+
+.matting-editor-loading strong {
+  color: var(--wb-text);
+  font-size: 14px;
+}
+
+.matting-editor-loading a {
+  color: var(--brand);
+}
+
+@media (min-width: 901px) and (max-width: 1366px) {
+
+  .pk-workspace.background-remove-page {
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+  }
+
+  .pk-workspace.background-remove-page .pk-section-title {
+    font-size: 12px;
+  }
+
+  .pk-workspace.background-remove-page .pk-upload-prompt small {
+    font-size: 12px;
+  }
+
+  .pk-workspace.background-remove-page .pk-upload-title-row {
+    gap: 4px;
+  }
+
+  .pk-workspace.background-remove-page .pk-upload-title-actions {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.background-remove-page {
+    box-sizing: border-box;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    margin: -16px -10px -24px;
+    padding: 16px;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    align-content: start;
+    overflow: visible;
+  }
+
+  .pk-workspace.background-remove-page .pk-input-pane,
+  .pk-workspace.background-remove-page .pk-result-pane {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+  }
+
+  .pk-workspace.background-remove-page .pk-result-pane {
+    min-height: 720px;
+  }
+}
+
+/* 上传区底色与虚线边：参考站 .local-redraw-source-upload 实测
+   #f6f7f9 / #d9dee8，不能沿用商品主图页的 --surface #f2f4f7。 */
+
+.pk-workspace.background-remove-page .pk-dropzone {
+  background: var(--surface-5);
+  border-color: var(--tool-border-4);
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.background-remove-page .pk-form-card {
+    height: auto;
+  }
+
+  .pk-workspace.background-remove-page .pk-form-scroll {
+    flex: none;
+    overflow: visible;
+  }
+}
+
+/* 上传区内部留白：参考站桌面 .local-redraw-source-upload 为 padding:0，
+ * 产品系移动端再补回 16px；不能统一沿用商品主图页的 16px。 */
+
+.pk-workspace.background-remove-page .pk-dropzone {
+  padding: 0;
+  gap: 8px;
+}
+
+.pk-workspace.background-remove-page .pk-thumb-grid-single {
+  width: 160px;
+  max-width: 100%;
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.background-remove-page .pk-input-pane,
+  .pk-workspace.background-remove-page .pk-form-card {
+    display: block;
+  }
+
+  .pk-workspace.background-remove-page .pk-form-scroll {
+    display: grid;
+    margin-bottom: 10px;
+  }
+
+  .pk-workspace.background-remove-page .pk-input-pane {
+    height: max-content;
+  }
+
+  .pk-workspace.background-remove-page {
+    height: auto;
+    max-height: none;
+  }
+
+  .pk-workspace.background-remove-page .pk-form-scroll {
+    margin-bottom: 12px;
+  }
+
+  .pk-workspace.background-remove-page .pk-submit-actions {
+    padding: 12px 14px 14px;
+  }
+
+  .pk-workspace.background-remove-page .background-source-row {
+    gap: 12px;
+  }
+
+  .pk-workspace.background-remove-page .background-source-preview {
+    flex-basis: min(160px, 48vw);
+    width: min(160px, 48vw);
+    height: min(160px, 48vw);
+  }
+}
+
+/* 参考站抠图卡标题 22px + 16px 底距，色板换行后自然高 176；
+   * .pk-form-scroll 的 10px gap 与 12px 底部留白已由共享骨架提供。 */
+
+@media (max-width: 900px) {
+  .pk-workspace.background-remove-page .background-color-card {
+    min-height: 176px;
+  }
+}
+
 .background-remove-stage {
   position: relative;
   flex: 1;
@@ -38,19 +299,19 @@
 }
 
 .background-remove-preview.result-tool-hand,
-.background-remove-preview.is-comparing {
+  .background-remove-preview.is-comparing {
   cursor: grab;
   touch-action: none;
   user-select: none;
 }
 
 .background-remove-preview.result-tool-hand:active,
-.background-remove-preview.is-comparing:active {
+  .background-remove-preview.is-comparing:active {
   cursor: grabbing;
 }
 
 .background-remove-preview.result-tool-eraser,
-.background-remove-preview.result-tool-repair {
+  .background-remove-preview.result-tool-repair {
   cursor: none;
   touch-action: none;
 }
@@ -149,7 +410,7 @@
 }
 
 .background-result-toolbar b,
-.background-result-footer b {
+  .background-result-footer b {
   flex: 0 0 1px;
   width: 1px;
   height: 16px;
@@ -344,7 +605,7 @@
 }
 
 .pk-workspace.background-remove-page .pk-input-pane,
-.pk-workspace.background-remove-page .pk-result-pane {
+  .pk-workspace.background-remove-page .pk-result-pane {
   width: 100%;
   height: 100%;
   min-height: 0;

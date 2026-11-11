@@ -1,4 +1,4 @@
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, X } from 'lucide-react';
 
 import {
   ActionButton,
@@ -17,6 +17,7 @@ export interface TemplateWorkspaceProps {
   groupNameById: Map<string, string>;
   search: string;
   statusFilter: StatusFilter;
+  tagFilter: string | null;
   emptyTitle: string;
   emptyDesc: string;
   writable: boolean;
@@ -28,6 +29,7 @@ export interface TemplateWorkspaceProps {
   showGroupName: boolean;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: StatusFilter) => void;
+  onTagFilter: (tag: string | null) => void;
   onClearFilters: () => void;
   onCreateGroup: () => void;
   onCreateItem: () => void;
@@ -47,6 +49,7 @@ export function TemplateWorkspace({
   groupNameById,
   search,
   statusFilter,
+  tagFilter,
   emptyTitle,
   emptyDesc,
   writable,
@@ -55,6 +58,7 @@ export function TemplateWorkspace({
   showGroupName,
   onSearchChange,
   onStatusChange,
+  onTagFilter,
   onClearFilters,
   onCreateGroup,
   onCreateItem,
@@ -99,7 +103,18 @@ export function TemplateWorkspace({
           ]}
           ariaLabel="按启用状态筛选"
         />
-        {(search || statusFilter !== 'all') && (
+        {tagFilter && (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-brand bg-brand-bg px-2 py-1 text-[12px] text-brand"
+            onClick={() => onTagFilter(null)}
+            aria-label={`清除标签筛选${tagFilter}`}
+          >
+            标签：{tagFilter}
+            <X className="size-3" aria-hidden />
+          </button>
+        )}
+        {(search || statusFilter !== 'all' || tagFilter) && (
           <ActionButton variant="ghost" size="xs" onClick={onClearFilters}>
             清除筛选
           </ActionButton>
@@ -183,14 +198,25 @@ export function TemplateWorkspace({
                 </div>
 
                 <div className="flex flex-wrap gap-1">
-                  {item.tags.slice(0, 4).map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border border-border bg-muted/50 px-1.5 py-0.5 text-[12px] leading-4 text-muted-foreground"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+                  {item.tags.slice(0, 4).map((tag) => {
+                    const active = tag === tagFilter;
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => onTagFilter(active ? null : tag)}
+                        aria-pressed={active}
+                        title={`按标签「${tag}」筛选`}
+                        className={`rounded-full border px-1.5 py-0.5 text-[12px] leading-4 transition-colors ${
+                          active
+                            ? 'border-brand bg-brand-bg text-brand'
+                            : 'border-border bg-muted/50 text-muted-foreground hover:border-brand hover:text-brand'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
                   {item.tags.length > 4 && (
                     <span className="rounded-full border border-border bg-muted/50 px-1.5 py-0.5 text-[12px] leading-4 text-muted-foreground">
                       +{item.tags.length - 4}

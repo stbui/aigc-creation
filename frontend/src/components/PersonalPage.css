@@ -85,10 +85,10 @@
  * 1120 的列在 1440 视口里贴左留出右侧空档。水平居中交给骨架。
  */
 .personal-page.account-page,
-.personal-page.credits-page,
-.personal-page.orders-page,
-.personal-page.invite-page,
-.personal-page.stats-page {
+  .personal-page.credits-page,
+  .personal-page.orders-page,
+  .personal-page.invite-page,
+  .personal-page.stats-page {
   padding: 0;
 }
 
@@ -105,10 +105,8 @@
     width: 100%;
     flex-wrap: wrap;
   }
-}
 
-@media (max-width: 900px) {
-.personal-page-extra .ui-btn:first-child {
+  .personal-page-extra .ui-btn:first-child {
      
     flex: 1 1 auto;
     min-width: 0;

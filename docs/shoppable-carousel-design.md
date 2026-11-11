@@ -198,7 +198,7 @@ article.social-media-card-W4j04q      307×193   padding 7px 7px 9px   bg #fff  
 
 ## 9. 与本站设计令牌的映射
 
-参考站品牌色（`#3388ff` 蓝系、`#1c1d1f` 近黑、`#f6f7fa` 灰底）**一律不沿用**。映射到 `frontend/src/styles/global.css` 的 `:root`：
+参考站品牌色（`#3388ff` 蓝系、`#1c1d1f` 近黑、`#f6f7fa` 灰底）**一律不沿用**。映射到 `frontend/src/styles/tokens.css` 的 `:root`：
 
 | 参考站实测 | 本站令牌 | 值 | 说明 |
 | --- | --- | --- | --- |

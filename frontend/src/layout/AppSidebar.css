@@ -1,0 +1,363 @@
+/**
+ * 侧边导航与移动抽屉（AppSidebar）。
+ * 从 AppLayout.css 按组件拆出；只放本组件的选择器，外壳骨架留在 AppLayout.css。
+ */
+
+/* 侧栏外壳: 宽度由 CSS 托管 —— 桌面 176px 横排 / ≤1366px 自动塌缩 100px 垂直轨 /
+   ≤900px display:none (响应式规则见文件末尾「响应式外壳」块)。
+   曾经由 JSX inline width 注入, inline 会压过媒体查询导致窄屏塌缩失效 (2026-10-19 修正)。
+   top/height 必须跟随完整 chrome 高度: 促销条开启时为 64 + 40 = 104px, 若仍写死 64
+   会让侧栏底部超出视口 40px, 客服入口不可见 (2026-10-28 修正)。
+   边框由内层 .app-sidebar 自带 (#f2f3f5), 此处不重复描边 */
+.app-sider-wrap {
+  background: var(--color-card);
+  flex: 0 0 auto;
+  width: 176px;
+  position: sticky;
+  top: var(--workspace-topbar-height, 64px);
+  height: calc(100vh - var(--workspace-topbar-height, 64px));
+  overflow: visible;
+}
+
+/* 侧边菜单：分组折叠 + 条目列表 + 底部真实入口。 */
+.app-sidebar {
+  --sidebar-scroll-thumb: rgb(85 70 216 / 0.32);
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border-right: 1px solid var(--color-border-soft);
+  padding: 16px 12px 24px 24px;
+  overflow: visible;
+}
+
+.app-sidebar-sections {
+  flex: auto;
+  min-height: 0;
+  display: grid;
+  grid-auto-rows: max-content;
+  gap: 16px;
+  align-content: start;
+  padding-top: 8px;
+  padding-right: 6px;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-scroll-thumb) transparent;
+}
+
+/* macOS 的 overlay 滚动条默认会隐藏，截断处会像排版错误；用底部渐隐提示还有入口，
+   滚到底（SideRail 的 has-more 判定）后撤掉，不遮住最后一个入口。 */
+.app-sidebar-sections.has-more {
+  -webkit-mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - 28px), transparent);
+}
+
+/* Firefox 等仍按下面两条渲染常显细滚动条。 */
+.app-sidebar-sections::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-sidebar-sections::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-sidebar-sections::-webkit-scrollbar-thumb {
+  background: var(--sidebar-scroll-thumb);
+  border-radius: var(--radius-pill);
+}
+
+.app-sidebar-section {
+  min-width: 0;
+}
+
+.app-sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-sidebar-section-toggle:hover,
+  .app-sidebar-section-toggle:focus-visible {
+  background: var(--surface-brand-5);
+}
+
+.app-sidebar-section-toggle svg {
+  flex: none;
+  color: var(--text-body);
+  transition: transform 0.18s;
+}
+
+.app-sidebar-section:not(.is-open) .app-sidebar-section-toggle svg {
+  transform: rotate(180deg);
+}
+
+.app-sidebar-section-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-sidebar-list {
+  display: grid;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+/* 菜单条目与底部入口共用同一套结构（图标 24 + 文字、12px 间距、8px 圆角），
+   差异只在高度与字号：菜单 45/13，底部入口 44/14。 */
+.app-sidebar-item,
+  .app-sidebar-footer-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--wb-text);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.app-sidebar-item {
+  height: 45px;
+  position: relative;
+  transition: background 0.18s, color 0.18s;
+}
+
+.app-sidebar-footer-item {
+  height: 44px;
+  font-size: 14px;
+}
+
+.app-sidebar-item:hover,
+  .app-sidebar-footer-item:hover,
+  .app-sidebar-footer-item:focus-visible {
+  color: var(--brand);
+  background: var(--surface-brand-5);
+}
+
+.app-sidebar-item.is-active,
+  .app-sidebar-item[aria-current='page'] {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.app-sidebar-item.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.app-sidebar-item.is-disabled:hover {
+  background: none;
+  color: var(--wb-text);
+}
+
+.app-sidebar-icon,
+  .app-sidebar-footer-icon {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+}
+
+.app-sidebar-footer-icon svg {
+  display: block;
+}
+
+.app-sidebar-icon img {
+  width: auto;
+  max-width: 24px;
+  height: auto;
+  max-height: 24px;
+  display: block;
+  filter: grayscale() opacity(0.62);
+  transition: filter 0.18s;
+}
+
+.app-sidebar-icon.is-active img,
+  .app-sidebar-item:hover .app-sidebar-icon img,
+  .app-sidebar-item:focus-visible .app-sidebar-icon img,
+  .app-sidebar-footer-item:hover .app-sidebar-icon img,
+  .app-sidebar-footer-item:focus-visible .app-sidebar-icon img {
+  filter: brightness(0) saturate() invert(34%) sepia(78%) saturate(2147%)
+    hue-rotate(232deg) brightness(88%) contrast(90%);
+}
+
+.app-sidebar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 底部真实入口: 参考站 sidebar 固定在菜单列末尾 */
+.app-sidebar-footer {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+@media (max-width: 1366px) {
+
+/* ── 响应式外壳 (2026-10-28 复测) ──
+   参考站侧栏为视口响应式双态: ≤1366 → 100px 垂直轨 / ≥1367 → 176px 横排列表。
+   断点实测: 1366 → 100px 轨 / 1367 → 176px 横排。
+   ≤900 → 本地保留移动抽屉 (参考站侧栏在 900 仍显示, ≤768 才隐藏; 该差异见文档)。
+   注意层级: 1366 块在前、900 块在后 —— .app-content 的 margin-left 需要 900 块覆盖
+   1366 块的 -16px。 */
+  /* 100px 垂直轨: 参考站 1280 实测 (aside pad 8 8 20 / sections 83 宽 gap14 /
+     条目 77×60 / 标签 10px / 分组标题 77×24) */
+  /* 参考站窄轨下底部入口相对内容列再右移 8px, 形成 x=16 / 83px 宽的实拍几何。 */
+  .app-sider-wrap {
+    width: 100px;
+  }
+  .app-sider-wrap .app-sidebar {
+    padding: 8px 8px 20px;
+  }
+  .app-sider-wrap .app-sidebar-sections {
+    gap: 14px;
+    padding-top: 6px;
+  }
+  .app-sider-wrap .app-sidebar-section-toggle {
+    height: 24px;
+    padding: 0 4px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+  .app-sider-wrap .app-sidebar-section-toggle svg {
+    width: 12px;
+    height: 12px;
+  }
+  .app-sider-wrap .app-sidebar-item {
+    width: 77px;
+    height: 60px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 2px;
+  }
+  .app-sider-wrap .app-sidebar-icon,
+  .app-sider-wrap .app-sidebar-footer-icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+  }
+  .app-sider-wrap .app-sidebar-label {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 14px;
+    text-align: center;
+  }
+  .app-sider-wrap .app-sidebar-footer {
+    left: 8px;
+  }
+  .app-sider-wrap .app-sidebar-footer-item {
+    height: 60px;
+    padding: 5px 2px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    font-size: 12px;
+    line-height: 14px;
+    text-align: center;
+  }
+}
+@media (max-width: 900px) {
+  /* 抽屉顶部补桌面顶导里的三个入口（首页/套餐/邀请） */
+  /* Drawer 内恢复完整横排菜单: 不受桌面窄轨的 77×60 / 12px 标签影响。 */
+  .app-sider-wrap {
+    display: none;
+  }
+  .app-mobile-links {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px 12px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-mobile-links a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    border-radius: var(--radius-control);
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .app-mobile-drawer .app-sidebar {
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    padding: 8px;
+    border-right: none;
+  }
+  .app-mobile-drawer .app-sidebar-sections {
+    flex: none;
+    max-height: none;
+    padding-right: 0;
+    overflow: visible;
+  }
+  .app-mobile-drawer .app-sidebar-section-toggle {
+    height: 44px;
+  }
+  .app-mobile-drawer .app-sidebar-item {
+    width: 100%;
+    height: 45px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 8px 4px;
+  }
+  .app-mobile-drawer .app-sidebar-label {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 20px;
+    text-align: left;
+  }
+  .app-mobile-drawer .app-sidebar-footer {
+    left: auto;
+  }
+  .app-mobile-drawer .app-sidebar-footer-item {
+    height: 44px;
+    padding: 8px 4px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    font-size: 14px;
+    line-height: 20px;
+    text-align: left;
+  }
+}
+
+.app-body:has(> .app-content > .pk-workspace) > .app-sider-wrap {
+  height: calc(100vh - var(--workspace-topbar-height));
+}

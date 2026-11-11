@@ -2,7 +2,7 @@
  * 我的订单页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
  *
  * 只放本页独占选择器；共享组件（AppLayout / 登录弹窗 / SideRail 等）
- * 与设计令牌仍留在 `styles/global.css`。
+ * 与设计令牌（`styles/tokens.css`）仍留在全局样式层。
  */
 
 /* ── 我的订单 ────────────────────────────────────────────────────────────
@@ -14,6 +14,19 @@
    - 状态筛选与计数同工单页, 客户端切片;
    - 开票表单由复用的结算卡片改成两列字段面板, 不再嵌一层 24px 内边距的卡。
    宽度与页头由 .personal-page 骨架提供, 页面类不再自带 max-width / padding。 */
+
+.order-load-more {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 8px;
+}
+
+@media (max-width: 640px) {
+  .order-action-btns .ui-btn,
+  .order-invoice-actions .ui-btn {
+    flex: 1;
+  }
+}
 
 .order-filters {
   display: flex;
@@ -131,13 +144,13 @@
 }
 
 .order-status.is-cancelled,
-.order-status.is-expired {
+  .order-status.is-expired {
   background: var(--surface);
   color: var(--text-desc);
 }
 
 .order-status.is-refunded,
-.order-status.is-partial_refunded {
+  .order-status.is-partial_refunded {
   background: var(--danger-soft-bg);
   color: var(--danger-text);
 }

@@ -42,7 +42,7 @@
 }
 
 .image-compare-before-label,
-.image-compare-after-label {
+  .image-compare-after-label {
   position: absolute;
   top: 14px;
   z-index: 4;

@@ -50,7 +50,7 @@
 }
 
 .vc-degree-option-active,
-.vc-degree-option-active:hover {
+  .vc-degree-option-active:hover {
   background: var(--brand-bg);
 }
 
@@ -355,7 +355,7 @@
 }
 
 .vc-compare-open:hover .vc-compare-open-mask,
-.vc-compare-open:focus-visible .vc-compare-open-mask {
+  .vc-compare-open:focus-visible .vc-compare-open-mask {
   opacity: 1;
 }
 
@@ -414,7 +414,7 @@
 }
 
 .vc-compare-media:hover .vc-output-actions,
-.vc-compare-media:focus-within .vc-output-actions {
+  .vc-compare-media:focus-within .vc-output-actions {
   opacity: 1;
   transform: translateY(0);
 }
@@ -570,7 +570,7 @@
 }
 
 .vc-editor-card,
-.vc-result-pane {
+  .vc-result-pane {
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -613,7 +613,7 @@
 }
 
 .vc-editor-content > [data-slot='separator'],
-.vc-editor-card > [data-slot='separator'] {
+  .vc-editor-card > [data-slot='separator'] {
   flex: none;
 }
 
@@ -631,9 +631,9 @@
 }
 
 .vc-config-section,
-.vc-generation-settings,
-.vc-requirement-section,
-.vc-degree-section {
+  .vc-generation-settings,
+  .vc-requirement-section,
+  .vc-degree-section {
   min-width: 0;
   display: flex;
   flex-direction: column;

@@ -5,6 +5,84 @@
  */
 
 /* 原始提示词区 (只读, 供对照) */
+
+/* ═══════════════════════════════════════════════════════════════════
+   提示词工具弹窗 (AI润色 / 图片转提示词) + 手机上传 (2026-10-20)
+   ───────────────────────────────────────────────────────────────────
+   参考站实拍 (ijihua.cn/free-creation, 2026-10-20 浏览器实测 + 截图):
+     弹窗宽 ~600, 圆角 12, 白底; 眉标「创意生图」12px 灰, 标题 18px/700 深色
+     原始提示词区: 浅灰底 #F7F8FA 圆角 8, 标题行左「原始提示词」右「仅润色文字」
+     输出区: 白底带边框 圆角 8, 最小高 180
+     底部: 左「0 字」12px 灰, 右 [开始润色] 描边 + [应用] 品牌紫实心
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 弹窗头部: 眉标 + 标题 */
+
+.pt-modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pt-modal-eyebrow {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-desc);
+}
+
+.pt-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 24px;
+  color: var(--text-strong);
+}
+
+.pt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pt-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 描边次要按钮 (「开始润色」/「提交解析」) */
+
+.pt-btn-ghost {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text-body);
+}
+
+.pt-btn-ghost:hover:not(:disabled) {
+  border-color: var(--brand-light);
+  color: var(--brand);
+}
+
+/* 品牌紫主按钮 (「应用」) */
+
+.pt-btn-primary {
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  color: var(--card-bg);
+}
+
+.pt-btn-primary:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
 .pt-polish-source {
   margin-top: 4px;
   background: var(--surface);

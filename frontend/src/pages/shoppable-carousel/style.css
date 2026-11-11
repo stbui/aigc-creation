@@ -132,7 +132,7 @@
 
 /* 区块标题 (参考站 15px / #0f172a / margin-bottom 12px) */
 .sc-sections .pk-section-title,
-.sc-sections .sc-section-title {
+  .sc-sections .sc-section-title {
   display: block;
   font-size: 15px;
   font-weight: 700;
@@ -399,7 +399,7 @@
 }
 
 .sc-template-card:hover .sc-template-preview,
-.sc-template-preview:focus-visible {
+  .sc-template-preview:focus-visible {
   opacity: 1;
 }
 
@@ -484,10 +484,6 @@
 }
 
 .sc-template-use:hover {
-  background: var(--brand-hover);
-}
-
-.sc-template-card.is-selected .sc-template-use {
   background: var(--brand-hover);
 }
 
@@ -664,7 +660,7 @@
 }
 
 .sc-history-link,
-.sc-history-refresh {
+  .sc-history-refresh {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -681,12 +677,12 @@
 }
 
 .sc-history-link:hover,
-.sc-history-refresh:hover {
+  .sc-history-refresh:hover {
   color: var(--brand-hover);
 }
 
 .sc-history-link:disabled,
-.sc-history-refresh:disabled {
+  .sc-history-refresh:disabled {
   color: var(--text-desc);
   cursor: not-allowed;
 }
@@ -842,7 +838,7 @@
 
 /* 生成设置的四组下拉: 高 40 (参考站实测), 底 rgba(0,30,89,.04), 圆角 8 */
 .sc-sections .pk-field [class*='select'] button,
-.sc-sections .pk-field button[role='combobox'] {
+  .sc-sections .pk-field button[role='combobox'] {
   height: 40px;
   border-radius: var(--radius-control);
   background: var(--surface-soft);
@@ -919,8 +915,8 @@
 }
 
 .sc-template-card:hover .sc-template-use,
-.sc-template-use:focus-visible,
-.sc-template-card.is-selected .sc-template-use {
+  .sc-template-use:focus-visible,
+  .sc-template-card.is-selected .sc-template-use {
   opacity: 1;
 }
 

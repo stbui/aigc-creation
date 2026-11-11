@@ -16,6 +16,23 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── 骨架屏 ────────────────────────────────────────────────────── */
+
+@keyframes state-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes state-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .state-skeleton {
   display: grid;
   gap: 16px;
@@ -27,7 +44,7 @@
 }
 
 .state-skeleton.is-row,
-.state-skeleton.is-panel {
+  .state-skeleton.is-panel {
   grid-template-columns: 1fr;
   gap: 12px;
 }

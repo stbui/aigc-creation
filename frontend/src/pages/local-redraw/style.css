@@ -6,6 +6,528 @@
  */
 
 /* 模板/主体上传按钮 (参考站 local-redraw-source-upload: 虚线区 + plus 图标) */
+
+/* 修图系业务卡 (参考站 local-redraw-card: 白底圆角 + 标题行) */
+
+.local-redraw-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-panel);
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+/* 局部重绘页的整页包裹：用于承载固定历史入口与弹层，不影响 ToolShell 自身布局 */
+
+.local-redraw-page {
+  position: relative;
+  height: 100%;
+}
+
+/* 局部重绘 / 去水印：左输入 / 中画布 / 右历史 */
+
+.pk-workspace.local-redraw-page {
+  box-sizing: border-box;
+  height: calc(100vh - var(--workspace-topbar-height));
+  min-height: 0;
+  max-height: calc(100vh - var(--workspace-topbar-height));
+  padding: 16px;
+  gap: 16px;
+  grid-template-columns: 432px minmax(560px, 1fr) 192px;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  color: var(--wb-text);
+  background: var(--page-bg);
+  overflow: hidden;
+}
+
+.pk-workspace.local-redraw-page .pk-input-pane,
+  .pk-workspace.local-redraw-page .pk-result-pane {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.pk-workspace.local-redraw-page {
+  font-size: 16px;
+  line-height: normal;
+}
+
+@media (max-width: 1500px) {
+  .pk-workspace.local-redraw-page {
+    grid-template-columns: 390px minmax(520px, 1fr) 176px;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1366px) {
+  .pk-workspace.local-redraw-page {
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr) 192px;
+  }
+
+  .pk-workspace.local-redraw-page .pk-section-title {
+    font-size: 12px;
+  }
+
+  .pk-workspace.local-redraw-page .pk-upload-prompt small {
+    font-size: 12px;
+  }
+
+  .pk-workspace.local-redraw-page .pk-upload-title-row {
+    gap: 4px;
+  }
+
+  .pk-workspace.local-redraw-page .pk-upload-title-actions {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .pk-workspace.local-redraw-page {
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+  }
+
+  .pk-workspace.local-redraw-page > .redraw-history-pane {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.local-redraw-page {
+    box-sizing: border-box;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    margin: -16px -10px -24px;
+    padding: 16px;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    align-content: start;
+    overflow: visible;
+  }
+
+  .pk-workspace.local-redraw-page .pk-input-pane,
+  .pk-workspace.local-redraw-page .pk-result-pane {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+  }
+
+  .pk-workspace.local-redraw-page .pk-result-pane {
+    min-height: 720px;
+  }
+
+  .pk-workspace.local-redraw-page .pk-mobile-upload-link {
+    display: none;
+  }
+}
+
+/* 上传区底色与虚线边：参考站 .local-redraw-source-upload 实测
+   #f6f7f9 / #d9dee8，不能沿用商品主图页的 --surface #f2f4f7。 */
+
+.pk-workspace.local-redraw-page .pk-dropzone {
+  background: var(--surface-5);
+  border-color: var(--tool-border-4);
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.local-redraw-page .pk-form-card {
+    height: auto;
+  }
+
+  .pk-workspace.local-redraw-page .pk-form-scroll {
+    flex: none;
+    overflow: visible;
+  }
+}
+
+/* 上传区内部留白：参考站桌面 .local-redraw-source-upload 为 padding:0，
+ * 产品系移动端再补回 16px；不能统一沿用商品主图页的 16px。 */
+
+.pk-workspace.local-redraw-page .pk-dropzone {
+  padding: 0;
+  gap: 8px;
+}
+
+.pk-workspace.local-redraw-page .pk-dropzone > .pk-upload-prompt {
+  width: 100%;
+  min-height: 0;
+  gap: 8px;
+}
+
+.pk-workspace.local-redraw-page .pk-thumb-grid-single {
+  width: 160px;
+  max-width: 100%;
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.local-redraw-page .pk-input-pane,
+  .pk-workspace.local-redraw-page .pk-form-card {
+    display: block;
+  }
+
+  .pk-workspace.local-redraw-page .pk-form-scroll {
+    display: grid;
+    margin-bottom: 10px;
+  }
+
+  .pk-workspace.local-redraw-page .pk-input-pane {
+    height: max-content;
+  }
+
+  .pk-workspace.local-redraw-page {
+    height: auto;
+    max-height: none;
+  }
+}
+
+/* ───────── 2026-10-25 参考站结构收敛 (DOM/CSS 对照) ─────────
+ *
+ * 局部重绘：reference local-redraw 收起历史时仍保留第三列 192px，只隐藏列表；
+ * 标题行继续作为「展开」按钮。≤1180 才切到浮动按钮 + Drawer。
+ * 旋转角度：image-tool-upload-actions 是上传卡上方的独立 13px flex 行
+ * (13 + 12 gap = 25px)，不是卡片内标题行；设置卡按参考站 12px gap 排列。 */
+
+.pk-workspace.local-redraw-page.history-collapsed {
+  grid-template-columns: 432px minmax(560px, 1fr) 192px;
+}
+
+@media (min-width: 901px) and (max-width: 1366px) {
+  .pk-workspace.local-redraw-page.history-collapsed {
+    grid-template-columns: 216px minmax(0, 1fr) 192px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .pk-workspace.local-redraw-page.history-collapsed {
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+  }
+
+  .pk-workspace.local-redraw-page.history-collapsed > .redraw-history-pane {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.local-redraw-page.history-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pk-workspace.image-translate-page .local-redraw-card.tool-card {
+    padding-bottom: 24px;
+  }
+
+  .pk-workspace.local-redraw-page .pk-form-scroll {
+    margin-bottom: 12px;
+  }
+
+  .pk-workspace.local-redraw-page .pk-submit-actions {
+    padding: 12px 14px 14px;
+  }
+}
+
+/* 局部重绘：上传卡 / 描述卡 / DOM 标注层 1:1（2026-10-26） */
+
+.pk-workspace.local-redraw-page .pk-dropzone.pk-dropzone-filled {
+  min-height: 160px;
+  height: 160px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--card-bg);
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pk-workspace.local-redraw-page .source-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  height: 160px;
+  position: relative;
+}
+
+.pk-workspace.local-redraw-page .source-row.processing::after {
+  content: '处理中…';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.35);
+  color: var(--card-bg);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.pk-workspace.local-redraw-page .source-row > .local-source-preview {
+  flex: 0 0 160px;
+  width: 160px;
+  height: 160px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.pk-workspace.local-redraw-page .source-row > .local-source-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pk-workspace.local-redraw-page .source-row > div {
+  display: grid;
+  gap: 10px;
+}
+
+.pk-workspace.local-redraw-page .source-row > div button {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pk-workspace.local-redraw-page .source-row > div button.soft {
+  border-color: transparent;
+  background: var(--color-border-soft);
+}
+
+.pk-workspace.local-redraw-page .source-row > div button:hover:not(:disabled) {
+  border-color: var(--border-brand);
+  color: var(--brand);
+}
+
+.pk-workspace.local-redraw-page .source-row > div button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pk-workspace.local-redraw-page .prompt-card {
+  display: grid;
+  gap: 16px;
+}
+
+.pk-workspace.local-redraw-page .prompt-card .card-title-row > span {
+  color: var(--text-body);
+  font-size: 12px;
+}
+
+.pk-workspace.local-redraw-page .prompt-card .card-title-row {
+  min-height: 22px;
+  margin-bottom: 16px;
+}
+
+.pk-workspace.local-redraw-page .prompt-card .card-title-row h2 {
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.pk-workspace.local-redraw-page .mask-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.pk-workspace.local-redraw-page .mask-mark {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid rgba(128, 100, 246, 0.85);
+  border-radius: 50%;
+  background: rgba(128, 100, 246, 0.28);
+  cursor: move;
+  pointer-events: auto;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+}
+
+.pk-workspace.local-redraw-page .mask-mark.has-index {
+  z-index: 10;
+}
+
+.pk-workspace.local-redraw-page .mask-mark.is-selected {
+  z-index: 12;
+  box-shadow: 0 0 0 1px rgba(85, 70, 216, 0.35);
+}
+
+.pk-workspace.local-redraw-page .mask-mark.rect {
+  border-radius: 3px;
+}
+
+.pk-workspace.local-redraw-page .mask-mark.brush {
+  aspect-ratio: 1;
+  border: 0;
+  background: var(--surface-brand-3);
+}
+
+.pk-workspace.local-redraw-page .mask-mark-index {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.pk-workspace.local-redraw-page .mask-mark-index.brush-index {
+  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+}
+
+.pk-workspace.local-redraw-page .mask-brush-stroke {
+  position: absolute;
+  inset: 0;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.pk-workspace.local-redraw-page .mask-brush-stroke .mask-mark.brush {
+  background: var(--surface-brand-3);
+}
+
+.pk-workspace.local-redraw-page .resize-handle {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--brand);
+  border-radius: 2px;
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.22);
+  pointer-events: auto;
+}
+
+.pk-workspace.local-redraw-page .resize-handle.n {
+  top: 0;
+  left: 50%;
+  cursor: ns-resize;
+  transform: translate(-50%, -50%);
+}
+
+.pk-workspace.local-redraw-page .resize-handle.e {
+  top: 50%;
+  right: 0;
+  cursor: ew-resize;
+  transform: translate(50%, -50%);
+}
+
+.pk-workspace.local-redraw-page .resize-handle.s {
+  bottom: 0;
+  left: 50%;
+  cursor: ns-resize;
+  transform: translate(-50%, 50%);
+}
+
+.pk-workspace.local-redraw-page .resize-handle.w {
+  top: 50%;
+  left: 0;
+  cursor: ew-resize;
+  transform: translate(-50%, -50%);
+}
+
+.pk-workspace.local-redraw-page .resize-handle.nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+  transform: translate(-50%, -50%);
+}
+
+.pk-workspace.local-redraw-page .resize-handle.ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+  transform: translate(50%, -50%);
+}
+
+.pk-workspace.local-redraw-page .resize-handle.se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+  transform: translate(50%, 50%);
+}
+
+.pk-workspace.local-redraw-page .resize-handle.sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+  transform: translate(-50%, 50%);
+}
+
+.pk-workspace.local-redraw-page .brush-cursor {
+  position: absolute;
+  z-index: 8;
+  aspect-ratio: 1;
+  border: 1px solid rgba(85, 70, 216, 0.95);
+  border-radius: 50%;
+  background: rgba(128, 100, 246, 0.18);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+@media (min-width: 901px) and (max-width: 1366px) {
+  .pk-workspace.local-redraw-page .source-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pk-workspace.local-redraw-page .source-row > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .pk-workspace.local-redraw-page .source-row > div button {
+    width: 100%;
+    min-width: 0;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.local-redraw-page .source-row {
+    gap: 12px;
+  }
+
+  .pk-workspace.local-redraw-page .source-row > div button {
+    width: 88px;
+    min-width: 88px;
+    padding: 0 12px;
+  }
+
+  .pk-workspace.local-redraw-page .redraw-prompt {
+    grid-template-columns: minmax(0, 1fr) 64px;
+  }
+}
+
 .local-redraw-source-upload {
   position: relative;
   width: 100%;

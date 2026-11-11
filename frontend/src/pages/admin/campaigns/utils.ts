@@ -44,6 +44,8 @@ export function emptyForm(): FormState {
     type: 'limited_price',
     startAt: toLocalInput(now.toISOString()),
     endAt: toLocalInput(later.toISOString()),
+    startAtRaw: '',
+    endAtRaw: '',
     status: 'draft',
     onlyNewUsers: false,
     productId: '',
@@ -66,16 +68,31 @@ export function buildCampaignPayload(form: FormState): UpsertCampaignPayload | s
   const name = form.name.trim();
   if (!name) return '请填写活动名称';
 
-  const start = new Date(form.startAt);
-  const end = new Date(form.endAt);
+  /*
+   * datetime-local 只到分钟：编辑回填后若用户只改了名称，直接提交会把原有
+   * 秒/毫秒抹成 00，限时活动的边界被悄悄挪动。未改动时间输入时沿用原始 ISO。
+   */
+  const rawStart = form.startAtRaw ? new Date(form.startAtRaw).getTime() : NaN;
+  const rawEnd = form.endAtRaw ? new Date(form.endAtRaw).getTime() : NaN;
+  const startIso =
+    Number.isFinite(rawStart) && form.startAt === toLocalInput(form.startAtRaw)
+      ? new Date(rawStart).toISOString()
+      : new Date(form.startAt).toISOString();
+  const endIso =
+    Number.isFinite(rawEnd) && form.endAt === toLocalInput(form.endAtRaw)
+      ? new Date(rawEnd).toISOString()
+      : new Date(form.endAt).toISOString();
+
+  const start = new Date(startIso);
+  const end = new Date(endIso);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '时间格式非法';
   if (end <= start) return '结束时间必须晚于开始时间';
 
   const payload: UpsertCampaignPayload = {
     name,
     type: form.type,
-    startAt: start.toISOString(),
-    endAt: end.toISOString(),
+    startAt: startIso,
+    endAt: endIso,
     status: form.status,
     onlyNewUsers: form.onlyNewUsers,
     payload: {},

@@ -7,19 +7,18 @@
 | 组件 | `frontend/src/layout/AppHeader.tsx`（外壳组合见 `AppLayout.tsx`） |
 | 样式 | `frontend/src/layout/AppLayout.css` 的 `.app-header` / `.app-topnav*` 区块 |
 | 数据 | `GET /capabilities` 的分组与能力名派生导航下拉 |
-| 高度契约 | `--workspace-topbar-height: calc(64px + var(--promo-topbar-height))` |
+| 高度契约 | `--workspace-topbar-height: 64px`（≤900px 54px） |
 
 ## 1. 外壳结构
 
 ```
-PromoBar  40px（≤900px 隐藏，并置 html[data-promo='off']）
 AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 ├── .app-brand          36×36 标记 + 「货觉」+ 紫色 AI 后缀
 ├── .app-topnav         flex:1，8 个导航项
 └── .app-header-right   消息铃铛 / 算力胶囊 / 用户菜单｜游客「登录 / 注册」
 ```
 
-`--workspace-topbar-height` 是跨组件契约：侧栏的 `top`/`height`、多图融合页与 pk 工作区的 `calc` 都读它。促销条显隐必须同步更新这个变量（由 `html[data-promo]` 驱动），只写 `display:none` 会让依赖它的页面高度算错 40px。
+`--workspace-topbar-height` 是跨组件契约：侧栏的 `top`/`height`、多图融合页与 pk 工作区的 `calc` 都读它，桌面固定 64px、≤900px 为 54px。
 
 ## 2. 规格
 
@@ -135,9 +134,8 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 ## 4. 实现约束
 
 1. 导航项数量由能力分组派生，新增分组自动进下拉；不要在组件里写死组数或组名。
-2. 下拉皮肤全部写在 `global.css`，组件只给 `classNames.root`；不要在 JSX 里塞内联样式。
+2. 下拉皮肤写在 `layout/AppHeader.css` / `layout/UserAccountMenu.css`，组件只给 `classNames.root`；不要在 JSX 里塞内联样式。
 3. 顶部高度只通过 `--workspace-topbar-height` 传递，页面里不要另外 `calc(100vh - 64px)`。
-4. `html[data-promo]` 与 PromoBar 的显隐必须由同一处 `matchMedia` 逻辑驱动。
 
 ## 5. 验证
 

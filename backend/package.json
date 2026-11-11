@@ -37,6 +37,7 @@
     "seed:legal": "ts-node -T scripts/seed-legal.ts",
     "seed:messages": "ts-node -T scripts/seed-message-templates.ts",
     "seed:templates": "ts-node -T scripts/seed-template-catalog.ts",
+    "import:templates": "ts-node -T scripts/import-portrait-templates.ts",
     "verify:billing": "ts-node -T scripts/verify-billing.ts",
     "verify:credits": "ts-node -T scripts/verify-credit-deduction.ts",
     "verify:credit-price": "ts-node -T scripts/verify-credit-price.ts",

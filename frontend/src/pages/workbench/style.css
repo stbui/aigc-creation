@@ -2,7 +2,7 @@
  * 工作台页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
  *
  * 只放本页独占选择器；共享组件（AppLayout / 登录弹窗 / SideRail 等）
- * 与设计令牌仍留在 `styles/global.css`。
+ * 与设计令牌（`styles/tokens.css`）仍留在全局样式层。
  */
 
 /* hero: 参考站 .wb-workflow-banner — 实拍 1148x212 (1280) / radius 16 / padding 0 100px /
@@ -11,6 +11,86 @@
    侧栏改 ≤1366px 自动塌缩为 100px 轨后双态均自然对齐参考站实测 —— 轨态 (侧栏 100 + 重叠 16
    + padding 24 + 100) 标题落 x=208 (= 参考站 1280 实测); 横排态 (176 + 24 + 100) 落
    x=300 (= 参考站 1440 实测)。84px 在 176px 侧栏下反而偏 16px (321 vs 300)。 */
+
+/* ───────── 工作台 (对齐参考站视觉, 数值来自实拍 computed styles) ───────── */
+
+/* 内容宽 = 视口 − 侧栏 − 48, 不设 max-width (2026-10-19 修正, 原 1142 上限):
+   参考站实测无上限 (1280→1148 / 1440→1216 / 1920→1696 全宽), 且本页有「不偏移、
+   没有差异」的硬要求 (见下方 hero 注释)。1142 上限会在横排档把 hero 标题
+   挤到 x=337 (参考站 300, 偏 37px), 故整页跟随参考站全宽。 */
+
+.workbench {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .wb-dashboard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wb-account-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .wb-hero {
+    height: auto;
+    min-height: 196px;
+    padding: 22px 20px;
+  }
+
+  .wb-hero-title {
+    font-size: 24px;
+    line-height: 1.4;
+    margin-bottom: 12px;
+    letter-spacing: 0;
+  }
+
+  .wb-hero-sub {
+    font-size: 14px;
+    line-height: 1.65;
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .workbench-content { padding: 12px 10px 40px; }
+
+  .wb-workflow-banner {
+    height: 160px;
+    padding: 18px 20px;
+    background-position: 65%;
+  }
+
+  .wb-workflow-banner h1 { max-width: 220px; font-size: 20px; line-height: 28px; }
+
+  .wb-workflow-banner p { max-width: 230px; margin-top: 12px; font-size: 12px; line-height: 20px; }
+
+  .wb-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+  .wb-panel.wb-account,
+  .wb-panel.wb-recent,
+  .wb-panel.wb-dashboard { padding: 16px; }
+
+  .wb-account-metrics { grid-template-columns: 1fr; }
+
+  .wb-dashboard-head,
+  .wb-dashboard-head > div:first-child { flex-direction: column; align-items: flex-start; }
+
+  .wb-dashboard-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  .wb-dashboard-stats > div { padding: 16px; }
+
+  .wb-jobs-list { gap: 16px; margin-top: 16px; }
+
+  .wb-job { gap: 12px; height: 64px; }
+
+  .wb-job-thumb { flex-basis: 64px; width: 64px; height: 64px; border-radius: 7px; }
+
+  .wb-job-status { display: none; }
+}
+
 .wb-hero {
   position: relative;
   display: flex;
@@ -39,13 +119,6 @@
   color: var(--wb-text-hero);
   margin: 0 0 24px;
   letter-spacing: 0.2px;
-}
-
-.wb-hero-sub {
-  font-size: 17px;
-  line-height: 31px;
-  color: var(--wb-text-muted);
-  margin: 0;
 }
 
 /* hero 右侧真实产出作品集: 主图 + 两张偏移小卡 (无产出时由 HeroArt 回退 SVG)。
@@ -384,10 +457,6 @@
   flex-direction: column;
 }
 
-.wb-panel-recent {
-  border-radius: var(--radius-panel);
-}
-
 /* 数据区严格按参考站样式产物 (`wb-*`):
    panel-title  flex space-between center gap12; 按钮 12px var(--wb-text-muted) inline-flex gap3 padding0
    account-metrics grid 1fr 1fr 1.35fr gap16; 块 var(--wb-surface) radius8 padding 20 24
@@ -407,14 +476,6 @@
   margin-bottom: 16px;
 }
 
-.wb-panel-head h3 {
-  margin: 0;
-  line-height: 22px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--wb-text);
-}
-
 .wb-panel-link {
   display: inline-flex;
   align-items: center;
@@ -428,19 +489,10 @@
   padding: 0;
 }
 
-.wb-panel-link:hover {
-  color: var(--wb-brand);
-}
-
 /* .wb-panel-loading 已移除 (2026-10-20): 面板加载态改用 StateSkeleton 骨架屏,
    由 .state-skeleton 自带脉动动画, 不再需要单独的居中转圈容器。 */
 
 /* 指标块: 灰底卡片 (账号面板 padding 20 24, 数据面板 padding 24) */
-.wb-account-metrics {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.35fr;
-  gap: 16px;
-}
 
 .wb-metric-block {
   display: flex;
@@ -537,43 +589,6 @@
 }
 
 /* 最近任务: 80x80 job 行 (参考站 wb-job-thumb / wb-job-copy / wb-job-status) */
-.wb-jobs-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin-top: 24px;
-}
-
-.wb-job {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  text-align: start;
-}
-
-.wb-job-thumb {
-  flex: 0 0 80px;
-  width: 80px;
-  height: 80px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: var(--radius-control);
-  background: var(--wb-surface);
-  color: var(--wb-text-desc);
-}
-
-.wb-job-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
 
 .wb-job-copy {
   flex: 1;
@@ -613,13 +628,6 @@
   color: var(--wb-brand);
 }
 
-.wb-jobs-empty {
-  color: var(--wb-text-muted);
-  text-align: center;
-  padding: 100px 0;
-  font-size: 13px;
-}
-
 /* 数据面板: 6 格指标 + 210px 趋势图 */
 .wb-dashboard-head {
   margin-bottom: 0;
@@ -633,17 +641,6 @@
   border-radius: var(--radius-panel);
   padding: 7px 12px;
   font-size: 12px;
-}
-
-.wb-dashboard-stats {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 24px;
-}
-
-.wb-dashboard-stats .wb-metric-block {
-  padding: 24px;
 }
 
 .wb-chart-title {
@@ -714,7 +711,7 @@
 /* ── 工作台严格 1:1 覆盖层 (参考站 wb-* 规则字面值, 2026-10-17)
    置于工作台区块之后, 覆盖前面为通用 token 写的值, 保证逐条对齐参考站产物 CSS ── */
 .wb-workflow-banner .wb-hero-title,
-.wb-hero-title {
+  .wb-hero-title {
   color: var(--wb-text-hero);
   font-size: 32px;
   font-weight: 500;
@@ -871,10 +868,6 @@
 }
 
 /* 流水表: 参考 .wb-account th/td + .wb-flow-type */
-.wb-flow-head {
-  margin: 24px 0 12px;
-  font-size: 14px;
-}
 
 .wb-flow-table th {
   color: var(--wb-text-body);
@@ -889,13 +882,6 @@
   padding: 9px 12px;
 }
 
-.wb-flow-type {
-  border-radius: var(--radius-tag);
-  padding: 2px 7px;
-  font-size: 12px;
-  line-height: 15px;
-}
-
 .wb-flow-type.flow-income {
   color: var(--wb-flow-income-fg);
   background: var(--wb-flow-income-bg);
@@ -907,22 +893,9 @@
 }
 
 /* 最近任务: 参考 .wb-jobs-list / .wb-job-* */
-.wb-jobs-list {
-  gap: 24px;
-  margin-top: 24px;
-}
-
-.wb-job-thumb {
-  flex: 0 0 80px;
-  width: 80px;
-  height: 80px;
-  border-radius: var(--radius-control);
-  background: var(--wb-thumb-bg);
-  color: var(--wb-thumb-fg);
-}
 
 .wb-job-copy b,
-.wb-job-name {
+  .wb-job-name {
   display: block;
   font-size: 14px;
   font-weight: 400;
@@ -941,13 +914,6 @@
   margin-top: 8px;
 }
 
-.wb-job-status {
-  flex: 0 0 80px;
-  width: 80px;
-  font-size: 14px;
-  line-height: 16px;
-}
-
 .wb-job-status.status-succeeded {
   color: var(--wb-status-completed);
 }
@@ -957,15 +923,8 @@
 }
 
 .wb-job-status.status-running,
-.wb-job-status.status-pending {
+  .wb-job-status.status-pending {
   color: var(--wb-status-processing);
-}
-
-.wb-jobs-empty {
-  color: var(--wb-empty);
-  text-align: center;
-  padding: 100px 0;
-  font-size: 13px;
 }
 
 /* 数据面板: 参考 .wb-dashboard-* / .wb-chart-title / .wb-trend-chart。
@@ -1212,8 +1171,8 @@
 }
 
 .wb-panel.wb-account,
-.wb-panel.wb-recent,
-.wb-panel.wb-dashboard {
+  .wb-panel.wb-recent,
+  .wb-panel.wb-dashboard {
   display: block;
   min-height: auto;
   padding: 24px;
@@ -1224,8 +1183,8 @@
 }
 
 .wb-panel-title,
-.wb-dashboard-head,
-.wb-flow-head {
+  .wb-dashboard-head,
+  .wb-flow-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1233,7 +1192,7 @@
 }
 
 .wb-panel-title strong,
-.wb-dashboard-head strong {
+  .wb-dashboard-head strong {
   color: var(--wb-text);
   font-size: 16px;
   font-weight: 600;
@@ -1241,7 +1200,7 @@
 }
 
 .wb-panel-title button,
-.wb-flow-head button {
+  .wb-flow-head button {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -1400,7 +1359,7 @@
 }
 
 .wb-dashboard-stats span,
-.wb-dashboard-stats b {
+  .wb-dashboard-stats b {
   display: block;
 }
 
@@ -1466,7 +1425,7 @@
 }
 
 .wb-job-copy b,
-.wb-job-copy > span {
+  .wb-job-copy > span {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;

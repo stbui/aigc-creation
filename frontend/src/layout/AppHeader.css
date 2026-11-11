@@ -1,0 +1,299 @@
+/**
+ * 顶部导航（AppHeader）。
+ * 从 AppLayout.css 按组件拆出；只放本组件的选择器，外壳骨架留在 AppLayout.css。
+ */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: var(--color-card);
+  /* 参考站实拍 border-bottom 1px #f2f3f5 —— 比全局 --color-border(#e2e8f0) 更浅 */
+  border-bottom: 1px solid var(--color-border-soft);
+  padding: 0 24px; /* 参考站 padding 0 24 (原 0 20, 品牌块 x 差 4px) */
+  height: 64px;
+  /* antd <Header> 默认 line-height:64px 会被子元素继承, 使 .app-quota / .app-user 的
+     行盒撑到 64px (再加 padding 即 72px), 溢出 64px 顶栏上下各 4px —— 2026-10-19 实测复现, 此处归零 */
+  line-height: normal;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.app-header.is-scrolled {
+  border-bottom-color: var(--color-border-soft);
+  box-shadow: 0 8px 24px rgba(31, 41, 55, 0.06);
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text-strong);
+  flex-shrink: 0;
+}
+
+/* brand 图标块 36x36 (对齐参考站 workspace-brand-logo 尺寸);
+   2026-10-19 换货觉AI「觉眼」logo (SVG 自带渐变容器, 此处不再铺底色) */
+.app-brand-mark {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: inline-flex;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.app-brand-mark-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* AI 后缀: 品牌紫, 与主名「货觉」深色形成层级 */
+.app-brand-ai {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.app-brand-text {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.app-topnav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+/* 顶栏导航: 对齐参考站 workspace-auth-nav button (13px/700 #667085 / radius8 / padding 0 14 / hover #5546d8 on #f1efff) */
+.app-topnav-item {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 14px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-control);
+  white-space: nowrap;
+  flex: none;
+}
+
+.app-topnav-item:hover {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.app-topnav-item-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px; /* 参考站下拉条目 gap 10 (icon 20 ↔ 文字) */
+}
+
+/* 顶栏动作控件统一底座：32px 高、透明底、悬停品牌淡紫。
+   铃铛 / 账户 / 登录注册 / 汉堡按钮只在此基础上声明各自差异。 */
+.app-header-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.app-header-action:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+/* guest「登录/注册」纯文字钮: 参考站 #workspace-logout (68x32 / pad 8 / radius 6 / 13-700 #667085) */
+.app-guest-login {
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/*
+ * 右侧动作区 (2026-10-30 收拢)
+ *
+ * 之前三个控件的视觉尺度各走各的: 铃铛 32 高、余额胶囊 24 高、用户钮 34 高，
+ * 余额又是灰字灰底，看起来像一段不可点的状态文字。现在统一成 32px 控件带，
+ * 余额用「白底 + 细描边 + 深色数字」成为唯一有量的信息，身份区前加一道
+ * 16px 细分割线；hover 一律落到品牌淡紫，强调色仍然只给交互态。
+ */
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.app-header-divider {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+}
+
+.app-quota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--color-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.app-quota:hover {
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-color: var(--brand);
+}
+
+.app-quota svg {
+  flex: none;
+  color: var(--text-desc);
+  transition: color 0.18s ease;
+}
+
+.app-quota:hover svg {
+  color: var(--brand);
+}
+
+.app-quota-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.18s ease;
+}
+
+.app-quota:hover .app-quota-num {
+  color: var(--brand);
+}
+
+.app-quota-label {
+  color: inherit;
+}
+
+/* 移动端汉堡按钮: 仅 ≤900px 显示 (桌面隐藏), 点击开 Drawer 承载侧栏 */
+.app-mobile-toggle {
+  display: none;
+}
+@media (max-width: 1149px) {
+  .app-quota,
+  .app-header-divider {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  /* 参考站移动态 390 实测: 无促销条 / 顶栏 54px (pad 0 14) / 侧栏 display:none / 2 列网格 */
+  .app-header {
+    height: 54px;
+    padding: 0 14px;
+    gap: 12px;
+  }
+  .app-topnav,
+  .app-quota,
+  .app-header-divider {
+    display: none;
+  }
+  .app-mobile-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-control);
+    color: var(--wb-text);
+    cursor: pointer;
+  }
+  .app-mobile-toggle:hover {
+    background: var(--brand-bg);
+    color: var(--brand);
+  }
+}
+
+/* 顶部导航下拉：Radix Content 取代 .ant-dropdown-menu */
+.app-topnav-dropdown.ui-dropdown-content {
+  min-width: 137px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-2);
+  background: var(--card-bg);
+  box-shadow: 0 18px 42px rgba(31, 41, 55, 0.14);
+}
+
+.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item:hover {
+  background: var(--surface-brand-4);
+  color: var(--text-brand-2);
+}
+
+.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item[data-disabled] {
+  color: var(--shell-text-2);
+}
+
+.app-topnav .ui-btn.app-topnav-item {
+  padding: 0 14px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.app-topnav .ui-btn.app-topnav-item:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+@media (min-width: 901px) and (max-width: 1024px) {
+
+/* 901–1024：此时侧栏仍在（折叠 60），但顶栏还是桌面版。8 项导航 + 右侧动作区
+   最小需要约 995px，901–994 会顶出文档级横向滚动（≤900 才切移动外壳）。
+   这一段只收内边距与间距：顶栏左右 24 → 12、导航项 14 → 8、导航间距 10 → 2；
+   字号与 8 项导航不动 —— 参考站 900 档同样显示全部 8 项。 */
+  .app-header {
+    padding: 0 12px;
+  }
+  .app-topnav {
+    gap: 2px;
+  }
+  .app-topnav .app-topnav-item,
+  .app-topnav .ui-btn.app-topnav-item {
+    padding: 0 8px;
+  }
+}

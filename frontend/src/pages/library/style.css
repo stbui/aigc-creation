@@ -6,6 +6,25 @@
  */
 
 /* ───────── 素材库 (复刻参考站 asset-library-*: 5 列方形卡 / radius14 / 批量条 / 分组面板) ───────── */
+
+@media (max-width: 720px) {
+
+  .asset-library-page { padding: 18px 12px 36px; }
+
+  .asset-library-header { align-items: flex-start; margin-bottom: 17px; }
+
+  .asset-library-title { font-size: 24px; line-height: 34px; }
+}
+
+/* * shadcn Button 的默认 size 带 `h-9`（36px）。下列皮肤的高度由内容或
+ * `aspect-ratio` 决定，页面 CSS 里没有写 height，`h-9` 会压过宽高比 ——
+ * 表现为图片型按钮被压成 36px 高的横条（结果缩略图、素材卡整张被裁掉）。
+ * 这些类只加显式高度，其余尺寸仍由各自皮肤决定。 */
+
+.alp-card.ui-btn {
+  height: auto;
+}
+
 .asset-library-page {
   min-height: calc(100vh - var(--workspace-topbar-height));
   box-sizing: border-box;
@@ -23,15 +42,6 @@
   margin-bottom: 22px;
 }
 
-.asset-library-title {
-  margin: 0;
-  /* 参考站 #asset-library-title 实测 28px/700/lh40 (原 24px/600, 2026-10-19 修正) */
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 40px;
-  color: var(--text-strong);
-}
-
 .asset-library-header-actions {
   display: flex;
   align-items: center;
@@ -40,7 +50,7 @@
 }
 
 .asset-library-date-filter,
-.asset-library-button {
+  .asset-library-button {
   height: 42px;
   padding: 0 15px;
   display: inline-flex;
@@ -65,7 +75,7 @@
 
 /* hover 对齐参考站 .asset-library-button:hover → color #5848da / bg #f4f2ff / border #7668ef (2026-10-18 交互态对拍补充) */
 .asset-library-button:hover,
-.asset-library-date-filter:hover {
+  .asset-library-date-filter:hover {
   border-color: var(--alp-border-brand-2);
   color: var(--alp-text-brand-2);
   background: var(--alp-surface-brand-4);
@@ -145,7 +155,7 @@
 
 /* 分组选中态: 与批量条同一套品牌紫浅底, 不引入新色 */
 .asset-library-group-item.is-active,
-.asset-library-group-item[data-state='on'] {
+  .asset-library-group-item[data-state='on'] {
   background: var(--brand-bg);
   border-color: var(--brand);
   color: var(--brand-hover);
@@ -158,13 +168,13 @@
 }
 
 .asset-library-group-item.is-active .asset-library-group-count,
-.asset-library-group-item[data-state='on'] .asset-library-group-count {
+  .asset-library-group-item[data-state='on'] .asset-library-group-count {
   color: var(--brand-hover);
 }
 
 /* 分组依据切换器 (2026-10-21): 未选中是虚线灰, 选中填实底 */
 .asset-library-new-group.is-active,
-.asset-library-new-group[data-state='on'] {
+  .asset-library-new-group[data-state='on'] {
   border-style: solid;
   border-color: var(--brand);
   background: var(--brand-bg);
@@ -382,7 +392,7 @@
 }
 
 .asset-library-check.on,
-.asset-library-check[data-state='checked'] {
+  .asset-library-check[data-state='checked'] {
   background: var(--alp-surface-brand-2);
   border-color: var(--alp-border-brand-1);
 }

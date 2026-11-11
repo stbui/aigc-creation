@@ -152,6 +152,7 @@ export class AdminCampaignsController {
       pageSize: query.pageSize,
       type: query.type,
       status: query.status,
+      effective: query.effective,
       keyword: query.keyword,
     });
   }
@@ -176,7 +177,7 @@ export class AdminCampaignsController {
 
   @Patch(":id/toggle")
   toggle(@Param("id") id: string) {
-    return this.marketing.disableCampaign(id);
+    return this.marketing.toggleCampaign(id);
   }
 
   @Delete(":id")

@@ -186,7 +186,7 @@
 
 /* 按钮：业务类名仍写在 Button 上，但 DOM 已不再带 .ant-btn */
 .tool-submit.ui-btn,
-.tool-submit.ui-btn:hover:not(:disabled) {
+  .tool-submit.ui-btn:hover:not(:disabled) {
   background: var(--brand);
   border-color: var(--brand);
   /* 迁移 shadcn 时漏抄, 2026-11-03 补回: 提交主 CTA 的字重/字距 */

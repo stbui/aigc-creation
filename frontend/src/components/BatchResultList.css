@@ -128,7 +128,7 @@
 }
 
 .pd-result-meta-chip,
-.pd-result-status {
+  .pd-result-status {
   display: inline-flex;
   align-items: center;
   height: 22px;
@@ -310,7 +310,7 @@
 
 /* 原图是参照物, 与产出区分: 稍深的描边 */
 .pd-result-cell-source .pd-result-thumb,
-.pd-result-cell-source .pd-result-source-thumb {
+  .pd-result-cell-source .pd-result-source-thumb {
   border-color: var(--border);
 }
 
@@ -390,8 +390,8 @@
 
 /* 非图状态 (生成中 / 失败 / 原图缺失) 与图片同框同尺寸, 行内保持对齐 */
 .pd-result-thumb.is-pending,
-.pd-result-thumb.is-failed,
-.pd-result-thumb.is-empty {
+  .pd-result-thumb.is-failed,
+  .pd-result-thumb.is-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -404,7 +404,7 @@
 
 /* 非图状态没有「悬停变紫」, 否则会被读成可点 */
 .pd-result-thumb.is-pending:hover,
-.pd-result-thumb.is-failed:hover {
+  .pd-result-thumb.is-failed:hover {
   border-color: var(--border-soft);
 }
 
@@ -477,7 +477,7 @@
 }
 
 .pd-result-thumb-wrap:hover .pd-result-download,
-.pd-result-download:focus-visible {
+  .pd-result-download:focus-visible {
   opacity: 1;
 }
 

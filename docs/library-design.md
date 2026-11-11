@@ -6,9 +6,9 @@
 | --- | --- |
 | 路由 | `/library`，别名 `/asset-library` |
 | 页面组件 | `frontend/src/pages/library/page.tsx` |
-| 样式 | `frontend/src/styles/global.css` 的 `.asset-library-*` 区块 |
+| 样式 | `frontend/src/pages/library/style.css` |
 | 组件来源 | `frontend/src/ui`；底层使用 shadcn / Radix 组合件 |
-| 全站字体与令牌 | `docs/typography.md`、`frontend/src/styles/global.css` 的 `:root` |
+| 全站字体与令牌 | `docs/typography.md`、`frontend/src/styles/tokens.css` 的 `:root` |
 | 数据接口 | `GET /assets`、`POST /assets/upload`、`DELETE /assets/:id` |
 
 ## 1. 设计原则

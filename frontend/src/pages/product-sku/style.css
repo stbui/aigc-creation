@@ -5,6 +5,16 @@
  * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
  */
 
+@media (max-width: 1024px) {
+
+  .pk-workspace.product-sku-page,
+  .pk-workspace.product-sku-page.pk-workspace-trailing,
+  .pk-workspace.product-sku-page.pk-workspace-trailing-collapsed {
+    height: auto;
+    min-height: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .product-sku-history.is-compact {
     transition: none;
@@ -25,46 +35,11 @@
   gap: 8px;
 }
 
-.product-sku-card-heading-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
 .product-sku-card-heading-top h2 {
   font-size: 14px;
   font-weight: 700;
   color: var(--wb-text);
   margin: 0;
-}
-
-.product-sku-card-heading-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.product-sku-card-heading-copy {
-  font-size: 12px;
-  line-height: 20px;
-  color: var(--text-desc);
-  margin: 0;
-}
-
-.product-sku-template-upload-wrap {
-  position: relative;
-  display: block;
-}
-
-.product-sku-template-loading {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-control);
-  background: rgba(255, 255, 255, 0.72);
 }
 
 .product-sku-template-actions {
@@ -286,18 +261,6 @@ ol.product-sku-steps {
   place-items: center;
 }
 
-.product-sku-step strong {
-  font-size: 13px;
-  color: var(--wb-text);
-  font-weight: 600;
-}
-
-.product-sku-step span {
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-desc);
-}
-
 /* SKU 清单编辑器 */
 .product-sku-rows {
   display: grid;
@@ -334,7 +297,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-row-field input,
-.product-sku-row-field select {
+  .product-sku-row-field select {
   width: 100%;
   height: 32px;
   border: 1px solid var(--border);
@@ -348,7 +311,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-row-field input:focus,
-.product-sku-row-field select:focus {
+  .product-sku-row-field select:focus {
   border-color: var(--brand-light);
 }
 
@@ -422,8 +385,8 @@ ol.product-sku-steps {
 }
 
 .product-sku-card-heading h2,
-.product-sku-steps-card h2,
-.product-sku-list-heading strong {
+  .product-sku-steps-card h2,
+  .product-sku-list-heading strong {
   margin: 0;
   color: var(--text-2);
   font-size: 14px;
@@ -447,7 +410,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-card-heading-actions .workspace-material-library-trigger,
-.product-sku-card-heading-actions .mobile-upload-trigger {
+  .product-sku-card-heading-actions .mobile-upload-trigger {
   min-height: 13px;
   padding: 0;
   border: 0;
@@ -801,8 +764,8 @@ ol.product-sku-steps {
 }
 
 .product-sku-reference-upload,
-.product-sku-variant-title .workspace-material-library-trigger,
-.product-sku-variant-title .mobile-upload-trigger {
+  .product-sku-variant-title .workspace-material-library-trigger,
+  .product-sku-variant-title .mobile-upload-trigger {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -818,8 +781,8 @@ ol.product-sku-steps {
 }
 
 .product-sku-reference-upload:hover,
-.product-sku-variant-title .workspace-material-library-trigger:hover,
-.product-sku-variant-title .mobile-upload-trigger:hover {
+  .product-sku-variant-title .workspace-material-library-trigger:hover,
+  .product-sku-variant-title .mobile-upload-trigger:hover {
   color: var(--brand);
 }
 
@@ -931,7 +894,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-result-retry,
-.product-sku-stage-retry {
+  .product-sku-stage-retry {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -948,12 +911,12 @@ ol.product-sku-steps {
 }
 
 .product-sku-result-retry:hover:not(:disabled),
-.product-sku-stage-retry:hover:not(:disabled) {
+  .product-sku-stage-retry:hover:not(:disabled) {
   background: var(--sku-surface-brand-4);
 }
 
 .product-sku-result-retry:disabled,
-.product-sku-stage-retry:disabled {
+  .product-sku-stage-retry:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -1057,7 +1020,7 @@ ol.product-sku-steps {
 
 /* 已选模板图预览 / 已生成结果：图片区不铺底色，框选区域叠在其上 */
 .product-sku-stage-source,
-.product-sku-stage-image {
+  .product-sku-stage-image {
   background: transparent;
 }
 
@@ -1331,13 +1294,13 @@ ol.product-sku-steps {
 }
 
 .product-sku-history-card:hover .product-sku-history-actions,
-.product-sku-history-card:focus-within .product-sku-history-actions {
+  .product-sku-history-card:focus-within .product-sku-history-actions {
   opacity: 1;
   visibility: visible;
 }
 
 .product-sku-history-actions button,
-.product-sku-history-actions a {
+  .product-sku-history-actions a {
   display: grid;
   place-items: center;
   width: 24px;
@@ -1351,7 +1314,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-history-actions button:hover,
-.product-sku-history-actions a:hover {
+  .product-sku-history-actions a:hover {
   background: var(--brand);
   color: var(--card-bg);
 }
@@ -1485,7 +1448,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-editor-toolbar > button,
-.product-sku-editor-tool-wrap > button {
+  .product-sku-editor-tool-wrap > button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1501,7 +1464,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-editor-toolbar > button.active,
-.product-sku-editor-tool-wrap > button.active {
+  .product-sku-editor-tool-wrap > button.active {
   color: var(--sku-text-brand-2);
 }
 
@@ -1645,12 +1608,12 @@ ol.product-sku-steps {
 }
 
 .product-sku-editor-frame.tool-rect,
-.product-sku-editor-frame.tool-ellipse {
+  .product-sku-editor-frame.tool-ellipse {
   cursor: crosshair;
 }
 
 .product-sku-editor-frame.tool-brush,
-.product-sku-editor-frame.tool-eraser {
+  .product-sku-editor-frame.tool-eraser {
   cursor: crosshair;
 }
 
@@ -1843,9 +1806,6 @@ ol.product-sku-steps {
     gap: 10px;
     padding: 10px;
   }
-  .product-sku-template-ready {
-    gap: 14px;
-  }
   .product-sku-template-thumb {
     flex-basis: 132px;
     width: 132px;
@@ -1889,23 +1849,6 @@ ol.product-sku-steps {
   }
   .product-sku-template-upload {
     min-height: 130px;
-  }
-  .product-sku-template-ready {
-    gap: 10px;
-  }
-  .product-sku-template-thumb {
-    flex-basis: 112px;
-    width: 112px;
-    height: 112px;
-  }
-  .product-sku-template-ready > div {
-    grid-auto-rows: 34px;
-    gap: 6px;
-  }
-  .product-sku-template-ready > div > button {
-    min-height: 34px;
-    padding-inline: 9px;
-    font-size: 12px;
   }
   .product-sku-result-panel {
     min-height: 520px;

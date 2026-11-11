@@ -5,6 +5,18 @@
  */
 
 /* 高级设置折叠壳（参考站共享组件 .image-output-settings-*） */
+
+@keyframes image-output-settings-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .image-output-settings-shell {
   position: relative;
   container: image-output-settings / inline-size;

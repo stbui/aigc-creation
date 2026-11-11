@@ -64,22 +64,24 @@ pages/admin/channels/
 ### 页面 CSS 归属
 
 - **只放本页独占的选择器**（如 `product-sku-*`、`smart-expand-*`、页面根类
-  `.my-works-page`）。共享骨架（`.pk-workspace` / `.tool-*` / `.state-*` / 全局
-  设计令牌）与跨页组件（`.product-recolor-result*`、`.fc-result-item*`、
-  `pd-*` 等）仍留在 `styles/global.css`。
+  `.my-works-page`）。共享骨架（`.pk-workspace` / `.tool-*` 在
+  `styles/tool-workspace.css`，`.ui-*` 兼容层在 `styles/ui-compat.css`）与全局
+  设计令牌（`styles/tokens.css`）不搬进页面文件。
 - 多文件目录用 `style.css`，由 `index.ts` 以 `import './style.css';` 引入；
   单文件页面用同名 `<PageName>.css`（如 `CreditsPage.tsx` + `CreditsPage.css`），
   在页面文件顶部引入。两者都随路由 chunk 懒加载，不要在组件里另行引入。
 - 页面 CSS 在全局 CSS **之后**加载，同优先级规则会覆盖全局规则；迁移时不要
   把需要被全局规则兜底的选择器搬进来。
-- `styles/global.css` 只保留令牌、共享组件与跨页布局；新增页面专属规则直接写进
+- `styles/global.css` 只是分层入口（`@layer` 顺序 + `@import`），不写具体规则：
+  令牌进 `tokens.css`，基础元素与 chrome 高度进 `base.css`，跨页工具皮肤进
+  `tool-workspace.css`，`ui-*` 兼容层进 `ui-compat.css`。新增页面专属规则直接写进
   对应目录的 `style.css` 或同名页面 CSS。
 - 共享组件的样式放组件同名 CSS（`components/ImageLightbox.css` 等），由组件文件
   顶部 `import './<Component>.css';` 引入；被多个组件共用的类（如结果画廊的
   `fc-result-*`）放共用 CSS，由使用它的组件各自引入。
 - 跨页面共享的域样式放 `styles/<域>.css`（如 `redraw.css` 给局部重绘 / 去水印，
   `product-detail-kit.css` 给商品详情 / 商品主图），由相关页面入口或共享组件引入；
-  不要再塞回 `global.css`。
+  不要再塞回 `global.css` 入口。
 
 ## 2. 每个入口的职责
 

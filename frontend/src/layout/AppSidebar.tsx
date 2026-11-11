@@ -1,3 +1,4 @@
+import './AppSidebar.css';
 import { Drawer } from '../ui';
 import { Link, useLocation } from 'react-router-dom';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';

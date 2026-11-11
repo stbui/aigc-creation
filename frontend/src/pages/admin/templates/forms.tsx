@@ -1,10 +1,9 @@
-import { useState, type ReactNode } from 'react';
-import { ImageIcon } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import { ImageIcon, Upload } from 'lucide-react';
 
 import {
   ActionButton,
   Drawer,
-  FilePicker,
   FormField,
   NumberField,
   SwitchField,
@@ -230,12 +229,11 @@ export function ItemFormDrawer({
 }) {
   const toast = useToast();
   const [draft, setDraft] = useState<ItemDraft>(initial);
-  const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const patch = (next: Partial<ItemDraft>) => setDraft((prev) => ({ ...prev, ...next }));
 
   const upload = async (next: File) => {
-    setFile(next);
     setUploading(true);
     try {
       const result = await adminTemplateCatalogApi.uploadImage(next);
@@ -245,7 +243,6 @@ export function ItemFormDrawer({
       toast.error(error instanceof Error ? error.message : '图片上传失败');
     } finally {
       setUploading(false);
-      setFile(null);
     }
   };
 
@@ -277,30 +274,53 @@ export function ItemFormDrawer({
 
       <FormField label="预览图" required hint="原图会保存到当前存储后端，C 端读取时重新生成访问地址">
         <div className="space-y-2">
-          <div className="flex h-40 w-full items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40">
+          <button
+            type="button"
+            className="group relative flex h-40 w-full items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="点击选择模板图片"
+            title="点击更换图片"
+          >
             {draft.previewUrl ? (
-              <img
-                src={draft.previewUrl}
-                alt="模板预览"
-                className="h-full w-full object-contain"
-              />
+              <>
+                <img
+                  src={draft.previewUrl}
+                  alt="模板预览"
+                  className="h-full w-full object-contain"
+                />
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-foreground/60 px-2 py-1 text-center text-[12px] text-background opacity-0 transition-opacity group-hover:opacity-100">
+                  点击更换图片
+                </span>
+              </>
             ) : (
               <span className="flex flex-col items-center gap-1 text-[12px] text-muted-foreground">
                 <ImageIcon className="size-5" aria-hidden />
-                暂无图片
+                点击上传图片
               </span>
             )}
-          </div>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+            className="hidden"
+            disabled={uploading}
+            onChange={(event) => {
+              const next = event.target.files?.[0];
+              event.target.value = '';
+              if (next) void upload(next);
+            }}
+          />
           <div className="flex items-center gap-3">
-            <FilePicker
-              file={file}
-              accept="image/png,image/jpeg,.png,.jpg,.jpeg"
-              onPick={(next) => void upload(next)}
-              onClear={() => setFile(null)}
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              icon={Upload}
               disabled={uploading}
-              label={draft.previewUrl ? '更换图片' : '上传图片'}
-              hint="PNG / JPEG"
-            />
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {draft.previewUrl ? '更换图片' : '上传图片'}
+            </ActionButton>
             {draft.imageUrl && (
               <ActionButton
                 variant="ghost"
@@ -311,10 +331,16 @@ export function ItemFormDrawer({
                 移除
               </ActionButton>
             )}
+            <span className="text-[12px] text-muted-foreground">PNG / JPEG / WebP</span>
           </div>
           <TextField
             value={draft.imageUrl}
-            onChange={(imageUrl) => patch({ imageUrl })}
+            onChange={(imageUrl) => {
+              const next = imageUrl.trim();
+              // 手工填写站内路径 / http 地址时同步刷新预览；storage:// 引用无法直接渲染，交给上传按钮
+              const previewUrl = next.startsWith('/') || /^https?:\/\//.test(next) ? next : '';
+              patch({ imageUrl, previewUrl });
+            }}
             placeholder="也可以直接填写 /templates/... 或 storage://..."
             ariaLabel="模板图片地址"
             maxLength={500}

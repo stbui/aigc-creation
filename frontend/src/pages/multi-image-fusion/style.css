@@ -17,6 +17,471 @@
    ──────────────────────────────────────────────────────────────────────────────── */
 
 /* ══ A. 页面容器 / 两步流根 ══ */
+
+@container image-output-settings (width <= 300px) {
+  .multi-image-fusion-ratio-options,
+  .multi-image-fusion-resolution-grid {
+    gap: 7px;
+  }
+  .multi-image-fusion-resolution-option {
+    padding-inline: 5px;
+  }
+  .multi-image-fusion-resolution-option span {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .multi-image-fusion-page {
+    padding-inline: 22px;
+  }
+
+  .multi-image-fusion-layout {
+    grid-template-columns: minmax(330px, 380px) minmax(0, 1fr);
+    gap: 15px;
+  }
+
+  .multi-image-fusion-card,
+  .multi-image-fusion-result-panel {
+    border-radius: 15px;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1366px) {
+  .multi-image-fusion-layout {
+    grid-template-columns: var(--mif-col-narrow) minmax(0, 1fr);
+  }
+
+  .multi-image-fusion-control-column {
+    width: var(--mif-col-narrow);
+    max-width: var(--mif-col-narrow);
+  }
+
+  .multi-image-fusion-accessory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0;
+  }
+
+  .multi-image-fusion-accessory-grid .multi-image-fusion-upload-empty {
+    box-sizing: border-box;
+    min-height: 96px;
+    padding: 8px;
+  }
+
+  .multi-image-fusion-accessory-grid .multi-image-fusion-image-card > img {
+    height: 96px;
+  }
+
+  .app-content > .multi-image-fusion-page {
+    padding-left: 24px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .multi-image-fusion-scene-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .multi-image-fusion-page {
+    min-height: 0;
+    padding: 18px 20px 32px;
+  }
+
+  .multi-image-fusion-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .multi-image-fusion-result-panel {
+    min-height: 0;
+  }
+
+  .multi-image-fusion-page {
+    height: auto;
+    min-height: calc(100vh - var(--mif-workspace-topbar-height));
+    padding-bottom: 24px;
+    overflow: visible;
+  }
+
+  .multi-image-fusion-layout {
+    height: auto;
+  }
+
+  .multi-image-fusion-preview-stage,
+  .multi-image-fusion-result-empty {
+    width: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .multi-image-fusion-page.is-scene-selection {
+    height: auto;
+    min-height: calc(100vh - var(--mif-workspace-topbar-height));
+    padding: 16px 16px 24px;
+  }
+
+  .multi-image-fusion-scene-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .multi-image-fusion-scene-visual {
+    min-height: 72px;
+  }
+
+  .multi-image-fusion-editor-head {
+    align-items: flex-start;
+    height: auto;
+  }
+
+  .multi-image-fusion-editor-title p {
+    max-width: none;
+  }
+}
+
+/* 手机端本身就是用手机上传，扫码入口在参考站不渲染。 */
+
+@media (max-width: 900px) {
+  .multi-image-fusion-mobile-upload-link {
+    display: none;
+  }
+
+  .multi-image-fusion-page,
+  .multi-image-fusion-page.is-scene-selection {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    padding: 12px 0 24px;
+  }
+
+  .multi-image-fusion-layout,
+  .multi-image-fusion-page.is-editor .multi-image-fusion-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    display: grid;
+  }
+
+  .multi-image-fusion-control-column,
+  .multi-image-fusion-result-panel,
+  .multi-image-fusion-card {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .multi-image-fusion-control-column,
+  .multi-image-fusion-result-panel {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .multi-image-fusion-page.is-scene-selection {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* 窄屏外壳的内边距是 16px 10px 24px；桌面态的 -24px 逃逸会把页面
+     左右各推出 14px（768 实测 x=-14 / 宽 796）。窄屏撤销逃逸，让页面
+     回到 app-content 的真实内容盒内。 */
+
+@media (max-width: 900px) {
+  .app-content > .multi-image-fusion-page {
+    margin: 0;
+    width: 100%;
+  }
+}
+
+/* 参考站移动态页面内容列贴边；本地外壳原有的 10px 左右内边距
+     会让 390 宽视口只剩 370，与参考站的 390 全宽卡片不一致。 */
+
+@media (max-width: 900px) {
+  .app-content:has(> .multi-image-fusion-page) {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 899px) {
+  .multi-image-fusion-scene-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .multi-image-fusion-accessory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .multi-image-fusion-scene-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .app-content:has(> .multi-image-fusion-page) {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .multi-image-fusion-page {
+    padding-inline: 14px;
+  }
+
+  .multi-image-fusion-result-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .multi-image-fusion-result-actions {
+    width: 100%;
+  }
+
+  .multi-image-fusion-result-actions button {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  .multi-image-fusion-ratio-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .multi-image-fusion-thumbnails {
+    grid-template-columns: repeat(2, max-content);
+  }
+
+  .multi-image-fusion-page,
+  .multi-image-fusion-page.is-scene-selection {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding: 12px 0 24px;
+  }
+
+  .multi-image-fusion-page.is-scene-selection {
+    padding-inline: 16px;
+  }
+
+  .multi-image-fusion-scene-selection {
+    width: calc(100% - 6px);
+    max-width: 100%;
+  }
+
+  .multi-image-fusion-editor-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+    height: auto;
+    margin-bottom: 10px;
+    display: grid;
+  }
+
+  .multi-image-fusion-editor-title,
+  .multi-image-fusion-editor-title > div {
+    min-width: 0;
+  }
+
+  .multi-image-fusion-editor-title h1 {
+    font-size: 18px;
+    line-height: 24px;
+  }
+
+  .multi-image-fusion-editor-title p {
+    max-width: none;
+    margin-top: 2px;
+    font-size: var(--mif-small-size);
+    line-height: 16px;
+  }
+
+  .multi-image-fusion-scene-back {
+    width: 32px;
+    height: 32px;
+  }
+
+  .multi-image-fusion-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .multi-image-fusion-control-column,
+  .multi-image-fusion-upload-section,
+  .multi-image-fusion-accessory-grid {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .multi-image-fusion-card,
+  .multi-image-fusion-result-panel {
+    box-sizing: border-box;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 100%;
+    padding: 12px;
+  }
+
+  .multi-image-fusion-card-heading {
+    margin-bottom: 12px;
+  }
+
+  .multi-image-fusion-upload-section + .multi-image-fusion-upload-section {
+    margin-top: 14px;
+  }
+
+  .multi-image-fusion-field-label {
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .multi-image-fusion-field-label small {
+    flex: none;
+    font-size: var(--mif-tiny-size);
+  }
+
+  .multi-image-fusion-upload-empty {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-height: 120px;
+    padding: 12px;
+  }
+
+  .multi-image-fusion-image-card > img {
+    height: 120px;
+  }
+
+  .multi-image-fusion-accessory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0;
+  }
+
+  .multi-image-fusion-accessory-grid .multi-image-fusion-upload-empty {
+    min-height: 96px;
+  }
+
+  .multi-image-fusion-accessory-grid .multi-image-fusion-image-card > img {
+    height: 96px;
+  }
+
+  .multi-image-fusion-analysis-card,
+  .multi-image-fusion-parameter-card {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .multi-image-fusion-parameter-group + .multi-image-fusion-parameter-group {
+    margin-top: 12px;
+  }
+
+  .multi-image-fusion-ratio-options {
+    gap: 6px;
+  }
+
+  .multi-image-fusion-ratio-options button {
+    min-height: 46px;
+    padding: 6px;
+  }
+
+  .multi-image-fusion-submit-area {
+    padding: 12px 0 0;
+  }
+
+  .multi-image-fusion-editor-title p {
+    font-size: var(--mif-tiny-size);
+  }
+}
+
+@media (max-width: 560px) {
+  .multi-image-fusion-page .image-tool-submit-area {
+    padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+    position: static;
+  }
+}
+
+@media (max-width: 520px) {
+  .multi-image-fusion-scene-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .multi-image-fusion-page.is-editor .multi-image-fusion-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+  }
+
+  .multi-image-fusion-control-column,
+  .multi-image-fusion-result-panel {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .multi-image-fusion-control-column,
+  .multi-image-fusion-result-panel,
+  .multi-image-fusion-card {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .multi-image-fusion-page,
+  .multi-image-fusion-page.is-scene-selection,
+  .multi-image-fusion-card,
+  .multi-image-fusion-result-panel {
+    padding-inline: 10px;
+  }
+
+  .multi-image-fusion-editor-title p {
+    font-size: var(--mif-tiny-size);
+  }
+
+  .multi-image-fusion-scene-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .multi-image-fusion-upload-empty,
+  .multi-image-fusion-analyze-button,
+  .multi-image-fusion-submit-button,
+  .multi-image-fusion-thumbnails button,
+  .multi-image-fusion-preview-image {
+    transition: none;
+  }
+
+  .multi-image-fusion-scene-visual img {
+    transition: none;
+  }
+
+  .multi-image-fusion-scene-card:hover .multi-image-fusion-scene-visual img,
+  .multi-image-fusion-scene-card:focus-visible .multi-image-fusion-scene-visual img {
+    transform: none;
+  }
+}
+
+/* 参考站全局 ::-webkit-scrollbar{width:6px} / thumb #d1d5db / radius 99px。
+   本地未落这条全局规则, 导致控制列 scrollbar-gutter 实测占 15px (浏览器默认) 而非 6px,
+   直接导致 E3 的 210px 卡片宽度与 524px 卡片高度对不上 (实测 201 / 538)。
+   只在本页命名空间内补齐, 不外溢到其他页面。 */
+
+.multi-image-fusion-page ::-webkit-scrollbar {
+  width: var(--mif-scrollbar-width);
+}
+
 .multi-image-fusion-page {
   width: min(100%, var(--mif-page-max));
   min-height: calc(100vh - var(--mif-workspace-topbar-height));
@@ -100,7 +565,7 @@
 }
 
 .multi-image-fusion-scene-card:hover,
-.multi-image-fusion-scene-card:focus-visible {
+  .multi-image-fusion-scene-card:focus-visible {
   outline: none;
   transform: translateY(-2px);
   box-shadow: var(--mif-shadow-scene-hover);
@@ -137,7 +602,7 @@
 }
 
 .multi-image-fusion-scene-card:hover .multi-image-fusion-scene-visual img,
-.multi-image-fusion-scene-card:focus-visible .multi-image-fusion-scene-visual img {
+  .multi-image-fusion-scene-card:focus-visible .multi-image-fusion-scene-visual img {
   transform: scale(1.06);
 }
 
@@ -223,7 +688,7 @@
 }
 
 .multi-image-fusion-scene-back:hover,
-.multi-image-fusion-scene-back:focus-visible {
+  .multi-image-fusion-scene-back:focus-visible {
   color: var(--mif-text-accent-4);
   background: var(--mif-surface-back-hover);
   border-color: var(--mif-border-scene-back-hover);
@@ -264,7 +729,7 @@
 
 /* ══ E. 卡片 / 卡片标题 / 计数器 ══ */
 .multi-image-fusion-card,
-.multi-image-fusion-result-panel {
+  .multi-image-fusion-result-panel {
   background: var(--mif-surface-card);
   border: 1px solid var(--mif-border-card);
   border-radius: var(--mif-radius-card);
@@ -295,7 +760,7 @@
 }
 
 .multi-image-fusion-result-heading h2,
-.multi-image-fusion-card-heading h2 {
+  .multi-image-fusion-card-heading h2 {
   color: var(--mif-text-title);
   margin: 0;
 }
@@ -391,8 +856,8 @@
 }
 
 .multi-image-fusion-upload-empty:hover,
-.multi-image-fusion-upload-empty.is-dragging,
-.multi-image-fusion-accessory-grid.is-dragging {
+  .multi-image-fusion-upload-empty.is-dragging,
+  .multi-image-fusion-accessory-grid.is-dragging {
   background: var(--mif-surface-drag);
   border-color: var(--mif-border-drag);
 }
@@ -512,7 +977,7 @@
 /* ══ G. AI 分析按钮 ══ */
 /* D-41: 参考站是 135deg 深紫→浅紫渐变实心按钮 (主次 CTA 层级), 不是白底描边 */
 .multi-image-fusion-analyze-button,
-.multi-image-fusion-submit-button {
+  .multi-image-fusion-submit-button {
   color: var(--card-bg);
   cursor: pointer;
   background: var(--mif-gradient-cta);
@@ -556,14 +1021,14 @@
 }
 
 .multi-image-fusion-analyze-button:hover:not(:disabled),
-.multi-image-fusion-submit-button:hover:not(:disabled) {
+  .multi-image-fusion-submit-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: var(--mif-shadow-cta-hover);
 }
 
 .multi-image-fusion-analyze-button:disabled,
-.multi-image-fusion-submit-button:disabled,
-.multi-image-fusion-result-actions button:disabled {
+  .multi-image-fusion-submit-button:disabled,
+  .multi-image-fusion-result-actions button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -608,7 +1073,7 @@
 
 /* ══ H. 输出参数（比例 / 变体） ══ */
 .multi-image-fusion-analysis-card,
-.multi-image-fusion-parameter-card {
+  .multi-image-fusion-parameter-card {
   padding-top: 16px;
   padding-bottom: 16px;
 }
@@ -618,7 +1083,7 @@
 }
 
 .multi-image-fusion-ratio-options,
-.multi-image-fusion-variant-options {
+  .multi-image-fusion-variant-options {
   gap: var(--mif-gap-option);
   display: grid;
 }
@@ -629,7 +1094,7 @@
 }
 
 .multi-image-fusion-ratio-options button,
-.multi-image-fusion-variant-options button {
+  .multi-image-fusion-variant-options button {
   color: var(--mif-text-muted-btn);
   cursor: pointer;
   background: var(--mif-surface-panel);
@@ -658,14 +1123,14 @@
 }
 
 .multi-image-fusion-ratio-options button:hover,
-.multi-image-fusion-variant-options button:hover {
+  .multi-image-fusion-variant-options button:hover {
   color: var(--mif-option-hover-text);
   border-color: var(--mif-border-option-hover);
 }
 
 /* D-51: 选中态边框是 transparent (边框消失), 不是变紫 */
 .multi-image-fusion-ratio-options button.selected,
-.multi-image-fusion-variant-options button.selected {
+  .multi-image-fusion-variant-options button.selected {
   color: var(--mif-text-accent-3);
   box-shadow: none;
   background: var(--mif-surface-selected);
@@ -959,7 +1424,7 @@
 
 /* D-80: 棋盘格底是本页标志性视觉, 4 层 45deg 渐变 + #fbfaff 底 */
 .multi-image-fusion-preview-stage,
-.multi-image-fusion-result-empty {
+  .multi-image-fusion-result-empty {
   background-color: var(--mif-surface-checker);
   background-image: var(--mif-checker);
   background-position: var(--mif-checker-pos);
@@ -983,7 +1448,7 @@
 /* 后定义段: 参考站 rule #155 —— 舞台/空态按所选比例自适应宽度。
    --fusion-ratio-width/height 由 JS 内联注入 (§1.3: 参考站 CSS 产物中无定义)。*/
 .multi-image-fusion-preview-stage,
-.multi-image-fusion-result-empty {
+  .multi-image-fusion-result-empty {
   width: min(
     100%,
     calc(
@@ -1012,7 +1477,7 @@
 }
 
 .multi-image-fusion-preview-stage:hover .result-feedback-trigger,
-.multi-image-fusion-preview-stage:focus-within .result-feedback-trigger {
+  .multi-image-fusion-preview-stage:focus-within .result-feedback-trigger {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -1187,15 +1652,15 @@
 
 /* ══ L. 焦点态统一（D-94: 参考站 9 类可交互元素统一 outline） ══ */
 .multi-image-fusion-scene-back:focus-visible,
-.multi-image-fusion-result-actions button:focus-visible,
-.multi-image-fusion-ratio-options button:focus-visible,
-.multi-image-fusion-variant-options button:focus-visible,
-.multi-image-fusion-upload-empty:focus-visible,
-.multi-image-fusion-remove:focus-visible,
-.multi-image-fusion-thumbnails button:focus-visible,
-.multi-image-fusion-analyze-button:focus-visible,
-.multi-image-fusion-description-toggle:focus-visible,
-.multi-image-fusion-submit-button:focus-visible {
+  .multi-image-fusion-result-actions button:focus-visible,
+  .multi-image-fusion-ratio-options button:focus-visible,
+  .multi-image-fusion-variant-options button:focus-visible,
+  .multi-image-fusion-upload-empty:focus-visible,
+  .multi-image-fusion-remove:focus-visible,
+  .multi-image-fusion-thumbnails button:focus-visible,
+  .multi-image-fusion-analyze-button:focus-visible,
+  .multi-image-fusion-description-toggle:focus-visible,
+  .multi-image-fusion-submit-button:focus-visible {
   outline-offset: 2px;
   outline: 2px solid var(--mif-focus-ring);
 }
@@ -1268,7 +1733,7 @@
 }
 
 .multi-image-fusion-page .image-output-settings-close:hover,
-.multi-image-fusion-page .image-output-settings-close:focus-visible {
+  .multi-image-fusion-page .image-output-settings-close:focus-visible {
   color: var(--mif-text-card);
   outline: none;
 }
@@ -1310,13 +1775,13 @@
 }
 
 .multi-image-fusion-page .image-output-ratio-option:disabled,
-.multi-image-fusion-page .image-output-resolution-option:disabled {
+  .multi-image-fusion-page .image-output-resolution-option:disabled {
   cursor: not-allowed;
   opacity: 0.56;
 }
 
 .multi-image-fusion-page .image-output-ratio-option.active:disabled,
-.multi-image-fusion-page .image-output-resolution-option.active:disabled {
+  .multi-image-fusion-page .image-output-resolution-option.active:disabled {
   opacity: 1;
 }
 
@@ -1361,8 +1826,8 @@
 }
 
 .multi-image-fusion-page .image-output-ratio-option:focus-visible,
-.multi-image-fusion-page .image-output-resolution-option:focus-visible,
-.multi-image-fusion-page .image-output-settings-close:focus-visible {
+  .multi-image-fusion-page .image-output-resolution-option:focus-visible,
+  .multi-image-fusion-page .image-output-settings-close:focus-visible {
   outline-offset: 2px;
   outline: 2px solid var(--mif-focus-ring);
 }
@@ -1407,13 +1872,13 @@
 
 /* 结果舞台按所选比例撑高；空态/生成中/失败/成功共用同一几何 */
 .multi-image-fusion-generating-stage,
-.multi-image-fusion-failure-stage,
-.multi-image-fusion-timeout-stage {
+  .multi-image-fusion-failure-stage,
+  .multi-image-fusion-timeout-stage {
   padding: 22px;
 }
 
 .multi-image-fusion-failure-stage .multi-image-fusion-result-empty,
-.multi-image-fusion-timeout-stage .multi-image-fusion-result-empty {
+  .multi-image-fusion-timeout-stage .multi-image-fusion-result-empty {
   width: 100%;
   flex: none;
 }

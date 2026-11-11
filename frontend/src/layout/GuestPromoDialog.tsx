@@ -9,7 +9,7 @@ const FALLBACK_CTA_URL = '/background-remove';
 /**
  * 游客首访营销弹层。
  *
- * 停留 6 秒且无操作时出现，开始操作即取消本次弹出；数据口径与 PromoBar 一致：
+ * 停留 6 秒且无操作时出现，开始操作即取消本次弹出；数据口径取自弹窗位活动：
  * 有 DB 活动取 `/marketing/popup`，无活动展示静态真实权益且不显示倒计时。
  * 弹出条件、活动数据与关闭持久化由 `useGuestPromoOffer` 托管。
  */

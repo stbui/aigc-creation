@@ -1,0 +1,105 @@
+/**
+ * 站内消息铃铛（NotificationBell）。
+ * 从 AppLayout.css 按组件拆出；只放本组件的选择器，外壳骨架留在 AppLayout.css。
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   顶导消息铃铛 (B4, 2026-10-21)
+   与 .app-quota 同一视觉尺度: 32px 高、12px 字号、中性色, 避免在 64px 顶栏里
+   抢过品牌与导航。未读角标由 antd Badge 托管, 不自定义。
+   ───────────────────────────────────────────────────────────────────────────── */
+.app-notif-trigger {
+  width: 32px;
+}
+
+/* 未读角标压到 12px 并加 2px 白描边: 18px 铃铛上的默认角标会糊成一团红点。
+   角标的实际 DOM 是 .ui-badge-count（Badge 兼容壳不再输出 .ant-badge），
+   覆盖规则见文件末尾「消息角标」适配层。 */
+.app-notif-panel {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+}
+
+.app-notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-notif-body {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+
+.app-notif-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.app-notif-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-notif-item:hover {
+  background: var(--surface);
+}
+
+/* 未读用左侧圆点而非整行底色: 底色会让列表看起来每一行都是"选中的" */
+.app-notif-item.is-unread .app-notif-title::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  vertical-align: middle;
+}
+
+.app-notif-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.app-notif-text {
+  font-size: 12px;
+  color: var(--text-body);
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.app-notif-time {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.app-notif-trigger .ui-badge-count {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  line-height: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px var(--color-card);
+}

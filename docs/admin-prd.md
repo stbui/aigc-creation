@@ -327,7 +327,7 @@
 | 项 | 要求 |
 |---|---|
 | 布局 | `admin-ui/shell/AdminBoardLayout`：shadcn `Sidebar` 组合 —— 全高侧栏 232px（折叠 60px，含品牌头 / 导航 / 账号底）+ 内容区 56px 顶栏（折叠开关 + 面包屑 + 告警 / 环境标识），无值班带 |
-| 独立性 | 不复用 C 端的 `AppLayout` / `SideRail` / `PromoBar`（均为 C 端语义） |
+| 独立性 | 不复用 C 端的 `AppLayout` / `SideRail`（均为 C 端语义） |
 | 路由 | `/admin/*` 独立于 C 端外壳，注册在 catch-all 之前 |
 
 ### 4.2 页面规范
@@ -344,7 +344,7 @@
 
 ### 4.3 样式约束
 
-只使用 `global.css` 已定义的语义化 token，**禁止硬编码色值**。后台样式只写在 `styles/admin.css`（不碰 `global.css`）；`adm-` 前缀只保留给外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内一律用 shadcn 语义类，不新增 `adm-*`。
+只使用 `tokens.css` 已定义的语义化 token，**禁止硬编码色值**。后台样式只写在 `styles/admin.css`（不碰 C 端样式层）；`adm-` 前缀只保留给外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内一律用 shadcn 语义类，不新增 `adm-*`。
 
 ### 4.4 响应式
 

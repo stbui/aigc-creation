@@ -6,6 +6,23 @@
  */
 
 /* 商品换色：参考站卡片 padding14 / gap16，标题 h2 20+12。 */
+
+@media (max-width: 900px) {
+
+  .pk-workspace.product-recolor-page .product-recolor-color-card {
+    min-height: 132px;
+  }
+}
+
+/* 上传态仍保留参考站的 720px 展示高；生成/结果态是独立结果卡，按参考站
+   * `.product-retouch-result` 的 360px 下限收高。 */
+
+@media (max-width: 900px) {
+  .pk-workspace.product-recolor-page .pk-result-pane:has(> .product-recolor-result) {
+    min-height: 360px;
+  }
+}
+
 .pk-workspace.product-recolor-page .product-recolor-color-card {
   padding: 14px;
   gap: 16px;

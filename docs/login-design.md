@@ -10,7 +10,7 @@
 | 第三方回调页 | `frontend/src/pages/OAuthCallbackPage.tsx`（`/auth/oauth/callback`） |
 | 全局唤起 | `context/AuthContext.tsx` 的 `loginOpen` + `openLogin()` |
 | 扫码面板 | `frontend/src/components/QrLoginPanel.tsx` |
-| 样式 | `frontend/src/styles/global.css` 的 `.login-*` 区块 |
+| 样式 | `frontend/src/styles/auth.css` |
 
 同一张卡两个宿主，不存在两套实现。
 

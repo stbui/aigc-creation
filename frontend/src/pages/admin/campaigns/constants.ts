@@ -44,11 +44,23 @@ export const EFFECTIVE_META: Record<AdminCampaign['effective'], { label: string;
   off: { label: '已下线', tone: 'muted' },
 };
 
+/**
+ * 列表状态筛选与「状态」列同口径 —— 下拉用派生生效态，不再用人工 status。
+ * 否则运营看到「未开始」却无从筛选，筛「进行中」又会捞到未开始/已结束。
+ */
+export const EFFECTIVE_OPTIONS = Object.entries(EFFECTIVE_META).map(([value, item]) => ({
+  value,
+  label: item.label,
+}));
+
 export interface FormState {
   name: string;
   type: CampaignType;
   startAt: string;
   endAt: string;
+  /** 编辑回填时的原始 ISO：用户没动时间输入就原样提交，避免秒/毫秒被截断 */
+  startAtRaw: string;
+  endAtRaw: string;
   status: CampaignStatus;
   onlyNewUsers: boolean;
   productId: string;

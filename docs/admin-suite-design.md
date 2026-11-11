@@ -182,14 +182,14 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 
 | 层 | 规范 |
 | --- | --- |
-| 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（shadcn `Sidebar` 组合：全高侧栏 + 内容区顶栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail` / `PromoBar`（C 端语义） |
+| 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（shadcn `Sidebar` 组合：全高侧栏 + 内容区顶栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail`（C 端语义） |
 | 组件底座 | 页面**只从 `admin-ui/primitives` 取件**（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / 表单控件 / `AdminDataTable`），底层是 shadcn 原子件（`admin-ui/components/ui`）；后台树内**不引 antd**，也不要把通用组件退回自绘 `div/button/input`。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增 |
 | 侧栏 | 分组折叠菜单，图标 lucide 16px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页；`rowKey="id"`、`size="small"` |
 | 详情 | 一律浮层、不跳独立路由，便于保留筛选态；窄内容用右侧抽屉（720px），需要并排区块 / 大图预览用居中弹窗（≤1120px，任务详情即此） |
 | 危险操作 | `ConfirmDialog`（shadcn `AlertDialog` 阻塞式确认弹窗），写明影响条数；退款、发票驳回等确有业务依据要求的动作必须填原因，能力下架的下线提示由后台统一生成，普通管理写操作不要求填写原因 |
 | 空态 / 加载 | 空态给真实说明；列表 loading 与失败态走 `Skeleton` / `Result` |
-| 颜色 | 只用 `global.css` 已有 token，禁裸 hex |
+| 颜色 | 只用 `tokens.css` 已有 token，禁裸 hex |
 | 数字 | 金额内部存分、展示 `¥` 两位小数；积分整数千分位 |
 | 时间 | 统一 `YYYY-MM-DD HH:mm` |
 | 批量 | 勾选 → 批量条 → 确认 → 结果弹窗（失败项排最前）→ 刷新；翻页或改筛选清空选择 |

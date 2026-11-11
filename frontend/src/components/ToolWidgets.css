@@ -57,7 +57,7 @@
 }
 
 .background-color-option.white.active > svg,
-.background-color-option.checker.active > svg {
+  .background-color-option.checker.active > svg {
   color: var(--card-bg);
   background: var(--brand);
 }

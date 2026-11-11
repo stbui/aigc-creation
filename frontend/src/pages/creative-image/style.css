@@ -7,6 +7,33 @@
 
 /* 自由创作页: 参考站 .free-creation-page 内边距四边均为 16 (其余能力页右侧为 24,
    故右内边距单独收紧, 结果栏因此 784 宽而非 776 —— 实拍 [640,80,784,804]) */
+
+/* 自由创作页窄屏: 标题头显示 + 提交区变 1 列灰底 (参考站同款行为) */
+
+@media (max-width: 1024px) {
+  .fc-section-head {
+    display: block;
+  }
+
+  .fc-actions {
+    background: var(--page-bg);
+    padding: 12px 16px 0;
+    gap: 8px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .fc-workspace .pk-input-pane {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 1024px) {
+  .pk-workspace.fc-workspace {
+    height: auto;
+  }
+}
+
 .pk-workspace.fc-workspace {
   padding-right: 16px;
 }

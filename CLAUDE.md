@@ -23,7 +23,8 @@
 | 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「能力与模型」「用户分组」）—— 代码里没有默认线路表 |
 | 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
-| 设计令牌 | `frontend/src/styles/global.css` 的 `:root`；shadcn 语义变量经 `frontend/src/styles/admin.css` 的 `@theme inline` 桥接，不另定义色值 |
+| 设计令牌 | `frontend/src/styles/tokens.css` 的 `:root`（由 `global.css` 入口 @import）；shadcn 语义变量经 `frontend/src/styles/admin.css` 的 `@theme inline` 桥接，不另定义色值 |
+| 令牌分层 / 命名 / 引用规则 | `docs/design-tokens.md` |
 | AIGC 角标默认样式 | `backend/src/common/aigc-label.config.ts` 的 `AIGC_LABEL_DEFAULTS`；运行期由后台「AI 标识」页覆盖 |
 | 后台侧栏与页面分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 接口清单 / 错误码 / 响应信封 | `docs/api-contract.md` |
@@ -143,7 +144,7 @@ aigc-creation/
     └── src/
         ├── App.tsx           # 34 条壳内路由（两组别名：/asset-library→/library、/my-works→/works）+ 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
         ├── admin-ui/         # 后台 UI：components/ui（shadcn 原子件）· primitives（页面唯一取用层）· shell · providers · hooks · lib
-        ├── layout/           # C 端外壳：AppLayout（组合）/ AppHeader / AppSidebar / SideRail / PromoBar
+        ├── layout/           # C 端外壳：AppLayout（组合）/ AppHeader / AppSidebar / SideRail
         │                     #   NotificationBell / UserAccountMenu / GuestPromoDialog / RouteExperience / hooks.ts
         ├── components/       # ToolShell / QrLoginPanel / 共享弹窗与页面片段 / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
         ├── pages/            # 12 个单文件页面（登录 / 工具页 / 法务 …）
@@ -153,7 +154,9 @@ aigc-creation/
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / money / poll / zip
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
         ├── hooks/            # 共享 hook（index.ts 统一出口）：useToolTask / useAssetLibrary / useToolHistory / useAdminAlerts 等
-        └── styles/           # global.css（设计令牌 + 全站规则）+ admin.css（后台 Tailwind 入口 + shadcn 语义桥接）
+        └── styles/           # global.css（分层入口）+ tokens.css（★ 设计令牌）+ base.css
+                              # + tool-workspace.css / ui-compat.css（跨页共享皮肤）
+                              # + admin.css（后台 Tailwind 入口 + shadcn 语义桥接）
 ```
 
 `backend/uploads`（UPLOAD_DIR）、`backend/logs`（LOG_DIR）、`backend/backups`（BACKUP_DIR）均为运行期产物，不入库。
@@ -304,7 +307,7 @@ npm run e2e                 # Playwright
   - **类名合并只走 `admin-ui/lib/cn.ts`**：实现是官方 npm 包 `cn` 的 `createCn`，在默认合并表上补登本项目 `@theme` 自造 token（`shadow-card`、`brand` / `success-*` / `warn-*` / `danger-*` 颜色组）。改 `styles/admin.css` 的 `@theme inline` 时必须同步补登，否则 `shadow-none` 盖不掉 `shadow-card`。`shadcn add` 之后必须跑 `scripts/post-shadcn.mjs`，它统一把组件的 `import { cn } from 'cn'` 改写成本文件。
   - **页面只从 `admin-ui/primitives` 取件**（barrel：`primitives/index.ts`），不直连 `components/ui`。原子件（`components/ui/*` 只被 primitives 引用）。
   - **没有转发层**：`admin-ui/shadcn`、`admin-ui/controls`、`admin-ui/widgets`、`admin-ui/primitives/DataTable|Dialog`、`components/admin/PageHeader|AdminWidgets` 均已删除。新增控件按用途落进 `primitives/layout|form|display|table|overlay|fields`，再从 barrel 导出。
-  - 颜色仍只在一处定义：`styles/global.css` 的 `:root` 是令牌源，`styles/admin.css` 的 `@theme inline` 把 shadcn 语义变量（`--background` / `--primary` / `--ring` …）桥接到那些令牌；改品牌色不改 shadcn 侧。页面只写 shadcn 类（`bg-card` / `text-muted-foreground` / `border-border` / `bg-accent` / `text-brand` / `bg-warn-soft`），旧套件那套 `text-text-tertiary` / `border-border-table` 词汇已随 vendor 一并删除。
+  - 颜色仍只在一处定义：`styles/tokens.css` 的 `:root` 是令牌源，`styles/admin.css` 的 `@theme inline` 把 shadcn 语义变量（`--background` / `--primary` / `--ring` …）桥接到那些令牌；改品牌色不改 shadcn 侧。页面只写 shadcn 类（`bg-card` / `text-muted-foreground` / `border-border` / `bg-accent` / `text-brand` / `bg-warn-soft`），旧套件那套 `text-text-tertiary` / `border-border-table` 词汇已随 vendor 一并删除。
   - Tailwind 只引 `theme.css` + `utilities.css`，**没有 preflight**：裸 `border` 会退回 `currentColor`，故兜底写在 `styles/admin.css` 的 `@layer base`（unlayered 规则会压过所有 `@layer`，`border-transparent` 就失效）。
   - 高危动作确认：页面内用 `ConfirmDialog`（shadcn `AlertDialog` 的组合壳，阻塞式弹窗）；需要跨页面复用的二次确认走 `useConfirm()`（`providers/ConfirmProvider`，shadcn Dialog）。
 - **外壳**：`admin-ui/shell/AdminBoardLayout` —— shadcn `Sidebar` 组合：全高侧栏 232（折叠 60，≤1280 自动折叠；品牌头 + 分组导航 + 底部账号菜单）+ 内容区（56px 顶栏：折叠开关 + 分组 / 页面面包屑 + 告警铃铛 / 环境标识）。导航区自身滚动，内容区独立滚动；无值班带。值班塔只出现在概览首屏（`primitives/duty-strip` 与 `duty-tower`）。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），规则在 **`styles/admin.css`** 的 `@layer base`（不再在 `global.css`）；值班塔改用 Tailwind 工具类，没有 `adm-tower*` / `adm-dot` / `adm-empty-inline` 了。页面内新增 `adm-*` 类是错的。
@@ -354,7 +357,7 @@ npm run e2e                 # Playwright
 
 ### 样式：语义化 token，禁止硬编码色值
 
-全站样式在 `frontend/src/styles/global.css` 的 `:root` 定义令牌（单一浅色主题，当前**没有**暗色块），页面**一律引用 `var(--token)`，不写裸 hex**：
+全站样式在 `frontend/src/styles/tokens.css` 的 `:root` 定义令牌（单一浅色主题，当前**没有**暗色块），页面**一律引用 `var(--token)`，不写裸 hex**：
 
 ```
 品牌紫（唯一主色 #5546d8）  --brand / --brand-light（仅渐变浅端）/ --brand-hover / --brand-bg
@@ -368,7 +371,7 @@ npm run e2e                 # Playwright
 
 **最小字号 12px（全站硬规范）**：任何页面、组件、图表刻度与内联样式都不得出现小于 12px 的文字 —— Tailwind `text-[10px]` / `text-[11px]`、CSS `font-size: 11px`、内联 `fontSize: 10` 一律禁止。字号规格见 `docs/typography.md`。
 
-**设计一致性优先**：品牌紫 `#5546D8`、冷灰中性色族、五档圆角优先于任何单页的局部数值。判断「某页与其它页不一致」时先按全站令牌校准；页面规格文档与 `global.css` 冲突时以 `global.css` 为准。
+**设计一致性优先**：品牌紫 `#5546D8`、冷灰中性色族、五档圆角优先于任何单页的局部数值。判断「某页与其它页不一致」时先按全站令牌校准；页面规格文档与 `tokens.css` 冲突时以 `tokens.css` 为准。
 
 ### 仓库约定
 
@@ -415,7 +418,7 @@ npm run e2e                 # Playwright
 | --- | --- |
 | 需求 | `prd.md`（整站）、`admin-prd.md`（后台） |
 | 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md`；`shoppable-carousel-design.md`（+ 模板来源 `shoppable-carousel-template-sources.md`）；品牌：`brand/brand-basics.md` |
-| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md` |
+| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |
 | 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`admin-workflow-design.md`（P0 已实施）、`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |

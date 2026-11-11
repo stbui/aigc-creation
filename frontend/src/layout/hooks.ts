@@ -3,12 +3,11 @@ import { useLocation, useNavigationType } from 'react-router-dom';
 import { membershipApi, myMarketingApi, notificationsApi } from '../lib/api';
 import { preloadRoute } from '../lib/routePreload';
 import { useAuth } from '../context/AuthContext';
-import { useBodyScrollLock, useCampaignCountdown, useMediaQuery } from '../hooks';
+import { useBodyScrollLock, useCampaignCountdown } from '../hooks';
 import type { MyMembership, NotificationItem, PopupCampaign } from '../types/api';
 
 /* ───────── 本地存储与常量 ───────── */
 
-const PROMO_DISMISS_KEY = 'huojue-promo-dismissed-v1';
 const GUEST_PROMO_DISMISS_KEY = 'huojue-guest-promo-dismissed-v1';
 const GUEST_PROMO_SHOWN_KEY = 'huojue-guest-promo-shown-v1';
 const GUEST_PROMO_DELAY_MS = 6000;
@@ -170,66 +169,13 @@ export function useNotificationInbox() {
   return { token, items, unread, loading, reload: load, markAllRead, markRead };
 }
 
-/* ───────── 顶部推广条 ───────── */
-
-/**
- * 推广条状态。
- *
- * 有 DB 活动时取 `/marketing/popup` 的文案与倒计时；接口失败静默回落静态条。
- * 关闭 / 窄屏 / 活动过期后整条隐藏，并通过 `html[data-promo]` 让外壳高度契约
- * （`--workspace-topbar-height`）随之变化。
- */
-export function usePromoBar() {
-  const [dismissed, setDismissed] = useState(() => readFlag(PROMO_DISMISS_KEY));
-  const [campaign, setCampaign] = useState<PopupCampaign | null>(null);
-  const narrow = useMediaQuery('(max-width: 900px)');
-
-  useEffect(() => {
-    if (!dismissed) return;
-    writeFlag(PROMO_DISMISS_KEY, '1');
-  }, [dismissed]);
-
-  // 拉真实活动。失败静默回落到静态条: 促销位挂掉不该让整个顶部报错
-  useEffect(() => {
-    if (dismissed) return;
-    let alive = true;
-    myMarketingApi
-      .popup()
-      .then((c) => {
-        if (alive) setCampaign(c ?? null);
-      })
-      .catch(() => {
-        if (alive) setCampaign(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [dismissed]);
-
-  const { remainText, expired } = useCampaignCountdown(campaign);
-
-  // 过期后整条隐藏：不回落到静态条，避免掩盖「活动已结束」。
-  const hidden = dismissed || narrow || expired;
-
-  useEffect(() => {
-    document.documentElement.dataset.promo = hidden ? 'off' : 'on';
-    return () => {
-      delete document.documentElement.dataset.promo;
-    };
-  }, [hidden]);
-
-  const dismiss = useCallback(() => setDismissed(true), []);
-
-  return { hidden, campaign, remainText, dismiss };
-}
-
 /* ───────── 游客首访营销弹层 ───────── */
 
 /**
  * 游客首访营销弹层状态。
  *
  * 停留 6 秒且期间无操作时弹出；登录、登录弹窗打开、当天已关闭或本会话已展示过
- * 都不再弹。活动数据与 `PromoBar` 同源，接口失败时展示静态真实权益。
+ * 都不再弹。活动数据取自 `/marketing/popup`，接口失败时展示静态真实权益。
  */
 export function useGuestPromoOffer() {
   const { token, loginOpen } = useAuth();

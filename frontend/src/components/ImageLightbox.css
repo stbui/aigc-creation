@@ -10,6 +10,22 @@
    放大后可拖拽查看局部, ←/→ 翻页, Esc 关闭, 点击黑色留白关闭。
    暗底刻意不取页面令牌 —— 浅色主题的 --page-bg 会把暗色查看器衬成一块灰,
    与全屏遮罩的视觉意图相反; 这里统一用半透明黑 + 半透明白的阶。 */
+
+@keyframes img-viewer-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes img-viewer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .img-viewer {
   position: fixed;
   inset: 0;
@@ -46,7 +62,7 @@
 }
 
 .img-viewer-close:hover,
-.img-viewer-close:focus-visible {
+  .img-viewer-close:focus-visible {
   background: rgba(255, 255, 255, 0.22);
 }
 
@@ -74,7 +90,7 @@
 }
 
 .img-viewer-nav:hover,
-.img-viewer-nav:focus-visible {
+  .img-viewer-nav:focus-visible {
   background: rgba(255, 255, 255, 0.22);
 }
 
@@ -164,7 +180,7 @@
 }
 
 .img-viewer-stage.is-dragging img,
-.img-viewer-stage.is-pinching img {
+  .img-viewer-stage.is-pinching img {
   cursor: grabbing;
 }
 
@@ -373,7 +389,7 @@
 }
 
 .img-viewer-rotate:hover,
-.img-viewer-rotate:focus-visible {
+  .img-viewer-rotate:focus-visible {
   border-color: rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.14);
   color: var(--card-bg);

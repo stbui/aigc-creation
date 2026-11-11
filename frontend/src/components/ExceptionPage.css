@@ -4,6 +4,27 @@
  * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
  */
 
+/* ───────── 统一异常页 (2026-10-20) ─────────
+   收敛此前散落 7 处的 antd <Result>: 全站只剩 .exc-* 一套。
+   色值全部引用既有语义 token, 不新增硬编码 hex (CLAUDE.md「样式: 语义化 token」)。
+   两种容器: .exc.is-full 撑满视口 (路由级), .exc 嵌内容区 (局部失败态)。 */
+
+.exc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  min-height: 60vh;
+}
+
+.exc.is-full {
+  min-height: 100vh;
+  padding: 80px 24px;
+  /* 极浅品牌紫晕染: 整屏异常页需要一点色彩锚点, 否则纯白底显得像没加载出来 */
+  background:
+    radial-gradient(120% 80% at 50% 0%, var(--brand-bg) 0%, var(--page-bg) 62%);
+}
+
 .exc-inner {
   width: 100%;
   max-width: 520px;
@@ -94,8 +115,8 @@
 
 /* 键盘可达性: 按钮是原生 <button>/<a>, 但视觉去掉了 outline —— 焦点环需补回 */
 .exc-btn:focus-visible,
-.exc-detail-toggle:focus-visible,
-.exc-detail-copy:focus-visible {
+  .exc-detail-toggle:focus-visible,
+  .exc-detail-copy:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
@@ -133,7 +154,7 @@
 }
 
 .exc-detail-toggle,
-.exc-detail-copy {
+  .exc-detail-copy {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -147,7 +168,7 @@
 }
 
 .exc-detail-toggle:hover,
-.exc-detail-copy:hover {
+  .exc-detail-copy:hover {
   color: var(--brand);
 }
 

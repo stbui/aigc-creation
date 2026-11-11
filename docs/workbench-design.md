@@ -14,7 +14,6 @@
 
 ```
 MainLayout（壳）
-├── PromoBar          40px，≤900px 隐藏
 ├── AppHeader         64px（移动 ≤900px 为 54px）
 ├── SideRail          176px｜100px 轨（≤1366）｜隐藏 + 抽屉（≤900）
 └── 主内容（window 滚动）
@@ -51,7 +50,7 @@ Hero 右半幅是本站自有的能力产出拼贴，不做外链图片。素材
 | ≤ 760 | 3 | 16 |
 | ≤ 520 | 2 | 8 |
 
-列数由 `global.css` 的 `.wb-tools` 单一规则组统一管辖（1100 / 760 / 520 三档）。同一文件后段的「工作台覆盖层」**不得重复声明 `grid-template-columns`** —— 覆盖层只覆盖值，不重复结构属性，否则会把前面的断点静默压死。
+列数由 `pages/workbench/style.css` 的 `.wb-tools` 单一规则组统一管辖（1100 / 760 / 520 三档）。同一文件后段的「工作台覆盖层」**不得重复声明 `grid-template-columns`** —— 覆盖层只覆盖值，不重复结构属性，否则会把前面的断点静默压死。
 
 ### 3.2 卡片规格
 
@@ -162,7 +161,7 @@ Hero 右半幅是本站自有的能力产出拼贴，不做外链图片。素材
 | 1367–1101 | 侧栏 100px 竖轨 | 6 列 |
 | ≤1366 | 侧栏 100px 竖轨，`.app-content` 负 16px 补偿 | 6 列 |
 | ≤1100 | 同左 | 4 列 |
-| ≤900 | 侧栏 `display:none` + 54px 顶栏 + 汉堡按钮；PromoBar 隐藏并置 `html[data-promo='off']` | 抽屉内 280px 宽完整横排菜单 |
+| ≤900 | 侧栏 `display:none` + 54px 顶栏 + 汉堡按钮 | 抽屉内 280px 宽完整横排菜单 |
 | ≤760 | 同左 | 3 列 |
 | ≤520 | 同左 | 2 列，gap 8 |
 
@@ -173,10 +172,9 @@ Hero 右半幅是本站自有的能力产出拼贴，不做外链图片。素材
 1. **响应式宽度必须 CSS 托管**。侧栏宽度历史上由 JSX inline `style` 注入，inline 会压过所有 `@media`，任何塌缩规则都失效。宽度类响应式只能写进样式表。
 2. **`@media` 不增特异性**。媒体查询里的规则与外层静态规则冲突时按源顺序决胜，所以 `.workbench { max-width: none }` 会被文件后方的静态声明反压。移动栅格规则必须排在全部 base 规则之后。
 3. **「覆盖层」只覆盖 token 值**。置于区块之后、用于锁定设计值的静态规则，如果重述 `grid-template-columns` 等结构属性，会把同区块前面的断点全部压死。
-4. **`html[data-promo]` 是跨组件契约**。隐藏促销条必须同时置 `data-promo='off'`，只写 `display:none` 会让依赖 `--workspace-topbar-height` 计算的页面高度算错 40px。
-5. **`<button>` 的 UA 默认样式**。工具卡是 `<button>` + `display:flex; flex-direction:column`，浏览器 UA 给 `button` 设了 `align-items: center`，会让子项不 stretch、按 min-content 定宽、冲出栅格轨并让省略号失效。改用显式 `align-items: stretch` + `min-width: 0`，grid item 同理。
-6. **「零溢出」扫描要先等真实内容**。`networkidle` 不等于渲染完成；先 `waitForSelector` 并断言元素数 > 0，再扫 `scrollWidth`。
-7. **多视口验证用单 context**。反复登录会撞登录限流（IP 维度），切视口请用 `setViewportSize` 而不是新建 context。
+4. **`<button>` 的 UA 默认样式**。工具卡是 `<button>` + `display:flex; flex-direction:column`，浏览器 UA 给 `button` 设了 `align-items: center`，会让子项不 stretch、按 min-content 定宽、冲出栅格轨并让省略号失效。改用显式 `align-items: stretch` + `min-width: 0`，grid item 同理。
+5. **「零溢出」扫描要先等真实内容**。`networkidle` 不等于渲染完成；先 `waitForSelector` 并断言元素数 > 0，再扫 `scrollWidth`。
+6. **多视口验证用单 context**。反复登录会撞登录限流（IP 维度），切视口请用 `setViewportSize` 而不是新建 context。
 
 ## 9. 验证
 

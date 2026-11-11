@@ -385,7 +385,7 @@
 }
 
 .stats-caps-head,
-.stats-cap {
+  .stats-cap {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 120px minmax(180px, 260px);
   align-items: center;

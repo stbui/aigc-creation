@@ -90,13 +90,13 @@
 }
 
 .tool-history-card:hover .tool-history-meta-actions,
-.tool-history-card:focus-within .tool-history-meta-actions {
+  .tool-history-card:focus-within .tool-history-meta-actions {
   opacity: 1;
   pointer-events: auto;
 }
 
 .tool-history-meta-actions button,
-.tool-history-meta-actions a {
+  .tool-history-meta-actions a {
   flex: none;
   display: grid;
   place-items: center;
@@ -111,9 +111,9 @@
 }
 
 .tool-history-meta-actions button:hover:not(:disabled),
-.tool-history-meta-actions a:hover,
-.tool-history-meta-actions button:focus-visible,
-.tool-history-meta-actions a:focus-visible {
+  .tool-history-meta-actions a:hover,
+  .tool-history-meta-actions button:focus-visible,
+  .tool-history-meta-actions a:focus-visible {
   background: var(--brand);
   color: var(--card-bg);
   outline: none;
@@ -193,7 +193,7 @@
 }
 
 .redraw-history-collapse:hover,
-.redraw-history-collapse:focus-visible {
+  .redraw-history-collapse:focus-visible {
   color: var(--brand);
   background: var(--brand-bg);
   outline: none;
@@ -293,7 +293,7 @@
 }
 
 .pk-workspace.local-redraw-page > .redraw-history-pane,
-.pk-workspace.watermark-removal-page > .redraw-history-pane {
+  .pk-workspace.watermark-removal-page > .redraw-history-pane {
   width: 100%;
   height: 100%;
   min-height: 0;

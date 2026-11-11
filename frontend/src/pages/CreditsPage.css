@@ -8,6 +8,13 @@
 /* ── 积分明细页 ────────────────────────────────────────────────────────── */
 
 /* 宽度与内边距由 .personal-page 骨架决定, 这里只挂页面级语义色 */
+
+@media (max-width: 900px) {
+  .credits-hero-side {
+    text-align: left;
+  }
+}
+
 .credits-page {
   /*
    * 增减金额的专用语义色。--success-text / --danger-text 在各自淡底上

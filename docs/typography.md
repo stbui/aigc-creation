@@ -5,8 +5,8 @@
 | 项 | 值 |
 | --- | --- |
 | 字体导入 | `frontend/index.html` |
-| 设计令牌 | `frontend/src/styles/global.css` 的 `:root` |
-| 前台 UI 层 | `frontend/src/ui/styles.css`（Tailwind 主题变量桥接到 `global.css` 令牌） |
+| 设计令牌 | `frontend/src/styles/tokens.css` 的 `:root`（由 `global.css` 入口 @import）；分层与命名见 [`design-tokens.md`](design-tokens.md) |
+| 前台 UI 层 | `frontend/src/ui/styles.css`（Tailwind 主题变量桥接到 `tokens.css` 令牌） |
 | 后台 UI 层 | `frontend/src/styles/admin.css`（同一套令牌，页面不另定义色值） |
 
 ## 1. 字体
@@ -33,7 +33,7 @@ display=swap
 
 Noto Sans SC 优先：Windows 没有 PingFang，把 webfont 放在首位才能跨平台一致。
 
-**字体栈必须在 Tailwind 主题里再声明一次**（`ui/styles.css` 的 `--font-sans`），不能只靠 `global.css` 的 `body` 规则。`font-sans` 类与 shadcn 组件默认字体都取自这个变量，两处必须逐字一致。排查方法与证据见附录 A。
+**字体栈必须在 Tailwind 主题里再声明一次**（`ui/styles.css` 的 `--font-sans`），不能只靠 `base.css` 的 `body` 规则。`font-sans` 类与 shadcn 组件默认字体都取自这个变量，两处必须逐字一致。排查方法与证据见附录 A。
 
 ## 2. 字号与字重
 
@@ -51,7 +51,7 @@ Noto Sans SC 优先：Windows 没有 PingFang，把 webfont 放在首位才能�
 
 ## 3. 前台 UI 层主题桥接
 
-前台页面只从 `frontend/src/ui` 取件，底层与后台共用 shadcn/radix 原子件；**颜色与圆角不另定义**，在 `ui/styles.css` 的 `@theme inline` 里引用 `global.css` 的令牌：
+前台页面只从 `frontend/src/ui` 取件，底层与后台共用 shadcn/radix 原子件；**颜色与圆角不另定义**，在 `ui/styles.css` 的 `@theme inline` 里引用 `tokens.css` 的令牌：
 
 | Tailwind 语义变量 | 来源令牌 |
 | --- | --- |
@@ -62,7 +62,7 @@ Noto Sans SC 优先：Windows 没有 PingFang，把 webfont 放在首位才能�
 | `--color-border` / `--color-input` | `--border` |
 | `--radius-sm … --radius-2xl` | `--radius-tag … --radius-hero` |
 
-**令牌只有一处定义**：改品牌色只改 `global.css` 的 `:root`，前台与后台同时生效。页面不写裸 hex，也不新增同义色簇；`ui/styles.css` 缺映射时补映射，不要在组件里写颜色。
+**令牌只有一处定义**：改品牌色只改 `tokens.css` 的 `:root`，前台与后台同时生效。页面不写裸 hex，也不新增同义色簇；`ui/styles.css` 缺映射时补映射，不要在组件里写颜色。
 
 ## 4. 圆角
 
@@ -114,7 +114,7 @@ shadcn 控件的 focus ring 取自 `--color-ring`（即 `--brand`），改令牌
 
 页面一律引用 `var(--token)`，不写裸 hex。`--color-primary` 历史上一度是蓝色 `#2563eb`，与紫系页面混用导致 hover 时蓝紫跳变 —— 这类同义色簇是最容易复发的样式缺陷。
 
-新增颜色前先查 `global.css` 是否已有语义合适的 token；确需新增则定义 token 并全站替换。
+新增颜色前先查 `tokens.css` 是否已有语义合适的 token；确需新增则定义 token 并全站替换。
 
 ## 附录 A · 字体生效的排查方法
 
@@ -122,7 +122,7 @@ shadcn 控件的 focus ring 取自 `--color-ring`（即 `--brand`），改令牌
 
 1. 用 CDP 的 `CSS.getPlatformFontsForNode` 取节点真实使用的 platform font（`isCustomFont: true` 表示是 webfont）。
 2. 沿祖先链逐级取计算样式，找到字体栈的切换点。正常情况下到 `body` 为止都应是同一栈；中途变化说明该子树用了别的 `font-family`（自定义类或内联样式）。
-3. 修复入口是 `global.css` 的 `body` 与 `ui/styles.css` 的 `--font-sans`，不要在页面里补字体声明。
+3. 修复入口是 `base.css` 的 `body` 与 `ui/styles.css` 的 `--font-sans`，不要在页面里补字体声明。
 
 ## 附录 B · 视觉断言的复核纪律
 
@@ -147,7 +147,7 @@ shadcn 控件的 focus ring 取自 `--color-ring`（即 `--brand`），改令牌
 
 | 位置 | 内容 | 覆盖范围 |
 | --- | --- | --- |
-| `global.css` 的 `body` | 同上字体栈 | body 自身与继承它的页面文本 |
+| `base.css` 的 `body` | 同上字体栈 | body 自身与继承它的页面文本 |
 | `ui/styles.css` 的 `--font-sans` | 同上字体栈 | `font-sans` 工具类与 shadcn 组件 |
 
 只改其中一处会出现"部分区域字体不同"的诡异现象。改动字体栈时两处同改，并用附录 A 的方法复测实际渲染字体。

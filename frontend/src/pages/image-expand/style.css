@@ -61,7 +61,7 @@
   gap: 8px;
 }
 .smart-expand-scale-options button,
-.smart-expand-scale-options label {
+  .smart-expand-scale-options label {
   box-sizing: border-box;
   height: 28px;
   color: var(--tool-text-1);

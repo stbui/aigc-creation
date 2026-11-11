@@ -6,6 +6,53 @@
  */
 
 /* ───────── 邀请页 (复刻 ijihua.cn/invitations 版面: 主视觉 + 三步 + 规则 + 数据明细) ───────── */
+
+/* 步骤横排三段在窄屏会挤成竖条, 退成单列; 指标四格退两列仍可读 */
+
+@media (max-width: 900px) {
+  .invite-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .invite-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .invite-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+    padding: 24px;
+  }
+
+  .invite-hero-qr {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+}
+
+.invite-load-more {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 8px;
+}
+
+@media (max-width: 900px) {
+  .invite-hero h1 {
+    font-size: 23px;
+    line-height: 1.35;
+  }
+
+  .invite-hero-actions {
+    flex-wrap: wrap;
+  }
+
+  .invite-hero-actions .ui-btn {
+    flex: 1 1 auto;
+  }
+}
+
 .invite-page {
   padding: 24px 0 8px;
   display: flex;
@@ -69,7 +116,7 @@
 }
 
 .invite-hero-qr img,
-.invite-hero-qr-fallback {
+  .invite-hero-qr-fallback {
   display: block;
   width: 100%;
   aspect-ratio: 1;

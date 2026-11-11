@@ -18,7 +18,7 @@
 | 基础件 | `frontend/src/admin-ui/components/ui/`（shadcn CLI 生成，`scripts/post-shadcn.mjs` 后处理） |
 | 类名合并 | `frontend/src/admin-ui/lib/cn.ts`（官方 `cn` 包的 `createCn` + 项目 token 补登） |
 | 状态色 | `frontend/src/components/admin/statusMeta.ts`（`STATUS_META`） |
-| 样式 | `global.css` 的 `:root` 令牌 + `frontend/src/styles/admin.css`（后台 Tailwind 入口 + `@theme inline` 桥接） |
+| 样式 | `tokens.css` 的 `:root` 令牌 + `frontend/src/styles/admin.css`（后台 Tailwind 入口 + `@theme inline` 桥接） |
 | 跨页微规格 | `docs/typography.md` |
 
 ---
@@ -27,7 +27,7 @@
 
 | 原则 | 说明 |
 | --- | --- |
-| 令牌复用 | 只用 `global.css` 的 token，不写裸 hex；shadcn 语义类经 `admin.css` 的 `@theme inline` 桥接过来 |
+| 令牌复用 | 只用 `tokens.css` 的 token，不写裸 hex；shadcn 语义类经 `admin.css` 的 `@theme inline` 桥接过来 |
 | 密度优先 | 后台是长时间使用的工具，信息密度高于 C 端营销页；表格行高与间距取紧凑档 |
 | 少装饰 | 无渐变、无插画，阴影仅用于浮层与卡片 |
 | 操作可见 | 关键操作紧邻数据行，不藏进菜单深处 |
@@ -39,7 +39,7 @@
 
 ### 1.1 语义映射
 
-后台页面写的是 shadcn 语义类，底层由 `admin.css` 的 `@theme inline` 映射到 `global.css` 的令牌：
+后台页面写的是 shadcn 语义类，底层由 `admin.css` 的 `@theme inline` 映射到 `tokens.css` 的令牌：
 
 | 用途 | shadcn 类 | 项目 token |
 | --- | --- | --- |
@@ -55,7 +55,7 @@
 | 成功 | `bg-success-soft` / `text-success-text` | `--success-soft-bg` / `--success-text` |
 | 警告 | `bg-warn-soft` / `text-warn-text` | `--warn-bg` / `--warn-text` |
 | 危险 | `bg-danger-soft` / `text-danger-text` | `--danger-soft-bg` / `--danger-text` |
-| 卡片投影 | `shadow-card` | `--shadow-card`（`global.css` 定义，`cn.ts` 补登） |
+| 卡片投影 | `shadow-card` | `--shadow-card`（`tokens.css` 定义，`cn.ts` 补登） |
 
 ### 1.2 圆角
 
@@ -287,7 +287,7 @@ SidebarInset（内容区）
 | --- | --- |
 | 移动端 | 不做适配；侧栏 ≤1280 折叠为图标栏，表格横向滚动 |
 | 告警阅读状态 | 告警计数是「当前待处理数」，不记录谁点过；事项处理后自然消失，不提供「已读」标记 |
-| 自定义主题 | 不支持；品牌色只由 `global.css` 的 `:root` 与 `admin.css` 的 `@theme inline` 决定 |
+| 自定义主题 | 不支持；品牌色只由 `tokens.css` 的 `:root` 与 `admin.css` 的 `@theme inline` 决定 |
 | 暗色模式 | 不支持。`shadcn add` 后的 `dark:` 变体由 `scripts/post-shadcn.mjs` 整段剥除 |
 
 ---
@@ -349,8 +349,8 @@ SidebarInset（内容区）
 - `--background` / `--card` / `--popover` → `--card-bg`；
 - `--foreground` → `--text-strong`；`--muted-foreground` → `--text-muted`；
 - `--primary` → `--brand`（#5546d8）；`--accent` → `--brand-bg`（悬停淡底，**不是**品牌强调色）；
-- `--destructive` → `--danger-text`；`--border` 直接沿用 `global.css` 的 `--border`；
-- 业务语义色 `--success-*` / `--warn-*` / `--danger-*` → `global.css` 里对应的 `--success-*` / `--warn-*` / `--danger-*`。
+- `--destructive` → `--danger-text`；`--border` 直接沿用 `tokens.css` 的 `--border`；
+- 业务语义色 `--success-*` / `--warn-*` / `--danger-*` → `tokens.css` 里对应的 `--success-*` / `--warn-*` / `--danger-*`。
 
 两条必须记住的实现约束：
 
@@ -368,7 +368,7 @@ SidebarInset（内容区）
 全站只有一套：**shadcn 语义类**（`bg-card` / `text-muted-foreground` / `border-border`
 / `bg-accent` / `text-brand` / `bg-success-soft`）。
 
-页面不写裸色值：新颜色先在 `global.css` 的 `:root` 定义令牌，再在 `styles/admin.css`
+页面不写裸色值：新颜色先在 `tokens.css` 的 `:root` 定义令牌，再在 `styles/admin.css`
 的 `@theme inline` 桥接成 shadcn 语义变量。
 
 ### 7.6 底座与后处理

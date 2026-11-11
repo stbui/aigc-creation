@@ -1,15 +1,12 @@
-import { memo, useState } from 'react';
-import { Check, Eye } from 'lucide-react';
+import { memo } from 'react';
 
-import { ImageLightbox, type LightboxItem } from './components';
 import type { TemplateEntry } from './utils';
 
 /**
  * 写真模板网格（右栏主内容）。
  *
- * 卡片结构：竖版预览图 + 模板名 + 提示词。提示词是提交给模型的风格描述，
- * 直接展示在卡片上 —— 用户选模板时看的就是「这张图会用什么提示词生成」。
- * 选中态用品牌紫描边，并浮出「已选用」角标。
+ * 卡片只展示预览图与模板名：模板提示词不下发到 C 端，标签、大图入口与角标
+ * 等附加信息都不展示。选中反馈由卡片品牌紫描边表达，不额外渲染文字角标。
  */
 
 export interface TemplateGalleryProps {
@@ -24,16 +21,6 @@ export interface TemplateGalleryProps {
   onRetry?: () => void;
 }
 
-function lightboxItemOf(template: TemplateEntry): LightboxItem {
-  return {
-    id: template.id,
-    url: template.thumbFile,
-    alt: `${template.name} 模板预览`,
-    prompt: template.prompt,
-    meta: [template.categoryName, template.groupName, template.name],
-  };
-}
-
 function TemplateGalleryImpl({
   templates,
   selectedId,
@@ -42,9 +29,6 @@ function TemplateGalleryImpl({
   loading,
   onRetry,
 }: TemplateGalleryProps) {
-  const [preview, setPreview] = useState<TemplateEntry | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
   if (error) {
     return (
       <div className="tpl-template-error">
@@ -67,88 +51,39 @@ function TemplateGalleryImpl({
   }
 
   return (
-    <>
-      <div className="tpl-template-grid">
-        {templates.map((template) => {
-          const selected = template.id === selectedId;
-          return (
-            <article
-              key={template.id}
-              className={`tpl-template-card${selected ? ' is-selected' : ''}`}
-              data-testid={`tpl-template-${template.id}`}
-            >
-              <div className="tpl-template-cover">
-                <button
-                  type="button"
-                  className="tpl-template-cover-btn"
-                  onClick={() => onSelect(template)}
-                  aria-label={`选用模板${template.name}`}
-                >
-                  <img
-                    src={template.thumbFile}
-                    alt={`${template.name} 模板预览`}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </button>
-                <button
-                  type="button"
-                  className="tpl-template-preview"
-                  aria-label={`查看模板${template.name}大图与提示词`}
-                  title="查看大图与提示词"
-                  onClick={() => setPreview(template)}
-                >
-                  <Eye size={14} />
-                </button>
-                {selected && (
-                  <span className="tpl-template-selected" aria-hidden>
-                    <Check size={12} />
-                    已选用
-                  </span>
-                )}
-              </div>
+    <div className="tpl-template-grid">
+      {templates.map((template) => {
+        const selected = template.id === selectedId;
+        return (
+          <article
+            key={template.id}
+            className={`tpl-template-card${selected ? ' is-selected' : ''}`}
+            data-testid={`tpl-template-${template.id}`}
+          >
+            <div className="tpl-template-cover">
+              <button
+                type="button"
+                className="tpl-template-cover-btn"
+                onClick={() => onSelect(template)}
+                aria-label={`选用模板${template.name}`}
+                aria-pressed={selected}
+              >
+                <img
+                  src={template.thumbFile}
+                  alt={`${template.name} 模板预览`}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </button>
+            </div>
 
-              <div className="tpl-template-content">
-                <strong className="tpl-template-title">{template.name}</strong>
-                <p
-                  className={`tpl-template-prompt${expandedId === template.id ? ' is-expanded' : ''}`}
-                  title={template.prompt}
-                >
-                  {template.prompt}
-                </p>
-                <div className="tpl-template-tags" aria-label="模板标签">
-                  {template.tags.map((tag) => (
-                    <span key={tag} className="tpl-template-tag">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="tpl-template-prompt-toggle"
-                  aria-expanded={expandedId === template.id}
-                  onClick={() =>
-                    setExpandedId((current) => (current === template.id ? null : template.id))
-                  }
-                >
-                  {expandedId === template.id ? '收起提示词' : '展开提示词'}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      {preview && (
-        <ImageLightbox
-          items={[lightboxItemOf(preview)]}
-          index={0}
-          onIndexChange={() => undefined}
-          onClose={() => setPreview(null)}
-          ariaLabel={`模板${preview.name}预览`}
-        />
-      )}
-    </>
+            <div className="tpl-template-content">
+              <strong className="tpl-template-title">{template.name}</strong>
+            </div>
+          </article>
+        );
+      })}
+    </div>
   );
 }
 

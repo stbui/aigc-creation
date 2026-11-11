@@ -1,3 +1,4 @@
+import './UserAccountMenu.css';
 import { useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,

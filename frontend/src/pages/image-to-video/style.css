@@ -2,7 +2,7 @@
  * 图生视频页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
  *
  * 只放本页独占选择器；左栏 432px、结果栏高度与提交条等共享骨架仍由
- * `styles/global.css` 提供。
+ * `styles/tool-workspace.css` 提供。
  */
 
 /* 上传首帧后，缩略图替代虚线拖拽框；保留真实构图，不用方图裁切。 */
@@ -146,7 +146,7 @@
 }
 
 .image-to-video-config-error,
-.image-to-video-runtime-notice {
+  .image-to-video-runtime-notice {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -168,7 +168,7 @@
 }
 
 .image-to-video-config-error svg,
-.image-to-video-runtime-notice > svg {
+  .image-to-video-runtime-notice > svg {
   flex: 0 0 auto;
   margin-top: 1px;
 }
@@ -193,7 +193,7 @@
 }
 
 .image-to-video-prompt > span,
-.image-to-video-param-head strong {
+  .image-to-video-param-head strong {
   color: var(--wb-text);
   font-size: 13px;
   font-weight: 600;
@@ -340,9 +340,9 @@
 }
 
 .image-to-video-idle,
-.image-to-video-generating,
-.image-to-video-failed,
-.image-to-video-success {
+  .image-to-video-generating,
+  .image-to-video-failed,
+  .image-to-video-success {
   flex: 1;
   min-height: 0;
 }
@@ -371,7 +371,7 @@
 }
 
 .image-to-video-idle-visual::before,
-.image-to-video-idle-visual::after {
+  .image-to-video-idle-visual::after {
   content: '';
   position: absolute;
   border-radius: 999px;
@@ -391,7 +391,7 @@
 }
 
 .image-to-video-idle-visual.has-source::before,
-.image-to-video-idle-visual.has-source::after {
+  .image-to-video-idle-visual.has-source::after {
   display: none;
 }
 
@@ -448,7 +448,7 @@
 }
 
 .image-to-video-ready-tags,
-.image-to-video-result-tags {
+  .image-to-video-result-tags {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -456,7 +456,7 @@
 }
 
 .image-to-video-ready-tags span,
-.image-to-video-result-tags span {
+  .image-to-video-result-tags span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -504,7 +504,7 @@
 }
 
 .image-to-video-generating-stage strong,
-.image-to-video-failed strong {
+  .image-to-video-failed strong {
   color: var(--wb-text);
   font-size: 15px;
   font-weight: 700;
@@ -512,8 +512,8 @@
 }
 
 .image-to-video-generating-stage p,
-.image-to-video-failed p,
-.image-to-video-failed > span:last-child {
+  .image-to-video-failed p,
+  .image-to-video-failed > span:last-child {
   margin: 0;
   color: var(--text-desc);
   font-size: 12px;
@@ -556,8 +556,8 @@
 }
 
 .image-to-video-video-stage .result-media-aigc,
-.image-to-video-video-stage > video,
-.image-to-video-video {
+  .image-to-video-video-stage > video,
+  .image-to-video-video {
   display: block;
   width: 100%;
   height: 100%;

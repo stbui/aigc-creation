@@ -5,6 +5,37 @@
  * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
  */
 
+/* ── 手机端: 落地页 ── */
+
+.mup {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: var(--mup-text-1);
+  background: linear-gradient(150deg, var(--mup-surface-brand-3) 0%, var(--mup-surface-brand-5) 44%, var(--mup-surface-info) 100%);
+  font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+@media (max-width: 520px) {
+  .mup {
+    place-items: start center;
+    padding: 12px;
+  }
+
+  .mup-card {
+    margin-top: 8px;
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  .mup-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .mup-card {
   box-sizing: border-box;
   width: min(520px, 100%);
@@ -59,7 +90,7 @@
 }
 
 .mup-message,
-.mup-error {
+  .mup-error {
   margin: 0 0 14px;
   padding: 10px 12px;
   border-radius: 9px;
@@ -84,7 +115,7 @@
 }
 
 .mup-preview,
-.mup-picker {
+  .mup-picker {
   position: relative;
   aspect-ratio: 1;
   border-radius: 12px;
@@ -217,7 +248,7 @@
 
 /* 成功 / 失败 / 参数缺失态: 居中列 */
 .mup-card.is-success,
-.mup-card.is-error {
+  .mup-card.is-error {
   min-height: 280px;
   display: flex;
   flex-direction: column;
@@ -236,7 +267,7 @@
 }
 
 .mup-card.is-success p,
-.mup-card.is-error p {
+  .mup-card.is-error p {
   margin: 0;
   font-size: 14px;
   color: var(--text-7);

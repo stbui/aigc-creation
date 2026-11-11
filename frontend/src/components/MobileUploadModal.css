@@ -20,6 +20,87 @@
    另外 `.ant-modal.mum-modal` 也是死的: 兼容壳的 DOM 里**根本没有 `.ant-modal` 节点**,
    容器是 `.ui-modal-content`。窄屏「右侧白色空带」改由 MobileUploadModal 直接传
    `width="min(440px, calc(100vw - 40px))"` 解决 (与 AssetLibraryModal 同一写法)。 */
+
+/* ═══════════════════════════════════════════════════════════════════
+   手机上传弹窗 (二维码方案)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.pt-mu-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+
+.pt-mu-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 220px;
+  font-size: 13px;
+  color: var(--text-desc);
+}
+
+.pt-mu-qr {
+  width: 220px;
+  height: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.pt-mu-qr img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pt-mu-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-body);
+  text-align: center;
+}
+
+.pt-mu-countdown {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-desc);
+}
+
+.pt-mu-expired {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 220px;
+  justify-content: center;
+}
+
+.pt-mu-expired p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-body);
+}
+
+.mum {
+  position: relative;
+  text-align: center;
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 30px 30px 26px;
+  width: min(440px, 100vw - 40px);
+}
+
 .mum-modal.ant-modal-container {
   padding: 0 !important;
   border-radius: 20px;
