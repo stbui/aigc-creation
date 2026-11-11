@@ -4,7 +4,6 @@ import { ConfirmDialog, Notice } from '~/admin-ui/primitives';
 import { useToast } from './hooks';
 import { ChannelModelDialogs } from './ChannelModelDialogs';
 import { ChannelModelTable } from './ChannelModelTable';
-import { createDefaultImageCapabilityConfigJson } from './imageCapability';
 import { createDefaultTextCapabilityConfigJson } from './textCapability';
 import {
   EMPTY_MODEL_DRAFT,
@@ -12,7 +11,7 @@ import {
   type BatchImportConfig,
   type ModelDraft,
 } from './constants';
-import { buildPriceTiers, toModelDraft } from './utils';
+import { buildPriceTiers, toCreditsInput, toModelDraft } from './utils';
 import { useChannelModelHealth, useChannelModels } from './useChannelModels';
 import { consumptionImpactText, type ProductConsumptionState } from './useProductConsumption';
 import type {
@@ -32,8 +31,9 @@ import type {
  *      档位选价，所有档位都被删掉时会回落到一个通配档；
  *   3. 连通性测试走与正式任务相同的协议、出站策略、鉴权，不建任务、不扣费。
  *
- * 上游目录导入只写入管理员勾选的模型，且默认停用、待定价 —— 自动启用会让
- * 一个没配价格的模型立刻进入路由，用户拿到 42204（无可用线路）。
+ * 上游目录导入只写入管理员勾选的模型。套用默认配置（或本次统一配置）的
+ * 商品可直接启用；没有配置的行仍保持停用、待定价 —— 缺价格的模型进入路由
+ * 只会让用户拿到 42204（无可用线路）。
  *
  * ## 模块划分
  *
@@ -147,8 +147,34 @@ export function ChannelModelManager({
     [models],
   );
 
+  /**
+   * 新建商品：预填供应商默认配置。
+   *
+   * 只是把默认值放进表单，运营仍可逐项改 —— 保存走同一条 `/models` 接口，
+   * 后端在字段缺失时还会再兜一次默认值。
+   */
   const openCreate = () => {
-    const next = { ...EMPTY_MODEL_DRAFT, tiers: [{ ...EMPTY_TIER }] };
+    const defaults = channel.defaultModel;
+    const capability = defaults?.capability || EMPTY_MODEL_DRAFT.capability;
+    const next: ModelDraft = {
+      ...EMPTY_MODEL_DRAFT,
+      capability,
+      protocol: defaults?.protocol ?? '',
+      capabilityConfig:
+        capability === 'text' ? createDefaultTextCapabilityConfigJson() : '',
+      enabled: defaults?.enabled ?? EMPTY_MODEL_DRAFT.enabled,
+      tiers: [
+        {
+          ...EMPTY_TIER,
+          billingMode: defaults?.billingMode ?? EMPTY_TIER.billingMode,
+          unit: defaults ? toCreditsInput(defaults.unitPriceMicrocredits) : EMPTY_TIER.unit,
+          input: defaults ? toCreditsInput(defaults.inputTokenPriceMicrocredits) : EMPTY_TIER.input,
+          output: defaults ? toCreditsInput(defaults.outputTokenPriceMicrocredits) : EMPTY_TIER.output,
+          cached: defaults ? toCreditsInput(defaults.cachedTokenPriceMicrocredits) : EMPTY_TIER.cached,
+          priceConfigured: Boolean(defaults),
+        },
+      ],
+    };
     setDraft(next);
     setEditing(null);
     setCreating(true);
@@ -367,6 +393,12 @@ export function ChannelModelManager({
     setUpstream(null);
   };
 
+  /**
+   * 导入上游商品。
+   *
+   * 配置应用统一由后端完成（本次弹窗配置 > 供应商默认配置 > 只建骨架行）：
+   * 前端不再「导入后再逐条回写」，少一轮竞态，也不会误改已存在的商品。
+   */
   const runImport = async (ids: string[], config?: BatchImportConfig) => {
     if (ids.length === 0) {
       toast.error('请勾选要导入的商品');
@@ -374,107 +406,20 @@ export function ChannelModelManager({
     }
     setImporting(true);
     try {
-      /*
-       * 导入接口只建骨架行。带统一配置时，前端按「导入前后 id 差集」找出
-       * 本次新增的商品，再逐条调用既有保存接口补类型 / 接入方式 / 售价。
-       * 这样不新增后端契约，也不会误改用户同时勾选的已存在商品。
-       */
-      const before = config ? await adminChannelsApi.models(channelId) : null;
-      const res = await adminChannelsApi.importModels(channelId, ids);
+      const res = await adminChannelsApi.importModels(channelId, ids, config);
 
-      let configured = 0;
-      let skipped = 0;
-      const failures: string[] = [];
-      if (config && res.added === 0) {
+      if (res.added === 0) {
         toast.success('没有新增商品：所选商品都已存在');
-        setUpstream(null);
-        await load();
-        onChanged();
-        return;
-      }
-      if (config) {
-        const beforeIds = new Set((before?.models ?? []).map((model) => model.id));
-        const wanted = new Set(ids.map((id) => id.toLowerCase()));
-        let after: Awaited<ReturnType<typeof adminChannelsApi.models>>;
-        try {
-          after = await adminChannelsApi.models(channelId);
-        } catch {
-          // 导入已经成功；这里失败只是拿不到新行，不能让用户以为整次导入失败
-          toast.error(`已导入 ${res.added} 个商品，但读取新商品失败；请刷新后手动补配置`);
-          setUpstream(null);
-          await load();
-          onChanged();
-          return;
-        }
-        const targets = after.models.filter((model) => {
-          if (beforeIds.has(model.id)) return false;
-          const upstreamKey = (model.providerModelKey || model.modelKey).toLowerCase();
-          return wanted.has(upstreamKey) || wanted.has(model.modelKey.toLowerCase());
-        });
-        skipped = Math.max(0, res.added - targets.length);
-
-        for (const model of targets) {
-          try {
-            const upstream = res.models.find(
-              (item) =>
-                item.id.toLowerCase() ===
-                (model.providerModelKey || model.modelKey).toLowerCase(),
-            );
-            const capabilityConfig =
-              config.capability === 'image'
-                ? JSON.parse(
-                    createDefaultImageCapabilityConfigJson(
-                      config.imageParameters,
-                      model.providerModelKey || model.modelKey,
-                    ),
-                  )
-                : JSON.parse(createDefaultTextCapabilityConfigJson());
-            await adminChannelsApi.updateModel(channelId, model.id, {
-              modelKey: model.modelKey,
-              providerModelKey: model.providerModelKey || model.modelKey,
-              displayName:
-                upstream?.displayName ||
-                (model.displayName && model.displayName !== '未分类'
-                  ? model.displayName
-                  : model.modelKey),
-              capability: config.capability,
-              protocol: config.protocol,
-              capabilityConfig,
-              enabled: false,
-              priceTiers: [
-                {
-                  selector: {},
-                  resolution: '*',
-                  videoSeconds: 0,
-                  billingMode: config.billingMode,
-                  unitPriceMicrocredits: config.unitPriceMicrocredits,
-                  inputTokenPriceMicrocredits: config.inputTokenPriceMicrocredits,
-                  outputTokenPriceMicrocredits: config.outputTokenPriceMicrocredits,
-                  cachedTokenPriceMicrocredits: config.cachedTokenPriceMicrocredits,
-                  priceConfigured: true,
-                  enabled: true,
-                },
-              ],
-            });
-            configured += 1;
-          } catch (e) {
-            failures.push(
-              `${model.modelKey}：${e instanceof Error ? e.message : '统一配置失败'}`,
-            );
-          }
-        }
-      }
-
-      if (failures.length > 0) {
-        toast.error(
-          `已导入 ${res.added} 个商品，${failures.length} 个统一配置失败：${failures
-            .slice(0, 2)
-            .join('；')}`,
-        );
-      } else if (config) {
-        toast.success(
-          `已导入并配置 ${configured} 个商品${skipped > 0 ? `，${skipped} 个未匹配到新行` : ''}，默认停用；确认售价后启用`,
-        );
+      } else if (res.configured > 0) {
+        const source = config ? '本次统一配置' : '供应商默认配置';
+        const autoEnabled = config?.enabled ?? channel.defaultModel?.enabled ?? false;
+        const rest =
+          res.configured < res.added
+            ? `；其余 ${res.added - res.configured} 个需逐条补配置`
+            : autoEnabled
+              ? '并启用'
+              : '，保持停用';
+        toast.success(`已导入 ${res.added} 个商品，${res.configured} 个已套用${source}${rest}`);
       } else {
         toast.success(
           `已导入 ${res.added} 个商品，默认停用；设置类型、接入方式与售价后再启用`,
@@ -650,6 +595,7 @@ export function ChannelModelManager({
         upstream={{
           models: upstream,
           existingKeys: existingUpstreamKeys,
+          defaultConfig: channel.defaultModel ?? null,
           importing,
           onClose: closeUpstream,
           onImport: (ids, config) => void runImport(ids, config),

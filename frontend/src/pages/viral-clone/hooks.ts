@@ -30,8 +30,8 @@ export { useCreditLabel } from '../../hooks/useCreditLabel';
 export { useGenerateError } from '../../hooks/useGenerateError';
 /** 结果列表轮询; `GalleryItem` 是结果网格的数据类型 */
 export { useResultGallery, type GalleryItem, type ResultGallery } from '../../hooks/useResultGallery';
-/** 素材库取数 (定义在 AssetLibraryModal 文件里) */
-export { useAssetLibrary } from '../../components/AssetLibraryModal';
+/** 素材库取数 */
+export { useAssetLibrary } from '../../hooks';
 /** 登录态: 判断是否已登录 (访客点提交先走登录弹窗) */
 export { useAuth } from '../../context/AuthContext';
 /** 余额变更通知: 扣费 / 退款后通知积分上下文刷新 */

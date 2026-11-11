@@ -35,6 +35,29 @@ export interface ChannelModelTag {
   color: string;
 }
 
+/**
+ * 供应商默认商品配置。
+ *
+ * 只覆盖图像 / 文本：这两种能力有可直接保存的默认合同。视频 / 音频的参数
+ * 组合差异太大，批量写默认值会把半成品推进路由目录，宁可让运营逐条配。
+ *
+ * 套用点有两处：后台「新建商品」与「从供应商同步商品」。两处共用同一份
+ * 事实源，避免「导入时配了、手工新建又要再配一遍」。
+ */
+export interface ChannelDefaultModelConfig {
+  /** 'image' | 'text' */
+  capability: string;
+  /** 协议 id（ProtocolRegistry 唯一事实源） */
+  protocol: string;
+  billingMode: string;
+  unitPriceMicrocredits: number;
+  inputTokenPriceMicrocredits: number;
+  outputTokenPriceMicrocredits: number;
+  cachedTokenPriceMicrocredits: number;
+  /** 套用后是否直接启用；默认 true（价格已随默认配置写入） */
+  enabled: boolean;
+}
+
 /** 渠道创建 / 更新入参（字段为 undefined 表示「未提交该字段」） */
 export interface ChannelRequest {
   name?: string;
@@ -49,6 +72,8 @@ export interface ChannelRequest {
   enabled?: boolean | null;
   /** 空串 = 显式清空渠道代理；undefined = 保持不变 */
   proxyUrl?: string | null;
+  /** undefined = 保持不变；null = 清空；对象 = 校验后保存 */
+  defaultModel?: ChannelDefaultModelConfig | null;
 }
 
 export interface ChannelModelCostPricingRequest {
@@ -163,6 +188,8 @@ export interface PublicModelChannel {
   hasApiKey: boolean;
   hasSecretKey: boolean;
   catalogProviderId?: string;
+  /** 供应商默认商品配置；仅后台视角下发 */
+  defaultModel?: ChannelDefaultModelConfig | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -259,6 +286,8 @@ export interface SystemChannelExportChannel {
   enabled: boolean;
   concurrencyLimit: number;
   catalogProviderId?: string;
+  /** 默认商品配置随导出文件走；省略 = 目标环境保持原值 */
+  defaultModel?: ChannelDefaultModelConfig | null;
   models: SystemChannelExportModel[];
 }
 

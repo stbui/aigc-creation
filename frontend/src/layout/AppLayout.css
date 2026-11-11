@@ -552,7 +552,7 @@
   /* 与侧栏同排时占满剩余宽度; 没有 min-width:0 时宽表/长词会把整列撑出视口 */
   flex: 1 1 auto;
   min-width: 0;
-  padding: 24px 24px 32px;
+  padding: 20px;
   overflow: auto;
 }
 

@@ -11,7 +11,8 @@
 `frontend/src/pages/admin/products/`、`frontend/src/pages/admin/backups/`、`frontend/src/pages/product-detail/`、`frontend/src/pages/product-kit/`、`frontend/src/pages/viral-clone/`、`frontend/src/pages/creative-image/`、`frontend/src/pages/product-sku/`、`frontend/src/pages/local-redraw/`、`frontend/src/pages/background-remove/`、`frontend/src/pages/watermark-remove/`、`frontend/src/pages/product-retouch/`、`frontend/src/pages/image-translate/`、`frontend/src/pages/image-expand/`、`frontend/src/pages/product-recolor/`、`frontend/src/pages/rotate-angle/`、`frontend/src/pages/multi-image-fusion/`、`frontend/src/pages/landing/`、
 `frontend/src/pages/library/`、`frontend/src/pages/works/`、
 `frontend/src/pages/invitations/`、`frontend/src/pages/account/`、
-`frontend/src/pages/checkout/` 同步维护）。
+`frontend/src/pages/checkout/`、`frontend/src/pages/orders/`、
+`frontend/src/pages/tickets/`、`frontend/src/pages/workbench/` 同步维护）。
 
 适用于 `frontend/src/pages/**` 下**多文件**的功能目录。单文件页面不强制套用；
 当页面长到需要拆分时，按本约定落位。参考实现见
@@ -209,11 +210,26 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     C 端结算页目录（`src/pages/checkout` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，幂等下单、支付轮询与券码试算下沉到 `utils.ts`；
     页面按板块拆成 `CheckoutOrderCard` / `CheckoutPaymentMethodCard` /
-    `CheckoutAmountCard` / `CheckoutResultCard`，支付状态仍留在 `page.tsx`）。
+    `CheckoutAmountCard` / `CheckoutResultCard`，支付状态仍留在 `page.tsx`）；
+  - `frontend/src/pages/orders/__tests__/orders-modules.test.ts` ——
+    C 端我的订单目录（`src/pages/orders` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`，筛选档位与可支付判定落 `utils.ts`；
+    页面按板块拆成 `OrderCard` / `OrdersFilterBar` / `OrderInvoiceStatus` /
+    `OrderInvoiceForm`，列表状态、轮询与写操作仍留在 `page.tsx`）；
+  - `frontend/src/pages/tickets/__tests__/tickets-modules.test.ts` ——
+    C 端我的工单目录（`src/pages/tickets` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`，类型 / 状态 / 优先级文案落 `constants.ts`；
+    页面按板块拆成 `TicketFilters` / `TicketCard` / `TicketComposeForm` /
+    `TicketThread`，列表分页、URL 同步与写操作仍留在 `page.tsx`）；
+  - `frontend/src/pages/workbench/__tests__/workbench-modules.test.ts` ——
+    C 端工作台目录（`src/pages/workbench` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`，示例图映射与看板指标表落 `constants.ts`；
+    页面按板块拆成 `WorkbenchToolGrid` / `WorkbenchAccountPanel` /
+    `WorkbenchRecentPanel` / `WorkbenchDashboard`，统计取数与登录态仍留在 `page.tsx`）。
 - 分层改动后跑：
 
   ```bash
-  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/landing src/pages/library src/pages/works src/pages/invitations src/pages/account src/pages/checkout src/pages/admin/payments
+  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/landing src/pages/library src/pages/works src/pages/invitations src/pages/account src/pages/checkout src/pages/orders src/pages/tickets src/pages/workbench src/pages/admin/payments
   ```
 
 - 类型校验以 `npm run typecheck` 为准。

@@ -6,9 +6,10 @@
  */
 
 import type { AdminCheckinListResult, AdminInviteListResult } from '../../../types/api';
+import type { TagTone } from '../../../components/admin/statusMeta';
 
 /** 状态标签色调，与 `StatusTag` 的 `tone` 同形 */
-export type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
+export type { TagTone };
 
 export type InviteRow = AdminInviteListResult['items'][number];
 export type CheckinRow = AdminCheckinListResult['items'][number];

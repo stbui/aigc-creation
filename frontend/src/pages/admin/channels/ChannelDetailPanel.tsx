@@ -1,6 +1,7 @@
 import { Pencil, Plus } from 'lucide-react';
 import { ActionButton, EmptyState, Panel, RowMenu, StatusTag } from '~/admin-ui/primitives';
 import { ChannelModelManager } from './ChannelModelManager';
+import { CAPABILITY_OPTIONS } from './constants';
 import type { ProductConsumptionState } from './useProductConsumption';
 import type { AdminChannelView } from '../../../types/model';
 
@@ -54,6 +55,7 @@ export function ChannelDetailPanel({
   onChanged,
   onFocusConsumed,
 }: ChannelDetailPanelProps) {
+  const defaultModel = selected?.defaultModel ?? null;
   return (
     <section
       id="admin-channel-detail"
@@ -86,6 +88,16 @@ export function ChannelDetailPanel({
               {selected.proxyUrl && <span className="font-mono">网络代理：{selected.proxyUrl}</span>}
               {selected.catalogProviderId && (
                 <span>来源：服务商目录 · {selected.catalogProviderId}</span>
+              )}
+              {defaultModel && (
+                <span>
+                  默认商品：
+                  {CAPABILITY_OPTIONS.find((item) => item.value === defaultModel.capability)
+                    ?.label ?? defaultModel.capability}
+                  {' · '}
+                  {defaultModel.protocol}
+                  {defaultModel.enabled ? '（套用后启用）' : '（套用后停用）'}
+                </span>
               )}
             </span>
           }

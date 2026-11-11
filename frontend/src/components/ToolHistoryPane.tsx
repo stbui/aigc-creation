@@ -1,8 +1,8 @@
 import './history-pane.css';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { ChevronUp, Download, History, ImageOff, RefreshCw } from 'lucide-react';
-import { assetSrc, assetThumbSrc, generateApi } from '../lib/api';
-import { useAuth } from '../context/AuthContext';
+import { assetSrc, assetThumbSrc } from '../lib/api';
+import { useToolHistory, type ToolHistoryTask } from '../hooks/useToolHistory';
 import { ImageLightbox } from './ImageLightbox';
 import { ToolTrailingContext } from './ToolShell';
 import { StateError } from './StateViews';
@@ -24,53 +24,6 @@ import { useApp, Drawer, Spin } from '../ui';
  * 参考站另有「反馈」入口，但依赖其私有反馈接口；本站没有对应契约，
  * 因此不做一个点了没反应的假按钮。
  */
-
-export type ToolHistoryTask = Awaited<ReturnType<typeof generateApi.list>>[number];
-
-export function useToolHistory(capability: string, refreshKey?: unknown) {
-  const { token } = useAuth();
-  const [tasks, setTasks] = useState<ToolHistoryTask[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    if (!token) {
-      setTasks([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    void generateApi
-      .listPage({ capability, limit: 50, offset: 0 })
-      .then((page) => {
-        if (cancelled) return;
-        setTasks(
-          page.items
-            .filter((task) => task.status === 'succeeded' && task.outputAsset)
-            .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
-            .slice(0, 24),
-        );
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setTasks([]);
-          setError((e as Error).message || '历史记录加载失败');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [capability, refreshKey, token, reloadKey]);
-
-  return { tasks, loading, error, retry: () => setReloadKey((value) => value + 1) };
-}
 
 /**
  * 历史卡列表本体。局部重绘仍使用自己的三栏折叠结构，但历史卡交互必须

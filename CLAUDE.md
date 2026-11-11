@@ -143,14 +143,16 @@ aigc-creation/
     └── src/
         ├── App.tsx           # 34 条壳内路由（两组别名：/asset-library→/library、/my-works→/works）+ 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
         ├── admin-ui/         # 后台 UI：components/ui（shadcn 原子件）· primitives（页面唯一取用层）· shell · providers · hooks · lib
-        ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
-        ├── pages/            # 15 个单文件页面（登录 / 工作台 / 订单 / 工单 / 工具页 / 法务 …）
+        ├── layout/           # C 端外壳：AppLayout（组合）/ AppHeader / AppSidebar / SideRail / PromoBar
+        │                     #   NotificationBell / UserAccountMenu / GuestPromoDialog / RouteExperience / hooks.ts
+        ├── components/       # ToolShell / QrLoginPanel / 共享弹窗与页面片段 / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
+        ├── pages/            # 12 个单文件页面（登录 / 工具页 / 法务 …）
         │   ├── admin/        # 后台 32 页：按域目录组织，含 AdminDashboardPage.tsx
-        │   └── <域>/          # 21 个 C 端域目录，按 index / page / components / api / hooks / utils / constants 分层
-        │                     #   product-kit / shoppable-carousel / product-detail / viral-clone / library / account …
+        │   └── <域>/          # 26 个 C 端域目录，按 index / page / components / api / hooks / utils / constants 分层
+        │                     #   product-kit / shoppable-carousel / product-detail / viral-clone / library / account / workbench …
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / money / poll / zip
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
-        ├── hooks/            # useToolTask / useProject / useCapabilities / usePollAbort / 上传相关
+        ├── hooks/            # 共享 hook（index.ts 统一出口）：useToolTask / useAssetLibrary / useToolHistory / useAdminAlerts 等
         └── styles/           # global.css（设计令牌 + 全站规则）+ admin.css（后台 Tailwind 入口 + shadcn 语义桥接）
 ```
 

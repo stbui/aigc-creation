@@ -24,18 +24,10 @@ import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { isCapabilityVisible, toolPath } from '../lib/capabilities';
 
 /**
- * 侧边菜单 —— 对齐参考站 2026-10-28 的 `workspace-side-menu-v2`。
+ * 侧边菜单。
  *
- * 参考站当前结构：顶部「工作台 / 我的作品」，随后是 AI视频、电商生图、AI修图、
- * 数据中心四个可折叠分组，底部固定「产品建议 / 联系客服」。
- *
- * 响应式由 CSS 托管：
- *   - >1366px：176px 横排，条目 133×45、13px 标签、24px 静态菜单图标；
- *   - ≤1366px：100px 垂直轨，条目 77×60、10px 标签、分组标题 24px；
- *   - ≤900px：本地保留抽屉导航（参考站在 ≤768px 才隐藏侧栏，差异见文档）。
- *
- * 本地保留的真实差异：图生视频入口、数据看板入口。
- * 侧栏不提供 hover 提示 / 预览 —— 悬停属导航行为，任何浮层都会遮挡主区。
+ * 响应式由 CSS 托管：>1366px 横排 / ≤1366px 垂直轨 / ≤900px 走抽屉。
+ * 侧栏不提供 hover 提示或浮层，避免遮挡主区。
  */
 
 const SIDEBAR_GROUP_ORDER = ['ai_video', 'ecommerce_gen', 'ai_retouch'];
@@ -64,12 +56,12 @@ const SIDEBAR_ITEM_ORDER: Record<string, string[]> = {
   ],
 };
 
-/** 参考站侧栏标签与能力注册表名称的两处差异；注册表仍保持完整能力名。 */
+/** 侧栏标签与能力注册表名称不一致的条目 */
 const SIDEBAR_LABELS: Record<string, string> = {
   detail_image: '商品详情',
 };
 
-/** 参考站 `/static/menu/*.svg` 的本地副本；运行时不请求参考站。 */
+/** 菜单图标本地副本，运行时不请求外部资源 */
 const SIDEBAR_ICONS: Record<string, string> = {
   workbench: '/menu/m_gzt.svg',
   works: '/menu/m_wdrw.svg',

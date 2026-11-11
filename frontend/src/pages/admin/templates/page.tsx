@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import {
-  ActionButton,
   ConfirmDialog,
   EmptyState,
   ListError,
   PageHeader,
   PageSkeleton,
-  Panel,
   RefreshButton,
 } from '~/admin-ui/primitives';
 import { adminTemplateCatalogApi } from './api';
@@ -23,6 +20,9 @@ import {
 } from './constants';
 import { buildCategoryPayload, buildGroupPayload, buildItemPayload } from './utils';
 import { CategoryFormDrawer, GroupFormDrawer, ItemFormDrawer } from './forms';
+import { CategorySidebar } from './CategorySidebar';
+import { TemplateWorkspace, type StatusFilter } from './TemplateWorkspace';
+import { TemplatePreviewDialog } from './TemplatePreviewDialog';
 import type {
   AdminTemplateCategory,
   AdminTemplateGroup,
@@ -37,8 +37,11 @@ type DeleteTarget =
 /**
  * 写真模板管理（`/admin/templates`）。
  *
- * 三级结构：一级分类（来源文章 / 主题）→ 二级分类（风格 / 场景）→ 模板（图 + 提示词 + 标签）。
- * 左侧选一级分类，中间选二级分类，右侧维护该分组下的模板。
+ * 两栏工作台：
+ *   左侧分类目录（一级分类 + 选中分类下的二级分类）
+ *   右侧模板工作区（搜索 / 状态筛选 / 卡片网格 / 预览）
+ *
+ * 三级结构：一级分类（主题）→ 二级分类（来源文章 / 风格）→ 模板（图 + 提示词 + 标签）。
  * 一级/二级分类删除会级联删除下级内容，确认弹窗列出影响面；模板删除不可恢复。
  */
 export function AdminTemplatesPage() {
@@ -53,33 +56,9 @@ export function AdminTemplatesPage() {
 
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [groupId, setGroupId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (categories.length === 0) {
-      setCategoryId(null);
-      setGroupId(null);
-      return;
-    }
-    if (!categories.some((category) => category.id === categoryId)) {
-      setCategoryId(categories[0].id);
-    }
-  }, [categories, categoryId]);
-
-  const selectedCategory =
-    categories.find((category) => category.id === categoryId) ?? null;
-
-  useEffect(() => {
-    if (!selectedCategory) {
-      setGroupId(null);
-      return;
-    }
-    if (!selectedCategory.groups.some((group) => group.id === groupId)) {
-      setGroupId(selectedCategory.groups[0]?.id ?? null);
-    }
-  }, [selectedCategory, groupId]);
-
-  const selectedGroup =
-    selectedCategory?.groups.find((group) => group.id === groupId) ?? null;
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [previewItem, setPreviewItem] = useState<AdminTemplateItem | null>(null);
 
   const [categoryDrawer, setCategoryDrawer] = useState<{
     mode: 'create' | 'edit';
@@ -95,6 +74,92 @@ export function AdminTemplatesPage() {
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+
+  const selectedCategory =
+    categories.find((category) => category.id === categoryId) ?? null;
+  const selectedGroup =
+    selectedCategory?.groups.find((group) => group.id === groupId) ?? null;
+
+  // 选中的分类/分组被删除后自动回落到上一级，避免右侧停留在不存在的实体上
+  useEffect(() => {
+    if (categoryId && !categories.some((category) => category.id === categoryId)) {
+      setCategoryId(null);
+      setGroupId(null);
+    }
+  }, [categories, categoryId]);
+
+  useEffect(() => {
+    const category = categories.find((item) => item.id === categoryId);
+    if (!category) {
+      if (groupId) setGroupId(null);
+      return;
+    }
+    if (groupId && !category.groups.some((group) => group.id === groupId)) {
+      setGroupId(null);
+    }
+  }, [categories, categoryId, groupId]);
+
+  const totalItems = useMemo(
+    () =>
+      categories.reduce(
+        (sum, category) =>
+          sum + category.groups.reduce((groupSum, group) => groupSum + group.itemCount, 0),
+        0,
+      ),
+    [categories],
+  );
+
+  const groupNameById = useMemo(
+    () =>
+      new Map(
+        categories.flatMap((category) =>
+          category.groups.map((group) => [group.id, group.name] as const),
+        ),
+      ),
+    [categories],
+  );
+
+  const formItems = useMemo(() => {
+    if (selectedGroup) return selectedGroup.items;
+    if (selectedCategory) return selectedCategory.groups.flatMap((group) => group.items);
+    return categories.flatMap((category) =>
+      category.groups.flatMap((group) => group.items),
+    );
+  }, [categories, selectedCategory, selectedGroup]);
+
+  const filteredItems = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    return formItems.filter((item) => {
+      if (statusFilter === 'enabled' && !item.enabled) return false;
+      if (statusFilter === 'disabled' && item.enabled) return false;
+      if (!keyword) return true;
+      return [item.name, item.prompt, ...item.tags].some((value) =>
+        value.toLowerCase().includes(keyword),
+      );
+    });
+  }, [formItems, search, statusFilter]);
+
+  const panelTitle = selectedGroup
+    ? `${selectedCategory?.name ?? ''} / ${selectedGroup.name}`
+    : selectedCategory
+      ? selectedCategory.name
+      : '全部模板';
+
+  const emptyText = useMemo(() => {
+    if (search.trim() || statusFilter !== 'all') {
+      return { title: '没有匹配的模板', desc: '换一个关键词，或把状态筛选切回「全部」。' };
+    }
+    if (selectedGroup) {
+      return { title: '该分组下还没有模板', desc: '点击右上角「新建模板」添加图片、提示词与标签。' };
+    }
+    if (selectedCategory) {
+      return {
+        title: '该分类下还没有模板',
+        desc: '先在左侧创建二级分类，再在二级分类下新建模板。',
+      };
+    }
+    return { title: '还没有模板分类', desc: '点击左侧「新建」开始搭建目录。' };
+  }, [search, statusFilter, selectedCategory, selectedGroup]);
 
   const categoryInitial = useMemo(
     () => (categoryDrawer?.target ? toCategoryDraft(categoryDrawer.target) : EMPTY_CATEGORY),
@@ -120,13 +185,15 @@ export function AdminTemplatesPage() {
       if (categoryDrawer?.target) {
         await adminTemplateCatalogApi.updateCategory(categoryDrawer.target.id, payload.value!);
         toast.success('一级分类已更新');
+        await reload();
       } else {
         const created = await adminTemplateCatalogApi.createCategory(payload.value!);
-        setCategoryId(created.id);
         toast.success('一级分类已创建');
+        await reload();
+        setCategoryId(created.id);
+        setGroupId(null);
       }
       setCategoryDrawer(null);
-      await reload();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : '保存失败');
     } finally {
@@ -135,7 +202,8 @@ export function AdminTemplatesPage() {
   };
 
   const saveGroup = async (draft: typeof EMPTY_GROUP) => {
-    if (!selectedCategory) return;
+    const category = selectedCategory;
+    if (!category) return;
     const payload = buildGroupPayload(draft);
     if (!payload.ok) {
       toast.error(payload.error ?? '请检查表单');
@@ -146,16 +214,18 @@ export function AdminTemplatesPage() {
       if (groupDrawer?.target) {
         await adminTemplateCatalogApi.updateGroup(groupDrawer.target.id, payload.value!);
         toast.success('二级分类已更新');
+        await reload();
       } else {
         const created = await adminTemplateCatalogApi.createGroup({
-          categoryId: selectedCategory.id,
+          categoryId: category.id,
           ...payload.value!,
         });
-        setGroupId(created.id);
         toast.success('二级分类已创建');
+        await reload();
+        setCategoryId(category.id);
+        setGroupId(created.id);
       }
       setGroupDrawer(null);
-      await reload();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : '保存失败');
     } finally {
@@ -164,7 +234,8 @@ export function AdminTemplatesPage() {
   };
 
   const saveItem = async (draft: typeof EMPTY_ITEM) => {
-    if (!selectedGroup) return;
+    const group = selectedGroup;
+    if (!group) return;
     const payload = buildItemPayload(draft);
     if (!payload.ok) {
       toast.error(payload.error ?? '请检查表单');
@@ -177,13 +248,13 @@ export function AdminTemplatesPage() {
         toast.success('模板已更新');
       } else {
         await adminTemplateCatalogApi.createItem({
-          groupId: selectedGroup.id,
+          groupId: group.id,
           ...payload.value!,
         });
         toast.success('模板已创建');
       }
-      setItemDrawer(null);
       await reload();
+      setItemDrawer(null);
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : '保存失败');
     } finally {
@@ -228,10 +299,16 @@ export function AdminTemplatesPage() {
     try {
       if (deleteTarget.kind === 'category') {
         await adminTemplateCatalogApi.removeCategory(deleteTarget.id);
+        if (categoryId === deleteTarget.id) {
+          setCategoryId(null);
+          setGroupId(null);
+        }
       } else if (deleteTarget.kind === 'group') {
         await adminTemplateCatalogApi.removeGroup(deleteTarget.id);
+        if (groupId === deleteTarget.id) setGroupId(null);
       } else {
         await adminTemplateCatalogApi.removeItem(deleteTarget.id);
+        if (previewItem?.id === deleteTarget.id) setPreviewItem(null);
       }
       toast.success(`已删除「${deleteTarget.name}」`);
       setDeleteTarget(null);
@@ -261,263 +338,63 @@ export function AdminTemplatesPage() {
     <div>
       <PageHeader
         title="写真模板"
-        description="维护 C 端 /template 的模板目录：一级分类（来源文章）→ 二级分类（风格/场景）→ 模板（图片 + 提示词 + 标签）。"
+        description="C 端 /template 的目录与素材。左侧选分类，右侧搜索、预览和维护模板。"
         actions={<RefreshButton onRefresh={() => void reload()} loading={loading} />}
       />
 
-      <div className="grid grid-cols-[minmax(220px,260px)_minmax(220px,280px)_minmax(0,1fr)] items-start gap-4">
-        <Panel
-          title="一级分类"
-          note={`${categories.length} 个`}
-          extra={
-            writable && (
-              <ActionButton
-                size="xs"
-                icon={Plus}
-                onClick={() => setCategoryDrawer({ mode: 'create' })}
-              >
-                新建
-              </ActionButton>
-            )
+      <div className="grid grid-cols-[300px_minmax(0,1fr)] items-start gap-4">
+        <CategorySidebar
+          categories={categories}
+          categoryId={categoryId}
+          groupId={groupId}
+          totalItems={totalItems}
+          writable={writable}
+          onSelectAll={() => {
+            setCategoryId(null);
+            setGroupId(null);
+          }}
+          onSelectCategory={(nextCategoryId) => {
+            setCategoryId(nextCategoryId);
+            setGroupId(null);
+          }}
+          onSelectGroup={(nextCategoryId, nextGroupId) => {
+            setCategoryId(nextCategoryId);
+            setGroupId(nextGroupId);
+          }}
+          onCreateCategory={() => setCategoryDrawer({ mode: 'create' })}
+          onEditCategory={(category) =>
+            setCategoryDrawer({ mode: 'edit', target: category })
           }
-        >
-          {categories.length === 0 ? (
-            <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
-              还没有一级分类，点击「新建」开始。
-            </p>
-          ) : (
-            <div className="divide-y divide-border">
-              {categories.map((category) => (
-                <div
-                  key={category.id}
-                  className={`flex items-start gap-2 px-3 py-3 ${
-                    category.id === categoryId ? 'bg-muted/50' : ''
-                  }`}
-                >
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => {
-                      setCategoryId(category.id);
-                      setGroupId(null);
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <strong className="truncate text-[13px] text-foreground">
-                        {category.name}
-                      </strong>
-                      {!category.enabled && (
-                        <span className="shrink-0 rounded bg-muted px-1 text-[12px] text-muted-foreground">
-                          停用
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                      {category.slug} · {category.groups.length} 个分组
-                    </div>
-                  </button>
-                  {writable && (
-                    <div className="flex shrink-0 items-center gap-1">
-                      <ActionButton
-                        variant="ghost"
-                        size="xs"
-                        icon={Pencil}
-                        ariaLabel={`编辑分类${category.name}`}
-                        onClick={() => setCategoryDrawer({ mode: 'edit', target: category })}
-                      />
-                      <ActionButton
-                        variant="ghost"
-                        size="xs"
-                        icon={Trash2}
-                        ariaLabel={`删除分类${category.name}`}
-                        onClick={() => requestDeleteCategory(category)}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
+          onDeleteCategory={requestDeleteCategory}
+          onCreateGroup={() => setGroupDrawer({ mode: 'create' })}
+          onEditGroup={(group) => setGroupDrawer({ mode: 'edit', target: group })}
+          onDeleteGroup={requestDeleteGroup}
+        />
 
-        <Panel
-          title="二级分类"
-          note={selectedCategory ? selectedCategory.name : '未选择'}
-          extra={
-            selectedCategory &&
-            writable && (
-              <ActionButton
-                size="xs"
-                icon={Plus}
-                onClick={() => setGroupDrawer({ mode: 'create' })}
-              >
-                新建
-              </ActionButton>
-            )
-          }
-        >
-          {!selectedCategory ? (
-            <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
-              先在左侧选择一级分类。
-            </p>
-          ) : selectedCategory.groups.length === 0 ? (
-            <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
-              该分类下还没有二级分类。
-            </p>
-          ) : (
-            <div className="divide-y divide-border">
-              {selectedCategory.groups.map((group) => (
-                <div
-                  key={group.id}
-                  className={`flex items-start gap-2 px-3 py-3 ${
-                    group.id === groupId ? 'bg-muted/50' : ''
-                  }`}
-                >
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => setGroupId(group.id)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <strong className="truncate text-[13px] text-foreground">
-                        {group.name}
-                      </strong>
-                      {!group.enabled && (
-                        <span className="shrink-0 rounded bg-muted px-1 text-[12px] text-muted-foreground">
-                          停用
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                      {group.slug} · {group.itemCount} 套模板
-                    </div>
-                  </button>
-                  {writable && (
-                    <div className="flex shrink-0 items-center gap-1">
-                      <ActionButton
-                        variant="ghost"
-                        size="xs"
-                        icon={Pencil}
-                        ariaLabel={`编辑分组${group.name}`}
-                        onClick={() => setGroupDrawer({ mode: 'edit', target: group })}
-                      />
-                      <ActionButton
-                        variant="ghost"
-                        size="xs"
-                        icon={Trash2}
-                        ariaLabel={`删除分组${group.name}`}
-                        onClick={() => requestDeleteGroup(group)}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-
-        <Panel
-          title="模板"
-          note={
-            selectedGroup
-              ? `${selectedGroup.name} · ${selectedGroup.itemCount} 套`
-              : '未选择二级分类'
-          }
-          extra={
-            selectedGroup &&
-            writable && (
-              <ActionButton
-                size="xs"
-                icon={Plus}
-                onClick={() => setItemDrawer({ mode: 'create' })}
-              >
-                新建模板
-              </ActionButton>
-            )
-          }
-        >
-          {!selectedGroup ? (
-            <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
-              先在左侧选择二级分类。
-            </p>
-          ) : selectedGroup.items.length === 0 ? (
-            <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
-              该分组下还没有模板。
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2">
-              {selectedGroup.items.map((item) => (
-                <article
-                  key={item.id}
-                  className="flex gap-3 rounded-lg border border-border bg-card p-2"
-                >
-                  <div className="h-[104px] w-[78px] shrink-0 overflow-hidden rounded-md bg-muted">
-                    {item.thumbFile ? (
-                      <img
-                        src={item.thumbFile}
-                        alt={`${item.name}预览`}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <span className="flex h-full items-center justify-center text-[12px] text-muted-foreground">
-                        无图
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <div className="flex items-start justify-between gap-1">
-                      <strong className="truncate text-[13px] text-foreground">
-                        {item.name}
-                      </strong>
-                      {!item.enabled && (
-                        <span className="shrink-0 rounded bg-muted px-1 text-[12px] text-muted-foreground">
-                          停用
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {item.tags.slice(0, 4).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded border border-border bg-muted/60 px-1 text-[12px] text-muted-foreground"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="line-clamp-2 text-[12px] leading-4 text-muted-foreground">
-                      {item.prompt}
-                    </p>
-                    <div className="mt-auto flex items-center justify-between gap-2">
-                      <span className="whitespace-nowrap text-[12px] text-muted-foreground">
-                        排序 {item.sortOrder}
-                      </span>
-                      {writable && (
-                        <div className="flex items-center gap-1">
-                          <ActionButton
-                            variant="ghost"
-                            size="xs"
-                            icon={Pencil}
-                            ariaLabel={`编辑模板${item.name}`}
-                            onClick={() => setItemDrawer({ mode: 'edit', target: item })}
-                          />
-                          <ActionButton
-                            variant="ghost"
-                            size="xs"
-                            icon={Trash2}
-                            ariaLabel={`删除模板${item.name}`}
-                            onClick={() => requestDeleteItem(item)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </Panel>
+        <TemplateWorkspace
+          title={panelTitle}
+          items={filteredItems}
+          groupNameById={groupNameById}
+          search={search}
+          statusFilter={statusFilter}
+          emptyTitle={emptyText.title}
+          emptyDesc={emptyText.desc}
+          writable={writable}
+          canCreateGroup={Boolean(selectedCategory && !selectedGroup)}
+          canCreateItem={Boolean(selectedGroup)}
+          showGroupName={!selectedGroup}
+          onSearchChange={setSearch}
+          onStatusChange={setStatusFilter}
+          onClearFilters={() => {
+            setSearch('');
+            setStatusFilter('all');
+          }}
+          onCreateGroup={() => setGroupDrawer({ mode: 'create' })}
+          onCreateItem={() => setItemDrawer({ mode: 'create' })}
+          onPreview={setPreviewItem}
+          onEdit={(item) => setItemDrawer({ mode: 'edit', target: item })}
+          onDelete={requestDeleteItem}
+        />
       </div>
 
       {categoryDrawer && (
@@ -549,6 +426,8 @@ export function AdminTemplatesPage() {
           onSubmit={(draft) => void saveItem(draft)}
         />
       )}
+
+      <TemplatePreviewDialog item={previewItem} onClose={() => setPreviewItem(null)} />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

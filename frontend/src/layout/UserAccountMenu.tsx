@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ArrowUpRight,
   CalendarDays,
@@ -17,8 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../context/AdminContext';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
-import { membershipApi } from '../lib/api';
-import type { MyMembership } from '../types/api';
+import { useAccountMembership } from './hooks';
 import { Avatar, Dropdown } from '../ui';
 
 function formatExpiry(iso: string | null | undefined): string {
@@ -43,42 +42,20 @@ function linkIcon(children: ReactNode): ReactNode {
 
 export function UserAccountMenu() {
   const navigate = useNavigate();
-  const { email, logout, authEpoch } = useAuth();
+  const { email, logout } = useAuth();
   const { balance } = useCredits();
   const { me, loading: adminLoading } = useAdmin();
   const [open, setOpen] = useState(false);
-  const [membership, setMembership] = useState<MyMembership | null>(null);
-  const [membershipLoading, setMembershipLoading] = useState(false);
-  const [membershipFailed, setMembershipFailed] = useState(false);
-  const requestSeq = useRef(0);
-
-  const loadMembership = useCallback(async () => {
-    const seq = ++requestSeq.current;
-    setMembershipLoading(true);
-    setMembershipFailed(false);
-    try {
-      const next = await membershipApi.me();
-      if (requestSeq.current === seq) setMembership(next);
-    } catch {
-      if (requestSeq.current === seq) {
-        setMembership(null);
-        setMembershipFailed(true);
-      }
-    } finally {
-      if (requestSeq.current === seq) setMembershipLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadMembership();
-    return () => {
-      requestSeq.current += 1;
-    };
-  }, [authEpoch, loadMembership]);
+  const {
+    membership,
+    loading: membershipLoading,
+    failed: membershipFailed,
+    reload: reloadMembership,
+  } = useAccountMembership();
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
-    if (next) void loadMembership();
+    if (next) void reloadMembership();
   };
 
   const go = (path: string) => {

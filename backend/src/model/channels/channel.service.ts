@@ -23,7 +23,12 @@ import {
   validateProxyUrl,
 } from '../infra/outbound';
 import { SecretCipher } from '../infra/secret-cipher';
+import { ProtocolCatalogService } from '../protocol/protocol-catalog.service';
 import { ChannelModelService } from './channel-model.service';
+import {
+  decodeDefaultModelConfig,
+  normalizeDefaultModelConfig,
+} from './channel-default-model';
 import {
   ChannelNotFoundError,
   ChannelOrderChangedError,
@@ -100,6 +105,7 @@ interface ChannelFields {
   headersJson: string;
   proxyUrl: string;
   enabled: boolean;
+  defaultModelConfigJson: string;
 }
 
 @Injectable()
@@ -109,6 +115,7 @@ export class ChannelService {
     private readonly cipher: SecretCipher,
     private readonly catalogVersion: CatalogVersionService,
     private readonly channelModels: ChannelModelService,
+    private readonly protocols: ProtocolCatalogService,
   ) {}
 
   /* ───────────────────────── 查询 ───────────────────────── */
@@ -184,6 +191,7 @@ export class ChannelService {
       concurrencyLimit: 0,
       enabled: true,
       headersJson: '',
+      defaultModelConfigJson: '',
     });
     const created = await this.prisma.$transaction(async (tx) => {
       const channel = await tx.modelChannel.create({
@@ -296,6 +304,7 @@ export class ChannelService {
           retiredModelsJson: source.retiredModelsJson,
           headersJson: source.headersJson,
           catalogProviderId: source.catalogProviderId,
+          defaultModelConfigJson: source.defaultModelConfigJson,
         },
       });
       if (sourceModels.length === 0) {
@@ -460,6 +469,7 @@ export class ChannelService {
         enabled: row.enabled,
         concurrencyLimit: row.concurrencyLimit,
         catalogProviderId: row.catalogProviderId || undefined,
+        defaultModel: decodeDefaultModelConfig(row.defaultModelConfigJson),
         models: exportedModels,
       });
     }
@@ -555,6 +565,8 @@ export class ChannelService {
       sortOrder,
       useGlobalConcurrency: useGlobal,
       concurrencyLimit: useGlobal ? undefined : imported.concurrencyLimit,
+      // 省略 = 目标环境保持原值；显式 null 才清空
+      ...(imported.defaultModel === undefined ? {} : { defaultModel: imported.defaultModel }),
     };
     const current = byName.get(name);
     if (current) {
@@ -683,6 +695,7 @@ export class ChannelService {
       concurrencyLimit: number;
       enabled: boolean;
       headersJson: string;
+      defaultModelConfigJson: string;
     },
   ): Promise<{ fields: ChannelFields; models: string[] }> {
     const name = String(req.name ?? '').trim();
@@ -700,6 +713,13 @@ export class ChannelService {
       }
     }
 
+    // undefined = 保持不变；null / 空对象 = 清空；对象 = 校验后保存
+    let defaultModelConfigJson = current.defaultModelConfigJson;
+    if (req.defaultModel !== undefined) {
+      const normalized = normalizeDefaultModelConfig(req.defaultModel, this.protocols);
+      defaultModelConfigJson = normalized ? JSON.stringify(normalized) : '';
+    }
+
     const fields: ChannelFields = {
       name,
       baseUrl: normalizedBaseUrl,
@@ -710,6 +730,7 @@ export class ChannelService {
       // 代理：undefined/null 已在 mergeRequest 中回填为渠道现有值；空串 = 显式清空
       proxyUrl: String(req.proxyUrl ?? '').trim(),
       enabled: req.enabled === undefined || req.enabled === null ? current.enabled : Boolean(req.enabled),
+      defaultModelConfigJson,
     };
     try {
       validateProxyUrl(fields.proxyUrl);
@@ -771,7 +792,12 @@ export class ChannelService {
       where: { channelId: row.id, deletedAt: null, ...(admin ? {} : { enabled: true }) },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     });
-    return publicChannel(row, admin, models);
+    return publicChannel(
+      row,
+      admin,
+      models,
+      admin ? decodeDefaultModelConfig(row.defaultModelConfigJson) : null,
+    );
   }
 
   private messageOf(error: unknown): string {

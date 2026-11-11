@@ -10,7 +10,7 @@ import {
 import { ChannelHeadersEditor } from './ChannelHeadersEditor';
 import { Field } from './ChannelField';
 import { useProtocolCatalog } from './useChannelModels';
-import type { ChannelDraft } from './constants';
+import { BILLING_MODE_OPTIONS, type ChannelDraft, type DefaultModelDraft } from './constants';
 import type { AdminChannelView } from '../../../types/model';
 
 interface ChannelFormDrawerProps {
@@ -54,6 +54,23 @@ export function ChannelFormDrawer({
   useEffect(() => {
     if (!open) setPresetId('');
   }, [open]);
+
+  const defaultCapability = draft.defaultModel.capability;
+  const defaultProtocols = useMemo(
+    () =>
+      protocolCatalog.filter(
+        (item) => !defaultCapability || item.capabilities.includes(defaultCapability),
+      ),
+    [protocolCatalog, defaultCapability],
+  );
+  const defaultBillingOptions = BILLING_MODE_OPTIONS.filter((item) =>
+    defaultCapability === 'text'
+      ? item.value === 'fixed_request' || item.value === 'token'
+      : item.value === 'fixed_request',
+  );
+  const patchDefaultModel = (patch: Partial<DefaultModelDraft>) => {
+    onChange({ defaultModel: { ...draft.defaultModel, ...patch } });
+  };
 
   const applyPreset = (id: string | undefined) => {
     if (!id) {
@@ -187,6 +204,118 @@ export function ChannelFormDrawer({
               />
             </Field>
           </div>
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-lg border border-border p-3">
+          <div>
+            <h3 className="text-xs font-semibold text-foreground">默认商品配置（可选）</h3>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              新建商品和从供应商同步商品时自动套用，免去逐条配置。只支持图像与文本；
+              不设置则保持逐条配置。
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="模型类型">
+              <SelectField
+                ariaLabel="默认商品模型类型"
+                value={defaultCapability || undefined}
+                options={[
+                  { value: 'image', label: '图像' },
+                  { value: 'text', label: '文本' },
+                ]}
+                placeholder="不设置"
+                allowClear
+                clearLabel="不设置"
+                disabled={!writable}
+                onChange={(value) =>
+                  patchDefaultModel({
+                    capability: value ?? '',
+                    protocol: '',
+                    billingMode: 'fixed_request',
+                  })
+                }
+              />
+            </Field>
+            <Field label="接入方式" hint="按类型过滤可用协议">
+              <SelectField
+                ariaLabel="默认商品接入方式"
+                value={draft.defaultModel.protocol || undefined}
+                options={defaultProtocols.map((item) => ({
+                  value: item.id,
+                  label: `${item.label}（${item.id}）`,
+                }))}
+                placeholder={presetLoading ? '读取中…' : '选择接入方式'}
+                disabled={!writable || !defaultCapability || presetLoading}
+                onChange={(value) => patchDefaultModel({ protocol: value ?? '' })}
+              />
+            </Field>
+          </div>
+          {defaultCapability && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="计费方式">
+                  <SelectField
+                    ariaLabel="默认商品计费方式"
+                    value={draft.defaultModel.billingMode}
+                    options={defaultBillingOptions}
+                    disabled={!writable}
+                    onChange={(value) =>
+                      patchDefaultModel({ billingMode: value ?? 'fixed_request' })
+                    }
+                  />
+                </Field>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {draft.defaultModel.billingMode === 'token' ? (
+                  <>
+                    <Field label="输入 Token 价格">
+                      <TextField
+                        ariaLabel="默认商品输入 Token 价格"
+                        inputMode="decimal"
+                        value={draft.defaultModel.input}
+                        onChange={(value) => patchDefaultModel({ input: value })}
+                        placeholder="积分 / 百万 Token"
+                      />
+                    </Field>
+                    <Field label="输出 Token 价格">
+                      <TextField
+                        ariaLabel="默认商品输出 Token 价格"
+                        inputMode="decimal"
+                        value={draft.defaultModel.output}
+                        onChange={(value) => patchDefaultModel({ output: value })}
+                        placeholder="必填"
+                      />
+                    </Field>
+                    <Field label="缓存 Token 价格">
+                      <TextField
+                        ariaLabel="默认商品缓存 Token 价格"
+                        inputMode="decimal"
+                        value={draft.defaultModel.cached}
+                        onChange={(value) => patchDefaultModel({ cached: value })}
+                        placeholder="选填"
+                      />
+                    </Field>
+                  </>
+                ) : (
+                  <Field label="售价（积分）">
+                    <TextField
+                      ariaLabel="默认商品售价"
+                      inputMode="decimal"
+                      value={draft.defaultModel.unit}
+                      onChange={(value) => patchDefaultModel({ unit: value })}
+                      placeholder="0 表示免费"
+                    />
+                  </Field>
+                )}
+              </div>
+              <SwitchField
+                checked={draft.defaultModel.enabled}
+                label="套用后自动启用"
+                ariaLabel="默认商品套用后自动启用"
+                onChange={(checked) => patchDefaultModel({ enabled: checked })}
+              />
+            </>
+          )}
         </section>
 
         <details className="group rounded-lg border border-border bg-muted/30">

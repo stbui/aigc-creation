@@ -39,6 +39,10 @@ import {
   saveChannelModelWithPriceTiers,
 } from './channel-model.repository';
 import {
+  applyDefaultModelToRequest,
+  decodeDefaultModelConfig,
+} from './channel-default-model';
+import {
   channelModelActiveKey,
   channelModelView,
   normalizeChannelModelTags,
@@ -151,7 +155,19 @@ export class ChannelModelService {
     const description = String(req.description ?? '').trim();
     if ([...description].length > 500) throw badRequest('模型描述不能超过 500 字');
 
-    const contract = this.normalizeContract(channel, req);
+    /*
+     * 新建商品时套用供应商默认配置。
+     *
+     * 只补未填字段：表单里显式改过的能力 / 协议 / 价格优先。导入路径会把
+     * 完整请求直接传进来，这里再补一次是幂等的。
+     */
+    const isCreate = String(id ?? '').trim() === '';
+    const defaults = isCreate ? decodeDefaultModelConfig(channel.defaultModelConfigJson) : null;
+    const effectiveReq = defaults
+      ? applyDefaultModelToRequest(req, defaults, this.protocols)
+      : req;
+
+    const contract = this.normalizeContract(channel, effectiveReq);
     const { modelKey, providerModelKey, capability, protocol, imageParameters } = contract;
     const channelLabel = channelLabelInput === providerModelKey ? '' : channelLabelInput;
     if ([...channelLabel].length > 80) throw badRequest('渠道展示名不能超过 80 字');
@@ -168,13 +184,13 @@ export class ChannelModelService {
           capability,
           protocol,
           model: providerModelKey,
-          input: req.capabilityConfig ?? null,
+          input: effectiveReq.capabilityConfig ?? null,
           imageParameterDefinitions: imageParameters,
         })
       : null;
     const capabilityConfigJson = capabilityConfig ? JSON.stringify(capabilityConfig) : '';
 
-    const tiers = this.normalizePriceTiers(req, capability, providerModelKey, capabilityConfig);
+    const tiers = this.normalizePriceTiers(effectiveReq, capability, providerModelKey, capabilityConfig);
     const previousProviderModelKey = existing ? normalizeModelKey(existing.providerModelKey) : '';
     if (previousProviderModelKey && providerModelKey !== previousProviderModelKey) {
       for (const tier of tiers) {
@@ -204,8 +220,8 @@ export class ChannelModelService {
     }
 
     let priceCurrency = '';
-    if (req.priceCurrency !== undefined && req.priceCurrency !== null) {
-      priceCurrency = normalizePriceCurrency(req.priceCurrency);
+    if (effectiveReq.priceCurrency !== undefined && effectiveReq.priceCurrency !== null) {
+      priceCurrency = normalizePriceCurrency(effectiveReq.priceCurrency);
     }
 
     const summary = summarizeTiers(tiers);
@@ -213,11 +229,11 @@ export class ChannelModelService {
       modelKey,
       activeKey: channelModelActiveKey(modelKey),
       providerModelKey,
-      displayName: String(req.displayName ?? '').trim() || '未分类',
+      displayName: String(effectiveReq.displayName ?? '').trim() || '未分类',
       channelLabel,
       tags: JSON.stringify(tags),
       description,
-      icon: String(req.icon ?? '').trim(),
+      icon: String(effectiveReq.icon ?? '').trim(),
       capability,
       protocol,
       billingMode: summary.billingMode,
@@ -230,7 +246,10 @@ export class ChannelModelService {
       priceCurrency: priceCurrency || existing?.priceCurrency || 'credits',
       capabilityConfigJson,
       capabilityVersion,
-      enabled: req.enabled === undefined || req.enabled === null ? (existing?.enabled ?? true) : Boolean(req.enabled),
+      enabled:
+        effectiveReq.enabled === undefined || effectiveReq.enabled === null
+          ? (existing?.enabled ?? true)
+          : Boolean(effectiveReq.enabled),
     };
 
     const savedId = await this.prisma.$transaction(async (tx) => {

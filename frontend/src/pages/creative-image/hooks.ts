@@ -25,5 +25,5 @@ export { notifyCreditsChanged } from '../../context/CreditsContext';
 export { usePasteUpload } from '../../hooks/usePasteUpload';
 /** 能力运行时状态: 后台下线或无线路时在前端事前标注 */
 export { useCapabilityRuntime } from '../../hooks/useCapabilityRuntime';
-/** 素材库取数 (定义在 AssetLibraryModal 文件里) */
-export { useAssetLibrary } from '../../components/AssetLibraryModal';
+/** 素材库取数 */
+export { useAssetLibrary } from '../../hooks';

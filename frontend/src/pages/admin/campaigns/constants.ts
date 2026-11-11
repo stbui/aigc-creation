@@ -6,6 +6,7 @@
  */
 
 import type { AdminCampaign, CampaignStatus, CampaignType } from '../../../types/api';
+import type { TagTone } from '../../../components/admin/statusMeta';
 
 export const TYPE_LABEL: Record<CampaignType, string> = {
   limited_price: '限时价',
@@ -28,7 +29,7 @@ export const STATUS_OPTIONS = Object.entries(STATUS_LABEL).map(([value, item]) =
 }));
 
 /** 状态标签色调，与 `StatusTag` 的 `tone` 同形 */
-export type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
+export type { TagTone };
 
 /**
  * 派生生效态优先于人工 status 展示。

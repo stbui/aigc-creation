@@ -2,7 +2,7 @@
  * 写真模板目录种子（2026-11-10）。
  *
  * 把 `capabilities/definitions/template.templates.ts` 里的 30 套模板导入数据库，
- * 形成「一级分类（文章/主题）→ 二级分类（风格/场景）→ 模板（图 + 提示词 + 标签）」。
+ * 形成「一级分类（主题）→ 二级分类（文章/风格）→ 模板（图 + 提示词 + 标签）」。
  *
  * **幂等且不覆盖后台修改**：分类/分组按 slug 查，模板按固定 id 查；
  * 已存在就跳过。后台改名、调序、停用后再次执行 seed 不会把它们冲掉。
@@ -70,39 +70,106 @@ interface CategorySeed {
 
 const CATEGORY_SEEDS: CategorySeed[] = [
   {
-    slug: 'longfeng',
-    name: '龙凤褂',
-    sourceUrl: 'https://mp.weixin.qq.com/s/dHYyjCFYg9AipYTe1c0AEw',
-    description: '龙凤褂 / 秀禾中式婚纱写真',
+    slug: 'wedding',
+    name: '婚纱摄影',
+    sourceUrl: '',
+    description: '龙凤褂与花海婚纱合集',
     sortOrder: 10,
     groups: [
-      { slug: 'studio', name: '纯色棚拍', sortOrder: 10, templateIds: ['longfeng-01', 'longfeng-08', 'longfeng-09', 'longfeng-10'] },
-      { slug: 'interior', name: '室内布景', sortOrder: 20, templateIds: ['longfeng-02', 'longfeng-03', 'longfeng-04', 'longfeng-05', 'longfeng-07'] },
-      { slug: 'outdoor', name: '户外庭院', sortOrder: 30, templateIds: ['longfeng-06'] },
-    ],
-  },
-  {
-    slug: 'flower',
-    name: '花海婚纱',
-    sourceUrl: 'https://mp.weixin.qq.com/s/GCKyw-1JtZaZQOjmGenYNw',
-    description: '草坪、花房与花墙主题的浪漫婚纱写真',
-    sortOrder: 20,
-    groups: [
-      { slug: 'lawn', name: '草坪花海', sortOrder: 10, templateIds: ['flower-01', 'flower-03', 'flower-04', 'flower-05', 'flower-10'] },
-      { slug: 'room', name: '室内花房', sortOrder: 20, templateIds: ['flower-02', 'flower-06', 'flower-09'] },
-      { slug: 'wall', name: '花墙花境', sortOrder: 30, templateIds: ['flower-07', 'flower-08'] },
+      {
+        slug: 'longfeng',
+        name: '龙凤褂',
+        sortOrder: 10,
+        templateIds: [
+          'longfeng-01',
+          'longfeng-02',
+          'longfeng-03',
+          'longfeng-04',
+          'longfeng-05',
+          'longfeng-06',
+          'longfeng-07',
+          'longfeng-08',
+          'longfeng-09',
+          'longfeng-10',
+        ],
+      },
+      {
+        slug: 'flower',
+        name: '花海婚纱',
+        sortOrder: 20,
+        templateIds: [
+          'flower-01',
+          'flower-02',
+          'flower-03',
+          'flower-04',
+          'flower-05',
+          'flower-06',
+          'flower-07',
+          'flower-08',
+          'flower-09',
+          'flower-10',
+        ],
+      },
     ],
   },
   {
     slug: 'campus',
-    name: '校园操场',
+    name: '情侣写真',
     sourceUrl: 'https://mp.weixin.qq.com/s/MP_FQuppTPvVCkPznfyt8g',
     description: '日系清新校园操场情侣写真',
-    sortOrder: 30,
+    sortOrder: 20,
     groups: [
       { slug: 'lawn', name: '草坪操场', sortOrder: 10, templateIds: ['campus-01', 'campus-02', 'campus-03', 'campus-04', 'campus-08', 'campus-09', 'campus-10'] },
       { slug: 'stands', name: '看台', sortOrder: 20, templateIds: ['campus-05', 'campus-06', 'campus-07'] },
     ],
+  },
+  {
+    slug: 'female-portrait',
+    name: '女生写真',
+    sourceUrl: '',
+    description: '女性个人写真模板',
+    sortOrder: 30,
+    groups: [],
+  },
+  {
+    slug: 'male-portrait',
+    name: '男生写真',
+    sourceUrl: '',
+    description: '男性个人写真模板',
+    sortOrder: 40,
+    groups: [],
+  },
+  {
+    slug: 'professional',
+    name: '职业形象',
+    sourceUrl: '',
+    description: '职业形象照与商务人像',
+    sortOrder: 50,
+    groups: [],
+  },
+  {
+    slug: 'family',
+    name: '亲子写真',
+    sourceUrl: '',
+    description: '亲子合影与家庭写真',
+    sortOrder: 60,
+    groups: [],
+  },
+  {
+    slug: 'baby',
+    name: '宝宝写真',
+    sourceUrl: '',
+    description: '婴幼儿写真',
+    sortOrder: 70,
+    groups: [],
+  },
+  {
+    slug: 'elite',
+    name: '精英人生',
+    sourceUrl: '',
+    description: '精英人设与生活方式写真',
+    sortOrder: 80,
+    groups: [],
   },
 ];
 

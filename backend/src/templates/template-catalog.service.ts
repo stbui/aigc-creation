@@ -90,7 +90,11 @@ export class TemplateCatalogService {
           items: await Promise.all(group.items.map((item) => this.publicItem(item))),
         });
       }
-      if (groups.length === 0) continue;
+      /*
+       * 空分类仍然下发：后台新建的「女生写真 / 男生写真 / 职业形象 …」
+       * 需要立即出现在 C 端顶部 tab，等待运营补充二级分类与模板。
+       * 页面在空分类下显示「该分类下暂无模板」，而不是让 tab 消失。
+       */
       result.push({
         id: category.id,
         slug: category.slug,

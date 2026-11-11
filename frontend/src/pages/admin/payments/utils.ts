@@ -6,6 +6,7 @@ import type {
   PaymentSource,
   VisiblePaymentMethod,
 } from '../../../types/payment';
+import { formatYuanPlain } from '../../../admin-ui/lib/format';
 import {
   PROVIDER_LABELS,
   type PaymentProviderState,
@@ -49,7 +50,7 @@ export function isValidReconciliationBillDate(value: string): boolean {
 /** 金额格式化：分 → 带币种符号的两位小数 */
 export function moneyText(cents: number, currency: string): string {
   const symbol = currency === 'USD' ? '$' : '¥';
-  return `${symbol}${(cents / 100).toFixed(2)}`;
+  return `${symbol}${formatYuanPlain(cents)}`;
 }
 
 /**

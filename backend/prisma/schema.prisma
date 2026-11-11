@@ -1687,6 +1687,9 @@ model ModelChannel {
   headersJson       String @default("")
   /// 由哪个服务商目录一键接入；空 = 自定义渠道。仅用于来源展示
   catalogProviderId String @default("")
+  /// 供应商默认商品配置（JSON）：类型 / 接入方式 / 计费与售价。
+  /// 新建商品与从上游同步时自动套用，免去逐条配置；空 = 不套用
+  defaultModelConfigJson String @default("")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

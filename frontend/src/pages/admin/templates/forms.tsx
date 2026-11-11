@@ -85,7 +85,7 @@ export function CategoryFormDrawer({
   return (
     <DrawerShell
       title={mode === 'create' ? '新建一级分类' : '编辑一级分类'}
-      description="一级分类对应一篇来源文章 / 一个主题，C 端显示为顶部 tab。"
+      description="一级分类是主题（如婚纱写真），C 端显示为顶部 tab。"
       saving={saving}
       onClose={onClose}
       onSave={submit}
@@ -173,7 +173,7 @@ export function GroupFormDrawer({
   return (
     <DrawerShell
       title={mode === 'create' ? `新建二级分类 · ${categoryName}` : '编辑二级分类'}
-      description="二级分类是风格 / 场景分组，C 端在一级分类下显示为筛选胶囊。"
+      description="二级分类是来源文章 / 风格（如龙凤褂、花海婚纱），C 端在一级分类下显示为筛选胶囊。"
       saving={saving}
       onClose={onClose}
       onSave={submit}

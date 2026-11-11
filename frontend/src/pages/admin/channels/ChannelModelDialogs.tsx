@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import type { BatchImportConfig, ModelDraft } from './constants';
 import type {
+  AdminChannelDefaultModelView,
   AdminChannelModelView,
   ProtocolTestResultView,
   UpstreamModelPreview,
@@ -51,6 +52,8 @@ interface ChannelModelDialogsProps {
   upstream: {
     models: UpstreamModelPreview[] | null;
     existingKeys: Set<string>;
+    /** 供应商默认配置：导入弹窗打开时预填统一配置 */
+    defaultConfig: AdminChannelDefaultModelView | null;
     importing: boolean;
     onClose: () => void;
     onImport: (ids: string[], config?: BatchImportConfig) => void;
@@ -110,6 +113,7 @@ export function ChannelModelDialogs({
             open
             models={upstream.models}
             existingKeys={upstream.existingKeys}
+            defaultConfig={upstream.defaultConfig}
             importing={upstream.importing}
             onClose={upstream.onClose}
             onImport={upstream.onImport}

@@ -8,7 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '../../admin-ui/components/ui/dropdown-menu';
 import { cn } from '../../admin-ui/lib/cn';
-import { ALERT_SEVERITY_META, useAdminAlerts } from './AlertCenter';
+import { ALERT_SEVERITY_META } from './AlertCenter';
+import { useAdminAlerts } from '../../hooks';
 
 /**
  * 顶栏告警铃铛。

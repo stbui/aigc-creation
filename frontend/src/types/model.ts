@@ -93,6 +93,23 @@ export interface PublicChannelModelCostView {
 }
 
 /** 后台渠道投影；`apiKey` 恒为空串，只看 `hasApiKey` */
+/**
+ * 供应商默认商品配置。
+ *
+ * 新建商品与从上游同步时自动套用；只覆盖图像 / 文本（视频 / 音频参数
+ * 组合差异太大，仍走逐条配置）。
+ */
+export interface AdminChannelDefaultModelView {
+  capability: string;
+  protocol: string;
+  billingMode: string;
+  unitPriceMicrocredits: number;
+  inputTokenPriceMicrocredits: number;
+  outputTokenPriceMicrocredits: number;
+  cachedTokenPriceMicrocredits: number;
+  enabled: boolean;
+}
+
 export interface AdminChannelView {
   id: string;
   userId: string;
@@ -112,6 +129,8 @@ export interface AdminChannelView {
   catalogProviderId?: string;
   hasApiKey: boolean;
   hasSecretKey: boolean;
+  /** 供应商默认商品配置；未配置时为 null / undefined */
+  defaultModel?: AdminChannelDefaultModelView | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -352,8 +371,10 @@ export interface UpstreamModelPreview {
 /** 上游目录导入结果：只写入管理员勾选且仍在上游目录里的模型 */
 export interface ChannelModelFetchResultView {
   models: UpstreamModelPreview[];
-  /** 本次新写入、默认停用的渠道模型数量 */
+  /** 本次新写入的渠道模型数量 */
   added: number;
+  /** 其中已套用配置（本次统一配置或供应商默认配置）的数量 */
+  configured: number;
 }
 
 /** 渠道模型连通性测试结果（与正式任务同一套协议 / 鉴权 / 出站策略） */
@@ -386,6 +407,7 @@ export interface SystemChannelExportView {
     enabled: boolean;
     concurrencyLimit: number;
     catalogProviderId?: string;
+    defaultModel?: AdminChannelDefaultModelView | null;
     models: Array<Record<string, unknown>>;
   }>;
 }

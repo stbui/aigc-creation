@@ -56,6 +56,8 @@ export interface ModelCatalogDiscovery {
 export interface ChannelModelFetchResult {
   /** 上游目录里的模型（含补充目录），已去重并排序 */
   models: ChannelModelCatalogItem[];
-  /** 本次新写入、默认停用的渠道模型数量 */
+  /** 本次新写入的渠道模型数量 */
   added: number;
+  /** 其中已经套用配置（本次统一配置或供应商默认配置）的数量 */
+  configured: number;
 }

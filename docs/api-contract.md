@@ -48,7 +48,7 @@
 | --- | --- | --- |
 | GET | `/api/v1/capabilities` | 能力清单（公开免登录），前端全部渲染依据 |
 | GET | `/api/v1/shoppable-carousel/templates` | AI 带货图文模板清单（公开免登录）：10 个业务分类 + 49 个模板（三拍文案 / 结构化提示词片段 / 静态缩略图路径）+ 张数区间 6–10 |
-| GET | `/api/v1/template/templates` | 写真模板目录（公开免登录）：3 个一级分类（龙凤褂 / 花海婚纱 / 校园操场）→ 8 个二级分类 → 30 个模板（预览图路径 / 提示词 / 标签）；数据由后台「写真模板」页维护 |
+| GET | `/api/v1/template/templates` | 写真模板目录（公开免登录）：8 个一级分类（婚纱摄影 / 情侣写真 / 女生写真 / 男生写真 / 职业形象 / 亲子写真 / 宝宝写真 / 精英人生）→ 4 个二级分类（龙凤褂 / 花海婚纱 / 草坪操场 / 看台）→ 30 个模板（预览图路径 / 提示词 / 标签）；数据由后台「写真模板」页维护 |
 | POST | `/api/v1/auth/register` | 注册，**直接返回 `accessToken`**（注册即登录） |
 | POST | `/api/v1/auth/login` | 登录，返回 `{ accessToken, user }` |
 | POST/GET | `/api/v1/auth/qr/create`、`/auth/qr/status` | 扫码登录：桌面建码 / 轮询换 token（公开，`status` 首次兑换即作废） |
@@ -136,13 +136,14 @@
 | POST | `/api/v1/admin/payments/exceptions/:id/retry-refund` | 重试自动原路退款。`unknown`（含历史无标记失败）必须复用原退款单号；`definitive` 才新建退款单号；调用前重新核对订单、成功支付流水、金额与币种，`finance.reconcile` |
 | POST | `/api/v1/admin/payments/exceptions/:id/confirm-refund` | 人工核销自动退款，请求体 `{ outcome: 'succeeded' \| 'failed', providerRefundId?, reason }`。仅允许 `cancelled_but_paid` 异常单；只更新退款与异常单，不改订单状态、不回收/恢复积分，`finance.reconcile` |
 | POST | `/api/v1/admin/payments/exceptions/:id/close` | 人工结案，请求体 `{ resolution }`；只关闭异常单，不改订单与积分，`finance.reconcile` |
-| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。渠道与渠道模型删除（含单删、批量删除）保留业务确认，但不要求原因 |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；渠道写入可带 `defaultModel`（类型 / 接入方式 / 计费与售价 / `enabled`，仅 `image` / `text`），新建商品与上游导入自动套用。写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。渠道与渠道模型删除（含单删、批量删除）保留业务确认，但不要求原因 |
 | GET | `/api/v1/admin/channel-models?channelId=&includeDisabled=` | 跨渠道模型视图（一行 = 一条渠道模型，条目带 `channelName` / `channelEnabled`）。`includeDisabled=1` 含已停用线路 —— 后台「全部模型」视图要用；不传时只给启用线路（前台模型的线路选择器用，停用线路进了下拉会让人以为选了就能用），`channel.model_read` |
 | GET/PUT | `/api/v1/admin/channels/order`、`/api/v1/admin/channels/:id/models/order` | 渠道排序 / 渠道内模型排序。`GET` 返回当前顺序的 id 数组；`PUT` 请求体 `{ ids, expectedIds }` —— `expectedIds` 是**读取时看到的顺序**，与库中不一致说明期间有人改过，整单拒绝 **409**（`code 40900`，「排序列表已变化，请重新加载后再保存」），不做部分落库。权限 `channel.write` / `channel.model_write`， |
 | GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；同时下发清单声明的 `baseUrl`、鉴权字段与配置字段，供渠道表单做服务商预设；`channel.model_read` |
 | GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔与「模型商品」共用，`channel.read` |
 | POST | `/api/v1/admin/channels/health/reset` | 解除本进程内全部线路冷却，返回 `{ cleared }`；只清内存不动数据库，多实例部署只影响处理本次请求的实例，`channel.write`， |
 | GET | `/api/v1/admin/channel-models/health?channelId=` | 线路**历史表现**：一行 = 一条渠道模型，给 24h / 7d 两个窗口的成功率与 P95 耗时 + 最近 10 条终态样本，`channel.model_read`。与 `/admin/channels/health` 的分工：后者是「现在」（启停 / 协议 / 冷却），本端点是「过去」（成功率 / 耗时），值班时两个都要看。成功率 = `success` ÷ 终态次数（`pending` / `canceled` 不计入分母），**无终态样本时为 `null`**（不是 0 ——「没数据」与「全失败」要分得开）；P95 用最近邻法（不插值），样本被采样上限截断时 `sampled=true` |
+| POST | `/api/v1/admin/channels/:id/models/import` | 导入勾选的上游商品。请求体 `{ models, config? }`；`config`（类型 / 接入方式 / 计费与售价 / `enabled`）优先于供应商默认配置，两者都没有则只建骨架行。返回 `{ models, added, configured }`。配置应用失败的商品回落为骨架行，不阻断整次导入；`channel.model_write` |
 | POST | `/api/v1/admin/channels/:id/models/batch-reprice` | 批量调价：只改**已启用规格的售价**，不动成本价 / 启停 / 上游键。请求体 `{ models: [{ modelId, priceVersion, priceTiers: [{ id, priceVersion, prices }] }] }`，单次 ≤ 100 个模型。`priceVersion` 是乐观并发令牌：任一模型或规格版本过期 → **整批拒绝**（40001，不部分落库）；`prices` 必须恰好是当前计费方式的全部售价字段（按次/按时长 → `unitPriceMicrocredits`；Token 非视频 → 输入/输出/缓存三项；Token 视频 → 仅输出），少一项或多夹一项都拒绝；规格缺成本价或售价未配置时拒绝。成功返回 `{ updated }`，`channel.model_write` |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/logical-models*` | 前台模型列表 / 保存（新 revision + 线路重建）/ 归档；`logical_model.read` / `logical_model.write` |
 | POST | `/api/v1/admin/logical-models/:id/simulate` | 路由模拟（只读）：返回产品能力匹配结果与逐条线路的判定原因；需 `logical_model.read`。入参 `capability` 是**模态**（`image` / `video` / `text`），不是产品能力 id（`expand` / `main_image`）——两层命名空间不能混；省略时**按模型自己的能力合同取模态**，传了产品能力 id 也按省略处理（模型是权威源，客户端不该改） |

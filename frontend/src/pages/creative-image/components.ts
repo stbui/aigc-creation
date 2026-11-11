@@ -7,7 +7,7 @@
  *
  * 第三方 UI 库 (antd / lucide-react) 不经本文件 —— 它们不是本项目的共享控件,
  * 与 `channels/` / `product-detail/` / `product-kit/` / `viral-clone/` 的做法一致。
- * `useAssetLibrary` 虽然定义在组件文件里, 但属于 hook, 统一从 `./hooks` 取。
+ * `useAssetLibrary` 属于 hook, 统一从 `./hooks` 取。
  */
 
 /** 底部提交栏 (生成按钮 + 价签 + 高级设置插槽) */

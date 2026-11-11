@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PERMISSION_LABELS, MODULE_LABELS, HIGH_RISK, ROLE_COL } from './constants';
+import { PERMISSION_LABELS, MODULE_LABELS, ROLE_COL } from './constants';
 import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from '../../../lib/api';
 
@@ -20,7 +20,7 @@ interface PermModule {
 
 export function AdminRolesPage() {
   const toast = useToast();
-  const { can, me, refresh } = useAdmin();
+  const { can, me, refresh, isHighRisk } = useAdmin();
   const editable = can('role.write');
 
   const [busy, setBusy] = useState(false);
@@ -281,14 +281,14 @@ export function AdminRolesPage() {
                   key={code}
                   className={cn(
                     'flex items-center gap-3 border-b border-border/60 py-1.5 last:border-b-0',
-                    HIGH_RISK.has(code) && 'bg-danger-soft/30',
+                    isHighRisk(code) && 'bg-danger-soft/30',
                   )}
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-1.5">
                     <span className="truncate text-xs text-foreground">
                       {PERMISSION_LABELS[code] ?? code}
                     </span>
-                    {HIGH_RISK.has(code) && (
+                    {isHighRisk(code) && (
                       <ToneBadge tone="warn">
                         高危
                       </ToneBadge>

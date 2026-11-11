@@ -29,10 +29,9 @@ import {
   runtimeOf,
   taskErrorText,
 } from '../lib/constants';
-import { useCreditLabel } from '../hooks/useCreditLabel';
-import { useDocumentMeta } from '../hooks/useDocumentMeta';
-import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
-import { CapabilityIcon } from '../components/AppLayout';
+import { useAssetLibrary, useCreditLabel, useDocumentMeta } from '../hooks';
+import { AssetLibraryModal } from '../components/AssetLibraryModal';
+import { CapabilityIcon } from '../layout';
 import { ExceptionPage } from '../components/ExceptionPage';
 import { ResultMedia, formatDuration } from '../components/ResultMedia';
 import { StateEmpty, StateSkeleton } from '../components/StateViews';

@@ -22,5 +22,5 @@ export { usePasteUpload } from '../../hooks/usePasteUpload';
 export { useAuth } from '../../context/AuthContext';
 /** 余额变更通知: 扣费 / 退款后通知积分上下文刷新 */
 export { notifyCreditsChanged } from '../../context/CreditsContext';
-/** 素材库取数 (定义在 AssetLibraryModal 文件里) */
-export { useAssetLibrary } from '../../components/AssetLibraryModal';
+/** 素材库取数 */
+export { useAssetLibrary } from '../../hooks';

@@ -30,9 +30,11 @@ import type {
   ChannelModelPriceTierView,
 } from '../../../types/model';
 import {
+  EMPTY_DEFAULT_MODEL_DRAFT,
   EMPTY_TIER,
   type ChannelDraft,
   type ChannelHeader,
+  type DefaultModelDraft,
   type ModelDraft,
   type TierDraft,
 } from './constants';
@@ -184,6 +186,7 @@ export function normalizeChannelHeaders(headers: ChannelHeader[]): ChannelHeader
 
 /** 渠道实体 → 表单草稿；凭证不回读，留空表示不修改 */
 export function toChannelDraft(channel: AdminChannelView): ChannelDraft {
+  const defaults = channel.defaultModel;
   return {
     name: channel.name,
     baseUrl: channel.baseUrl,
@@ -196,6 +199,56 @@ export function toChannelDraft(channel: AdminChannelView): ChannelDraft {
     enabled: channel.enabled,
     sortOrder: String(channel.sortOrder ?? 0),
     headers: channel.headers ?? [],
+    defaultModel: defaults
+      ? {
+          capability: defaults.capability,
+          protocol: defaults.protocol,
+          billingMode: defaults.billingMode,
+          unit: toCreditsInput(defaults.unitPriceMicrocredits),
+          input: toCreditsInput(defaults.inputTokenPriceMicrocredits),
+          output: toCreditsInput(defaults.outputTokenPriceMicrocredits),
+          cached: toCreditsInput(defaults.cachedTokenPriceMicrocredits),
+          enabled: defaults.enabled,
+        }
+      : { ...EMPTY_DEFAULT_MODEL_DRAFT },
+  };
+}
+
+/**
+ * 默认商品配置草稿 → 接口载荷。
+ *
+ * 未选类型 = 显式清空（保存 `null`）。选了类型就必须有接入方式与售价：
+ * 半份默认配置会让导入出来的商品看似可用、实际缺价，比不配更难排查。
+ */
+export function buildDefaultModelPayload(
+  draft: DefaultModelDraft,
+): { value: Record<string, unknown> | null } | { error: string } {
+  if (!draft.capability) return { value: null };
+  if (!draft.protocol) return { error: '默认商品配置：请选择接入方式' };
+  const unit = parseCredits(draft.unit);
+  const input = parseCredits(draft.input);
+  const output = parseCredits(draft.output);
+  const cached = parseCredits(draft.cached);
+  if ([unit, input, output, cached].some((value) => value === null)) {
+    return { error: '默认商品售价必须是数字，最多 6 位小数' };
+  }
+  if (draft.billingMode === 'token' && !draft.output.trim()) {
+    return { error: '默认商品配置：请填写输出 Token 价格' };
+  }
+  if (draft.billingMode !== 'token' && !draft.unit.trim()) {
+    return { error: '默认商品配置：请填写售价' };
+  }
+  return {
+    value: {
+      capability: draft.capability,
+      protocol: draft.protocol,
+      billingMode: draft.billingMode,
+      unitPriceMicrocredits: unit ?? 0,
+      inputTokenPriceMicrocredits: input ?? 0,
+      outputTokenPriceMicrocredits: output ?? 0,
+      cachedTokenPriceMicrocredits: cached ?? 0,
+      enabled: draft.enabled,
+    },
   };
 }
 

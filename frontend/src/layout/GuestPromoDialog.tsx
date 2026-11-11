@@ -1,109 +1,24 @@
 import './GuestPromoDialog.css';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useCampaignCountdown } from '../hooks/useCampaignCountdown';
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import { myMarketingApi } from '../lib/api';
-import type { PopupCampaign } from '../types/api';
+import { useGuestPromoOffer } from './hooks';
 
-const DISMISS_KEY = 'huojue-guest-promo-dismissed-v1';
-const SESSION_SHOWN_KEY = 'huojue-guest-promo-shown-v1';
-const SHOW_DELAY_MS = 6000;
 const FALLBACK_CTA_URL = '/background-remove';
 
 /**
- * 参考站游客首访营销弹层（`.guest-promo-overlay`）的本地化复原。
+ * 游客首访营销弹层。
  *
- * 保留：500×427 构图、遮罩、右上 28px 关闭、倒计时数字块、CTA 热区与入场动画。
- * 改写：参考站的「送 100 积分 / 50 次权益」在本站不存在，注册接口也不发积分；
- * 因此这里只展示真实可兑现的能力（抠图、去水印当前 0 积分）与登录账户能力。
- * 交互：仅在用户停留 6 秒且没有任何指针/键盘/滚轮操作时自动出现；一旦开始
- * 操作就取消本次弹出，营销入口继续留在顶部促销条，避免打断创作任务流。
- *
- * 数据口径与顶部 PromoBar 一致：有 DB 活动时标题、CTA、有效期全部取
- * `/marketing/popup`；没有活动时展示静态真实权益，且**不显示倒计时**。
+ * 停留 6 秒且无操作时出现，开始操作即取消本次弹出；数据口径与 PromoBar 一致：
+ * 有 DB 活动取 `/marketing/popup`，无活动展示静态真实权益且不显示倒计时。
+ * 弹出条件、活动数据与关闭持久化由 `useGuestPromoOffer` 托管。
  */
 export function GuestPromoDialog() {
   const navigate = useNavigate();
-  const { token, loginOpen } = useAuth();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
-  const [dismissed, setDismissed] = useState(() => {
-    try {
-      return localStorage.getItem(DISMISS_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-  const [autoOpen, setAutoOpen] = useState(false);
-  const [campaign, setCampaign] = useState<PopupCampaign | null>(null);
-
-  useEffect(() => {
-    if (dismissed || token || loginOpen) return;
-    try {
-      // The offer is optional chrome. Do not reopen it on every SPA route change
-      // after the user has already seen it once in this browser session.
-      if (sessionStorage.getItem(SESSION_SHOWN_KEY) === '1') return;
-    } catch {
-      // Storage failures just disable the duplicate-show guard.
-    }
-
-    let timer = 0;
-    const cleanup = () => {
-      if (timer) window.clearTimeout(timer);
-      for (const event of ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const) {
-        window.removeEventListener(event, onInteract);
-      }
-    };
-    const onInteract = () => cleanup();
-
-    for (const event of ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const) {
-      window.addEventListener(event, onInteract, { passive: true, once: true });
-    }
-    timer = window.setTimeout(() => {
-      setAutoOpen(true);
-      try {
-        sessionStorage.setItem(SESSION_SHOWN_KEY, '1');
-      } catch {
-        /* ignore */
-      }
-      cleanup();
-    }, SHOW_DELAY_MS);
-    return cleanup;
-  }, [dismissed, loginOpen, token]);
-
-  useEffect(() => {
-    if (dismissed || token) return;
-    let alive = true;
-    myMarketingApi
-      .popup()
-      .then((value) => {
-        if (alive) setCampaign(value ?? null);
-      })
-      .catch(() => {
-        // 营销位不可用不应阻塞页面；静态权益仍可展示。
-        if (alive) setCampaign(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [dismissed, token]);
-
-  const { parts, expired } = useCampaignCountdown(campaign);
-  const open = !token && !dismissed && autoOpen && !loginOpen && !expired;
-  useBodyScrollLock(open);
-
-  const dismiss = useCallback(() => {
-    setDismissed(true);
-    try {
-      localStorage.setItem(DISMISS_KEY, '1');
-    } catch {
-      /* 隐私模式下写入失败只影响下次访问，不影响本次关闭 */
-    }
-  }, []);
+  const { open, campaign, parts, dismiss } = useGuestPromoOffer();
 
   useEffect(() => {
     if (!open) return;

@@ -150,12 +150,18 @@ export const adminChannelsApi = {
       },
     ),
 
-  importModels: (id: string, models: string[]) =>
+  /**
+   * 导入上游商品。
+   *
+   * `config` 为本次统一配置；省略时后端套用供应商默认商品配置。配置应用
+   * 失败不会阻断导入，未套用的商品回落为骨架行。
+   */
+  importModels: (id: string, models: string[], config?: unknown) =>
     request<ChannelModelFetchResultView>(
       `/admin/channels/${id}/models/import`,
       {
-        method: "POST",
-        body: { models },
+        method: 'POST',
+        body: config ? { models, config } : { models },
       },
     ),
 

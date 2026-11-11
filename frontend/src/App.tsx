@@ -4,12 +4,11 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AdminProvider } from './context/AdminContext';
 import { CreditsProvider } from './context/CreditsContext';
-import { AppLayout } from './components/AppLayout';
+import { AppLayout, RouteExperience } from './layout';
 import { LoginModalHost } from './components/LoginModal';
 import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ExceptionPage, NotFoundPage } from './components/ExceptionPage';
-import { RouteExperience } from './components/RouteExperience';
 import { useCapabilities } from './hooks/useCapabilities';
 import { StateLoading } from './components/StateViews';
 import { registerRoutePreload } from './lib/routePreload';
@@ -66,7 +65,7 @@ const ResetPasswordPage = lazyRoute(
 const LandingPage = lazyRoute('/', () => import('./pages/landing'), 'LandingPage');
 const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/SitemapPage'), 'SitemapPage');
 const LegalPage = lazyRoute('/legal/*', () => import('./pages/LegalPage'), 'LegalPage');
-const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/WorkbenchPage'), 'WorkbenchPage');
+const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/workbench'), 'WorkbenchPage');
 const ProductKitPage = lazyRoute('/product-kit', () => import('./pages/product-kit'), 'ProductKitPage');
 const ShoppableCarouselPage = lazyRoute(
   '/shoppable-carousel',
@@ -105,9 +104,9 @@ const InvitationsPage = lazyRoute('/invitations', () => import('./pages/invitati
 const PackagesPage = lazyRoute('/packages', () => import('./pages/PackagesPage'), 'PackagesPage');
 const CheckoutPage = lazyRoute('/checkout/*', () => import('./pages/checkout'), 'CheckoutPage');
 const CreditsPage = lazyRoute('/credits', () => import('./pages/CreditsPage'), 'CreditsPage');
-const OrdersPage = lazyRoute('/orders', () => import('./pages/OrdersPage'), 'OrdersPage');
+const OrdersPage = lazyRoute('/orders', () => import('./pages/orders'), 'OrdersPage');
 const AccountPage = lazyRoute('/account', () => import('./pages/account'), 'AccountPage');
-const TicketsPage = lazyRoute('/tickets', () => import('./pages/TicketsPage'), 'TicketsPage');
+const TicketsPage = lazyRoute('/tickets', () => import('./pages/tickets'), 'TicketsPage');
 
 // 后台管理端: 独立外壳与鉴权, 不走 C 端 Shell (侧栏/顶导/促销条均为 C 端语义)
 const AdminShell = lazyRoute(

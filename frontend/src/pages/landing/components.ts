@@ -8,4 +8,4 @@
  */
 
 /** 顶部促销条 (限时活动横幅) */
-export { PromoBar } from '../../components/PromoBar';
+export { PromoBar } from '../../layout';

@@ -17,6 +17,13 @@ import { SecretCipher } from '../infra/secret-cipher';
 import { parseOutboundHeaders } from '../infra/outbound';
 import { ModelDomainError, normalizeModelKey, uniqueNonEmpty } from '../domain/json';
 import { channelModelActiveKey, retiredChannelModelKeys } from '../channels/channel.presentation';
+import { ChannelModelService } from '../channels/channel-model.service';
+import {
+  decodeDefaultModelConfig,
+  defaultModelRequest,
+  normalizeDefaultModelConfig,
+} from '../channels/channel-default-model';
+import { ProtocolCatalogService } from '../protocol/protocol-catalog.service';
 import { ModelCatalogClient } from './model-catalog.client';
 import type { ChannelModelCatalogItem, ChannelModelFetchResult } from './model-catalog.types';
 
@@ -28,6 +35,8 @@ export class ModelCatalogService {
     private readonly prisma: PrismaService,
     private readonly cipher: SecretCipher,
     private readonly client: ModelCatalogClient,
+    private readonly protocols: ProtocolCatalogService,
+    private readonly channelModels: ChannelModelService,
   ) {}
 
   /** 只读取上游目录，不写入任何数据 */
@@ -46,7 +55,11 @@ export class ModelCatalogService {
    * 导入管理员勾选的模型。只接受仍在**当前上游目录**里的键：上游已下线的模型
    * 导入进来只会得到一条永远失败的路由。
    */
-  async import(channelId: string, selected: string[]): Promise<ChannelModelFetchResult> {
+  async import(
+    channelId: string,
+    selected: string[],
+    rawConfig?: unknown,
+  ): Promise<ChannelModelFetchResult> {
     const channel = await this.requireChannel(channelId);
     const catalog = await this.client.fetch({
       baseUrl: channel.baseUrl,
@@ -93,30 +106,59 @@ export class ModelCatalogService {
       missing.push(name);
     }
 
-    if (missing.length > 0) {
-      await this.prisma.$transaction(async (tx) => {
-        for (const name of missing) {
-          await tx.channelModel.create({
-            data: {
-              channelId,
-              modelKey: normalizeModelKey(name),
-              activeKey: channelModelActiveKey(name),
-              providerModelKey: name,
-              displayName: '未分类',
-              // 能力与协议由管理员在渠道模型上声明；导入只建骨架行
-              capability: '',
-              protocol: '',
-              billingMode: 'fixed_request',
-              enabled: false,
-              priceConfigured: false,
-              priceVersion: 1,
-            },
-          });
+    /*
+     * 导入时的配置优先级：本次弹窗统一配置 > 供应商默认配置 > 只建骨架行。
+     *
+     * 配置应用失败（例如默认协议在保存后又被插件停用）不阻断导入：回落成
+     * 骨架行，由运营逐条补。导入本身只增不删，不能因为一条配置失效让整次
+     * 「同步上游目录」失败。
+     */
+    const override =
+      rawConfig === undefined || rawConfig === null
+        ? null
+        : normalizeDefaultModelConfig(rawConfig, this.protocols);
+    const defaults = override ?? decodeDefaultModelConfig(channel.defaultModelConfigJson);
+
+    let configured = 0;
+    for (const name of missing) {
+      const modelKey = normalizeModelKey(name);
+      if (defaults) {
+        try {
+          const entry = this.protocols.require(defaults.protocol, defaults.capability);
+          const request = defaultModelRequest(defaults, entry, modelKey, name);
+          // 保留上游给的展示名（与骨架行同一口径，运营不用再回填一次）
+          const upstream = catalog.find((item) => item.id === name);
+          if (upstream?.displayName) request.displayName = upstream.displayName;
+          await this.channelModels.save(channelId, '', request);
+          configured += 1;
+          continue;
+        } catch {
+          // 见上：配置失效时回落骨架行
         }
-      });
+      }
+      await this.createSkeleton(channelId, modelKey, name);
     }
 
-    return { models: catalog, added: missing.length };
+    return { models: catalog, added: missing.length, configured };
+  }
+
+  /** 只建骨架行：能力、协议与售价留给管理员逐条声明 */
+  private async createSkeleton(channelId: string, modelKey: string, name: string): Promise<void> {
+    await this.prisma.channelModel.create({
+      data: {
+        channelId,
+        modelKey,
+        activeKey: channelModelActiveKey(name),
+        providerModelKey: name,
+        displayName: '未分类',
+        capability: '',
+        protocol: '',
+        billingMode: 'fixed_request',
+        enabled: false,
+        priceConfigured: false,
+        priceVersion: 1,
+      },
+    });
   }
 
   private async requireChannel(channelId: string) {

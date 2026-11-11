@@ -28,6 +28,7 @@ import {
   adminOrderHref,
   adminUserDetailHref,
   cn,
+  formatYuanPlain,
   transitionLabel,
 } from './utils';
 import { TICKET_REPLY_TEMPLATES, fillTicketTemplate } from './reply-templates';
@@ -328,7 +329,7 @@ export function TicketDetailDrawer({
                           </Link>
                           <span className="text-[12px] text-muted-foreground">
                             {detail.related.order.status} · ¥
-                            {(detail.related.order.paidCents / 100).toFixed(2)}
+                            {formatYuanPlain(detail.related.order.paidCents)}
                           </span>
                           {refundHref && (
                             <Link

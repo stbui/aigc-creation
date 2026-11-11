@@ -55,6 +55,31 @@ export function perCreditYuanText(
 }
 
 /**
+ * 卡片上的金额：带千分位，与积分数字的排版口径一致。
+ *
+ * 不复用 `centsToYuanText` —— 那个函数同时服务表单回填，带逗号会破坏输入框解析。
+ */
+export function moneyText(cents: number): string {
+  return (cents / 100).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** 限时商品的结束时刻：后台同屏比较多个商品时只需要日期与时分 */
+export function saleWindowEnd(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+/**
  * 删除前置条件：只有从没卖出去过的 SKU 能删。
  *
  * 有订单的商品要保留记录供退款 / 积分回收回查，只能下架。返回 `null`

@@ -5,10 +5,10 @@
 | 项 | 值 |
 | --- | --- |
 | 路由 | `/workbench`（壳内页） |
-| 页面组件 | `frontend/src/pages/WorkbenchPage.tsx` |
-| 样式 | `frontend/src/styles/global.css` 的 `.workbench` / `.wb-*` 区块 |
+| 页面组件 | `frontend/src/pages/workbench/`（`page.tsx` + 分层面板组件） |
+| 样式 | `frontend/src/pages/workbench/style.css` 的 `.wb-*` 区块 |
 | 数据来源 | `GET /capabilities`（卡片布局与角标）+ `GET /stats/overview`（登录后） |
-| 外壳 | `components/AppLayout.tsx` + `components/SideRail.tsx` |
+| 外壳 | `layout/AppLayout.tsx`（组合）+ `layout/AppHeader.tsx` + `layout/AppSidebar.tsx`（内含 `SideRail`） |
 
 ## 1. 页面结构
 
@@ -105,7 +105,7 @@ Hero 右半幅是本站自有的能力产出拼贴，不做外链图片。素材
 
 ## 5. 新客营销弹窗
 
-`frontend/src/components/GuestPromoDialog.tsx`，仅游客首访渲染，关闭后写 `localStorage` 键 `huojue-guest-promo-dismissed-v1`；登录用户不渲染。
+`frontend/src/layout/GuestPromoDialog.tsx`，仅游客首访渲染，关闭后写 `localStorage` 键 `huojue-guest-promo-dismissed-v1`；登录用户不渲染。
 
 - 尺寸 500×427 居中对话框，遮罩 + 入场动画。仅在用户停留 6 秒且没有指针、
   键盘或滚轮操作时自动出现；用户一旦开始操作即取消本次弹出，营销入口继续保留在顶部促销条。
@@ -114,7 +114,7 @@ Hero 右半幅是本站自有的能力产出拼贴，不做外链图片。素材
 
 ## 6. 侧栏与菜单信息架构
 
-侧栏由 `components/SideRail.tsx` 渲染，菜单分组与顺序的唯一事实源在组件内。默认全部展开：
+侧栏由 `layout/SideRail.tsx` 渲染，菜单分组与顺序的唯一事实源在组件内。默认全部展开：
 
 1. **根区域**：工作台、我的作品
 2. **AI视频**：自由创作、图生视频

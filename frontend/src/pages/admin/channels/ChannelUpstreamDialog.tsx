@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { UploadCloud } from 'lucide-react';
 import {
   ActionButton,
@@ -7,16 +7,17 @@ import {
   ModalDialog,
   SelectField,
   StatusTag,
+  SwitchField,
   TextField,
 } from '~/admin-ui/primitives';
 import { useProtocolCatalog } from './useChannelModels';
-import { parseCredits } from './utils';
+import { parseCredits, toCreditsInput } from './utils';
 import {
   BILLING_MODE_OPTIONS,
   CAPABILITY_OPTIONS,
   type BatchImportConfig,
 } from './constants';
-import type { UpstreamModelPreview } from '../../../types/model';
+import type { AdminChannelDefaultModelView, UpstreamModelPreview } from '../../../types/model';
 
 interface ChannelUpstreamDialogProps {
   open: boolean;
@@ -24,6 +25,8 @@ interface ChannelUpstreamDialogProps {
   models: UpstreamModelPreview[];
   /** 本地已有的上游键（大小写不敏感），命中就不会重复写入 */
   existingKeys: Set<string>;
+  /** 供应商默认商品配置：打开时预填统一配置，可覆盖 */
+  defaultConfig?: AdminChannelDefaultModelView | null;
   importing: boolean;
   onClose: () => void;
   onImport: (ids: string[], config?: BatchImportConfig) => void;
@@ -40,13 +43,14 @@ const BATCH_CAPABILITIES = CAPABILITY_OPTIONS.filter(
  * 一家厂商动辄几十上百个模型，内联列表会把「这条渠道有哪些模型」挤到屏幕外；
  * 弹窗里带搜索与「已存在」计数，默认只预选本地还没有的模型。
  *
- * 新增「导入后统一配置」：填一次类型、接入方式与售价，导入后由调用方逐条
- * 写入默认合同。不填则保持原行为，只建骨架行。
+ * 「导入后统一配置」：填一次类型、接入方式与售价，作为本次导入的覆盖配置；
+ * 省略时由后端套用供应商默认配置，仍未配置则只建骨架行。
  */
 export function ChannelUpstreamDialog({
   open,
   models,
   existingKeys,
+  defaultConfig,
   importing,
   onClose,
   onImport,
@@ -60,23 +64,40 @@ export function ChannelUpstreamDialog({
   const [inputPrice, setInputPrice] = useState('');
   const [outputPrice, setOutputPrice] = useState('');
   const [cachedPrice, setCachedPrice] = useState('');
+  const [enabled, setEnabled] = useState(false);
   const [configError, setConfigError] = useState('');
+  /** 记住上一次能力值：预填默认配置时不能触发「切换能力清空协议」 */
+  const previousCapability = useRef<'' | 'image' | 'text'>('');
 
-  const { protocols, options: protocolOptions, loading: protocolLoading } =
-    useProtocolCatalog(capability);
-  const selectedProtocol = useMemo(
-    () => protocols.find((item) => item.id === protocol),
-    [protocols, protocol],
-  );
+  const { options: protocolOptions, loading: protocolLoading } = useProtocolCatalog(capability);
 
   useEffect(() => {
     if (!open) return;
     setKeyword('');
     // 默认预选「本地还没有」的模型：已存在的由用户自己决定要不要再导入一次
     setSelected(models.filter((item) => !existingKeys.has(item.id.toLowerCase())).map((item) => item.id));
-  }, [open, models, existingKeys]);
+
+    /*
+     * 用供应商默认配置预填统一配置。用户仍可改 / 清空；清空时后端会
+     * 自己套用默认配置（见 `ModelCatalogService.import`）。
+     */
+    const preset = defaultConfig;
+    const presetCapability = (preset?.capability as 'image' | 'text' | undefined) ?? '';
+    previousCapability.current = presetCapability;
+    setCapability(presetCapability);
+    setProtocol(preset?.protocol ?? '');
+    setBillingMode(preset?.billingMode ?? 'fixed_request');
+    setUnitPrice(preset ? toCreditsInput(preset.unitPriceMicrocredits) : '');
+    setInputPrice(preset ? toCreditsInput(preset.inputTokenPriceMicrocredits) : '');
+    setOutputPrice(preset ? toCreditsInput(preset.outputTokenPriceMicrocredits) : '');
+    setCachedPrice(preset ? toCreditsInput(preset.cachedTokenPriceMicrocredits) : '');
+    setEnabled(preset?.enabled ?? false);
+    setConfigError('');
+  }, [open, models, existingKeys, defaultConfig]);
 
   useEffect(() => {
+    if (previousCapability.current === capability) return;
+    previousCapability.current = capability;
     setProtocol('');
     setBillingMode('fixed_request');
     setConfigError('');
@@ -131,7 +152,7 @@ export function ChannelUpstreamDialog({
       inputTokenPriceMicrocredits: input ?? 0,
       outputTokenPriceMicrocredits: output ?? 0,
       cachedTokenPriceMicrocredits: cached ?? 0,
-      imageParameters: selectedProtocol?.imageParameters ?? [],
+      enabled,
     };
   };
 
@@ -215,7 +236,10 @@ export function ChannelUpstreamDialog({
           <div>
             <div className="text-xs font-semibold text-foreground">导入后统一配置（可选）</div>
             <div className="text-[12px] text-muted-foreground">
-              只支持图像与文本；视频 / 音频请导入后逐条配置。不填则只建骨架行。
+              只支持图像与文本；视频 / 音频请导入后逐条配置。
+              {defaultConfig
+                ? '已按供应商默认配置预填，清空后仍会套用默认配置。'
+                : '不填则只建骨架行。'}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -279,6 +303,13 @@ export function ChannelUpstreamDialog({
               />
             )}
           </div>
+          <SwitchField
+            checked={enabled}
+            label="导入后自动启用"
+            ariaLabel="导入后自动启用"
+            disabled={!capability || !protocol || !priceReady}
+            onChange={setEnabled}
+          />
           {configError && <p className="text-[12px] text-danger-text">{configError}</p>}
         </section>
 

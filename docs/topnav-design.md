@@ -4,8 +4,8 @@
 
 | 项 | 值 |
 | --- | --- |
-| 组件 | `frontend/src/components/AppLayout.tsx` |
-| 样式 | `frontend/src/styles/global.css` 的 `.app-header` / `.app-topnav*` 区块 |
+| 组件 | `frontend/src/layout/AppHeader.tsx`（外壳组合见 `AppLayout.tsx`） |
+| 样式 | `frontend/src/layout/AppLayout.css` 的 `.app-header` / `.app-topnav*` 区块 |
 | 数据 | `GET /capabilities` 的分组与能力名派生导航下拉 |
 | 高度契约 | `--workspace-topbar-height: calc(64px + var(--promo-topbar-height))` |
 

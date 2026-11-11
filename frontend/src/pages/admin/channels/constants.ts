@@ -1,6 +1,5 @@
 import type { SelectFieldOption } from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS } from '../../../lib/billing-mode';
-import type { ImageParameterDefinitionView } from './imageCapability';
 
 /* ------------------------------------------------------------------------- */
 /* 渠道                                                                      */
@@ -16,6 +15,35 @@ export interface ChannelHeader {
  *
  * 凭证只在内存里，保存后不回读；`apiKey` / `secretKey` 留空表示「不修改」。
  */
+/**
+ * 供应商默认商品配置的本地草稿。
+ *
+ * 与单个商品的售价一样按「积分」输入、6 位小数；保存时换算成微积分。
+ * `capability` 为空 = 不使用默认配置（导入只建骨架行）。
+ */
+export interface DefaultModelDraft {
+  capability: string;
+  protocol: string;
+  billingMode: string;
+  unit: string;
+  input: string;
+  output: string;
+  cached: string;
+  /** 套用到商品后是否直接启用 */
+  enabled: boolean;
+}
+
+export const EMPTY_DEFAULT_MODEL_DRAFT: DefaultModelDraft = {
+  capability: '',
+  protocol: '',
+  billingMode: 'fixed_request',
+  unit: '',
+  input: '',
+  output: '',
+  cached: '',
+  enabled: true,
+};
+
 export interface ChannelDraft {
   name: string;
   baseUrl: string;
@@ -27,6 +55,7 @@ export interface ChannelDraft {
   enabled: boolean;
   sortOrder: string;
   headers: ChannelHeader[];
+  defaultModel: DefaultModelDraft;
 }
 
 export const EMPTY_CHANNEL_DRAFT: ChannelDraft = {
@@ -40,6 +69,7 @@ export const EMPTY_CHANNEL_DRAFT: ChannelDraft = {
   enabled: true,
   sortOrder: '0',
   headers: [],
+  defaultModel: { ...EMPTY_DEFAULT_MODEL_DRAFT },
 };
 
 /** 渠道级健康汇总：把该渠道下各线路的 24h 样本加总，左列一眼看出哪家在坏 */
@@ -87,11 +117,13 @@ export const STATUS_FILTER_OPTIONS = [
 export const PAGE_SIZE = 20;
 
 /**
- * 上游导入后的批量基础配置。
+ * 上游导入时的统一配置。
  *
  * 只支持 image / text：这两种能力有可直接保存的默认合同；video / audio 的
  * 参数组合差异太大，批量写默认值会把半成品推进路由目录，宁可让运营逐条配。
- * `imageParameters` 只用于本地生成能力合同，不提交给后端。
+ *
+ * 能力合同由后端按**真实上游模型键**生成（插件参数可以限定适用模型），
+ * 前端不再拼 JSON —— 否则同一份默认配置在不同模型上会少参数。
  */
 export interface BatchImportConfig {
   capability: 'image' | 'text';
@@ -101,7 +133,8 @@ export interface BatchImportConfig {
   inputTokenPriceMicrocredits: number;
   outputTokenPriceMicrocredits: number;
   cachedTokenPriceMicrocredits: number;
-  imageParameters: ImageParameterDefinitionView[];
+  /** 导入后是否直接启用 */
+  enabled: boolean;
 }
 
 /** 「商品台账」的状态筛选：比单供应商清单多「不健康」一档 */

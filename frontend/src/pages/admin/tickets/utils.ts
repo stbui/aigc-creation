@@ -4,7 +4,7 @@
 
 import type { TicketStatus } from '../../../types/api';
 
-export { formatDateTime } from '../../../admin-ui/lib/format';
+export { formatDateTime, formatYuanPlain } from '../../../admin-ui/lib/format';
 export { cn } from '../../../admin-ui/lib/cn';
 export {
   adminAssetHref,

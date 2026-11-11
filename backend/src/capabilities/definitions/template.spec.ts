@@ -42,21 +42,15 @@ describe('template 模板数据', () => {
     }
   });
 
-  it('每个模板都归属婚纱写真与一个场景分组', () => {
-    const groupIds = new Set(TEMPLATE_CATEGORIES.map((category) => category.id));
-    const sceneIds = new Set(['studio', 'interior', 'outdoor', 'flower', 'campus']);
+  it('每个模板只归属一个一级分类', () => {
+    const categoryIds = new Set(TEMPLATE_CATEGORIES.map((category) => category.id));
 
     for (const template of PORTRAIT_TEMPLATES) {
-      expect(template.categoryIds).toContain('wedding');
-      expect(template.categoryIds.filter((id) => sceneIds.has(id))).toHaveLength(1);
-      template.categoryIds.forEach((id) => expect(groupIds.has(id)).toBe(true));
+      expect(template.categoryIds).toHaveLength(1);
+      template.categoryIds.forEach((id) => expect(categoryIds.has(id)).toBe(true));
     }
     expect([...new Set(PORTRAIT_TEMPLATES.flatMap((t) => t.categoryIds))].sort()).toEqual([
       'campus',
-      'flower',
-      'interior',
-      'outdoor',
-      'studio',
       'wedding',
     ]);
   });

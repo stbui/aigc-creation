@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 import { useProject } from './useProject';
 import { usePasteUpload } from './usePasteUpload';
-import { useAssetLibrary } from '../components/AssetLibraryModal';
+import { useAssetLibrary } from './useAssetLibrary';
 import { SUPPORTED_IMAGE_LABEL, isSupportedImageFile } from '../lib/constants';
 import type { Asset, MobileUploadAsset } from '../types/api';
 import { useApp } from '../ui';

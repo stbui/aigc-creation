@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SEVERITY_SURFACE, SEVERITY_BADGE, SEVERITY_TONE, SeverityFilter } from './constants';
 import { readSeverity } from './utils';
-import { useAdminUrlFilterSync } from './hooks';
+import { useAdminAlerts, useAdminUrlFilterSync } from './hooks';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { ActionButton, EmptyState, ListError, PageHeader, Panel, SegmentedGroup, SkeletonBody, StatCard, StaleError, ToneBadge, WorkQueue, WorkQueueSection } from '~/admin-ui/primitives';
@@ -10,7 +10,6 @@ import {
   ALERT_SEVERITY_META,
   AlertRefreshButton,
   alertTime,
-  useAdminAlerts,
 } from '../../../components/admin/AlertCenter';
 import type { AdminAlertSeverity } from '../../../types/api';
 

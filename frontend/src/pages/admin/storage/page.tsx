@@ -213,7 +213,7 @@ export function AdminStoragePage() {
               )}
 
               <div className="mt-auto flex items-center gap-2 pt-3">
-                {b.configured && (
+                {can('channel.test') && b.configured && (
                   <ActionButton
                     variant="secondary"
                     disabled={probing === b.backend}

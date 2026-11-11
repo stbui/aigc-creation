@@ -3,7 +3,8 @@ import { ApiError, generateApi, newIdempotencyKey } from '../lib/api';
 import { resolveModelId } from '../lib/models';
 import { useProject } from './useProject';
 import { useGenerateError } from './useGenerateError';
-import { useTaskPoller, type ToolAsset, type ToolResult } from '../components/ToolShell';
+import { useTaskPoller } from './useTaskPoller';
+import type { ToolAsset, ToolResult } from '../components/toolShellTypes';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { useApp } from '../ui';
 

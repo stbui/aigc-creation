@@ -16,7 +16,12 @@ import {
   useUnsavedGuard,
 } from './hooks';
 import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants';
-import { normalizeChannelHeaders, toChannelDraft, validateChannelHeaders } from './utils';
+import {
+  buildDefaultModelPayload,
+  normalizeChannelHeaders,
+  toChannelDraft,
+  validateChannelHeaders,
+} from './utils';
 import { useProductConsumption } from './useProductConsumption';
 import type { AdminChannelView, SystemChannelExportView } from '../../../types/model';
 
@@ -140,6 +145,11 @@ export function useChannelWorkspace() {
       toast.error(headerError);
       return;
     }
+    const defaultModel = buildDefaultModelPayload(draft.defaultModel);
+    if ('error' in defaultModel) {
+      toast.error(defaultModel.error);
+      return;
+    }
     // 新建渠道没有凭证就是一条永远 401 的线路，建出来只会污染路由目录
     if (!editing && !draft.apiKey.trim()) {
       toast.error('请填写访问凭证');
@@ -157,6 +167,8 @@ export function useChannelWorkspace() {
         : { concurrencyLimit: Number(draft.concurrencyLimit) || 1 }),
       // 空数组 = 显式清空，`undefined` 才是「不修改」
       headers: normalizeChannelHeaders(draft.headers),
+      // null = 清空默认配置；对象 = 保存后自动套用到新建 / 导入的商品
+      defaultModel: defaultModel.value,
     };
     // 空串 = 不修改已有凭证；新建时必填
     if (draft.apiKey.trim()) body.apiKey = draft.apiKey.trim();

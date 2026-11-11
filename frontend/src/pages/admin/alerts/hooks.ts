@@ -5,3 +5,5 @@
 export {
   useAdminUrlFilterSync,
 } from '../../../admin-ui/primitives';
+
+export { useAdminAlerts } from '../../../hooks';

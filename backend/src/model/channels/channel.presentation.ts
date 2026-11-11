@@ -10,6 +10,7 @@ import { badRequest, decodeJsonLoose, normalizeModelKey, uniqueNonEmpty } from '
 import { decodeCapabilityConfig } from '../domain/capability-config';
 import { decodeSkuSelector } from '../domain/selector';
 import type {
+  ChannelDefaultModelConfig,
   ChannelModelTag,
   ChannelModelView,
   PublicChannelModelCost,
@@ -233,6 +234,7 @@ export interface ChannelRowLike {
   modelsJson: string;
   headersJson: string;
   catalogProviderId: string;
+  defaultModelConfigJson: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -255,7 +257,12 @@ export interface ChannelRowLike {
  * 三者都不下发。`id` / `sortOrder` / `models` / `modelCosts` 保留 ——
  * C 端要用它们选线路、算价格。
  */
-export function publicChannel(row: ChannelRowLike, admin: boolean, models: ChannelModelRowLike[]): PublicModelChannel {
+export function publicChannel(
+  row: ChannelRowLike,
+  admin: boolean,
+  models: ChannelModelRowLike[],
+  defaultModel?: ChannelDefaultModelConfig | null,
+): PublicModelChannel {
   const enabledModels = models.filter((item) => item.enabled);
   const names = enabledModels.map((item) => item.modelKey);
   const modelCosts: PublicChannelModelCost[] = [];
@@ -316,6 +323,7 @@ export function publicChannel(row: ChannelRowLike, admin: boolean, models: Chann
     hasSecretKey: admin && String(row.secretKey ?? '').trim() !== '',
     // provider id 等于报出协议与厂商，非管理员视角不下发
     catalogProviderId: admin ? row.catalogProviderId || undefined : undefined,
+    defaultModel: admin ? defaultModel ?? null : undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

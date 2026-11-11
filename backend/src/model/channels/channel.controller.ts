@@ -74,6 +74,8 @@ export class ChannelWriteBodyDto {
   @IsOptional() @Allow() headers?: unknown;
   @IsOptional() @IsBoolean() enabled?: boolean | null;
   @IsOptional() @IsString() proxyUrl?: string | null;
+  /** 默认商品配置：类型 / 接入方式 / 计费与售价 */
+  @IsOptional() @Allow() defaultModel?: unknown;
 }
 
 /** 渠道模型创建 / 更新入参 */
@@ -116,6 +118,8 @@ export class ChannelModelTestBodyDto {
 /** 上游目录导入入参：只导入管理员明确勾选的模型 */
 export class ChannelModelImportBodyDto {
   @IsArray() @IsString({ each: true }) models!: string[];
+  /** 本次导入统一配置；省略 = 使用供应商默认配置 */
+  @IsOptional() @Allow() config?: unknown;
 }
 
 export class ChannelEnabledBodyDto {
@@ -382,7 +386,12 @@ export class AdminChannelsController {
     return { models: await this.catalog.preview(id) };
   }
 
-  /** 导入勾选的上游模型：默认停用、待定价；能力与协议仍需管理员声明 */
+  /**
+   * 导入勾选的上游模型。
+   *
+   * 带统一配置（或渠道配置了默认商品）时，导入即为完整商品；否则只建骨架行，
+   * 由管理员逐条声明能力、协议与售价。
+   */
   @Post(":id/models/import")
   @RequirePermission(PERMISSIONS.channelModelWrite)
   @RateLimit(RL_CHANNEL_IMPORT)
@@ -390,7 +399,7 @@ export class AdminChannelsController {
     @Param("id") id: string,
     @Body() body: ChannelModelImportBodyDto,
   ) {
-    return this.catalog.import(id, body.models ?? []);
+    return this.catalog.import(id, body.models ?? [], body.config);
   }
 
   @Patch(":id/models/:modelId")

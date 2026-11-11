@@ -1,23 +1,23 @@
-import './TicketsPage.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import { MessageSquarePlus, X } from 'lucide-react';
+import type { Ticket, TicketStatus, TicketType } from '../../types/api';
 import {
-  CheckCircle2,
-  ChevronRight,
-  MessageSquare,
-  MessageSquarePlus,
-  Send,
-  User,
-  X,
-} from 'lucide-react';
-import { ticketsApi } from '../lib/api';
-import { formatDateTime } from '../lib/format';
-import { useAuth } from '../context/AuthContext';
-import { useDocumentMeta } from '../hooks/useDocumentMeta';
-import { PersonalPage } from '../components/PersonalPage';
-import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
-import type { Ticket, TicketPriority, TicketStatus, TicketType } from '../types/api';
-import { Button, Input, Select } from '../ui';
+  EMPTY_TICKET_FORM,
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  TYPE_OPTIONS,
+  type TicketFilterValue,
+  type TicketFormState,
+} from './constants';
+import { ticketsApi } from './api';
+import { useAuth, useDocumentMeta } from './hooks';
+import { formatDateTime } from './utils';
+import { Button, PersonalPage, StateButton, StateEmpty, StateError, StateSkeleton } from './components';
+import { TicketCard } from './TicketCard';
+import { TicketComposeForm } from './TicketComposeForm';
+import { TicketFilters } from './TicketFilters';
+import { TicketThread } from './TicketThread';
 
 /**
  * 我的工单 / 反馈。
@@ -31,44 +31,13 @@ import { Button, Input, Select } from '../ui';
  *
  * 工单量少（单个用户通常个位数）, 用列表切片切换详情比抽屉更适合移动端:
  * 桌面端与手机走同一套布局, 不必为后台抽屉那套交互再写一份移动适配。
+ *
+ * 分层（见 `docs/frontend-module-conventions.md`）:
+ * 路由级状态与写操作留在本文件，列表卡 / 筛选条 / 新建表单 / 对话线各自成组件，
+ * 常量、接口、hook、纯函数分别走 `constants` / `api` / `hooks` / `utils`。
  */
-
-const TYPE_OPTIONS: Array<{ value: TicketType; label: string }> = [
-  { value: 'bug', label: '功能异常' },
-  { value: 'complaint', label: '投诉' },
-  { value: 'consultation', label: '咨询' },
-  { value: 'invoice', label: '发票问题' },
-  { value: 'other', label: '其他' },
-];
-
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  open: '待处理',
-  processing: '处理中',
-  resolved: '已解决',
-  closed: '已关闭',
-};
-
-const PRIORITY_LABELS: Record<TicketPriority, string> = {
-  low: '低',
-  normal: '中',
-  high: '高',
-};
-
-/**
- * 列表筛选。工单量小 (单个用户通常个位数), 列表接口一次返回全部,
- * 因此在客户端按状态切片即可 —— 不为每次切档位再发一次请求。
- */
-const FILTERS: Array<{ value: 'all' | TicketStatus; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'open', label: '待处理' },
-  { value: 'processing', label: '处理中' },
-  { value: 'resolved', label: '已解决' },
-  { value: 'closed', label: '已关闭' },
-];
-
 export function TicketsPage() {
   useDocumentMeta('我的工单 · 货觉AI', '提交问题反馈并跟踪客服处理进度。');
-  const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -79,7 +48,7 @@ export function TicketsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** 列表状态筛选; 只影响当前视图, 不改动已加载的数据 */
-  const [filter, setFilter] = useState<'all' | TicketStatus>('all');
+  const [filter, setFilter] = useState<TicketFilterValue>('all');
   /** 已加载条数（加载更多时作为 offset） */
   const loadedCountRef = useRef(0);
 
@@ -94,12 +63,7 @@ export function TicketsPage() {
 
   /** 新建表单 */
   const [composing, setComposing] = useState(false);
-  const [form, setForm] = useState<{
-    type: TicketType;
-    subject: string;
-    content: string;
-    priority: TicketPriority;
-  }>({ type: 'consultation', subject: '', content: '', priority: 'normal' });
+  const [form, setForm] = useState<TicketFormState>(EMPTY_TICKET_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -223,7 +187,7 @@ export function TicketsPage() {
     try {
       const t = await ticketsApi.create({ ...form, subject, content });
       setComposing(false);
-      setForm({ type: 'consultation', subject: '', content: '', priority: 'normal' });
+      setForm(EMPTY_TICKET_FORM);
       await load();
       await openDetail(t.id);
     } catch (e) {
@@ -264,9 +228,6 @@ export function TicketsPage() {
     }
   };
 
-  /** 各状态计数来自后端全量 groupBy，不受当前分页影响 */
-  const counts = useMemo(() => statusCounts, [statusCounts]);
-
   const visibleItems = useMemo(
     () => (filter === 'all' ? items : items.filter((t) => t.status === filter)),
     [items, filter],
@@ -304,76 +265,14 @@ export function TicketsPage() {
 
         {detailLoading && <StateSkeleton variant="row" count={2} />}
 
-        <div className="ticket-thread">
-          <div className="ticket-msg is-user">
-            <div className="ticket-msg-head">
-              <span className="ticket-msg-author">
-                <span className="ticket-msg-avatar">
-                  <User size={12} aria-hidden />
-                </span>
-                我
-              </span>
-              <span className="ticket-msg-time">{formatDateTime(detail.createdAt)}</span>
-            </div>
-            <div className="ticket-msg-body">{detail.content}</div>
-          </div>
-          {(detail.replies ?? []).map((r) => {
-            const isAdmin = r.authorType === 'admin';
-            return (
-              <div key={r.id} className={`ticket-msg ${isAdmin ? 'is-admin' : 'is-user'}`}>
-                <div className="ticket-msg-head">
-                  <span className="ticket-msg-author">
-                    <span className="ticket-msg-avatar">
-                      {isAdmin ? '服' : <User size={12} aria-hidden />}
-                    </span>
-                    {isAdmin ? '货觉客服' : '我'}
-                  </span>
-                  <span className="ticket-msg-time">{formatDateTime(r.createdAt)}</span>
-                </div>
-                <div className="ticket-msg-body">{r.content}</div>
-              </div>
-            );
-          })}
-        </div>
-
-        {detail.status === 'closed' ? (
-          <p className="ticket-closed-note">
-            <CheckCircle2 size={15} aria-hidden />
-            该工单已关闭，如需继续沟通请新建工单。
-          </p>
-        ) : (
-          <div className="ticket-reply">
-            <div className="ticket-reply-head">
-              <h3>
-                <MessageSquare size={15} aria-hidden /> 继续沟通
-              </h3>
-              <span>客服回复会同时推送站内消息</span>
-            </div>
-            <Input.TextArea
-              rows={4}
-              maxLength={2000}
-              value={reply}
-              disabled={busy}
-              onChange={(e) => setReply(e.target.value)}
-              placeholder="补充说明或继续追问…"
-              showCount
-            />
-            <div className="ticket-reply-actions">
-              <Button disabled={busy} onClick={() => void closeTicket()}>
-                问题已解决，关闭工单
-              </Button>
-              <Button
-                type="primary"
-                icon={<Send size={14} />}
-                disabled={busy || !reply.trim()}
-                loading={busy}
-                onClick={() => void sendReply()}
-              >
-                发送
-              </Button>
-            </div>
-          </div>
-        )}
+        <TicketThread
+          detail={detail}
+          reply={reply}
+          busy={busy}
+          onReplyChange={setReply}
+          onSendReply={() => void sendReply()}
+          onCloseTicket={() => void closeTicket()}
+        />
       </PersonalPage>
     );
   }
@@ -394,61 +293,14 @@ export function TicketsPage() {
       }
     >
       {composing && (
-        <section className="ticket-compose">
-          <div className="ticket-compose-head">
-            <h2>新建工单</h2>
-            <p>说明发生了什么、在哪一步发生。信息越具体，客服越不必来回追问。</p>
-          </div>
-          {/* Select 不用 <label> 包裹：label 会把点击二次转发给触发按钮（打开即关闭） */}
-          <div>
-            问题类型
-            <Select
-              value={form.type}
-              onChange={(value) => setForm({ ...form, type: value })}
-              options={TYPE_OPTIONS}
-              aria-label="问题类型"
-            />
-          </div>
-          <div>
-            优先级
-            <Select
-              value={form.priority}
-              onChange={(value) => setForm({ ...form, priority: value })}
-              options={(['low', 'normal', 'high'] as TicketPriority[]).map((p) => ({
-                value: p,
-                label: PRIORITY_LABELS[p],
-              }))}
-              aria-label="优先级"
-            />
-          </div>
-          <label className="is-full">
-            标题
-            <Input
-              maxLength={80}
-              value={form.subject}
-              onChange={(e) => setForm({ ...form, subject: e.target.value })}
-              placeholder="一句话说明问题，如：生成的主图保存后是空白"
-            />
-          </label>
-          <label className="is-full">
-            详细描述
-            <Input.TextArea
-              rows={5}
-              maxLength={2000}
-              showCount
-              value={form.content}
-              onChange={(e) => setForm({ ...form, content: e.target.value })}
-              placeholder="复现步骤、涉及的能力名称或订单号；有报错截图可一并描述。"
-            />
-          </label>
-          {formError && <p className="ticket-error is-full">{formError}</p>}
-          <div className="ticket-compose-actions">
-            <Button onClick={() => setComposing(false)}>取消</Button>
-            <Button type="primary" loading={submitting} onClick={() => void submit()}>
-              提交工单
-            </Button>
-          </div>
-        </section>
+        <TicketComposeForm
+          form={form}
+          formError={formError}
+          submitting={submitting}
+          onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+          onCancel={() => setComposing(false)}
+          onSubmit={() => void submit()}
+        />
       )}
 
       {loading && <StateSkeleton variant="row" count={3} />}
@@ -470,57 +322,24 @@ export function TicketsPage() {
 
       {items.length > 0 && (
         <>
-          {/* 状态筛选: 计数直接来自已加载列表, 与卡片上的状态一一对应 */}
-          <div className="ticket-filters" role="tablist" aria-label="按状态筛选工单">
-            {FILTERS.map((f) => {
-              const count = f.value === 'all' ? items.length : (counts[f.value] ?? 0);
-              const active = filter === f.value;
-              return (
-                <button
-                  key={f.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={`ticket-filter${active ? ' is-active' : ''}`}
-                  onClick={() => setFilter(f.value)}
-                >
-                  {f.label}
-                  <span className="ticket-filter-count">{count}</span>
-                </button>
-              );
-            })}
-          </div>
+          <TicketFilters
+            filter={filter}
+            counts={statusCounts}
+            loaded={items.length}
+            onChange={setFilter}
+          />
 
           {visibleItems.length === 0 ? (
             <p className="ticket-filter-empty">该状态下还没有工单</p>
           ) : (
             <div className="ticket-list">
               {visibleItems.map((t) => (
-                <button
+                <TicketCard
                   key={t.id}
-                  type="button"
-                  className={`ticket-card${activeId === t.id ? ' is-active' : ''}`}
-                  onClick={() => void openDetail(t.id)}
-                >
-                  <span className="ticket-card-main">
-                    <span className="ticket-card-row">
-                      <span className="ticket-card-title">{t.subject}</span>
-                      {t.priority === 'high' && (
-                        <span className="ticket-card-flag">高优先级</span>
-                      )}
-                    </span>
-                    <span className="ticket-card-sub">
-                      <span>{t.ticketNo}</span>
-                      <span>{t.typeLabel}</span>
-                      <span>{formatDateTime(t.createdAt)}</span>
-                      {t.replyCount ? <span>{t.replyCount} 条回复</span> : null}
-                    </span>
-                  </span>
-                  <span className="ticket-card-side">
-                    <span className={`ticket-status is-${t.status}`}>{STATUS_LABELS[t.status]}</span>
-                    <ChevronRight size={15} className="ticket-card-arrow" aria-hidden />
-                  </span>
-                </button>
+                  ticket={t}
+                  active={activeId === t.id}
+                  onOpen={() => void openDetail(t.id)}
+                />
               ))}
             </div>
           )}

@@ -6,6 +6,7 @@
  */
 
 import type { AdminCoupon, CouponScope, CouponStatus, CouponType } from '../../../types/api';
+import type { TagTone } from '../../../components/admin/statusMeta';
 
 export const TYPE_LABEL: Record<CouponType, string> = {
   full_cut: '满减',
@@ -35,7 +36,7 @@ export const STATUS_OPTIONS = [
 ];
 
 /** 状态标签色调，与 `StatusTag` 的 `tone` 同形 */
-export type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
+export type { TagTone };
 
 /** 券的派生生效态：优先于人工开关展示，过期/未开始/售罄不是「停用」 */
 export const EFFECTIVE_META: Record<AdminCoupon['effective'], { label: string; tone: TagTone }> = {

@@ -361,12 +361,9 @@ export function WorksPage() {
   }, [tab, filters.biz, filters.status, filters.taskPick, filters.datePreset, filters.customRange]);
 
   return (
-    <div className="my-works-page">
-      <header className="my-works-head">
-        <div className="my-works-heading">
-          <h1>我的作品</h1>
-          <p>所有生成产出都汇总在这里，可查看大图、批量下载或再次创作。</p>
-        </div>
+    <div className="">
+      <header className="flex items-center justify-between">
+          <h1 className="m-0">我的作品</h1>
         <button
           type="button"
           className="my-works-refresh"
