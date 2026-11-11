@@ -34,7 +34,7 @@ test.describe('左侧菜单复原', () => {
     });
 
     await page.goto(`${UI}/workbench`, { waitUntil: 'networkidle' });
-    const aside = page.locator('.app-sider-wrap .workspace-side-menu-v2');
+    const aside = page.locator('.app-sider-wrap .app-sidebar');
     await expect(aside).toBeVisible();
 
     const box = await aside.boundingBox();
@@ -43,23 +43,23 @@ test.describe('左侧菜单复原', () => {
     expect(box?.height).toBe(896);
     expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(1000);
 
-    const sections = page.locator('.app-sider-wrap .workspace-side-menu-sections');
+    const sections = page.locator('.app-sider-wrap .app-sidebar-sections');
     await expect(sections).toHaveCSS('padding-top', '8px');
     await expect(sections).toHaveCSS('row-gap', '16px');
     await expect(sections).toHaveCSS('width', '139px');
 
-    const firstItem = page.locator('.app-sider-wrap .workspace-side-menu-btn').first();
+    const firstItem = page.locator('.app-sider-wrap .app-sidebar-item').first();
     await expect(firstItem).toHaveCSS('width', '133px');
     await expect(firstItem).toHaveCSS('height', '45px');
-    await expect(firstItem.locator('.side-menu-label')).toHaveCSS('font-size', '13px');
+    await expect(firstItem.locator('.app-sidebar-label')).toHaveCSS('font-size', '13px');
     await expect(firstItem).toHaveAttribute('aria-current', 'page');
 
     expect(
-      await page.locator('.app-sider-wrap .workspace-menu-section-label').allTextContents(),
+      await page.locator('.app-sider-wrap .app-sidebar-section-label').allTextContents(),
     ).toEqual(['AI视频', '电商生图', 'AI修图', '数据中心']);
     expect(
       await page
-        .locator('.app-sider-wrap .workspace-side-menu-btn .side-menu-label')
+        .locator('.app-sider-wrap .app-sidebar-item .app-sidebar-label')
         .allTextContents(),
     ).toEqual([
       '工作台',
@@ -86,13 +86,13 @@ test.describe('左侧菜单复原', () => {
     ]);
 
     const iconSources = await page
-      .locator('.app-sider-wrap .workspace-menu-icon img')
+      .locator('.app-sider-wrap .app-sidebar-icon img')
       .evaluateAll((images) => images.map((image) => image.getAttribute('src')));
     expect(iconSources.length).toBeGreaterThanOrEqual(19);
     expect(iconSources.every((src) => src?.startsWith('/menu/'))).toBe(true);
 
-    const suggestion = page.locator('.app-sider-wrap .product-suggestion-sidebar-launcher');
-    const service = page.locator('.app-sider-wrap .workspace-customer-service-trigger');
+    const suggestion = page.locator('.app-sider-wrap .app-sidebar-suggestion');
+    const service = page.locator('.app-sider-wrap .app-sidebar-service');
     await expect(suggestion).toContainText('产品建议');
     await expect(suggestion).toHaveAttribute(
       'href',
@@ -115,18 +115,18 @@ test.describe('左侧菜单复原', () => {
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.goto(`${UI}/workbench`, { waitUntil: 'networkidle' });
 
-    const aside = page.locator('.app-sider-wrap .workspace-side-menu-v2');
+    const aside = page.locator('.app-sider-wrap .app-sidebar');
     await expect(aside).toHaveCSS('width', '100px');
     await expect(aside).toHaveCSS('padding', '8px 8px 20px');
 
-    const item = page.locator('.app-sider-wrap .workspace-side-menu-btn').first();
+    const item = page.locator('.app-sider-wrap .app-sidebar-item').first();
     await expect(item).toHaveCSS('width', '77px');
     await expect(item).toHaveCSS('height', '60px');
     await expect(item).toHaveCSS('flex-direction', 'column');
-    await expect(item.locator('.side-menu-label')).toHaveCSS('font-size', '10px');
-    await expect(item.locator('.side-menu-label')).toHaveCSS('line-height', '14px');
+    await expect(item.locator('.app-sidebar-label')).toHaveCSS('font-size', '10px');
+    await expect(item.locator('.app-sidebar-label')).toHaveCSS('line-height', '14px');
 
-    const toggle = page.locator('.app-sider-wrap .workspace-menu-section-toggle').first();
+    const toggle = page.locator('.app-sider-wrap .app-sidebar-section-toggle').first();
     await expect(toggle).toHaveCSS('width', '77px');
     await expect(toggle).toHaveCSS('height', '24px');
     await expect(toggle).toHaveCSS('font-size', '12px');
@@ -139,13 +139,13 @@ test.describe('左侧菜单复原', () => {
     await skipGuestPromo(page);
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto(`${UI}/workbench`, { waitUntil: 'networkidle' });
-    await expect(page.locator('.app-sider-wrap .workspace-side-menu-v2')).toHaveCSS(
+    await expect(page.locator('.app-sider-wrap .app-sidebar')).toHaveCSS(
       'width',
       '100px',
     );
 
     await page.setViewportSize({ width: 1367, height: 900 });
-    await expect(page.locator('.app-sider-wrap .workspace-side-menu-v2')).toHaveCSS(
+    await expect(page.locator('.app-sider-wrap .app-sidebar')).toHaveCSS(
       'width',
       '176px',
     );
@@ -160,16 +160,16 @@ test.describe('左侧菜单复原', () => {
     const section = toggle.locator('xpath=..');
     const panelId = await toggle.getAttribute('aria-controls');
     expect(panelId).toBeTruthy();
-    await expect(section.locator('.workspace-side-menu-list')).toHaveCount(1);
+    await expect(section.locator('.app-sidebar-list')).toHaveCount(1);
     await expect(page.locator(`[id="${panelId}"]`)).toHaveCount(1);
 
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(section.locator('.workspace-side-menu-list')).toHaveCount(0);
+    await expect(section.locator('.app-sidebar-list')).toHaveCount(0);
 
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(section.locator('.workspace-side-menu-btn')).toHaveCount(8);
+    await expect(section.locator('.app-sidebar-item')).toHaveCount(8);
   });
 
   test('底部入口进入真实工单表单，并预填产品建议 / 咨询类型', async ({ page, request }) => {
@@ -184,7 +184,7 @@ test.describe('左侧菜单复原', () => {
     );
     await page.reload({ waitUntil: 'networkidle' });
 
-    await page.locator('.app-sider-wrap .product-suggestion-sidebar-launcher').click();
+    await page.locator('.app-sider-wrap .app-sidebar-suggestion').click();
     await expect(page).toHaveURL(/\/tickets$/);
     await expect(page.locator('.ticket-compose')).toBeVisible();
     await expect(page.getByLabel('标题')).toHaveValue('产品建议');
@@ -192,7 +192,7 @@ test.describe('左侧菜单复原', () => {
     await expect(type).toBeVisible();
     await expect(type).toContainText('其他');
 
-    await page.locator('.app-sider-wrap .workspace-customer-service-trigger').click();
+    await page.locator('.app-sider-wrap .app-sidebar-service').click();
     await expect(type).toBeVisible();
     await expect(type).toContainText('咨询');
   });
@@ -205,8 +205,8 @@ test.describe('左侧菜单复原', () => {
     await page.getByRole('button', { name: '打开导航菜单' }).click();
     const drawer = page.locator('.app-mobile-drawer');
     await expect(drawer).toBeVisible();
-    await expect(drawer.locator('.workspace-menu-section-toggle')).toHaveCount(4);
-    await expect(drawer.locator('.workspace-side-menu-btn')).toHaveCount(21);
+    await expect(drawer.locator('.app-sidebar-section-toggle')).toHaveCount(4);
+    await expect(drawer.locator('.app-sidebar-item')).toHaveCount(21);
     await expect(drawer.getByText('AI视频', { exact: true })).toBeVisible();
     await expect(drawer.getByText('图生视频', { exact: true })).toBeVisible();
     await expect(drawer.getByText('产品建议', { exact: true })).toBeAttached();

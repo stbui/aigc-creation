@@ -188,7 +188,7 @@ test.describe('素材库复原', () => {
       await expect(page.locator('.asset-library-header-actions')).toHaveCount(0);
       await expect(page.locator('.asset-library-groups-panel')).toHaveCount(0);
       await expect(
-        page.locator('.workspace-side-menu-btn.active').filter({ hasText: '素材库' }),
+        page.locator('.app-sidebar-item.is-active').filter({ hasText: '素材库' }),
       ).toHaveCount(1);
 
       await page.waitForTimeout(500);

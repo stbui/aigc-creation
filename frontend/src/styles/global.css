@@ -751,65 +751,6 @@ body {
   transform: translateY(0);
 }
 
-.workspace-menu-icon,
-.product-suggestion-sidebar-icon {
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-}
-
-.side-menu-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.side-menu-disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.side-menu-disabled:hover {
-  background: none;
-  color: var(--wb-text);
-}
-
-.product-suggestion-sidebar-launcher,
-.workspace-customer-service-trigger {
-  width: 100%;
-  height: 44px;
-  padding: 8px 4px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--wb-text);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 20px;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-}
-
-.product-suggestion-sidebar-launcher:hover,
-.product-suggestion-sidebar-launcher:focus-visible,
-.workspace-customer-service-trigger:hover,
-.workspace-customer-service-trigger:focus-visible {
-  color: var(--brand);
-  background: var(--surface-brand-5);
-}
-
-.product-suggestion-sidebar-icon svg {
-  display: block;
-}
-
 /* 促销条关闭 (PromoBar JS 置位) / 窄屏隐藏时, chrome 只剩顶栏 */
 html[data-promo='off'] {
   --promo-topbar-height: 0px;
@@ -5144,21 +5085,6 @@ img[data-broken='1'] {
   .asset-library-header { align-items: flex-start; margin-bottom: 17px; }
 
   .asset-library-title { font-size: 24px; line-height: 34px; }
-}
-
-@keyframes guest-promo-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes guest-promo-enter {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 /* ───────── 移动端工作台高度收口 (2026-11-02) ─────────

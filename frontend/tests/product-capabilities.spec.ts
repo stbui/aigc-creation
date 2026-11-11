@@ -197,8 +197,8 @@ test.describe('能力可见性与运行态', () => {
     await expect(creative.getByText('暂不可用')).toBeVisible();
 
     // 侧栏：与顶导同一口径
-    await expect(page.locator('.side-menu-label', { hasText: '一键抠图' })).toHaveCount(0);
-    await expect(page.locator('.side-menu-label', { hasText: '创意生图' })).toBeVisible();
+    await expect(page.locator('.app-sidebar-label', { hasText: '一键抠图' })).toHaveCount(0);
+    await expect(page.locator('.app-sidebar-label', { hasText: '创意生图' })).toBeVisible();
 
     // 站点地图：同样不再列出下线能力
     await page.goto(`${UI}/sitemap.html`);

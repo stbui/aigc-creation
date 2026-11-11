@@ -219,7 +219,7 @@ export function UserAccountMenu() {
       }}
     >
       <button
-        className={`app-user${open ? ' is-open' : ''}`}
+        className={`app-header-action app-user${open ? ' is-open' : ''}`}
         type="button"
         aria-label="打开账户菜单"
         aria-haspopup="menu"

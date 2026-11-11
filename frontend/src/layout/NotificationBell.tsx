@@ -74,7 +74,7 @@ export function NotificationBell() {
       placement="bottom"
       className="app-notif-popover"
     >
-      <button type="button" className="app-notif-trigger" aria-label={unread ? `消息通知，${unread} 条未读` : '消息通知'}>
+      <button type="button" className="app-header-action app-notif-trigger" aria-label={unread ? `消息通知，${unread} 条未读` : '消息通知'}>
         <Badge count={unread} size="small" offset={[0, -2]}>
           <Bell size={18} />
         </Badge>

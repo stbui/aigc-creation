@@ -120,7 +120,7 @@ export function AppHeader({ groups, items, mobileNavOpen, onOpenMobileNav }: Pro
           <UserAccountMenu />
         ) : (
           /* 未登录：唤起登录弹窗 */
-          <button type="button" className="app-guest-login" onClick={openLogin}>
+          <button type="button" className="app-header-action app-guest-login" onClick={openLogin}>
             登录/注册
           </button>
         )}

@@ -87,15 +87,6 @@
 }
 
 /* ───────── 应用骨架 ───────── */
-.app-boot {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .app-layout {
   min-height: 100vh;
 }
@@ -194,27 +185,35 @@
   gap: 10px; /* 参考站下拉条目 gap 10 (icon 20 ↔ 文字) */
 }
 
-/* 下拉菜单皮肤: 逐值对齐参考站 .workspace-nav-menu
-   (实测 1280: 宽 137 / radius 12 / border 1px #e5e7f0 / shadow 0 18px 42px rgba(31,41,55,.14) /
-    pad 10 8 / 条目 119x36 radius 9 pad 0 12 / 文字 13px 600 #475467 / icon 20 /
-    条目 hover #f2efff + #5b4df5) —— antd 默认皮肤全部不符, 见 docs/topnav-design.md P2-1
-   实际生效的选择器在文件末尾「顶部导航下拉」适配层（Radix Content 取代 .ant-dropdown-menu）。 */
-/* guest「登录/注册」纯文字钮: 参考站 #workspace-logout (68x32 / pad 8 / radius 6 / 13-700 #667085) */
-.app-guest-login {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-muted);
-  padding: 8px;
+/* 顶栏动作控件统一底座：32px 高、透明底、悬停品牌淡紫。
+   铃铛 / 账户 / 登录注册 / 汉堡按钮只在此基础上声明各自差异。 */
+.app-header-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   height: 32px;
-  border-radius: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
-.app-guest-login:hover {
-  color: var(--brand);
+.app-header-action:hover {
   background: var(--brand-bg);
+  color: var(--brand);
+}
+
+/* guest「登录/注册」纯文字钮: 参考站 #workspace-logout (68x32 / pad 8 / radius 6 / 13-700 #667085) */
+.app-guest-login {
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 /*
@@ -288,16 +287,7 @@
 }
 
 .app-user {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
   padding: 0 8px 0 4px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  border-radius: var(--radius-control);
-  transition: background 0.18s ease;
 }
 
 /* 用户区 hover: 对齐参考站 #f1efff (2026-10-18 去蓝, 原 slate-100) */
@@ -309,6 +299,7 @@
 .app-user-avatar {
   flex: none;
   background: var(--brand);
+  color: var(--on-brand);
   font-size: 12px;
   font-weight: 600;
 }
@@ -373,7 +364,7 @@
    曾经由 JSX inline width 注入, inline 会压过媒体查询导致窄屏塌缩失效 (2026-10-19 修正)。
    top/height 必须跟随完整 chrome 高度: 促销条开启时为 64 + 40 = 104px, 若仍写死 64
    会让侧栏底部超出视口 40px, 客服入口不可见 (2026-10-28 修正)。
-   边框由内层 .workspace-side-menu-v2 自带 (#f2f3f5), 此处不重复描边 */
+   边框由内层 .app-sidebar 自带 (#f2f3f5), 此处不重复描边 */
 .app-sider-wrap {
   background: var(--color-card);
   flex: 0 0 auto;
@@ -384,59 +375,62 @@
   overflow: visible;
 }
 
-/* 侧边菜单 —— 复刻参考站 workspace-side-menu-v2 (2026-10-28 重抓) */
-.workspace-side-menu-v2 {
+/* 侧边菜单：分组折叠 + 条目列表 + 底部真实入口。 */
+.app-sidebar {
+  --sidebar-scroll-thumb: rgb(85 70 216 / 0.32);
   height: 100%;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   background: var(--card-bg);
   border-right: 1px solid var(--color-border-soft);
   padding: 16px 12px 24px 24px;
   overflow: visible;
-  display: flex;
-  flex-direction: column;
 }
 
-.workspace-side-menu-sections {
+.app-sidebar-sections {
   flex: auto;
   min-height: 0;
-  padding-right: 6px;
-  padding-top: 8px;
-  overflow: hidden auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(85, 70, 216, 0.32) transparent;
-  scrollbar-gutter: auto;
   display: grid;
   grid-auto-rows: max-content;
   gap: 16px;
   align-content: start;
+  padding-top: 8px;
+  padding-right: 6px;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-scroll-thumb) transparent;
 }
 
 /* macOS 的 overlay 滚动条默认会隐藏，截断处会像排版错误；用底部渐隐提示还有入口，
    滚到底（SideRail 的 has-more 判定）后撤掉，不遮住最后一个入口。 */
-.workspace-side-menu-sections.has-more {
+.app-sidebar-sections.has-more {
   -webkit-mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - 28px), transparent);
   mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - 28px), transparent);
 }
 
 /* Firefox 等仍按下面两条渲染常显细滚动条。 */
-.workspace-side-menu-sections::-webkit-scrollbar {
+.app-sidebar-sections::-webkit-scrollbar {
   width: 6px;
 }
 
-.workspace-side-menu-sections::-webkit-scrollbar-track {
+.app-sidebar-sections::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.workspace-side-menu-sections::-webkit-scrollbar-thumb {
-  background: rgba(85, 70, 216, 0.32);
-  border-radius: 999px;
+.app-sidebar-sections::-webkit-scrollbar-thumb {
+  background: var(--sidebar-scroll-thumb);
+  border-radius: var(--radius-pill);
 }
 
-.workspace-menu-section {
+.app-sidebar-section {
   min-width: 0;
 }
 
-.workspace-menu-section-toggle {
+.app-sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
   height: 28px;
   padding: 0 4px;
@@ -449,47 +443,46 @@
   line-height: 20px;
   text-align: left;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
-.workspace-menu-section-toggle:hover,
-.workspace-menu-section-toggle:focus-visible {
+.app-sidebar-section-toggle:hover,
+.app-sidebar-section-toggle:focus-visible {
   background: var(--surface-brand-5);
 }
 
-.workspace-menu-section-toggle svg {
+.app-sidebar-section-toggle svg {
   flex: none;
   color: var(--text-body);
   transition: transform 0.18s;
 }
 
-.workspace-menu-section:not(.open) .workspace-menu-section-toggle svg {
+.app-sidebar-section:not(.is-open) .app-sidebar-section-toggle svg {
   transform: rotate(180deg);
 }
 
-.workspace-menu-section-label {
+.app-sidebar-section-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.workspace-side-menu-list {
+.app-sidebar-list {
   display: grid;
   gap: 4px;
   padding-top: 4px;
 }
 
-.workspace-side-menu-btn {
+/* 菜单条目与底部入口共用同一套结构（图标 24 + 文字、12px 间距、8px 圆角），
+   差异只在高度与字号：菜单 45/13，底部入口 44/14。 */
+.app-sidebar-item,
+.app-sidebar-footer-item {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
   width: 100%;
   min-width: 0;
-  height: 45px;
   padding: 8px 4px;
   border: 0;
   border-radius: var(--radius-control);
@@ -501,24 +494,56 @@
   text-align: left;
   text-decoration: none;
   cursor: pointer;
-  transition:
-    background 0.18s,
-    color 0.18s;
-  position: relative;
 }
 
-.workspace-side-menu-btn:hover {
+.app-sidebar-item {
+  height: 45px;
+  position: relative;
+  transition: background 0.18s, color 0.18s;
+}
+
+.app-sidebar-footer-item {
+  height: 44px;
+  font-size: 14px;
+}
+
+.app-sidebar-item:hover,
+.app-sidebar-footer-item:hover,
+.app-sidebar-footer-item:focus-visible {
   color: var(--brand);
   background: var(--surface-brand-5);
 }
 
-.workspace-side-menu-btn.active,
-.workspace-side-menu-btn[aria-current='page'] {
+.app-sidebar-item.is-active,
+.app-sidebar-item[aria-current='page'] {
   color: var(--brand);
   background: var(--brand-bg);
 }
 
-.workspace-menu-icon img {
+.app-sidebar-item.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.app-sidebar-item.is-disabled:hover {
+  background: none;
+  color: var(--wb-text);
+}
+
+.app-sidebar-icon,
+.app-sidebar-footer-icon {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+}
+
+.app-sidebar-footer-icon svg {
+  display: block;
+}
+
+.app-sidebar-icon img {
   width: auto;
   max-width: 24px;
   height: auto;
@@ -528,17 +553,24 @@
   transition: filter 0.18s;
 }
 
-.workspace-menu-icon.is-active img,
-.workspace-side-menu-btn:hover .workspace-menu-icon img,
-.workspace-side-menu-btn:focus-visible .workspace-menu-icon img,
-.workspace-customer-service-trigger:hover .workspace-menu-icon img,
-.workspace-customer-service-trigger:focus-visible .workspace-menu-icon img {
+.app-sidebar-icon.is-active img,
+.app-sidebar-item:hover .app-sidebar-icon img,
+.app-sidebar-item:focus-visible .app-sidebar-icon img,
+.app-sidebar-footer-item:hover .app-sidebar-icon img,
+.app-sidebar-footer-item:focus-visible .app-sidebar-icon img {
   filter: brightness(0) saturate() invert(34%) sepia(78%) saturate(2147%)
     hue-rotate(232deg) brightness(88%) contrast(90%);
 }
 
+.app-sidebar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 底部真实入口: 参考站 sidebar 固定在菜单列末尾 */
-.workspace-customer-service {
+.app-sidebar-footer {
   position: relative;
   z-index: 3;
   flex: none;
@@ -563,22 +595,24 @@
   min-height: calc(100vh - 140px);
 }
 
-/* 页面级 padding 与外壳 padding 的叠加治理 (2026-10-19)
-   参考站 .workspace-route-content **无内边距**, 页面自带 padding, 内容列从 route 边缘起算;
-   本地父级 .app-content 带 24px/24px/32px, 页面再带一层就右移 24px、窄 48px。
-   实测 @1280 (参考站目标: 内容列 x=108 / 宽 1148):
-     library   x=132 / 1100   ← 双重padding
-     my-works  ✅ 已与素材库同骨架逃逸 (2026-10-31), 自有 padding 24px
-     invite    x=108 / 1148   ✅ 自身横向 0, 无需动
-     pkg-shop  x=108 / 1148   ✅ 自身无 padding, 无需动
-     mif       x=108 / 1141   ✅ 已有逃逸规则
-   修法沿用 mif 的既有范式 (.app-content > X { margin:0 -24px -32px }): 页面盒逃到
-   app-content 的 padding 之外, 再由页面自身 padding 定位 —— 页面级 padding 语义不被破坏,
-   底部 -32 同时抵消 app-content 的 32, 使总下边距等于参考站的页面级值。
-   仅对 ≥901px 生效: ≤900px 时 .app-content padding 变成 16px 10px 24px, 固定 -24 会反冲。 */
+/* 页面自带内边距的「逃逸」约定 (2026-10-19)
+   参考站 .workspace-route-content 无内边距，页面自带 padding，内容列从 route 边缘起算；
+   本地 .app-content 再包一层 padding 就会右移并变窄。修法：页面盒用负 margin 逃到
+   .app-content 的 padding 之外，同时底部 -32 抵消外壳 32px 下内边距。
+   素材库 / 我的作品是同一骨架，规则只在这里声明一次，页面样式不再各写一份。
+   ≤900px 时 .app-content padding 变成 16px 10px 24px，负值同步换成 -16 / -10 / -24。 */
 @media (min-width: 901px) {
-  .app-content > .asset-library-page {
-    margin: 0 -24px -32px;
+  .app-content > .asset-library-page,
+  .app-content > .my-works-page {
+    margin: -24px -24px -32px;
+    width: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-content > .asset-library-page,
+  .app-content > .my-works-page {
+    margin: -16px -10px -24px;
     width: auto;
   }
 }
@@ -600,25 +634,24 @@
   .app-content {
     margin-left: -16px;
   }
-  .app-sider-wrap .workspace-side-menu-v2 {
+  .app-sider-wrap .app-sidebar {
     padding: 8px 8px 20px;
   }
-  .app-sider-wrap .workspace-side-menu-sections {
+  .app-sider-wrap .app-sidebar-sections {
     gap: 14px;
     padding-top: 6px;
   }
-  .app-sider-wrap .workspace-menu-section-toggle {
+  .app-sider-wrap .app-sidebar-section-toggle {
     height: 24px;
     padding: 0 4px;
     font-size: 12px;
     line-height: 18px;
   }
-  .app-sider-wrap .workspace-menu-section-toggle svg {
+  .app-sider-wrap .app-sidebar-section-toggle svg {
     width: 12px;
     height: 12px;
   }
-  .app-sider-wrap .workspace-side-menu-btn,
-  .app-sider-wrap .side-menu-disabled {
+  .app-sider-wrap .app-sidebar-item {
     width: 77px;
     height: 60px;
     flex-direction: column;
@@ -626,23 +659,23 @@
     gap: 2px;
     padding: 5px 2px;
   }
-  .app-sider-wrap .workspace-menu-icon {
+  .app-sider-wrap .app-sidebar-icon,
+  .app-sider-wrap .app-sidebar-footer-icon {
     flex: 0 0 24px;
     width: 24px;
     height: 24px;
   }
-  .app-sider-wrap .workspace-side-menu-btn .side-menu-label {
+  .app-sider-wrap .app-sidebar-label {
     font-size: 12px;
     font-weight: 500;
     line-height: 14px;
     text-align: center;
   }
   /* 参考站窄轨下底部入口相对内容列再右移 8px, 形成 x=16 / 83px 宽的实拍几何。 */
-  .app-sider-wrap .workspace-customer-service {
+  .app-sider-wrap .app-sidebar-footer {
     left: 8px;
   }
-  .app-sider-wrap .product-suggestion-sidebar-launcher,
-  .app-sider-wrap .workspace-customer-service-trigger {
+  .app-sider-wrap .app-sidebar-footer-item {
     height: 60px;
     padding: 5px 2px;
     flex-direction: column;
@@ -651,12 +684,6 @@
     font-size: 12px;
     line-height: 14px;
     text-align: center;
-  }
-  .app-sider-wrap .product-suggestion-sidebar-icon,
-  .app-sider-wrap .workspace-customer-service-trigger .workspace-menu-icon {
-    flex: 0 0 24px;
-    width: 24px;
-    height: 24px;
   }
 }
 
@@ -719,25 +746,24 @@
     font-weight: 600;
     text-decoration: none;
   }
-  /* Drawer 内恢复完整横排菜单: 不受桌面窄轨的 77×60 / 10px 标签影响。 */
-  .app-mobile-drawer .workspace-side-menu-v2 {
+  /* Drawer 内恢复完整横排菜单: 不受桌面窄轨的 77×60 / 12px 标签影响。 */
+  .app-mobile-drawer .app-sidebar {
     width: 100%;
     height: auto;
     min-height: 100%;
     padding: 8px;
     border-right: none;
   }
-  .app-mobile-drawer .workspace-side-menu-sections {
+  .app-mobile-drawer .app-sidebar-sections {
     flex: none;
     max-height: none;
     padding-right: 0;
     overflow: visible;
   }
-  .app-mobile-drawer .workspace-menu-section-toggle {
+  .app-mobile-drawer .app-sidebar-section-toggle {
     height: 44px;
   }
-  .app-mobile-drawer .workspace-side-menu-btn,
-  .app-mobile-drawer .side-menu-disabled {
+  .app-mobile-drawer .app-sidebar-item {
     width: 100%;
     height: 45px;
     flex-direction: row;
@@ -745,17 +771,16 @@
     gap: 12px;
     padding: 8px 4px;
   }
-  .app-mobile-drawer .workspace-side-menu-btn .side-menu-label {
+  .app-mobile-drawer .app-sidebar-label {
     font-size: 13px;
     font-weight: 400;
     line-height: 20px;
     text-align: left;
   }
-  .app-mobile-drawer .workspace-customer-service {
+  .app-mobile-drawer .app-sidebar-footer {
     left: auto;
   }
-  .app-mobile-drawer .product-suggestion-sidebar-launcher,
-  .app-mobile-drawer .workspace-customer-service-trigger {
+  .app-mobile-drawer .app-sidebar-footer-item {
     height: 44px;
     padding: 8px 4px;
     flex-direction: row;
@@ -774,42 +799,13 @@
   cursor: not-allowed;
 }
 
-/*
- * 逃逸 .app-content 的 padding, 与 .asset-library-page 同源:
- * 页面自带内边距, 负数 margin 只在能精确抵消外壳 padding 的断点生效
- * (≤900px 外壳 padding 变成 16px 10px 24px, 固定 -24 会反冲)。
- * width:auto 必须显式写 —— width:100% 会锁在 app-content 内容盒宽度,
- * 负 margin 只平移不变宽, 右侧会留出外壳 padding 的空档。
- */
-@media (min-width: 901px) {
-  .app-content > .my-works-page {
-    margin: -24px -24px -32px;
-    width: auto;
-  }
-}
-
 /* ─────────────────────────────────────────────────────────────────────────────
    顶导消息铃铛 (B4, 2026-10-21)
    与 .app-quota 同一视觉尺度: 32px 高、12px 字号、中性色, 避免在 64px 顶栏里
    抢过品牌与导航。未读角标由 antd Badge 托管, 不自定义。
    ───────────────────────────────────────────────────────────────────────────── */
 .app-notif-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-control);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.app-notif-trigger:hover {
-  background: var(--brand-bg);
-  color: var(--brand);
 }
 
 /* 未读角标压到 12px 并加 2px 白描边: 18px 铃铛上的默认角标会糊成一团红点。
@@ -894,57 +890,34 @@
   color: var(--text-desc);
 }
 
-/* 外壳 .app-body 的 min-height 只扣 64px 顶栏；本页固定视口工作台在促销条
- * 开启时会因此多出 40px 页面滚动。仅在局部重绘页存在时校正外壳高度。 */
-.app-body:has(> .app-content > .local-redraw-page) {
+/* 固定视口工作台：`.pk-workspace` 是 ToolShell 的共享根，高度按顶栏 + 推广条计算。
+ * 外壳的 min-height 只扣顶栏，促销条开启时会多出 40px 假滚动；命中工具页时跟随完整
+ * chrome 高度收口。长文档页（素材库 / 我的作品 / 首页）没有这个根，不受影响。 */
+.app-body:has(> .app-content > .pk-workspace) {
   min-height: calc(100vh - var(--workspace-topbar-height));
 }
 
-.app-body:has(> .app-content > .local-redraw-page) > .app-sider-wrap {
-  height: calc(100vh - var(--workspace-topbar-height));
-}
-
-/* 产品系与抠图页同样是固定视口工作台：顶栏 + 推广条合计 104px，
- * 外壳的 64px 扣减会让文档多出 12–40px 的假滚动。只在这两类页面收敛，
- * 避免影响长文档页面（素材库 / 我的作品 / 首页）。 */
-.app-body:has(> .app-content > .product-retouch-page),
-.app-body:has(> .app-content > .background-remove-page) {
-  min-height: calc(100vh - var(--workspace-topbar-height));
-}
-
-.app-body:has(> .app-content > .product-retouch-page) > .app-sider-wrap,
-.app-body:has(> .app-content > .background-remove-page) > .app-sider-wrap {
+.app-body:has(> .app-content > .pk-workspace) > .app-sider-wrap {
   height: calc(100vh - var(--workspace-topbar-height));
 }
 
 /* 参考站在 ≤900px 把滚动交给 route content，文档本身不产生第二层滚动。
- * 本地对应容器是 .app-content；只在局部重绘存在时收敛高度。 */
+ * 本地对应容器是 .app-content；只有固定视口工作台需要收敛高度。 */
 @media (max-width: 900px) {
-  .app-layout:has(> .app-body > .app-content > .local-redraw-page),
-  .app-layout:has(> .app-body > .app-content > .background-remove-page) {
+  .app-layout:has(> .app-body > .app-content > .pk-workspace) {
     height: 100vh;
     min-height: 0;
     overflow: hidden;
   }
-  .app-body:has(> .app-content > .local-redraw-page),
-  .app-body:has(> .app-content > .background-remove-page) {
+  .app-body:has(> .app-content > .pk-workspace) {
     height: calc(100vh - var(--workspace-topbar-height));
     min-height: 0;
     overflow: hidden;
   }
-  .app-body:has(> .app-content > .local-redraw-page) > .app-content,
-  .app-body:has(> .app-content > .background-remove-page) > .app-content {
+  .app-body:has(> .app-content > .pk-workspace) > .app-content {
     height: 100%;
     min-height: 0;
     overflow: hidden auto;
-  }
-}
-
-/* 素材库: 页面自带 24px 内边距, 仍逃逸 .app-content 的 padding 以拿到整幅宽度。
-   我的作品 (2026-10-31) 与素材库同规则逃逸 —— 见 .app-content > .my-works-page。 */
-@media (min-width: 901px) {
-  .app-content > .asset-library-page {
-    margin: -24px -24px -32px;
   }
 }
 
@@ -1005,14 +978,6 @@
   .app-topnav .ui-btn.app-topnav-item {
     padding: 0 8px;
   }
-}
-
-.app-user-avatar {
-  flex: none;
-  background: var(--brand);
-  color: var(--on-brand);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 /* 用户账户面板：身份、套餐与常用入口集中在一个下拉层里。 */

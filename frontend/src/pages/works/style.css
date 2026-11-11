@@ -29,13 +29,6 @@
   box-sizing: border-box;
 }
 
-@media (max-width: 900px) {
-  .app-content > .my-works-page {
-    margin: -16px -10px -24px;
-    width: auto;
-  }
-}
-
 /* 页头: 标题 + 说明在左, 刷新在右 (与 .personal-page-head 同一套度量) */
 .my-works-head {
   display: flex;
@@ -1007,11 +1000,6 @@
 /* 移动端规则必须留在页面样式内：本文件随路由懒加载，加载顺序晚于 global.css，
    同一选择器的全局媒体查询会被这里的基础规则覆盖。 */
 @media (max-width: 900px) {
-  .app-content > .my-works-page {
-    margin: -16px -10px -24px;
-    width: auto;
-  }
-
   .my-works-page {
     padding: 16px 16px 52px;
   }

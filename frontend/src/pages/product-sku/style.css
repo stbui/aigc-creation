@@ -1962,16 +1962,6 @@ ol.product-sku-steps {
   height: 100%;
 }
 
-/* SKU 页是固定视口工作台；促销条开启时外壳必须按 104px 顶栏高度收敛，
-   否则文档会多出 40px 假滚动。 */
-.app-body:has(> .app-content > .product-sku-page) {
-  min-height: calc(100vh - var(--workspace-topbar-height));
-}
-
-.app-body:has(> .app-content > .product-sku-page) > .app-sider-wrap {
-  height: calc(100vh - var(--workspace-topbar-height));
-}
-
 @media (min-width: 1367px) {
   .pk-workspace.product-sku-page,
   .pk-workspace.product-sku-page.pk-workspace-trailing,

@@ -151,23 +151,26 @@ export function CategorySidebar({
                         </span>
                       </button>
                       {writable && (
-                        <RowMenu
-                          label={`更多操作：${group.name}`}
-                          items={[
-                            {
-                              key: 'edit',
-                              label: '编辑分组',
-                              onSelect: () => onEditGroup(group),
-                            },
-                            {
-                              key: 'delete',
-                              label: '删除分组',
-                              danger: true,
-                              separator: true,
-                              onSelect: () => onDeleteGroup(group),
-                            },
-                          ]}
-                        />
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <ActionButton
+                            variant="ghost"
+                            size="xs"
+                            icon={Pencil}
+                            ariaLabel={`编辑分组${group.name}`}
+                            onClick={() => onEditGroup(group)}
+                          />
+                          <RowMenu
+                            label={`更多操作：${group.name}`}
+                            items={[
+                              {
+                                key: 'delete',
+                                label: '删除分组',
+                                danger: true,
+                                onSelect: () => onDeleteGroup(group),
+                              },
+                            ]}
+                          />
+                        </div>
                       )}
                     </div>
                   ))}

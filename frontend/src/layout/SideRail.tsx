@@ -186,14 +186,14 @@ export function SideRail({ groups, items, activePath, onNavigate }: Props) {
   const dataCenterOpen = !closedSections.data_center;
 
   return (
-    <nav className="workspace-side-menu-v2" aria-label="侧边导航">
+    <nav className="app-sidebar" aria-label="侧边导航">
       <div
         ref={sectionsRef}
-        className={`workspace-side-menu-sections${hasMoreBelow ? ' has-more' : ''}`}
+        className={`app-sidebar-sections${hasMoreBelow ? ' has-more' : ''}`}
         onScroll={syncSectionsOverflow}
       >
-        <section className="workspace-menu-section open workspace-menu-root-items">
-          <div className="workspace-side-menu-list">
+        <section className="app-sidebar-section is-open">
+          <div className="app-sidebar-list">
             <SideMenuItem
               to="/workbench"
               label="工作台"
@@ -213,21 +213,21 @@ export function SideRail({ groups, items, activePath, onNavigate }: Props) {
 
         {sections.map((group) => {
           const open = !closedSections[group.id];
-          const panelId = `${uid}-workspace-menu-section-${group.id}`;
+          const panelId = `${uid}-app-sidebar-section-${group.id}`;
           return (
-            <section key={group.id} className={`workspace-menu-section${open ? ' open' : ''}`}>
+            <section key={group.id} className={`app-sidebar-section${open ? ' is-open' : ''}`}>
               <button
                 type="button"
-                className="workspace-menu-section-toggle"
+                className="app-sidebar-section-toggle"
                 aria-expanded={open}
                 aria-controls={panelId}
                 onClick={() => toggleSection(group.id)}
               >
-                <span className="workspace-menu-section-label">{group.name}</span>
+                <span className="app-sidebar-section-label">{group.name}</span>
                 <ChevronUp size={14} aria-hidden="true" />
               </button>
               {open && (
-                <div id={panelId} className="workspace-side-menu-list">
+                <div id={panelId} className="app-sidebar-list">
                   {group.items.map(renderCapability)}
                 </div>
               )}
@@ -235,22 +235,22 @@ export function SideRail({ groups, items, activePath, onNavigate }: Props) {
           );
         })}
 
-        <section className={`workspace-menu-section${dataCenterOpen ? ' open' : ''}`}>
+        <section className={`app-sidebar-section${dataCenterOpen ? ' is-open' : ''}`}>
           {/* 数据看板是本地真实 IA 增强；素材库保持参考站命名与顺序。 */}
           <button
             type="button"
-            className="workspace-menu-section-toggle"
+            className="app-sidebar-section-toggle"
             aria-expanded={dataCenterOpen}
-            aria-controls={`${uid}-workspace-menu-section-data-center`}
+            aria-controls={`${uid}-app-sidebar-section-data-center`}
             onClick={() => toggleSection('data_center')}
           >
-            <span className="workspace-menu-section-label">数据中心</span>
+            <span className="app-sidebar-section-label">数据中心</span>
             <ChevronUp size={14} aria-hidden="true" />
           </button>
           {dataCenterOpen && (
             <div
-              id={`${uid}-workspace-menu-section-data-center`}
-              className="workspace-side-menu-list"
+              id={`${uid}-app-sidebar-section-data-center`}
+              className="app-sidebar-list"
             >
               <SideMenuItem
                 to="/stats"
@@ -273,27 +273,27 @@ export function SideRail({ groups, items, activePath, onNavigate }: Props) {
         </section>
       </div>
 
-      <div className="workspace-customer-service">
+      <div className="app-sidebar-footer">
         <Link
           to="/tickets?type=other&compose=1&subject=%E4%BA%A7%E5%93%81%E5%BB%BA%E8%AE%AE"
-          className="product-suggestion-launcher product-suggestion-sidebar-launcher"
+          className="app-sidebar-footer-item app-sidebar-suggestion"
           onClick={() =>
             onNavigate?.(
               '/tickets?type=other&compose=1&subject=%E4%BA%A7%E5%93%81%E5%BB%BA%E8%AE%AE',
             )
           }
         >
-          <span className="product-suggestion-sidebar-icon" aria-hidden="true">
+          <span className="app-sidebar-footer-icon" aria-hidden="true">
             <MessageSquarePlus size={19} />
           </span>
           <span>产品建议</span>
         </Link>
         <Link
           to="/tickets?type=consultation&compose=1"
-          className="workspace-customer-service-trigger"
+          className="app-sidebar-footer-item app-sidebar-service"
           onClick={() => onNavigate?.('/tickets?type=consultation&compose=1')}
         >
-          <span className="workspace-menu-icon" aria-hidden="true">
+          <span className="app-sidebar-icon" aria-hidden="true">
             <img src="/menu/m_kf.svg" alt="" />
           </span>
           <span>联系客服</span>
@@ -331,18 +331,18 @@ function SideMenuItem({
   const body = (
     <>
       <span
-        className={`workspace-side-icon workspace-menu-icon${active ? ' is-active' : ''}`}
+        className={`app-sidebar-icon${active ? ' is-active' : ''}`}
         aria-hidden="true"
       >
         {glyph}
       </span>
-      <span className="side-menu-label">{label}</span>
+      <span className="app-sidebar-label">{label}</span>
     </>
   );
 
   return planned ? (
     <span
-      className={`workspace-side-menu-btn side-menu-disabled${active ? ' active' : ''}`}
+      className={`app-sidebar-item is-disabled${active ? ' is-active' : ''}`}
       aria-disabled
     >
       {body}
@@ -351,7 +351,7 @@ function SideMenuItem({
     <Link
       to={path}
       onClick={() => onNavigate?.(path)}
-      className={`workspace-side-menu-btn${active ? ' active' : ''}`}
+      className={`app-sidebar-item${active ? ' is-active' : ''}`}
       aria-current={active ? 'page' : undefined}
     >
       {body}

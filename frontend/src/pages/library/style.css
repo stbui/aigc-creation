@@ -506,12 +506,6 @@
   }
 }
 
-@media (max-width: 900px) {
-  .app-content > .asset-library-page {
-    margin: -16px -10px -24px;
-  }
-}
-
 /* 素材库：标题 28/700，空态 160×160 插画 + 212 高透明容器。 */
 .asset-library-shell {
   width: 100%;
