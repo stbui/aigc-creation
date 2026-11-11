@@ -97,7 +97,7 @@ export function CatalogTable({
         <div className="flex items-center gap-1">
           <ActionButton
             variant="ghost"
-            size="xs"
+            size="sm"
             disabled={busy === `catalog:${row.id}`}
             onClick={() => onVerify(row)}
           >
@@ -105,7 +105,7 @@ export function CatalogTable({
           </ActionButton>
           <ActionButton
             variant="ghost"
-            size="xs"
+            size="sm"
             disabled={!writable || row.installed || busy === `catalog:${row.id}`}
             onClick={() => onInstall(row)}
           >

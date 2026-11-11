@@ -1,6 +1,7 @@
 import { CalendarDays } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
+  formatNumber,
   ActionButton,
   Card,
   CardFooter,
@@ -199,7 +200,7 @@ export function ProductCard({
                     active ? 'text-foreground' : 'text-muted-foreground',
                   )}
                 >
-                  {row.credits.toLocaleString('zh-CN')}
+                  {formatNumber(row.credits)}
                 </span>
                 <span className="text-[12px] leading-4 text-muted-foreground">
                   积分

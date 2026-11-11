@@ -62,7 +62,8 @@ export function CouponTable({
     {
       key: 'code',
       title: '券码',
-      width: 125,
+      /* 券码最长 24 位等宽字符，125px 会贴到名称列 */
+      width: 150,
       render: (row) => (
         <button
           type="button"
@@ -73,7 +74,7 @@ export function CouponTable({
         </button>
       ),
     },
-    { key: 'name', title: '名称', width: 140, render: (row) => <span>{row.name}</span> },
+    { key: 'name', title: '名称', width: 150, render: (row) => <span>{row.name}</span> },
     {
       key: 'type',
       title: '类型',
@@ -200,6 +201,7 @@ export function CouponTable({
       onRetry={onRetry}
       /* 整行可点开编辑；只读账号不挂这个入口，避免打开一个存不了的抽屉 */
       onRowClick={writable ? onEdit : undefined}
+      /* 只设下限：抬到列宽总和会把状态列挤出 1280 视口的可视区 */
       minWidth={1120}
       pagination={{
         current,

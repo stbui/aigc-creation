@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FormField, SegmentedGroup, TextField } from './form';
+import { FormField, SegmentedGroup, SelectField, TextField } from './form';
 
 describe('Admin FormField', () => {
   it('将 label 关联到布局容器内的真实控件，并注入错误语义', () => {
@@ -80,5 +80,44 @@ describe('SegmentedGroup', () => {
 
     await user.keyboard('{Enter}');
     expect(onChange).toHaveBeenCalledWith('active');
+  });
+});
+
+describe('Admin SelectField', () => {
+  const options = [
+    { value: 'active', label: '启用' },
+    { value: 'disabled', label: '停用' },
+  ];
+
+  it('带清除的下拉未选中时，触发器文案取 clearLabel', () => {
+    render(
+      <SelectField
+        ariaLabel="按状态筛选"
+        clearLabel="全部状态"
+        allowClear
+        value={undefined}
+        onChange={vi.fn()}
+        options={options}
+      />,
+    );
+
+    // 触发器与复位项同文案：只写「全部」时分不清这一格管的是状态还是类型
+    expect(screen.getByRole('combobox', { name: '按状态筛选' })).toHaveTextContent('全部状态');
+  });
+
+  it('显式 placeholder 仍然优先于 clearLabel', () => {
+    render(
+      <SelectField
+        ariaLabel="模型类型"
+        placeholder="请选择模型类型"
+        clearLabel="全部类型"
+        allowClear
+        value={undefined}
+        onChange={vi.fn()}
+        options={options}
+      />,
+    );
+
+    expect(screen.getByRole('combobox', { name: '模型类型' })).toHaveTextContent('请选择模型类型');
   });
 });

@@ -638,7 +638,6 @@ async function seedPriorDays(userId, n) {
       await db(() =>  prisma.accountToken.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.loginLog.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.loginSession.deleteMany({ where: { userId: { in: emails } } }));
-      await db(() =>  prisma.consentRecord.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.oAuthIdentity.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.ticket.deleteMany({ where: { userId: { in: emails } } }));
       // 创作域：GenerationTask 引用 Asset.outputAssetId 与 Project，必须先删任务

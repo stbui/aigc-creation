@@ -18,6 +18,7 @@ import { adminApiLogsApi } from '../../../lib/api';
 import { ModelCallDetailDrawer } from './ModelCallDetailDrawer';
 
 import {
+  AdminPage,
   ActionButton,
   RefreshButton,
   ExportCsvButton,
@@ -28,12 +29,11 @@ import {
   DateRangeField,
   FilterActions,
   FilterBar,
-  PageHeader,
   Panel,
   SelectField,
   StatusTag,
   StaleError,
-  formatDateTimeLoose,
+  formatDateTime,
   formatDuration,
   type AdminColumn,
   type AppliedFilter,
@@ -325,7 +325,7 @@ export function AdminModelCallsPage() {
         key: 'createdAt',
         title: '时间',
         width: 150,
-        render: (row) => formatDateTimeLoose(row.createdAt),
+        render: (row) => formatDateTime(row.createdAt),
       },
       {
         key: 'status',
@@ -430,7 +430,7 @@ export function AdminModelCallsPage() {
         width: 80,
         fixed: 'right',
         render: (row) => (
-          <ActionButton variant="ghost" size="xs" onClick={() => setDetailId(row.id)}>
+          <ActionButton variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
             详情
           </ActionButton>
         ),
@@ -440,16 +440,14 @@ export function AdminModelCallsPage() {
   );
 
   return (
-    <>
-      <PageHeader
-        title="调用记录"
-        description="逐次留痕的上游 HTTP 调用，含后台连通性测试（不计费）。排查「哪个请求失败、返回了什么」看这里。"
-      />
+    <AdminPage
+      title="调用记录"
+      description="逐次留痕的上游 HTTP 调用，含后台连通性测试（不计费）。排查「哪个请求失败、返回了什么」看这里。"
+    >
 
        <FilterBar>
           <SelectField
             ariaLabel="调用状态"
-            placeholder="全部状态"
             clearLabel="全部状态"
             value={status}
             options={STATUS_OPTIONS}
@@ -459,7 +457,6 @@ export function AdminModelCallsPage() {
           />
           <SelectField
             ariaLabel="请求类型"
-            placeholder="全部类型"
             clearLabel="全部类型"
             value={requestKind}
             options={REQUEST_KIND_OPTIONS}
@@ -469,7 +466,6 @@ export function AdminModelCallsPage() {
           />
           <SelectField
             ariaLabel="调用来源"
-            placeholder="全部来源"
             clearLabel="全部来源"
             value={source}
             options={SOURCE_OPTIONS}
@@ -479,7 +475,6 @@ export function AdminModelCallsPage() {
           />
           <SelectField
             ariaLabel="调用操作"
-            placeholder="全部操作"
             clearLabel="全部操作"
             value={operation}
             options={OPERATION_OPTIONS}
@@ -489,7 +484,6 @@ export function AdminModelCallsPage() {
           />
           <SelectField
             ariaLabel="是否计费"
-            placeholder="全部计费"
             clearLabel="全部计费"
             value={billable}
             options={BILLABLE_OPTIONS}
@@ -592,6 +586,6 @@ export function AdminModelCallsPage() {
       </Panel>
 
       <ModelCallDetailDrawer detailId={detailId} detail={detail} onClose={() => setDetailId(null)} />
-    </>
+    </AdminPage>
   );
 }

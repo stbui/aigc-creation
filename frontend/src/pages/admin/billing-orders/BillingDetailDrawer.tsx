@@ -5,7 +5,7 @@ import {
   adminModelCallsHref,
   adminTaskHref,
   adminUserDetailHref,
-  formatTime,
+  fmtTime,
   toCredits,
   toCreditsInput,
 } from './utils';
@@ -48,10 +48,8 @@ export function BillingDetailDrawer({
   return (
     <Drawer
       open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      width={720}
+      onClose={onClose}
+      size="lg"
       title="账单详情"
       description={detail ? `${STATUS_LABELS[detail.status] ?? detail.status} · ${detail.id}` : undefined}
       footer={
@@ -152,8 +150,8 @@ export function BillingDetailDrawer({
                   ? `输入 ${detail.inputTokens} · 输出 ${detail.outputTokens} · 缓存 ${detail.cachedTokens}（${detail.usageSource}）`
                   : '无用量数据',
               },
-              { label: '开始 / 结算', value: `${formatTime(detail.startedAt)} / ${formatTime(detail.settledAt)}` },
-              { label: '退款时间', value: formatTime(detail.refundedAt) },
+              { label: '开始 / 结算', value: `${fmtTime(detail.startedAt)} / ${fmtTime(detail.settledAt)}` },
+              { label: '退款时间', value: fmtTime(detail.refundedAt) },
               { label: '核对批次', value: <span className="font-mono text-xs">{detail.reviewBatchId || '—'}</span> },
               { label: '上游请求号', value: <span className="font-mono text-xs">{detail.providerRequestId || '—'}</span> },
             ]}

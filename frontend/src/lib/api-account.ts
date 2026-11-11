@@ -1,5 +1,5 @@
 import { request, toQuery, downloadCsv } from "./api";
-import type { AdminLegalDoc, AdminTicketAssignee, AdminTicketDetail, AdminTicketListResult, CreateTicketPayload, DeletionPreview, DeliveryChannelStatusMap, LegalDoc, LegalIndexItem, MessageTemplateItem, MyProfile, NotificationList, Ticket, TicketListResult, TicketStats } from "../types/api";
+import type { AdminTicketAssignee, AdminTicketDetail, AdminTicketListResult, CreateTicketPayload, DeletionPreview, DeliveryChannelStatusMap, MessageTemplateItem, MyProfile, NotificationList, Ticket, TicketListResult, TicketStats } from "../types/api";
 
 /**
  * 账户自助 (B4)。
@@ -37,17 +37,6 @@ export const meApi = {
     }),
 };
 
-/**
- * 法务文档（公开，免登录）。
- *
- * `current` 的数据可能为 null（后台从未发布过）—— 前端保留内置兜底文本，
- * 页面不能因为"没种数据"而白屏。
- */
-export const legalApi = {
-  index: () => request<LegalIndexItem[]>("/legal"),
-  current: (slug: string) => request<LegalDoc | null>(`/legal/${slug}`),
-};
-
 /** 站内消息 */
 export const notificationsApi = {
   list: (params: { unreadOnly?: boolean; limit?: number } = {}) =>
@@ -63,28 +52,6 @@ export const notificationsApi = {
     request<{ updated: number; unread: number }>("/notifications/read-all", {
       method: "POST",
     }),
-};
-
-/** 后台：法务文档版本管理 */
-export const adminLegalApi = {
-  versions: (slug?: string) =>
-    request<AdminLegalDoc[]>(
-      `/admin/legal${slug ? `?slug=${encodeURIComponent(slug)}` : ""}`,
-    ),
-
-  upsert: (data: {
-    slug: string;
-    version: string;
-    title: string;
-    content: string;
-    status?: "draft" | "published" | "archived";
-  }) => request<AdminLegalDoc>("/admin/legal", { method: "PUT", body: data }),
-
-  publish: (slug: string, version: string) =>
-    request<AdminLegalDoc>(
-      `/admin/legal/${encodeURIComponent(slug)}/${encodeURIComponent(version)}/publish`,
-      { method: "POST" },
-    ),
 };
 
 /** 后台：站内消息广播与模板 */

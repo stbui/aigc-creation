@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Upload } from 'lucide-react';
 import {
+  AdminPage,
   ActionButton,
   ExportCsvButton,
   useAdminExport,
@@ -10,7 +11,6 @@ import {
   ClearableField,
   FilterActions,
   FilterBar,
-  PageHeader,
   Panel,
   RefreshButton,
   StatCards,
@@ -157,12 +157,14 @@ export function AdminCreditsPage() {
       key: 'balance',
       title: '当前余额',
       width: 110,
+      align: 'right',
       render: (row) => <b className="tabular-nums">{row.balance}</b>,
     },
     {
       key: 'expiringSoon',
       title: '30 天内到期',
       width: 120,
+      align: 'right',
       render: (row) =>
         row.expiringSoon > 0 ? (
           <span className="tabular-nums text-warn-text">{row.expiringSoon}</span>
@@ -174,18 +176,21 @@ export function AdminCreditsPage() {
       key: 'totalEarned',
       title: '累计获得',
       width: 100,
+      align: 'right',
       render: (row) => <span className="tabular-nums">{row.totalEarned}</span>,
     },
     {
       key: 'totalConsumed',
       title: '累计消耗',
       width: 100,
+      align: 'right',
       render: (row) => <span className="tabular-nums">{row.totalConsumed}</span>,
     },
     {
       key: 'activeLots',
       title: '有效批次',
       width: 90,
+      align: 'right',
       render: (row) => <span className="tabular-nums">{row.activeLots}</span>,
     },
     {
@@ -200,7 +205,7 @@ export function AdminCreditsPage() {
       width: 80,
       fixed: 'right',
       render: (row) => (
-        <ActionButton variant="ghost" size="xs" onClick={() => setDetail(row)}>
+        <ActionButton variant="ghost" size="sm" onClick={() => setDetail(row)}>
           明细
         </ActionButton>
       ),
@@ -208,27 +213,26 @@ export function AdminCreditsPage() {
   ];
 
   return (
-    <>
-      <PageHeader
-        title="积分账本"
-        description="余额由批次推导，流水只追加不修改。人工调整会立即改变用户可用余额，并记录调整人、备注与变动。"
-        actions={
-          can('credit.adjust') ? (
-            <>
-              <ActionButton variant="secondary" icon={Upload} onClick={() => setBatchOpen(true)}>
-                批量调整
-              </ActionButton>
-              {/* CSV 导入走邮箱而非用户 ID: 运营手里的补偿名单通常是邮箱表, 不是 cuid */}
-              {/* 后端 /admin/credits/import 的权限点是 credit.adjust（导入会改余额，
-                  与人工调整同一套规则）。权限跟动作走：导入属于给钱，统一要求
-                  credit.adjust，不再使用无效的通用导入权限。 */}
-              <ActionButton variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>
-                导入 CSV
-              </ActionButton>
-            </>
-          ) : undefined
-        }
-      />
+    <AdminPage
+      title="积分账本"
+      description="余额由批次推导，流水只追加不修改。人工调整会立即改变用户可用余额，并记录调整人、备注与变动。"
+      actions={
+        can('credit.adjust') ? (
+          <>
+            <ActionButton variant="secondary" icon={Upload} onClick={() => setBatchOpen(true)}>
+              批量调整
+            </ActionButton>
+            {/* CSV 导入走邮箱而非用户 ID: 运营手里的补偿名单通常是邮箱表, 不是 cuid */}
+            {/* 后端 /admin/credits/import 的权限点是 credit.adjust（导入会改余额，
+                与人工调整同一套规则）。权限跟动作走：导入属于给钱，统一要求
+                credit.adjust，不再使用无效的通用导入权限。 */}
+            <ActionButton variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>
+              导入 CSV
+            </ActionButton>
+          </>
+        ) : undefined
+      }
+    >
 
       <StatCards
         columns={3}
@@ -349,6 +353,6 @@ export function AdminCreditsPage() {
           reload();
         }}
       />
-    </>
+    </AdminPage>
   );
 }

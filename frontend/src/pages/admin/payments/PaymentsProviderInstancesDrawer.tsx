@@ -280,12 +280,10 @@ export function PaymentsProviderInstancesDrawer({
   return (
     <Drawer
       open={open}
-      onOpenChange={(next) => {
-        if (!next) requestClose();
-      }}
+      onClose={requestClose}
       title={`${initialProvider.name} · 服务商实例`}
       description="同一渠道可配置多个独立实例，前台支付来源只会在当前来源内选择可用实例，不会跨来源回退。"
-      width={820}
+      size="lg"
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <span className="text-[12px] text-muted-foreground">

@@ -425,6 +425,12 @@
   display: block;
 }
 
+/* 商品主图页描述框: 默认 80px 只露出 3 行, 加高到 132px (5 行 22px + 内边距/边框),
+   与 rows=5 保持一致; 商品详情页仍用默认高度。 */
+.pk-desc-editor-tall textarea {
+  height: 132px;
+}
+
 .pk-desc-editor textarea:focus {
   border-color: var(--brand-light);
 }
@@ -474,54 +480,6 @@
   font-size: 14px;
   color: var(--text-muted);
   line-height: 13px;
-}
-
-.pk-number-control {
-  width: 120px;
-  height: 32px;
-  display: grid;
-  grid-template-columns: 32px 56px 32px;
-  align-items: center;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tag);
-  background: var(--card-bg);
-  overflow: hidden;
-}
-
-.pk-number-control button {
-  width: 32px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  background: var(--card-bg);
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0;
-}
-
-.pk-number-control button:hover {
-  background: var(--surface-soft);
-  color: var(--brand);
-}
-
-.pk-number-control input {
-  width: 56px;
-  height: 32px;
-  border: none;
-  outline: none;
-  text-align: center;
-  font-size: 14px;
-  font-family: inherit;
-  color: var(--text-strong);
-  background: var(--card-bg);
-  -moz-appearance: textfield;
-}
-
-.pk-number-control input::-webkit-outer-spin-button,
-  .pk-number-control input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 /* 高级设置 + 提交 */

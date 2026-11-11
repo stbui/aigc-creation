@@ -1,6 +1,6 @@
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
-import type { PaymentIntent, PaymentProviderInfo } from '../../types/payment';
+import type { PaymentProviderInfo } from '../../types/payment';
 
 /**
  * 支付方式卡。
@@ -9,14 +9,12 @@ import type { PaymentIntent, PaymentProviderInfo } from '../../types/payment';
  * 还是易支付由管理员选择，本组件不读取也不展示真实服务商身份。
  */
 export function CheckoutPaymentMethodCard({
-  onlineIntent,
   providers,
   selectedProviderId,
   onSelectProvider,
   providersLoading,
   providersError,
 }: {
-  onlineIntent: PaymentIntent | null;
   providers: PaymentProviderInfo[];
   selectedProviderId: string;
   onSelectProvider: (id: string) => void;
@@ -29,26 +27,27 @@ export function CheckoutPaymentMethodCard({
   return (
     <section className="co-card">
       <div className="co-card-head">
-        <h2>支付方式</h2>
+        <h2>
+          <span className="co-step">2</span>
+          支付方式
+        </h2>
       </div>
 
       {providersLoading && providers.length === 0 ? (
-        <div className="co-pay-option is-muted">
-          <span className="co-pay-icon">…</span>
-          <div className="co-pay-body">
-            <div className="co-pay-name">正在读取支付渠道…</div>
-          </div>
+        <div className="co-pay-empty">
+          <span className="co-pay-empty-icon" aria-hidden>…</span>
+          <p className="co-pay-empty-title">正在读取支付渠道…</p>
         </div>
       ) : providers.length === 0 ? (
-        <div className="co-pay-option is-muted">
-          <span className="co-pay-icon">!</span>
-          <div className="co-pay-body">
-            <div className="co-pay-name">
+        <div className="co-pay-empty is-warn">
+          <span className="co-pay-empty-icon" aria-hidden>!</span>
+          <div>
+            <p className="co-pay-empty-title">
               {providersError ? '支付方式加载失败' : '暂无可用支付方式'}
-            </div>
-            <div className="co-pay-desc">
+            </p>
+            <p className="co-pay-empty-desc">
               {providersError ?? '后台尚未选择可用支付来源，请联系管理员。'}
-            </div>
+            </p>
           </div>
         </div>
       ) : (
@@ -79,22 +78,6 @@ export function CheckoutPaymentMethodCard({
           })}
         </div>
       )}
-
-      <div className="co-notice">
-        <AlertTriangle size={14} aria-hidden />
-        <span>
-          {onlineIntent ? (
-            <>
-              <strong>支付结果以服务商为准。</strong>
-              请按收银台提示完成支付，到账后本页会自动刷新。
-            </>
-          ) : (
-            <>
-              支付来源由管理员配置；如按钮不可用，请联系管理员检查对应服务商。
-            </>
-          )}
-        </span>
-      </div>
     </section>
   );
 }

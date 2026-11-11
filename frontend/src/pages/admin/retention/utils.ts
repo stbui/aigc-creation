@@ -3,4 +3,4 @@
  */
 
 /** 时间展示（统一实现在 admin-ui/lib/format.ts） */
-export { formatDateTimeLoose as fmtTime } from '../../../admin-ui/primitives';
+export { formatDateTime as fmtTime } from '../../../admin-ui/primitives';

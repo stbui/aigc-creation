@@ -1,4 +1,4 @@
-import { EmptyState, Panel, StatusTag } from '~/admin-ui/primitives';
+import { formatDateTime, EmptyState, Panel, StatusTag } from '~/admin-ui/primitives';
 import { triggerLabel } from './utils';
 import type { AdminCleanupLog } from '../../../types/api';
 
@@ -23,7 +23,7 @@ export function BackupCleanupLog({ logs }: { logs: AdminCleanupLog[] }) {
                 {triggerLabel(log.trigger)}
               </span>
               <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
-                {new Date(log.createdAt).toLocaleString('zh-CN')}
+                {formatDateTime(log.createdAt)}
               </span>
             </li>
           ))}

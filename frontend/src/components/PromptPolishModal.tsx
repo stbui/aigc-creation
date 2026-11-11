@@ -7,7 +7,7 @@ import type { PromptToolResult } from '../types/api';
 import { useApp, Modal, Spin } from '../ui';
 
 /**
- * AI 润色弹窗 —— 1:1 复刻参考站 (ijihua.cn/free-creation) 的「AI润色」弹窗。
+ * AI 润色弹窗
  *
  * ## 参考站实拍结构 (2026-10-20 浏览器实测 + 截图)
  *

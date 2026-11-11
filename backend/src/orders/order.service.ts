@@ -752,6 +752,13 @@ export class OrderService {
     rawPayload?: string;
     /** 渠道侧下单单据 id（PayPal order id / Stripe Checkout Session id 等） */
     providerRef?: string | null;
+    /**
+     * 后台手工核销依据。
+     *
+     * 人工入账没有渠道报文，这段文字是财务事后唯一能解释「这单为什么是手工
+     * 入账」的凭据，落在 Payment.message 上随支付流水一起展示。
+     */
+    note?: string;
   }) {
     // 1) 交易号已存在 = 重复回调
     const dupPayment = await this.prisma.payment.findUnique({
@@ -840,6 +847,8 @@ export class OrderService {
       sandboxScenario: params.sandboxScenario ?? null,
       rawPayload: params.rawPayload ?? '',
       ...(params.providerRef ? { providerRef: params.providerRef } : {}),
+      // 手工核销依据: 只在有值时写入，避免把渠道已有的失败原因冲成 null
+      ...(params.note ? { message: params.note } : {}),
     };
 
     try {

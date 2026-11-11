@@ -9,6 +9,7 @@ import {
   IconButton,
   Panel,
   SelectField,
+  SkeletonBody,
 } from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
 import { formatRate, healthTone } from './utils';
@@ -201,7 +202,9 @@ export function ChannelListPanel({
          */}
         <div className="flex flex-col gap-0.5" aria-busy={loading}>
           {loading && rows.length === 0 && (
-            <p className="py-6 text-center text-xs text-muted-foreground">加载中…</p>
+            /* 一行「加载中…」只有 24px，数据到了左列长到 N×56px，整块版面跟着长；
+               换成 5 行占位条，至少把位置先占住 */
+            <SkeletonBody rows={5} />
           )}
           {!loading && !error && visible.length === 0 && (
             <EmptyState

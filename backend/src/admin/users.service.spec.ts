@@ -93,7 +93,6 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       oAuthIdentity: table(),
       userPluginState: table(),
       loginLog: table(),
-      consentRecord: table(),
       apiCallLog: table(),
     };
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FolderPlus, Pencil, Trash2 } from 'lucide-react';
 import {
+  formatDateTime,
   ActionButton,
   AdminDataTable,
   ClearableField,
@@ -141,7 +142,7 @@ export function ProjectsPanel({ onDataChanged }: { onDataChanged?: () => void })
       key: 'createdAt',
       title: '创建时间',
       width: 170,
-      render: (project) => new Date(project.createdAt).toLocaleString('zh-CN'),
+      render: (project) => formatDateTime(project.createdAt),
     },
     {
       key: 'ops',
@@ -189,7 +190,7 @@ export function ProjectsPanel({ onDataChanged }: { onDataChanged?: () => void })
       <FilterBar>
         <ClearableField
           className="w-64"
-          placeholder="项目名称关键词"
+          placeholder="项目名称"
           ariaLabel="按项目名称筛选"
           value={keyword}
           onChange={setKeyword}

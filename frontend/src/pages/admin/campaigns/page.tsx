@@ -4,22 +4,23 @@ import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
 import {
   ActionButton,
+  AdminPage,
   ConfirmDialog,
   ExportCsvButton,
   useAdminExport,
-  PageHeader,
+  Notice,
   Panel,
   RefreshButton,
   StaleError,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
-import { STATUS_LABEL, TYPE_LABEL, type FormState } from './constants';
+import { EFFECTIVE_META, TYPE_LABEL, type FormState } from './constants';
 import { buildCampaignPayload, emptyForm, toLocalInput } from './utils';
 import { CampaignFilterBar } from './CampaignFilterBar';
 import { CampaignTable } from './CampaignTable';
 import { CampaignFormDrawer } from './CampaignFormDrawer';
-import type { AdminCampaign, CampaignStatus } from '../../../types/api';
+import type { AdminCampaign } from '../../../types/api';
 
 /**
  * 限时活动（`/admin/campaigns`）。
@@ -40,15 +41,15 @@ export function AdminCampaignsPage() {
   // 深链/刷新后保留筛选。初始值同时喂给 useAdminList, 首次请求即带筛选。
   const [searchParams] = useSearchParams();
   const initialKeyword = searchParams.get('keyword') ?? '';
-  // 地址栏参数不可信: 只接受筛选下拉里真实存在的状态值
-  const rawStatus = searchParams.get('status');
-  const initialStatus = rawStatus && rawStatus in STATUS_LABEL ? rawStatus : undefined;
+  // 地址栏参数不可信: 只接受筛选下拉里真实存在的派生生效态
+  const rawEffective = searchParams.get('effective');
+  const initialEffective = rawEffective && rawEffective in EFFECTIVE_META ? rawEffective : undefined;
   const rawType = searchParams.get('type');
   const initialType = rawType && rawType in TYPE_LABEL ? rawType : undefined;
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [type, setType] = useState<string | undefined>(initialType);
-  const [status, setStatus] = useState<string | undefined>(initialStatus);
+  const [effective, setEffective] = useState<string | undefined>(initialEffective);
   const [busy, setBusy] = useState(false);
   const { exporting, runExport } = useAdminExport(toast);
   const [editing, setEditing] = useState<AdminCampaign | null>(null);
@@ -69,7 +70,7 @@ export function AdminCampaignsPage() {
         pageSize: params.pageSize as number,
         keyword: params.keyword as string | undefined,
         type: params.type as string | undefined,
-        status: params.status as string | undefined,
+        effective: params.effective as string | undefined,
       }),
     [],
   );
@@ -82,30 +83,30 @@ export function AdminCampaignsPage() {
   }>(fetcher, {
     keyword: initialKeyword || undefined,
     type: initialType,
-    status: initialStatus,
+    effective: initialEffective,
   });
 
   // 只同步已生效的筛选, 不同步分页
   useAdminUrlFilterSync({
     keyword: params.keyword as string | undefined,
     type: params.type as string | undefined,
-    status: params.status as string | undefined,
+    effective: params.effective as string | undefined,
   });
 
-  const hasFilter = Boolean(params.keyword || params.type || params.status);
+  const hasFilter = Boolean(params.keyword || params.type || params.effective);
   const rows = data?.items ?? [];
 
-  const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, type, status });
+  const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, type, effective });
   const resetFilters = () => {
     setKeyword('');
     setType(undefined);
-    setStatus(undefined);
-    setQuery({ keyword: undefined, type: undefined, status: undefined });
+    setEffective(undefined);
+    setQuery({ keyword: undefined, type: undefined, effective: undefined });
   };
 
   const appliedKeyword = (params.keyword as string | undefined) ?? '';
   const appliedType = params.type as string | undefined;
-  const appliedStatus = params.status as string | undefined;
+  const appliedEffective = params.effective as string | undefined;
   const appliedChips: AppliedFilter[] = [
     appliedKeyword
       ? {
@@ -127,13 +128,13 @@ export function AdminCampaignsPage() {
           },
         }
       : null,
-    appliedStatus
+    appliedEffective
       ? {
-          key: 'status',
-          label: `状态：${STATUS_LABEL[appliedStatus as CampaignStatus]?.label ?? appliedStatus}`,
+          key: 'effective',
+          label: `生效状态：${EFFECTIVE_META[appliedEffective as AdminCampaign['effective']]?.label ?? appliedEffective}`,
           onClear: () => {
-            setStatus(undefined);
-            setQuery({ status: undefined });
+            setEffective(undefined);
+            setQuery({ effective: undefined });
           },
         }
       : null,
@@ -146,7 +147,7 @@ export function AdminCampaignsPage() {
         marketingApi.exportCampaigns({
           keyword: params.keyword as string | undefined,
           type: params.type as string | undefined,
-          status: params.status as string | undefined,
+          effective: params.effective as string | undefined,
         }),
       '导出已开始下载',
     );
@@ -178,6 +179,8 @@ export function AdminCampaignsPage() {
       type: c.type,
       startAt: toLocalInput(c.startAt),
       endAt: toLocalInput(c.endAt),
+      startAtRaw: c.startAt,
+      endAtRaw: c.endAt,
       status: c.status,
       onlyNewUsers: !!c.audience?.onlyNewUsers,
       productId: p.productId ?? '',
@@ -221,10 +224,11 @@ export function AdminCampaignsPage() {
 
   /** 启停可随时再切回，按产品要求直接执行，不再弹窗确认 */
   const doToggle = async (row: AdminCampaign) => {
+    const goingLive = row.status !== 'active';
     setBusy(true);
     try {
       await marketingApi.toggleCampaign(row.id);
-      toast.success('状态已切换');
+      toast.success(goingLive ? '活动已上线' : '活动已下线');
       reload();
     } catch (e) {
       toast.error((e as Error).message);
@@ -233,10 +237,11 @@ export function AdminCampaignsPage() {
     }
   };
 
-  /** 有订单的活动不能物理删除；先给出下一步，不让运营点进注定失败的确认框。 */
+  /** 有订单或免费账单的活动不能物理删除；先给出下一步，不让运营点进注定失败的确认框。 */
   const requestDelete = (row: AdminCampaign) => {
-    if (row.orderCount > 0) {
-      toast.error(`该活动已有 ${row.orderCount} 笔关联订单，不能删除；请改为下线`);
+    const usageCount = row.orderCount + (row.billingCount ?? 0);
+    if (usageCount > 0) {
+      toast.error(`该活动已有 ${usageCount} 条关联记录，不能删除；请改为下线`);
       return;
     }
     setDeleting(row);
@@ -257,29 +262,41 @@ export function AdminCampaignsPage() {
     }
   };
 
+  /*
+   * 后端把 marketing.write 声明在 controller 类上，列表 GET 同样要求该权限。
+   * 没有它的账号连列表都拉不到，不能渲染一个写着「仅可查看」却 403 的表格。
+   * 是否拆出 marketing.read 让财务/只读角色可查看，属权限模型决策，未在本批改动。
+   */
+  if (!writable) {
+    return (
+      <AdminPage title="限时活动" description="限时价 / 限时免费 / 弹窗位。">
+        <Panel title="活动列表">
+          <Notice tone="warn" className="mb-0">
+            当前账号没有 marketing.write 权限，无法查看活动列表。如需只读访问，请联系管理员调整角色权限。
+          </Notice>
+        </Panel>
+      </AdminPage>
+    );
+  }
+
   return (
-    <>
-      <PageHeader
-        title="限时活动"
-        description="限时价 / 限时免费 / 弹窗位。状态为「进行中」但不在时间窗内，活动不会展示。"
-        actions={
-          writable ? (
-            <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
-              新建活动
-            </ActionButton>
-          ) : (
-            <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
-          )
-        }
-      />
+    <AdminPage
+      title="限时活动"
+      description="限时价 / 限时免费 / 弹窗位。状态为「进行中」但不在时间窗内，活动不会展示。"
+      actions={
+        <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
+          新建活动
+        </ActionButton>
+      }
+    >
 
       <CampaignFilterBar
         keyword={keyword}
         onKeywordChange={setKeyword}
         type={type}
         onTypeChange={setType}
-        status={status}
-        onStatusChange={setStatus}
+        effective={effective}
+        onEffectiveChange={setEffective}
         appliedChips={appliedChips}
         onApply={applyFilters}
         onReset={resetFilters}
@@ -287,7 +304,7 @@ export function AdminCampaignsPage() {
 
       <Panel
         title="活动列表"
-        note="列表状态为派生结果：时间窗、人工开关与上下线共同决定"
+        note="列表状态与筛选均为派生结果：人工状态优先，仅「进行中」按时间窗派生"
         extra={
           <>
             {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
@@ -360,7 +377,7 @@ export function AdminCampaignsPage() {
           deleting
             ? [
                 `活动类型：${TYPE_LABEL[deleting.type] ?? deleting.type}`,
-                '该活动没有关联订单，删除不影响任何历史交易',
+                '该活动没有关联订单或限时免费账单，删除不影响任何历史交易',
               ]
             : undefined
         }
@@ -370,6 +387,6 @@ export function AdminCampaignsPage() {
         onCancel={() => setDeleting(null)}
         onConfirm={() => void confirmDelete()}
       />
-    </>
+    </AdminPage>
   );
 }

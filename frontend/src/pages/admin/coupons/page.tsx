@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
 import {
   ActionButton,
+  AdminPage,
   ConfirmDialog,
   ExportCsvButton,
   useAdminExport,
@@ -11,7 +12,6 @@ import {
   ClearableField,
   FilterActions,
   FilterBar,
-  PageHeader,
   Panel,
   RefreshButton,
   SelectField,
@@ -263,21 +263,19 @@ export function AdminCouponsPage() {
   };
 
   return (
-    <>
-      <PageHeader
-        title="优惠券"
-        description="发放范围、使用条件、有效期与限用。有历史订单的券只能停用；从未产生订单的券可删除。"
-        actions={
-          writable ? (
-            <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
-              新建优惠券
-            </ActionButton>
-          ) : (
-            <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
-          )
-        }
-      />
-
+    <AdminPage
+      title="优惠券"
+      description="发放范围、使用条件、有效期与限用。有历史订单的券只能停用；从未产生订单的券可删除。"
+      actions={
+        writable ? (
+          <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
+            新建优惠券
+          </ActionButton>
+        ) : (
+          <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
+        )
+      }
+    >
       <FilterBar>
         <ClearableField
           className="w-56"
@@ -290,7 +288,6 @@ export function AdminCouponsPage() {
         <SelectField
           className="w-32"
           ariaLabel="按类型筛选"
-          placeholder="全部类型"
           clearLabel="全部类型"
           allowClear
           value={type}
@@ -300,13 +297,13 @@ export function AdminCouponsPage() {
         <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
-          placeholder="全部状态"
           clearLabel="全部状态"
           allowClear
           value={status}
           onChange={setStatus}
           options={STATUS_OPTIONS}
         />
+        {/* 动作按钮右对齐，与全站其余筛选栏一致；右侧留白是刻意的呼吸区 */}
         <FilterActions>
           <ActionButton variant="default" onClick={applyFilters}>
             查询
@@ -320,7 +317,6 @@ export function AdminCouponsPage() {
 
       <Panel
         title="券列表"
-        note="核销进度按发行总量计算，不限量券不显示进度"
         extra={
           <>
             {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
@@ -388,6 +384,6 @@ export function AdminCouponsPage() {
         onCancel={() => setDeleting(null)}
         onConfirm={() => void confirmDelete()}
       />
-    </>
+    </AdminPage>
   );
 }

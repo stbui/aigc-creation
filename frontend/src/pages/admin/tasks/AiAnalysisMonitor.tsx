@@ -15,7 +15,7 @@ import {
   StaleError,
   StatCards,
   StatusTag,
-  formatDateTimeLoose,
+  formatDateTime,
   formatDuration,
   type AdminColumn,
   type AppliedFilter,
@@ -42,7 +42,7 @@ const COLUMNS: Array<AdminColumn<ApiLogView>> = [
     width: 145,
     render: (row) => (
       <time className="whitespace-nowrap text-[12px] tabular-nums" dateTime={row.createdAt}>
-        {formatDateTimeLoose(row.createdAt)}
+        {formatDateTime(row.createdAt)}
       </time>
     ),
   },
@@ -104,6 +104,7 @@ const COLUMNS: Array<AdminColumn<ApiLogView>> = [
     key: 'duration',
     title: '耗时',
     width: 90,
+    align: 'right',
     render: (row) => (
       <span className="text-[12px] tabular-nums">{formatDuration(row.durationMs)}</span>
     ),
@@ -300,7 +301,6 @@ export function AiAnalysisMonitor() {
       <FilterBar>
         <SelectField
           ariaLabel="AI 分析状态"
-          placeholder="全部状态"
           clearLabel="全部状态"
           value={status}
           options={[

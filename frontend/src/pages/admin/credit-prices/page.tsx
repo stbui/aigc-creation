@@ -1,4 +1,4 @@
-import { PageHeader } from '~/admin-ui/primitives';
+import { AdminPage,} from '~/admin-ui/primitives';
 import { CapabilityPricingPanel } from '../logical-models/CapabilityPricingPanel';
 
 /**
@@ -10,12 +10,11 @@ import { CapabilityPricingPanel } from '../logical-models/CapabilityPricingPanel
  */
 export function AdminCreditPricesPage() {
   return (
-    <>
-      <PageHeader
-        title="能力消耗价"
-        description="每次生成实际扣除的积分；保存后立即对 C 端展示与生成扣费生效。"
-      />
+    <AdminPage
+      title="能力消耗价"
+      description="每次生成实际扣除的积分；保存后立即对 C 端展示与生成扣费生效。"
+    >
       <CapabilityPricingPanel />
-    </>
+    </AdminPage>
   );
 }

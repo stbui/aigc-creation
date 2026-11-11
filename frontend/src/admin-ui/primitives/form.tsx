@@ -349,22 +349,18 @@ export interface SelectFieldOption {
 
 /**
  * 下拉选择（radix `Select`）。`undefined` 表示未选中，由调用方决定是否给「全部」项。
+ * `allowClear` 渲染的「全部」项是一个真实存在的选项：radix 的受控值无法直接清空，
+ * 只能靠它回落到 `undefined`。
  *
- * `allowClear` 渲染一个「全部」项：radix Select 的受控值无法直接清空，
- * 只能靠一个真实存在的选项回落到 `undefined` —— 筛选条里「全部角色」就是
- * 这个位置。
- *
- * ## 未选中时显示占位文案，而不是「全部」这一项的文字
- *
- * 筛选条里并排三个下拉，全写「全部」就分不清哪个是状态、哪个是渠道；
- * 占位文案（「全部状态」「全部能力」）才是这一格的身份标签。选了具体值之后
- * 交给 radix 显示选项自己的文字。
+ * 未选中时触发器显示「全部状态」而不是「全部」：并排三个下拉全写「全部」就分不清
+ * 哪一格管什么，「全部状态」既是复位项文案也是这一格的身份标签。所以 `placeholder`
+ * 缺省取 `clearLabel` —— 两处各写一份，迟早写成「状态」对「全部状态」（现网出现过 5 处）。
  */
 export function SelectField({
   value,
   onChange,
   options,
-  placeholder = '请选择',
+  placeholder,
   clearLabel = '全部',
   allowClear = false,
   ariaLabel,
@@ -388,6 +384,8 @@ export function SelectField({
   className?: string;
 } & ControlAriaProps) {
   const ALL = '__all__';
+  /* 带清除的下拉：未选时的触发器文案就是清除项文案，缺省即取它 */
+  const placeholderText = placeholder ?? (allowClear ? clearLabel : '请选择');
   return (
     <Select
       value={value ?? (allowClear ? ALL : undefined)}
@@ -403,9 +401,9 @@ export function SelectField({
         aria-required={ariaRequired}
         className={cn('w-full bg-background', !value && 'text-muted-foreground', className)}
       >
-        <SelectValue placeholder={placeholder}>
+        <SelectValue placeholder={placeholderText}>
           {value === undefined ? (
-            <span className="text-muted-foreground">{placeholder}</span>
+            <span className="text-muted-foreground">{placeholderText}</span>
           ) : undefined}
         </SelectValue>
       </SelectTrigger>

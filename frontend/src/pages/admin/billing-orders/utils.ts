@@ -10,7 +10,8 @@ import { toCredits, toCreditsInput } from '../../../lib/microcredits';
 export { toCredits, toCreditsInput };
 
 /** 时间展示（统一实现在 admin-ui/lib/format.ts） */
-export { formatDateTimeLoose as formatTime } from '../../../admin-ui/primitives';
+/** 后台统一的时间展示；空值显示破折号 */
+export { formatDateTime as fmtTime } from '../../../admin-ui/primitives';
 
 /** 跨模块深链（用户 / 任务 / 渠道调用记录） */
 export { adminModelCallsHref, adminTaskHref, adminUserDetailHref } from '../../../lib/admin-links';

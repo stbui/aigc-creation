@@ -1,4 +1,4 @@
-import { VARIANT_LABELS } from './constants';
+import { VARIANT_FIELDS, VARIANT_LABELS } from './constants';
 import { assetsApi, assetSrc, type Asset } from './api';
 import type { GalleryItem, UploadedImage } from './hooks';
 import { modelImageInputLimit, type PublicLogicalModel } from '../../lib/models';
@@ -38,6 +38,26 @@ export function imageInputCountError(
   const max = modelImageInputLimit(model);
   if (max === null || imageCount <= max) return null;
   return `所选模型「${model.name}」最多支持 ${max} 张商品图，请移除 ${imageCount - max} 张或切换模型`;
+}
+
+/* ------------------------------------------------------------------------- */
+/* 提交计划                                                                 */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * 自定义配置计数 → 本次要创建的变体清单。
+ *
+ * 一类变体填 3 就重复出现 3 次（每张独立建任务、各扣一份单价），顺序与
+ * `VARIANT_FIELDS` 一致。页签角标与价签的「本次张数」都按这份清单的长度计，
+ * 与 `page.tsx` 实际提交的任务数同源。
+ */
+export function buildVariantPlan(counts: Record<string, number>): string[] {
+  const plan: string[] = [];
+  for (const field of VARIANT_FIELDS) {
+    const count = counts[field.key] ?? 0;
+    for (let i = 0; i < count; i += 1) plan.push(field.key);
+  }
+  return plan;
 }
 
 /* ------------------------------------------------------------------------- */

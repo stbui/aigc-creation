@@ -6,9 +6,6 @@
 
 /* ═══════════════════════════════════════════════════════════════════
    素材库导入选择器 (asset-library-picker)
-   ───────────────────────────────────────────────────────────────────
-   数值全部抄自参考站线上样式表 index-glaqVozH.css 的
-   .asset-library-picker-* 规则 (2026-10-20 取证)。
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ⚠️ **必须是紧邻合并选择器 `.alp-modal.ant-modal-container`, 不能写成后代形式。**
@@ -439,6 +436,21 @@
   flex-direction: column;
   min-width: 0;
   padding: 0;
+  /*
+   * ⚠️ 必须显式 `height: auto`。
+   *
+   * 卡片是 shadcn `Button`（类名里带 `h-9` = 36px），而 `ui-compat.css` 的
+   * `.ui-btn` 基线也是 `height: 36px`。本卡片的高度应当由内部
+   * `.alp-cover { aspect-ratio: 1 }` 决定，自身不写 height —— 于是高度被基线
+   * 钉在 36px，封面盒只能压成「宽 128 × 高 36」的横条，图片随之被压扁。
+   *
+   * 这条规则原只写在 `pages/library/style.css` 的 `.alp-card.ui-btn` 里，
+   * 而那是 `/library` 路由的懒加载样式 —— 从**工具页**（商品 SKU 等）打开
+   * 同一个弹窗时该文件未加载，压扁照旧。故就近收进组件样式，对所有调用方生效。
+   * 未分层规则优先于 `@layer utilities` 的 `h-9` 与 `@layer components` 的
+   * `.ui-btn`，不依赖源码顺序。@2026-11-11
+   */
+  height: auto;
   text-align: left;
   color: var(--alp-text-3);
   background: var(--card-bg);

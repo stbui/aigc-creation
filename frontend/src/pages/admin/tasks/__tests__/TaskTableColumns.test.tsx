@@ -43,18 +43,23 @@ function renderOps(
 }
 
 describe('任务表格操作列', () => {
-  it('失败任务只显示详情、重试、删除，并把动作交给确认流程', async () => {
+  it('失败任务直显详情与重试，删除收进「更多」并交给确认流程', async () => {
     const user = userEvent.setup();
     const onAction = vi.fn();
     renderOps(BASE_TASK, () => true, onAction);
 
     expect(screen.getByRole('button', { name: '详情' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '删除' })).toBeInTheDocument();
+    // 操作列只直显两个动作：删除是不可撤销的，收进菜单
+    expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '终止' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '重试' }));
     expect(onAction).toHaveBeenCalledWith('retry', BASE_TASK);
+
+    await user.click(screen.getByRole('button', { name: /更多操作/ }));
+    await user.click(await screen.findByRole('menuitem', { name: '删除任务' }, { timeout: 3000 }));
+    expect(onAction).toHaveBeenCalledWith('delete', BASE_TASK);
   });
 
   it('运行中任务按权限显示终止，不显示重试或删除', () => {

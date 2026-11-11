@@ -12,7 +12,7 @@ import {
   SelectField,
   StaleError,
   StatusTag,
-  formatShanghaiDateTime,
+  formatDateTime,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import {
@@ -259,7 +259,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       width: 150,
       render: (row) => (
         <span className="text-[12px] text-muted-foreground tabular-nums">
-          {formatShanghaiDateTime(row.completedAt)}
+          {formatDateTime(row.completedAt)}
         </span>
       ),
     },

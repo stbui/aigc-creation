@@ -3,12 +3,11 @@ import { Link } from 'react-router-dom';
 import { RefreshCw, Upload } from 'lucide-react';
 import { adminPluginsApi, adminProviderCatalogApi } from './api';
 import {
+  AdminPage,
   ActionButton,
   Button,
   Notice,
-  PageHeader,
   Panel,
-  SkeletonBody,
   StaleError,
 } from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast } from './hooks';
@@ -168,52 +167,51 @@ export function AdminPluginsPage() {
   };
 
   return (
-    <>
-      <PageHeader
-        title="插件"
-        description="插件的启停会立即重注册协议；渠道模型可选的协议列表就是注册表的投影。"
-        actions={
-          <>
-            {can('channel.read') && (
-              <Button asChild variant="outline" size="sm">
-                <Link to="/admin/channels">模型商品</Link>
-              </Button>
-            )}
-            {(can('capability.read') || can('logical_model.read')) && (
-              <Button asChild variant="outline" size="sm">
-                <Link to="/admin/capabilities">能力与模型</Link>
-              </Button>
-            )}
-            {/*
-              文件选择框隐藏在外壳后面：上传动作必须由按钮触发，否则页头会出现
-              一个突兀的浏览器控件。`data-testid` 是安装流程的 e2e 锚点。
-            */}
-            <input
-              ref={fileInput}
-              type="file"
-              accept=".zip,application/zip"
-              className="hidden"
-              data-testid="admin-plugin-file"
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null;
-                // 同一文件连续选择两次时清空，否则第二次不会触发 change
-                event.target.value = '';
-                if (!file) return;
-                setInstallTarget(file);
-              }}
-            />
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={Upload}
-              disabled={!writable}
-              onClick={() => fileInput.current?.click()}
-            >
-              上传安装
-            </ActionButton>
-          </>
-        }
-      />
+    <AdminPage
+      title="插件"
+      description="插件的启停会立即重注册协议；渠道模型可选的协议列表就是注册表的投影。"
+      actions={
+        <>
+          {can('channel.read') && (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin/channels">模型商品</Link>
+            </Button>
+          )}
+          {(can('capability.read') || can('logical_model.read')) && (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin/capabilities">能力与模型</Link>
+            </Button>
+          )}
+          {/*
+            文件选择框隐藏在外壳后面：上传动作必须由按钮触发，否则页头会出现
+            一个突兀的浏览器控件。`data-testid` 是安装流程的 e2e 锚点。
+          */}
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".zip,application/zip"
+            className="hidden"
+            data-testid="admin-plugin-file"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              // 同一文件连续选择两次时清空，否则第二次不会触发 change
+              event.target.value = '';
+              if (!file) return;
+              setInstallTarget(file);
+            }}
+          />
+          <ActionButton
+            variant="secondary"
+            size="sm"
+            icon={Upload}
+            disabled={!writable}
+            onClick={() => fileInput.current?.click()}
+          >
+            上传安装
+          </ActionButton>
+        </>
+      }
+    >
 
       <PluginStats summary={summary} unavailableCount={unavailableCount} />
 
@@ -221,30 +219,28 @@ export function AdminPluginsPage() {
         title="插件清单"
         note="停用只影响新建调用的协议解析：引用该协议的渠道模型会在调用时失败并退款。"
       >
-        {loading && items.length === 0 ? (
-          /* 面板外壳已经是实的，只替内容行 */
-          <SkeletonBody rows={4} />
-        ) : (
-          <>
-            {error && <StaleError error={error} onRetry={() => void reload()} />}
-            <PluginTable
-              items={items}
-              loading={loading}
-              error={error}
-              writable={writable}
-              busy={busy}
-              onDetail={setDetail}
-              onVerify={(row) => void runVerify(row)}
-              onToggle={(row) => {
-                setToggleTarget(row);
-              }}
-              onUninstall={(row) => {
-                setUninstallTarget(row);
-              }}
-              onRetry={() => void reload()}
-            />
-          </>
-        )}
+        {/*
+         * 首次加载不在面板这一层画骨架 —— 表格自带 `TableSkeleton`，它按
+         * `columns` 的 width / align 排真实列宽，切换时不会横向重排；面板级
+         * 的等宽灰条既没有列宽也没有行高，反而多一套形态。
+         */}
+        {error && items.length > 0 && <StaleError error={error} onRetry={() => void reload()} />}
+        <PluginTable
+          items={items}
+          loading={loading}
+          error={error}
+          writable={writable}
+          busy={busy}
+          onDetail={setDetail}
+          onVerify={(row) => void runVerify(row)}
+          onToggle={(row) => {
+            setToggleTarget(row);
+          }}
+          onUninstall={(row) => {
+            setUninstallTarget(row);
+          }}
+          onRetry={() => void reload()}
+        />
       </Panel>
 
       <Panel
@@ -308,6 +304,6 @@ export function AdminPluginsPage() {
         onCancel={() => setUninstallTarget(null)}
         onConfirm={() => void runUninstall()}
       />
-    </>
+    </AdminPage>
   );
 }

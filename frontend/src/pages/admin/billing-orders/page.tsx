@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminBillingOrdersApi } from './api';
 import {
+  AdminPage,
   ActionButton,
   ContextBanner,
-  PageHeader,
   Panel,
   SavedViewBar,
   StaleError,
@@ -305,11 +305,10 @@ export function AdminBillingOrdersPage() {
   ].filter(Boolean) as AppliedFilter[];
 
   return (
-    <>
-      <PageHeader
-        title="生成账单"
-        description="一次任务一条账单。人工核对只做结算或全额退款，金额口径完全由计费服务决定。"
-      />
+    <AdminPage
+      title="生成账单"
+      description="一次任务一条账单。人工核对只做结算或全额退款，金额口径完全由计费服务决定。"
+    >
 
       {(actionContext.from || done) && (
         <ContextBanner
@@ -449,6 +448,6 @@ export function AdminBillingOrdersPage() {
         onClose={requestCloseDetail}
         onResolve={() => void runResolve()}
       />
-    </>
+    </AdminPage>
   );
 }

@@ -166,11 +166,9 @@ export function CsvImportDrawer({
   return (
     <Drawer
       title="导入积分（CSV）"
-      width={680}
+      size="lg"
       open={open}
-      onOpenChange={(next) => {
-        if (!next) requestClose();
-      }}
+      onClose={requestClose}
       footer={
         <>
           <ActionButton variant="secondary" onClick={requestClose} disabled={busy}>

@@ -73,7 +73,7 @@ export function UserFilters({
 }: UserFiltersProps) {
   return (
     <>
-      <FilterBar className="mb-2">
+      <FilterBar>
         <ClearableField
           className="w-full sm:w-64"
           ariaLabel="按关键词搜索用户"
@@ -85,7 +85,6 @@ export function UserFilters({
         <SelectField
           className="min-w-0 flex-1 sm:w-32 sm:flex-none"
           ariaLabel="按角色筛选"
-          placeholder="角色"
           allowClear
           clearLabel="全部角色"
           value={role}
@@ -98,7 +97,6 @@ export function UserFilters({
         <SelectField
           className="min-w-0 flex-1 sm:w-32 sm:flex-none"
           ariaLabel="按状态筛选"
-          placeholder="状态"
           allowClear
           clearLabel="全部状态"
           value={status}
@@ -111,7 +109,6 @@ export function UserFilters({
         <SelectField
           className="min-w-0 flex-1 sm:w-32 sm:flex-none"
           ariaLabel="按运营分群筛选"
-          placeholder="分群"
           allowClear
           clearLabel="全部分群"
           value={segment}
@@ -124,7 +121,6 @@ export function UserFilters({
         <SelectField
           className="min-w-0 flex-1 sm:w-32 sm:flex-none"
           ariaLabel="按会员状态筛选"
-          placeholder="会员"
           allowClear
           clearLabel="全部会员"
           value={membership}
@@ -143,7 +139,8 @@ export function UserFilters({
           to={to}
           onChange={onDateRangeChange}
         />
-        <FilterActions className="basis-full justify-end sm:basis-auto">
+        {/* 动作按钮一律右对齐：与其余 30 处筛选栏同一横向位置，换行时也贴右端 */}
+        <FilterActions>
           <ActionButton variant="default" onClick={onApply}>
             查询
           </ActionButton>

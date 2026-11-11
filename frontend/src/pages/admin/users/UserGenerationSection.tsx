@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { DetailSection, EmptyState } from '~/admin-ui/primitives';
+import { DetailSection, EmptyState, MiniStat } from '~/admin-ui/primitives';
 import { cn } from '~/admin-ui/lib/cn';
 import type { AdminUserGeneration } from '../../../types/admin-users';
 import { adminTasksHref } from './utils';
@@ -10,34 +10,6 @@ const MODALITY_LABEL: Record<string, string> = {
   text: '文本',
   audio: '音频',
 };
-
-function GenMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: 'success' | 'danger' | 'muted';
-}) {
-  return (
-    <div className="min-w-0 px-4 py-3 first:pl-0 last:pr-0">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd
-        className={cn(
-          'mt-1 text-lg leading-6 font-semibold tabular-nums',
-          tone === 'success'
-            ? 'text-success-text'
-            : tone === 'danger'
-              ? 'text-danger-text'
-              : 'text-foreground',
-        )}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
 
 function successRateClass(rate: number | null): string {
   if (rate === null) return 'text-muted-foreground';
@@ -67,18 +39,18 @@ export function UserGenerationSection({
       <DetailSection title="生成" note={`近 30 天 ${generation.last30d.total} 次`}>
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <dl className="grid grid-cols-4 divide-x divide-border/70 px-4">
-            <GenMetric label="任务总数" value={String(generation.total)} />
-            <GenMetric
+            <MiniStat label="任务总数" value={String(generation.total)} />
+            <MiniStat
               label="成功"
               value={String(generation.succeeded)}
               tone="success"
             />
-            <GenMetric
+            <MiniStat
               label="失败"
               value={String(generation.failed)}
               tone={generation.failed > 0 ? 'danger' : 'muted'}
             />
-            <GenMetric
+            <MiniStat
               label="成功率"
               value={
                 generation.successRate === null

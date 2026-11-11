@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Copy, ExternalLink, ImageOff } from 'lucide-react';
 import {
+  formatDateTime,
   ActionButton,
   AdminModal,
   Descriptions,
@@ -81,7 +82,7 @@ export function TaskDetailModal({
       open={detailId !== null}
       title="任务详情"
       description="按同一任务 ID 串联提交、线路派发、模型调用与账单终态。"
-      width={1120}
+      size="xl"
       onClose={onClose}
       fetcher={detailFetcher}
       footer={(d) => {
@@ -137,8 +138,8 @@ export function TaskDetailModal({
     >
       {(d) => {
         const errorLabel = d.errorCode ? taskErrorLabel(d.errorCode) : null;
-        const createdAt = new Date(d.createdAt).toLocaleString('zh-CN');
-        const updatedAt = new Date(d.updatedAt).toLocaleString('zh-CN');
+        const createdAt = formatDateTime(d.createdAt);
+        const updatedAt = formatDateTime(d.updatedAt);
         const paramsJson = JSON.stringify(d.params, null, 2) ?? '{}';
         const paramCount = Object.keys(d.params).length;
 
@@ -312,7 +313,7 @@ export function TaskDetailModal({
                           : 'active'
                       : 'done',
                   description: n.at
-                    ? new Date(n.at).toLocaleString('zh-CN')
+                    ? formatDateTime(n.at)
                     : n.done
                       ? '未记录具体时间'
                       : d.status === 'queued'

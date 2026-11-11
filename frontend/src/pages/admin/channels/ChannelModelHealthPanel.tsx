@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
-import { AdminDataTable, HelpTip, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
+import {
+  formatDateTime,
+  AdminDataTable,
+  HelpTip,
+  StatusTag,
+  type AdminColumn,
+} from '~/admin-ui/primitives';
 import type { ChannelModelHealthRowView } from '../../../types/model';
 
 /**
@@ -62,7 +68,7 @@ export function ChannelModelHealthPanel({
                 </HelpTip>
               )}
               {row.coolingUntil && (
-                <HelpTip tip={`冷却到 ${new Date(row.coolingUntil).toLocaleString('zh-CN')}`}>
+                <HelpTip tip={`冷却到 ${formatDateTime(row.coolingUntil)}`}>
                   <StatusTag status="cooling" tone="warn" label="暂时不可用" />
                 </HelpTip>
               )}
@@ -139,7 +145,7 @@ export function ChannelModelHealthPanel({
             <div className="min-w-0">
               <div className="truncate text-[12px] text-muted-foreground">
                 {sample.status === 'success' ? '成功' : '失败'} · {formatDuration(sample.durationMs)} ·{' '}
-                {new Date(sample.at).toLocaleString('zh-CN')}
+                {formatDateTime(sample.at)}
               </div>
               {row.lastErrorCode && (
                 <HelpTip tip={row.recent.find((item) => item.error)?.error || row.lastErrorCode}>

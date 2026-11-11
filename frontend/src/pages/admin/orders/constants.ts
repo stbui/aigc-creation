@@ -69,6 +69,20 @@ export const REFUND_STATE_TONES: Record<string, TagTone> = {
   succeeded: 'success',
 };
 
+/**
+ * 支付流水状态 → 中文（2026-11-11）。
+ *
+ * 详情里的流水原先只用圆点颜色区分成功/未成功 —— 颜色是唯一的编码，
+ * 读屏和色弱用户拿不到信息，也说不清一条 `ZPay · ¥27.30` 到底是成功、
+ * 失败还是已关闭。状态必须有一份文字。
+ */
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: '待支付',
+  succeeded: '支付成功',
+  failed: '支付失败',
+  closed: '已关闭',
+};
+
 /** 退款状态筛选项。值必须与后端 `REFUND_STATES` 白名单一致 */
 export const REFUND_STATE_OPTIONS = [
   { value: 'processing', label: '渠道处理中' },

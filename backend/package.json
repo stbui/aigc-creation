@@ -34,7 +34,6 @@
     "seed:marketing": "ts-node -T scripts/seed-marketing.ts",
     "smoke:marketing": "node scripts/smoke-marketing.js",
     "smoke:payments": "node scripts/smoke-payments.js",
-    "seed:legal": "ts-node -T scripts/seed-legal.ts",
     "seed:messages": "ts-node -T scripts/seed-message-templates.ts",
     "seed:templates": "ts-node -T scripts/seed-template-catalog.ts",
     "import:templates": "ts-node -T scripts/import-portrait-templates.ts",

@@ -42,7 +42,7 @@ export function TempPasswordDialog({
       }}
       title="临时密码已生成"
       description="请立即复制并安全转交给用户，关闭后无法再次查看。"
-      width={440}
+      size="sm"
       footer={<ActionButton onClick={onClose}>我已保存</ActionButton>}
     >
       <div className="flex flex-col gap-2">

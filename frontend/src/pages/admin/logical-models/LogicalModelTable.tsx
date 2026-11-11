@@ -1,5 +1,4 @@
-import { Archive, FlaskConical } from 'lucide-react';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
+import { ActionButton, AdminDataTable, RowMenu, StatusTag, type AdminColumn, type RowMenuItem } from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS, PRICE_POLICY_LABELS } from './constants';
 import type { AdminLogicalModelView } from '../../../types/model';
 
@@ -126,37 +125,40 @@ export function LogicalModelTable({
     {
       key: 'ops',
       title: '操作',
-      width: 200,
+      width: 150,
       fixed: 'right',
-      render: (row) => (
-        <div className="flex items-center gap-1">
-          <ActionButton
-            variant="ghost"
-            size="xs"
-            disabled={!writable || !!row.archivedAt}
-            onClick={() => onEdit(row)}
-          >
-            编辑
-          </ActionButton>
-          <ActionButton
-            variant="ghost"
-            size="xs"
-            icon={FlaskConical}
-            onClick={() => onSimulate(row)}
-          >
-            测试消费
-          </ActionButton>
-          <ActionButton
-            variant="ghost"
-            size="xs"
-            icon={Archive}
-            disabled={!writable || !!row.archivedAt}
-            onClick={() => onArchive(row)}
-          >
-            移除售卖
-          </ActionButton>
-        </div>
-      ),
+      render: (row) => {
+        /*
+         * 直显只有「编辑」。测试消费与移除售卖都是低频动作：前者是配价时的
+         * 一次性验证，后者是下架前才点，平铺三颗会让操作列比正文还抢眼。
+         */
+        const moreItems: RowMenuItem[] = [
+          { key: 'simulate', label: '测试消费', onSelect: () => onSimulate(row) },
+        ];
+        if (!row.archivedAt) {
+          moreItems.push({
+            key: 'archive',
+            label: '移除售卖',
+            danger: true,
+            separator: true,
+            disabled: !writable,
+            onSelect: () => onArchive(row),
+          });
+        }
+        return (
+          <div className="flex items-center gap-1">
+            <ActionButton
+              variant="ghost"
+              size="sm"
+              disabled={!writable || !!row.archivedAt}
+              onClick={() => onEdit(row)}
+            >
+              编辑
+            </ActionButton>
+            <RowMenu label={`售卖单元 ${row.name} 更多操作`} items={moreItems} />
+          </div>
+        );
+      },
     },
   ];
 

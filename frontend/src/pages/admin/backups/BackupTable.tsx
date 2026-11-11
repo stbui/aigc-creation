@@ -1,10 +1,13 @@
 import { useMemo } from 'react';
 import {
+  formatDateTime,
   ActionButton,
   AdminDataTable,
   Descriptions,
+  RowMenu,
   StatusTag,
   type AdminColumn,
+  type RowMenuItem,
 } from '~/admin-ui/primitives';
 import { backupStatusLabel, formatBytes, formatRelative, triggerLabel } from './utils';
 import type { AdminBackup } from '../../../types/api';
@@ -89,7 +92,7 @@ export function BackupTable({
         render: (row) => (
           <span
             className="text-xs text-muted-foreground"
-            title={new Date(row.createdAt).toLocaleString('zh-CN')}
+            title={formatDateTime(row.createdAt)}
           >
             {formatRelative(row.createdAt)}
           </span>
@@ -98,53 +101,65 @@ export function BackupTable({
       {
         key: 'actions',
         title: '',
-        width: 230,
+        width: 180,
         fixed: 'right',
-        render: (row) => (
-          <div className="flex items-center gap-1">
-            <ActionButton
-              variant="ghost"
-              size="xs"
-              onClick={() =>
-                onExpandedChange(
-                  expanded.includes(row.id)
-                    ? expanded.filter((key) => key !== row.id)
-                    : [row.id],
-                )
-              }
-            >
-              {expanded.includes(row.id) ? '收起' : '详情'}
-            </ActionButton>
-            {canRun && row.status === 'succeeded' && (
-              <ActionButton variant="ghost" size="xs" onClick={() => onVerify(row)} disabled={busy}>
-                验证
-              </ActionButton>
-            )}
-            {row.verified ? (
-              <ActionButton variant="ghost" size="xs" onClick={() => onDownload(row)}>
-                下载
-              </ActionButton>
-            ) : (
-              /* B-97: 无验证记录的备份视为无效, 不给下载入口 */
-              <span
-                className="cursor-not-allowed text-[12px] text-muted-foreground"
-                title="未通过恢复验证的备份不可下载"
-              >
-                下载
-              </span>
-            )}
-            {canRun && (
+        render: (row) => {
+          /*
+           * 直显只留「详情 / 下载」：验证与删除都是低频动作（验证在生成后一次，
+           * 删除要过二次确认），四颗按钮平铺会把这一列撑到 230px，右侧固定列
+           * 抢走正文宽度。
+           */
+          const moreItems: RowMenuItem[] = [];
+          if (canRun && row.status === 'succeeded') {
+            moreItems.push({
+              key: 'verify',
+              label: '验证可恢复性',
+              disabled: busy,
+              onSelect: () => onVerify(row),
+            });
+          }
+          if (canRun) {
+            moreItems.push({
+              key: 'delete',
+              label: '删除备份',
+              danger: true,
+              separator: moreItems.length > 0,
+              disabled: busy,
+              onSelect: () => onDelete(row),
+            });
+          }
+          return (
+            <div className="flex items-center gap-1">
               <ActionButton
-                variant="destructive"
-                size="xs"
-                onClick={() => onDelete(row)}
-                disabled={busy}
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  onExpandedChange(
+                    expanded.includes(row.id)
+                      ? expanded.filter((key) => key !== row.id)
+                      : [row.id],
+                  )
+                }
               >
-                删除
+                {expanded.includes(row.id) ? '收起' : '详情'}
               </ActionButton>
-            )}
-          </div>
-        ),
+              {row.verified ? (
+                <ActionButton variant="ghost" size="sm" onClick={() => onDownload(row)}>
+                  下载
+                </ActionButton>
+              ) : (
+                /* B-97: 无验证记录的备份视为无效, 不给下载入口 */
+                <span
+                  className="cursor-not-allowed text-[12px] text-muted-foreground"
+                  title="未通过恢复验证的备份不可下载"
+                >
+                  下载
+                </span>
+              )}
+              <RowMenu label={`备份 ${row.id} 更多操作`} items={moreItems} />
+            </div>
+          );
+        },
       },
     ],
     [expanded, onExpandedChange, canRun, busy, onVerify, onDownload, onDelete],
@@ -174,7 +189,7 @@ export function BackupTable({
             },
             {
               label: '验证时间',
-              value: row.verifiedAt ? new Date(row.verifiedAt).toLocaleString('zh-CN') : '未验证',
+              value: row.verifiedAt ? formatDateTime(row.verifiedAt) : '未验证',
             },
             ...(row.verifyReport ? [{ label: '验证报告', value: row.verifyReport }] : []),
             ...(row.verifyWarnings

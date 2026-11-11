@@ -11,38 +11,9 @@ import { useApp, Button, Input, Modal } from '../ui';
 /**
  * 素材库导入选择器
  *
- * ## 参考站形态 (CSS 实测)
- *
- *   backdrop   inset 0, blur(3px), 背景 #1c1e2d75, grid 居中
- *   dialog     min(1180px, 100vw - 40px), 圆角 20, 白底, 阴影 0 24px 80px #282b4c33
- *              max-height min(760px, 100vh - 40px), 纵向 flex
- *   header     padding 22px 26px 18px, 下边框 #eef0f5
- *              h2 22px/30 #171a2b
- *              close 34x34 圆形, 底 #f3f4f7, 悬浮 #e9eaf0
- *   toolbar    底 #fbfcfe, padding 14px 26px, gap 16
- *              groups 横向滚动胶囊 (h34, 圆角 9, 边框 #e4e7ef, 选中 #f1efff/#5546d8)
- *              search  250x34, 圆角 9, 边框 #e2e5ed
- *   layout     flex: 1
- *   sidebar    宽 184, 底 #f7f8fd, 右边框 #eef0f5, padding 18px 12px 20px
- *              nav button 13px, 圆角 10, 选中 白底+紫字+阴影
- *   content    padding 20px 26px 24px, 最小高 280, 纵向滚动
- *   grid       repeat(auto-fill, minmax(128px, 1fr)), gap 14
- *   card       纯图片瓦片, 圆角 12, 边框 #e3e6ee, 悬浮上浮 2px + 阴影
- *              选中 2px #5546d8 + 外发光; 右上角勾选圆标 24x24
- *   footer     padding 14px 26px 18px, 上边框 #eef0f5, 12px #8d95a8
- *              cancel 描边 / confirm 品牌紫实心, 36 高, 圆角 9
- *
- * ## 与参考站的**刻意**差异
- *
- * 参考站侧栏的「素材分组」是**用户自建分组** (需 asset_group 表), 本项目素材库
- * 没有这个数据模型。侧栏改为两个真实维度: 来源 (全部 / 原始图片 / 生成图片)
- * 与用途 (由素材的 capability 字段动态聚合)。不臆造分组表, 也不放点不动的假入口。
- *
  * ## 交互
  *
- *   多选 (参考站 maxSelectable 语义) → 底部显示「已选 N / 最多选择 M 张」
- *   → 「确定」一次性回填多张; 「取消」丢弃选择; 「清除选择」清空当前勾选
- *   超过上限时禁止继续勾选并如实提示 (不静默截断)
+ * 多选 → 底部显示「已选 N / 最多选择 M 张」 → 「确定」一次性回填多张; 「取消」丢弃选择; 「清除选择」清空当前勾选超过上限时禁止继续勾选并如实提示 (不静默截断)
  */
 
 export interface AssetLibraryModalProps {
@@ -282,8 +253,6 @@ export function AssetLibraryModal({
       closeIcon={null}
       styles={{
         body: { padding: 0 },
-        // 参考站 backdrop: 背景 #1c1e2d75 + blur(3px)。antd 默认遮罩是 45% 纯黑,
-        // 既更深又没有毛玻璃 —— 一眼能看出是两个站点的弹层。
         mask: { background: 'var(--overlay-mask-strong)', backdropFilter: 'blur(3px)' },
       }}
       /*

@@ -3,12 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { DatabaseBackup, Trash2 } from 'lucide-react';
 import { adminBackupsApi, adminRetentionApi } from './api';
 import {
+  AdminPage,
   ActionButton,
   EmptyState,
   FilterActions,
   FilterBar,
   ListError,
-  PageHeader,
   PageSkeleton,
   Panel,
   SelectField,
@@ -193,35 +193,34 @@ export function AdminBackupPage() {
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
 
   return (
-    <>
-      <PageHeader
-        title="数据备份"
-        description="数据库定期全量备份 · 每份备份须通过恢复验证后才可下载"
-        actions={
-          can('backup.run') ? (
-            <>
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                icon={Trash2}
-                onClick={() => setPruneOpen(true)}
-                disabled={busy || rows.length === 0}
-              >
-                保留份数清理
-              </ActionButton>
-              <ActionButton
-                variant="default"
-                size="sm"
-                icon={DatabaseBackup}
-                onClick={() => setRunOpen(true)}
-                disabled={busy}
-              >
-                {busy ? '执行中…' : '立即备份'}
-              </ActionButton>
-            </>
-          ) : undefined
-        }
-      />
+    <AdminPage
+      title="数据备份"
+      description="数据库定期全量备份 · 每份备份须通过恢复验证后才可下载"
+      actions={
+        can('backup.run') ? (
+          <>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              icon={Trash2}
+              onClick={() => setPruneOpen(true)}
+              disabled={busy || rows.length === 0}
+            >
+              保留份数清理
+            </ActionButton>
+            <ActionButton
+              variant="default"
+              size="sm"
+              icon={DatabaseBackup}
+              onClick={() => setRunOpen(true)}
+              disabled={busy}
+            >
+              {busy ? '执行中…' : '立即备份'}
+            </ActionButton>
+          </>
+        ) : undefined
+      }
+    >
 
       <BackupHealth stats={stats} />
 
@@ -236,7 +235,6 @@ export function AdminBackupPage() {
             onChange={(value) => setFilter(value)}
             allowClear
             clearLabel="全部记录"
-            placeholder="全部记录"
             options={BACKUP_FILTER_OPTIONS.map((option) => ({
               value: option.value,
               label: option.label,
@@ -315,6 +313,6 @@ export function AdminBackupPage() {
         onCancel={() => setPruneOpen(false)}
         onConfirm={() => void doPrune()}
       />
-    </>
+    </AdminPage>
   );
 }

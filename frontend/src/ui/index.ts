@@ -12,6 +12,7 @@ export { Radio } from './primitives/radio';
 export { Switch } from './primitives/switch';
 export { Slider } from './primitives/slider';
 export { InputNumber } from './primitives/input-number';
+export { NumberStepper, type NumberStepperProps } from './primitives/number-stepper';
 export { Upload, type UploadFile, type UploadProps } from './primitives/upload';
 export { Modal, type ModalProps } from './primitives/modal';
 export { Drawer, type DrawerProps } from './primitives/drawer';

@@ -30,7 +30,7 @@ backend/src/admin/
 ├── assets-admin.controller.ts / assets-admin.service.ts   # 项目与素材
 ├── tasks-admin.controller.ts / tasks-admin.service.ts
 ├── tickets-admin.controller.ts
-├── legal.controller.ts / notifications.controller.ts
+├── notifications.controller.ts
 ├── commerce.controller.ts / commerce-admin.service.ts     # 商品/订单/支付/积分
 ├── marketing.controller.ts
 ├── invoices-admin.controller.ts
@@ -245,18 +245,6 @@ AI 分析标签查询 `GET /admin/api-logs?source=tool&operation=image_to_prompt
 
 ---
 
-## 6. 法务文档 `/admin/legal`
-
-`GET /admin/legal`（版本列表）、`PUT /admin/legal`（新建草稿）、`POST /admin/legal/:slug/:version/publish`（发布）。
-
-- 四类固定 slug（`LEGAL_SLUGS`）：`user-agreement` / `privacy-policy` / `minors-policy` / `account-rules`。
-- 按 `(slug, version)` 版本化；已发布版本**不可原地覆盖**（`upsert` 返回 409），改文本须升版本号。
-- 发布时同 slug 的其他已发布版本自动 `archived`，保证 `current()` 唯一。
-- 前台 `GET /legal/:slug` 只读最新已发布版本，读不到时 `LegalPage` 用内置文本兜底。
-- 读 `legal.read`、写 `legal.write`；发布不要求填写变更原因。
-
----
-
 ## 7. 站内消息 `/admin/notifications`
 
 `GET /admin/notifications/channels`（实际生效的邮件 / 短信实现：`provider` / `delivers` / `configured`，不含凭据）、`POST /admin/notifications/broadcast`（全站广播）、`GET|POST /admin/notifications/templates`。
@@ -384,7 +372,7 @@ partial_refunded → refunded | partial_refunded
 | 页面 | 接口 | 规则 |
 | --- | --- | --- |
 | 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；限量名额由 pending 订单预占、支付时核销、取消/超时释放，核销走 `Order.couponId`；无关联订单可删除，有订单只能停用；`GET /admin/coupons/export` 按同一筛选导出 CSV（`marketing.write + data.export`，路由在 `:id` 之前） |
-| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的免活动让 `resolve()` 返回 0；到期由调度任务收尾；无关联订单可删除，有订单只能下线；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`marketing.write + data.export`） |
+| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的限时免费活动让 `resolve()` 返回 0；到期由调度任务收尾；列表/筛选/导出统一按派生生效态 `effective`（`draft/live/scheduled/ended/off`），人工 `status` 参数保留兼容；上线前校验结束时间未过、商品在架、活动价低于原价、能力 ID 有效；无关联订单**与**免费账单（`BillingOrder.promotionId`）才可删除，有引用只能下线；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`marketing.write + data.export`） |
 | 邀请与签到 | `/admin/invites*`、`/admin/checkin*` | 邀请奖励在被邀请人**首次付费**才触发；签到规则含基础积分与连签加成 |
 
 C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns` 只回真正更便宜且在售的活动）。

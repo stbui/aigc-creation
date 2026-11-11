@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Send, Share2, UserCheck } from 'lucide-react';
 import {
+  formatDateTime,
   ActionButton,
   Descriptions,
   DetailSection,
@@ -150,10 +151,8 @@ export function TicketDetailDrawer({
   return (
     <Drawer
       open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      width={760}
+      onClose={onClose}
+      size="lg"
       title={detail ? `${detail.subject} · ${detail.ticketNo}` : '工单详情'}
       description={replyDirty ? '有未发送的回复' : undefined}
     >
@@ -188,7 +187,6 @@ export function TicketDetailDrawer({
             <SelectField
               className="w-48"
               ariaLabel="指派处理人"
-              placeholder="未指派"
               allowClear
               clearLabel="未指派"
               value={detail.assigneeId ?? undefined}
@@ -299,7 +297,7 @@ export function TicketDetailDrawer({
                 label: '提交时间',
                 value: (
                   <span className="tabular-nums">
-                    {new Date(detail.createdAt).toLocaleString('zh-CN')}
+                    {formatDateTime(detail.createdAt)}
                   </span>
                 ),
               },
@@ -309,7 +307,7 @@ export function TicketDetailDrawer({
                       label: '解决时间',
                       value: (
                         <span className="tabular-nums">
-                          {new Date(detail.resolvedAt).toLocaleString('zh-CN')}
+                          {formatDateTime(detail.resolvedAt)}
                         </span>
                       ),
                     },
@@ -373,7 +371,7 @@ export function TicketDetailDrawer({
             <div className="flex flex-col gap-2">
               <Message
                 author={detail.user.name || detail.user.email}
-                at={new Date(detail.createdAt).toLocaleString('zh-CN')}
+                at={formatDateTime(detail.createdAt)}
                 body={detail.content}
               />
               {detail.replies.map((r) => (
@@ -388,7 +386,7 @@ export function TicketDetailDrawer({
                         ? `客服 · ${r.authorName}`
                         : r.authorName
                   }
-                  at={new Date(r.createdAt).toLocaleString('zh-CN')}
+                  at={formatDateTime(r.createdAt)}
                   body={r.content}
                 />
               ))}

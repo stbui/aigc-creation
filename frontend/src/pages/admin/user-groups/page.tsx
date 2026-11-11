@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { adminChannelsApi, adminUserGroupsApi } from './api';
 import {
+  AdminPage,
   ActionButton,
   ConfirmDialog,
-  PageHeader,
   Panel,
-  SkeletonBody,
   StaleError,
 } from '~/admin-ui/primitives';
 import {
@@ -145,39 +144,36 @@ export function AdminUserGroupsPage() {
   };
 
   return (
-    <>
-      <PageHeader
-        title="用户分组"
-        description="决定倍率、可见渠道与按模型的覆盖价格。分组由会员套餐映射，没有有效会员的用户落在默认分组。"
-        actions={
-          <ActionButton variant="default" size="sm" icon={Plus} disabled={!writable} onClick={openCreate}>
-            新建分组
-          </ActionButton>
-        }
-      />
+    <AdminPage
+      title="用户分组"
+      description="决定倍率、可见渠道与按模型的覆盖价格。分组由会员套餐映射，没有有效会员的用户落在默认分组。"
+      actions={
+        <ActionButton variant="default" size="sm" icon={Plus} disabled={!writable} onClick={openCreate}>
+          新建分组
+        </ActionButton>
+      }
+    >
 
       <Panel
         title="分组清单"
         note="保存后目录快照与报价缓存同时失效；只刷新其中一个会出现「展示按新倍率、扣费按旧倍率」。"
       >
-        {loading && rows.length === 0 ? (
-          /* 面板外壳已经是实的，只替内容行 */
-          <SkeletonBody rows={4} />
-        ) : (
-          <>
-            {error && <StaleError error={error} onRetry={() => void reload()} />}
-            <UserGroupTable
-              rows={rows}
-              loading={loading}
-              error={error}
-              onRetry={() => void reload()}
-              writable={writable}
-              channels={channels}
-              onEdit={openEdit}
-              onDelete={setDeleteTarget}
-            />
-          </>
-        )}
+        {/*
+         * 首次加载不在面板这一层画骨架 —— 表格自带 `TableSkeleton`，它按
+         * `columns` 的 width / align 排真实列宽，切换时不会横向重排；面板级
+         * 的等宽灰条既没有列宽也没有行高，反而多一套形态。
+         */}
+        {error && rows.length > 0 && <StaleError error={error} onRetry={() => void reload()} />}
+        <UserGroupTable
+          rows={rows}
+          loading={loading}
+          error={error}
+          onRetry={() => void reload()}
+          writable={writable}
+          channels={channels}
+          onEdit={openEdit}
+          onDelete={setDeleteTarget}
+        />
       </Panel>
 
       <UserGroupFormDrawer
@@ -210,6 +206,6 @@ export function AdminUserGroupsPage() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => void runDelete()}
       />
-    </>
+    </AdminPage>
   );
 }

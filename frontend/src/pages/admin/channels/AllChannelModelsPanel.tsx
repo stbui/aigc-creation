@@ -457,7 +457,7 @@ export function AllChannelModelsPanel({
             {onEditModel && (
               <ActionButton
                 variant="secondary"
-                size="xs"
+                size="sm"
                 icon={Pencil}
                 disabled={!writable}
                 onClick={() => onEditModel(row.channelId, row.id)}
@@ -467,7 +467,7 @@ export function AllChannelModelsPanel({
             )}
             <ActionButton
               variant="ghost"
-              size="xs"
+              size="sm"
               // 与按渠道视图一致：破坏性只靠红字表达，不铺底色
               className={
                 row.enabled ? 'text-danger-text hover:text-danger-text' : 'hover:bg-muted'
@@ -505,7 +505,7 @@ export function AllChannelModelsPanel({
           ariaLabel="搜索商品"
           value={keyword}
           onChange={(value) => updateFilter(() => setKeyword(value))}
-          placeholder="搜索商品编号、名称或供应商"
+          placeholder="商品编号 / 名称 / 供应商"
           className="w-64"
         />
         <SelectField
@@ -513,7 +513,6 @@ export function AllChannelModelsPanel({
           value={capability}
           onChange={(value) => updateFilter(() => setCapability(value))}
           options={CAPABILITY_OPTIONS}
-          placeholder="全部类型"
           clearLabel="全部类型"
           allowClear
           className="w-32"
@@ -523,10 +522,9 @@ export function AllChannelModelsPanel({
           value={status === 'all' ? undefined : status}
           onChange={(value) => updateFilter(() => setStatus((value as AllModelsStatusFilter) ?? 'all'))}
           options={ALL_MODELS_STATUS_OPTIONS.filter((item) => item.value !== 'all')}
-          placeholder="全部状态"
-          // 复位项就叫「全部」：它是「不按状态筛」的通用说法，各页统一，
-          // 运营不用逐页记这一格叫「全部状态」还是「全部商品」。
-          clearLabel="全部"
+          // 触发器与复位项写同一句「全部状态」，与其它页一致：五个下拉并排时
+          // 只写「全部」分不清这一格管的是状态还是类型
+          clearLabel="全部状态"
           allowClear
           className="w-40"
         />
@@ -535,7 +533,6 @@ export function AllChannelModelsPanel({
           value={channelFilter}
           onChange={(value) => updateFilter(() => setChannelFilter(value))}
           options={channelOptions}
-          placeholder="全部供应商"
           clearLabel="全部供应商"
           allowClear
           className="w-40"

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, ChevronUp, Columns2, History, Minus, Plus, Trash2, Undo2, Redo2, X } from 'lucide-react';
 
 import {
   MAX_ANNOTATIONS,
   TOOLS,
   type MaskPainterHandle,
-  type PaintState,
+  type MaskState,
   type PaintTool,
   type RegionBounds,
 } from './constants';
@@ -204,26 +204,64 @@ export function LocalRedrawPage() {
     setHistoryOpen(false);
   };
 
-  const historyPane = (
-    <>
-      <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
-        <div className="redraw-history-head">
-          <h2>
-            <History size={15} />
-            历史记录
-          </h2>
-          <button
-            type="button"
-            className="redraw-history-collapse"
-            aria-label={historyCollapsed ? '展开历史记录' : '收起历史记录'}
-            aria-expanded={!historyCollapsed}
-            title={historyCollapsed ? '展开历史记录' : '收起历史记录'}
-            onClick={() => setHistoryCollapsed((value) => !value)}
-          >
-            {historyCollapsed ? <ChevronRight size={16} /> : <ChevronUp size={16} />}
-          </button>
-        </div>
-        <div className="redraw-history-scroll">
+  /**
+   * 历史栏只在数据与折叠态变化时重建。
+   *
+   * 页面其余部分（尤其是标注描述输入）每敲一个字都会重渲染；`useMemo`
+   * 保持元素引用不变，React 直接跳过这棵子树的对账（最多 20 张历史卡）。
+   */
+  const historyPane = useMemo(
+    () => (
+      <>
+        <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
+          <div className="redraw-history-head">
+            <h2>
+              <History size={15} />
+              历史记录
+            </h2>
+            <button
+              type="button"
+              className="redraw-history-collapse"
+              aria-label={historyCollapsed ? '展开历史记录' : '收起历史记录'}
+              aria-expanded={!historyCollapsed}
+              title={historyCollapsed ? '展开历史记录' : '收起历史记录'}
+              onClick={() => setHistoryCollapsed((value) => !value)}
+            >
+              {historyCollapsed ? <ChevronRight size={16} /> : <ChevronUp size={16} />}
+            </button>
+          </div>
+          <div className="redraw-history-scroll">
+            <ToolHistoryGrid
+              tasks={history}
+              loading={historyLoading}
+              error={historyError}
+              emptyText=""
+              onRetry={() => setHistoryReload((value) => value + 1)}
+            />
+          </div>
+        </aside>
+
+        <button
+          type="button"
+          className="redraw-history-float-toggle"
+          aria-label="历史记录"
+          title="历史记录"
+          onClick={() => {
+            // 桌面端右栏收起后，浮动按钮把右栏展开；窄屏没有右栏，改用抽屉。
+            if (window.matchMedia('(max-width: 1180px)').matches) setHistoryOpen(true);
+            else setHistoryCollapsed(false);
+          }}
+        >
+          <History size={16} />
+        </button>
+
+        <Drawer
+          title="历史记录"
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          size={320}
+          styles={{ body: { padding: 12 } }}
+        >
           <ToolHistoryGrid
             tasks={history}
             loading={historyLoading}
@@ -231,43 +269,14 @@ export function LocalRedrawPage() {
             emptyText=""
             onRetry={() => setHistoryReload((value) => value + 1)}
           />
-        </div>
-      </aside>
-
-      <button
-        type="button"
-        className="redraw-history-float-toggle"
-        aria-label="历史记录"
-        title="历史记录"
-        onClick={() => {
-          // 桌面端右栏收起后，浮动按钮把右栏展开；窄屏没有右栏，改用抽屉。
-          if (window.matchMedia('(max-width: 1180px)').matches) setHistoryOpen(true);
-          else setHistoryCollapsed(false);
-        }}
-      >
-        <History size={16} />
-      </button>
-
-      <Drawer
-        title="历史记录"
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        size={320}
-        styles={{ body: { padding: 12 } }}
-      >
-        <ToolHistoryGrid
-          tasks={history}
-          loading={historyLoading}
-          error={historyError}
-          emptyText=""
-          onRetry={() => setHistoryReload((value) => value + 1)}
-        />
-      </Drawer>
-    </>
+        </Drawer>
+      </>
+    ),
+    [history, historyLoading, historyError, historyCollapsed, historyOpen],
   );
 
   const handlePaintState = useCallback(
-    (state: PaintState) => {
+    (state: MaskState) => {
       setPainted(state.painted);
       setCanUndo(state.canUndo);
       setCanRedo(state.canRedo);
@@ -281,6 +290,11 @@ export function LocalRedrawPage() {
     const next = width / height;
     setSourceAspect((current) => (Math.abs(current - next) < 0.0001 ? current : next));
   }, []);
+
+  /** 画布拒绝新区域时的提示；引用必须稳定，否则 MaskPainter 的 memo 失效。 */
+  const handleRegionLimit = useCallback(() => {
+    message.warning(`最多支持 ${MAX_ANNOTATIONS} 个标注区域，请先撤回或删除一个`);
+  }, [message]);
 
   const removeAnnotationAt = (id: number) => {
     if (uploadBusy) {
@@ -465,7 +479,7 @@ export function LocalRedrawPage() {
       resultView="canvas"
       generatingAspect={sourceAspect}
       onHistoryReuse={handleHistoryReuse}
-      onSubmit={(inputs, settings) => submit(inputs, settings)}
+      onSubmit={submit}
       resultActions={
         result ? (
           <button type="button" className="tool-result-action" onClick={handleReannotation}>
@@ -562,7 +576,7 @@ export function LocalRedrawPage() {
                   pan={pan}
                   maxRegions={MAX_ANNOTATIONS}
                   onPanChange={setPan}
-                  onRegionLimit={() => message.warning(`最多支持 ${MAX_ANNOTATIONS} 个标注区域，请先撤回或删除一个`) }
+                  onRegionLimit={handleRegionLimit}
                   onChange={handlePaintState}
                   onNaturalSize={handleNaturalSize}
                   handleRef={painter}

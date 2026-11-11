@@ -41,7 +41,6 @@ export function OrderFilterBar({
       <SelectField
         className="w-32"
         ariaLabel="按状态筛选"
-        placeholder="全部状态"
         clearLabel="全部状态"
         allowClear
         value={values.status}
@@ -71,7 +70,6 @@ export function OrderFilterBar({
       <SelectField
         className="w-32"
         ariaLabel="按渠道筛选"
-        placeholder="全部渠道"
         clearLabel="全部渠道"
         allowClear
         value={values.channel}
@@ -85,7 +83,6 @@ export function OrderFilterBar({
       <SelectField
         className="w-32"
         ariaLabel="按退款状态筛选"
-        placeholder="全部退款"
         clearLabel="全部退款"
         allowClear
         value={values.refundState}

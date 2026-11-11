@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
+import {
+  formatDateTime,
+  ActionButton,
+  AdminDataTable,
+  StatusTag,
+  type AdminColumn,
+} from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import { toCredits } from './utils';
 import type { BillingOrderView } from '../../../types/model';
@@ -41,7 +47,7 @@ export function BillingOrderTable({
         width: 150,
         render: (row) => (
           <span className="text-[12px] tabular-nums text-muted-foreground">
-            {new Date(row.createdAt).toLocaleString('zh-CN')}
+            {formatDateTime(row.createdAt)}
           </span>
         ),
       },
@@ -142,7 +148,7 @@ export function BillingOrderTable({
         width: 80,
         fixed: 'right',
         render: (row) => (
-          <ActionButton variant="ghost" size="xs" onClick={() => onOpenDetail(row)}>
+          <ActionButton variant="ghost" size="sm" onClick={() => onOpenDetail(row)}>
             详情
           </ActionButton>
         ),

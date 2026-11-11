@@ -1,43 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { MAX_IMAGE_MB, MAX_IMAGES, VARIANT_FIELDS } from './constants';
 import {
   AssetLibraryModal,
   MobileUploadModal,
-  ModelPicker,
-  ToolSettingsPopover,
-  ToolSubmitBar,
   ToolWorkflowSteps,
   type PublicLogicalModel,
 } from './components';
-import { ProductKitConfig } from './ProductKitConfig';
 import { ProductKitDescriptionModal } from './ProductKitDescriptionModal';
-import { ProductKitExamplePanel } from './ProductKitExamplePanel';
-import { ProductKitResultList } from './ProductKitResultList';
-import { ProductKitSettings } from './ProductKitSettings';
-import { ProductKitTabs } from './ProductKitTabs';
+import { ProductKitInputPane } from './ProductKitInputPane';
+import { ProductKitOutputPane } from './ProductKitOutputPane';
 import {
-  notifyCreditsChanged,
   useAuth,
   useCreditCost,
-  useGenerateError,
   useImageUpload,
-  useProject,
   useResultGallery,
   useRightTab,
   type GalleryItem,
 } from './hooks';
-import { generateApi, newIdempotencyKey, promptToolsApi, resolveModel } from './api';
+import { generateApi, promptToolsApi, resolveModel } from './api';
 import { promptToolErrorMessage } from '../../lib/promptToolMessages';
 import {
+  buildVariantPlan,
   countGenerations,
-  ensureAssetsInProject,
   imageInputCountError,
   modelImageInputLimit,
   platformSpec,
   variantCaption,
 } from './utils';
+import { useProductKitSubmit } from './useProductKitSubmit';
 import { useApp } from '../../ui';
 
 /**
@@ -46,9 +37,6 @@ import { useApp } from '../../ui';
 
 export function ProductKitPage() {
   const { message, modal } = useApp();
-  const reportError = useGenerateError();
-  const navigate = useNavigate();
-  const { ensureProject } = useProject();
   /**
    * 当前模型的能力合同决定实际可提交的图片数。页面上限仍保留 5，
    * 既兼容未来支持 5 张的模型，也避免已有 5 张素材被静默删除。
@@ -114,19 +102,8 @@ export function ProductKitPage() {
   // ── 弹窗状态 ──
   const [expandOpen, setExpandOpen] = useState(false);
 
-  // ── 任务状态 ──
-  const [submitting, setSubmitting] = useState(false);
   /** 所选模型的实时单张报价（积分）；null = 未取到，回落到能力基础价 */
   const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
-  /**
-   * 最近一次“尚未拿到全部 taskId”的提交。
-   *
-   * 顺序建单时如果第 k 个请求网络失败，前 k-1 个任务已在服务端创建；
-   * 用户重试必须复用同一批幂等键与 batchId，让后端返回既有任务而不是
-   * 再扣一次钱，也避免补建的任务被分到另一行。
-   * 拿到全部 taskId 后清空，之后的主动“再生成一次”才是新任务。
-   */
-  const pendingBatchRef = useRef<{ fingerprint: string; keys: string[]; batchId: string } | null>(null);
   /*
    * 本页不直接展示 capability runtime 的后台诊断原因；运行时不可用文案统一由
    * `runtimeOf` 转换为用户提示。真正的可用性仍由后端把关（下架走 40005，
@@ -144,9 +121,9 @@ export function ProductKitPage() {
     includeFailed: true,
   });
   // 只认 queued/running: 失败任务同样没有 url, 按「无图」判断会让提交按钮永久禁用。
-  const generating = useMemo(
-    () => submitting || gallery.items.some((item) => item.status === 'queued' || item.status === 'running'),
-    [submitting, gallery.items],
+  const galleryRunning = useMemo(
+    () => gallery.items.some((item) => item.status === 'queued' || item.status === 'running'),
+    [gallery.items],
   );
   /** 页签角标按生成次数计, 与下方批次行数一致 */
   const generationCount = useMemo(() => countGenerations(gallery.items), [gallery.items]);
@@ -161,7 +138,8 @@ export function ProductKitPage() {
   // 首访落在「功能示例」, 有历史产出时自动切到「创作结果」; 用户点过页签后不再自动切换
   const { rightTab, pick: pickRightTab, showResults } = useRightTab(gallery.items.length, gallery.loading);
 
-  const totalCount = useMemo(() => VARIANT_FIELDS.reduce((sum, v) => sum + (counts[v.key] ?? 0), 0), [counts]);
+  /** 本次张数：与提交时拆出的任务清单同源（都走 `buildVariantPlan`） */
+  const totalCount = useMemo(() => buildVariantPlan(counts).length, [counts]);
   /*
    * 价签必须按“本次要出几张”计算。此前只显示单张单价，用户选 3 个变体时
    * 按钮仍写“本次消耗 10 积分”，实际扣 30 —— 属于计费披露错误。
@@ -180,6 +158,27 @@ export function ProductKitPage() {
     productName.trim().length > 0 &&
     description.trim().length > 0 &&
     totalCount > 0;
+
+  // 生成提交流程（模型校验 / 素材准备 / 幂等批次 / 顺序建单）收口在独立 hook
+  const { submitting, submit } = useProductKitSubmit({
+    input: {
+      images,
+      counts,
+      productName,
+      brand,
+      platform,
+      language,
+      description,
+      ratio,
+      resolution,
+    },
+    canSubmit: formValid,
+    running: galleryRunning,
+    onReplaceImage: replaceImage,
+    onSubmitted: showResults,
+    reloadResults: gallery.reload,
+  });
+  const generating = submitting || galleryRunning;
 
   /** 切换平台：用户没手动改过比例/画质时，带出该平台的主图规格 */
   const changePlatform = (value: string) => {
@@ -232,118 +231,6 @@ export function ProductKitPage() {
     }
   };
 
-  // ── 生成 ──
-  const submit = async () => {
-    if (!formValid || generating) return;
-    // guest 点击仍应走登录弹窗（generateApi 的 401 → auth:required 契约）
-    setSubmitting(true);
-    let batchStarted = false;
-    // 提交后视线应落在结果区: 整批占位卡在那里, 留在示例页看不到进度
-    showResults();
-
-    try {
-      /*
-       * 模型选择器可能还没完成目录加载，或用户刚切换模型；提交前再按真实
-       * 落库模型校验一次。超限时保留全部素材并明确提示，绝不静默截断。
-       */
-      const model = await resolveModel('main_image');
-      const limitError = imageInputCountError(model, images.length);
-      if (limitError) {
-        message.warning(limitError);
-        return;
-      }
-      const projectId = await ensureProject();
-      /*
-       * 素材库会展示账号下所有项目的图片，但后端只允许任务引用同项目素材。
-       * 跨项目选中时先复制到当前项目；复制成功立即替换输入位，失败则停在
-       * 建单之前 —— 绝不把跨项目 asset id 直接提交。
-       */
-      const preparedImages = await ensureAssetsInProject(images, projectId, {
-        onPrepared: replaceImage,
-      });
-      const inputAssetIds = preparedImages.map((image) => image.id);
-      // 一批变体必须落在同一个模型上，解析一次即可；循环里再解析会让
-      // 目录缓存过期的瞬间出现「同一批用了两个模型」
-      const logicalModelId = model.id;
-      // 自定义配置计数 → 每类变体生成 count 张 (与参考站批量出图行为一致)
-      const plan: string[] = [];
-      for (const v of VARIANT_FIELDS) {
-        const n = counts[v.key] ?? 0;
-        for (let i = 0; i < n; i++) plan.push(v.key);
-      }
-
-      const baseParams = {
-        productName: productName.trim(),
-        brand: brand.trim(),
-        platform,
-        language,
-        description: description.trim(),
-        ratio,
-        size: resolution,
-      };
-      /*
-       * 幂等键按“本次输入指纹”复用：某次建单请求在网络层失败后，用户重试
-       * 会拿到同一个 key，服务端返回已创建的任务而不是再扣一次钱。
-       * 全部 taskId 都拿到后清空，之后的主动再生成才是新任务。
-       */
-      const fingerprint = JSON.stringify({
-        capability: 'main_image',
-        projectId,
-        logicalModelId,
-        inputAssetIds,
-        baseParams,
-        plan,
-      });
-      const previous = pendingBatchRef.current?.fingerprint === fingerprint ? pendingBatchRef.current : null;
-      const batchId = previous?.batchId ?? newIdempotencyKey();
-      const keys = previous?.keys ?? plan.map(() => newIdempotencyKey());
-      pendingBatchRef.current = { fingerprint, keys, batchId };
-
-      // 顺序创建任务: 并行创建曾触发 broker IPC EPIPE, 顺序提交更稳
-      for (let i = 0; i < plan.length; i += 1) {
-        const variant = plan[i];
-        await generateApi.start({
-          projectId,
-          capability: 'main_image',
-          logicalModelId,
-          inputAssetIds,
-          idempotencyKey: keys[i],
-          params: {
-            ...baseParams,
-            variant,
-            batchId,
-            batchIndex: i + 1,
-            batchSize: plan.length,
-          },
-        });
-        // 只有首个任务真正创建成功后才进入“部分已提交”语义。首单失败时
-        // pendingBatchRef 仍在，但不能误报已经落单。
-        batchStarted = true;
-      }
-
-      // 重拉列表拿到整批占位卡, 之后 useResultGallery 会轮询到全部任务终态
-      await gallery.reload();
-      // 整批已创建且列表已刷新成功; 之后的主动再生成才是新批次
-      pendingBatchRef.current = null;
-      message.success(`已提交 ${plan.length} 张商品主图，生成完成后自动更新`);
-    } catch (e) {
-      reportError(e);
-      /*
-       * 中途建单失败：已创建的任务不回滚（服务端已扣费）。尽量重拉一次，
-       * 让已经落地的占位卡可见；pendingBatchRef 保留，用户重试时复用同一
-       * batchId 与幂等键，服务端会返回既有任务并继续补齐缺失张数。
-       */
-      if (batchStarted) {
-        await gallery.reload();
-        message.warning('部分商品主图可能已提交，请查看生成记录；重新提交会继续补齐本批');
-      }
-    } finally {
-      setSubmitting(false);
-      // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
-      notifyCreditsChanged();
-    }
-  };
-
   /**
    * 删除一次生成 —— 主图批次由多个独立任务组成, 没有 parentTaskId,
    * 因此必须逐张删除；成功的本地摘除, 失败的保留并提示刷新重试。
@@ -382,131 +269,64 @@ export function ProductKitPage() {
   return (
     <div className="pk-workspace">
       {/* ── 左: 输入栏 ── */}
-      <aside className="pk-input-pane">
-        <div className="pk-form-card">
-          <ProductKitTabs />
+      <ProductKitInputPane
+        images={images}
+        maxImages={imageMax}
+        imageLimitError={imageInputError}
+        uploading={uploading}
+        fileInputRef={fileInputRef}
+        onFiles={(f) => void uploadFiles(f)}
+        onRemoveImage={removeImage}
+        onOpenLibrary={openLibrary}
+        onOpenMobile={mobile.openMobile}
+        productName={productName}
+        onProductNameChange={setProductName}
+        brand={brand}
+        onBrandChange={setBrand}
+        platform={platform}
+        onPlatformChange={changePlatform}
+        language={language}
+        onLanguageChange={setLanguage}
+        description={description}
+        onDescriptionChange={setDescription}
+        analyzing={analyzing}
+        onAnalyze={() => void runAiAnalyze()}
+        onExpandDescription={() => setExpandOpen(true)}
+        counts={counts}
+        onCountChange={(key, value) => setCounts((c) => ({ ...c, [key]: value }))}
+        settingsOpen={settingsOpen}
+        onToggleSettings={() => setSettingsOpen((v) => !v)}
+        ratio={ratio}
+        onRatioChange={(v) => {
+          setRatioTouched(true);
+          setRatio(v);
+        }}
+        resolution={resolution}
+        onResolutionChange={(v) => {
+          setResolutionTouched(true);
+          setResolution(v);
+        }}
+        onModelQuoteChange={setModelQuoteCredits}
+        onModelChange={setSelectedModel}
+        generating={generating}
+        formValid={formValid}
+        creditLabel={creditLabel}
+        onSubmit={() => void submit()}
+      />
 
-          <div className="pk-form-scroll">
-            {/* 上传商品图 + 生成设置 + 商品描述 (参考站同一张卡片) */}
-            <ProductKitSettings
-              images={images}
-              maxImages={imageMax}
-              imageLimitError={imageInputError}
-              uploading={uploading}
-              fileInputRef={fileInputRef}
-              onFiles={(f) => void uploadFiles(f)}
-              onRemove={removeImage}
-              onOpenLibrary={openLibrary}
-              onOpenMobile={mobile.openMobile}
-              productName={productName}
-              onProductNameChange={setProductName}
-              brand={brand}
-              onBrandChange={setBrand}
-              platform={platform}
-              onPlatformChange={changePlatform}
-              language={language}
-              onLanguageChange={setLanguage}
-              description={description}
-              onDescriptionChange={setDescription}
-              analyzing={analyzing}
-              onAnalyze={() => void runAiAnalyze()}
-              onExpandDescription={() => setExpandOpen(true)}
-            />
-
-            {/* 自定义配置 */}
-            <ProductKitConfig
-              counts={counts}
-              onCountChange={(key, value) => setCounts((c) => ({ ...c, [key]: value }))}
-            />
-          </div>
-
-          {/* 高级设置 + 提交 (sticky 底部) */}
-          <ToolSubmitBar
-            submitting={generating}
-            disabled={!formValid}
-            label="立即生成"
-            creditLabel={creditLabel ?? undefined}
-            settings={
-              <ToolSettingsPopover
-                open={settingsOpen}
-                onToggle={() => setSettingsOpen((v) => !v)}
-                ratio={ratio}
-                onRatioChange={(v) => {
-                  setRatioTouched(true);
-                  setRatio(v);
-                }}
-                resolution={resolution}
-                onResolutionChange={(v) => {
-                  setResolutionTouched(true);
-                  setResolution(v);
-                }}
-                capabilityId="main_image"
-                modelPicker={
-                  <ModelPicker
-                    capability="main_image"
-                    options={{ ratio, resolution }}
-                    onQuoteChange={setModelQuoteCredits}
-                    onModelChange={setSelectedModel}
-                  />
-                }
-              />
-            }
-            onSubmit={() => void submit()}
-          />
-        </div>
-      </aside>
-
-      {/* ── 右: 功能示例 / 创作结果 ──
-          创作结果按批次逐行陈列 (一次生成一行, 原图 + 各变体主图);
-          提交后重拉列表拿到整批占位卡, 由 useResultGallery 轮询到全部终态。 */}
-      <section className="pd-right-pane">
-        <div className="pd-tabs" role="tablist" aria-label="右侧面板">
-          <button
-            type="button"
-            role="tab"
-            id="pk-tab-demo"
-            aria-selected={rightTab === 'demo'}
-            aria-controls="pk-panel-demo"
-            className={rightTab === 'demo' ? 'is-active' : ''}
-            onClick={() => pickRightTab('demo')}
-          >
-            功能示例
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="pk-tab-results"
-            aria-selected={rightTab === 'results'}
-            aria-controls="pk-panel-results"
-            className={rightTab === 'results' ? 'is-active' : ''}
-            onClick={() => pickRightTab('results')}
-          >
-            创作结果
-            {generationCount > 0 && <span className="pd-tab-count">{generationCount}</span>}
-          </button>
-        </div>
-
-        <div className="pd-right-body">
-          {rightTab === 'demo' ? (
-            <div role="tabpanel" id="pk-panel-demo" aria-labelledby="pk-tab-demo" className="pd-right-panel">
-              <ProductKitExamplePanel />
-            </div>
-          ) : (
-            <div role="tabpanel" id="pk-panel-results" aria-labelledby="pk-tab-results" className="pd-right-panel">
-              <ProductKitResultList
-                items={gallery.items}
-                loading={gallery.loading}
-                error={gallery.error}
-                emptyTitle="效果图预览"
-                emptyDesc={resultEmptyDesc}
-                emptyChildren={resultEmptyChildren}
-                onDeleteRow={deleteRow}
-                downloadNamePrefix="main-image"
-              />
-            </div>
-          )}
-        </div>
-      </section>
+      {/* ── 右: 功能示例 / 创作结果 ── */}
+      <ProductKitOutputPane
+        rightTab={rightTab}
+        onPickTab={pickRightTab}
+        generationCount={generationCount}
+        items={gallery.items}
+        loading={gallery.loading}
+        error={gallery.error}
+        emptyDesc={resultEmptyDesc}
+        emptyChildren={resultEmptyChildren}
+        onDeleteRow={deleteRow}
+        downloadNamePrefix="main-image"
+      />
 
       {/* 素材库选择弹窗 (真实数据) */}
       <AssetLibraryModal

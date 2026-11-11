@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  PageHeader,
+  AdminPage,
   Panel,
   SegmentedTabs,
   StaleError,
@@ -370,8 +370,7 @@ export function AdminAssetsPage() {
   const tablePageSize = [20, 50, 100].includes(pageSize) ? pageSize : TABLE_PAGE_SIZE;
 
   return (
-    <>
-      <PageHeader title="素材管理" />
+    <AdminPage title="素材管理" >
 
       {canReadProjects && (
         <SegmentedTabs
@@ -507,6 +506,6 @@ export function AdminAssetsPage() {
       )}
         </>
       )}
-    </>
+    </AdminPage>
   );
 }

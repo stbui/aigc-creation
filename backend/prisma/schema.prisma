@@ -79,7 +79,6 @@ model User {
   /// 扫码登录会话 (B8)
   loginSessions LoginSession[]
 
-  consents      ConsentRecord[]
   notifications Notification[]
 
   /// 用户提交的工单 (B7)
@@ -1430,54 +1429,8 @@ model ReconciliationItem {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 账户自助 / 法务 / 站内消息 (B4)
+// 账户自助 / 站内消息 (B4)
 // ─────────────────────────────────────────────────────────────────────────────
-
-/// 法务文档（用户协议 / 隐私政策 / 未成年人保护）。
-///
-/// 版本化而不是覆盖：用户同意的是**某个版本的某一条款**，覆盖会让
-/// 「他到底同意了哪一版」失去证据。发布新版本 = 新增一行 + 旧行置 archived。
-model LegalDocument {
-  id          String    @id @default(cuid())
-  /// privacy-policy | user-agreement | minors-policy（slug 白名单在 service 层）
-  slug        String
-  /// 语义化版本，如 2026-10-21 或 v2
-  version     String
-  title       String
-  /// 正文（Markdown 子集：`## 标题` 与空行分段，前端按此渲染）
-  content     String
-  /// 'draft' 草稿 | 'published' 已发布 | 'archived' 历史版本
-  status      String    @default("draft")
-  publishedAt DateTime?
-  /// 发布人（后台账号 id）
-  publishedBy String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@unique([slug, version])
-  @@index([slug, status])
-}
-
-/// 同意记录 —— 注册 / 下单时勾选的那一份条款。
-///
-/// 只记「谁同意了哪个 slug 的哪个 version」，不存正文快照：
-/// 正文在 LegalDocument 里按 (slug, version) 唯一，重复存储只会让两份数据打架。
-model ConsentRecord {
-  id        String   @id @default(cuid())
-  userId    String?
-  /// register | order | legal_update
-  kind      String
-  slug      String
-  version   String
-  ip        String?
-  ua        String?
-  createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id])
-
-  @@index([userId, kind])
-  @@index([slug, version])
-}
 
 /// 站内消息。
 ///

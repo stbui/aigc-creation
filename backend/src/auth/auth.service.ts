@@ -114,32 +114,14 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     try {
-      const user = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.user.create({
-          data: {
-            email,
-            passwordHash,
-            name,
-            emailVerifiedAt: new Date(),
-            ...(phone ? { phone, phoneVerifiedAt: new Date() } : {}),
-          },
-        });
-        /*
-         * 同意记录 (B4)。只在前端确实给了版本号时落库 —— 不替用户补一个
-         * 「默认同意」：那会在合规审查时变成一条**伪造的证据**。与建号放在
-         * 同一事务，避免账号已创建但同意凭证永久缺失。
-         */
-        if (dto.consentVersion) {
-          await tx.consentRecord.create({
-            data: {
-              userId: created.id,
-              kind: 'register',
-              slug: 'user-agreement',
-              version: dto.consentVersion,
-            },
-          });
-        }
-        return created;
+      const user = await this.prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          name,
+          emailVerifiedAt: new Date(),
+          ...(phone ? { phone, phoneVerifiedAt: new Date() } : {}),
+        },
       });
 
       const accessToken = JwtService.sign({

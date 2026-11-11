@@ -56,12 +56,30 @@ import {
 
 /* ────────────────────────── 居中弹窗 ────────────────────────── */
 
+/**
+ * 弹窗宽度档位。
+ *
+ * 与抽屉同理：迁移前 9 个弹窗用了 8 种宽度（440 / 560 / 640 / 760 / 980 /
+ * 1080 / 1120 / 1160），连「删除一条记录」这种一句话确认都占 560，「改价表」
+ * 占 1080，两者在屏幕上看起来一样重要。
+ *
+ * 按内容形态分四档：
+ *   - `sm` 520 —— 一句话确认、单个字段（临时密码）；
+ *   - `md` 720 —— 常规表单（默认）；
+ *   - `lg` 960 —— 双列表单、并排区块；
+ *   - `xl` 1200 —— 宽表格、大图预览。
+ */
+export const MODAL_WIDTH = { sm: 520, md: 720, lg: 960, xl: 1200 } as const;
+
+export type ModalSize = keyof typeof MODAL_WIDTH;
+
 export function ModalDialog({
   open,
   onOpenChange,
   title,
   description,
-  width = 720,
+  size = 'md',
+  width,
   footer,
   children,
 }: {
@@ -69,15 +87,20 @@ export function ModalDialog({
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
   description?: ReactNode;
+  /** 宽度档位，默认 `md`。 */
+  size?: ModalSize;
+  /** 例外宽度（像素）。只有档位确实装不下内容时才用，用完请在此处注明原因。 */
   width?: number;
   footer?: ReactNode;
   children: ReactNode;
 }) {
+  const resolvedWidth = width ?? MODAL_WIDTH[size];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="admin-modal"
-        style={{ maxWidth: width }}
+        style={{ maxWidth: resolvedWidth }}
         className="admin-portal flex max-h-[calc(100dvh-48px)] flex-col gap-0 overflow-hidden p-0"
       >
         <DialogHeader className="shrink-0 border-b border-border px-5 py-3.5">
@@ -108,29 +131,64 @@ export function ModalDialog({
 
 /* ────────────────────────── 右侧抽屉 ────────────────────────── */
 
+/**
+ * 抽屉宽度档位。
+ *
+ * 迁移前 21 个抽屉散着 11 种宽度（520 / 540 / 560 / 620 / 640 / 680 / 700 /
+ * 720 / 760 / 820 / 1080）—— 同样是「一列表单」的抽屉，从用户页进是 520，
+ * 从优惠券页进是 560，从通知页进是 640，切换页面时右侧面板会一跳一跳。
+ *
+ * 只保留四档，按内容形态选，不按页面选：
+ *   - `sm` 520 —— 3~6 个字段的单列表单；
+ *   - `md` 640 —— 双列栅格表单（默认）；
+ *   - `lg` 760 —— 带内嵌列表 / 明细块的表单与详情；
+ *   - `xl` 1080 —— 内含宽表格（对账明细）。
+ */
+export const DRAWER_WIDTH = { sm: 520, md: 640, lg: 760, xl: 1080 } as const;
+
+export type DrawerSize = keyof typeof DRAWER_WIDTH;
+
 export function Drawer({
   open,
-  onOpenChange,
+  onClose,
   title,
   description,
-  width = 520,
+  size = 'md',
+  width,
   footer,
   children,
 }: {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  /*
+   * 只接 `onClose`，不接 `onOpenChange`。
+   *
+   * 21 个抽屉里有 19 个写的是同一段
+   * `onOpenChange={(next) => { if (!next) onClose(); }}` —— 三行样板，唯一
+   * 变化是回调用哪个名字。打开方向没有调用方需要，收成单向即可。
+   */
+  onClose: () => void;
   title: ReactNode;
   description?: ReactNode;
+  /** 宽度档位，默认 `md`。 */
+  size?: DrawerSize;
+  /** 例外宽度（像素）。只有档位确实装不下内容时才用，用完请在此处注明原因。 */
   width?: number;
   footer?: ReactNode;
   children: ReactNode;
 }) {
+  const resolvedWidth = width ?? DRAWER_WIDTH[size];
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
       <SheetContent
         data-testid="admin-drawer"
         side="right"
-        style={{ width, maxWidth: '100vw' }}
+        style={{ width: resolvedWidth, maxWidth: '100vw' }}
         className="admin-portal flex w-full flex-col gap-0 p-0 sm:max-w-none"
       >
         <SheetHeader className="border-b border-border px-5 py-4">
@@ -301,6 +359,13 @@ export function RowMenu({ items, label = '更多' }: { items: RowMenuItem[]; lab
         className="admin-portal w-40"
         aria-label="更多操作"
         aria-labelledby={undefined}
+        /*
+         * 菜单 Portal 到 body，但 React 合成事件沿组件树冒泡：菜单项是
+         * div[role=menuitem]，绕过了表格行「button/a/input/label」的守卫，
+         * 点「删除」会连带触发 onRowClick 弹出编辑抽屉。在此截断冒泡 ——
+         * 菜单项的 onSelect 在冒泡前已执行，菜单自身行为不受影响。
+         */
+        onClick={(event) => event.stopPropagation()}
       >
         <DropdownMenuGroup>
           {items.map((item) => (

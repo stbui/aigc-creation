@@ -72,27 +72,26 @@ export function buildCampaignPayload(form: FormState): UpsertCampaignPayload | s
    * datetime-local 只到分钟：编辑回填后若用户只改了名称，直接提交会把原有
    * 秒/毫秒抹成 00，限时活动的边界被悄悄挪动。未改动时间输入时沿用原始 ISO。
    */
-  const rawStart = form.startAtRaw ? new Date(form.startAtRaw).getTime() : NaN;
-  const rawEnd = form.endAtRaw ? new Date(form.endAtRaw).getTime() : NaN;
-  const startIso =
-    Number.isFinite(rawStart) && form.startAt === toLocalInput(form.startAtRaw)
-      ? new Date(rawStart).toISOString()
-      : new Date(form.startAt).toISOString();
-  const endIso =
-    Number.isFinite(rawEnd) && form.endAt === toLocalInput(form.endAtRaw)
-      ? new Date(rawEnd).toISOString()
-      : new Date(form.endAt).toISOString();
-
-  const start = new Date(startIso);
-  const end = new Date(endIso);
+  const rawStart = form.startAtRaw ? new Date(form.startAtRaw) : null;
+  const rawEnd = form.endAtRaw ? new Date(form.endAtRaw) : null;
+  const typedStart = new Date(form.startAt);
+  const typedEnd = new Date(form.endAt);
+  const start =
+    rawStart && Number.isFinite(rawStart.getTime()) && form.startAt === toLocalInput(form.startAtRaw)
+      ? rawStart
+      : typedStart;
+  const end =
+    rawEnd && Number.isFinite(rawEnd.getTime()) && form.endAt === toLocalInput(form.endAtRaw)
+      ? rawEnd
+      : typedEnd;
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '时间格式非法';
   if (end <= start) return '结束时间必须晚于开始时间';
 
   const payload: UpsertCampaignPayload = {
     name,
     type: form.type,
-    startAt: startIso,
-    endAt: endIso,
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
     status: form.status,
     onlyNewUsers: form.onlyNewUsers,
     payload: {},
@@ -109,15 +108,17 @@ export function buildCampaignPayload(form: FormState): UpsertCampaignPayload | s
     payload.payload = { capabilityIds: ids };
   } else {
     if (!form.title.trim()) return '请填写弹窗标题';
-    // 站内相对路径：后端限定不接受外链，前端先拦一道给出更友好的提示
-    if (form.ctaUrl.trim() && !form.ctaUrl.trim().startsWith('/')) {
-      return '跳转地址必须是站内相对路径(以 / 开头)';
+    // 站内相对路径：后端限定不接受外链，前端先拦一道给出更友好的提示。
+    // `//evil.com` 虽以 / 开头，但浏览器会当协议相对地址跳站外，C 端会静默兜底成 /packages。
+    const ctaUrl = form.ctaUrl.trim();
+    if (ctaUrl && (!ctaUrl.startsWith('/') || ctaUrl.startsWith('//'))) {
+      return '跳转地址必须是站内相对路径(以 / 开头，不接受 // 开头的站外地址)';
     }
     payload.payload = {
       title: form.title.trim(),
       body: form.body.trim(),
       ctaText: form.ctaText.trim(),
-      ctaUrl: form.ctaUrl.trim(),
+      ctaUrl,
     };
   }
   return payload;

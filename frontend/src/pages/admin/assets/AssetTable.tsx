@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  AdminDataTable,
+  StatusTag,
+  formatDateTime,
+  type AdminColumn,
+} from '~/admin-ui/primitives';
 import { AssetThumb } from './AssetThumb';
 import { BACKEND_LABEL, type AssetRow } from './constants';
 import { assetLabel, fmtBytes, fmtFormat, thumbSrc } from './utils';
@@ -147,8 +153,9 @@ export function AssetTable({
       {
         key: 'createdAt',
         title: '上传时间',
-        width: 120,
-        render: (row) => new Date(row.createdAt).toLocaleDateString('zh-CN'),
+        /* 标题写「时间」就该给到分秒；只到日期的列在排序时看不出先后 */
+        width: 170,
+        render: (row) => formatDateTime(row.createdAt),
       },
       {
         key: 'ops',

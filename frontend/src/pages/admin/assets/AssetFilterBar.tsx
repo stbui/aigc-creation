@@ -50,7 +50,6 @@ export function AssetFilterBar({
       <SelectField
         className="w-32"
         ariaLabel="按类型筛选"
-        placeholder="类型"
         allowClear
         clearLabel="全部类型"
         value={kind}
@@ -60,7 +59,6 @@ export function AssetFilterBar({
       <SelectField
         className="w-32"
         ariaLabel="按状态筛选"
-        placeholder="状态"
         allowClear
         clearLabel="全部状态"
         value={status}
@@ -70,7 +68,6 @@ export function AssetFilterBar({
       <SelectField
         className="w-36"
         ariaLabel="按存储后端筛选"
-        placeholder="存储后端"
         allowClear
         clearLabel="全部存储后端"
         value={backend}

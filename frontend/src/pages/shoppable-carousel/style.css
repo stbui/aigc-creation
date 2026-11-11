@@ -806,10 +806,9 @@
   padding: 16px 24px 20px;
 }
 
-.sc-form-footer .pk-number-control button {
+.sc-form-footer [data-slot='number-stepper'] button {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
   background: var(--surface-soft);
   font-size: 18px;
 }
@@ -954,7 +953,7 @@
   color: var(--text-desc);
 }
 
-.sc-footer-row .pk-number-control {
+.sc-footer-row [data-slot='number-stepper'] {
   flex: none;
 }
 

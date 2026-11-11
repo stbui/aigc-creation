@@ -63,7 +63,6 @@ export const AdminCreditsPage = lazyAdminPage(() => import('./credits'), 'AdminC
 export const AdminRetentionPage = lazyAdminPage(() => import('./retention'), 'AdminRetentionPage');
 export const AdminInvoicesPage = lazyAdminPage(() => import('./invoices'), 'AdminInvoicesPage');
 export const AdminPaymentsPage = lazyAdminPage(() => import('./payments'), 'AdminPaymentsPage');
-export const AdminLegalPage = lazyAdminPage(() => import('./legal'), 'AdminLegalPage');
 export const AdminNotificationsPage = lazyAdminPage(
   () => import('./notifications'),
   'AdminNotificationsPage',

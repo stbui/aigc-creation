@@ -53,7 +53,6 @@ export function BillingFilterBar({
     <FilterBar>
       <SelectField
         ariaLabel="账单状态"
-        placeholder="全部状态"
         clearLabel="全部状态"
         value={status}
         options={[REVIEW_OPTION, ...STATUS_OPTIONS]}
@@ -63,7 +62,6 @@ export function BillingFilterBar({
       />
       <SelectField
         ariaLabel="计费方式"
-        placeholder="全部计费方式"
         clearLabel="全部计费方式"
         value={billingMode}
         options={BILLING_MODE_OPTIONS}

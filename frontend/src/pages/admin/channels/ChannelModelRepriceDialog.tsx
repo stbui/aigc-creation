@@ -147,7 +147,7 @@ export function ChannelModelRepriceDialog({
       onOpenChange={(next) => {
         if (!next && !saving) onClose();
       }}
-      width={1080}
+      size="xl"
       title={`统一调价 · ${models.length} 个商品`}
       description={`渠道 ${channelName}：只改已启用规格的售价，不改成本与启停状态`}
       footer={

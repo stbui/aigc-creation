@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ConfirmDialog, TextField } from '~/admin-ui/primitives';
+import { ActionButton, ConfirmDialog, ModalDialog, TextField } from '~/admin-ui/primitives';
 import { yuan } from './utils';
 import type { AdminOrderRefund, AdminOrderRow } from '../../../types/api';
 
@@ -21,33 +21,48 @@ export function OrderActionDialog({
   action,
   refundYuan,
   refundReason,
+  markPaidNote,
   loading,
   onRefundYuanChange,
   onRefundReasonChange,
+  onMarkPaidNoteChange,
   onCancel,
   onConfirm,
 }: {
   action: { kind: 'markPaid' | 'refund'; row: AdminOrderRow } | null;
   refundYuan: string;
   refundReason: string;
+  /** 手工核销依据。人工入账没有渠道报文，必须留下书面凭据 */
+  markPaidNote: string;
   loading: boolean;
   onRefundYuanChange: (value: string) => void;
   onRefundReasonChange: (value: string) => void;
+  onMarkPaidNoteChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   if (!action) return null;
+  const isRefund = action.kind === 'refund';
+  /*
+   * 两个必填项在按钮上先拦住：格式错/没填原因跑到后端再弹 toast，
+   * 等于让运营白等一次往返。后端校验保留作为最后一道。
+   */
+  const refundAmountValid = /^\d+(\.\d{1,2})?$/.test(refundYuan.trim()) && Number(refundYuan) > 0;
+  const confirmDisabled = isRefund
+    ? !refundAmountValid || !refundReason.trim()
+    : !markPaidNote.trim();
   return (
     <ConfirmDialog
       open
-      title={action.kind === 'markPaid' ? '手工核销订单' : '订单退款'}
-      confirmText={action.kind === 'markPaid' ? '确认已收款' : '确认退款'}
-      danger={action.kind === 'refund'}
+      title={isRefund ? '订单退款' : '手工核销订单'}
+      confirmText={isRefund ? '确认退款' : '确认已收款'}
+      danger={isRefund}
       loading={loading}
+      confirmDisabled={confirmDisabled}
       onCancel={onCancel}
       onConfirm={onConfirm}
       description={
-        action.kind === 'markPaid' ? (
+        !isRefund ? (
           <>
             <p>
               将先生成一条 <b>channel=manual</b> 的支付流水，再把订单置为已支付并发放积分/会员权益。
@@ -71,13 +86,14 @@ export function OrderActionDialog({
         )
       }
       impact={
-        action.kind === 'markPaid'
+        !isRefund
           ? [
               '订单状态 → 已支付',
               `发放 ${action.row.grantedCredits > 0 ? action.row.grantedCredits : '（按商品配置）'} 积分`,
               action.row.membershipPlanName
                 ? `激活会员：${action.row.membershipPlanName}`
                 : '不涉及会员',
+              '核销依据会写进支付流水，供财务追溯',
             ]
           : [
               `退款金额 ¥ ${refundYuan || '未填'}`,
@@ -86,7 +102,21 @@ export function OrderActionDialog({
             ]
       }
       extra={
-        action.kind === 'refund' ? (
+        !isRefund ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">核销依据（必填）</span>
+            <TextField
+              ariaLabel="核销依据"
+              value={markPaidNote}
+              onChange={onMarkPaidNoteChange}
+              placeholder="如：线下转账已到账，凭证号 20261111001"
+              maxLength={200}
+            />
+            <span className="text-[12px] leading-5 text-muted-foreground">
+              手工核销不产生渠道流水，这段文字是财务对账时唯一能解释这笔入账的依据。
+            </span>
+          </div>
+        ) : (
           <>
             <div className="flex flex-col gap-1.5">
               <span className="text-xs text-muted-foreground">退款金额（元）</span>
@@ -125,7 +155,7 @@ export function OrderActionDialog({
               约束（可退时间窗 / 比例上限 / 已消耗积分）。超出规则时会在提示里说明该调哪一条。
             </p>
           </>
-        ) : undefined
+        )
       }
     />
   );
@@ -267,5 +297,58 @@ export function BatchMarkPaidDialog({
         '发放对应的积分或会员权益',
       ]}
     />
+  );
+}
+
+export interface BatchMarkPaidFailure {
+  orderNo: string;
+  message: string;
+}
+
+/**
+ * 批量核销结果。
+ *
+ * 逐条执行必然出现「部分成功」，后端也逐条返回了原因（`common/batch.ts`
+ * 的 `results[].message`）。只报一句「失败 3 单」等于让运营自己在 40 行里
+ * 猜是哪 3 单、为什么 —— 这里把订单号与原因摆出来，失败项还会保留勾选
+ * 以便修完原因直接重试。
+ */
+export function BatchMarkPaidResultDialog({
+  summary,
+  onClose,
+}: {
+  summary: {
+    total: number;
+    succeeded: number;
+    failed: number;
+    failures: BatchMarkPaidFailure[];
+  } | null;
+  onClose: () => void;
+}) {
+  if (!summary) return null;
+  return (
+    <ModalDialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={`批量核销结果：成功 ${summary.succeeded} 笔，失败 ${summary.failed} 笔`}
+      description="失败项已保留勾选。按下列原因处理后可直接重试，无需重新勾选。"
+      size="md"
+      footer={
+        <ActionButton variant="secondary" size="sm" onClick={onClose}>
+          关闭
+        </ActionButton>
+      }
+    >
+      <ul className="divide-y divide-border rounded-lg border border-border">
+        {summary.failures.map((failure) => (
+          <li key={failure.orderNo} className="flex flex-col gap-0.5 px-3 py-2">
+            <code className="font-mono text-xs text-foreground">{failure.orderNo}</code>
+            <span className="text-[12px] leading-4 text-danger-text">{failure.message}</span>
+          </li>
+        ))}
+      </ul>
+    </ModalDialog>
   );
 }

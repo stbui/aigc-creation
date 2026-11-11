@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+
+import {
+  MaskSession,
+  pointInsideRect,
+  sourcePoint,
+  type DragMode,
+  type Mark,
+  type RegionBounds,
+} from '../mask-sdk';
 
 /** 去水印标注工具：参考站上传态只提供抓手与框选，默认框选。 */
 export type WatermarkMaskTool = 'hand' | 'rect';
 
 type ResizeHandle = 'n' | 'e' | 's' | 'w';
 
-export interface WatermarkMaskRegion {
-  id: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  sourceWidth: number;
-  sourceHeight: number;
-}
+/** 去水印的标注区域与 SDK 的包围盒同源。 */
+export type WatermarkMaskRegion = RegionBounds;
 
 export interface WatermarkMaskHandle {
   toBlob: () => Promise<Blob | null>;
@@ -23,27 +25,7 @@ export interface WatermarkMaskHandle {
   remove: (id: number) => void;
 }
 
-interface RectMark {
-  id: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface DragState {
-  mode: 'move' | 'resize';
-  mark: RectMark;
-  snapshot: RectMark;
-  start: { x: number; y: number };
-  handle?: ResizeHandle;
-}
-
 const RESIZE_HANDLES: ResizeHandle[] = ['n', 'e', 's', 'w'];
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
 
 function framePosition(imageWidth: number, imageHeight: number) {
   if (imageWidth <= 0 || imageHeight <= 0) {
@@ -58,12 +40,16 @@ function framePosition(imageWidth: number, imageHeight: number) {
 }
 
 /**
- * 去水印画布。
+ * 去水印画布 —— 页面侧适配层。
  *
- * 可见标注使用参考站同款 `.redraw-image-frame > .mask-layer > .mask-mark` DOM，
- * 不再用 canvas 位图覆盖交互。离屏遮罩仅在提交时生成：白底 + 透明标注区域。
+ * 标记、撤销栈、手势、遮罩与导出都在 `mask-sdk` 的会话里；本组件只负责
+ * 画框布局、指针捕获与可见标注层。可见标注使用参考站同款
+ * `.redraw-image-frame > .mask-layer > .mask-mark` DOM，遮罩仅在提交时导出。
+ *
+ * 记忆化：本组件的 props 全部由页面稳定持有（setPan / handleMaskState / ref），
+ * 页面因标注计数或上传态重渲染时无需重走标注 DOM。
  */
-export function WatermarkMaskEditor({
+export const WatermarkMaskEditor = memo(function WatermarkMaskEditor({
   url,
   alt,
   tool,
@@ -82,156 +68,65 @@ export function WatermarkMaskEditor({
   onState: (painted: boolean, canUndo: boolean, canRedo: boolean, regions: WatermarkMaskRegion[]) => void;
   handleRef: { current: WatermarkMaskHandle | null };
 }) {
-  const canvasRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const naturalRef = useRef({ w: 0, h: 0 });
-  const nextIdRef = useRef(1);
-  const startRef = useRef<{ x: number; y: number } | null>(null);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
-  const dragRef = useRef<DragState | null>(null);
-
-  const [marks, setMarks] = useState<RectMark[]>([]);
-  const [redoMarks, setRedoMarks] = useState<RectMark[]>([]);
-  const [draft, setDraft] = useState<RectMark | null>(null);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  /** 手势开始时缓存的画框矩形；逐次 pointermove 读取会强制重排。 */
+  const gestureRectRef = useRef<DOMRect | null>(null);
   const [panning, setPanning] = useState(false);
-  const [imageRevision, setImageRevision] = useState(0);
 
-  const marksRef = useRef(marks);
-  const redoRef = useRef(redoMarks);
-  useEffect(() => {
-    marksRef.current = marks;
-  }, [marks]);
-  useEffect(() => {
-    redoRef.current = redoMarks;
-  }, [redoMarks]);
+  const sessionRef = useRef<MaskSession | null>(null);
+  /* 去水印拖出新框时不立即显示缩放柄，抬起提交后再选中。 */
+  if (!sessionRef.current) sessionRef.current = new MaskSession({ selectDraftShape: false });
+  const session = sessionRef.current;
+
+  const version = useSyncExternalStore(session.subscribe, session.getVersion, session.getVersion);
+  const overlay = useMemo(() => session.getOverlayModel(), [session, version]);
+
+  /* 离散状态才回传页面；连续手势只刷新叠层。 */
+  useEffect(
+    () =>
+      session.onStateChange((state) => {
+        onState(state.painted, state.canUndo, state.canRedo, state.regions);
+      }),
+    [onState, session],
+  );
+
+  useEffect(() => () => session.dispose(), [session]);
 
   useEffect(() => {
     naturalRef.current = { w: 0, h: 0 };
-    nextIdRef.current = 1;
-    startRef.current = null;
     panStartRef.current = null;
-    dragRef.current = null;
-    setMarks([]);
-    setRedoMarks([]);
-    marksRef.current = [];
-    redoRef.current = [];
-    setDraft(null);
-    setSelectedId(null);
+    gestureRectRef.current = null;
+    session.reset();
     setPanning(false);
-  }, [url]);
+  }, [session, url]);
 
-  const regions: WatermarkMaskRegion[] = marks.map((mark) => ({
-    ...mark,
-    sourceWidth: naturalRef.current.w,
-    sourceHeight: naturalRef.current.h,
-  }));
-
+  /* 缩放 / 平移 / 换图都会改变画框矩形，手势缓存必须作废。 */
   useEffect(() => {
-    onState(marks.length > 0, marks.length > 0, redoMarks.length > 0, regions);
-    // regions 由 marks / 图片尺寸派生；imageRevision 让 onLoad 后重新发布一次。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [marks, redoMarks, imageRevision, onState]);
+    gestureRectRef.current = null;
+  }, [zoom, pan, url]);
 
   const pointFromClient = useCallback((clientX: number, clientY: number) => {
-    const frame = frameRef.current;
     const { w, h } = naturalRef.current;
-    const rect = frame?.getBoundingClientRect();
-    if (!rect || rect.width <= 0 || rect.height <= 0 || w <= 0 || h <= 0) return null;
-    return {
-      x: clamp(((clientX - rect.left) / rect.width) * w, 0, w),
-      y: clamp(((clientY - rect.top) / rect.height) * h, 0, h),
-      inside:
-        clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom,
-    };
-  }, []);
-
-  const setMark = useCallback((next: RectMark) => {
-    const updated = marksRef.current.map((mark) => (mark.id === next.id ? next : mark));
-    marksRef.current = updated;
-    setMarks(updated);
-  }, []);
-
-  const commitMark = useCallback((mark: RectMark) => {
-    const updated = [...marksRef.current, mark];
-    marksRef.current = updated;
-    redoRef.current = [];
-    setMarks(updated);
-    setRedoMarks([]);
-    setSelectedId(mark.id);
-    setDraft(null);
-    startRef.current = null;
-  }, []);
-
-  const undo = useCallback(() => {
-    const current = marksRef.current;
-    const last = current[current.length - 1];
-    if (!last) return;
-    const next = current.slice(0, -1);
-    const redo = [last, ...redoRef.current];
-    marksRef.current = next;
-    redoRef.current = redo;
-    setMarks(next);
-    setRedoMarks(redo);
-    setSelectedId((selected) => (selected === last.id ? null : selected));
-  }, []);
-
-  const redo = useCallback(() => {
-    const next = redoRef.current[0];
-    if (!next) return;
-    const redo = redoRef.current.slice(1);
-    const updated = [...marksRef.current, next];
-    marksRef.current = updated;
-    redoRef.current = redo;
-    setMarks(updated);
-    setRedoMarks(redo);
-    setSelectedId(next.id);
-  }, []);
-
-  const clear = useCallback(() => {
-    marksRef.current = [];
-    redoRef.current = [];
-    setMarks([]);
-    setRedoMarks([]);
-    setDraft(null);
-    setSelectedId(null);
-    startRef.current = null;
-    dragRef.current = null;
-  }, []);
-
-  const remove = useCallback((id: number) => {
-    const updated = marksRef.current.filter((mark) => mark.id !== id);
-    marksRef.current = updated;
-    redoRef.current = [];
-    setMarks(updated);
-    setRedoMarks([]);
-    setSelectedId((selected) => (selected === id ? null : selected));
-  }, []);
-
-  const toBlob = useCallback((): Promise<Blob | null> => {
-    const { w, h } = naturalRef.current;
-    const current = marksRef.current;
-    if (w <= 0 || h <= 0 || current.length === 0) return Promise.resolve(null);
-
-    const mask = document.createElement('canvas');
-    mask.width = w;
-    mask.height = h;
-    const ctx = mask.getContext('2d');
-    if (!ctx) return Promise.resolve(null);
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'black';
-    for (const mark of current) ctx.fillRect(mark.x, mark.y, mark.width, mark.height);
-    return new Promise<Blob | null>((resolve) => mask.toBlob((blob) => resolve(blob), 'image/png'));
+    const rect = gestureRectRef.current ?? frameRef.current?.getBoundingClientRect() ?? null;
+    const point = sourcePoint(clientX, clientY, rect, w, h);
+    if (!point || !rect) return null;
+    return { ...point, inside: pointInsideRect(rect, clientX, clientY) };
   }, []);
 
   useEffect(() => {
-    handleRef.current = { toBlob, clear, undo, redo, remove };
+    handleRef.current = {
+      toBlob: () => session.toBlob(),
+      clear: () => session.clear(),
+      undo: () => session.undo(),
+      redo: () => session.redoStep(),
+      remove: (id: number) => session.removeRegion(id),
+    };
     return () => {
       handleRef.current = null;
     };
-  }, [clear, handleRef, redo, remove, toBlob, undo]);
+  }, [handleRef, session]);
 
   const onCanvasPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -243,11 +138,14 @@ export function WatermarkMaskEditor({
       return;
     }
 
+    /* 画框在本次手势内不会移动，缓存矩形避免每次 pointermove 强制重排。 */
+    gestureRectRef.current = frameRef.current?.getBoundingClientRect() ?? null;
     const point = pointFromClient(event.clientX, event.clientY);
-    if (!point || !point.inside) return;
-    startRef.current = { x: point.x, y: point.y };
-    setSelectedId(null);
-    setDraft({ id: nextIdRef.current, x: point.x, y: point.y, width: 0, height: 0 });
+    if (!point || !point.inside) {
+      gestureRectRef.current = null;
+      return;
+    }
+    session.beginGesture('rect', point);
   };
 
   const onCanvasPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -258,102 +156,63 @@ export function WatermarkMaskEditor({
       });
       return;
     }
-    if (!startRef.current || !draft) return;
+    if (!session.isGesturing()) return;
     const point = pointFromClient(event.clientX, event.clientY);
     if (!point) return;
-    const start = startRef.current;
-    setDraft({
-      ...draft,
-      x: Math.min(start.x, point.x),
-      y: Math.min(start.y, point.y),
-      width: Math.abs(point.x - start.x),
-      height: Math.abs(point.y - start.y),
-    });
+    session.extendGesture(point);
   };
 
   const onCanvasPointerUp = () => {
     panStartRef.current = null;
+    gestureRectRef.current = null;
     setPanning(false);
-    if (!draft) return;
-    if (draft.width >= 4 && draft.height >= 4) {
-      nextIdRef.current += 1;
-      commitMark(draft);
-    } else {
-      setDraft(null);
-      startRef.current = null;
-    }
+    session.endGesture();
   };
 
   const onCanvasPointerCancel = () => {
     panStartRef.current = null;
-    startRef.current = null;
-    dragRef.current = null;
+    gestureRectRef.current = null;
     setPanning(false);
-    setDraft(null);
+    session.cancelGesture();
   };
 
   const beginMarkInteraction = (
     event: React.PointerEvent<HTMLElement>,
-    mark: RectMark,
-    mode: DragState['mode'],
+    mark: Mark,
+    mode: DragMode,
     handle?: ResizeHandle,
   ) => {
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
-    setSelectedId(mark.id);
-    setRedoMarks([]);
-    dragRef.current = {
+    gestureRectRef.current = frameRef.current?.getBoundingClientRect() ?? null;
+    const started = session.beginDrag(
+      mark.id,
       mode,
-      mark: { ...mark },
-      snapshot: { ...mark },
-      start: pointFromClient(event.clientX, event.clientY) ?? { x: 0, y: 0 },
+      pointFromClient(event.clientX, event.clientY) ?? { x: 0, y: 0 },
       handle,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    );
+    if (started) event.currentTarget.setPointerCapture(event.pointerId);
+    else gestureRectRef.current = null;
   };
 
   const onMarkPointerMove = (event: React.PointerEvent<HTMLElement>) => {
-    const drag = dragRef.current;
-    if (!drag) return;
+    if (!session.isDragging()) return;
     event.stopPropagation();
     const point = pointFromClient(event.clientX, event.clientY);
     if (!point) return;
-    const dx = point.x - drag.start.x;
-    const dy = point.y - drag.start.y;
-    const { w, h } = naturalRef.current;
-    const snapshot = drag.snapshot;
-    let next: RectMark;
-
-    if (drag.mode === 'move') {
-      next = {
-        ...drag.mark,
-        x: clamp(snapshot.x + dx, 0, Math.max(0, w - snapshot.width)),
-        y: clamp(snapshot.y + dy, 0, Math.max(0, h - snapshot.height)),
-      };
-    } else {
-      let left = snapshot.x;
-      let top = snapshot.y;
-      let right = snapshot.x + snapshot.width;
-      let bottom = snapshot.y + snapshot.height;
-      if (drag.handle === 'w') left = clamp(left + dx, 0, right - 4);
-      if (drag.handle === 'e') right = clamp(right + dx, left + 4, w);
-      if (drag.handle === 'n') top = clamp(top + dy, 0, bottom - 4);
-      if (drag.handle === 's') bottom = clamp(bottom + dy, top + 4, h);
-      next = { ...drag.mark, x: left, y: top, width: right - left, height: bottom - top };
-    }
-    drag.mark = next;
-    setMark(next);
+    session.extendDrag(point);
   };
 
   const endMarkInteraction = (event: React.PointerEvent<HTMLElement>) => {
-    if (!dragRef.current) return;
+    if (!session.isDragging()) return;
     event.stopPropagation();
-    dragRef.current = null;
+    session.endDrag();
+    gestureRectRef.current = null;
   };
 
-  const visibleMarks = draft ? [...marks, draft] : marks;
   const frame = framePosition(naturalRef.current.w, naturalRef.current.h);
+  const { marks, regionIndex, selectedId } = overlay;
 
   return (
     <div
@@ -361,7 +220,6 @@ export function WatermarkMaskEditor({
       style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom / 100})` }}
     >
       <div
-        ref={canvasRef}
         className={`redraw-canvas tool-${tool}${panning ? ' is-panning' : ''}`}
         onPointerDown={onCanvasPointerDown}
         onPointerMove={onCanvasPointerMove}
@@ -375,33 +233,33 @@ export function WatermarkMaskEditor({
             alt={alt}
             draggable={false}
             onLoad={(event) => {
-              naturalRef.current = {
-                w: event.currentTarget.naturalWidth,
-                h: event.currentTarget.naturalHeight,
-              };
-              setImageRevision((value) => value + 1);
+              const width = event.currentTarget.naturalWidth;
+              const height = event.currentTarget.naturalHeight;
+              if (width <= 0 || height <= 0) return;
+              naturalRef.current = { w: width, h: height };
+              session.setSourceSize(width, height);
             }}
           />
           <div className="mask-layer" aria-hidden="true">
-            {visibleMarks.map((mark, index) => {
-              const { w, h } = naturalRef.current;
+            {marks.map((mark) => {
               const selected = selectedId === mark.id;
+              const index = regionIndex.get(mark.id);
               return (
                 <i
                   key={mark.id}
                   className={`mask-mark rect has-index${selected ? ' is-selected' : ''}`}
                   style={{
-                    left: `${((mark.x + mark.width / 2) / Math.max(w, 1)) * 100}%`,
-                    top: `${((mark.y + mark.height / 2) / Math.max(h, 1)) * 100}%`,
-                    width: `${(mark.width / Math.max(w, 1)) * 100}%`,
-                    height: `${(mark.height / Math.max(h, 1)) * 100}%`,
+                    left: `${((mark.x + mark.width / 2) / Math.max(naturalRef.current.w, 1)) * 100}%`,
+                    top: `${((mark.y + mark.height / 2) / Math.max(naturalRef.current.h, 1)) * 100}%`,
+                    width: `${(mark.width / Math.max(naturalRef.current.w, 1)) * 100}%`,
+                    height: `${(mark.height / Math.max(naturalRef.current.h, 1)) * 100}%`,
                   }}
                   onPointerDown={(event) => beginMarkInteraction(event, mark, 'move')}
                   onPointerMove={onMarkPointerMove}
                   onPointerUp={endMarkInteraction}
                   onPointerCancel={endMarkInteraction}
                 >
-                  <span className="mask-mark-index">{index + 1}</span>
+                  {index ? <span className="mask-mark-index">{index}</span> : null}
                   {selected
                     ? RESIZE_HANDLES.map((handle) => (
                         <span
@@ -422,4 +280,4 @@ export function WatermarkMaskEditor({
       </div>
     </div>
   );
-}
+});

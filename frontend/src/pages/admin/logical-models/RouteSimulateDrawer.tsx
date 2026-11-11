@@ -109,10 +109,8 @@ export function RouteSimulateDrawer({
   return (
     <Drawer
       open={model !== null}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      width={720}
+      onClose={onClose}
+      size="lg"
       title={`消费测试 · ${model?.name ?? ''}`}
       description="只读测试消费落点，不扣费、不创建任务"
       footer={

@@ -2,7 +2,7 @@
  * AdminSettingsPage 的本地常量与类型。
  */
 
-import { DatabaseBackup, MessagesSquare, Network, Scale, type LucideIcon } from 'lucide-react';
+import { DatabaseBackup, MessagesSquare, Network, type LucideIcon } from 'lucide-react';
 
 import type { AdminSettings } from '../../../types/api';
 
@@ -31,13 +31,6 @@ export const RELATED_ENTRIES: RelatedEntry[] = [
     description: '备份频次、恢复验证与保留份数',
     permission: 'backup.read',
     icon: DatabaseBackup,
-  },
-  {
-    to: '/admin/legal',
-    label: '法务文档',
-    description: '用户协议 / 隐私政策 / 未成年人保护 / 账号规则',
-    permission: 'legal.read',
-    icon: Scale,
   },
   {
     to: '/admin/tickets',

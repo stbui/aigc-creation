@@ -3,34 +3,17 @@
  *
  * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
  * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ *
+ * 2026-11-11 重设计:
+ * - **响应式断点统一移到文件末尾**。原先 `@media (max-width:900px)` 写在
+ *   文件头，被后面的 `.co-layout` / `.co-side` 基础规则（同特异性、后定义）
+ *   覆盖，移动端仍是 `1fr 336px` 双列，主区被压成竖排单字；
+ * - 商品信息由「标签 + 右对齐值」表格改为主视觉商品行 + 规格标签行；
+ * - 金额卡改为汇总主操作区：明细逐行、优惠码独立成组、价格块强突出；
+ * - 卡片标题带步骤序号，页头补信任标识。
+ *
+ * 只改视觉层：所有类名、props 与支付状态分支保持原样，颜色一律走令牌。
  */
-
-/* ════════════════════════════════════════════════════════════════════════════
-   结算与支付态 (2026-10-20 接入真实订单与沙箱支付后补齐)
-   订单与沙箱支付链路已通, confirm / pay-btn / result-card 有了真实数据可承载。
-   ════════════════════════════════════════════════════════════════════════════ */
-
-/* ── 结算页 (CheckoutPage) ────────────────────────────────────────────────
-   2026-10-30 优化:
-   - 去掉页面自带的 100vh 灰底与 24px 内边距 —— 结算页在 AppShell 内,
-     .app-content 已经给过留白, 再套一层灰底会浮出一块与外壳错位的色块;
-   - 560px 单列改为 1040px 双列: 左侧套餐/权益/支付方式, 右侧金额与支付按钮
-     粘性跟随, 宽屏不再留大半屏空白;
-   - 应付金额由 `--pkg-alipay` 蓝改回品牌紫 —— 全站唯一强调色是 #5546D8;
-   - 颜色全部走令牌, 去掉 #f5d9a8 / #fffaeb / #8a5a00 / #a32d2d 等裸值。
-   共用类 .pkg-confirm-card / .pkg-confirm-row / .pkg-pay-btn / .pkg-pay-hint /
-   .pkg-sandbox-btn / .pkg-result-actions / .pkg-result-btn 仍被 OrdersPage
-   的订单抽屉复用, 只在此处改成直接引用令牌, 不改变结构与尺寸。 */
-
-@media (max-width: 900px) {
-  .co-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .co-side {
-    position: static;
-  }
-}
 
 .pkg-checkout-page {
   --co-line: var(--border);
@@ -38,9 +21,9 @@
   --co-muted: var(--text-muted);
   --co-text: var(--text-strong);
   width: 100%;
-  max-width: 1040px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 4px 0 48px;
+  padding: 4px 0 64px;
   box-sizing: border-box;
   animation: 0.35s both fadeIn;
 }
@@ -52,11 +35,20 @@
   margin: 0 auto;
 }
 
+/* ── 页头 ─────────────────────────────────────────────────────────────── */
+.co-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .co-back {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 0 0 12px -2px;
+  margin: 0;
   padding: 6px 0;
   border: 0;
   background: none;
@@ -67,12 +59,23 @@
 }
 
 .co-back:hover {
-  color: var(--co-text);
+  color: var(--brand);
 }
 
-/* ── 页头 ─────────────────────────────────────────────────────────────── */
+.co-trust {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--success-text) 10%, transparent);
+  color: var(--success-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .co-head {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .co-head-title {
@@ -84,9 +87,9 @@
 
 .co-head-title h1 {
   margin: 0;
-  font-size: 22px;
-  line-height: 30px;
-  letter-spacing: -0.3px;
+  font-size: 26px;
+  line-height: 34px;
+  letter-spacing: -0.4px;
   color: var(--co-text);
 }
 
@@ -110,8 +113,8 @@
 /* ── 双列骨架: 左内容 + 右粘性结算栏 ───────────────────────────────────── */
 .co-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 336px;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
   align-items: start;
 }
 
@@ -123,7 +126,7 @@
 }
 
 .co-card {
-  padding: 18px 20px;
+  padding: 20px 22px;
   border: 1px solid var(--co-line);
   border-radius: var(--radius-panel);
   background: var(--card-bg);
@@ -138,17 +141,105 @@
 }
 
 .co-card-head h2 {
+  display: flex;
+  align-items: center;
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--co-text);
 }
 
 .co-card-head > span {
+  flex: none;
   font-size: 12px;
   color: var(--text-desc);
 }
 
+.co-step {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  border-radius: 6px;
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── 商品主视觉行 ─────────────────────────────────────────────────────── */
+.co-product {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--co-line-soft);
+  border-radius: var(--radius-card);
+  background: var(--surface-tint);
+}
+
+.co-product-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.co-product-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.co-product-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--co-text);
+  word-break: break-word;
+}
+
+.co-product-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--co-muted);
+}
+
+.co-product-price {
+  flex: none;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--co-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.co-product-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.co-product-tags li {
+  padding: 4px 10px;
+  border: 1px solid var(--co-line-soft);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+/* 旧版 dl 明细表保留规则, 避免其他调用方贴用这些类名时样式丢失 */
 .co-rows {
   margin: 0;
 }
@@ -174,6 +265,7 @@
 
 .co-row dd {
   margin: 0;
+  min-width: 0;
   font-size: 14px;
   font-weight: 600;
   color: var(--co-text);
@@ -210,13 +302,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 12px;
 }
 
 .co-pay-option {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
   padding: 14px 16px;
   border: 1px solid var(--brand);
   border-radius: var(--radius-card);
@@ -246,6 +338,54 @@
   background: var(--surface);
 }
 
+.co-pay-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--co-line);
+  border-radius: var(--radius-card);
+  background: var(--surface-tint);
+}
+
+.co-pay-empty.is-warn {
+  border-color: color-mix(in srgb, var(--warn-text) 35%, var(--co-line));
+  background: color-mix(in srgb, var(--warn-text) 6%, var(--card-bg));
+}
+
+.co-pay-empty-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.co-pay-empty.is-warn .co-pay-empty-icon {
+  background: var(--warn-text);
+  color: var(--on-brand);
+}
+
+.co-pay-empty-title {
+  margin: 3px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--co-text);
+}
+
+.co-pay-empty-desc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--co-muted);
+}
+
 .co-blocked {
   display: flex;
   flex-direction: column;
@@ -262,12 +402,12 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-control);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: var(--brand);
   color: var(--on-brand);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -292,32 +432,6 @@
 .co-pay-check {
   flex: none;
   color: var(--brand);
-}
-
-/* ⚠ 沙箱声明: 不做「假支付蒙混」。真实通道接入前必须让用户清楚
-   这里不产生真实扣款, 否则截图外流会被误认为已接通支付。 */
-.co-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--warn-border);
-  border-radius: var(--radius-control);
-  background: var(--warn-bg);
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--warn-text);
-}
-
-.co-notice svg {
-  flex: none;
-  margin-top: 2px;
-}
-
-.co-notice code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
 }
 
 /* ── 帮助信息 ─────────────────────────────────────────────────────────── */
@@ -347,44 +461,60 @@
   object-fit: contain;
 }
 
-/* ── 结算栏 ───────────────────────────────────────────────────────────── */
+/* ── 结算栏（汇总主操作区） ───────────────────────────────────────────── */
 .co-side {
   position: sticky;
-  top: 16px;
+  top: 24px;
   min-width: 0;
 }
 
 .co-side-card {
-  padding: 18px 20px;
+  padding: 20px;
   border: 1px solid var(--co-line);
+  border-top: 3px solid var(--brand);
   border-radius: var(--radius-panel);
   background: var(--card-bg);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--text-strong) 5%, transparent);
 }
 
 .co-side-title {
-  margin: 0;
-  font-size: 14px;
+  margin: 0 0 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--co-text);
+}
+
+.co-coupon-box {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-tint);
 }
 
 .co-coupon {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin: 0;
+}
+
+.co-coupon > svg {
+  flex: none;
+  color: var(--brand);
 }
 
 .co-coupon > span {
   flex: none;
-  font-size: 13px;
-  color: var(--co-muted);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--co-text);
 }
 
 .co-coupon input {
   flex: 1;
   min-width: 0;
-  height: 34px;
+  height: 36px;
   padding: 0 10px;
   border: 1px solid var(--co-line);
   border-radius: var(--radius-control);
@@ -403,6 +533,13 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
+.co-coupon-tip {
+  margin: 6px 0 0 22px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-desc);
+}
+
 .co-hint {
   margin: 8px 0 0;
   font-size: 12px;
@@ -419,32 +556,38 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--co-line-soft);
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--brand) 6%, var(--card-bg));
 }
 
 .co-total span {
   font-size: 13px;
-  color: var(--co-muted);
+  font-weight: 600;
+  color: var(--co-text);
 }
 
 .co-total strong {
-  font-size: 28px;
-  line-height: 34px;
+  font-size: 32px;
+  line-height: 38px;
   font-weight: 700;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.8px;
   color: var(--brand);
   font-variant-numeric: tabular-nums;
 }
 
 .co-sub {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  margin-top: 10px;
   font-size: 12px;
+  line-height: 18px;
   color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
 }
 
 .co-pay-btn {
@@ -452,64 +595,30 @@
   align-items: center;
   justify-content: center;
   width: 100%;
+  min-height: 48px;
   margin-top: 16px;
   padding: 12px 20px;
   border: 0;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-card);
   background: var(--brand);
   color: var(--on-brand);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 22%, transparent);
+  transition: background 0.15s, transform 0.15s;
 }
 
 .co-pay-btn:hover:not(:disabled) {
   background: var(--brand-hover);
+  transform: translateY(-1px);
 }
 
 .co-pay-btn:disabled {
   background: var(--border-hover);
+  box-shadow: none;
   cursor: not-allowed;
-}
-
-.co-sandbox {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--co-line-soft);
-}
-
-.co-sandbox-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--text-desc);
-}
-
-.co-sandbox-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.co-sandbox-btn {
-  padding: 8px;
-  border: 1px solid var(--co-line);
-  border-radius: var(--radius-control);
-  background: var(--card-bg);
-  color: var(--text-body);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.co-sandbox-btn:hover:not(:disabled) {
-  border-color: var(--brand);
-  color: var(--brand);
-}
-
-.co-sandbox-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  transform: none;
 }
 
 .co-qr {
@@ -606,10 +715,13 @@
 }
 
 .co-side-note {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--co-line-soft);
   font-size: 12px;
   line-height: 18px;
   color: var(--text-desc);
+  text-align: center;
 }
 
 /* ── 支付结果 ─────────────────────────────────────────────────────────── */
@@ -697,31 +809,65 @@
   margin-top: 22px;
 }
 
+/* ── 响应式 ───────────────────────────────────────────────────────────────
+   必须放在所有基础规则之后: @media 不提升特异性, 写在文件头会被后面的
+   .co-layout / .co-side 覆盖, 移动端就会退回 1fr 336px 双列。            */
+@media (max-width: 980px) {
+  .co-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .co-side {
+    position: static;
+  }
+}
+
 @media (max-width: 640px) {
   .pkg-checkout-page {
     padding-bottom: 32px;
   }
+
   .co-head-title h1 {
-    font-size: 20px;
+    font-size: 22px;
+    line-height: 30px;
   }
+
+  .co-trust {
+    font-size: 11px;
+  }
+
   .co-card,
   .co-side-card {
     padding: 16px;
   }
+
+  .co-product {
+    flex-wrap: wrap;
+  }
+
+  .co-product-price {
+    margin-left: 66px;
+  }
+
   .co-perks {
     grid-template-columns: minmax(0, 1fr);
   }
+
   .co-total strong {
-    font-size: 24px;
-    line-height: 30px;
+    font-size: 28px;
+    line-height: 34px;
   }
+
   .co-result {
     padding: 28px 18px 22px;
     border-radius: var(--radius-panel);
   }
+
   .co-result-actions {
     flex-direction: column;
   }
+
   .co-result-actions .co-btn {
     width: 100%;
   }

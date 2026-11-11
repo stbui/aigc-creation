@@ -95,10 +95,6 @@ const SECTIONS: SitemapSection[] = [
     color: 'var(--sitemap-accent-4)',
     links: [
       { name: '网站地图', to: '/sitemap.html', path: '/sitemap.html' },
-      { name: '用户协议', to: '/legal/user-agreement.html', path: '/legal/user-agreement.html' },
-      { name: '隐私政策', to: '/legal/privacy-policy.html', path: '/legal/privacy-policy.html' },
-      { name: '账号规则', to: '/legal/account-rules.html', path: '/legal/account-rules.html' },
-      { name: '未成年人保护', to: '/legal/minors-policy.html', path: '/legal/minors-policy.html' },
       { name: '投诉举报', to: '/tickets?type=complaint&compose=1', path: '/tickets?type=complaint&compose=1' },
     ],
   },

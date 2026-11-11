@@ -132,7 +132,7 @@ export function ChannelOrderDialog({
       onOpenChange={(next) => {
         if (!next && !saving && !loading) onClose();
       }}
-      width={640}
+      size="md"
       title={channelId ? `自定义商品排序 · ${channelName ?? ''}` : '调整供应商顺序'}
       description="拖拽或用上下箭头调整顺序，也可输入目标位置。这里包含全部条目，不受列表筛选和分页影响。"
       footer={

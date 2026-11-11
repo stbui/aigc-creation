@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActionButton,
-  Drawer,
+  FormDrawer,
   NumberField,
   SelectField,
   SwitchField,
@@ -88,23 +87,15 @@ export function ChannelFormDrawer({
   };
 
   return (
-    <Drawer
+    <FormDrawer
       open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      width={760}
+      onClose={onClose}
+      size="lg"
       title={editing ? '编辑供应商' : '接入供应商'}
-      footer={
-        <>
-          <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={saving}>
-            取消
-          </ActionButton>
-          <ActionButton variant="default" size="sm" disabled={saving || !writable} onClick={onSubmit}>
-            {saving ? '保存中…' : editing ? '保存修改' : '接入'}
-          </ActionButton>
-        </>
-      }
+      busy={saving}
+      submitLabel={editing ? '保存修改' : '接入'}
+      submitDisabled={!writable}
+      onSubmit={onSubmit}
     >
       <div className="flex flex-col gap-5">
         <section className="flex flex-col gap-3">
@@ -223,7 +214,6 @@ export function ChannelFormDrawer({
                   { value: 'image', label: '图像' },
                   { value: 'text', label: '文本' },
                 ]}
-                placeholder="不设置"
                 allowClear
                 clearLabel="不设置"
                 disabled={!writable}
@@ -386,6 +376,6 @@ export function ChannelFormDrawer({
           />
         </div>
       </div>
-    </Drawer>
+    </FormDrawer>
   );
 }

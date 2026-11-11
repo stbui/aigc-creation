@@ -11,6 +11,7 @@ import { adminOrdersApi } from './api';
 import {
   aggregateRefundState,
   CHANNEL_LABELS,
+  PAYMENT_STATUS_LABELS,
   REFUND_STATUS_LABELS,
   STATUS_LABEL_OVERRIDE,
 } from './constants';
@@ -96,6 +97,11 @@ function rowFromDetail(detail: AdminOrderDetail): AdminOrderRow {
  * 深链意图的自动打开器。
  *
  * 只打开弹窗、不提交；用 ref 防止详情刷新后重复弹出。
+ *
+ * `confirmRefund`（渠道退款结果核对）**刻意不自动打开任何确认框**：
+ * 这个动作有两个方向（已退款 / 退款失败），自动弹出其中一个等于替运营
+ * 选了方向，而「确认已退款」会立刻扣积分、改订单状态。这里只把抽屉打开，
+ * 由运营看完退款记录后在下方的两个按钮上自行选择。
  */
 function OrderIntentAutoOpen({
   detail,
@@ -103,14 +109,12 @@ function OrderIntentAutoOpen({
   canMarkPaid,
   canRefund,
   onAction,
-  onConfirmRefund,
 }: {
   detail: AdminOrderDetail;
   intent: 'markPaid' | 'refund' | 'confirmRefund';
   canMarkPaid: boolean;
   canRefund: boolean;
   onAction: (kind: 'markPaid' | 'refund', row: AdminOrderRow) => void;
-  onConfirmRefund: (orderId: string, refund: AdminOrderRefund) => void;
 }) {
   const fired = useRef(false);
 
@@ -130,16 +134,8 @@ function OrderIntentAutoOpen({
     ) {
       fired.current = true;
       onAction('refund', rowFromDetail(detail));
-      return;
     }
-    if (intent === 'confirmRefund' && canRefund) {
-      const processing = detail.refunds.find((refund) => refund.status === 'processing');
-      if (processing) {
-        fired.current = true;
-        onConfirmRefund(detail.id, processing);
-      }
-    }
-  }, [canMarkPaid, canRefund, detail, intent, onAction, onConfirmRefund]);
+  }, [canMarkPaid, canRefund, detail, intent, onAction]);
 
   return null;
 }
@@ -254,7 +250,6 @@ export function OrderDetailDrawer({
               canMarkPaid={canMarkPaid}
               canRefund={canRefund}
               onAction={onAction}
-              onConfirmRefund={(orderId, refund) => onConfirmRefund(orderId, refund, 'succeeded')}
             />
           )}
           <DetailSection title="订单概要" note="金额以「分」存储，展示按「元」">
@@ -416,6 +411,20 @@ export function OrderDetailDrawer({
                     head={
                       <>
                         {CHANNEL_LABELS[p.channel] ?? p.channel} · ¥ {yuan(p.amountCents)}
+                        {/*
+                         * 状态必须有文字：圆点颜色是唯一的编码时，读屏用户
+                         * 和色弱用户都拿不到「这笔到底成没成」。
+                         */}
+                        <span
+                          className={
+                            p.status === 'succeeded'
+                              ? 'text-[12px] text-success-text'
+                              : 'text-[12px] text-warn-text'
+                          }
+                        >
+                          {' '}
+                          · {PAYMENT_STATUS_LABELS[p.status] ?? p.status}
+                        </span>
                       </>
                     }
                     meta={
@@ -434,6 +443,17 @@ export function OrderDetailDrawer({
 
           {d.refunds.length > 0 && (
             <DetailSection title="退款记录">
+              {/*
+               * 有退款卡在渠道侧时必须显式提示：订单此时仍是「已支付」，
+               * 运营容易以为退款没生效而重复发起。结论要由渠道商户后台给出，
+               * 这里不替渠道判定。
+               */}
+              {d.refunds.some((r) => r.status === 'processing') && (
+                <p className="mb-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12px] leading-5 text-foreground">
+                  有退款仍在<b>渠道处理中</b>：订单状态与积分尚未变化。请先到渠道商户后台核对最终结果，
+                  再在下方选择「确认渠道已退款」或「确认退款失败」。
+                </p>
+              )}
               <ul className="divide-y divide-border rounded-lg border border-border">
                 {d.refunds.map((r) => (
                   <RecordRow

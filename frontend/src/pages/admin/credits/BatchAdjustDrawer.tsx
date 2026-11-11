@@ -148,11 +148,9 @@ export function BatchAdjustDrawer({
   return (
     <Drawer
       title="批量调整积分"
-      width={680}
+      size="lg"
       open={open}
-      onOpenChange={(next) => {
-        if (!next) requestClose();
-      }}
+      onClose={requestClose}
       footer={
         <>
           <ActionButton variant="secondary" onClick={requestClose} disabled={busy}>

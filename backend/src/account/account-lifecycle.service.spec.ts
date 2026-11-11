@@ -34,7 +34,6 @@ describe("AccountLifecycleService 软注销", () => {
       oAuthIdentity: table(),
       userPluginState: table(),
       loginLog: table(),
-      consentRecord: table(),
       user: {
         ...table(),
         findUnique: vi.fn().mockResolvedValue({

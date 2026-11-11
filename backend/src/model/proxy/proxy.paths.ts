@@ -29,7 +29,6 @@ const RESERVED_API_PREFIXES = new Set([
   'generate',
   'health',
   'invoices',
-  'legal',
   'marketing',
   'me',
   'membership',

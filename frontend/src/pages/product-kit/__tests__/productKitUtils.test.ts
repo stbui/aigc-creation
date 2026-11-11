@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   batchIndexOf,
   buildRows,
+  buildVariantPlan,
   cellState,
   countGenerations,
   downloadFileName,
@@ -434,5 +435,25 @@ describe('ensureAssetsInProject', () => {
     ).rejects.toThrow('素材「失效素材.png」不存在或无权限，请重新选择');
     expect(fetchAsset).not.toHaveBeenCalled();
     expect(uploadAsset).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildVariantPlan', () => {
+  it('按变体顺序展开计数，一类填几张就出现几次', () => {
+    expect(
+      buildVariantPlan({ white_background: 1, scene: 2, selling_point: 0, other: 3 }),
+    ).toEqual([
+      'white_background',
+      'scene',
+      'scene',
+      'other',
+      'other',
+      'other',
+    ]);
+  });
+
+  it('缺省或为 0 的变体不产生任务', () => {
+    expect(buildVariantPlan({})).toEqual([]);
+    expect(buildVariantPlan({ white_background: 0, scene: 0 })).toEqual([]);
   });
 });

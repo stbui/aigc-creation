@@ -28,9 +28,7 @@ import {
 import { AdminPaymentsService } from './payments/payment-admin.service';
 import { PaymentsModule } from '../payments/payments.module';
 import { InvoicesModule } from '../invoices/invoices.module';
-import { LegalModule } from '../legal/legal.module';
 import { AccountModule } from '../account/account.module';
-import { AdminLegalController } from './legal.controller';
 import { AdminNotificationsController } from './notifications.controller';
 import { AdminTicketsController } from './tickets-admin.controller';
 import { AdminSearchController } from './search.controller';
@@ -101,8 +99,6 @@ import { SchedulerService } from './scheduler.service';
     PaymentsModule,
     // 发票: 复用 C 端的开票/渲染逻辑, 后台只做审核动作
     InvoicesModule,
-    // 法务: 后台版本管理复用 C 端的版本解析与发布规则
-    LegalModule,
     // 注销: 后台与 C 端自助注销复用同一份 AccountLifecycleService
     AccountModule,
     // 能力管控: 上下线状态与 C 端 GET /capabilities 共用同一份运行时判定
@@ -133,8 +129,7 @@ import { SchedulerService } from './scheduler.service';
     AdminInvoicesController,
     // 支付渠道状态 (只读): 凭据只从环境变量读
 
-    // 法务文档版本管理 + 站内消息广播/模板 (B4)
-    AdminLegalController,
+    // 站内消息广播/模板 (B4)
     AdminNotificationsController,
     // 工单处理中心 + 全局搜索 (B7)
     AdminTicketsController,

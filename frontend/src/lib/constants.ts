@@ -105,19 +105,17 @@ export const RUNTIME_LABELS: Record<CapabilityRuntime['effective'], string> = {
   unavailable: '暂不可用',
 };
 
-/** 前台不可用提示：后端 reason 可能包含运营/配置诊断信息，不直接透出给用户。 */
-export const CAPABILITY_UNAVAILABLE_NOTICE = '当前生成服务暂不可用，请稍后再试。';
-
 /**
  * 将能力运行时状态转换为前台可展示的数据。
  *
- * `unavailable` 的 reason 来自模型路由诊断，只供后台排障；C 端统一换成
- * 面向用户的提示，避免把「真实模型 / 线路配置」等内部信息暴露到页面。
+ * `unavailable` 的 reason 来自模型路由诊断，只供后台排障；C 端不展示
+ * 不可用原因，避免把「真实模型 / 线路配置」等内部信息暴露到页面，也避免
+ * 在提交区重复提示 —— 按钮置灰本身已表达「当前不可提交」。
  * 后台「能力与模型」直接使用管理接口返回的数据，不受这里影响。
  */
 export function publicCapabilityRuntime(runtime: CapabilityRuntime): CapabilityRuntime {
   if (runtime.effective !== 'unavailable') return runtime;
-  return { ...runtime, reason: CAPABILITY_UNAVAILABLE_NOTICE };
+  return { ...runtime, reason: '' };
 }
 
 /**
@@ -132,7 +130,7 @@ export function runtimeOf(def: Pick<CapabilityDef, 'mode' | 'runtime'>): Capabil
     enabled: def.mode !== 'planned',
     remoteAvailable: false,
     effective: def.mode === 'planned' ? 'disabled' : 'unavailable',
-    reason: '尚未获取模型线路状态，请刷新后重试',
+    reason: '',
   };
 }
 

@@ -94,7 +94,6 @@
 | GET/PATCH/DELETE | `/api/v1/me` | 账户资料 / 更正昵称 / 自助注销（密码 + 确认词） |
 | POST | `/api/v1/me/{password,export}` | 改密（成功后旧 token 全失效）/ 个人信息导出 JSON |
 | GET | `/api/v1/me/deletion-preview` | 注销影响面（项目 / 作品 / 素材 / 订单 / 消息） |
-| GET | `/api/v1/legal`、`/legal/:slug` | 法务文档概览 / 最新已发布正文（公开免登录） |
 | GET/POST | `/api/v1/notifications`、`/notifications/:id/read`、`/read-all` | 我的站内消息 / 标记已读 |
 | GET | `/api/v1/aigc-label` | 生效的可见角标参数（公开；前端视频播放器角标用） |
 | GET/POST | `/api/v1/tickets`、`/tickets/:id`、`/tickets/:id/replies`、`/tickets/:id/close` | 我的工单 / 详情 / 回复 / 关闭（越权 404） |
@@ -164,7 +163,6 @@
 | POST | `/api/v1/admin/{users,assets,tasks,orders}/batch` | 批量动作，逐条结果（≤ 100 条，使用各领域动作权限） |
 | GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,invoices,coupons,campaigns}/export` | CSV 导出（BOM，领域读权限 + `data.export`；上限 5000 行，筛选口径与列表一致）。调用记录是 `/admin/api-logs/export` |
 | POST | `/api/v1/admin/credits/import` | 积分 CSV 导入（multipart，按邮箱匹配，`credit.adjust`） |
-| GET/PUT/POST | `/api/v1/admin/legal*` | 法务版本列表 / 新建草稿 / 发布（`legal.write`） |
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`） |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/templates/*` | 写真模板目录：`catalog` 读取；`categories` / `groups` / `items` 三层 CRUD；`upload` 上传预览图。读需 `template.read`，写需 `template.write` |
 | GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`provider` / `delivers` / `configured`，不含凭据；`message.write`） |

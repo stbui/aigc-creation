@@ -546,6 +546,5 @@ export function useCheckoutPayment({
     stopPolling,
     refreshPaymentStatus,
     payOnline,
-    pay,
   };
 }

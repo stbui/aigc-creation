@@ -3,9 +3,9 @@ import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { adminProductsApi } from './api';
 import {
+  AdminPage,
   ActionButton,
   ConfirmDialog,
-  PageHeader,
   RefreshButton,
   StaleError,
   type AppliedFilter,
@@ -267,18 +267,17 @@ export function AdminProductsPage() {
   };
 
   return (
-    <>
-      <PageHeader
-        title="商品管理"
-        description="积分包与增值商品的价目表。改价只影响之后的下单，历史订单按下单时的快照结算。"
-        actions={
-          writable ? undefined : (
-            <span className="text-[12px] text-muted-foreground">
-              当前账号无 product.write 权限，仅可查看
-            </span>
-          )
-        }
-      />
+    <AdminPage
+      title="商品管理"
+      description="积分包与增值商品的价目表。改价只影响之后的下单，历史订单按下单时的快照结算。"
+      actions={
+        writable ? undefined : (
+          <span className="text-[12px] text-muted-foreground">
+            当前账号无 product.write 权限，仅可查看
+          </span>
+        )
+      }
+    >
 
       <ProductStats rows={rows} />
 
@@ -373,6 +372,6 @@ export function AdminProductsPage() {
         onCancel={() => setDeleting(null)}
         onConfirm={() => void confirmDelete()}
       />
-    </>
+    </AdminPage>
   );
 }

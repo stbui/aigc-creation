@@ -89,7 +89,7 @@ export function TemplateWorkspace({
         <TextField
           value={search}
           onChange={onSearchChange}
-          placeholder="搜索名称 / 标签 / 提示词"
+          placeholder="名称 / 标签 / 提示词"
           ariaLabel="搜索模板"
           className="w-[260px]"
         />

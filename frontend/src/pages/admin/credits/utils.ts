@@ -26,4 +26,4 @@ export function signed(n: number): string {
 }
 
 /** 后台统一的时间展示；空值显示破折号，不用空白单元格 */
-export { formatDateTimeLoose as fmtTime } from '../../../admin-ui/primitives';
+export { formatDateTime as fmtTime } from '../../../admin-ui/primitives';

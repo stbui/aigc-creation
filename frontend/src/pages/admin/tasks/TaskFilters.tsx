@@ -58,8 +58,8 @@ export function TaskFilters({
       <SelectField
         className="w-28"
         ariaLabel="按状态筛选"
-        placeholder="状态"
         allowClear
+        clearLabel="全部状态"
         value={status}
         onChange={onStatusChange}
         options={STATUS_OPTIONS}
@@ -67,7 +67,7 @@ export function TaskFilters({
       <SelectField
         className="w-28"
         ariaLabel="按能力筛选"
-        placeholder="能力"
+        clearLabel="全部能力"
         allowClear
         value={capability}
         onChange={onCapabilityChange}

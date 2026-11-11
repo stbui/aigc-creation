@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
+  AdminPage,
   ActionButton,
   ContextBanner,
   ExportCsvButton,
-  AppliedFilters,
-  ClearableField,
-  FilterActions,
-  FilterBar,
-  PageHeader,
   Panel,
   SavedViewBar,
-  SelectField,
   StaleError,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -39,6 +34,7 @@ import {
   TYPE_OPTIONS,
 } from './constants';
 import { transitionLabel } from './utils';
+import { TicketFilterBar, type TicketFilterDraft } from './TicketFilterBar';
 import { TicketStatsCards } from './TicketStatsCards';
 import { TicketTable } from './TicketTable';
 import { TicketDetailDrawer } from './TicketDetailDrawer';
@@ -103,6 +99,19 @@ export function AdminTicketsPage() {
 
   /** 关键词草稿：只有点「查询」或回车才生效，避免失焦与翻页互相抢请求 */
   const [qDraft, setQDraft] = useState(urlQ);
+  /**
+   * 下拉草稿：与关键词同一时机提交。
+   *
+   * 原先四个下拉是 selected 即 `setQuery`，同一条筛选条里出现了两种提交方式 ——
+   * 改下拉立刻刷新，改关键词还要按「查询」，而且「查询」按钮实际上不管下拉。
+   * 一条筛选条只留一种时机：都在「查询」/ 回车时提交。
+   */
+  const [draft, setDraft] = useState<TicketFilterDraft>({
+    status: urlTicketStatus,
+    type: urlTicketType,
+    priority: urlTicketPriority,
+    assigneeId: urlAssigneeId,
+  });
   const appliedUrlStatus = useRef<string | undefined>(urlTicketStatus);
   const [detailId, setDetailId] = useAdminDetailParam();
   const [detail, setDetail] = useState<AdminTicketDetail | null>(null);
@@ -142,6 +151,8 @@ export function AdminTicketsPage() {
     if (next === appliedUrlStatus.current) return;
     appliedUrlStatus.current = next;
     // 浏览器后退到无 status 的地址时也要清掉筛选，否则列表与地址栏不一致
+    // 草稿同步跟住地址栏：否则下拉还显示上一次选中的值，与列表对不上
+    setDraft((prev) => ({ ...prev, status: next }));
     setQuery({ status: next });
   }, [searchParams, setQuery]);
 
@@ -331,11 +342,21 @@ export function AdminTicketsPage() {
     }
   };
 
-  const applyKeyword = () => setQuery({ q: qDraft.trim() || undefined });
+  const applyFilters = () => {
+    appliedUrlStatus.current = draft.status;
+    setQuery({
+      status: draft.status,
+      type: draft.type,
+      priority: draft.priority,
+      assigneeId: draft.assigneeId,
+      q: qDraft.trim() || undefined,
+    });
+  };
 
   const resetFilters = () => {
     appliedUrlStatus.current = undefined;
     setQDraft('');
+    setDraft({ status: undefined, type: undefined, priority: undefined, assigneeId: undefined });
     setQuery({
       status: undefined,
       type: undefined,
@@ -357,6 +378,7 @@ export function AdminTicketsPage() {
           label: `状态：${STATUS_LABELS[appliedStatus as TicketStatus] ?? appliedStatus}`,
           onClear: () => {
             appliedUrlStatus.current = undefined;
+            setDraft((prev) => ({ ...prev, status: undefined }));
             setQuery({ status: undefined });
           },
         }
@@ -365,21 +387,30 @@ export function AdminTicketsPage() {
       ? {
           key: 'type',
           label: `类型：${TYPE_LABELS[appliedType as TicketType] ?? appliedType}`,
-          onClear: () => setQuery({ type: undefined }),
+          onClear: () => {
+            setDraft((prev) => ({ ...prev, type: undefined }));
+            setQuery({ type: undefined });
+          },
         }
       : null,
     appliedPriority
       ? {
           key: 'priority',
           label: `优先级：${PRIORITY_LABELS[appliedPriority as keyof typeof PRIORITY_LABELS] ?? appliedPriority}`,
-          onClear: () => setQuery({ priority: undefined }),
+          onClear: () => {
+            setDraft((prev) => ({ ...prev, priority: undefined }));
+            setQuery({ priority: undefined });
+          },
         }
       : null,
     appliedAssignee
       ? {
           key: 'assigneeId',
           label: appliedAssignee === 'unassigned' ? '归属：仅未指派' : `处理人：${appliedAssignee}`,
-          onClear: () => setQuery({ assigneeId: undefined }),
+          onClear: () => {
+            setDraft((prev) => ({ ...prev, assigneeId: undefined }));
+            setQuery({ assigneeId: undefined });
+          },
         }
       : null,
     appliedQ
@@ -407,122 +438,43 @@ export function AdminTicketsPage() {
   };
 
   return (
-    <>
-      {done === 'refunded' && (
-        <ContextBanner
-          title="关联订单已退款"
-          detail="建议用回复模板告知用户，或先写一条内部备注留痕。"
-        />
-      )}
-
-      {actionContext.from && done !== 'refunded' && (
-        <ContextBanner
-          title={
-            actionContext.from === 'workbench'
-              ? '来自工作台待办'
-              : actionContext.from.startsWith('alert:')
-                ? '来自告警中心'
-                : '来自关联页面'
-          }
-          detail="打开工单详情处理；退款与积分动作仍在订单模块执行"
-          returnTo={actionContext.returnTo}
-        />
-      )}
-
-      <PageHeader
-        title="工单处理"
-        description="用户提交的问题、投诉与咨询集中在这里。关联订单与素材只读展示，退款与积分补偿请回订单模块执行。"
-        actions={
-          can('data.export') ? (
-            <ExportCsvButton
-              exporting={exporting}
-              onExport={() =>
-                runExport(() =>
-                  adminTicketsApi.exportCsv({
-                    status: params.status as string | undefined,
-                    type: params.type as string | undefined,
-                    priority: params.priority as string | undefined,
-                    assigneeId: params.assigneeId as string | undefined,
-                    q: params.q as string | undefined,
-                  }),
-                )
-              }
-            />
-          ) : undefined
-        }
-      />
+    <AdminPage
+      title="工单处理"
+      description="用户提交的问题、投诉与咨询集中在这里。关联订单与素材只读展示，退款与积分补偿请回订单模块执行。"
+      actions={
+        can('data.export') ? (
+          <ExportCsvButton
+            exporting={exporting}
+            onExport={() =>
+              runExport(() =>
+                adminTicketsApi.exportCsv({
+                  status: params.status as string | undefined,
+                  type: params.type as string | undefined,
+                  priority: params.priority as string | undefined,
+                  assigneeId: params.assigneeId as string | undefined,
+                  q: params.q as string | undefined,
+                }),
+              )
+            }
+          />
+        ) : undefined
+      }
+    >
 
       <TicketStatsCards stats={stats} />
 
       {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
       {error && data && <StaleError error={error} onRetry={reload} />}
 
-      <FilterBar>
-        <SelectField
-          className="w-32"
-          ariaLabel="按状态筛选"
-          placeholder="全部状态"
-          allowClear
-          clearLabel="全部状态"
-          value={appliedStatus}
-          onChange={(value) => {
-            appliedUrlStatus.current = value;
-            setQuery({ status: value });
-          }}
-          options={STATUS_OPTIONS}
-        />
-        <SelectField
-          className="w-32"
-          ariaLabel="按类型筛选"
-          placeholder="全部类型"
-          allowClear
-          clearLabel="全部类型"
-          value={appliedType}
-          onChange={(value) => setQuery({ type: value })}
-          options={TYPE_OPTIONS}
-        />
-        <SelectField
-          className="w-32"
-          ariaLabel="按优先级筛选"
-          placeholder="全部优先级"
-          allowClear
-          clearLabel="全部优先级"
-          value={appliedPriority}
-          onChange={(value) => setQuery({ priority: value })}
-          options={[
-            { value: 'high', label: '高' },
-            { value: 'normal', label: '中' },
-            { value: 'low', label: '低' },
-          ]}
-        />
-        <SelectField
-          className="w-32"
-          ariaLabel="按归属筛选"
-          placeholder="全部归属"
-          allowClear
-          clearLabel="全部归属"
-          value={appliedAssignee}
-          onChange={(value) => setQuery({ assigneeId: value })}
-          options={[{ value: 'unassigned', label: '仅未指派' }]}
-        />
-        <ClearableField
-          className="w-56"
-          placeholder="工单号 / 标题 / 正文"
-          ariaLabel="工单号 / 标题 / 正文"
-          value={qDraft}
-          onChange={setQDraft}
-          onEnter={applyKeyword}
-        />
-        <FilterActions>
-          <ActionButton variant="default" onClick={applyKeyword}>
-            查询
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={resetFilters}>
-            重置
-          </ActionButton>
-        </FilterActions>
-        <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
-      </FilterBar>
+      <TicketFilterBar
+        draft={draft}
+        onDraftChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+        keyword={qDraft}
+        onKeywordChange={setQDraft}
+        chips={appliedChips}
+        onApply={applyFilters}
+        onReset={resetFilters}
+      />
 
       <SavedViewBar
         pageKey="tickets"
@@ -604,6 +556,6 @@ export function AdminTicketsPage() {
           onConfirm={(assigneeId, note) => void transferTicket(assigneeId, note)}
         />
       )}
-    </>
+    </AdminPage>
   );
 }

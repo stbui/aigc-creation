@@ -62,9 +62,9 @@
 
 - **C 端创作站**：18 项能力（全部 `real`；17 image + 1 video；14 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
 - **生成通道**：唯一链路是 `src/model/**` —— 渠道 → 渠道模型 → 前台模型 revision/线路 → 路由/冷却 → 任务执行 → 账单。建任务必带 `logicalModelId`（来自 `GET /models`）；协议来自 `plugins/` 内置插件清单，代码里没有手写协议实现。旧三层（`src/providers/**`、`GATEWAY_*`、`ModelCallLog`、`/admin/model-config`）已整体删除，**不存在并存期**。
-- **后台管理端**（`/admin`）：32 个页面、8 个侧栏分组，权限点 + 定时任务 + 备份 + 存储切换。
+- **后台管理端**（`/admin`）：31 个页面、8 个侧栏分组，权限点 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 支付对账。
-- **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
+- **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单、后台全局搜索、批量动作与 CSV 导入导出。
 
 ## 技术栈
@@ -133,7 +133,7 @@ aigc-creation/
 │       ├── generate/         # 建任务入口（controller + DTO）+ 任务查询，实现落在 model/tasks
 │       ├── admin/            # 后台：guards / 权限点 / 调度 / 备份 / 各管理 controller
 │       ├── payments/         # 支付三层：沙箱 / 支付宝 RSA2 / 微信 v3 + 回调
-│       ├── account/ legal/ aigc-label/ notifications/ channels/ health/
+│       ├── account/ aigc-label/ notifications/ channels/ health/
 │       │                     # ↑ channels 是通知出口（sms / email），不是模型渠道
 │       ├── auth/ projects/ assets/ stats/ storage/ invoices/ prompt-tools/ mobile-upload/
 │       └── credits/ orders/ membership/ marketing/ products/
@@ -142,12 +142,12 @@ aigc-creation/
     ├── nginx.conf.template   # SPA 回退 + /api 反代 + /uploads 直出（envsubst 模板）
     ├── .env.development / .env.test / .env.production.example
     └── src/
-        ├── App.tsx           # 34 条壳内路由（两组别名：/asset-library→/library、/my-works→/works）+ 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
+        ├── App.tsx           # 34 条壳内路由（两组别名：/asset-library→/library、/my-works→/works）+ 2 条裸外壳页 + 6 条独立页 + /admin/* 子应用
         ├── admin-ui/         # 后台 UI：components/ui（shadcn 原子件）· primitives（页面唯一取用层）· shell · providers · hooks · lib
         ├── layout/           # C 端外壳：AppLayout（组合）/ AppHeader / AppSidebar / SideRail
         │                     #   NotificationBell / UserAccountMenu / GuestPromoDialog / RouteExperience / hooks.ts
         ├── components/       # ToolShell / QrLoginPanel / 共享弹窗与页面片段 / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
-        ├── pages/            # 12 个单文件页面（登录 / 工具页 / 法务 …）
+        ├── pages/            # 12 个单文件页面（登录 / 工具页 …）
         │   ├── admin/        # 后台 32 页：按域目录组织，含 AdminDashboardPage.tsx
         │   └── <域>/          # 26 个 C 端域目录，按 index / page / components / api / hooks / utils / constants 分层
         │                     #   product-kit / shoppable-carousel / product-detail / viral-clone / library / account / workbench …
@@ -296,7 +296,7 @@ npm run e2e                 # Playwright
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-32 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
+31 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
 - 退款、手动调整积分、权限与系统设置、调价等确有业务依据要求的动作需填写原因；删除渠道 / 渠道模型只保留业务影响确认，不要求原因。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
@@ -326,7 +326,6 @@ npm run e2e                 # Playwright
 ### 其他模块要点
 
 - **账户自助**：`/me` 只认令牌身份；改密后 `tokenVersion + 1`，该账号全部旧 token 立即失效。注销实现（`account-lifecycle.service.ts`）后台与 C 端共用同一份：清除作品/素材/项目/积分批次，保留订单/支付/退款/发票/流水并匿名化。
-- **法务**：四类固定 slug（`LEGAL_SLUGS`）按 `(slug, version)` 版本化；**已发布版本不可原地覆盖**，改文本须升版本。
 - **扫码登录**：票据只存 SHA-256、扫码 ≠ 授权、兑换一次性；手机端确认前展示发起端 IP + UA。
 - **第三方登录**：`accessToken` 不进 URL，只下发 60 秒票据；只有 `emailVerified` 的邮箱才自动绑定已有账号；`returnTo` 只接受站内绝对路径。
 - **站内消息**：`notify()` **永不抛异常**，模板缺失回落内置文案；已接支付成功、任务失败退款、会员到期、工单回复。
@@ -418,7 +417,7 @@ npm run e2e                 # Playwright
 | --- | --- |
 | 需求 | `prd.md`（整站）、`admin-prd.md`（后台） |
 | 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md`；`shoppable-carousel-design.md`（+ 模板来源 `shoppable-carousel-template-sources.md`）；品牌：`brand/brand-basics.md` |
-| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md` |
+| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md`、`mask-canvas-sdk.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |
 | 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`admin-workflow-design.md`（P0 已实施）、`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |

@@ -3,7 +3,7 @@ import { ImageIcon, Upload } from 'lucide-react';
 
 import {
   ActionButton,
-  Drawer,
+  FormDrawer,
   FormField,
   NumberField,
   SwitchField,
@@ -31,27 +31,17 @@ interface DrawerShellProps {
 
 function DrawerShell({ title, description, saving, onClose, onSave, children }: DrawerShellProps) {
   return (
-    <Drawer
+    <FormDrawer
       open
-      onOpenChange={(open) => {
-        if (!open && !saving) onClose();
-      }}
+      onClose={onClose}
+      size="md"
       title={title}
       description={description}
-      width={560}
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <ActionButton variant="outline" onClick={onClose} disabled={saving}>
-            取消
-          </ActionButton>
-          <ActionButton onClick={onSave} disabled={saving}>
-            {saving ? '保存中…' : '保存'}
-          </ActionButton>
-        </div>
-      }
+      busy={saving}
+      onSubmit={onSave}
     >
-      <div className="space-y-4">{children}</div>
-    </Drawer>
+      {children}
+    </FormDrawer>
   );
 }
 

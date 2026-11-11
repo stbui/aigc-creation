@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { adminMembershipPlansApi, adminUserGroupsApi } from './api';
 import {
+  AdminPage,
   ActionButton,
   EmptyState,
   ListError,
-  PageHeader,
   PageSkeleton,
   RefreshButton,
   StaleError,
@@ -200,18 +200,17 @@ export function AdminMembershipPlansPage() {
   if (!data) return <EmptyState title="还没有会员套餐" />;
 
   return (
-    <>
-      <PageHeader
-        title="会员套餐"
-        description="会员按周期生效，权益在下单时快照到用户订阅上；改价或改权益只影响之后的订单。"
-        actions={
-          writable ? undefined : (
-            <span className="text-[12px] text-muted-foreground">
-              当前账号无 product.write 权限，仅可查看
-            </span>
-          )
-        }
-      />
+    <AdminPage
+      title="会员套餐"
+      description="会员按周期生效，权益在下单时快照到用户订阅上；改价或改权益只影响之后的订单。"
+      actions={
+        writable ? undefined : (
+          <span className="text-[12px] text-muted-foreground">
+            当前账号无 product.write 权限，仅可查看
+          </span>
+        )
+      }
+    >
 
       {error && data && (
         <StaleError error={error} onRetry={() => void reload()} />
@@ -278,6 +277,6 @@ export function AdminMembershipPlansPage() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => void runDelete()}
       />
-    </>
+    </AdminPage>
   );
 }

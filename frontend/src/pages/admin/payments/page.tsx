@@ -1,12 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  PageHeader,
+  AdminPage,
+  AdminTabs,
   RefreshButton,
-  Tabs,
   TabsContent,
-  TabsList,
-  TabsTrigger,
 } from '~/admin-ui/primitives';
 import { PaymentsProvidersTab } from './PaymentsProvidersTab';
 import { PaymentsReconciliationTab } from './PaymentsReconciliationTab';
@@ -70,31 +68,18 @@ export function AdminPaymentsPage() {
   );
 
   return (
-    <div className="flex flex-col">
-      <PageHeader
-        title="支付充值"
-        description="支付渠道、T+1 对账与支付异常；充值商品去商品管理，订单与退款去订单管理"
-        actions={
-          <RefreshButton
-            variant="default"
-            onRefresh={() => setRefreshNonce((n) => n + 1)}
-            ariaLabel="刷新当前标签"
-          />
-        }
-      />
-
-      <Tabs value={tab} onValueChange={switchTab} className="gap-3">
-        <TabsList aria-label="支付域标签" className="h-9 gap-1 p-1">
-          {TABS.map((item) => (
-            <TabsTrigger
-              key={item.value}
-              value={item.value}
-              className="h-7 px-3 text-sm font-medium"
-            >
-              {item.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <AdminPage
+      title="支付充值"
+      description="支付渠道、T+1 对账与支付异常；充值商品去商品管理，订单与退款去订单管理"
+      actions={
+        <RefreshButton
+          variant="default"
+          onRefresh={() => setRefreshNonce((n) => n + 1)}
+          ariaLabel="刷新当前标签"
+        />
+      }
+    >
+      <AdminTabs value={tab} onValueChange={switchTab} items={TABS} ariaLabel="支付域标签">
 
         {/*
          * 筛选条件与详情深链都在地址栏，切回标签时能恢复；标签未激活时不挂载
@@ -114,7 +99,7 @@ export function AdminPaymentsPage() {
         <TabsContent value="exceptions">
           <PaymentsExceptionPanel refreshNonce={refreshNonce} />
         </TabsContent>
-      </Tabs>
-    </div>
+      </AdminTabs>
+    </AdminPage>
   );
 }

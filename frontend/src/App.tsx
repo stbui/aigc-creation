@@ -64,7 +64,6 @@ const ResetPasswordPage = lazyRoute(
 );
 const LandingPage = lazyRoute('/', () => import('./pages/landing'), 'LandingPage');
 const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/SitemapPage'), 'SitemapPage');
-const LegalPage = lazyRoute('/legal/*', () => import('./pages/LegalPage'), 'LegalPage');
 const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/workbench'), 'WorkbenchPage');
 const ProductKitPage = lazyRoute('/product-kit', () => import('./pages/product-kit'), 'ProductKitPage');
 const ShoppableCarouselPage = lazyRoute(
@@ -138,11 +137,10 @@ function RouteFallback() {
 function Shell() {
   const { data, loading, error } = useCapabilities();
   const location = useLocation();
-  // 营销首页 / 站点索引 / 法务页走独立全宽外壳 (无侧栏), 与参考站一致
+  // 营销首页 / 站点索引走独立全宽外壳 (无侧栏), 与参考站一致
   const isBare =
     location.pathname === '/' ||
-    location.pathname.startsWith('/sitemap.html') ||
-    location.pathname.startsWith('/legal/');
+    location.pathname.startsWith('/sitemap.html');
 
   if (isBare) {
     return (
@@ -150,8 +148,7 @@ function Shell() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/sitemap.html" element={<SitemapPage />} />
-          <Route path="/legal/:slug" element={<LegalPage />} />
-          {/* 前缀匹配会把 /legal/、/legal/a/b、/sitemap.html/x 也送进裸外壳；
+          {/* 前缀匹配会把 /sitemap.html/x 也送进裸外壳；
               没有 catch-all 时 <Routes> 返回 null，整页空白且无返回入口 */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

@@ -4,12 +4,12 @@ import { adminModelCallsHref, defaultRange } from './utils';
 import { useAdminResource, useAdminUrlFilterSync } from './hooks';
 import { adminAnalyticsApi } from '../../../lib/api';
 import {
+  AdminPage,
   ActionButton,
   RefreshButton,
   AdminDataTable,
   FilterActions,
   FilterBar,
-  PageHeader,
   Panel,
   StatCards,
   TextField,
@@ -205,12 +205,11 @@ export function AdminFinancePage() {
   );
 
   return (
-    <>
-      <PageHeader
-        title="财务分析"
-        description="按账单口径汇总：实收只算已结算，挂账单列。金额单位为积分，保留 6 位小数。与概览页的「订单收入（元）」不是同一笔账。"
-        actions={<RefreshButton loading={loading} onRefresh={reload} />}
-      />
+    <AdminPage
+      title="财务分析"
+      description="按账单口径汇总：实收只算已结算，挂账单列。金额单位为积分，保留 6 位小数。与概览页的「订单收入（元）」不是同一笔账。"
+      actions={<RefreshButton loading={loading} onRefresh={reload} />}
+    >
 
       <StatCards
         columns={6}
@@ -291,6 +290,6 @@ export function AdminFinancePage() {
         {breakdownPanel('按能力', '取订单数前 10', data?.byCapability, '能力')}
         {breakdownPanel('按场景', '取订单数前 10', data?.byScene, '场景')}
       </div>
-    </>
+    </AdminPage>
   );
 }

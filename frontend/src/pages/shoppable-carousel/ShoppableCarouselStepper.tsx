@@ -1,4 +1,4 @@
-import { Minus, Plus } from 'lucide-react';
+import { NumberStepper } from '../../ui';
 
 /**
  * 生成张数步进器。
@@ -30,39 +30,14 @@ export function ShoppableCarouselStepper({
             全量文案会被挤成省略号, 故收成同义的短版。 */}
         <small>多为 6 张</small>
       </span>
-      <div className="pk-number-control">
-        <button
-          type="button"
-          aria-label="减少张数"
-          disabled={count <= min}
-          onClick={() => onCountChange(Math.max(min, count - 1))}
-        >
-          <Minus size={13} />
-        </button>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          value={count}
-          aria-label="生成张数"
-          onChange={(e) => {
-            const n = Number(e.target.value);
-            onCountChange(
-              Number.isFinite(n)
-                ? Math.min(max, Math.max(min, Math.round(n)))
-                : min,
-            );
-          }}
-        />
-        <button
-          type="button"
-          aria-label="增加张数"
-          disabled={count >= max}
-          onClick={() => onCountChange(Math.min(max, count + 1))}
-        >
-          <Plus size={13} />
-        </button>
-      </div>
+      <NumberStepper
+        label="张数"
+        inputLabel="生成张数"
+        value={count}
+        min={min}
+        max={max}
+        onChange={onCountChange}
+      />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import {
 import { ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
 import { languageOptions, platformOptions } from './utils';
-import { Input, Select } from '../../ui';
+import { Input, Select, Textarea } from '../../ui';
 
 /**
  * 生成设置卡：上传商品图 + 名称/品牌/平台/语言 + 商品描述。
@@ -152,9 +152,9 @@ export function ProductKitSettings({
             </button>
           </div>
         </div>
-        <div className="pk-desc-editor">
-          <textarea
-            rows={3}
+        <div className="pk-desc-editor pk-desc-editor-tall">
+          <Textarea
+            rows={5}
             maxLength={MAX_DESC_LEN}
             value={description}
             placeholder="* 请输入商品描述"

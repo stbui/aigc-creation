@@ -222,7 +222,7 @@ export function ChannelModelTable({
         <div className="flex items-center justify-end gap-1">
           <ActionButton
             variant="ghost"
-            size="xs"
+            size="sm"
             icon={Pencil}
             ariaLabel={`编辑商品 ${model.modelKey}`}
             disabled={!writable}
@@ -285,7 +285,7 @@ export function ChannelModelTable({
               setKeyword(value);
               setPage(1);
             }}
-            placeholder="搜索商品编号、名称或上游模型名"
+            placeholder="商品编号 / 名称 / 上游模型名"
             className="w-64"
           />
           <SelectField
@@ -296,7 +296,6 @@ export function ChannelModelTable({
               setPage(1);
             }}
             options={CAPABILITY_OPTIONS}
-            placeholder="全部类型"
             clearLabel="全部类型"
             allowClear
             className="w-32"
@@ -309,7 +308,6 @@ export function ChannelModelTable({
               setPage(1);
             }}
             options={STATUS_FILTER_OPTIONS}
-            placeholder="全部状态"
             clearLabel="全部状态"
             allowClear
             className="w-36"

@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
+import { Tag } from 'lucide-react';
 import type { MarketingQuote, MembershipPlan, Order } from '../../types/api';
 import type { PaymentIntent } from '../../types/payment';
 import { CheckoutStripePaymentElement } from './CheckoutStripePaymentElement';
-import { COUPON_MAX_LENGTH, IS_PROD } from './constants';
+import { COUPON_MAX_LENGTH } from './constants';
 import { formatYuan } from './utils';
 
 /**
@@ -34,7 +35,6 @@ export function CheckoutAmountCard({
   onlineIntent,
   onPayOnline,
   onCancelQr,
-  onSandboxPay,
   onRefreshPayment,
 }: {
   order: Order | null;
@@ -60,7 +60,6 @@ export function CheckoutAmountCard({
   onlineIntent: PaymentIntent | null;
   onPayOnline: () => void;
   onCancelQr: () => void;
-  onSandboxPay: (scenario: 'success' | 'failed' | 'timeout') => void;
   onRefreshPayment: () => void;
 }) {
   return (
@@ -74,15 +73,20 @@ export function CheckoutAmountCard({
           会员单不参与券与折扣 (后端会忽略), 因此整块隐藏。
         */}
         {!order && !plan && (
-          <label className="co-coupon">
-            <span>优惠码</span>
-            <input
-              placeholder="选填，提交后自动核算"
-              value={couponCode}
-              onChange={(e) => onCouponChange(e.target.value)}
-              maxLength={COUPON_MAX_LENGTH}
-            />
-          </label>
+          <div className="co-coupon-box">
+            <label className="co-coupon" htmlFor="co-coupon-input">
+              <Tag size={14} aria-hidden />
+              <span>优惠码</span>
+              <input
+                id="co-coupon-input"
+                placeholder="选填，输入后自动核算"
+                value={couponCode}
+                onChange={(e) => onCouponChange(e.target.value)}
+                maxLength={COUPON_MAX_LENGTH}
+              />
+            </label>
+            <p className="co-coupon-tip">券与限时活动不叠加，系统自动取更优惠的一项</p>
+          </div>
         )}
 
         {!order && !plan && quoteError && (
@@ -205,38 +209,6 @@ export function CheckoutAmountCard({
               </button>
             )}
           </>
-        )}
-
-        {/*
-         * 沙箱三态演示。保留失败/超时两个入口是刻意的 ——
-         * 只让点成功就等于没做失败路径的验证, 真实通道接入后
-         * 回调重复/超时这些分支会第一次被跑到, 那时才发现问题就晚了。
-         * 且只在开发/测试环境、且确实是沙箱通道时出现: 生产环境该端点
-         * 本身已按 404 处理 (见 OrderService.sandboxPay), 继续渲染按钮
-         * 只会让用户点到一个「订单不存在」。
-         */}
-        {!payBlockedReason && !IS_PROD && (!onlineIntent || onlineIntent.sandbox) && (
-          <div className="co-sandbox">
-            <span className="co-sandbox-label">沙箱联调</span>
-            <div className="co-sandbox-actions">
-              <button
-                type="button"
-                className="co-sandbox-btn"
-                disabled={paying}
-                onClick={() => onSandboxPay('failed')}
-              >
-                模拟支付失败
-              </button>
-              <button
-                type="button"
-                className="co-sandbox-btn"
-                disabled={paying}
-                onClick={() => onSandboxPay('timeout')}
-              >
-                模拟支付超时
-              </button>
-            </div>
-          </div>
         )}
 
         {error && (

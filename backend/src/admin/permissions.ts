@@ -131,10 +131,6 @@ export const PERMISSIONS = {
   messageWrite: "message.write",
   ticketHandle: "ticket.handle",
 
-  // 合规文本 (B4)。法务正文是用户要举证的文本, 改动必须与内容运营分开授权
-  legalRead: "legal.read",
-  legalWrite: "legal.write",
-
   // 工单 (B7 预留; B4 先把权限点落定, 避免角色矩阵二次迁移)
   ticketRead: "ticket.read",
 
@@ -201,7 +197,6 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.messageWrite,
     PERMISSIONS.ticketRead,
     PERMISSIONS.ticketHandle,
-    PERMISSIONS.legalRead,
     PERMISSIONS.settingRead,
     PERMISSIONS.roleRead,
     PERMISSIONS.dataExport,
@@ -235,7 +230,6 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.modelAnalyticsRead,
     PERMISSIONS.ticketRead,
     PERMISSIONS.ticketHandle,
-    PERMISSIONS.legalRead,
     PERMISSIONS.roleRead,
     PERMISSIONS.dataExport,
     PERMISSIONS.dataSearch,
@@ -267,7 +261,6 @@ export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.pluginWrite,
   PERMISSIONS.billingOrderResolve,
   PERMISSIONS.settingWrite,
-  PERMISSIONS.legalWrite,
   PERMISSIONS.roleWrite,
   PERMISSIONS.backupRun,
 ];

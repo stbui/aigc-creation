@@ -1,4 +1,5 @@
 import {
+  formatDateTime,
   ActionButton,
   AdminDataTable,
   Descriptions,
@@ -52,10 +53,8 @@ export function PluginDetailDrawer({
   return (
     <Drawer
       open={plugin !== null}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      width={680}
+      onClose={onClose}
+      size="lg"
       title={plugin ? `${plugin.name} · ${plugin.id}` : '插件详情'}
       description={
         plugin
@@ -87,7 +86,7 @@ export function PluginDetailDrawer({
               {
                 label: '最近更新',
                 value: plugin.updatedAt
-                  ? new Date(plugin.updatedAt).toLocaleString('zh-CN')
+                  ? formatDateTime(plugin.updatedAt)
                   : '—',
               },
             ]}
@@ -157,7 +156,7 @@ export function PluginDetailDrawer({
               {
                 label: '最近校验',
                 value: plugin.verify
-                  ? `${plugin.verify.ok ? '通过' : '未通过'} · ${new Date(plugin.verify.checkedAt).toLocaleString('zh-CN')}${plugin.verify.reason ? ` · ${plugin.verify.reason}` : ''}`
+                  ? `${plugin.verify.ok ? '通过' : '未通过'} · ${formatDateTime(plugin.verify.checkedAt)}${plugin.verify.reason ? ` · ${plugin.verify.reason}` : ''}`
                   : '未校验',
               },
             ]}

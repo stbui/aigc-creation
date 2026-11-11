@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  AdminPage,
   ConfirmDialog,
   ContextBanner,
   ExportCsvButton,
-  PageHeader,
   Panel,
   RefreshButton,
   SavedViewBar,
@@ -24,6 +24,7 @@ import { OrderDeleteConfirm } from './OrderDeleteConfirm';
 import { OrderTable } from './OrderTable';
 import {
   BatchMarkPaidDialog,
+  BatchMarkPaidResultDialog,
   OrderActionDialog,
   RefundConfirmationDialog,
   type RefundConfirmationTarget,
@@ -93,6 +94,15 @@ export function AdminOrdersPage() {
   /** 退款金额（元）。打开弹窗时预填可退上限 */
   const [refundYuan, setRefundYuan] = useState('');
   const [refundReason, setRefundReason] = useState('');
+  /** 手工核销依据。人工入账没有渠道报文，必填并写进支付流水 */
+  const [markPaidNote, setMarkPaidNote] = useState('');
+  /** 批量核销的部分失败清单（订单号 + 原因），null = 无失败需要展示 */
+  const [batchFailures, setBatchFailures] = useState<{
+    total: number;
+    succeeded: number;
+    failed: number;
+    failures: Array<{ orderNo: string; message: string }>;
+  } | null>(null);
   const [refundConfirmation, setRefundConfirmation] = useState<RefundConfirmationTarget | null>(null);
   const [refundConfirmationReason, setRefundConfirmationReason] = useState('');
   const [refundProviderId, setRefundProviderId] = useState('');
@@ -109,6 +119,7 @@ export function AdminOrdersPage() {
   const openAction = (kind: 'markPaid' | 'refund', row: AdminOrderRow) => {
     setAction({ kind, row });
     setRefundReason('');
+    setMarkPaidNote('');
     // 默认退款金额 = 可退上限 (实付 - 已退)。部分退款时运营只需改小
     setRefundYuan(kind === 'refund' ? yuan(Math.max(row.paidCents - row.refundedCents, 0)) : '');
   };
@@ -139,6 +150,7 @@ export function AdminOrdersPage() {
 
     let refundCents: number | null = null;
     let refundNote = '';
+    let note = '';
     if (action.kind === 'refund') {
       refundCents = yuanToCents(refundYuan);
       if (refundCents === null) {
@@ -150,12 +162,22 @@ export function AdminOrdersPage() {
         toast.error('请填写退款原因');
         return;
       }
+    } else {
+      /*
+       * 核销依据必填：人工入账没有渠道流水，不留下「为什么算收到钱」，
+       * 财务对账时这笔钱就是一笔无来源的入账。
+       */
+      note = markPaidNote.trim();
+      if (!note) {
+        toast.error('请填写核销依据');
+        return;
+      }
     }
 
     setBusy(true);
     try {
       if (action.kind === 'markPaid') {
-        const result = await adminOrdersApi.markPaid(action.row.id);
+        const result = await adminOrdersApi.markPaid(action.row.id, note);
         toast.success(
           result.idempotentHit ? `订单已是已支付状态（${result.message ?? '幂等命中'}）` : '已标记为已支付并发放权益',
         );
@@ -298,12 +320,31 @@ export function AdminOrdersPage() {
     try {
       const summary = await adminOrdersApi.batchMarkPaid(selected);
       if (summary.failed > 0) {
+        /*
+         * 后端逐条返回了失败原因（common/batch.ts），必须展示出来 ——
+         * 「失败 3 单」不告诉运营是哪 3 单、为什么，等于把排查成本
+         * 又推回给人工比对。失败项保留勾选，修完原因可直接重试。
+         */
+        const orderNoById = new Map((data?.items ?? []).map((row) => [row.id, row.orderNo]));
+        const failures = summary.results
+          .filter((item) => !item.ok)
+          .map((item) => ({
+            orderNo: orderNoById.get(item.id) ?? item.id,
+            message: item.message ?? '未返回失败原因',
+          }));
+        setBatchFailures({
+          total: summary.total,
+          succeeded: summary.succeeded,
+          failed: summary.failed,
+          failures,
+        });
+        setSelected(summary.results.filter((item) => !item.ok).map((item) => item.id));
         toast.warning(`批量核销完成：成功 ${summary.succeeded} 单，失败 ${summary.failed} 单`);
       } else {
         toast.success(`批量核销完成：成功 ${summary.succeeded} 单`);
+        setSelected([]);
       }
       setBatchOpen(false);
-      setSelected([]);
       reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '批量核销失败');
@@ -313,11 +354,10 @@ export function AdminOrdersPage() {
   };
 
   return (
-    <>
-      <PageHeader
-        title="订单管理"
-        description="订单、支付与退款。核销、渠道查单、关单与退款均保留业务记录；关单不退款。"
-      />
+    <AdminPage
+      title="订单管理"
+      description="订单、支付与退款。核销、渠道查单、关单与退款均保留业务记录；关单不退款。"
+    >
 
       {(actionContext.from || done) && (
         <ContextBanner
@@ -431,9 +471,11 @@ export function AdminOrdersPage() {
         action={action}
         refundYuan={refundYuan}
         refundReason={refundReason}
+        markPaidNote={markPaidNote}
         loading={busy}
         onRefundYuanChange={setRefundYuan}
         onRefundReasonChange={setRefundReason}
+        onMarkPaidNoteChange={setMarkPaidNote}
         onCancel={() => setAction(null)}
         onConfirm={() => void runAction()}
       />
@@ -483,6 +525,8 @@ export function AdminOrdersPage() {
         onCancel={() => setBatchOpen(false)}
         onConfirm={() => void runBatchMarkPaid()}
       />
-    </>
+
+      <BatchMarkPaidResultDialog summary={batchFailures} onClose={() => setBatchFailures(null)} />
+    </AdminPage>
   );
 }

@@ -10,9 +10,6 @@ import type { CreditBalance, Order } from '../../types/api';
  * 一律经由本文件 —— 目录内新增共享常量时在这里补一行。
  */
 
-/** 生产环境开关: 沙箱三态按钮只在非生产渲染 */
-export { IS_PROD } from '../../lib/constants';
-
 /** 结算页两个阶段: 确认支付 / 支付结果 */
 export type Phase = 'confirm' | 'result';
 

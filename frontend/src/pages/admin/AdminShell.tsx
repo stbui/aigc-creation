@@ -25,7 +25,6 @@ import {
   AdminCreditsPage,
   AdminFinancePage,
   AdminInvoicesPage,
-  AdminLegalPage,
   AdminMarketingRulesPage,
   AdminMembershipPlansPage,
   AdminModelCallsPage,
@@ -189,7 +188,6 @@ export function AdminShell() {
                 path="reconciliation"
                 element={<Navigate to="/admin/payments?tab=reconciliation" replace />}
               />
-              <Route path="legal" element={<AdminLegalPage />} />
               <Route path="notifications" element={<AdminNotificationsPage />} />
               <Route path="templates" element={<AdminTemplatesPage />} />
               {/* AI 标识样式 */}

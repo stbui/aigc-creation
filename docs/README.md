@@ -67,6 +67,7 @@
 | [`product-detail-generation.md`](product-detail-generation.md) | `/product-detail` 商品详情图：模块拆批、任务与账单、提示词、执行状态机、轮询聚合、删除与失败边界 |
 | [`typography.md`](typography.md) | 字体、主题桥接、圆角阴影与组件微规格 |
 | [`design-tokens.md`](design-tokens.md) | 设计令牌标准：基础 / 通用 / 组件三层、命名、引用规则、新增流程与审计命令 |
+| [`mask-canvas-sdk.md`](mask-canvas-sdk.md) | 遮罩画布 SDK：标记 / 手势 / 遮罩 / 导出内核、两条通知通道、适配层职责与约束 |
 
 目录结构、能力清单、环境坑等与代码强相关的坐标速查表放在仓库根 `CLAUDE.md`；接口清单与错误码在 [`api-contract.md`](api-contract.md)。
 

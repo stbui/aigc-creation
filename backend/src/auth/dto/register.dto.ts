@@ -67,15 +67,4 @@ export class RegisterDto {
   @MaxLength(6)
   smsCode?: string;
 
-  /**
-   * 同意的用户协议版本（`GET /legal` 返回的 version）。
-   *
-   * 选填而不是必填：后端不该因为前端漏传一个版本号就拒绝注册 ——
-   * 但那意味着这次注册**没有同意凭证**，所以只在实际给了版本号时才落库，
-   * 绝不替用户补一个"默认同意"。
-   */
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  consentVersion?: string;
 }

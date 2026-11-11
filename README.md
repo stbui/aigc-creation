@@ -124,7 +124,7 @@ aigc-creation/
 │   │   │                       #   tasks / billing / user-groups / plugins / proxy / media
 │   │   ├── generate/           # 建任务入口与任务查询（实现落在 model/tasks）
 │   │   ├── admin/              # 后台：权限点 / 审计 / 调度 / 备份 / 对账 / 各管理 controller
-│   │   ├── auth/ account/ legal/ aigc-label/ notifications/ tickets/
+│   │   ├── auth/ account/ aigc-label/ notifications/ tickets/
 │   │   ├── credits/ orders/ payments/ invoices/ membership/ marketing/ products/
 │   │   ├── common/             # JWT 守卫 / 限流 / 签名 URL / AIGC 标识 / 文件日志 / 请求追踪 / CSV
 │   │   ├── config/             # 三环境档位（env-files.ts）+ 启动期校验（ENV_SPECS）
@@ -314,7 +314,7 @@ node scripts/verify-deps.js --quiet   # 仅输出结论，有致命问题则 exi
 | GET | `/api/v1/credits/{balance,lots,ledger}` | 积分余额 / 批次 / 流水（FEFO 扣减） |
 | GET/POST | `/api/v1/orders*`、`/payments/*` | 订单（含取消未支付单）、沙箱支付、真实渠道支付意图与回调 |
 | GET/PATCH/DELETE | `/api/v1/me` | 账户资料 / 更正 / 自助注销；`/me/{password,export}` 改密与导出 |
-| GET/POST | `/api/v1/legal*`、`/notifications*`、`/tickets*` | 法务正文 / 站内消息 / 工单 |
+| GET/POST | `/notifications*`、`/tickets*` | 站内消息 / 工单 |
 | GET | `/uploads/*` | 静态图片（签名开启时需 `sig` 参数） |
 
 所有成功响应统一信封 `{ code: 0, data, message: '' }`，前端 `lib/api.ts` 的 `request()` 负责剥离；异常走 `AppError` + `AllExceptionsFilter`，跨模块错误码表见 `docs/api-contract.md`。

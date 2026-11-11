@@ -10,6 +10,7 @@ import {
   DetailSection,
   EmptyState,
   ListError,
+  MiniStat,
   SkeletonBody,
   StatusTag,
 } from '~/admin-ui/primitives';
@@ -48,17 +49,6 @@ function InfoItem({
 }
 
 /** 抽屉里的资源计数。统一放在一条统计带里，避免三张独立小卡重复描边。 */
-function MiniStat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="min-w-0 px-4 py-3 first:pl-0 last:pr-0">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-xl leading-6 font-semibold text-foreground tabular-nums">
-        {value}
-      </dd>
-    </div>
-  );
-}
-
 /**
  * 详情抽屉里的「最近登录」区块。
  *
@@ -296,9 +286,9 @@ export function UserDetailDrawer({
           <DetailSection title="资源统计">
             <div className="overflow-hidden rounded-lg border border-border bg-card">
               <dl className="grid grid-cols-3 divide-x divide-border/70 px-4">
-                <MiniStat label="项目" value={d.stats.projects} />
-                <MiniStat label="任务" value={d.stats.tasks} />
-                <MiniStat label="素材" value={d.stats.assets} />
+                <MiniStat size="xl" label="项目" value={d.stats.projects} />
+                <MiniStat size="xl" label="任务" value={d.stats.tasks} />
+                <MiniStat size="xl" label="素材" value={d.stats.assets} />
               </dl>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs">

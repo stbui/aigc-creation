@@ -4,7 +4,7 @@ import { RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Skeleton } from './skeleton';
 import { EmptyState } from './layout';
-import { Drawer, ModalDialog } from './overlay';
+import { Drawer, ModalDialog, type ModalSize } from './overlay';
 
 /**
  * 详情浮层的数据生命周期。
@@ -135,12 +135,10 @@ export function AdminDrawer<T>({
   return (
     <Drawer
       open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
+      onClose={onClose}
       title={title}
       description={description}
-      width={720}
+      size="lg"
       footer={data && footer ? footer(data) : undefined}
     >
       <DetailBody loading={loading} error={error} data={data} onRetry={retry}>
@@ -161,7 +159,7 @@ export function AdminModal<T>({
   open,
   title,
   description,
-  width = 960,
+  size = 'lg',
   onClose,
   fetcher,
   children,
@@ -170,7 +168,8 @@ export function AdminModal<T>({
   open: boolean;
   title: ReactNode;
   description?: ReactNode;
-  width?: number;
+  /** 与 `ModalDialog` 同一套档位；详情弹窗默认 `lg`（960）。 */
+  size?: ModalSize;
   onClose: () => void;
   fetcher: () => Promise<T>;
   children: (data: T) => ReactNode;
@@ -186,7 +185,7 @@ export function AdminModal<T>({
       }}
       title={title}
       description={description}
-      width={width}
+      size={size}
       footer={data && footer ? footer(data) : undefined}
     >
       <DetailBody loading={loading} error={error} data={data} onRetry={retry}>

@@ -76,7 +76,7 @@ export const marketingApi = {
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
   exportCampaigns: (
-    params: { keyword?: string; type?: string; status?: string } = {},
+    params: { keyword?: string; type?: string; status?: string; effective?: string } = {},
   ) => downloadCsv(`/admin/campaigns/export${toQuery(params)}`),
 
   // ── 邀请规则 (B-66) ─────────────────────────────────────────────
@@ -291,11 +291,14 @@ export const adminOrdersApi = {
    *
    * 幂等 —— 重复点击返回 idempotentHit=true 而非重复发积分。
    * 交易号用 `MANUAL-<管理员>-<时间戳>` 由后端生成, 不与渠道流水混在一起。
+   *
+   * `note` 是核销依据（线下转账凭证号 / 渠道商户后台查到的交易号）。人工入账
+   * 没有渠道报文，这段文字会写进支付流水并在详情里展示，是事后唯一的凭据。
    */
-  markPaid: (id: string) =>
+  markPaid: (id: string, note?: string) =>
     request<{ order: Order; idempotentHit: boolean; message?: string }>(
       `/admin/orders/${id}/mark-paid`,
-      { method: "POST" },
+      { method: "POST", body: note?.trim() ? { note: note.trim() } : {} },
     ),
 
   /**

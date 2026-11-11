@@ -1,12 +1,11 @@
 /**
- * 站内消息 + 后台法务管理冒烟测试 (B4)。
+ * 站内消息冒烟测试 (B4)。
  *
- * 守住五条承诺:
+ * 守住四条承诺:
  *   1. 站内消息按用户隔离 —— 只能读/标自己的
  *   2. 支付成功后**真的**产生 payment_success 消息（不是"代码里写了"）
  *   3. 后台广播扩散到所有活跃账号, 普通用户无权调用
  *   4. 模板可增改, 停用后不影响主流程（通知服务有内置兜底）
- *   5. 法务已发布版本不可原地覆盖; 发布新版本会把旧版本归档
  *
  * 用法（测试档, 禁止指向开发库）:
  *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-notifications.js
@@ -64,7 +63,7 @@ async function ensureAdminRole() {
   const record = await prisma.adminRole.findUnique({ where: { code: 'admin' } });
   if (!record) {
     await prisma.adminRole.create({
-      data: { code: 'admin', name: '超级管理员', permissions: JSON.stringify(['message.write', 'legal.write', 'legal.read']) },
+      data: { code: 'admin', name: '超级管理员', permissions: JSON.stringify(['message.write']) },
     });
     return;
   }
@@ -74,7 +73,7 @@ async function ensureAdminRole() {
   } catch {
     perms = [];
   }
-  const missing = ['message.write', 'legal.write', 'legal.read'].filter((p) => !perms.includes(p));
+  const missing = ['message.write'].filter((p) => !perms.includes(p));
   if (missing.length) {
     // 只在缺权限时补写，不覆盖管理员在后台调过的矩阵
     await prisma.adminRole.update({
@@ -237,92 +236,14 @@ async function ensureAdminRole() {
     payMsg ? `body=${String(payMsg.body).slice(0, 40)}` : '—',
   );
 
-  console.log('\n【法务版本化】');
-  /*
-   * 法务数据不由 seed:all 预置（seed:legal 是单独命令，且只建草稿）。
-   * 脚本自己备一份「已发布基线」，否则后面几条断言测的是「库里没有数据」，
-   * 而不是「已发布版本不可覆盖 / 发布后旧版归档」。基线用 smoke- 前缀，
-   * 收尾时与其它临时版本一起删除。
-   */
-  const adminLegal0 = await call('GET', '/admin/legal', adminToken);
-  let legalDocs = Array.isArray(adminLegal0.data) ? adminLegal0.data : [];
-  let published = legalDocs.find((d) => d.slug === 'user-agreement' && d.status === 'published');
-  const baselineVersion = `smoke-baseline-${stamp}`;
-  if (!published) {
-    await prisma.legalDocument.create({
-      data: {
-        slug: 'user-agreement',
-        version: baselineVersion,
-        title: '冒烟基线用户协议',
-        content: '## 冒烟基线\n\n用于验证版本化的已发布基线文本。',
-        status: 'published',
-        publishedAt: new Date(),
-      },
-    });
-    const reread = await call('GET', '/admin/legal', adminToken);
-    legalDocs = Array.isArray(reread.data) ? reread.data : [];
-    published = legalDocs.find((d) => d.slug === 'user-agreement' && d.status === 'published');
-  }
-  check(
-    '后台可读全部版本 (legal.read)',
-    adminLegal0.status === 200 && legalDocs.length >= 1,
-    `n=${legalDocs.length}${published ? '' : ' (基线创建失败)'}`,
-  );
-  check('存在已发布版本', Boolean(published), published?.version);
-
-  const overwrite = await call('PUT', '/admin/legal', adminToken, {
-    slug: 'user-agreement',
-    version: published?.version ?? 'v1',
-    title: '试图覆盖',
-    content: '试图覆盖已发布正文',
-    status: 'draft',
-    reason: '冒烟: 验证已发布版本不可覆盖',
-  });
-  check('已发布版本不可原地覆盖', overwrite.status === 409, `status=${overwrite.status} ${overwrite.message || ''}`);
-
-  const draftVersion = `smoke-${stamp}`;
-  const draft = await call('PUT', '/admin/legal', adminToken, {
-    slug: 'user-agreement',
-    version: draftVersion,
-    title: '冒烟版本',
-    content: '## 冒烟条款\n\n这是一份用于验证版本化的临时文本。',
-    status: 'draft',
-    reason: '冒烟: 新建草稿',
-  });
-  check('新建草稿版本', draft.status === 200 || draft.status === 201, `status=${draft.status} ${draft.message || ''}`);
-
-  const beforePublish = await call('GET', '/legal/user-agreement', null);
-  check('草稿不影响线上生效版本', beforePublish.data?.version !== draftVersion, `current=${beforePublish.data?.version}`);
-
-  const pub = await call('POST', `/admin/legal/user-agreement/${draftVersion}/publish`, adminToken, {
-    reason: '冒烟: 发布草稿验证归档',
-  });
-  check('发布草稿', pub.status === 200 || pub.status === 201, `status=${pub.status} ${pub.message || ''}`);
-
-  const afterPub = await call('GET', '/legal/user-agreement', null);
-  check('新版本成为当前版本', afterPub.data?.version === draftVersion, `current=${afterPub.data?.version}`);
-
-  const archived = await prisma.legalDocument.findFirst({
-    where: { slug: 'user-agreement', version: published?.version ?? 'v1' },
-  });
-  check('旧版本自动归档', archived?.status === 'archived', `status=${archived?.status}`);
-
-  // 还原: 把原版本重新发布, 保证测试库可重复运行
-  const restore = await call('POST', `/admin/legal/user-agreement/${published?.version ?? 'v1'}/publish`, adminToken, {
-    reason: '冒烟: 还原演示文本',
-  });
-  check('可还原原版本', restore.status === 200 || restore.status === 201, `status=${restore.status}`);
-
   // 清理: 逐个模型删并各自 catch —— 任何一张表漏删都只影响残留, 不该让脚本崩在收尾
   const cleanup = [
-    () => prisma.legalDocument.deleteMany({ where: { version: { startsWith: 'smoke-' } } }),
     () => prisma.messageTemplate.deleteMany({ where: { code: probeCode } }),
     () => prisma.payment.deleteMany({ where: { order: { userId: { in: createdUserIds } } } }),
     () => prisma.refund.deleteMany({ where: { order: { userId: { in: createdUserIds } } } }),
     () => prisma.orderItem.deleteMany({ where: { order: { userId: { in: createdUserIds } } } }),
     () => prisma.order.deleteMany({ where: { userId: { in: createdUserIds } } }),
     () => prisma.notification.deleteMany({ where: { userId: { in: createdUserIds } } }),
-    () => prisma.consentRecord.deleteMany({ where: { userId: { in: createdUserIds } } }),
     () => prisma.accountToken.deleteMany({ where: { userId: { in: createdUserIds } } }),
     () => prisma.loginLog.deleteMany({ where: { userId: { in: createdUserIds } } }),
     () => clearCredits(prisma, { in: createdUserIds }),

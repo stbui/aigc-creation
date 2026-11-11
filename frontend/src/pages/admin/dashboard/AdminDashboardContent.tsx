@@ -5,9 +5,9 @@ import { useAdmin } from '../../../context/AdminContext';
 import { ExceptionPage } from '../../../components/ExceptionPage';
 import {
   ActionButton,
+  AdminPage,
   Button,
   RefreshButton,
-  PageHeader,
   PageSkeleton,
   Panel,
   SegmentedTabs,
@@ -162,42 +162,41 @@ export function AdminDashboardContent() {
   const firstFailure = earliestFailure(tasks);
 
   return (
-    <>
-      <PageHeader
-        title="平台概览"
-        description={`${isFinance ? '经营' : '生成与经营'} · 近 ${days} 天 · 截至 ${hhmm(
-          data.generatedAt,
-        )} · 数据缓存 ${data.cacheTtlSeconds} 秒`}
-        actions={
-          <>
-            {canSwitchView && (
-              <SegmentedTabs
-                ariaLabel="工作台视角"
-                value={view}
-                onChange={(value) => setView(value as typeof view)}
-                options={[
-                  { value: 'admin', label: '管理员' },
-                  { value: 'operator', label: '运营' },
-                  { value: 'finance', label: '财务' },
-                ]}
-              />
-            )}
+    <AdminPage
+      title="平台概览"
+      description={`${isFinance ? '经营' : '生成与经营'} · 近 ${days} 天 · 截至 ${hhmm(
+        data.generatedAt,
+      )} · 数据缓存 ${data.cacheTtlSeconds} 秒`}
+      actions={
+        <>
+          {canSwitchView && (
             <SegmentedTabs
-              ariaLabel="统计时间窗"
-              value={String(days)}
-              onChange={(value) => setDays(Number(value))}
-              options={[7, 30, 90].map((value) => ({
-                value: String(value),
-                label: `近 ${value} 天`,
-              }))}
+              ariaLabel="工作台视角"
+              value={view}
+              onChange={(value) => setView(value as typeof view)}
+              options={[
+                { value: 'admin', label: '管理员' },
+                { value: 'operator', label: '运营' },
+                { value: 'finance', label: '财务' },
+              ]}
             />
-            <Button asChild variant="outline" size="sm">
-              <Link to="/admin/alerts">告警中心</Link>
-            </Button>
-            <RefreshButton variant="outline" loading={loading} onRefresh={reload} />
-          </>
-        }
-      />
+          )}
+          <SegmentedTabs
+            ariaLabel="统计时间窗"
+            value={String(days)}
+            onChange={(value) => setDays(Number(value))}
+            options={[7, 30, 90].map((value) => ({
+              value: String(value),
+              label: `近 ${value} 天`,
+            }))}
+          />
+          <Button asChild variant="outline" size="sm">
+            <Link to="/admin/alerts">告警中心</Link>
+          </Button>
+          <RefreshButton variant="outline" loading={loading} onRefresh={reload} />
+        </>
+      }
+    >
 
       {/* 换时间窗失败时保留上一窗口的数字，但要明说这是旧的 */}
       {error && <StaleError error={error} onRetry={() => void reload()} />}
@@ -421,6 +420,6 @@ export function AdminDashboardContent() {
           </div>
         </Panel>
       </Fold>
-    </>
+    </AdminPage>
   );
 }

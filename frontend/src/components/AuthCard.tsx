@@ -1,9 +1,9 @@
 import '../styles/auth.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Checkbox, Form, FormItem, Input, useApp, useForm, useWatch } from '../ui';
+import { Button, Form, FormItem, Input, useApp, useForm, useWatch } from '../ui';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, X, Smartphone, ShieldCheck } from 'lucide-react';
-import { authApi, legalApi, oauthAuthorizeUrl, type OAuthProviderInfo } from '../lib/api';
+import { authApi, oauthAuthorizeUrl, type OAuthProviderInfo } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { QrLoginPanel } from './QrLoginPanel';
 import type { SmsPurpose } from '../types/api';
@@ -108,30 +108,6 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
   const phoneValue = useWatch('phone', form);
   const emailValue = useWatch('email', form);
   const needPhoneCode = mode === 'register' && Boolean(phoneValue);
-
-  /*
-   * 当前生效的用户协议版本号。
-   *
-   * 注册时勾选框只是前端校验；同意留痕必须把**真实版本号**发给后端，
-   * 否则库里永远没有 ConsentRecord —— 合规审查时等于「用户没同意过」。
-   * 拉不到就宁可不传：由后端决定不落库，而不是编一个版本号。
-   */
-  const [consentVersion, setConsentVersion] = useState<string | null>(null);
-  useEffect(() => {
-    if (mode !== 'register') return;
-    let alive = true;
-    legalApi
-      .current('user-agreement')
-      .then((doc) => {
-        if (alive && doc?.version) setConsentVersion(doc.version);
-      })
-      .catch(() => {
-        /* 法务文档未发布时保持 null，注册仍可进行 */
-      });
-    return () => {
-      alive = false;
-    };
-  }, [mode]);
 
   useEffect(() => {
     let alive = true;
@@ -267,7 +243,6 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
         name: values.name,
         emailCode: values.emailCode!,
         ...(values.phone ? { phone: values.phone, smsCode: values.smsCode } : {}),
-        ...(consentVersion ? { consentVersion } : {}),
       });
       login(res.accessToken, values.email, res.user?.role);
       message.success('注册成功，已自动登录');
@@ -524,30 +499,6 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
             {mode === 'sms' && codeField('login')}
             {needPhoneCode && codeField('verify')}
 
-            {mode === 'register' && (
-              <FormItem
-                name="agreed"
-                valuePropName="checked"
-                className="login-field login-agree-field"
-                rules={[
-                  {
-                    validator: (_rule, value) =>
-                      value
-                        ? Promise.resolve()
-                        : Promise.reject(new Error('请先阅读并同意用户协议与隐私政策')),
-                  },
-                ]}
-              >
-                <label className="login-agree-control">
-                  <Checkbox aria-label="同意用户协议与隐私政策" />
-                  <span>
-                    我已阅读并同意<a href="/legal/user-agreement.html">用户协议</a>与
-                    <a href="/legal/privacy-policy.html">个人信息保护政策</a>
-                  </span>
-                </label>
-              </FormItem>
-            )}
-
             {/* 参考站 .auth-submit: 340x48 / linear-gradient(90deg,#8064f6,#5546d8) / 14px 600 / radius 8 */}
             <Button type="primary" htmlType="submit" block className="login-submit" loading={submitting}>
               {mode === 'login' ? '登录' : mode === 'sms' ? '登录' : '注册并登录'}
@@ -592,14 +543,6 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
               ))}
             </div>
           )}
-
-          {/* 参考站 .auth-agreement: 12px/400 #86909C, 内嵌协议链接 */}
-          <p className="login-agreement">
-            登录即代表我已同意
-            <a href="/legal/user-agreement.html">用户协议</a>
-            <a href="/legal/privacy-policy.html">个人信息保护政策</a>
-            <a href="/legal/account-rules.html">账号规则</a>
-          </p>
 
           {/* 注册入口: 参考站无 (走短信/扫码), 本项目邮箱注册体系需要 → 保留文字链接 */}
           <div className="login-switch">

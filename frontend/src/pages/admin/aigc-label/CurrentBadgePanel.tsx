@@ -1,4 +1,4 @@
-import { Panel } from '~/admin-ui/primitives';
+import { formatDateTime, Panel } from '~/admin-ui/primitives';
 import type { AdminAigcLabel } from '../../../types/api';
 
 /**
@@ -27,7 +27,7 @@ export function CurrentBadgePanel({ badge }: { badge: AdminAigcLabel['badge'] })
       <p className="mt-2 text-xs text-muted-foreground">
         {badge.width}×{badge.height}px
         {badge.updatedAt
-          ? ` · 更新于 ${new Date(badge.updatedAt).toLocaleString('zh-CN')}`
+          ? ` · 更新于 ${formatDateTime(badge.updatedAt)}`
           : ''}
       </p>
     </Panel>

@@ -6,6 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { adminInvoicesApi } from './api';
 
 import {
+  AdminPage,
   ActionButton,
   ExportCsvButton,
   useAdminExport,
@@ -15,7 +16,6 @@ import {
   ConfirmDialog,
   FilterActions,
   FilterBar,
-  PageHeader,
   Panel,
   RefreshButton,
   SavedViewBar,
@@ -23,7 +23,7 @@ import {
   StatusTag,
   StaleError,
   TextField,
-  formatDateTimeLoose,
+  formatDateTime,
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -181,7 +181,7 @@ export function AdminInvoicesPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <code className="font-mono font-medium text-foreground">{row.invoiceNo}</code>
-          <span className="text-muted-foreground">{formatDateTimeLoose(row.createdAt)}</span>
+          <span className="text-muted-foreground">{formatDateTime(row.createdAt)}</span>
         </div>
       ),
     },
@@ -253,7 +253,7 @@ export function AdminInvoicesPage() {
               title={row.redFlushReason ?? undefined}
             >
               {row.redFlushReason ?? '未填写冲红原因'}
-              {row.redFlushedAt ? ` · ${formatDateTimeLoose(row.redFlushedAt)}` : ''}
+              {row.redFlushedAt ? ` · ${formatDateTime(row.redFlushedAt)}` : ''}
             </span>
           )}
         </div>
@@ -297,17 +297,15 @@ export function AdminInvoicesPage() {
   ];
 
   return (
-    <>
-      <PageHeader
-        title="发票管理"
-        description="审核并开具用户申请的开票。保留历史记录，已开具发票只能登记冲红。"
-      />
+    <AdminPage
+      title="发票管理"
+      description="审核并开具用户申请的开票。保留历史记录，已开具发票只能登记冲红。"
+    >
 
       <FilterBar>
         <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
-          placeholder="全部状态"
           clearLabel="全部状态"
           allowClear
           value={status}
@@ -449,6 +447,6 @@ export function AdminInvoicesPage() {
           }
         />
       )}
-    </>
+    </AdminPage>
   );
 }

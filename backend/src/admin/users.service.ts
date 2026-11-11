@@ -900,15 +900,11 @@ export class AdminUsersService {
         await tx.loginSession.deleteMany({ where: { userId: id } });
         await tx.notification.deleteMany({ where: { userId: id } });
         // 账号安全域的子表: 令牌 / OAuth 身份 / 插件状态随人走;
-        // 登录、同意与上游调用记录断开关联但**保留**数据，避免删除后失去举证链。
+        // 登录与上游调用记录断开关联但**保留**数据，避免删除后失去举证链。
         await tx.accountToken.deleteMany({ where: { userId: id } });
         await tx.oAuthIdentity.deleteMany({ where: { userId: id } });
         await tx.userPluginState.deleteMany({ where: { userId: id } });
         await tx.loginLog.updateMany({
-          where: { userId: id },
-          data: { userId: null },
-        });
-        await tx.consentRecord.updateMany({
           where: { userId: id },
           data: { userId: null },
         });

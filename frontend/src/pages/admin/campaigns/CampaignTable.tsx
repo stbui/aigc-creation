@@ -100,7 +100,8 @@ export function CampaignTable({
             label: row.statusLabel,
             tone: 'muted' as TagTone,
           };
-          return <StatusTag status={row.status} label={meta.label} tone={meta.tone} />;
+          /* data-status 与可见标签同口径，避免 e2e 按人工 status 断言却看到派生文案 */
+          return <StatusTag status={row.effective} label={meta.label} tone={meta.tone} />;
         },
       },
       {
@@ -114,9 +115,9 @@ export function CampaignTable({
               <ActionButton variant="ghost" size="sm" onClick={() => onEdit(row)}>
                 编辑
               </ActionButton>
-              {/* 后端是 off ↔ active 的翻转；按当前状态给出明确动作名 */}
+              {/* 后端 active → 下线，其余 draft/ended/off → 上线；按当前人工状态给动作名 */}
               <ActionButton variant="ghost" size="sm" disabled={busy} onClick={() => onToggle(row)}>
-                {row.status === 'off' ? '上线' : '下线'}
+                {row.status === 'active' ? '下线' : '上线'}
               </ActionButton>
               <RowMenu
                 label={`${row.name} 更多操作`}

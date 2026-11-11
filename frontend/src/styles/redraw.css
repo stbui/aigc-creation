@@ -51,10 +51,6 @@
   cursor: grabbing;
 }
 
-.redraw-mask-hidden {
-  display: none;
-}
-
 .redraw-zoom-value {
   min-width: 40px;
   text-align: center;

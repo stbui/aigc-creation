@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Image as ImageIcon, Loader2 } from 'lucide-react';
 import {
+  formatDateTime,
   ActionButton,
   FilePicker,
   NumberField,
@@ -258,7 +259,7 @@ export function SettingItemRow({
           {item.updatedBy && (
             <span>
               上次修改：{item.updatedBy}
-              {item.updatedAt ? ` · ${new Date(item.updatedAt).toLocaleString('zh-CN')}` : ''}
+              {item.updatedAt ? ` · ${formatDateTime(item.updatedAt)}` : ''}
             </span>
           )}
           {item.linkTo && (

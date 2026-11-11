@@ -11,7 +11,7 @@ import type {
   CreateProductPayload,
   UpdateProductPayload,
 } from '../../../types/api';
-import { formatYuanPlain } from '../../../admin-ui/lib/format';
+import { formatMonthDayTime, formatYuanPlain } from '../../../admin-ui/lib/format';
 import {
   DEFAULT_SORT_ORDER,
   type ProductCurrency,
@@ -66,17 +66,13 @@ export function moneyText(cents: number): string {
   });
 }
 
-/** 限时商品的结束时刻：后台同屏比较多个商品时只需要日期与时分 */
+/**
+ * 限时商品的结束时刻。
+ *
+ * 后台同屏比较多个商品时只需要「月-日 时:分」；年份与秒是噪声。
+ */
 export function saleWindowEnd(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+  return formatMonthDayTime(iso);
 }
 
 /**

@@ -22,7 +22,7 @@
 
 | 角色 | 说明 | 关键权限 |
 | --- | --- | --- |
-| 访客 | 未登录 | 浏览首页、工作台、能力页、站点地图、法务正文；执行生成/上传时唤起登录弹窗 |
+| 访客 | 未登录 | 浏览首页、工作台、能力页、站点地图；执行生成/上传时唤起登录弹窗 |
 | 普通用户 | 已注册 | 创作、上传、素材库、作品、积分、订单、会员、工单、账户自助 |
 | 后台角色 | 管理员 / 运营 / 财务 / 自定义 | 由 `AdminRole` 权限点控制；前端隐藏无权限入口，后端强制校验 |
 
@@ -70,8 +70,6 @@
 | A-07 | 个人数据导出（JSON） | 已实现 |
 | A-08 | 自助注销：清除作品/素材/项目/积分批次，保留订单等法定留存数据 | 已实现 |
 | A-09 | 注销影响面预览与二次确认 | 已实现 |
-| A-10 | 法务文档版本化（用户协议 / 隐私政策 / 未成年人保护 / 账号规则） | 已实现 |
-| A-11 | 同意留痕（版本号 + 时间） | 已实现 |
 | A-12 | 站内消息：支付成功、任务失败退款、会员到期、工单回复、全站广播 | 已实现 |
 | A-13 | 登录日志与扫码登录记录 | 已实现 |
 | A-14 | 第三方登录：标准 OAuth2 / OIDC（内置 Google、GitHub，另有 generic 可接任意合规 provider）；凭据齐全且列入 `OAUTH_ENABLED` 才在登录页显示按钮 | 已实现 |
@@ -79,7 +77,6 @@
 **硬约束**：
 
 - 扫码票据只存 SHA-256；扫码不等于授权，必须手机端确认；兑换一次性（`confirmed → consumed`）。
-- 法务已发布版本不可原地覆盖；改文本须升版本号再发布。
 - 注销说明必须写明订单留存 3 年，否则构成告知不准确。
 - 第三方登录：`state` 绑定 provider 且 10 分钟过期（防 CSRF 与跨 provider 复用）；只有 provider 明确确权（`emailVerified`）的邮箱才自动绑定已有账号，其余一律新建本地账号；`accessToken` 不进 URL，回调只回传 60 秒短时票据，由前端换取正式会话；登录记录记 `reason=oauth:<provider>`。
 
@@ -156,7 +153,7 @@
 
 ### 4.6 后台管理
 
-后台 32 个页面，权限点定义在 `backend/src/admin/permissions.ts`；侧栏分组唯一事实源是 `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU`。
+后台 31 个页面，权限点定义在 `backend/src/admin/permissions.ts`；侧栏分组唯一事实源是 `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU`。
 
 | 分组 | 页面 |
 | --- | --- |
@@ -165,7 +162,7 @@
 | 模型与渠道 | 模型商品 / 插件 / 能力与模型 / 用户分组 / 调用记录 |
 | 交易 | 商品管理 / 会员套餐 / 订单管理 / 积分账本 / 优惠券 / 限时活动 / 邀请与签到 |
 | 财务 | 支付充值 / 发票管理 / 生成账单 / 财务分析 |
-| 内容与合规 | 法务文档 / 站内消息 / AI 标识 |
+| 内容与合规 | 站内消息 / AI 标识 |
 | 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 |
 | 数据安全 | 数据备份 / 保留期清理 |
 
@@ -212,7 +209,7 @@
 | 增长 | `Coupon` / `Campaign` / `InviteRelation` / `InviteRewardRule` / `CheckinRecord` / `CheckinRule` |
 | 财务 | `Invoice` / `ReconciliationBatch` / `ReconciliationItem` |
 | 身份安全 | `AccountToken`（一次性令牌：重置密码等）/ `LoginLog` / `LoginSession`（扫码登录票据，**只存 SHA-256 哈希**，`confirmed → consumed` 一次性兑换）/ `OAuthIdentity`（第三方绑定：`provider` + `subject` 联合唯一，`lastLoginAt` 记录最近登录） |
-| 内容与合规 | `LegalDocument`（按 slug + version 版本化）/ `ConsentRecord`（同意留痕）/ `Notification` / `MessageTemplate` / `AigcLabelConfig`（单行 `id='default'`：`specJson` 样式 + `pngBase64` 浏览器渲染位图 + `specKey` 过期判定） |
+| 内容与合规 | `Notification` / `MessageTemplate` / `AigcLabelConfig`（单行 `id='default'`：`specJson` 样式 + `pngBase64` 浏览器渲染位图 + `specKey` 过期判定） |
 | 服务 | `Ticket`（`ticketNo @unique`，状态机见 `tickets.service.ts` 的 `TRANSITIONS`）/ `TicketReply` |
 | 模型层 | `ModelChannel` / `ChannelModel` / `ChannelModelPriceTier` / `LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute` / `RouteAttempt` / `UserGroup` / `UserGroupChannel` / `BillingOrder` / `ApiCallLog` / `CapabilityControl`（能力上下线，**无行 = 启用**） |
 | 运维 | `BackupRecord` / `CleanupLog` / `PluginPlatformState` / `UserPluginState` / `RouteCatalogVersion` |

@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FolderPlus, Save } from 'lucide-react';
 import {
-  ActionButton,
-  Drawer,
+  FormDrawer,
   FormField,
-  Notice,
   SelectField,
   TextField,
 } from '~/admin-ui/primitives';
@@ -121,95 +119,75 @@ export function ProjectFormDrawer({ open, editing, onClose, onSaved }: ProjectFo
   };
 
   return (
-    <Drawer
+    <FormDrawer
       open={open}
-      onOpenChange={(next) => {
-        if (!next && !saving) onClose();
-      }}
-      width={520}
+      onClose={onClose}
+      size="sm"
       title={editing ? `编辑项目 · ${editing.name}` : '新建项目'}
       description={editing ? '仅修改项目名称；归属用户不会改变。' : undefined}
-      footer={
-        <>
-          <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={saving}>
-            取消
-          </ActionButton>
-          <ActionButton
-            variant="default"
-            size="sm"
-            icon={editing ? Save : FolderPlus}
-            disabled={!canSave || saving}
-            onClick={() => void save()}
-          >
-            {saving ? '保存中…' : editing ? '保存' : '创建项目'}
-          </ActionButton>
-        </>
-      }
+      busy={saving}
+      formError={formError}
+      submitLabel={editing ? '保存' : '创建项目'}
+      submitIcon={editing ? Save : FolderPlus}
+      submitDisabled={!canSave}
+      onSubmit={() => void save()}
     >
-      <div className="flex flex-col gap-4">
-        {formError && (
-          <Notice tone="danger" className="mb-0">
-            {formError}
-          </Notice>
-        )}
+      <FormField label="项目名称" required hint="用于素材库中的项目分组，最多 80 个字符。">
+        <TextField
+          ariaLabel="项目名称"
+          value={name}
+          maxLength={80}
+          showCount
+          placeholder="例如：双十一主视觉"
+          disabled={saving}
+          onChange={setName}
+          onEnter={() => void save()}
+        />
+      </FormField>
 
-        <FormField label="项目名称" required hint="用于素材库中的项目分组，最多 80 个字符。">
-          <TextField
-            ariaLabel="项目名称"
-            value={name}
-            maxLength={80}
-            showCount
-            placeholder="例如：双十一主视觉"
-            disabled={saving}
-            onChange={setName}
-            onEnter={() => void save()}
-          />
+      {editing ? (
+        <FormField label="所属用户">
+          <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
+            <div>{editing.ownerName || '未命名用户'}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{editing.ownerEmail}</div>
+          </div>
         </FormField>
-
-        {editing ? (
-          <FormField label="所属用户">
-            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
-              <div>{editing.ownerName || '未命名用户'}</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">{editing.ownerEmail}</div>
-            </div>
+      ) : (
+        <>
+          <FormField label="搜索用户" hint="按邮箱或名称搜索正常状态账号。">
+            <TextField
+              ariaLabel="搜索所属用户"
+              value={userKeyword}
+              placeholder="输入邮箱或名称"
+              disabled={saving}
+              onChange={setUserKeyword}
+            />
           </FormField>
-        ) : (
-          <>
-            <FormField label="搜索用户" hint="按邮箱或名称搜索正常状态账号。">
-              <TextField
-                ariaLabel="搜索所属用户"
-                value={userKeyword}
-                placeholder="输入邮箱或名称"
-                disabled={saving}
-                onChange={setUserKeyword}
-              />
-            </FormField>
 
-            <FormField
-              label="所属用户"
-              required
-              error={usersError}
-              hint={usersLoading ? '正在加载用户…' : '默认展示前 100 个账号，可用上方搜索缩小范围。'}
-            >
-              <SelectField
-                ariaLabel="所属用户"
-                value={ownerId || undefined}
-                onChange={(value) => {
-                  const next = value ?? '';
-                  const user = users.find((candidate) => candidate.id === next);
-                  setOwnerId(next);
-                  setSelectedOwnerLabel(
-                    user ? (user.name ? `${user.name} · ${user.email}` : user.email) : '',
-                  );
-                }}
-                options={ownerOptions}
-                placeholder={usersLoading ? '正在加载用户…' : '请选择所属用户'}
-                disabled={saving || usersLoading}
-              />
-            </FormField>
-          </>
-        )}
-      </div>
-    </Drawer>
+          <FormField
+            label="所属用户"
+            required
+            error={usersError}
+            hint={usersLoading ? '正在加载用户…' : '默认展示前 100 个账号，可用上方搜索缩小范围。'}
+          >
+            <SelectField
+              ariaLabel="所属用户"
+              value={ownerId || undefined}
+              onChange={(value) => {
+                const next = value ?? '';
+                const user = users.find((candidate) => candidate.id === next);
+                setOwnerId(next);
+                setSelectedOwnerLabel(
+                  user ? (user.name ? `${user.name} · ${user.email}` : user.email) : '',
+                );
+              }}
+              options={ownerOptions}
+              placeholder={usersLoading ? '正在加载用户…' : '请选择所属用户'}
+              disabled={saving || usersLoading}
+            />
+          </FormField>
+        </>
+      )}
+    </FormDrawer>
   );
 }

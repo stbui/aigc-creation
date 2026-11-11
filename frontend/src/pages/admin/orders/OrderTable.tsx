@@ -70,7 +70,7 @@ export function OrderTable({
     {
       key: 'orderNo',
       title: '订单号 / 下单时间',
-      width: 190,
+      width: 192,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <Link
@@ -86,7 +86,7 @@ export function OrderTable({
     {
       key: 'user',
       title: '用户',
-      width: 170,
+      width: 135,
       render: (row) => (
         <Link
           className="block max-w-[160px] truncate font-medium text-foreground transition-colors hover:text-brand hover:underline"
@@ -100,7 +100,7 @@ export function OrderTable({
     {
       key: 'status',
       title: '状态 / 渠道',
-      width: 120,
+      width: 105,
       render: (row) => (
         <div className="flex flex-col items-start gap-0.5">
           <StatusTag status={row.status} label={STATUS_LABEL_OVERRIDE[row.status]} />
@@ -111,9 +111,32 @@ export function OrderTable({
       ),
     },
     {
+      /*
+       * 退款状态列：退款单状态与订单状态是两个维度 —— 渠道异步退款时订单
+       * 仍是「已支付」，不单列一列就「筛得出却看不出是哪单」。
+       *
+       * 紧挨状态列而不是放在最右：右侧「操作」列是固定的，表宽超出视口时
+       * 会把这一列压在下面，而筛选条件恰好可以按退款状态筛 —— 筛得出来却
+       * 看不见原因，是最容易让人以为筛选坏了的位置。
+       */
+      key: 'refundState',
+      title: '退款状态',
+      width: 100,
+      render: (row) =>
+        row.refundState ? (
+          <StatusTag
+            status={`refund-${row.refundState}`}
+            tone={REFUND_STATE_TONES[row.refundState]}
+            label={REFUND_STATUS_LABELS[row.refundState]}
+          />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
       key: 'paid',
       title: '实付 / 优惠',
-      width: 150,
+      width: 135,
       render: (row) => {
         const extra = [
           row.refundedCents > 0 ? `已退 ¥ ${yuan(row.refundedCents)}` : '',
@@ -141,7 +164,7 @@ export function OrderTable({
     {
       key: 'items',
       title: '商品 / 积分',
-      width: 180,
+      width: 125,
       render: (row) => {
         const credits = row.grantedCredits > 0 ? `+${row.grantedCredits} 积分` : '无积分';
         return row.membershipPlanName ? (
@@ -177,7 +200,8 @@ export function OrderTable({
     {
       key: 'paidAt',
       title: '支付时间',
-      width: 160,
+      /* 与「下单时间」同宽：完整时间 19 字符，135 会折行 */
+      width: 170,
       render: (row) =>
         row.paidAt ? (
           <span className="tabular-nums">{fmtTime(row.paidAt)}</span>
@@ -186,28 +210,9 @@ export function OrderTable({
         ),
     },
     {
-      /*
-       * 退款状态列：退款单状态与订单状态是两个维度 —— 渠道异步退款时订单
-       * 仍是「已支付」，不单列一列就「筛得出却看不出是哪单」。
-       */
-      key: 'refundState',
-      title: '退款状态',
-      width: 110,
-      render: (row) =>
-        row.refundState ? (
-          <StatusTag
-            status={`refund-${row.refundState}`}
-            tone={REFUND_STATE_TONES[row.refundState]}
-            label={REFUND_STATUS_LABELS[row.refundState]}
-          />
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
-    },
-    {
       key: 'ops',
       title: '操作',
-      width: 170,
+      width: 155,
       /* 固定在最右, 保证滚动时高频动作仍可见 */
       fixed: 'right',
       render: (row) => {
@@ -303,6 +308,16 @@ export function OrderTable({
         </ActionButton>
       </BatchBar>
 
+      {/*
+       * 整页没有「待支付」订单时，勾选框会全部禁用。勾选框disabled但没有任何
+       * 说明，运营只会以为页面坏了或自己没权限 —— 一句话说清是哪种情况。
+       */}
+      {rows.length > 0 && !rows.some((row) => row.status === 'pending') && (
+        <p className="mb-2 text-xs text-muted-foreground">
+          当前列表没有「待支付」订单，勾选与批量核销不可用（批量核销只处理待支付订单）。
+        </p>
+      )}
+
       <AdminDataTable<AdminOrderRow>
         rows={rows}
         columns={columns}
@@ -312,7 +327,13 @@ export function OrderTable({
         onRetry={onRetry}
         /* 整行可点开详情：操作列在横向滚动后容易被裁掉 */
         onRowClick={(row) => onOpenDetail(row.id)}
-        minWidth={1200}
+        minWidth={1090}
+        /*
+         * 列宽固定：自动布局会按内容把「用户」「商品」两列撑宽，总额超出容器后
+         * 右固定的操作列会盖住支付时间。固定列宽 + 单元格 truncate 让每一列都
+         * 恰好占住自己该占的位置，长文本靠 title 提示。
+         */
+        fixedLayout
         selectable
         selected={selected}
         onSelectedChange={onSelectedChange}

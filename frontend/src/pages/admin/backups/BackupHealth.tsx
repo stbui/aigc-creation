@@ -1,5 +1,5 @@
 import { ShieldAlert } from 'lucide-react';
-import { Notice, StatCard } from '~/admin-ui/primitives';
+import { formatDateTime, Notice, StatCard } from '~/admin-ui/primitives';
 import { formatRelative } from './utils';
 import type { AdminBackupStats } from '../../../types/api';
 
@@ -46,7 +46,7 @@ export function BackupHealth({ stats }: { stats: AdminBackupStats | null }) {
           value={<span className="text-[18px]">{formatRelative(stats.lastSuccessAt)}</span>}
           hint={
             stats.lastSuccessAt
-              ? new Date(stats.lastSuccessAt).toLocaleString('zh-CN')
+              ? formatDateTime(stats.lastSuccessAt)
               : '从未成功备份'
           }
         />

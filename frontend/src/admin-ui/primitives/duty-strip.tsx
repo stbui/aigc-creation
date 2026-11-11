@@ -6,7 +6,7 @@ import { cn } from '../lib/cn';
 import { Button } from '../components/ui/button';
 import { useDuty, type DutyCounter, type DutyTask } from '../../components/admin/DutyContext';
 import { earliestFailure } from './duty-tower';
-import { formatDuration, tickHeight } from '../lib/format';
+import { formatDuration, formatNumber, tickHeight } from '../lib/format';
 
 /**
  * 值班条（概览首屏）。
@@ -221,7 +221,8 @@ function Ruler({ ticks }: { ticks: DutyTask[] }) {
 }
 
 function Counter({ counter }: { counter: DutyCounter }) {
-  const show = counter.value === null ? '—' : counter.value.toLocaleString('zh-CN');
+  /* 空值即「没有该类任务」，`formatNumber` 统一给破折号 */
+  const show = formatNumber(counter.value);
   return (
     <Link
       to={counter.to}

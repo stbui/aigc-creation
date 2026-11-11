@@ -536,13 +536,13 @@ export function LandingPage() {
                     <span className="lp-campaign-tag">限时免费</span>
                     <h3>{c.name}</h3>
                     <div className="lp-addon-price">
-                      <strong>0</strong>
-                      <span>积分</span>
+                      <strong>{c.onlyNewUsers ? '新客' : '0'}</strong>
+                      <span>{c.onlyNewUsers ? '专享' : '积分'}</span>
                     </div>
                     <p className="lp-addon-meta">
                       {(c.capabilityIds ?? []).map((id) => capabilityName(id)).join(' / ')}
                       <br />
-                      {formatCampaignEnd(c.endAt)}结束
+                      {c.onlyNewUsers ? '仅限新用户，登录后按资格生效 · ' : ''}{formatCampaignEnd(c.endAt)}结束
                     </p>
                     <button
                       type="button"
@@ -676,8 +676,6 @@ export function LandingPage() {
           <div className="landing-footer-col">
             <h4>支持与服务</h4>
             <Link to="/tickets?type=consultation&compose=1">帮助中心</Link>
-            <Link to="/legal/user-agreement.html">用户协议</Link>
-            <Link to="/legal/privacy-policy.html">隐私政策</Link>
             <Link to="/tickets?type=complaint&compose=1">投诉举报</Link>
           </div>
         </div>

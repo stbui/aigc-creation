@@ -5,6 +5,8 @@
  * 可以直接在后续图表或测试中复用。
  */
 
+import { formatDate, formatHm, formatMonthDayTime } from '../../../admin-ui/lib/format';
+
 /** 队列最多列几条：再多就不叫队列，剩下的去任务页筛 */
 export const QUEUE_LIMIT = 6;
 
@@ -23,26 +25,18 @@ export const CHANNEL_LABELS: Record<string, string> = {
  * 队列时刻。
  *
  * 只写 HH:MM 会骗人：队列里的失败可能来自几天前，读起来却像「今天 21:54」。
- * 跨天的行带上月日。
+ * 跨天的行带上月日。是否同一天按北京时间的日期判断 —— 用浏览器本地日期
+ * 会让出差在外的运营看到错误的「今天」。
  */
 export function queueTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  const time = hhmm(iso);
-  if (sameDay) return time;
-  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${time}`;
+  const date = formatDate(iso);
+  if (date === '—') return '—';
+  return date === formatDate(new Date().toISOString()) ? formatHm(iso) : formatMonthDayTime(iso);
 }
 
 /** 时刻 → HH:MM。后台用 24 小时制，与日志时间对齐 */
 export function hhmm(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  return formatHm(iso);
 }
 
 /**

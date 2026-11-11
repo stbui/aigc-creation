@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { assetThumbUrl } from '../../../lib/api';
-import { Meter, formatDuration } from '../../../admin-ui/primitives';
+import { formatNumber, formatDateTime, Meter, formatDuration } from '../../../admin-ui/primitives';
 import { taskErrorLabel } from '../../../lib/admin-error-codes';
 import { adminOrderDetailHref, adminTaskHref } from '../../../lib/admin-links';
 import type { DutyTask } from '../../../components/admin/DutyContext';
@@ -123,7 +123,7 @@ export function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: b
               </span>
               <span
                 className="text-[12px] text-muted-foreground"
-                title={new Date(t.createdAt).toLocaleString('zh-CN')}
+                title={formatDateTime(t.createdAt)}
               >
                 {queueTime(t.createdAt)}
               </span>
@@ -214,7 +214,7 @@ export function OutputStrip({ tasks }: { tasks: DutyTask[] }) {
           <Link
             className="group relative block aspect-square overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-1"
             to={adminTaskHref(t.id)}
-            title={`${t.capabilityName} · ${new Date(t.createdAt).toLocaleString('zh-CN')}`}
+            title={`${t.capabilityName} · ${formatDateTime(t.createdAt)}`}
             aria-label={`查看产出任务：${t.capabilityName}`}
           >
             <img
@@ -262,7 +262,7 @@ export function OrderQueue({ orders, loading }: { orders: AdminOrderRow[]; loadi
             </span>
             <span
               className="text-[12px] text-muted-foreground"
-              title={new Date(o.createdAt).toLocaleString('zh-CN')}
+              title={formatDateTime(o.createdAt)}
             >
               {hhmm(o.createdAt)}
             </span>
@@ -299,10 +299,10 @@ export function FinanceGrid({
       value: `¥${yuan(commerce.refundedWindowCents)}`,
       tone: commerce.refundedWindowCents > 0 ? 'danger' : undefined,
     },
-    { label: '有效会员', value: commerce.members.active.toLocaleString('zh-CN') },
+    { label: '有效会员', value: formatNumber(commerce.members.active) },
     {
       label: `近 ${days} 天积分消耗`,
-      value: commerce.credits.consumedInWindow.toLocaleString('zh-CN'),
+      value: formatNumber(commerce.credits.consumedInWindow),
     },
   ];
 

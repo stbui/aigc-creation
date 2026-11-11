@@ -21,6 +21,7 @@ const ROOTS = [
   'src/hooks',
   'src/lib',
   'src/context',
+  'src/mask-sdk',
 ];
 
 describe('局部重绘页具名导入', () => {

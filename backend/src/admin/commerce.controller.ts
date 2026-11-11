@@ -106,6 +106,20 @@ export class RefundDto {
   @IsString() @MaxLength(200) reason!: string;
 }
 
+/**
+ * 手工核销。
+ *
+ * `note` 是「为什么这笔钱算是收到了」的依据（线下转账凭证号、渠道商户后台
+ * 查到的交易号等）。接口保持可选以兼容脚本调用；后台界面强制填写 —— 人工
+ * 入账没有渠道报文，这段文字是事后唯一的凭据。
+ */
+export class MarkPaidDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  note?: string;
+}
+
 /** 异步退款人工核销：必须先到渠道商户后台核实最终结果 */
 export class RefundConfirmDto {
   @IsIn(["succeeded", "failed"])
@@ -433,13 +447,18 @@ export class AdminCommerceController {
   /** 手工核销 (B-42): 标记已支付 */
   @Post("orders/:id/mark-paid")
   @RequirePermission(PERMISSIONS.orderMarkPaid)
-  async markPaid(@Param("id") id: string, @AdminUser() actor: AdminUser) {
+  async markPaid(
+    @Param("id") id: string,
+    @Body() dto: MarkPaidDto,
+    @AdminUser() actor: AdminUser,
+  ) {
     const order = await this.commerce.orderDetail(id);
     return this.orders.markPaid({
       orderId: id,
       userId: order.userId,
       payTransactionId: `MANUAL-${actor.id}-${Date.now()}`,
       channel: "manual",
+      note: dto?.note?.trim() || undefined,
     });
   }
 

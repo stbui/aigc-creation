@@ -310,9 +310,7 @@ export interface AdminCampaign {
    * 以为活动已在跑而实际没有曝光。
    */
   effective: "draft" | "live" | "scheduled" | "ended" | "off";
-  audience: { onlyNewUsers?: boolean }; orderCount: number;
-  /** 引用该活动的限时免费账单数（BillingOrder.promotionId），删除预检需与订单合并 */
-  billingCount: number;
+  audience: { onlyNewUsers?: boolean }; orderCount: number; billingCount: number; // BillingOrder.promotionId 引用数，删除预检与订单合并
   createdAt: string;
   updatedAt: string;
 }
@@ -514,10 +512,8 @@ export interface PromoCampaign {
   product?: { id: string; sku: string; name: string; priceCents: number };
   /** 实际生效的活动价（分），限时价活动才有 */
   priceCents?: number;
-  /** 限时免费覆盖的能力 id */
-  capabilityIds?: string[];
-  /** 仅新用户专享：匿名展示时不能承诺「0 积分」，落地页需标注 */
-  onlyNewUsers?: boolean;
+  /** 限时免费覆盖的能力 id；onlyNewUsers = 新客专享，匿名不承诺 0 积分 */
+  capabilityIds?: string[]; onlyNewUsers?: boolean;
 }
 
 /* ────────────────────────────────────────────────────────────────

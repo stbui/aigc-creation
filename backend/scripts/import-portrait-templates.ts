@@ -2,7 +2,7 @@
  * 写真模板扩充目录导入（2026-11-11）。
  *
  * 把 `src/capabilities/definitions/portrait-templates.import.ts` 中
- * 59 篇微信公众号文章去重后的 516 套模板，按
+ * 60 篇微信公众号文章去重后的 520 套模板，按
  * 「一级分类 → 二级分类（来源文章）→ 模板」写入数据库目录表。
  *
  * **幂等且不覆盖后台修改**：一级分类按 slug、二级分类按 (categoryId, slug)、

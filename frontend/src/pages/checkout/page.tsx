@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
 
 import { QUOTE_DEBOUNCE_MS } from './constants';
 import { StateError, StateSkeleton } from './components';
@@ -17,18 +17,15 @@ import { useAuth } from '../../context/AuthContext';
 import { useDocumentMeta } from '../../hooks/useDocumentMeta';
 
 /**
- * 结算页: 下单确认 → 沙箱支付 → 结果。
+ * 结算页: 下单确认 → 支付 → 结果。
  *
- * 三个必须做对的地方:
+ * 两个必须做对的地方:
  *
  * 1. **幂等键用 ref 持有**: 同一笔下单的重试 (网络抖动、用户重复点)
  *    必须复用同一个 key, 否则后端会当成两笔新订单各扣一次钱。
  *    用 useState 会在重渲染后拿到新值, 所以用 ref。
  *
- * 2. **沙箱身份明示**: 当前只有沙箱通道, 不产生真实扣款。支付方式卡片内常驻声明,
- *    不做「看起来像真支付」的蒙混 —— 否则截图外流会被误认为已接通支付。
- *
- * 3. **结果如实展示**: 失败/超时都把后端给的 message 原样透出,
+ * 2. **结果如实展示**: 失败/超时都把后端给的 message 原样透出,
  *    不粉饰成「稍后再试」这类模糊话术。
  */
 
@@ -119,7 +116,6 @@ export function CheckoutPage() {
     stopPolling,
     refreshPaymentStatus,
     payOnline,
-    pay,
   } = useCheckoutPayment({ product, plan, couponCode, token });
 
   useEffect(() => {
@@ -284,10 +280,6 @@ export function CheckoutPage() {
     return (
       <div className="pkg-checkout-page">
         <div className="co-shell">
-          {/*
-            失败态不复用支付卡的沙箱声明块 (`.co-notice`): 那个 class 的语义是
-            "沙箱支付说明", 拿来渲染"商品加载失败"会把环境说明和错误混在同一视觉里。
-          */}
           <StateError
             title={isMembership ? '套餐信息加载失败' : '商品信息加载失败'}
             desc={
@@ -344,9 +336,14 @@ export function CheckoutPage() {
 
   return (
     <div className="pkg-checkout-page">
-      <button type="button" className="co-back" onClick={() => navigate(-1)}>
-        <ArrowLeft size={14} aria-hidden /> 返回
-      </button>
+      <div className="co-head-top">
+        <button type="button" className="co-back" onClick={() => navigate(-1)}>
+          <ArrowLeft size={14} aria-hidden /> 返回
+        </button>
+        <span className="co-trust">
+          <ShieldCheck size={14} aria-hidden /> 支付信息加密传输
+        </span>
+      </div>
 
       <header className="co-head">
         <div className="co-head-title">
@@ -364,7 +361,6 @@ export function CheckoutPage() {
         <div className="co-main">
           <CheckoutOrderCard product={product} plan={plan} />
           <CheckoutPaymentMethodCard
-            onlineIntent={onlineIntent}
             providers={providers}
             selectedProviderId={selectedProviderId}
             onSelectProvider={setSelectedProviderId}
@@ -398,7 +394,6 @@ export function CheckoutPage() {
             setQrDataUrl(null);
             setOnlineIntent(null);
           }}
-          onSandboxPay={(scenario) => void pay(scenario)}
           onRefreshPayment={() => void refreshPaymentStatus(order!.id)}
         />
       </div>

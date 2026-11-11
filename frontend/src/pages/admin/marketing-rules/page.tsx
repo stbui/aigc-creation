@@ -1,11 +1,9 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  PageHeader,
-  Tabs,
+  AdminPage,
+  AdminTabs,
   TabsContent,
-  TabsList,
-  TabsTrigger,
 } from '~/admin-ui/primitives';
 import { CheckinRecordsTab } from './CheckinRecordsTab';
 import { InviteRelationsTab } from './InviteRelationsTab';
@@ -54,31 +52,18 @@ export function AdminMarketingRulesPage() {
   useUnsavedGuard(writable && drafts.dirty);
 
   return (
-    <div className="flex flex-col">
-      <PageHeader
-        title="邀请与签到"
-        description="邀请分销与每日签到的积分规则，以及邀请关系、签到记录两张流水表。规则保存后立即生效，已发放的积分不受影响。"
-        actions={
-          !writable ? (
-            <span className="text-[12px] text-muted-foreground">
-              当前账号无 marketing.write 权限，仅可查看
-            </span>
-          ) : undefined
-        }
-      />
-
-      <Tabs value={tab} onValueChange={switchTab} className="gap-3">
-        <TabsList aria-label="邀请与签到标签" className="h-9 gap-1 p-1">
-          {TAB_OPTIONS.map((item) => (
-            <TabsTrigger
-              key={item.value}
-              value={item.value}
-              className="h-7 px-3 text-sm font-medium"
-            >
-              {item.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <AdminPage
+      title="邀请与签到"
+      description="邀请分销与每日签到的积分规则，以及邀请关系、签到记录两张流水表。规则保存后立即生效，已发放的积分不受影响。"
+      actions={
+        !writable ? (
+          <span className="text-[12px] text-muted-foreground">
+            当前账号无 marketing.write 权限，仅可查看
+          </span>
+        ) : undefined
+      }
+    >
+      <AdminTabs value={tab} onValueChange={switchTab} items={TAB_OPTIONS} ariaLabel="邀请与签到标签">
 
         {/*
          * 标签未激活时不挂载（Radix 默认）：进页只发两次规则请求，不必并发
@@ -93,7 +78,7 @@ export function AdminMarketingRulesPage() {
         <TabsContent value="checkins">
           <CheckinRecordsTab />
         </TabsContent>
-      </Tabs>
-    </div>
+      </AdminTabs>
+    </AdminPage>
   );
 }

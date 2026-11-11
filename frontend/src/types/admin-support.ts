@@ -302,45 +302,8 @@ export interface AdminRetentionTarget {
 // ══════════════════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 账户自助 / 法务 / 站内消息 (B4)
+// 账户自助 / 站内消息 (B4)
 // ─────────────────────────────────────────────────────────────────────────────
-
-export type LegalSlug =
-  "user-agreement" | "privacy-policy" | "minors-policy" | "account-rules";
-export type LegalStatus = "draft" | "published" | "archived";
-
-/** 公开接口：某文档的最新已发布版本 */
-export interface LegalDoc {
-  slug: string;
-  version: string;
-  title: string;
-  content: string;
-  publishedAt: string;
-}
-
-/** 公开接口：三类文档的版本概览 */
-export interface LegalIndexItem {
-  slug: string;
-  label: string;
-  /** 从未发布过时为 null（前端走内置兜底文本） */
-  version: string | null;
-  title: string;
-  publishedAt: string | null;
-}
-
-/** 后台：某文档的全部版本（含草稿与历史） */
-export interface AdminLegalDoc {
-  id: string;
-  slug: string;
-  version: string;
-  title: string;
-  content: string;
-  status: LegalStatus;
-  publishedAt: string | null;
-  publishedBy: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 /** 我的账号 */
 export interface MyProfile {

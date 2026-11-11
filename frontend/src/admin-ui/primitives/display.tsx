@@ -444,3 +444,48 @@ export function EmptyHint({
     </Empty>
   );
 }
+
+/* ────────────────────────── 紧凑指标 ────────────────────────── */
+
+/**
+ * 详情抽屉 / 卡片内的小指标：标签在上、数字在下。
+ *
+ * 此前三处各写一份（`UserDetailDrawer` 的 `MiniStat`、`UserGenerationSection`
+ * 的 `GenMetric`、`UserSpendingSection` 的 `SpendMetric`）：数字字号在 18 / 20px
+ * 之间摇摆，同样表示「没有异常」的 0 值，一处渲染正文色、一处渲染灰色。
+ *
+ * 与 `StatCard` 的分工：`StatCard` 是页面级统计（独立卡片、92px 高、22px 数字），
+ * 这里是它的紧凑版 —— 不带边框与外边距，由调用方的 `divide-x` 网格负责分隔。
+ */
+export function MiniStat({
+  label,
+  value,
+  tone,
+  size = 'lg',
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  /** 语义色：成功绿 / 失败红 / 警示橙 / 弱化灰（0 值、无异常）。 */
+  tone?: 'success' | 'danger' | 'warn' | 'muted';
+  /** `lg` 18px（默认，网格内并排）/ `xl` 20px（需要强调的一两个数字）。 */
+  size?: 'lg' | 'xl';
+}) {
+  return (
+    <div className="min-w-0 px-4 py-3 first:pl-0 last:pr-0">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd
+        className={cn(
+          'mt-1 leading-6 font-semibold tabular-nums',
+          size === 'xl' ? 'text-xl' : 'text-lg',
+          tone === 'success' && 'text-success-text',
+          tone === 'danger' && 'text-danger-text',
+          tone === 'warn' && 'text-warn-text',
+          tone === 'muted' && 'text-muted-foreground',
+          !tone && 'text-foreground',
+        )}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}

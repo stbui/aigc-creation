@@ -149,7 +149,7 @@ export class AccountService {
     });
     if (!user) throw new AppError(40401, '账号不存在', 404);
 
-    const [projects, assets, tasks, orders, credits, ledger, memberships, consents, notifications] =
+    const [projects, assets, tasks, orders, credits, ledger, memberships, notifications] =
       await Promise.all([
         this.prisma.project.findMany({ where: { ownerId: userId, deletedAt: null } }),
         this.prisma.asset.findMany({
@@ -200,7 +200,6 @@ export class AccountService {
           take: 2000,
         }),
         this.prisma.membership.findMany({ where: { userId } }),
-        this.prisma.consentRecord.findMany({ where: { userId } }),
         this.prisma.notification.findMany({
           where: { userId },
           orderBy: { createdAt: 'desc' },
@@ -229,7 +228,6 @@ export class AccountService {
         ledger: ledger.map(projectEntry),
       },
       memberships,
-      consents,
       notifications,
     };
   }

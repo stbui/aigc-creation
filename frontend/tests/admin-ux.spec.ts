@@ -288,11 +288,10 @@ test.describe('后台高频动线', () => {
     await expect(drawer(page)).toHaveCount(0);
   });
 
-  test('营销、法务与消息模板抽屉同样保护未保存内容', async ({ page }) => {
+  test('营销与消息模板抽屉同样保护未保存内容', async ({ page }) => {
     const cases = [
       ['/admin/coupons', '优惠券', '新建优惠券', '券名称', '新建优惠券'],
       ['/admin/campaigns', '限时活动', '新建活动', '活动名称', '新建活动'],
-      ['/admin/legal', '法务文档', '新建版本', '版本号', '新建法务文档版本'],
       ['/admin/notifications', '站内消息', '新建模板', '模板编码', '新建消息模板'],
     ] as const;
 

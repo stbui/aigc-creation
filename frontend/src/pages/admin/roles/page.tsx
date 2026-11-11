@@ -3,7 +3,7 @@ import { PERMISSION_LABELS, MODULE_LABELS, ROLE_COL } from './constants';
 import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from '../../../lib/api';
 
-import { ActionButton, CheckboxField, EmptyState, ListError, PageHeader, PageSkeleton, Panel, StaleError, ToneBadge } from '~/admin-ui/primitives';
+import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, ToneBadge } from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
@@ -181,15 +181,14 @@ export function AdminRolesPage() {
   if (roles.length === 0) return <EmptyState title="未配置任何后台角色" />;
 
   return (
-    <>
-      <PageHeader
-        title="角色权限"
-        description={
-          editable
-            ? '勾选变更后使用保存条提交；保存立即生效，无需重启或重新登录'
-            : '当前账号无 role.write 权限，仅可查看'
-        }
-      />
+    <AdminPage
+      title="角色权限"
+      description={
+        editable
+          ? '勾选变更后使用保存条提交；保存立即生效，无需重启或重新登录'
+          : '当前账号无 role.write 权限，仅可查看'
+      }
+    >
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
       {error && <StaleError error={error} onRetry={reload} />}
@@ -314,6 +313,6 @@ export function AdminRolesPage() {
           ))}
         </div>
       </Panel>
-    </>
+    </AdminPage>
   );
 }

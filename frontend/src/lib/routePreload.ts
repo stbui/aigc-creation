@@ -12,7 +12,6 @@ function candidatesFor(pathname: string) {
   const candidates = [pathname];
   if (pathname.startsWith('/tools/')) candidates.push('/tools/*');
   if (pathname.startsWith('/admin/')) candidates.push('/admin/*');
-  if (pathname.startsWith('/legal/')) candidates.push('/legal/*');
   if (pathname.startsWith('/checkout/')) candidates.push('/checkout/*');
   return candidates;
 }

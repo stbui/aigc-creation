@@ -142,9 +142,17 @@ test.describe('营销中心', () => {
     await expect(couponRow).toBeVisible({ timeout: 20000 });
 
     await couponRow.getByRole('button', { name: `${couponFixture!.name} 更多操作` }).click();
-    await expect(
-      page.getByRole('menu', { name: '更多操作' }).getByRole('menuitem', { name: '删除' }),
-    ).toBeVisible();
+    const menu = page.getByRole('menu', { name: '更多操作' });
+    await expect(menu.getByRole('menuitem', { name: '删除' })).toBeVisible();
+
+    /*
+     * 回归：菜单项是 div[role=menuitem] 且 Portal 到 body，点击曾沿 React
+     * 组件树冒泡到 onRowClick，绕过了行的 button/a/input/label 守卫，
+     * 导致点「删除」连带弹出编辑抽屉、把删除确认框压在下面。
+     */
+    await menu.getByRole('menuitem', { name: '删除' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(menu).toHaveCount(0);
   });
 
   test('限时活动页渲染', async ({ page }) => {

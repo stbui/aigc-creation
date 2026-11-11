@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CAPABILITY_UNAVAILABLE_NOTICE, publicCapabilityRuntime, runtimeOf } from '../constants';
+import { publicCapabilityRuntime, runtimeOf } from '../constants';
 import type { CapabilityRuntime } from '../../types/api';
 
 const internalUnavailableRuntime: CapabilityRuntime = {
@@ -11,16 +11,16 @@ const internalUnavailableRuntime: CapabilityRuntime = {
 };
 
 describe('capability runtime public copy', () => {
-  it('replaces the internal unavailable reason before it reaches C-end pages', () => {
+  it('clears the internal unavailable reason before it reaches C-end pages', () => {
     const runtime = runtimeOf({ mode: 'real', runtime: internalUnavailableRuntime });
 
-    expect(runtime.reason).toBe(CAPABILITY_UNAVAILABLE_NOTICE);
+    expect(runtime.reason).toBe('');
     expect(runtime.reason).not.toContain('真实模型');
     expect(runtime.reason).not.toContain('内部诊断');
   });
 
   it('sanitizes runtime data loaded from the public capability endpoint', () => {
-    expect(publicCapabilityRuntime(internalUnavailableRuntime).reason).toBe(CAPABILITY_UNAVAILABLE_NOTICE);
+    expect(publicCapabilityRuntime(internalUnavailableRuntime).reason).toBe('');
   });
 
   it('keeps the operator-provided reason when a capability is taken offline', () => {

@@ -74,7 +74,6 @@ async function collectMoveCounts(db, ids) {
     ['checkins', db.checkinRecord, { userId: { in: ids } }],
     ['loginLogs', db.loginLog, { userId: { in: ids } }],
     ['invoices', db.invoice, { userId: { in: ids } }],
-    ['consents', db.consentRecord, { userId: { in: ids } }],
     ['notifications', db.notification, { userId: { in: ids } }],
     ['tickets', db.ticket, { userId: { in: ids } }],
     ['modelCallLogs', db.modelCallLog, { ownerId: { in: ids } }],
@@ -203,7 +202,6 @@ async function main() {
       await moveWhere('checkins', tx.checkinRecord, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('loginLogs', tx.loginLog, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('invoices', tx.invoice, { userId: sourceFilter }, { userId: target.id });
-      await moveWhere('consents', tx.consentRecord, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('notifications', tx.notification, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('tickets', tx.ticket, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('modelCallLogs', tx.modelCallLog, { ownerId: sourceFilter }, { ownerId: target.id });

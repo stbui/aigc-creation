@@ -5,7 +5,7 @@ import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { ShieldAlert } from 'lucide-react';
 import { adminRetentionApi } from '../../../lib/api';
 
-import { ActionButton, AdminDataTable, ConfirmDialog, NumberField, Notice, PageHeader, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/primitives';
+import { AdminPage, ActionButton, AdminDataTable, ConfirmDialog, NumberField, Notice, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/primitives';
 import type { AdminCleanupLog, AdminRetentionTarget } from '../../../types/api';
 
 /**
@@ -233,11 +233,10 @@ export function AdminRetentionPage() {
   ];
 
   return (
-    <>
-      <PageHeader
-        title="保留期清理"
-        description="按时间清理运行痕迹类数据。订单、积分流水、素材与任务不在可清理范围内。"
-      />
+    <AdminPage
+      title="保留期清理"
+      description="按时间清理运行痕迹类数据。订单、积分流水、素材与任务不在可清理范围内。"
+    >
 
       <div className="mb-3 grid gap-3 [grid-template-columns:repeat(3,minmax(0,1fr))]">
         <StatCard label="可清理目标" value={targets.length} hint="固定白名单，不支持自定义表名" />
@@ -320,6 +319,6 @@ export function AdminRetentionPage() {
       >
         删除前请确认已做过备份：清理不进入回收站，SQLite 的 VACUUM 之后也无法从文件碎片恢复。
       </Notice>
-    </>
+    </AdminPage>
   );
 }

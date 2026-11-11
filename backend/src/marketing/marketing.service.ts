@@ -938,9 +938,10 @@ export class MarketingService {
       }
     } else if (dto.type === 'popup') {
       if (!payload.title) errors.push('弹窗活动必须填写标题');
-      // 外链会引入钓鱼与合规风险, 站内相对路径之外一律拒绝
-      if (payload.ctaUrl && !payload.ctaUrl.startsWith('/')) {
-        errors.push('弹窗按钮仅支持站内相对路径');
+      // 外链会引入钓鱼与合规风险, 站内相对路径之外一律拒绝。
+      // `//host` 是协议相对地址，以 / 开头却会跳站外，C 端只能静默兜底。
+      if (payload.ctaUrl && (!payload.ctaUrl.startsWith('/') || payload.ctaUrl.startsWith('//'))) {
+        errors.push('弹窗按钮仅支持站内相对路径（不接受 // 开头的站外地址）');
       }
     }
 

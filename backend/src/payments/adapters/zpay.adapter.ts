@@ -36,7 +36,15 @@ interface ZpayApiResponse extends Record<string, unknown> {
 }
 
 /** 渠道已返回合法 JSON 且明确拒绝；与网络/解析失败的资金语义不同。 */
-class ZpayApiRejectedError extends Error {}
+class ZpayApiRejectedError extends Error {
+  constructor(
+    message: string,
+    /** 渠道原始应答，用于把「明确查无此单」与其它拒绝区分开并留痕 */
+    readonly response?: ZpayApiResponse,
+  ) {
+    super(message);
+  }
+}
 
 /**
  * ZPay 聚合支付适配器。
@@ -240,6 +248,22 @@ export class ZpayAdapter implements PaymentAdapter {
       }
       return failedQuery(input.orderNo, `ZPay 返回未知订单状态: ${status}`);
     } catch (e) {
+      /*
+       * ZPay 对「商户订单号不存在」不返回独立错误码，而是 code≠1 + 明文 msg。
+       * 这是渠道确认查无此单的唯一凭据，必须映射成 not_found：关单流程只有
+       * 看到 not_found 才允许本地关单。若按 failed 处理，下单阶段就失败
+       * （例如回调地址缺失，渠道根本没收到请求）的订单会永远无法关闭，
+       * worker 每轮重试都卡在同一条「订单编号不存在」上。
+       * 其它 code≠1（密钥错误、商户号错误等）仍按 failed 处理，不能本地关单。
+       */
+      if (e instanceof ZpayApiRejectedError && isOrderNotFoundMessage(e.message)) {
+        return {
+          state: 'not_found',
+          orderNo: input.orderNo,
+          providerStatus: 'ZPAY_ORDER_NOT_FOUND',
+          rawPayload: e.response ? JSON.stringify(e.response) : '',
+        };
+      }
       return failedQuery(input.orderNo, `ZPay 查单失败: ${(e as Error).message}`);
     }
   }
@@ -423,6 +447,7 @@ export class ZpayAdapter implements PaymentAdapter {
     if (code !== 1) {
       throw new ZpayApiRejectedError(
         asString(response.msg) || `ZPay API 返回 code=${String(response.code)}`,
+        response,
       );
     }
     return response;
@@ -526,6 +551,14 @@ function failedQuery(orderNo: string, error: string): ProviderPaymentResult {
     error,
     rawPayload: '',
   };
+}
+
+/**
+ * 渠道确认「商户订单号不存在」。只认这两种已知措辞（允许末尾中文/ASCII 标点与空白），
+ * 不做模糊包含匹配 —— 其它拒绝原因必须保持 failed，避免把已支付订单判成查无此单。
+ */
+function isOrderNotFoundMessage(message: string): boolean {
+  return /^订单(?:编号)?不存在[!！.。\s]*$/.test(message.trim());
 }
 
 function stringRecord(body: Record<string, unknown>): Record<string, string> {

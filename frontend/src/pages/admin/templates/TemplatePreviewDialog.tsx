@@ -19,7 +19,7 @@ export function TemplatePreviewDialog({
       }}
       title={item?.name ?? '模板预览'}
       description={item ? `排序 ${item.sortOrder} · ${item.enabled ? '启用' : '已停用'}` : undefined}
-      width={1160}
+      size="xl"
       footer={
         <ActionButton variant="outline" onClick={onClose}>
           关闭

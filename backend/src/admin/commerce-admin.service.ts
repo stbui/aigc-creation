@@ -160,6 +160,29 @@ const PRODUCT_DEFAULT_SORT_ORDER = 100;
 const EXPORT_LIMIT = 10_000;
 
 /**
+ * 订单「实付」的唯一口径（列表 / 详情 / 导出共用）。
+ *
+ * 历史订单没有写入 `paidCents` 快照，直接展示会是 0 元；但**真正的 0 元单**
+ * （100% 券/活动、免费领取）也必须显示 0，不能回落成原价，否则运营会以为
+ * 用户付过钱、甚至对一个免费单发起退款。
+ *
+ * 区分办法与 C 端 `OrderService.toOrderView` 一致：看有没有 `channel=free`
+ * 的成功流水。此前只有列表做了回落、详情返回原始值，同一笔订单在列表和抽屉
+ * 里出现两个数字（见 2026-11-11 订单页审查 P1-1），所以收敛到这里一处实现。
+ */
+function effectivePaidCents(order: {
+  paidCents: number;
+  totalCents: number;
+  payments?: Array<{ status: string; channel: string }>;
+}): number {
+  if (order.paidCents > 0) return order.paidCents;
+  const freePaid = (order.payments ?? []).some(
+    (p) => p.status === "succeeded" && p.channel === "free",
+  );
+  return freePaid ? 0 : order.totalCents;
+}
+
+/**
  * 积分导入行数上限。
  *
  * 与批量操作上限 (100) 刻意不同: 补发场景经常是几百人的活动名单,
@@ -621,7 +644,8 @@ export class AdminCommerceService {
           // 明细只取快照名与 SKU：订单页要能看出买的是哪件商品，
           // 商品被删除或改名都不影响这里（快照是下单时的值）
           items: { select: { id: true, nameSnapshot: true, skuSnapshot: true } },
-          payments: { select: { id: true } },
+          // status/channel 供 `effectivePaidCents` 区分 0 元单与历史空值
+          payments: { select: { id: true, status: true, channel: true } },
           /*
            * 退款单要带上状态：退款状态挂在 `Refund` 而不是订单上，
            * 渠道异步退款时订单仍是 `paid`。列表若只给订单状态，运营
@@ -644,7 +668,7 @@ export class AdminCommerceService {
         channel: o.channel,
         totalCents: o.totalCents,
         discountCents: o.discountCents ?? 0,
-        paidCents: o.paidCents > 0 ? o.paidCents : o.totalCents,
+        paidCents: effectivePaidCents(o),
         refundedCents: o.refundedCents,
         grantedCredits: o.grantedCredits,
         itemCount: o.items.length,
@@ -695,7 +719,12 @@ export class AdminCommerceService {
       })
       .then((o) => {
         if (!o) throw new AppError(40400, "订单不存在", 404);
-        return o;
+        /*
+         * 详情与列表必须给同一个「实付」：历史订单 paidCents 为空时回落应付
+         * 总额、0 元单显示 0。这里不能用原始字段 —— 那会让同一笔订单在列表
+         * 与抽屉里显示两个数字，退款上限也跟着算错。
+         */
+        return { ...o, paidCents: effectivePaidCents(o) };
       });
   }
 
@@ -858,16 +887,33 @@ export class AdminCommerceService {
     return { id: order.id, orderNo: order.orderNo };
   }
 
-  /** 订单导出 (CSV)。金额列同时给分与元, 财务按元核对, 技术按分回查 */
+  /**
+   * 订单导出 (CSV)。金额列同时给分与元, 财务按元核对, 技术按分回查。
+   *
+   * 超过 `EXPORT_LIMIT` 直接拒绝, **不静默截断**: 这是财务对账的交付物,
+   * 少几行的 CSV 看起来和正常文件一模一样，对账差额永远查不出来。口径与
+   * 支付域导出 (`payment-admin.service.ts` 超限报错) 保持一致。
+   */
   async exportOrders(q: OrderListQuery): Promise<string> {
+    const where = this.orderWhere(q);
+    const total = await this.prisma.order.count({ where });
+    if (total > EXPORT_LIMIT) {
+      throw new AppError(
+        40001,
+        `筛选结果共 ${total} 单，超过单次导出上限 ${EXPORT_LIMIT} 单，请缩小时间范围后分批导出`,
+        400,
+      );
+    }
+
     const rows = await this.prisma.order.findMany({
-      where: this.orderWhere(q),
+      where,
       orderBy: { createdAt: "desc" },
       take: EXPORT_LIMIT,
       include: {
         user: { select: { email: true } },
         items: { select: { nameSnapshot: true, skuSnapshot: true } },
         membershipPlan: { select: { code: true } },
+        payments: { select: { status: true, channel: true } },
       },
     });
 
@@ -882,14 +928,8 @@ export class AdminCommerceService {
       { label: "订单金额(分)", value: (o) => o.totalCents },
       { label: "订单金额(元)", value: (o) => centsToYuan(o.totalCents) },
       { label: "优惠(分)", value: (o) => o.discountCents ?? 0 },
-      {
-        label: "实付(分)",
-        value: (o) => (o.paidCents > 0 ? o.paidCents : o.totalCents),
-      },
-      {
-        label: "实付(元)",
-        value: (o) => centsToYuan(o.paidCents > 0 ? o.paidCents : o.totalCents),
-      },
+      { label: "实付(分)", value: (o) => effectivePaidCents(o) },
+      { label: "实付(元)", value: (o) => centsToYuan(effectivePaidCents(o)) },
       { label: "已退(分)", value: (o) => o.refundedCents },
       { label: "赠送积分", value: (o) => o.grantedCredits },
       {
@@ -1395,6 +1435,14 @@ export class AdminCommerceService {
    * `to` 含当天: 运营输入 2026-10-21 想看到的是这一整天, 而不是 00:00:00
    * 之前。只写日期的值补到 23:59:59.999。
    * 非法日期直接 400 —— 静默忽略会让导出结果与筛选条件不符且看不出来。
+   *
+   * ## 日期必须按**业务时区**解释，不能按服务器本地时区
+   *
+   * 只写日期的值原先是 `new Date('2026-10-21T00:00:00.000')`，由 Node 按
+   * 进程时区解释：本机是 CST 时行为正确，但容器默认 UTC，同一个筛选会在
+   * 生产环境偏移 8 小时——「今天」的订单里 00:00–08:00 下的单全部漏掉，
+   * 而页面上写的还是「日期筛选含结束当天」。这里显式带 `+08:00`，
+   * 结果与部署环境无关。
    */
   private dateRange(
     from?: string,
@@ -1409,7 +1457,7 @@ export class AdminCommerceService {
       const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
       const d = new Date(
         dateOnly
-          ? `${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`
+          ? `${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+08:00`
           : value,
       );
       if (Number.isNaN(d.getTime()))

@@ -469,6 +469,30 @@ describe('ZpayAdapter.queryOrder', () => {
       error: expect.stringContaining('network down'),
     });
   });
+
+  it('渠道确认订单编号不存在时返回 not_found，允许关单流程本地关闭', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: -1, msg: '订单编号不存在' }));
+
+    await expect(
+      adapter.queryOrder({ config: makeConfig(), orderNo: ORDER_NO }),
+    ).resolves.toMatchObject({
+      state: 'not_found',
+      orderNo: ORDER_NO,
+      providerStatus: 'ZPAY_ORDER_NOT_FOUND',
+    });
+  });
+
+  it('其它渠道拒绝仍按 failed 处理，不能据此本地关单', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ code: -1, msg: '商户密钥错误' }));
+
+    await expect(
+      adapter.queryOrder({ config: makeConfig(), orderNo: ORDER_NO }),
+    ).resolves.toMatchObject({
+      state: 'failed',
+      providerStatus: 'QUERY_FAILED',
+      error: expect.stringContaining('商户密钥错误'),
+    });
+  });
 });
 
 describe('ZpayAdapter 退款与关单', () => {

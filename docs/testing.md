@@ -70,6 +70,9 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `lib/channelOrder.test.ts` | 排序纯函数：越界 / 找不到 / 原地不动返回**原数组引用**（React 不多渲染一次）、移动后其余元素相对顺序不变、`orderChanged` 逐项比对 id 序列（只比长度会漏掉换位） |
 | `lib/channelReprice.test.ts` | 统一调价的金额换算：售价字段按计费方式取子集、加价率校验、成本加价的 half-up 取整（含 0.0002 积分量级）、售价文本互逆、缺成本价/售价未配置的模型被拦截 |
 | `lib/expandGeometry.test.ts` | 扩图占比与原图位置几何换算 |
+| `mask-sdk/geometry.test.ts` | 遮罩画布 SDK 的几何：客户端坐标 → 原图像素（含夹取与无效画框）、矩形拖动 / 四边四角缩放（最小边长、源图边界）、白底 + `destination-out` 透明标注区的合成契约 |
+| `mask-sdk/marks.test.ts` | 遮罩画布 SDK 的标记识别：单点笔迹不成区域、完全擦除后消失、部分擦除保留原 id、删除其它区域后包围盒稳定 |
+| `mask-sdk/session.test.ts` | 遮罩画布 SDK 的会话状态机：涂抹 / 形状的提交与丢弃、区域上限回调、撤销 / 恢复 / 删除、拖动与缩放夹取、连续手势只通知叠层不回调页面状态、换图重置 |
 | `lib/multiFusionBilling.test.ts` | 多图融合变体数 × 积分计费 |
 | `lib/optionSets.test.ts` | 平台/语言/比例等选项集合的默认值与排序 |
 | `lib/poll.test.ts` | 轮询重试、超时、视频上限放宽、中止语义 |
@@ -184,7 +187,7 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | 身份安全 | `smoke-auth.js` | 注册昵称必填、忘记密码防枚举、重置一次性、改密后旧 token 失效 |
 | 扫码登录 | `smoke-qr-login.js` | 扫码≠授权、一次性兑换 `consumed`、过期、未登录 401、登录记录 `reason=qr` |
 | 账户与合规 | `smoke-account.js` | `/me` 只认令牌、资料更正白名单、导出、注销后订单保留 |
-| | `smoke-notifications.js` | 消息用户隔离、支付成功产生消息、法务版本化；邮件/短信通道状态只读 |
+| | `smoke-notifications.js` | 消息用户隔离、支付成功产生消息；邮件/短信通道状态只读 |
 | | `smoke-aigc.js` | PNG chunk CRC / JPEG XMP / 可见角标像素差 / 角标样式可配 / 角标可关闭 / 公开配置接口 / 真实生成链路落盘核对 |
 | | `smoke-signed-url.js` | 另起带密钥实例：无签名 403、带签名 200、篡改 403、过期 410、HEAD 200 |
 | | `smoke-rate-limit.js` | 短信 1/分、换号不换配额、伪造 XFF 无效、找回密码 3/时 |
@@ -401,7 +404,7 @@ P6 的判据由 `verify-proxy-runtime.ts` 钉住（`npm run verify:proxy-runtime
 ## 6. 测试数据与清理
 
 - 冒烟脚本自建账号 / 商品 / 订单，并在 `finally` 或结尾清理；失败中断时可能留残留，需手工按外键顺序清理。
-- 清理顺序（SQLite 无级联）：`GenerationTask → Asset → Project → Refund → Invoice → Payment → OrderItem → Membership → Order → ApiCallLog → CreditReservationItem → BillingOrder → CreditLedgerEntry → CreditLot → CreditAccount → MembershipUsage → CheckinRecord → InviteRelation → Notification → Ticket → OAuthIdentity → AccountToken → LoginSession → LoginLog(置空 userId) → ConsentRecord → User → Product → MembershipPlan`。脚本侧可直接用 `scripts/credit-fixture.js` 的 `clearCredits()` 完成账单 / 预留明细 / 流水 / 批次 / 账户五张表的清理。
+- 清理顺序（SQLite 无级联）：`GenerationTask → Asset → Project → Refund → Invoice → Payment → OrderItem → Membership → Order → ApiCallLog → CreditReservationItem → BillingOrder → CreditLedgerEntry → CreditLot → CreditAccount → MembershipUsage → CheckinRecord → InviteRelation → Notification → Ticket → OAuthIdentity → AccountToken → LoginSession → LoginLog(置空 userId) → User → Product → MembershipPlan`。脚本侧可直接用 `scripts/credit-fixture.js` 的 `clearCredits()` 完成账单 / 预留明细 / 流水 / 批次 / 账户五张表的清理。
 - 不得删除非本次测试产生的数据；发现历史残留时先确认归属。
 - 测试档账号与开发档账号是两套数据，不要跨库复用凭据。
 

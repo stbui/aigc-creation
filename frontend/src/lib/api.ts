@@ -96,10 +96,7 @@ import type {
   PromptToolResult,
   MobileUploadSessionCreated,
   MobileUploadSessionStatus,
-  // 账户 / 法务 / 站内消息 (B4)
-  LegalDoc,
-  LegalIndexItem,
-  AdminLegalDoc,
+  // 账户 / 站内消息 (B4)
   MyProfile,
   DeletionPreview,
   NotificationList,
@@ -742,5 +739,5 @@ export { authApi, oauthAuthorizeUrl, projectsApi, assetsApi, generateApi, newIde
 export type { OAuthProviderInfo, AssetSourceFields } from "./api-tools";
 export { adminUsersApi, adminRolesApi, adminSettingsApi, adminAigcLabelApi, adminTasksApi, adminBackupsApi, adminAssetsApi, adminStorageApi, adminTemplateCatalogApi } from "./api-admin-system";
 export { marketingApi, myMarketingApi, adminSchedulerApi, adminProductsApi, adminMembershipPlansApi, adminOrdersApi, adminCreditsApi, adminRetentionApi, adminInvoicesApi } from "./api-admin-commerce";
-export { meApi, legalApi, notificationsApi, adminLegalApi, adminNotificationsApi, ticketsApi, adminTicketsApi } from "./api-account";
+export { meApi, notificationsApi, adminNotificationsApi, ticketsApi, adminTicketsApi } from "./api-account";
 export { adminChannelsApi, adminChannelModelsApi, adminLogicalModelsApi, adminUserGroupsApi, adminPluginsApi, adminProviderCatalogApi, adminBillingOrdersApi } from "./api-admin-channels";

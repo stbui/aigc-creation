@@ -26,7 +26,6 @@ import { ProductsModule } from './products/products.module';
 import { PromptToolsModule } from './prompt-tools/prompt-tools.module';
 import { MobileUploadModule } from './mobile-upload/mobile-upload.module';
 import { AccountModule } from './account/account.module';
-import { LegalModule } from './legal/legal.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { HealthModule } from './health/health.module';
@@ -75,8 +74,6 @@ import { ProxyModule } from './model/proxy/proxy.module';
     MobileUploadModule,
     // 账户自助 (B4): 资料 / 改密 / 导出 / 注销
     AccountModule,
-    // 法务文档 (B4): 公开读取 + 后台版本管理
-    LegalModule,
     // 工单/反馈 (B7): C 端提交与回复; 后台控制器在 AdminModule 复用本模块导出的 service
     TicketsModule,
     // 健康检查 (B5): /health 诊断 + /health/ready 就绪探针（无需鉴权）

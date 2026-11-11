@@ -63,7 +63,6 @@ export function ReconciliationToolbar({
         options={providerOptions}
         allowClear
         clearLabel="全部渠道"
-        placeholder="全部渠道"
         className="w-[140px]"
         ariaLabel="对账渠道"
       />
@@ -84,7 +83,6 @@ export function ReconciliationToolbar({
         options={statusOptions}
         allowClear
         clearLabel="全部状态"
-        placeholder="全部状态"
         className="w-[120px]"
         ariaLabel="对账状态"
       />

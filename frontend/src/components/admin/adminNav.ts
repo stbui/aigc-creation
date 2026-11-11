@@ -25,7 +25,6 @@ import {
   Package,
   Puzzle,
   ReceiptText,
-  Scale,
   Settings,
   Share2,
   ShieldCheck,
@@ -220,12 +219,6 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
   {
     name: "内容与合规",
     items: [
-      {
-        path: "/admin/legal",
-        label: "法务文档",
-        icon: Scale,
-        permission: "legal.read",
-      },
       {
         path: "/admin/notifications",
         label: "站内消息",

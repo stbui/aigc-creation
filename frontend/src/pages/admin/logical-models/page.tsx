@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { adminCapabilitiesApi, adminChannelModelsApi, adminChannelsApi, adminLogicalModelsApi } from './api';
 import {
+  AdminPage,
   ActionButton,
   AppliedFilters,
   Button,
@@ -13,7 +14,6 @@ import {
   FilterBar,
   ListError,
   Notice,
-  PageHeader,
   Panel,
   RefreshButton,
   SegmentedTabs,
@@ -520,37 +520,36 @@ export function AdminLogicalModelsPage() {
   if (pricingReadable) tabs.push({ value: 'pricing', label: '能力消耗价' });
 
   return (
-    <>
-      <PageHeader
-        title={capabilityWorkspaceReadable ? '能力与模型' : '能力消耗价'}
-        description={description}
-        actions={
-          tab === 'capabilities' ? (
-            <>
-              {canReadChannels && (
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/admin/channels">模型商品</Link>
-                </Button>
-              )}
-              {canReadPlugins && (
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/admin/plugins">插件</Link>
-                </Button>
-              )}
-              {modelWritable && (
-                <ActionButton
-                  variant="default"
-                  size="sm"
-                  icon={Plus}
-                  onClick={() => openCreate()}
-                >
-                  添加商品
-                </ActionButton>
-              )}
-            </>
-          ) : undefined
-        }
-      />
+    <AdminPage
+      title={capabilityWorkspaceReadable ? '能力与模型' : '能力消耗价'}
+      description={description}
+      actions={
+        tab === 'capabilities' ? (
+          <>
+            {canReadChannels && (
+              <Button asChild variant="outline" size="sm">
+                <Link to="/admin/channels">模型商品</Link>
+              </Button>
+            )}
+            {canReadPlugins && (
+              <Button asChild variant="outline" size="sm">
+                <Link to="/admin/plugins">插件</Link>
+              </Button>
+            )}
+            {modelWritable && (
+              <ActionButton
+                variant="default"
+                size="sm"
+                icon={Plus}
+                onClick={() => openCreate()}
+              >
+                添加商品
+              </ActionButton>
+            )}
+          </>
+        ) : undefined
+      }
+    >
 
       {tabs.length > 1 && (
         <div className="mb-4">
@@ -581,7 +580,6 @@ export function AdminLogicalModelsPage() {
           <SelectField
             className="w-40"
             ariaLabel="按分组筛选"
-            placeholder="全部分组"
             allowClear
             clearLabel="全部分组"
             value={group || undefined}
@@ -591,7 +589,6 @@ export function AdminLogicalModelsPage() {
           <SelectField
             className="w-40"
             ariaLabel="按运行结论筛选"
-            placeholder="全部运行结论"
             allowClear
             clearLabel="全部运行结论"
             value={runtime}
@@ -788,6 +785,6 @@ export function AdminLogicalModelsPage() {
         }
         impact={['C 端停止提交该能力', 'C 端展示统一下线提示']}
       />
-    </>
+    </AdminPage>
   );
 }

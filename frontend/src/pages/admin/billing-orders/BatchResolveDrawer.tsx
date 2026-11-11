@@ -32,10 +32,8 @@ export function BatchResolveDrawer({
   return (
     <Drawer
       open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      width={620}
+      onClose={onClose}
+      size="md"
       title="批量核对账单"
       description={`已选 ${count} 条。逐条独立处置，单条失败不影响其余。`}
       footer={

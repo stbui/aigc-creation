@@ -3,86 +3,97 @@
  *
  * 全部是纯函数，不碰 React。放一处的理由：同一个日期在列表、抽屉、导出里
  * 出现三次，各页自己写 `toLocaleString('zh-CN')` 迟早出现两种写法。
+ *
+ * ## 为什么不用 `toLocaleString`
+ *
+ * `toLocaleString` 的输出跟两件环境因素绑定：
+ *
+ * 1. **浏览器时区**。运营在北京看到 `18:16`，出差到伦敦看到 `10:16`，与渠道
+ *    账单差 8 小时；对账「完成时间」这类字段尤其致命。
+ * 2. **分隔符**。`en` 系 locale 下是 `11/3/2026`，`zh-CN` 下是 `2026/11/3`
+ *    —— 同一个字段在两张表里长得不像，扫读时得先做心理转换。
+ *
+ * 后台口径是北京时间，所以这里不依赖 `Intl` 的时区推导，直接对 UTC 时间戳
+ * 加固定偏移。当前无夏令时，偏移可视为常量。
  */
 
-/** 日期时间渲染本体：只有「无法解析时显示什么」这一处口径差异。 */
-function displayDateTime(iso: string, invalidFallback: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return invalidFallback;
-  return date.toLocaleString('zh-CN', { hour12: false });
+/** 固定东八区偏移。 */
+const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
 }
 
-/** 固定东八区偏移。运营口径是北京时间，不能跟着浏览器时区漂。 */
-const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+/**
+ * ISO → 东八区的年/月/日/时/分/秒（已补零）。
+ * 无法解析返回 `null`，由各格式化函数决定兜底文案。
+ */
+function shanghaiParts(iso: string): [string, string, string, string, string, string] | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const shifted = new Date(date.getTime() + SHANGHAI_OFFSET_MS);
+  return [
+    String(shifted.getUTCFullYear()),
+    pad(shifted.getUTCMonth() + 1),
+    pad(shifted.getUTCDate()),
+    pad(shifted.getUTCHours()),
+    pad(shifted.getUTCMinutes()),
+    pad(shifted.getUTCSeconds()),
+  ];
+}
 
 /**
  * ISO 字符串 → `2026-11-03 10:20:25`（固定东八区）。
  *
- * 与后端 `formatShanghai` 同口径：后台列表、抽屉、导出看到的都是同一时刻。
- * 直接 `slice(0, 19)` 截 ISO 字符串会把 UTC 当成本地时间显示，比北京时间
- * 少 8 小时 —— 对账「完成时间」这类要跟渠道账单对齐的字段尤其致命。
- */
-export function formatShanghaiDateTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  const shifted = new Date(date.getTime() + SHANGHAI_OFFSET_MS);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return (
-    `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())} ` +
-    `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:${pad(shifted.getUTCSeconds())}`
-  );
-}
-
-/**
- * ISO 字符串 → `2026-11-03 10:20`（固定东八区，精确到分钟）。
+ * 列表、抽屉、详情、导出**统一**用它。空值与无法解析一律 `—`：后台不该把
+ * 原始脏值直接摆到运营面前（早期版本让无法解析的值原样返回，结果列表里
+ * 混进过 `Invalid Date`）。
  *
- * 列表列宽有限、要能扫读的场景用它；需要秒的用 {@link formatShanghaiDateTime}。
+ * 与后端 `formatShanghai` 同口径：三处看到的都是同一时刻。
  */
-export function formatShanghaiDateTimeShort(iso: string | null | undefined): string {
-  const full = formatShanghaiDateTime(iso);
-  return full === '—' ? full : full.slice(0, 16);
-}
-
-/** ISO 字符串 → `2026-11-03`（固定东八区）。与 {@link formatShanghaiDateTime} 同口径。 */
-export function formatShanghaiDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  const shifted = new Date(date.getTime() + SHANGHAI_OFFSET_MS);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
-}
-
-/** ISO 字符串 → `2026/11/02 14:03:12`。无法解析时原样返回（便于发现脏数据）。 */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return displayDateTime(iso, String(iso));
+  const parts = shanghaiParts(iso);
+  if (!parts) return '—';
+  return `${parts[0]}-${parts[1]}-${parts[2]} ${parts[3]}:${parts[4]}:${parts[5]}`;
+}
+
+/** ISO 字符串 → `2026-11-03`（固定东八区）。有效期区间这类只到日的场景用它。 */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const parts = shanghaiParts(iso);
+  if (!parts) return '—';
+  return `${parts[0]}-${parts[1]}-${parts[2]}`;
+}
+
+/** 只取时分秒 `10:20:25`（固定东八区），用于「最后一次成功」这类同日内比较。 */
+export function formatTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const parts = shanghaiParts(iso);
+  if (!parts) return '—';
+  return `${parts[3]}:${parts[4]}:${parts[5]}`;
 }
 
 /**
- * ISO 字符串 → 日期时间；空值与无法解析一律显示 `—`。
- * 列表与抽屉展示用这个口径，不把原始脏值暴露给运营。
+ * ISO 字符串 → `11-11 18:16`（固定东八区，月-日 时:分）。
+ *
+ * 紧凑档：单元格宽度紧、同屏要比较多个时刻，年份和秒都是噪声。
+ * 队列、限时活动窗口用它；**不要**为了省宽度各页自己拼 —— 早先有三处
+ * 各拼一次，分隔符在 `11/11` 和 `11-11` 之间来回。
  */
-export function formatDateTimeLoose(iso: string | null | undefined): string {
+export function formatMonthDayTime(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return displayDateTime(iso, '—');
+  const parts = shanghaiParts(iso);
+  if (!parts) return '—';
+  return `${parts[1]}-${parts[2]} ${parts[3]}:${parts[4]}`;
 }
 
-/** ISO 字符串 → `2026/11/02`。 */
-export function formatDate(iso: string | null | undefined): string {
+/** 只取时分 `18:16`（固定东八区）。同日内的时间标签用它，跨天请用 {@link formatMonthDayTime}。 */
+export function formatHm(iso: string | null | undefined): string {
   if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return String(iso);
-  return date.toLocaleDateString('zh-CN');
-}
-
-/** 只取时分秒，用于「最后一次成功」这类同日内比较的场景。 */
-export function formatTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return String(iso);
-  return date.toLocaleTimeString('zh-CN', { hour12: false });
+  const parts = shanghaiParts(iso);
+  if (!parts) return '—';
+  return `${parts[3]}:${parts[4]}`;
 }
 
 /**

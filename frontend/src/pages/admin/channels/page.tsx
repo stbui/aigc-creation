@@ -2,11 +2,11 @@ import { lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import {
+  AdminPage,
   ActionButton,
   Button,
   StaleError,
   ConfirmDialog,
-  PageHeader,
   Panel,
   SegmentedGroup,
   SkeletonBody,
@@ -149,38 +149,37 @@ export function AdminChannelsPage() {
   );
 
   return (
-    <>
-      <PageHeader
-        title="模型商品"
-        description="商品来自供应商渠道；能力决定谁在消费这些商品。"
-        actions={
-          <>
-            {writable && (
-              <ActionButton
-                variant="default"
-                size="sm"
-                icon={Plus}
-                onClick={() => {
-                  setView('channels');
-                  openCreate();
-                }}
-              >
-                接入供应商
-              </ActionButton>
-            )}
-            {canReadCapabilities && (
-              <Button asChild variant="outline" size="sm">
-                <Link to="/admin/capabilities">能力与模型</Link>
-              </Button>
-            )}
-            {canReadPlugins && (
-              <Button asChild variant="outline" size="sm">
-                <Link to="/admin/plugins">插件</Link>
-              </Button>
-            )}
-          </>
-        }
-      />
+    <AdminPage
+      title="模型商品"
+      description="商品来自供应商渠道；能力决定谁在消费这些商品。"
+      actions={
+        <>
+          {writable && (
+            <ActionButton
+              variant="default"
+              size="sm"
+              icon={Plus}
+              onClick={() => {
+                setView('channels');
+                openCreate();
+              }}
+            >
+              接入供应商
+            </ActionButton>
+          )}
+          {canReadCapabilities && (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin/capabilities">能力与模型</Link>
+            </Button>
+          )}
+          {canReadPlugins && (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin/plugins">插件</Link>
+            </Button>
+          )}
+        </>
+      }
+    >
 
       <SegmentedGroup
         ariaLabel="模型商品视图"
@@ -348,6 +347,6 @@ export function AdminChannelsPage() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => void runDelete()}
       />
-    </>
+    </AdminPage>
   );
 }

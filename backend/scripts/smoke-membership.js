@@ -288,7 +288,6 @@ function check(name, ok, detail = '') {
     prisma.notification.deleteMany({ where: { userId: { in: uids } } }),
     prisma.accountToken.deleteMany({ where: { userId: { in: uids } } }),
     prisma.loginLog.deleteMany({ where: { userId: { in: uids } } }),
-    prisma.consentRecord.deleteMany({ where: { userId: { in: uids } } }),
     prisma.asset.deleteMany({ where: { ownerId: { in: uids } } }),
     prisma.project.deleteMany({ where: { ownerId: { in: uids } } }),
     prisma.user.deleteMany({ where: { id: { in: uids } } }),

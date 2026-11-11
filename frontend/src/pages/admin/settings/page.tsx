@@ -10,11 +10,11 @@ import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminSettingsApi } from '../../../lib/api';
 
 import {
+  AdminPage,
   ActionButton,
   EmptyState,
   ListError,
   ModalDialog,
-  PageHeader,
   PageSkeleton,
   Panel,
   SaveBar,
@@ -244,25 +244,24 @@ export function AdminSettingsPage() {
   const relatedEntries = RELATED_ENTRIES.filter((entry) => can(entry.permission));
 
   return (
-    <>
-      <PageHeader
-        title="系统设置"
-        className="max-w-[760px]"
-        description={
-          editable
-            ? '调整全站运行参数；保存后立即生效，已自定义的值可恢复为代码默认值'
-            : '当前账号无 setting.write 权限，仅可查看'
-        }
-        actions={
-          editable ? (
-            dirtyCount > 0 ? (
-              <ToneBadge tone="warn">{dirtyCount} 项待保存</ToneBadge>
-            ) : undefined
-          ) : (
-            <ToneBadge tone="neutral">只读</ToneBadge>
-          )
-        }
-      />
+    <AdminPage
+      title="系统设置"
+      className="max-w-[760px]"
+      description={
+        editable
+          ? '调整全站运行参数；保存后立即生效，已自定义的值可恢复为代码默认值'
+          : '当前账号无 setting.write 权限，仅可查看'
+      }
+      actions={
+        editable ? (
+          dirtyCount > 0 ? (
+            <ToneBadge tone="warn">{dirtyCount} 项待保存</ToneBadge>
+          ) : undefined
+        ) : (
+          <ToneBadge tone="neutral">只读</ToneBadge>
+        )
+      }
+    >
 
       {/* 刷新失败但配置还在：页面必须让用户知道「屏幕上这份可能已过期」 */}
       {error && <StaleError error={error} onRetry={() => void reload()} />}
@@ -450,7 +449,7 @@ export function AdminSettingsPage() {
         }}
         title="保存系统设置"
         description="以下配置变更将立即生效，影响所有用户。"
-        width={560}
+        size="sm"
         footer={
           <>
             <ActionButton variant="outline" disabled={busy} onClick={() => setConfirming(false)}>
@@ -476,6 +475,6 @@ export function AdminSettingsPage() {
           </div>
         )}
       </ModalDialog>
-    </>
+    </AdminPage>
   );
 }

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from '~/admin-ui/primitives';
+import { AdminPage, AdminTabs, TabsContent } from '~/admin-ui/primitives';
 import { AiAnalysisMonitor } from './AiAnalysisMonitor';
 import { GenerationTasksTab } from './GenerationTasksTab';
 import { useAdmin } from './hooks';
@@ -50,25 +50,11 @@ export function AdminTasksPage() {
   );
 
   return (
-    <>
-      <PageHeader
-        title="任务监控"
-        description="生成任务的生命周期与同步 AI 分析调用；两类数据分开呈现，避免把同步调用伪装成任务。"
-      />
-
-      <Tabs value={tab} onValueChange={switchTab} className="gap-3">
-        <TabsList aria-label="任务监控标签" className="h-9 gap-1 p-1">
-          {tabs.map((item) => (
-            <TabsTrigger
-              key={item.value}
-              value={item.value}
-              className="h-7 px-3 text-sm font-medium"
-            >
-              {item.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
+    <AdminPage
+      title="任务监控"
+      description="生成任务的生命周期与同步 AI 分析调用；两类数据分开呈现，避免把同步调用伪装成任务。"
+    >
+      <AdminTabs value={tab} onValueChange={switchTab} items={tabs} ariaLabel="任务监控标签">
         <TabsContent value="tasks">
           <GenerationTasksTab />
         </TabsContent>
@@ -77,7 +63,7 @@ export function AdminTasksPage() {
             <AiAnalysisMonitor />
           </TabsContent>
         )}
-      </Tabs>
-    </>
+      </AdminTabs>
+    </AdminPage>
   );
 }

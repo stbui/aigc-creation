@@ -22,7 +22,7 @@
 | 模型与渠道 | 模型商品 / 插件 / 能力与模型 / 用户分组 / 调用记录 | `/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` |
 | 交易 | 商品 / 会员套餐 / 订单 / 积分账本 / 优惠券 / 限时活动 / 邀请与签到 | `/admin/products` 等 7 页 |
 | 财务 | 支付充值 / 发票管理 / 生成账单 / 财务分析 | `/admin/payments` · `/admin/invoices` · `/admin/billing-orders` · `/admin/finance` |
-| 内容与合规 | 法务文档 / 站内消息 / AI 标识 | `/admin/legal` · `/admin/notifications` · `/admin/aigc-label` |
+| 内容与合规 | 站内消息 / AI 标识 | `/admin/notifications` · `/admin/aigc-label` |
 | 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 | `/admin/roles` 等 4 页 |
 | 数据安全 | 数据备份 / 保留期清理 | `/admin/backups` · `/admin/retention` |
 
@@ -36,7 +36,7 @@
 | --- | --- |
 | 模型与渠道 | 生成链路的生产关键配置，排障路径要求最短，紧随日常运营放在第 3；组内按供应侧 → 协议 → 能力与模型 → 人群 → 排障排列，不淹没在通用系统设置里 |
 | 交易 / 财务 | 「卖什么、卖了多少」与「钱已收进来之后的动作」不是同一批人；退款、对账、开票归财务。生成账单与财务分析并入财务，账单口径不再散落两处 |
-| 内容与合规 | 发给全体用户的话（法务正文、站内消息、AI 标识样式），每条都会烙印到每个账号或每张产出图上，误改比调错价格更难挽回 |
+| 内容与合规 | 发给全体用户的话（站内消息、AI 标识样式），每条都会烙印到每个账号或每张产出图上，误改比调错价格更难挽回 |
 | 数据安全 | 只在出事时进，使用频率与日常运营不同，独立成组留在末尾避免误触 |
 
 ### 1.2 合规专项（AIGC 内容标识）
@@ -65,7 +65,7 @@
 | 角色 | code | 定位 | 权限点数 |
 | --- | --- | --- | ---: |
 | 平台管理员 | `admin` | 全部权限 | 67 |
-| 运营 | `operator` | 用户/项目/素材/任务只读或受限写、营销、消息、工单、法务只读、模型侧只读 | 32 |
+| 运营 | `operator` | 用户/项目/素材/任务只读或受限写、营销、消息、工单、模型侧只读 | 32 |
 | 财务 | `finance` | 商品/订单/退款/积分调整/发票/对账，模型成本与生成账单只读、账单可处置 | 28 |
 
 **为什么必须拆**：财务能退款 = 能改钱，运营能删用户 = 能毁数据。两种权限绑在一个布尔位上，出了事无法区分是谁做的，责任边界也失去意义。
@@ -92,7 +92,6 @@
 | 插件 | `plugin.read` / `plugin.write` |
 | 账单与台账 | `billing_order.read` / `billing_order.resolve` / `model.call_read` / `model.analytics_read` |
 | 增长与服务 | `marketing.write` / `message.write` / `ticket.read` / `ticket.handle` |
-| 法务 | `legal.read` / `legal.write` |
 | 系统 | `setting.read` / `setting.write` / `role.read` / `role.write` |
 | 数据工具 | `data.export` / `data.search` / `backup.read` / `backup.run` |
 
@@ -106,7 +105,7 @@
 | 最后一个 admin | 禁用与降级前统计 `status='active'` 的 admin 数，`≤1` 时返回 409 `40901` |
 | 高危动作确认 | 退款、发票驳回、能力下架等确有业务语义的动作由 DTO 要求原因；前端只对业务操作做二次确认 |
 
-高危权限点：`user.delete` / `user.reset_password` / `asset.delete` / `project.delete` / `task.delete` / `product.delete` / `order.refund` / `credit.adjust` / `compliance.takedown` / `capability.write` / `channel.write` / `channel.model_write` / `logical_model.write` / `user_group.write` / `plugin.write` / `billing_order.resolve` / `setting.write` / `legal.write` / `role.write` / `backup.run`。
+高危权限点：`user.delete` / `user.reset_password` / `asset.delete` / `project.delete` / `task.delete` / `product.delete` / `order.refund` / `credit.adjust` / `compliance.takedown` / `capability.write` / `channel.write` / `channel.model_write` / `logical_model.write` / `user_group.write` / `plugin.write` / `billing_order.resolve` / `setting.write` / `role.write` / `backup.run`。
 
 ---
 
@@ -116,7 +115,6 @@
 | --- | --- | --- |
 | 工单 | C 端 `/tickets` + 后台工单中心 | 状态机只在 `tickets.service.ts` 的 `TRANSITIONS` 定义；越权一律 404；客服回复即受理并自动认领 |
 | 站内消息 | `notifications`（`@Global()`） | `notify()` 永不抛异常；模板缺失回落内置文案；已接支付成功、任务失败退款、会员到期、工单回复四类事件 |
-| 法务文档 | `legal` | 四类固定 slug（`user-agreement` / `privacy-policy` / `minors-policy` / `account-rules`），按 `(slug, version)` 版本化，已发布版本不可原地覆盖，升版本才可改文本 |
 
 **与订单的边界**：工单是沟通与记录通道，退款等财务动作一律跳转到订单模块执行，避免两处都能改钱。
 
@@ -135,7 +133,7 @@
 | 增长 | `Coupon` / `Campaign` / `InviteRelation` / `InviteRewardRule` / `CheckinRecord` / `CheckinRule` |
 | 财务 | `Invoice` / `ReconciliationBatch` / `ReconciliationItem` / `PaymentProviderConfig` / `PaymentRoundRobinCursor` / `PaymentNotification` / `PaymentExceptionCase` / `PaymentAutoReconcileState` / `PaymentReconciliationRun` / `PaymentReconciliationItem` |
 | 身份安全 | `AccountToken` / `LoginLog` / `LoginSession` |
-| 内容与合规 | `LegalDocument` / `ConsentRecord` / `Notification` / `MessageTemplate` / `AigcLabelConfig` |
+| 内容与合规 | `Notification` / `MessageTemplate` / `AigcLabelConfig` |
 | 服务 | `Ticket` / `TicketReply` |
 | 模型层 | `ModelChannel` / `ChannelModel` / `ChannelModelPriceTier` / `LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute` / `RouteAttempt` / `UserGroup` / `UserGroupChannel` / `BillingOrder` / `ApiCallLog` / `CapabilityControl` |
 | 运维 | `BackupRecord` / `CleanupLog` / `PluginPlatformState` / `UserPluginState` / `RouteCatalogVersion` |
@@ -159,7 +157,6 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 工单 `/admin/tickets*` | `tickets-admin.controller.ts` |
 | 交易与积分 `/admin/products*`、`/admin/orders*`、`/admin/payments*`、`/admin/credits*`、`/admin/credit-prices*` | `commerce.controller.ts` |
 | 营销 `/admin/coupons*`、`/admin/campaigns*`、`/admin/invites*`、`/admin/checkin*` | `marketing.controller.ts` |
-| 法务 `/admin/legal*` | `legal.controller.ts` |
 | 消息 `/admin/notifications*` | `notifications.controller.ts` |
 | 发票 `/admin/invoices*` | `invoices-admin.controller.ts` |
 | 支付域 `/admin/payments*`（渠道 / 商品 / 订单 / 对账） | `admin/payments/payment-admin.controller.ts` |

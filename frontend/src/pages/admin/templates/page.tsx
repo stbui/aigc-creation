@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  AdminPage,
   ConfirmDialog,
   EmptyState,
   ListError,
-  PageHeader,
   PageSkeleton,
   RefreshButton,
 } from '~/admin-ui/primitives';
@@ -356,12 +356,11 @@ export function AdminTemplatesPage() {
   if (!data) return <EmptyState title="还没有模板目录" />;
 
   return (
-    <div>
-      <PageHeader
-        title="写真模板"
-        description="C 端 /template 的目录与素材。左侧选分类，右侧搜索、预览和维护模板。"
-        actions={<RefreshButton onRefresh={() => void reload()} loading={loading} />}
-      />
+    <AdminPage
+      title="写真模板"
+      description="C 端 /template 的目录与素材。左侧选分类，右侧搜索、预览和维护模板。"
+      actions={<RefreshButton onRefresh={() => void reload()} loading={loading} />}
+    >
 
       <div className="grid grid-cols-[300px_minmax(0,1fr)] items-start gap-4">
         <CategorySidebar
@@ -467,6 +466,6 @@ export function AdminTemplatesPage() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => void runDelete()}
       />
-    </div>
+    </AdminPage>
   );
 }

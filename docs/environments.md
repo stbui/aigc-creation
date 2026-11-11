@@ -299,7 +299,7 @@ npm run seed:test             # 只灌测试库种子
 npm run start:test            # NODE_ENV=test node dist/main.js
 ```
 
-种子按需组合（`seed:all` = 开发账号 + 角色 + 后台管理员 + 商品 + 会员 + 营销 + 法务 + 消息模板）：
+种子按需组合（`seed:all` = 开发账号 + 角色 + 后台管理员 + 商品 + 会员 + 营销 + 消息模板）：
 
 ```bash
 npm run seed                  # 开发账号（需 SEED_USER_EMAIL，未设置则什么都不建）
@@ -308,7 +308,6 @@ npm run seed:roles            # 后台角色与权限点
 npm run seed:commerce         # 商品（积分包）
 npm run seed:membership       # 会员套餐
 npm run seed:marketing        # 优惠券 / 活动 / 邀请签到规则
-npm run seed:legal            # 三份法务文档 v1 草稿（不自动发布；已发布的不会被覆盖；不在 seed:all 内）
 npm run seed:messages         # 五条站内消息模板（只补缺失，不覆盖已改文案）
 ```
 

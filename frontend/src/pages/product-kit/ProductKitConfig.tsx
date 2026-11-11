@@ -1,4 +1,4 @@
-import { Minus, Plus } from 'lucide-react';
+import { NumberStepper } from '../../ui';
 
 import { VARIANT_FIELDS } from './constants';
 
@@ -23,42 +23,16 @@ export function ProductKitConfig({
         <strong className="pk-section-title">自定义配置</strong>
         <div className="pk-count-grid">
           {VARIANT_FIELDS.map((v) => (
-            <label key={v.key} className="pk-count-field">
+            <div key={v.key} className="pk-count-field">
               <span className="pk-count-label">{v.label}</span>
-              <div className="pk-number-control">
-                <button
-                  type="button"
-                  aria-label={`减少${v.label}`}
-                  onClick={() => onCountChange(v.key, Math.max(0, (counts[v.key] ?? 0) - 1))}
-                >
-                  <Minus size={13} />
-                </button>
-                <input
-                  type="number"
-                  min={0}
-                  max={MAX_PER_VARIANT}
-                  value={counts[v.key] ?? 0}
-                  onChange={(e) => {
-                    const n = Number(e.target.value);
-                    onCountChange(
-                      v.key,
-                      Number.isFinite(n)
-                        ? Math.min(MAX_PER_VARIANT, Math.max(0, Math.round(n)))
-                        : 0,
-                    );
-                  }}
-                />
-                <button
-                  type="button"
-                  aria-label={`增加${v.label}`}
-                  onClick={() =>
-                    onCountChange(v.key, Math.min(MAX_PER_VARIANT, (counts[v.key] ?? 0) + 1))
-                  }
-                >
-                  <Plus size={13} />
-                </button>
-              </div>
-            </label>
+              <NumberStepper
+                label={v.label}
+                value={counts[v.key] ?? 0}
+                min={0}
+                max={MAX_PER_VARIANT}
+                onChange={(next) => onCountChange(v.key, next)}
+              />
+            </div>
           ))}
         </div>
       </div>

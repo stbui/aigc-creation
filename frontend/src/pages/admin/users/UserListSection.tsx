@@ -15,14 +15,13 @@ import { cn } from '~/admin-ui/lib/cn';
 import { PAGE_SIZE_OPTIONS } from './constants';
 import { formatDateTime } from './utils';
 import { UserCard, type UserCardAction } from './UserCard';
-import type { AdminUserListResult, AdminUserStats } from '../../../types/api';
+import type { AdminUserListResult } from '../../../types/api';
 import type { AdminUserRow } from './types';
 
 export type UserListView = 'cards' | 'table';
 
 interface UserListSectionProps {
   data: AdminUserListResult | null;
-  stats: AdminUserStats | null;
   loading: boolean;
   error: string | null;
   hasFilter: boolean;
@@ -110,7 +109,6 @@ const TABLE_COLUMNS: Array<AdminColumn<AdminUserRow>> = [
 /** 用户列表的加载、空态、卡片/表格两种视图与分页。 */
 export function UserListSection({
   data,
-  stats,
   loading,
   error,
   hasFilter,
@@ -136,14 +134,6 @@ export function UserListSection({
     selectableRows.every((row) => selected.includes(row.id));
   const someSelected = selectableRows.some((row) => selected.includes(row.id));
   const selectedSet = new Set(selected);
-
-  const total = stats?.total ?? data?.total ?? 0;
-  const activeCount = stats?.byStatus.active ?? 0;
-  const restrictedCount = stats?.byStatus.disabled ?? 0;
-  const privilegedCount =
-    (stats?.byRole.admin ?? 0) +
-    (stats?.byRole.operator ?? 0) +
-    (stats?.byRole.finance ?? 0);
 
   return (
     <>
@@ -255,29 +245,6 @@ export function UserListSection({
             </div>
           )}
 
-          <div
-            data-testid="admin-user-summary"
-            className="mb-3 grid grid-cols-4 divide-x divide-border overflow-hidden rounded-lg border border-border bg-card shadow-card"
-          >
-            <UserSummaryMetric
-              label="匹配用户"
-              value={total}
-              hint="跟随当前筛选条件"
-            />
-            <UserSummaryMetric label="正常账号" value={activeCount} hint="全站状态为正常" />
-            <UserSummaryMetric
-              label="受限账号"
-              value={restrictedCount}
-              hint="全站已禁用（不含已注销）"
-              tone={restrictedCount > 0 ? 'warn' : undefined}
-            />
-            <UserSummaryMetric
-              label="管理身份"
-              value={Math.max(0, privilegedCount)}
-              hint="管理员 / 运营 / 财务"
-            />
-          </div>
-
           {view === 'cards' ? (
             <div
               data-testid="admin-user-grid"
@@ -363,32 +330,5 @@ export function UserListSection({
         </>
       )}
     </>
-  );
-}
-
-function UserSummaryMetric({
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  label: string;
-  value: number;
-  hint?: string;
-  tone?: 'warn';
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 px-4 py-3">
-      <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
-      <span
-        className={cn(
-          'text-[18px] font-semibold leading-6 tabular-nums text-foreground',
-          tone === 'warn' && 'text-warn-text',
-        )}
-      >
-        {value}
-      </span>
-      {hint && <span className="truncate text-[12px] leading-4 text-muted-foreground">{hint}</span>}
-    </div>
   );
 }

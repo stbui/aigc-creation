@@ -84,12 +84,10 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
   return (
     <Drawer
       open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
+      onClose={onClose}
       title="对账明细"
       description="差异由系统比对得出；需要人工处理的异常走订单退款流程"
-      width={1080}
+      size="xl"
       footer={
         <div className="flex items-center justify-end gap-2">
           <ActionButton onClick={onClose}>关闭</ActionButton>

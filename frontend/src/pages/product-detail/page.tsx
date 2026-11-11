@@ -403,7 +403,7 @@ export function ProductDetailPage() {
             label="立即生成"
             creditLabel={creditLabel ?? undefined}
             hint={
-              capabilityBlocked && token ? (
+              capabilityBlocked && token && capabilityReason ? (
                 <span className="tool-submit-notice tool-submit-notice-error">{capabilityReason}</span>
               ) : undefined
             }

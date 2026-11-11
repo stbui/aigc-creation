@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 import {
   DetailSection,
   EmptyState,
+  MiniStat,
   StatusTag,
   formatYuan,
 } from '~/admin-ui/primitives';
-import { cn } from '~/admin-ui/lib/cn';
 import type {
   AdminUserRecentOrder,
   AdminUserSpending,
@@ -20,37 +20,6 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   refunded: '已退款',
   partial_refunded: '部分退款',
 };
-
-function SpendMetric({
-  label,
-  value,
-  emphasize,
-  tone,
-}: {
-  label: string;
-  value: string;
-  emphasize?: boolean;
-  tone?: 'warn' | 'muted';
-}) {
-  return (
-    <div className="min-w-0 px-4 py-3 first:pl-0 last:pr-0">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd
-        className={cn(
-          'mt-1 text-lg leading-6 font-semibold tabular-nums',
-          tone === 'warn'
-            ? 'text-warn-text'
-            : tone === 'muted'
-              ? 'text-muted-foreground'
-              : 'text-foreground',
-          emphasize && 'text-xl',
-        )}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
 
 /**
  * 用户详情中的消费概览。
@@ -85,21 +54,21 @@ export function UserSpendingSection({
       >
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <dl className="grid grid-cols-4 divide-x divide-border/70 px-4">
-            <SpendMetric
+            <MiniStat
               label="累计实付"
               value={formatYuan(spending.paidCents)}
-              emphasize
+              size="xl"
             />
-            <SpendMetric
+            <MiniStat
               label="累计退款"
               value={formatYuan(spending.refundedCents)}
             />
-            <SpendMetric
+            <MiniStat
               label="净消费"
               value={formatYuan(spending.netCents)}
-              emphasize
+              size="xl"
             />
-            <SpendMetric
+            <MiniStat
               label="退款处理中"
               value={
                 spending.refundingCents > 0

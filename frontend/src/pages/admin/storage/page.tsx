@@ -6,12 +6,12 @@ import { CheckCircle2, Lock, XCircle } from 'lucide-react';
 import { adminStorageApi } from '../../../lib/api';
 
 import {
+  AdminPage,
   ActionButton,
   RefreshButton,
   EmptyState,
   ListError,
   Notice,
-  PageHeader,
   PageSkeleton,
   Skeleton,
   StaleError,
@@ -107,12 +107,11 @@ export function AdminStoragePage() {
   if (!data) return <EmptyState title="暂无存储后端信息" />;
 
   return (
-    <>
-      <PageHeader
-        title="存储配置"
-        description="素材文件的存放位置。切换只影响新上传，已写入的素材仍按原后端读取。"
-        actions={<RefreshButton loading={loading} onRefresh={reload} />}
-      />
+    <AdminPage
+      title="存储配置"
+      description="素材文件的存放位置。切换只影响新上传，已写入的素材仍按原后端读取。"
+      actions={<RefreshButton loading={loading} onRefresh={reload} />}
+    >
 
       {error && <StaleError error={error} onRetry={() => void reload()} />}
 
@@ -232,6 +231,6 @@ export function AdminStoragePage() {
           );
         })}
       </div>
-    </>
+    </AdminPage>
   );
 }

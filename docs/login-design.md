@@ -28,8 +28,7 @@
 └── 右侧表单面板 .login-form-panel  420×478，padding 32px 40px，radius 0 32 32 0
     └── .login-panel-inner         340 宽，flex column gap 8，padding-top 24
         ├── .login-tabs            3 tab：扫码登录 / 短信登录 / 账号登录
-        ├── .login-form            输入项 + 提交 + 次级入口
-        └── .login-agreement       协议行
+        └── .login-form            输入项 + 提交 + 次级入口
 ```
 
 ## 2. 关键规格
@@ -46,7 +45,6 @@
 | 输入框 | 340×48，`padding: 0 20px`，底 `#f2f3f5`，字 `#1d2129` 14px / 400，radius 8，边框 `1px solid #e5e7ef` |
 | 提交按钮 | 340×48，`linear-gradient(90deg, #8064f6, #5546d8)`，白字 14px / 600，radius 8 |
 | 第三方登录区 | `.login-oauth`：表单下方 `margin-top 14`，竖排 `gap 8`；「或」分隔 12px `#86909c`；按钮 340×44、白底、`1px solid #e5e7ef`、radius 8，hover 转品牌紫 |
-| 协议行 | 12px / 400 / 行高 18 / `#86909c` |
 | 关闭按钮 | `.login-close`：弹窗内关闭弹窗；独立页改为「返回上一页」 |
 
 ## 3. 登录方式
@@ -68,7 +66,7 @@
 - `accessToken` 不放进回调 URL：后端 302 回前端只带 60 秒票据，`OAuthCallbackPage` 用它换正式会话，失败给可读原因与「返回登录」。
 - 回跳目标只接受站内绝对路径，`//evil.com` 这类开放重定向写法一律丢弃，回落到 `/workbench`。
 
-注册态在账号 tab 内以文字链接切换（`register`），字段为邮箱 + 密码 + 昵称（+ 可选手机号与验证码），提交按钮文案「注册并登录」，`POST /auth/register` 直接返回 `accessToken`（注册即登录）。注册必须勾选协议。
+注册态在账号 tab 内以文字链接切换（`register`），字段为邮箱 + 密码 + 昵称（+ 可选手机号与验证码），提交按钮文案「注册并登录」，`POST /auth/register` 直接返回 `accessToken`（注册即登录）。
 
 **权益文案必须与后端一致**，不得出现未兑现的承诺：
 
@@ -109,8 +107,7 @@
 
 1. 卡片只有 `AuthCard` 一处实现，两个宿主都渲染它；不要在 `/login` 另写一套表单。
 2. 表单提交态、错误提示、倒计时都走 `ui` 的 `Form` / `useApp().message`，不自绘。
-3. 协议勾选是注册的必要条件，法务链接指向 `/legal/*` 的真实 slug（见 `legal.service.ts` 的 `LEGAL_SLUGS`）。
-4. 不要在登录卡里硬编码任何账号密码，也不提供「填充演示账号」入口。
+3. 不要在登录卡里硬编码任何账号密码，也不提供「填充演示账号」入口。
 
 ## 8. 验证
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { AdminOverview } from '../../../types/api';
+import { formatNumber } from '../../../admin-ui/lib/format';
 import { yuan } from './utils';
 
 /**
@@ -26,7 +27,7 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
           {
             key: 'tasks',
             label: '任务量',
-            value: w.tasks.toLocaleString('zh-CN'),
+            value: formatNumber(w.tasks),
             delta: <Delta current={w.tasks} previous={cmp.tasks} />,
             hint: `上一窗口 ${cmp.tasks}`,
           },
@@ -42,7 +43,7 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
     {
       key: 'users',
       label: '新增用户',
-      value: w.revenue.usersNew.toLocaleString('zh-CN'),
+      value: formatNumber(w.revenue.usersNew),
       delta: <Delta current={w.revenue.usersNew} previous={cmp.usersNew} />,
       hint: `上一窗口 ${cmp.usersNew}`,
     },
@@ -57,7 +58,7 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
     {
       key: 'paid',
       label: '支付订单',
-      value: w.revenue.paidOrders.toLocaleString('zh-CN'),
+      value: formatNumber(w.revenue.paidOrders),
       delta: <Delta current={w.revenue.paidOrders} previous={cmp.paidOrders} />,
       hint: `上一窗口 ${cmp.paidOrders}`,
     },
@@ -121,13 +122,13 @@ export function TotalsStrip({ data, isFinance }: { data: AdminOverview; isFinanc
     {
       key: 'users',
       label: '用户总数',
-      value: t.users.toLocaleString('zh-CN'),
-      hint: `近 ${data.days} 天新增 ${t.newUsers.toLocaleString('zh-CN')}`,
+      value: formatNumber(t.users),
+      hint: `近 ${data.days} 天新增 ${formatNumber(t.newUsers)}`,
     },
     {
       key: 'projects',
       label: '项目总数',
-      value: t.projects.toLocaleString('zh-CN'),
+      value: formatNumber(t.projects),
       hint: '平台全部项目',
     },
     ...(isFinance
@@ -136,29 +137,29 @@ export function TotalsStrip({ data, isFinance }: { data: AdminOverview; isFinanc
             key: 'gmv',
             label: '累计实收（元）',
             value: `¥${yuan(data.commerce.gmvCents)}`,
-            hint: `${data.commerce.orders.paid.toLocaleString('zh-CN')} 笔已支付订单`,
+            hint: `${formatNumber(data.commerce.orders.paid)} 笔已支付订单`,
           },
         ]
       : [
           {
             key: 'tasks',
             label: '任务总数',
-            value: t.tasks.toLocaleString('zh-CN'),
-            hint: `运行中 ${t.running.toLocaleString('zh-CN')} · 排队 ${t.queued.toLocaleString('zh-CN')}`,
+            value: formatNumber(t.tasks),
+            hint: `运行中 ${formatNumber(t.running)} · 排队 ${formatNumber(t.queued)}`,
           },
           {
             key: 'success',
             label: '累计成功率',
             value: t.successRate === null ? '—' : `${t.successRate}%`,
-            hint: `成功 ${t.succeeded.toLocaleString('zh-CN')} · 失败 ${t.failed.toLocaleString('zh-CN')}`,
+            hint: `成功 ${formatNumber(t.succeeded)} · 失败 ${formatNumber(t.failed)}`,
             danger: t.successRate !== null && t.successRate < 90,
           },
         ]),
     {
       key: 'assets',
       label: '素材总量',
-      value: t.assets.toLocaleString('zh-CN'),
-      hint: `原始 ${t.originals.toLocaleString('zh-CN')} · 生成 ${t.generated.toLocaleString('zh-CN')}`,
+      value: formatNumber(t.assets),
+      hint: `原始 ${formatNumber(t.originals)} · 生成 ${formatNumber(t.generated)}`,
     },
   ];
 

@@ -1,4 +1,4 @@
-import { ActionButton, Descriptions, Drawer, Notice, formatDateTimeLoose, formatDuration } from '~/admin-ui/primitives';
+import { ActionButton, Descriptions, Drawer, Notice, formatDateTime, formatDuration } from '~/admin-ui/primitives';
 import type { ApiLogView } from '../../../types/model';
 import {
   CAPABILITY_LABELS,
@@ -20,10 +20,8 @@ export function ModelCallDetailDrawer({
   return (
     <Drawer
       open={detailId !== null}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      width={720}
+      onClose={onClose}
+      size="lg"
       title="调用详情"
       description={detail ? `${detail.method} ${detail.path}` : undefined}
       footer={
@@ -104,7 +102,7 @@ export function ModelCallDetailDrawer({
                 label: '产出',
                 value: `${detail.mediaCount} 个媒体${detail.videoSeconds > 0 ? ` · ${detail.videoSeconds}s` : ''}`,
               },
-              { label: '时间', value: formatDateTimeLoose(detail.createdAt) },
+              { label: '时间', value: formatDateTime(detail.createdAt) },
             ]}
             columns={2}
           />

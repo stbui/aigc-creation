@@ -102,7 +102,6 @@ export class AccountLifecycleService {
       await tx.userPluginState.deleteMany({ where: { userId } });
       // 登录审计断开关联但保留记录（安全事件举证）
       await tx.loginLog.updateMany({ where: { userId }, data: { userId: null } });
-      await tx.consentRecord.updateMany({ where: { userId }, data: { userId: null } });
       await tx.user.update({
         where: { id: userId },
         data: {

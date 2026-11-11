@@ -115,12 +115,12 @@ export function UserGroupTable({
         fixed: 'right',
         render: (row) => (
           <div className="flex items-center gap-1">
-            <ActionButton variant="ghost" size="xs" disabled={!writable} onClick={() => onEdit(row)}>
+            <ActionButton variant="ghost" size="sm" disabled={!writable} onClick={() => onEdit(row)}>
               编辑
             </ActionButton>
             <ActionButton
               variant="ghost"
-              size="xs"
+              size="sm"
               icon={Trash2}
               disabled={!writable || row.isDefault}
               onClick={() => onDelete(row)}

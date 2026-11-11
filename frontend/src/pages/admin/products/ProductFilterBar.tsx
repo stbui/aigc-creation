@@ -53,7 +53,6 @@ export function ProductFilterBar({
       <SelectField
         className="w-32"
         ariaLabel="按状态筛选"
-        placeholder="全部状态"
         allowClear
         clearLabel="全部状态"
         value={status}
@@ -63,7 +62,6 @@ export function ProductFilterBar({
       <SelectField
         className="w-40"
         ariaLabel="按发放方式筛选"
-        placeholder="全部发放方式"
         allowClear
         clearLabel="全部发放方式"
         value={grantType}

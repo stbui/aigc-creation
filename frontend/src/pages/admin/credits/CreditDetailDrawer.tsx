@@ -222,11 +222,9 @@ export function CreditDetailDrawer({
   return (
     <Drawer
       title={`积分明细 · ${user.email}`}
-      width={760}
+      size="lg"
       open
-      onOpenChange={(next) => {
-        if (!next) requestClose();
-      }}
+      onClose={requestClose}
     >
       {error && data && <StaleError error={error} onRetry={() => void reload()} />}
 
@@ -353,8 +351,8 @@ export function CreditDetailDrawer({
           <SelectField
             className="w-36"
             ariaLabel="按流水类型筛选"
-            placeholder="类型"
             allowClear
+            clearLabel="全部类型"
             value={type}
             onChange={setType}
             options={LEDGER_OPTIONS}

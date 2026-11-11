@@ -660,9 +660,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await prisma.logicalModel.deleteMany({ where: { id: logicalModel.id } });
   await prisma.channelModel.deleteMany({ where: { id: channelModel.id } });
   await prisma.modelChannel.deleteMany({ where: { id: channel.id } });
-  // 注册写同意留痕、登录写登录日志、退款失败给站内消息 —— 三者都直接引用 User,
+  // 登录写登录日志、退款失败给站内消息 —— 两者都直接引用 User,
   // 漏删任意一张都会让最后一步 delete 撞上外键, 看起来像「脚本异常」而非清理不全
-  await prisma.consentRecord.deleteMany({ where: { userId: user.id } });
   await prisma.loginLog.deleteMany({ where: { userId: user.id } });
   await prisma.notification.deleteMany({ where: { userId: user.id } });
   await prisma.user.delete({ where: { id: user.id } });

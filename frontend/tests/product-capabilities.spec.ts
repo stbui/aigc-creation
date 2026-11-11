@@ -360,10 +360,9 @@ test.describe('能力可见性与运行态', () => {
 
     await authed(page, '/local-redraw', token, email);
     const btn = page.locator('button.pk-primary-btn').first();
-    // unavailable 的 reason 来自路由诊断，C 端必须换成统一文案，不能把内部线路信息漏给用户。
-    const notice = page.locator('.tool-submit-notice-error');
-    await expect(notice).toHaveText('当前生成服务暂不可用，请稍后再试。');
-    await expect(notice).not.toContainText('图像编辑通道维护中');
+    // unavailable 时只置灰按钮，不再渲染提交区提示；内部线路信息也不得漏给用户。
+    await expect(page.locator('.tool-submit-notice-error')).toHaveCount(0);
+    await expect(page.getByText('图像编辑通道维护中')).toHaveCount(0);
     await expect(btn).toBeDisabled();
 
     // 访客：能力不可用不应成为第一道墙；先让访客完成本页必填校验，
@@ -636,8 +635,12 @@ test.describe('局部重绘画布', () => {
     const canvas = page.locator('.redraw-mask-overlay');
     await expect(canvas).toBeVisible();
     await page.waitForFunction(() => {
-      const el = document.querySelector('.redraw-mask-overlay') as HTMLCanvasElement | null;
-      return Boolean(el && el.width === 240 && el.height === 160);
+      /*
+       * 遮罩画布由 SDK 在内部持有（不进 DOM），尺寸锚点改看原图：
+       * 图片按原始像素加载完成后才能开始坐标换算。
+       */
+      const img = document.querySelector('.redraw-image-frame img') as HTMLImageElement | null;
+      return Boolean(img && img.complete && img.naturalWidth === 240 && img.naturalHeight === 160);
     });
 
     await page.locator('.redraw-tool-btn', { hasText: '框选' }).click();
@@ -831,8 +834,9 @@ test.describe('局部重绘画布', () => {
     const canvas = page.locator('.redraw-mask-overlay');
     await expect(canvas).toBeVisible();
     await page.waitForFunction(() => {
-      const el = document.querySelector('.redraw-mask-overlay') as HTMLCanvasElement | null;
-      return Boolean(el && el.width === 240 && el.height === 160);
+      /* 遮罩画布由 SDK 在内部持有，尺寸锚点看原图是否按原始像素加载完成。 */
+      const img = document.querySelector('.redraw-image-frame img') as HTMLImageElement | null;
+      return Boolean(img && img.complete && img.naturalWidth === 240 && img.naturalHeight === 160);
     });
 
     await page.locator('.redraw-tool-btn', { hasText: '涂抹' }).click();

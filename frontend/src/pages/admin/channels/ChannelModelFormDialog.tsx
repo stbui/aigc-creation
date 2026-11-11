@@ -49,7 +49,7 @@ export function ChannelModelFormDialog({
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
-      width={980}
+      size="lg"
       title={editing ? `编辑商品 · ${editing.modelKey}` : '新建商品'}
       footer={
         <>

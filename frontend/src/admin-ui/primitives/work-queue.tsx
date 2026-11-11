@@ -60,6 +60,7 @@ export function WorkQueue({
   error = null,
   emptyTitle = '当前没有待处理事项',
   emptyDescription = '告警、退款、对账与备份都在正常范围内。',
+  hideEmptyGroups = false,
   className,
 }: {
   groups: AdminWorkbenchGroup[];
@@ -67,10 +68,22 @@ export function WorkQueue({
   error?: string | null;
   emptyTitle?: string;
   emptyDescription?: string;
+  /**
+   * 只渲染有实体行的分组。
+   *
+   * 分组本身仍有价值（带着计数和「查看全部」），但只有计数、没有下钻样本时
+   * 整块只剩一句「该类没有可展开的实体行」—— 在告警页这种按条数堆高度的
+   * 列表里是纯占位。过滤后若一条不剩，回退为全部，避免整区凭空消失。
+   */
+  hideEmptyGroups?: boolean;
   className?: string;
 }) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
+  const visibleGroups =
+    hideEmptyGroups && groups.some((group) => group.items.length > 0)
+      ? groups.filter((group) => group.items.length > 0)
+      : groups;
 
   if (loading && groups.length === 0) {
     return (
@@ -105,7 +118,7 @@ export function WorkQueue({
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
-      {groups.map((group) => {
+      {visibleGroups.map((group) => {
         const style = SEVERITY_STYLE[group.severity];
         const amount = currency(group.amountCents);
         return (
@@ -138,39 +151,51 @@ export function WorkQueue({
               </div>
             ) : (
               <ul className="divide-y divide-border">
-                {group.items.map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      to={withReturnTo(item.target.path, returnTo)}
-                      className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent"
-                    >
-                      <span className={cn('size-1.5 shrink-0 rounded-full', style.dot)} aria-hidden />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-foreground">{item.title}</span>
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.subtitle}</span>
-                      </span>
-                      {item.meta.length > 0 && (
-                        <span className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground xl:flex">
-                          {item.meta.map((meta) => (
-                            <span key={meta.label} className="whitespace-nowrap">
-                              {meta.label}
-                              <span
-                                className={cn(
-                                  'ml-1 font-medium text-foreground',
-                                  meta.tone === 'danger' && 'text-danger-text',
-                                  meta.tone === 'warn' && 'text-warn-text',
-                                )}
-                              >
-                                {meta.value}
-                              </span>
-                            </span>
-                          ))}
+                {group.items.map((item) => {
+                  /*
+                   * 后端有时把同一个标识既放进副标题又放进 meta（对账差异行的
+                   * 订单号就是如此），行内会连着出现两遍同一串字符。只在**字面
+                   * 完全相同**时去掉 meta 那一份，含义不同的 meta 一律保留。
+                   */
+                  const extraMeta = item.meta.filter((meta) => meta.value !== item.subtitle);
+                  return (
+                    <li key={item.id}>
+                      <Link
+                        to={withReturnTo(item.target.path, returnTo)}
+                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent"
+                      >
+                        <span className={cn('size-1.5 shrink-0 rounded-full', style.dot)} aria-hidden />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-foreground">{item.title}</span>
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.subtitle}</span>
                         </span>
-                      )}
-                      <span className="shrink-0 text-xs text-brand">处理</span>
-                    </Link>
-                  </li>
-                ))}
+                        {extraMeta.length > 0 && (
+                          <span className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground xl:flex">
+                            {extraMeta.map((meta) => (
+                              <span key={meta.label} className="whitespace-nowrap">
+                                {meta.label}
+                                <span
+                                  className={cn(
+                                    'ml-1 font-medium text-foreground',
+                                    meta.tone === 'danger' && 'text-danger-text',
+                                    meta.tone === 'warn' && 'text-warn-text',
+                                  )}
+                                >
+                                  {meta.value}
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                        {/* 分组头是「查看全部 →」，行内动作也该带方向，否则蓝色「处理」读起来像状态词 */}
+                        <span className="inline-flex shrink-0 items-center gap-0.5 text-xs text-brand">
+                          处理
+                          <ArrowRight className="size-3" aria-hidden />
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>

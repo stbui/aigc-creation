@@ -168,7 +168,7 @@ export function ChannelUpstreamDialog({
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
-      width={760}
+      size="md"
       title="导入供应商商品"
       description="仅添加勾选的商品；默认停用。可统一填类型、接入方式与售价，省去逐条编辑。"
       footer={
@@ -197,7 +197,7 @@ export function ChannelUpstreamDialog({
           ariaLabel="搜索供应商商品"
           value={keyword}
           onChange={setKeyword}
-          placeholder="搜索商品编号或展示名称"
+          placeholder="商品编号 / 展示名称"
         />
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
           <span className="text-xs text-muted-foreground">
@@ -247,7 +247,6 @@ export function ChannelUpstreamDialog({
               ariaLabel="统一模型类型"
               value={capability || undefined}
               options={BATCH_CAPABILITIES}
-              placeholder="不统一配置"
               allowClear
               clearLabel="不统一配置"
               onChange={(value) => setCapability((value as 'image' | 'text') ?? '')}

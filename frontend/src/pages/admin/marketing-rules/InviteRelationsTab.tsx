@@ -12,7 +12,7 @@ import {
   SelectField,
   StaleError,
   StatusTag,
-  formatShanghaiDateTime,
+  formatDateTime,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { marketingApi } from './api';
@@ -129,7 +129,7 @@ export function InviteRelationsTab() {
       width: 160,
       render: (row) => (
         <span className="tabular-nums text-muted-foreground">
-          {formatShanghaiDateTime(row.boundAt)}
+          {formatDateTime(row.boundAt)}
         </span>
       ),
     },
@@ -189,7 +189,6 @@ export function InviteRelationsTab() {
         <SelectField
           className="w-32"
           ariaLabel="按奖励状态筛选"
-          placeholder="全部状态"
           clearLabel="全部状态"
           allowClear
           value={rewardStatus}

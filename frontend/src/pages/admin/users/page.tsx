@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { PageHeader } from '~/admin-ui/primitives';
+import { AdminPage, StatCards } from '~/admin-ui/primitives';
 import { useAdmin, useAdminDetailParam } from './hooks';
 import { useAdminUserActions } from './useAdminUserActions';
 import { useAdminUserFilters } from './useAdminUserFilters';
@@ -40,12 +40,40 @@ export function AdminUsersPage() {
   }, [filters.params]);
 
   return (
-    <div className="w-full">
-      <PageHeader
-        title="用户管理"
-        description="管理注册用户的账号状态、角色与资源"
-        inlineDescription
-        className="mb-3"
+    <AdminPage title="用户管理" description="管理注册用户的账号状态、角色与资源">
+      {/*
+       * 统计卡固定在筛选之上：全站后台的顺序统一为「页头 → 统计 → 筛选 → 列表」，
+       * 概览数字是「现在什么情况」，筛选是「我要看哪一部分」，先总后分。
+       */}
+      <StatCards
+        columns={4}
+        className="mb-4"
+        items={[
+          {
+            label: '匹配用户',
+            value: filters.stats?.total ?? 0,
+            hint: '跟随当前筛选条件',
+          },
+          {
+            label: '正常账号',
+            value: filters.stats?.byStatus.active ?? 0,
+            hint: '全站状态为正常',
+          },
+          {
+            label: '受限账号',
+            value: filters.stats?.byStatus.disabled ?? 0,
+            hint: '全站已禁用（不含已注销）',
+            tone: (filters.stats?.byStatus.disabled ?? 0) > 0 ? 'warn' : undefined,
+          },
+          {
+            label: '管理身份',
+            value:
+              (filters.stats?.byRole.admin ?? 0) +
+              (filters.stats?.byRole.operator ?? 0) +
+              (filters.stats?.byRole.finance ?? 0),
+            hint: '管理员 / 运营 / 财务',
+          },
+        ]}
       />
 
       <UserFilters
@@ -77,7 +105,6 @@ export function AdminUsersPage() {
 
       <UserListSection
         data={filters.data}
-        stats={filters.stats}
         loading={filters.loading}
         error={filters.error}
         hasFilter={filters.hasFilter}
@@ -145,6 +172,6 @@ export function AdminUsersPage() {
           onClose={actions.closeTempPassword}
         />
       )}
-    </div>
+    </AdminPage>
   );
 }

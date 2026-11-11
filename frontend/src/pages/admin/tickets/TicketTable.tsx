@@ -1,5 +1,11 @@
 import { Link } from 'react-router-dom';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
+import {
+  formatDateTime,
+  ActionButton,
+  AdminDataTable,
+  StatusTag,
+  type AdminColumn,
+} from '~/admin-ui/primitives';
 import {
   PRIORITY_LABELS,
   PRIORITY_TONE,
@@ -119,8 +125,8 @@ export function TicketTable({
       width: 170,
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-[12px] tabular-nums text-muted-foreground">
-          <span>{new Date(row.createdAt).toLocaleString('zh-CN')}</span>
-          <span>{new Date(row.updatedAt).toLocaleString('zh-CN')}</span>
+          <span>{formatDateTime(row.createdAt)}</span>
+          <span>{formatDateTime(row.updatedAt)}</span>
         </div>
       ),
     },

@@ -19,6 +19,7 @@ const ROOTS = [
   'src/hooks',
   'src/lib',
   'src/context',
+  'src/mask-sdk',
 ];
 
 describe('去除水印页具名导入', () => {

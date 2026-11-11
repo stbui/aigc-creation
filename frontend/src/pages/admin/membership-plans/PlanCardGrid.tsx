@@ -1,5 +1,6 @@
 import { CalendarDays, Coins, Crown } from 'lucide-react';
 import {
+  formatNumber,
   ActionButton,
   Card,
   CardContent,
@@ -260,7 +261,7 @@ function PlanCard({
                   active ? 'text-foreground' : 'text-muted-foreground',
                 )}
               >
-                {row.monthlyCredits.toLocaleString('zh-CN')}
+                {formatNumber(row.monthlyCredits)}
               </span>
             </span>
           </div>

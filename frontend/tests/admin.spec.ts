@@ -227,7 +227,6 @@ test.describe('后台管理端', () => {
    * 首屏既没有弹窗/抽屉，也没有常驻的操作条；否则整页会被挡住或占位。
    */
   for (const [path, heading] of [
-    ['/admin/legal', '法务文档'],
     ['/admin/notifications', '站内消息'],
   ] as const) {
     test(`${heading}页不得常驻确认弹窗或操作条`, async ({ page }) => {

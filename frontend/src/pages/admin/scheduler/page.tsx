@@ -7,12 +7,12 @@ import { AlertTriangle, Play } from 'lucide-react';
 import { adminSchedulerApi } from '../../../lib/api';
 
 import {
+  AdminPage,
   ActionButton,
   RefreshButton,
   EmptyState,
   ListError,
   Notice,
-  PageHeader,
   PageSkeleton,
   Panel,
   StaleError,
@@ -102,12 +102,11 @@ export function AdminSchedulerPage() {
     .join('、');
 
   return (
-    <>
-      <PageHeader
-        title="定时任务"
-        description="订单超时关闭、积分到期回收、备份与保留期清理的统一调度"
-        actions={<RefreshButton loading={loading} onRefresh={reload} />}
-      />
+    <AdminPage
+      title="定时任务"
+      description="订单超时关闭、积分到期回收、备份与保留期清理的统一调度"
+      actions={<RefreshButton loading={loading} onRefresh={reload} />}
+    >
 
       {/*
        * 刷新失败但手上有旧数据：保留内容，但必须明说「这是上次的」——
@@ -204,6 +203,6 @@ export function AdminSchedulerPage() {
           </li>
         </ul>
       </Panel>
-    </>
+    </AdminPage>
   );
 }

@@ -1,9 +1,12 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  formatDateTime,
   ActionButton,
+  RowMenu,
   StatusTag,
   type AdminColumn,
+  type RowMenuItem,
 } from '~/admin-ui/primitives';
 import { assetThumbUrl } from './api';
 import {
@@ -101,6 +104,7 @@ export function useTaskTableColumns({
         key: 'durationMs',
         title: '耗时',
         width: 76,
+        align: 'right',
         cellTitle: (row) => (row.status === 'running' ? '任务执行中，耗时仍在增长' : undefined),
         render: (row) => (
           <span className="text-[12px] tabular-nums whitespace-nowrap">
@@ -115,7 +119,7 @@ export function useTaskTableColumns({
         sortable: true,
         render: (row) => (
           <span className="block truncate text-[12px] tabular-nums text-muted-foreground">
-            {new Date(row.createdAt).toLocaleString('zh-CN')}
+            {formatDateTime(row.createdAt)}
           </span>
         ),
       },
@@ -125,45 +129,49 @@ export function useTaskTableColumns({
         width: 148,
         /* 固定在最右，保证滚动时主操作仍可见。 */
         fixed: 'right',
-        render: (row) => (
-          <div className="flex items-center gap-1 whitespace-nowrap">
-            <ActionButton variant="ghost" size="sm" onClick={() => onOpenDetail(row.id)}>
-              详情
-            </ActionButton>
-            {/*
-             * 重试/终止按状态出现，而不是一律置灰：
-             * 「仅失败任务可重试」是后端硬校验，给一个点不动的按钮只会让人反复试。
-             */}
-            {row.status === 'failed' && can('task.retry') && (
-              <ActionButton variant="ghost" size="sm" onClick={() => onAction('retry', row)}>
-                重试
+        render: (row) => {
+          const removable =
+            (row.status === 'succeeded' || row.status === 'failed' || row.status === 'cancelled') &&
+            can('task.delete');
+          const moreItems: RowMenuItem[] = removable
+            ? [
+                {
+                  key: 'delete',
+                  label: '删除任务',
+                  danger: true,
+                  onSelect: () => onAction('delete', row),
+                },
+              ]
+            : [];
+          return (
+            <div className="flex items-center gap-1 whitespace-nowrap">
+              <ActionButton variant="ghost" size="sm" onClick={() => onOpenDetail(row.id)}>
+                详情
               </ActionButton>
-            )}
-            {(row.status === 'queued' || row.status === 'running') && can('task.cancel') && (
-              <ActionButton
-                variant="destructive"
-                size="sm"
-                onClick={() => onAction('cancel', row)}
-              >
-                终止
-              </ActionButton>
-            )}
-            {/* 仅终态可删；排队中/执行中必须先终止，避免 worker 回写已删除任务。 */}
-            {(row.status === 'succeeded' ||
-              row.status === 'failed' ||
-              row.status === 'cancelled') &&
-              can('task.delete') && (
-                <ActionButton
-                  variant="ghost"
-                  size="sm"
-                  className="text-danger-text hover:text-danger-text"
-                  onClick={() => onAction('delete', row)}
-                >
-                  删除
+              {/*
+               * 重试/终止按状态出现，而不是一律置灰：
+               * 「仅失败任务可重试」是后端硬校验，给一个点不动的按钮只会让人反复试。
+               * 删除收进「更多」：它只在终态出现，平铺时会让失败任务那一行同时挤进
+               * 三颗按钮，而删除是这里唯一不可撤销的动作。
+               */}
+              {row.status === 'failed' && can('task.retry') && (
+                <ActionButton variant="ghost" size="sm" onClick={() => onAction('retry', row)}>
+                  重试
                 </ActionButton>
               )}
-          </div>
-        ),
+              {(row.status === 'queued' || row.status === 'running') && can('task.cancel') && (
+                <ActionButton
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => onAction('cancel', row)}
+                >
+                  终止
+                </ActionButton>
+              )}
+              <RowMenu label={`任务 ${shortId(row.id)} 更多操作`} items={moreItems} />
+            </div>
+          );
+        },
       },
     ],
     [can, onAction, onOpenDetail],

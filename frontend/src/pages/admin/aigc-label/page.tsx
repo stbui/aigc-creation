@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { adminAigcLabelApi } from './api';
 import {
+  AdminPage,
   ActionButton,
   EmptyState,
   ListError,
   Notice,
-  PageHeader,
   PageSkeleton,
   SaveBar,
   SkeletonPanel,
@@ -153,15 +153,14 @@ export function AdminAigcLabelPage() {
   if (!data || !spec) return <EmptyState title="暂无配置" />;
 
   return (
-    <>
-      <PageHeader
-        title="AI 标识"
-        description={
-          editable
-            ? '生成图片的显式 AIGC 角标：可改样式，也可整体关闭（关闭后仅保留文件内隐式标识）。文案与字体由浏览器渲染成位图后保存，位置与缩放实时生效'
-            : '当前账号无 setting.write 权限，仅可查看'
-        }
-      />
+    <AdminPage
+      title="AI 标识"
+      description={
+        editable
+          ? '生成图片的显式 AIGC 角标：可改样式，也可整体关闭（关闭后仅保留文件内隐式标识）。文案与字体由浏览器渲染成位图后保存，位置与缩放实时生效'
+          : '当前账号无 setting.write 权限，仅可查看'
+      }
+    >
 
       {/* 刷新失败但草稿还在：不能把编辑中的样式清掉，只提示「配置可能已过期」 */}
       {error && <StaleError error={error} onRetry={() => void reload()} />}
@@ -224,6 +223,6 @@ export function AdminAigcLabelPage() {
         onCancel={() => setConfirming(false)}
         onConfirm={() => void save()}
       />
-    </>
+    </AdminPage>
   );
 }

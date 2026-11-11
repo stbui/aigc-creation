@@ -119,7 +119,7 @@ export function ProjectDeleteConfirm({ target, onCancel, onDeleted }: ProjectDel
             <TextField
               ariaLabel="搜索迁移目标项目"
               value={keyword}
-              placeholder="搜索目标项目名称"
+              placeholder="项目名称"
               disabled={submitting}
               onChange={setKeyword}
             />

@@ -155,8 +155,8 @@ test.describe('自由创作 · 提交按钮登录态', () => {
     expect(filled.text).toContain('立即生成');
     expect(filled.text).toContain('本次消耗 10 积分');
     /*
-     * 有通道: 可提交。没通道 (本机未配图像线路): 按钮置灰, 并在提交区给出原因 ——
-     * 后者正是「绝不交占位图」在界面上的落点, 不是缺陷。
+     * 有通道: 可提交。没通道 (本机未配图像线路): 按钮置灰, 提交区不再渲染
+     * 不可用提示 —— 「绝不交占位图」由置灰本身表达。
      */
     expect(filled.disabled).toBe(!canSubmit);
     if (canSubmit) {
@@ -164,7 +164,7 @@ test.describe('自由创作 · 提交按钮登录态', () => {
       expect(filled.cursor).toBe('pointer');
     } else {
       expect(filled.opacity).toBeLessThan(1);
-      await expect(page.locator('.tool-submit-notice-error')).toBeVisible();
+      await expect(page.locator('.tool-submit-notice-error')).toHaveCount(0);
     }
   });
 });
