@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { MAX_IMAGE_MB, MAX_IMAGES, VARIANT_FIELDS } from './constants';
+import { MAX_IMAGE_MB, MAX_IMAGES, PRODUCT_KIT_CAPABILITY, VARIANT_FIELDS } from './constants';
 import {
   AssetLibraryModal,
   MobileUploadModal,
@@ -49,7 +49,7 @@ export function ProductKitPage() {
    */
   useEffect(() => {
     let alive = true;
-    void resolveModel('main_image')
+    void resolveModel(PRODUCT_KIT_CAPABILITY)
       .then((model) => {
         if (alive) setSelectedModel(model);
       })
@@ -61,13 +61,13 @@ export function ProductKitPage() {
     };
   }, []);
   const modelImageMax = selectedModel ? modelImageInputLimit(selectedModel) : null;
-  const imageMax = Math.min(MAX_IMAGES, modelImageMax ?? MAX_IMAGES);
+  const maxImages = Math.min(MAX_IMAGES, modelImageMax ?? MAX_IMAGES);
   // 上传 (三重校验 / 素材库回填 / 粘贴) 统一由 useImageUpload 处理
   const { images, uploading, fileInputRef, uploadFiles, removeImage, replaceImage, library, mobile } = useImageUpload({
-    max: imageMax,
+    max: maxImages,
     maxMb: MAX_IMAGE_MB,
   });
-  const imageInputError = selectedModel ? imageInputCountError(selectedModel, images.length) : null;
+  const imageLimitError = selectedModel ? imageInputCountError(selectedModel, images.length) : null;
   const {
     open: libraryOpen,
     loading: libraryLoading,
@@ -84,6 +84,15 @@ export function ProductKitPage() {
   const [platform, setPlatform] = useState('taobao');
   const [language, setLanguage] = useState('zh-CN');
   const [description, setDescription] = useState('');
+  /**
+   * 描述的同步镜像：AI 分析是异步的，响应回来时要按**最新**输入判断是否提示
+   * 覆盖，不能用点击瞬间的闭包值 —— 否则请求期间用户手打的描述会被静默冲掉。
+   */
+  const descriptionRef = useRef(description);
+  const applyDescription = useCallback((value: string) => {
+    descriptionRef.current = value;
+    setDescription(value);
+  }, []);
   const [counts, setCounts] = useState<Record<string, number>>(() =>
     Object.fromEntries(VARIANT_FIELDS.map((v) => [v.key, v.default])),
   );
@@ -115,7 +124,7 @@ export function ProductKitPage() {
   // 「一行一次生成」。失败任务也进列表, 用户能看到具体是哪一类主图失败。
   const { token } = useAuth();
   const gallery = useResultGallery({
-    capability: 'main_image',
+    capability: PRODUCT_KIT_CAPABILITY,
     token,
     captionOf: variantCaption,
     includeFailed: true,
@@ -144,7 +153,7 @@ export function ProductKitPage() {
    * 价签必须按“本次要出几张”计算。此前只显示单张单价，用户选 3 个变体时
    * 按钮仍写“本次消耗 10 积分”，实际扣 30 —— 属于计费披露错误。
    */
-  const unitCreditCost = useCreditCost('main_image');
+  const unitCreditCost = useCreditCost(PRODUCT_KIT_CAPABILITY);
   const creditLabel = useMemo(() => {
     const unit = modelQuoteCredits ?? unitCreditCost;
     if (unit == null) return null;
@@ -154,14 +163,14 @@ export function ProductKitPage() {
   }, [unitCreditCost, modelQuoteCredits, totalCount]);
   const formValid =
     images.length > 0 &&
-    !imageInputError &&
+    !imageLimitError &&
     productName.trim().length > 0 &&
     description.trim().length > 0 &&
     totalCount > 0;
 
   // 生成提交流程（模型校验 / 素材准备 / 幂等批次 / 顺序建单）收口在独立 hook
   const { submitting, submit } = useProductKitSubmit({
-    input: {
+    form: {
       images,
       counts,
       productName,
@@ -211,18 +220,18 @@ export function ProductKitPage() {
         message.warning('这次没有生成可用内容，请重试');
         return;
       }
-      // 已填过描述时不静默覆盖, 先问一句
-      if (description.trim()) {
+      // 已填过描述时不静默覆盖, 先问一句（按响应时的最新输入判断）
+      if (descriptionRef.current.trim()) {
         modal.confirm({
           title: '替换商品描述？',
           content: 'AI 分析会覆盖当前已填写的描述。',
           okText: '替换',
           cancelText: '取消',
-          onOk: () => setDescription(content),
+          onOk: () => applyDescription(content),
         });
         return;
       }
-      setDescription(content);
+      applyDescription(content);
       message.success('已按首张商品图生成描述，可继续编辑');
     } catch (e) {
       message.error(promptToolErrorMessage(e, 'image'));
@@ -271,8 +280,8 @@ export function ProductKitPage() {
       {/* ── 左: 输入栏 ── */}
       <ProductKitInputPane
         images={images}
-        maxImages={imageMax}
-        imageLimitError={imageInputError}
+        maxImages={maxImages}
+        imageLimitError={imageLimitError}
         uploading={uploading}
         fileInputRef={fileInputRef}
         onFiles={(f) => void uploadFiles(f)}
@@ -288,7 +297,7 @@ export function ProductKitPage() {
         language={language}
         onLanguageChange={setLanguage}
         description={description}
-        onDescriptionChange={setDescription}
+        onDescriptionChange={applyDescription}
         analyzing={analyzing}
         onAnalyze={() => void runAiAnalyze()}
         onExpandDescription={() => setExpandOpen(true)}
@@ -325,7 +334,6 @@ export function ProductKitPage() {
         emptyDesc={resultEmptyDesc}
         emptyChildren={resultEmptyChildren}
         onDeleteRow={deleteRow}
-        downloadNamePrefix="main-image"
       />
 
       {/* 素材库选择弹窗 (真实数据) */}
@@ -336,7 +344,7 @@ export function ProductKitPage() {
         error={libraryError}
         onCancel={closeLibrary}
         onPick={pick}
-        maxSelectable={MAX_IMAGES}
+        maxSelectable={maxImages}
       />
 
       {/* 手机上传弹窗 (二维码方案) */}
@@ -346,7 +354,7 @@ export function ProductKitPage() {
       <ProductKitDescriptionModal
         open={expandOpen}
         description={description}
-        onChange={setDescription}
+        onChange={applyDescription}
         onClose={() => setExpandOpen(false)}
       />
     </div>

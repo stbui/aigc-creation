@@ -3,7 +3,7 @@ import { PERMISSION_LABELS, MODULE_LABELS, ROLE_COL } from './constants';
 import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from '../../../lib/api';
 
-import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, ToneBadge } from '~/admin-ui/primitives';
+import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, Toggle, ToneBadge } from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
@@ -251,24 +251,30 @@ export function AdminRolesPage() {
                     return (
                       <div key={r.code} className={cn(ROLE_COL, 'shrink-0')}>
                         {/*
-                         * `ActionButton` 不透传 `aria-pressed`；这一枚需要把
-                         * 「当前模块已全选」暴露给读屏，用原生按钮保留该状态。
+                         * 「当前模块已全选」要暴露给读屏：用 `Toggle` 而不是
+                         * `ActionButton`，选中态由它输出 `aria-pressed`。
+                         * 这一枚是纯文字动作（全选 ↔ 全不选），所以关掉选中底
+                         * 色，只靠文字色区分。
                          */}
-                        <button
-                          type="button"
+                        <Toggle
+                          variant="default"
+                          size="sm"
+                          pressed={all}
+                          onPressedChange={() => toggleModule(r.code, mod.codes)}
                           disabled={!editable}
-                          aria-pressed={all}
-                          onClick={() => toggleModule(r.code, mod.codes)}
                           className={cn(
-                            'inline-flex h-6 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors',
-                            'outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                            'disabled:cursor-not-allowed disabled:opacity-50',
-                            all && 'text-brand',
-                            none && 'text-muted-foreground/60',
+                            'h-6 min-w-0 px-2 text-xs font-medium hover:bg-accent',
+                            // 这一枚是纯文字动作，选中时不加底色，只换文字色；
+                            // 必须连同官方的 `data-[state=on]:text-accent-foreground`
+                            // 一起顶掉，否则选中后文字变浅、在透明底上看不清。
+                            'data-[state=on]:bg-transparent',
+                            all && 'text-brand hover:text-brand data-[state=on]:text-brand',
+                            none &&
+                              'text-muted-foreground/60 hover:text-muted-foreground/60 data-[state=on]:text-muted-foreground/60',
                           )}
                         >
                           {all ? '全不选' : '全选'}
-                        </button>
+                        </Toggle>
                       </div>
                     );
                   })}

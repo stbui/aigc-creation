@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { OutputTabsPane } from './components';
 import type { GalleryItem, RightTab } from './hooks';
 import { ProductKitExamplePanel } from './ProductKitExamplePanel';
 import { ProductKitResultList } from './ProductKitResultList';
@@ -42,53 +43,23 @@ export function ProductKitOutputPane({
   downloadNamePrefix = 'main-image',
 }: ProductKitOutputPaneProps) {
   return (
-    <section className="pd-right-pane">
-      <div className="pd-tabs" role="tablist" aria-label="右侧面板">
-        <button
-          type="button"
-          role="tab"
-          id="pk-tab-demo"
-          aria-selected={rightTab === 'demo'}
-          aria-controls="pk-panel-demo"
-          className={rightTab === 'demo' ? 'is-active' : ''}
-          onClick={() => onPickTab('demo')}
-        >
-          功能示例
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="pk-tab-results"
-          aria-selected={rightTab === 'results'}
-          aria-controls="pk-panel-results"
-          className={rightTab === 'results' ? 'is-active' : ''}
-          onClick={() => onPickTab('results')}
-        >
-          创作结果
-          {generationCount > 0 && <span className="pd-tab-count">{generationCount}</span>}
-        </button>
-      </div>
-
-      <div className="pd-right-body">
-        {rightTab === 'demo' ? (
-          <div role="tabpanel" id="pk-panel-demo" aria-labelledby="pk-tab-demo" className="pd-right-panel">
-            <ProductKitExamplePanel />
-          </div>
-        ) : (
-          <div role="tabpanel" id="pk-panel-results" aria-labelledby="pk-tab-results" className="pd-right-panel">
-            <ProductKitResultList
-              items={items}
-              loading={loading}
-              error={error}
-              emptyTitle="效果图预览"
-              emptyDesc={emptyDesc}
-              emptyChildren={emptyChildren}
-              onDeleteRow={onDeleteRow}
-              downloadNamePrefix={downloadNamePrefix}
-            />
-          </div>
-        )}
-      </div>
-    </section>
+    <OutputTabsPane
+      value={rightTab}
+      onChange={onPickTab}
+      generationCount={generationCount}
+      demo={<ProductKitExamplePanel />}
+      results={
+        <ProductKitResultList
+          items={items}
+          loading={loading}
+          error={error}
+          emptyTitle="效果图预览"
+          emptyDesc={emptyDesc}
+          emptyChildren={emptyChildren}
+          onDeleteRow={onDeleteRow}
+          downloadNamePrefix={downloadNamePrefix}
+        />
+      }
+    />
   );
 }

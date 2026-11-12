@@ -7,6 +7,7 @@ import {
   AssetLibraryModal,
   MobileUploadModal,
   ModelPicker,
+  OutputTabsPane,
   ToolImageDropzone,
   ToolSettingsPopover,
   ToolSubmitBar,
@@ -436,59 +437,24 @@ export function ProductDetailPage() {
       {/* ── 右: 功能示例 / 创作结果 ──
           创作结果按批次逐行陈列 (一次生成一行, 原图 + 各模块图);
           提交后重拉列表拿到整批占位卡, 由 useResultGallery 轮询到全部到终态。 */}
-      <section className="pd-right-pane">
-        <div className="pd-tabs" role="tablist" aria-label="右侧面板">
-          <Button
-            type="text"
-            role="tab"
-            id="pd-tab-demo"
-            aria-selected={rightTab === 'demo'}
-            aria-controls="pd-panel-demo"
-            className={rightTab === 'demo' ? 'is-active' : ''}
-            onClick={() => pickRightTab('demo')}
-          >
-            功能示例
-          </Button>
-          <Button
-            type="text"
-            role="tab"
-            id="pd-tab-results"
-            aria-selected={rightTab === 'results'}
-            aria-controls="pd-panel-results"
-            className={rightTab === 'results' ? 'is-active' : ''}
-            onClick={() => pickRightTab('results')}
-          >
-            创作结果
-            {generationCount > 0 && <span className="pd-tab-count">{generationCount}</span>}
-          </Button>
-        </div>
-
-        <div className="pd-right-body">
-          {rightTab === 'demo' ? (
-            <div role="tabpanel" id="pd-panel-demo" aria-labelledby="pd-tab-demo" className="pd-right-panel">
-              <DetailExamplePanel />
-            </div>
-          ) : (
-            <div
-              role="tabpanel"
-              id="pd-panel-results"
-              aria-labelledby="pd-tab-results"
-              className="pd-right-panel"
-            >
-              <DetailResultList
-                items={gallery.items}
-                loading={gallery.loading}
-                error={gallery.error}
-                emptyTitle="效果图预览"
-                emptyDesc={resultEmptyDesc}
-                emptyChildren={resultEmptyChildren}
-                onDeleteRow={deleteRow}
-                downloadNamePrefix="product-detail"
-              />
-            </div>
-          )}
-        </div>
-      </section>
+      <OutputTabsPane
+        value={rightTab}
+        onChange={pickRightTab}
+        generationCount={generationCount}
+        demo={<DetailExamplePanel />}
+        results={
+          <DetailResultList
+            items={gallery.items}
+            loading={gallery.loading}
+            error={gallery.error}
+            emptyTitle="效果图预览"
+            emptyDesc={resultEmptyDesc}
+            emptyChildren={resultEmptyChildren}
+            onDeleteRow={deleteRow}
+            downloadNamePrefix="product-detail"
+          />
+        }
+      />
 
       {/* 素材库选择弹窗 (真实数据) */}
       <AssetLibraryModal

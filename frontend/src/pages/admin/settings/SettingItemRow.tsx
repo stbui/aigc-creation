@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
 import {
   formatDateTime,
   ActionButton,
   FilePicker,
   NumberField,
   SelectField,
+  Spinner,
   SwitchField,
   TextField,
   ToneBadge,
@@ -106,7 +107,7 @@ function ImageUploadControl({
       </div>
       {uploading && (
         <p className="flex items-center gap-1 text-[12px] text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          <Spinner className="size-3.5" aria-hidden />
           正在上传…
         </p>
       )}

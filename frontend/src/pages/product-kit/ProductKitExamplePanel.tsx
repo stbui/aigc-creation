@@ -32,7 +32,7 @@ const SUITE_IMAGES = [
  * 输入与输出示例均取自 public/landing, 不画示意图, 也不读取用户数据。
  * 内容全为常量, 用 memo 隔离左栏表单的按键重渲染。
  */
-function ProductKitExamplePanelBase() {
+function ProductKitExamplePanelImpl() {
   return (
     <div className="pd-demo">
       <header className="pd-demo-intro">
@@ -102,4 +102,4 @@ function ProductKitExamplePanelBase() {
   );
 }
 
-export const ProductKitExamplePanel = memo(ProductKitExamplePanelBase);
+export const ProductKitExamplePanel = memo(ProductKitExamplePanelImpl);

@@ -7,10 +7,11 @@ const MAX_PER_VARIANT = 5;
 /**
  * 自定义配置：白底 / 场景 / 卖点 / 其他图的张数。
  *
+ * 只负责「变体张数」，故命名带 Variant，避免与表单区、高级设置混为一谈。
  * 计数只到 5，输入框与步进按钮共用同一套夹取规则；超出范围的输入被归一，
  * 不抛错也不静默保留非法值。
  */
-export function ProductKitConfig({
+export function ProductKitVariantConfig({
   counts,
   onCountChange,
 }: {

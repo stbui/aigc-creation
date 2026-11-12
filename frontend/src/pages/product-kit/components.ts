@@ -23,9 +23,9 @@ export type { PublicLogicalModel } from '../../lib/models';
 export { AssetLibraryModal } from '../../components/AssetLibraryModal';
 /** 手机扫码上传弹窗 */
 export { MobileUploadModal } from '../../components/MobileUploadModal';
-/** 空态与工作流步骤说明 */
-export { ToolEmptyState, ToolWorkflowSteps } from '../../components/ToolEmptyState';
-/** 大图查看器与它的数据类型 */
-export { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
-/** 批次结果列表 (本页 / 详情图 / 带货图文共用) 与它的行类型 */
-export { BatchResultList, type BatchRow } from '../../components/BatchResultList';
+/** 空态工作流步骤说明 */
+export { ToolWorkflowSteps } from '../../components/ToolEmptyState';
+/** 右侧「功能示例 / 创作结果」页签外壳（与商品详情共用） */
+export { OutputTabsPane, type OutputTab } from '../../components/OutputTabsPane';
+/** 批次结果列表 (本页 / 详情图 / 带货图文共用) */
+export { BatchResultList } from '../../components/BatchResultList';

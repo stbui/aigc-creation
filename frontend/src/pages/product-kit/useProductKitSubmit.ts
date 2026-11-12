@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { generateApi, newIdempotencyKey, resolveModel } from './api';
+import { PRODUCT_KIT_CAPABILITY } from './constants';
 import { useApp } from '../../ui';
 import {
   notifyCreditsChanged,
@@ -29,9 +30,6 @@ import {
  * 细节从页面编排里移出来，页面只留 `useProductKitSubmit(...)` 一行。
  */
 
-/** 本页能力 id（与后端 capability.registry 一致） */
-const CAPABILITY = 'main_image';
-
 /** 最近一次「尚未拿到全部 taskId」的提交，用于失败重试复用 */
 interface PendingBatch {
   fingerprint: string;
@@ -40,7 +38,7 @@ interface PendingBatch {
 }
 
 /** 提交所需的表单快照 —— 页面在本次渲染里原样传入 */
-export interface ProductKitSubmitInput {
+export interface ProductKitSubmitForm {
   /** 页面输入位上的图片（尚未复制到本项目） */
   images: UploadedImage[];
   /** 四类变体的张数 */
@@ -55,7 +53,7 @@ export interface ProductKitSubmitInput {
 }
 
 export interface UseProductKitSubmitOptions {
-  input: ProductKitSubmitInput;
+  form: ProductKitSubmitForm;
   /** 提交前条件（图片 / 名称 / 描述 / 张数） */
   canSubmit: boolean;
   /** 已有任务排队或运行中 —— 防止重复提交（不含本 hook 的 `submitting`） */
@@ -94,7 +92,7 @@ async function createTasks(context: BatchContext, onCreated: () => void): Promis
   for (let i = 0; i < plan.length; i += 1) {
     await generateApi.start({
       projectId,
-      capability: CAPABILITY,
+      capability: PRODUCT_KIT_CAPABILITY,
       logicalModelId,
       inputAssetIds,
       idempotencyKey: keys[i],
@@ -121,7 +119,7 @@ function reuseOrCreateBatch(
   ref: { current: PendingBatch | null },
   fresh: Omit<BatchContext, 'batchId' | 'keys'>,
 ): { batchId: string; keys: string[] } {
-  const fingerprint = JSON.stringify({ capability: CAPABILITY, ...fresh });
+  const fingerprint = JSON.stringify({ capability: PRODUCT_KIT_CAPABILITY, ...fresh });
   const previous = ref.current?.fingerprint === fingerprint ? ref.current : null;
   const batchId = previous?.batchId ?? newIdempotencyKey();
   const keys = previous?.keys ?? fresh.plan.map(() => newIdempotencyKey());
@@ -130,7 +128,7 @@ function reuseOrCreateBatch(
 }
 
 export function useProductKitSubmit({
-  input,
+  form,
   canSubmit,
   running,
   onReplaceImage,
@@ -149,8 +147,8 @@ export function useProductKitSubmit({
      * 模型选择器可能还没完成目录加载，或用户刚切换模型；提交前再按真实
      * 落库模型校验一次。超限时保留全部素材并明确提示，绝不静默截断。
      */
-    const model = await resolveModel(CAPABILITY);
-    const limitError = imageInputCountError(model, input.images.length);
+    const model = await resolveModel(PRODUCT_KIT_CAPABILITY);
+    const limitError = imageInputCountError(model, form.images.length);
     if (limitError) return { ok: false, reason: limitError };
 
     const projectId = await ensureProject();
@@ -159,7 +157,7 @@ export function useProductKitSubmit({
      * 跨项目选中时先复制到当前项目；复制成功立即替换输入位，失败则停在
      * 建单之前 —— 绝不把跨项目 asset id 直接提交。
      */
-    const preparedImages = await ensureAssetsInProject(input.images, projectId, {
+    const preparedImages = await ensureAssetsInProject(form.images, projectId, {
       onPrepared: onReplaceImage,
     });
     return {
@@ -168,7 +166,7 @@ export function useProductKitSubmit({
       logicalModelId: model.id,
       inputAssetIds: preparedImages.map((image) => image.id),
     };
-  }, [input.images, ensureProject, onReplaceImage]);
+  }, [form.images, ensureProject, onReplaceImage]);
 
   const submit = useCallback(async () => {
     if (!canSubmit || submitting || running) return;
@@ -185,16 +183,16 @@ export function useProductKitSubmit({
       }
 
       const baseParams = {
-        productName: input.productName.trim(),
-        brand: input.brand.trim(),
-        platform: input.platform,
-        language: input.language,
-        description: input.description.trim(),
-        ratio: input.ratio,
-        size: input.resolution,
+        productName: form.productName.trim(),
+        brand: form.brand.trim(),
+        platform: form.platform,
+        language: form.language,
+        description: form.description.trim(),
+        ratio: form.ratio,
+        size: form.resolution,
       };
       // 自定义配置计数 → 每类变体生成 count 张 (与参考站批量出图行为一致)
-      const plan = buildVariantPlan(input.counts);
+      const plan = buildVariantPlan(form.counts);
       const batchInput = {
         projectId: prepared.projectId,
         logicalModelId: prepared.logicalModelId,
@@ -221,7 +219,15 @@ export function useProductKitSubmit({
        * batchId 与幂等键，服务端会返回既有任务并继续补齐缺失张数。
        */
       if (batchStarted) {
-        await reloadResults();
+        /*
+         * 刷新失败不能吞掉「可能已提交」的提示，也不能让异常继续冒泡到
+         * 页面的 `void submit()` 变成未处理拒绝 —— 提示优先。
+         */
+        try {
+          await reloadResults();
+        } catch {
+          // 列表稍后会由轮询补上；这里只保证不掩盖真正原因
+        }
         message.warning('部分商品主图可能已提交，请查看生成记录；重新提交会继续补齐本批');
       }
     } finally {
@@ -238,14 +244,14 @@ export function useProductKitSubmit({
     message,
     reloadResults,
     reportError,
-    input.counts,
-    input.productName,
-    input.brand,
-    input.platform,
-    input.language,
-    input.description,
-    input.ratio,
-    input.resolution,
+    form.counts,
+    form.productName,
+    form.brand,
+    form.platform,
+    form.language,
+    form.description,
+    form.ratio,
+    form.resolution,
   ]);
 
   return { submitting, submit };

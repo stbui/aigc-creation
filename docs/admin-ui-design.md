@@ -350,10 +350,23 @@ SidebarInset（内容区）
 | `Notice` / `StaleError` | `Alert` |
 | `EmptyState` / `ListError` | `Empty`（`EmptyMedia` / `EmptyHeader` / `EmptyContent`） |
 | `SegmentedTabs` | `Tabs` / `TabsList` / `TabsTrigger` |
+| `SegmentedGroup` | `ToggleGroup` / `ToggleGroupItem`（`spacing={1}` 保持胶囊间隙） |
 | `Meter` | `Progress` |
 | `PageSkeleton` / `SkeletonPanel` / `SkeletonBody` / `SkeletonStats` / `SkeletonCards` / `SkeletonTabs` / `SkeletonDutyStrip` / `Skeleton` | `Skeleton` / `Card` / `CardHeader` / `CardContent` / `TabsList` |
 | `StatusTag` / `AdminDataTable` | `Badge` / `Table` |
 | `ModalDialog` / `Drawer` / `RowMenu` | `Dialog` / `Sheet` / `DropdownMenu` |
+| `ChoiceButton`（AI 标识页） | `Toggle` |
+| 筛选胶囊（商品状态条 / 失败错误码 / 模板标签 / 权限矩阵） | `Toggle` |
+| 加载指示（按钮内 / 行内） | `Spinner` |
+
+表格里的**文字入口**（工单标题、券码、供应商名）用 `Button variant="link"`，不要
+裸 `<button>` + `hover:underline`：链接变体自带 `underline-offset`、focus ring 与
+禁用态，颜色仍由 `text-brand` 覆盖。加载指示统一 `Spinner`，不要再手写
+`Loader2 + animate-spin` —— 尺寸、`role="status"` 与旋转动画只维护一处。
+
+反过来，**内容型触发器**（整卡点击层 `absolute inset-0`、图片缩略图、侧栏树节点、
+标签胶囊）保持原生 `button`：`Button` 的固定高度、内边距与 `hover` 底色会把卡片
+整块染色，套上去只能靠覆盖类打架，不如不套。
 
 `Panel` 的标题仍渲染原生 `h2`（不套 `CardTitle` 的 `div`）：分区标题的 heading
 语义要留给读屏与 `getByRole('heading')` 的页面断言。
@@ -364,7 +377,7 @@ SidebarInset（内容区）
 | --- | --- |
 | `layout.tsx` | `PageHeader` / `Panel` / `StatCard` / `SaveBar` / `EmptyState` / `ListError` / `StaleError` |
 | `form.tsx` | `FormField` / `TextField` / `TextAreaField` / `NumberField` / `SelectField` / `SwitchField` / `ClearableField` / `ActionButton` / `ToneBadge` / `SegmentedTabs` / `SegmentedGroup` |
-| `display.tsx` | `FilterBar` / `FilterActions` / `AppliedFilters` / `StatusTag` / `Notice` / `Meter` / `Descriptions` / `Pagination` / `EmptyHint` |
+| `display.tsx` | `FilterBar` / `FilterActions` / `AppliedFilters` / `StatusTag` / `Notice` / `Meter` / `Descriptions` / `Pagination` |
 | `skeleton.tsx` | `PageSkeleton` / `SkeletonPanel` / `SkeletonBody` / `SkeletonStats` / `SkeletonCards` / `SkeletonTabs` / `SkeletonDutyStrip` / `Skeleton` |
 | `fields.tsx` | `CheckboxField` / `FilePicker` / `HelpTip` / `IconButton` / `ColorField` / `RangeField` / `SuggestField` |
 | `table.tsx` | `AdminDataTable` |

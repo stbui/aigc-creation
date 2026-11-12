@@ -2,11 +2,14 @@ import { Pencil, Plus, X } from 'lucide-react';
 
 import {
   ActionButton,
+  Badge,
   Panel,
   RowMenu,
   SegmentedGroup,
   TextField,
+  Toggle,
 } from '~/admin-ui/primitives';
+import { cn } from '../../../admin-ui/lib/cn';
 import type { AdminTemplateItem } from '../../../types/api';
 
 export type StatusFilter = 'all' | 'enabled' | 'disabled';
@@ -104,15 +107,20 @@ export function TemplateWorkspace({
           ariaLabel="按启用状态筛选"
         />
         {tagFilter && (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-full border border-brand bg-brand-bg px-2 py-1 text-[12px] text-brand"
-            onClick={() => onTagFilter(null)}
-            aria-label={`清除标签筛选${tagFilter}`}
+          <Badge
+            variant="outline"
+            asChild
+            className="gap-1 rounded-full border-brand bg-brand-bg py-1 text-[12px] font-normal text-brand"
           >
-            标签：{tagFilter}
-            <X className="size-3" aria-hidden />
-          </button>
+            <button
+              type="button"
+              onClick={() => onTagFilter(null)}
+              aria-label={`清除标签筛选${tagFilter}`}
+            >
+              标签：{tagFilter}
+              <X className="size-3" aria-hidden />
+            </button>
+          </Badge>
         )}
         {(search || statusFilter !== 'all' || tagFilter) && (
           <ActionButton variant="ghost" size="xs" onClick={onClearFilters}>
@@ -201,20 +209,22 @@ export function TemplateWorkspace({
                   {item.tags.slice(0, 4).map((tag) => {
                     const active = tag === tagFilter;
                     return (
-                      <button
+                      <Toggle
                         key={tag}
-                        type="button"
-                        onClick={() => onTagFilter(active ? null : tag)}
-                        aria-pressed={active}
+                        variant="outline"
+                        size="sm"
+                        pressed={active}
+                        onPressedChange={() => onTagFilter(active ? null : tag)}
                         title={`按标签「${tag}」筛选`}
-                        className={`rounded-full border px-1.5 py-0.5 text-[12px] leading-4 transition-colors ${
-                          active
-                            ? 'border-brand bg-brand-bg text-brand'
-                            : 'border-border bg-muted/50 text-muted-foreground hover:border-brand hover:text-brand'
-                        }`}
+                        className={cn(
+                          'h-auto min-w-0 gap-1 rounded-full border-border bg-muted/50 px-1.5 py-0.5 text-[12px] leading-4 font-normal shadow-none',
+                          'text-muted-foreground hover:border-brand hover:bg-muted/50 hover:text-brand',
+                          'data-[state=on]:border-brand data-[state=on]:bg-brand-bg data-[state=on]:text-brand',
+                          'data-[state=on]:hover:bg-brand-bg data-[state=on]:hover:text-brand',
+                        )}
                       >
                         {tag}
-                      </button>
+                      </Toggle>
                     );
                   })}
                   {item.tags.length > 4 && (

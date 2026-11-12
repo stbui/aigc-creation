@@ -1,4 +1,5 @@
 import { cn } from '../../../admin-ui/lib/cn';
+import { Toggle } from '~/admin-ui/primitives';
 import type { AllModelsStatusFilter } from './constants';
 import { PRODUCT_STATE_META, type ProductState } from './utils';
 
@@ -80,25 +81,24 @@ export function ProductStatusStrip({
       {items.map((item) => {
         const selected = active === item.value;
         return (
-          <button
+          <Toggle
             key={item.value}
-            type="button"
-            data-state={item.state}
-            aria-pressed={selected}
-            onClick={() => onChange(selected ? 'all' : item.value)}
+            data-kind={item.state}
+            variant="outline"
+            size="sm"
+            pressed={selected}
+            onPressedChange={() => onChange(selected ? 'all' : item.value)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] leading-4 transition-colors',
-              'outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
-              selected
-                ? 'border-brand/30 bg-accent text-accent-foreground'
-                : 'border-border bg-card text-muted-foreground hover:bg-muted',
+              'h-auto min-w-0 gap-1.5 rounded-lg border-border bg-card px-2.5 py-1 text-[12px] leading-4 font-normal',
+              'text-muted-foreground hover:bg-muted hover:text-muted-foreground',
+              'data-[state=on]:border-brand/30 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground',
               item.count === 0 && !selected && 'opacity-60',
             )}
           >
             <span className={cn('size-1.5 rounded-full', item.dot)} aria-hidden />
             <span>{item.label}</span>
             <span className="tabular-nums font-medium text-foreground">{item.count}</span>
-          </button>
+          </Toggle>
         );
       })}
     </div>

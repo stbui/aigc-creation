@@ -3,6 +3,7 @@ import {
   formatDateTime,
   ActionButton,
   AdminDataTable,
+  Button,
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
@@ -58,14 +59,15 @@ export function TicketTable({
       width: 280,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <button
-            type="button"
-            className="max-w-[260px] truncate rounded text-left text-brand hover:underline"
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto max-w-[260px] justify-start overflow-hidden p-0 text-brand"
             title={row.subject}
             onClick={() => onOpen(row.id)}
           >
             {row.subject}
-          </button>
+          </Button>
           <span className="text-[12px] text-muted-foreground">
             <code className="font-mono">{row.ticketNo}</code> ·{' '}
             {row.typeLabel || TYPE_LABELS[row.type]}

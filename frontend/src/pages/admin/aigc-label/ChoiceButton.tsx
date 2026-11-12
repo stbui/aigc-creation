@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import { cn } from '~/admin-ui/lib/cn';
+import { Toggle } from '~/admin-ui/primitives';
 
 /**
  * 单选按钮组的一枚。
  *
- * `ActionButton` 不透传 `aria-pressed`，而字重 / 位置这两组按钮需要把当前
- * 选中态暴露给读屏与 e2e —— 用原生按钮并沿用同一套语义色。
+ * 用 shadcn `Toggle` 而不是原生 `button`：选中态由 radix 输出成
+ * `data-state=on` 与 `aria-pressed`，键盘操作、禁用态、聚焦环都由原子件负责，
+ * 这里只声明「选中时填品牌色」这一层视觉。
  */
 export function ChoiceButton({
   pressed,
@@ -19,21 +21,20 @@ export function ChoiceButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={pressed}
+    <Toggle
+      variant="outline"
+      size="sm"
+      pressed={pressed}
+      onPressedChange={onClick}
       disabled={disabled}
-      onClick={onClick}
       className={cn(
-        'inline-flex h-8 items-center justify-center rounded-md border px-3 text-sm font-medium shadow-xs transition-colors',
-        'outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        pressed
-          ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
-          : 'border-border bg-card text-foreground hover:bg-accent',
+        'h-8 px-3 transition-colors disabled:cursor-not-allowed',
+        'border-border bg-card text-foreground hover:bg-accent hover:text-foreground',
+        'data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground',
+        'data-[state=on]:hover:bg-primary/90 data-[state=on]:hover:text-primary-foreground',
       )}
     >
       {children}
-    </button>
+    </Toggle>
   );
 }

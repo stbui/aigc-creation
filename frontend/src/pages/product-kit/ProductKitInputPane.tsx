@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 
+import { PRODUCT_KIT_CAPABILITY } from './constants';
 import {
   ModelPicker,
   ToolSettingsPopover,
@@ -7,15 +8,15 @@ import {
   type PublicLogicalModel,
 } from './components';
 import type { UploadedImage } from './hooks';
-import { ProductKitConfig } from './ProductKitConfig';
-import { ProductKitSettings } from './ProductKitSettings';
-import { ProductKitTabs } from './ProductKitTabs';
+import { ProductKitFormSection } from './ProductKitFormSection';
+import { ProductKitToolTabs } from './ProductKitToolTabs';
+import { ProductKitVariantConfig } from './ProductKitVariantConfig';
 
 /**
  * 商品主图工作台左栏：业务类型 tab + 生成设置 + 自定义配置 + 提交栏。
  *
  * 表单、上传与提交的状态全部在 `page.tsx`，这里只负责左栏结构与事件转发。
- * 与 `ProductKitSettings` 的定位一致：展示组件不持有业务状态，避免把
+ * 与 `ProductKitFormSection` 的定位一致：展示组件不持有业务状态，避免把
  * 「提交 / 扣费」逻辑分散到布局层。
  */
 export interface ProductKitInputPaneProps {
@@ -109,11 +110,11 @@ export function ProductKitInputPane({
   return (
     <aside className="pk-input-pane">
       <div className="pk-form-card">
-        <ProductKitTabs />
+        <ProductKitToolTabs />
 
         <div className="pk-form-scroll">
           {/* 上传商品图 + 生成设置 + 商品描述 (参考站同一张卡片) */}
-          <ProductKitSettings
+          <ProductKitFormSection
             images={images}
             maxImages={maxImages}
             imageLimitError={imageLimitError}
@@ -139,7 +140,7 @@ export function ProductKitInputPane({
           />
 
           {/* 自定义配置 */}
-          <ProductKitConfig counts={counts} onCountChange={onCountChange} />
+          <ProductKitVariantConfig counts={counts} onCountChange={onCountChange} />
         </div>
 
         {/* 高级设置 + 提交 (sticky 底部) */}
@@ -156,10 +157,10 @@ export function ProductKitInputPane({
               onRatioChange={onRatioChange}
               resolution={resolution}
               onResolutionChange={onResolutionChange}
-              capabilityId="main_image"
+              capabilityId={PRODUCT_KIT_CAPABILITY}
               modelPicker={
                 <ModelPicker
-                  capability="main_image"
+                  capability={PRODUCT_KIT_CAPABILITY}
                   options={{ ratio, resolution }}
                   onQuoteChange={onModelQuoteChange}
                   onModelChange={onModelChange}

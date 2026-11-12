@@ -1,4 +1,5 @@
 import { AlertTriangle, X } from 'lucide-react';
+import { Button, Toggle } from '~/admin-ui/primitives';
 import { cn, taskErrorLabel } from './utils';
 
 /**
@@ -29,31 +30,33 @@ export function TaskFailureGroups({
       {groups.map((group) => {
         const active = group.errorCode === activeErrorCode;
         return (
-          <button
+          <Toggle
             key={group.errorCode}
-            type="button"
-            onClick={() => onSelect(group.errorCode)}
+            variant="outline"
+            size="sm"
+            pressed={active}
+            onPressedChange={() => onSelect(group.errorCode)}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors',
-              active
-                ? 'border-brand/30 bg-accent text-brand'
-                : 'border-border bg-card text-muted-foreground hover:bg-muted',
+              'h-auto min-w-0 gap-1 rounded-md border-border bg-card px-2 py-1 text-xs font-normal',
+              'text-muted-foreground hover:bg-muted hover:text-muted-foreground',
+              'data-[state=on]:border-brand/30 data-[state=on]:bg-accent data-[state=on]:text-brand',
             )}
           >
             {taskErrorLabel(group.errorCode)}
             <span className="font-semibold tabular-nums">{group.count}</span>
-          </button>
+          </Toggle>
         );
       })}
       {activeErrorCode && (
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+        <Button
+          variant="ghost"
+          size="xs"
+          className="font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
           onClick={onClear}
         >
           <X className="size-3" aria-hidden />
           清除错误码
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -21,6 +21,8 @@ export interface TabsProps {
   items: TabItem[];
   className?: string;
   tabBarClassName?: string;
+  /** tablist 的可访问名称；页签文案之外的上下文（如「右侧面板」）由这里补 */
+  tabBarAriaLabel?: string;
 }
 
 /** antd Tabs 的兼容壳：items[].key/label/children。 */
@@ -31,6 +33,7 @@ export function Tabs({
   items,
   className,
   tabBarClassName,
+  tabBarAriaLabel,
 }: TabsProps) {
   return (
     <ShadcnTabs
@@ -45,6 +48,7 @@ export function Tabs({
       */}
       <TabsList
         variant="line"
+        aria-label={tabBarAriaLabel}
         className={cn('ui-tabs-list h-auto justify-start gap-6 overflow-x-auto', tabBarClassName)}
       >
         {items.map((item) => (

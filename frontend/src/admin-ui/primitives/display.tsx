@@ -6,14 +6,6 @@ import { Alert } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '../components/ui/empty';
-import {
   Pagination as PaginationRoot,
   PaginationContent,
   PaginationEllipsis,
@@ -21,7 +13,6 @@ import {
 } from '../components/ui/pagination';
 import { Progress } from '../components/ui/progress';
 import { STATUS_META, type TagTone } from '../../components/admin/statusMeta';
-import { EmptyState } from './layout';
 
 /** 状态语义色的取值集合，随 `StatusTag` 一起对外导出 */
 export type { TagTone };
@@ -406,42 +397,6 @@ function PageCell({
     >
       {page}
     </Button>
-  );
-}
-
-/* ────────────────────────── 空态 ────────────────────────── */
-
-/**
- * 带自定义图标的空态。
- *
- * 比 `layout.EmptyState` 多一个 `icon`：有些页面的空态其实是「成功的」，
- * 比如「今天没有新告警」，用信箱图标会让人以为出了错。
- */
-export function EmptyHint({
-  icon,
-  title,
-  description,
-  action,
-}: {
-  icon?: ReactNode;
-  title: string;
-  description?: ReactNode;
-  action?: ReactNode;
-}) {
-  if (!icon) return <EmptyState title={title} description={description} action={action} />;
-  return (
-    <Empty className="gap-2 px-6 py-14">
-      <EmptyMedia variant="default" className="text-muted-foreground [&_svg]:size-7">
-        {icon}
-      </EmptyMedia>
-      <EmptyHeader className="gap-2">
-        <EmptyTitle className="text-sm font-medium text-foreground">{title}</EmptyTitle>
-        {description && (
-          <EmptyDescription className="max-w-md text-xs leading-5">{description}</EmptyDescription>
-        )}
-      </EmptyHeader>
-      {action && <EmptyContent className="mt-2 max-w-none">{action}</EmptyContent>}
-    </Empty>
   );
 }
 

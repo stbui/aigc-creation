@@ -84,6 +84,7 @@ vi.mock('../components', () => ({
   AssetLibraryModal: () => null,
   MobileUploadModal: () => null,
   ModelPicker: () => null,
+  OutputTabsPane: () => null,
   ToolImageDropzone: () => <div>上传商品图</div>,
   ToolSettingsPopover: () => null,
   ToolSubmitBar: ({

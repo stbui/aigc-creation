@@ -4,6 +4,7 @@ import { Pencil, Power } from 'lucide-react';
 import { adminChannelModelsApi, adminChannelsApi, fetchChannelHealth } from './api';
 import {
   AdminDataTable,
+  Button,
   StaleError,
   ActionButton,
   ClearableField,
@@ -375,14 +376,15 @@ export function AllChannelModelsPanel({
             <div className="min-w-0">
               {/* 排障动线：在这看到某条线不对，一步跳回它所属的渠道去改 */}
               {onOpenChannel ? (
-                <button
-                  type="button"
-                  className="block max-w-full truncate text-brand hover:underline"
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto max-w-full justify-start overflow-hidden p-0 text-brand"
                   title="在供应商中查看"
                   onClick={() => onOpenChannel(row.channelId)}
                 >
                   {name}
-                </button>
+                </Button>
               ) : (
                 <div className="truncate text-muted-foreground" title={name}>
                   {name}

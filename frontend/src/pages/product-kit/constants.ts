@@ -11,6 +11,9 @@ export { MAX_IMAGE_MB } from '../../lib/constants';
 
 // ───────────────── 上传与字段长度 (参考站实拍) ─────────────────
 
+/** 本页能力 id（与后端 `capability.registry` 一致） */
+export const PRODUCT_KIT_CAPABILITY = 'main_image';
+
 /** 一次提交最多上传的商品图张数 */
 export const MAX_IMAGES = 5;
 /** 商品名称 / 品牌输入上限 */

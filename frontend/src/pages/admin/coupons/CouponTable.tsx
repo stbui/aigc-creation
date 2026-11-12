@@ -2,6 +2,7 @@ import { Plus } from 'lucide-react';
 import {
   ActionButton,
   AdminDataTable,
+  Button,
   Meter,
   RowMenu,
   StatusTag,
@@ -65,13 +66,14 @@ export function CouponTable({
       /* 券码最长 24 位等宽字符，125px 会贴到名称列 */
       width: 150,
       render: (row) => (
-        <button
-          type="button"
-          className="rounded font-mono font-medium text-brand hover:underline"
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto justify-start p-0 font-mono text-brand"
           onClick={() => onEdit(row)}
         >
           {row.code}
-        </button>
+        </Button>
       ),
     },
     { key: 'name', title: '名称', width: 150, render: (row) => <span>{row.name}</span> },

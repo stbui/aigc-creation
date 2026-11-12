@@ -12,12 +12,14 @@ import { languageOptions, platformOptions } from './utils';
 import { Input, Select, Textarea } from '../../ui';
 
 /**
- * 生成设置卡：上传商品图 + 名称/品牌/平台/语言 + 商品描述。
+ * 商品主图表单区：上传商品图 + 名称/品牌/平台/语言 + 商品描述。
  *
+ * 叫 FormSection 而不是 Settings：页面的「高级设置」浮层（比例 / 画质 / 模型）
+ * 才叫 settings，两者不能共用同一个词。
  * 上传、AI 分析与放大编辑的状态都在 `page.tsx`，这里只负责表单展示与事件转发，
  * 避免把「提交/扣费」逻辑带进展示组件。
  */
-export function ProductKitSettings({
+export function ProductKitFormSection({
   images,
   maxImages,
   imageLimitError,

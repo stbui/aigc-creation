@@ -1,6 +1,5 @@
 import { useId, type AriaAttributes, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
-import { ToggleGroup as ToggleGroupPrimitive } from 'radix-ui';
 
 import { cn } from '../lib/cn';
 import { findFirstControlId, injectPropsIntoFirstControl } from '../lib/control-injection';
@@ -25,6 +24,7 @@ import {
 import { Switch } from '../components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Textarea } from '../components/ui/textarea';
+import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group';
 
 /**
  * 后台表单控件。
@@ -566,11 +566,14 @@ export function SegmentedTabs({
  * 分段选项组（胶囊式）。
  *
  * 语义是**筛选维度**而不是页签：切换后同一块区域换的是过滤条件，不是
- * 「另一块内容」。底层直接使用 Radix ToggleGroup 单选模式，由它负责
- * `radiogroup` / `aria-checked`、roving focus、方向键与 `data-state`；
- * 页面不再手写按钮键盘逻辑。
+ * 「另一块内容」。底层用 shadcn `ToggleGroup`（单选模式），`radiogroup` /
+ * `aria-checked`、roving focus、方向键与 `data-state` 都由原子件负责；
+ * 这里只声明「浅灰轨道 + 选中浮起成白底」这一层视觉。
  *
- * 保留 `SegmentedGroup` 名称兼容既有调用点，后续可逐步改名为 `ToggleGroup`。
+ * `spacing={1}` 是关键：默认 `0` 会把相邻项拼成一条无缝分段条（首尾留圆角、
+ * 去掉中间边框），与本页其它胶囊控件的 1px 间隙对不上。
+ *
+ * 保留 `SegmentedGroup` 名称兼容既有调用点。
  */
 export function SegmentedGroup({
   value,
@@ -586,30 +589,31 @@ export function SegmentedGroup({
   className?: string;
 }) {
   return (
-    <ToggleGroupPrimitive.Root
+    <ToggleGroup
       type="single"
       value={value}
       onValueChange={(next) => {
         if (next) onChange(next);
       }}
       aria-label={ariaLabel}
-      className={cn('inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1', className)}
+      spacing={1}
+      size="sm"
+      className={cn('h-9 rounded-lg bg-muted p-1', className)}
     >
       {options.map((option) => (
-        <ToggleGroupPrimitive.Item
+        <ToggleGroupItem
           key={option.value}
           value={option.value}
           className={cn(
-            'inline-flex h-7 items-center justify-center rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors',
-            'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-            'text-muted-foreground hover:text-foreground',
+            'h-7 px-3 text-sm font-medium transition-colors',
+            'text-muted-foreground hover:bg-transparent hover:text-foreground',
             'data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs',
           )}
         >
           {option.label}
-        </ToggleGroupPrimitive.Item>
+        </ToggleGroupItem>
       ))}
-    </ToggleGroupPrimitive.Root>
+    </ToggleGroup>
   );
 }
 

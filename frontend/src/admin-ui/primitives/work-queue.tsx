@@ -205,25 +205,6 @@ export function WorkQueue({
   );
 }
 
-/** 工作台分组标题旁的计数摘要，供概览页头复用 */
-export function WorkQueueSummary({ groups }: { groups: AdminWorkbenchGroup[] }) {
-  const total = groups.reduce((sum, group) => sum + group.count, 0);
-  const critical = groups.filter((group) => group.severity === 'critical').length;
-  return (
-    <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-      <span>
-        待办 <strong className="text-foreground">{total}</strong> 项
-      </span>
-      {critical > 0 && (
-        <span className="inline-flex items-center gap-1 rounded bg-danger-soft px-1.5 py-0.5 font-medium text-danger-text">
-          <AlertCircle className="size-3" aria-hidden />
-          {critical} 类紧急
-        </span>
-      )}
-    </span>
-  );
-}
-
 /** 便于页面在队列上方放标题与操作 */
 export function WorkQueueSection({
   title,

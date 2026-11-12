@@ -30,7 +30,6 @@ export { AdminPage, AdminTabs } from './page';
 
 export {
   WorkQueue,
-  WorkQueueSummary,
   WorkQueueSection,
 } from './work-queue';
 
@@ -81,8 +80,11 @@ export {
   CardContent,
 } from '../components/ui/card';
 export { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+export { Badge } from '../components/ui/badge';
 export { Button } from '../components/ui/button';
 export { Separator } from '../components/ui/separator';
+export { Spinner } from '../components/ui/spinner';
+export { Toggle } from '../components/ui/toggle';
 
 export {
   FilterBar,
@@ -94,7 +96,6 @@ export {
   MiniStat,
   Descriptions,
   Pagination,
-  EmptyHint,
   type AppliedFilter,
   type TagTone,
 } from './display';

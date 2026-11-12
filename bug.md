@@ -7,17 +7,11 @@ https://nextshot.cn/image?tab=local_transfer
 https://maolong.da-ai.cc/toolbox/image-generation
 https://www.designkit.cn/agent-lib
 https://www.pixpix.com/zh-CN/tools/product-set
-
+https://www.pixpix.com/zh-CN/workbench
 https://thai.quantv.com/image-creation
 
 
-http://localhost:3000/admin/logs
-http://localhost:3000/admin/payments
-复刻功能流程
-
-后台页面功能完善
-后台页面设计完善
-
+https://mp.weixin.qq.com/s/oH1ce7uivmn3pZQyLy9LAw
 
 todo：
 - 将后端功能迁移到本项目
@@ -46,8 +40,6 @@ todo：
 tailwind-merge
 
 
-
-https://www.pixpix.com/zh-CN/workbench
 
 API 定价目录
 https://www.seeany.com/developer/pricing

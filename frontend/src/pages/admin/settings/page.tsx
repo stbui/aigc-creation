@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 
 import { RELATED_ENTRIES } from './constants';
 import { SettingItemRow } from './SettingItemRow';
@@ -23,6 +22,7 @@ import {
   SkeletonPanel,
   SkeletonTabs,
   StaleError,
+  Spinner,
   ToneBadge,
 } from '~/admin-ui/primitives';
 import type { AdminSettingValue } from '../../../types/api';
@@ -456,7 +456,7 @@ export function AdminSettingsPage() {
               取消
             </ActionButton>
             <ActionButton disabled={busy} onClick={() => void save()}>
-              {busy && <Loader2 className="animate-spin" />}
+              {busy && <Spinner aria-hidden />}
               {busy ? '保存中…' : '确认保存'}
             </ActionButton>
           </>
