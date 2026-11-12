@@ -6,8 +6,8 @@ import {
   modalityOfFormat,
   type LightboxItem,
 } from './components';
-import { MoveAssetsDialog } from './MoveAssetsDialog';
-import { ProjectManagerDialog } from './ProjectManagerDialog';
+import { LibraryMoveAssetsDialog } from './LibraryMoveAssetsDialog';
+import { LibraryProjectManagerDialog } from './LibraryProjectManagerDialog';
 import { assetsApi, assetSrc, projectsApi } from './api';
 import { useApp, useAuth, useCapabilities, useDocumentMeta, useProject } from './hooks';
 import {
@@ -27,7 +27,8 @@ import {
   isSupportedImageFile,
   toolPath,
 } from './utils';
-import { useLibraryAssets, useLibraryProjects } from './useLibraryData';
+import { useLibraryAssets } from './useLibraryAssets';
+import { useLibraryProjects } from './useLibraryProjects';
 import { useLibraryGroups } from './useLibraryGroups';
 import { LibraryToolbar } from './LibraryToolbar';
 import { LibraryGroupPanel } from './LibraryGroupPanel';
@@ -42,8 +43,8 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
 /**
  * 素材库。
  *
- * 页面只保留编排与写操作（上传 / 删除 / 下载 / 移动）；服务端取数在
- * `useLibraryData.ts`，分组状态与可见集合在 `useLibraryGroups.ts`，
+ * 页面只保留编排与写操作（上传 / 删除 / 下载 / 移动）；取数在
+ * `useLibraryAssets.ts` / `useLibraryProjects.ts`，分组状态与可见集合在 `useLibraryGroups.ts`，
  * 页头 / 分组面板 / 批量条 / 状态视图 / 网格各自一个展示组件。
  * 分层约定见 `docs/frontend-module-conventions.md`。
  */
@@ -404,7 +405,7 @@ export function LibraryPage() {
           onCancel={() => setMobileOpen(false)}
         />
 
-        <ProjectManagerDialog
+        <LibraryProjectManagerDialog
           open={projectManagerOpen}
           projects={projects}
           currentProjectId={selectedProjectId}
@@ -428,7 +429,7 @@ export function LibraryPage() {
           }}
         />
 
-        <MoveAssetsDialog
+        <LibraryMoveAssetsDialog
           open={moveDialogOpen}
           count={selected.length}
           projects={moveTargetProjects}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FolderOpen, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Button, Input, Modal, Select } from './components';
+import { Button, InlineAlert, InlineAlertDescription, Input, Modal, Select, StatusBadge } from './components';
 import type { ProjectListItem } from '../../types/api';
 
 export interface LibraryProjectManagerDialogProps {
@@ -133,9 +133,9 @@ export function LibraryProjectManagerDialog({
         </section>
 
         {error && (
-          <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {error}
-          </div>
+          <InlineAlert variant="destructive">
+            <InlineAlertDescription>{error}</InlineAlertDescription>
+          </InlineAlert>
         )}
 
         <section>
@@ -174,7 +174,7 @@ export function LibraryProjectManagerDialog({
                             <div className="flex items-center gap-2">
                               <span className="truncate text-sm font-medium">{project.name}</span>
                               {currentProjectId === project.id && (
-                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[12px] text-primary">当前</span>
+                                <StatusBadge variant="secondary">当前</StatusBadge>
                               )}
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">

@@ -199,9 +199,10 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `LibraryGroupByToggle` + `LibraryGroupFilter` + `LibraryGroupOptionLabel`
     组合）/ `LibraryBatchBar` / `LibraryLoadingState` / `LibraryErrorState` /
     `LibraryEmptyState` / `LibraryGrid`（`LibraryLoadMore`）/ `LibraryUploadInput`，
-    取数与项目列表落 `useLibraryData.ts`、
-    分组状态与可见集合落 `useLibraryGroups.ts`，上传 / 删除 / 下载 / 移动等
-    写操作仍留在 `page.tsx`）；
+    卡片与弹窗为 `LibraryAssetCard` / `LibraryMoveAssetsDialog` /
+    `LibraryProjectManagerDialog`；取数落 `useLibraryAssets.ts`、项目列表落
+    `useLibraryProjects.ts`、分组状态与可见集合落 `useLibraryGroups.ts`，
+    上传 / 删除 / 下载 / 移动等写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/works/__tests__/works-modules.test.ts` ——
     C 端我的作品目录（`src/pages/works` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，切日 / 模态判定 / 下载扩展名落 `utils.ts`，
