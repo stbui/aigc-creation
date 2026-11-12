@@ -5,7 +5,6 @@ import {
   AdminPage,
   ActionButton,
   Button,
-  StaleError,
   ConfirmDialog,
   Panel,
   SegmentedGroup,
@@ -15,7 +14,6 @@ import { useChannelWorkspace } from './useChannelWorkspace';
 import { channelConsumptionRefs, consumptionImpactText } from './useProductConsumption';
 import { ChannelDetailPanel } from './ChannelDetailPanel';
 import { ChannelListPanel } from './ChannelListPanel';
-import { ChannelModelHealthPanel } from './ChannelModelHealthPanel';
 import { CHANNEL_VIEW_OPTIONS } from './constants';
 
 /**
@@ -34,7 +32,7 @@ import { CHANNEL_VIEW_OPTIONS } from './constants';
  *
  * ## 代码边界
  *
- * 默认「商品台账」视图只同步加载商品表与线路健康；供应商主从视图、商品
+ * 默认「商品台账」视图只同步加载商品表；供应商主从视图、商品
  * 编辑抽屉与排序弹窗都在第一次打开时才下载各自 chunk。路由本身已按页面
  * 懒加载（见 `admin/routes.ts`），这里拆的是页面内部的低频功能。
  *
@@ -70,9 +68,6 @@ export function AdminChannelsPage() {
     canTest,
     canReadCapabilities,
     canReadPlugins,
-    resetCooling,
-    coolingCount,
-    resettingHealth,
     rows,
     loading,
     error,
@@ -123,31 +118,6 @@ export function AdminChannelsPage() {
     setAutoUpstreamFor,
   } = useChannelWorkspace();
 
-  const healthPanel = (
-    <Panel
-      title="线路健康"
-      extra={
-        writable && coolingCount > 0 ? (
-          // 冷却只对可归因失败写入；上游恢复后允许提前解除，省掉再等一个冷却周期
-          <ActionButton
-            variant="ghost"
-            size="xs"
-            disabled={resettingHealth}
-            onClick={() => void resetCooling()}
-          >
-            {resettingHealth ? '解除中…' : `解除冷却（${coolingCount}）`}
-          </ActionButton>
-        ) : undefined
-      }
-    >
-      {health.error && health.rows.length === 0 ? (
-        <StaleError error={health.error} onRetry={() => void health.reload()} />
-      ) : (
-        <ChannelModelHealthPanel rows={health.rows} loading={health.loading} />
-      )}
-    </Panel>
-  );
-
   return (
     <AdminPage
       title="模型商品"
@@ -190,7 +160,7 @@ export function AdminChannelsPage() {
 
       {view === 'models' ? (
         <div className="min-w-0">
-          {/* 同页还有「线路健康」表格，视觉定位用容器包一层，测试按容器取行 */}
+          {/* 商品台账容器：e2e 按容器取行，避免受同页其它表格影响 */}
           <div data-testid="admin-all-models">
             <Panel title="商品台账">
               <Suspense fallback={<SkeletonBody rows={8} />}>
@@ -204,7 +174,6 @@ export function AdminChannelsPage() {
               </Suspense>
             </Panel>
           </div>
-          {healthPanel}
         </div>
       ) : (
         <div
@@ -267,7 +236,6 @@ export function AdminChannelsPage() {
               onChanged={() => void reload()}
               onFocusConsumed={() => setPendingModelId(null)}
             />
-            {healthPanel}
           </div>
         </div>
       )}

@@ -16,6 +16,7 @@ export { useGenerateError } from './useGenerateError';
 export { useImageUpload, type UploadedImage } from './useImageUpload';
 export { useIsMobile } from './use-mobile';
 export { useLightboxIndex } from './useLightboxIndex';
+export { mediaHeightRatio, useMasonryColumns } from './useMasonryColumns';
 export { useMediaQuery } from './useMediaQuery';
 export { usePasteUpload } from './usePasteUpload';
 export { usePollAbort } from './usePollAbort';

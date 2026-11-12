@@ -188,36 +188,6 @@ test.describe('渠道与模型 P5', () => {
     await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
   });
 
-  test('线路健康：模型商品展示按线路统计的成功率与耗时', async ({ page, request }) => {
-    await login(page);
-    await page.goto(`${UI}/admin/channels?view=channels`);
-    await expect(page.getByRole('heading', { name: '模型商品' })).toBeVisible({ timeout: 20000 });
-
-    // 健康面板与「当前状态」是两份数据：面板给过去 24h / 7d 的成功率与 P95
-    await expect(page.getByRole('heading', { name: '线路健康' })).toBeVisible();
-    await expect(page.getByText('24h 成功率').first()).toBeVisible();
-    await expect(page.getByText('7d 成功率').first()).toBeVisible();
-    await expect(page.getByText('P95 耗时').first()).toBeVisible();
-
-    // 面板数据来自 /admin/channel-models/health，不是前端自己算的
-    const token = await adminToken(request);
-    const auth = { Authorization: `Bearer ${token}` };
-    const health = await request.get(`${API}/api/v1/admin/channel-models/health`, { headers: auth });
-    expect(health.ok()).toBeTruthy();
-    const items = ((await health.json())?.data?.items ?? []) as Array<any>;
-    if (items.length === 0) {
-      // 没有可观测线路时面板给空态，不是空白
-      await expect(page.getByText('暂无可观测线路').first()).toBeVisible();
-      return;
-    }
-    // 每条线路都有两个窗口，且无样本时成功率是 null（不是 0）
-    for (const item of items) {
-      expect(item.windows?.day).toBeTruthy();
-      expect(item.windows?.week).toBeTruthy();
-      expect(item.windows.day.successRate === null || typeof item.windows.day.successRate === 'number').toBeTruthy();
-    }
-  });
-
   test('统一调价：勾选模型 → 按成本算价 → 保存售价', async ({ page, request }) => {
     await login(page);
     await page.goto(`${UI}/admin/channels?view=channels`);
@@ -860,8 +830,7 @@ test.describe('渠道与模型 P5', () => {
       return;
     }
 
-    // 表格行数 = 全部商品数（含停用项）
-    // 同页的「线路健康」也是一张表，按容器取行，否则会把它的行数算进来
+    // 表格行数 = 全部商品数（含停用项）；按商品台账容器取行
     const allModelRows = () => page.getByTestId('admin-all-models').getByTestId('admin-table-row');
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(all.length);
 

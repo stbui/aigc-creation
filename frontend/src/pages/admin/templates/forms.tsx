@@ -6,9 +6,11 @@ import {
   FormDrawer,
   FormField,
   NumberField,
+  SelectField,
   SwitchField,
   TextAreaField,
   TextField,
+  type SelectFieldOption,
 } from '~/admin-ui/primitives';
 import { adminTemplateCatalogApi } from './api';
 import { useToast } from './hooks';
@@ -205,20 +207,28 @@ export function GroupFormDrawer({
 export function ItemFormDrawer({
   mode,
   groupName,
+  groups,
+  initialGroupId,
   initial,
   saving,
   onClose,
   onSubmit,
 }: {
   mode: 'create' | 'edit';
+  /** 编辑时展示当前模板所属分组名 */
   groupName: string;
+  /** 创建时可选的二级分类，跨一级分类展开 */
+  groups: SelectFieldOption[];
+  /** 创建时预选的分组；没有上下文时回落第一个可选项 */
+  initialGroupId: string | null;
   initial: ItemDraft;
   saving: boolean;
   onClose: () => void;
-  onSubmit: (draft: ItemDraft) => void;
+  onSubmit: (draft: ItemDraft, groupId: string) => void;
 }) {
   const toast = useToast();
   const [draft, setDraft] = useState<ItemDraft>(initial);
+  const [groupId, setGroupId] = useState(initialGroupId ?? groups[0]?.value ?? '');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const patch = (next: Partial<ItemDraft>) => setDraft((prev) => ({ ...prev, ...next }));
@@ -237,22 +247,45 @@ export function ItemFormDrawer({
   };
 
   const submit = () => {
+    if (!groupId) {
+      toast.error('请选择模板所属的二级分类');
+      return;
+    }
     const payload = buildItemPayload(draft);
     if (!payload.ok) {
       toast.error(payload.error ?? '请检查表单');
       return;
     }
-    onSubmit(draft);
+    onSubmit(draft, groupId);
   };
 
   return (
     <DrawerShell
-      title={mode === 'create' ? `新建模板 · ${groupName}` : '编辑模板'}
-      description="模板 = 一张预览图 + 提示词 + 标签；C 端点击图片即选用。"
+      title={mode === 'create' ? '新建模板' : '编辑模板'}
       saving={saving}
       onClose={onClose}
       onSave={submit}
     >
+      {mode === 'create' ? (
+        <FormField
+          label="所属分组"
+          required
+          hint="模板必须挂在一级分类下的二级分类；列表为空时先到左侧分类目录创建。"
+        >
+          <SelectField
+            value={groupId || undefined}
+            onChange={(next) => setGroupId(next ?? '')}
+            options={groups}
+            placeholder="选择二级分类"
+            ariaLabel="所属二级分类"
+          />
+        </FormField>
+      ) : (
+        <FormField label="所属分组" hint="如需换组，请新建模板后删除旧条目">
+          <p className="text-[13px] text-foreground">{groupName}</p>
+        </FormField>
+      )}
+
       <FormField label="名称" required>
         <TextField
           value={draft.name}

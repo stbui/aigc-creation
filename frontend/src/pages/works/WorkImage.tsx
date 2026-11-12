@@ -8,17 +8,20 @@ import { ImageOff } from 'lucide-react';
  * - 加载失败可原地重试（签名 URL 过期 / 后端重启后无需刷新整页）；
  * - 状态按 **URL** 记而不是布尔值 —— 刷新列表会换签名地址，布尔值不会自己复位。
  *
- * 画布是固定方形的 (见 .my-work-image-button), 图片 contain 填满: 产出比例
- * 从 1:1 到 16:9 不等, 按各自比例排会让同一行的卡片高矮不齐。
+ * 画布按产出自然宽高比展示（`ratio`，与素材库的流水网格一致）；
+ * 缺尺寸的旧产出回落到 CSS 的方形兜底。图片 `contain` 填满，不裁切内容。
  */
 export function WorkImage({
   src,
   alt,
+  ratio,
   priority,
   onOpen,
 }: {
   src: string;
   alt: string;
+  /** CSS aspect-ratio 值（如 `1024 / 1536`）；不传用方形兜底 */
+  ratio?: string;
   /** 首屏前两张: 不懒加载, 让作品页一进来就有图可看 */
   priority?: boolean;
   onOpen: () => void;
@@ -46,6 +49,7 @@ export function WorkImage({
     <button
       type="button"
       className={`my-work-image-button${loaded ? ' is-loaded' : ''}${failed ? ' is-failed' : ''}`}
+      style={ratio ? { aspectRatio: ratio } : undefined}
       onClick={failed ? retry : onOpen}
       aria-label={failed ? '图片加载失败，点击重试' : `查看${alt}大图`}
       title={failed ? '加载失败，点击重试' : '点击查看大图'}

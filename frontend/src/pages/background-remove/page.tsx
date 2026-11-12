@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 
 import { BackgroundSourcePreview } from './BackgroundSourcePreview';
-import { ColorStudio, MattingResultEditor, ToolCard, ToolShell } from './components';
+import { BackgroundRemoveIntro } from './BackgroundRemoveIntro';
+import { BackgroundRemoveUploadPreview } from './BackgroundRemoveUploadPreview';
+import { BackgroundResultPane } from './BackgroundResultPane';
+import { ColorStudio, ToolCard, ToolShell } from './components';
 import { DEFAULT_CUSTOM_COLOR, MATTING_COLOR_SWATCHES } from './constants';
-import { useCreditCost, useToolTask } from './hooks';
-import { assetThumbUrl } from './api';
+import { useApp, useCreditCost, useToolTask } from './hooks';
 import { colorLabelOf, isValidHexColor, normalizeHexColor } from './utils';
-import { useApp } from '../../ui';
 
 /**
  * 一键抠图 —— 1:1 复刻参考站 https://ijihua.cn/background-remove。
@@ -22,8 +23,11 @@ import { useApp } from '../../ui';
  *
  * 诚实披露: matting 由真实图像模型完成主体分割与背景替换；
  * 抠图边缘质量取决于当前模型通道能力。
+ *
+ * 板块拆分见 `docs/frontend-module-conventions.md`：上传预览
+ * `BackgroundRemoveUploadPreview`、空态 `BackgroundRemoveIntro`、结果面板
+ * `BackgroundResultPane`；颜色状态与提交仍留在 `page.tsx`。
  */
-
 export function BackgroundRemovePage() {
   const { message } = useApp();
   const { submitting, result, run } = useToolTask({ capability: 'matting', successMessage: '抠图结果已生成' });
@@ -60,24 +64,12 @@ export function BackgroundRemovePage() {
         const image = uploads[0];
         if (!image) return null;
         return (
-          <div className={`background-source-row${controls.uploading ? ' processing' : ''}`}>
-            <button
-              type="button"
-              className="background-source-preview"
-              aria-label="预览待处理图片"
-              onClick={() => controls.preview(image)}
-            >
-              <img src={assetThumbUrl(image.url, 320) ?? image.url} alt="待处理图片" draggable={false} />
-            </button>
-            <button
-              type="button"
-              className="background-source-reupload"
-              disabled={controls.uploading}
-              onClick={controls.open}
-            >
-              重新上传
-            </button>
-          </div>
+          <BackgroundRemoveUploadPreview
+            image={image}
+            uploading={controls.uploading}
+            onPreview={() => controls.preview(image)}
+            onOpen={controls.open}
+          />
         );
       }}
       settings={{ ratio: true }}
@@ -90,25 +82,7 @@ export function BackgroundRemovePage() {
       resultTag={colorLabel}
       sourcePane={(images) => {
         const image = images[0];
-        if (!image) {
-          return (
-            <div className="background-remove-stage" aria-label="一键抠图介绍">
-              <div className="background-remove-empty">
-                <video
-                  src="/static/mp4/background-remove.mp4"
-                  poster="/static/mp4/background-remove-poster.jpg"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  aria-label="一键抠图演示"
-                />
-                <strong>一键抠图</strong>
-                <p>上传图片后，自动去除图片背景</p>
-              </div>
-            </div>
-          );
-        }
+        if (!image) return <BackgroundRemoveIntro />;
         return (
           <div className="background-remove-stage background-remove-source-stage">
             <BackgroundSourcePreview key={image.url} image={image} />
@@ -133,16 +107,14 @@ export function BackgroundRemovePage() {
       }}
       resultPane={
         result?.status === 'succeeded' && result.url && sourceUrl ? (
-          <section className="pk-result-pane pk-result-pane-editor">
-            <MattingResultEditor
-              resultUrl={result.url}
-              originalUrl={sourceUrl}
-              selectedColor={selectedColor}
-              customColor={customColor}
-              customAlpha={customAlpha}
-              outputRatio={outputRatio}
-            />
-          </section>
+          <BackgroundResultPane
+            resultUrl={result.url}
+            originalUrl={sourceUrl}
+            selectedColor={selectedColor}
+            customColor={customColor}
+            customAlpha={customAlpha}
+            outputRatio={outputRatio}
+          />
         ) : undefined
       }
     >

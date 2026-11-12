@@ -50,7 +50,7 @@ const OAuthCallbackPage = lazyRoute(
   'OAuthCallbackPage',
 );
 // 扫码登录确认页 (B8): 手机相机扫开二维码即进入, 裸外壳
-const QrLoginPage = lazyRoute('/qr-login', () => import('./pages/QrLoginPage'), 'QrLoginPage');
+const QrLoginPage = lazyRoute('/qr-login', () => import('./pages/qr-login'), 'QrLoginPage');
 // 找回/重置密码 (B2): 独立页, 与登录页同为裸卡布局
 const ForgotPasswordPage = lazyRoute(
   '/forgot-password',
@@ -63,7 +63,7 @@ const ResetPasswordPage = lazyRoute(
   'ResetPasswordPage',
 );
 const LandingPage = lazyRoute('/', () => import('./pages/landing'), 'LandingPage');
-const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/SitemapPage'), 'SitemapPage');
+const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/sitemap'), 'SitemapPage');
 const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/workbench'), 'WorkbenchPage');
 const ProductKitPage = lazyRoute('/product-kit', () => import('./pages/product-kit'), 'ProductKitPage');
 const ShoppableCarouselPage = lazyRoute(
@@ -79,7 +79,7 @@ const CreativeImagePage = lazyRoute(
   () => import('./pages/creative-image'),
   'CreativeImagePage',
 );
-const MobileUploadPage = lazyRoute('/mobile-upload', () => import('./pages/MobileUploadPage'), 'MobileUploadPage');
+const MobileUploadPage = lazyRoute('/mobile-upload', () => import('./pages/mobile-upload'), 'MobileUploadPage');
 const MultiFusionPage = lazyRoute('/multi-image-fusion', () => import('./pages/multi-image-fusion'), 'MultiFusionPage');
 const ProductSkuPage = lazyRoute('/product-sku', () => import('./pages/product-sku'), 'ProductSkuPage');
 const LocalRedrawPage = lazyRoute('/local-redraw', () => import('./pages/local-redraw'), 'LocalRedrawPage');
@@ -95,14 +95,14 @@ const ImageToVideoPage = lazyRoute(
   () => import('./pages/image-to-video'),
   'ImageToVideoPage',
 );
-const ToolPage = lazyRoute('/tools/*', () => import('./pages/ToolPage'), 'ToolPage');
+const ToolPage = lazyRoute('/tools/*', () => import('./pages/tool'), 'ToolPage');
 const WorksPage = lazyRoute(['/works', '/my-works'], () => import('./pages/works'), 'WorksPage');
 const LibraryPage = lazyRoute(['/library', '/asset-library'], () => import('./pages/library'), 'LibraryPage');
-const StatsPage = lazyRoute('/stats', () => import('./pages/StatsPage'), 'StatsPage');
+const StatsPage = lazyRoute('/stats', () => import('./pages/stats'), 'StatsPage');
 const InvitationsPage = lazyRoute('/invitations', () => import('./pages/invitations'), 'InvitationsPage');
-const PackagesPage = lazyRoute('/packages', () => import('./pages/PackagesPage'), 'PackagesPage');
+const PackagesPage = lazyRoute('/packages', () => import('./pages/packages'), 'PackagesPage');
 const CheckoutPage = lazyRoute('/checkout/*', () => import('./pages/checkout'), 'CheckoutPage');
-const CreditsPage = lazyRoute('/credits', () => import('./pages/CreditsPage'), 'CreditsPage');
+const CreditsPage = lazyRoute('/credits', () => import('./pages/credits'), 'CreditsPage');
 const OrdersPage = lazyRoute('/orders', () => import('./pages/orders'), 'OrdersPage');
 const AccountPage = lazyRoute('/account', () => import('./pages/account'), 'AccountPage');
 const TicketsPage = lazyRoute('/tickets', () => import('./pages/tickets'), 'TicketsPage');

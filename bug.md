@@ -1,6 +1,6 @@
 
 
-
+https://www.xiaohongshu.com/explore/6a1ff3840000000038022eeb?xsec_token=AB43BejByT5HKVOUZWHeHSeTgFGiSPKJFGBKLPecjRmt8=&xsec_source=pc_search&source=web_explore_feed
 # 
 https://nextshot.cn/image?tab=local_transfer
 
@@ -39,6 +39,8 @@ todo：
 支持：android
 tailwind-merge
 
+描述语：
+C 端
 
 
 API 定价目录

@@ -59,7 +59,7 @@ export function LibraryAssetCard({
   const isVideo = modalityOfFormat(asset.format) === 'video';
   /*
    * 滚动加载: 卡片接近视口才挂载媒体, 首屏前 5 张 (priority) 直接加载。
-   * 未挂载时用素材记录的宽高撑住占位高度, 避免瀑布流在滚动过程中反复跳动。
+   * 未挂载时用素材记录的宽高撑住占位高度, 避免网格加载过程中反复跳动。
    */
   const [coverRef, near] = useNearViewport<HTMLDivElement>();
   const shouldLoad = priority || near;
@@ -67,8 +67,8 @@ export function LibraryAssetCard({
     asset.width && asset.height ? `${asset.width} / ${asset.height}` : undefined;
   /*
    * 网格只加载缩略图; 视频没有缩略图管线, 直接用原文件 (卡片是懒加载)。
-   * 缩略图只限宽、保留原图比例 (preserveAspect)，流式布局下卡片高度随图而异，
-   * 否则方形缩略图 (?w&h) 会让所有卡片等高，瀑布流退化成普通方格。
+   * 缩略图只限宽、保留原图比例 (preserveAspect), 封面高度随图而异,
+   * 网格行内的卡片顶端对齐, 不裁切图片。
    */
   const previewUrl = isVideo ? url : assetThumbSrc(asset, 640, true) ?? url;
   const canPreview = lightboxIndex >= 0;

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 
 import {
+  ActionButton,
   AdminPage,
   ConfirmDialog,
   EmptyState,
@@ -72,6 +74,8 @@ export function AdminTemplatesPage() {
   const [itemDrawer, setItemDrawer] = useState<{
     mode: 'create' | 'edit';
     target?: AdminTemplateItem;
+    /** 创建时预选的分组；从页头入口进入时可能为空 */
+    groupId?: string | null;
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -132,9 +136,23 @@ export function AdminTemplatesPage() {
     [categories],
   );
 
+  /** 创建模板时的分组下拉：跨一级分类展开，标签带上分类名避免同名分组混淆。 */
+  const groupOptions = useMemo(
+    () =>
+      categories.flatMap((category) =>
+        category.groups.map((group) => ({
+          value: group.id,
+          label: `${category.name} / ${group.name}`,
+        })),
+      ),
+    [categories],
+  );
+
   const itemDrawerGroup = itemDrawer?.target
     ? (groupById.get(itemDrawer.target.groupId) ?? null)
-    : selectedGroup;
+    : itemDrawer?.groupId
+      ? (groupById.get(itemDrawer.groupId) ?? null)
+      : selectedGroup;
 
   const formItems = useMemo(() => {
     if (selectedGroup) return selectedGroup.items;
@@ -251,8 +269,8 @@ export function AdminTemplatesPage() {
     }
   };
 
-  const saveItem = async (draft: typeof EMPTY_ITEM) => {
-    const group = itemDrawerGroup;
+  const saveItem = async (draft: typeof EMPTY_ITEM, groupId: string) => {
+    const group = groupById.get(groupId);
     if (!group) {
       toast.error('模板所属分组不存在，请刷新后重试');
       return;
@@ -281,6 +299,58 @@ export function AdminTemplatesPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  /**
+   * 复制模板：同分组内新建一条副本，提示词 / 图片 / 标签 / 排序全部沿用。
+   * 副本默认停用 —— 直接上架会在 C 端出现两张完全相同的模板。
+   */
+  const copyItem = async (item: AdminTemplateItem) => {
+    const suffix = '（副本）';
+    const base = item.name.endsWith(suffix) ? item.name : `${item.name}${suffix}`;
+    const name =
+      base.length <= 40 ? base : `${base.slice(0, 40 - suffix.length)}${suffix}`;
+    setSaving(true);
+    try {
+      await adminTemplateCatalogApi.createItem({
+        groupId: item.groupId,
+        name,
+        prompt: item.prompt,
+        imageUrl: item.imageUrl,
+        tags: item.tags,
+        sortOrder: item.sortOrder,
+        enabled: false,
+      });
+      toast.success(`已复制「${item.name}」`, '副本为停用状态，确认内容后再启用。');
+      await reload();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '复制失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * 页头「新建模板」入口：不要求先在左侧选中二级分类。
+   * 没有任何二级分类时无法落库，直接提示去建目录，避免打开一个空抽屉。
+   */
+  const openCreateItem = () => {
+    if (groupOptions.length === 0) {
+      toast.error('还没有二级分类', '请先在左侧分类目录中创建一级分类与二级分类。');
+      return;
+    }
+    setItemDrawer({ mode: 'create', groupId: selectedGroup?.id ?? null });
+  };
+
+  /** 点击卡片上的分组名：定位到左侧目录的对应二级分类。 */
+  const selectGroupById = (groupId: string) => {
+    const category = categories.find((item) =>
+      item.groups.some((group) => group.id === groupId),
+    );
+    if (!category) return;
+    setCategoryId(category.id);
+    setGroupId(groupId);
+    setTagFilter(null);
   };
 
   const requestDeleteCategory = (category: AdminTemplateCategory) => {
@@ -358,8 +428,16 @@ export function AdminTemplatesPage() {
   return (
     <AdminPage
       title="写真模板"
-      description="C 端 /template 的目录与素材。左侧选分类，右侧搜索、预览和维护模板。"
-      actions={<RefreshButton onRefresh={() => void reload()} loading={loading} />}
+      actions={
+        <>
+          {writable && (
+            <ActionButton icon={Plus} onClick={openCreateItem}>
+              新建模板
+            </ActionButton>
+          )}
+          <RefreshButton onRefresh={() => void reload()} loading={loading} />
+        </>
+      }
     >
 
       <div className="grid grid-cols-[300px_minmax(0,1fr)] items-start gap-4">
@@ -406,6 +484,7 @@ export function AdminTemplatesPage() {
           canCreateGroup={Boolean(selectedCategory && !selectedGroup)}
           canCreateItem={Boolean(selectedGroup)}
           showGroupName={!selectedGroup}
+          scopeKey={`${categoryId ?? 'all'}:${groupId ?? 'all'}`}
           onSearchChange={setSearch}
           onStatusChange={setStatusFilter}
           tagFilter={tagFilter}
@@ -416,10 +495,14 @@ export function AdminTemplatesPage() {
             setTagFilter(null);
           }}
           onCreateGroup={() => setGroupDrawer({ mode: 'create' })}
-          onCreateItem={() => setItemDrawer({ mode: 'create' })}
+          onCreateItem={() =>
+            setItemDrawer({ mode: 'create', groupId: selectedGroup?.id ?? null })
+          }
           onPreview={setPreviewItem}
           onEdit={(item) => setItemDrawer({ mode: 'edit', target: item })}
+          onCopy={(item) => void copyItem(item)}
           onDelete={requestDeleteItem}
+          onGroupClick={selectGroupById}
         />
       </div>
 
@@ -442,14 +525,18 @@ export function AdminTemplatesPage() {
           onSubmit={(draft) => void saveGroup(draft)}
         />
       )}
-      {itemDrawer && itemDrawerGroup && (
+      {itemDrawer && (itemDrawer.target || groupOptions.length > 0) && (
         <ItemFormDrawer
           mode={itemDrawer.mode}
-          groupName={itemDrawerGroup.name}
+          groupName={itemDrawerGroup?.name ?? ''}
+          groups={groupOptions}
+          initialGroupId={
+            itemDrawer.target?.groupId ?? itemDrawer.groupId ?? selectedGroup?.id ?? null
+          }
           initial={itemInitial}
           saving={saving}
           onClose={() => setItemDrawer(null)}
-          onSubmit={(draft) => void saveItem(draft)}
+          onSubmit={(draft, groupId) => void saveItem(draft, groupId)}
         />
       )}
 

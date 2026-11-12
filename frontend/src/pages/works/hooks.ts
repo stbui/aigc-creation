@@ -17,6 +17,8 @@ export { useAuth } from '../../context/AuthContext';
 export { useDocumentMeta } from '../../hooks/useDocumentMeta';
 /** 大图查看器下标（越界收敛 + id→下标映射） */
 export { useLightboxIndex } from '../../hooks/useLightboxIndex';
+/** 流水布局列分布（最短列优先） */
+export { mediaHeightRatio, useMasonryColumns } from '../../hooks/useMasonryColumns';
 /** 删除 / 重试后广播余额变化 */
 export { notifyCreditsChanged } from '../../context/CreditsContext';
 /** 全局反馈 (message / modal) */

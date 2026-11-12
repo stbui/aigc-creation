@@ -18,7 +18,7 @@ export function TemplatePreviewDialog({
         if (!open) onClose();
       }}
       title={item?.name ?? '模板预览'}
-      description={item ? `排序 ${item.sortOrder} · ${item.enabled ? '启用' : '已停用'}` : undefined}
+      description={item ? (item.enabled ? '启用' : '已停用') : undefined}
       size="xl"
       footer={
         <ActionButton variant="outline" onClick={onClose}>

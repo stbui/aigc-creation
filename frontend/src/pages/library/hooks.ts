@@ -11,6 +11,8 @@ export { useAuth } from '../../context/AuthContext';
 export { useDocumentMeta } from '../../hooks/useDocumentMeta';
 /** 大图查看器下标（越界收敛 + id→下标映射） */
 export { useLightboxIndex } from '../../hooks/useLightboxIndex';
+/** 流水布局列分布（最短列优先） */
+export { mediaHeightRatio, useMasonryColumns } from '../../hooks/useMasonryColumns';
 /** 上传前确保项目存在 */
 export { useProject } from '../../hooks/useProject';
 /** 能力清单: 能力筛选下拉的真实数据源 */

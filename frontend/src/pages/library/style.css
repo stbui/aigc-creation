@@ -222,40 +222,36 @@
   color: inherit;
 }
 
-/* 网格: 参考站 .asset-library-grid 为 fluid (卡片无固定宽度, 只有 min-width:0),
-   断点全部来自参考站 CSS 产物字面值 (2026-10-19 从 /tmp/ref-app.css 提取, 原审计
-   「参考站 populated 态被登录墙挡住取不到」不成立 —— 产物里有全套媒体查询):
-     ≤1200 → 4 列
-     ≤980  → page padding 24px 20px 44px + 3 列
-     ≤640  → page padding 18px 12px 36px + 2 列 + gap 10
-     ≤380  → 1 列
-   注: 10-17 审计记录的「卡 207×273」并非参考站字面值, 而是 fluid 卡片在本地**双重 padding
-   bug**(内容列 1100)下的测量结果 —— 容器纠正为 1148 后卡片自然是 216.8。 */
-/* 流式（masonry）布局：图片按自然宽高比流动排布，列数随视口收拢，间距收紧 */
+/* 网格: 流水（masonry）布局 + 从左到右、从上到下的阅读顺序。
+   列数由 `useMasonryColumns` 按视口断点计算（--asset-library-columns），
+   素材按「最短列优先」分配到各列：第一行从左到右铺满，之后每张落到最矮的一列。
+   **不要改回 `column-count`** —— 多列布局按列优先填充，视觉顺序会变成
+   「先向下、再向右」，与阅读习惯相反。
+   卡片保留自然宽高比，列内顶端对齐。 */
 .asset-library-grid {
-  column-count: 5;
-  column-gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(var(--asset-library-columns, 5), minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
 }
 
-@media (max-width: 1200px) {
-  .asset-library-grid {
-    column-count: 4;
-  }
+.asset-library-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 @media (max-width: 980px) {
-  .asset-library-grid {
-    column-count: 3;
-  }
   .asset-library-page {
     padding: 24px 20px 44px;
   }
 }
 
 @media (max-width: 640px) {
-  .asset-library-grid {
-    column-count: 2;
-    column-gap: 6px;
+  .asset-library-grid,
+  .asset-library-column {
+    gap: 6px;
   }
   /* 参考站 .asset-library-page 移动变体实测 padding 18px 12px 36px */
   .asset-library-page {
@@ -273,12 +269,6 @@
   }
 }
 
-@media (max-width: 380px) {
-  .asset-library-grid {
-    column-count: 1;
-  }
-}
-
 @media (max-width: 700px) {
   .asset-library-header {
     flex-direction: column;
@@ -287,21 +277,19 @@
 }
 
 /* 卡片: 直角纯图卡。标题 / 尺寸 / 体积 / 来源文案已移除, 只保留封面 (2026-10-31)。
-   hover 不再变色、上浮、放大, 也没有封面遮罩背景; 操作按钮仍按 hover / 聚焦 / 触屏显示。 */
-/* 卡片: 直角纯图卡。流式布局下需避免跨列断开，并用 margin 控制垂直间距 */
+   hover 不再变色、上浮、放大, 也没有封面遮罩背景; 操作按钮仍按 hover / 聚焦 / 触屏显示。
+   垂直间距由网格 gap 负责, 卡片自身不再带 margin。 */
 .asset-library-card {
   position: relative;
   display: block;
   min-width: 0;
   gap: 0;
   padding: 0;
-  margin-bottom: 8px;
   background: var(--card-bg);
   border: 1px solid var(--border-soft);
   border-radius: 0;
   box-shadow: none;
   overflow: hidden;
-  break-inside: avoid;
 }
 
 .asset-library-card-body {

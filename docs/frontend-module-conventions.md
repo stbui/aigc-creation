@@ -12,6 +12,10 @@
 `frontend/src/pages/shoppable-carousel/`、`frontend/src/pages/template/`、
 `frontend/src/pages/library/`、`frontend/src/pages/works/`、
 `frontend/src/pages/invitations/`、`frontend/src/pages/account/`、
+`frontend/src/pages/stats/`、`frontend/src/pages/credits/`、
+`frontend/src/pages/packages/`、`frontend/src/pages/mobile-upload/`、
+`frontend/src/pages/tool/`、
+`frontend/src/pages/sitemap/`、`frontend/src/pages/qr-login/`、
 `frontend/src/pages/checkout/`、`frontend/src/pages/orders/`、
 `frontend/src/pages/tickets/`、`frontend/src/pages/workbench/` 同步维护）。
 
@@ -180,7 +184,9 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `page.tsx`）；
   - `frontend/src/pages/background-remove/__tests__/background-remove-modules.test.ts` ——
     C 端一键抠图目录（`src/pages/background-remove` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`，含本页原图预览组件 `BackgroundSourcePreview` 与页面的导入）；
+    `src/lib` / `src/context`，含本页原图预览组件 `BackgroundSourcePreview` 与页面的导入；
+    上传预览 `BackgroundRemoveUploadPreview`、空态 `BackgroundRemoveIntro` 与结果面板
+    `BackgroundResultPane` 为独立展示件，颜色状态与提交仍留在 `page.tsx`）；
   - `frontend/src/pages/watermark-remove/__tests__/watermark-remove-modules.test.ts` ——
     C 端去除水印目录（`src/pages/watermark-remove` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，含页面对 `WatermarkMaskEditor` 遮罩画布的导入；画布舞台
@@ -277,6 +283,46 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `AccountIdentityCard` / `AccountAssetsCard` / `AccountStatsCard` /
     `AccountOrdersCard` / `AccountMessagesCard` / `AccountSecurityCard` 六个展示卡
     与 `AccountPasswordModal` / `AccountDeleteModal` 两个弹窗，状态仍留在 `page.tsx`）；
+  - `frontend/src/pages/stats/__tests__/stats-modules.test.ts` ——
+    C 端数据中心目录（`src/pages/stats` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`；KPI `StatsKpiGrid`、趋势 `StatsTrendPanel`、
+    最近创作 `StatsRecentPanel`、常用能力 `StatsCapabilityPanel` 与空态
+    `StatsEmptyPanel`；取数与自动刷新落 `hooks.ts` 的 `useStatsOverview`，
+    日期 / 汇总 / 柱高换算落 `utils.ts`）；
+  - `frontend/src/pages/credits/__tests__/credits-modules.test.ts` ——
+    C 端积分明细目录（`src/pages/credits` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`；余额 `CreditsHero`、汇总 `CreditsStatsGrid`、
+    两个页签 `CreditsLedgerPanel` / `CreditsLotPanel`（窄屏 `CreditsLedgerList` /
+    `CreditsLotList`）；账本取数与筛选分页落 `hooks.ts` 的 `useCreditsData`，
+    筛选参数与备注口径落 `utils.ts`）；
+  - `frontend/src/pages/packages/__tests__/packages-modules.test.ts` ——
+    C 端积分商城目录（`src/pages/packages` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`；页头 `PackagesHero`、会员 `PackagesPlanSection`、
+    积分包 `PackagesProductSection`；价目与会员状态取数落 `hooks.ts` 的
+    `usePackagesCatalog`，折合单价 / 最划算判定 / 按钮文案落 `utils.ts`）；
+  - `frontend/src/pages/mobile-upload/__tests__/mobile-upload-modules.test.ts` ——
+    C 端手机上传落地页目录（`src/pages/mobile-upload` / `src/components` /
+    `src/hooks` / `src/lib` / `src/context`；选图态 `MobileUploadEditor` 与单张
+    `MobileUploadPreview`；压缩与 objectURL 生命周期落 `utils.ts` /
+    `hooks.ts` 的 `useMobileUpload`，成功 / 失败 / 参数缺失三个终态留在
+    `page.tsx`）；
+  - `frontend/src/pages/tool/__tests__/tool-modules.test.ts` ——
+    通用工具页目录（`src/pages/tool` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`；页头 `ToolPageHeader`、上传与参数
+    `ToolUploadCard`（单项 `ToolParamField`）、结果 `ToolResultCard`；上传 /
+    建任务 / 轮询状态落 `hooks.ts` 的 `useToolPageTask`，能力路由兜底与
+    运行时拦截仍留在 `page.tsx`）；
+  - `frontend/src/pages/sitemap/__tests__/sitemap-modules.test.ts` ——
+    网站地图目录（`src/pages/sitemap` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`；顶部条 `SitemapTopbar`、页头 `SitemapHero`、
+    分组卡 `SitemapSectionCard`、页脚 `SitemapFooter`；静态路由清单落
+    `constants.ts`，能力可见性过滤落 `utils.ts`）；
+  - `frontend/src/pages/qr-login/__tests__/qr-login-modules.test.ts` ——
+    扫码登录确认目录（`src/pages/qr-login` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`；页壳 `QrConfirmCard`，无效 / 待登录 / 待确认 /
+    已处理四态分别为 `QrInvalidState` / `QrLoginRequiredState` /
+    `QrConfirmState` / `QrResultState`；scan / confirm 与忙碌态落 `hooks.ts`
+    的 `useQrLogin`）；
   - `frontend/src/pages/checkout/__tests__/checkout-modules.test.ts` ——
     C 端结算页目录（`src/pages/checkout` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，幂等下单、支付轮询与券码试算下沉到 `utils.ts`；
@@ -300,7 +346,7 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
 - 分层改动后跑：
 
   ```bash
-  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/landing src/pages/shoppable-carousel src/pages/template src/pages/library src/pages/works src/pages/invitations src/pages/account src/pages/checkout src/pages/orders src/pages/tickets src/pages/workbench src/pages/admin/payments
+  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/landing src/pages/shoppable-carousel src/pages/template src/pages/library src/pages/works src/pages/invitations src/pages/account src/pages/stats src/pages/credits src/pages/packages src/pages/mobile-upload src/pages/tool src/pages/sitemap src/pages/qr-login src/pages/checkout src/pages/orders src/pages/tickets src/pages/workbench src/pages/admin/payments
   ```
 
 - 类型校验以 `npm run typecheck` 为准。

@@ -47,9 +47,14 @@ export function WorkCard({
   const fullUrl = task.outputAsset ? assetSrc(task.outputAsset) : undefined;
   const isVideo = taskModality(task) === 'video';
   // 网格只显示缩略图；点开查看器 / 下载仍走完整地址 (lightboxItems / downloadSelected)
-  const src = isVideo ? fullUrl : assetThumbSrc(task.outputAsset, 640) ?? fullUrl;
+  const src = isVideo ? fullUrl : assetThumbSrc(task.outputAsset, 640, true) ?? fullUrl;
   const hasOutput = Boolean(src);
   const canPreview = hasOutput && lightboxIndex >= 0;
+  /** 图片卡按产出自然比例展示，与素材库一致；缺尺寸时回落到方形 */
+  const coverRatio =
+    task.outputAsset?.width && task.outputAsset?.height
+      ? `${task.outputAsset.width} / ${task.outputAsset.height}`
+      : undefined;
 
   return (
     <article className={`my-work-card${selected ? ' selected' : ''}`}>
@@ -69,6 +74,7 @@ export function WorkCard({
             <WorkImage
               src={src}
               alt={capabilityName(task.capability)}
+              ratio={coverRatio}
               priority={priority}
               onOpen={() => {
                 if (canPreview) onPreview(lightboxIndex);

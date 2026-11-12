@@ -1,6 +1,6 @@
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 
-import { ActionButton, Panel, RowMenu } from '~/admin-ui/primitives';
+import { ActionButton, Panel } from '~/admin-ui/primitives';
 import type {
   AdminTemplateCategory,
   AdminTemplateGroup,
@@ -79,7 +79,7 @@ export function CategorySidebar({
           return (
             <div key={category.id} className="mb-1">
               <div
-                className={`flex items-center gap-1 rounded-md px-2 py-2 transition-colors ${
+                className={`group flex items-center gap-1 rounded-md px-2 py-2 transition-colors ${
                   active ? 'bg-muted' : 'hover:bg-muted/50'
                 }`}
               >
@@ -103,7 +103,7 @@ export function CategorySidebar({
                   </div>
                 </button>
                 {writable && (
-                  <div className="flex shrink-0 items-center gap-0.5">
+                  <div className="flex shrink-0 items-center gap-0.5 opacity-0 pointer-events-none transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
                     <ActionButton
                       variant="ghost"
                       size="xs"
@@ -111,16 +111,13 @@ export function CategorySidebar({
                       ariaLabel={`编辑分类${category.name}`}
                       onClick={() => onEditCategory(category)}
                     />
-                    <RowMenu
-                      label={`更多操作：${category.name}`}
-                      items={[
-                        {
-                          key: 'delete',
-                          label: '删除分类',
-                          danger: true,
-                          onSelect: () => onDeleteCategory(category),
-                        },
-                      ]}
+                    <ActionButton
+                      variant="ghost"
+                      size="xs"
+                      icon={Trash2}
+                      className="text-danger-text hover:bg-danger-soft hover:text-danger-text"
+                      ariaLabel={`删除分类${category.name}`}
+                      onClick={() => onDeleteCategory(category)}
                     />
                   </div>
                 )}
@@ -136,7 +133,7 @@ export function CategorySidebar({
                   {category.groups.map((group) => (
                     <div
                       key={group.id}
-                      className={`flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors ${
+                      className={`group flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors ${
                         groupId === group.id ? 'bg-muted' : 'hover:bg-muted/50'
                       }`}
                     >
@@ -151,7 +148,7 @@ export function CategorySidebar({
                         </span>
                       </button>
                       {writable && (
-                        <div className="flex shrink-0 items-center gap-0.5">
+                        <div className="flex shrink-0 items-center gap-0.5 opacity-0 pointer-events-none transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
                           <ActionButton
                             variant="ghost"
                             size="xs"
@@ -159,16 +156,13 @@ export function CategorySidebar({
                             ariaLabel={`编辑分组${group.name}`}
                             onClick={() => onEditGroup(group)}
                           />
-                          <RowMenu
-                            label={`更多操作：${group.name}`}
-                            items={[
-                              {
-                                key: 'delete',
-                                label: '删除分组',
-                                danger: true,
-                                onSelect: () => onDeleteGroup(group),
-                              },
-                            ]}
+                          <ActionButton
+                            variant="ghost"
+                            size="xs"
+                            icon={Trash2}
+                            className="text-danger-text hover:bg-danger-soft hover:text-danger-text"
+                            ariaLabel={`删除分组${group.name}`}
+                            onClick={() => onDeleteGroup(group)}
                           />
                         </div>
                       )}
