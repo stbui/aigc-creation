@@ -19,3 +19,8 @@ export const DEFAULT_RATIO = '3:4';
 
 /** 默认画质档位（与全站生图能力一致）。 */
 export const DEFAULT_SIZE = '2k';
+
+/** 分类 tab 的「全部」项（纯前端筛选态，不来自后端） */
+export const ALL_CATEGORY = '';
+/** 二级分类的「全部分组」项 */
+export const ALL_GROUP = '';

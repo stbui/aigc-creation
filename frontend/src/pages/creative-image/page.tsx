@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ImagePlus, Plus, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import {
@@ -7,24 +6,16 @@ import {
   CREATION_DOWNLOAD_PREFIX,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
-  MAX_PROMPT_LEN,
   MAX_REF_IMAGES,
-  SUPPORTED_IMAGE_ACCEPT,
   SUPPORTED_IMAGE_LABEL,
   type CreationCapability,
-  type PkAsset,
-  type PkResult,
 } from './constants';
 import {
   AssetLibraryModal,
-  CreationPromptField,
   ImageToPromptModal,
   MobileUploadModal,
-  ModelPicker,
   PromptPolishModal,
-  ResultGalleryPane,
-  ToolSettingsPopover,
-  ToolSubmitBar,
+  type ToolAsset,
 } from './components';
 import {
   notifyCreditsChanged,
@@ -40,9 +31,12 @@ import {
   type GalleryItem,
 } from './hooks';
 import { assetsApi, assetSrc, generateApi, newIdempotencyKey, resolveModelId, toAbsoluteUrl } from './api';
-import { assetThumbUrl, isSupportedImageFile, pollToResult, resolveCreationCapability, taskErrorText } from './utils';
+import { isSupportedImageFile, pollToResult, resolveCreationCapability, taskErrorText } from './utils';
+import { CreativeImageInputPane } from './CreativeImageInputPane';
+import { CreativeImageOutputPane } from './CreativeImageOutputPane';
+import { CreativeImagePromptModal } from './CreativeImagePromptModal';
 import type { Asset, MobileUploadAsset } from '../../types/api';
-import { useApp, Modal, Spin } from '../../ui';
+import { useApp } from '../../ui';
 
 /**
  * 创意生图 / 自由创作工作台
@@ -73,6 +67,11 @@ import { useApp, Modal, Spin } from '../../ui';
  *   useAuth().token), 登录后停在原页不跳转;
  *   已登录 → 主文案「立即生成」+ 角标「本次消耗 10 积分」(10 积分/张 与 AuthCard 文案同口径);
  *   提示词为空时按钮 disabled 且视觉置灰 (opacity .55 + not-allowed)。
+ *
+ * 板块拆分见 `docs/frontend-module-conventions.md`：输入栏 `CreativeImageInputPane`
+ * （上传 `CreativeImageUploadSection` / 缩略图 `CreativeImageReferenceThumb` /
+ * 提交 `CreativeImageSubmitBar`）、结果栏 `CreativeImageOutputPane`、
+ * 提示词放大 `CreativeImagePromptModal`。状态与写操作只留在本文件。
  */
 
 export function CreativeImagePage({ capability: capabilityProp }: { capability?: CreationCapability } = {}) {
@@ -85,7 +84,6 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
   // 未知参数回落到自由创作, 避免把任意串透传给后端。
   const capability = capabilityProp ?? resolveCreationCapability(searchParams.get('capability'));
   const capabilityLabel = CREATION_CAPABILITY_LABELS[capability];
-  const fileInputRef = useRef<HTMLInputElement>(null);
   /**
    * 建单幂等键。请求超时/连接重置但服务端已落单时，用户重试必须复用同一个 key，
    * 否则同一个提示词会生成两次、扣两次费；拿到 taskId 后清空。
@@ -102,14 +100,14 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
         : `本次约 ${modelQuoteCredits} 积分（按所选模型）`;
 
   // ── 表单状态 ──
-  const [images, setImages] = useState<PkAsset[]>([]);
+  const [images, setImages] = useState<ToolAsset[]>([]);
   /**
    * 参考图位的同步镜像。
    *
    * 素材库「确定」是同步 for 循环逐个调 onPick, 期间不重渲染 —— 只读 state
    * 会让一次勾选超过剩余位数的图全部进列表 (每张都读到同一份旧值)。
    */
-  const imagesRef = useRef<PkAsset[]>(images);
+  const imagesRef = useRef<ToolAsset[]>(images);
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
@@ -127,12 +125,12 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<PkResult | null>(null);
+  /** 最近一次生成失败的用户可读文案；成功提交时清空 */
+  const [failureNotice, setFailureNotice] = useState<string | null>(null);
   const pollSignal = usePollAbort();
 
   // ── 右侧「全部生成图」(本页能力的历史产出) ──
   // 数据取自 /tasks 而非 /assets: 生成记录以任务为准 (创作时间、尺寸口径都在任务上)。
-  // 网格/大图/右键菜单由 components/ResultGalleryPane 渲染 (与商品主图页共用)。
   const gallery = useResultGallery({ capability, token });
   // 服务端仍有 running/pending 任务时也算生成中: 离开页面再回来, 禁用态与标题不丢
   const generating = submitting || gallery.items.some((item) => !item.url);
@@ -161,24 +159,24 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
       }
       const accepted = list.slice(0, room);
       if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
-      const oversize = accepted.filter((f) => f.size > MAX_IMAGE_BYTES);
+      const oversize = accepted.filter((file) => file.size > MAX_IMAGE_BYTES);
       if (oversize.length > 0) {
-        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
+        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((file) => file.name).join('、')}`);
         return;
       }
 
       setUploading(true);
       try {
         const projectId = await ensureProject();
-        const uploaded: PkAsset[] = [];
+        const uploaded: ToolAsset[] = [];
         for (const file of accepted) {
           const asset = await assetsApi.upload(file, projectId);
           uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         }
         setImages((prev) => [...prev, ...uploaded]);
         message.success(`已上传 ${uploaded.length} 张参考图片`);
-      } catch (e) {
-        message.error((e as Error).message || '上传失败');
+      } catch (error) {
+        message.error((error as Error).message || '上传失败');
       } finally {
         setUploading(false);
       }
@@ -186,21 +184,20 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
     [images.length, ensureProject, message],
   );
 
-  const removeImage = (id: string) => setImages((prev) => prev.filter((x) => x.id !== id));
+  const removeImage = (id: string) => setImages((prev) => prev.filter((item) => item.id !== id));
 
   /** 调整参考图顺序 (参考站缩略图左右箭头; 边界禁用) */
-  const moveImage = (index: number, dir: -1 | 1) => {
+  const moveImage = (index: number, direction: -1 | 1) => {
     setImages((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
       const next = [...prev];
-      const target = index + dir;
-      if (target < 0 || target >= next.length) return prev;
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
   };
 
   // 拖拽 & 粘贴 (本页唯一上传区即参考图区, 粘贴直接进参考图)
-  const [dragging, setDragging] = useState(false);
   usePasteUpload(uploadFiles);
 
   // ── 素材库导入 (真实数据) ──
@@ -215,17 +212,17 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
       message.warning(`最多上传 ${MAX_REF_IMAGES} 张参考图片`);
       return false;
     }
-    if (current.some((x) => x.id === asset.id)) {
+    if (current.some((item) => item.id === asset.id)) {
       message.info('该素材已在列表中');
       return false;
     }
-    const next: PkAsset = {
+    const next: ToolAsset = {
       id: asset.id,
       url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
       name: asset.sourceUrl.split('/').pop() ?? '素材',
     };
     imagesRef.current = [...current, next];
-    setImages((prev) => (prev.some((x) => x.id === next.id) ? prev : [...prev, next]));
+    setImages((prev) => (prev.some((item) => item.id === next.id) ? prev : [...prev, next]));
     return true;
   };
 
@@ -285,7 +282,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
           message.warning(`参考图位已满 (${MAX_REF_IMAGES} 张), 手机上传的图片未加入`);
           return prev;
         }
-        const fresh = assets.filter((a) => !prev.some((x) => x.id === a.id));
+        const fresh = assets.filter((asset) => !prev.some((item) => item.id === asset.id));
         const accepted = fresh.slice(0, room);
         const dropped = fresh.length - accepted.length;
         if (dropped > 0) {
@@ -293,10 +290,10 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
         }
         return [
           ...prev,
-          ...accepted.map((a) => ({
-            id: a.id,
-            url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
-            name: a.filename,
+          ...accepted.map((asset) => ({
+            id: asset.id,
+            url: toAbsoluteUrl(asset.signedUrl || asset.url) ?? '',
+            name: asset.filename,
           })),
         ];
       });
@@ -308,7 +305,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
 
   // ── 结果图右键操作 ──
   //
-  // 「查看大图 / 复制地址 / 下载 / 删除」由 ResultGalleryPane 提供, 本页只补
+  // 「查看大图 / 复制地址 / 下载 / 删除」由结果栏组件提供, 本页只补
   // 本页独有的「用作参考图」与删除时的连带清理 —— 每个动作都用已有接口与状态,
   // 不新增后端能力。
 
@@ -324,7 +321,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
       message.error('这张图片的素材已不存在，无法用作参考图');
       return;
     }
-    if (images.some((x) => x.id === assetId)) {
+    if (images.some((image) => image.id === assetId)) {
       message.info('该图片已在参考图位');
       return;
     }
@@ -347,10 +344,10 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
            * 产出素材随之被删, 若它已被「用作参考图」放进左侧参考图位,
            * 必须同步摘掉 —— 否则下一次生成会带着一个已不存在的 assetId 提交。
            */
-          if (item.assetId) setImages((prev) => prev.filter((x) => x.id !== item.assetId));
+          if (item.assetId) setImages((prev) => prev.filter((image) => image.id !== item.assetId));
           message.success('已删除作品及其生成图');
-        } catch (e) {
-          message.error((e as Error).message || '删除失败');
+        } catch (error) {
+          message.error((error as Error).message || '删除失败');
         }
       },
     });
@@ -367,7 +364,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
       return;
     }
     setSubmitting(true);
-    setResult(null);
+    setFailureNotice(null);
     try {
       const projectId = await ensureProject();
       const logicalModelId = await resolveModelId(capability);
@@ -376,7 +373,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
         capability,
         logicalModelId,
         // 参考图选填 0~4 张; 顺序即构图顺序 (provider 顶部条带按序横排)
-        inputAssetIds: images.map((x) => x.id),
+        inputAssetIds: images.map((image) => image.id),
         params: {
           prompt: prompt.trim(),
           ratio,
@@ -390,7 +387,6 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
       const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
       pendingStartRef.current = null;
       const done = await pollTask(taskId);
-      setResult(done);
       /*
        * 新图**直接插到列表首位**, 不再回头重拉列表。
        *
@@ -413,12 +409,14 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
           },
         ]);
       } else if (done.status === 'failed') {
-        message.error(`生成失败：${taskErrorText(done.errorCode)}`);
+        const notice = taskErrorText(done.errorCode);
+        message.error(`生成失败：${notice}`);
+        setFailureNotice(notice);
       } else {
         message.success('创作图已生成');
       }
-    } catch (e) {
-      reportError(e);
+    } catch (error) {
+      reportError(error);
     } finally {
       setSubmitting(false);
       // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
@@ -426,259 +424,55 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
     }
   };
 
+  /*
+   * 不可用的置灰**只对已登录生效**: guest 点按钮的职责是弹登录框
+   * (见 free-creation-submit.spec.ts 的登录墙契约), 置灰会把它挡掉。
+   * 已登录时置灰 + 上方说明, 避免发起一次注定 42204 的请求。
+   */
+  const submitDisabled = !formValid || (Boolean(token) && capabilityBlocked);
+
   return (
     <div className="pk-workspace fc-workspace">
-      {/* ── 左: 输入栏 ── */}
-      <aside className="pk-input-pane">
-        <div className="pk-form-card">
-          {/* 窄屏标题头 (桌面 display:none 实拍确认) */}
-          <div className="fc-section-head">
-            <span>{capabilityLabel}</span>
-            <h1>输入提示词，直接生成图片</h1>
-          </div>
+      <CreativeImageInputPane
+        capability={capability}
+        capabilityLabel={capabilityLabel}
+        images={images}
+        uploading={uploading}
+        onUploadFiles={uploadFiles}
+        onRemoveImage={removeImage}
+        onMoveImage={moveImage}
+        onOpenLibrary={openLibrary}
+        onOpenMobile={runMobileUpload}
+        prompt={prompt}
+        onPromptChange={setPrompt}
+        onPolish={runPolish}
+        onImageToPrompt={runImageToPrompt}
+        onExpandPrompt={() => setExpandOpen(true)}
+        generating={generating}
+        submitDisabled={submitDisabled}
+        creditLabel={creditLabel}
+        unavailableReason={unavailableReason}
+        settingsOpen={settingsOpen}
+        onToggleSettings={() => setSettingsOpen((open) => !open)}
+        ratio={ratio}
+        onRatioChange={setRatio}
+        resolution={resolution}
+        onResolutionChange={setResolution}
+        onModelQuoteChange={setModelQuoteCredits}
+        onSubmit={() => void submit()}
+      />
 
-          <div className="pk-form-scroll">
-            <section className="pk-config-card">
-              {/* 上传参考图 (选填, 无必填星号) */}
-              <div className="pk-section fc-upload-section">
-                <div className="pk-upload-title-row">
-                  <strong className="pk-section-title">上传参考图</strong>
-                  <div className="pk-upload-title-actions">
-                    <button
-                      type="button"
-                      className="pk-text-link"
-                      onClick={() => {
-                        // 素材库内容是登录用户的私有数据, 未登录时先弹登录框
-                        // (参考站该按钮在未登录态是 disabled, 本项目路由已对外开放,
-                        //  故改为点按弹登录框, 登录后停在原页)
-                        if (!requireLogin()) return;
-                        openLibrary();
-                      }}
-                    >
-                      从素材库导入
-                    </button>
-                    <button
-                      type="button"
-                      className="pk-text-link"
-                      title="扫码在手机上选择图片，接收后自动进入参考图位"
-                      onClick={runMobileUpload}
-                    >
-                      手机上传
-                    </button>
-                    <span className="pk-upload-count">
-                      {images.length}/{MAX_REF_IMAGES}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  className={`pk-dropzone fc-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${images.length > 0 ? ' fc-dropzone-ready' : ''}`}
-                  onClick={() => images.length < MAX_REF_IMAGES && fileInputRef.current?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragging(false);
-                    void uploadFiles(e.dataTransfer.files);
-                  }}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept={SUPPORTED_IMAGE_ACCEPT}
-                    multiple
-                    hidden
-                    onChange={(e) => {
-                      if (e.target.files) void uploadFiles(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                  {uploading && (
-                    <div className="pk-dropzone-loading">
-                      <Spin size="small" />
-                    </div>
-                  )}
-                  {images.length === 0 ? (
-                    <label className="pk-upload-prompt fc-upload-prompt">
-                      <ImagePlus size={14} />
-                      <span>点击、拖拽或粘贴参考图片到此处上传</span>
-                      <small>
-                        最多可上传 {MAX_REF_IMAGES} 张参考图片，单张不超过 {MAX_IMAGE_MB}MB
-                      </small>
-                    </label>
-                  ) : (
-                    <>
-                      <div className="fc-thumb-grid">
-                        {images.map((img, i) => (
-                          <div key={img.id} className="fc-thumb">
-                            <img
-                              src={assetThumbUrl(img.url, 320) ?? img.url}
-                              alt={img.name}
-                              loading="lazy"
-                              decoding="async"
-                            />
-                            <div className="fc-thumb-order">
-                              <button
-                                type="button"
-                                aria-label={`前移 ${img.name}`}
-                                disabled={i === 0}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  moveImage(i, -1);
-                                }}
-                              >
-                                <ChevronLeft size={12} />
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`后移 ${img.name}`}
-                                disabled={i === images.length - 1}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  moveImage(i, 1);
-                                }}
-                              >
-                                <ChevronRight size={12} />
-                              </button>
-                            </div>
-                            <button
-                              type="button"
-                              className="fc-thumb-remove"
-                              aria-label={`移除 ${img.name}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeImage(img.id);
-                              }}
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ))}
-                        {images.length < MAX_REF_IMAGES && (
-                          <button
-                            type="button"
-                            className="fc-thumb-add"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              fileInputRef.current?.click();
-                            }}
-                          >
-                            <Plus size={18} />
-                            <span>添加</span>
-                          </button>
-                        )}
-                      </div>
-                      <p className="fc-sort-tip">使用箭头调整参考图顺序，顺序会影响生成构图</p>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* 创作提示词 (必填) */}
-              <CreationPromptField
-                value={prompt}
-                onChange={setPrompt}
-                onPolish={runPolish}
-                onImageToPrompt={runImageToPrompt}
-                onExpand={() => setExpandOpen(true)}
-              />
-            </section>
-          </div>
-
-          {/* 高级设置 + 提交 (sticky 底部) */}
-          <div className="fc-actions">
-            {/* 无可用模型通道: 提前说明, 而不是让用户点下去等一次 42204 */}
-            {unavailableReason && !generating && (
-              <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
-            )}
-            <ToolSubmitBar
-              submitting={generating}
-              /*
-               * 不可用的置灰**只对已登录生效**: guest 点按钮的职责是弹登录框
-               * (见 free-creation-submit.spec.ts 的登录墙契约), 置灰会把它挡掉。
-               * 已登录时置灰 + 上方说明, 避免发起一次注定 42204 的请求。
-               */
-              disabled={!formValid || (Boolean(token) && capabilityBlocked)}
-              label="立即生成"
-              guestLabel="登录免费生成"
-              creditLabel={creditLabel ?? undefined}
-              settings={
-                <ToolSettingsPopover
-                  open={settingsOpen}
-                  onToggle={() => setSettingsOpen((v) => !v)}
-                  ratio={ratio}
-                  onRatioChange={setRatio}
-                  resolution={resolution}
-                  onResolutionChange={setResolution}
-                  capabilityId={capability}
-                  modelPicker={
-                    <ModelPicker
-                      capability={capability}
-                      options={{ ratio, resolution }}
-                      onQuoteChange={setModelQuoteCredits}
-                    />
-                  }
-                  popoverClassName="fc-settings-popover"
-                  popoverRole="dialog"
-                  popoverAriaLabel="高级设置"
-                  header={
-                    <div className="fc-settings-popover-head">
-                      <h2>高级设置</h2>
-                      <button
-                        type="button"
-                        className="fc-settings-close"
-                        aria-label="关闭高级设置"
-                        title="关闭"
-                        onClick={() => setSettingsOpen(false)}
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                  }
-                />
-              }
-              onSubmit={() => void submit()}
-            />
-          </div>
-        </div>
-      </aside>
-
-      {/* ── 右: 结果栏 (本页全部生成图) ──
-          网格展示本页能力的全部成功产出; 网格/大图/右键菜单由
-          components/ResultGalleryPane 渲染, 与商品主图页共用同一套展示
-          (两页只在「额外动作」与连带清理上不同)。 */}
-      <ResultGalleryPane
-        title={generating ? '生成中…' : '全部生成图'}
+      <CreativeImageOutputPane
+        generating={generating}
+        submitting={submitting}
         items={gallery.items}
         loading={gallery.loading}
         error={gallery.error}
-        notice={
-          result?.status === 'failed' ? (
-            <p className="tool-submit-notice tool-submit-notice-error">
-              最近一次生成失败：{taskErrorText(result.errorCode)}
-            </p>
-          ) : null
-        }
-        pending={submitting ? [{ key: 'pending' }] : []}
-        emptyTitle="效果图预览"
-        emptyDesc={
-          token
-            ? '提交任务后，生成结果将在此处展示，本页生成过的图片都会保留在这里'
-            : '登录后，你在这个页面生成过的图片都会显示在这里'
-        }
+        failureNotice={failureNotice}
+        loggedIn={Boolean(token)}
         onRefresh={() => void gallery.reload()}
         onDelete={deleteImage}
-        extraActions={(item) => [
-          {
-            key: 'reference',
-            label: '用作参考图',
-            icon: ImagePlus,
-            onSelect: () => useAsReference(item),
-          },
-        ]}
+        onUseAsReference={useAsReference}
         downloadNamePrefix={CREATION_DOWNLOAD_PREFIX[capability]}
       />
 
@@ -719,24 +513,12 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
       {/* 手机上传弹窗 (二维码方案) —— 手机端传回后进入参考图位 */}
       <MobileUploadModal open={mobileOpen} onReceived={addMobileAssets} onCancel={() => setMobileOpen(false)} />
 
-      {/* 创作提示词放大编辑 */}
-      <Modal
+      <CreativeImagePromptModal
         open={expandOpen}
-        title="编辑创作提示词"
-        okText="确定"
-        cancelText="取消"
-        onOk={() => setExpandOpen(false)}
-        onCancel={() => setExpandOpen(false)}
-      >
-        <textarea
-          className="pk-expand-textarea"
-          rows={10}
-          maxLength={MAX_PROMPT_LEN}
-          value={prompt}
-          placeholder="例如：把这款产品放在未来感厨房场景中，清晨自然光，干净高级，电商广告质感"
-          onChange={(e) => setPrompt(e.target.value)}
-        />
-      </Modal>
+        value={prompt}
+        onChange={setPrompt}
+        onClose={() => setExpandOpen(false)}
+      />
     </div>
   );
 }

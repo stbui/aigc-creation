@@ -1,5 +1,3 @@
-import type { TaskStatus } from '../../types/api';
-
 /**
  * 创意生图 / 自由创作工作台页面的常量 —— 目录内文件的唯一常量入口。
  *
@@ -23,6 +21,10 @@ export const MAX_REF_IMAGES = 4;
 /** 创作提示词输入上限 (textarea maxlength) */
 export const MAX_PROMPT_LEN = 4000;
 
+/** 提示词输入框与放大编辑共用同一份占位文案，避免两处漂移 */
+export const CREATION_PROMPT_PLACEHOLDER =
+  '例如：把这款产品放在未来感厨房场景中，清晨自然光，干净高级，电商广告质感';
+
 // ───────────────── 能力上下文 ─────────────────
 
 /**
@@ -44,21 +46,3 @@ export const CREATION_DOWNLOAD_PREFIX: Record<CreationCapability, string> = {
   creative_image: 'creative-image',
   free_create: 'free-create',
 };
-
-// ───────────────── 页面数据类型 ─────────────────
-
-/** 本页上传区里的素材 (参考图) */
-export interface PkAsset {
-  id: string;
-  url: string;
-  name: string;
-}
-
-/** 一次创作任务的结果 (只用于失败提示与提交后的即时插卡) */
-export interface PkResult {
-  status: TaskStatus;
-  url?: string;
-  width?: number;
-  height?: number;
-  errorCode?: string | null;
-}

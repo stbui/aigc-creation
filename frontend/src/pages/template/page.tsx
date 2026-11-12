@@ -1,23 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import {
+  ALL_CATEGORY,
+  ALL_GROUP,
   CAPABILITY_ID,
   DEFAULT_RATIO,
   DEFAULT_SIZE,
   MAX_IMAGES,
   MAX_IMAGE_MB,
 } from './constants';
-import {
-  AssetLibraryModal,
-  MobileUploadModal,
-  ModelPicker,
-  ResultGalleryPane,
-  ToolImageDropzone,
-  ToolSettingsPopover,
-  ToolSubmitBar,
-} from './components';
-import { TemplateGallery } from './TemplateGallery';
-import { TemplateHistory } from './TemplateHistory';
+import { AssetLibraryModal, MobileUploadModal, ResultGalleryPane } from './components';
+import { TemplateInputPane } from './TemplateInputPane';
+import { TemplateShowcase } from './TemplateShowcase';
 import {
   notifyCreditsChanged,
   useAuth,
@@ -28,36 +22,12 @@ import {
   useImageUpload,
   useProject,
   useResultGallery,
+  useTemplateCatalog,
   type GalleryItem,
 } from './hooks';
-import {
-  ApiError,
-  generateApi,
-  newIdempotencyKey,
-  resolveModelId,
-  templateApi,
-  type TemplateCatalogCategory,
-} from './api';
-import { filterCatalog, flattenCatalog, type TemplateEntry } from './utils';
+import { generateApi, newIdempotencyKey, resolveModelId } from './api';
+import { flattenCatalog, isUncertainSubmitError, type TemplateEntry } from './utils';
 import { Modal, useApp } from '../../ui';
-
-/** 分类 tab 的「全部」项（纯前端筛选态，不来自后端） */
-const ALL_CATEGORY = '';
-/** 二级分类的「全部分组」项 */
-const ALL_GROUP = '';
-
-/**
- * `POST /generate` 的失败是否「结果不明」。
- *
- * 一次提交只发一个请求，服务端在同一事务里建任务 + 建账 + 预留：
- *   · 4xx 是扣费前的确定性拒绝（参数 / 权益 / 余额），不可能留下任务；
- *   · 5xx 与 fetch 网络中断时，请求可能已经到达服务端并落库，
- *     只能提示用户先核对生成记录。
- */
-function isUncertainSubmitError(error: unknown): boolean {
-  if (error instanceof ApiError) return error.status >= 500;
-  return true;
-}
 
 /**
  * 婚纱写真模板工作台
@@ -69,6 +39,12 @@ function isUncertainSubmitError(error: unknown): boolean {
  * 生成规则：至少上传 1 张人物照片；提交的参数只有模板 id，服务端按模板
  * 查回提示词，与上传照片一起组成模型请求。模板清单由后端下发，前端不存副本；
  * 提示词不下发到 C 端，页面也不展示。
+ *
+ * 板块拆分见 `docs/frontend-module-conventions.md`：左栏 `TemplateInputPane`
+ * （已选模板回显 `TemplateSelectedCard`），右栏 `TemplateShowcase`
+ * （一级分类 `TemplateCategoryNav` / 二级分组 `TemplateGroupNav` / 网格
+ * `TemplateGallery` / 历史 `TemplateHistory`）；模板取数落 `hooks.ts` 的
+ * `useTemplateCatalog`，提交 / 删除等写操作仍留在本文件。
  */
 export function TemplatePage() {
   useDocumentMeta('婚纱写真模板 · 货觉AI', '上传人物照片，选择模板，生成同款婚纱写真');
@@ -79,29 +55,15 @@ export function TemplatePage() {
   const { token } = useAuth();
 
   // ── 模板清单（来自后端，前端不存副本） ──
-  const [catalog, setCatalog] = useState<TemplateCatalogCategory[]>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(true);
-  const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const {
+    catalog,
+    loading: templatesLoading,
+    error: templatesError,
+    reload: reloadTemplates,
+  } = useTemplateCatalog();
   const [categoryId, setCategoryId] = useState(ALL_CATEGORY);
   const [groupId, setGroupId] = useState(ALL_GROUP);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-
-  const loadTemplates = useCallback(async () => {
-    setTemplatesLoading(true);
-    setTemplatesError(null);
-    try {
-      const result = await templateApi.templates();
-      setCatalog(result.categories);
-    } catch (e) {
-      setTemplatesError((e as Error).message || '模板清单加载失败');
-    } finally {
-      setTemplatesLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadTemplates();
-  }, [loadTemplates]);
 
   // ── 上传 ──
   const { images, uploading, fileInputRef, uploadFiles, removeImage, library, mobile } = useImageUpload({
@@ -171,11 +133,6 @@ export function TemplatePage() {
     [allTemplates, selectedTemplateId],
   );
 
-  const activeCategory = useMemo(
-    () => catalog.find((category) => category.id === categoryId) ?? null,
-    [catalog, categoryId],
-  );
-
   const formValid = images.length > 0 && Boolean(selectedTemplateId);
 
   const selectTemplate = useCallback((template: TemplateEntry) => {
@@ -187,11 +144,6 @@ export function TemplatePage() {
     setCategoryId(nextCategoryId);
     setGroupId(ALL_GROUP);
   }, []);
-
-  const visibleTemplates = useMemo(
-    () => filterCatalog(catalog, categoryId, groupId),
-    [catalog, categoryId, groupId],
-  );
 
   // ── 生成 ──
   const submit = async () => {
@@ -236,10 +188,10 @@ export function TemplatePage() {
       await gallery.reload();
       pendingSubmitRef.current = null;
       message.success('已提交婚纱写真，生成完成后自动更新');
-    } catch (e) {
-      reportError(e);
+    } catch (error) {
+      reportError(error);
       await gallery.reload();
-      if (isUncertainSubmitError(e)) {
+      if (isUncertainSubmitError(error)) {
         message.warning('提交结果未确认，请先查看生成记录；重新提交不会重复扣费');
       }
     } finally {
@@ -261,8 +213,8 @@ export function TemplatePage() {
             await generateApi.remove(item.id);
             gallery.removeItem(item.id);
             message.success('已删除写真');
-          } catch (e) {
-            message.error((e as Error).message || '删除失败，请刷新后重试');
+          } catch (error) {
+            message.error((error as Error).message || '删除失败，请刷新后重试');
             await gallery.reload();
           }
         },
@@ -271,164 +223,62 @@ export function TemplatePage() {
     [gallery, message, modal],
   );
 
+  const guestLabel = blocked ? undefined : '登录后生成婚纱写真';
+  const hint = blocked
+    ? (reason ?? undefined)
+    : images.length === 0
+      ? '请先上传至少 1 张人物照片'
+      : !selectedTemplateId
+        ? '请先在右侧选择一个模板'
+        : undefined;
+
   return (
     <div className="tpl-workspace">
       <div className="tpl-body">
         {/* ── 左: 配置栏 ── */}
-        <aside className="tpl-input-pane">
-          <div className="tpl-form-card">
-            <div className="tpl-form-scroll">
-              <ToolImageDropzone
-                title="上传人像照片"
-                noun="人像照片"
-                required
-                images={images}
-                max={MAX_IMAGES}
-                maxMb={MAX_IMAGE_MB}
-                uploading={uploading}
-                fileInputRef={fileInputRef}
-                onFiles={(files) => void uploadFiles(files)}
-                onRemove={removeImage}
-                onOpenLibrary={openLibrary}
-                onOpenMobile={mobile.openMobile}
-                emptyHint={`至少上传 1 张清晰人像；最多 ${MAX_IMAGES} 张，单张不超过 ${MAX_IMAGE_MB}MB`}
-              />
-
-              <section className="tpl-section">
-                <strong className="pk-section-title">
-                  <i className="pk-required-mark">*</i>
-                  选择模板
-                </strong>
-                {selectedTemplate ? (
-                  <div className="tpl-selected">
-                    <img
-                      src={selectedTemplate.thumbFile}
-                      alt={`${selectedTemplate.name} 模板预览`}
-                      loading="lazy"
-                    />
-                    <div className="tpl-selected-copy">
-                      <strong>{selectedTemplate.name}</strong>
-                      <button
-                        type="button"
-                        className="tpl-selected-clear"
-                        onClick={() => setSelectedTemplateId(null)}
-                      >
-                        清除
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="tpl-selected-empty">在右侧选择一个模板后即可生成</div>
-                )}
-              </section>
-            </div>
-
-            <div className="tpl-form-footer">
-              <div className="tpl-footer-row">
-                <ToolSettingsPopover
-                  open={settingsOpen}
-                  onToggle={() => setSettingsOpen((open) => !open)}
-                  ratio={ratio}
-                  onRatioChange={setRatio}
-                  resolution={resolution}
-                  onResolutionChange={setResolution}
-                  capabilityId={CAPABILITY_ID}
-                  modelPicker={
-                    <ModelPicker
-                      capability={CAPABILITY_ID}
-                      options={{ ratio, size: resolution }}
-                      onQuoteChange={setModelQuoteCredits}
-                    />
-                  }
-                />
-              </div>
-              <ToolSubmitBar
-                submitting={generating}
-                disabled={!formValid || blocked}
-                label="生成婚纱写真"
-                guestLabel={blocked ? undefined : '登录后生成婚纱写真'}
-                creditLabel={creditLabel ?? undefined}
-                hint={
-                  blocked
-                    ? (reason ?? undefined)
-                    : images.length === 0
-                      ? '请先上传至少 1 张人物照片'
-                      : !selectedTemplateId
-                        ? '请先在右侧选择一个模板'
-                        : undefined
-                }
-                onSubmit={() => void submit()}
-              />
-            </div>
-          </div>
-        </aside>
+        <TemplateInputPane
+          images={images}
+          uploading={uploading}
+          fileInputRef={fileInputRef}
+          onFiles={(files) => void uploadFiles(files)}
+          onRemove={removeImage}
+          onOpenLibrary={openLibrary}
+          onOpenMobile={mobile.openMobile}
+          selectedTemplate={selectedTemplate}
+          onClearTemplate={() => setSelectedTemplateId(null)}
+          settingsOpen={settingsOpen}
+          onToggleSettings={() => setSettingsOpen((open) => !open)}
+          ratio={ratio}
+          onRatioChange={setRatio}
+          resolution={resolution}
+          onResolutionChange={setResolution}
+          onModelQuoteChange={setModelQuoteCredits}
+          generating={generating}
+          submitDisabled={!formValid || blocked}
+          guestLabel={guestLabel}
+          creditLabel={creditLabel}
+          hint={hint}
+          onSubmit={() => void submit()}
+        />
 
         {/* ── 右: 模板展示（常驻）+ 底部历史记录 ── */}
         <section className="tpl-showcase">
-          <nav className="tpl-categories" aria-label="模板分类">
-            <button
-              type="button"
-              aria-pressed={categoryId === ALL_CATEGORY}
-              className={`tpl-category${categoryId === ALL_CATEGORY ? ' is-active' : ''}`}
-              onClick={() => selectCategory(ALL_CATEGORY)}
-            >
-              全部模板
-            </button>
-            {catalog.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                aria-pressed={categoryId === category.id}
-                className={`tpl-category${categoryId === category.id ? ' is-active' : ''}`}
-                onClick={() => selectCategory(category.id)}
-              >
-                {category.name}
-              </button>
-            ))}
-          </nav>
-
-          {activeCategory && activeCategory.groups.length > 0 && (
-            <nav className="tpl-subcategories" aria-label="模板二级分类">
-              <button
-                type="button"
-                aria-pressed={groupId === ALL_GROUP}
-                className={`tpl-subcategory${groupId === ALL_GROUP ? ' is-active' : ''}`}
-                onClick={() => setGroupId(ALL_GROUP)}
-              >
-                全部分组
-              </button>
-              {activeCategory.groups.map((group) => (
-                <button
-                  key={group.id}
-                  type="button"
-                  aria-pressed={groupId === group.id}
-                  className={`tpl-subcategory${groupId === group.id ? ' is-active' : ''}`}
-                  onClick={() => setGroupId(group.id)}
-                >
-                  {group.name}
-                  <span className="tpl-subcategory-count">{group.items.length}</span>
-                </button>
-              ))}
-            </nav>
-          )}
-
-          <div className="tpl-template-scroll">
-            <TemplateGallery
-              templates={visibleTemplates}
-              selectedId={selectedTemplateId}
-              onSelect={selectTemplate}
-              error={templatesError}
-              loading={templatesLoading}
-              onRetry={() => void loadTemplates()}
-            />
-          </div>
-
-          <TemplateHistory
-            items={gallery.items}
-            templates={allTemplates}
-            loading={gallery.loading}
-            error={gallery.error}
-            onRefresh={refreshGallery}
+          <TemplateShowcase
+            catalog={catalog}
+            categoryId={categoryId}
+            groupId={groupId}
+            onCategoryChange={selectCategory}
+            onGroupChange={setGroupId}
+            allTemplates={allTemplates}
+            selectedTemplateId={selectedTemplateId}
+            onSelectTemplate={selectTemplate}
+            templatesLoading={templatesLoading}
+            templatesError={templatesError}
+            onRetryTemplates={() => void reloadTemplates()}
+            galleryItems={gallery.items}
+            galleryLoading={gallery.loading}
+            galleryError={gallery.error}
+            onRefreshGallery={refreshGallery}
             onOpenAll={() => setHistoryOpen(true)}
           />
         </section>

@@ -1,27 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Columns2, Hand, Minus, Plus, Redo2, Square, Trash2, Undo2, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import { ZOOM_DEFAULT, ZOOM_STEP } from './constants';
 import {
-  ToolCard,
   ToolHistoryPane,
   ToolShell,
-  WatermarkMaskEditor,
   type ToolAsset,
   type WatermarkMaskHandle,
   type WatermarkMaskRegion,
   type WatermarkMaskTool,
 } from './components';
-import { useCreditCost, useProject, useToolTask } from './hooks';
-import { assetThumbUrl, assetsApi } from './api';
-import { clampZoom, previewStyleOf } from './utils';
-import { useApp } from '../../ui';
+import { useApp, useCreditCost, useProject, useToolTask } from './hooks';
+import { assetsApi } from './api';
+import { clampZoom } from './utils';
+import { WatermarkRemoveAnnotationPanel } from './WatermarkRemoveAnnotationPanel';
+import { WatermarkRemoveIntro } from './WatermarkRemoveIntro';
+import { WatermarkRemoveStage } from './WatermarkRemoveStage';
+import { WatermarkRemoveUploadPreview } from './WatermarkRemoveUploadPreview';
 
 /**
  * 去除水印 —— 对齐参考站 watermark-remove 的上传态交互。
  *
  * 仅有抓手 / 对比（未出结果时禁用）/ 框选；默认框选。
  * 可见标注是 DOM（.mask-layer > .mask-mark），提交时才生成透明遮罩 PNG。
+ *
+ * 板块拆分见 `docs/frontend-module-conventions.md`：画布舞台 `WatermarkRemoveStage`
+ * （工具栏 `WatermarkRemoveToolbar` / 底部操作条 `WatermarkRemoveCanvasFooter`）、
+ * 水印标记面板 `WatermarkRemoveAnnotationPanel`（逐条 `WatermarkRemoveAnnotationRow`）、
+ * 上传预览 `WatermarkRemoveUploadPreview` 与空态 `WatermarkRemoveIntro`；
+ * 遮罩 / 提交 / 删除等写操作仍留在本文件。
  */
 
 export function WatermarkRemovePage() {
@@ -169,20 +176,8 @@ export function WatermarkRemovePage() {
     setResult(null);
   };
 
-  const toolButton = (value: WatermarkMaskTool, label: string, shortcut?: string, Icon = value === 'hand' ? Hand : Square) => (
-    <span className="toolbar-item-wrap" key={value}>
-      <button
-        type="button"
-        className={`redraw-tool-btn${tool === value ? ' active' : ''}`}
-        aria-pressed={tool === value}
-        title={shortcut ? `${label} (${shortcut})` : label}
-        onClick={() => setTool(value)}
-      >
-        <Icon size={13} />
-        {label}
-      </button>
-    </span>
-  );
+  const zoomIn = () => setZoom((value) => clampZoom(value, ZOOM_STEP));
+  const zoomOut = () => setZoom((value) => clampZoom(value, -ZOOM_STEP));
 
   return (
     <ToolShell
@@ -204,33 +199,13 @@ export function WatermarkRemovePage() {
         const image = uploads[0];
         if (!image) return null;
         return (
-          <div className={`source-row${controls.uploading ? ' processing' : ''}`}>
-            <button
-              type="button"
-              className="local-source-preview"
-              aria-label="预览待去水印图片"
-              onClick={() => controls.preview(image)}
-            >
-              <img src={assetThumbUrl(image.url, 320) ?? image.url} alt="待去水印图片" draggable={false} />
-            </button>
-            <div>
-              <button
-                type="button"
-                disabled={controls.uploading}
-                onClick={() => controls.remove(image.id)}
-              >
-                重新编辑
-              </button>
-              <button
-                type="button"
-                className="soft"
-                disabled={controls.uploading}
-                onClick={controls.open}
-              >
-                重新上传
-              </button>
-            </div>
-          </div>
+          <WatermarkRemoveUploadPreview
+            image={image}
+            uploading={controls.uploading}
+            onPreview={() => controls.preview(image)}
+            onRemove={() => controls.remove(image.id)}
+            onOpen={controls.open}
+          />
         );
       }}
       submitLabel="开始去除"
@@ -261,153 +236,33 @@ export function WatermarkRemovePage() {
       children={(images) => {
         if (images.length === 0) return null;
         return (
-          <ToolCard
-            title={<><i className="pk-required-mark">*</i>水印标记</>}
-            className="prompt-card watermark-mark-card"
-          >
-            {(regions.length > 0 ? regions : [null]).map((region, index) => (
-              <div
-                key={region?.id ?? 'pending'}
-                className={`redraw-prompt watermark-annotation-row${region ? ' is-marked' : ' is-pending'}`}
-              >
-                <label className={`redraw-prompt-label ${region ? 'is-marked' : 'is-pending'}`}>
-                  <i />
-                  标注{index + 1}
-                </label>
-                {region && sourceImage ? (
-                  <div className="annotation-mark-preview">
-                    <img src={sourceImage.url} alt={`标注${index + 1}框选区域`} style={previewStyleOf(region)} />
-                    <button
-                      type="button"
-                      className="annotation-remove"
-                      aria-label={`删除标注${index + 1}`}
-                      title={`删除标注${index + 1}`}
-                      onClick={() => painter.current?.remove(region.id)}
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </ToolCard>
+          <WatermarkRemoveAnnotationPanel
+            regions={regions}
+            sourceImage={sourceImage}
+            onRemove={(id) => painter.current?.remove(id)}
+          />
         );
       }}
       sourcePane={(images) => {
         const image = images[0];
-        if (!image) {
-          return (
-            <div className="redraw-intro" aria-label="去除水印介绍">
-              <video
-                className="redraw-intro-video"
-                src="/static/mp4/03_qcsy.mp4"
-                poster="/static/mp4/03_qcsy-poster.jpg"
-                autoPlay
-                loop
-                muted
-                playsInline
-                aria-label="去除水印演示"
-              />
-              <div className="redraw-intro-copy">
-                <strong>去除水印</strong>
-                <p>框选、圈选或涂抹水印区域，即可去除图片中的水印</p>
-              </div>
-            </div>
-          );
-        }
-
+        if (!image) return <WatermarkRemoveIntro />;
         return (
-          <main className="local-redraw-stage" aria-busy={submitting}>
-            <div className="redraw-stage-topbar">
-              <div className="redraw-toolbar" role="toolbar" aria-label="重绘工具">
-                {toolButton('hand', '抓手', 'H')}
-                <span className="toolbar-item-wrap">
-                  <button type="button" className="redraw-tool-btn" title="对比" disabled aria-pressed={false}>
-                    <Columns2 size={13} />
-                    对比
-                  </button>
-                  <b className="toolbar-divider" />
-                  <button
-                    type="button"
-                    className={`redraw-tool-btn${tool === 'rect' ? ' active' : ''}`}
-                    aria-pressed={tool === 'rect'}
-                    title="框选 (R)"
-                    onClick={() => setTool('rect')}
-                  >
-                    <Square size={13} />
-                    框选
-                  </button>
-                </span>
-              </div>
-              <div className="stage-actions stage-actions-placeholder" aria-hidden="true" />
-            </div>
-
-            <WatermarkMaskEditor
-              url={image.url}
-              alt="待去水印的原图"
-              tool={tool}
-              zoom={zoom}
-              pan={pan}
-              onPanChange={setPan}
-              onState={handleMaskState}
-              handleRef={painter}
-            />
-
-            <div className="canvas-footer-toolbar redraw-canvas-footer">
-              <button
-                type="button"
-                className="redraw-footer-btn"
-                disabled={!canUndo}
-                title="撤回 (Ctrl+Z)"
-                onClick={() => painter.current?.undo()}
-              >
-                <Undo2 size={16} />
-                撤回
-              </button>
-              <button
-                type="button"
-                className="redraw-footer-btn"
-                disabled={!canRedo}
-                title="恢复 (Ctrl+Shift+Z)"
-                onClick={() => painter.current?.redo()}
-              >
-                <Redo2 size={16} />
-                恢复
-              </button>
-              <button
-                type="button"
-                className="redraw-footer-btn"
-                disabled={!painted}
-                onClick={() => painter.current?.clear()}
-              >
-                <Trash2 size={16} />
-                清空
-              </button>
-              <b className="redraw-tool-divider" />
-              <button
-                type="button"
-                className="redraw-footer-btn redraw-zoom-btn"
-                aria-label="缩小"
-                title="缩小 (-)"
-                onClick={() => setZoom((value) => clampZoom(value, -ZOOM_STEP))}
-              >
-                <Minus size={16} />
-              </button>
-              <span className="redraw-zoom-value">{zoom}%</span>
-              <button
-                type="button"
-                className="redraw-footer-btn redraw-zoom-btn"
-                aria-label="放大"
-                title="放大 (+)"
-                onClick={() => setZoom((value) => clampZoom(value, ZOOM_STEP))}
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-            <div className="shortcut-hint redraw-shortcut-hint">
-              快捷键：H 抓手 · Ctrl+Z 撤回 · Ctrl+Shift+Z 恢复 · +/- 缩放
-            </div>
-          </main>
+          <WatermarkRemoveStage
+            image={image}
+            tool={tool}
+            zoom={zoom}
+            pan={pan}
+            submitting={submitting}
+            painted={painted}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            painter={painter}
+            onToolChange={setTool}
+            onPanChange={setPan}
+            onState={handleMaskState}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+          />
         );
       }}
     />

@@ -7,6 +7,7 @@
  *
  * 第三方 UI 库 (antd / lucide-react) 不经本文件 —— 它们不是本项目的共享控件,
  * 与 `channels/` / `product-detail/` / `product-kit/` / `viral-clone/` 的做法一致。
+ * 本目录自有的业务组件也不在此转出（避免循环引用），由页面直接 `./Xxx` 引入。
  * `useAssetLibrary` 属于 hook, 统一从 `./hooks` 取。
  */
 
@@ -26,5 +27,5 @@ export { ResultGalleryPane } from '../../components/ResultGalleryPane';
 export { PromptPolishModal } from '../../components/PromptPolishModal';
 /** 图片转提示词弹窗 */
 export { ImageToPromptModal } from '../../components/ImageToPromptModal';
-/** 创作提示词输入区 */
-export { CreationPromptField } from './CreationPromptField';
+/** 参考图 / 结果的口径类型 (与 ToolShell 共用, 不再本页自定义) */
+export type { ToolAsset, ToolResult } from '../../components/ToolShell';

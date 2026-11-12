@@ -11,3 +11,5 @@ export { useToolTask } from '../../hooks/useToolTask';
 export { useProject } from '../../hooks/useProject';
 /** 能力定价: 0 元档展示「限时免费」 */
 export { useCreditCost } from '../../hooks/useCreditLabel';
+/** 全局反馈 (message) */
+export { useApp } from '../../ui';

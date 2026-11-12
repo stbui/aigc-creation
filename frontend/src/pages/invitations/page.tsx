@@ -1,33 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import {
-  BadgeCheck,
-  CalendarCheck,
-  Clock3,
-  Coins,
-  Download,
-  Flame,
-  Gift,
-  Image as ImageIcon,
-  Link2,
-  ListOrdered,
-  ScrollText,
-  UserCheck,
-  Users,
-} from 'lucide-react';
+
 import { myMarketingApi } from './api';
-import { Button, Modal, PersonalPage, StateEmpty, StateError, StateSkeleton } from './components';
+import { PersonalPage, StateSkeleton } from './components';
 import { notifyCreditsChanged, useApp, useAuth, useDocumentMeta } from './hooks';
-import { RELATION_PAGE_SIZE, REWARD_STATUS } from './constants';
+import { RELATION_PAGE_SIZE, type CheckinStatus, type MyInvites } from './constants';
 import {
   buildInvitePoster,
-  formatBoundDay,
-  formatForecastDay,
-  formatNumber,
+  buildInviteSteps,
+  inviteHeroTitle,
   posterFileName,
   qrColors,
 } from './utils';
-import type { CheckinStatus, MyInvites } from '../../types/api';
+import { InviteCheckinBlock } from './InviteCheckinBlock';
+import { InviteErrorState } from './InviteErrorState';
+import { InviteGuestState } from './InviteGuestState';
+import { InviteHero } from './InviteHero';
+import { InviteMetricsBlock } from './InviteMetricsBlock';
+import { InvitePosterModal } from './InvitePosterModal';
+import { InviteRelationsBlock } from './InviteRelationsBlock';
+import { InviteRulesBlock } from './InviteRulesBlock';
+import { InviteStepsBlock } from './InviteStepsBlock';
 
 /**
  * 邀请有奖 + 每日签到 (M11 · admin-detailed-design.md §12.3 / §12.4)。
@@ -40,6 +33,11 @@ import type { CheckinStatus, MyInvites } from '../../types/api';
  *   **如实说明不发放积分**, 不得展示「立赚 200 积分」这类空头承诺。
  *   commerce-design.md 已记录过同类缺陷: 营销页上收费展示但兑现不了的承诺
  *   构成虚假宣传 —— 本页的所有数字都必须来自真实数据, 不允许占位值。
+ *
+ * 板块拆分见 `docs/frontend-module-conventions.md`：`InviteHero` / `InviteCheckinBlock` /
+ * `InviteMetricsBlock` / `InviteStepsBlock` / `InviteRelationsBlock` / `InviteRulesBlock` /
+ * `InvitePosterModal`，访客与失败态分别是 `InviteGuestState` / `InviteErrorState`；
+ * 文案派生落 `utils.ts`，取数、绑定、签到与海报等写操作仍留在本文件。
  */
 export function InvitationsPage() {
   useDocumentMeta('邀请有奖 · 货觉AI', '邀请好友注册并首次付费，双方获得积分奖励。');
@@ -80,15 +78,15 @@ export function InvitationsPage() {
       myMarketingApi.invites({ limit: RELATION_PAGE_SIZE, offset: 0 }),
       myMarketingApi.checkinStatus(),
     ])
-      .then(([inv, ci]) => {
-        setData(inv);
-        loadedRelationsRef.current = inv.relations.length;
-        setCheckin(ci);
+      .then(([invites, status]) => {
+        setData(invites);
+        loadedRelationsRef.current = invites.relations.length;
+        setCheckin(status);
       })
-      .catch((e: unknown) => {
+      .catch((cause: unknown) => {
         // 失败置 null → 渲染失败态, 不回落到任何占位数字
         setData(null);
-        setError(e instanceof Error ? e.message : '邀请数据加载失败');
+        setError(cause instanceof Error ? cause.message : '邀请数据加载失败');
       })
       .finally(() => setLoading(false));
   }, [token]);
@@ -115,8 +113,8 @@ export function InvitationsPage() {
           : next,
       );
       loadedRelationsRef.current += next.relations.length;
-    } catch (e) {
-      message.error((e as Error).message || '邀请记录加载失败');
+    } catch (cause) {
+      message.error((cause as Error).message || '邀请记录加载失败');
     } finally {
       setLoadingMore(false);
     }
@@ -136,8 +134,8 @@ export function InvitationsPage() {
     let alive = true;
     myMarketingApi
       .bindInvite(code)
-      .then((r) => {
-        if (!alive || !r.bound) return;
+      .then((result) => {
+        if (!alive || !result.bound) return;
         message.success('邀请关系已绑定，好友首次付费后自动发放奖励');
         // 绑上即清地址栏: 刷新不重复提交, 也不把码带进后续分享
         window.history.replaceState({}, '', '/invitations');
@@ -209,11 +207,11 @@ export function InvitationsPage() {
         color: qrColors(),
       });
       /* 文案跟随真实规则: 邀请人奖励为 0 时写「立赚 0 积分」等于空头承诺 */
-      const claim = !enabled
+      const claim = !data.enabled
         ? '邀请好友一起用货觉AI'
-        : rule.inviterCredits > 0
-          ? `邀请好友，立赚 ${rule.inviterCredits} 积分`
-          : `好友注册得 ${rule.inviteeCredits} 积分`;
+        : data.rule.inviterCredits > 0
+          ? `邀请好友，立赚 ${data.rule.inviterCredits} 积分`
+          : `好友注册得 ${data.rule.inviteeCredits} 积分`;
       const url = await buildInvitePoster({
         qrDataUrl: qr,
         code: data.inviteCode,
@@ -230,21 +228,22 @@ export function InvitationsPage() {
 
   const downloadPoster = () => {
     if (!posterUrl || !data) return;
-    const a = document.createElement('a');
-    a.href = posterUrl;
-    a.download = posterFileName(data.inviteCode);
-    a.rel = 'noopener';
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = posterUrl;
+    anchor.download = posterFileName(data.inviteCode);
+    anchor.rel = 'noopener';
+    anchor.click();
   };
 
   const doCheckin = async () => {
     if (!checkin || checkin.checkedIn || submitting) return;
     setSubmitting(true);
     try {
-      const r = await myMarketingApi.checkin();
-      if (r.alreadyCheckedIn) message.info('今天已经签过到了');
-      else {
-        message.success(`签到成功，获得 ${r.credits} 积分`);
+      const result = await myMarketingApi.checkin();
+      if (result.alreadyCheckedIn) {
+        message.info('今天已经签过到了');
+      } else {
+        message.success(`签到成功，获得 ${result.credits} 积分`);
         // 顶栏余额由 CreditsContext 持有：不发广播会一直显示签到前的数字
         notifyCreditsChanged();
       }
@@ -261,15 +260,7 @@ export function InvitationsPage() {
    * 需鉴权的接口并把 401 渲染成「邀请数据加载失败」。
    */
   if (!token) {
-    return (
-      <PersonalPage title="邀请有奖" description="邀请好友注册，双方都能获得积分；每天签到也能领积分。">
-        <StateEmpty
-          title="登录后查看邀请与签到"
-          desc="邀请链接、邀请人数与每日签到都与账号绑定；带邀请码进入的新用户注册后会自动绑定。"
-          action={<Button type="primary" onClick={openLogin}>登录/注册</Button>}
-        />
-      </PersonalPage>
-    );
+    return <InviteGuestState onLogin={openLogin} />;
   }
 
   /*
@@ -287,54 +278,12 @@ export function InvitationsPage() {
 
   // 加载失败: 如实说明, 不编造任何数字
   if (!data) {
-    return (
-      <PersonalPage title="邀请有奖" description="邀请好友注册，双方都能获得积分；每天签到也能领积分。">
-        <StateError
-          title="邀请数据加载失败"
-          desc="请确认已登录，且后端服务正常运行。本页数据全部来自真实接口，加载失败时不展示任何占位数字。"
-          detail={error ?? undefined}
-          onRetry={load}
-        />
-      </PersonalPage>
-    );
+    return <InviteErrorState error={error} onRetry={load} />;
   }
 
   const { rule, metrics, enabled } = data;
-  const m = metrics;
-
-  /* 邀请人奖励为 0 时不能写「立赚 0 积分」—— 规则允许只奖励被邀请人 */
-  const heroTitle = !enabled
-    ? '邀请好友一起用货觉AI'
-    : rule.inviterCredits > 0
-      ? `邀请好友立赚 ${rule.inviterCredits} 积分`
-      : '邀请好友，注册即得积分';
-
-  const steps = [
-    { title: '分享邀请链接', desc: `复制含专属邀请码的链接发送给好友：${data.inviteCode}` },
-    {
-      title: '好友注册',
-      desc:
-        rule.inviteeCredits > 0
-          ? `好友通过链接注册即得 ${rule.inviteeCredits} 积分`
-          : '好友通过链接注册后自动与你的账号绑定',
-    },
-    {
-      title: '奖励自动发放',
-      desc:
-        !enabled || rule.inviterCredits <= 0
-          ? '当前未配置邀请人奖励，分享仅记录邀请关系'
-          : rule.triggerOn === 'first_pay'
-            ? `好友首次付费成功后，你得 ${rule.inviterCredits} 积分`
-            : `好友注册成功后，你得 ${rule.inviterCredits} 积分`,
-    },
-  ];
-
-  const metricsRow = [
-    { label: '累计邀请（人）', value: m.totalInvited, Icon: Users, highlight: false },
-    { label: '累计收益（积分）', value: m.earnedCredits, Icon: Coins, highlight: true },
-    { label: '已发放（笔）', value: m.rewardedCount, Icon: BadgeCheck, highlight: false },
-    { label: '待发放（笔）', value: m.pendingCount, Icon: Clock3, highlight: false },
-  ];
+  const heroTitle = inviteHeroTitle(rule, enabled);
+  const steps = buildInviteSteps(rule, enabled, data.inviteCode);
 
   return (
     <PersonalPage
@@ -342,250 +291,46 @@ export function InvitationsPage() {
       title="邀请有奖"
       description="分享专属链接，好友完成指定动作后奖励自动到账；每天签到也能积累积分。"
     >
-      <section className="invite-hero">
-        <div className="invite-hero-copy">
-          <h1>{heroTitle}</h1>
-          <p>
-            {enabled ? (
-              <>
-                好友通过链接注册并完成
-                {rule.triggerOn === 'first_pay' ? '首次付费' : '注册'}后，奖励自动发放到你的积分账户。
-              </>
-            ) : (
-              '邀请奖励规则尚未配置，当前分享链接仅记录邀请关系，不发放积分。'
-            )}
-          </p>
-          <div className="invite-hero-actions">
-            <Button type="primary" icon={<Link2 size={15} />} onClick={() => void copyLink()}>
-              复制邀请链接
-            </Button>
-            <Button
-              icon={<ImageIcon size={15} />}
-              loading={posterBusy}
-              onClick={() => void openPoster()}
-            >
-              查看邀请海报
-            </Button>
-          </div>
-        </div>
-        {/* 二维码与「邀请码」并置: 电脑上看链接、面对面时直接让对方扫 */}
-        <aside className="invite-hero-qr">
-          {qrUrl ? (
-            <img src={qrUrl} alt={`邀请二维码，邀请码 ${data.inviteCode}`} />
-          ) : (
-            <span className="invite-hero-qr-fallback" aria-hidden />
-          )}
-          <div className="invite-hero-qr-meta">
-            <span>邀请码</span>
-            <strong>{data.inviteCode}</strong>
-          </div>
-          <p>扫码注册，自动绑定邀请关系</p>
-        </aside>
-      </section>
+      <InviteHero
+        enabled={enabled}
+        rule={rule}
+        heroTitle={heroTitle}
+        inviteCode={data.inviteCode}
+        qrUrl={qrUrl}
+        posterBusy={posterBusy}
+        onCopyLink={() => void copyLink()}
+        onOpenPoster={() => void openPoster()}
+      />
 
       {/* 签到 (B-67): 与邀请并列 —— 两者都是积分来源, 但触发方式不同 */}
       {checkin && (
-        <section className="invite-block">
-          <div className="invite-block-head">
-            <h2>
-              <CalendarCheck size={16} aria-hidden /> 每日签到
-            </h2>
-            <span className="invite-block-sub">连续签到有额外加成</span>
-          </div>
-
-          <div className="invite-checkin">
-            <div className="invite-checkin-stats">
-              <div className="invite-checkin-stat">
-                <span className="invite-metric-label">
-                  <Flame size={13} aria-hidden /> 连续签到
-                </span>
-                <span className="invite-checkin-value">
-                  {checkin.streak}
-                  <em>天</em>
-                </span>
-              </div>
-              {/* 签到关闭时不能写「今日可得 N 积分」—— 那是一个拿不到的数字 */}
-              <div className="invite-checkin-stat">
-                <span className="invite-metric-label">
-                  <Gift size={13} aria-hidden />{' '}
-                  {!checkin.rule.enabled
-                    ? '签到状态'
-                    : checkin.checkedIn
-                      ? '今日已得'
-                      : '今日可得'}
-                </span>
-                <span
-                  className={`invite-checkin-value${checkin.rule.enabled ? '' : ' is-text'}`}
-                >
-                  {!checkin.rule.enabled
-                    ? '未开启'
-                    : checkin.checkedIn
-                      ? checkin.todayCredits
-                      : checkin.nextCredits}
-                  {checkin.rule.enabled && <em>积分</em>}
-                </span>
-              </div>
-            </div>
-            <Button
-              type="primary"
-              size="large"
-              className="invite-checkin-btn"
-              onClick={() => void doCheckin()}
-              loading={submitting}
-              disabled={checkin.checkedIn || !checkin.rule.enabled}
-            >
-              {checkin.checkedIn
-                ? `今日已签到 +${checkin.todayCredits}`
-                : checkin.rule.enabled
-                  ? '立即签到'
-                  : '签到未开启'}
-            </Button>
-          </div>
-
-          {/* 未来 7 天: 让用户看清连签到第 3/7 天各能多拿多少 */}
-          {checkin.rule.enabled && checkin.forecast.length > 0 && (
-            <ol className="invite-checkin-days" aria-label="未来 7 天签到可得">
-              {checkin.forecast.slice(0, 7).map((f) => {
-                const isToday = f.day === checkin.today;
-                const isBonus = f.credits > checkin.rule.baseCredits;
-                return (
-                  <li
-                    key={f.day}
-                    className={`${isToday ? 'is-today' : ''}${isBonus ? ' is-bonus' : ''}`.trim()}
-                  >
-                    <span className="invite-checkin-day">
-                      {isToday ? '今天' : formatForecastDay(f.day)}
-                    </span>
-                    <span className="invite-checkin-streak">第 {f.streak} 天</span>
-                    <strong>+{f.credits}</strong>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </section>
+        <InviteCheckinBlock
+          checkin={checkin}
+          submitting={submitting}
+          onCheckin={() => void doCheckin()}
+        />
       )}
 
-      <section className="invite-block">
-        <div className="invite-block-head">
-          <h2>
-            <Users size={16} aria-hidden /> 数据明细
-          </h2>
-          <span className="invite-block-sub">只统计已产生的邀请关系</span>
-        </div>
-        <div className="invite-metrics">
-          {metricsRow.map((row) => (
-            <div key={row.label} className="invite-metric">
-              <span className="invite-metric-label">
-                <row.Icon size={13} aria-hidden /> {row.label}
-              </span>
-              <span className={`invite-metric-value${row.highlight ? ' is-brand' : ''}`}>
-                {formatNumber(row.value)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <InviteMetricsBlock metrics={metrics} />
+      <InviteStepsBlock steps={steps} />
 
-      <section className="invite-block">
-        <div className="invite-block-head">
-          <h2>
-            <ListOrdered size={16} aria-hidden /> 邀请步骤
-          </h2>
-          <span className="invite-block-sub">好友完成指定动作后自动发放</span>
-        </div>
-        <ol className="invite-steps">
-          {steps.map((s, i) => (
-            <li key={s.title} className="invite-step">
-              <span className="invite-step-no">{i + 1}</span>
-              <span className="invite-step-title">{s.title}</span>
-              <span className="invite-step-desc">{s.desc}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {data.metrics.totalInvited > 0 && (
-        <section className="invite-block">
-          <div className="invite-block-head">
-            <h2>
-              <UserCheck size={16} aria-hidden /> 邀请记录
-            </h2>
-            <span className="invite-block-sub">
-              共 {data.metrics.totalInvited} 人
-              {data.relations.length < data.metrics.totalInvited
-                ? `（已显示 ${data.relations.length} 条）`
-                : ''}
-            </span>
-          </div>
-          <ul className="invite-relations">
-            {data.relations.map((r) => {
-              const status = REWARD_STATUS[r.rewardStatus] ?? REWARD_STATUS.pending;
-              return (
-                <li key={r.id} className="invite-relation">
-                  <span className="invite-relation-name">{r.inviteeName}</span>
-                  <span className="invite-relation-date">{formatBoundDay(r.boundAt)}</span>
-                  <span className={`invite-relation-status ${status.className}`}>
-                    {status.label}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          {data.relations.length < data.metrics.totalInvited && (
-            <div className="invite-load-more">
-              <Button loading={loadingMore} onClick={() => void loadMore()}>
-                加载更多记录（已显示 {data.relations.length} / {data.metrics.totalInvited}）
-              </Button>
-            </div>
-          )}
-        </section>
+      {metrics.totalInvited > 0 && (
+        <InviteRelationsBlock
+          relations={data.relations}
+          totalInvited={metrics.totalInvited}
+          loadingMore={loadingMore}
+          onLoadMore={() => void loadMore()}
+        />
       )}
 
-      <section className="invite-block">
-        <div className="invite-block-head">
-          <h2>
-            <ScrollText size={16} aria-hidden /> 规则说明
-          </h2>
-        </div>
-        <ul className="invite-rules">
-          <li>
-            被邀请人奖励 {rule.inviteeCredits} 积分，
-            {rule.inviterCredits > 0
-              ? `邀请人奖励 ${rule.inviterCredits} 积分`
-              : '当前不设邀请人奖励'}
-            ；触发时机为{rule.triggerOn === 'first_pay' ? '被邀请人首次付费' : '被邀请人注册'}。
-          </li>
-          <li>一个账号只能被一位邀请人绑定；自邀请不生效。</li>
-          {/* 待发放为 0 时这条没有信息量, 不占一行 */}
-          {m.pendingCount > 0 && (
-            <li>
-              累计收益只统计已发放的邀请。待发放的 {m.pendingCount} 笔按当前规则预估约{' '}
-              {m.pendingCredits} 积分，规则调整后以实际发放为准。
-            </li>
-          )}
-          {!rule.valid && <li>邀请奖励当前已关闭，新绑定不发放积分。</li>}
-          {enabled && <li>奖励以积分形式发放，可在积分明细中查看到账流水。</li>}
-        </ul>
-      </section>
+      <InviteRulesBlock rule={rule} enabled={enabled} metrics={metrics} />
 
-      <Modal
+      <InvitePosterModal
         open={posterOpen}
-        onCancel={() => setPosterOpen(false)}
-        footer={null}
-        width={420}
-        centered
-        title="邀请海报"
-        destroyOnHidden
-      >
-        {posterUrl && (
-          <img src={posterUrl} alt="邀请海报" className="invite-poster-image" />
-        )}
-        <Button type="primary" block icon={<Download size={15} />} className="invite-poster-download" onClick={downloadPoster}>
-          下载海报
-        </Button>
-        <p className="invite-poster-note">海报含你的专属邀请码，好友扫码注册后自动绑定邀请关系。</p>
-      </Modal>
+        posterUrl={posterUrl}
+        onClose={() => setPosterOpen(false)}
+        onDownload={downloadPoster}
+      />
     </PersonalPage>
   );
 }

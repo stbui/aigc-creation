@@ -12,6 +12,33 @@ import type { SkuBatchResult } from './constants';
 import { useCreditCost, type GalleryItem } from './hooks';
 import type { SkuBatchGroup } from './utils';
 
+interface ProductSkuWorkspaceProps {
+  template: ToolAsset | null;
+  regions: SkuRegion[];
+  itemCount: number;
+  settingsSeed: number;
+  defaultRatio: string;
+  defaultResolution: string;
+  validationMessage: string | null;
+  submitting: boolean;
+  formValid: boolean;
+  onSubmit: (inputs: ToolAsset[], settings: ToolSettings) => Promise<void>;
+  batchItems: SkuBatchResult[];
+  galleryLoading: boolean;
+  galleryError: string | null;
+  failedNotice: string | null;
+  activeResultId: string | null;
+  onActiveResultChange: (id: string | null) => void;
+  onRefresh: () => void;
+  onRetryFailed: (itemId?: string) => void;
+  onDownloadAll: () => void;
+  historyGroups: SkuBatchGroup[];
+  onOpenHistory: (group: SkuBatchGroup) => void;
+  onRestoreHistory: (group: SkuBatchGroup) => void;
+  onDownloadHistory: (group: SkuBatchGroup) => void;
+  children: ReactNode;
+}
+
 /**
  * SKU 页的 ToolShell 编排：左表单 / 右结果 / 尾部历史。
  *
@@ -36,40 +63,13 @@ export function ProductSkuWorkspace({
   onActiveResultChange,
   onRefresh,
   onRetryFailed,
-  batchDownloading,
   onDownloadAll,
   historyGroups,
   onOpenHistory,
   onRestoreHistory,
   onDownloadHistory,
   children,
-}: {
-  template: ToolAsset | null;
-  regions: SkuRegion[];
-  itemCount: number;
-  settingsSeed: number;
-  defaultRatio: string;
-  defaultResolution: string;
-  validationMessage: string | null;
-  submitting: boolean;
-  formValid: boolean;
-  onSubmit: (inputs: ToolAsset[], settings: ToolSettings) => Promise<void>;
-  batchItems: SkuBatchResult[];
-  galleryLoading: boolean;
-  galleryError: string | null;
-  failedNotice: string | null;
-  activeResultId: string | null;
-  onActiveResultChange: (id: string | null) => void;
-  onRefresh: () => void;
-  onRetryFailed: (itemId?: string) => void;
-  batchDownloading: boolean;
-  onDownloadAll: () => void;
-  historyGroups: SkuBatchGroup[];
-  onOpenHistory: (group: SkuBatchGroup) => void;
-  onRestoreHistory: (group: SkuBatchGroup) => void;
-  onDownloadHistory: (group: SkuBatchGroup) => void;
-  children: ReactNode;
-}) {
+}: ProductSkuWorkspaceProps) {
   /*
    * 每个 SKU 各建一条任务、各扣一份单价 —— 按钮上按数量折算总价，
    * 单价取 `GET /capabilities` 的运行时生效价，与建单扣费同源。
@@ -125,7 +125,7 @@ export function ProductSkuWorkspace({
           onActiveChange={onActiveResultChange}
           onDownloadAll={onDownloadAll}
           onRetryFailed={onRetryFailed}
-          retrying={submitting || batchDownloading}
+          retrying={submitting}
         />
       }
       trailingPane={

@@ -99,6 +99,9 @@ export const QUALITY_OPTIONS = [
 /** 能力 id (建任务与取价都用它) */
 export const CAPABILITY_ID = 'shoppable_carousel';
 
+/** 分类 tab 的「全部」项（纯前端筛选态，不来自后端） */
+export const ALL_CATEGORY = '';
+
 /**
  * 卖点文案输入框的 placeholder (参考站实拍原文)
  */

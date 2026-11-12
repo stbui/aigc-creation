@@ -1,23 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, ChevronUp, Columns2, History, Minus, Plus, Trash2, Undo2, Redo2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   MAX_ANNOTATIONS,
   TOOLS,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  ZOOM_STEP,
+  type AnnotationDraft,
   type MaskPainterHandle,
   type MaskState,
   type PaintTool,
   type RegionBounds,
 } from './constants';
-import { MaskPainter } from './MaskPainter';
-import { ToolCard, ToolHistoryGrid, ToolShell, type ToolAsset } from './components';
-import {
-  useAuth,
-  useProject,
-  useToolTask,
-} from './hooks';
-import { assetsApi, assetSrc, assetThumbUrl, generateApi } from './api';
-import { useApp, Drawer } from '../../ui';
+import { ToolShell, type ToolAsset } from './components';
+import { useApp, useProject, useToolHistory, useToolTask } from './hooks';
+import { assetsApi, assetSrc } from './api';
+import { LocalRedrawAnnotationPanel } from './LocalRedrawAnnotationPanel';
+import { LocalRedrawHistoryPane } from './LocalRedrawHistoryPane';
+import { LocalRedrawIntro } from './LocalRedrawIntro';
+import { LocalRedrawStage } from './LocalRedrawStage';
+import { LocalRedrawUploadPreview } from './LocalRedrawUploadPreview';
 
 /**
  * 局部重绘 —— 1:1 复刻参考站 https://ijihua.cn/local-redraw。
@@ -40,12 +42,21 @@ import { useApp, Drawer } from '../../ui';
  *
  * 诚实披露: local_redraw 必须由真实 inpainting 模型完成, 本地没有实现；
  * 没有可用通道时后端判 failed/42204 并退款，本页据 runtime 提前禁用提交。
+ *
+ * 板块拆分见 `docs/frontend-module-conventions.md`：画布舞台 `LocalRedrawStage`
+ * （工具栏 `LocalRedrawToolbar` / 底部操作条 `LocalRedrawCanvasFooter`）、
+ * 标注面板 `LocalRedrawAnnotationPanel`（逐条 `LocalRedrawAnnotationItem`）、
+ * 历史栏 `LocalRedrawHistoryPane`、上传预览 `LocalRedrawUploadPreview`、
+ * 空态 `LocalRedrawIntro`；历史取数复用共享 `useToolHistory`（经 `hooks.ts` 转出），
+ * 画布 / 提交 / 删除等写操作仍留在本文件。
  */
-
 export function LocalRedrawPage() {
   const { message } = useApp();
   const { ensureProject } = useProject();
-  const { submitting, result, setResult, run } = useToolTask({ capability: 'local_redraw', successMessage: '重绘结果已生成' });
+  const { submitting, result, setResult, run } = useToolTask({
+    capability: 'local_redraw',
+    successMessage: '重绘结果已生成',
+  });
 
   const [tool, setTool] = useState<PaintTool>('rect');
   const [brush, setBrush] = useState(30);
@@ -57,7 +68,7 @@ export function LocalRedrawPage() {
   /** 当前有效的画布区域；id 稳定，描述/参考图都按 id 绑定。 */
   const [regions, setRegions] = useState<RegionBounds[]>([]);
   /** 每个区域各有一份描述与可选参考图；删除/重排其它区域不会串位。 */
-  const [annotationDrafts, setAnnotationDrafts] = useState<Record<number, { prompt: string; reference: ToolAsset | null }>>({});
+  const [annotationDrafts, setAnnotationDrafts] = useState<Record<number, AnnotationDraft>>({});
   /** 遮罩上传期间也要禁用按钮 —— 否则连点会传两份遮罩 */
   const [preparing, setPreparing] = useState(false);
   /**
@@ -68,16 +79,11 @@ export function LocalRedrawPage() {
    */
   const [referenceUploading, setReferenceUploading] = useState<Set<number>>(() => new Set());
   const uploadBusy = referenceUploading.size > 0;
-  /** 历史抽屉 */
+  /** 历史抽屉（窄屏）；桌面右栏折叠由 `historyCollapsed` 控制 */
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<Awaited<ReturnType<typeof generateApi.list>>>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyReload, setHistoryReload] = useState(0);
+  const [historyCollapsed, setHistoryCollapsed] = useState(false);
   /** 原图真实宽高比；画布按它展示，避免非方图出现额外留白。 */
   const [sourceAspect, setSourceAspect] = useState(1);
-  /** 桌面右栏折叠; 窄屏本来就不显示右栏, 改用浮动按钮打开抽屉 */
-  const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const painter = useRef<MaskPainterHandle | null>(null);
   /*
    * 提交后结果态会卸载标注画布，painter 也随之清空。「重新生成」必须复用
@@ -88,12 +94,15 @@ export function LocalRedrawPage() {
   const maskAssetIdRef = useRef<string | null>(null);
   const maskSourceIdRef = useRef<string | null>(null);
   const lastSourceIdRef = useRef<string | null>(null);
-  const { token } = useAuth();
 
-  const updateAnnotationDraft = (
-    id: number,
-    patch: Partial<{ prompt: string; reference: ToolAsset | null }>,
-  ) => {
+  const {
+    tasks: history,
+    loading: historyLoading,
+    error: historyError,
+    retry: retryHistory,
+  } = useToolHistory('local_redraw', result?.url);
+
+  const updateAnnotationDraft = (id: number, patch: Partial<AnnotationDraft>) => {
     setAnnotationDrafts((prev) => {
       const current = prev[id] ?? { prompt: '', reference: null };
       return { ...prev, [id]: { ...current, ...patch } };
@@ -109,8 +118,8 @@ export function LocalRedrawPage() {
       updateAnnotationDraft(id, {
         reference: { id: asset.id, url: assetSrc(asset) ?? '', name: file.name },
       });
-    } catch (e) {
-      message.error((e as Error).message || '参考图上传失败，请重试');
+    } catch (error) {
+      message.error((error as Error).message || '参考图上传失败，请重试');
     } finally {
       setReferenceUploading((prev) => {
         const next = new Set(prev);
@@ -119,41 +128,6 @@ export function LocalRedrawPage() {
       });
     }
   };
-
-  // 历史记录以任务为准；生成完成后刷新一次，首次挂载若有登录态也拉一次。
-  useEffect(() => {
-    if (!token) {
-      setHistory([]);
-      setHistoryLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setHistoryLoading(true);
-    setHistoryError(null);
-    void generateApi
-      .listPage({ capability: 'local_redraw', limit: 50, offset: 0 })
-      .then((page) => {
-        if (cancelled) return;
-        setHistory(
-          page.items
-            .filter((task) => task.status === 'succeeded' && task.outputAsset)
-            .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
-            .slice(0, 20),
-        );
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setHistory([]);
-          setHistoryError((e as Error).message || '历史记录加载失败');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setHistoryLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [token, result, historyReload]);
 
   /** 清掉当前图的遮罩、笔迹状态与结果；源图本身由上传位管理。 */
   const clearMaskSession = useCallback(() => {
@@ -204,86 +178,12 @@ export function LocalRedrawPage() {
     setHistoryOpen(false);
   };
 
-  /**
-   * 历史栏只在数据与折叠态变化时重建。
-   *
-   * 页面其余部分（尤其是标注描述输入）每敲一个字都会重渲染；`useMemo`
-   * 保持元素引用不变，React 直接跳过这棵子树的对账（最多 20 张历史卡）。
-   */
-  const historyPane = useMemo(
-    () => (
-      <>
-        <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
-          <div className="redraw-history-head">
-            <h2>
-              <History size={15} />
-              历史记录
-            </h2>
-            <button
-              type="button"
-              className="redraw-history-collapse"
-              aria-label={historyCollapsed ? '展开历史记录' : '收起历史记录'}
-              aria-expanded={!historyCollapsed}
-              title={historyCollapsed ? '展开历史记录' : '收起历史记录'}
-              onClick={() => setHistoryCollapsed((value) => !value)}
-            >
-              {historyCollapsed ? <ChevronRight size={16} /> : <ChevronUp size={16} />}
-            </button>
-          </div>
-          <div className="redraw-history-scroll">
-            <ToolHistoryGrid
-              tasks={history}
-              loading={historyLoading}
-              error={historyError}
-              emptyText=""
-              onRetry={() => setHistoryReload((value) => value + 1)}
-            />
-          </div>
-        </aside>
-
-        <button
-          type="button"
-          className="redraw-history-float-toggle"
-          aria-label="历史记录"
-          title="历史记录"
-          onClick={() => {
-            // 桌面端右栏收起后，浮动按钮把右栏展开；窄屏没有右栏，改用抽屉。
-            if (window.matchMedia('(max-width: 1180px)').matches) setHistoryOpen(true);
-            else setHistoryCollapsed(false);
-          }}
-        >
-          <History size={16} />
-        </button>
-
-        <Drawer
-          title="历史记录"
-          open={historyOpen}
-          onClose={() => setHistoryOpen(false)}
-          size={320}
-          styles={{ body: { padding: 12 } }}
-        >
-          <ToolHistoryGrid
-            tasks={history}
-            loading={historyLoading}
-            error={historyError}
-            emptyText=""
-            onRetry={() => setHistoryReload((value) => value + 1)}
-          />
-        </Drawer>
-      </>
-    ),
-    [history, historyLoading, historyError, historyCollapsed, historyOpen],
-  );
-
-  const handlePaintState = useCallback(
-    (state: MaskState) => {
-      setPainted(state.painted);
-      setCanUndo(state.canUndo);
-      setCanRedo(state.canRedo);
-      setRegions(state.regions);
-    },
-    [],
-  );
+  const handlePaintState = useCallback((state: MaskState) => {
+    setPainted(state.painted);
+    setCanUndo(state.canUndo);
+    setCanRedo(state.canRedo);
+    setRegions(state.regions);
+  }, []);
 
   const handleNaturalSize = useCallback(({ width, height }: { width: number; height: number }) => {
     if (width <= 0 || height <= 0) return;
@@ -295,6 +195,14 @@ export function LocalRedrawPage() {
   const handleRegionLimit = useCallback(() => {
     message.warning(`最多支持 ${MAX_ANNOTATIONS} 个标注区域，请先撤回或删除一个`);
   }, [message]);
+
+  const toggleHistory = useCallback(() => setHistoryCollapsed((value) => !value), []);
+  const expandHistory = useCallback(() => setHistoryCollapsed(false), []);
+  const openHistoryDrawer = useCallback(() => setHistoryOpen(true), []);
+  const closeHistoryDrawer = useCallback(() => setHistoryOpen(false), []);
+
+  const zoomIn = () => setZoom((value) => Math.min(ZOOM_MAX, value + ZOOM_STEP));
+  const zoomOut = () => setZoom((value) => Math.max(ZOOM_MIN, value - ZOOM_STEP));
 
   const removeAnnotationAt = (id: number) => {
     if (uploadBusy) {
@@ -313,24 +221,29 @@ export function LocalRedrawPage() {
 
   // 快捷键：H/B/E/R/O 切工具，Ctrl+Z 撤回，Ctrl+Shift+Z 恢复，+/- 缩放
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) painter.current?.redo();
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)
+      ) {
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) painter.current?.redo();
         else painter.current?.undo();
         return;
       }
-      if (e.key === '+' || e.key === '=') {
-        setZoom((z) => Math.min(140, z + 10));
+      if (event.key === '+' || event.key === '=') {
+        setZoom((value) => Math.min(ZOOM_MAX, value + ZOOM_STEP));
         return;
       }
-      if (e.key === '-') {
-        setZoom((z) => Math.max(70, z - 10));
+      if (event.key === '-') {
+        setZoom((value) => Math.max(ZOOM_MIN, value - ZOOM_STEP));
         return;
       }
-      const toolKey = TOOLS.find((t) => t.shortcut.toLowerCase() === e.key.toLowerCase());
+      const toolKey = TOOLS.find((item) => item.shortcut.toLowerCase() === event.key.toLowerCase());
       if (toolKey) setTool(toolKey.value);
     };
     window.addEventListener('keydown', onKey);
@@ -396,8 +309,8 @@ export function LocalRedrawPage() {
         maskAssetIdRef.current = asset.id;
       }
       maskAssetId = maskAssetIdRef.current;
-    } catch (e) {
-      message.error((e as Error).message || '遮罩上传失败，请重试');
+    } catch (error) {
+      message.error((error as Error).message || '遮罩上传失败，请重试');
       return;
     } finally {
       setPreparing(false);
@@ -418,10 +331,10 @@ export function LocalRedrawPage() {
 
   /** 每个有效区域必须逐区填写描述；最多 3 条与画布限制一致。 */
   const filledCount = regions.filter((region) => annotationDrafts[region.id]?.prompt.trim()).length;
-  const formValid = painted && regions.length > 0 && filledCount === regions.length && !uploadBusy && !preparing;
+  const formValid =
+    painted && regions.length > 0 && filledCount === regions.length && !uploadBusy && !preparing;
 
   return (
-    <>
     <ToolShell
       capability="local_redraw"
       pageClass={`local-redraw-page${historyCollapsed ? ' history-collapsed' : ''}`}
@@ -435,33 +348,13 @@ export function LocalRedrawPage() {
         const image = uploaded[0];
         if (!image) return null;
         return (
-          <div className={`source-row${controls.uploading ? ' processing' : ''}`}>
-            <button
-              type="button"
-              className="local-source-preview"
-              aria-label="预览待重绘商品"
-              onClick={() => controls.preview(image)}
-            >
-              <img src={assetThumbUrl(image.url, 320) ?? image.url} alt="待重绘商品" draggable={false} />
-            </button>
-            <div>
-              <button
-                type="button"
-                disabled={controls.uploading}
-                onClick={() => controls.remove(image.id)}
-              >
-                重新编辑
-              </button>
-              <button
-                type="button"
-                className="soft"
-                disabled={controls.uploading}
-                onClick={controls.open}
-              >
-                重新上传
-              </button>
-            </div>
-          </div>
+          <LocalRedrawUploadPreview
+            image={image}
+            uploading={controls.uploading}
+            onPreview={() => controls.preview(image)}
+            onRemove={() => controls.remove(image.id)}
+            onOpen={controls.open}
+          />
         );
       }}
       settings={{ ratio: true, resolution: true }}
@@ -488,235 +381,63 @@ export function LocalRedrawPage() {
         ) : null
       }
       keepSourceWhileSubmitting
-      trailingPane={historyPane}
+      trailingPane={
+        <LocalRedrawHistoryPane
+          tasks={history}
+          loading={historyLoading}
+          error={historyError}
+          collapsed={historyCollapsed}
+          drawerOpen={historyOpen}
+          onToggle={toggleHistory}
+          onExpand={expandHistory}
+          onOpenDrawer={openHistoryDrawer}
+          onCloseDrawer={closeHistoryDrawer}
+          onRetry={retryHistory}
+        />
+      }
       sourcePane={(images) => {
         const image = images[0];
-        if (!image) {
-          return (
-            <div className="redraw-intro">
-              <video
-                className="redraw-intro-video"
-                src="/static/mp4/local-redraw.mp4"
-                poster="/static/mp4/local-redraw-poster.jpg"
-                autoPlay
-                loop
-                muted
-                playsInline
-                aria-label="局部重绘演示"
-              />
-              <div className="redraw-intro-copy">
-                <strong>局部重绘</strong>
-                <p>只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素</p>
-              </div>
-            </div>
-          );
-        }
-        const renderToolButton = (value: PaintTool) => {
-          const item = TOOLS.find((t) => t.value === value);
-          if (!item) return null;
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              className={`redraw-tool-btn${tool === item.value ? ' active' : ''}`}
-              aria-pressed={tool === item.value}
-              title={`${item.label} (${item.shortcut})`}
-              onClick={() => setTool(item.value)}
-            >
-              <Icon size={16} />
-              {item.label}
-            </button>
-          );
-        };
+        if (!image) return <LocalRedrawIntro />;
         return (
-          <div className={`pk-source-pane redraw-stage${submitting ? ' is-submitting' : ''}`} aria-busy={submitting}>
-            <div className="redraw-stage-topbar">
-              <div className="redraw-toolbar" role="toolbar" aria-label="重绘工具">
-                {renderToolButton('hand')}
-                {renderToolButton('eraser')}
-                <button
-                  type="button"
-                  className="redraw-tool-btn"
-                  title="对比"
-                  disabled
-                >
-                  <Columns2 size={16} />
-                  对比
-                </button>
-                {renderToolButton('rect')}
-                {renderToolButton('ellipse')}
-                {renderToolButton('brush')}
-                <label className="redraw-toolbar-brush">
-                  <span className="sr-only">画笔大小</span>
-                  <input
-                    aria-label="画笔大小"
-                    type="range"
-                    min={10}
-                    max={60}
-                    step={2}
-                    value={brush}
-                    style={{ '--range-progress': `${((brush - 10) / 50) * 100}%` } as React.CSSProperties}
-                    onChange={(e) => setBrush(Number(e.target.value))}
-                  />
-                  <output>{brush}</output>
-                </label>
-              </div>
-            </div>
-            <div className="redraw-stage-main">
-              <div
-                className="redraw-canvas-wrap"
-                style={{ '--redraw-image-aspect': sourceAspect } as React.CSSProperties}
-              >
-                <MaskPainter
-                  url={image.url}
-                  tool={tool}
-                  brush={brush}
-                  zoom={zoom}
-                  pan={pan}
-                  maxRegions={MAX_ANNOTATIONS}
-                  onPanChange={setPan}
-                  onRegionLimit={handleRegionLimit}
-                  onChange={handlePaintState}
-                  onNaturalSize={handleNaturalSize}
-                  handleRef={painter}
-                />
-              </div>
-            </div>
-            <div className="redraw-canvas-footer">
-              <button
-                type="button"
-                className="redraw-footer-btn"
-                disabled={!canUndo || uploadBusy}
-                title="撤回 (Ctrl+Z)"
-                onClick={() => painter.current?.undo()}
-              >
-                <Undo2 size={16} />
-                撤回
-              </button>
-              <button
-                type="button"
-                className="redraw-footer-btn"
-                disabled={!canRedo || uploadBusy}
-                title="恢复 (Ctrl+Shift+Z)"
-                onClick={() => painter.current?.redo()}
-              >
-                <Redo2 size={16} />
-                恢复
-              </button>
-              <button type="button" className="redraw-footer-btn" disabled={uploadBusy} onClick={() => painter.current?.clear()}>
-                <Trash2 size={16} />
-                清空
-              </button>
-              <span className="redraw-tool-divider" />
-              <button type="button" className="redraw-footer-btn redraw-zoom-btn" aria-label="缩小" title="缩小 (-)" onClick={() => setZoom((z) => Math.max(70, z - 10))}>
-                <Minus size={16} />
-              </button>
-              <span className="redraw-zoom-value">{zoom}%</span>
-              <button type="button" className="redraw-footer-btn redraw-zoom-btn" aria-label="放大" title="放大 (+)" onClick={() => setZoom((z) => Math.min(140, z + 10))}>
-                <Plus size={16} />
-              </button>
-            </div>
-            <p className="redraw-shortcut-hint">
-              快捷键：H 抓手 · B 涂抹 · E 擦除 · Ctrl+Z 撤回 · Ctrl+Shift+Z 恢复 · +/- 缩放
-            </p>
-          </div>
+          <LocalRedrawStage
+            image={image}
+            tool={tool}
+            brush={brush}
+            zoom={zoom}
+            pan={pan}
+            aspect={sourceAspect}
+            submitting={submitting}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            busy={uploadBusy}
+            painter={painter}
+            onToolChange={setTool}
+            onBrushChange={setBrush}
+            onPanChange={setPan}
+            onRegionLimit={handleRegionLimit}
+            onPaintState={handlePaintState}
+            onNaturalSize={handleNaturalSize}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+          />
         );
       }}
     >
       {(images) => {
         if (images.length === 0) return null;
         return (
-          <>
-            <ToolCard
-              title={<><i className="pk-required-mark">*</i>重绘描述</>}
-              actions={<span>{filledCount}/{regions.length}</span>}
-              className="prompt-card"
-            >
-              {regions.length === 0 ? (
-                <div className="redraw-prompt is-pending">
-                  <label className="redraw-prompt-label is-pending">
-                    <i />
-                    标注1
-                  </label>
-                  <textarea rows={2} value="" disabled placeholder="请先在图片上标注区域..." />
-                </div>
-              ) : regions.map((region, index) => {
-                const draft = annotationDrafts[region.id];
-                const reference = draft?.reference ?? null;
-                return (
-                  <div key={region.id} className="redraw-prompt">
-                    <button
-                      type="button"
-                      className="remove-annotation"
-                      aria-label={`删除标注${index + 1}`}
-                      title={`删除标注${index + 1}`}
-                      disabled={uploadBusy}
-                      onClick={() => removeAnnotationAt(region.id)}
-                    >
-                      <X size={13} />
-                    </button>
-                    <label className="redraw-prompt-label is-marked">
-                      <i />
-                      标注{index + 1}
-                    </label>
-                    <textarea
-                      rows={2}
-                      maxLength={200}
-                      value={draft?.prompt ?? ''}
-                      placeholder="请输入您要重绘的内容，例如：更换颜色..."
-                      onChange={(e) => updateAnnotationDraft(region.id, { prompt: e.target.value })}
-                    />
-                    <label
-                      className={`redraw-prompt-tools reference-upload${reference ? ' has-image' : ''}`}
-                      title={reference ? `替换标注${index + 1}参考图` : `上传标注${index + 1}参考图`}
-                    >
-                      {reference && (
-                        <>
-                          <img src={assetThumbUrl(reference.url, 240) ?? reference.url} alt={`标注${index + 1}参考图`} />
-                          <button
-                            type="button"
-                            className="remove-reference"
-                            aria-label={`移除标注${index + 1}参考图`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              updateAnnotationDraft(region.id, { reference: null });
-                            }}
-                          >
-                            <X size={12} />
-                          </button>
-                        </>
-                      )}
-                      {referenceUploading.has(region.id) && !reference ? (
-                        <span>上传中…</span>
-                      ) : !reference ? (
-                        <>
-                          <Plus size={16} />
-                          <span>上传图片</span>
-                        </>
-                      ) : null}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        hidden
-                        disabled={referenceUploading.has(region.id)}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          void uploadReference(region.id, file);
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                  </div>
-                );
-              })}
-            </ToolCard>
-          </>
+          <LocalRedrawAnnotationPanel
+            regions={regions}
+            drafts={annotationDrafts}
+            filledCount={filledCount}
+            uploadBusy={uploadBusy}
+            referenceUploading={referenceUploading}
+            onRemove={removeAnnotationAt}
+            onDraftChange={updateAnnotationDraft}
+            onUploadReference={uploadReference}
+          />
         );
       }}
     </ToolShell>
-
-    </>
   );
 }

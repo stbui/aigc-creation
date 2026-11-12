@@ -16,7 +16,7 @@ import {
 import { useApp } from '../../ui';
 
 /**
- * 智能扩图 —— 1:1 复刻参考站 https://ijihua.cn/image-expand。
+ * 智能扩图
  *
  * 实拍结构 (smart-expand-page):
  *   上传卡: * 上传图片

@@ -7,11 +7,57 @@
 
 import { DEFAULT_CUSTOM_COLOR, qrColors, tokenColor } from '../../lib/colorPalette';
 import { POSTER_HEIGHT, POSTER_WIDTH } from './constants';
+import type { MyInvites } from '../../types/api';
 
 /** 海报与站内共用同一组设计令牌 */
 export { DEFAULT_CUSTOM_COLOR, qrColors, tokenColor };
 /** 千分位 */
 export { formatNumber } from '../../lib/format';
+
+/**
+ * 页头主标题。
+ *
+ * 邀请人奖励为 0 时不能写「立赚 0 积分」—— 规则允许只奖励被邀请人；
+ * 规则关闭时也不能承诺任何积分。
+ */
+export function inviteHeroTitle(rule: MyInvites['rule'], enabled: boolean): string {
+  if (!enabled) return '邀请好友一起用货觉AI';
+  if (rule.inviterCredits > 0) return `邀请好友立赚 ${rule.inviterCredits} 积分`;
+  return '邀请好友，注册即得积分';
+}
+
+/** 邀请步骤文案里的一条 */
+export interface InviteStep {
+  title: string;
+  desc: string;
+}
+
+/** 邀请步骤：奖励口径随真实规则变化，不写兑现不了的数字。 */
+export function buildInviteSteps(
+  rule: MyInvites['rule'],
+  enabled: boolean,
+  inviteCode: string,
+): InviteStep[] {
+  return [
+    { title: '分享邀请链接', desc: `复制含专属邀请码的链接发送给好友：${inviteCode}` },
+    {
+      title: '好友注册',
+      desc:
+        rule.inviteeCredits > 0
+          ? `好友通过链接注册即得 ${rule.inviteeCredits} 积分`
+          : '好友通过链接注册后自动与你的账号绑定',
+    },
+    {
+      title: '奖励自动发放',
+      desc:
+        !enabled || rule.inviterCredits <= 0
+          ? '当前未配置邀请人奖励，分享仅记录邀请关系'
+          : rule.triggerOn === 'first_pay'
+            ? `好友首次付费成功后，你得 ${rule.inviterCredits} 积分`
+            : `好友注册成功后，你得 ${rule.inviterCredits} 积分`,
+    },
+  ];
+}
 
 /** 签到日期只留「月/日」。按字符串切分, 避免时区把 10-31 显示成 10-30 */
 export function formatForecastDay(day: string): string {

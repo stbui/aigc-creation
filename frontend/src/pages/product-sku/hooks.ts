@@ -6,15 +6,19 @@ import {
   type StartedTask,
   type VariantParam,
 } from './constants';
-import type { ToolAsset, ToolSettings } from './components';
+import type { SkuResultItem, ToolAsset, ToolSettings } from './components';
 import { generateApi, newIdempotencyKey, resolveModelId } from './api';
 import type { GalleryItem } from '../../hooks/useResultGallery';
 import { useProject } from '../../hooks/useProject';
 import { useGenerateError } from '../../hooks/useGenerateError';
 import { notifyCreditsChanged } from '../../context/CreditsContext';
 import {
+  downloadDirect,
+  downloadUrlsAsZip,
   pollToResult,
   resultFromGallery,
+  safeFilename,
+  skuZipFilename,
   taskErrorText,
   type SkuBatchGroup,
 } from './utils';
@@ -381,4 +385,37 @@ export function useSkuBatch({
     retryFailed,
     openHistoryResult,
   };
+}
+
+/**
+ * 批次结果打包下载：优先 zip，浏览器不支持时逐张回退。
+ *
+ * 当前批次与历史提交共用同一份命名规则（`01-SKU名.png`），
+ * 空结果直接返回，是否提示由调用方按业务语义决定。
+ */
+export function useSkuDownload() {
+  const { message } = useApp();
+
+  return useCallback(
+    async (items: SkuResultItem[]) => {
+      const ready = items.filter((item) => item.url);
+      if (ready.length === 0) return;
+      try {
+        await downloadUrlsAsZip(
+          skuZipFilename(),
+          ready.map((item, index) => ({
+            name: `${String(index + 1).padStart(2, '0')}-${safeFilename(item.label)}.png`,
+            url: item.url!,
+          })),
+        );
+        message.success(`已打包下载 ${ready.length} 张 SKU 图`);
+      } catch {
+        ready.forEach((item, index) =>
+          window.setTimeout(() => downloadDirect(item), index * 180),
+        );
+        message.info('浏览器不支持打包，已改为逐张下载');
+      }
+    },
+    [message],
+  );
 }

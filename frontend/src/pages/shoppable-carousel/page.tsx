@@ -6,23 +6,14 @@ import {
   DEFAULT_LANGUAGE,
   DEFAULT_MARKET,
   DEFAULT_PLATFORM,
-  MAX_COUNT,
   MAX_IMAGE_MB,
   MAX_IMAGES,
-  MIN_COUNT,
 } from './constants';
-import {
-  AssetLibraryModal,
-  MobileUploadModal,
-  ModelPicker,
-  ToolSubmitBar,
-  ToolSettingsPopover,
-} from './components';
+import { AssetLibraryModal, MobileUploadModal } from './components';
 import { ShoppableCarouselConfig } from './ShoppableCarouselConfig';
-import { ShoppableCarouselHistory } from './ShoppableCarouselHistory';
+import { ShoppableCarouselFooter } from './ShoppableCarouselFooter';
 import { ShoppableCarouselResultList } from './ShoppableCarouselResultList';
-import { ShoppableCarouselStepper } from './ShoppableCarouselStepper';
-import { TemplateGrid } from './TemplateGrid';
+import { ShoppableCarouselShowcase } from './ShoppableCarouselShowcase';
 import {
   notifyCreditsChanged,
   useAuth,
@@ -32,10 +23,11 @@ import {
   useImageUpload,
   useProject,
   useResultGallery,
+  useShoppableCarouselTemplates,
   type GalleryItem,
 } from './hooks';
-import { ApiError, generateApi, newIdempotencyKey, promptToolsApi, resolveModelId, shoppableCarouselApi } from './api';
-import { clampCount, filterTemplatesByCategory } from './utils';
+import { generateApi, newIdempotencyKey, promptToolsApi, resolveModelId } from './api';
+import { clampCount, isUncertainSubmitError } from './utils';
 import { Modal, useApp } from '../../ui';
 import type { ShoppableCarouselTemplate } from '../../types/api';
 
@@ -48,24 +40,13 @@ import type { ShoppableCarouselTemplate } from '../../types/api';
  *
  * 生成链路与站内其它能力同源：一次提交由后端 `outputPlan` 拆成 N 个任务，
  * 每张各计一次价、共享 batchId；页面只负责收集输入与展示。
- */
-
-/** 分类 tab 的「全部」项（纯前端筛选态，不来自后端） */
-const ALL_CATEGORY = '';
-
-/**
- * `POST /generate` 的失败是否「结果不明」。
  *
- * 一次提交只发一个请求，服务端在**同一事务**里建任务 + 建账 + 预留：
- *   · 4xx 是扣费前的确定性拒绝（参数 / 权益 / 余额），不可能留下任务；
- *   · 5xx 与 fetch 网络中断时，请求可能已经到达服务端并落库，
- *     只能提示用户先核对生成记录。
+ * 板块拆分见 `docs/frontend-module-conventions.md`：左栏配置 `ShoppableCarouselConfig`
+ * 与底栏 `ShoppableCarouselFooter`（张数步进 `ShoppableCarouselStepper`），右栏
+ * `ShoppableCarouselShowcase`（模板网格 `TemplateGrid` + 历史 `ShoppableCarouselHistory`），
+ * 全部记录抽屉 `ShoppableCarouselResultList`；模板取数落 `hooks.ts` 的
+ * `useShoppableCarouselTemplates`，提交 / 删除 / 文案生成等写操作仍留在本文件。
  */
-function isUncertainSubmitError(error: unknown): boolean {
-  if (error instanceof ApiError) return error.status >= 500;
-  return true;
-}
-
 export function ShoppableCarouselPage() {
   const { message, modal } = useApp();
   const reportError = useGenerateError();
@@ -73,45 +54,19 @@ export function ShoppableCarouselPage() {
   const { token } = useAuth();
 
   // ── 模板清单（来自后端，前端不存副本） ──
-  const [templates, setTemplates] = useState<ShoppableCarouselTemplate[]>([]);
-  const [categories, setCategories] = useState<Array<{ id: string; label: string }>>([]);
-  /**
-   * 生成张数区间。
-   *
-   * 本地常量只作首屏兜底：接口返回后以服务端 `countRange` 为准，
-   * 避免后端调整区间时前端仍按旧值收敛/计价。
-   */
-  const [countRange, setCountRange] = useState({ min: MIN_COUNT, max: MAX_COUNT });
-  const [templatesLoading, setTemplatesLoading] = useState(true);
-  const [templatesError, setTemplatesError] = useState<string | null>(null);
-  const [categoryId, setCategoryId] = useState(ALL_CATEGORY);
+  const {
+    templates,
+    categories,
+    countRange,
+    loading: templatesLoading,
+    error: templatesError,
+    reload: reloadTemplates,
+  } = useShoppableCarouselTemplates();
+  const [categoryId, setCategoryId] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
-  const loadTemplates = useCallback(async () => {
-    setTemplatesLoading(true);
-    setTemplatesError(null);
-    try {
-      const result = await shoppableCarouselApi.templates();
-      setTemplates(result.templates);
-      setCategories(result.categories);
-      const min = Math.trunc(Number(result.countRange?.min));
-      const max = Math.trunc(Number(result.countRange?.max));
-      if (Number.isFinite(min) && Number.isFinite(max) && min > 0 && min <= max) {
-        setCountRange({ min, max });
-      }
-    } catch (e) {
-      setTemplatesError((e as Error).message || '模板清单加载失败');
-    } finally {
-      setTemplatesLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadTemplates();
-  }, [loadTemplates]);
-
   // ── 上传 ──
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, clearImages, library, mobile } = useImageUpload({
+  const { images, uploading, fileInputRef, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
     maxMb: MAX_IMAGE_MB,
   });
@@ -169,7 +124,7 @@ export function ShoppableCarouselPage() {
   }, [gallery.reload]);
 
   // ── 能力运行时（不可用时禁用提交并给出原因） ──
-  const { runtime, blocked, reason } = useCapabilityRuntime(CAPABILITY_ID);
+  const { blocked, reason } = useCapabilityRuntime(CAPABILITY_ID);
 
   // ── 价签：按本次要出几张算总价 ──
   const unitCreditCost = useCreditCost(CAPABILITY_ID);
@@ -197,7 +152,7 @@ export function ShoppableCarouselPage() {
   }, [countRange]);
 
   const selectedTemplate = useMemo(
-    () => templates.find((t) => t.id === selectedTemplateId) ?? null,
+    () => templates.find((template) => template.id === selectedTemplateId) ?? null,
     [templates, selectedTemplateId],
   );
 
@@ -228,7 +183,7 @@ export function ShoppableCarouselPage() {
    * 分类保持在「全部模板」不动。
    */
   const shuffleTemplate = useCallback(() => {
-    const pool = templates.filter((t) => t.id !== selectedTemplateId);
+    const pool = templates.filter((template) => template.id !== selectedTemplateId);
     if (pool.length === 0) return;
     const next = pool[Math.floor(Math.random() * pool.length)];
     setSelectedTemplateId(next.id);
@@ -276,8 +231,8 @@ export function ShoppableCarouselPage() {
       }
       setSellingPoints(content);
       message.success('已按商品图生成卖点文案，可继续编辑');
-    } catch (e) {
-      message.error((e as Error).message || '文案生成暂时不可用，请稍后再试');
+    } catch (error) {
+      message.error((error as Error).message || '文案生成暂时不可用，请稍后再试');
     } finally {
       setAnalyzing(false);
     }
@@ -307,7 +262,7 @@ export function ShoppableCarouselPage() {
         noText,
         socialCaption,
       };
-      const inputAssetIds = images.map((x) => x.id);
+      const inputAssetIds = images.map((image) => image.id);
 
       /*
        * 幂等键按「本次输入指纹」复用：结果未确认时用户重试会拿到同一个 key，
@@ -343,15 +298,15 @@ export function ShoppableCarouselPage() {
       await gallery.reload();
       pendingSubmitRef.current = null;
       message.success(`已提交 ${shotCount} 张带货图文，生成完成后自动更新`);
-    } catch (e) {
-      reportError(e);
+    } catch (error) {
+      reportError(error);
       if (batchStarted) {
         await gallery.reload();
         /*
          * 4xx 是扣费前拦截，提示用户改输入即可；只有网络中断 / 5xx
          * 才可能「已经建单但没拿到响应」，此时重试会复用幂等键。
          */
-        if (isUncertainSubmitError(e)) {
+        if (isUncertainSubmitError(error)) {
           message.warning('提交结果未确认，请先查看生成记录；重新提交不会重复扣费');
         }
       }
@@ -383,8 +338,8 @@ export function ShoppableCarouselPage() {
         onOk: async () => {
           try {
             await generateApi.remove(parent.id);
-          } catch (e) {
-            message.error((e as Error).message || '删除失败，请刷新后重试');
+          } catch (error) {
+            message.error((error as Error).message || '删除失败，请刷新后重试');
             await gallery.reload();
             return;
           }
@@ -405,22 +360,19 @@ export function ShoppableCarouselPage() {
     [modal, message, gallery.removeItem, gallery.reload],
   );
 
-  /** 新建任务: 清空表单（含已上传图片）回到空态 */
-  const resetTask = useCallback(() => {
-    clearImages();
-    setSellingPoints('');
-    setSelectedTemplateId(null);
-    setMode('ai');
-    setCount(DEFAULT_COUNT);
-    setNoText(false);
-    setSocialCaption(true);
-    message.success('已新建任务，请上传商品图片');
-  }, [clearImages, message]);
-
-  const visibleTemplates = useMemo(
-    () => filterTemplatesByCategory(templates, categoryId),
-    [templates, categoryId],
-  );
+  /*
+   * 登录墙只在**通道可用**时挂。
+   *
+   * 通道不可用时挂 guestLabel 会让按钮写成「登录后生成带货图文」——
+   * 登录也解决不了没有模型线路的问题, 那是在骗用户。
+   * 此时保持真实文案, 由 hint 原样给出 runtime 的原因。
+   */
+  const guestLabel = blocked ? undefined : '登录后生成带货图文';
+  const hint = blocked
+    ? (reason ?? undefined)
+    : mode === 'template' && !selectedTemplateId
+      ? '请先在右侧选择一个模板'
+      : undefined;
 
   return (
     <div className="sc-workspace">
@@ -429,133 +381,74 @@ export function ShoppableCarouselPage() {
         <aside className="sc-input-pane">
           <div className="sc-form-card">
             <div className="sc-form-scroll">
-            <ShoppableCarouselConfig
-              images={images}
-              uploading={uploading}
-              fileInputRef={fileInputRef}
-              onFiles={(f) => void uploadFiles(f)}
-              onRemove={removeImage}
-              onOpenLibrary={openLibrary}
-              onOpenMobile={mobile.openMobile}
-              platform={platform}
-              onPlatformChange={setPlatform}
-              market={market}
-              onMarketChange={setMarket}
-              language={language}
-              onLanguageChange={setLanguage}
-              ratio={ratio}
-              onRatioChange={setRatio}
-              sellingPoints={sellingPoints}
-              onSellingPointsChange={setSellingPoints}
-              analyzing={analyzing}
-              onAnalyze={() => void runAiWrite()}
-              mode={mode}
-              onModeChange={setMode}
-              selectedTemplate={selectedTemplate}
-              onShuffleTemplate={shuffleTemplate}
-              noText={noText}
-              onNoTextChange={setNoText}
-              socialCaption={socialCaption}
-              onSocialCaptionChange={setSocialCaption}
-            />
-          </div>
-
-          {/* 固定底栏: 张数步进器 + 高级设置 + 生成按钮（参考站 sidebarFooter, 415×125） */}
-          <div className="sc-form-footer">
-            {/* 参考站底栏只有一行「张数 + 生成按钮」(415×125)。
-                本站的「高级设置」与张数并排放在同一行, 不再单独占一行 ——
-                多一行会把底栏撑到 169, 与参考站的 125 明显不符。 */}
-            <div className="sc-footer-row">
-              <ShoppableCarouselStepper
-                count={count}
-                min={countRange.min}
-                max={countRange.max}
-                onCountChange={onCountChange}
-              />
-              <ToolSettingsPopover
-                open={settingsOpen}
-                onToggle={() => setSettingsOpen((v) => !v)}
+              <ShoppableCarouselConfig
+                images={images}
+                uploading={uploading}
+                fileInputRef={fileInputRef}
+                onFiles={(files) => void uploadFiles(files)}
+                onRemove={removeImage}
+                onOpenLibrary={openLibrary}
+                onOpenMobile={mobile.openMobile}
+                platform={platform}
+                onPlatformChange={setPlatform}
+                market={market}
+                onMarketChange={setMarket}
+                language={language}
+                onLanguageChange={setLanguage}
                 ratio={ratio}
                 onRatioChange={setRatio}
-                resolution={resolution}
-                onResolutionChange={setResolution}
-                capabilityId={CAPABILITY_ID}
-                showRatio={false}
-                modelPicker={
-                  <ModelPicker
-                    capability={CAPABILITY_ID}
-                    options={{ ratio, resolution }}
-                    onQuoteChange={setModelQuoteCredits}
-                  />
-                }
+                sellingPoints={sellingPoints}
+                onSellingPointsChange={setSellingPoints}
+                analyzing={analyzing}
+                onAnalyze={() => void runAiWrite()}
+                mode={mode}
+                onModeChange={setMode}
+                selectedTemplate={selectedTemplate}
+                onShuffleTemplate={shuffleTemplate}
+                noText={noText}
+                onNoTextChange={setNoText}
+                socialCaption={socialCaption}
+                onSocialCaptionChange={setSocialCaption}
               />
             </div>
-            <ToolSubmitBar
-              submitting={generating}
-              disabled={!formValid || blocked}
-              label="生成带货图文"
-              /*
-               * 登录墙只在**通道可用**时挂。
-               *
-               * 通道不可用时挂 guestLabel 会让按钮写成「登录后生成带货图文」——
-               * 登录也解决不了没有模型线路的问题, 那是在骗用户。
-               * 此时保持真实文案, 由 hint 原样给出 runtime 的原因。
-               */
-              guestLabel={blocked ? undefined : '登录后生成带货图文'}
-              creditLabel={creditLabel ?? undefined}
-              hint={
-                blocked
-                  ? (reason ?? undefined)
-                  : mode === 'template' && !selectedTemplateId
-                    ? '请先在右侧选择一个模板'
-                    : undefined
-              }
+
+            <ShoppableCarouselFooter
+              count={count}
+              min={countRange.min}
+              max={countRange.max}
+              onCountChange={onCountChange}
+              settingsOpen={settingsOpen}
+              onToggleSettings={() => setSettingsOpen((open) => !open)}
+              ratio={ratio}
+              onRatioChange={setRatio}
+              resolution={resolution}
+              onResolutionChange={setResolution}
+              onModelQuoteChange={setModelQuoteCredits}
+              generating={generating}
+              submitDisabled={!formValid || blocked}
+              guestLabel={guestLabel}
+              creditLabel={creditLabel}
+              hint={hint}
               onSubmit={() => void submit()}
             />
-          </div>
           </div>
         </aside>
 
         {/* ── 右: 模板展示（常驻）+ 底部历史记录 ── */}
         <section className="sc-showcase">
-          <nav className="sc-categories" aria-label="模板分类">
-            <button
-              type="button"
-              aria-pressed={categoryId === ALL_CATEGORY}
-              className={`sc-category${categoryId === ALL_CATEGORY ? ' is-active' : ''}`}
-              onClick={() => setCategoryId(ALL_CATEGORY)}
-            >
-              全部模板
-            </button>
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                aria-pressed={categoryId === category.id}
-                className={`sc-category${categoryId === category.id ? ' is-active' : ''}`}
-                onClick={() => setCategoryId(category.id)}
-              >
-                {category.label}
-              </button>
-            ))}
-          </nav>
-
-          <div className="sc-template-scroll">
-            <TemplateGrid
-              templates={visibleTemplates}
-              selectedId={selectedTemplateId}
-              onSelect={selectTemplate}
-              error={templatesError}
-              loading={templatesLoading}
-            />
-          </div>
-
-          {/* 底部历史记录: 常驻, 不与模板区互斥 */}
-          <ShoppableCarouselHistory
-            items={gallery.items}
-            loading={gallery.loading}
-            error={gallery.error}
-            onRefresh={refreshGallery}
+          <ShoppableCarouselShowcase
+            categories={categories}
+            categoryId={categoryId}
+            onCategoryChange={setCategoryId}
+            templates={templates}
+            selectedTemplateId={selectedTemplateId}
+            onSelectTemplate={selectTemplate}
+            templatesError={templatesError}
+            templatesLoading={templatesLoading}
+            galleryItems={gallery.items}
+            galleryLoading={gallery.loading}
+            galleryError={gallery.error}
+            onRefreshGallery={refreshGallery}
             onOpenAll={() => setHistoryOpen(true)}
           />
         </section>

@@ -7,6 +7,9 @@
 
 import type { MyInvites } from '../../types/api';
 
+/** 页面共用的接口类型 (仅类型, 无运行期依赖) */
+export type { CheckinStatus, MyInvites } from '../../types/api';
+
 /** 邀请记录的状态文案与色板: pending 不能被写成「已发放」 */
 export const REWARD_STATUS: Record<
   MyInvites['relations'][number]['rewardStatus'],

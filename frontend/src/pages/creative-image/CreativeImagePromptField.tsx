@@ -1,8 +1,8 @@
 import { Maximize2, Sparkles } from 'lucide-react';
 
-import { MAX_PROMPT_LEN } from './constants';
+import { CREATION_PROMPT_PLACEHOLDER, MAX_PROMPT_LEN } from './constants';
 
-interface CreationPromptFieldProps {
+interface CreativeImagePromptFieldProps {
   value: string;
   onChange: (value: string) => void;
   onPolish: () => void;
@@ -11,13 +11,13 @@ interface CreationPromptFieldProps {
 }
 
 /** 创作提示词输入区：工具入口与主文本域保持同页视觉和交互。 */
-export function CreationPromptField({
+export function CreativeImagePromptField({
   value,
   onChange,
   onPolish,
   onImageToPrompt,
   onExpand,
-}: CreationPromptFieldProps) {
+}: CreativeImagePromptFieldProps) {
   return (
     <div className="pk-section fc-prompt-field">
       <div className="fc-prompt-label-row">
@@ -44,7 +44,7 @@ export function CreationPromptField({
           rows={8}
           maxLength={MAX_PROMPT_LEN}
           value={value}
-          placeholder="例如：把这款产品放在未来感厨房场景中，清晨自然光，干净高级，电商广告质感"
+          placeholder={CREATION_PROMPT_PLACEHOLDER}
           onChange={(event) => onChange(event.target.value)}
         />
         <button

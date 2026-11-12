@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { generateApi } from '../lib/api';
 
@@ -52,5 +52,8 @@ export function useToolHistory(capability: string, refreshKey?: unknown) {
     };
   }, [capability, refreshKey, token, reloadKey]);
 
-  return { tasks, loading, error, retry: () => setReloadKey((value) => value + 1) };
+  /** 稳定引用：历史栏用 memo 隔离输入时的重渲染，retry 每次新建会让隔离失效 */
+  const retry = useCallback(() => setReloadKey((value) => value + 1), []);
+
+  return { tasks, loading, error, retry };
 }

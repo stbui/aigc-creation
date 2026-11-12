@@ -8,6 +8,8 @@
 
 /** 缩略图地址换算 */
 export { assetThumbUrl } from '../../lib/api';
+/** 提交失败是否「结果不明」（5xx / 网络中断）—— 与写真模板页共用 */
+export { isUncertainSubmitError } from '../../lib/generateSubmit';
 
 import type { GalleryItem } from './hooks';
 import { buildBatchRows, cellState, formatBatchDate, type BatchRowBase } from '../../components/batchResult';

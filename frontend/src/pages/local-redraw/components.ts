@@ -15,3 +15,5 @@ export { ToolShell, type ToolAsset } from '../../components/ToolShell';
 export { ToolCard } from '../../components/ToolWidgets';
 /** 历史产出网格 */
 export { ToolHistoryGrid } from '../../components/ToolHistoryPane';
+/** 窄屏历史抽屉 */
+export { Drawer } from '../../ui';

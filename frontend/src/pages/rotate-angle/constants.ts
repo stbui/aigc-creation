@@ -9,6 +9,17 @@
  * 一律经由本文件或 `./components` —— 目录内新增共享常量时在这里补一行。
  */
 
+/** 旋转模式: 主体 (立方体拖拽) / 摄像头 (轨道与方向键) */
+export type RotateTab = 'subject' | 'camera';
+
+/** 摄像头模式四个方向键的调整方向 */
+export type NudgeDirection = 'left' | 'right' | 'up' | 'down';
+
+/** 默认角度 (初始状态与重置共用, 避免两处漂移) */
+export const DEFAULT_YAW = 0;
+export const DEFAULT_PITCH = 0;
+export const DEFAULT_ZOOM = 1;
+
 /** 参考站方向键每次 ±5° */
 export const ARROW_STEP = 5;
 

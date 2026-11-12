@@ -9,6 +9,7 @@
 `frontend/src/pages/admin/billing-orders/`、`frontend/src/pages/admin/campaigns/`、
 `frontend/src/pages/admin/user-groups/`、`frontend/src/pages/admin/membership-plans/`、
 `frontend/src/pages/admin/products/`、`frontend/src/pages/admin/backups/`、`frontend/src/pages/product-detail/`、`frontend/src/pages/product-kit/`、`frontend/src/pages/viral-clone/`、`frontend/src/pages/creative-image/`、`frontend/src/pages/product-sku/`、`frontend/src/pages/local-redraw/`、`frontend/src/pages/background-remove/`、`frontend/src/pages/watermark-remove/`、`frontend/src/pages/product-retouch/`、`frontend/src/pages/image-translate/`、`frontend/src/pages/image-expand/`、`frontend/src/pages/product-recolor/`、`frontend/src/pages/rotate-angle/`、`frontend/src/pages/multi-image-fusion/`、`frontend/src/pages/landing/`、
+`frontend/src/pages/shoppable-carousel/`、`frontend/src/pages/template/`、
 `frontend/src/pages/library/`、`frontend/src/pages/works/`、
 `frontend/src/pages/invitations/`、`frontend/src/pages/account/`、
 `frontend/src/pages/checkout/`、`frontend/src/pages/orders/`、
@@ -153,19 +154,41 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `src/context`）；
   - `frontend/src/pages/creative-image/__tests__/creative-image-modules.test.ts` ——
     C 端创意生图 / 自由创作目录（`src/pages/creative-image` / `src/components` /
-    `src/hooks` / `src/lib` / `src/context`）；
+    `src/hooks` / `src/lib` / `src/context`；页面按板块拆成 `CreativeImageInputPane` /
+    `CreativeImageOutputPane` 两栏，左栏再拆 `CreativeImageUploadSection`（原子缩略图
+    `CreativeImageReferenceThumb`）/ `CreativeImagePromptField` / `CreativeImageSubmitBar`，
+    提示词放大为 `CreativeImagePromptModal`；状态与上传 / 提交 / 删除等写操作仍留在
+    `page.tsx`）；
   - `frontend/src/pages/product-sku/__tests__/product-sku-modules.test.ts` ——
     C 端商品 SKU 图目录（`src/pages/product-sku` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`）；
+    `src/lib` / `src/context`；页面按板块拆成 `ProductSkuWorkspace`（三栏外壳）内的
+    `ProductSkuTemplateCard`（空态 `ProductSkuTemplateDropzone` / 已选态
+    `ProductSkuTemplatePreview`）/ `ProductSkuStepsCard` / `ProductSkuListSection`，
+    清单再拆行 `ProductSkuListItem` → 区域 `ProductSkuVariantRow`（参考图原子件
+    `ProductSkuReferenceThumb` / `ProductSkuReferenceUploadButton`）；使用步骤文案落
+    `constants.ts` 的 `SKU_STEPS`，历史恢复与变体更新落 `utils.ts`，打包下载落
+    `hooks.ts` 的 `useSkuDownload`，状态与上传 / 提交 / 删除等写操作仍留在
+    `page.tsx`）；
   - `frontend/src/pages/local-redraw/__tests__/local-redraw-modules.test.ts` ——
     C 端局部重绘目录（`src/pages/local-redraw` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`，含本页画布组件 `MaskPainter` 与页面的导入）；
+    `src/lib` / `src/context`，含本页画布组件 `MaskPainter` 与页面的导入；画布舞台
+    `LocalRedrawStage` 内含工具栏 `LocalRedrawToolbar` 与底部操作条
+    `LocalRedrawCanvasFooter`，标注面板 `LocalRedrawAnnotationPanel` 逐条拆
+    `LocalRedrawAnnotationItem`，另有历史栏 `LocalRedrawHistoryPane`、上传预览
+    `LocalRedrawUploadPreview` 与空态 `LocalRedrawIntro`；历史取数复用共享
+    `useToolHistory`（经 `hooks.ts` 转出），画布 / 提交 / 删除等写操作仍留在
+    `page.tsx`）；
   - `frontend/src/pages/background-remove/__tests__/background-remove-modules.test.ts` ——
     C 端一键抠图目录（`src/pages/background-remove` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，含本页原图预览组件 `BackgroundSourcePreview` 与页面的导入）；
   - `frontend/src/pages/watermark-remove/__tests__/watermark-remove-modules.test.ts` ——
     C 端去除水印目录（`src/pages/watermark-remove` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`，含页面对 `WatermarkMaskEditor` 遮罩画布的导入）；
+    `src/lib` / `src/context`，含页面对 `WatermarkMaskEditor` 遮罩画布的导入；画布舞台
+    `WatermarkRemoveStage` 内含工具栏 `WatermarkRemoveToolbar` 与底部操作条
+    `WatermarkRemoveCanvasFooter`，水印标记面板 `WatermarkRemoveAnnotationPanel`
+    逐条拆 `WatermarkRemoveAnnotationRow`，另有上传预览
+    `WatermarkRemoveUploadPreview` 与空态 `WatermarkRemoveIntro`；遮罩 / 提交 / 删除等
+    写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/product-retouch/__tests__/product-retouch-modules.test.ts` ——
     C 端产品精修目录（`src/pages/product-retouch` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`）；
@@ -180,7 +203,11 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `src/lib` / `src/context`）；
   - `frontend/src/pages/rotate-angle/__tests__/rotate-angle-modules.test.ts` ——
     C 端旋转角度目录（`src/pages/rotate-angle` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`）；
+    `src/lib` / `src/context`；设置卡 `RotateAngleSettingsCard` 内含模式页签
+    `RotateAngleModeTabs`、可拖拽预览 `RotateAnglePreview`（主体舞台
+    `RotateAngleSubjectStage` / 摄像头舞台 `RotateAngleCameraStage`）；默认角度与
+    滑杆区间落 `constants.ts`，角度夹取与轨道投影落 `utils.ts`，角度状态与提交
+    仍留在 `page.tsx`）；
   - `frontend/src/pages/multi-image-fusion/__tests__/multi-image-fusion-modules.test.ts` ——
     C 端多图融合目录（`src/pages/multi-image-fusion` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，含变体计费 `lib/multiFusionBilling` 与提示词工具文案
@@ -191,7 +218,27 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
   - `frontend/src/pages/landing/__tests__/landing-modules.test.ts` ——
     C 端营销首页目录（`src/pages/landing` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`；静态素材与案例清单落 `constants.ts`，去重与路径映射
-    落 `utils.ts`，顶导自实现落 `LandingHeader.tsx`）；
+    落 `utils.ts`，顶导自实现落 `LandingHeader.tsx`；页面按板块拆成 `LandingHero` /
+    `LandingScenes` / `LandingTools` / `LandingFlow` / `LandingCases` /
+    `LandingPackages`（三个页签分别 `LandingPlanGrid` / `LandingAddonGrid` /
+    `LandingCampaignGrid`）/ `LandingFeatures` / `LandingCta` / `LandingFooter`；
+    价目与活动取数落 `hooks.ts` 的 `useLandingCatalog`，可见能力过滤与页签状态
+    仍留在 `page.tsx`）；
+  - `frontend/src/pages/shoppable-carousel/__tests__/shoppable-carousel-modules.test.ts` ——
+    C 端 AI 带货图文目录（`src/pages/shoppable-carousel` / `src/components` /
+    `src/hooks` / `src/lib` / `src/context`；左栏 `ShoppableCarouselConfig` 与底栏
+    `ShoppableCarouselFooter`（张数步进 `ShoppableCarouselStepper`），右栏
+    `ShoppableCarouselShowcase`（模板网格 `TemplateGrid` + 历史
+    `ShoppableCarouselHistory`），全部记录抽屉 `ShoppableCarouselResultList`；
+    模板取数落 `hooks.ts` 的 `useShoppableCarouselTemplates`，提交 / 删除 / 文案生成
+    等写操作仍留在 `page.tsx`）；
+  - `frontend/src/pages/template/__tests__/template-modules.test.ts` ——
+    C 端婚纱写真模板目录（`src/pages/template` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`；左栏 `TemplateInputPane`（已选模板回显
+    `TemplateSelectedCard`），右栏 `TemplateShowcase`（一级分类
+    `TemplateCategoryNav` / 二级分组 `TemplateGroupNav` / 网格 `TemplateGallery` /
+    历史 `TemplateHistory`）；模板取数落 `hooks.ts` 的 `useTemplateCatalog`，
+    展平与筛选落 `utils.ts`，提交 / 删除等写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/library/__tests__/library-modules.test.ts` ——
     C 端素材库目录（`src/pages/library` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，日期分组、下载扩展名与空态文案落 `utils.ts`；
@@ -218,7 +265,12 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     下标复用 `src/hooks/useLightboxIndex`）；
   - `frontend/src/pages/invitations/__tests__/invitations-modules.test.ts` ——
     C 端邀请页目录（`src/pages/invitations` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`，邀请海报绘制与二维码配色落 `utils.ts`）；
+    `src/lib` / `src/context`，邀请海报绘制与二维码配色落 `utils.ts`；页面按板块拆成
+    `InviteHero` / `InviteCheckinBlock` / `InviteMetricsBlock` / `InviteStepsBlock` /
+    `InviteRelationsBlock` / `InviteRulesBlock` / `InvitePosterModal`，访客与失败态为
+    `InviteGuestState` / `InviteErrorState`；主标题与步骤文案由 `utils.ts` 的
+    `inviteHeroTitle` / `buildInviteSteps` 按真实规则派生，取数、绑定、签到与海报
+    等写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/account/__tests__/account-modules.test.ts` ——
     C 端账户中心目录（`src/pages/account` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，多接口并行取数与金额 / 日期格式化；页面按板块拆成
@@ -248,7 +300,7 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
 - 分层改动后跑：
 
   ```bash
-  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/landing src/pages/library src/pages/works src/pages/invitations src/pages/account src/pages/checkout src/pages/orders src/pages/tickets src/pages/workbench src/pages/admin/payments
+  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/landing src/pages/shoppable-carousel src/pages/template src/pages/library src/pages/works src/pages/invitations src/pages/account src/pages/checkout src/pages/orders src/pages/tickets src/pages/workbench src/pages/admin/payments
   ```
 
 - 类型校验以 `npm run typecheck` 为准。

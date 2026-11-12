@@ -1,35 +1,15 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Info, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
 
+import { DEFAULT_PITCH, DEFAULT_YAW, DEFAULT_ZOOM, type RotateTab } from './constants';
 import {
-  ARROW_STEP,
-  DRAG_PITCH_FACTOR,
-  DRAG_YAW_FACTOR,
-  ORBIT_LINE_COUNT,
-  ORBIT_LINE_STEP_DEG,
-  PITCH_MAX,
-  PITCH_MIN,
-  YAW_MAX,
-  YAW_MIN,
-  ZOOM_MAX,
-  ZOOM_MIN,
-  ZOOM_STEP,
-} from './constants';
-import {
-  RangeRow,
   ToolHistoryPane,
   ToolShell,
   productSourcePane,
   productSourceUploadPreview,
 } from './components';
 import { useToolTask } from './hooks';
-import {
-  clampPitch,
-  clampYaw,
-  orbitNeedleOf,
-  resultTagOf,
-  rotatePayload,
-} from './utils';
+import { resultTagOf, rotatePayload } from './utils';
+import { RotateAngleSettingsCard } from './RotateAngleSettingsCard';
 import { useApp } from '../../ui';
 
 /**
@@ -53,78 +33,35 @@ import { useApp } from '../../ui';
  *
  * 诚实披露: rotate 为 real 能力 —— yaw 平面旋转 + pitch 逐行剪切 + zoom 缩放的
  * 2D 近似 (真实 3D 重建需 AI 模型, 页面与结果图均有标注)。
+ *
+ * 板块拆分见 `docs/frontend-module-conventions.md`：设置卡 `RotateAngleSettingsCard`
+ * 内含模式页签 `RotateAngleModeTabs`、可拖拽预览 `RotateAnglePreview`
+ * （主体舞台 `RotateAngleSubjectStage` / 摄像头舞台 `RotateAngleCameraStage`）；
+ * 角度状态与提交仍只留在本文件。
  */
-
-interface DragOrigin {
-  pointerId: number;
-  x: number;
-  y: number;
-  yaw: number;
-  pitch: number;
-}
-
 export function RotateAnglePage() {
   const { message } = useApp();
-  const { submitting, result, setResult, run } = useToolTask({ capability: 'rotate', successMessage: '旋转结果已生成' });
+  const { submitting, result, setResult, run } = useToolTask({
+    capability: 'rotate',
+    successMessage: '旋转结果已生成',
+  });
 
-  const [tab, setTab] = useState<'subject' | 'camera'>('subject');
-  const [yaw, setYaw] = useState(0);
-  const [pitch, setPitch] = useState(0);
-  const [zoom, setZoom] = useState(1);
-  const [dragging, setDragging] = useState(false);
+  const [tab, setTab] = useState<RotateTab>('subject');
+  const [yaw, setYaw] = useState(DEFAULT_YAW);
+  const [pitch, setPitch] = useState(DEFAULT_PITCH);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [sourceUrl, setSourceUrl] = useState('');
-  const dragOrigin = useRef<DragOrigin | null>(null);
 
   const handleHistoryReuse = () => {
     setSourceUrl('');
     setResult(null);
   };
 
-  const reset = () => {
-    setYaw(0);
-    setPitch(0);
-    setZoom(1);
+  const resetAngles = () => {
+    setYaw(DEFAULT_YAW);
+    setPitch(DEFAULT_PITCH);
+    setZoom(DEFAULT_ZOOM);
     message.info('已重置旋转参数');
-  };
-
-  // 摄像头方向键: 左右调 yaw, 上下调 pitch (参考站 orbit-arrow)
-  const nudge = (dir: 'left' | 'right' | 'up' | 'down') => {
-    if (dir === 'left') setYaw((v) => clampYaw(v - ARROW_STEP));
-    if (dir === 'right') setYaw((v) => clampYaw(v + ARROW_STEP));
-    if (dir === 'up') setPitch((v) => clampPitch(v + ARROW_STEP));
-    if (dir === 'down') setPitch((v) => clampPitch(v - ARROW_STEP));
-  };
-
-  const startPreviewDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    // 预览里的方向键/按钮各自处理点击，不应触发整块预览拖拽。
-    if ((e.target as HTMLElement).closest('button')) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragOrigin.current = {
-      pointerId: e.pointerId,
-      x: e.clientX,
-      y: e.clientY,
-      yaw,
-      pitch,
-    };
-    setDragging(true);
-  };
-
-  const movePreviewDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const origin = dragOrigin.current;
-    if (!origin || origin.pointerId !== e.pointerId) return;
-    setYaw(Math.round(clampYaw(origin.yaw + (e.clientX - origin.x) * DRAG_YAW_FACTOR)));
-    setPitch(Math.round(clampPitch(origin.pitch - (e.clientY - origin.y) * DRAG_PITCH_FACTOR)));
-  };
-
-  const endPreviewDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (dragOrigin.current?.pointerId !== e.pointerId) return;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-    dragOrigin.current = null;
-    setDragging(false);
   };
 
   return (
@@ -161,127 +98,20 @@ export function RotateAnglePage() {
         <ToolHistoryPane capability="rotate" refreshKey={result?.url} emptyText="暂无旋转记录" />
       }
     >
-      {(images) => {
-        const previewImage = images[0]?.url;
-        const { orbitZ, needleX, needleY } = orbitNeedleOf(yaw, pitch);
-        return (
-      <section className="local-redraw-card rotate-angle-settings">
-        <div className="rotate-angle-settings-head">
-          <h2>旋转角度</h2>
-          <button type="button" aria-label="重置参数" title="重置参数" onClick={reset}>
-            <RotateCcw size={16} />
-          </button>
-        </div>
-
-        <div className="rotate-angle-tabs" role="tablist" aria-label="旋转模式">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'subject'}
-            className={tab === 'subject' ? 'active' : ''}
-            onClick={() => setTab('subject')}
-          >
-            主体
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'camera'}
-            className={tab === 'camera' ? 'active' : ''}
-            onClick={() => setTab('camera')}
-          >
-            摄像头
-          </button>
-        </div>
-
-        <div
-          className={`rotate-angle-preview${dragging ? ' dragging' : ''}`}
-          onPointerDown={startPreviewDrag}
-          onPointerMove={movePreviewDrag}
-          onPointerUp={endPreviewDrag}
-          onPointerCancel={endPreviewDrag}
-          title="拖拽预览可调整旋转与倾斜"
-        >
-          {tab === 'subject' ? (
-            <div className="rotate-angle-subject-stage">
-              <div
-                className="rotate-angle-cube"
-                style={{ transform: `rotateX(${-pitch * 0.6}deg) rotateY(${yaw}deg)` }}
-              >
-                <span className="rotate-angle-cube-face front">
-                  {previewImage ? (
-                    <img src={previewImage} alt="" style={{ transform: `scale(${zoom})` }} draggable={false} />
-                  ) : (
-                    '前'
-                  )}
-                </span>
-                <span className="rotate-angle-cube-face back">后</span>
-                <span className="rotate-angle-cube-face left">左</span>
-                <span className="rotate-angle-cube-face right">右</span>
-                <span className="rotate-angle-cube-face top">上</span>
-                <span className="rotate-angle-cube-face bottom">下</span>
-              </div>
-            </div>
-          ) : (
-            <div className="rotate-angle-camera-stage">
-              <div className="rotate-angle-orbit">
-                <div className="rotate-angle-wire" style={{ transform: `rotateX(${pitch * 0.38}deg) rotateY(${yaw * 0.22}deg) rotateZ(${-yaw * 0.12}deg)` }}>
-                  {Array.from({ length: ORBIT_LINE_COUNT }, (_, i) => (
-                    <i key={i} style={{ ['--line-angle' as string]: `${i * ORBIT_LINE_STEP_DEG}deg` }} />
-                  ))}
-                </div>
-              </div>
-              <div
-                className="rotate-angle-needle"
-                style={{
-                  width: `${Math.hypot(needleX, needleY)}px`,
-                  transform: `rotate(${(Math.atan2(needleY, needleX) * 180) / Math.PI}deg)`,
-                }}
-              />
-              {previewImage && (
-                <div
-                  className="rotate-angle-orbit-subject"
-                  style={{ transform: `translate(-50%, -50%) scale(${zoom})` }}
-                >
-                  <img src={previewImage} alt="" draggable={false} />
-                </div>
-              )}
-              <div
-                className="rotate-angle-camera"
-                style={{
-                  transform: `translate(-50%, -50%) translate(${needleX}px, ${needleY}px) rotate(${yaw * 0.7}deg) scale(${0.82 + Math.max(0, orbitZ) * 0.18})`,
-                }}
-              >
-                <span className="rotate-angle-camera-body"><i /></span>
-              </div>
-              <button type="button" className="orbit-arrow left" aria-label="向左旋转" title="向左旋转" onPointerDown={(e) => e.stopPropagation()} onClick={() => nudge('left')}>
-                ‹
-              </button>
-              <button type="button" className="orbit-arrow right" aria-label="向右旋转" title="向右旋转" onPointerDown={(e) => e.stopPropagation()} onClick={() => nudge('right')}>
-                ›
-              </button>
-              <button type="button" className="orbit-arrow up" aria-label="向上倾斜" title="向上倾斜" onPointerDown={(e) => e.stopPropagation()} onClick={() => nudge('up')}>
-                ⌃
-              </button>
-              <button type="button" className="orbit-arrow down" aria-label="向下倾斜" title="向下倾斜" onPointerDown={(e) => e.stopPropagation()} onClick={() => nudge('down')}>
-                ⌄
-              </button>
-            </div>
-          )}
-
-        </div>
-
-        <RangeRow label="旋转" min={YAW_MIN} max={YAW_MAX} step={1} value={yaw} onChange={setYaw} />
-        <RangeRow label="倾斜" min={PITCH_MIN} max={PITCH_MAX} step={1} value={pitch} onChange={setPitch} />
-        <RangeRow label="缩放" display={zoom === 1 ? '特写' : zoom.toFixed(2)} min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP} value={zoom} onChange={setZoom} />
-
-        <p className="rotate-angle-tip">
-          <Info size={13} />
-          <span>相机保持静止，生成时按主体旋转角度重建商品展示。</span>
-        </p>
-      </section>
-        );
-      }}
+      {(images) => (
+        <RotateAngleSettingsCard
+          tab={tab}
+          onTabChange={setTab}
+          yaw={yaw}
+          pitch={pitch}
+          zoom={zoom}
+          previewImage={images[0]?.url ?? null}
+          onYawChange={setYaw}
+          onPitchChange={setPitch}
+          onZoomChange={setZoom}
+          onReset={resetAngles}
+        />
+      )}
     </ToolShell>
   );
 }

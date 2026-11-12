@@ -1,4 +1,5 @@
-import type { SkuRegion, SkuResultItem } from './components';
+import type { SkuBatchGroup } from '../../lib/skuBatches';
+import type { SkuRegion, SkuResultItem, ToolAsset } from './components';
 import type { GalleryItem } from './hooks';
 import {
   MAX_REGIONS,
@@ -72,6 +73,28 @@ export function nextSkuKey(): number {
   return ++skuSeq;
 }
 
+/**
+ * 局部更新某个 SKU 在某个区域下的内容。
+ *
+ * 名称输入与变体说明 / 参考图回填共用这一条更新路径，避免各写一份 map；
+ * 区域缺失时按空内容补齐，保证恢复历史与新建行读到同一形状。
+ */
+export function patchSkuVariant(
+  items: SkuItem[],
+  itemKey: number,
+  regionId: string,
+  patch: Partial<Omit<SkuVariantContent, 'regionId'>>,
+): SkuItem[] {
+  return items.map((item) => {
+    if (item.key !== itemKey) return item;
+    const previous = item.variants[regionId] ?? { regionId, instruction: '' };
+    return {
+      ...item,
+      variants: { ...item.variants, [regionId]: { ...previous, ...patch } },
+    };
+  });
+}
+
 /* ------------------------------------------------------------------------- */
 /* 任务参数反解 (历史提交恢复)                                                */
 /* ------------------------------------------------------------------------- */
@@ -143,6 +166,80 @@ export function normalizeVariants(raw: unknown): VariantParam[] {
   });
 }
 
+/** 历史恢复所需的页面草稿；写回 state 由 `page.tsx` 负责。 */
+export interface RestoredSkuDraft {
+  template: ToolAsset;
+  regions: SkuRegion[];
+  items: SkuItem[];
+  defaultRatio: string;
+  defaultResolution: string;
+}
+
+/** 恢复历史只需要任务上的参数与输入素材，不依赖接口层类型。 */
+export interface RestorableTask {
+  params?: Record<string, unknown>;
+  inputAssetIds?: string[];
+}
+
+/**
+ * 历史任务 + 输入素材 → 可继续编辑的 SKU 草稿。
+ *
+ * `assetOf` 由页面用已取到的素材构造（含显示地址），这里只按 id 取；
+ * 模板图或区域缺失时抛错，由页面提示「原模板或参考图已不可用」。
+ */
+export function restoreSkuDraft(
+  tasks: RestorableTask[],
+  assetOf: (id: string) => ToolAsset | undefined,
+  group: SkuBatchGroup,
+): RestoredSkuDraft {
+  const primaryTask =
+    tasks.find((task) => normalizeRegions(task.params?.regions).length > 0) ?? tasks[0];
+  const template = primaryTask?.inputAssetIds?.[0]
+    ? assetOf(primaryTask.inputAssetIds[0])
+    : undefined;
+  if (!template) throw new Error('原模板图已不可用');
+
+  const regions = normalizeRegions(primaryTask?.params?.regions);
+  if (regions.length === 0) throw new Error('这条历史记录没有可恢复的区域');
+
+  const items = tasks.map((task, index) => {
+    const variantParams = normalizeVariants(task.params?.variants);
+    const name =
+      typeof task.params?.skuName === 'string'
+        ? task.params.skuName
+        : group.items[index]?.caption || `SKU ${index + 1}`;
+    return {
+      key: nextSkuKey(),
+      name,
+      variants: Object.fromEntries(
+        regions.map((region, regionIndex) => {
+          const variant =
+            variantParams.find((entry) => entry.regionId === region.id) ??
+            variantParams[regionIndex];
+          return [
+            region.id,
+            {
+              regionId: region.id,
+              instruction: variant?.instruction ?? '',
+              reference: variant?.referenceAssetId
+                ? assetOf(variant.referenceAssetId)
+                : undefined,
+            } satisfies SkuVariantContent,
+          ];
+        }),
+      ),
+    } satisfies SkuItem;
+  });
+
+  return {
+    template,
+    regions,
+    items,
+    defaultRatio: typeof primaryTask?.params?.ratio === 'string' ? primaryTask.params.ratio : '1:1',
+    defaultResolution: typeof primaryTask?.params?.size === 'string' ? primaryTask.params.size : '1k',
+  };
+}
+
 /* ------------------------------------------------------------------------- */
 /* 结果 → 展示口径                                                           */
 /* ------------------------------------------------------------------------- */
@@ -162,6 +259,11 @@ export function resultFromGallery(item: GalleryItem): SkuResultItem {
 /** 把 SKU 名称变成安全文件名 */
 export function safeFilename(value: string): string {
   return value.replace(/[\\/:*?"<>|\s]+/g, '-').replace(/^-+|-+$/g, '') || 'SKU';
+}
+
+/** 批次打包文件名；按自然日命名，同一天多次下载不会互相覆盖目录结构。 */
+export function skuZipFilename(): string {
+  return `sku-batch-${new Date().toISOString().slice(0, 10)}.zip`;
 }
 
 /** 单张结果直接下载 */

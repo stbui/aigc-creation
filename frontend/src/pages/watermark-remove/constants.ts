@@ -17,3 +17,6 @@ export const ZOOM_MAX = 140;
 export const ZOOM_STEP = 10;
 /** 初始 / 复位后的缩放 (%) */
 export const ZOOM_DEFAULT = 100;
+
+/** 画布底部快捷键提示；与 `page.tsx` 的键盘监听保持同一份文案。 */
+export const SHORTCUT_HINT = '快捷键：H 抓手 · Ctrl+Z 撤回 · Ctrl+Shift+Z 恢复 · +/- 缩放';

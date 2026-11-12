@@ -8,8 +8,8 @@ import type { CreationCapability } from './constants';
  * 目录内新增外部工具引用时在这里补一行 re-export。
  */
 
-/** 上传前的图片格式校验 */
-export { isSupportedImageFile, runtimeOfId, taskErrorText } from '../../lib/constants';
+/** 上传前的图片格式校验与错误码文案 */
+export { isSupportedImageFile, taskErrorText } from '../../lib/constants';
 /** 任务轮询到终态 */
 export { pollToResult } from '../../lib/poll';
 /** 缩略图地址换算 */

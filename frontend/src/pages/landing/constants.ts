@@ -59,6 +59,9 @@ export interface ToolEntry {
   capability: string;
 }
 
+/** 套餐与积分区的三个页签 */
+export type LandingPackageTab = 'sub' | 'addon' | 'campaign';
+
 /** 8 个常用修图工具, 一屏内完成选择 */
 export const TOOL_ENTRIES: ToolEntry[] = [
   { label: '局部重绘', icon: 'm_jbch', to: '/local-redraw', capability: 'local_redraw' },

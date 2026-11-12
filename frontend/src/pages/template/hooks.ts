@@ -24,3 +24,37 @@ export { useDocumentMeta } from '../../hooks/useDocumentMeta';
 export { useAuth } from '../../context/AuthContext';
 /** 余额变更通知: 扣费 / 退款后通知积分上下文刷新 */
 export { notifyCreditsChanged } from '../../context/CreditsContext';
+
+import { useCallback, useEffect, useState } from 'react';
+
+import { templateApi, type TemplateCatalogCategory } from './api';
+
+/**
+ * 模板清单：分类树由后端下发，前端不复制清单。
+ *
+ * 加载 / 失败 / 就绪分开记录，失败时模板区展示重试入口而不是「暂无模板」。
+ */
+export function useTemplateCatalog() {
+  const [catalog, setCatalog] = useState<TemplateCatalogCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await templateApi.templates();
+      setCatalog(result.categories);
+    } catch (cause) {
+      setError((cause as Error).message || '模板清单加载失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { catalog, loading, error, reload };
+}

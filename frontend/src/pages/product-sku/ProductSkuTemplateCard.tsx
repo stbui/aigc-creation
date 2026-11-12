@@ -1,5 +1,4 @@
 import type { RefObject } from 'react';
-import { ImagePlus } from 'lucide-react';
 
 import { SUPPORTED_IMAGE_ACCEPT } from './constants';
 import {
@@ -13,12 +12,26 @@ import {
   SurfaceTitle,
   type ToolAsset,
 } from './components';
-import { assetThumbUrl } from './api';
+import { ProductSkuTemplateDropzone } from './ProductSkuTemplateDropzone';
+import { ProductSkuTemplatePreview } from './ProductSkuTemplatePreview';
+
+interface ProductSkuTemplateCardProps {
+  template: ToolAsset | null;
+  uploading: boolean;
+  /** 隐藏文件选择框由卡片自持，页面只接收选中的文件 */
+  templateInputRef: RefObject<HTMLInputElement | null>;
+  onUpload: (files: FileList | File[]) => void;
+  onOpenLibrary: () => void;
+  onOpenMobile: () => void;
+  onEditRegions: () => void;
+  onPreview: (url: string) => void;
+}
 
 /**
  * 模板图卡片：上传 / 拖拽 / 素材库 / 手机上传与重新框选。
  *
- * 上传、框选与清空动作由页面提供；这里只负责展示与事件转发。
+ * 上传、框选与预览动作由页面提供；这里只负责卡片编排与拖拽命中区，
+ * 空态与已选态分别落在 `ProductSkuTemplateDropzone` / `ProductSkuTemplatePreview`。
  */
 export function ProductSkuTemplateCard({
   template,
@@ -29,16 +42,9 @@ export function ProductSkuTemplateCard({
   onOpenMobile,
   onEditRegions,
   onPreview,
-}: {
-  template: ToolAsset | null;
-  uploading: boolean;
-  templateInputRef: RefObject<HTMLInputElement | null>;
-  onUpload: (files: FileList | File[]) => void;
-  onOpenLibrary: () => void;
-  onOpenMobile: () => void;
-  onEditRegions: () => void;
-  onPreview: (url: string) => void;
-}) {
+}: ProductSkuTemplateCardProps) {
+  const openFilePicker = () => templateInputRef.current?.click();
+
   return (
     <Surface className="product-sku-card product-sku-template-card border-0 shadow-none">
       <SurfaceHeader className="mb-3 gap-1 px-0">
@@ -96,45 +102,14 @@ export function ProductSkuTemplateCard({
           )}
 
           {template ? (
-            <div className="flex min-h-40 items-start gap-6 max-[900px]:gap-3.5 max-[560px]:min-h-0 max-[560px]:flex-col max-[560px]:gap-2.5">
-              <Button
-                htmlType="button"
-                variant="ghost"
-                aria-label="预览模板图"
-                className="size-40 shrink-0 cursor-zoom-in overflow-hidden rounded-md border-0 p-0 hover:bg-transparent max-[900px]:size-33 max-[560px]:aspect-square max-[560px]:h-auto max-[560px]:w-full"
-                onClick={() => onPreview(template.url)}
-              >
-                <img
-                  className="size-full object-cover"
-                  src={assetThumbUrl(template.url, 320) ?? template.url}
-                  alt={template.name}
-                />
-              </Button>
-              <div className="grid auto-rows-10 gap-2.5 max-[560px]:w-full max-[560px]:auto-rows-8.5 max-[560px]:gap-1.5">
-                <Button htmlType="button" variant="outline" className="min-w-22" onClick={onEditRegions}>
-                  重新编辑
-                </Button>
-                <Button
-                  htmlType="button"
-                  variant="secondary"
-                  className="min-w-22"
-                  onClick={() => templateInputRef.current?.click()}
-                >
-                  重新上传
-                </Button>
-              </div>
-            </div>
+            <ProductSkuTemplatePreview
+              template={template}
+              onPreview={onPreview}
+              onEditRegions={onEditRegions}
+              onReupload={openFilePicker}
+            />
           ) : (
-            <Button
-              htmlType="button"
-              variant="outline"
-              className="h-auto min-h-40 w-full flex-col gap-1.5 rounded-md border-dashed bg-muted px-4 py-4 whitespace-normal text-muted-foreground hover:border-brand max-[560px]:min-h-32.5"
-              onClick={() => templateInputRef.current?.click()}
-            >
-              <ImagePlus className="size-5.5 text-brand" />
-              <strong className="text-xs font-medium text-foreground">点击或拖拽图片到此处上传</strong>
-              <span className="text-xs font-normal">点击、拖拽或粘贴图片上传，最多 1 张</span>
-            </Button>
+            <ProductSkuTemplateDropzone onPick={openFilePicker} />
           )}
         </div>
       </SurfaceContent>

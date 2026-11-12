@@ -11,3 +11,8 @@ export { useToolTask } from '../../hooks/useToolTask';
 export { useProject } from '../../hooks/useProject';
 /** 登录态: 历史记录读取与提交前判断 */
 export { useAuth } from '../../context/AuthContext';
+/** 历史产出：与其他修图页共用同一份取数实现 */
+export { useToolHistory } from '../../hooks/useToolHistory';
+export type { ToolHistoryTask } from '../../hooks/useToolHistory';
+/** 全局反馈 (message) */
+export { useApp } from '../../ui';

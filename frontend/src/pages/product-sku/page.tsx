@@ -8,7 +8,6 @@ import {
   SUPPORTED_IMAGE_LABEL,
   type LibraryTarget,
   type SkuItem,
-  type SkuVariantContent,
 } from './constants';
 import {
   AssetLibraryModal,
@@ -22,7 +21,7 @@ import {
 } from './components';
 import { ProductSkuTemplateCard } from './ProductSkuTemplateCard';
 import { ProductSkuWorkspace } from './ProductSkuWorkspace';
-import { ProductSkuList } from './ProductSkuList';
+import { ProductSkuListSection } from './ProductSkuListSection';
 import { ProductSkuStepsCard } from './ProductSkuStepsCard';
 import {
   useAssetLibrary,
@@ -33,26 +32,24 @@ import {
   useProject,
   useResultGallery,
   useSkuBatch,
+  useSkuDownload,
 } from './hooks';
 import {
   assetsApi,
-  assetSrc,
+  fileNameFromUrl,
   generateApi,
-  toAbsoluteUrl,
+  toToolAsset,
 } from './api';
 import {
   cloneSkuItem,
   createSkuItem,
   downloadDirect,
-  downloadUrlsAsZip,
   groupContainsTask,
   groupSkuHistory,
   isSupportedImageFile,
-  nextSkuKey,
-  normalizeRegions,
-  normalizeVariants,
+  patchSkuVariant,
   resultFromGallery,
-  safeFilename,
+  restoreSkuDraft,
   syncVariants,
   type SkuBatchGroup,
 } from './utils';
@@ -106,6 +103,7 @@ export function ProductSkuPage() {
     retryFailed,
     openHistoryResult,
   } = useSkuBatch({ pollSignal, prependGallery: gallery.prepend });
+  const downloadZip = useSkuDownload();
 
   const historyGroups = useMemo(() => groupSkuHistory(gallery.items), [gallery.items]);
 
@@ -127,11 +125,7 @@ export function ProductSkuPage() {
     try {
       const projectId = await ensureProject();
       const asset = await assetsApi.upload(file, projectId);
-      applyTemplate({
-        id: asset.id,
-        url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
-        name: file.name,
-      });
+      applyTemplate(toToolAsset(asset, file.name));
       message.success('模板图已上传，请框选变体区域');
     } catch (error) {
       reportError(error);
@@ -143,24 +137,13 @@ export function ProductSkuPage() {
   usePasteUpload((files) => uploadTemplate(files));
 
   const setVariantReference = useCallback((itemKey: number, regionId: string, reference: ToolAsset | undefined) => {
-    setItems((current) => current.map((item) => {
-      if (item.key !== itemKey) return item;
-      const previous = item.variants[regionId] ?? { regionId, instruction: '' };
-      return {
-        ...item,
-        variants: { ...item.variants, [regionId]: { ...previous, reference } },
-      };
-    }));
+    setItems((current) => patchSkuVariant(current, itemKey, regionId, { reference }));
   }, []);
 
   const pickFromLibrary = useCallback((asset: Asset) => {
     const target = libraryTargetRef.current;
     if (!target) return false;
-    const picked: ToolAsset = {
-      id: asset.id,
-      url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
-      name: asset.sourceUrl.split('/').pop() ?? '素材',
-    };
+    const picked = toToolAsset(asset, fileNameFromUrl(asset.sourceUrl, '素材'));
     if (target.kind === 'template') {
       applyTemplate(picked);
       message.success('已从素材库设为模板图');
@@ -194,11 +177,7 @@ export function ProductSkuPage() {
     const first = assets[0];
     mobileTargetRef.current = null;
     if (!first || !target) return;
-    const picked: ToolAsset = {
-      id: first.id,
-      url: toAbsoluteUrl(first.signedUrl || first.url) ?? '',
-      name: first.filename,
-    };
+    const picked = toToolAsset(first, first.filename);
     if (target.kind === 'template') {
       applyTemplate(picked);
       message.success('已从手机接收模板图');
@@ -230,11 +209,7 @@ export function ProductSkuPage() {
     try {
       const projectId = await ensureProject();
       const asset = await assetsApi.upload(file, projectId);
-      setVariantReference(itemKey, regionId, {
-        id: asset.id,
-        url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
-        name: file.name,
-      });
+      setVariantReference(itemKey, regionId, toToolAsset(asset, file.name));
       message.success('参考图已上传');
     } catch (error) {
       reportError(error);
@@ -256,19 +231,7 @@ export function ProductSkuPage() {
   };
 
   const updateInstruction = (itemKey: number, regionId: string, instruction: string) => {
-    setItems((current) => current.map((item) => {
-      if (item.key !== itemKey) return item;
-      return {
-        ...item,
-        variants: {
-          ...item.variants,
-          [regionId]: {
-            ...(item.variants[regionId] ?? { regionId, instruction: '' }),
-            instruction,
-          },
-        },
-      };
-    }));
+    setItems((current) => patchSkuVariant(current, itemKey, regionId, { instruction }));
   };
 
   const addSku = () => {
@@ -285,13 +248,17 @@ export function ProductSkuPage() {
     setItems((current) => current.filter((item) => item.key !== key));
   };
 
-  const nameCounts = useMemo(() => {
-    const counts = new Map<string, number>();
+  /** 与其它行重名的规范化名称（小写），供清单做即时提示 */
+  const duplicateNames = useMemo(() => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
     for (const item of items) {
-      const normalized = item.name.trim().toLowerCase();
-      if (normalized) counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
+      const name = item.name.trim().toLowerCase();
+      if (!name) continue;
+      if (seen.has(name)) duplicates.add(name);
+      else seen.add(name);
     }
-    return counts;
+    return duplicates;
   }, [items]);
 
   const validationMessage = useMemo(() => {
@@ -300,7 +267,7 @@ export function ProductSkuPage() {
       const name = item.name.trim();
       if (!name) return `请填写 SKU ${index + 1} 的名称`;
       if (name.length > MAX_SKU_NAME) return `SKU ${index + 1} 名称不能超过 ${MAX_SKU_NAME} 个字符`;
-      if ((nameCounts.get(name.toLowerCase()) ?? 0) > 1) return `SKU 名称「${name}」重复`;
+      if (duplicateNames.has(name.toLowerCase())) return `SKU 名称「${name}」重复`;
       for (const [regionIndex, region] of regions.entries()) {
         const variant = item.variants[region.id];
         if (!variant?.instruction.trim() && !variant?.reference) {
@@ -309,7 +276,7 @@ export function ProductSkuPage() {
       }
     }
     return null;
-  }, [items, nameCounts, regions, template]);
+  }, [items, duplicateNames, regions]);
 
   const submitFromForm = useCallback(
     async (_inputs: ToolAsset[], settings: ToolSettings) => {
@@ -337,49 +304,24 @@ export function ProductSkuPage() {
       const assetResults = await Promise.allSettled(inputIds.map((id) => assetsApi.get(id)));
       const assets = assetResults.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
       if (assets.length !== inputIds.length) throw new Error('原模板或参考图已不可用，无法恢复整批内容');
-      const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
-      const primaryTask = tasks.find((task) => normalizeRegions(task.params?.regions).length > 0) ?? tasks[0];
-      const templateId = primaryTask?.inputAssetIds?.[0];
-      const templateAsset = templateId ? assetsById.get(templateId) : undefined;
-      if (!templateAsset) throw new Error('原模板图已不可用');
-      const restoredRegions = normalizeRegions(primaryTask?.params?.regions);
-      if (restoredRegions.length === 0) throw new Error('这条历史记录没有可恢复的区域');
+      const assetsById = new Map(
+        assets.map((asset) => [asset.id, toToolAsset(asset, fileNameFromUrl(asset.sourceUrl, '素材'))]),
+      );
 
-      const restoredItems = tasks.map((task, index) => {
-        const variantParams = normalizeVariants(task.params?.variants);
-        const name = typeof task.params?.skuName === 'string' ? task.params.skuName : group.items[index]?.caption || `SKU ${index + 1}`;
-        return {
-          key: nextSkuKey(),
-          name,
-          variants: Object.fromEntries(restoredRegions.map((region, regionIndex) => {
-            const variant = variantParams.find((entry) => entry.regionId === region.id) ?? variantParams[regionIndex];
-            const referenceAsset = variant?.referenceAssetId ? assetsById.get(variant.referenceAssetId) : undefined;
-            return [region.id, {
-              regionId: region.id,
-              instruction: variant?.instruction ?? '',
-              reference: referenceAsset ? {
-                id: referenceAsset.id,
-                url: assetSrc(referenceAsset) ?? toAbsoluteUrl(referenceAsset.sourceUrl) ?? '',
-                name: referenceAsset.sourceUrl.split('/').pop() ?? '参考图',
-              } : undefined,
-            } satisfies SkuVariantContent];
-          })),
-        } satisfies SkuItem;
-      });
-
-      setTemplate({
-        id: templateAsset.id,
-        url: assetSrc(templateAsset) ?? toAbsoluteUrl(templateAsset.sourceUrl) ?? '',
-        name: templateAsset.sourceUrl.split('/').pop() ?? '模板图',
-      });
-      setRegions(restoredRegions);
-      setItems(restoredItems.length > 0 ? restoredItems : [createSkuItem(restoredRegions)]);
-      setDefaultRatio(typeof primaryTask?.params?.ratio === 'string' ? primaryTask.params.ratio : '1:1');
-      setDefaultResolution(typeof primaryTask?.params?.size === 'string' ? primaryTask.params.size : '1k');
+      const draft = restoreSkuDraft(tasks, (id) => assetsById.get(id), group);
+      setTemplate(draft.template);
+      setRegions(draft.regions);
+      setItems(draft.items.length > 0 ? draft.items : [createSkuItem(draft.regions)]);
+      setDefaultRatio(draft.defaultRatio);
+      setDefaultResolution(draft.defaultResolution);
       setSettingsSeed((value) => value + 1);
       setFailedNotice(null);
       openHistoryResult(group);
-      message.success(restoredItems.length > 1 ? `已恢复整批 ${restoredItems.length} 个 SKU` : '已恢复历史提交，可继续编辑');
+      message.success(
+        draft.items.length > 1
+          ? `已恢复整批 ${draft.items.length} 个 SKU`
+          : '已恢复历史提交，可继续编辑',
+      );
     } catch (error) {
       message.error((error as Error).message || '历史提交恢复失败');
     } finally {
@@ -405,37 +347,13 @@ export function ProductSkuPage() {
       downloadDirect(resultFromGallery(ready[0]));
       return;
     }
-    try {
-      await downloadUrlsAsZip(
-        `sku-batch-${new Date().toISOString().slice(0, 10)}.zip`,
-        ready.map((item, index) => ({
-          name: `${String(index + 1).padStart(2, '0')}-${safeFilename(item.caption || 'SKU')}.png`,
-          url: item.url!,
-        })),
-      );
-      message.success(`已打包下载 ${ready.length} 张 SKU 图`);
-    } catch {
-      ready.forEach((item, index) => window.setTimeout(() => downloadDirect(resultFromGallery(item)), index * 180));
-      message.info('浏览器不支持打包，已改为逐张下载');
-    }
-  }, [message]);
+    await downloadZip(ready.map(resultFromGallery));
+  }, [downloadZip, message]);
 
   const handleDownloadAll = async () => {
     const ready = batchItems.filter((item) => item.status === 'succeeded' && item.url);
     if (ready.length === 0) return;
-    try {
-      await downloadUrlsAsZip(
-        `sku-batch-${new Date().toISOString().slice(0, 10)}.zip`,
-        ready.map((item, index) => ({
-          name: `${String(index + 1).padStart(2, '0')}-${safeFilename(item.label)}.png`,
-          url: item.url!,
-        })),
-      );
-      message.success(`已打包下载 ${ready.length} 张 SKU 图`);
-    } catch {
-      ready.forEach((item, index) => window.setTimeout(() => downloadDirect(item), index * 180));
-      message.info('浏览器不支持打包，已改为逐张下载');
-    }
+    await downloadZip(ready);
   };
 
   return (
@@ -459,7 +377,6 @@ export function ProductSkuPage() {
         onActiveResultChange={setActiveResultId}
         onRefresh={() => void gallery.reload()}
         onRetryFailed={(itemId) => void retryFailed(itemId)}
-        batchDownloading={false}
         onDownloadAll={() => void handleDownloadAll()}
         historyGroups={historyGroups}
         onOpenHistory={openHistoryResult}
@@ -480,10 +397,10 @@ export function ProductSkuPage() {
         {regions.length === 0 ? (
           <ProductSkuStepsCard />
         ) : (
-          <ProductSkuList
+          <ProductSkuListSection
             items={items}
             regions={regions}
-            nameCounts={nameCounts}
+            duplicateNames={duplicateNames}
             referenceBusy={referenceBusy}
             onAdd={addSku}
             onRemove={removeSku}

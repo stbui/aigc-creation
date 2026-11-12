@@ -75,3 +75,11 @@ export interface VariantParam {
 export type LibraryTarget =
   | { kind: 'template' }
   | { kind: 'reference'; itemKey: number; regionId: string };
+
+/** 未框选区域时展示的使用步骤；由 `ProductSkuStepsCard` 按顺序渲染。 */
+export const SKU_STEPS = [
+  { title: '上传模板图', description: '导入 SKU 图，作为批量生成的模板图' },
+  { title: '框选要变化的区域', description: '框选可变内容区域，精准控制生成范围' },
+  { title: '编辑SKU清单', description: '录入商品 SKU 信息，配置每个 SKU 的变化内容' },
+  { title: '批量输出SKU图', description: '一键生成多款 SKU 图，高效完成批量出图' },
+] as const;

@@ -6,6 +6,8 @@
 
 /** 缩略图地址换算 */
 export { assetThumbUrl } from '../../lib/api';
+/** 提交失败是否「结果不明」（5xx / 网络中断）—— 与带货图文页共用 */
+export { isUncertainSubmitError } from '../../lib/generateSubmit';
 
 import type { GalleryItem } from './hooks';
 import type { TemplateCatalogCategory } from './api';
