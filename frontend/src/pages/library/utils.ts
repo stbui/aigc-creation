@@ -27,3 +27,49 @@ export function dateBucket(iso: string): { key: string; label: string; sort: num
 export function assetExtension(format: string | null | undefined): string {
   return (format || 'png').toLowerCase().replace(/^\./, '') || 'png';
 }
+
+/** 空态文案：标题 / 说明 / 行动按钮文案 */
+export interface EmptyStateCopy {
+  title: string;
+  description: string;
+  action: string;
+}
+
+/**
+ * 空态不是一种状态：游客、真实空库、筛选无结果显示不同的原因与下一步。
+ *
+ * 2026-11-12 从 `page.tsx` 抽成纯函数 —— 文案分支与页面状态无关，只取决于
+ * 「是否登录 / 是否停在某个项目 / 是否有筛选」。
+ */
+export function buildEmptyStateCopy(args: {
+  loggedIn: boolean;
+  activeProjectName: string | null;
+  hasFilters: boolean;
+}): EmptyStateCopy {
+  if (!args.loggedIn) {
+    return {
+      title: '登录后管理素材',
+      description: '上传原图或生成图片后，可在这里统一筛选、预览和下载。',
+      action: '登录并上传',
+    };
+  }
+  if (args.activeProjectName) {
+    return {
+      title: `「${args.activeProjectName}」还没有素材`,
+      description: '把素材上传到这个项目，或在批量操作中把已有素材移动过来。',
+      action: '上传到该项目',
+    };
+  }
+  if (args.hasFilters) {
+    return {
+      title: '没有符合条件的素材',
+      description: '换个来源、能力或分组条件试试。',
+      action: '清除筛选',
+    };
+  }
+  return {
+    title: '还没有本地上传的素材',
+    description: '上传原图后，可在这里统一筛选、预览和下载。',
+    action: '上传素材',
+  };
+}

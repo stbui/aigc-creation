@@ -24,7 +24,7 @@ import type { Asset } from '../../types/api';
  * 右键卡片弹出操作菜单（查看大图 / 查看原图 / 下载 / 删除），与 hover
  * 操作区同源，但触屏与精确点选更友好。
  */
-export interface AssetCardProps {
+export interface LibraryAssetCardProps {
   asset: Asset;
   selected: boolean;
   /** 首屏前 5 张优先加载 */
@@ -42,7 +42,7 @@ export interface AssetCardProps {
 const CTX_MENU_WIDTH = 168;
 const CTX_MENU_HEIGHT = 176;
 
-export function AssetCard({
+export function LibraryAssetCard({
   asset,
   selected,
   priority,
@@ -52,7 +52,7 @@ export function AssetCard({
   onDownload,
   onRemove,
   onReuse,
-}: AssetCardProps) {
+}: LibraryAssetCardProps) {
   const url = assetSrc(asset);
   const isVideo = modalityOfFormat(asset.format) === 'video';
   /*

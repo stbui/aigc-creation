@@ -3,7 +3,7 @@ import { FolderInput } from 'lucide-react';
 import { Button, Modal, Select } from './components';
 import type { ProjectListItem } from '../../types/api';
 
-export interface MoveAssetsDialogProps {
+export interface LibraryMoveAssetsDialogProps {
   open: boolean;
   count: number;
   projects: ProjectListItem[];
@@ -12,7 +12,7 @@ export interface MoveAssetsDialogProps {
 }
 
 /** 批量把选中的素材移动到另一个项目。 */
-export function MoveAssetsDialog({ open, count, projects, onCancel, onConfirm }: MoveAssetsDialogProps) {
+export function LibraryMoveAssetsDialog({ open, count, projects, onCancel, onConfirm }: LibraryMoveAssetsDialogProps) {
   const [projectId, setProjectId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

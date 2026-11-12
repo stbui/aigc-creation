@@ -3,7 +3,7 @@ import { FolderOpen, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button, Input, Modal, Select } from './components';
 import type { ProjectListItem } from '../../types/api';
 
-export interface ProjectManagerDialogProps {
+export interface LibraryProjectManagerDialogProps {
   open: boolean;
   projects: ProjectListItem[];
   currentProjectId: string | null;
@@ -15,7 +15,7 @@ export interface ProjectManagerDialogProps {
 }
 
 /** 素材库项目管理：新建、重命名、删除，并在删除有素材的项目时选择迁移目标。 */
-export function ProjectManagerDialog({
+export function LibraryProjectManagerDialog({
   open,
   projects,
   currentProjectId,
@@ -24,7 +24,7 @@ export function ProjectManagerDialog({
   onRename,
   onDelete,
   onSelect,
-}: ProjectManagerDialogProps) {
+}: LibraryProjectManagerDialogProps) {
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');

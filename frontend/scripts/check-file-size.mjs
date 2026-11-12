@@ -67,7 +67,6 @@ const BASELINE = {
   'src/pages/creative-image/page.tsx': 768,
   'src/pages/invitations/page.tsx': 591,
   'src/pages/landing/page.tsx': 690,
-  'src/pages/library/page.tsx': 799,
   'src/pages/local-redraw/MaskPainter.tsx': 632,
   'src/pages/local-redraw/page.tsx': 708,
   'src/pages/multi-image-fusion/page.tsx': 617,

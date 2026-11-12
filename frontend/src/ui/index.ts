@@ -82,3 +82,10 @@ export {
   InputGroupText,
   InputGroupTextarea,
 } from '~/admin-ui/components/ui/input-group';
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from '~/admin-ui/components/ui/context-menu';

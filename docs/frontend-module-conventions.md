@@ -194,7 +194,14 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     落 `utils.ts`，顶导自实现落 `LandingHeader.tsx`）；
   - `frontend/src/pages/library/__tests__/library-modules.test.ts` ——
     C 端素材库目录（`src/pages/library` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`，日期分组与下载扩展名落 `utils.ts`）；
+    `src/lib` / `src/context`，日期分组、下载扩展名与空态文案落 `utils.ts`；
+    页面按板块拆成 `LibraryToolbar` / `LibraryGroupPanel`（由
+    `LibraryGroupByToggle` + `LibraryGroupFilter` + `LibraryGroupOptionLabel`
+    组合）/ `LibraryBatchBar` / `LibraryLoadingState` / `LibraryErrorState` /
+    `LibraryEmptyState` / `LibraryGrid`（`LibraryLoadMore`）/ `LibraryUploadInput`，
+    取数与项目列表落 `useLibraryData.ts`、
+    分组状态与可见集合落 `useLibraryGroups.ts`，上传 / 删除 / 下载 / 移动等
+    写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/works/__tests__/works-modules.test.ts` ——
     C 端我的作品目录（`src/pages/works` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，切日 / 模态判定 / 下载扩展名落 `utils.ts`，
