@@ -44,6 +44,7 @@ interface ListOverrides {
   renderRowTitle?: (row: Row) => ReactNode;
   renderRowMeta?: (row: Row) => ReactNode;
   renderSourceCaption?: (row: Row) => ReactNode;
+  onRegenerateRow?: (row: Row) => void;
 }
 
 function renderList(over: ListOverrides = {}) {
@@ -57,6 +58,7 @@ function renderList(over: ListOverrides = {}) {
         emptyDesc={over.emptyDesc}
         emptyChildren={over.emptyChildren}
         onDeleteRow={onDeleteRow}
+        onRegenerateRow={over.onRegenerateRow}
         downloadNamePrefix="demo"
         labelOf={labelOf}
         layout={over.layout}
@@ -237,6 +239,41 @@ describe('BatchResultList 卡片布局', () => {
     expect(firstLabel).toBe(grid?.querySelector('.pd-result-cell:first-child .pd-result-label'));
     expect(firstLabel).toHaveClass('pd-result-label');
     expect(within(grid as HTMLElement).getByText('图片 3')).toBeVisible();
+  });
+
+  it('提供「重新生成」回调时把整行交回页面', () => {
+    const onRegenerateRow = vi.fn();
+    renderList({
+      rows: rowsOf([item({ id: 't1', url: '/uploads/a.png' })]),
+      layout: 'card',
+      onRegenerateRow,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '重新生成' }));
+    expect(onRegenerateRow).toHaveBeenCalledTimes(1);
+    expect(onRegenerateRow.mock.calls[0][0].key).toBe('b1');
+  });
+
+  it('卡片布局未传重新生成回调时不渲染该按钮', () => {
+    renderList({ layout: 'card' });
+    expect(screen.queryByRole('button', { name: '重新生成' })).not.toBeInTheDocument();
+  });
+
+  it('批次仍有任务在生成时禁用重新生成', () => {
+    const onRegenerateRow = vi.fn();
+    renderList({
+      rows: rowsOf([
+        item({ id: 't1', url: '/uploads/a.png' }),
+        item({ id: 't2', status: 'running', params: { batchId: 'b1', batchIndex: 2 } }),
+      ]),
+      layout: 'card',
+      onRegenerateRow,
+    });
+
+    const button = screen.getByRole('button', { name: '重新生成' });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onRegenerateRow).not.toHaveBeenCalled();
   });
 
   it('一键下载会把本次生成的全部已完成图片打包为一个 ZIP', async () => {

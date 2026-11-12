@@ -31,6 +31,18 @@ describe('asset thumbnail middleware', () => {
     expect(mime).toBe('image/jpeg');
     expect(readImageDimensions(body, mime!)).toEqual({ width: 60, height: 80 });
   });
+
+  it('关闭时（enabled=false）直接放行，不生成缩略图', async () => {
+    const result = await requestPassthrough(root, { w: '60' }, false);
+    expect(result.fellThrough).toBe(true);
+    expect(result.endCalled).toBe(false);
+  });
+
+  it('开启时（enabled=true，默认）会生成缩略图', async () => {
+    const result = await requestPassthrough(root, { w: '60' }, true);
+    expect(result.fellThrough).toBe(false);
+    expect(result.endCalled).toBe(true);
+  });
 });
 
 function requestThumb(
@@ -62,6 +74,37 @@ function requestThumb(
       middleware(req, res, next);
     } catch (error) {
       reject(error);
+    }
+  });
+}
+
+/** 校验中间件是否放行（next）或生成缩略图（res.end）。enabled 控制开关。 */
+function requestPassthrough(
+  uploadsDir: string,
+  query: Record<string, string>,
+  enabled: boolean,
+): Promise<{ fellThrough: boolean; endCalled: boolean }> {
+  const middleware = createAssetThumbnailMiddleware(uploadsDir, enabled);
+  return new Promise((resolve) => {
+    const res = {
+      setHeader: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+      end: vi.fn(() => {
+        resolve({ fellThrough: false, endCalled: true });
+      }),
+    } as unknown as Response;
+    const req = {
+      method: 'GET',
+      path: '/uploads/generated/result.png',
+      query,
+    } as unknown as Request;
+    const next: NextFunction = () => {
+      resolve({ fellThrough: true, endCalled: false });
+    };
+    try {
+      middleware(req, res, next);
+    } catch {
+      resolve({ fellThrough: false, endCalled: false });
     }
   });
 }

@@ -24,6 +24,10 @@ export { AssetLibraryModal } from '../../components/AssetLibraryModal';
 export { MobileUploadModal } from '../../components/MobileUploadModal';
 /** 空态与工作流步骤说明 */
 export { ToolWorkflowSteps } from '../../components/ToolEmptyState';
+/** 右侧「功能示例 / 创作结果」页签外壳 (与商品详情 / 商品主图共用) */
+export { OutputTabsPane, type OutputTab } from '../../components/OutputTabsPane';
+/** 批次行头时间格式化 (与商品详情 / 商品主图共用) */
+export { formatBatchDate } from '../../components/batchResult';
 /** 右侧结果网格 */
 export { ResultGalleryPane } from '../../components/ResultGalleryPane';
 /** 图片大图查看器与查看器条目类型 */

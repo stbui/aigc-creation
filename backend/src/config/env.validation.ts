@@ -226,6 +226,11 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'rateLimit.trustProxy', env: 'RATE_LIMIT_TRUST_PROXY', type: 'boolean', def: false },
   // 素材签名密钥。留空 = /uploads 保持公开（默认行为）；设置后要求 HMAC 签名。
   { key: 'asset.signingSecret', env: 'ASSET_SIGNING_SECRET', type: 'string', def: '' },
+  // 本地缩略图中间件开关。默认关闭：带 ?w= 的请求直接回落静态服务返回原图，
+  // 不再做解码 / 缩放 / JPEG 编码与落盘缓存。需要缩略图时置
+  // ASSET_THUMBNAIL_ENABLED=true（例如前端首屏大量原图拖慢加载的场景）。
+  // 属「后台可配」：改环境变量即可，无需改码。
+  { key: 'asset.thumbnailEnabled', env: 'ASSET_THUMBNAIL_ENABLED', type: 'boolean', def: false },
   // 未处理异常的告警 webhook（可选）。留空则只落盘，不发外部请求。
   { key: 'observability.errorWebhookUrl', env: 'ERROR_WEBHOOK_URL', type: 'string', def: '' },
 
@@ -300,7 +305,7 @@ export interface AppConfigTree {
     console: boolean;
     errorFile: boolean;
   };
-  asset: { publicBase: string; signingSecret: string };
+  asset: { publicBase: string; signingSecret: string; thumbnailEnabled: boolean };
   rateLimit: { enabled: boolean; trustProxy: boolean };
   observability: { errorWebhookUrl: string };
   storage: {

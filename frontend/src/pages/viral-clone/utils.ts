@@ -15,8 +15,8 @@ export { isSupportedImageFile } from '../../lib/constants';
 export { taskErrorText } from '../../lib/constants';
 /** 平台 / 语言 / 平台规格（读自后端能力清单） */
 export { languageOptions, platformOptions, platformSpec } from '../../lib/optionSets';
-/** 任务轮询到终态 */
-export { pollToResult } from '../../lib/poll';
+/** 任务轮询到终态; `PolledResult` 是本页「本次提交结果」的类型 */
+export { pollToResult, type PolledResult } from '../../lib/poll';
 
 
 /* ------------------------------------------------------------------------- */

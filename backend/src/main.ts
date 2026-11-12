@@ -162,8 +162,15 @@ async function bootstrap(): Promise<void> {
   /*
    * 缩略图中间件同样必须在静态服务之前: 带 `?w=` 的请求若先被静态命中,
    * 拿到的还是原图。未带参数 / 非图片时它直接放行, 回落静态服务。
+   * 是否启用由后台配置 `asset.thumbnailEnabled`（ASSET_THUMBNAIL_ENABLED）决定，
+   * 关闭时中间件直接放行，静态服务返回原图。
    */
-  app.use(createAssetThumbnailMiddleware(uploadsDir));
+  app.use(
+    createAssetThumbnailMiddleware(
+      uploadsDir,
+      config.get<boolean>('asset.thumbnailEnabled') ?? true,
+    ),
+  );
 
   // 静态服务: GET /uploads/* 直接返回图片
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });

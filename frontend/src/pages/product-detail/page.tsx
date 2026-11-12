@@ -1,22 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Maximize2, Sparkles } from 'lucide-react';
 
-import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES, MAX_NAME_LEN } from './constants';
-import {
-  AssetLibraryModal,
-  MobileUploadModal,
-  ModelPicker,
-  OutputTabsPane,
-  ToolImageDropzone,
-  ToolSettingsPopover,
-  ToolSubmitBar,
-  ToolWorkflowSteps,
-} from './components';
-import { DetailExamplePanel } from './DetailExamplePanel';
-import { DetailResultList } from './DetailResultList';
-import { DetailSectionPicker } from './DetailSectionPicker';
-import { FormSelect } from './FormSelect';
+import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
+import { AssetLibraryModal, MobileUploadModal, ToolWorkflowSteps } from './components';
+import { DetailInputPane } from './DetailInputPane';
+import { DetailOutputPane } from './DetailOutputPane';
 import {
   notifyCreditsChanged,
   useAuth,
@@ -38,21 +25,23 @@ import {
   resolveModelId,
   startDetailGeneration,
 } from './api';
-import { countGenerations, languageOptions, platformDetailSpec, platformOptions, sectionCaption } from './utils';
+import { countGenerations, formSnapshotOf, platformDetailSpec, sectionCaption, type ResultRow } from './utils';
 import { promptToolErrorMessage } from '../../lib/promptToolMessages';
-import { useApp, Button, Input, Modal, Textarea } from '../../ui';
+import { useApp, Modal, Textarea } from '../../ui';
 
 /**
  * 商品详情图工作台
+ *
+ * 左右分栏：左栏（输入）与右栏（功能示例 / 创作结果）拆成独立展示组件，
+ * 本文件只保留路由级状态、取数与写操作（提交 / 删除）。
  */
 
 export function ProductDetailPage() {
   const { message, modal } = useApp();
   const reportError = useGenerateError();
-  const navigate = useNavigate();
   const { ensureProject } = useProject();
   // 上传 (三重校验 / 素材库回填 / 粘贴) 统一由 useImageUpload 处理
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, library, mobile } = useImageUpload({
+  const { images, uploading, fileInputRef, uploadFiles, removeImage, replaceImages, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
     maxMb: MAX_IMAGE_MB,
   });
@@ -73,7 +62,7 @@ export function ProductDetailPage() {
   const [language, setLanguage] = useState('zh-CN');
   const [description, setDescription] = useState('');
   // 包含模块: 上限、顺序归一化与默认勾选都在 useSectionSelection + DetailSectionPicker
-  const { sections, toggle: toggleSection } = useSectionSelection();
+  const { sections, toggle: toggleSection, applySelection } = useSectionSelection();
   const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
   /** 用户手动改过画质后，切换平台不再覆盖 */
@@ -282,6 +271,40 @@ export function ProductDetailPage() {
     [modal, message, gallery.removeItem],
   );
 
+  /**
+   * 重新生成：把一次历史生成的参数回填到左栏，由用户确认 / 调整后再提交。
+   *
+   * 只回填、不直接建任务 —— 价格与模型线路可能已经变化，是否真的再生成一次
+   * 必须由用户按下「立即生成」；回填的模块清单还会按当前能力过滤未知项。
+   * 原图素材被删除时保留文字参数并明确提示重传，不静默提交一次缺图任务。
+   */
+  const regenerateFromRow = useCallback(
+    (row: ResultRow) => {
+      const snapshot = formSnapshotOf(row.cells);
+      if (!snapshot) return;
+      setProductName(snapshot.productName);
+      setBrand(snapshot.brand);
+      setDescription(snapshot.description);
+      // 旧任务可能缺这些参数: 缺省时保留当前值，避免把下拉框清空成空串
+      if (snapshot.platform) setPlatform(snapshot.platform);
+      if (snapshot.language) setLanguage(snapshot.language);
+      if (snapshot.ratio) setRatio(snapshot.ratio);
+      if (snapshot.resolution) {
+        setResolution(snapshot.resolution);
+        // 画质是随这批任务恢复的，之后切平台不应再覆盖用户看到的值
+        setResolutionTouched(true);
+      }
+      if (snapshot.sections.length > 0) applySelection(snapshot.sections);
+      if (snapshot.images.length > 0) {
+        replaceImages(snapshot.images);
+        message.success('已带入这次生成的参数，可在左侧调整后重新生成');
+      } else {
+        message.warning('原图已不可用，已带入文字参数，请重新上传商品图');
+      }
+    },
+    [applySelection, replaceImages, message],
+  );
+
   /** 放大编辑弹窗的开 / 关 (两处回调共用同一引用) */
   const closeExpand = useCallback(() => setExpandOpen(false), []);
   const openExpand = useCallback(() => setExpandOpen(true), []);
@@ -291,169 +314,65 @@ export function ProductDetailPage() {
    */
   const toggleSettings = useCallback(() => setSettingsOpen((v) => !v), []);
 
+  const canSubmit = formValid && !(token && capabilityBlocked);
+
   return (
     <div className="pk-workspace">
       {/* ── 左: 输入栏 ── */}
-      <aside className="pk-input-pane">
-        <div className="pk-form-card">
-          {/* 业务类型 tab: 参考站仅窄屏显示 (桌面端 display:none 实拍确认) */}
-          <div className="pk-editor-tabs" role="tablist" aria-label="业务类型">
-            <Button type="text" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/product-kit')}>
-              商品主图
-            </Button>
-            <Button type="text" role="tab" aria-selected className="pk-editor-tab pk-editor-tab-active">
-              商品详情
-            </Button>
-            <Button type="text" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/viral-clone')}>
-              爆款复刻
-            </Button>
-          </div>
-
-          <div className="pk-form-scroll">
-            {/* 上传商品图 + 生成设置 + 商品描述 (参考站同一张卡片) */}
-            <section className="pk-config-card">
-              <ToolImageDropzone
-                title="上传商品图"
-                images={images}
-                max={MAX_IMAGES}
-                maxMb={MAX_IMAGE_MB}
-                uploading={uploading}
-                fileInputRef={fileInputRef}
-                onFiles={(f) => void uploadFiles(f)}
-                onRemove={removeImage}
-                onOpenLibrary={openLibrary}
-                onOpenMobile={mobile.openMobile}
-                noun="商品图片"
-              />
-
-              <div className="pk-section">
-                <strong className="pk-section-title">
-                  <i className="pk-required-mark">*</i>生成设置
-                </strong>
-                <div className="pk-form-grid">
-                  <label className="pk-field">
-                    <span className="pk-field-label">
-                      <i className="pk-required-mark">*</i>商品名称
-                    </span>
-                    <Input
-                      value={productName}
-                      maxLength={MAX_NAME_LEN}
-                      placeholder="* 请输入商品名称"
-                      onChange={(e) => setProductName(e.target.value)}
-                    />
-                  </label>
-                  <label className="pk-field">
-                    <span className="pk-field-label">品牌（选填）</span>
-                    <Input
-                      value={brand}
-                      maxLength={MAX_NAME_LEN}
-                      placeholder="请输入品牌（选填）"
-                      onChange={(e) => setBrand(e.target.value)}
-                    />
-                  </label>
-                  <FormSelect label="平台" value={platform} options={platformOptions()} onChange={changePlatform} />
-                  <FormSelect label="语言" value={language} options={languageOptions()} onChange={setLanguage} />
-                </div>
-              </div>
-
-              <div className="pk-section">
-                <div className="pk-field-label-row">
-                  <span className="pk-section-title">
-                    <i className="pk-required-mark">*</i>商品描述
-                  </span>
-                  <div className="pk-desc-actions">
-                    <Button
-                      type="text"
-                      className="pk-ai-btn"
-                      disabled={analyzing}
-                      onClick={() => void runAiAnalyze()}
-                    >
-                      <Sparkles size={12} className="size-[12px]" />
-                      <span>{analyzing ? '分析中…' : 'AI分析'}</span>
-                    </Button>
-                  </div>
-                </div>
-                <div className="pk-desc-editor">
-                  <Textarea
-                    rows={3}
-                    maxLength={MAX_DESC_LEN}
-                    value={description}
-                    placeholder="* 请输入商品描述"
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                  <Button
-                    type="text"
-                    className="pk-desc-expand"
-                    aria-label="放大编辑商品描述"
-                    title="放大编辑"
-                    onClick={openExpand}
-                  >
-                    <Maximize2 size={14} className="size-[14px]" />
-                  </Button>
-                </div>
-              </div>
-            </section>
-
-            <DetailSectionPicker selected={sections} onToggle={toggleSection} />
-          </div>
-
-          {/* 高级设置 + 提交 (sticky 底部) */}
-          <ToolSubmitBar
-            submitting={generating}
-            disabled={!formValid || (Boolean(token) && capabilityBlocked)}
-            label="立即生成"
-            creditLabel={creditLabel ?? undefined}
-            hint={
-              capabilityBlocked && token && capabilityReason ? (
-                <span className="tool-submit-notice tool-submit-notice-error">{capabilityReason}</span>
-              ) : undefined
-            }
-            settings={
-              <ToolSettingsPopover
-                open={settingsOpen}
-                onToggle={toggleSettings}
-                resolution={resolution}
-                onResolutionChange={(v) => {
-                  setResolutionTouched(true);
-                  setResolution(v);
-                }}
-                ratio={ratio}
-                onRatioChange={setRatio}
-                capabilityId={DETAIL_CAPABILITY}
-                modelPicker={
-                  <ModelPicker
-                    capability={DETAIL_CAPABILITY}
-                    options={{ ratio, resolution }}
-                    onQuoteChange={setModelQuoteCredits}
-                  />
-                }
-              />
-            }
-            onSubmit={() => void submit()}
-          />
-        </div>
-      </aside>
+      <DetailInputPane
+        images={images}
+        uploading={uploading}
+        fileInputRef={fileInputRef}
+        onFiles={(f) => void uploadFiles(f)}
+        onRemove={removeImage}
+        onOpenLibrary={openLibrary}
+        onOpenMobile={mobile.openMobile}
+        productName={productName}
+        onProductNameChange={setProductName}
+        brand={brand}
+        onBrandChange={setBrand}
+        platform={platform}
+        onPlatformChange={changePlatform}
+        language={language}
+        onLanguageChange={setLanguage}
+        description={description}
+        onDescriptionChange={setDescription}
+        analyzing={analyzing}
+        onAnalyze={() => void runAiAnalyze()}
+        onExpandDescription={openExpand}
+        sections={sections}
+        onToggleSection={toggleSection}
+        settingsOpen={settingsOpen}
+        onToggleSettings={toggleSettings}
+        ratio={ratio}
+        onRatioChange={setRatio}
+        resolution={resolution}
+        onResolutionChange={(v) => {
+          setResolutionTouched(true);
+          setResolution(v);
+        }}
+        onModelQuoteChange={setModelQuoteCredits}
+        generating={generating}
+        submitDisabled={!canSubmit}
+        submitHint={capabilityBlocked && token && capabilityReason ? capabilityReason : undefined}
+        creditLabel={creditLabel}
+        onSubmit={() => void submit()}
+      />
 
       {/* ── 右: 功能示例 / 创作结果 ──
           创作结果按批次逐行陈列 (一次生成一行, 原图 + 各模块图);
           提交后重拉列表拿到整批占位卡, 由 useResultGallery 轮询到全部到终态。 */}
-      <OutputTabsPane
-        value={rightTab}
-        onChange={pickRightTab}
+      <DetailOutputPane
+        rightTab={rightTab}
+        onPickTab={pickRightTab}
         generationCount={generationCount}
-        demo={<DetailExamplePanel />}
-        results={
-          <DetailResultList
-            items={gallery.items}
-            loading={gallery.loading}
-            error={gallery.error}
-            emptyTitle="效果图预览"
-            emptyDesc={resultEmptyDesc}
-            emptyChildren={resultEmptyChildren}
-            onDeleteRow={deleteRow}
-            downloadNamePrefix="product-detail"
-          />
-        }
+        items={gallery.items}
+        loading={gallery.loading}
+        error={gallery.error}
+        emptyDesc={resultEmptyDesc}
+        emptyChildren={resultEmptyChildren}
+        onDeleteRow={deleteRow}
+        onRegenerateRow={regenerateFromRow}
       />
 
       {/* 素材库选择弹窗 (真实数据) */}

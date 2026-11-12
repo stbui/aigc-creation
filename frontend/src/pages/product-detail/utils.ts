@@ -10,7 +10,8 @@
  */
 
 import type { GalleryItem } from './hooks';
-import { buildBatchRows, cellState, formatBatchDate, type BatchRowBase } from '../../components/batchResult';
+import { MAX_SECTIONS, SECTION_VALUES } from './constants';
+import { buildBatchRows, formatBatchDate, resultMetaOf, type BatchRowBase, type ResultMeta } from '../../components/batchResult';
 import { languageOptions, platformDetailSpec, platformOptions } from '../../lib/optionSets';
 
 /* ------------------------------------------------------------------------- */
@@ -55,58 +56,9 @@ export interface ResultRow extends BatchRowBase {
   meta: ResultMeta;
 }
 
-/** 商品详情结果卡的参数摘要 */
-export interface ResultMeta {
-  resolution?: string;
-  ratio?: string;
-  platform?: string;
-  country?: string;
-  language?: string;
-}
-
-/** 输出语言的地区码 → 国家/地区展示名。取值来自当前 LANGUAGES 的 locale 列表。 */
-const COUNTRY_BY_REGION: Record<string, string> = {
-  CN: '中国',
-  US: '美国',
-  RU: '俄罗斯',
-  ES: '西班牙',
-  DE: '德国',
-  JP: '日本',
-  KR: '韩国',
-  PT: '葡萄牙',
-  ID: '印度尼西亚',
-  TH: '泰国',
-};
-
-function optionLabel(options: Array<{ value: string | number; label: string }>, value?: string): string | undefined {
-  if (!value) return undefined;
-  return options.find((option) => String(option.value) === value)?.label ?? value;
-}
-
-/** 从任务参数提取结果卡参数摘要。缺失字段不补默认值，避免把旧任务伪装成新参数。 */
-export function resultMetaOf(item: GalleryItem): ResultMeta {
-  const language = textParam(item, 'language');
-  const region = language?.split('-')[1]?.toUpperCase();
-  return {
-    resolution: textParam(item, 'size'),
-    ratio: textParam(item, 'ratio'),
-    platform: optionLabel(platformOptions(), textParam(item, 'platform')),
-    country: region ? COUNTRY_BY_REGION[region] : undefined,
-    language: optionLabel(languageOptions(), language),
-  };
-}
-
-export type ResultStatusTone = 'processing' | 'done' | 'partial' | 'failed';
-
-/** 批次状态：任一生成中 → 生成中；终态后按成功/失败数量区分。 */
-export function resultStatusOf(cells: GalleryItem[]): { label: string; tone: ResultStatusTone } {
-  const ready = cells.filter((item) => cellState(item) === 'ready').length;
-  const failed = cells.filter((item) => cellState(item) === 'failed').length;
-  if (cells.some((item) => cellState(item) === 'pending')) return { label: '生成中', tone: 'processing' };
-  if (failed > 0 && ready > 0) return { label: '部分失败', tone: 'partial' };
-  if (failed > 0) return { label: '生成失败', tone: 'failed' };
-  return { label: '已完成', tone: 'done' };
-}
+/** 结果卡参数摘要与状态口径（与商品主图共用） */
+export type { ResultMeta, ResultStatusTone } from '../../components/batchResult';
+export { resultMetaOf, resultStatusOf } from '../../components/batchResult';
 
 /** 格子的模块名: 优先任务参数里的 sectionLabel, 回落任务 caption */
 export function labelOf(item: GalleryItem): string {
@@ -148,6 +100,63 @@ export function buildRows(items: GalleryItem[]): ResultRow[] {
     }),
     rowKeyOf,
   );
+}
+
+/* ------------------------------------------------------------------------- */
+/* 重新生成: 历史批次 → 左栏表单                                             */
+/* ------------------------------------------------------------------------- */
+
+/** 一次生成回填左栏所需的表单快照 */
+export interface DetailFormSnapshot {
+  productName: string;
+  brand: string;
+  platform: string;
+  language: string;
+  description: string;
+  sections: string[];
+  ratio: string;
+  resolution: string;
+  /** 原图素材 (id 用于再次提交, url 用于图片位展示) */
+  images: Array<{ id: string; url: string; name: string }>;
+}
+
+/** 任务参数里的模块清单: 兼容逗号串与旧任务的数组形态, 只留当前模块并按固定顺序排列 */
+function snapshotSections(raw: unknown): string[] {
+  const list = Array.isArray(raw)
+    ? raw.filter((value): value is string => typeof value === 'string')
+    : typeof raw === 'string'
+      ? raw.split(',')
+      : [];
+  const picked = new Set(list.map((value) => value.trim()).filter(Boolean));
+  return SECTION_VALUES.filter((value) => picked.has(value)).slice(0, MAX_SECTIONS);
+}
+
+/**
+ * 从一次生成的任务快照还原左栏表单。
+ *
+ * 同批各任务的表单参数完全一致（只有 `sectionLabel` / `batchIndex` 不同），
+ * 因此只读首格；缺字段返回空串，让回填后的表单与当初提交的一致，
+ * 而不是悄悄沿用当前表单里的残留值。
+ */
+export function formSnapshotOf(items: GalleryItem[]): DetailFormSnapshot | null {
+  const first = items[0];
+  if (!first) return null;
+  const text = (key: string) => textParam(first, key) ?? '';
+  return {
+    productName: text('productName'),
+    brand: text('brand'),
+    platform: text('platform'),
+    language: text('language'),
+    description: text('description'),
+    sections: snapshotSections(first.params?.sections),
+    ratio: text('ratio'),
+    resolution: text('size'),
+    images: (first.inputAssets ?? []).map((asset, index) => ({
+      id: asset.id,
+      url: asset.url,
+      name: asset.name || `原图 ${index + 1}`,
+    })),
+  };
 }
 
 /* ------------------------------------------------------------------------- */

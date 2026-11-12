@@ -1,7 +1,7 @@
 import './BatchResultList.css';
 import './result-list.css';
 import { memo, useMemo, useState, type ReactNode } from 'react';
-import { Download, ImagePlus, Trash2 } from 'lucide-react';
+import { Download, ImagePlus, RotateCcw, Trash2 } from 'lucide-react';
 
 import { ImageLightbox, type LightboxItem } from './ImageLightbox';
 import { ToolEmptyState } from './ToolEmptyState';
@@ -47,6 +47,11 @@ export interface BatchResultListProps<Row extends BatchRow> {
   emptyChildren?: ReactNode;
   /** 删除一次生成（批次内全部任务） */
   onDeleteRow: (items: GalleryItem[]) => void;
+  /**
+   * 卡片布局的「重新生成」：把这次生成的参数回填到页面表单。
+   * 不传则不渲染该按钮（其它页面还没有回填契约）。
+   */
+  onRegenerateRow?: (row: Row) => void;
   /** 下载文件名前缀 */
   downloadNamePrefix: string;
   /** 单格名称（模块名 / 主图变体名 / 第 N 张） */
@@ -123,6 +128,7 @@ function BatchResultListImpl<Row extends BatchRow>({
   emptyDesc,
   emptyChildren,
   onDeleteRow,
+  onRegenerateRow,
   downloadNamePrefix,
   labelOf,
   cellLabelOf,
@@ -338,6 +344,18 @@ function BatchResultListImpl<Row extends BatchRow>({
                           <span className="pd-result-card-source-empty">原图已删除</span>
                         )}
                       </div>
+                      {onRegenerateRow && (
+                        <button
+                          type="button"
+                          className="pd-result-regenerate"
+                          disabled={row.pending}
+                          title={row.pending ? '生成中，完成后可重新生成' : '把这次生成的参数带回左侧'}
+                          onClick={() => onRegenerateRow(row)}
+                        >
+                          <RotateCcw size={13} />
+                          重新生成
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="pd-result-download-all"

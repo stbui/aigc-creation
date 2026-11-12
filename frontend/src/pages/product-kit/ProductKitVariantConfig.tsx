@@ -1,8 +1,6 @@
 import { NumberStepper } from '../../ui';
 
-import { VARIANT_FIELDS } from './constants';
-
-const MAX_PER_VARIANT = 5;
+import { MAX_PER_VARIANT, VARIANT_FIELDS } from './constants';
 
 /**
  * 自定义配置：白底 / 场景 / 卖点 / 其他图的张数。

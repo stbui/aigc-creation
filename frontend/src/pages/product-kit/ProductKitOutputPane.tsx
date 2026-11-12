@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { OutputTabsPane } from './components';
 import type { GalleryItem, RightTab } from './hooks';
+import type { ResultRow } from './utils';
 import { ProductKitExamplePanel } from './ProductKitExamplePanel';
 import { ProductKitResultList } from './ProductKitResultList';
 
@@ -27,6 +28,8 @@ export interface ProductKitOutputPaneProps {
   emptyChildren?: ReactNode;
   /** 删除一次生成（批次内全部任务） */
   onDeleteRow: (items: GalleryItem[]) => void;
+  /** 重新生成：把这次生成的参数回填左栏表单 */
+  onRegenerateRow?: (row: ResultRow) => void;
   downloadNamePrefix?: string;
 }
 
@@ -40,6 +43,7 @@ export function ProductKitOutputPane({
   emptyDesc,
   emptyChildren,
   onDeleteRow,
+  onRegenerateRow,
   downloadNamePrefix = 'main-image',
 }: ProductKitOutputPaneProps) {
   return (
@@ -57,6 +61,7 @@ export function ProductKitOutputPane({
           emptyDesc={emptyDesc}
           emptyChildren={emptyChildren}
           onDeleteRow={onDeleteRow}
+          onRegenerateRow={onRegenerateRow}
           downloadNamePrefix={downloadNamePrefix}
         />
       }

@@ -1,8 +1,14 @@
-import { VARIANT_FIELDS, VARIANT_LABELS } from './constants';
+import { VARIANT_FIELDS, VARIANT_LABELS, MAX_PER_VARIANT } from './constants';
 import { assetsApi, assetSrc, type Asset } from './api';
 import type { GalleryItem, UploadedImage } from './hooks';
 import { modelImageInputLimit, type PublicLogicalModel } from '../../lib/models';
-import { buildBatchRows, formatBatchDate, type BatchRowBase } from '../../components/batchResult';
+import {
+  buildBatchRows,
+  formatBatchDate,
+  resultMetaOf,
+  type BatchRowBase,
+  type ResultMeta,
+} from '../../components/batchResult';
 
 /**
  * 商品主图工作台页面的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
@@ -213,6 +219,8 @@ export { batchIndexOf, cellState } from '../../components/batchResult';
 export interface ResultRow extends BatchRowBase {
   prompt?: string;
   productName?: string;
+  /** 结果卡第二行展示的任务参数；同批次内各任务共用一份 */
+  meta: ResultMeta;
 }
 
 /** 主图格的变体名: 优先任务 caption, 回落「商品主图」 */
@@ -244,14 +252,74 @@ export function countGenerations(items: GalleryItem[]): number {
 
 /** 按 batchId 归组; 无 batchId 的任务各自成行。列表本身已按时间倒序 */
 export function buildRows(items: GalleryItem[]): ResultRow[] {
-  return buildBatchRows<{ prompt?: string; productName?: string }>(
+  return buildBatchRows<{ prompt?: string; productName?: string; meta: ResultMeta }>(
     items,
     (item) => ({
       prompt: textParam(item, 'description'),
       productName: textParam(item, 'productName'),
+      meta: resultMetaOf(item),
     }),
     rowKeyOf,
   );
+}
+
+/* ------------------------------------------------------------------------- */
+/* 重新生成: 历史批次 → 左栏表单                                             */
+/* ------------------------------------------------------------------------- */
+
+/** 一次生成回填左栏所需的表单快照 */
+export interface ProductKitFormSnapshot {
+  productName: string;
+  brand: string;
+  platform: string;
+  language: string;
+  description: string;
+  /** 四类变体的张数; 缺省类为 0 */
+  counts: Record<string, number>;
+  ratio: string;
+  resolution: string;
+  /** 原图素材 (id 用于再次提交, url 用于图片位展示) */
+  images: Array<{ id: string; url: string; name: string }>;
+}
+
+/**
+ * 从一次生成的任务快照还原左栏表单。
+ *
+ * 同批各任务的表单参数完全一致（只有 `variant` / `batchIndex` 不同），
+ * 因此表单字段只读首格；变体张数则按整批任务的 `variant` 统计 —— 用当前
+ * 批次反推「当初每类选了几张」，比让用户重新数一遍可靠。
+ * 缺字段返回空串 / 0，让回填后的表单与当初提交的一致。
+ */
+export function formSnapshotOf(items: GalleryItem[]): ProductKitFormSnapshot | null {
+  const first = items[0];
+  if (!first) return null;
+
+  const text = (key: string) => textParam(first, key) ?? '';
+  const counts: Record<string, number> = Object.fromEntries(
+    VARIANT_FIELDS.map((field) => [field.key, 0]),
+  );
+  for (const item of items) {
+    const variant = textParam(item, 'variant');
+    if (variant && variant in counts) {
+      counts[variant] = Math.min(counts[variant] + 1, MAX_PER_VARIANT);
+    }
+  }
+
+  return {
+    productName: text('productName'),
+    brand: text('brand'),
+    platform: text('platform'),
+    language: text('language'),
+    description: text('description'),
+    counts,
+    ratio: text('ratio'),
+    resolution: text('size'),
+    images: (first.inputAssets ?? []).map((asset, index) => ({
+      id: asset.id,
+      url: asset.url,
+      name: asset.name || `原图 ${index + 1}`,
+    })),
+  };
 }
 
 /* ------------------------------------------------------------------------- */

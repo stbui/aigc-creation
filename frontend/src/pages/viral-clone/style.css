@@ -89,9 +89,6 @@
  * 每条生成记录固定三格: 商品上传图 → 参考图 → 生成图。
  * 参考站原版只铺生成图；本页需要解释「商品换进参考场景」的前后关系，
  * 所以历史也按一次任务一组展示，回看时不用再靠记忆猜输入是哪几张。 */
-.vc-result-body {
-  gap: 12px;
-}
 
 .vc-result-loading {
   flex: 1;
@@ -569,8 +566,7 @@
   flex-direction: column;
 }
 
-.vc-editor-card,
-  .vc-result-pane {
+.vc-editor-card {
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -584,18 +580,6 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-}
-
-.vc-editor-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-}
-
-.vc-editor-heading > div {
-  min-width: 0;
 }
 
 .vc-editor-tabs {
@@ -693,24 +677,6 @@
   background: var(--brand-bg);
 }
 
-.vc-result-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
-}
-
-.vc-result-content {
-  flex: 1;
-  min-height: 0;
-  padding: 16px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .vc-result-alert {
   flex: none;
 }
@@ -718,6 +684,28 @@
 .vc-result-empty {
   flex: 1;
   border: 0;
+}
+
+/* 功能示例: 真实复刻案例 (每张是「商品图 + 参考图 → 复刻结果」的完整对照) */
+.vc-demo-cases {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vc-demo-cases img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+@media (max-width: 720px) {
+  .vc-demo-cases {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .vc-result-loading-grid {
@@ -778,15 +766,6 @@
     overflow: visible;
   }
 
-  .vc-result-pane {
-    height: auto;
-    min-height: 480px;
-  }
-
-  .vc-result-content {
-    min-height: 400px;
-  }
-
   .vc-result-list {
     overflow: visible;
   }
@@ -799,11 +778,6 @@
 }
 
 @media (max-width: 720px) {
-  .vc-result-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
   .vc-result-row-head {
     padding: 10px 10px 8px;
   }

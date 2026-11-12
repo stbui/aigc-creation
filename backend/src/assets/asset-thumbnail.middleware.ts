@@ -55,7 +55,22 @@ function sizeParam(raw: unknown, fallback: number): number {
   return Math.min(Math.max(value, MIN_SIZE), MAX_SIZE);
 }
 
-export function createAssetThumbnailMiddleware(uploadsDir: string) {
+export function createAssetThumbnailMiddleware(
+  uploadsDir: string,
+  /** 是否启用本地缩略图。关闭时直接放行，由静态服务返回原图。默认开启。 */
+  enabled = true,
+) {
+  // 功能关闭：一律回落，后续静态服务返回原图（?w= 等参数被忽略）。
+  // 这样无需改前端：前端照常请求 ?w=，后端只当原图返回。
+  if (!enabled) {
+    return function disabledAssetThumbnailMiddleware(
+      _req: Request,
+      _res: Response,
+      next: NextFunction,
+    ): void {
+      next();
+    };
+  }
   const root = resolve(uploadsDir);
   const cacheRoot = join(root, '.thumbs');
   /** 同一张图同一尺寸并发请求时只解码一次 */

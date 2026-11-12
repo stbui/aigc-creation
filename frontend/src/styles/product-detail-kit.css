@@ -281,6 +281,11 @@
   background: var(--surface);
 }
 
+/* 商品主图套图示例是 4 张: 详情页的 5 列切图留下空列 */
+.pd-demo-slices--suite {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .pd-demo-note {
   margin: 0;
   font-size: 12px;

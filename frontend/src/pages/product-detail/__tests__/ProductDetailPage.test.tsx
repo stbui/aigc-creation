@@ -50,6 +50,7 @@ vi.mock('../hooks', async () => {
       fileInputRef: { current: null },
       uploadFiles: vi.fn(),
       removeImage: vi.fn(),
+      replaceImages: vi.fn(),
       library: {
         open: false,
         loading: false,
@@ -75,6 +76,7 @@ vi.mock('../hooks', async () => {
       return {
         sections,
         toggle: vi.fn(),
+        applySelection: vi.fn(),
       };
     },
   };
@@ -106,7 +108,7 @@ vi.mock('../components', () => ({
 vi.mock('../DetailExamplePanel', () => ({ DetailExamplePanel: () => null }));
 vi.mock('../DetailResultList', () => ({ DetailResultList: () => null }));
 vi.mock('../DetailSectionPicker', () => ({ DetailSectionPicker: () => null }));
-vi.mock('../FormSelect', () => ({ FormSelect: () => null }));
+vi.mock('../DetailSelectField', () => ({ DetailSelectField: () => null }));
 
 vi.mock('../api', () => ({
   DETAIL_CAPABILITY: 'detail_image',

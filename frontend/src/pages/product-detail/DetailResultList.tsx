@@ -1,18 +1,18 @@
 import { memo, useMemo, type ReactNode } from 'react';
 
-import { BatchResultList } from './components';
-import { buildRows, formatDate, labelOf, resultStatusOf } from './utils';
+import { BatchResultCardList } from './components';
+import { buildRows, labelOf, type ResultRow } from './utils';
 import type { GalleryItem } from './hooks';
 
 /**
  * 商品详情图「创作结果」批次列表。
  *
- * 一次生成 = 一张卡: 商品名 + 时间 / 参数 + 状态 / 原图 + 一键下载,
- * 之后三列展示本次模块图。这与网格结果栏的区别是**归组**:
- * 网格把每张图当独立作品, 用户看不出「这 6 张是同一次生成的」。
+ * 一次生成 = 一张卡: 商品名 + 时间 / 参数 / 原图 / 各模块图。
+ * 与通用网格结果栏的区别是**归组**: 网格把每张图当独立作品,
+ * 用户看不出「这 6 张是同一次生成的」。
  *
- * 渲染本体在 `components/BatchResultList`(与商品主图 / 带货图文共用),
- * 这里只提供详情图的页面语义, 通用渲染与下载逻辑仍在 `BatchResultList`。
+ * 卡片的信息编排在 `components/BatchResultCardList`(与商品主图共用),
+ * 这里只提供详情图的单格名称语义。
  *
  * 数据口径:
  *   - 批次由任务参数 `batchId` 标识, 批内按 `batchIndex` 排序;
@@ -30,6 +30,8 @@ export interface DetailResultListProps {
   emptyChildren?: ReactNode;
   /** 删除一次生成（批次内全部任务） */
   onDeleteRow: (items: GalleryItem[]) => void;
+  /** 重新生成：把这次生成的参数回填左栏表单 */
+  onRegenerateRow?: (row: ResultRow) => void;
   /** 下载文件名前缀 */
   downloadNamePrefix?: string;
 }
@@ -42,12 +44,13 @@ function DetailResultListImpl({
   emptyDesc,
   emptyChildren,
   onDeleteRow,
+  onRegenerateRow,
   downloadNamePrefix = 'product-detail',
 }: DetailResultListProps) {
   const rows = useMemo(() => buildRows(items), [items]);
 
   return (
-    <BatchResultList
+    <BatchResultCardList
       rows={rows}
       loading={loading}
       error={error}
@@ -55,41 +58,9 @@ function DetailResultListImpl({
       emptyDesc={emptyDesc}
       emptyChildren={emptyChildren}
       onDeleteRow={onDeleteRow}
-      downloadNamePrefix={downloadNamePrefix}
+      onRegenerateRow={onRegenerateRow}
       labelOf={labelOf}
-      layout="card"
-      cellLabelOf={(item) => labelOf(item)}
-      renderRowTitle={(row) => (
-        <div className="pd-result-card-title">
-          <strong title={`商品：${row.productName || '未命名商品'}`}>
-            商品：{row.productName || '未命名商品'}
-          </strong>
-          <time dateTime={row.createdAt}>{formatDate(row.createdAt) || '时间未知'}</time>
-        </div>
-      )}
-      renderRowMeta={(row) => {
-        const status = resultStatusOf(row.cells);
-        const chips = [
-          ['resolution', row.meta.resolution],
-          ['ratio', row.meta.ratio],
-          ['platform', row.meta.platform],
-          ['country', row.meta.country],
-          ['language', row.meta.language],
-        ] as const;
-        return (
-          <>
-            {chips.map(([key, label]) =>
-              label ? (
-                <span className="pd-result-meta-chip" key={key}>
-                  {label}
-                </span>
-              ) : null,
-            )}
-            <span className={`pd-result-status is-${status.tone}`}>{status.label}</span>
-          </>
-        );
-      }}
-      renderSourceCaption={() => null}
+      downloadNamePrefix={downloadNamePrefix}
     />
   );
 }

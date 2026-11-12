@@ -13,8 +13,8 @@ export {
   SUPPORTED_IMAGE_LABEL,
 } from '../../lib/constants';
 
-/** 首屏与「加载更多」每次追加的素材数 */
-export const PAGE_SIZE = 20;
+/** 首屏与滚动加载每次追加的素材数（默认一次加载 50 张，向下滚动自动续加） */
+export const PAGE_SIZE = 50;
 
 /** 素材来源筛选: 全部 / 本地上传 / 生成图 */
 export type Kind = 'all' | 'original' | 'generated';

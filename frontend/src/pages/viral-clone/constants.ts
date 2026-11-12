@@ -1,5 +1,3 @@
-import type { TaskStatus } from '../../types/api';
-
 /**
  * 爆款复刻工作台页面的常量 —— 目录内文件的唯一常量入口。
  *
@@ -24,9 +22,15 @@ export const REQUIREMENT_PLACEHOLDER = '例如：背景保持简洁、商品居�
 
 // ───────────────── 复刻程度 ─────────────────
 
+/** 复刻程度两档: 高度复刻 (默认) / 参考风格 */
+export type CloneDegree = 'reference_style' | 'high_replica';
+
+/** 图片位: 商品图 / 参考图 */
+export type AssetSlot = 'product' | 'reference';
+
 /** 复刻程度两档 (实拍: 默认选中「高度复刻」) */
 export const CLONE_DEGREES: Array<{
-  value: 'reference_style' | 'high_replica';
+  value: CloneDegree;
   label: string;
   desc: string;
 }> = [
@@ -39,19 +43,3 @@ export const DEGREE_LABEL: Record<string, string> = {
   reference_style: '参考风格',
   high_replica: '高度复刻',
 };
-
-/** 本页上传区里的素材 (商品图 / 参考图共用) */
-export interface PkAsset {
-  id: string;
-  url: string;
-  name: string;
-}
-
-/** 一次爆款复刻任务的结果 (只用于本次提交的提示行) */
-export interface PkResult {
-  status: TaskStatus;
-  url?: string;
-  width?: number;
-  height?: number;
-  errorCode?: string | null;
-}

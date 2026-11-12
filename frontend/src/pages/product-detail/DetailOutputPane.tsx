@@ -1,0 +1,70 @@
+import type { ReactNode } from 'react';
+
+import { OutputTabsPane } from './components';
+import type { GalleryItem, RightTab } from './hooks';
+import type { ResultRow } from './utils';
+import { DetailExamplePanel } from './DetailExamplePanel';
+import { DetailResultList } from './DetailResultList';
+
+/**
+ * 商品详情图工作台右栏：功能示例 / 创作结果 两个页签。
+ *
+ * 创作结果按批次逐行陈列（一次生成一行，原图 + 各模块图）。右栏不取数：
+ * 结果轮询与页签落位（`useResultGallery` / `useRightTab`）都在 `page.tsx`，
+ * 提交后把页签切到「创作结果」也由页面统一驱动。
+ */
+export interface DetailOutputPaneProps {
+  rightTab: RightTab;
+  onPickTab: (tab: RightTab) => void;
+  /** 页签角标：按生成次数计，与下方批次行数一致 */
+  generationCount: number;
+
+  // ── 创作结果 ──
+  items: GalleryItem[];
+  loading: boolean;
+  /** 加载失败信息；非空时保留已有列表并提示 */
+  error?: string | null;
+  emptyDesc?: string;
+  emptyChildren?: ReactNode;
+  /** 删除一次生成（批次内全部任务） */
+  onDeleteRow: (items: GalleryItem[]) => void;
+  /** 重新生成：把这次生成的参数回填左栏表单 */
+  onRegenerateRow?: (row: ResultRow) => void;
+  downloadNamePrefix?: string;
+}
+
+export function DetailOutputPane({
+  rightTab,
+  onPickTab,
+  generationCount,
+  items,
+  loading,
+  error,
+  emptyDesc,
+  emptyChildren,
+  onDeleteRow,
+  onRegenerateRow,
+  downloadNamePrefix = 'product-detail',
+}: DetailOutputPaneProps) {
+  return (
+    <OutputTabsPane
+      value={rightTab}
+      onChange={onPickTab}
+      generationCount={generationCount}
+      demo={<DetailExamplePanel />}
+      results={
+        <DetailResultList
+          items={items}
+          loading={loading}
+          error={error}
+          emptyTitle="效果图预览"
+          emptyDesc={emptyDesc}
+          emptyChildren={emptyChildren}
+          onDeleteRow={onDeleteRow}
+          onRegenerateRow={onRegenerateRow}
+          downloadNamePrefix={downloadNamePrefix}
+        />
+      }
+    />
+  );
+}

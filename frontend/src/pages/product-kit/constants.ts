@@ -43,3 +43,6 @@ export const VARIANT_LABELS: Record<string, string> = {
   selling_point: '卖点图',
   other: '其他图',
 };
+
+/** 单类变体的张数上限 (步进器与历史回填共用) */
+export const MAX_PER_VARIANT = 5;

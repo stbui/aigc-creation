@@ -18,8 +18,8 @@ import { useApp } from '../../ui';
  * 目录内新增通用 hook 时在这里补一行 re-export。
  */
 
-/** 上传 (三重校验 / 素材库回填 / 粘贴) */
-export { useImageUpload } from '../../hooks/useImageUpload';
+/** 上传 (三重校验 / 素材库回填 / 粘贴); `UploadedImage` 是上传区的条目类型 */
+export { useImageUpload, type UploadedImage } from '../../hooks/useImageUpload';
 /** 项目归属 (上传与建任务都要求 projectId) */
 export { useProject } from '../../hooks/useProject';
 /** 能力运行时状态: 后台下线或无线路时在前端事前标注 */
@@ -43,6 +43,9 @@ export type RightTab = 'demo' | 'results';
  *
  * `toggle` 必须是稳定引用: 模块卡片是 memo 组件, 回调每次重建会让它跟着
  * 页面一起重渲染。顺序按模块固定顺序归一化, 不按点击先后重排。
+ *
+ * `applySelection` 供「重新生成」把历史参数的模块清单一键回填: 同样过滤未知
+ * key 并按固定顺序归一化, 避免旧任务里的已下线模块让计数与勾选对不上。
  */
 export function useSectionSelection() {
   const { message } = useApp();
@@ -62,7 +65,12 @@ export function useSectionSelection() {
     [message],
   );
 
-  return { sections, toggle };
+  const applySelection = useCallback((values: string[]) => {
+    const picked = new Set(values);
+    setSections(SECTION_VALUES.filter((value) => picked.has(value)).slice(0, MAX_SECTIONS));
+  }, []);
+
+  return { sections, toggle, applySelection };
 }
 
 /**

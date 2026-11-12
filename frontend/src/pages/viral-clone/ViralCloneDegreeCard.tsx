@@ -1,4 +1,4 @@
-import { CLONE_DEGREES } from './constants';
+import { CLONE_DEGREES, type CloneDegree } from './constants';
 import { FieldLegend, FieldSet, ToggleGroup } from './components';
 
 /** 复刻程度两档（独立卡，默认高度复刻）。 */
@@ -6,8 +6,8 @@ export function ViralCloneDegreeCard({
   degree,
   onDegreeChange,
 }: {
-  degree: 'reference_style' | 'high_replica';
-  onDegreeChange: (value: 'reference_style' | 'high_replica') => void;
+  degree: CloneDegree;
+  onDegreeChange: (value: CloneDegree) => void;
 }) {
   return (
     <FieldSet className="vc-degree-section">
@@ -17,7 +17,7 @@ export function ViralCloneDegreeCard({
       <ToggleGroup
         value={degree}
         onValueChange={(value) => {
-          if (value) onDegreeChange(value as 'reference_style' | 'high_replica');
+          if (value) onDegreeChange(value as CloneDegree);
         }}
         aria-label="复刻程度"
         className="vc-degree-options grid w-full grid-cols-2 gap-3"

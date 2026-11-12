@@ -153,6 +153,25 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
     setImages((prev) => prev.map((image) => (image.id === id ? next : image)));
   }, []);
 
+  /**
+   * 用一组已有素材整体替换图片位（结果卡「重新生成」回填原图）。
+   *
+   * 与 `replaceImage` 的单张原位替换不同，这里是一次全量覆盖：先推进清空代次，
+   * 让替换前发起、尚未完成的上传不会在覆盖后再追加进来。
+   */
+  const replaceImages = useCallback(
+    (next: UploadedImage[]) => {
+      resetSeqRef.current += 1;
+      const accepted = next.slice(0, max);
+      imagesRef.current = accepted;
+      setImages(accepted);
+      if (accepted.length < next.length) {
+        message.warning(`最多 ${max} 张${noun}，超出的 ${next.length - accepted.length} 张未带入`);
+      }
+    },
+    [max, noun, message],
+  );
+
   // 参考站支持点击 / 拖拽 / 粘贴三种上传方式（拖拽高亮态在 ToolImageDropzone 内部）
   usePasteUpload(uploadFiles);
 
@@ -229,6 +248,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
     uploadFiles,
     removeImage,
     replaceImage,
+    replaceImages,
     clearImages,
     /** 素材库弹窗状态 (openLibrary / closeLibrary / pick) */
     library,

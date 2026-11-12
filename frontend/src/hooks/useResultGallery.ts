@@ -13,10 +13,22 @@ import type { TaskStatus } from '../types/api';
  * 自由创作页与商品主图 / 详情 / 爆款复刻页共用这份逻辑, 避免出现
  * 「一边按 capability 过滤、另一边忘了过滤」这类只在某一页复现的错。
  */
+/**
+ * 输入素材快照（id + 可展示地址）。
+ *
+ * 结果行展示原图只需要地址，但「重新生成」要把原图回填到图片位、再次提交时
+ * 用的是**素材 id**，所以这里保留 id 与地址成对的形态，避免按两个数组下标
+ * 对齐时因素材被删除而错位。
+ */
+export interface GalleryInputAsset {
+  id: string;
+  url: string;
+  name?: string;
+}
+
 export interface GalleryItem {
   /** 任务 id (稳定且唯一) */
-  id: string;
-  /**
+  id: string;  /**
    * 父任务 id（一次提交拆成多个任务时，子任务指向父任务）。
    *
    * 删除批次必须只删父任务：后端会级联删除整批，逐张删会得到
@@ -45,6 +57,8 @@ export interface GalleryItem {
    * 任务输入取。素材被删或历史任务缺字段时为空数组，调用方按商品名称占位。
    */
   inputUrls?: string[];
+  /** 输入素材快照，顺序与提交时一致；重新生成时原样回填图片位 */
+  inputAssets?: GalleryInputAsset[];
   /** 任务原始参数；SKU 批量历史按 batchId 聚合时使用。 */
   params?: Record<string, unknown>;
   /**
@@ -140,9 +154,16 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
       for (const t of tasks) {
         if (t.capability !== capability) continue;
         const params = t.params ?? {};
-        const inputUrls = (t.inputAssets ?? [])
-          .map((asset) => assetSrc(asset))
-          .filter((url): url is string => Boolean(url));
+        const inputAssets: GalleryInputAsset[] = [];
+        for (const asset of t.inputAssets ?? []) {
+          const url = assetSrc(asset);
+          if (!url) continue;
+          inputAssets.push({
+            id: asset.id,
+            url,
+            name: asset.sourceUrl?.split('/').pop() || undefined,
+          });
+        }
         const base = {
           id: t.id,
           parentTaskId: t.parentTaskId ?? null,
@@ -150,7 +171,8 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
           params,
           prompt: promptOf(params),
           caption: captionRef.current?.(params) || undefined,
-          inputUrls,
+          inputUrls: inputAssets.map((asset) => asset.url),
+          inputAssets,
         };
         if (t.status !== 'succeeded') {
           // 生成中的任务也要进列表: 离开页面再回来时, 占位卡由服务端状态回填

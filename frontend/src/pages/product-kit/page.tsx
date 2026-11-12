@@ -23,10 +23,12 @@ import { promptToolErrorMessage } from '../../lib/promptToolMessages';
 import {
   buildVariantPlan,
   countGenerations,
+  formSnapshotOf,
   imageInputCountError,
   modelImageInputLimit,
   platformSpec,
   variantCaption,
+  type ResultRow,
 } from './utils';
 import { useProductKitSubmit } from './useProductKitSubmit';
 import { useApp } from '../../ui';
@@ -63,7 +65,7 @@ export function ProductKitPage() {
   const modelImageMax = selectedModel ? modelImageInputLimit(selectedModel) : null;
   const maxImages = Math.min(MAX_IMAGES, modelImageMax ?? MAX_IMAGES);
   // 上传 (三重校验 / 素材库回填 / 粘贴) 统一由 useImageUpload 处理
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, replaceImage, library, mobile } = useImageUpload({
+  const { images, uploading, fileInputRef, uploadFiles, removeImage, replaceImage, replaceImages, library, mobile } = useImageUpload({
     max: maxImages,
     maxMb: MAX_IMAGE_MB,
   });
@@ -275,6 +277,42 @@ export function ProductKitPage() {
     [modal, message, gallery.removeItem, gallery.reload],
   );
 
+  /**
+   * 重新生成：把一次历史生成的参数回填到左栏，由用户确认 / 调整后再提交。
+   *
+   * 只回填、不直接建任务 —— 模型价格与线路可能已经变化，是否真的再生成
+   * 必须由用户按下「立即生成」。变体张数按整批任务反推，旧任务缺参数时
+   * 保留当前配置，不把计数清空成 0。
+   */
+  const regenerateFromRow = useCallback(
+    (row: ResultRow) => {
+      const snapshot = formSnapshotOf(row.cells);
+      if (!snapshot) return;
+      setProductName(snapshot.productName);
+      setBrand(snapshot.brand);
+      applyDescription(snapshot.description);
+      // 旧任务可能缺这些参数: 缺省时保留当前值，避免把下拉框清空成空串
+      if (snapshot.platform) setPlatform(snapshot.platform);
+      if (snapshot.language) setLanguage(snapshot.language);
+      if (snapshot.ratio) {
+        setRatio(snapshot.ratio);
+        setRatioTouched(true);
+      }
+      if (snapshot.resolution) {
+        setResolution(snapshot.resolution);
+        setResolutionTouched(true);
+      }
+      if (Object.values(snapshot.counts).some((count) => count > 0)) setCounts(snapshot.counts);
+      if (snapshot.images.length > 0) {
+        replaceImages(snapshot.images);
+        message.success('已带入这次生成的参数，可在左侧调整后重新生成');
+      } else {
+        message.warning('原图已不可用，已带入文字参数，请重新上传商品图');
+      }
+    },
+    [applyDescription, replaceImages, message],
+  );
+
   return (
     <div className="pk-workspace">
       {/* ── 左: 输入栏 ── */}
@@ -334,6 +372,7 @@ export function ProductKitPage() {
         emptyDesc={resultEmptyDesc}
         emptyChildren={resultEmptyChildren}
         onDeleteRow={deleteRow}
+        onRegenerateRow={regenerateFromRow}
       />
 
       {/* 素材库选择弹窗 (真实数据) */}

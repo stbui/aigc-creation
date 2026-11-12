@@ -27,5 +27,6 @@ export { MobileUploadModal } from '../../components/MobileUploadModal';
 export { ToolWorkflowSteps } from '../../components/ToolEmptyState';
 /** 右侧「功能示例 / 创作结果」页签外壳（与商品详情共用） */
 export { OutputTabsPane, type OutputTab } from '../../components/OutputTabsPane';
-/** 批次结果列表 (本页 / 详情图 / 带货图文共用) */
-export { BatchResultList } from '../../components/BatchResultList';
+/** 批次结果卡片 (与商品详情共用) 与它的行类型 */
+export { BatchResultCardList } from '../../components/BatchResultCardList';
+export type { BatchCardRow, ResultMeta } from '../../components/batchResult';

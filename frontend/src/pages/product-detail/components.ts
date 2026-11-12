@@ -6,7 +6,7 @@
  * 目录内新增共享组件引用时在这里补一行 re-export。
  *
  * 本页自己的板块组件 (`DetailSectionPicker` / `DetailResultList` /
- * `DetailExamplePanel` / `FormSelect`) 不在此转出: 它们依赖本页的 hooks 与接口,
+ * `DetailExamplePanel` / `DetailSelectField`) 不在此转出: 它们依赖本页的 hooks 与接口,
  * 反向 re-export 会形成循环引用。
  *
  * 第三方 UI 库 (antd / lucide-react) 不经本文件 —— 它们不是本项目的共享控件,
@@ -34,5 +34,6 @@ export { ToolEmptyState, ToolWorkflowSteps } from '../../components/ToolEmptySta
 export { OutputTabsPane } from '../../components/OutputTabsPane';
 /** 大图查看器与它的数据类型 */
 export { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
-/** 批次结果列表 (本页 / 商品主图 / 带货图文共用) 与它的行类型 */
-export { BatchResultList, type BatchRow } from '../../components/BatchResultList';
+/** 批次结果卡片 (本页 / 商品主图共用) 与它的行类型 */
+export { BatchResultCardList, type BatchResultCardListProps } from '../../components/BatchResultCardList';
+export type { BatchCardRow, BatchRowBase, ResultMeta } from '../../components/batchResult';

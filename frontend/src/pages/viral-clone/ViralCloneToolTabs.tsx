@@ -8,7 +8,7 @@ import { NavigationTabs, NavigationTabsList, NavigationTabsTrigger } from './com
  * 参考站只在窄屏显示这组 tab（桌面端 `display: none` 实拍确认），
  * 所以这里保持相同的 DOM 顺序与类名，显隐交给 `pk-editor-tabs` 的样式。
  */
-export function ViralCloneTabs() {
+export function ViralCloneToolTabs() {
   const navigate = useNavigate();
 
   return (

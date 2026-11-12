@@ -569,14 +569,16 @@ export function assetThumbSrc(
     storageBackend?: string | null;
   } | null,
   size = 640,
+  /** true = 只限宽、保留原图比例（瀑布流/流式布局用，避免方形裁切） */
+  preserveAspect = false,
 ): string | undefined {
   const src = assetSrc(asset);
   if (!src) return undefined;
-  if (asset?.storageBackend === "local") return appendThumbParams(src, size);
+  if (asset?.storageBackend === "local") return appendThumbParams(src, size, preserveAspect);
   // 明确声明了云端后端: 签名地址追加参数会破坏签名, 原样返回
   if (asset?.storageBackend) return src;
   // 未声明后端 (任务接口的 outputAsset 不带该字段): 按 URL 自身判断是否本地 /uploads
-  return assetThumbUrl(src, size);
+  return assetThumbUrl(src, size, preserveAspect);
 }
 
 /**

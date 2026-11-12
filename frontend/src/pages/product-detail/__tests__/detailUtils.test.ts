@@ -8,6 +8,7 @@ import {
   cellState,
   countGenerations,
   downloadFileName,
+  formSnapshotOf,
   formatDate,
   labelOf,
   resultMetaOf,
@@ -166,6 +167,79 @@ describe('buildRows', () => {
     ]);
     expect(rows[0].productName).toBe('轻奢沙发');
     expect(rows[0].prompt).toBe('弧形设计');
+  });
+});
+
+describe('formSnapshotOf', () => {
+  it('还原表单参数与原图素材（id 与地址成对）', () => {
+    const snapshot = formSnapshotOf([
+      item({
+        id: 't1',
+        params: {
+          batchId: 'b1',
+          batchIndex: 1,
+          productName: ' 轻奢沙发 ',
+          brand: ' 品牌A ',
+          platform: 'douyin',
+          language: 'zh-CN',
+          description: ' 弧形设计 ',
+          sections: 'hero,usage_scene',
+          ratio: '9:16',
+          size: '2k',
+        },
+        inputAssets: [
+          { id: 'asset-1', url: '/uploads/a.png', name: 'a.png' },
+          { id: 'asset-2', url: '/uploads/b.png' },
+        ],
+      }),
+    ]);
+
+    expect(snapshot).toEqual({
+      productName: '轻奢沙发',
+      brand: '品牌A',
+      platform: 'douyin',
+      language: 'zh-CN',
+      description: '弧形设计',
+      sections: ['hero', 'usage_scene'],
+      ratio: '9:16',
+      resolution: '2k',
+      images: [
+        { id: 'asset-1', url: '/uploads/a.png', name: 'a.png' },
+        { id: 'asset-2', url: '/uploads/b.png', name: '原图 2' },
+      ],
+    });
+  });
+
+  it('模块清单按固定顺序归一化并剔除已下线项', () => {
+    const snapshot = formSnapshotOf([
+      item({ id: 't1', params: { sections: 'usage_scene,retired_module,hero' } }),
+    ]);
+    expect(snapshot?.sections).toEqual(['hero', 'usage_scene']);
+  });
+
+  it('兼容旧任务的数组形态模块参数', () => {
+    const snapshot = formSnapshotOf([
+      item({ id: 't1', params: { sections: ['multi_angle', 'hero'] } }),
+    ]);
+    expect(snapshot?.sections).toEqual(['hero', 'multi_angle']);
+  });
+
+  it('缺参数时返回空串，不沿用当前表单', () => {
+    expect(formSnapshotOf([item({ id: 't1' })])).toEqual({
+      productName: '',
+      brand: '',
+      platform: '',
+      language: '',
+      description: '',
+      sections: [],
+      ratio: '',
+      resolution: '',
+      images: [],
+    });
+  });
+
+  it('没有任务格时返回 null', () => {
+    expect(formSnapshotOf([])).toBeNull();
   });
 });
 

@@ -205,6 +205,34 @@
   font-size: 12px;
 }
 
+.pd-result-regenerate {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.pd-result-regenerate:hover:not(:disabled) {
+  background: var(--brand-bg);
+}
+
+.pd-result-regenerate:disabled {
+  border-color: var(--border);
+  color: var(--text-desc);
+  cursor: not-allowed;
+}
+
 .pd-result-download-all {
   flex: none;
   display: inline-flex;

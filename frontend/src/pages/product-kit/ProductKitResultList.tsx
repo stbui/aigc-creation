@@ -1,18 +1,17 @@
 import { memo, useMemo, type ReactNode } from 'react';
 
-import { BatchResultList } from './components';
-import { buildRows, labelOf } from './utils';
+import { BatchResultCardList } from './components';
+import { buildRows, labelOf, type ResultRow } from './utils';
 import type { GalleryItem } from './hooks';
 
 /**
  * 商品主图「创作结果」批次列表。
  *
- * 一次提交 = 一行: 行头是日期, 行内第一格是上传的原图 (下方标商品名称),
- * 之后每格是一张主图 (下方标白底图 / 场景图 / 卖点图)。与通用结果网格相比,
- * 这里保留了「这套图属于同一次生成」的上下文。
+ * 一次生成 = 一张卡: 商品名 + 时间 / 参数 / 原图 / 各变体主图。
+ * 与通用结果网格相比, 这里保留了「这套图属于同一次生成」的上下文。
  *
- * 渲染本体在 `components/BatchResultList`(与详情图 / 带货图文共用),
- * 这里只提供商品主图的页面语义: 原图格标商品名与张数。
+ * 卡片的信息编排在 `components/BatchResultCardList`(与商品详情共用),
+ * 这里只提供商品主图的单格名称语义。
  *
  * 数据口径:
  *   - 批次由任务参数 `batchId` 标识, 批内按 `batchIndex` 排序;
@@ -30,6 +29,8 @@ export interface ProductKitResultListProps {
   emptyChildren?: ReactNode;
   /** 删除一次生成（批次内全部任务） */
   onDeleteRow: (items: GalleryItem[]) => void;
+  /** 重新生成：把这次生成的参数回填左栏表单 */
+  onRegenerateRow?: (row: ResultRow) => void;
   /** 下载文件名前缀 */
   downloadNamePrefix?: string;
 }
@@ -42,12 +43,13 @@ function ProductKitResultListImpl({
   emptyDesc,
   emptyChildren,
   onDeleteRow,
+  onRegenerateRow,
   downloadNamePrefix = 'main-image',
 }: ProductKitResultListProps) {
   const rows = useMemo(() => buildRows(items), [items]);
 
   return (
-    <BatchResultList
+    <BatchResultCardList
       rows={rows}
       loading={loading}
       error={error}
@@ -55,19 +57,9 @@ function ProductKitResultListImpl({
       emptyDesc={emptyDesc}
       emptyChildren={emptyChildren}
       onDeleteRow={onDeleteRow}
-      downloadNamePrefix={downloadNamePrefix}
+      onRegenerateRow={onRegenerateRow}
       labelOf={labelOf}
-      renderSourceCaption={(row) => (
-        <>
-          {row.productName || '商品原图'}
-          {row.sourceUrls.length > 1 ? ` · ${row.sourceUrls.length} 张` : ''}
-        </>
-      )}
-      sourceCaptionTitle={(row) =>
-        row.sourceUrls.length > 1
-          ? `${row.productName || '商品原图'}，共 ${row.sourceUrls.length} 张`
-          : row.productName
-      }
+      downloadNamePrefix={downloadNamePrefix}
     />
   );
 }

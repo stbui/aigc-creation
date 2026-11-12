@@ -166,6 +166,9 @@ export function LibraryPage() {
    */
   const loadSeq = useRef(0);
 
+  /** 无限滚动哨兵：进入视口（含提前量）即自动续加可见条数 */
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;
     // guest 不发请求: 素材接口要鉴权, 401 会被渲染成「素材加载失败」。
@@ -234,6 +237,26 @@ export function LibraryPage() {
     loadSeq.current += 1;
   }, []);
 
+  /*
+   * 滚动加载（无限滚动）。数据已全量在 items 里，这里只是按视口续加可见条数，
+   * 不再发请求。哨兵距视口 400px 即预触发，体感无缝；触底后 guard 自动停手。
+   * 哨兵节点稳定，shown.length 经 ref 实时读取，故依赖为空数组。
+   */
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisible((v) => (v < shownLengthRef.current ? v + PAGE_SIZE : v));
+        }
+      },
+      { rootMargin: '400px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   /** 单个素材的所属分组（键 / 显示名 / 排序位） */
   const groupOf = useCallback(
     (a: Asset): { key: string; label: string; sort: number } => {
@@ -292,6 +315,10 @@ export function LibraryPage() {
     () => (activeGroup ? items.filter((a) => groupOf(a).key === activeGroup) : items),
     [items, activeGroup, groupOf],
   );
+
+  /** 实时镜像 shown.length，避免 IntersectionObserver 回调读到过期闭包 */
+  const shownLengthRef = useRef(shown.length);
+  shownLengthRef.current = shown.length;
 
   /** 空态不是一种状态：游客、真实空库、筛选无结果显示不同的原因与下一步。 */
   const hasActiveFilters =
@@ -528,12 +555,7 @@ export function LibraryPage() {
         {token && (
           <Surface className="asset-library-groups-panel gap-0">
             <SurfaceHeader className="asset-library-group-head px-0">
-              <div className="min-w-0">
-                <SurfaceTitle className="asset-library-group-title">素材分组</SurfaceTitle>
-                <SurfaceDescription className="asset-library-group-desc">
-                  按项目、能力或日期聚合素材，点选即可筛选
-                </SurfaceDescription>
-              </div>
+              <SurfaceTitle className="asset-library-group-title">素材分组</SurfaceTitle>
               <Button
                 type="text"
                 size="small"
@@ -737,6 +759,9 @@ export function LibraryPage() {
             )}
           </>
         )}
+
+        {/* 无限滚动哨兵常驻：进入视口即自动加载更多（见上方 IntersectionObserver） */}
+        <div ref={sentinelRef} className="asset-library-sentinel" aria-hidden="true" />
 
         {previewIndex !== null && lightboxItems[previewIndex] && (
           <ImageLightbox
