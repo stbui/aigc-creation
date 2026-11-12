@@ -3,11 +3,13 @@ import { assetsApi, assetSrc, type Asset } from './api';
 import type { GalleryItem, UploadedImage } from './hooks';
 import { modelImageInputLimit, type PublicLogicalModel } from '../../lib/models';
 import {
-  buildBatchRows,
+  buildProductBatchRows,
+  countGenerations as countGenerationsOf,
+  downloadFileName as downloadFileNameOf,
   formatBatchDate,
-  resultMetaOf,
-  type BatchRowBase,
-  type ResultMeta,
+  rowKeyOf as rowKeyOfItem,
+  textParam as textParamOf,
+  type ProductBatchRow,
 } from '../../components/batchResult';
 
 /**
@@ -215,13 +217,8 @@ export function variantCaption(params: Record<string, unknown>): string | undefi
 export type { CellState } from '../../components/batchResult';
 export { batchIndexOf, cellState } from '../../components/batchResult';
 
-/** 一行 = 一次生成 (批次内全部任务); 页面在公共字段之外多带提示词与商品名 */
-export interface ResultRow extends BatchRowBase {
-  prompt?: string;
-  productName?: string;
-  /** 结果卡第二行展示的任务参数；同批次内各任务共用一份 */
-  meta: ResultMeta;
-}
+/** 一行 = 一次生成 (批次内全部任务) */
+export type ResultRow = ProductBatchRow;
 
 /** 主图格的变体名: 优先任务 caption, 回落「商品主图」 */
 export function labelOf(item: GalleryItem): string {
@@ -229,16 +226,10 @@ export function labelOf(item: GalleryItem): string {
 }
 
 /** 取任务参数里的字符串参数; 非字符串或空串返回 undefined */
-export function textParam(item: GalleryItem, key: string): string | undefined {
-  const value = item.params?.[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
+export const textParam = textParamOf;
 
 /** 归组键: 同批次共享 `batch:…`, 旧任务各自 `task:…` */
-export function rowKeyOf(item: GalleryItem): string {
-  const batchId = textParam(item, 'batchId');
-  return batchId ? `batch:${batchId}` : `task:${item.id}`;
-}
+export const rowKeyOf = rowKeyOfItem;
 
 /**
  * 结果行数（一次生成 = 一行），供页签角标使用。
@@ -246,21 +237,11 @@ export function rowKeyOf(item: GalleryItem): string {
  * 页签上直接写任务数会把「一次生成 5 张」显示成 5 次；角标语义必须和
  * 下方列表的行数一致。
  */
-export function countGenerations(items: GalleryItem[]): number {
-  return new Set(items.map(rowKeyOf)).size;
-}
+export const countGenerations = countGenerationsOf;
 
 /** 按 batchId 归组; 无 batchId 的任务各自成行。列表本身已按时间倒序 */
 export function buildRows(items: GalleryItem[]): ResultRow[] {
-  return buildBatchRows<{ prompt?: string; productName?: string; meta: ResultMeta }>(
-    items,
-    (item) => ({
-      prompt: textParam(item, 'description'),
-      productName: textParam(item, 'productName'),
-      meta: resultMetaOf(item),
-    }),
-    rowKeyOf,
-  );
+  return buildProductBatchRows(items);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -338,6 +319,5 @@ export function downloadFileName(
   item: GalleryItem,
   downloadNamePrefix = 'main-image',
 ): string {
-  const ext = (item.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
-  return `${downloadNamePrefix}-${labelOf(item)}-${item.id.slice(-6)}.${ext}`;
+  return downloadFileNameOf(item, labelOf(item), downloadNamePrefix);
 }

@@ -1,19 +1,22 @@
 import type { RefObject } from 'react';
+import { CircleAlert } from 'lucide-react';
 
 import type { PublicLogicalModel } from './api';
 import type { AssetSlot, CloneDegree } from './constants';
 import {
+  InlineAlert,
+  InlineAlertDescription,
   Surface,
   SurfaceContent,
   SurfaceFooter,
   SurfaceHeader,
+  ToolGenerationSubmitBar,
+  ToolTypeTabs,
 } from './components';
 import type { UploadedImage } from './hooks';
 import { ViralCloneFormSection } from './ViralCloneFormSection';
 import { ViralCloneDegreeCard } from './ViralCloneDegreeCard';
 import { ViralCloneRequirementCard } from './ViralCloneRequirementCard';
-import { ViralCloneSubmitBar } from './ViralCloneSubmitBar';
-import { ViralCloneToolTabs } from './ViralCloneToolTabs';
 
 /**
  * 爆款复刻工作台左栏：业务类型 tab + 配置卡 + 复刻要求 + 复刻程度 + 提交栏。
@@ -118,7 +121,7 @@ export function ViralCloneInputPane({
     <aside className="vc-input-pane" aria-label="爆款复刻设置">
       <Surface className="vc-editor-card">
         <SurfaceHeader className="vc-editor-header">
-          <ViralCloneToolTabs />
+          <ToolTypeTabs active="viral-clone" />
         </SurfaceHeader>
 
         <SurfaceContent className="vc-editor-content">
@@ -155,11 +158,19 @@ export function ViralCloneInputPane({
         </SurfaceContent>
 
         <SurfaceFooter className="vc-editor-footer">
-          <ViralCloneSubmitBar
+          <ToolGenerationSubmitBar
+            capability="hot_remake"
             generating={generating}
-            formValid={formValid}
-            unavailableReason={unavailableReason}
+            disabled={!formValid || Boolean(unavailableReason)}
             creditLabel={creditLabel}
+            notice={
+              unavailableReason && !generating ? (
+                <InlineAlert variant="destructive" className="vc-submit-alert">
+                  <CircleAlert />
+                  <InlineAlertDescription>{unavailableReason}</InlineAlertDescription>
+                </InlineAlert>
+              ) : null
+            }
             settingsOpen={settingsOpen}
             ratio={ratio}
             resolution={resolution}

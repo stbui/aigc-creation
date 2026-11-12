@@ -1,16 +1,26 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
-import { AssetLibraryModal, MobileUploadModal, ToolWorkflowSteps } from './components';
-import { DetailInputPane } from './DetailInputPane';
-import { DetailOutputPane } from './DetailOutputPane';
 import {
+  AssetLibraryModal,
+  ExpandTextModal,
+  MobileUploadModal,
+  ToolBatchOutputPane,
+  ToolWorkflowSteps,
+} from './components';
+import { DetailExamplePanel } from './DetailExamplePanel';
+import { DetailInputPane } from './DetailInputPane';
+import {
+  hasActiveGalleryItems,
   notifyCreditsChanged,
   useAuth,
   useCapabilityRuntime,
-  useDetailCreditLabel,
   useGenerateError,
+  useGenerationSettings,
+  useIdempotencyKey,
+  useImageToPromptAnalysis,
   useImageUpload,
+  useModelQuoteCreditLabel,
   useProject,
   useResultGallery,
   useRightTab,
@@ -18,16 +28,20 @@ import {
   type GalleryItem,
 } from './hooks';
 import {
-  analyzeImageToPrompt,
   DETAIL_CAPABILITY,
-  newIdempotencyKey,
   removeDetailGeneration,
   resolveModelId,
   startDetailGeneration,
 } from './api';
-import { countGenerations, formSnapshotOf, platformDetailSpec, sectionCaption, type ResultRow } from './utils';
-import { promptToolErrorMessage } from '../../lib/promptToolMessages';
-import { useApp, Modal, Textarea } from '../../ui';
+import {
+  countGenerations,
+  formSnapshotOf,
+  labelOf,
+  platformDetailSpec,
+  sectionCaption,
+  type ResultRow,
+} from './utils';
+import { useApp } from '../../ui';
 
 /**
  * 商品详情图工作台
@@ -40,6 +54,7 @@ export function ProductDetailPage() {
   const { message, modal } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
+  const { keyFor: idempotencyKeyFor, reset: resetIdempotencyKey } = useIdempotencyKey();
   // 上传 (三重校验 / 素材库回填 / 粘贴) 统一由 useImageUpload 处理
   const { images, uploading, fileInputRef, uploadFiles, removeImage, replaceImages, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
@@ -58,35 +73,46 @@ export function ProductDetailPage() {
   // ── 表单状态 ──
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
-  const [platform, setPlatform] = useState('taobao');
   const [language, setLanguage] = useState('zh-CN');
   const [description, setDescription] = useState('');
   // 包含模块: 上限、顺序归一化与默认勾选都在 useSectionSelection + DetailSectionPicker
   const { sections, toggle: toggleSection, applySelection } = useSectionSelection();
-  const [ratio, setRatio] = useState('3:4');
-  const [resolution, setResolution] = useState('1k');
-  /** 用户手动改过画质后，切换平台不再覆盖 */
-  const [resolutionTouched, setResolutionTouched] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  /** AI 分析进行中 (按钮禁用 + 文案切换, 防止连点时重复请求文本通道) */
-  const [analyzing, setAnalyzing] = useState(false);
+  // 平台 / 比例 / 画质 / 高级设置开合：详情图比例独立选择，不跟随平台预设
+  const {
+    platform,
+    ratio,
+    resolution,
+    settingsOpen,
+    changePlatform,
+    changeRatio,
+    changeResolution,
+    toggleSettings,
+    applySettings,
+  } = useGenerationSettings({
+    defaultRatio: '3:4',
+    defaultResolution: '1k',
+    specOf: platformDetailSpec,
+    trackRatio: false,
+  });
 
   // ── 弹窗状态 ──
   const [expandOpen, setExpandOpen] = useState(false);
 
+  // AI 分析：走文本通道的「图片转提示词」，对首张商品图做真实识别
+  const { analyzing, analyze: runAiAnalyze } = useImageToPromptAnalysis({
+    images,
+    value: description,
+    onApply: setDescription,
+  });
+
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
-  /** 一次详情图提交会拆成 N 个任务，网络重试必须复用同一个幂等键 */
-  const pendingStartRef = useRef<{ fingerprint: string; key: string } | null>(null);
-  /** 所选模型的实时单张报价（积分） */
-  const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
-  // 实时价优先取模型报价，取不到才回落到能力清单基础价
-  const baseCreditLabel = useDetailCreditLabel(sections.length);
-  const creditLabel = useMemo(() => {
-    if (modelQuoteCredits == null) return baseCreditLabel;
-    if (modelQuoteCredits === 0) return '限时免费';
-    return `本次约 ${modelQuoteCredits * Math.max(sections.length, 1)} 积分（按所选模型）`;
-  }, [baseCreditLabel, modelQuoteCredits, sections.length]);
+  // 价签按已选模块数折算；限时免费与后台改价由运行时价 / 模型报价给出
+  const { label: creditLabel, onModelQuoteChange } = useModelQuoteCreditLabel({
+    capability: DETAIL_CAPABILITY,
+    count: sections.length,
+    freeLabel: '限时免费',
+  });
   const { blocked: capabilityBlocked, reason: capabilityReason } = useCapabilityRuntime(DETAIL_CAPABILITY);
   // ── 右侧结果栏 ──
   //
@@ -102,10 +128,8 @@ export function ProductDetailPage() {
   });
   // 服务端仍有 queued/running 任务时也算生成中: 离开页面再回来, 禁用态与标题不丢。
   // 只认这两个状态 —— 失败任务同样没有 url, 按「无图」判断会让提交按钮永久禁用。
-  const generating = useMemo(
-    () => submitting || gallery.items.some((item) => item.status === 'queued' || item.status === 'running'),
-    [submitting, gallery.items],
-  );
+  const galleryRunning = useMemo(() => hasActiveGalleryItems(gallery.items), [gallery.items]);
+  const generating = submitting || galleryRunning;
   /** 页签角标的「生成了几次」 = 结果行数, 与下方列表逐行对应 */
   const generationCount = useMemo(() => countGenerations(gallery.items), [gallery.items]);
 
@@ -132,55 +156,6 @@ export function ProductDetailPage() {
       sections.length > 0,
     [images.length, productName, description, sections.length],
   );
-
-  /** 切换平台：用户没手动改过画质时，带出该平台的详情长图规格 */
-  const changePlatform = (value: string) => {
-    setPlatform(value);
-    const spec = platformDetailSpec(value);
-    if (spec?.size && !resolutionTouched) setResolution(spec.size);
-  };
-
-  // ── AI分析: 走文本通道的「图片转提示词」, 对首张商品图做真实识别 ──
-  //
-  // 失败语义: 文本通道没配时后端返回 502, 如实把原因抛给用户;
-  // 绝不退回「用文件名拼一段描述」—— 那会让用户以为模型看过图。
-  const runAiAnalyze = async () => {
-    if (images.length === 0) {
-      message.warning('请先上传商品图片');
-      return;
-    }
-    const first = images[0];
-    if (!first?.id) {
-      message.warning('首张图缺少素材 id，请重新上传后再分析');
-      return;
-    }
-    setAnalyzing(true);
-    try {
-      const { text } = await analyzeImageToPrompt(first.id);
-      const content = text?.trim();
-      if (!content) {
-        message.warning('这次没有生成可用内容，请重试');
-        return;
-      }
-      // 已填过描述时不静默覆盖, 先问一句
-      if (description.trim()) {
-        modal.confirm({
-          title: '替换商品描述？',
-          content: 'AI 分析会覆盖当前已填写的描述。',
-          okText: '替换',
-          cancelText: '取消',
-          onOk: () => setDescription(content),
-        });
-        return;
-      }
-      setDescription(content);
-      message.success('已按首张商品图生成描述，可继续编辑');
-    } catch (e) {
-      message.error(promptToolErrorMessage(e, 'image'));
-    } finally {
-      setAnalyzing(false);
-    }
-  };
 
   // ── 生成 ──
   const submit = async () => {
@@ -216,16 +191,12 @@ export function ProductDetailPage() {
         ratio,
         resolution,
       };
-      const fingerprint = JSON.stringify(input);
-      const idempotencyKey =
-        pendingStartRef.current?.fingerprint === fingerprint
-          ? pendingStartRef.current.key
-          : newIdempotencyKey();
-      pendingStartRef.current = { fingerprint, key: idempotencyKey };
+      // 同一次提交的网络重试复用同一个幂等键；拿到任务后再清空
+      const idempotencyKey = idempotencyKeyFor(JSON.stringify(input));
       const started = await startDetailGeneration({ ...input, idempotencyKey });
       await gallery.reload();
       // 任务已创建且列表已刷新成功；之后的主动再生成才是新批次
-      pendingStartRef.current = null;
+      resetIdempotencyKey();
       const shotCount = started.batchSize ?? 1;
       // 金额以后端返回的合计为准：限时免费 / 后台改价时前端自己算的价会不准
       message.success(
@@ -286,14 +257,9 @@ export function ProductDetailPage() {
       setBrand(snapshot.brand);
       setDescription(snapshot.description);
       // 旧任务可能缺这些参数: 缺省时保留当前值，避免把下拉框清空成空串
-      if (snapshot.platform) setPlatform(snapshot.platform);
+      if (snapshot.platform) changePlatform(snapshot.platform);
       if (snapshot.language) setLanguage(snapshot.language);
-      if (snapshot.ratio) setRatio(snapshot.ratio);
-      if (snapshot.resolution) {
-        setResolution(snapshot.resolution);
-        // 画质是随这批任务恢复的，之后切平台不应再覆盖用户看到的值
-        setResolutionTouched(true);
-      }
+      applySettings({ ratio: snapshot.ratio, resolution: snapshot.resolution });
       if (snapshot.sections.length > 0) applySelection(snapshot.sections);
       if (snapshot.images.length > 0) {
         replaceImages(snapshot.images);
@@ -302,17 +268,8 @@ export function ProductDetailPage() {
         message.warning('原图已不可用，已带入文字参数，请重新上传商品图');
       }
     },
-    [applySelection, replaceImages, message],
+    [applySettings, applySelection, changePlatform, replaceImages, message],
   );
-
-  /** 放大编辑弹窗的开 / 关 (两处回调共用同一引用) */
-  const closeExpand = useCallback(() => setExpandOpen(false), []);
-  const openExpand = useCallback(() => setExpandOpen(true), []);
-  /*
-   * 高级设置的开合。必须是稳定引用: ToolSettingsPopover 的「点外部 / Esc 收起」
-   * 监听器以该回调为依赖, 每次按键都换新引用会让监听器反复解绑重绑。
-   */
-  const toggleSettings = useCallback(() => setSettingsOpen((v) => !v), []);
 
   const canSubmit = formValid && !(token && capabilityBlocked);
 
@@ -339,19 +296,16 @@ export function ProductDetailPage() {
         onDescriptionChange={setDescription}
         analyzing={analyzing}
         onAnalyze={() => void runAiAnalyze()}
-        onExpandDescription={openExpand}
+        onExpandDescription={() => setExpandOpen(true)}
         sections={sections}
         onToggleSection={toggleSection}
         settingsOpen={settingsOpen}
         onToggleSettings={toggleSettings}
         ratio={ratio}
-        onRatioChange={setRatio}
+        onRatioChange={changeRatio}
         resolution={resolution}
-        onResolutionChange={(v) => {
-          setResolutionTouched(true);
-          setResolution(v);
-        }}
-        onModelQuoteChange={setModelQuoteCredits}
+        onResolutionChange={changeResolution}
+        onModelQuoteChange={onModelQuoteChange}
         generating={generating}
         submitDisabled={!canSubmit}
         submitHint={capabilityBlocked && token && capabilityReason ? capabilityReason : undefined}
@@ -362,10 +316,11 @@ export function ProductDetailPage() {
       {/* ── 右: 功能示例 / 创作结果 ──
           创作结果按批次逐行陈列 (一次生成一行, 原图 + 各模块图);
           提交后重拉列表拿到整批占位卡, 由 useResultGallery 轮询到全部到终态。 */}
-      <DetailOutputPane
+      <ToolBatchOutputPane
         rightTab={rightTab}
         onPickTab={pickRightTab}
         generationCount={generationCount}
+        demo={<DetailExamplePanel />}
         items={gallery.items}
         loading={gallery.loading}
         error={gallery.error}
@@ -373,6 +328,8 @@ export function ProductDetailPage() {
         emptyChildren={resultEmptyChildren}
         onDeleteRow={deleteRow}
         onRegenerateRow={regenerateFromRow}
+        labelOf={labelOf}
+        downloadNamePrefix="product-detail"
       />
 
       {/* 素材库选择弹窗 (真实数据) */}
@@ -390,23 +347,15 @@ export function ProductDetailPage() {
       <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
 
       {/* 商品描述放大编辑 */}
-      <Modal
+      <ExpandTextModal
         open={expandOpen}
         title="编辑商品描述"
-        okText="确定"
-        cancelText="取消"
-        onOk={closeExpand}
-        onCancel={closeExpand}
-      >
-        <Textarea
-          className="pk-expand-textarea"
-          rows={10}
-          maxLength={MAX_DESC_LEN}
-          value={description}
-          placeholder="* 请输入商品描述"
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </Modal>
+        value={description}
+        maxLength={MAX_DESC_LEN}
+        placeholder="* 请输入商品描述"
+        onChange={setDescription}
+        onClose={() => setExpandOpen(false)}
+      />
     </div>
   );
 }

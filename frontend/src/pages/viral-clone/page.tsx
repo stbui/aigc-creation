@@ -1,16 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { AssetLibraryModal, MobileUploadModal } from './components';
-import type { CloneDegree } from './constants';
+import { AssetLibraryModal, ExpandTextModal, MobileUploadModal } from './components';
+import {
+  MAX_REQUIREMENT_LEN,
+  REQUIREMENT_PLACEHOLDER,
+  type CloneDegree,
+} from './constants';
 import { ViralCloneInputPane } from './ViralCloneInputPane';
 import { ViralCloneOutputPane } from './ViralCloneOutputPane';
-import { ViralCloneRequirementModal } from './ViralCloneRequirementModal';
 import {
+  hasActiveGalleryItems,
   notifyCreditsChanged,
   useAuth,
-  useCreditLabel,
+  useDeleteGalleryItem,
   useGenerateError,
+  useGenerationSettings,
   useHotRemakeAvailability,
+  useIdempotencyKey,
+  useModelQuoteCreditLabel,
   usePollAbort,
   useProject,
   useResultGallery,
@@ -21,7 +28,6 @@ import {
 import {
   generateApi,
   modelImageInputLimit,
-  newIdempotencyKey,
   resolveModel,
   type PublicLogicalModel,
 } from './api';
@@ -38,7 +44,7 @@ import { useApp } from '../../ui';
 
 /**
  * 爆款复刻工作台
- * 
+ *
  * 左右分栏: 左栏输入 / 右栏「功能示例 / 创作结果」, 右栏与商品详情、商品主图共用
  * `OutputTabsPane` 外壳; 创作结果保留本页特有的「商品图 → 参考图 → 生成图」对照行。
  *
@@ -52,25 +58,33 @@ import { useApp } from '../../ui';
  */
 
 export function ViralClonePage() {
-  const { message, modal } = useApp();
+  const { message } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
-  /** 同一次提交的网络重试复用幂等键，避免重复建单扣费 */
-  const pendingStartRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  // 同一次提交的网络重试复用幂等键，避免重复建单扣费
+  const { keyFor: idempotencyKeyFor, reset: resetIdempotencyKey } = useIdempotencyKey();
 
   // ── 表单状态 ──
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
-  const [platform, setPlatform] = useState('taobao');
   const [language, setLanguage] = useState('zh-CN');
   const [requirement, setRequirement] = useState('');
   const [degree, setDegree] = useState<CloneDegree>('high_replica');
-  const [ratio, setRatio] = useState('1:1');
-  const [resolution, setResolution] = useState('1k');
-  /** 用户手动改过比例/画质后，切换平台不再覆盖 */
-  const [ratioTouched, setRatioTouched] = useState(false);
-  const [resolutionTouched, setResolutionTouched] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // 平台 / 比例 / 画质 / 高级设置开合：用户手改过的值不再被平台预设覆盖
+  const {
+    platform,
+    ratio,
+    resolution,
+    settingsOpen,
+    changePlatform,
+    changeRatio,
+    changeResolution,
+    toggleSettings,
+  } = useGenerationSettings({
+    defaultRatio: '1:1',
+    defaultResolution: '1k',
+    specOf: platformSpec,
+  });
 
   // ── 弹窗状态 ──
   const [expandOpen, setExpandOpen] = useState(false);
@@ -79,15 +93,10 @@ export function ViralClonePage() {
   const [submitting, setSubmitting] = useState(false);
   /** 当前实际会被提交的模型；图片上限必须读它的能力合同，不能只看页面上限。 */
   const [selectedModel, setSelectedModel] = useState<PublicLogicalModel | null>(null);
-  // 实时价优先用所选模型报价，取不到才回落到能力基础价
-  const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
-  const baseCreditLabel = useCreditLabel('hot_remake');
-  const creditLabel =
-    modelQuoteCredits == null
-      ? baseCreditLabel
-      : modelQuoteCredits === 0
-        ? '免费'
-        : `本次约 ${modelQuoteCredits} 积分（按所选模型）`;
+  // 价签按所选模型的实时报价优先，取不到才回落到能力基础价
+  const { label: creditLabel, onModelQuoteChange } = useModelQuoteCreditLabel({
+    capability: 'hot_remake',
+  });
   /** 最近这一次提交的结果 (只用于提示行; 历史产出由 gallery 维护) */
   const [result, setResult] = useState<PolledResult | null>(null);
   const pollSignal = usePollAbort();
@@ -143,19 +152,10 @@ export function ViralClonePage() {
   const { rightTab, pick: pickRightTab, showResults } = useRightTab(gallery.items.length, gallery.loading);
   // 服务端仍有 queued/running 任务时也算生成中: 离开页面再回来, 禁用态不丢
   const generating =
-    submitting || gallery.items.some((item) => item.status === 'queued' || item.status === 'running');
+    submitting || hasActiveGalleryItems(gallery.items);
 
   // 参考站本页名称/品牌/复刻要求均为选填, 提交条件 = 商品图 ≥1 + 参考图 =1 + 未超模型图片上限
   const formValid = images.length > 0 && reference !== null && !imageInputError;
-
-  /** 切换平台：用户没手动改过比例/画质时，带出该平台的主图规格 */
-  const changePlatform = (value: string) => {
-    setPlatform(value);
-    const spec = platformSpec(value);
-    if (!spec) return;
-    if (!ratioTouched) setRatio(spec.ratio);
-    if (!resolutionTouched) setResolution(spec.size);
-  };
 
   // 该能力此刻能不能生成 (没有可用模型通道 / 后台下线时提前拦住提交)
   const unavailableReason = useHotRemakeAvailability();
@@ -202,12 +202,9 @@ export function ViralClonePage() {
           size: resolution,
         },
       };
-      const fingerprint = JSON.stringify(payload);
-      const idempotencyKey =
-        pendingStartRef.current?.fingerprint === fingerprint ? pendingStartRef.current.key : newIdempotencyKey();
-      pendingStartRef.current = { fingerprint, key: idempotencyKey };
+      const idempotencyKey = idempotencyKeyFor(JSON.stringify(payload));
       const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
-      pendingStartRef.current = null;
+      resetIdempotencyKey();
       const done = await pollTask(taskId);
       setResult(done);
       /*
@@ -266,36 +263,14 @@ export function ViralClonePage() {
 
   /**
    * 删除一张生成图 —— DELETE /tasks/:id 会连带删掉产出素材与磁盘文件。
-   *
-   * 与创意生图 / 商品主图 / 商品详情页同款确认框: 删除不可逆, 且用户此时看到的
-   * 是缩略图, 未必意识到「作品记录」也一起没了。
+   * 产出素材若正占着参考图位，必须一并清掉，否则下一轮会带空 assetId 提交。
    */
-  const deleteImage = useCallback(
-    (item: GalleryItem) => {
-      modal.confirm({
-        title: '删除这张作品？',
-        content: '生成图与本地文件会一并删除，不可恢复。',
-        okText: '删除',
-        okButtonProps: { danger: true },
-        cancelText: '取消',
-        onOk: async () => {
-          try {
-            await generateApi.remove(item.id);
-            gallery.removeItem(item.id);
-            /*
-             * 产出素材随之被删, 若它已被「用作参考图」放进参考图位, 必须同步清掉 ——
-             * 否则下一次提交会带着一个已不存在的 assetId, 后端只能报错。
-             */
-            if (item.assetId) removeReferenceAsset(item.assetId);
-            message.success('已删除作品及其生成图');
-          } catch (e) {
-            message.error((e as Error).message || '删除失败');
-          }
-        },
-      });
+  const deleteImage = useDeleteGalleryItem({
+    removeItem: gallery.removeItem,
+    onDeleted: (item) => {
+      if (item.assetId) removeReferenceAsset(item.assetId);
     },
-    [gallery.removeItem, message, modal, removeReferenceAsset],
-  );
+  });
 
   return (
     <main className="vc-workspace">
@@ -327,18 +302,12 @@ export function ViralClonePage() {
         degree={degree}
         onDegreeChange={setDegree}
         settingsOpen={settingsOpen}
-        onToggleSettings={() => setSettingsOpen((v) => !v)}
+        onToggleSettings={toggleSettings}
         ratio={ratio}
-        onRatioChange={(value) => {
-          setRatioTouched(true);
-          setRatio(value);
-        }}
+        onRatioChange={changeRatio}
         resolution={resolution}
-        onResolutionChange={(value) => {
-          setResolutionTouched(true);
-          setResolution(value);
-        }}
-        onModelQuoteChange={setModelQuoteCredits}
+        onResolutionChange={changeResolution}
+        onModelQuoteChange={onModelQuoteChange}
         onModelChange={setSelectedModel}
         generating={generating}
         formValid={formValid}
@@ -381,10 +350,13 @@ export function ViralClonePage() {
         onCancel={mobile.closeMobile}
       />
 
-      <ViralCloneRequirementModal
+      <ExpandTextModal
         open={expandOpen}
-        requirement={requirement}
-        onRequirementChange={setRequirement}
+        title="编辑复刻要求"
+        value={requirement}
+        maxLength={MAX_REQUIREMENT_LEN}
+        placeholder={REQUIREMENT_PLACEHOLDER}
+        onChange={setRequirement}
         onClose={() => setExpandOpen(false)}
       />
     </main>

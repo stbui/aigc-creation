@@ -1,30 +1,40 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { MAX_IMAGE_MB, MAX_IMAGES, PRODUCT_KIT_CAPABILITY, VARIANT_FIELDS } from './constants';
+import {
+  MAX_DESC_LEN,
+  MAX_IMAGE_MB,
+  MAX_IMAGES,
+  PRODUCT_KIT_CAPABILITY,
+  VARIANT_FIELDS,
+} from './constants';
 import {
   AssetLibraryModal,
+  ExpandTextModal,
   MobileUploadModal,
+  ToolBatchOutputPane,
   ToolWorkflowSteps,
   type PublicLogicalModel,
 } from './components';
-import { ProductKitDescriptionModal } from './ProductKitDescriptionModal';
+import { ProductKitExamplePanel } from './ProductKitExamplePanel';
 import { ProductKitInputPane } from './ProductKitInputPane';
-import { ProductKitOutputPane } from './ProductKitOutputPane';
 import {
+  hasActiveGalleryItems,
   useAuth,
-  useCreditCost,
+  useGenerationSettings,
+  useImageToPromptAnalysis,
   useImageUpload,
+  useModelQuoteCreditLabel,
   useResultGallery,
   useRightTab,
   type GalleryItem,
 } from './hooks';
-import { generateApi, promptToolsApi, resolveModel } from './api';
-import { promptToolErrorMessage } from '../../lib/promptToolMessages';
+import { generateApi, resolveModel } from './api';
 import {
   buildVariantPlan,
   countGenerations,
   formSnapshotOf,
   imageInputCountError,
+  labelOf,
   modelImageInputLimit,
   platformSpec,
   variantCaption,
@@ -83,43 +93,38 @@ export function ProductKitPage() {
   // ── 表单状态 ──
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
-  const [platform, setPlatform] = useState('taobao');
   const [language, setLanguage] = useState('zh-CN');
   const [description, setDescription] = useState('');
-  /**
-   * 描述的同步镜像：AI 分析是异步的，响应回来时要按**最新**输入判断是否提示
-   * 覆盖，不能用点击瞬间的闭包值 —— 否则请求期间用户手打的描述会被静默冲掉。
-   */
-  const descriptionRef = useRef(description);
-  const applyDescription = useCallback((value: string) => {
-    descriptionRef.current = value;
-    setDescription(value);
-  }, []);
   const [counts, setCounts] = useState<Record<string, number>>(() =>
     Object.fromEntries(VARIANT_FIELDS.map((v) => [v.key, v.default])),
   );
-  const [ratio, setRatio] = useState('1:1');
-  const [resolution, setResolution] = useState('1k');
-  /**
-   * 用户手动改过比例/画质后，切换平台不再覆盖 —— 平台规格只是默认值，
-   * 不能把用户已经调好的设置抢走。
-   */
-  const [ratioTouched, setRatioTouched] = useState(false);
-  const [resolutionTouched, setResolutionTouched] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  /** AI 分析进行中 (按钮禁用 + 文案切换, 防止连点时重复请求文本通道) */
-  const [analyzing, setAnalyzing] = useState(false);
+  // 平台 / 比例 / 画质 / 高级设置开合：用户手改过的值不再被平台预设覆盖
+  const {
+    platform,
+    ratio,
+    resolution,
+    settingsOpen,
+    changePlatform,
+    changeRatio,
+    changeResolution,
+    toggleSettings,
+    applySettings,
+  } = useGenerationSettings({
+    defaultRatio: '1:1',
+    defaultResolution: '1k',
+    specOf: platformSpec,
+  });
 
   // ── 弹窗状态 ──
   const [expandOpen, setExpandOpen] = useState(false);
 
-  /** 所选模型的实时单张报价（积分）；null = 未取到，回落到能力基础价 */
-  const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
-  /*
-   * 本页不直接展示 capability runtime 的后台诊断原因；运行时不可用文案统一由
-   * `runtimeOf` 转换为用户提示。真正的可用性仍由后端把关（下架走 40005，
-   * 无线路由 resolveModelId 在提交时如实报错）。
-   */
+  // AI 分析：走文本通道的「图片转提示词」，对首张商品图做真实识别
+  const { analyzing, analyze: runAiAnalyze } = useImageToPromptAnalysis({
+    images,
+    value: description,
+    onApply: setDescription,
+  });
+
   // ── 右侧结果栏 ──
   //
   // 与商品详情页同构: 一次提交的服务端任务共享 batchId, 结果栏按批次聚合成
@@ -132,10 +137,7 @@ export function ProductKitPage() {
     includeFailed: true,
   });
   // 只认 queued/running: 失败任务同样没有 url, 按「无图」判断会让提交按钮永久禁用。
-  const galleryRunning = useMemo(
-    () => gallery.items.some((item) => item.status === 'queued' || item.status === 'running'),
-    [gallery.items],
-  );
+  const galleryRunning = useMemo(() => hasActiveGalleryItems(gallery.items), [gallery.items]);
   /** 页签角标按生成次数计, 与下方批次行数一致 */
   const generationCount = useMemo(() => countGenerations(gallery.items), [gallery.items]);
   const resultEmptyChildren = useMemo(() => <ToolWorkflowSteps />, []);
@@ -155,14 +157,10 @@ export function ProductKitPage() {
    * 价签必须按“本次要出几张”计算。此前只显示单张单价，用户选 3 个变体时
    * 按钮仍写“本次消耗 10 积分”，实际扣 30 —— 属于计费披露错误。
    */
-  const unitCreditCost = useCreditCost(PRODUCT_KIT_CAPABILITY);
-  const creditLabel = useMemo(() => {
-    const unit = modelQuoteCredits ?? unitCreditCost;
-    if (unit == null) return null;
-    if (unit === 0) return '免费';
-    const total = unit * Math.max(totalCount, 1);
-    return modelQuoteCredits == null ? `本次消耗 ${total} 积分` : `本次约 ${total} 积分（按所选模型）`;
-  }, [unitCreditCost, modelQuoteCredits, totalCount]);
+  const { label: creditLabel, onModelQuoteChange } = useModelQuoteCreditLabel({
+    capability: PRODUCT_KIT_CAPABILITY,
+    count: totalCount,
+  });
   const formValid =
     images.length > 0 &&
     !imageLimitError &&
@@ -190,57 +188,6 @@ export function ProductKitPage() {
     reloadResults: gallery.reload,
   });
   const generating = submitting || galleryRunning;
-
-  /** 切换平台：用户没手动改过比例/画质时，带出该平台的主图规格 */
-  const changePlatform = (value: string) => {
-    setPlatform(value);
-    const spec = platformSpec(value);
-    if (!spec) return;
-    if (!ratioTouched) setRatio(spec.ratio);
-    if (!resolutionTouched) setResolution(spec.size);
-  };
-
-  // ── AI分析: 走文本通道的「图片转提示词」, 对首张商品图做真实识别 ──
-  //
-  // 失败语义: 文本通道没配时后端返回 502, 如实把原因抛给用户;
-  // 绝不退回「用文件名拼一段描述」—— 那会让用户以为模型看过图。
-  const runAiAnalyze = async () => {
-    if (images.length === 0) {
-      message.warning('请先上传商品图片');
-      return;
-    }
-    const first = images[0];
-    if (!first?.id) {
-      message.warning('首张图缺少素材 id，请重新上传后再分析');
-      return;
-    }
-    setAnalyzing(true);
-    try {
-      const { text } = await promptToolsApi.imageToPrompt(first.id);
-      const content = text?.trim();
-      if (!content) {
-        message.warning('这次没有生成可用内容，请重试');
-        return;
-      }
-      // 已填过描述时不静默覆盖, 先问一句（按响应时的最新输入判断）
-      if (descriptionRef.current.trim()) {
-        modal.confirm({
-          title: '替换商品描述？',
-          content: 'AI 分析会覆盖当前已填写的描述。',
-          okText: '替换',
-          cancelText: '取消',
-          onOk: () => applyDescription(content),
-        });
-        return;
-      }
-      applyDescription(content);
-      message.success('已按首张商品图生成描述，可继续编辑');
-    } catch (e) {
-      message.error(promptToolErrorMessage(e, 'image'));
-    } finally {
-      setAnalyzing(false);
-    }
-  };
 
   /**
    * 删除一次生成 —— 主图批次由多个独立任务组成, 没有 parentTaskId,
@@ -290,18 +237,11 @@ export function ProductKitPage() {
       if (!snapshot) return;
       setProductName(snapshot.productName);
       setBrand(snapshot.brand);
-      applyDescription(snapshot.description);
+      setDescription(snapshot.description);
       // 旧任务可能缺这些参数: 缺省时保留当前值，避免把下拉框清空成空串
-      if (snapshot.platform) setPlatform(snapshot.platform);
+      if (snapshot.platform) changePlatform(snapshot.platform);
       if (snapshot.language) setLanguage(snapshot.language);
-      if (snapshot.ratio) {
-        setRatio(snapshot.ratio);
-        setRatioTouched(true);
-      }
-      if (snapshot.resolution) {
-        setResolution(snapshot.resolution);
-        setResolutionTouched(true);
-      }
+      applySettings({ ratio: snapshot.ratio, resolution: snapshot.resolution });
       if (Object.values(snapshot.counts).some((count) => count > 0)) setCounts(snapshot.counts);
       if (snapshot.images.length > 0) {
         replaceImages(snapshot.images);
@@ -310,7 +250,7 @@ export function ProductKitPage() {
         message.warning('原图已不可用，已带入文字参数，请重新上传商品图');
       }
     },
-    [applyDescription, replaceImages, message],
+    [applySettings, changePlatform, replaceImages, message],
   );
 
   return (
@@ -335,25 +275,19 @@ export function ProductKitPage() {
         language={language}
         onLanguageChange={setLanguage}
         description={description}
-        onDescriptionChange={applyDescription}
+        onDescriptionChange={setDescription}
         analyzing={analyzing}
         onAnalyze={() => void runAiAnalyze()}
         onExpandDescription={() => setExpandOpen(true)}
         counts={counts}
         onCountChange={(key, value) => setCounts((c) => ({ ...c, [key]: value }))}
         settingsOpen={settingsOpen}
-        onToggleSettings={() => setSettingsOpen((v) => !v)}
+        onToggleSettings={toggleSettings}
         ratio={ratio}
-        onRatioChange={(v) => {
-          setRatioTouched(true);
-          setRatio(v);
-        }}
+        onRatioChange={changeRatio}
         resolution={resolution}
-        onResolutionChange={(v) => {
-          setResolutionTouched(true);
-          setResolution(v);
-        }}
-        onModelQuoteChange={setModelQuoteCredits}
+        onResolutionChange={changeResolution}
+        onModelQuoteChange={onModelQuoteChange}
         onModelChange={setSelectedModel}
         generating={generating}
         formValid={formValid}
@@ -362,10 +296,11 @@ export function ProductKitPage() {
       />
 
       {/* ── 右: 功能示例 / 创作结果 ── */}
-      <ProductKitOutputPane
+      <ToolBatchOutputPane
         rightTab={rightTab}
         onPickTab={pickRightTab}
         generationCount={generationCount}
+        demo={<ProductKitExamplePanel />}
         items={gallery.items}
         loading={gallery.loading}
         error={gallery.error}
@@ -373,6 +308,8 @@ export function ProductKitPage() {
         emptyChildren={resultEmptyChildren}
         onDeleteRow={deleteRow}
         onRegenerateRow={regenerateFromRow}
+        labelOf={labelOf}
+        downloadNamePrefix="main-image"
       />
 
       {/* 素材库选择弹窗 (真实数据) */}
@@ -390,10 +327,13 @@ export function ProductKitPage() {
       <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
 
       {/* 商品描述放大编辑 */}
-      <ProductKitDescriptionModal
+      <ExpandTextModal
         open={expandOpen}
-        description={description}
-        onChange={applyDescription}
+        title="编辑商品描述"
+        value={description}
+        maxLength={MAX_DESC_LEN}
+        placeholder="* 请输入商品描述"
+        onChange={setDescription}
         onClose={() => setExpandOpen(false)}
       />
     </div>

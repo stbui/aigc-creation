@@ -130,6 +130,16 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
     setImages((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
+  /** 调整图片顺序（顺序即构图顺序）；边界移动为 no-op */
+  const moveImage = useCallback((index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= imagesRef.current.length) return;
+    const next = [...imagesRef.current];
+    [next[index], next[target]] = [next[target], next[index]];
+    imagesRef.current = next;
+    setImages(next);
+  }, []);
+
   /**
    * 清空图片位（工具页「新建任务」回到空态）。
    *
@@ -247,6 +257,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
     fileInputRef,
     uploadFiles,
     removeImage,
+    moveImage,
     replaceImage,
     replaceImages,
     clearImages,

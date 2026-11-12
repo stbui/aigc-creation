@@ -46,16 +46,27 @@ export { useCreditLabel } from '../../hooks/useCreditLabel';
 /** 错误提示: 把接口错误码翻译成用户可读文案 */
 export { useGenerateError } from '../../hooks/useGenerateError';
 /** 结果列表轮询; `GalleryItem` 是结果网格的数据类型 */
-export { useResultGallery, type GalleryItem, type ResultGallery } from '../../hooks/useResultGallery';
+export {
+  hasActiveGalleryItems,
+  useResultGallery,
+  type GalleryItem,
+  type ResultGallery,
+} from '../../hooks/useResultGallery';
+export { useRightTab, type RightTab } from '../../hooks/useRightTab';
+/** 单次提交的幂等键 */
+export { useIdempotencyKey } from '../../hooks/useIdempotencyKey';
+/** 模型实时报价优先的价签 */
+export { useModelQuoteCreditLabel } from '../../hooks/useModelQuoteCreditLabel';
+/** 平台 / 比例 / 画质的生成设置 */
+export { useGenerationSettings } from '../../hooks/useGenerationSettings';
+/** 删除单张作品（确认框 + 接口 + 本地摘除） */
+export { useDeleteGalleryItem } from '../../hooks/useDeleteGalleryItem';
 /** 素材库取数 */
 export { useAssetLibrary };
 /** 登录态: 判断是否已登录 (访客点提交先走登录弹窗) */
 export { useAuth } from '../../context/AuthContext';
 /** 余额变更通知: 扣费 / 退款后通知积分上下文刷新 */
 export { notifyCreditsChanged } from '../../context/CreditsContext';
-
-/** 右侧面板页签 */
-export type RightTab = 'demo' | 'results';
 
 interface ViralCloneAssetsOptions {
   /** 商品图位上限，已为参考图预留 1 个模型输入位 */
@@ -300,32 +311,6 @@ export function useHotRemakeAvailability(): string | null {
   if (!runtime) return null;
   if (runtime.effective !== 'unavailable' && runtime.effective !== 'disabled') return null;
   return runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。';
-}
-
-/**
- * 右侧面板页签。
- *
- * 与商品详情 / 商品主图同款: 首访展示功能示例, 已有历史结果时自动落到创作结果;
- * 用户自己点过页签后不再自动切换, 避免正在看示例时被晚到的列表请求弹走。
- *
- * `showResults` 供提交时调用: 本次复刻的占位行在结果区, 留在示例页看不到进度。
- */
-export function useRightTab(itemCount: number, loading: boolean) {
-  const [rightTab, setRightTab] = useState<RightTab>('demo');
-  const [touched, setTouched] = useState(false);
-
-  const pick = useCallback((tab: RightTab) => {
-    setTouched(true);
-    setRightTab(tab);
-  }, []);
-  const showResults = useCallback(() => setRightTab('results'), []);
-
-  useEffect(() => {
-    if (touched || loading) return;
-    if (itemCount > 0) setRightTab('results');
-  }, [touched, loading, itemCount]);
-
-  return { rightTab, pick, showResults };
 }
 
 /**

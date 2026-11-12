@@ -88,7 +88,7 @@
 | [`canvas-port-design.md`](canvas-port-design.md) | 无限画布全量移植方案（对齐 open-ai-canvas）：Postgres + Redis 前置、文档 operations 协议、协作与实时、快照/分享、四模态生成、Agent/3D 末排、工作分解与验收 | 规划中，未实施 |
 | [`canvas-detailed-design.md`](canvas-detailed-design.md) | 无限画布实现详细设计：仓库现状差距、P0 基础设施改造、7 张表与 Prisma 定义、operations 写入算法与错误码、租约/实时/快照/分享、四模态生成回填、前端引擎与编辑器拆分、后台管理与验收闸口 | 规划中，未实施 |
 | [`channel-model-design.md`](channel-model-design.md) | 渠道与模型子系统整体移植方案（对齐 open-ai-canvas）：渠道/渠道模型/价格档/前台模型/路由/微积分计费/分组/协议插件/代理 —— 现模型层的设计依据与取舍记录 | 已实施（P0–P6） |
-| [`channel-model-automation-design.md`](channel-model-automation-design.md) | 模型渠道能力重构方案：配渠道 → 选模型 → 自动售卖与切换；`LogicalModelSource` 自动线路池、能力识别与导入上架、按健康度分层、同能力跨模型跨渠道切线、模式切换与迁移分期 | 规划中，未实施 |
+| [`channel-model-automation-design.md`](channel-model-automation-design.md) | 模型渠道能力重构方案：删除前台模型三层，渠道模型直接售卖；能力 ↔ 商品绑定、模型分组只读聚合、能力级统一定价、按健康度分层与同能力跨模型跨渠道切线、配置自动化与迁移分期 | 规划中，未实施 |
 | [`payment-refactor-design.md`](payment-refactor-design.md) | 支付域重构方案 v2（对齐 open-ai-canvas）：多渠道配置版本化与加密托管、查单/关单、回调收件箱与 15s worker、T+1 对账自动补发、`/admin/payments` 四标签页完整规格、迁移与验收标准 | 部分实施：后端主链路已落地；前端页面与开放差距见 §25 |
 | [`admin-workflow-design.md`](admin-workflow-design.md) | 后台角色化工作流：运营/财务/管理员三种首屏、统一待办、上下文直达、保存视图与命令面板、工单转交、批量动作与分期验收 | P0 已实施（对账保存视图未落地）；P1 / P2 规划中 |
 

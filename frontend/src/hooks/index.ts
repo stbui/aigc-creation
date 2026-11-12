@@ -11,9 +11,14 @@ export { useCampaignCountdown, type CampaignCountdownParts } from './useCampaign
 export { useCapabilities, type UseCapabilitiesResult } from './useCapabilities';
 export { useCapabilityRuntime, type CapabilityRuntimeState } from './useCapabilityRuntime';
 export { useCreditCost, useCreditLabel } from './useCreditLabel';
+export { useDeleteGalleryItem } from './useDeleteGalleryItem';
 export { useDocumentMeta } from './useDocumentMeta';
 export { useGenerateError } from './useGenerateError';
+export { useGenerationSettings, type PlatformPreset } from './useGenerationSettings';
+export { useIdempotencyKey } from './useIdempotencyKey';
+export { useImageToPromptAnalysis } from './useImageToPromptAnalysis';
 export { useImageUpload, type UploadedImage } from './useImageUpload';
+export { useModelQuoteCreditLabel } from './useModelQuoteCreditLabel';
 export { useIsMobile } from './use-mobile';
 export { useLightboxIndex } from './useLightboxIndex';
 export { mediaHeightRatio, useMasonryColumns } from './useMasonryColumns';
@@ -21,7 +26,13 @@ export { useMediaQuery } from './useMediaQuery';
 export { usePasteUpload } from './usePasteUpload';
 export { usePollAbort } from './usePollAbort';
 export { useProject } from './useProject';
-export { useResultGallery, type GalleryItem, type ResultGallery } from './useResultGallery';
+export {
+  hasActiveGalleryItems,
+  useResultGallery,
+  type GalleryItem,
+  type ResultGallery,
+} from './useResultGallery';
+export { useRightTab, type RightTab } from './useRightTab';
 export { useTaskPoller } from './useTaskPoller';
 export { useToolHistory, type ToolHistoryTask } from './useToolHistory';
 export { useToolTask } from './useToolTask';

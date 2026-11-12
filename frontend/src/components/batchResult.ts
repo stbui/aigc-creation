@@ -127,19 +127,65 @@ function optionLabel(
 }
 
 /** 取任务参数里的字符串参数; 非字符串或空串返回 undefined */
-function paramText(item: GalleryItem, key: string): string | undefined {
+export function textParam(item: GalleryItem, key: string): string | undefined {
   const value = item.params?.[key];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+/** 归组键: 同批次共享 `batch:…`, 旧任务各自 `task:…` */
+export function rowKeyOf(item: GalleryItem): string {
+  const batchId = textParam(item, 'batchId');
+  return batchId ? `batch:${batchId}` : `task:${item.id}`;
+}
+
+/** 结果行数（一次生成 = 一行），供页签角标使用 */
+export function countGenerations(items: GalleryItem[]): number {
+  return new Set(items.map(rowKeyOf)).size;
+}
+
+/**
+ * 下载文件名: `<前缀>-<格名>-<任务 id 尾 6 位>.<真实格式>`。
+ *
+ * 扩展名跟真实格式走：厂商链接常常没有后缀，猜后缀会把 PNG 存成 .jpg。
+ */
+export function downloadFileName(
+  item: GalleryItem,
+  label: string,
+  prefix: string,
+): string {
+  const ext = (item.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
+  return `${prefix}-${label}-${item.id.slice(-6)}.${ext}`;
+}
+
+/** 商品图批次行：主图 / 详情图共用同一份字段口径 */
+export interface ProductBatchRow extends BatchRowBase {
+  prompt?: string;
+  productName?: string;
+  /** 结果卡第二行展示的任务参数；同批次内各任务共用一份 */
+  meta: ResultMeta;
+}
+
+/** 按 batchId 归组商品图批次（主图 / 详情图字段完全一致） */
+export function buildProductBatchRows(items: GalleryItem[]): ProductBatchRow[] {
+  return buildBatchRows<ProductBatchRow>(
+    items,
+    (item) => ({
+      prompt: textParam(item, 'description'),
+      productName: textParam(item, 'productName'),
+      meta: resultMetaOf(item),
+    }),
+    rowKeyOf,
+  );
+}
+
 /** 从任务参数提取结果卡参数摘要。缺失字段不补默认值，避免把旧任务伪装成新参数。 */
 export function resultMetaOf(item: GalleryItem): ResultMeta {
-  const language = paramText(item, 'language');
+  const language = textParam(item, 'language');
   const region = language?.split('-')[1]?.toUpperCase();
   return {
-    resolution: paramText(item, 'size'),
-    ratio: paramText(item, 'ratio'),
-    platform: optionLabel(platformOptions(), paramText(item, 'platform')),
+    resolution: textParam(item, 'size'),
+    ratio: textParam(item, 'ratio'),
+    platform: optionLabel(platformOptions(), textParam(item, 'platform')),
     country: region ? COUNTRY_BY_REGION[region] : undefined,
     language: optionLabel(languageOptions(), language),
   };

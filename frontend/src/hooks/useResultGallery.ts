@@ -73,6 +73,11 @@ function promptOf(params: Record<string, unknown> | undefined): string | undefin
   return typeof prompt === 'string' && prompt.trim() ? prompt.trim() : undefined;
 }
 
+/** 列表里还有排队 / 运行中的任务 —— 提交按钮与标题的「生成中」以此为准 */
+export function hasActiveGalleryItems(items: GalleryItem[]): boolean {
+  return items.some((item) => item.status === 'queued' || item.status === 'running');
+}
+
 export interface ResultGallery {
   items: GalleryItem[];
   loading: boolean;

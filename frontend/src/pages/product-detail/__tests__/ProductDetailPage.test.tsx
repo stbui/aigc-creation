@@ -40,9 +40,29 @@ vi.mock('../hooks', async () => {
   const { useState } = await import('react');
   return {
     notifyCreditsChanged: vi.fn(),
+    hasActiveGalleryItems: () => false,
     useAuth: () => ({ token: null }),
     useCapabilityRuntime: () => ({ blocked: false, reason: '' }),
-    useDetailCreditLabel: () => '本次消耗 20 积分',
+    useModelQuoteCreditLabel: () => ({
+      label: '本次消耗 20 积分',
+      onModelQuoteChange: vi.fn(),
+    }),
+    useGenerationSettings: () => ({
+      platform: 'taobao',
+      ratio: '3:4',
+      resolution: '1k',
+      settingsOpen: false,
+      changePlatform: vi.fn(),
+      changeRatio: vi.fn(),
+      changeResolution: vi.fn(),
+      toggleSettings: vi.fn(),
+      applySettings: vi.fn(),
+    }),
+    useIdempotencyKey: () => ({
+      keyFor: () => 'idem-test',
+      reset: vi.fn(),
+    }),
+    useImageToPromptAnalysis: () => ({ analyzing: false, analyze: vi.fn() }),
     useGenerateError: () => vi.fn(),
     useImageUpload: () => ({
       images: [{ id: 'asset-1', url: '/uploads/probe.png', name: 'probe.png' }],
@@ -84,31 +104,52 @@ vi.mock('../hooks', async () => {
 
 vi.mock('../components', () => ({
   AssetLibraryModal: () => null,
+  ExpandTextModal: () => null,
   MobileUploadModal: () => null,
-  ModelPicker: () => null,
-  OutputTabsPane: () => null,
-  ToolImageDropzone: () => <div>上传商品图</div>,
-  ToolSettingsPopover: () => null,
-  ToolSubmitBar: ({
+  ToolBatchOutputPane: () => null,
+  ToolTypeTabs: () => null,
+  ToolWorkflowSteps: () => null,
+  ProductFormSection: ({
+    productName,
+    onProductNameChange,
+    description,
+    onDescriptionChange,
+  }: {
+    productName: string;
+    onProductNameChange: (value: string) => void;
+    description: string;
+    onDescriptionChange: (value: string) => void;
+  }) => (
+    <>
+      <input
+        value={productName}
+        placeholder="* 请输入商品名称"
+        onChange={(event) => onProductNameChange(event.target.value)}
+      />
+      <textarea
+        value={description}
+        placeholder="* 请输入商品描述"
+        onChange={(event) => onDescriptionChange(event.target.value)}
+      />
+    </>
+  ),
+  ToolGenerationSubmitBar: ({
     disabled,
-    label,
+    label = '立即生成',
     onSubmit,
   }: {
     disabled?: boolean;
-    label: string;
+    label?: string;
     onSubmit: () => void;
   }) => (
     <button type="button" disabled={disabled} onClick={onSubmit}>
       {label}
     </button>
   ),
-  ToolWorkflowSteps: () => null,
 }));
 
 vi.mock('../DetailExamplePanel', () => ({ DetailExamplePanel: () => null }));
-vi.mock('../DetailResultList', () => ({ DetailResultList: () => null }));
 vi.mock('../DetailSectionPicker', () => ({ DetailSectionPicker: () => null }));
-vi.mock('../DetailSelectField', () => ({ DetailSelectField: () => null }));
 
 vi.mock('../api', () => ({
   DETAIL_CAPABILITY: 'detail_image',

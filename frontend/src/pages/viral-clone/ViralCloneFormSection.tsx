@@ -1,21 +1,15 @@
 import type { RefObject } from 'react';
 
-import { MAX_IMAGE_MB, MAX_NAME_LEN, type AssetSlot } from './constants';
-import {
-  Field,
-  FieldGroup,
-  Input,
-  Select,
-  ToolImageDropzone,
-} from './components';
+import { MAX_IMAGE_MB, type AssetSlot } from './constants';
+import { ProductFieldsGrid, ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
-import { languageOptions, platformOptions } from './utils';
 
 /**
  * 爆款复刻左栏表单区：上传商品图 / 上传参考图（爆款图）/ 生成设置。
  *
  * 与商品详情、商品主图的 `*FormSection` 同角色；三者在参考站同属一张配置卡。
- * 参考图是单张位，标题行不显示计数器。
+ * 参考图是单张位，标题行不显示计数器。商品基础字段走共享 `ProductFieldsGrid`，
+ * 名称 / 品牌在本页为选填。
  */
 export function ViralCloneFormSection({
   images,
@@ -99,46 +93,18 @@ export function ViralCloneFormSection({
         <h3 id="vc-generation-settings-title" className="text-sm font-semibold text-foreground">
           生成设置
         </h3>
-        <FieldGroup className="vc-generation-settings-grid grid grid-cols-2 gap-3">
-          <Field className="gap-1.5">
-            <Input
-              id="vc-product-name"
-              aria-label="商品名称"
-              value={productName}
-              maxLength={MAX_NAME_LEN}
-              placeholder="请输入商品名称"
-              onChange={(e) => onProductNameChange(e.target.value)}
-            />
-          </Field>
-          <Field className="gap-1.5">
-            <Input
-              id="vc-brand"
-              aria-label="品牌"
-              value={brand}
-              maxLength={MAX_NAME_LEN}
-              placeholder="请输入品牌"
-              onChange={(e) => onBrandChange(e.target.value)}
-            />
-          </Field>
-          <Field className="gap-1.5">
-            <Select
-              value={platform}
-              onChange={(value) => onPlatformChange(String(value))}
-              options={platformOptions()}
-              aria-label="平台"
-              className="w-full"
-            />
-          </Field>
-          <Field className="gap-1.5">
-            <Select
-              value={language}
-              onChange={(value) => onLanguageChange(String(value))}
-              options={languageOptions()}
-              aria-label="语言"
-              className="w-full"
-            />
-          </Field>
-        </FieldGroup>
+        <ProductFieldsGrid
+          productName={productName}
+          onProductNameChange={onProductNameChange}
+          brand={brand}
+          onBrandChange={onBrandChange}
+          platform={platform}
+          onPlatformChange={onPlatformChange}
+          language={language}
+          onLanguageChange={onLanguageChange}
+          required={false}
+          showTitle={false}
+        />
       </section>
     </div>
   );

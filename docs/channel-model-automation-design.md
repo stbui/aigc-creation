@@ -1,185 +1,245 @@
-# 模型渠道能力重构实现方案（配置自动化与模型自动切换）
+# 模型渠道能力重构实现方案（去掉前台模型层）
 
 > 状态：规划中，未实施。
 > 日期：2026-11-12
-> 决策：保留 `LogicalModel` 作为 C 端售卖单元；把「建渠道 → 建渠道模型 → 手建前台模型 → 手挑线路 / 配 priority / 配 weight」收敛为「配渠道 → 选模型 → 自动售卖与切换」；自动切换限定同能力、跨模型、跨渠道。
+> 决策：删除 `LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute` 三层；渠道模型（商品）即售卖供给，通过「能力 ↔ 渠道模型」绑定直接对 C 端提供模型选项；同能力内跨模型、跨渠道自动切换。
 > 关联：`docs/model-architecture.md`、`docs/channel-model-design.md`、`docs/api-contract.md`、`docs/testing.md`、`CLAUDE.md`
 
 ## 1. 范围
 
-### 1.1 要解决的问题
+### 1.1 现状问题
 
-当前模型层有四层配置：`ModelChannel` → `ChannelModel`（商品）→ `LogicalModel`（按 C 端能力建立的售卖单元）→ `LogicalModelRevision` + `LogicalModelRoute`。前两层是供应事实，后两层是售卖事实。问题集中在后两层：
+当前模型层是四层：`ModelChannel` → `ChannelModel`（商品）→ `LogicalModel`（按 C 端能力建的售卖单元）→ `LogicalModelRevision` + `LogicalModelRoute`。供应与售卖被拆成两套事实：
 
-1. **配置重复**：每个上游模型先建商品，再按能力手建前台模型，再逐条挑线路；同一批模型服务 15 个图像能力时要重复 15 次。
-2. **候选池被人为截断**：选路只读取当前前台模型 revision 下的 `LogicalModelRoute`（`route-catalog.service.ts`），没有绑定进来的同能力商品永远不会参与，包括同渠道的备用模型。
-3. **静态优先级与运行时健康脱节**：`priority` / `weight` 是手工值，冷却与 24h 成功率只在任务失败后被动生效，不能提前避开坏线路。
-4. **两套可售口径**：商品台账已经维护能力、成本、售价与价格档，前台模型又维护能力合同、价格策略与线路；运营容易把「模态」和「能力 id」配混，也容易让展示价与实扣价分叉。
-5. **新增渠道无法闭环**：拉取上游模型、导入、定价、上架、绑定能力分散在多个页面，缺少一次完成的动线。
+1. **配置重复**：每个上游模型先建商品，再按能力手建前台模型，再逐条挑线路、配 `priority` / `weight`；同一批模型服务多个能力时重复多轮。
+2. **候选池被人为截断**：选路只读当前前台模型 revision 下的线路（`route-catalog.service.ts`），没有绑定进来的同能力商品永远不参与。
+3. **模型身份与供应线路耦合**：C 端选的是 `logicalModelId`，一个售卖身份背后挂若干线路；新增渠道模型必须回头改前台模型，否则模型不可售。
+4. **两套能力合同**：渠道模型有 `capabilityConfigJson`，前台模型 revision 又存一份 `capabilitySpecJson`，两份合同漂移时表现为「商品能测、售卖不能生成」。
+5. **两套价格口径**：前台模型支持 `unified` / `channel`，渠道价格档又维护成本与售价；展示价与实扣价容易分叉。
+6. **新增渠道无法闭环**：拉取、导入、定价、上架、绑定能力分散在渠道与能力两个页面。
 
 ### 1.2 本方案做
 
-- 渠道导入时自动识别模型模态与可承接的 C 端能力，勾选后一次完成「建商品 + 定价 + 上架到能力」。
-- 为每个能力维护一个**自动线路池**（`LogicalModelSource`），不再手工维护线路。
-- 自动模式下按运行时健康度分层，坏线路自动下沉；同能力池内跨模型、跨渠道自动切换。
-- 保留手工模式，作为高级覆盖与回滚路径。
-- 保留现有任务快照、账单、失败语义与冷却规则。
+- 删除前台模型三层，渠道模型直接作为售卖供给。
+- 用 `CapabilityModelBinding` 表达「某能力可以使用哪些商品」，这是唯一的售卖方配置。
+- C 端按「能力 + 模型标识」选模型；模型标识是读取时按 `modelGroupKey` 聚合出来的展示分组，不落表。
+- 同能力候选池覆盖全部已绑定商品，按健康度分层、可跨模型跨渠道自动切换。
+- 售价收口到能力级（`CapabilityPricing` + `CreditPriceService`），渠道价格档只保留成本。
+- 渠道导入时一次完成「建商品 + 识别能力 + 绑能力」。
 
 ### 1.3 本方案不做
 
-- 不删除 `LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute`。
-- 不改变失败判定：仍然只有 `rejected_no_job` 切线；超时、5xx、建连后中断判 `42206`，不切线、不自动退款（`docs/model-architecture.md`）。
+- 不保留 `LogicalModel` 的任何兼容层、别名或双写。
+- 不改变失败判定：只有 `rejected_no_job` 切线；超时、5xx、建连后中断判 `42206`，不切线、不自动退款（`docs/model-architecture.md`）。
 - 不改变冷却键与时长：401/403 冷却渠道 10 分钟，404 冷却渠道模型 10 分钟，429 按 `Retry-After` 或 30 秒。
-- 不改变钱包、预留、结算、退款与 `route_switch` 账单替换规则。
+- 不改变钱包、预留、结算、退款与积分批次规则。
 - 不做跨能力、跨模态兜底（图像失败不退到视频）。
 - 不引入 Redis：健康分层用进程内缓存 + 30 秒 TTL，多实例各自判定。
 
-## 2. 现状依据
+## 2. 目标形态
 
-| 事实 | 位置 |
-| --- | --- |
-| 目录快照只装载 `LogicalModel` 及其 revision 下的启用线路 | `backend/src/model/catalog/route-catalog.service.ts` |
-| 候选池按 `priority` 硬分层、同层 `weight` 加权随机 | `backend/src/model/routing/router.service.ts` 的 `eligibleRoutes` / `weightedRoute` |
-| 故障切换重新解析并排除本轮已试线路 | `backend/src/model/tasks/task-worker.service.ts` 的 `switchRoute` |
-| 渠道模型已支持上游目录拉取、导入、默认商品配置 | `channel-model.service.ts`、`channel-default-model.ts`、`POST /admin/channels/:id/models/fetch` |
-| 前台模型保存即新建 revision 并重建线路 | `backend/src/model/catalog/logical-model.admin.service.ts` 的 `save` |
-| 渠道价按价格档 × 分组倍率 × 货币结算，换线换账单 | `docs/model-architecture.md` 计费与切线章节 |
-| 能力定义声明产出模态、默认参数与输入数量 | `backend/src/capabilities/definitions/<id>.ts` 的 `model` 与 `inputs` |
-| 协议清单声明 provider 的能力模态 | `backend/plugins/<plugin>/manifest.json` 的 `contributes.providers[].capabilities` |
-
-## 3. 目标形态
-
-### 3.1 三层收敛为三个动作
+### 2.1 三个动作
 
 ```
 配渠道（凭证 / 端点 / 代理 / 并发）
    ↓
-选模型（拉取上游目录 → 勾选 → 自动识别模态与可承接能力 → 套用定价）
+选模型（拉取上游目录 → 勾选 → 识别模态与可承接能力 → 绑到能力）
    ↓
-自动售卖与切换（自动线路池 → 健康分层 → 失败切线 → 换线换账单）
+自动售卖与切换（能力候选池 → 健康分层 → 失败切线）
 ```
 
-运营心智从「维护四张表」变成「一个渠道能用哪些模型、每个能力由哪些模型承接」。
+### 2.2 实体收敛
 
-### 3.2 两个显式模式
-
-`LogicalModel.routeMode`：
-
-| 模式 | 线路来源 | 适用 |
+| 旧实体 | 处理 | 新归属 |
 | --- | --- | --- |
-| `auto`（新模型默认） | `LogicalModelSource` 自动派生，健康度决定顺序 | 常规售卖、需要自动切换 |
-| `manual` | 运营手工维护 `LogicalModelRoute` 的 `priority` / `weight` | 灰度、定向放量、历史模型与回滚 |
+| `ModelChannel` | 保留 | 供应来源与凭证 |
+| `ChannelModel` | 保留 | 可售商品：模态、协议、能力合同、成本档、启停 |
+| `ChannelModelPriceTier` | 保留但改口径 | 只保留成本（`cost*`）；售价移到能力级 |
+| `LogicalModel` | 删除 | 能力定义 + `CapabilityPricing` |
+| `LogicalModelRevision` | 删除 | 能力定义即合同 |
+| `LogicalModelRoute` | 删除 | `CapabilityModelBinding` 即候选池 |
+| `RouteAttempt` | 改列 | 记录实际尝试的 `channelModelId` / `channelId` |
 
-两种模式共用同一套选路、计费与切线代码；差异只在候选池来源与优先级来源。
+### 2.3 两个关键决策
 
-## 4. 数据模型
+**决策一：模型分组只读派生，不建表。**
 
-### 4.1 新增字段
+C 端看到的「模型」是同一能力下、`modelGroupKey` 相同的渠道模型集合。`modelGroupKey` 为空时取 `modelKey`，因此同一上游模型挂在多条渠道时只有一个 C 端选项，底层自动切换。分组不需要主键、不需要 revision、不需要发布流程。
+
+**决策二：售价按能力统一，渠道价格档只记成本。**
+
+去掉前台模型后，`unified` / `channel` 双价格策略失去承载点。若继续按渠道售价计费，自动切换会让同一次操作在不同线路下价格不同，报价与实扣必然分叉。因此：
+
+- 一个能力只有一个对外售价（固定价或 Token 价），由 `CapabilityPricing` 维护；
+- 运行时仍由 `CreditPriceService` 解析覆盖价、分组倍率、货币换算与限时免费，保持「运行期生效积分价」单一事实源；
+- 渠道价格档的 `cost*` 用于成本快照与毛利，`sale*` 不再参与计费与展示，按 P4 清理；
+- 自动切换不改变用户应付金额，因此不需要替换账单。
+
+如果产品后续需要「同一个能力按模型分级定价」，应新增独立的分级价表，而不是恢复前台模型层。
+
+## 3. 数据模型
+
+### 3.1 删除
 
 ```prisma
-model LogicalModel {
-  // ...现有字段
-  /// 'auto' 线路池由 LogicalModelSource 派生 | 'manual' 手工维护线路
-  routeMode String @default("auto")
-}
+// 整表删除
+LogicalModel
+LogicalModelRevision
+LogicalModelRoute
 ```
 
-新增索引：`@@index([routeMode, capability, enabled])`，供目录装载与迁移盘点使用。
+`GenerationTask` / `RouteAttempt` / `BillingOrder` 上对应的 `logicalModelId`、`logicalModelRevisionId`、`routeId`、`pricePolicy` 一并删除。
 
-### 4.2 新增表
+### 3.2 新增：能力 ↔ 商品绑定
 
 ```prisma
-/// 自动线路池：一个前台模型可选用的供应商品集合。
-/// 只表达「允许用哪些」，不表达「当前哪条最快」——后者由运行时健康分层决定。
-model LogicalModelSource {
+/// 能力候选池：某 C 端能力允许使用哪些渠道模型。
+/// 既是后台的「选模型」结果，也是运行时唯一的候选来源。
+model CapabilityModelBinding {
   id             String  @id @default(cuid())
-  logicalModelId String
+  /// C 端能力 id：free_create / main_image / ...
+  capabilityId   String
   channelModelId String
   enabled        Boolean @default(true)
-  /// null = 完全由健康度决定；非 null = 在该值基础上叠加健康分层
-  priority       Int?
-  /// null = 默认 100；同层加权随机使用
-  weight         Int?
+  /// 手工分层：数字越小越优先；自动健康分层在此基础上叠加
+  priority       Int     @default(0)
+  /// 同层加权随机
+  weight         Int     @default(100)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([logicalModelId, channelModelId])
-  @@index([logicalModelId, enabled])
+  @@unique([capabilityId, channelModelId])
+  @@index([capabilityId, enabled])
   @@index([channelModelId])
 }
 ```
 
-不建软删除：来源是配置关系，被任务 / 账单引用的只有派发后的 `LogicalModelRoute` 与任务快照，来源行可以直接删除。删除来源时把对应线路置 `enabled=false`，不物理删除，保证历史 `routeId` 仍可回溯。
+不建软删除：绑定是配置关系；任务与账单引用的是派发后的 `channelModelId` 快照，不引用绑定 id。删除绑定直接删行。
 
-### 4.3 不新增的表
+### 3.3 新增：能力定价
 
-- 不新增「能力 → 商品」之外的映射表：一个商品可以同时服务多个能力，`LogicalModelSource` 天然是多对多。
-- 不新增健康表：24h / 7d 指标已有 `ChannelModelMetricsService` 与 `channel-models/health`，运行时分层复用聚合结果。
-- 不新增定价表：自动模式默认 `pricePolicy='channel'`，售价仍来自 `ChannelModelPriceTier`。
-
-## 5. 自动线路池
-
-### 5.1 派生规则
-
-对 `routeMode='auto'` 的前台模型，活跃 revision 的 `LogicalModelRoute` 由 `RouteAutoSyncService` 从 `LogicalModelSource` 派生：
-
-```
-source 存在 + source.enabled + 渠道启用 + 商品启用 + 未删除
-  → route.enabled = true
-否则
-  → route.enabled = false（保留行，不删除）
-route.priority = source.priority ?? 0
-route.weight   = source.weight ?? 100
+```prisma
+/// 能力级售价：一个能力一套价格，切换线路不改价。
+model CapabilityPricing {
+  capabilityId                 String   @id
+  /// 'fixed_request' | 'per_second' | 'token'
+  billingMode                  String   @default("fixed_request")
+  unitPriceMicrocredits        BigInt   @default(0)
+  inputTokenPriceMicrocredits  BigInt   @default(0)
+  outputTokenPriceMicrocredits BigInt   @default(0)
+  cachedTokenPriceMicrocredits BigInt   @default(0)
+  updatedBy                    String   @default("")
+  updatedAt                    DateTime @updatedAt
+  createdAt                    DateTime @default(now())
+}
 ```
 
-价格档、能力合同、分组可见性不写进线路：它们是运行时过滤条件，写死会在改价 / 改配置后变成脏快照。
+- 首次读取时若缺行：固定价能力回落到能力定义里的 `creditCost`，不阻断上线；Token 计费能力不回落到固定价，按「未配置」处理；
+- `CreditPriceService` 增加 `resolvePricing(capabilityId, userId)`，一次返回计费方式、四项单价、命中的限时免费活动 id 与最终固定价；
+- 现有 `resolve()` 保留给 C 端按钮展示，内部与 `resolvePricing` 共用同一份缓存。
 
-### 5.2 同步触发
+### 3.4 渠道模型补充
 
-`RouteAutoSyncService.sync(logicalModelId)` 为幂等操作：
+```prisma
+model ChannelModel {
+  // ...现有字段
+  /// C 端模型分组键；空串 = 使用 modelKey。
+  /// 同一上游模型在多条渠道使用不同上游键时，靠它合并成一个 C 端选项。
+  modelGroupKey String @default("")
+}
+```
 
-| 触发 | 调用点 |
-| --- | --- |
-| 来源新增 / 删除 / 启停 / 改权重 | `LogicalModelSource` 写入接口 |
-| 渠道模型启停、价格档变更 | `ChannelModelService.setEnabled` / `save` / `removeMany` / `repriceMany` |
-| 渠道启停 / 删除 | `ChannelService.update` / `remove` |
-| 前台模型保存（新建 revision 后） | `LogicalModelAdminService.save` |
-| 定时对账（兜底） | 新增 `route-source-sync` 定时任务，每 5 分钟扫描不一致 |
+`priceConfigured` 语义改为「至少有一个可用的成本档」；不再作为可售前提。没有成本档的商品仍可售，但账单的成本快照为空、毛利不可算，后台在商品台账标「成本未配置」。
 
-同步在事务内 upsert 活跃 revision 的线路，完成后调用 `CatalogVersionService.invalidate()`。**同步不创建 revision、不递增 `revisionSequence`**：线路是运行期可用性，不是发布内容；历史 revision 的线路保持当时状态，供账单与任务排查。
+### 3.5 任务与账单字段
 
-### 5.3 模式切换
+| 表 | 删除 | 新增 / 保留 |
+| --- | --- | --- |
+| `GenerationTask` | `logicalModelId`、`logicalModelRevisionId`、`routeId` | 新增 `capabilityId`、`modelKey`（C 端所选分组键快照）、`channelModelId`、`channelId`；保留 `routeRun` 作为重试轮次 |
+| `RouteAttempt` | `logicalModelId`、`logicalModelRevisionId`、`routeId` | 新增 `capabilityId`、`modelKey`、`channelModelId`、`channelId`；尝试编号与 `dispatchState` 不变 |
+| `BillingOrder` | `routeId`、`pricePolicy`、`logicalModel*` | 新增 `capabilityId`、`modelKey`、`channelModelId`、`channelId`；售价字段改为能力价快照；成本字段记录最终线路的成本档 |
 
-- `manual → auto`：把当前活跃 revision 的线路写成来源（`LogicalModelSource`），保留 `priority` / `weight` 作为覆盖值，然后进入自动维护。
-- `auto → manual`：直接把当前派生线路留在原地，后续手工编辑；来源行保留但在后台隐藏，切回 auto 时复用。
-- 切换是显式动作，必须二次确认；不做静默迁移。
+任务快照的权威字段改为 `capabilityId + modelKey + channelModelId + channelId + creditCost`；下游任何一层不得替换供应侧字段（沿用现有约束）。
 
-### 5.4 保存语义（自动模式）
+## 4. 目录投影
 
-`LogicalModelAdminService.save` 按 `routeMode` 分支，不能只靠保存后同步：
+### 4.1 快照结构
 
-- `auto`：忽略请求里的 `routes`，从 `LogicalModelSource` 读取候选，按 §6.4 生成能力合同，用来源规格做 `validateProductSpecWithinRoutes` 与可结算校验；派生线路仍写入新 revision，保证 revision 快照完整；
-- `manual`：保持现有逻辑；
-- 启用判定从「至少一条启用线路」改为「至少一条来源可结算」；
-- 来源为空时允许保存，但强制 `enabled=false`，不让没有线路的自动模型对外可见。
+`route-catalog.service.ts` 重写为 `capability-catalog.service.ts`：
 
-## 6. 配置自动化
+```
+capabilityId
+  ├── pricing            // CapabilityPricing + 覆盖价 + 限时免费标记
+  └── groups: Map<modelGroupKey, ModelGroup>
+        ├── modelKey / groupKey
+        ├── displayName / icon   // 取 binding.priority 数值最小（最优先）、sortOrder 最小的商品
+        └── lines: ChannelModel[] // 已绑定、启用、渠道启用的商品
+```
 
-### 6.1 自动识别能力
+装载时剔除：
 
-`POST /admin/channels/:id/models/fetch` 的返回值追加：
+- 能力被 `CapabilityControl` 下线；
+- 绑定停用、商品停用、渠道停用或软删除；
+- 能力合同非法（`capabilityConfigJson` 解析失败）；
+- 商品能力与能力定义的产出模态不一致。
+
+TTL 30 秒、最大过期 5 分钟、首次装载失败直接报错；写入后 `CatalogVersionService.invalidate()`。规则与现有目录一致。
+
+### 4.2 能力合同
+
+- C 端表单合同以 `capabilities/definitions/<id>.ts` 为准；不再有 per-model 的 `capabilitySpecJson`。
+- 绑定写入时用能力的规范意图逐条 `matchCapability`：一条商品只要有一个规范意图匹配不上，就不允许绑定，返回具体原因。
+- 用户选了可选参数而某条线路不支持时，运行时按意图过滤该线路；只要池内还有线路支持就继续，全部不支持则在扣费前返回 `40001`。
+- 图片参数预设取能力定义；不再从 revision 合并。
+
+### 4.3 报价
+
+`POST /models/quote`：
+
+```ts
+{ capabilityId: string; modelKey?: string; params: Record<string, unknown> }
+→ {
+  capabilityId: string;
+  modelKey: string;          // 解析到的分组键
+  available: boolean;
+  amount: number;            // 积分，与实际扣费同源
+  billingMode: string;
+  reason: string;            // 不可用时给可读原因
+}
+```
+
+报价只校验能力是否启用、池内是否有可承接线路，不选具体线路；金额来自 `CreditPriceService.resolvePricing`，与建任务时的账单同源。
+
+### 4.4 能力可用性
+
+`CapabilityAvailabilityService.remoteOf` 改为检查能力绑定池：
+
+- 至少一条绑定启用；
+- 商品与渠道启用、未删除；
+- 线路未冷却；
+- 能力合同可承接该能力的规范意图；
+- 能力有可结算定价（固定价回退或 Token 定价行）。
+
+判定与选路共用同一份快照与同一个过滤函数，不能出现「界面显示可用、提交后无线路」；`generate.service` 在建任务扣费前仍按该结论拦截并返回 `40005`。
+
+## 5. 配置自动化
+
+### 5.1 能力识别
+
+`POST /admin/channels/:id/models/fetch` 返回值追加：
 
 ```ts
 {
   models: Array<{
     modelKey: string;
     // ...现有字段
+    modelGroupKey: string;
     inferredCapability: 'image' | 'text' | 'video' | 'audio' | '';
     compatibleCapabilities: Array<{
-      capability: string;   // C 端能力 id：free_create / main_image / ...
+      capability: string;
       matched: boolean;
-      reason: string;       // 不匹配时给可读原因
+      reason: string;
     }>;
   }>;
 }
@@ -187,14 +247,14 @@ route.weight   = source.weight ?? 100
 
 判定顺序：
 
-1. 渠道模型所选协议的 provider 声明模态（`contributes.providers[].capabilities`）；
+1. 协议 provider 声明模态（`contributes.providers[].capabilities`）；
 2. 上游模型名与协议参数的能力合同（尺寸 / 输入数量 / 操作）；
-3. 逐能力构造该能力的规范意图，用 `matchCapability` 判定是否可承接；
-4. 无匹配时返回空数组，不猜测。
+3. 逐能力构造规范意图，用 `matchCapability` 判定；
+4. 无匹配返回空数组，不猜测。
 
-识别结果只是**建议**，导入时必须由运营勾选确认；不做静默上架。
+识别结果只作建议，导入时必须由运营勾选确认。
 
-### 6.2 导入时一次完成上架
+### 5.2 导入即绑定
 
 `POST /admin/channels/:id/models/import` 请求体扩展：
 
@@ -202,7 +262,7 @@ route.weight   = source.weight ?? 100
 {
   models: string[];
   config?: unknown;
-  /** 商品键 → 允许承接的能力 id；缺省 = 只建商品，不上架 */
+  /** 商品键 → 能力 id 列表；缺省 = 只建商品，不绑定 */
   capabilitiesByModel?: Record<string, string[]>;
 }
 ```
@@ -210,19 +270,13 @@ route.weight   = source.weight ?? 100
 处理顺序：
 
 1. 按现有逻辑建商品，套用渠道默认商品配置；
-2. 对每个勾选能力，找该能力未归档且 `routeMode='auto'` 的前台模型：
-   - 不存在 → 创建 `auto-<能力 id>`（名称取能力定义），`pricePolicy='channel'`，按能力定义生成能力合同；
-   - 存在但为 `manual` → 跳过并返回 `skippedReason='该能力使用手工售卖配置'`，由运营在该能力页切换模式；
-   - 存在但已归档 → 不复活，返回 `skippedReason`；
-3. 写入 `LogicalModelSource`，若商品未定价则不写入，返回 `skippedReason='待定价'`；
-4. 同步线路并失效目录；
-5. 返回每个商品的 `linkedCapabilities` 与 `skippedReason`。
+2. 为每个能力写 `CapabilityModelBinding`（已存在则跳过，保留原 `priority` / `weight`）；
+3. 能力首次获得绑定且无 `CapabilityPricing` 时，固定价能力用能力定义的 `creditCost` 建默认固定价；Token 计费能力不建默认价，标「待定价」且不进入可售目录；
+4. 失效目录并返回每个商品的 `boundCapabilities` 与 `skippedReason`。
 
-自动创建的前台模型只有在**至少一条来源已定价且能力合同可承接**时才 `enabled=true`；否则建成停用，后台显示待完成原因。
+固定价能力缺少定价行时使用 `creditCost` 默认价；Token 计费能力在配置 `CapabilityPricing` 前不可售，后台标「待定价」，不静默按固定价收款。
 
-### 6.3 商品台账的上架动作
-
-已存在的商品补上架：
+### 5.3 商品台账批量绑定
 
 `POST /admin/channel-models/:id/publish`
 
@@ -230,204 +284,228 @@ route.weight   = source.weight ?? 100
 { capabilities: string[] }
 ```
 
-语义与导入一致：补来源、必要时创建自动前台模型、同步线路。返回每个能力的成功 / 跳过原因。商品台账增加「可售能力」列与「上架到能力」动作；未定价商品直接禁用该动作并提示先补售价。
+商品台账增加「可售能力」列与「绑定到能力」动作；已绑定的能力不可重复添加。支持多选商品后批量绑定到同一能力。
 
-### 6.4 能力合同的生成
+## 6. 选路与自动切换
 
-服务端新增纯函数 `buildAutoProductSpec(capabilityId, sourceSpecs)`（落在 `backend/src/model/intent/capability-spec.ts`）：
+### 6.1 候选池
 
-- 起点是能力定义声明的产出模态、操作与默认参数；
-- 图片能力从来源规格取**交集**作为可展示参数（复用 `effectiveImageParameterSpec`）；
-- 至少有一条来源无法覆盖时，不把该来源放进这个能力的池子，并记录原因；
-- 生成结果仍走现有 `validateProductSpecWithinRoutes` 校验，不允许自动路径绕过合同。
+一次解析的候选池来自 `capability-catalog`：
 
-## 7. 选路与自动切换
+1. 能力启用且未下线；
+2. 绑定启用；
+3. 商品与渠道启用、未删除；
+4. 本轮未尝试（故障切换的已试集合）；
+5. 未冷却（`RouteHealthService` 三键）；
+6. 分组可见（`UserGroupChannel`）；
+7. `matchCapability` 通过（含用户本次参数）。
 
-### 7.1 候选池
+不再要求「价格档命中」：售价在能力级，成本档缺失不阻塞执行。
 
-自动模式与手工模式共用过滤条件：
+### 6.2 排序
 
-1. 线路启用、`weight > 0`；
-2. 本轮未尝试（故障切换的已试集合）；
-3. 未冷却（`RouteHealthService` 三键）；
-4. 分组可见；
-5. `matchCapability` 通过；
-6. `pricePolicy='channel'` 时有命中价格档。
+按以下键升序分层，只保留最优一层（`groupRank` 与 `effectivePriority` 都相同），同层按 `weight` 加权随机：
 
-自动模式与手工模式的差异只有优先级：
+```
+1. groupRank：所选 modelKey = 0；同能力其它分组 = 1
+2. effectivePriority = healthTier(channelModel) * 1000 + binding.priority
+```
 
-| 模式 | 有效优先级 |
+- `groupRank` 保证用户选了哪个模型就先走哪个模型的线路；
+- 该分组全部线路失败后，才允许跨模型兜底到同能力的其它分组（`groupRank=1`）；
+- `healthTier` 让 24h 成功率低的线路自动下沉，且优先级高于手工分层；
+- `binding.priority` 只在同一健康层内决定先后，不能把坏线路顶到健康线路之前；
+- 商品 `sortOrder` 只用于后台展示与分组展示名的稳定选择，不参与选路分层。
+
+### 6.3 健康分层
+
+| 条件（近 24h 终态样本） | `healthTier` |
 | --- | --- |
-| `manual` | `route.priority`（现有行为，最高一层优先） |
-| `auto` | `route.priority + healthTier(route.channelModel)` |
-
-`healthTier`：
-
-| 条件（近 24h 终态样本） | 分层 |
-| --- | --- |
-| 冷却中 | 已在候选池剔除，不参与分层 |
-| 样本 < 5（含无样本） | 0（不惩罚新线路） |
+| 冷却中 | 已在候选池剔除 |
+| 样本 < 5（含无样本） | 0 |
 | 成功率 ≥ 90% | 0 |
 | 50% ≤ 成功率 < 90% | 1 |
 | 成功率 < 50% | 2 |
 
-同层仍按 `weight` 加权随机，权重默认 100；运营可以用来源的 `priority` 把某条线路整体上移或下移，但健康分层会在此基础上继续生效。
+新增 `RouteScoreService`：进程内缓存 `channelModelId → healthTier`，TTL 30 秒，数据来自 `ChannelModelMetricsService` 的 24h 聚合；读取失败返回 0。
 
-### 7.2 健康分层的读取
-
-新增 `RouteScoreService`：
-
-- 进程内缓存 `channelModelId → healthTier`，TTL 30 秒；
-- 数据来自 `ChannelModelMetricsService` 的 24h 聚合，不新增表；
-- 读取失败一律返回 0（不要把数据库抖动放大成「全部线路降级」）；
-- 进程内冷却由现有 `RouteHealthService` 判定，不走这层缓存。
-
-### 7.3 自动切换
+### 6.4 自动切换
 
 复用现有 `switchRoute`：
 
-1. 安全失败（`rejected_no_job`）后，把已试 `routeId` 加入排除集；
-2. `router.resolve` 重新选路，自动池里的下一条模型 / 下一条渠道自然成为候选；
-3. `pricePolicy='channel'` 时生成替换账单，原账单标记 `refundReason='route_switch'`；
-4. 新线路仍失败则继续，全部失败落 `42204` 并退款；
-5. 超时、5xx、建连后中断仍落 `42206`，不切线、不退款。
+1. `rejected_no_job` 后把已试 `channelModelId` 加入排除集；
+2. 重新解析候选池，先在同分组换线路，再跨分组兜底；
+3. 新线路仍失败继续，全部失败落 `42204` 并全额退款；
+4. 超时、5xx、建连后中断落 `42206`，不切线、不退款；
+5. `routeRun` 只在用户手动重试时 `+1`。
 
-自动模式不改变「一次任务只沿一个方向切换」的语义，也不扩大失败判定。
+因为售价在能力级，切线**不重建账单、不改金额**；只更新任务与账单上的最终供应快照（`channelModelId` / `channelId` / 成本档），并在 `RouteAttempt` 里逐次记录真实线路与成本。
 
-### 7.4 主动避让
+### 6.5 模拟
 
-健康分层在**选路时**生效，不写库、不触发目录失效：
-
-- 24h 成功率低的线路自动下沉到低优先级层；
-- 冷却中的线路直接剔除；
-- 恢复后的线路随下一次 30 秒缓存刷新回到健康层，不需要人工解除冷却。
-
-运营仍可在自动池里手工停用某个来源，立即生效（写来源后同步线路）。
-
-### 7.5 路由模拟
-
-`POST /admin/logical-models/:id/simulate` 的返回追加：
+`POST /admin/capabilities/:id/simulate` 返回：
 
 ```ts
 {
-  routeMode: 'auto' | 'manual';
-  sources: Array<{
-    channelModelId: string;
-    enabled: boolean;
-    healthTier: number;
-    effectivePriority: number;
-    weight: number;
-    eligible: boolean;
-    reason: string;
+  capabilityId: string;
+  intent: ModelRequestIntent;
+  groups: Array<{
+    modelKey: string;
+    lines: Array<{
+      channelModelId: string;
+      channelId: string;
+      channelName: string;
+      healthTier: number;
+      effectivePriority: number;
+      weight: number;
+      eligible: boolean;
+      reason: string;
+    }>;
   }>;
+  selectedChannelModelId: string;
+  selectedModelKey: string;
+  reason: string;
 }
 ```
 
-模拟与真实选路必须共用 `eligibleRoutes` / 分层函数；测试断言 `simulate.selectedRouteId` 与 `resolve` 选择一致。
+模拟与真实选路共用同一套过滤与排序函数；测试断言两者选同一条线路。
 
-## 8. 计费与价格
+## 7. 计费
 
-1. 自动创建的前台模型默认 `pricePolicy='channel'`；售价来自渠道价格档，不引入第二套价格。
-2. 换线必须换账单（现有规则）。新线路价格不同则按新价格重新预留；余额不足或超授权上限时拒绝切换并退款。
-3. C 端报价仍是当前选中线路的报价；自动切换后按实际线路结算。任务详情展示「已自动切换线路」与最终金额。
-4. 一个自动前台模型的池子里，价格档规格必须能被同一份能力合同表达；不兼容的来源在配置期就拒绝，不等到运行期报 `40001`。
-5. `unified` 策略继续可用：手建前台模型或把自动模型切到 `manual` 后改统一价；自动模式不生成统一价。
+1. 建任务时按 `CapabilityPricing` 计算并快照 `task.creditCost`，与 C 端报价同源。
+2. 预留、结算、退款仍走 `CreditWalletService` / `BillingService`，金额口径不变。
+3. 固定价模型切换线路不改金额；Token 模型按上游实际 usage × 能力级 Token 单价结算，切换线路不会把不同模型的价格混用。
+4. 成本快照：每次 `RouteAttempt` 记录该线路的成本档；`BillingOrder` 记录最终线路的成本，用于毛利分析。成本缺失时 `costConfigured=false`，不按 0 记账。
+5. 限时免费、后台覆盖价、分组倍率、货币换算全部在 `CreditPriceService` 内完成，渠道侧不再参与售价计算。
+6. 已结算账单不允许自动退款；`uncertain` 仍只能人工 `settle` / `refund`，原因必填。
 
-## 9. 接口变更
+## 8. 接口变更
 
-### 9.1 新增 / 扩展
+### 8.1 公开接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/admin/channel-models/:id/capabilities` | 兼容能力预览：规范意图逐条判定，返回可承接 / 不可承接与原因 |
-| POST | `/admin/channel-models/:id/publish` | 商品上架到能力，写来源并同步线路 |
-| GET | `/admin/logical-models/:id/sources` | 自动线路池 |
-| PUT | `/admin/logical-models/:id/sources` | 整体替换来源（仅 `routeMode='auto'`） |
-| PATCH | `/admin/logical-models/:id` | 请求体增加 `routeMode` |
-| POST | `/admin/channels/:id/models/import` | 增加 `capabilitiesByModel`，返回 `linkedCapabilities` / `skippedReason` |
-| POST | `/admin/logical-models/:id/simulate` | 返回增加 `routeMode` 与逐来源诊断 |
+| GET | `/capabilities` | 保留；每项继续带 `runtime` 与生效积分价 |
+| GET | `/models?capability=` | 返回该能力的模型分组：`modelKey / displayName / icon / billingMode / priceLabel / available` |
+| POST | `/models/quote` | 能力 + 可选模型 + 参数 → 金额与可用性 |
+| POST | `/generate` | 请求体改为 `capability` + `modelKey` + 能力参数 + 输入素材；不再接受 `logicalModelId` |
 
-### 9.2 权限
+旧的前台模型字段、`/models/available` 与 `/models/:id/quote` 直接删除，不做兼容；`/models` 路径保留，但响应从「前台模型」改为「能力下的模型分组」。`/generate` 不再接受 `logicalModelId`。
 
-沿用现有权限点，不新增：
+### 8.2 后台接口
 
-- 商品上架 / 来源写入：`channel.model_write` 与 `logical_model.write` 同时校验；
-- 能力兼容预览：`channel.model_read`；
-- 模式切换：`logical_model.write`；
-- 所有写接口在 handler 内二次校验，不能只靠前端 `can()`。
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET/PUT | `/admin/capabilities/:id/models` | 读取 / 整体替换能力绑定（`channelModelId`、`enabled`、`priority`、`weight`） |
+| POST | `/admin/capabilities/:id/simulate` | 路由模拟 |
+| GET/PUT | `/admin/capabilities/:id/pricing` | 能力定价（计费方式与四项单价） |
+| GET | `/admin/channel-models/:id/capabilities` | 商品兼容能力预览 |
+| POST | `/admin/channel-models/:id/publish` | 商品绑定到能力 |
+| POST | `/admin/channels/:id/models/import` | 增加 `capabilitiesByModel` |
+| DELETE | `/admin/logical-models/*` | 整组接口删除，不保留重定向 |
 
-## 10. 后台交互
+### 8.3 权限
 
-### 10.1 渠道工作台
+- 新增 `capability_model.read` / `capability_model.write`（能力绑定与模拟）；`capability.read/write` 继续管上下线，`capability.price` 管定价。
+- 删除 `logical_model.read/write`，同步更新角色种子与后台菜单权限映射。
+- 所有写接口在后端二次校验，前端 `can()` 只用于隐藏按钮。
 
-- 上游导入弹窗增加两列：识别模态、可承接能力（多选，默认勾选高置信项）。
-- 导入结果按商品展示「已上架到 N 个能力 / 跳过原因」。
-- 商品台账增加「可售能力」列；未定价商品显示「待定价」，并提供「上架到能力」动作。
-- 供应商详情内的商品清单不再要求先建前台模型才能售卖。
+## 9. 后台交互
 
-### 10.2 能力与模型页
+### 9.1 渠道工作台
 
-- 每个能力卡片显示当前模式（自动 / 手工）与池子健康度。
-- 自动模式：
-  - 展示来源表：商品、渠道、能力合同、健康分层、价格档、启停、优先级覆盖；
-  - 不显示自由新增线路；提供「添加来源」「停用来源」「切换为手工」；
-  - 价格策略固定 `channel` 并只读，提示去渠道商品定价。
-- 手工模式：保留现有表单、线路 priority / weight、能力合同与默认参数编辑。
-- 切换模式走 `ConfirmDialog`，说明会影响哪些任务与账单口径。
+- 上游导入弹窗增加：识别模态、可承接能力多选、`modelGroupKey`（默认取 `modelKey`，可改）。
+- 导入结果按商品展示「已绑定 N 个能力 / 跳过原因」。
+- 商品台账增加「可售能力」列与「绑定到能力」动作；支持批量绑定。
+- 商品表单移除售价字段，只保留成本档与成本摘要；毛利展示改为「能力售价 − 成本」。
 
-### 10.3 C 端
+### 9.2 能力与模型页
 
-- 目录接口不变；自动模型的价格按现有 `computeModelPriceDisplay` 展示。
-- 能力页仍按 `logicalModelId` 提交，不感知来源。
-- 任务失败自动切换后，详情展示最终线路的模型名与金额；不展示渠道与上游标识。
+页面重构为三块：
 
-## 11. 迁移
+1. **能力状态**：上下线、下线原因、当前可用模型数；
+2. **模型候选池**：该能力已绑定的商品列表，列为 商品 / 渠道 / 健康分层 / 成本 / 优先级 / 权重 / 启停；支持添加（从兼容商品里选）、移除、调优先级；
+3. **定价**：计费方式与单价，展示生效价与限时免费状态。
 
-1. 新增 `LogicalModel.routeMode` 与 `LogicalModelSource`；`prisma:push`。
-2. 存量 `LogicalModel` 全部回填 `routeMode='manual'`，行为与当前完全一致。
-3. 可选升级：后台对某个手工模型点「切换为自动」，把活跃 revision 的线路写成来源；不批量自动迁移，避免一次上线改变所有能力的流量分布。
-4. 历史任务、账单、`RouteAttempt` 不改；`routeId` 保持可回溯。
-5. 回滚：把 `routeMode` 改回 `manual`，派生线路已在库中，可直接继续手工编辑；`LogicalModelSource` 保留，不影响运行。
+删除旧的前台模型表单、revision、线路编辑、归档与 `RouteSimulateDrawer` 中依赖 `logicalModelId` 的逻辑。模拟入口改到能力级。
 
-## 12. 分期与验收
+### 9.3 导航
+
+- 后台菜单「能力与模型」保留，路由仍为 `/admin/capabilities`。
+- 删除 `pages/admin/logical-models/**` 与旧 `/admin/logical-models` 重定向。
+
+### 9.4 C 端
+
+- 模型选择器按能力请求 `GET /models?capability=`，展示分组（同一模型不因多渠道重复出现）。
+- 参数控件改为读能力定义的 `params`（`GET /capabilities`），不再从模型能力合同下发；模型能力合同只用于绑定校验与运行期匹配。
+- 记忆键从 `logicalModelId` 改为 `capabilityId + modelKey`。
+- 提交携带 `capability` + `modelKey`；报价展示能力价，切换线路不改价。
+- 任务详情展示最终线路的模型名；后台才展示渠道与成本。
+
+## 10. 迁移与删除清单
+
+### 10.1 数据迁移
+
+开发阶段不做双写与兼容；若部署环境已有需要在意的历史账单，执行前先补一份回填与只读审计脚本：
+
+1. 新增 `CapabilityModelBinding`、`CapabilityPricing`、`ChannelModel.modelGroupKey`；
+2. 任务 / 账单 / 尝试表新增 `capabilityId`、`modelKey`、`channelModelId`、`channelId`；
+3. 用现有 `LogicalModel` 的 `capability`、线路与前台模型价格回填历史行（仅用于保留可读性）；
+4. 删除 `LogicalModel*` 表与相关列；
+5. 重建种子：至少一个渠道 + 一个商品 + 一个能力绑定 + 一条能力定价。
+
+开发环境允许直接 `db:reset` 后重灌种子。
+
+### 10.2 代码删除清单
+
+| 删除 | 说明 |
+| --- | --- |
+| `src/model/catalog/logical-model.admin.service.ts`、`admin-logical-model.controller.ts` | 后台前台模型管理 |
+| `src/model/routing/router.service.ts` 中 logical model 分支 | 重写为能力选路 |
+| `src/model/catalog/route-catalog.service.ts` | 由 `capability-catalog.service.ts` 取代 |
+| `src/model/catalog/quote.service.ts` 中 logical model 报价 | 改为能力报价 |
+| `src/capabilities/capability-availability.service.ts` 的线路判定 | 改为绑定池判定 |
+| `frontend/src/pages/admin/logical-models/**` | 页面与组件 |
+| `src/model/catalog/models.controller.ts` 中旧 `/models*` | 改为新模型分组接口 |
+| `prisma` 中三张表与相关列 | 同步清理 |
+
+## 11. 分期与验收
 
 | 期 | 内容 | 验收 |
 | --- | --- | --- |
-| P0 | 数据模型、`RouteAutoSyncService`、来源 CRUD、模式切换、目录装载 `routeMode` | 单测：来源派生幂等、删除来源置停用不删行、模式切换往返、目录版本失效；存量模型保持 `manual` 行为 |
-| P1 | 能力识别、导入上架、`publish` 接口、自动前台模型创建、合同生成 | 集成：拉取 → 勾选 → 导入 → 来源与线路生成；未定价 / 手工模型 / 归档模型的跳过原因准确；无来源时不启用 |
-| P2 | `RouteScoreService`、自动模式分层、模拟诊断、自动切换验收 | 脚本：同能力两条渠道，401 切线且账单替换；超时落 `42206` 不切线；24h 低成功率线路下沉；`simulate` 与 `resolve` 同选 |
-| P3 | 渠道导入 UI、能力页自动池、商品台账上架动作、C 端文案 | e2e：配渠道 → 选模型 → 自动上架 → C 端生成 → 人为切断一条线路 → 任务成功且账单金额正确 |
-| P4 | 定时对账、文档同步、旧手工路径收口 | 5 分钟对账无差异；`docs/model-architecture.md` / `api-contract.md` / `testing.md` 更新 |
+| P0 | 数据模型、`CapabilityPricing`、`CreditPriceService.resolvePricing`、能力目录投影 | 单测：定价回退、覆盖价与限时免费、目录装载与剔除、快照失效 |
+| P1 | `CapabilityModelBinding` 写入、能力绑定接口、商品兼容预览 | 集成：绑定 / 解绑 / 冲突、兼容判定、权限 |
+| P2 | 选路重写、健康分层、自动切换、模拟 | 脚本：同能力两渠道，401 切线且金额不变；同分组失败后跨分组；超时 `42206` 不切线；低健康下沉；模拟与解析同选 |
+| P3 | 渠道导入绑定、能力与模型页重构、C 端选型与提交流程 | e2e：配渠道 → 选模型 → 绑定能力 → C 端选模型 → 生成 → 人为断线 → 成功且金额正确 |
+| P4 | 删除前台模型代码与旧接口、种子与文档同步 | 全仓无 `LogicalModel` 引用；`docs/model-architecture.md` / `api-contract.md` / `testing.md` 更新 |
 
-每期独立可运行；P0/P1 不改变 C 端流量行为。
-
-## 13. 测试
+## 12. 测试
 
 | 层 | 覆盖 |
 | --- | --- |
-| 单元 | 能力识别矩阵、合同交集、来源派生幂等、模式切换、健康分层边界（无样本 / 50% / 90%）、有效优先级 |
-| 集成 | 导入上架、来源增删、渠道停用级联、改价后目录刷新、换线换账单、余额不足拒绝切换 |
-| 契约 | `/models` 响应不变；`simulate` 新增字段；导入返回结构 |
-| 脚本 | `verify:auto-route`：本机 mock 上游跑「自动池 + 401 切线 + 超时不确定 + 低健康下沉」 |
-| e2e | 后台配置动线 + C 端生成；手工模式回归用例保持 |
+| 单元 | 能力识别矩阵、绑定兼容判定、健康分层边界、排序与分组优先、能力定价回退、成本快照 |
+| 集成 | 导入绑定、绑定增删、渠道停用级联、改价即时生效、切换线路金额不变、Token 结算 |
+| 契约 | `/models` 分组结构、`/models/quote`、`/generate` 新入参、模拟返回 |
+| 脚本 | `verify:capability-routing`：自动池 + 401 切线 + 超时不确定 + 跨分组兜底 + 低健康下沉 |
+| e2e | 后台配置动线 + C 端生成 + 任务详情线路展示 |
 
-现有 `verify:route-catalog`、`verify:task-runtime` 必须继续通过，手工模式行为不得回归。
+现有 `verify:billing` 需改写为能力定价口径；`verify:route-catalog` 由新脚本替代；`verify:task-runtime` 保留切线 / 不确定 / 唯一线路 429 三段语义。
 
-## 14. 风险与对策
+## 13. 风险与对策
 
 | 风险 | 对策 |
 | --- | --- |
-| 自动池扩大改变流量与成本分布 | 存量模型默认 `manual`；自动模式逐模型显式切换；池子变更可审计 |
-| 换线后价格与报价不一致 | 沿用换线换账单与授权上限；任务详情展示最终金额；拒绝超限切换 |
-| 能力识别误判导致错误上架 | 识别只给建议，导入必须勾选；配置期跑规范意图匹配，不合就不进池 |
-| 健康分层让新线路长期冷启动 | 无样本与样本不足按 0 层处理，不降级 |
-| 目录快照与来源不同步 | 所有写路径同步 + 5 分钟定时对账 + `invalidate()` |
-| revision 不可变语义被破坏 | 只同步活跃 revision 的线路行，不新建 revision；历史 revision 不动 |
-| 多实例健康判定不一致 | 冷却与健康分层都是进程内 30 秒缓存，各自判定；正确性不依赖共享状态 |
+| 删除前台模型导致历史任务 / 账单不可回溯 | 迁移时把 `capabilityId / modelKey / channelModelId` 回填到历史行；开发阶段允许重置 |
+| 售价改到能力级，运营失去按模型定价能力 | 明确口径：一个能力一个价；需要分级时新增独立分级价表，不恢复前台模型层 |
+| 自动跨分组兜底换到用户没选的模型 | `groupRank` 先同组；跨组只在同组全部失败后发生；任务详情明确展示最终模型 |
+| 健康分层误伤新线路 | 无样本与样本不足按 0 层 |
+| 两大页面同时重构，回归面大 | P0–P2 先落地后端与脚本，P3 才动 UI；手工模式已删除，不留双路径 |
+| 权限点改名影响既有角色 | 迁移脚本同步角色授权；后台登录冒烟 + 权限单测 |
+| 能力合同只在代码里，运营无法微调 | 能力定义是唯一合同；确需按模型收窄时在 `ChannelModel.capabilityConfigJson` 表达，并作为绑定校验输入 |
 
-## 15. 未决项
+## 14. 未决项
 
-1. 自动前台模型的命名 / code 规则是否允许运营改写；本方案取 `auto-<能力 id>`。
-2. 同一能力已存在多个手工前台模型时，是否允许一键合并为自动池；本方案先不做，只提供逐模型切换。
-3. 自动池是否需要「价格带宽」约束（例如池内售价差超过 2 倍时拒绝加入）；本方案暂不设硬限制，依靠授权上限与换线换账单兜底。
-4. 健康分层是否扩展到手工模式；本方案只在 `auto` 生效，避免改变既有灰度策略。
+1. `modelGroupKey` 的命名规则与后台可见性：默认取 `modelKey`，是否允许同组展示名不同。
+2. 能力级定价是否支持按用户分组设置不同价格档（现由分组倍率覆盖，暂不新增价表）。
+3. Token 计费能力的四项单价是否需要按模型区分（当前方案为一套能力价）。
+4. 历史账单是否需要在 P4 前保留只读前台模型字段做审计，还是直接重置开发库。

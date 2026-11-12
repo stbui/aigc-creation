@@ -1,17 +1,17 @@
 import type { RefObject } from 'react';
 
 import { DETAIL_CAPABILITY } from './api';
-import { ModelPicker, ToolSettingsPopover, ToolSubmitBar } from './components';
+import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
+import { ProductFormSection, ToolGenerationSubmitBar, ToolTypeTabs } from './components';
 import type { UploadedImage } from './hooks';
-import { DetailFormSection } from './DetailFormSection';
 import { DetailSectionPicker } from './DetailSectionPicker';
-import { DetailToolTabs } from './DetailToolTabs';
 
 /**
  * 商品详情图工作台左栏：业务类型 tab + 表单区 + 包含模块 + 提交栏。
  *
  * 表单、上传与提交的状态全部在 `page.tsx`，这里只负责左栏结构与事件转发。
- * 展示组件不持有业务状态，避免把「提交 / 扣费」逻辑分散到布局层。
+ * 商品图 + 基础字段 + 描述由共享 `ProductFormSection` 渲染，提交区由共享
+ * `ToolGenerationSubmitBar` 渲染 —— 本页只声明差异（不可提交提示）。
  */
 export interface DetailInputPaneProps {
   // ── 上传 ──
@@ -99,11 +99,13 @@ export function DetailInputPane({
   return (
     <aside className="pk-input-pane">
       <div className="pk-form-card">
-        <DetailToolTabs />
+        <ToolTypeTabs active="product-detail" />
 
         <div className="pk-form-scroll">
-          <DetailFormSection
+          <ProductFormSection
             images={images}
+            max={MAX_IMAGES}
+            maxMb={MAX_IMAGE_MB}
             uploading={uploading}
             fileInputRef={fileInputRef}
             onFiles={onFiles}
@@ -123,40 +125,31 @@ export function DetailInputPane({
             analyzing={analyzing}
             onAnalyze={onAnalyze}
             onExpandDescription={onExpandDescription}
+            maxLength={MAX_DESC_LEN}
+            descriptionRows={3}
           />
 
           <DetailSectionPicker selected={sections} onToggle={onToggleSection} />
         </div>
 
         {/* 高级设置 + 提交 (sticky 底部) */}
-        <ToolSubmitBar
-          submitting={generating}
+        <ToolGenerationSubmitBar
+          capability={DETAIL_CAPABILITY}
+          generating={generating}
           disabled={submitDisabled}
-          label="立即生成"
-          creditLabel={creditLabel ?? undefined}
+          creditLabel={creditLabel}
           hint={
             submitHint ? (
               <span className="tool-submit-notice tool-submit-notice-error">{submitHint}</span>
             ) : undefined
           }
-          settings={
-            <ToolSettingsPopover
-              open={settingsOpen}
-              onToggle={onToggleSettings}
-              resolution={resolution}
-              onResolutionChange={onResolutionChange}
-              ratio={ratio}
-              onRatioChange={onRatioChange}
-              capabilityId={DETAIL_CAPABILITY}
-              modelPicker={
-                <ModelPicker
-                  capability={DETAIL_CAPABILITY}
-                  options={{ ratio, resolution }}
-                  onQuoteChange={onModelQuoteChange}
-                />
-              }
-            />
-          }
+          settingsOpen={settingsOpen}
+          onToggleSettings={onToggleSettings}
+          ratio={ratio}
+          onRatioChange={onRatioChange}
+          resolution={resolution}
+          onResolutionChange={onResolutionChange}
+          onModelQuoteChange={onModelQuoteChange}
           onSubmit={onSubmit}
         />
       </div>

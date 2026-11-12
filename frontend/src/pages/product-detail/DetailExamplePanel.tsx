@@ -1,5 +1,7 @@
 import { memo } from 'react';
 
+import { ToolExampleCard, ToolExamplePanel, ToolExampleSource } from './components';
+
 const A = '/landing/feat';
 
 /** 三步流程: 固定文案, 与左侧表单的字段一一对应 */
@@ -39,71 +41,33 @@ const SOURCE_FACTS = [
  * public/landing/feat 的同一套沙发详情页, 不画示意图、不编造效果。
  *
  * 纯展示组件: 不读接口、不接受业务数据 —— 示例与用户数据必须分开,
- * 否则「示例」会被误认为自己的历史作品。内容全为常量, 用 memo 隔离
- * 左栏表单的按键重渲染。
+ * 否则「示例」会被误认为自己的历史作品。
  */
 function DetailExamplePanelBase() {
   return (
-    <div className="pd-demo">
-      <header className="pd-demo-intro">
-        <h3>从一张商品图，到一整套详情页</h3>
-        <p>上传素材与卖点，AI 按模块策划画面，一次生成整套可直接上架的详情图。</p>
-        <ol className="pd-demo-steps">
-          {FLOW_STEPS.map((step, i) => (
-            <li key={step.title} className="pd-demo-step">
-              <span className="pd-demo-step-no">{String(i + 1).padStart(2, '0')}</span>
-              <div>
-                <strong>{step.title}</strong>
-                <small>{step.desc}</small>
-              </div>
-            </li>
+    <ToolExamplePanel
+      title="从一张商品图，到一整套详情页"
+      description="上传素材与卖点，AI 按模块策划画面，一次生成整套可直接上架的详情图。"
+      steps={FLOW_STEPS}
+      note="示例素材用于展示流程，实际出图以模型输出为准。"
+    >
+      <ToolExampleCard step={1} title="商家产品素材 & 参数" tag="素材输入">
+        <ToolExampleSource
+          src={`${A}/top_01.png`}
+          alt="示例商品图：弧形轻奢沙发白底图"
+          caption="产品原图"
+          facts={SOURCE_FACTS}
+        />
+      </ToolExampleCard>
+
+      <ToolExampleCard step={2} title="各模块成品示例" tag="按模块出图">
+        <div className="pd-demo-slices">
+          {SECTIONS.map((section) => (
+            <img key={section.file} src={`${A}/${section.file}`} alt={section.alt} loading="lazy" />
           ))}
-        </ol>
-      </header>
-
-      <div className="pd-demo-cards">
-        <article className="pd-demo-card">
-          <header className="pd-demo-card-head">
-            <h4>
-              <i className="pd-demo-dot" aria-hidden />
-              1. 商家产品素材 &amp; 参数
-            </h4>
-            <span className="pd-demo-tag">素材输入</span>
-          </header>
-          <div className="pd-demo-source">
-            <figure className="pd-demo-shot">
-              <img src={`${A}/top_01.png`} alt="示例商品图：弧形轻奢沙发白底图" loading="lazy" />
-              <figcaption>产品原图</figcaption>
-            </figure>
-            <ul className="pd-demo-facts">
-              {SOURCE_FACTS.map((fact) => (
-                <li key={fact.label}>
-                  <strong>{fact.label}：</strong>
-                  {fact.value}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </article>
-
-        <article className="pd-demo-card">
-          <header className="pd-demo-card-head">
-            <h4>
-              <i className="pd-demo-dot" aria-hidden />
-              2. 各模块成品示例
-            </h4>
-            <span className="pd-demo-tag">按模块出图</span>
-          </header>
-          <div className="pd-demo-slices">
-            {SECTIONS.map((section) => (
-              <img key={section.file} src={`${A}/${section.file}`} alt={section.alt} loading="lazy" />
-            ))}
-          </div>
-        </article>
-      </div>
-
-      <p className="pd-demo-note">示例素材用于展示流程，实际出图以模型输出为准。</p>
-    </div>
+        </div>
+      </ToolExampleCard>
+    </ToolExamplePanel>
   );
 }
 
