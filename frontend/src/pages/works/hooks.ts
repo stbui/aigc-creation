@@ -15,6 +15,8 @@ export { useGenerateError } from '../../hooks/useGenerateError';
 export { useAuth } from '../../context/AuthContext';
 /** 路由级 SEO 元信息 */
 export { useDocumentMeta } from '../../hooks/useDocumentMeta';
+/** 大图查看器下标（越界收敛 + id→下标映射） */
+export { useLightboxIndex } from '../../hooks/useLightboxIndex';
 /** 删除 / 重试后广播余额变化 */
 export { notifyCreditsChanged } from '../../context/CreditsContext';
 /** 全局反馈 (message / modal) */

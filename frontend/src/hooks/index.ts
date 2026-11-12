@@ -15,6 +15,7 @@ export { useDocumentMeta } from './useDocumentMeta';
 export { useGenerateError } from './useGenerateError';
 export { useImageUpload, type UploadedImage } from './useImageUpload';
 export { useIsMobile } from './use-mobile';
+export { useLightboxIndex } from './useLightboxIndex';
 export { useMediaQuery } from './useMediaQuery';
 export { usePasteUpload } from './usePasteUpload';
 export { usePollAbort } from './usePollAbort';

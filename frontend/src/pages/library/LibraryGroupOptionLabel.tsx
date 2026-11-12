@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react';
-
 /** 分组选项的标签原子：名称 + 计数，两层 ToggleGroup 共用 */
-export function LibraryGroupOptionLabel({ label, count }: { label: ReactNode; count: number }) {
+export interface LibraryGroupOptionLabelProps {
+  label: string;
+  count: number;
+}
+
+export function LibraryGroupOptionLabel({ label, count }: LibraryGroupOptionLabelProps) {
   return (
     <>
       {label}

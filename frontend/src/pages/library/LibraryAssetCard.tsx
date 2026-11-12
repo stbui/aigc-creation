@@ -1,13 +1,9 @@
 import { useCallback } from 'react';
-import { Download, Eye, Sparkles, Trash2 } from 'lucide-react';
 import { assetSrc, assetThumbSrc } from './api';
 import {
   Button,
   Checkbox,
   ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
   ContextMenuTrigger,
   ResultMedia,
   StatusBadge,
@@ -17,6 +13,9 @@ import {
   modalityOfFormat,
 } from './components';
 import { useApp } from './hooks';
+import { useNearViewport } from './useNearViewport';
+import { LibraryAssetActions } from './LibraryAssetActions';
+import { LibraryAssetMenu } from './LibraryAssetMenu';
 import { capabilityName } from './utils';
 import type { Asset } from '../../types/api';
 
@@ -27,17 +26,16 @@ import type { Asset } from '../../types/api';
  * 上传原图带常驻角标；查看 / 下载 / 再来一张 / 删除在 hover、键盘聚焦和
  * 触屏环境显示。封面点开时若素材在预览器里，按下标打开整屏查看器。
  *
- * 右键菜单用 shadcn `ContextMenu`（radix）：查看大图 / 查看原图 / 下载 / 删除，
- * 与 hover 操作区同源，但触屏与精确点选更友好。删除确认走 `useApp().modal`，
- * 不再用浏览器原生 `window.confirm`。
+ * 操作区与右键菜单分别落在 `LibraryAssetActions` / `LibraryAssetMenu`，
+ * 本组件只负责封面、选中与懒加载；删除确认走 `useApp().modal`。
  */
 export interface LibraryAssetCardProps {
   asset: Asset;
   selected: boolean;
   /** 首屏前 5 张优先加载 */
   priority: boolean;
-  /** 在预览器中的下标；-1 = 视频或不参与预览 */
-  previewIndex: number;
+  /** 在大图查看器中的下标；-1 = 视频或不参与预览 */
+  lightboxIndex: number;
   onToggle: (id: string) => void;
   onPreview: (index: number) => void;
   onDownload: (asset: Asset) => void;
@@ -49,7 +47,7 @@ export function LibraryAssetCard({
   asset,
   selected,
   priority,
-  previewIndex,
+  lightboxIndex,
   onToggle,
   onPreview,
   onDownload,
@@ -60,15 +58,24 @@ export function LibraryAssetCard({
   const url = assetSrc(asset);
   const isVideo = modalityOfFormat(asset.format) === 'video';
   /*
+   * 滚动加载: 卡片接近视口才挂载媒体, 首屏前 5 张 (priority) 直接加载。
+   * 未挂载时用素材记录的宽高撑住占位高度, 避免瀑布流在滚动过程中反复跳动。
+   */
+  const [coverRef, near] = useNearViewport<HTMLDivElement>();
+  const shouldLoad = priority || near;
+  const coverRatio =
+    asset.width && asset.height ? `${asset.width} / ${asset.height}` : undefined;
+  /*
    * 网格只加载缩略图; 视频没有缩略图管线, 直接用原文件 (卡片是懒加载)。
    * 缩略图只限宽、保留原图比例 (preserveAspect)，流式布局下卡片高度随图而异，
    * 否则方形缩略图 (?w&h) 会让所有卡片等高，瀑布流退化成普通方格。
    */
   const previewUrl = isVideo ? url : assetThumbSrc(asset, 640, true) ?? url;
+  const canPreview = lightboxIndex >= 0;
 
   /** 整屏查看器：封面点开或右键「查看大图」走这里 */
   const openPreview = () => {
-    if (previewIndex >= 0) onPreview(previewIndex);
+    if (canPreview) onPreview(lightboxIndex);
     else if (url) window.open(url, '_blank', 'noopener');
   };
   /** 「查看」按钮 / 右键「查看原图」：始终打开原图地址（新标签页） */
@@ -86,13 +93,21 @@ export function LibraryAssetCard({
     });
   }, [asset.id, modal, onRemove]);
 
+  const reuse = useCallback(() => {
+    if (asset.capability) onReuse(asset.capability);
+  }, [asset.capability, onReuse]);
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <Surface className={cn('asset-library-card', selected && 'is-selected')}>
           <SurfaceContent className="asset-library-card-body p-0">
-            <div className="asset-library-cover">
-              {previewUrl && (isVideo ? (
+            <div
+              className="asset-library-cover"
+              ref={coverRef}
+              style={coverRatio ? { aspectRatio: coverRatio } : undefined}
+            >
+              {shouldLoad && previewUrl && (isVideo ? (
                 <ResultMedia
                   url={previewUrl}
                   modality="video"
@@ -116,6 +131,7 @@ export function LibraryAssetCard({
                   />
                 </Button>
               ))}
+              {!shouldLoad && <div className="asset-library-cover-placeholder" aria-hidden="true" />}
               <Checkbox
                 checked={selected}
                 onChange={() => onToggle(asset.id)}
@@ -127,74 +143,26 @@ export function LibraryAssetCard({
                   上传原图
                 </StatusBadge>
               )}
-              <div className="asset-library-hover-actions">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Eye className="size-3" />}
-                  aria-label="查看原图地址"
-                  title="查看原图（新标签页打开原图）"
-                  onClick={openOriginal}
-                >
-                  查看
-                </Button>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Download className="size-3" />}
-                  aria-label="下载素材"
-                  title="下载素材"
-                  onClick={() => onDownload(asset)}
-                >
-                  下载
-                </Button>
-                {asset.kind === 'generated' && asset.capability && (
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<Sparkles className="size-3" />}
-                    onClick={() => onReuse(asset.capability as string)}
-                  >
-                    再来一张
-                  </Button>
-                )}
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Trash2 className="size-3" />}
-                  className="asset-library-hover-delete"
-                  aria-label={`删除素材${asset.kind === 'generated' ? '及其作品记录' : ''}`}
-                  title="删除素材"
-                  onClick={confirmRemove}
-                />
-              </div>
+              <LibraryAssetActions
+                canReuse={asset.kind === 'generated' && Boolean(asset.capability)}
+                deleteLabel={`删除素材${asset.kind === 'generated' ? '及其作品记录' : ''}`}
+                onOpenOriginal={openOriginal}
+                onDownload={() => onDownload(asset)}
+                onReuse={reuse}
+                onRemove={confirmRemove}
+              />
             </div>
           </SurfaceContent>
         </Surface>
       </ContextMenuTrigger>
 
-      {/* 右键菜单：查看大图 / 查看原图 / 下载 / 删除 */}
-      <ContextMenuContent>
-        {previewIndex >= 0 && (
-          <ContextMenuItem onSelect={() => onPreview(previewIndex)}>
-            <Eye className="size-3.5" />
-            查看大图
-          </ContextMenuItem>
-        )}
-        <ContextMenuItem onSelect={openOriginal}>
-          <Eye className="size-3.5" />
-          查看原图
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onDownload(asset)}>
-          <Download className="size-3.5" />
-          下载素材
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onSelect={confirmRemove}>
-          <Trash2 className="size-3.5" />
-          删除素材
-        </ContextMenuItem>
-      </ContextMenuContent>
+      <LibraryAssetMenu
+        canPreview={canPreview}
+        onPreview={() => onPreview(lightboxIndex)}
+        onOpenOriginal={openOriginal}
+        onDownload={() => onDownload(asset)}
+        onRemove={confirmRemove}
+      />
     </ContextMenu>
   );
 }

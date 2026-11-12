@@ -1,7 +1,7 @@
 import { RefreshCw, Smartphone, Upload } from 'lucide-react';
 
 import { Button, Select } from './components';
-import { KIND_OPTIONS, type Kind } from './constants';
+import { ASSET_KIND_OPTIONS, type AssetKind } from './constants';
 
 /**
  * 素材库页头与筛选工具条。
@@ -17,11 +17,11 @@ export interface LibraryCapabilityOption {
 
 export interface LibraryToolbarProps {
   loggedIn: boolean;
-  kind: Kind;
+  assetKind: AssetKind;
   capability: string;
   capabilityOptions: LibraryCapabilityOption[];
   uploading: boolean;
-  onKindChange: (kind: Kind) => void;
+  onAssetKindChange: (assetKind: AssetKind) => void;
   onCapabilityChange: (capability: string) => void;
   onRefresh: () => void;
   onMobileUpload: () => void;
@@ -30,11 +30,11 @@ export interface LibraryToolbarProps {
 
 export function LibraryToolbar({
   loggedIn,
-  kind,
+  assetKind,
   capability,
   capabilityOptions,
   uploading,
-  onKindChange,
+  onAssetKindChange,
   onCapabilityChange,
   onRefresh,
   onMobileUpload,
@@ -48,9 +48,9 @@ export function LibraryToolbar({
       {loggedIn && (
         <div className="asset-library-header-actions">
           <Select
-            value={kind}
-            onChange={(next) => onKindChange(next as Kind)}
-            options={KIND_OPTIONS}
+            value={assetKind}
+            onChange={(next) => onAssetKindChange(next as AssetKind)}
+            options={ASSET_KIND_OPTIONS}
             aria-label="来源筛选"
             className="asset-library-date-filter"
           />
@@ -62,18 +62,15 @@ export function LibraryToolbar({
               ...capabilityOptions.map((item) => ({ value: item.id, label: item.name })),
             ]}
             aria-label="能力筛选"
-            className="asset-library-button"
           />
           <Button
             icon={<RefreshCw className="size-3.5" />}
-            className="asset-library-button"
             onClick={onRefresh}
           >
             刷新
           </Button>
           <Button
             icon={<Smartphone className="size-3.5" />}
-            className="asset-library-button"
             onClick={onMobileUpload}
           >
             手机上传
@@ -81,7 +78,6 @@ export function LibraryToolbar({
           <Button
             type="primary"
             icon={<Upload className="size-3.5" />}
-            className="asset-library-button asset-library-button-primary"
             loading={uploading}
             onClick={onUpload}
           >

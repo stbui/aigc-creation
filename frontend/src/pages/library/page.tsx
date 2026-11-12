@@ -9,16 +9,16 @@ import {
 import { LibraryMoveAssetsDialog } from './LibraryMoveAssetsDialog';
 import { LibraryProjectManagerDialog } from './LibraryProjectManagerDialog';
 import { assetsApi, assetSrc, projectsApi } from './api';
-import { useApp, useAuth, useCapabilities, useDocumentMeta, useProject } from './hooks';
+import { useApp, useAuth, useCapabilities, useDocumentMeta, useLightboxIndex, useProject } from './hooks';
 import {
-  DEFAULT_KIND,
+  DEFAULT_ASSET_KIND,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
   PAGE_SIZE,
   SUPPORTED_IMAGE_ACCEPT,
   SUPPORTED_IMAGE_LABEL,
   type GroupBy,
-  type Kind,
+  type AssetKind,
 } from './constants';
 import {
   assetExtension,
@@ -30,6 +30,7 @@ import {
 import { useLibraryAssets } from './useLibraryAssets';
 import { useLibraryProjects } from './useLibraryProjects';
 import { useLibraryGroups } from './useLibraryGroups';
+import { useInfiniteScroll } from './useInfiniteScroll';
 import { LibraryToolbar } from './LibraryToolbar';
 import { LibraryGroupPanel } from './LibraryGroupPanel';
 import { LibraryBatchBar } from './LibraryBatchBar';
@@ -44,7 +45,8 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
  * 素材库。
  *
  * 页面只保留编排与写操作（上传 / 删除 / 下载 / 移动）；取数在
- * `useLibraryAssets.ts` / `useLibraryProjects.ts`，分组状态与可见集合在 `useLibraryGroups.ts`，
+ * `useLibraryAssets.ts` / `useLibraryProjects.ts`，分组状态与可见集合在
+ * `useLibraryGroups.ts`，滚动加载在 `useInfiniteScroll.ts`，
  * 页头 / 分组面板 / 批量条 / 状态视图 / 网格各自一个展示组件。
  * 分层约定见 `docs/frontend-module-conventions.md`。
  */
@@ -57,25 +59,23 @@ export function LibraryPage() {
   const { data: caps } = useCapabilities();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [kind, setKind] = useState<Kind>(DEFAULT_KIND);
+  const [assetKind, setAssetKind] = useState<AssetKind>(DEFAULT_ASSET_KIND);
   const [capability, setCapability] = useState('all');
-  const [visible, setVisible] = useState(PAGE_SIZE);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   /** 手机扫码上传弹窗；素材由后端直落素材库，接收后只需刷新列表 */
   const [mobileOpen, setMobileOpen] = useState(false);
   const [projectManagerOpen, setProjectManagerOpen] = useState(false);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-  /** 大图查看器下标；null = 关闭。只收录图片素材，视频继续使用原生播放器。 */
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   /*
    * 首屏数据到达后把可见条数收敛回第一页：换筛选 / 刷新后不应沿用上一轮的
    * 滚动深度，否则会一次性铺开几百张卡片。
    */
-  const resetVisible = useCallback(() => setVisible(PAGE_SIZE), []);
+  const resetVisible = useCallback(() => setVisibleCount(PAGE_SIZE), []);
   const { items, setItems, loading, error, load } = useLibraryAssets({
-    kind,
+    assetKind,
     capability,
     onLoaded: resetVisible,
   });
@@ -101,8 +101,8 @@ export function LibraryPage() {
    * 否则用户会把屏幕上看不到、无法核对的素材一起下载。
    */
   useEffect(() => {
-    setSelected([]);
-  }, [kind, capability, groupBy, groupKey]);
+    setSelectedIds([]);
+  }, [assetKind, capability, groupBy, groupKey]);
 
   /*
    * 切换分组依据时一并处理副作用：能力只存在于生成结果上，默认来源是
@@ -111,7 +111,7 @@ export function LibraryPage() {
    */
   const handleGroupByChange = (next: GroupBy) => {
     if (next === 'capability') {
-      setKind('all');
+      setAssetKind('all');
       setCapability('all');
     }
     setGroupBy(next);
@@ -125,33 +125,16 @@ export function LibraryPage() {
     else setGroupKey(key);
   };
 
-  /** 实时镜像 shown.length，避免 IntersectionObserver 回调读到过期闭包 */
-  const shownLengthRef = useRef(shown.length);
-  shownLengthRef.current = shown.length;
-
   /*
    * 滚动加载（无限滚动）。数据已全量在 items 里，这里只是按视口续加可见条数，
    * 不再发请求。哨兵距视口 400px 即预触发，体感无缝；触底后 guard 自动停手。
-   * 哨兵节点稳定，shown.length 经 ref 实时读取，故依赖为空数组。
    */
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setVisible((v) => (v < shownLengthRef.current ? v + PAGE_SIZE : v));
-        }
-      },
-      { rootMargin: '400px 0px' },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+  const sentinelRef = useInfiniteScroll(() => {
+    setVisibleCount((count) => (count < shown.length ? count + PAGE_SIZE : count));
+  });
 
   const hasActiveFilters =
-    kind !== DEFAULT_KIND || capability !== 'all' || activeGroup !== null;
+    assetKind !== DEFAULT_ASSET_KIND || capability !== 'all' || activeGroup !== null;
   const emptyState = buildEmptyStateCopy({
     loggedIn: Boolean(token),
     activeProjectName: activeProject?.name ?? null,
@@ -164,37 +147,30 @@ export function LibraryPage() {
   const lightboxItems = useMemo<LightboxItem[]>(
     () =>
       shown
-        .filter((a) => modalityOfFormat(a.format) !== 'video')
-        .flatMap((a) => {
-          const url = assetSrc(a);
+        .filter((asset) => modalityOfFormat(asset.format) !== 'video')
+        .flatMap((asset) => {
+          const url = assetSrc(asset);
           if (!url) return [];
           return [{
-            id: a.id,
+            id: asset.id,
             url,
-            alt: `${capabilityName(a.capability)} 素材`,
-            width: a.width ?? null,
-            height: a.height ?? null,
-            createdAt: a.createdAt,
+            alt: `${capabilityName(asset.capability)} 素材`,
+            width: asset.width ?? null,
+            height: asset.height ?? null,
+            createdAt: asset.createdAt,
             meta: [
-              a.kind === 'generated' ? '生成图' : '原图',
-              a.sourceTitle?.trim() || null,
-              a.capability ? capabilityName(a.capability) : null,
+              asset.kind === 'generated' ? '生成图' : '原图',
+              asset.sourceTitle?.trim() || null,
+              asset.capability ? capabilityName(asset.capability) : null,
             ].filter((value): value is string => Boolean(value)),
           }];
         }),
     [shown],
   );
 
-  // id→查看器下标：卡片渲染时 O(1) 取值，取代对每张图的全量 findIndex。
-  const lightboxIndexById = useMemo(() => new Map(lightboxItems.map((item, index) => [item.id, index])), [lightboxItems]);
-
-  // 筛选/分组切换或删除素材后，当前下标可能已失效；收敛到最近一张，列表为空则关闭。
-  useEffect(() => {
-    setPreviewIndex((prev) => {
-      if (prev === null) return null;
-      return prev < lightboxItems.length ? prev : lightboxItems.length > 0 ? lightboxItems.length - 1 : null;
-    });
-  }, [lightboxItems.length]);
+  // id→查看器下标：卡片渲染时 O(1) 取值；下标越界时收敛到最近一张，列表为空则关闭。
+  const { index: previewIndex, setIndex: setPreviewIndex, indexById: lightboxIndexById } =
+    useLightboxIndex(lightboxItems);
 
   /*
    * 上传前先自检。此前素材库只按 MIME 过滤, 于是把任意文件改名为 .png 就能
@@ -204,7 +180,7 @@ export function LibraryPage() {
    * 三道检查: 类型 / 体积 / **能否真正解码**(决定它是不是一张图片)。
    * 体积上限与工具页共用同一个常量, 不再各写一套。
    */
-  const upload = async (files: FileList | File[]) => {
+  const uploadFiles = async (files: FileList | File[]) => {
     const picked = Array.from(files);
     const list = picked.filter(isSupportedImageFile);
     if (list.length === 0) {
@@ -214,18 +190,18 @@ export function LibraryPage() {
     if (list.length < picked.length) {
       message.warning(`已忽略 ${picked.length - list.length} 个非图片文件`);
     }
-    const oversize = list.filter((f) => f.size > MAX_IMAGE_BYTES);
+    const oversize = list.filter((file) => file.size > MAX_IMAGE_BYTES);
     if (oversize.length > 0) {
-      message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
+      message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((file) => file.name).join('、')}`);
       return;
     }
     const undecodable: string[] = [];
-    for (const f of list) {
+    for (const file of list) {
       try {
-        const bitmap = await createImageBitmap(f);
+        const bitmap = await createImageBitmap(file);
         bitmap.close();
       } catch {
-        undecodable.push(f.name);
+        undecodable.push(file.name);
       }
     }
     if (undecodable.length > 0) {
@@ -235,11 +211,11 @@ export function LibraryPage() {
     setUploading(true);
     try {
       const targetProjectId = selectedProjectId ?? (await ensureProject());
-      for (const f of list) await assetsApi.upload(f, targetProjectId);
+      for (const file of list) await assetsApi.upload(file, targetProjectId);
       message.success(`已上传 ${list.length} 张素材`);
       await Promise.all([refreshProjects(), load()]);
-    } catch (e) {
-      message.error((e as Error).message || '上传失败');
+    } catch (caught) {
+      message.error((caught as Error).message || '上传失败');
     } finally {
       setUploading(false);
     }
@@ -257,39 +233,42 @@ export function LibraryPage() {
     await Promise.all([refreshProjects(), load()]);
   };
 
-  const remove = async (id: string) => {
+  const removeAsset = async (id: string) => {
     try {
-      const res = await assetsApi.remove(id);
-      setItems((prev) => prev.filter((a) => a.id !== id));
-      setSelected((prev) => prev.filter((x) => x !== id));
-      message.success(res.removedTasks > 0 ? '已删除素材及其作品记录' : '已删除素材');
+      const result = await assetsApi.remove(id);
+      setItems((prev) => prev.filter((asset) => asset.id !== id));
+      setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+      message.success(result.removedTasks > 0 ? '已删除素材及其作品记录' : '已删除素材');
       await refreshProjects();
-    } catch (e) {
-      message.error((e as Error).message || '删除失败');
+    } catch (caught) {
+      message.error((caught as Error).message || '删除失败');
     }
   };
 
-  const downloadAsset = (a: Asset) => {
-    const url = assetSrc(a);
+  const downloadAsset = (asset: Asset) => {
+    const url = assetSrc(asset);
     if (!url) return;
-    const ext = assetExtension(a.format);
-    const el = document.createElement('a');
-    el.href = url;
-    el.download = `asset-${a.id.slice(-6)}.${ext}`;
-    el.rel = 'noopener';
-    el.click();
+    const extension = assetExtension(asset.format);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `asset-${asset.id.slice(-6)}.${extension}`;
+    anchor.rel = 'noopener';
+    anchor.click();
   };
 
   const downloadSelected = () => {
-    const list = items.filter((a) => selected.includes(a.id));
-    list.forEach((a, i) => {
-      window.setTimeout(() => downloadAsset(a), i * 200);
+    const list = items.filter((asset) => selectedIds.includes(asset.id));
+    list.forEach((asset, index) => {
+      window.setTimeout(() => downloadAsset(asset), index * 200);
     });
     message.success(`已下载 ${list.length} 张素材`);
   };
 
-  const toggle = (id: string) =>
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id],
+    );
+  };
 
   const handleEmptyAction = () => {
     if (!token) {
@@ -301,7 +280,7 @@ export function LibraryPage() {
       return;
     }
     if (hasActiveFilters) {
-      setKind(DEFAULT_KIND);
+      setAssetKind(DEFAULT_ASSET_KIND);
       setCapability('all');
       setGroupKey(null);
       setProjectParam(null);
@@ -315,11 +294,11 @@ export function LibraryPage() {
       <div className="asset-library-shell">
         <LibraryToolbar
           loggedIn={Boolean(token)}
-          kind={kind}
+          assetKind={assetKind}
           capability={capability}
           capabilityOptions={caps?.items ?? []}
           uploading={uploading}
-          onKindChange={setKind}
+          onAssetKindChange={setAssetKind}
           onCapabilityChange={setCapability}
           onRefresh={() => void load()}
           onMobileUpload={() => setMobileOpen(true)}
@@ -343,19 +322,19 @@ export function LibraryPage() {
         )}
 
         {/* 批量操作条（选中后出现） */}
-        {selected.length > 0 && (
+        {selectedIds.length > 0 && (
           <LibraryBatchBar
-            count={selected.length}
+            count={selectedIds.length}
             onDownload={downloadSelected}
             onMove={() => setMoveDialogOpen(true)}
-            onClear={() => setSelected([])}
+            onClear={() => setSelectedIds([])}
           />
         )}
 
         <LibraryUploadInput
           inputRef={fileInputRef}
           accept={SUPPORTED_IMAGE_ACCEPT}
-          onSelect={(files) => void upload(files)}
+          onSelect={(files) => void uploadFiles(files)}
         />
 
         {loading ? (
@@ -372,19 +351,19 @@ export function LibraryPage() {
         ) : (
           <LibraryGrid
             assets={shown}
-            visible={visible}
-            selected={selected}
+            visibleCount={visibleCount}
+            selectedIds={selectedIds}
             lightboxIndexById={lightboxIndexById}
-            onLoadMore={() => setVisible((v) => v + PAGE_SIZE)}
-            onToggle={toggle}
+            onLoadMore={() => setVisibleCount((count) => count + PAGE_SIZE)}
+            onToggle={toggleSelected}
             onPreview={setPreviewIndex}
             onDownload={downloadAsset}
-            onRemove={(id) => void remove(id)}
+            onRemove={(id) => void removeAsset(id)}
             onReuse={(capabilityId) => navigate(toolPath(capabilityId))}
           />
         )}
 
-        {/* 无限滚动哨兵常驻：进入视口即自动加载更多（见上方 IntersectionObserver） */}
+        {/* 无限滚动哨兵常驻：进入视口即自动加载更多（见 useInfiniteScroll） */}
         <div ref={sentinelRef} className="asset-library-sentinel" aria-hidden="true" />
 
         {previewIndex !== null && lightboxItems[previewIndex] && (
@@ -431,14 +410,14 @@ export function LibraryPage() {
 
         <LibraryMoveAssetsDialog
           open={moveDialogOpen}
-          count={selected.length}
+          count={selectedIds.length}
           projects={moveTargetProjects}
           onCancel={() => setMoveDialogOpen(false)}
           onConfirm={async (projectId) => {
-            const result = await assetsApi.move(selected, projectId);
+            const result = await assetsApi.move(selectedIds, projectId);
             message.success(`已移动 ${result.moved} 个素材`);
             setMoveDialogOpen(false);
-            setSelected([]);
+            setSelectedIds([]);
             await Promise.all([refreshProjects(), load()]);
           }}
         />

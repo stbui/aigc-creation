@@ -8,6 +8,7 @@ import {
   EmptyStateHeader,
   EmptyStateMedia,
   EmptyStateTitle,
+  cn,
 } from './components';
 import type { EmptyStateCopy } from './utils';
 
@@ -16,16 +17,14 @@ import type { EmptyStateCopy } from './utils';
  *
  * 文案由 `buildEmptyStateCopy()` 按登录态 / 项目 / 筛选给出，行动由页面处理。
  */
-export function LibraryEmptyState({
-  copy,
-  primary,
-  onAction,
-}: {
+export interface LibraryEmptyStateProps {
   copy: EmptyStateCopy;
   /** 主行动（上传）为 true；「清除筛选」这类次要动作为 false */
   primary: boolean;
   onAction: () => void;
-}) {
+}
+
+export function LibraryEmptyState({ copy, primary, onAction }: LibraryEmptyStateProps) {
   return (
     <EmptyState className="asset-library-empty asset-library-state-empty">
       <EmptyStateMedia>
@@ -39,11 +38,11 @@ export function LibraryEmptyState({
         <Button
           type={primary ? 'primary' : 'default'}
           icon={primary ? <Upload className="size-3.5" /> : undefined}
-          className={
-            primary
-              ? 'asset-library-button asset-library-button-primary asset-library-empty-action'
-              : 'asset-library-button asset-library-empty-action'
-          }
+          className={cn(
+            'asset-library-button',
+            'asset-library-empty-action',
+            primary && 'asset-library-button-primary',
+          )}
           onClick={onAction}
         >
           {copy.action}

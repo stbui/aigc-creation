@@ -4,13 +4,12 @@ import { ToggleGroup } from './components';
 import type { GroupBy } from './constants';
 
 /** 分组依据切换：不分组 / 按项目 / 按能力 / 按日期 */
-export function LibraryGroupByToggle({
-  value,
-  onChange,
-}: {
+export interface LibraryGroupByToggleProps {
   value: GroupBy;
   onChange: (next: GroupBy) => void;
-}) {
+}
+
+export function LibraryGroupByToggle({ value, onChange }: LibraryGroupByToggleProps) {
   return (
     <ToggleGroup
       aria-label="素材分组方式"

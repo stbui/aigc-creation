@@ -7,17 +7,19 @@ import { LibraryGroupOptionLabel } from './LibraryGroupOptionLabel';
  *
  * 没有分组时自身不渲染（不分组 / 空库），调用方不必再判一次。
  */
+export interface LibraryGroupFilterProps {
+  groups: AssetGroup[];
+  activeGroup: string | null;
+  totalCount: number;
+  onChange: (key: string | null) => void;
+}
+
 export function LibraryGroupFilter({
   groups,
   activeGroup,
   totalCount,
   onChange,
-}: {
-  groups: AssetGroup[];
-  activeGroup: string | null;
-  totalCount: number;
-  onChange: (key: string | null) => void;
-}) {
+}: LibraryGroupFilterProps) {
   if (groups.length === 0) return null;
   return (
     <ToggleGroup

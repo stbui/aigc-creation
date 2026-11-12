@@ -199,14 +199,23 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `LibraryGroupByToggle` + `LibraryGroupFilter` + `LibraryGroupOptionLabel`
     组合）/ `LibraryBatchBar` / `LibraryLoadingState` / `LibraryErrorState` /
     `LibraryEmptyState` / `LibraryGrid`（`LibraryLoadMore`）/ `LibraryUploadInput`，
-    卡片与弹窗为 `LibraryAssetCard` / `LibraryMoveAssetsDialog` /
-    `LibraryProjectManagerDialog`；取数落 `useLibraryAssets.ts`、项目列表落
-    `useLibraryProjects.ts`、分组状态与可见集合落 `useLibraryGroups.ts`，
+    卡片与弹窗为 `LibraryAssetCard`（操作区 `LibraryAssetActions`、右键菜单
+    `LibraryAssetMenu`）/ `LibraryMoveAssetsDialog` / `LibraryProjectManagerDialog`；
+    取数落 `useLibraryAssets.ts`、项目列表落 `useLibraryProjects.ts`、分组状态与
+    可见集合落 `useLibraryGroups.ts`、滚动哨兵落 `useInfiniteScroll.ts`、卡片
+    懒加载落 `useNearViewport.ts`，大图查看器下标复用 `src/hooks/useLightboxIndex`，
     上传 / 删除 / 下载 / 移动等写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/works/__tests__/works-modules.test.ts` ——
     C 端我的作品目录（`src/pages/works` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`，切日 / 模态判定 / 下载扩展名落 `utils.ts`，
-    作品卡图片落 `WorkImage.tsx`）；
+    `src/lib` / `src/context`，切日 / 模态判定 / 下载扩展名 / 脚注时间格式化落
+    `utils.ts`，作品卡图片落 `WorkImage.tsx`；页面按板块拆成 `WorksHeader` /
+    `WorksToolbar`（由 `WorksFilterMenu` + `WorksCapabilityFilter` /
+    `WorksDateFilter` / `WorksStatusFilter` / `WorksTaskFilter` 组合）/
+    `WorksSelectionBar` / `WorksCountBar` / `WorksGrid`（`WorkCard`，浮层
+    `WorkCardActionBar` / 原子 `WorkCardAction`、占位卡 `WorkCardPlaceholder`）/
+    `WorksLoadMore` / `WorksGuestState` / `WorksEmptyState`；取数分页落
+    `useWorksTasks.ts`，筛选状态与可见列表落 `useWorksFilters.ts`，大图查看器
+    下标复用 `src/hooks/useLightboxIndex`）；
   - `frontend/src/pages/invitations/__tests__/invitations-modules.test.ts` ——
     C 端邀请页目录（`src/pages/invitations` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，邀请海报绘制与二维码配色落 `utils.ts`）；

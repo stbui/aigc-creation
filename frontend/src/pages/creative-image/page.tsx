@@ -45,34 +45,8 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
 import { useApp, Modal, Spin } from '../../ui';
 
 /**
- * 创意生图 / 自由创作工作台 —— 1:1 复刻参考站，同一套版面服务两个能力:
+ * 创意生图 / 自由创作工作台
  * `/creative-image` → creative_image，`/free-creation` → free_create。
- * 参考站对应页 https://ijihua.cn/free-creation。
- *
- * 版面数值来自参考站 computed styles 实拍 (1920×1080):
- *   布局与 product-kit/viral-clone 同构: page padding 16; layout grid 432px+1fr gap16;
- *   输入栏 432 (form-scroll gap 10, 底部 actions margin-top auto 推底); 结果栏白底 radius16
- *   上传参考图: 标题行 (从素材库导入/手机上传/计数器 0/4, 标题无必填星号 = 选填);
- *              空态 dropzone 400x160 虚线 #E5E7EF/#F2F4F7 radius8 padding16,
- *              prompt 366x126 (img 14x14 margin-bottom 20, span 14px/22 #1D2129,
- *              small 12px/20 #86909C); 有图后 ready 态: 去边框底色, thumb-grid
- *              repeat(auto-fill,80px) gap10, thumb 80x80 radius8, add-card 80x80,
- *              排序箭头 18x18 圆形 rgba(29,33,41,.66), sort-tip 11px #86909C
- *   创作提示词: label 行 (span 14px/700 #333 lh13, ::before "*" #EB5757 必填;
- *              工具按钮 12px #5546D8 h16 gap4, 组 gap12: AI润色/图片转提示词, 图标 13x13);
- *              textarea 400x80 rows8 maxlength4000 padding 5px 36px 5px 12px radius4
- *              border #E5E7EF 14px/22 #333 resize vertical + 放大编辑按钮
- *   高级设置: summary 400x34 白底 (开启时上圆角 9px 9px 6px 6px) padding 0 12px
- *             11px #687182; chip 白底 border #E4E7EF radius5 h28 padding 0 9px 11px #48505E;
- *             popover 带头部 (h2 16px/20 #292839 + close 24x24 #526077) bottom calc(100%+8px)
- *             radius16 padding 17px 16px shadow rgba(61,66,86,.2) 0 8px 24px;
- *             比例 4 列 gap10 option 84.5x39 (激活 #F1EFFF/#5D47EA);
- *             分辨率 3 列 option 116x62 (strong 13px/500, span 11px)
- *   提交区: actions flex column gap16 margin-top auto; primary 400x40 radius8 渐变
- *           (不设 secondary「重置」/「清空结果」行: 900 高视口下会溢出首屏)
- *   窄屏: section-head 显示 (span 14px/700 #333 lh13 + h1 16px/700 #333 lh22 margin-top 8);
- *         actions 变 1 列 bg #F6F7FB padding 12px 16px 0 gap8, 按钮 100% 宽
- *   结果栏: 空态 160x160 插画 + h3 14px/700 #333 + p 12px #86909C
  *
  * 结果栏展示「全部生成图」: 本页能力 (creative_image / free_create) 全部成功产出的网格,
  * 数据取自 /tasks。

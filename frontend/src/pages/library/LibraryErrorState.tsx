@@ -1,7 +1,12 @@
 import { StateError } from './components';
 
 /** 「没连上」不是「没素材」：加载失败只渲染失败态，不落空态分支 */
-export function LibraryErrorState({ detail, onRetry }: { detail: string; onRetry: () => void }) {
+export interface LibraryErrorStateProps {
+  detail: string;
+  onRetry: () => void;
+}
+
+export function LibraryErrorState({ detail, onRetry }: LibraryErrorStateProps) {
   return (
     <StateError
       title="素材加载失败"

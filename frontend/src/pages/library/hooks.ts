@@ -9,6 +9,8 @@
 export { useAuth } from '../../context/AuthContext';
 /** 路由级 SEO 元信息 */
 export { useDocumentMeta } from '../../hooks/useDocumentMeta';
+/** 大图查看器下标（越界收敛 + id→下标映射） */
+export { useLightboxIndex } from '../../hooks/useLightboxIndex';
 /** 上传前确保项目存在 */
 export { useProject } from '../../hooks/useProject';
 /** 能力清单: 能力筛选下拉的真实数据源 */

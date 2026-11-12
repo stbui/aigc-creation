@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { assetsApi } from './api';
-import type { Kind } from './constants';
+import type { AssetKind } from './constants';
 import { useAuth } from './hooks';
 import type { Asset } from '../../types/api';
 
@@ -13,13 +13,13 @@ import type { Asset } from '../../types/api';
  */
 
 export interface UseLibraryAssetsArgs {
-  kind: Kind;
+  assetKind: AssetKind;
   capability: string;
   /** 首屏数据到达后回调：页面据此把可见条数收敛回第一页（须保持引用稳定） */
   onLoaded?: () => void;
 }
 
-export function useLibraryAssets({ kind, capability, onLoaded }: UseLibraryAssetsArgs) {
+export function useLibraryAssets({ assetKind, capability, onLoaded }: UseLibraryAssetsArgs) {
   const { token } = useAuth();
   const [items, setItems] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export function useLibraryAssets({ kind, capability, onLoaded }: UseLibraryAsset
     setLoading(true);
     setError(null);
     const params = {
-      kind: kind === 'all' ? undefined : kind,
+      kind: assetKind === 'all' ? undefined : assetKind,
       capability: capability === 'all' ? undefined : capability,
       limit: 200,
     };
@@ -91,7 +91,7 @@ export function useLibraryAssets({ kind, capability, onLoaded }: UseLibraryAsset
     } catch {
       /* 已展示首屏, 后台补齐失败不打扰用户 */
     }
-  }, [kind, capability, token, onLoaded]);
+  }, [assetKind, capability, token, onLoaded]);
 
   useEffect(() => {
     void load();
