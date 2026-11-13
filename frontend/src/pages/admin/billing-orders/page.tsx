@@ -114,6 +114,24 @@ export function AdminBillingOrdersPage() {
     from: params.from as string | undefined,
     to: params.to as string | undefined,
   });
+  const appliedFilters = {
+    status: params.status as string | undefined,
+    billingMode: params.billingMode as string | undefined,
+    model: params.model as string | undefined,
+    userId: params.userId as string | undefined,
+    taskId: params.taskId as string | undefined,
+    from: params.from as string | undefined,
+    to: params.to as string | undefined,
+  };
+  const draftFilters = {
+    status,
+    billingMode,
+    model: model.trim() || undefined,
+    userId: userId.trim() || undefined,
+    taskId: taskId.trim() || undefined,
+    from: from || undefined,
+    to: to || undefined,
+  };
   const rows = data?.items ?? [];
   const statusCounts = data?.statusCounts ?? {};
 
@@ -348,15 +366,9 @@ export function AdminBillingOrdersPage() {
 
       <SavedViewBar
         pageKey="billing-orders"
-        currentFilters={{
-          status,
-          billingMode,
-          model: model || undefined,
-          userId: userId || undefined,
-          taskId: taskId || undefined,
-          from: from || undefined,
-          to: to || undefined,
-        }}
+        appliedFilters={appliedFilters}
+        draftFilters={draftFilters}
+        onApplyDraft={applyFilters}
         onApply={(next) => {
           setStatus(next.status);
           setBillingMode(next.billingMode);

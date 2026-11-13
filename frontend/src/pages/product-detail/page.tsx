@@ -1,6 +1,23 @@
-import { useCallback, useMemo, useState } from 'react';
-
-import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  imageInputCountError,
+  modelImageInputLimit,
+  type PublicModelGroup,
+  resolveModel,
+} from '../../lib/models';
+import {
+  languageOptions,
+  platformOptions,
+  ratioOptions,
+  resolutionOptions,
+} from '../../lib/optionSets';
+import { useApp } from '../../ui';
+import {
+  DETAIL_CAPABILITY,
+  removeDetailGeneration,
+  resolveModelKey,
+  startDetailGeneration,
+} from './api';
 import {
   AssetLibraryModal,
   ExpandTextModal,
@@ -8,9 +25,11 @@ import {
   ToolBatchOutputPane,
   ToolWorkflowSteps,
 } from './components';
+import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
 import { DetailExamplePanel } from './DetailExamplePanel';
 import { DetailInputPane } from './DetailInputPane';
 import {
+  type GalleryItem,
   hasActiveGalleryItems,
   notifyCreditsChanged,
   useAuth,
@@ -25,23 +44,15 @@ import {
   useResultGallery,
   useRightTab,
   useSectionSelection,
-  type GalleryItem,
 } from './hooks';
-import {
-  DETAIL_CAPABILITY,
-  removeDetailGeneration,
-  resolveModelKey,
-  startDetailGeneration,
-} from './api';
 import {
   countGenerations,
   formSnapshotOf,
   labelOf,
   platformDetailSpec,
-  sectionCaption,
   type ResultRow,
+  sectionCaption,
 } from './utils';
-import { useApp } from '../../ui';
 
 /**
  * 商品详情图工作台
@@ -55,11 +66,42 @@ export function ProductDetailPage() {
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { keyFor: idempotencyKeyFor, reset: resetIdempotencyKey } = useIdempotencyKey();
+  /*
+   * 所选模型的能力合同决定图片上限与可选画质。页面固定 5 张只是业务上限；
+   * 模型只支持 1-4 张时必须同步收窄并给出可读原因，不能等提交后才 400。
+   */
+  const [selectedModel, setSelectedModel] = useState<PublicModelGroup | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void resolveModel(DETAIL_CAPABILITY)
+      .then((model) => {
+        if (alive) setSelectedModel(model);
+      })
+      .catch(() => {
+        // 目录不可用时保留页面上限；提交时会再次解析并给出准确原因
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const modelImageMax = selectedModel ? modelImageInputLimit(selectedModel) : null;
+  const maxImages = Math.min(MAX_IMAGES, modelImageMax ?? MAX_IMAGES);
   // 上传 (三重校验 / 素材库回填 / 粘贴) 统一由 useImageUpload 处理
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, replaceImages, library, mobile } = useImageUpload({
-    max: MAX_IMAGES,
+  const {
+    images,
+    uploading,
+    fileInputRef,
+    uploadFiles,
+    removeImage,
+    replaceImages,
+    library,
+    mobile,
+  } = useImageUpload({
+    max: maxImages,
     maxMb: MAX_IMAGE_MB,
   });
+  const imageLimitError = selectedModel ? imageInputCountError(selectedModel, images.length) : null;
+  const resolutionValues = selectedModel?.capabilitySpec?.options?.imageResolution?.values ?? null;
   const {
     open: libraryOpen,
     loading: libraryLoading,
@@ -87,7 +129,7 @@ export function ProductDetailPage() {
     changeRatio,
     changeResolution,
     toggleSettings,
-    applySettings,
+    applySnapshot,
   } = useGenerationSettings({
     defaultRatio: '3:4',
     defaultResolution: '1k',
@@ -113,7 +155,8 @@ export function ProductDetailPage() {
     count: sections.length,
     freeLabel: '限时免费',
   });
-  const { blocked: capabilityBlocked, reason: capabilityReason } = useCapabilityRuntime(DETAIL_CAPABILITY);
+  const { blocked: capabilityBlocked, reason: capabilityReason } =
+    useCapabilityRuntime(DETAIL_CAPABILITY);
   // ── 右侧结果栏 ──
   //
   // 一次生成 = 服务端按模块拆出的 N 个任务 (每张各计一次费), 全部带同一个
@@ -143,18 +186,21 @@ export function ProductDetailPage() {
     [token],
   );
   // 首访落在「功能示例」, 有历史产出时自动切到「创作结果」; 用户点过页签后不再自动切换
-  const { rightTab, pick: pickRightTab, showResults } = useRightTab(
-    gallery.items.length,
-    gallery.loading,
-  );
+  const {
+    rightTab,
+    pick: pickRightTab,
+    showResults,
+  } = useRightTab(gallery.items.length, gallery.loading);
 
   const formValid = useMemo(
     () =>
+      !uploading &&
+      !imageLimitError &&
       images.length > 0 &&
       productName.trim().length > 0 &&
       description.trim().length > 0 &&
       sections.length > 0,
-    [images.length, productName, description, sections.length],
+    [uploading, imageLimitError, images.length, productName, description, sections.length],
   );
 
   // ── 生成 ──
@@ -191,19 +237,33 @@ export function ProductDetailPage() {
         ratio,
         resolution,
       };
-      // 同一次提交的网络重试复用同一个幂等键；拿到任务后再清空
-      const idempotencyKey = idempotencyKeyFor(JSON.stringify(input));
+      // 同一次提交的网络重试复用同一个幂等键；拿到任务后再清空。
+      // 指纹与实际 payload 用同一份 trim 结果，否则只改一个尾随空格就会换 key，
+      // 服务端已建好的任务会被重复创建、重复扣费。
+      const idempotencyKey = idempotencyKeyFor(
+        JSON.stringify({
+          ...input,
+          productName: productName.trim(),
+          brand: brand.trim(),
+          description: description.trim(),
+        }),
+      );
       const started = await startDetailGeneration({ ...input, idempotencyKey });
       await gallery.reload();
       // 任务已创建且列表已刷新成功；之后的主动再生成才是新批次
       resetIdempotencyKey();
       const shotCount = started.batchSize ?? 1;
-      // 金额以后端返回的合计为准：限时免费 / 后台改价时前端自己算的价会不准
-      message.success(
-        started.creditCost
-          ? `已提交 ${shotCount} 张模块图，本次扣除 ${started.creditCost} 积分`
-          : `已提交 ${shotCount} 张模块图（本次免费），生成完成后自动更新`,
-      );
+      if (started.idempotentHit) {
+        // 幂等命中没有二次扣费，不能沿用「本次扣除 X 积分」的提示
+        message.info(`已复用本次提交，未重复扣费（${shotCount} 张模块图）`);
+      } else {
+        // 金额以后端返回的合计为准：限时免费 / 后台改价时前端自己算的价会不准
+        message.success(
+          started.creditCost
+            ? `已提交 ${shotCount} 张模块图，本次扣除 ${started.creditCost} 积分`
+            : `已提交 ${shotCount} 张模块图（本次免费），生成完成后自动更新`,
+        );
+      }
     } catch (e) {
       reportError(e);
     } finally {
@@ -218,10 +278,17 @@ export function ProductDetailPage() {
    */
   const deleteRow = useCallback(
     (items: GalleryItem[]) => {
-      const parent = items.find((item) => Number(item.params?.batchIndex) === 1) ?? items[0];
-      if (!parent) return;
+      /*
+       * 后端只按父任务级联删除整批；拿不到 batchIndex=1 时不能随便挑一张
+       * 子任务去删 —— 那会只删掉一格，界面却把整行移除。
+       */
+      const parent = items.find((item) => Number(item.params?.batchIndex) === 1);
+      if (!parent) {
+        message.error('未找到这次生成的首张图，请刷新后重试');
+        return;
+      }
       modal.confirm({
-        title: `删除这次生成的 ${items.length} 张图？`,
+        title: '删除这次生成的全部图片？',
         content: '生成图与本地文件会一并删除，不可恢复。',
         okText: '删除',
         okButtonProps: { danger: true },
@@ -256,10 +323,30 @@ export function ProductDetailPage() {
       setProductName(snapshot.productName);
       setBrand(snapshot.brand);
       setDescription(snapshot.description);
-      // 旧任务可能缺这些参数: 缺省时保留当前值，避免把下拉框清空成空串
-      if (snapshot.platform) changePlatform(snapshot.platform);
-      if (snapshot.language) setLanguage(snapshot.language);
-      applySettings({ ratio: snapshot.ratio, resolution: snapshot.resolution });
+      /*
+       * 历史任务的枚举值必须按当前能力校验后再回填：平台 / 语言下架、
+       * 比例或画质档位调整后，原样写回会在提交时 400。缺省或已失效的
+       * 字段保留当前值，不能把下拉框清空成空串。
+       */
+      const hasOption = (options: Array<{ value: string | number }>, value?: string) =>
+        Boolean(value) && options.some((option) => String(option.value) === value);
+      const platform = hasOption(platformOptions(), snapshot.platform)
+        ? snapshot.platform
+        : undefined;
+      const language = hasOption(languageOptions(), snapshot.language)
+        ? snapshot.language
+        : undefined;
+      const ratio = hasOption(ratioOptions(DETAIL_CAPABILITY), snapshot.ratio)
+        ? snapshot.ratio
+        : undefined;
+      const resolutionOption = resolutionOptions(DETAIL_CAPABILITY).find(
+        (option) => String(option.value) === snapshot.resolution,
+      );
+      const resolution =
+        resolutionOption && !resolutionOption.disabled ? snapshot.resolution : undefined;
+
+      applySnapshot({ platform, ratio, resolution });
+      if (language) setLanguage(language);
       if (snapshot.sections.length > 0) applySelection(snapshot.sections);
       if (snapshot.images.length > 0) {
         replaceImages(snapshot.images);
@@ -268,16 +355,21 @@ export function ProductDetailPage() {
         message.warning('原图已不可用，已带入文字参数，请重新上传商品图');
       }
     },
-    [applySettings, applySelection, changePlatform, replaceImages, message],
+    [applySnapshot, applySelection, replaceImages, message],
   );
 
   const canSubmit = formValid && !(token && capabilityBlocked);
+  // 通道不可用时挂 guestLabel 会让按钮写成「登录后生成…」—— 登录也解决不了，
+  // 保持禁用态与真实原因更重要。
+  const guestLabel = capabilityBlocked ? undefined : '登录后生成商品详情图';
 
   return (
     <div className="pk-workspace">
       {/* ── 左: 输入栏 ── */}
       <DetailInputPane
         images={images}
+        max={maxImages}
+        limitError={imageLimitError}
         uploading={uploading}
         fileInputRef={fileInputRef}
         onFiles={(f) => void uploadFiles(f)}
@@ -305,8 +397,11 @@ export function ProductDetailPage() {
         onRatioChange={changeRatio}
         resolution={resolution}
         onResolutionChange={changeResolution}
+        resolutionValues={resolutionValues}
         onModelQuoteChange={onModelQuoteChange}
+        onModelChange={setSelectedModel}
         generating={generating}
+        guestLabel={guestLabel}
         submitDisabled={!canSubmit}
         submitHint={capabilityBlocked && token && capabilityReason ? capabilityReason : undefined}
         creditLabel={creditLabel}
@@ -344,7 +439,11 @@ export function ProductDetailPage() {
       />
 
       {/* 手机上传弹窗 (二维码方案) */}
-      <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
+      <MobileUploadModal
+        open={mobile.open}
+        onReceived={mobile.addAssets}
+        onCancel={mobile.closeMobile}
+      />
 
       {/* 商品描述放大编辑 */}
       <ExpandTextModal

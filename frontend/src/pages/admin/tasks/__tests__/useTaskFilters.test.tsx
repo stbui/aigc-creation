@@ -105,6 +105,26 @@ describe('useTaskFilters', () => {
     });
   });
 
+  it('已生效筛选不跟草稿变化，应用视图后草稿、已生效筛选与回显同步', async () => {
+    const { result } = renderHook(() => useTaskFilters(), { wrapper: TestWrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => result.current.setStatus('failed'));
+    expect(result.current.appliedFilters.status).toBeUndefined();
+    expect(result.current.draftFilters.status).toBe('failed');
+    expect(result.current.hasFilter).toBe(false);
+
+    act(() => result.current.applyView({ status: 'running' }));
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+
+    expect(result.current.appliedFilters.status).toBe('running');
+    expect(result.current.draftFilters.status).toBe('running');
+    expect(result.current.hasFilter).toBe(true);
+    expect(result.current.appliedChips).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'status', label: '状态：执行中' })]),
+    );
+  });
+
   it('深链筛选会进入首次请求', async () => {
     function DeepLinkWrapper({ children }: PropsWithChildren) {
       return (

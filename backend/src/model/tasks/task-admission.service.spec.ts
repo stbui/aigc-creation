@@ -19,8 +19,7 @@ describe('TaskAdmissionService 输入素材归属', () => {
       asset: { findMany: vi.fn().mockResolvedValue(assets) },
     };
     const membership = {
-      checkConcurrency: vi.fn().mockResolvedValue({ current: 0, limit: 0 }),
-      perksOf: vi.fn().mockResolvedValue({ fastChannel: false }),
+      perksOf: vi.fn().mockResolvedValue({ fastChannel: false, maxConcurrent: 10, addonDiscountBps: 10000 }),
     };
     const availability = { runtimeOf: vi.fn().mockResolvedValue(undefined) };
     const router = {
@@ -176,8 +175,7 @@ describe('TaskAdmissionService 商品主图自定义配置拆单', () => {
       $transaction: vi.fn(async (run: (client: typeof tx) => Promise<string[]>) => run(tx)),
     };
     const membership = {
-      checkConcurrency: vi.fn().mockResolvedValue({ current: 0, limit: 0 }),
-      perksOf: vi.fn().mockResolvedValue({ fastChannel: false }),
+      perksOf: vi.fn().mockResolvedValue({ fastChannel: false, maxConcurrent: 10, addonDiscountBps: 10000 }),
     };
     const availability = { runtimeOf: vi.fn().mockResolvedValue(undefined) };
     const price = { freeCampaignIdOf: vi.fn().mockResolvedValue(undefined) };
@@ -219,11 +217,11 @@ describe('TaskAdmissionService 商品主图自定义配置拆单', () => {
       promptTools as never,
     );
 
-    return { service, prisma, billing, createdTasks, updatedTasks, membership };
+    return { service, prisma, billing, createdTasks, updatedTasks };
   }
 
   it('6 张配置创建 6 个独立任务并各预留一份积分', async () => {
-    const { service, billing, createdTasks, updatedTasks, membership } = setup();
+    const { service, billing, createdTasks, updatedTasks } = setup();
 
     const result = await service.admit({
       ownerId: 'user-1',
@@ -245,11 +243,8 @@ describe('TaskAdmissionService 商品主图自定义配置拆单', () => {
     });
 
     expect(createdTasks).toHaveLength(VARIANTS.length);
-    // 并发按张占位：一次提交 6 张，事务外与事务内两次校验都要带上本次任务数。
-    expect(membership.checkConcurrency.mock.calls.map((call) => call[3])).toEqual([
-      VARIANTS.length,
-      VARIANTS.length,
-    ]);
+    // 并发上限随任务快照落库，由 worker 领取时按张分批；提交阶段不拒绝。
+    expect(JSON.parse(createdTasks[0].data.params).__memberConcurrency).toBe(10);
     const taskParams = createdTasks.map(({ data }) => JSON.parse(data.params));
     for (const params of taskParams) {
       expect(params).toMatchObject({
@@ -298,5 +293,32 @@ describe('TaskAdmissionService 商品主图自定义配置拆单', () => {
       idempotentHit: false,
       batchSize: VARIANTS.length,
     });
+  });
+
+  it('20 张超过套餐并发 10 也不在提交阶段拒绝，由 worker 分批执行', async () => {
+    const { service, createdTasks } = setup();
+    const variants = Array.from({ length: 20 }, () => 'scene').join(',');
+
+    const result = await service.admit({
+      ownerId: 'user-1',
+      dto: {
+        projectId: 'project-1',
+        capability: 'main_image',
+        modelKey: 'model-main-image',
+        inputAssetIds: ['asset-1'],
+        params: {
+          productName: '轻音桌面循环扇',
+          description: '三档风速，低噪运行，USB 供电',
+          platform: 'taobao',
+          language: 'zh-CN',
+          ratio: '1:1',
+          size: '1k',
+          variants,
+        },
+      },
+    });
+
+    expect(createdTasks).toHaveLength(20);
+    expect(result.batchSize).toBe(20);
   });
 });

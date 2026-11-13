@@ -20,7 +20,7 @@ function setup() {
   };
   const billing = {
     settle: vi.fn().mockResolvedValue({}),
-    refund: vi.fn().mockResolvedValue({}),
+    refund: vi.fn().mockResolvedValue(true),
     markUncertain: vi.fn().mockResolvedValue(undefined),
   };
   const notifications = { notify: vi.fn().mockResolvedValue(undefined) };
@@ -59,7 +59,10 @@ describe('TaskLifecycleService 取消竞态', () => {
     expect(prisma.generationTask.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
       prisma.routeAttempt.findFirst.mock.invocationCallOrder[0],
     );
-    expect(billing.markUncertain).toHaveBeenCalledWith('order-1', expect.stringContaining('后台终止'));
+    expect(billing.markUncertain).toHaveBeenCalledWith(
+      'order-1',
+      expect.stringContaining('后台终止'),
+    );
     expect(billing.refund).not.toHaveBeenCalled();
   });
 
@@ -93,7 +96,10 @@ describe('TaskLifecycleService 取消竞态', () => {
       status: 'cancelled',
       billing: 'uncertain',
     });
-    expect(billing.markUncertain).toHaveBeenCalledWith('order-1', expect.stringContaining('后台终止'));
+    expect(billing.markUncertain).toHaveBeenCalledWith(
+      'order-1',
+      expect.stringContaining('后台终止'),
+    );
     expect(billing.refund).not.toHaveBeenCalled();
   });
 });
@@ -111,11 +117,7 @@ describe('TaskLifecycleService 失败退款', () => {
       }),
     ).resolves.toBe(true);
 
-    expect(billing.refund).toHaveBeenCalledWith(
-      'order-1',
-      '建连前网络失败且无下一线路',
-      'failure',
-    );
+    expect(billing.refund).toHaveBeenCalledWith('order-1', '建连前网络失败且无下一线路', 'failure');
     expect(billing.markUncertain).not.toHaveBeenCalled();
   });
 
@@ -157,6 +159,59 @@ describe('TaskLifecycleService 失败退款', () => {
         fallbackBody: expect.stringContaining('6 积分已退回'),
       }),
     );
+  });
+
+  it('非首张模块独立失败也要通知，不因 parentTaskId 静默退款', async () => {
+    const { service, prisma, notifications } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue({
+      ...runningTask,
+      parentTaskId: 'parent-1',
+    });
+    prisma.billingOrder.findMany.mockResolvedValue([{ id: 'billing-order-child' }]);
+    prisma.creditLedgerEntry.aggregate.mockResolvedValue({
+      _sum: { availableDeltaMicrocredits: 10_000_000n },
+    });
+
+    await service.fail('task-1', {
+      errorCode: '42201',
+      errorMessage: '模块生成失败',
+      reason: 'generation_failed',
+    });
+
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vars: expect.objectContaining({ credits: 10 }),
+      }),
+    );
+  });
+
+  it('一张失败不再连坐取消同批其它模块', async () => {
+    const { service, prisma } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue(runningTask);
+
+    await service.fail('task-1', {
+      errorCode: '42201',
+      errorMessage: '生成失败',
+      reason: 'generation_failed',
+    });
+
+    // 只有后台显式终止（cancel）才读取并取消子任务
+    expect(prisma.generationTask.findMany).not.toHaveBeenCalled();
+  });
+
+  it('退款失败时取消结果不能谎报已退款', async () => {
+    const { service, prisma, billing } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue(runningTask);
+    prisma.routeAttempt.findFirst.mockResolvedValue({
+      status: 'selected',
+      dispatchState: 'not_sent',
+    });
+    billing.refund.mockRejectedValue(new Error('钱包结算失败'));
+
+    await expect(service.cancel('task-1', '后台终止')).resolves.toEqual({
+      status: 'cancelled',
+      billing: 'uncertain',
+    });
   });
 
   it('净可用增量为 0 时明确说明过期作废，不宣称原额退回', async () => {
@@ -238,7 +293,9 @@ describe('TaskLifecycleService 取消后的派发结果收敛', () => {
       { status: 'dispatching', dispatchState: 'submission_unknown' },
     ]);
 
-    await expect(service.reconcileCancelledTask('task-1', 'generation_failed')).resolves.toBe(false);
+    await expect(service.reconcileCancelledTask('task-1', 'generation_failed')).resolves.toBe(
+      false,
+    );
 
     expect(billing.refund).not.toHaveBeenCalled();
     expect(billing.markUncertain).not.toHaveBeenCalled();

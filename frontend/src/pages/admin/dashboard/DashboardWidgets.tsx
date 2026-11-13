@@ -18,9 +18,9 @@ import { QUEUE_LIMIT, hhmm, queueTime, yuan } from './utils';
 /** 小节副标题：标题 + 口径说明 */
 export function Subhead({ title, note }: { title: string; note?: string }) {
   return (
-    <div className="mb-2.5 flex items-baseline gap-2 text-xs font-semibold text-foreground">
+    <div className="mb-2.5 flex items-baseline gap-2 text-[13px] font-semibold text-foreground">
       <span>{title}</span>
-      {note && <span className="text-[12px] font-normal text-muted-foreground">{note}</span>}
+      {note && <span className="text-[13px] font-normal text-muted-foreground">{note}</span>}
     </div>
   );
 }
@@ -47,7 +47,7 @@ export function MeterRow({
   tone?: 'brand' | 'danger';
 }) {
   return (
-    <div className="grid grid-cols-[minmax(96px,160px)_minmax(120px,1fr)_auto] items-center gap-2.5 text-xs">
+    <div className="grid grid-cols-[minmax(96px,160px)_minmax(120px,1fr)_auto] items-center gap-2.5 text-[13px]">
       <span className="truncate text-muted-foreground" title={title ?? label}>
         {label}
       </span>
@@ -100,7 +100,7 @@ export function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: b
                 {String(i + 1).padStart(2, '0')}
               </span>
               <span className="flex min-w-0 flex-col gap-px">
-                <span className="overflow-hidden text-[13px] leading-[18px] font-semibold text-ellipsis whitespace-nowrap text-foreground">
+                <span className="overflow-hidden text-sm leading-[18px] font-semibold text-ellipsis whitespace-nowrap text-foreground">
                   {/* 状态点先于文字：一列红点让「这是异常」在扫视时成立 */}
                   <span
                     className="mr-1.5 inline-block size-[5px] rounded-full bg-danger-text align-[2px]"
@@ -108,7 +108,7 @@ export function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: b
                   />
                   {t.capabilityName}
                 </span>
-                <span className="overflow-hidden text-[12px] leading-4 text-ellipsis whitespace-nowrap text-muted-foreground">
+                <span className="overflow-hidden text-[13px] leading-5 text-ellipsis whitespace-nowrap text-muted-foreground">
                   {/* 错误码放在原因前面：排障时先拿码去查日志 */}
                   {t.errorCode ? `${t.errorCode} · ` : ''}
                   {taskErrorLabel(t.errorCode)}
@@ -127,7 +127,7 @@ export function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: b
         ))}
       </ol>
       {failures.length > shown.length && (
-        <p className="mt-2.5 border-t border-border pt-2.5 text-[12px]">
+        <p className="mt-2.5 border-t border-border pt-2.5 text-[13px]">
           <Link className="text-brand hover:underline" to="/admin/tasks?status=failed">
             另有 {failures.length - shown.length} 条失败任务 →
           </Link>
@@ -158,7 +158,7 @@ export function MachineStats({ tasks }: { tasks: DutyTask[] }) {
       <div className="min-w-0">
         {/* 「近期」是要紧的限定：下面还有一条近 N 天的成功率，不区分会被读成打架 */}
         <dt
-          className="mb-0.5 overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground"
+          className="mb-0.5 overflow-hidden text-[13px] text-ellipsis whitespace-nowrap text-muted-foreground"
           title={`最近 ${tasks.length} 条任务中的已结算项`}
         >
           近期成功率
@@ -174,7 +174,7 @@ export function MachineStats({ tasks }: { tasks: DutyTask[] }) {
         </dd>
       </div>
       <div className="min-w-0">
-        <dt className="mb-0.5 overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground">
+        <dt className="mb-0.5 overflow-hidden text-[13px] text-ellipsis whitespace-nowrap text-muted-foreground">
           中位耗时
         </dt>
         <dd className="text-base leading-5 font-semibold tracking-tight text-foreground">
@@ -182,7 +182,7 @@ export function MachineStats({ tasks }: { tasks: DutyTask[] }) {
         </dd>
       </div>
       <div className="min-w-0">
-        <dt className="mb-0.5 overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground">
+        <dt className="mb-0.5 overflow-hidden text-[13px] text-ellipsis whitespace-nowrap text-muted-foreground">
           样本
         </dt>
         <dd className="text-base leading-5 font-semibold tracking-tight text-foreground">
@@ -210,14 +210,14 @@ export function OrderQueue({ orders, loading }: { orders: AdminOrderRow[]; loadi
               {String(i + 1).padStart(2, '0')}
             </span>
             <span className="flex min-w-0 flex-col gap-px">
-              <span className="overflow-hidden text-[13px] leading-[18px] font-semibold text-ellipsis whitespace-nowrap text-foreground">
+              <span className="overflow-hidden text-sm leading-[18px] font-semibold text-ellipsis whitespace-nowrap text-foreground">
                 {o.orderNo}
               </span>
-              <span className="overflow-hidden text-[12px] leading-4 text-ellipsis whitespace-nowrap text-muted-foreground">
+              <span className="overflow-hidden text-[13px] leading-5 text-ellipsis whitespace-nowrap text-muted-foreground">
                 {o.userEmail}
               </span>
             </span>
-            <span className="text-[12.5px] font-semibold text-foreground">
+            <span className="text-[13px] font-semibold text-foreground">
               ¥{yuan(o.totalCents, 0)}
             </span>
             <span
@@ -270,7 +270,7 @@ export function FinanceGrid({
     <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5">
       {items.map((item) => (
         <div key={item.label} className="min-w-0">
-          <dt className="mb-0.5 overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground">
+          <dt className="mb-0.5 overflow-hidden text-[13px] text-ellipsis whitespace-nowrap text-muted-foreground">
             {item.label}
           </dt>
           <dd

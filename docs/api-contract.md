@@ -61,7 +61,7 @@
 | GET | `/api/v1/assets` | 素材库列表（`kind`/`capability`/`limit`/`offset`） |
 | PATCH | `/api/v1/assets/move` | 批量移动素材到另一项目（`{ ids: string[], projectId }`，≤100），返回 `{ moved, missing, projectId }`；只改素材分组，不动任务归属 |
 | DELETE | `/api/v1/assets/:id` | 删除素材（生成图连带删除产出它的任务） |
-| POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`capability` 与 `modelKey` 必填（模型分组键来自 `/models?capability=`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前为商品详情图与 AI 带货图文）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
+| POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`capability` 与 `modelKey` 必填（模型分组键来自 `/models?capability=`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前为商品主图、商品详情图与 AI 带货图文）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
 | GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图；`errorCode` 取 `42201`–`42206` |
 | GET | `/api/v1/tasks` | 任务列表（含 `outputAsset`，历史页缩略图依赖它） |
 | GET | `/api/v1/tasks/page` | 任务列表分页（`projectId` / `capability` / `excludeFailed` / `limit` / `offset`），返回 `{ items, total, limit, offset }`；`excludeFailed=1` 时列表与总数都排除失败任务。**必须注册在 `/tasks/:id` 之前**，否则 `page` 会被当成 id |
@@ -192,7 +192,7 @@
 
 #### 交易与发票处置约束
 
-- **账单人工核对只处理可核对项**：列表和详情返回同一口径的 `reviewable`；任务仍在执行、已有作品或正在补交付的账单不得处置。`reason` 必填，批量操作每次共享同一个 `reviewBatchId`，但每条账单仍独立事务处置。
+- **账单人工核对只处理可核对项**：列表和详情返回同一口径的 `reviewable`（结算或退款任一可用即为真）；任务仍在执行、正在补交付的账单不得处置；已交付作品的账单只能 `settle`，不能 `refund`。`reason` 必填，批量操作每次共享同一个 `reviewBatchId`，但每条账单仍独立事务处置。
 - **异步退款不能提前销账**：`processing` 退款单在人工确认前不改订单金额、状态和积分。确认失败只把退款单置为 `failed` 并保留渠道证据；确认成功与同步退款复用同一原子记账路径。
 - **发票历史不可覆盖**：订单与发票是一对多；驳回后可重新申请，旧记录仍保留。已开具发票可登记 `red_flushed`，必须填写原因、记录操作人和时间，冲红后不能再次申请。
 

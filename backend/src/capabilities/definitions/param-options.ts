@@ -161,7 +161,10 @@ export const DETAIL_RATIOS: ParamOption[] = [
  * 修图系工具的比例选项: 参考站这些页面高级设置默认「原比例」(保持输入图尺寸),
  * 复刻时把「原比例」作为首项与默认值, 其余 8 项与生图工具一致。
  */
-export const RATIOS_WITH_ORIGINAL: ParamOption[] = [{ value: 'original', label: '原比例' }, ...RATIOS];
+export const RATIOS_WITH_ORIGINAL: ParamOption[] = [
+  { value: 'original', label: '原比例' },
+  ...RATIOS,
+];
 
 /** 抠图/换色的背景色板 (参考站 background-color-options 实拍: 色值与 aria-label 一致) */
 export const BG_COLOR_OPTIONS: ParamOption[] = [
@@ -272,7 +275,12 @@ export const DETAIL_SECTIONS: ParamOption[] = [
   { value: 'usage_tips', label: '使用建议图' },
 ];
 
-export const DETAIL_SECTION_DEFAULTS: string[] = DETAIL_SECTIONS.slice(0, 6).map((s) => String(s.value));
+export const DETAIL_SECTION_DEFAULTS: string[] = DETAIL_SECTIONS.slice(0, 6).map((s) =>
+  String(s.value),
+);
+
+/** 一次提交最多产出的详情模块数（与页面「已选 N/10」一致） */
+export const MAX_DETAIL_SECTIONS = 10;
 
 /**
  * 解析「包含模块」参数: 逗号分隔字符串 → 合法键数组。
@@ -285,7 +293,7 @@ export function parseDetailSections(raw: unknown): string[] {
     .map((s) => s.trim())
     .filter((s) => valid.has(s));
   const out = [...new Set(list)];
-  return out.length > 0 ? out.slice(0, 10) : [...DETAIL_SECTION_DEFAULTS];
+  return out.length > 0 ? out.slice(0, MAX_DETAIL_SECTIONS) : [...DETAIL_SECTION_DEFAULTS];
 }
 
 /**
@@ -370,7 +378,9 @@ export const platformSpecText = (p: Record<string, any>): string => {
   const spec = platformSpec(p.platform);
   if (!spec?.spec) return `，适配${label}平台`;
   const ratio = String(p.ratio ?? '').trim();
-  const size = String(p.size ?? '').trim().toLowerCase();
+  const size = String(p.size ?? '')
+    .trim()
+    .toLowerCase();
   const ratioOk = !ratio || !spec.ratio || ratio === spec.ratio;
   const sizeOk = !size || !spec.size || (SIZE_RANK[size] ?? 0) >= (SIZE_RANK[spec.size] ?? 0);
   return ratioOk && sizeOk ? `，适配${label}平台（${spec.spec}）` : `，适配${label}平台`;
@@ -387,7 +397,9 @@ export const platformDetailSpecText = (p: Record<string, any>): string => {
   if (!label) return '';
   const spec = platformDetailSpec(p.platform);
   if (!spec?.spec) return `，适配${label}平台`;
-  const size = String(p.size ?? '').trim().toLowerCase();
+  const size = String(p.size ?? '')
+    .trim()
+    .toLowerCase();
   const sizeOk = !size || !spec.size || (SIZE_RANK[size] ?? 0) >= (SIZE_RANK[spec.size] ?? 0);
   return sizeOk ? `，适配${label}平台（${spec.spec}）` : `，适配${label}平台`;
 };

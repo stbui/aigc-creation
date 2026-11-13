@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { OutboundError } from '../infra/outbound';
-import { TaskExecutorService, failureCodeOf, safeFailure, type CallLogInput } from './task-executor.service';
+import {
+  type CallLogInput,
+  failureCodeOf,
+  safeFailure,
+  TaskExecutorService,
+} from './task-executor.service';
 
 function input(overrides: Partial<CallLogInput> = {}): CallLogInput {
   return {
@@ -73,6 +78,28 @@ describe('TaskExecutorService.logCall', () => {
     expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({ videoSeconds: 6 }),
     });
+  });
+});
+
+describe('create 请求构建失败', () => {
+  it('buildCreate 抛错时请求未发出，按「上游明确没接」处理', async () => {
+    const buildCreate = vi.fn().mockRejectedValue(new Error('协议参数缺失'));
+    const send = vi.fn();
+    const service = new TaskExecutorService({} as never, { send } as never);
+
+    const result = await service.create(
+      { buildCreate } as never,
+      {
+        runtime: { baseUrl: 'https://example.test' },
+        channelId: 'channel-1',
+        concurrencyLimit: 0,
+      } as never,
+      { capability: 'image', operation: 'text_to_image', prompt: '测试' } as never,
+    );
+
+    expect(result.outcome.failureCode).toBe('request_invalid');
+    expect(result.outcome.rejectedNoJob).toBe(true);
+    expect(send).not.toHaveBeenCalled();
   });
 });
 

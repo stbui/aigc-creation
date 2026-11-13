@@ -24,22 +24,26 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { AppError } from '../../common/app.exception';
-import { getCapability, sanitizeParams, validateCapabilityParams } from '../../capabilities/capability.registry';
+import {
+  getCapability,
+  sanitizeParams,
+  validateCapabilityParams,
+} from '../../capabilities/capability.registry';
+import { CapabilityAvailabilityService } from '../../capabilities/capability-availability.service';
 import {
   normalizeLocalRedrawBounds,
   parseLocalRedrawAnnotations,
 } from '../../capabilities/definitions/local_redraw';
-import { CapabilityAvailabilityService } from '../../capabilities/capability-availability.service';
-import { MembershipService } from '../../membership/membership.service';
+import { AppError } from '../../common/app.exception';
 import { CreditPriceService } from '../../credits/credit-price.service';
-import { PromptToolsService } from '../../prompt-tools/prompt-tools.service';
 import { CreateGenerationDto } from '../../generate/dto/create-generation.dto';
-import { BillingService, type BillingDraft } from '../billing/billing.service';
+import { MembershipService } from '../../membership/membership.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { PromptToolsService } from '../../prompt-tools/prompt-tools.service';
+import { type BillingDraft, BillingService } from '../billing/billing.service';
+import { restrictIntentToSpec } from '../intent/model-intent';
 import { RouterService } from '../routing/router.service';
 import { UserGroupService } from '../user-groups/user-group.service';
-import { restrictIntentToSpec } from '../intent/model-intent';
 import { scaleMultiFusionDraft } from './task-billing-scale';
 
 /** 一次准入的输入 */
@@ -99,6 +103,9 @@ export class TaskAdmissionService {
     if (!def) throw new AppError(40001, `不支持的能力: ${dto.capability}`, 400);
     if (def.mode === 'planned') throw new AppError(40001, `${def.name} 尚未开放`, 400);
     validateCapabilityParams(dto.capability, dto.params);
+    // 能力特有的强校验（如详情图的模块键）：必须在拆单 / 扣费之前拦截，
+    // 不允许「显式传错模块」被静默回落成默认 6 项并照收 6 份钱。
+    def.validateParams?.(dto.params ?? {});
 
     /*
      * 3. 后台上下线管控。
@@ -138,26 +145,9 @@ export class TaskAdmissionService {
       );
     }
 
-    // 5. 会员并发（必须在扣费之前：校验失败却已扣分会造成资损）
-    // 先解析一次权益，供并发校验与任务参数复用 —— 两者此前各查一遍
-    // 会员 / 订单周期，同一请求内是纯重复读。
+    // 5. 会员权益：并发上限与快速通道随任务快照落库，由 worker 在领取任务时
+    //    按「当前执行中任务数」分批调度；提交阶段不因并发上限拒绝请求。
     const perks = await this.membership.perksOf(ownerId);
-    /*
-     * 参数清洗提前到这里：并发按「本次实际要创建的任务数」占名额，
-     * 必须先展开 `outputPlan` 才知道这次是 1 张还是 N 张。
-     */
-    const sanitized = sanitizeParams(dto.capability, dto.params);
-    const planned = def.outputPlan?.(sanitized) ?? [];
-    const incoming = planned.length > 0 ? planned.length : 1;
-    const concurrency = await this.membership.checkConcurrency(
-      ownerId,
-      undefined,
-      perks,
-      incoming,
-    );
-    if (concurrency.limit > 0) {
-      this.log.debug(`并发校验: ${concurrency.current}/${concurrency.limit}，本次 ${incoming}`);
-    }
 
     // 6. 项目与素材归属（两条查询互不依赖，并行取回）
     const [project, assets] = await Promise.all([
@@ -188,6 +178,7 @@ export class TaskAdmissionService {
 
     // 7. 遮罩与局部重绘标注（都是生成输入，必须在扣费前确认可用）
     await this.validateMask(ownerId, dto, assets);
+    const sanitized = sanitizeParams(dto.capability, dto.params);
     const sourceAsset = assets.find((asset: { id: string }) => asset.id === dto.inputAssetIds[0]);
     await this.validateAnnotations(ownerId, dto, sourceAsset);
     this.assertLocalRedrawHasInput(dto, sanitized);
@@ -204,7 +195,10 @@ export class TaskAdmissionService {
     const imageInput = routed.capabilitySpec.inputs?.image;
     const imageCount = dto.inputAssetIds.length;
     if (imageInput && (imageCount < imageInput.min || imageCount > imageInput.max)) {
-      const range = imageInput.min === imageInput.max ? `${imageInput.max}` : `${imageInput.min}-${imageInput.max}`;
+      const range =
+        imageInput.min === imageInput.max
+          ? `${imageInput.max}`
+          : `${imageInput.min}-${imageInput.max}`;
       throw new AppError(
         40001,
         `所选模型「${routed.modelKey}」仅支持 ${range} 张输入图片（当前 ${imageCount} 张），请调整图片数量或更换模型`,
@@ -248,17 +242,25 @@ export class TaskAdmissionService {
     // **每张各自计费**。价目表里的价是「一张图」的价：勾 6 个模块就是 6 × 单价。
     // 每张都有自己的账单，失败 / 取消各自按自己的账单退款 —— 一张失败不连累
     // 同批其它图，也不会出现「整套没出来却只退了一张的钱」。
-    //
-    // `planned` 已在并发校验前展开，这里直接复用，避免同一请求两次执行
-    // `outputPlan` 得到不一致的任务数。
+    const planned = def.outputPlan?.(sanitized) ?? [];
     const outputs = planned.length > 0 ? planned : null;
     const batchId = outputs && outputs.length > 1 ? randomUUID() : undefined;
     const batchSize = outputs?.length ?? 0;
     const paramsFor = (index: number): Record<string, any> => ({
       ...sanitized,
       __memberFastChannel: perks.fastChannel,
+      // 并发上限随任务快照落库：worker 领取时按它分批，不要求用户计划在
+      // 任务排队期间保持不变（与会员权益快照口径一致）。
+      __memberConcurrency: perks.maxConcurrent,
       ...(outputs ? outputs[index].params : {}),
-      ...(batchId ? { batchId, batchIndex: index + 1, batchSize } : {}),
+      /*
+       * 批次字段只允许服务端写入。N=1 时显式置空，避免调用方自带的
+       * `batchId/batchIndex/batchSize` 落库，被幂等重放当成更大的批次。
+       * JSON.stringify 会丢掉 undefined，单图任务因此不会带这些键。
+       */
+      ...(batchId
+        ? { batchId, batchIndex: index + 1, batchSize }
+        : { batchId: undefined, batchIndex: undefined, batchSize: undefined }),
     });
     /** 子任务与父任务共用同一份线路与价格快照，各自承担一份计费 */
     const taskBase: Omit<Prisma.GenerationTaskUncheckedCreateInput, 'params'> = {
@@ -356,9 +358,16 @@ export class TaskAdmissionService {
     amountMicrocredits: bigint;
     freeCampaignId?: string;
   }): Promise<string[]> {
-    const { ownerId, idempotencyKey, requestFingerprint, creditCost, taskBase, paramsFor, outputs, draft } = params;
-    // 本次事务要创建的任务数：多图提交按张占并发名额，单图为 1。
-    const incoming = outputs && outputs.length > 0 ? outputs.length : 1;
+    const {
+      ownerId,
+      idempotencyKey,
+      requestFingerprint,
+      creditCost,
+      taskBase,
+      paramsFor,
+      outputs,
+      draft,
+    } = params;
     return this.prisma.$transaction(async (tx) => {
       // 项目校验与任务落库之间可能隔着模型解析、计价等步骤；后台软删项目
       // 若恰好发生在这段窗口内，必须在扣费事务内再次拒绝，避免任务/账单
@@ -370,21 +379,6 @@ export class TaskAdmissionService {
       if (!activeProject) {
         throw new AppError(40001, '项目不存在或无权限', 403);
       }
-
-      /*
-       * 并发上限必须在写事务内复核。
-       *
-       * 事务外那次 checkConcurrency 只用于快速失败；两个同时提交的请求都能
-       * 读到旧数量并各自建任务，实际并发会超过会员上限。先用 no-op UPDATE
-       * 取得用户行写锁（与 OrderService.create 同一口径），再在锁内统计，
-       * 让同一用户的建任务串行化；超限时整个事务回滚，不留任务/账单。
-       *
-       * 复核同样带上本次要创建的任务数：多图提交一次建 N 个任务，只比较
-       * 「当前数量」会让 8/10 的用户再建 5 个任务。
-       */
-      await tx.$executeRaw`
-        UPDATE "User" SET "name" = "name" WHERE id = ${ownerId}`;
-      await this.membership.checkConcurrency(ownerId, tx, undefined, incoming);
 
       const ids: string[] = [];
       const parent = await tx.generationTask.create({
@@ -431,13 +425,6 @@ export class TaskAdmissionService {
       }
       return ids;
     });
-  }
-
-  /** 整批删除（父任务 + 其子任务）。仅用于存量数据清理；新建路径已改为同事务，不再需要补偿删除 */
-  private async deleteBatch(parentTaskId: string): Promise<void> {
-    await this.prisma.generationTask
-      .deleteMany({ where: { OR: [{ id: parentTaskId }, { parentTaskId }] } })
-      .catch(() => undefined);
   }
 
   // ── 校验 ──────────────────────────────────────────────────────────
@@ -547,7 +534,10 @@ export class TaskAdmissionService {
   }
 
   /** 局部重绘至少需要遮罩、文字描述或标注之一；空白字符串不算输入。 */
-  private assertLocalRedrawHasInput(dto: CreateGenerationDto, sanitized: Record<string, any>): void {
+  private assertLocalRedrawHasInput(
+    dto: CreateGenerationDto,
+    sanitized: Record<string, any>,
+  ): void {
     if (dto.capability !== 'local_redraw') return;
     const prompt = typeof sanitized.prompt === 'string' ? sanitized.prompt.trim() : '';
     const annotations = parseLocalRedrawAnnotations(sanitized.annotations);
@@ -566,13 +556,20 @@ export class TaskAdmissionService {
     const hints = (
       await Promise.all(
         annotations.map(async (item) => {
-          if (typeof item.referenceAssetId !== 'string' || !item.referenceAssetId.trim()) return null;
+          if (typeof item.referenceAssetId !== 'string' || !item.referenceAssetId.trim())
+            return null;
           try {
-            const result = await this.promptTools.imageToPrompt(ownerId, item.referenceAssetId, item.instruction);
+            const result = await this.promptTools.imageToPrompt(
+              ownerId,
+              item.referenceAssetId,
+              item.instruction,
+            );
             const text = result.text?.trim();
             return text ? `${item.label || '参考图'}：${text}` : null;
           } catch (error) {
-            this.log.warn(`局部重绘参考图 ${item.referenceAssetId} 转描述失败，已跳过：${(error as Error).message}`);
+            this.log.warn(
+              `局部重绘参考图 ${item.referenceAssetId} 转描述失败，已跳过：${(error as Error).message}`,
+            );
             return null;
           }
         }),
@@ -647,7 +644,10 @@ function toIdempotentResult(
  * 素材或任一参数发生变化时会被识别为冲突。
  */
 export function generationRequestFingerprint(
-  dto: Pick<CreateGenerationDto, 'projectId' | 'capability' | 'modelKey' | 'inputAssetIds' | 'params'>,
+  dto: Pick<
+    CreateGenerationDto,
+    'projectId' | 'capability' | 'modelKey' | 'inputAssetIds' | 'params'
+  >,
 ): string {
   const canonical = {
     projectId: String(dto.projectId ?? ''),
@@ -680,7 +680,10 @@ function microcreditsToCredits(microcredits: bigint): number {
 }
 
 /** 请求体字段与 Idempotency-Key 头二选一；同时给出时必须一致 */
-export function normalizeIdempotencyKey(bodyValue?: string, headerValue?: string): string | undefined {
+export function normalizeIdempotencyKey(
+  bodyValue?: string,
+  headerValue?: string,
+): string | undefined {
   const body = typeof bodyValue === 'string' ? bodyValue.trim() : '';
   const header = typeof headerValue === 'string' ? headerValue.trim() : '';
   if (body && header && body !== header) {

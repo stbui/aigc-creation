@@ -23,31 +23,36 @@
  *   4. **所有终态都经过 `TaskLifecycleService`**：任务状态与账单状态同时落定。
  */
 
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { hostname } from 'node:os';
 import { randomBytes } from 'node:crypto';
+import { hostname } from 'node:os';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { GenerationTask, RouteAttempt } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { ProtocolExecutor, decodeDataUrl } from '../protocol/executor';
-import type { GenerationRequest, MediaReference, ProtocolResult } from '../protocol/runtime';
-import type { RoutedModel } from '../routing/routing.types';
-import { RouterService } from '../routing/router.service';
-import { detectImageFormat } from '../media/image-format';
-import { RouteHealthService } from '../routing/route-health.service';
-import { BillingService } from '../billing/billing.service';
+import { getCapability } from '../../capabilities/capability.registry';
 import { AppError } from '../../common/app.exception';
 import { CreditPriceService } from '../../credits/credit-price.service';
-import { UserGroupService } from '../user-groups/user-group.service';
-import { getCapability } from '../../capabilities/capability.registry';
+import { PrismaService } from '../../prisma/prisma.service';
+import { BillingService } from '../billing/billing.service';
+import {
+  type ChannelExecution,
+  ChannelRuntimeService,
+  ChannelUnavailableError,
+} from '../channels/channel-runtime.service';
 import { restrictIntentToSpec } from '../intent/model-intent';
-import { ChannelRuntimeService, ChannelUnavailableError, type ChannelExecution } from '../channels/channel-runtime.service';
+import { detectImageFormat } from '../media/image-format';
+import { decodeDataUrl, ProtocolExecutor } from '../protocol/executor';
+import type { GenerationRequest, MediaReference, ProtocolResult } from '../protocol/runtime';
+import { RouteHealthService } from '../routing/route-health.service';
+import { RouterService } from '../routing/router.service';
+import type { RoutedModel } from '../routing/routing.types';
+import { UserGroupService } from '../user-groups/user-group.service';
 import { ChannelSlotService } from './channel-slot.service';
 import { TaskAttemptService } from './task-attempt.service';
-import { TaskExecutorService } from './task-executor.service';
-import { TaskLifecycleService, TASK_ERROR } from './task-lifecycle.service';
-import { TaskMediaService, type PendingOutput } from './task-media.service';
-import { TaskRequestService } from './task-request.service';
 import { scaleMultiFusionDraft } from './task-billing-scale';
+import { TaskExecutorService } from './task-executor.service';
+import { TASK_ERROR, TaskLifecycleService } from './task-lifecycle.service';
+import { type PendingOutput, TaskMediaService } from './task-media.service';
+import { TaskRequestService } from './task-request.service';
 
 /** 租约时长：进程被杀后最迟这么久被接管 */
 const TASK_LEASE_MS = 45_000;
@@ -55,8 +60,10 @@ const TASK_LEASE_MS = 45_000;
 const LEASE_RENEW_MS = 15_000;
 /** 调度节拍 */
 const WORKER_TICK_MS = 1_000;
-/** 本进程同时执行的任务数（轮询等待期间不占额度） */
-const MAX_ACTIVE_TASKS = 8;
+/** 本进程执行位兜底值；`MODEL_ACTIVE_TASK_LIMIT` 覆盖（1–64） */
+const DEFAULT_MAX_ACTIVE_TASKS = 64;
+/** 单轮最多扫描的排队任务数：一个用户的大量排队任务不应饿死同页其它用户 */
+const CLAIM_SCAN_LIMIT = 200;
 /** 单次调用内最多推进的步数（派发 + 切换 + 轮询的成功路径） */
 const MAX_STEPS = 8;
 /** 落盘重试上限；超过即判失败退款，并记录上游可能已计费的事实 */
@@ -64,7 +71,12 @@ const MAX_MEDIA_RETRIES = 5;
 const MEDIA_RETRY_DELAY_MS = 30_000;
 
 /** 轮询间隔与总时限（按能力模态） */
-const POLL_INTERVAL_MS: Record<string, number> = { image: 3_000, video: 5_000, text: 1_000, audio: 2_000 };
+const POLL_INTERVAL_MS: Record<string, number> = {
+  image: 3_000,
+  video: 5_000,
+  text: 1_000,
+  audio: 2_000,
+};
 const POLL_DEADLINE_MS: Record<string, number> = {
   image: 15 * 60_000,
   video: 60 * 60_000,
@@ -101,6 +113,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly media: TaskMediaService,
     private readonly requests: TaskRequestService,
     private readonly lifecycle: TaskLifecycleService,
+    private readonly config: ConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -121,6 +134,14 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── 调度 ──────────────────────────────────────────────────────────
+
+  /** 本进程执行位上限：配置缺省时回落安全值，避免无界并发打满上游 */
+  private get maxActiveTasks(): number {
+    const value = this.config.get<number>('model.activeTaskLimit');
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? Math.trunc(value)
+      : DEFAULT_MAX_ACTIVE_TASKS;
+  }
 
   private async tick(): Promise<void> {
     if (this.stopped || this.ticking) return;
@@ -143,25 +164,66 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     void this.run(taskId).finally(() => this.active.delete(taskId));
   }
 
-  /** 领取排队任务：CAS 成功才执行 */
+  /** 领取排队任务：按用户并发与渠道并发分批，CAS 成功才执行 */
   private async claimQueued(): Promise<void> {
-    const free = MAX_ACTIVE_TASKS - this.active.size;
+    let free = this.maxActiveTasks - this.active.size;
     if (free <= 0) return;
     const candidates = await this.prisma.generationTask.findMany({
       // 有账单的走预留；零价无账单的只有一种：后台重试（刻意不二次扣费）。
       // 多图产出的每张图都有自己的账单，与单图任务走同一条预留链路。
       where: {
         status: 'queued',
-        OR: [
-          { billingOrderId: { not: null } },
-          { creditCost: 0, retriedFromId: { not: null } },
-        ],
+        OR: [{ billingOrderId: { not: null } }, { creditCost: 0, retriedFromId: { not: null } }],
       },
       orderBy: { createdAt: 'asc' },
-      take: free,
-      select: { id: true },
+      // 扫描窗口大于本轮执行位：被用户 / 渠道并发挡住的候选要跳过，
+      // 不能因为它们占满前 N 条就饿死后面的任务。
+      take: Math.min(CLAIM_SCAN_LIMIT, Math.max(free * 4, 16)),
+      select: { id: true, ownerId: true, channelId: true, params: true },
     });
+    if (candidates.length === 0) return;
+
+    const channelIds = [...new Set(candidates.map((item) => item.channelId))];
+    const [ownerRows, channelRows, channelConfigs] = await Promise.all([
+      this.prisma.generationTask.groupBy({
+        by: ['ownerId'],
+        where: { status: 'running' },
+        _count: { _all: true },
+      }),
+      this.prisma.generationTask.groupBy({
+        by: ['channelId'],
+        where: { status: 'running' },
+        _count: { _all: true },
+      }),
+      this.prisma.modelChannel.findMany({
+        where: { id: { in: channelIds } },
+        select: { id: true, concurrencyLimit: true },
+      }),
+    ]);
+
+    /*
+     * 并发口径：同一时间交给模型处理的任务数。
+     *   · 用户侧：会员套餐 maxConcurrent（任务快照），0 = 不限；
+     *   · 渠道侧：ModelChannel.concurrencyLimit，0 = 不限；
+     *   · 进程侧：maxActiveTasks 只是安全上限。
+     * 两个业务上限都在领取时判断，超出的任务留在 queued，等有任务结束
+     * 释放名额后由下一轮调度领取 —— 不在提交阶段拒绝。
+     */
+    const ownerUsed = new Map(ownerRows.map((row) => [row.ownerId, row._count._all]));
+    const channelUsed = new Map(channelRows.map((row) => [row.channelId, row._count._all]));
+    const channelLimit = new Map(
+      channelConfigs.map((row) => [row.id, Math.max(0, Math.trunc(row.concurrencyLimit ?? 0))]),
+    );
+
     for (const candidate of candidates) {
+      if (free <= 0) break;
+      const ownerLimit = memberConcurrencyOf(candidate.params);
+      const ownerCurrent = ownerUsed.get(candidate.ownerId) ?? 0;
+      if (ownerLimit > 0 && ownerCurrent >= ownerLimit) continue;
+      const limit = channelLimit.get(candidate.channelId) ?? 0;
+      const channelCurrent = channelUsed.get(candidate.channelId) ?? 0;
+      if (limit > 0 && channelCurrent >= limit) continue;
+
       const now = new Date();
       const claimed = await this.prisma.generationTask.updateMany({
         where: { id: candidate.id, status: 'queued' },
@@ -174,13 +236,18 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
           progress: 5,
         },
       });
-      if (claimed.count === 1) this.launch(candidate.id);
+      if (claimed.count === 1) {
+        ownerUsed.set(candidate.ownerId, ownerCurrent + 1);
+        channelUsed.set(candidate.channelId, channelCurrent + 1);
+        free -= 1;
+        this.launch(candidate.id);
+      }
     }
   }
 
   /** 领取到点的轮询任务：等待期间 `leaseOwner` 为空，领取时再写 */
   private async claimDuePolls(): Promise<void> {
-    const free = MAX_ACTIVE_TASKS - this.active.size;
+    const free = this.maxActiveTasks - this.active.size;
     if (free <= 0) return;
     const now = new Date();
     const due = await this.prisma.generationTask.findMany({
@@ -227,10 +294,14 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       const state = attempt?.dispatchState ?? 'not_sent';
       if (state === 'submission_unknown') {
         // 执行者可能在请求已发出后死掉：不能重发，交给人工核对
-        const claimed = await this.lifecycle.uncertain(task.id, '执行者租约过期，且请求可能已经发出', {
-          leaseOwner: task.leaseOwner,
-          leaseUntil: task.leaseUntil,
-        });
+        const claimed = await this.lifecycle.uncertain(
+          task.id,
+          '执行者租约过期，且请求可能已经发出',
+          {
+            leaseOwner: task.leaseOwner,
+            leaseUntil: task.leaseUntil,
+          },
+        );
         if (claimed) recovered += 1;
         continue;
       }
@@ -390,12 +461,22 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
           await this.uncertainOwned(task.id, '上游已受理并可能已产出，但结果未能落盘');
           return;
         }
-        const switched = await this.switchRoute(fresh, params, inputIds, runAttempts.map((item) => item.channelModelId));
+        const switched = await this.switchRoute(
+          fresh,
+          params,
+          inputIds,
+          runAttempts.map((item) => item.channelModelId),
+        );
         if (switched !== 'continue') return;
         continue;
       }
       if (begin.action === 'switch') {
-        const switched = await this.switchRoute(fresh, params, inputIds, runAttempts.map((item) => item.channelModelId));
+        const switched = await this.switchRoute(
+          fresh,
+          params,
+          inputIds,
+          runAttempts.map((item) => item.channelModelId),
+        );
         if (switched !== 'continue') return;
         continue;
       }
@@ -435,7 +516,10 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** 没有可用线路：遮罩任务给 42205，其余 42204，并退款（请求没发出去） */
-  private async failNoRoute(task: GenerationTask, params: Record<string, any>): Promise<StepResult> {
+  private async failNoRoute(
+    task: GenerationTask,
+    params: Record<string, any>,
+  ): Promise<StepResult> {
     const hasMask = this.requests.maskAssetId(params) !== '';
     await this.failOwned(task.id, {
       errorCode: hasMask ? TASK_ERROR.maskUnsupported : TASK_ERROR.noRoute,
@@ -450,7 +534,10 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private routeSnapshotDiffers(task: GenerationTask, routed: RoutedModel): boolean {
-    return task.channelModelId !== routed.channelModel.id || task.channelId !== routed.channelModel.channelId;
+    return (
+      task.channelModelId !== routed.channelModel.id ||
+      task.channelId !== routed.channelModel.channelId
+    );
   }
 
   private async startAttempt(
@@ -502,7 +589,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     const routed = await this.resolveRoute(task, params, inputIds, new Set(triedRouteIds));
     if (!routed) {
       await this.failOwned(task.id, {
-        errorCode: this.requests.maskAssetId(params) ? TASK_ERROR.maskUnsupported : TASK_ERROR.noRoute,
+        errorCode: this.requests.maskAssetId(params)
+          ? TASK_ERROR.maskUnsupported
+          : TASK_ERROR.noRoute,
         errorMessage: '全部可用线路都拒绝或无法承接本次请求',
         reason: 'generation_failed',
       });
@@ -551,7 +640,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
             select: { promotionId: true },
           })
         : null;
-      freeCampaignId = existingOrder?.promotionId || (await this.price.freeCampaignIdOf(task.capability, task.ownerId));
+      freeCampaignId =
+        existingOrder?.promotionId ||
+        (await this.price.freeCampaignIdOf(task.capability, task.ownerId));
       if (freeCampaignId) {
         draft = { ...draft, amountMicrocredits: 0n };
       }
@@ -664,7 +755,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       })
       .catch(() => null);
     if (!old) return 0n;
-    return old.reservedAmountMicrocredits > 0n ? old.reservedAmountMicrocredits : old.amountMicrocredits;
+    return old.reservedAmountMicrocredits > 0n
+      ? old.reservedAmountMicrocredits
+      : old.amountMicrocredits;
   }
 
   // ── 派发 ──────────────────────────────────────────────────────────
@@ -702,7 +795,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       });
       if (unavailable) {
         const routes = await this.attempts.listRun(task.id, task.routeRun);
-        return this.switchRoute(task, params, inputIds, routes.map((item) => item.channelModelId));
+        return this.switchRoute(
+          task,
+          params,
+          inputIds,
+          routes.map((item) => item.channelModelId),
+        );
       }
       await this.failOwned(task.id, {
         errorCode: TASK_ERROR.generationFailed,
@@ -712,7 +810,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       return 'stop';
     }
 
-    const release = await this.slots.acquire(channel.channelId, channel.concurrencyLimit).catch(() => null);
+    const release = await this.slots
+      .acquire(channel.channelId, channel.concurrencyLimit)
+      .catch(() => null);
     if (!release) {
       await this.attempts.markFailed(attempt.id, {
         failureCode: 'channel_unavailable',
@@ -720,7 +820,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         rejectedNoJob: true,
       });
       const routes = await this.attempts.listRun(task.id, task.routeRun);
-      return this.switchRoute(task, params, inputIds, routes.map((item) => item.channelModelId));
+      return this.switchRoute(
+        task,
+        params,
+        inputIds,
+        routes.map((item) => item.channelModelId),
+      );
     }
 
     // 渠道准备与并发排队期间后台可能已终止任务；发送前必须再做一次租约闸门。
@@ -758,7 +863,14 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
 
     if (outcome.status === 'succeeded' && outcome.result) {
       await this.attempts.markSucceeded(attempt.id, outcome.providerRequestId);
-      await this.finalize(task, attempt, outcome.result, channel, params, outcome.providerRequestId);
+      await this.finalize(
+        task,
+        attempt,
+        outcome.result,
+        channel,
+        params,
+        outcome.providerRequestId,
+      );
       return 'stop';
     }
     if (outcome.status === 'pending') {
@@ -835,7 +947,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     inputIds: string[],
   ): Promise<StepResult> {
     if (!(await this.ownsTaskLease(task.id))) return 'stop';
-    const deadline = task.createdAt.getTime() + (POLL_DEADLINE_MS[modalityOf(task.capability)] ?? POLL_DEADLINE_MS.image);
+    const deadline =
+      task.createdAt.getTime() +
+      (POLL_DEADLINE_MS[modalityOf(task.capability)] ?? POLL_DEADLINE_MS.image);
     if (Date.now() > deadline) {
       await this.uncertainOwned(task.id, '上游长时间未返回结果');
       return 'stop';
@@ -861,7 +975,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       return 'stop';
     }
 
-    const release = await this.slots.acquire(channel.channelId, channel.concurrencyLimit).catch(() => null);
+    const release = await this.slots
+      .acquire(channel.channelId, channel.concurrencyLimit)
+      .catch(() => null);
     if (!release) {
       await this.schedulePoll(task, task.providerRequestId ?? '', '等待渠道并发');
       return 'wait';
@@ -896,7 +1012,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       method: result.spec.method,
       path: result.spec.path,
       outcome,
-      pollCount: (await this.prisma.apiCallLog.count({ where: { taskId: task.id, requestKind: 'poll' } })) + 1,
+      pollCount:
+        (await this.prisma.apiCallLog.count({ where: { taskId: task.id, requestKind: 'poll' } })) +
+        1,
       requestBody: result.requestBody,
       responseBody: result.responseBody,
       upstreamUrl: result.upstreamUrl,
@@ -908,7 +1026,14 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       if (task.billingOrderId) {
         await this.billing.updateProviderRequestId(task.billingOrderId, outcome.providerRequestId);
       }
-      await this.finalize(task, attempt, outcome.result, channel, params, outcome.providerRequestId);
+      await this.finalize(
+        task,
+        attempt,
+        outcome.result,
+        channel,
+        params,
+        outcome.providerRequestId,
+      );
       return 'stop';
     }
     if (outcome.status === 'pending') {
@@ -930,7 +1055,11 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** 安排下一次回查，并释放执行位（等待期间不占进程） */
-  private async schedulePoll(task: GenerationTask, providerRequestId: string, stage: string): Promise<void> {
+  private async schedulePoll(
+    task: GenerationTask,
+    providerRequestId: string,
+    stage: string,
+  ): Promise<void> {
     const interval = POLL_INTERVAL_MS[modalityOf(task.capability)] ?? POLL_INTERVAL_MS.image;
     await this.prisma.generationTask.updateMany({
       where: { id: task.id, status: 'running', leaseOwner: this.owner },
@@ -960,12 +1089,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private recordHealth(
-    failureCode: string,
-    attempt: RouteAttempt,
-    retryAfterMs?: number,
-  ): void {
-    const retryAfter = failureCode === 'upstream_429' ? retryAfterMs ?? 30_000 : undefined;
+  private recordHealth(failureCode: string, attempt: RouteAttempt, retryAfterMs?: number): void {
+    const retryAfter = failureCode === 'upstream_429' ? (retryAfterMs ?? 30_000) : undefined;
     this.health.recordFailure(
       failureCode,
       {
@@ -1000,11 +1125,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
 
     const references = collectReferences(result);
     if (references.length === 0) {
-      await this.failOwned(task.id, {
-        errorCode: TASK_ERROR.generationFailed,
-        errorMessage: '上游返回成功但没有任何产出',
-        reason: 'generation_failed',
-      });
+      /*
+       * 上游返回成功却解析不到任何产出：可能是协议字段变更，也可能上游已经
+       * 生成并计费、只是链接缺失。自动退款会让平台白付一次调用，按「结果不明」
+       * 冻结积分等人工核对，与超时 / 5xx / 建连后中断同一口径。
+       */
+      await this.uncertainOwned(task.id, '上游返回成功但没有任何可解析的产出');
       return;
     }
 
@@ -1012,7 +1138,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       const outputs = await this.download(references, channel, task.capability, params);
       const stored = await this.media.persist(toMediaRef(task), outputs);
       const promoted = await this.lifecycle.succeed(
-        { id: task.id, ownerId: task.ownerId, billingOrderId: task.billingOrderId, providerRequestId: task.providerRequestId },
+        {
+          id: task.id,
+          ownerId: task.ownerId,
+          billingOrderId: task.billingOrderId,
+          providerRequestId: task.providerRequestId,
+        },
         {
           outputAssetIds: stored.map((item) => item.assetId),
           aigcMeta: JSON.stringify(stored[0]?.aigcMeta ?? {}),
@@ -1045,7 +1176,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       await this.uncertainOwned(taskId, `产出落盘失败且无法暂存：${message}`);
       return;
     }
-    this.log.warn(`任务 ${taskId} 产出落盘失败，${MEDIA_RETRY_DELAY_MS / 1000}s 后重试：${message}`);
+    this.log.warn(
+      `任务 ${taskId} 产出落盘失败，${MEDIA_RETRY_DELAY_MS / 1000}s 后重试：${message}`,
+    );
     await this.prisma.generationTask.updateMany({
       where: { id: taskId, status: 'running', leaseOwner: this.owner },
       data: {
@@ -1096,7 +1229,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       );
       const stored = await this.media.persist(toMediaRef(task), outputs);
       const promoted = await this.lifecycle.succeed(
-        { id: task.id, ownerId: task.ownerId, billingOrderId: task.billingOrderId, providerRequestId: task.providerRequestId },
+        {
+          id: task.id,
+          ownerId: task.ownerId,
+          billingOrderId: task.billingOrderId,
+          providerRequestId: task.providerRequestId,
+        },
         {
           outputAssetIds: stored.map((item) => item.assetId),
           aigcMeta: JSON.stringify(stored[0]?.aigcMeta ?? {}),
@@ -1119,7 +1257,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async retryOrFail(task: GenerationTask, result: ProtocolResult, retries: number, message: string): Promise<void> {
+  private async retryOrFail(
+    task: GenerationTask,
+    result: ProtocolResult,
+    retries: number,
+    message: string,
+  ): Promise<void> {
     if (retries >= MAX_MEDIA_RETRIES) {
       // 上游已经成功且计费，只是本地落盘失败；按普通失败退款会造成「双损」
       await this.uncertainOwned(task.id, `产出落盘连续失败 ${retries} 次：${message}`);
@@ -1165,8 +1308,17 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
 
       // 多图融合偶发返回低于所选档位的尺寸：按所选档位对齐，避免静默降级。
       // 只对融合能力生效 —— 其余能力的 `ratio/size` 语义不同，误对齐会改坏成品
-      if (capability === 'multi_fusion' && !String(format).startsWith('video/') && !String(format).startsWith('audio/')) {
-        const normalized = await this.media.normalizeFusionOutput(buffer, format, params.ratio, params.size);
+      if (
+        capability === 'multi_fusion' &&
+        !String(format).startsWith('video/') &&
+        !String(format).startsWith('audio/')
+      ) {
+        const normalized = await this.media.normalizeFusionOutput(
+          buffer,
+          format,
+          params.ratio,
+          params.size,
+        );
         buffer = normalized.buffer;
         format = normalized.format;
       }
@@ -1213,19 +1365,42 @@ function safeJson<T>(raw: string | null | undefined, fallback: T): T {
   }
 }
 
+/**
+ * 任务快照里的会员并发上限。
+ *
+ * 建任务时写入，worker 领取时按它分批；存量任务或后台重试任务缺该字段时
+ * 按 0（不限）处理，由渠道与进程安全上限兜底。
+ */
+function memberConcurrencyOf(raw: string | null | undefined): number {
+  const params = safeJson<Record<string, unknown>>(raw, {});
+  const value = Number(params.__memberConcurrency);
+  return Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
+}
+
 /** 只接受完整的 `type/subtype`；缺 subtype 的一律当作未知，交给字节魔数判断 */
 function normalizeMediaMime(value: string, kind?: string): string {
-  const mime = String(value ?? '').split(';')[0].trim().toLowerCase();
+  const mime = String(value ?? '')
+    .split(';')[0]
+    .trim()
+    .toLowerCase();
   if (!/^[a-z]+\/[a-z0-9.+-]+$/.test(mime)) return '';
-  if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/')) return mime;
+  if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/'))
+    return mime;
   return kind === 'video' ? 'video/mp4' : kind === 'audio' ? 'audio/mpeg' : '';
 }
 
 /** 字节魔数兜底：多家上游返回无扩展名链接，按 URL 猜格式必然出错 */
 function inferMediaMime(buffer: Buffer, kind?: string): string {
   if (buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp') return 'video/mp4';
-  if (buffer.length >= 3 && buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33) return 'audio/mpeg';
-  if (buffer.length >= 4 && buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) {
+  if (buffer.length >= 3 && buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33)
+    return 'audio/mpeg';
+  if (
+    buffer.length >= 4 &&
+    buffer[0] === 0x1a &&
+    buffer[1] === 0x45 &&
+    buffer[2] === 0xdf &&
+    buffer[3] === 0xa3
+  ) {
     return 'video/webm';
   }
   // 图片走既有魔数嗅探（PNG / JPEG / WebP / GIF）

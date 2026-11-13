@@ -41,7 +41,7 @@ export interface ChannelExecution {
   providerModelKey: string;
   capability: string;
   protocol: string;
-  /** 0 = 使用全局并发上限 */
+  /** 0 = 不限制（worker 领取与渠道并发槽都按不限处理） */
   concurrencyLimit: number;
   adapter: ProtocolAdapter;
   runtime: ProtocolChannelRuntime;

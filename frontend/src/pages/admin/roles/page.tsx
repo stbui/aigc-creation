@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PERMISSION_LABELS, MODULE_LABELS, ROLE_COL } from './constants';
-import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
+import { useAdmin, useConfirm, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from '../../../lib/api';
 
 import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, Toggle, ToneBadge } from '~/admin-ui/primitives';
@@ -19,11 +19,13 @@ interface PermModule {
 }
 
 export function AdminRolesPage() {
+  const confirm = useConfirm();
   const toast = useToast();
   const { can, me, refresh, isHighRisk } = useAdmin();
   const editable = can('role.write');
 
   const [busy, setBusy] = useState(false);
+  const [onlyChanged, setOnlyChanged] = useState(false);
 
   // 草稿为 roleCode -> Set<permission>; 直接改库会导致每次勾选都发一次请求
   const [draft, setDraft] = useState<Record<string, Set<string>>>({});
@@ -57,12 +59,22 @@ export function AdminRolesPage() {
           code: role.code,
           label: role.label,
           current,
+          added,
+          removed,
           changedCount: added.length + removed.length,
         };
       }),
     [draft, roles],
   );
   const dirtyRoles = roleChanges.filter((role) => role.changedCount > 0);
+  const changedCodes = useMemo(
+    () =>
+      new Set(
+        dirtyRoles.flatMap((role) => [...role.added, ...role.removed]),
+      ),
+    [dirtyRoles],
+  );
+  const showOnlyChanged = onlyChanged && dirtyRoles.length > 0;
 
   useUnsavedGuard(editable && dirtyRoles.length > 0);
 
@@ -101,6 +113,21 @@ export function AdminRolesPage() {
     return Array.from(map.values());
   }, [data?.allPermissions]);
 
+  const visibleModules = useMemo(
+    () =>
+      modules
+        .map((mod) => ({
+          ...mod,
+          codes: showOnlyChanged
+            ? mod.codes.filter((code) => changedCodes.has(code))
+            : mod.codes,
+        }))
+        .filter((mod) => mod.codes.length > 0),
+    [changedCodes, modules, showOnlyChanged],
+  );
+
+  const hasNoChangedModules = showOnlyChanged && visibleModules.length === 0;
+
   const toggle = (roleCode: string, permission: string) => {
     if (!editable) return;
     setDraft((d) => {
@@ -134,6 +161,45 @@ export function AdminRolesPage() {
   const saveAll = async () => {
     const rolesToSave = dirtyRoles;
     if (rolesToSave.length === 0) return;
+
+    const highRiskChanges = Array.from(
+      new Set(
+        rolesToSave.flatMap((role) =>
+          [...role.added, ...role.removed].filter((code) => isHighRisk(code)),
+        ),
+      ),
+    );
+    const selfRoleChanged = Boolean(me && rolesToSave.some((role) => role.code === me.role));
+    const answer = await confirm({
+      title: '确认保存权限变更？',
+      description: (
+        <span className="flex flex-col gap-2">
+          <span className="block">保存后立即生效，无需重新登录。</span>
+          {rolesToSave.map((role) => (
+            <span key={role.code} className="block">
+              {role.label}：新增 {role.added.length} 项，移除 {role.removed.length} 项
+            </span>
+          ))}
+          {highRiskChanges.length > 0 && (
+            <span className="block rounded-md bg-warn-soft px-2.5 py-2 text-warn-text">
+              涉及高危权限：
+              {highRiskChanges
+                .map((code) => PERMISSION_LABELS[code] ?? code)
+                .join('、')}
+            </span>
+          )}
+          {selfRoleChanged && (
+            <span className="block rounded-md bg-danger-soft px-2.5 py-2 text-danger-text">
+              正在修改当前账号自身角色；保存后本地权限会立即刷新，可能失去本页入口。
+            </span>
+          )}
+        </span>
+      ),
+      confirmText: '确认保存',
+      danger: highRiskChanges.length > 0 || selfRoleChanged,
+    });
+    if (answer === null) return;
+
     setBusy(true);
     try {
       await adminRolesApi.updatePermissions(
@@ -200,9 +266,14 @@ export function AdminRolesPage() {
           className="mb-3 flex flex-col gap-3 rounded-xl border border-warn-border bg-warn-soft px-3.5 py-2.5"
         >
           <div className="flex w-full items-center gap-3">
-            <span className="min-w-0 flex-1 text-xs text-warn-text">
+            <span className="min-w-0 flex-1 text-[13px] text-warn-text">
               有 {dirtyRoles.length} 个角色未保存：
-              {dirtyRoles.map((role) => `${role.label} ${role.changedCount} 项`).join('、')}
+              {dirtyRoles
+                .map(
+                  (role) =>
+                    `${role.label} 新增 ${role.added.length} / 移除 ${role.removed.length}`,
+                )
+                .join('、')}
             </span>
             <ActionButton variant="secondary" size="sm" disabled={busy} onClick={resetDraft}>
               放弃变更
@@ -222,11 +293,23 @@ export function AdminRolesPage() {
       <Panel
         title="权限矩阵"
         note={`共 ${allPermissions.length} 个权限点，内置角色不可删除，仅可调整权限`}
+        extra={
+          dirtyRoles.length > 0 ? (
+            <Toggle
+              size="sm"
+              pressed={showOnlyChanged}
+              onPressedChange={setOnlyChanged}
+              className="h-7 px-2.5 text-[13px] font-medium"
+            >
+              {showOnlyChanged ? '显示全部权限' : `只看已修改项 (${changedCodes.size})`}
+            </Toggle>
+          ) : undefined
+        }
       >
         {/* 图例：每个角色当前勾了多少，与右侧模块表同一份草稿 */}
         <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-border pb-3">
           {roles.map((r) => (
-            <span key={r.code} className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
+            <span key={r.code} className="flex items-baseline gap-1.5 text-[13px] text-muted-foreground">
               {r.label}
               <em className="font-medium not-italic tabular-nums text-foreground">
                 {(draft[r.code] ?? new Set()).size} / {allPermissions.length}
@@ -235,88 +318,109 @@ export function AdminRolesPage() {
           ))}
         </div>
 
-        <div className="flex flex-col gap-4">
-          {modules.map((mod) => (
-            <section key={mod.module}>
-              {/* 模块头：每个角色一个「全选 / 全不选」的快捷切换 */}
-              <div className="flex items-center gap-3 border-b border-border pb-1.5">
-                <strong className="min-w-0 flex-1 text-xs font-semibold text-foreground">
-                  {mod.label}
-                </strong>
-                <div className="flex shrink-0">
-                  {roles.map((r) => {
-                    const set = draft[r.code] ?? new Set<string>();
-                    const all = mod.codes.every((c) => set.has(c));
-                    const none = mod.codes.every((c) => !set.has(c));
-                    return (
-                      <div key={r.code} className={cn(ROLE_COL, 'shrink-0')}>
-                        {/*
-                         * 「当前模块已全选」要暴露给读屏：用 `Toggle` 而不是
-                         * `ActionButton`，选中态由它输出 `aria-pressed`。
-                         * 这一枚是纯文字动作（全选 ↔ 全不选），所以关掉选中底
-                         * 色，只靠文字色区分。
-                         */}
-                        <Toggle
-                          variant="default"
-                          size="sm"
-                          pressed={all}
-                          onPressedChange={() => toggleModule(r.code, mod.codes)}
-                          disabled={!editable}
-                          className={cn(
-                            'h-6 min-w-0 px-2 text-xs font-medium hover:bg-accent',
-                            // 这一枚是纯文字动作，选中时不加底色，只换文字色；
-                            // 必须连同官方的 `data-[state=on]:text-accent-foreground`
-                            // 一起顶掉，否则选中后文字变浅、在透明底上看不清。
-                            'data-[state=on]:bg-transparent',
-                            all && 'text-brand hover:text-brand data-[state=on]:text-brand',
-                            none &&
-                              'text-muted-foreground/60 hover:text-muted-foreground/60 data-[state=on]:text-muted-foreground/60',
-                          )}
-                        >
-                          {all ? '全不选' : '全选'}
-                        </Toggle>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {mod.codes.map((code) => (
-                <div
-                  key={code}
-                  className={cn(
-                    'flex items-center gap-3 border-b border-border/60 py-1.5 last:border-b-0',
-                    isHighRisk(code) && 'bg-danger-soft/30',
-                  )}
+        <div className="max-h-[calc(100svh-300px)] overflow-auto rounded-md border border-border">
+          <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-3 py-2">
+            <span className="min-w-0 flex-1 text-[13px] font-semibold text-foreground">权限点</span>
+            <div className="flex shrink-0">
+              {roles.map((role) => (
+                <span
+                  key={role.code}
+                  className={cn(ROLE_COL, 'shrink-0 text-center text-[13px] font-semibold text-foreground')}
                 >
-                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="truncate text-xs text-foreground">
-                      {PERMISSION_LABELS[code] ?? code}
-                    </span>
-                    {isHighRisk(code) && (
-                      <ToneBadge tone="warn">
-                        高危
-                      </ToneBadge>
-                    )}
-                    <code className="truncate font-mono text-[12px] text-muted-foreground/60">{code}</code>
-                  </div>
+                  {role.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 px-3 pt-2 pb-3">
+            {hasNoChangedModules && (
+              <p className="py-6 text-center text-[13px] text-muted-foreground">
+                当前没有已修改的权限点。
+              </p>
+            )}
+            {visibleModules.map((mod) => (
+              <section key={mod.module}>
+                {/* 模块头：每个角色一个「全选 / 全不选」的快捷切换 */}
+                <div className="flex items-center gap-3 border-b border-border pb-1.5">
+                  <strong className="min-w-0 flex-1 text-[13px] font-semibold text-foreground">
+                    {mod.label}
+                  </strong>
                   <div className="flex shrink-0">
-                    {roles.map((r) => (
-                      <div key={r.code} className={cn(ROLE_COL, 'shrink-0')}>
-                        <CheckboxField
-                          size="sm"
-                          checked={(draft[r.code] ?? new Set()).has(code)}
-                          disabled={!editable}
-                          ariaLabel={`${r.label} · ${PERMISSION_LABELS[code] ?? code}`}
-                          onChange={() => toggle(r.code, code)}
-                        />
-                      </div>
-                    ))}
+                    {roles.map((r) => {
+                      const set = draft[r.code] ?? new Set<string>();
+                      const all = mod.codes.every((c) => set.has(c));
+                      const none = mod.codes.every((c) => !set.has(c));
+                      return (
+                        <div key={r.code} className={cn(ROLE_COL, 'shrink-0')}>
+                          {/*
+                           * 「当前模块已全选」要暴露给读屏：用 `Toggle` 而不是
+                           * `ActionButton`，选中态由它输出 `aria-pressed`。
+                           * 这一枚是纯文字动作（全选 ↔ 全不选），所以关掉选中底
+                           * 色，只靠文字色区分。
+                           */}
+                          <Toggle
+                            variant="default"
+                            size="sm"
+                            pressed={all}
+                            onPressedChange={() => toggleModule(r.code, mod.codes)}
+                            disabled={!editable}
+                            className={cn(
+                              'h-6 min-w-0 px-2 text-[13px] font-medium hover:bg-accent',
+                              // 这一枚是纯文字动作，选中时不加底色，只换文字色；
+                              // 必须连同官方的 `data-[state=on]:text-accent-foreground`
+                              // 一起顶掉，否则选中后文字变浅、在透明底上看不清。
+                              'data-[state=on]:bg-transparent',
+                              all && 'text-brand hover:text-brand data-[state=on]:text-brand',
+                              none &&
+                                'text-muted-foreground/60 hover:text-muted-foreground/60 data-[state=on]:text-muted-foreground/60',
+                            )}
+                          >
+                            {all ? '全不选' : '全选'}
+                          </Toggle>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
-            </section>
-          ))}
+
+                {mod.codes.map((code) => (
+                  <div
+                    key={code}
+                    className={cn(
+                      'flex items-center gap-3 border-b border-border/60 py-1.5 last:border-b-0',
+                      isHighRisk(code) && 'bg-danger-soft/30',
+                    )}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span className="truncate text-[13px] text-foreground">
+                        {PERMISSION_LABELS[code] ?? code}
+                      </span>
+                      {isHighRisk(code) && (
+                        <ToneBadge tone="warn">
+                          高危
+                        </ToneBadge>
+                      )}
+                      <code className="truncate font-mono text-[12px] text-muted-foreground/60">{code}</code>
+                    </div>
+                    <div className="flex shrink-0">
+                      {roles.map((r) => (
+                        <div key={r.code} className={cn(ROLE_COL, 'shrink-0')}>
+                          <CheckboxField
+                            size="sm"
+                            checked={(draft[r.code] ?? new Set()).has(code)}
+                            disabled={!editable}
+                            ariaLabel={`${r.label} · ${PERMISSION_LABELS[code] ?? code}`}
+                            onChange={() => toggle(r.code, code)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            ))}
+          </div>
         </div>
       </Panel>
     </AdminPage>

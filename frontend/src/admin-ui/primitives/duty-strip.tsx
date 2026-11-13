@@ -77,7 +77,7 @@ export function DutyStrip() {
 
   const failed = ticks.filter((t) => t.status === 'failed').length;
   const sub = data
-    ? `${
+    ? `独立于指标窗口 · ${
         data.mode === 'finance'
           ? '近 6 笔待办'
           : `最近 ${Math.min(data.tasks.length, FULL_TICKS)} 条任务`
@@ -96,7 +96,7 @@ export function DutyStrip() {
           <h2 className="text-sm font-semibold text-card-foreground">
             {data ? (MODE_LABEL[data.mode] ?? '值班') : '值班'}
           </h2>
-          <span className="truncate text-xs text-muted-foreground">{sub}</span>
+          <span className="truncate text-[13px] text-muted-foreground">{sub}</span>
         </div>
         {action && (
           <Button asChild size="sm">
@@ -110,7 +110,7 @@ export function DutyStrip() {
 
       {error && (
         <div
-          className="flex items-center justify-between gap-2 border-b border-warn-border bg-warn-soft px-4 py-1.5 text-xs text-warn-text"
+          className="flex items-center justify-between gap-2 border-b border-warn-border bg-warn-soft px-4 py-1.5 text-[13px] text-warn-text"
           role="status"
         >
           <span className="flex min-w-0 items-center gap-1.5">
@@ -148,7 +148,7 @@ export function DutyStrip() {
           {(data?.counters ?? []).map((counter) => (
             <Counter key={counter.key} counter={counter} />
           ))}
-          {!data && <div className="col-span-4 text-xs text-muted-foreground">读取中…</div>}
+          {!data && <div className="col-span-4 text-[13px] text-muted-foreground">读取中…</div>}
         </div>
       </div>
     </section>
@@ -238,7 +238,7 @@ function Counter({ counter }: { counter: DutyCounter }) {
             : 'border-border bg-muted/40 hover:border-ring/40',
       )}
     >
-      <span className="truncate text-[12px] text-muted-foreground">{counter.label}</span>
+      <span className="truncate text-[13px] text-muted-foreground">{counter.label}</span>
       <span
         key={show}
         className={cn(

@@ -28,5 +28,9 @@ describe('startDetailGeneration', () => {
     const request = start.mock.calls[0][0];
     expect(request.params).not.toHaveProperty('sectionPrompts');
     expect(request.params.sections).toBe('hero,selling_points');
+    // 页面字段叫 resolution，后端能力参数叫 size；写错会被 sanitize 静默回落 1k
+    expect(request.params.size).toBe('1k');
+    expect(request.params).not.toHaveProperty('resolution');
+    expect(request.params.productName).toBe('轻音循环扇');
   });
 });

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
 import type { GenerationTask, RouteAttempt } from '@prisma/client';
+import { describe, expect, it, vi } from 'vitest';
 
 import { TaskWorkerService } from './task-worker.service';
 
@@ -31,9 +31,11 @@ function setup() {
     generationTask: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      groupBy: vi.fn(),
       update: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    modelChannel: { findMany: vi.fn().mockResolvedValue([]) },
     apiCallLog: { count: vi.fn().mockResolvedValue(0) },
   };
   const attempts = {
@@ -55,6 +57,7 @@ function setup() {
     reconcileCancelledTask: vi.fn().mockResolvedValue(false),
   };
   const health = { recordFailure: vi.fn() };
+  const config = { get: vi.fn().mockReturnValue(64) };
   const worker = new TaskWorkerService(
     prisma as never,
     {} as never,
@@ -70,8 +73,9 @@ function setup() {
     media as never,
     {} as never,
     lifecycle as never,
+    config as never,
   );
-  return { worker, prisma, attempts, channels, slots, executor, media, lifecycle, health };
+  return { worker, prisma, attempts, channels, slots, executor, media, lifecycle, health, config };
 }
 
 function task(): GenerationTask {
@@ -102,7 +106,13 @@ describe('TaskWorkerService 派发状态机', () => {
   it('租约恢复的精确 CAS 失败时不计为已回收，避免误清刚续租的执行者', async () => {
     const { worker, prisma, attempts, lifecycle } = setup();
     prisma.generationTask.findMany.mockResolvedValue([
-      { id: 'task-1', routeRun: 1, leaseOwner: 'worker-old', leaseUntil: new Date(1), pendingResult: null },
+      {
+        id: 'task-1',
+        routeRun: 1,
+        leaseOwner: 'worker-old',
+        leaseUntil: new Date(1),
+        pendingResult: null,
+      },
     ]);
     attempts.latest.mockResolvedValue(attempt({ status: 'selected', dispatchState: 'not_sent' }));
     prisma.generationTask.updateMany.mockResolvedValue({ count: 0 });
@@ -126,7 +136,9 @@ describe('TaskWorkerService 派发状态机', () => {
     prisma.generationTask.findMany.mockResolvedValue([
       { id: 'task-1', routeRun: 1, leaseOwner: 'worker-old', leaseUntil, pendingResult: null },
     ]);
-    attempts.latest.mockResolvedValue(attempt({ status: 'dispatching', dispatchState: 'submission_unknown' }));
+    attempts.latest.mockResolvedValue(
+      attempt({ status: 'dispatching', dispatchState: 'submission_unknown' }),
+    );
     lifecycle.uncertain.mockResolvedValue(true);
 
     await expect(worker.recoverStaleTasks()).resolves.toBe(1);
@@ -156,15 +168,26 @@ describe('TaskWorkerService 派发状态机', () => {
     expect(attempts.begin).toHaveBeenCalledTimes(1);
     expect(attempts.begin).toHaveBeenCalledWith(selected);
     expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(dispatch).toHaveBeenCalledWith(current, dispatching, expect.any(Object), expect.any(Array));
-    expect(attempts.begin.mock.invocationCallOrder[0]).toBeLessThan(dispatch.mock.invocationCallOrder[0]);
+    expect(dispatch).toHaveBeenCalledWith(
+      current,
+      dispatching,
+      expect.any(Object),
+      expect.any(Array),
+    );
+    expect(attempts.begin.mock.invocationCallOrder[0]).toBeLessThan(
+      dispatch.mock.invocationCallOrder[0],
+    );
   });
 
   it('换线建新 attempt 后返回主循环，不直接调用 dispatch', async () => {
     const { worker, prisma, attempts } = setup();
     const current = task();
     (current as any).leaseOwner = (worker as any).owner;
-    const oldAttempt = attempt({ id: 'attempt-old', status: 'failed', dispatchState: 'rejected_no_job' });
+    const oldAttempt = attempt({
+      id: 'attempt-old',
+      status: 'failed',
+      dispatchState: 'rejected_no_job',
+    });
     const newAttempt = attempt({ id: 'attempt-new', attemptNumber: 2 });
 
     vi.spyOn(worker as any, 'resolveRoute').mockResolvedValue(routed);
@@ -173,7 +196,9 @@ describe('TaskWorkerService 派发状态机', () => {
     prisma.generationTask.findUnique.mockResolvedValue(current);
     const dispatch = vi.spyOn(worker as any, 'dispatch').mockResolvedValue('wait');
 
-    await expect((worker as any).switchRoute(current, {}, [], ['channel-model-old'])).resolves.toBe('continue');
+    await expect((worker as any).switchRoute(current, {}, [], ['channel-model-old'])).resolves.toBe(
+      'continue',
+    );
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -303,7 +328,9 @@ describe('TaskWorkerService 派发状态机', () => {
     });
     attempts.markAccepted.mockResolvedValue(false);
 
-    await expect((worker as any).dispatch(current, dispatching, { duration: '6' }, [])).resolves.toBe('stop');
+    await expect(
+      (worker as any).dispatch(current, dispatching, { duration: '6' }, []),
+    ).resolves.toBe('stop');
     expect(lifecycle.uncertain).toHaveBeenCalledWith(
       'task-1',
       expect.stringContaining('上游已受理'),
@@ -336,7 +363,10 @@ describe('TaskWorkerService 派发状态机', () => {
     };
     const release = vi.fn();
     slots.acquire.mockResolvedValue(release);
-    (worker as any).ownsTaskLease = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    (worker as any).ownsTaskLease = vi
+      .fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
 
     await expect((worker as any).pollOnce(current, accepted, {}, [])).resolves.toBe('stop');
     expect(executor.poll).not.toHaveBeenCalled();
@@ -356,7 +386,10 @@ describe('TaskWorkerService 派发状态机', () => {
         created: true,
       },
     ];
-    prisma.generationTask.findUnique.mockResolvedValue({ status: 'running', leaseOwner: (worker as any).owner });
+    prisma.generationTask.findUnique.mockResolvedValue({
+      status: 'running',
+      leaseOwner: (worker as any).owner,
+    });
     vi.spyOn(worker as any, 'download').mockResolvedValue([
       { buffer: Buffer.from('image'), format: 'image/png', durationMs: null },
     ]);
@@ -373,6 +406,33 @@ describe('TaskWorkerService 派发状态机', () => {
     );
 
     expect(media.discardCreated).toHaveBeenCalledWith('task-1', stored);
+  });
+
+  it('上游返回成功但没有任何可解析产出时转人工核对，不自动退款', async () => {
+    const { worker, prisma, lifecycle, media } = setup();
+    const current = task();
+    (current as any).leaseOwner = (worker as any).owner;
+    prisma.generationTask.findUnique.mockResolvedValue({
+      status: 'running',
+      leaseOwner: (worker as any).owner,
+    });
+    const uncertain = vi.spyOn(worker as any, 'uncertainOwned').mockResolvedValue(undefined);
+
+    await (worker as any).finalize(
+      current,
+      attempt(),
+      { images: [] },
+      { channelId: 'channel-1' },
+      {},
+      'upstream-job-1',
+    );
+
+    expect(uncertain).toHaveBeenCalledWith(
+      'task-1',
+      expect.stringContaining('没有任何可解析的产出'),
+    );
+    expect(media.persist).not.toHaveBeenCalled();
+    expect(lifecycle.fail).not.toHaveBeenCalled();
   });
 
   it('无线路失败收口必须携带当前执行租约围栏', async () => {
@@ -407,5 +467,58 @@ describe('TaskWorkerService 派发状态机', () => {
       },
       { leaseOwner: (worker as any).owner },
     );
+  });
+});
+
+describe('TaskWorkerService 并发生图调度', () => {
+  const queue = (count: number, concurrency: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: `task-${index + 1}`,
+      ownerId: 'user-1',
+      channelId: 'channel-1',
+      params: JSON.stringify({ __memberConcurrency: concurrency }),
+    }));
+
+  function runningCounts(owner: number, channel: number) {
+    return async (args: { by: string[] }) =>
+      args.by.includes('ownerId')
+        ? [{ ownerId: 'user-1', _count: { _all: owner } }]
+        : [{ channelId: 'channel-1', _count: { _all: channel } }];
+  }
+
+  it('当前 6 个执行中、套餐并发 10 时，5 张只领取 4 张', async () => {
+    const { worker, prisma } = setup();
+    prisma.generationTask.findMany.mockResolvedValue(queue(5, 10));
+    prisma.generationTask.groupBy.mockImplementation(runningCounts(6, 0));
+    prisma.modelChannel.findMany.mockResolvedValue([{ id: 'channel-1', concurrencyLimit: 0 }]);
+    const launch = vi.spyOn(worker as any, 'launch').mockImplementation(() => {});
+
+    await (worker as any).claimQueued();
+
+    expect(launch).toHaveBeenCalledTimes(4);
+  });
+
+  it('渠道并发上限 8、当前 6 个执行中时，5 张只再领取 2 张', async () => {
+    const { worker, prisma } = setup();
+    prisma.generationTask.findMany.mockResolvedValue(queue(5, 10));
+    prisma.generationTask.groupBy.mockImplementation(runningCounts(6, 6));
+    prisma.modelChannel.findMany.mockResolvedValue([{ id: 'channel-1', concurrencyLimit: 8 }]);
+    const launch = vi.spyOn(worker as any, 'launch').mockImplementation(() => {});
+
+    await (worker as any).claimQueued();
+
+    expect(launch).toHaveBeenCalledTimes(2);
+  });
+
+  it('20 张、套餐并发 10 且渠道不限时，首批领取 10 张', async () => {
+    const { worker, prisma } = setup();
+    prisma.generationTask.findMany.mockResolvedValue(queue(20, 10));
+    prisma.generationTask.groupBy.mockImplementation(runningCounts(0, 0));
+    prisma.modelChannel.findMany.mockResolvedValue([{ id: 'channel-1', concurrencyLimit: 0 }]);
+    const launch = vi.spyOn(worker as any, 'launch').mockImplementation(() => {});
+
+    await (worker as any).claimQueued();
+
+    expect(launch).toHaveBeenCalledTimes(10);
   });
 });

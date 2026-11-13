@@ -263,9 +263,9 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'model.pluginInstallDir', env: 'MODEL_PLUGIN_INSTALL_DIR', type: 'string', def: 'plugins-installed' },
   // 服务商目录（远端 JSON 清单）。留空 = 目录为空态，不内置任何假条目
   { key: 'model.providerCatalogUrl', env: 'MODEL_PROVIDER_CATALOG_URL', type: 'string', def: '' },
-  // 预留的进程执行位配置。当前 worker 使用固定 8 个执行位（MAX_ACTIVE_TASKS），
-  // 未读取此值；用户级并发由会员套餐 maxConcurrent 在准入层按任务数控制。
-  { key: 'model.activeTaskLimit', env: 'MODEL_ACTIVE_TASK_LIMIT', type: 'number', def: 2, min: 1, max: 64 },
+  // 本进程执行位上限（1–64）。超过该值会在进程内排队；用户并发由会员
+  // maxConcurrent、渠道并发由 ModelChannel.concurrencyLimit 在 worker 领取时分别限制。
+  { key: 'model.activeTaskLimit', env: 'MODEL_ACTIVE_TASK_LIMIT', type: 'number', def: 64, min: 1, max: 64 },
   // 上游请求默认超时与产物下载超时
   { key: 'model.httpTimeoutMs', env: 'MODEL_HTTP_TIMEOUT_MS', type: 'number', def: 120000, min: 1000 },
   { key: 'model.mediaTimeoutMs', env: 'MODEL_MEDIA_TIMEOUT_MS', type: 'number', def: 180000, min: 1000 },

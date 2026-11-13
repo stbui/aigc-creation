@@ -554,7 +554,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 | 人工核对 | `POST /admin/billing-orders/:id/resolve`（`action: settle \| refund`，高危） | `billing_order.resolve` |
 | 财务汇总 | `GET /admin/analytics/finance` | `model.analytics_read` |
 
-- 账单状态机：`reserved / running / settled / refunded / uncertain`。`uncertain`（超时、5xx、连接中断）不自动退款、不切线，只能人工 `settle` 或 `refund`。
+- 账单状态机：`reserved / running / settled / refunded / uncertain`。`uncertain`（超时、5xx、连接中断，或已交付但结算失败）不自动退款、不切线；未交付的可人工 `settle` 或 `refund`，已交付的只能 `settle`（拿到图又退钱会造成资损）。
 - 财务口径固定三条：实收 = 已结算账单实际金额；已退 = 订单退款金额；净收入 = 实收 − 已退。预留 / 运行 / 待核对单列为「挂账」，**不计入实收**。
 - **与概览页的「订单收入」不是同一笔账**：财务页单位是**积分**（内部计价单位，已结算账单口径），概览页「订单收入」单位是**元**（订单实付口径，Σ `Order.paidCents`）。两者都曾叫「收入 / 营收」，同名不同义会让人把两处的数字对在一起，对不上就以为其中一处坏了。概览页的营收标签带「（元）」、财务页的说明写明「与概览页的订单收入（元）不是同一笔账」，并在概览页给出财务页入口。**两个口径的差异是事实，不允许合并成一个数。**
 

@@ -5,6 +5,7 @@
  * 任一模块失败都不能影响同批其它模块的产出。
  */
 
+import { AppError } from '../../common/app.exception';
 import type { CapabilityPlugin } from '../capability-plugin.type';
 import { generateImageIntent } from '../model-mapping';
 import {
@@ -12,6 +13,7 @@ import {
   DETAIL_SECTIONS,
   LANGUAGES,
   languageText,
+  MAX_DETAIL_SECTIONS,
   PLATFORMS,
   parseDetailSections,
   platformDetailSpecText,
@@ -121,6 +123,38 @@ function parseSectionPrompts(raw: unknown): Map<string, string> {
   return prompts;
 }
 
+/**
+ * 提交前的「包含模块」强校验。
+ *
+ * `parseDetailSections` 会过滤未知键、截断到 10 项并回落到默认 6 项 —— 这适合
+ * 兼容历史数据，但不能用在扣费入口：调用方显式传 `typo` 时若静默回落，会按
+ * 6 张图扣 6 份钱。这里只允许「空值走默认」与「全部合法且不超过上限」。
+ */
+export function validateDetailSections(raw: unknown): void {
+  const tokens = (
+    Array.isArray(raw)
+      ? raw.map((item) => String(item ?? '').trim())
+      : String(raw ?? '')
+          .split(',')
+          .map((item) => item.trim())
+  ).filter(Boolean);
+  if (tokens.length === 0) return;
+
+  const valid = DETAIL_SECTIONS.map((section) => String(section.value));
+  const known = new Set(valid);
+  const unknown = [...new Set(tokens.filter((token) => !known.has(token)))];
+  if (unknown.length > 0) {
+    throw new AppError(
+      40001,
+      `包含模块取值无效：${unknown.join('、')}（允许：${valid.join('、')}）`,
+      400,
+    );
+  }
+  if (new Set(tokens).size > MAX_DETAIL_SECTIONS) {
+    throw new AppError(40001, `包含模块最多选择 ${MAX_DETAIL_SECTIONS} 项`, 400);
+  }
+}
+
 /** 模块键 → 展示名 (供准入层构造 outputPlan 与结果行标签) */
 export function detailSectionLabel(key: string): string {
   return SECTION_LABELS.get(key) ?? key;
@@ -214,6 +248,7 @@ export const DetailImage: CapabilityPlugin = {
     },
     { key: 'batchSize', label: '批次数量', type: 'number', hidden: true, min: 1, max: 10, step: 1 },
   ],
+  validateParams: (p) => validateDetailSections(p?.sections),
   buildPrompt: (p, refCount = 0) => {
     const section = typeof p.section === 'string' ? p.section.trim() : '';
     if (!section) return fallbackPrompt(p);
@@ -296,12 +331,17 @@ export const DetailImage: CapabilityPlugin = {
       params: {
         section: key,
         sectionLabel: detailSectionLabel(key),
-        ...(prompts.get(key) ? { sectionPrompt: prompts.get(key) } : {}),
+        // 始终写入（无补充要求时为空串）：覆盖调用方可能直接塞进 params 的
+        // 顶层 `sectionPrompt`，否则它会广播到所有没有自定义提示词的模块。
+        sectionPrompt: prompts.get(key) ?? '',
       },
     }));
   },
   modality: 'image',
   model: { capability: 'image', operation: 'text_to_image', intent: generateImageIntent },
   inputs: 1,
+  // 页面契约最多 5 张；通用准入上限是 10，能力级必须显式收窄，
+  // 否则直接调 API 可以传 6-10 张并照常计费。
+  maxInputs: 5,
   inWorkbench: true,
 };

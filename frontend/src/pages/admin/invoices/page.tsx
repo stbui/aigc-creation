@@ -106,6 +106,14 @@ export function AdminInvoicesPage() {
 
   const appliedStatus = params.status as InvoiceStatus | undefined;
   const appliedKeyword = (params.keyword as string | undefined) ?? '';
+  const appliedFilters = {
+    status: appliedStatus,
+    keyword: appliedKeyword || undefined,
+  };
+  const draftFilters = {
+    status,
+    keyword: keyword.trim() || undefined,
+  };
   const appliedChips: AppliedFilter[] = [
     appliedStatus
       ? {
@@ -333,16 +341,15 @@ export function AdminInvoicesPage() {
 
       <SavedViewBar
         pageKey="invoices"
-        currentFilters={{
-          status: appliedStatus,
-          keyword: appliedKeyword || undefined,
-        }}
+        appliedFilters={appliedFilters}
+        draftFilters={draftFilters}
         onApply={(next) => {
           const nextStatus = next.status as InvoiceStatus | undefined;
           setStatus(nextStatus);
           setKeyword(next.keyword ?? '');
           setQuery({ status: nextStatus, keyword: next.keyword });
         }}
+        onApplyDraft={applyQuery}
       />
 
       <Panel

@@ -17,6 +17,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { ChannelExecution } from '../channels/channel-runtime.service';
 import { OutboundError } from '../infra/outbound';
 import { ProtocolExecutor, type ProtocolHttpResponse } from '../protocol/executor';
 import type {
@@ -27,7 +28,6 @@ import type {
   ProtocolRequestSpec,
   ProtocolResult,
 } from '../protocol/runtime';
-import type { ChannelExecution } from '../channels/channel-runtime.service';
 import { extractUsage } from '../protocol/usage';
 import { preConnectionNetworkFailure, safeRouteFailure } from './task-failure-policy';
 
@@ -49,8 +49,12 @@ export function upstreamErrorText(body: string): string {
     ]) {
       const value = path
         .split('.')
-        .reduce<any>((current, key) => (current && typeof current === 'object' ? current[key] : undefined), payload);
-      if (value !== undefined && value !== null && String(value).trim() !== '') return truncate(String(value), 500);
+        .reduce<any>(
+          (current, key) => (current && typeof current === 'object' ? current[key] : undefined),
+          payload,
+        );
+      if (value !== undefined && value !== null && String(value).trim() !== '')
+        return truncate(String(value), 500);
     }
   } catch {
     // 非 JSON 响应按原文返回
@@ -128,7 +132,14 @@ export class TaskExecutorService {
     adapter: ProtocolAdapter,
     channel: ChannelExecution,
     request: GenerationRequest,
-  ): Promise<{ outcome: CallOutcome; create: ProtocolCreateResult | null; upstreamUrl: string; requestBody: string; responseBody: string; spec: ProtocolRequestSpec }> {
+  ): Promise<{
+    outcome: CallOutcome;
+    create: ProtocolCreateResult | null;
+    upstreamUrl: string;
+    requestBody: string;
+    responseBody: string;
+    spec: ProtocolRequestSpec;
+  }> {
     const startedAt = Date.now();
     let spec: ProtocolRequestSpec | null = null;
     let response: ProtocolHttpResponse | null = null;
@@ -138,10 +149,12 @@ export class TaskExecutorService {
     let failureCode = '';
     let failureMessage = '';
     let statusCode = 0;
+    let sent = false;
 
     try {
       spec = await adapter.buildCreate({ baseUrl: channel.runtime.baseUrl, request });
       requestBody = truncate(safeJson(spec.body), 4000);
+      sent = true;
       response = await this.executor.send(spec, channel.runtime);
       statusCode = response.status;
       responseBody = truncate(response.text, 4000);
@@ -157,13 +170,24 @@ export class TaskExecutorService {
         }
       }
     } catch (error) {
-      failureCode = failureCodeOf(error, statusCode);
+      /*
+       * buildCreate 抛错发生在请求写出之前：上游一定没有接下任务。
+       * 不能按普通 provider_error 判「结果不明」冻结积分 —— 这是本地协议
+       * 构建失败，切线或退款都安全。
+       */
+      failureCode = sent ? failureCodeOf(error, statusCode) : 'request_invalid';
       failureMessage = error instanceof Error ? error.message : String(error);
     }
 
     const durationMs = Date.now() - startedAt;
     const status: CallOutcome['status'] =
-      failureCode !== '' ? 'failed' : create && (create.status === 'pending' || create.status === 'processing') ? 'pending' : create?.status === 'succeeded' ? 'succeeded' : 'failed';
+      failureCode !== ''
+        ? 'failed'
+        : create && (create.status === 'pending' || create.status === 'processing')
+          ? 'pending'
+          : create?.status === 'succeeded'
+            ? 'succeeded'
+            : 'failed';
     if (failureCode === '' && (create === null || create.status === 'cancelled')) {
       failureCode = 'upstream_no_result';
       failureMessage = create?.message || '上游没有返回可用结果';
@@ -177,10 +201,13 @@ export class TaskExecutorService {
         result: create?.result ?? null,
         stage: String(create?.stage ?? ''),
         message: String(create?.message ?? ''),
-        failureCode: failureCode !== '' ? failureCode : status === 'failed' ? 'upstream_no_result' : '',
+        failureCode:
+          failureCode !== '' ? failureCode : status === 'failed' ? 'upstream_no_result' : '',
         failureMessage: failureMessage || (create?.message ?? ''),
-        // 200 明确失败与 HTTP 拒绝都表示「上游没有建立任务」；请求根本没发出去也是
-        rejectedNoJob: failureCode !== '' && safeFailure(failureCode),
+        // 200 明确失败与 HTTP 拒绝都表示「上游没有建立任务」；请求根本没发出去
+        // （buildCreate 失败 / 建连前网络失败）也属于这一类。
+        rejectedNoJob:
+          failureCode !== '' && (safeFailure(failureCode) || failureCode === 'request_invalid'),
         statusCode,
         retryAfterMs: retryAfterMsOf(response?.headers),
         durationMs,
@@ -200,7 +227,14 @@ export class TaskExecutorService {
     channel: ChannelExecution,
     request: GenerationRequest,
     taskId: string,
-  ): Promise<{ outcome: CallOutcome; poll: ProtocolPollResult | null; upstreamUrl: string; requestBody: string; responseBody: string; spec: ProtocolRequestSpec }> {
+  ): Promise<{
+    outcome: CallOutcome;
+    poll: ProtocolPollResult | null;
+    upstreamUrl: string;
+    requestBody: string;
+    responseBody: string;
+    spec: ProtocolRequestSpec;
+  }> {
     const startedAt = Date.now();
     let poll: ProtocolPollResult | null = null;
     let response: ProtocolHttpResponse | null = null;
@@ -282,7 +316,11 @@ export class TaskExecutorService {
       (outcome.result?.videos?.length ?? 0) +
       (outcome.result?.audios?.length ?? 0);
     const status =
-      outcome.status === 'succeeded' ? 'success' : outcome.status === 'pending' ? 'pending' : 'failed';
+      outcome.status === 'succeeded'
+        ? 'success'
+        : outcome.status === 'pending'
+          ? 'pending'
+          : 'failed';
     try {
       await this.prisma.apiCallLog.create({
         data: {
@@ -364,8 +402,13 @@ export function failureCodeOf(error: unknown, statusCode = 0): string {
   }
   if (statusCode > 0) return upstreamFailureCode(statusCode);
   const message = String(error instanceof Error ? error.message : error).toLowerCase();
-  if (message.includes('timeout') || message.includes('超时') || message.includes('aborted')) return 'timeout';
-  if (message.includes('fetch failed') || message.includes('econnreset') || message.includes('socket')) {
+  if (message.includes('timeout') || message.includes('超时') || message.includes('aborted'))
+    return 'timeout';
+  if (
+    message.includes('fetch failed') ||
+    message.includes('econnreset') ||
+    message.includes('socket')
+  ) {
     return 'connection_error';
   }
   return 'provider_error';
@@ -408,6 +451,8 @@ function logVideoSeconds(input: CallLogInput): number {
   const explicit = input.videoSeconds;
   return Math.max(
     0,
-    Math.trunc(Number(explicit !== undefined ? explicit : extractVideoSeconds(input.requestBody)) || 0),
+    Math.trunc(
+      Number(explicit !== undefined ? explicit : extractVideoSeconds(input.requestBody)) || 0,
+    ),
   );
 }

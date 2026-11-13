@@ -1,18 +1,8 @@
 import type { RefObject } from 'react';
-import { CircleAlert } from 'lucide-react';
 
 import type { PublicModelGroup } from './api';
 import type { AssetSlot, CloneDegree } from './constants';
-import {
-  InlineAlert,
-  InlineAlertDescription,
-  Surface,
-  SurfaceContent,
-  SurfaceFooter,
-  SurfaceHeader,
-  ToolGenerationSubmitBar,
-  ToolTypeTabs,
-} from './components';
+import { ToolGenerationSubmitBar, ToolTypeTabs } from './components';
 import type { UploadedImage } from './hooks';
 import { ViralCloneFormSection } from './ViralCloneFormSection';
 import { ViralCloneDegreeCard } from './ViralCloneDegreeCard';
@@ -24,6 +14,11 @@ import { ViralCloneRequirementCard } from './ViralCloneRequirementCard';
  * 表单、上传、弹窗与提交的状态全部在 `page.tsx`，这里只负责左栏结构与事件转发。
  * 与 `ViralCloneOutputPane`（功能示例 / 创作结果）一起构成页面的左右分栏：
  * 展示组件不持有业务状态，避免把「提交 / 扣费」逻辑分散到布局层。
+ *
+ * 骨架与商品主图 / 商品详情同源：`pk-input-pane` → `pk-form-card` →
+ * `pk-form-scroll`（内含多张 `pk-config-card`）+ 底部 `ToolGenerationSubmitBar`。
+ * 三页共用同一套工具页皮肤，不再各自包一层 Card，否则栏内分组、圆角与留白
+ * 会与相邻页面对不上。
  */
 export interface ViralCloneInputPaneProps {
   // ── 上传 ──
@@ -118,13 +113,11 @@ export function ViralCloneInputPane({
   onSubmit,
 }: ViralCloneInputPaneProps) {
   return (
-    <aside className="vc-input-pane" aria-label="爆款复刻设置">
-      <Surface className="vc-editor-card">
-        <SurfaceHeader className="vc-editor-header">
-          <ToolTypeTabs active="viral-clone" />
-        </SurfaceHeader>
+    <aside className="pk-input-pane" aria-label="爆款复刻设置">
+      <div className="pk-form-card">
+        <ToolTypeTabs active="viral-clone" />
 
-        <SurfaceContent className="vc-editor-content">
+        <div className="pk-form-scroll">
           <ViralCloneFormSection
             images={images}
             maxImages={maxImages}
@@ -155,34 +148,30 @@ export function ViralCloneInputPane({
           />
 
           <ViralCloneDegreeCard degree={degree} onDegreeChange={onDegreeChange} />
-        </SurfaceContent>
+        </div>
 
-        <SurfaceFooter className="vc-editor-footer">
-          <ToolGenerationSubmitBar
-            capability="hot_remake"
-            generating={generating}
-            disabled={!formValid || Boolean(unavailableReason)}
-            creditLabel={creditLabel}
-            notice={
-              unavailableReason && !generating ? (
-                <InlineAlert variant="destructive" className="vc-submit-alert">
-                  <CircleAlert />
-                  <InlineAlertDescription>{unavailableReason}</InlineAlertDescription>
-                </InlineAlert>
-              ) : null
-            }
-            settingsOpen={settingsOpen}
-            ratio={ratio}
-            resolution={resolution}
-            onToggleSettings={onToggleSettings}
-            onRatioChange={onRatioChange}
-            onResolutionChange={onResolutionChange}
-            onModelQuoteChange={onModelQuoteChange}
-            onModelChange={onModelChange}
-            onSubmit={onSubmit}
-          />
-        </SurfaceFooter>
-      </Surface>
+        {/* 高级设置 + 提交 (sticky 底部)；不可用原因走共享提示行样式 */}
+        <ToolGenerationSubmitBar
+          capability="hot_remake"
+          generating={generating}
+          disabled={!formValid || Boolean(unavailableReason)}
+          creditLabel={creditLabel}
+          hint={
+            unavailableReason && !generating ? (
+              <span className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</span>
+            ) : undefined
+          }
+          settingsOpen={settingsOpen}
+          ratio={ratio}
+          resolution={resolution}
+          onToggleSettings={onToggleSettings}
+          onRatioChange={onRatioChange}
+          onResolutionChange={onResolutionChange}
+          onModelQuoteChange={onModelQuoteChange}
+          onModelChange={onModelChange}
+          onSubmit={onSubmit}
+        />
+      </div>
     </aside>
   );
 }

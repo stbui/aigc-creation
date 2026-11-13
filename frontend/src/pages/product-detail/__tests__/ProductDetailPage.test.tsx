@@ -1,9 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { ProductDetailPage } from '../page';
 import { startDetailGeneration } from '../api';
+import { ProductDetailPage } from '../page';
 
 vi.mock('../../../ui', async () => {
   const { forwardRef } = await import('react');
@@ -20,9 +19,10 @@ vi.mock('../../../ui', async () => {
   const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
     (props, ref) => <input ref={ref} {...props} />,
   );
-  const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
-    (props, ref) => <textarea ref={ref} {...props} />,
-  );
+  const Textarea = forwardRef<
+    HTMLTextAreaElement,
+    React.TextareaHTMLAttributes<HTMLTextAreaElement>
+  >((props, ref) => <textarea ref={ref} {...props} />);
   return {
     useApp: () => ({
       message: { warning: vi.fn(), error: vi.fn(), success: vi.fn(), info: vi.fn() },
@@ -31,7 +31,8 @@ vi.mock('../../../ui', async () => {
     Button,
     Input,
     Textarea,
-    Modal: ({ open, children }: { open?: boolean; children?: React.ReactNode }) => (open ? <div>{children}</div> : null),
+    Modal: ({ open, children }: { open?: boolean; children?: React.ReactNode }) =>
+      open ? <div>{children}</div> : null,
     Card: passthrough,
   };
 });
@@ -57,6 +58,7 @@ vi.mock('../hooks', async () => {
       changeResolution: vi.fn(),
       toggleSettings: vi.fn(),
       applySettings: vi.fn(),
+      applySnapshot: vi.fn(),
     }),
     useIdempotencyKey: () => ({
       keyFor: () => 'idem-test',

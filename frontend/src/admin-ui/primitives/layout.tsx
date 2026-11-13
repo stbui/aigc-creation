@@ -65,7 +65,7 @@ export function PageHeader({
         {description && (
           <p
             className={cn(
-              'text-[12px] leading-5 text-muted-foreground',
+              'text-[13px] leading-5 text-muted-foreground',
               !inlineDescription && 'mt-1',
             )}
           >
@@ -128,7 +128,7 @@ export function Panel({
                 {title}
               </h2>
             )}
-            {note && <CardDescription className="mt-0.5 text-[12px]">{note}</CardDescription>}
+            {note && <CardDescription className="mt-0.5 text-[13px] leading-5">{note}</CardDescription>}
           </div>
           {extra && <div className="flex shrink-0 items-center gap-2">{extra}</div>}
         </CardHeader>
@@ -180,16 +180,16 @@ export function StatCard({
     >
       {inline ? (
         <div className="flex min-w-0 items-center justify-between gap-2">
-          <div className="shrink-0 text-xs font-medium text-muted-foreground">{label}</div>
+          <div className="shrink-0 text-[13px] font-medium text-muted-foreground">{label}</div>
           <div className={cn(valueClassName, 'whitespace-nowrap text-lg leading-6')}>{value}</div>
         </div>
       ) : (
         <>
-          <div className="text-xs font-medium text-muted-foreground">{label}</div>
+          <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
           <div className={cn(valueClassName, 'mt-1 text-[22px] leading-7')}>{value}</div>
         </>
       )}
-      {hint && <div className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{hint}</div>}
+      {hint && <div className="mt-0.5 text-[13px] leading-5 text-muted-foreground">{hint}</div>}
     </Card>
   );
 }
@@ -318,7 +318,7 @@ export function DetailSection({
       <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         {note && (
-          <span className="min-w-0 text-[12px] break-words text-muted-foreground">{note}</span>
+          <span className="min-w-0 text-[13px] leading-5 break-words text-muted-foreground">{note}</span>
         )}
       </div>
       {children}
@@ -355,7 +355,7 @@ export function BatchBar({
         className,
       )}
     >
-      <span className="text-xs font-medium text-accent-foreground">
+      <span className="text-[13px] font-medium text-accent-foreground">
         已选 {count} {unit}
       </span>
       {children}
@@ -385,7 +385,7 @@ export function EmptyState({
       <EmptyHeader className="gap-2">
         <EmptyTitle className="text-sm font-medium text-foreground">{title}</EmptyTitle>
         {description && (
-          <EmptyDescription className="max-w-md text-xs leading-5">{description}</EmptyDescription>
+          <EmptyDescription className="max-w-md text-[13px] leading-5">{description}</EmptyDescription>
         )}
       </EmptyHeader>
       {action && <EmptyContent className="mt-2 max-w-none">{action}</EmptyContent>}
@@ -402,7 +402,7 @@ export function ListError({ error, onRetry }: { error: string; onRetry?: () => v
       </EmptyMedia>
       <EmptyHeader className="gap-2">
         <EmptyTitle className="text-sm font-medium text-foreground">加载失败</EmptyTitle>
-        <EmptyDescription className="max-w-md text-xs leading-5">{error}</EmptyDescription>
+        <EmptyDescription className="max-w-md text-[13px] leading-5">{error}</EmptyDescription>
       </EmptyHeader>
       {/*
        * 没有 `onRetry` 就不渲染按钮 —— 一个点了没反应的按钮比没有更糟。
@@ -429,7 +429,7 @@ export function StaleError({ error, onRetry }: { error: string; onRetry: () => v
   return (
     <Alert
       role="status"
-      className="mb-4 flex items-start gap-2 rounded-lg border-warn-soft bg-warn-soft px-3 py-2.5 text-xs text-warn-text"
+      className="mb-4 flex items-start gap-2 rounded-lg border-warn-soft bg-warn-soft px-3 py-2.5 text-[13px] text-warn-text"
     >
       <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1">

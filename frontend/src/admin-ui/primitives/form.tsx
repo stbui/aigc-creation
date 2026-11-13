@@ -105,7 +105,7 @@ export function FormField({
       data-required={required || undefined}
     >
       <div className="flex items-center gap-1">
-        <Label htmlFor={controlId} className="text-xs font-medium text-foreground">
+        <Label htmlFor={controlId} className="text-[13px] font-medium text-foreground">
           {label}
         </Label>
         {required && (
@@ -116,9 +116,9 @@ export function FormField({
       </div>
       {control}
       {error ? (
-        <p id={errorId} className="min-w-0 break-words text-xs leading-5 text-destructive [overflow-wrap:anywhere]" role="alert">{error}</p>
+        <p id={errorId} className="min-w-0 break-words text-[13px] leading-5 text-destructive [overflow-wrap:anywhere]" role="alert">{error}</p>
       ) : hint ? (
-        <p className="min-w-0 break-words text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{hint}</p>
+        <p className="min-w-0 break-words text-[13px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">{hint}</p>
       ) : null}
     </div>
   );

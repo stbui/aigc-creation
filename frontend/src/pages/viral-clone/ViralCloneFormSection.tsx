@@ -7,9 +7,10 @@ import type { UploadedImage } from './hooks';
 /**
  * 爆款复刻左栏表单区：上传商品图 / 上传参考图（爆款图）/ 生成设置。
  *
- * 与商品详情、商品主图的 `*FormSection` 同角色；三者在参考站同属一张配置卡。
- * 参考图是单张位，标题行不显示计数器。商品基础字段走共享 `ProductFieldsGrid`，
- * 名称 / 品牌在本页为选填。
+ * 与商品详情、商品主图的 `*FormSection` 同角色；三者在参考站同属一张配置卡，
+ * 因此这里也复用 `.pk-config-card` 皮肤（白底 + `--radius-panel` + 16px 内边距），
+ * 而不是在页面级的 Card 里铺平内容。参考图是单张位，标题行不显示计数器。
+ * 商品基础字段走共享 `ProductFieldsGrid`，名称 / 品牌在本页为选填。
  */
 export function ViralCloneFormSection({
   images,
@@ -56,7 +57,7 @@ export function ViralCloneFormSection({
   onLanguageChange: (value: string) => void;
 }) {
   return (
-    <div className="vc-config-section">
+    <section className="pk-config-card">
       <ToolImageDropzone
         title="上传商品图"
         images={images}
@@ -89,23 +90,18 @@ export function ViralCloneFormSection({
         emptyHint={`上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过 ${MAX_IMAGE_MB}MB`}
       />
 
-      <section className="vc-generation-settings" aria-labelledby="vc-generation-settings-title">
-        <h3 id="vc-generation-settings-title" className="text-sm font-semibold text-foreground">
-          生成设置
-        </h3>
-        <ProductFieldsGrid
-          productName={productName}
-          onProductNameChange={onProductNameChange}
-          brand={brand}
-          onBrandChange={onBrandChange}
-          platform={platform}
-          onPlatformChange={onPlatformChange}
-          language={language}
-          onLanguageChange={onLanguageChange}
-          required={false}
-          showTitle={false}
-        />
-      </section>
-    </div>
+      {/* 「生成设置」小标题由 ProductFieldsGrid 按 pk 皮肤渲染，与另两页同一字号/字重 */}
+      <ProductFieldsGrid
+        productName={productName}
+        onProductNameChange={onProductNameChange}
+        brand={brand}
+        onBrandChange={onBrandChange}
+        platform={platform}
+        onPlatformChange={onPlatformChange}
+        language={language}
+        onLanguageChange={onLanguageChange}
+        required={false}
+      />
+    </section>
   );
 }

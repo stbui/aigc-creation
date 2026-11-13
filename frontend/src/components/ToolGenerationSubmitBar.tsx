@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-
+import type { PublicModelGroup } from '../lib/models';
 import { ModelPicker } from './ModelPicker';
 import { ToolSettingsPopover, type ToolSettingsPopoverProps } from './ToolSettingsPopover';
 import { ToolSubmitBar } from './ToolSubmitBar';
-import type { PublicModelGroup } from '../lib/models';
 
 export interface ToolGenerationSubmitBarProps {
   /** 能力 id（与后端 capability.registry 一致） */
@@ -24,6 +23,8 @@ export interface ToolGenerationSubmitBarProps {
   onRatioChange: (value: string) => void;
   resolution: string;
   onResolutionChange: (value: string) => void;
+  /** 所选模型的画质档位合同；提供时禁用不支持的档位 */
+  resolutionValues?: readonly unknown[] | null;
   onModelQuoteChange: (credits: number | null) => void;
   onModelChange?: (model: PublicModelGroup | null) => void;
   /** 高级设置浮层的差异项（自定义头部 / 类名等） */
@@ -55,6 +56,7 @@ export function ToolGenerationSubmitBar({
   onRatioChange,
   resolution,
   onResolutionChange,
+  resolutionValues,
   onModelQuoteChange,
   onModelChange,
   settingsProps,
@@ -81,6 +83,7 @@ export function ToolGenerationSubmitBar({
             resolution={resolution}
             onResolutionChange={onResolutionChange}
             capabilityId={capability}
+            resolutionValues={resolutionValues}
             {...restSettingsProps}
             modelPicker={
               modelPicker ?? (

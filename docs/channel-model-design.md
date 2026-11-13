@@ -335,7 +335,7 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 - 执行：恢复/创建 attempt → 派发 → 轮询；
 - 轮询：`providerRequestId` 存在且 `nextPollAt` 到期才回查，回查期间释放执行位；
 - 租约过期：`task-recover` 扫描 `leaseUntil < now()`，按 attempt 的 `dispatchState` 决定续跑 / 失败 / 待核对；
-- 并发上限：本进程固定 8 个执行位（`MAX_ACTIVE_TASKS`；`MODEL_ACTIVE_TASK_LIMIT` 未接入）；渠道级并发槽按渠道 `concurrencyLimit`，等待策略为 200ms 指数退避、上限 2s 加抖动，等槽总上限 `MODEL_SLOT_WAIT_MS`。
+- 并发上限：本进程执行位由 `MODEL_ACTIVE_TASK_LIMIT` 控制（默认 64）；领取时按会员 `maxConcurrent` 与渠道 `concurrencyLimit` 分批，超出的任务留在队列；渠道级并发槽按渠道 `concurrencyLimit`，等待策略为 200ms 指数退避、上限 2s 加抖动，等槽总上限 `MODEL_SLOT_WAIT_MS`。
 
 ### 5.10 产物回收
 

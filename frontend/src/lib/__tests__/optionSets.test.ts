@@ -189,4 +189,38 @@ describe('resolutionOptions', () => {
       expect.objectContaining({ multiplier: 1, sub: '1倍消耗' }),
     ]);
   });
+
+  it('模型合同声明 imageResolution 时以合同为准，不放开不支持的档位', async () => {
+    const sizes = [
+      { value: '1k', label: '1K (1024px)' },
+      { value: '2k', label: '2K (2048px)' },
+      { value: '4k', label: '4K (4096px)' },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: 0,
+            message: '',
+            data: {
+              groups: [],
+              workbenchIds: [],
+              items: [{ id: 'main_image', params: [{ key: 'size', options: sizes }] }],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    );
+
+    await loadCapabilities(true);
+
+    expect(
+      resolutionOptions('main_image', ['1k', '2k']).map((option) => Boolean(option.disabled)),
+    ).toEqual([false, false, true]);
+    expect(
+      resolutionOptions('main_image', ['*']).map((option) => Boolean(option.disabled)),
+    ).toEqual([false, false, false]);
+  });
 });

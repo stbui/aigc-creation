@@ -1,16 +1,15 @@
-import { VARIANT_FIELDS, VARIANT_LABELS, MAX_PER_VARIANT } from './constants';
-import { assetsApi, assetSrc, type Asset } from './api';
-import type { GalleryItem, UploadedImage } from './hooks';
-import { modelImageInputLimit, type PublicModelGroup } from '../../lib/models';
 import {
   buildProductBatchRows,
   countGenerations as countGenerationsOf,
   downloadFileName as downloadFileNameOf,
   formatBatchDate,
+  type ProductBatchRow,
   rowKeyOf as rowKeyOfItem,
   textParam as textParamOf,
-  type ProductBatchRow,
 } from '../../components/batchResult';
+import { type Asset, assetSrc, assetsApi } from './api';
+import { MAX_PER_VARIANT, VARIANT_FIELDS, VARIANT_LABELS } from './constants';
+import type { GalleryItem, UploadedImage } from './hooks';
 
 /**
  * 商品主图工作台页面的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
@@ -20,33 +19,17 @@ import {
  * 目录内新增外部工具引用时在这里补一行 re-export。
  */
 
-/** 平台 / 语言 / 平台规格（读自后端能力清单） */
-export { languageOptions, platformOptions, platformSpec } from '../../lib/optionSets';
 /** 缩略图地址换算 */
 export { assetThumbUrl } from '../../lib/api';
 /** 模型能力合同里的图片输入上限 */
-export { modelImageInputLimit } from '../../lib/models';
-
+/** 超出模型输入上限的可读原因（页面与详情图共用） */
+export { imageInputCountError, modelImageInputLimit } from '../../lib/models';
+/** 平台 / 语言 / 平台规格（读自后端能力清单） */
+export { languageOptions, platformOptions, platformSpec } from '../../lib/optionSets';
 
 /* ------------------------------------------------------------------------- */
 /* 模型输入约束                                                             */
 /* ------------------------------------------------------------------------- */
-
-/**
- * 素材数量超过模型能力合同时的可读原因。
- *
- * 前端页面上限与模型上限是两个概念：页面允许保留 5 个输入位，但模型合同
- * 可能只接受 4 张。超限时必须在建单前明确拦住，绝不静默丢掉用户素材 ——
- * 否则用户会误以为 5 张都参与了生成。
- */
-export function imageInputCountError(
-  model: Pick<PublicModelGroup, 'name' | 'capabilitySpec'>,
-  imageCount: number,
-): string | null {
-  const max = modelImageInputLimit(model);
-  if (max === null || imageCount <= max) return null;
-  return `所选模型「${model.name}」最多支持 ${max} 张商品图，请移除 ${imageCount - max} 张或切换模型`;
-}
 
 /* ------------------------------------------------------------------------- */
 /* 提交计划                                                                 */
@@ -135,7 +118,11 @@ function mimeOf(blobType: string, format: string, extension: string): string {
 }
 
 function copyFileName(name: string, id: string, extension: string): string {
-  const base = name.replace(/[/\\]/g, '_').replace(/\.[^.]+$/, '').trim() || 'asset';
+  const base =
+    name
+      .replace(/[/\\]/g, '_')
+      .replace(/\.[^.]+$/, '')
+      .trim() || 'asset';
   return `${base}-${id.slice(-6)}.${extension}`;
 }
 
@@ -189,10 +176,8 @@ export async function ensureAssetsInProject(
       const blob = await response.blob();
       if (!blob.size) throw new Error('图片内容为空');
 
-      const extension = extensionOfMime(blob.type)
-        ?? extensionOfMime(asset.format)
-        ?? extensionOfUrl(src)
-        ?? 'png';
+      const extension =
+        extensionOfMime(blob.type) ?? extensionOfMime(asset.format) ?? extensionOfUrl(src) ?? 'png';
       const mime = mimeOf(blob.type, asset.format, extension);
       const file = new File([blob], copyFileName(image.name, image.id, extension), { type: mime });
       const uploaded = await dependencies.uploadAsset(file, targetProjectId);
@@ -329,9 +314,6 @@ export const formatDate = formatBatchDate;
  *
  * 扩展名跟真实格式走，避免把 PNG 存成 .jpg。
  */
-export function downloadFileName(
-  item: GalleryItem,
-  downloadNamePrefix = 'main-image',
-): string {
+export function downloadFileName(item: GalleryItem, downloadNamePrefix = 'main-image'): string {
   return downloadFileNameOf(item, labelOf(item), downloadNamePrefix);
 }

@@ -50,4 +50,44 @@ describe('useResultGallery', () => {
       '/uploads/in-5.png',
     ]);
   });
+
+  it('任务成功但产出地址缺失时保留失败格，不静默丢弃模块', async () => {
+    listPageMock.mockResolvedValue({
+      items: [
+        {
+          id: 'task-2',
+          capability: 'detail_image',
+          status: 'succeeded',
+          params: {
+            batchId: 'batch-1',
+            batchIndex: 2,
+            batchSize: 3,
+            sectionLabel: '核心卖点图',
+          },
+          inputAssets: [],
+          outputAsset: null,
+        },
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      useResultGallery({
+        capability: 'detail_image',
+        token: 'test-token',
+        includeFailed: true,
+        captionOf: (params) =>
+          typeof params.sectionLabel === 'string' ? params.sectionLabel : undefined,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0]).toMatchObject({
+      id: 'task-2',
+      status: 'failed',
+      url: '',
+      caption: '核心卖点图',
+    });
+  });
 });

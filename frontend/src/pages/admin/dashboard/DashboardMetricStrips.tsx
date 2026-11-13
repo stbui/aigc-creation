@@ -83,7 +83,7 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
               : 'min-w-0 border-l border-border px-4'
           }
         >
-          <dt className="mb-1.5 text-[12px] text-muted-foreground">{item.label}</dt>
+          <dt className="mb-1.5 text-[13px] text-muted-foreground">{item.label}</dt>
           <dd className="flex items-baseline gap-1.5">
             <span
               className={
@@ -96,7 +96,9 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
             </span>
             <span className="text-[12px]">{item.delta}</span>
           </dd>
-          <span className="mt-0.5 block text-[12px] text-muted-foreground">{item.hint}</span>
+          <span className="mt-0.5 block text-[13px] leading-5 text-muted-foreground">
+            {item.hint}
+          </span>
         </div>
       ))}
     </dl>
@@ -106,7 +108,7 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
 /**
  * 累计规模。
  *
- * `totals` 一直是全量口径，不随页头的时间窗变化；它解决的是「平台现在有
+ * `totals` 一直是全量口径，不随页头的指标窗口变化；它解决的是「平台现在有
  * 多少用户 / 项目 / 素材」这类存量问题。任务状态与累计成功率只给有任务读权
  * 的运营视角；财务视角用累计实收补位，避免与上方窗口营收混淆。
  */
@@ -173,7 +175,7 @@ export function TotalsStrip({ data, isFinance }: { data: AdminOverview; isFinanc
           key={item.key}
           className={index === 0 ? 'min-w-0 px-4 pl-0' : 'min-w-0 border-l border-border px-4'}
         >
-          <dt className="mb-1.5 text-[12px] text-muted-foreground">{item.label}</dt>
+          <dt className="mb-1.5 text-[13px] text-muted-foreground">{item.label}</dt>
           <dd
             className={
               item.danger
@@ -183,7 +185,9 @@ export function TotalsStrip({ data, isFinance }: { data: AdminOverview; isFinanc
           >
             {item.value}
           </dd>
-          <span className="mt-0.5 block text-[12px] text-muted-foreground">{item.hint}</span>
+          <span className="mt-0.5 block text-[13px] leading-5 text-muted-foreground">
+            {item.hint}
+          </span>
         </div>
       ))}
     </dl>

@@ -1,7 +1,14 @@
 import { CLONE_DEGREES, type CloneDegree } from './constants';
-import { FieldLegend, FieldSet, ToggleGroup } from './components';
+import { ToggleGroup } from './components';
 
-/** 复刻程度两档（独立卡，默认高度复刻）。 */
+/**
+ * 复刻程度两档（独立配置卡，默认高度复刻）。
+ *
+ * 与商品详情「包含模块」同一套结构：`pk-config-card` > `pk-section` >
+ * `pk-section-title` + 两列选项。选项皮肤收在 `./style.css` 的 `.vc-degree-*`，
+ * 不再把一长串 tailwind 原子类写到 JSX 里 —— 与相邻页面的分组标题、圆角、
+ * 16px 列间距才对得上。
+ */
 export function ViralCloneDegreeCard({
   degree,
   onDegreeChange,
@@ -10,34 +17,31 @@ export function ViralCloneDegreeCard({
   onDegreeChange: (value: CloneDegree) => void;
 }) {
   return (
-    <FieldSet className="vc-degree-section">
-      <FieldLegend variant="label" className="mb-0 text-sm font-semibold">
-        复刻程度
-      </FieldLegend>
-      <ToggleGroup
-        value={degree}
-        onValueChange={(value) => {
-          if (value) onDegreeChange(value as CloneDegree);
-        }}
-        aria-label="复刻程度"
-        className="vc-degree-options grid w-full grid-cols-2 items-stretch gap-3"
-        itemClassName="vc-degree-toggle group h-auto min-h-20 w-full flex-col items-start justify-center gap-2 whitespace-normal rounded-lg border-border bg-secondary px-4 py-2.5 text-left font-normal hover:bg-muted data-[state=on]:border-primary data-[state=on]:bg-accent"
-        options={CLONE_DEGREES.map((d) => ({
-          value: d.value,
-          label: (
-            <>
-              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <span
-                  className="size-3.5 shrink-0 rounded-full border border-border bg-transparent group-data-[state=on]:border-4 group-data-[state=on]:border-primary group-data-[state=on]:bg-background"
-                  aria-hidden
-                />
-                {d.label}
-              </span>
-              <span className="text-xs leading-5 text-muted-foreground">{d.desc}</span>
-            </>
-          ),
-        }))}
-      />
-    </FieldSet>
+    <section className="pk-config-card">
+      <div className="pk-section">
+        <strong className="pk-section-title u-font-14">复刻程度</strong>
+        <ToggleGroup
+          value={degree}
+          onValueChange={(value) => {
+            if (value) onDegreeChange(value as CloneDegree);
+          }}
+          aria-label="复刻程度"
+          className="vc-degree-options"
+          itemClassName="vc-degree-option"
+          options={CLONE_DEGREES.map((d) => ({
+            value: d.value,
+            label: (
+              <>
+                <span className="vc-degree-title">
+                  <span className="vc-degree-dot" aria-hidden />
+                  {d.label}
+                </span>
+                <span className="vc-degree-desc">{d.desc}</span>
+              </>
+            ),
+          }))}
+        />
+      </div>
+    </section>
   );
 }

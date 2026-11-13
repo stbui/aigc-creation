@@ -63,8 +63,7 @@ function setup(opts: SetupOptions = {}) {
     },
   };
   const membership = {
-    checkConcurrency: vi.fn().mockResolvedValue({ current: 0, limit: 0 }),
-    perksOf: vi.fn().mockResolvedValue({ fastChannel: false }),
+    perksOf: vi.fn().mockResolvedValue({ fastChannel: false, maxConcurrent: 10, addonDiscountBps: 10000 }),
   };
   const availability = { runtimeOf: vi.fn().mockResolvedValue(undefined) };
   const price = {

@@ -1,6 +1,6 @@
 import '../styles/image-output-settings.css';
 import { ChevronDown, X } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { ratioOptions, resolutionOptions } from '../lib/optionSets';
 import { Button } from '../ui';
 
@@ -29,6 +29,11 @@ export interface ToolSettingsPopoverProps {
    * （`runtime.remoteAvailable`）才放开；不传按不可用处理。
    */
   capabilityId?: string;
+  /**
+   * 所选模型的 `imageResolution` 可取档位（`capabilitySpec.options.imageResolution.values`）。
+   * 提供时优先按它禁用不支持的档位，避免「界面可选 4K、提交后被拒或降档」。
+   */
+  resolutionValues?: readonly unknown[] | null;
   showRatio?: boolean;
   showResolution?: boolean;
   /** 分组标题（默认即参考站取值）。副文由 `lib/optionSets.resolutionOptions()` 统一给出，不另开覆盖口子 */
@@ -61,6 +66,7 @@ export function ToolSettingsPopover({
   resolution,
   onResolutionChange,
   capabilityId,
+  resolutionValues,
   showRatio = true,
   showResolution = true,
   // 参考站该分组标题的唯一取值（bundle: `resolutionLabel:'分辨率（积分/权益消耗）'`），
@@ -106,14 +112,20 @@ export function ToolSettingsPopover({
         onClick={onToggle}
       >
         <span className="pk-settings-label u-font-12">高级设置</span>
-        {showRatio && ratio && <span className="pk-settings-chip u-font-12">比例 {ratioLabel(ratio)}</span>}
-        {showResolution && <span className="pk-settings-chip u-font-12">画质 {resolution.toUpperCase()}</span>}
+        {showRatio && ratio && (
+          <span className="pk-settings-chip u-font-12">比例 {ratioLabel(ratio)}</span>
+        )}
+        {showResolution && (
+          <span className="pk-settings-chip u-font-12">画质 {resolution.toUpperCase()}</span>
+        )}
         <ChevronDown size={15} className="pk-settings-chevron size-[15px]" />
       </Button>
 
       {open && (
         <div
-          className={popoverClassName ? `pk-settings-popover ${popoverClassName}` : 'pk-settings-popover'}
+          className={
+            popoverClassName ? `pk-settings-popover ${popoverClassName}` : 'pk-settings-popover'
+          }
           {...(popoverRole ? { role: popoverRole } : {})}
           {...(popoverAriaLabel ? { 'aria-label': popoverAriaLabel } : {})}
         >
@@ -157,7 +169,7 @@ export function ToolSettingsPopover({
             <div className="pk-settings-group">
               <strong className="pk-settings-group-label">{resolutionTitle}</strong>
               <div className="pk-resolution-grid">
-                {resolutionOptions(capabilityId).map((o) => (
+                {resolutionOptions(capabilityId, resolutionValues).map((o) => (
                   <Button
                     key={String(o.value)}
                     type="text"

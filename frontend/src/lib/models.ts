@@ -1,7 +1,7 @@
-import { API_ROOT, unwrapEnvelope } from './http';
-import { getToken } from './auth';
-import { readSelectedModelId } from './modelSelection';
 import type { CapabilitySpecView } from '../types/model';
+import { getToken } from './auth';
+import { API_ROOT, unwrapEnvelope } from './http';
+import { readSelectedModelId } from './modelSelection';
 
 /**
  * C 端模型目录（`GET /api/v1/models`）。
@@ -98,7 +98,9 @@ export async function resolveModel(
   const candidates = modelsForCapability(capability, models, requiredInputs);
   const selectedId = readSelectedModelId(capability);
   const selected = selectedId ? candidates.find((m) => m.id === selectedId) : null;
-  const model = selected?.available ? selected : defaultModelFor(capability, models, requiredInputs);
+  const model = selected?.available
+    ? selected
+    : defaultModelFor(capability, models, requiredInputs);
   if (!model) {
     throw new Error(
       requiredInputs.includes('mask')
@@ -129,6 +131,21 @@ export function modelImageInputLimit(
 ): number | null {
   const max = model.capabilitySpec?.inputs?.image?.max;
   return typeof max === 'number' && Number.isInteger(max) && max >= 0 ? max : null;
+}
+
+/**
+ * 素材数量超过模型能力合同时的可读原因。
+ *
+ * 前端页面上限与模型上限是两个概念：页面允许保留若干输入位，但模型合同
+ * 可能只接受更少。超限时必须在建单前明确拦住，绝不静默丢掉用户素材。
+ */
+export function imageInputCountError(
+  model: Pick<PublicModelGroup, 'name' | 'capabilitySpec'>,
+  imageCount: number,
+): string | null {
+  const max = modelImageInputLimit(model);
+  if (max === null || imageCount <= max) return null;
+  return `所选模型「${model.name}」最多支持 ${max} 张商品图，请移除 ${imageCount - max} 张或切换模型`;
 }
 
 /**

@@ -80,7 +80,7 @@ export function AppliedFilters({
       className="flex basis-full flex-wrap items-center gap-1.5 pt-0.5"
       aria-label="已生效的筛选条件"
     >
-      <span className="text-xs text-muted-foreground">已筛选</span>
+      <span className="text-[13px] text-muted-foreground">已筛选</span>
       {items.map((item) => (
         <Badge
           key={item.key}
@@ -88,7 +88,7 @@ export function AppliedFilters({
           data-testid="admin-filter-chip"
           data-filter-key={item.key}
           title={item.label}
-          className="gap-1 overflow-visible rounded-md bg-accent px-1.5 py-0.5 text-xs font-normal text-accent-foreground"
+          className="gap-1 overflow-visible rounded-md bg-accent px-1.5 py-0.5 text-[13px] font-normal text-accent-foreground"
         >
           <span className="max-w-[220px] truncate">{item.label}</span>
           {item.onClear && (
@@ -197,7 +197,7 @@ export function Notice({
     <Alert
       role={tone === 'danger' ? 'alert' : 'status'}
       className={cn(
-        'mb-3 flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-xs',
+        'mb-3 flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-[13px]',
         meta.cls,
         className,
       )}

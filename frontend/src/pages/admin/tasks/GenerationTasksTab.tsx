@@ -114,33 +114,10 @@ export function GenerationTasksTab() {
 
       <SavedViewBar
         pageKey="tasks"
-        currentFilters={{
-          status: filters.status,
-          capability: filters.capability,
-          userId: filters.owner || undefined,
-          projectId: filters.project || undefined,
-          errorCode: filters.errorCode || undefined,
-          from: filters.from || undefined,
-          to: filters.to || undefined,
-        }}
-        onApply={(next) => {
-          filters.setStatus(next.status);
-          filters.setCapability(next.capability);
-          filters.setOwner(next.userId ?? '');
-          filters.setProject(next.projectId ?? '');
-          filters.setErrorCode(next.errorCode ?? '');
-          filters.setFrom(next.from ?? '');
-          filters.setTo(next.to ?? '');
-          filters.setQuery({
-            status: next.status,
-            capability: next.capability,
-            userId: next.userId,
-            projectId: next.projectId,
-            errorCode: next.errorCode,
-            from: next.from,
-            to: next.to,
-          });
-        }}
+        appliedFilters={filters.appliedFilters}
+        draftFilters={filters.draftFilters}
+        onApplyDraft={filters.applyFilters}
+        onApply={filters.applyView}
       />
 
       <TaskListSection

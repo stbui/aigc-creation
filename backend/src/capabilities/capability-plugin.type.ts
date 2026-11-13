@@ -183,6 +183,14 @@ export interface CapabilityPlugin {
   /** 送给真实模型的提示词。**必填** —— 缺失即装配期失败 */
   buildPrompt: PromptBuilder;
   /**
+   * 提交前的能力特有强校验（可选）。
+   *
+   * 在通用参数白名单校验之后、`outputPlan` 拆单与扣费之前调用；抛
+   * `AppError` 直接拒绝本次提交。用于通用枚举 / 长度无法表达的约束 ——
+   * 例如详情图的模块键集合：显式传错模块不能被静默回落成默认项并照常收费。
+   */
+  validateParams?: (params: Record<string, any>) => void;
+  /**
    * 一次提交要产出的多张图（可选）。
    *
    * 未声明 = 一次生成一张图。声明后准入层按本函数把提交拆成 N 个任务,
@@ -264,7 +272,9 @@ export function assertCapabilityIntegrity(plugins: CapabilityPlugin[]): void {
     }
 
     if (typeof p.creditCost !== 'number') {
-      errors.push(`能力 ${tag} 未声明 creditCost —— 会导致免费开放（显式写 0 表示限时免费，是合规的）`);
+      errors.push(
+        `能力 ${tag} 未声明 creditCost —— 会导致免费开放（显式写 0 表示限时免费，是合规的）`,
+      );
     }
 
     if (!p.modality) {
@@ -277,9 +287,7 @@ export function assertCapabilityIntegrity(plugins: CapabilityPlugin[]): void {
      */
     if (p.maxInputs !== undefined) {
       if (!Number.isInteger(p.maxInputs) || p.maxInputs < p.inputs) {
-        errors.push(
-          `能力 ${tag} 的 maxInputs(${p.maxInputs}) 必须是 ≥ inputs(${p.inputs}) 的整数`,
-        );
+        errors.push(`能力 ${tag} 的 maxInputs(${p.maxInputs}) 必须是 ≥ inputs(${p.inputs}) 的整数`);
       }
     }
 
@@ -293,7 +301,9 @@ export function assertCapabilityIntegrity(plugins: CapabilityPlugin[]): void {
       if (!p.model.capability) {
         errors.push(`能力 ${tag} 的 model.capability 缺失`);
       } else if (String(p.model.capability) !== String(p.modality)) {
-        errors.push(`能力 ${tag} 的 model.capability(${p.model.capability}) 与 modality(${p.modality}) 不一致`);
+        errors.push(
+          `能力 ${tag} 的 model.capability(${p.model.capability}) 与 modality(${p.modality}) 不一致`,
+        );
       }
       if (p.model.operation !== undefined && !String(p.model.operation).trim()) {
         errors.push(`能力 ${tag} 的 model.operation 不能是空串`);

@@ -330,16 +330,21 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
     orderNo?: string;
     email?: string;
     channel?: string;
+    productId?: string;
+    productName?: string;
     from?: string;
     to?: string;
   }) => {
     appliedOrderNoRef.current = next.orderNo ?? '';
     appliedUrlRefundState.current = next.refundState;
+    appliedProductIdRef.current = next.productId ?? '';
     setStatus(next.status);
     setRefundState(next.refundState);
     setOrderNo(next.orderNo ?? '');
     setEmail(next.email ?? '');
     setChannel(next.channel);
+    setProductId(next.productId ?? '');
+    setProductName(next.productName ?? '');
     setFrom(next.from ?? '');
     setTo(next.to ?? '');
     notifyQueryChange();
@@ -349,11 +354,10 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
       orderNo: next.orderNo,
       email: next.email,
       channel: next.channel,
+      productId: next.productId,
+      productName: next.productName,
       from: next.from,
       to: next.to,
-      // 保存视图不包含商品筛选时清掉，避免旧商品条件把结果筛空
-      productId: undefined,
-      productName: undefined,
     });
   };
 
@@ -439,8 +443,37 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
     to,
   };
 
+  /*
+   * 保存视图只看已生效查询；草稿单独传给组件，用来提示“改了但还没查询”。
+   * 两边分开后，活动视图、空态、chips 与导出不会再各读一套状态。
+   */
+  const appliedFilters = {
+    status: appliedStatus,
+    refundState: appliedRefundState,
+    orderNo: appliedOrderNo || undefined,
+    email: appliedEmail || undefined,
+    channel: appliedChannel,
+    productId: appliedProductId || undefined,
+    productName: appliedProductName || undefined,
+    from: appliedFrom || undefined,
+    to: appliedTo || undefined,
+  };
+  const draftFilters = {
+    status,
+    refundState,
+    orderNo: orderNo.trim() || undefined,
+    email: email.trim() || undefined,
+    channel,
+    productId: productId || undefined,
+    productName: productName || undefined,
+    from: from || undefined,
+    to: to || undefined,
+  };
+
   return {
     values,
+    appliedFilters,
+    draftFilters,
     updateFilter,
     applyQuery,
     applyView,

@@ -45,6 +45,26 @@ function settleOf(db: unknown) {
 }
 
 describe('CreditWalletService 过期批次回填', () => {
+  it('0 元订单在账户缺失时先补建空账户，避免结算被迫转人工', async () => {
+    const { db } = walletDb({ expireAt: null });
+    db.creditAccount.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ availableMicrocredits: 0n, reservedMicrocredits: 0n });
+    const create = vi.fn().mockResolvedValue({});
+    (db.creditAccount as unknown as { create: typeof create }).create = create;
+
+    const result = await new CreditWalletService().settle(db as never, {
+      userId: 'u-new',
+      billingOrderId: 'bill-free',
+      reservedMicrocredits: 0n,
+      actualMicrocredits: 0n,
+    });
+
+    expect(create).toHaveBeenCalledWith({ data: { userId: 'u-new' } });
+    expect(result.refund).toBe(0n);
+    expect(db.creditAccount.updateMany).toHaveBeenCalled();
+  });
+
   it('结算差额命中已过期批次时立即作废，不增加可用余额', async () => {
     const { db, entries } = walletDb({ expireAt: new Date(Date.now() - 60_000) });
 

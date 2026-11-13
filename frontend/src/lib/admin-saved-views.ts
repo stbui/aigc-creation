@@ -31,16 +31,19 @@ export const ADMIN_BUILTIN_VIEWS: Record<string, AdminSavedView[]> = {
       id: 'ticket-open',
       name: '待回复',
       filters: { status: 'open', assigneeId: 'unassigned' },
+      builtin: true,
     },
     {
       id: 'ticket-mine',
       name: '我处理中',
       filters: { status: 'processing', assigneeId: '__me' },
+      builtin: true,
     },
     {
       id: 'ticket-high',
       name: '高优先级',
       filters: { status: 'open', priority: 'high' },
+      builtin: true,
     },
   ],
   tasks: [
@@ -48,16 +51,19 @@ export const ADMIN_BUILTIN_VIEWS: Record<string, AdminSavedView[]> = {
       id: 'task-failed-24h',
       name: '近 24h 失败',
       filters: { status: 'failed', from: '__24h' },
+      builtin: true,
     },
     {
       id: 'task-running',
       name: '执行中积压',
       filters: { status: 'running' },
+      builtin: true,
     },
     {
       id: 'task-uncertain',
       name: '结果不明',
       filters: { status: 'failed', errorCode: '42206' },
+      builtin: true,
     },
   ],
   orders: [
@@ -65,11 +71,13 @@ export const ADMIN_BUILTIN_VIEWS: Record<string, AdminSavedView[]> = {
       id: 'order-refund-processing',
       name: '退款处理中',
       filters: { refundState: 'processing' },
+      builtin: true,
     },
     {
       id: 'order-pending',
       name: '待支付',
       filters: { status: 'pending' },
+      builtin: true,
     },
   ],
   'billing-orders': [
@@ -77,6 +85,7 @@ export const ADMIN_BUILTIN_VIEWS: Record<string, AdminSavedView[]> = {
       id: 'billing-uncertain',
       name: '结果不明',
       filters: { status: 'uncertain' },
+      builtin: true,
     },
   ],
   invoices: [
@@ -84,6 +93,7 @@ export const ADMIN_BUILTIN_VIEWS: Record<string, AdminSavedView[]> = {
       id: 'invoice-pending',
       name: '待开具',
       filters: { status: 'pending' },
+      builtin: true,
     },
   ],
 };

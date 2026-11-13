@@ -6,16 +6,16 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { CreditPriceService } from '../../credits/credit-price.service';
-import { badRequest } from '../domain/json';
 import { getCapability } from '../../capabilities/capability.registry';
+import { CreditPriceService } from '../../credits/credit-price.service';
 import { normalizeCapability } from '../domain/capability-config';
-import { creditAmount, convertCurrencyPrice, tokenAmount } from '../infra/microcredits';
-import { RouterService } from '../routing/router.service';
-import { CapabilityCatalogService } from './capability-catalog.service';
-import { PriceTierService } from '../routing/price-tier.service';
-import type { UserGroupAccess } from '../user-groups/user-group.service';
+import { badRequest } from '../domain/json';
+import { convertCurrencyPrice, creditAmount, tokenAmount } from '../infra/microcredits';
 import type { ModelRequestIntent } from '../intent/spec-types';
+import { PriceTierService } from '../routing/price-tier.service';
+import { RouterService } from '../routing/router.service';
+import type { UserGroupAccess } from '../user-groups/user-group.service';
+import { CapabilityCatalogService } from './capability-catalog.service';
 
 export interface CapabilityQuote {
   capabilityId: string;
@@ -44,7 +44,10 @@ export function validateQuoteIntent(intent: ModelRequestIntent): void {
 }
 
 /** 预授权数量：按请求参数推导的计费单位数。 */
-export function requestedBillingQuantity(capability: string, options: Record<string, unknown> | undefined): number {
+export function requestedBillingQuantity(
+  capability: string,
+  options: Record<string, unknown> | undefined,
+): number {
   const kind = normalizeCapability(capability);
   const seconds = Math.trunc(Number(options?.videoSeconds ?? 0));
   if (kind === 'video') return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
@@ -57,7 +60,10 @@ export function requestedBillingQuantity(capability: string, options: Record<str
 }
 
 /** 文本 Token 估算：字符数 / 4，输出取 max_tokens 类参数并限幅 */
-export function estimateTextTokens(intent: ModelRequestIntent): { inputTokens: number; outputTokens: number } {
+export function estimateTextTokens(intent: ModelRequestIntent): {
+  inputTokens: number;
+  outputTokens: number;
+} {
   const payload = JSON.stringify(intent ?? {});
   const inputTokens = Math.max(1, Math.ceil([...payload].length / 4));
   const option = intent.options ?? {};
@@ -97,9 +103,18 @@ export class QuoteService {
     const pricing = access.pricing(channelModel.priceCurrency, [channelModel.modelKey]);
     const bps = pricing.multiplierBasisPoints;
     const unit = convertCurrencyPrice(tier.unitPriceMicrocredits, pricing.rateMicrocredits);
-    const inputPrice = convertCurrencyPrice(tier.inputTokenPriceMicrocredits, pricing.rateMicrocredits);
-    const outputPrice = convertCurrencyPrice(tier.outputTokenPriceMicrocredits, pricing.rateMicrocredits);
-    const cachedPrice = convertCurrencyPrice(tier.cachedTokenPriceMicrocredits, pricing.rateMicrocredits);
+    const inputPrice = convertCurrencyPrice(
+      tier.inputTokenPriceMicrocredits,
+      pricing.rateMicrocredits,
+    );
+    const outputPrice = convertCurrencyPrice(
+      tier.outputTokenPriceMicrocredits,
+      pricing.rateMicrocredits,
+    );
+    const cachedPrice = convertCurrencyPrice(
+      tier.cachedTokenPriceMicrocredits,
+      pricing.rateMicrocredits,
+    );
     if (tier.billingMode === 'token') {
       const usage = estimateTextTokens(intent);
       return {
@@ -124,7 +139,10 @@ export class QuoteService {
         note: '按估算用量计价，结算以上游用量为准',
       };
     }
-    const quantity = tier.billingMode === 'per_second' ? requestedBillingQuantity(intent.capability, intent.options) : 1;
+    const quantity =
+      tier.billingMode === 'per_second'
+        ? requestedBillingQuantity(intent.capability, intent.options)
+        : 1;
     if (quantity <= 0) throw badRequest('请求未提供有效时长');
     return {
       capabilityId: '',
@@ -160,7 +178,10 @@ export class QuoteService {
     const groupKey = modelKey || capability.orderedGroupKeys[0] || '';
     const group = capability.groups.get(groupKey);
     if (!group) throw badRequest('当前能力没有可用模型', 40005);
-    const quoteIntent = this.withMinimumInputs(group.lines[0]?.channelModel.capabilitySpec, capabilityIntent);
+    const quoteIntent = this.withMinimumInputs(
+      group.lines[0]?.channelModel.capabilitySpec,
+      capabilityIntent,
+    );
     const routed = await this.router.resolve(access, capabilityId, groupKey, quoteIntent);
     const pricing = routed.pricing;
 
@@ -177,7 +198,13 @@ export class QuoteService {
       };
     }
 
-    const groupPricing = access.pricing('credits', [capabilityId]);
+    // 与建单（BillingService.buildDraft）同一口径：分组覆盖既可能按能力 id，
+    // 也可能按模型 key 配置；报价只传能力 id 会让「看到的价」低于实扣。
+    const groupPricing = access.pricing('credits', [
+      capabilityId,
+      groupKey,
+      routed.channelModel.modelKey,
+    ]);
     const bps = groupPricing.multiplierBasisPoints;
 
     if (pricing.billingMode === 'fixed_request') {
@@ -194,7 +221,10 @@ export class QuoteService {
     }
 
     if (pricing.billingMode === 'per_second') {
-      const quantity = requestedBillingQuantity(capabilityIntent.capability, capabilityIntent.options);
+      const quantity = requestedBillingQuantity(
+        capabilityIntent.capability,
+        capabilityIntent.options,
+      );
       if (quantity <= 0) {
         return {
           capabilityId,
@@ -258,7 +288,14 @@ export class QuoteService {
   }
 
   private withMinimumInputs(
-    spec: { inputs?: { image?: { min?: number; max?: number }; video?: { min?: number; max?: number } } } | undefined,
+    spec:
+      | {
+          inputs?: {
+            image?: { min?: number; max?: number };
+            video?: { min?: number; max?: number };
+          };
+        }
+      | undefined,
     intent: ModelRequestIntent,
   ): ModelRequestIntent {
     if (!spec?.inputs) return intent;

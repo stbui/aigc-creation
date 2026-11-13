@@ -233,7 +233,7 @@ export function AdminDataTable<T>({
               size="sm"
               onClick={headerColumn.getToggleSortingHandler()}
               className={cn(
-                '-ml-2 h-7 gap-1 px-2 text-xs font-semibold',
+                '-ml-2 h-7 gap-1 px-2 text-[13px] font-semibold',
                 active && 'text-foreground',
               )}
             >
@@ -352,7 +352,7 @@ export function AdminDataTable<T>({
       >
         <Table
           data-testid="admin-table"
-          className={cn('text-[13px]', fixedLayout && 'table-fixed')}
+          className={cn('text-sm', fixedLayout && 'table-fixed')}
           style={minWidth ? { minWidth } : undefined}
         >
           <TableHeader>
@@ -385,7 +385,7 @@ export function AdminDataTable<T>({
                             : undefined
                       }
                       className={cn(
-                        'h-9 whitespace-nowrap bg-muted/40 px-3 text-xs font-semibold text-foreground',
+                        'h-9 whitespace-nowrap bg-muted/40 px-3 text-[13px] font-semibold text-foreground',
                         ALIGN_CLASS[column.align ?? 'left'],
                         column.fixed === 'right' && 'sticky right-0 bg-muted',
                       )}
@@ -577,7 +577,7 @@ function TableSkeleton({
     <div className="py-3" data-testid="admin-page-loading">
       <div data-testid="admin-table-scroll" className="relative overflow-x-auto">
         <Table
-          className={cn('text-[13px]', fixedLayout && 'table-fixed')}
+          className={cn('text-sm', fixedLayout && 'table-fixed')}
           style={minWidth ? { minWidth } : undefined}
         >
           <TableHeader>
@@ -593,7 +593,7 @@ function TableSkeleton({
                   scope="col"
                   style={column.width ? { width: column.width } : undefined}
                   className={cn(
-                    'h-9 whitespace-nowrap bg-muted/40 px-3 text-xs font-semibold text-foreground',
+                    'h-9 whitespace-nowrap bg-muted/40 px-3 text-[13px] font-semibold text-foreground',
                     ALIGN_CLASS[column.align ?? 'left'],
                     column.fixed === 'right' && 'sticky right-0 bg-muted',
                   )}

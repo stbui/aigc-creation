@@ -273,7 +273,7 @@ export function ViralClonePage() {
   });
 
   return (
-    <main className="vc-workspace">
+    <main className="pk-workspace">
       {/* ── 左: 输入栏 ── */}
       <ViralCloneInputPane
         images={images}

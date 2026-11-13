@@ -1,10 +1,11 @@
 import type { RefObject } from 'react';
 
 import { DETAIL_CAPABILITY } from './api';
-import { MAX_DESC_LEN, MAX_IMAGES } from './constants';
+import type { PublicModelGroup } from './components';
 import { ProductFormSection, ToolGenerationSubmitBar, ToolTypeTabs } from './components';
-import type { UploadedImage } from './hooks';
+import { MAX_DESC_LEN } from './constants';
 import { DetailSectionPicker } from './DetailSectionPicker';
+import type { UploadedImage } from './hooks';
 
 /**
  * 商品详情图工作台左栏：业务类型 tab + 表单区 + 包含模块 + 提交栏。
@@ -16,6 +17,10 @@ import { DetailSectionPicker } from './DetailSectionPicker';
 export interface DetailInputPaneProps {
   // ── 上传 ──
   images: UploadedImage[];
+  /** 当前模型能力合同允许的图片数（已与页面上限取较小值） */
+  max: number;
+  /** 已选素材超过模型上限时的可读原因 */
+  limitError?: string | null;
   uploading: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
@@ -49,10 +54,15 @@ export interface DetailInputPaneProps {
   onRatioChange: (value: string) => void;
   resolution: string;
   onResolutionChange: (value: string) => void;
+  /** 所选模型的画质档位合同；提供时禁用不支持的档位 */
+  resolutionValues?: readonly unknown[] | null;
   onModelQuoteChange: (credits: number | null) => void;
+  onModelChange?: (model: PublicModelGroup | null) => void;
 
   // ── 提交 ──
   generating: boolean;
+  /** 未登录时的按钮文案；传了即启用登录墙 */
+  guestLabel?: string;
   submitDisabled: boolean;
   /** 不可提交原因（能力下线 / 无可用线路），由页面按登录态决定是否展示 */
   submitHint?: string;
@@ -62,6 +72,8 @@ export interface DetailInputPaneProps {
 
 export function DetailInputPane({
   images,
+  max,
+  limitError,
   uploading,
   fileInputRef,
   onFiles,
@@ -89,8 +101,11 @@ export function DetailInputPane({
   onRatioChange,
   resolution,
   onResolutionChange,
+  resolutionValues,
   onModelQuoteChange,
+  onModelChange,
   generating,
+  guestLabel,
   submitDisabled,
   submitHint,
   creditLabel,
@@ -104,7 +119,8 @@ export function DetailInputPane({
         <div className="pk-form-scroll">
           <ProductFormSection
             images={images}
-            max={MAX_IMAGES}
+            max={max}
+            limitError={limitError}
             uploading={uploading}
             fileInputRef={fileInputRef}
             onFiles={onFiles}
@@ -136,6 +152,7 @@ export function DetailInputPane({
           capability={DETAIL_CAPABILITY}
           generating={generating}
           disabled={submitDisabled}
+          guestLabel={guestLabel}
           creditLabel={creditLabel}
           hint={
             submitHint ? (
@@ -148,7 +165,9 @@ export function DetailInputPane({
           onRatioChange={onRatioChange}
           resolution={resolution}
           onResolutionChange={onResolutionChange}
+          resolutionValues={resolutionValues}
           onModelQuoteChange={onModelQuoteChange}
+          onModelChange={onModelChange}
           onSubmit={onSubmit}
         />
       </div>

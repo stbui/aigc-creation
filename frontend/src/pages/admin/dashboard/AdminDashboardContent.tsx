@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../../../lib/api';
 import { useAdmin } from '../../../context/AdminContext';
@@ -23,7 +23,7 @@ import {
 } from '../../../admin-ui/primitives';
 import { useDuty } from '../../../components/admin/DutyContext';
 import { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';
-import type { AdminOverview } from '../../../types/api';
+import type { AdminOverview, AdminWorkbenchRoleView } from '../../../types/api';
 import {
   EmptyInline,
   FailureQueue,
@@ -36,6 +36,81 @@ import {
 import { WindowStrip, TotalsStrip } from './DashboardMetricStrips';
 import { CHANNEL_LABELS, queueTime, yuan } from './utils';
 import { taskErrorLabel } from '../../../lib/admin-error-codes';
+
+function ControlGroup({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex max-w-[280px] flex-col items-start gap-1">
+      <span className="text-[13px] font-medium text-foreground">{label}</span>
+      {children}
+      <span className="text-[13px] leading-5 text-muted-foreground">{hint}</span>
+    </div>
+  );
+}
+
+function DashboardControls({
+  days,
+  onDaysChange,
+  view,
+  canSwitchView,
+  onViewChange,
+  loading,
+  onRefresh,
+}: {
+  days: number;
+  onDaysChange: (days: number) => void;
+  view: AdminWorkbenchRoleView;
+  canSwitchView: boolean;
+  onViewChange: (view: AdminWorkbenchRoleView) => void;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-end gap-x-4 gap-y-3">
+      {canSwitchView && (
+        <ControlGroup label="工作台视角" hint="仅预览版式，不改变账号权限">
+          <SegmentedTabs
+            ariaLabel="工作台视角"
+            value={view}
+            onChange={(value) => onViewChange(value as AdminWorkbenchRoleView)}
+            options={[
+              { value: 'admin', label: '管理员' },
+              { value: 'operator', label: '运营' },
+              { value: 'finance', label: '财务' },
+            ]}
+          />
+        </ControlGroup>
+      )}
+      <ControlGroup
+        label="指标窗口"
+        hint="仅影响经营指标与趋势；值班条和累计存量不受影响"
+      >
+        <SegmentedTabs
+          ariaLabel="指标窗口"
+          value={String(days)}
+          onChange={(value) => onDaysChange(Number(value))}
+          options={[7, 30, 90].map((value) => ({
+            value: String(value),
+            label: `近 ${value} 天`,
+          }))}
+        />
+      </ControlGroup>
+      <div className="flex items-center gap-2 pt-6">
+        <Button asChild variant="outline" size="sm">
+          <Link to="/admin/alerts">告警中心</Link>
+        </Button>
+        <RefreshButton variant="outline" loading={loading} onRefresh={onRefresh} />
+      </div>
+    </div>
+  );
+}
 
 /**
  * 平台概览（值班台）页面内容。
@@ -63,7 +138,7 @@ import { taskErrorLabel } from '../../../lib/admin-error-codes';
 export function AdminDashboardContent() {
   const [days, setDays] = useState<number>(7);
   /*
-   * 切换时间窗与「重试」都走同一份资源：换窗口时旧数据留在屏幕上直到新数据
+   * 切换指标窗口与「重试」都走同一份资源：换窗口时旧数据留在屏幕上直到新数据
    * 到位，不再整页塌成骨架屏 —— 概览页塌一次，用户会以为刚看到的数字丢了。
    */
   const { data, loading, error, reload } = useAdminResource(() => adminApi.overview(days), [days]);
@@ -90,25 +165,22 @@ export function AdminDashboardContent() {
    * 首屏骨架：只有完全没有数据时才塌**正文**。
    *
    * 页头照常渲染 —— 概览页是后台的门面，加载期间连标题都没有的话，用户会以为
-   * 后台没打开。时间窗分段与「刷新」按钮也在位（禁用），数据到位后它们不动。
+   * 后台没打开。指标窗口分段与「刷新」按钮也在位（禁用），数据到位后它们不动。
    */
   if (loading && !data) {
     return (
       <PageSkeleton
         title="平台概览"
         actions={
-          <>
-            <SegmentedTabs
-              ariaLabel="统计时间窗"
-              value={String(days)}
-              onChange={(value) => setDays(Number(value))}
-              options={[7, 30, 90].map((value) => ({
-                value: String(value),
-                label: `近 ${value} 天`,
-              }))}
-            />
-            <RefreshButton variant="outline" disabled />
-          </>
+          <DashboardControls
+            days={days}
+            onDaysChange={setDays}
+            view={view}
+            canSwitchView={canSwitchView}
+            onViewChange={setView}
+            loading
+            onRefresh={reload}
+          />
         }
         /*
          * 概览页的真实版面不是「面板上下排」：值班条 + 62/38 双栏 + 一串
@@ -153,7 +225,7 @@ export function AdminDashboardContent() {
   const w = data.window;
   const tasks = duty?.tasks ?? [];
   /*
-   * 带子上的「近 1 小时失败」与队列里的失败不是同一个时间窗：队列是最新
+   * 带子上的「近 1 小时失败」与队列里的失败不是同一个口径：队列是最新
    * 100 条任务快照里的全部失败。把最早那条的时刻写到标题旁，读的人不用
    * 自己对「带子说 0、队列有 4 条」这件事。
    */
@@ -163,36 +235,18 @@ export function AdminDashboardContent() {
     <AdminPage
       title="平台概览"
       actions={
-        <>
-          {canSwitchView && (
-            <SegmentedTabs
-              ariaLabel="工作台视角"
-              value={view}
-              onChange={(value) => setView(value as typeof view)}
-              options={[
-                { value: 'admin', label: '管理员' },
-                { value: 'operator', label: '运营' },
-                { value: 'finance', label: '财务' },
-              ]}
-            />
-          )}
-          <SegmentedTabs
-            ariaLabel="统计时间窗"
-            value={String(days)}
-            onChange={(value) => setDays(Number(value))}
-            options={[7, 30, 90].map((value) => ({
-              value: String(value),
-              label: `近 ${value} 天`,
-            }))}
-          />
-          <Button asChild variant="outline" size="sm">
-            <Link to="/admin/alerts">告警中心</Link>
-          </Button>
-          <RefreshButton variant="outline" loading={loading} onRefresh={reload} />
-        </>
+        <DashboardControls
+          days={days}
+          onDaysChange={setDays}
+          view={view}
+          canSwitchView={canSwitchView}
+          onViewChange={setView}
+          loading={loading}
+          onRefresh={reload}
+        />
       }
     >
-      {/* 换时间窗失败时保留上一窗口的数字，但要明说这是旧的 */}
+      {/* 换指标窗口失败时保留上一窗口的数字，但要明说这是旧的 */}
       {error && <StaleError error={error} onRetry={() => void reload()} />}
 
       <DutyStrip />
@@ -215,7 +269,7 @@ export function AdminDashboardContent() {
             title="待办队列"
             note={duty ? `待付 ${duty.orders.length} 笔 · 最早在前` : '读取中…'}
             extra={
-              <Link className="text-xs text-brand hover:underline" to="/admin/orders?status=pending">
+              <Link className="text-[13px] text-brand hover:underline" to="/admin/orders?status=pending">
                 全部待付订单
               </Link>
             }
@@ -233,7 +287,7 @@ export function AdminDashboardContent() {
                 : '读取中…'
             }
             extra={
-              <Link className="text-xs text-brand hover:underline" to="/admin/tasks?status=failed">
+              <Link className="text-[13px] text-brand hover:underline" to="/admin/tasks?status=failed">
                 全部失败任务
               </Link>
             }
@@ -255,7 +309,7 @@ export function AdminDashboardContent() {
           }
           extra={
             !isFinance && can('channel.read') ? (
-              <Link className="text-xs text-brand hover:underline" to="/admin/channels">
+              <Link className="text-[13px] text-brand hover:underline" to="/admin/channels">
                 模型商品
               </Link>
             ) : undefined
@@ -282,7 +336,7 @@ export function AdminDashboardContent() {
         <Subhead title={`近 ${days} 天`} note={`对比上一个 ${days} 天`} />
         <WindowStrip data={data} isFinance={isFinance} />
         <div className="mt-4 border-t border-border pt-4">
-          <Subhead title="累计存量" note="不受时间窗影响" />
+          <Subhead title="累计存量" note="不受指标窗口影响" />
           <TotalsStrip data={data} isFinance={isFinance} />
         </div>
       </Panel>
@@ -298,7 +352,7 @@ export function AdminDashboardContent() {
           note={`近 ${days} 天 · 任务 ${w.tasks} 个 · 失败 ${w.failed} 个`}
           extra={
             w.failed > 0 ? (
-              <Link className="text-xs text-brand hover:underline" to="/admin/tasks?status=failed">
+              <Link className="text-[13px] text-brand hover:underline" to="/admin/tasks?status=failed">
                 查看失败任务
               </Link>
             ) : undefined
@@ -355,7 +409,7 @@ export function AdminDashboardContent() {
         title="订单收入（元）"
         note={`近 ${days} 天 ¥${yuan(c.gmvWindowCents)} · 累计 ¥${yuan(c.gmvCents)}`}
         extra={
-          <Link className="text-xs text-brand hover:underline" to="/admin/finance">
+          <Link className="text-[13px] text-brand hover:underline" to="/admin/finance">
             积分口径净收入
           </Link>
         }

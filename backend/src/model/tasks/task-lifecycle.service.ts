@@ -16,12 +16,12 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { BillingService } from '../billing/billing.service';
-import { CreditService, microcreditsToCredits } from '../../credits/credit.service';
-import { NotificationsService } from '../../notifications/notifications.service';
 import { getCapability } from '../../capabilities/capability.registry';
 import { AppError } from '../../common/app.exception';
+import { CreditService, microcreditsToCredits } from '../../credits/credit.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { BillingService } from '../billing/billing.service';
 
 /** 任务终态错误码（与前端展示口径一致） */
 export const TASK_ERROR = {
@@ -62,8 +62,18 @@ export class TaskLifecycleService {
    * 把已交付的结果收回只会让用户既没图也没积分。
    */
   async succeed(
-    task: { id: string; ownerId: string; billingOrderId: string | null; providerRequestId: string | null },
-    input: { outputAssetIds: string[]; aigcMeta: string; providerRequestId?: string; outputDurationMs?: number },
+    task: {
+      id: string;
+      ownerId: string;
+      billingOrderId: string | null;
+      providerRequestId: string | null;
+    },
+    input: {
+      outputAssetIds: string[];
+      aigcMeta: string;
+      providerRequestId?: string;
+      outputDurationMs?: number;
+    },
     /** 传入后只有仍持有该租约的执行者才能提交结果，防止过期执行者覆盖接管者。 */
     guard?: { leaseOwner: string },
   ): Promise<boolean> {
@@ -104,7 +114,9 @@ export class TaskLifecycleService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.log.error(`任务 ${task.id} 已交付但结算失败，转人工核对：${message}`);
-      await this.billing.markUncertain(task.billingOrderId, `结算失败：${message}`).catch(() => undefined);
+      await this.billing
+        .markUncertain(task.billingOrderId, `结算失败：${message}`)
+        .catch(() => undefined);
     }
     return true;
   }
@@ -112,7 +124,12 @@ export class TaskLifecycleService {
   /** 任务失败：退款（默认）或转人工核对 */
   async fail(
     taskId: string,
-    input: { errorCode: TaskErrorCode | string; errorMessage?: string; reason: FailureReason; refund?: boolean },
+    input: {
+      errorCode: TaskErrorCode | string;
+      errorMessage?: string;
+      reason: FailureReason;
+      refund?: boolean;
+    },
     guard?: { leaseOwner: string; leaseUntil?: Date | null },
   ): Promise<boolean> {
     const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
@@ -137,15 +154,16 @@ export class TaskLifecycleService {
     });
     if (claimed.count === 0) return false;
 
-    // 同一次生成的其余图不再继续：父任务已失败，子任务产出的图也凑不成一套
-    await this.cancelQueuedChildren(taskId, input.reason);
-
+    /*
+     * 模块之间互不连坐：一张失败只退自己的账单，其余模块继续执行。
+     * 只有后台显式终止 / 整批取消（`cancel()`）才连带处理兄弟任务 ——
+     * 否则「第一张失败」会让用户本可拿到的其余模块白白被取消。
+     */
     if (input.refund === false) {
       await this.toUncertain(taskId, task.billingOrderId, input.errorMessage ?? input.reason);
       return true;
     }
-    // 同批次的图只由父任务发一条汇总通知，否则一次失败会在站内信里刷出 N 条
-    await this.refund(task, input.reason, input.errorMessage ?? '', !task.parentTaskId);
+    await this.refund(task, input.reason, input.errorMessage ?? '', true);
     return true;
   }
 
@@ -212,7 +230,7 @@ export class TaskLifecycleService {
     });
     if (claimed.count === 0) throw new AppError(40009, '任务状态已变更，请刷新后重试', 409);
 
-    await this.cancelQueuedChildren(taskId, 'cancelled_by_admin');
+    const refundedChildren = await this.cancelQueuedChildren(taskId, 'cancelled_by_admin');
 
     /*
      * 必须先落任务终态，再判断请求是否已离开宿主。反过来会留下竞态窗口：
@@ -225,8 +243,11 @@ export class TaskLifecycleService {
       await this.toUncertain(taskId, task.billingOrderId, `后台终止：${reason}`);
       return { status: 'cancelled', billing: 'uncertain' };
     }
-    await this.refund(task, 'cancelled_by_admin', reason, !task.parentTaskId);
-    return { status: 'cancelled', billing: task.billingOrderId ? 'refunded' : 'none' };
+    const refunded = await this.refund(task, 'cancelled_by_admin', reason, true, refundedChildren);
+    return {
+      status: 'cancelled',
+      billing: task.billingOrderId ? (refunded ? 'refunded' : 'uncertain') : 'none',
+    };
   }
 
   /**
@@ -252,23 +273,28 @@ export class TaskLifecycleService {
     );
     if (mayHaveDispatched) return false;
 
-    await this.refund(task, reason, '已确认请求未到达上游，取消任务自动退款', false);
-    return true;
+    return this.refund(task, reason, '已确认请求未到达上游，取消任务自动退款', false);
   }
 
   // ── 内部 ──────────────────────────────────────────────────────────
 
   /**
-   * 父任务结束（失败 / 终止）时取消尚未派发的子任务并退回它们自己的账单。
+   * 后台整批终止时取消尚未结束的子任务，并退回它们自己的账单。
    *
    * 每张图各有一份预授权，取消就要按各自账单退回，否则这批钱会一直冻结在
    * 钱包里。已经越过派发 CAS 的子任务不能按未派发退款：这里先取消任务，
    * 再按 attempt 事实将账单转 `uncertain`，等待人工核对上游是否已计费。
+   *
+   * @returns 本次真正退款成功的子任务 id，供父任务汇总一条通知
    */
-  private async cancelQueuedChildren(parentTaskId: string, reason: FailureReason): Promise<void> {
+  private async cancelQueuedChildren(
+    parentTaskId: string,
+    reason: FailureReason,
+  ): Promise<string[]> {
     const children = await this.prisma.generationTask.findMany({
       where: { parentTaskId, status: { in: ['queued', 'running'] } },
     });
+    const refunded: string[] = [];
     for (const child of children) {
       const claimed = await this.prisma.generationTask
         .updateMany({
@@ -288,10 +314,11 @@ export class TaskLifecycleService {
       // 同样先取消再回查：如果 worker 已越过派发 CAS，账单只能转待核对。
       if (await this.wasDispatched(child.id, child.routeRun)) {
         await this.toUncertain(child.id, child.billingOrderId, `同批次的其它图已取消：${reason}`);
-      } else {
-        await this.refund(child, reason, '同批次的其它图已取消', false);
+      } else if (await this.refund(child, reason, '同批次的其它图已取消', false)) {
+        refunded.push(child.id);
       }
     }
+    return refunded;
   }
 
   /** 是否已有请求离开过宿主（决定能否自动退款） */
@@ -308,7 +335,7 @@ export class TaskLifecycleService {
     );
   }
 
-  /** 退款：新任务按账单，存量任务（无账单）回退旧积分批次 */
+  /** 退款：新任务按账单，存量任务（无账单）回退旧积分批次。返回是否真的退成功 */
   private async refund(
     task: {
       id: string;
@@ -319,14 +346,16 @@ export class TaskLifecycleService {
     },
     reason: FailureReason,
     message: string,
-    /** 是否发站内信：同批次被父任务连坐取消的其它图沉默退钱，由父任务汇总发一条 */
+    /** 是否发站内信：同批次被后台整批终止的其它图沉默退钱，由父任务汇总发一条 */
     notify = true,
-  ): Promise<void> {
+    /** 本次取消连带退款的子任务；用于汇总通知金额，避免把历史退款也算进来 */
+    extraRefundedTaskIds: string[] = [],
+  ): Promise<boolean> {
     /*
      * 零价且无账单的任务（管理员重试）根本没扣过钱：既不退款，也不能发
      * 「积分已退回 0」—— 一条假退款通知比不通知更让人困惑。
      */
-    if (!task.billingOrderId && task.creditCost === 0) return;
+    if (!task.billingOrderId && task.creditCost === 0) return true;
     const labels: Record<FailureReason, string> = {
       generation_failed: '生成失败自动退还',
       cancelled_by_admin: '任务被终止自动退还',
@@ -351,31 +380,29 @@ export class TaskLifecycleService {
       this.log.error(
         `★资损: 退款失败 task=${task.id} user=${task.ownerId}: ${(error as Error).message}`,
       );
-      return;
+      return false;
     }
-    if (!notify) return;
-    await this.notifyFailure(task.ownerId, task.id, labels[reason], task);
+    if (notify)
+      await this.notifyFailure(task.ownerId, task.id, labels[reason], task, extraRefundedTaskIds);
+    return true;
   }
 
   /**
-   * 本次实际退回的积分：父任务把整批（自己 + 同批其它图）加在一起。
+   * 本次实际退回的积分。
    *
-   * 一次提交拆成 N 张时每张各有账单，逐张发「10 积分已退回」会让一次失败在
-   * 站内信里刷出 N 条，且看不出总共退了多少；汇总成一条才对得上用户付的那笔。
+   * 一次提交拆成 N 张时每张各有账单；后台整批终止会逐张退款，但只由父任务
+   * 发一条汇总通知。汇总范围必须**严格是本次退款的账单** —— 把同批此前已
+   * 独立失败退过的历史账单也算进来，用户会看到与本次失败无关的金额。
    */
-  private async refundedCreditsOf(task: {
-    id: string;
-    billingOrderId: string | null;
-    parentTaskId?: string | null;
-  }): Promise<number> {
-    const taskIds = [task.id];
-    if (!task.parentTaskId) {
-      const children = await this.prisma.generationTask.findMany({
-        where: { parentTaskId: task.id },
-        select: { id: true },
-      });
-      taskIds.push(...children.map((child) => child.id));
-    }
+  private async refundedCreditsOf(
+    task: {
+      id: string;
+      billingOrderId: string | null;
+      parentTaskId?: string | null;
+    },
+    extraRefundedTaskIds: string[] = [],
+  ): Promise<number> {
+    const taskIds = [task.id, ...extraRefundedTaskIds];
     const orders = await this.prisma.billingOrder.findMany({
       where: {
         taskId: { in: taskIds },
@@ -404,11 +431,17 @@ export class TaskLifecycleService {
     return microcreditsToCredits(ledger._sum.availableDeltaMicrocredits ?? 0n);
   }
 
-  private async toUncertain(taskId: string, billingOrderId: string | null, message: string): Promise<void> {
+  private async toUncertain(
+    taskId: string,
+    billingOrderId: string | null,
+    message: string,
+  ): Promise<void> {
     if (!billingOrderId) return;
-    await this.billing.markUncertain(billingOrderId, message.slice(0, 1000)).catch((error: Error) => {
-      this.log.error(`账单转待核对失败 task=${taskId}: ${error.message}`);
-    });
+    await this.billing
+      .markUncertain(billingOrderId, message.slice(0, 1000))
+      .catch((error: Error) => {
+        this.log.error(`账单转待核对失败 task=${taskId}: ${error.message}`);
+      });
   }
 
   /** 只有**真的退成功**才通知：退款失败时发「积分已退回」会变成假证据 */
@@ -417,15 +450,16 @@ export class TaskLifecycleService {
     taskId: string,
     reason: string,
     task: { id: string; billingOrderId: string | null; parentTaskId?: string | null },
+    extraRefundedTaskIds: string[] = [],
   ): Promise<void> {
     try {
       const row = await this.prisma.generationTask
         .findUnique({ where: { id: taskId }, select: { capability: true } })
         .catch(() => null);
       const capabilityName = row?.capability
-        ? getCapability(row.capability)?.name ?? row.capability
+        ? (getCapability(row.capability)?.name ?? row.capability)
         : '生成任务';
-      const credits = await this.refundedCreditsOf(task).catch(() => 0);
+      const credits = await this.refundedCreditsOf(task, extraRefundedTaskIds).catch(() => 0);
       const refunded = credits > 0;
       await this.notifications.notify({
         userId: ownerId,

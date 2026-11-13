@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { assetSrc, generateApi } from '../lib/api';
 import { POLL_INTERVAL_MS } from '../lib/constants';
-import type { TaskStatus } from '../types/api';
+import type { TaskPageResult, TaskStatus } from '../types/api';
 
 /**
  * 结果栏「全部生成图」的数据源。
@@ -28,12 +28,12 @@ export interface GalleryInputAsset {
 
 export interface GalleryItem {
   /** 任务 id (稳定且唯一) */
-  id: string;  /**
+  id: string /**
    * 父任务 id（一次提交拆成多个任务时，子任务指向父任务）。
    *
    * 删除批次必须只删父任务：后端会级联删除整批，逐张删会得到
    * 「父任务删完后其余 403」的假失败提示。
-   */
+   */;
   parentTaskId?: string | null;
   /**
    * 任务状态。生成中的任务没有 url, 由结果栏渲染成占位卡;
@@ -107,7 +107,12 @@ interface Options {
   includeFailed?: boolean;
 }
 
-export function useResultGallery({ capability, token, captionOf, includeFailed = false }: Options): ResultGallery {
+export function useResultGallery({
+  capability,
+  token,
+  captionOf,
+  includeFailed = false,
+}: Options): ResultGallery {
   const [items, setItems] = useState<GalleryItem[]>([]);
   /*
    * 已登录时首帧就是 loading: reload 在 effect 里才跑, 若初值是 false,
@@ -132,90 +137,119 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
     captionRef.current = captionOf;
   }, [captionOf]);
 
-  const load = useCallback(async (silent = false): Promise<number> => {
-    const seq = ++loadSeqRef.current;
-    if (!token) {
-      setItems([]);
-      setError(null);
-      return 0;
-    }
-    if (!silent) setLoading(true);
-    try {
-      const requestToken = token;
-      /*
-       * 结果栏只关心当前能力，交给服务端按 capability 过滤并限制 100 条。
-       * 之前拉全量任务再在前端 filter，用户任务多时每次轮询都要传整张表。
-       */
-      const page = await generateApi.listPage({ capability, limit: 100, offset: 0 });
-      const tasks = page.items;
-      /*
-       * 用户可能在请求期间登出 / 切号 / 重新拉取。旧响应如果直接 setItems,
-       * 会把上一账号的作品写进新会话；序号与 token 双校验兜住。
-       */
-      if (seq !== loadSeqRef.current || tokenRef.current !== requestToken) {
-        return activeRef.current;
+  const load = useCallback(
+    async (silent = false): Promise<number> => {
+      const seq = ++loadSeqRef.current;
+      if (!token) {
+        setItems([]);
+        setError(null);
+        setLoading(false);
+        return 0;
       }
-      const next: GalleryItem[] = [];
-      for (const t of tasks) {
-        if (t.capability !== capability) continue;
-        const params = t.params ?? {};
-        const inputAssets: GalleryInputAsset[] = [];
-        for (const asset of t.inputAssets ?? []) {
-          const url = assetSrc(asset);
-          if (!url) continue;
-          inputAssets.push({
-            id: asset.id,
+      if (!silent) setLoading(true);
+      try {
+        const requestToken = token;
+        /*
+         * 结果栏只关心当前能力，交给服务端按 capability 过滤。
+         * 默认只取第一页；仅当页尾把某个批次截断时再翻页补齐 —— 否则一个
+         * 6 模块批次可能被 100 条边界切成半批，行内少格、删除也会选错父任务。
+         */
+        const PAGE_LIMIT = 100;
+        const MAX_PAGES = 5;
+        const tasks: TaskPageResult['items'] = [];
+        let offset = 0;
+        for (let pageIndex = 0; pageIndex < MAX_PAGES; pageIndex += 1) {
+          const page = await generateApi.listPage({ capability, limit: PAGE_LIMIT, offset });
+          tasks.push(...page.items);
+          if (page.items.length < PAGE_LIMIT) break;
+          const tail = page.items[page.items.length - 1];
+          const tailBatchId = typeof tail?.params?.batchId === 'string' ? tail.params.batchId : '';
+          if (!tailBatchId) break;
+          const tailBatchSize = Number(tail.params?.batchSize) || 0;
+          const seen = tasks.filter((task) => task.params?.batchId === tailBatchId).length;
+          if (tailBatchSize <= 0 || seen >= tailBatchSize) break;
+          offset += PAGE_LIMIT;
+        }
+        // 翻页期间新任务插入会让 offset 漂移；按 id 去重后再渲染
+        const uniqueTasks = Array.from(new Map(tasks.map((task) => [task.id, task])).values());
+        /*
+         * 用户可能在请求期间登出 / 切号 / 重新拉取。旧响应如果直接 setItems,
+         * 会把上一账号的作品写进新会话；序号与 token 双校验兜住。
+         */
+        if (seq !== loadSeqRef.current || tokenRef.current !== requestToken) {
+          return activeRef.current;
+        }
+        const next: GalleryItem[] = [];
+        for (const t of uniqueTasks) {
+          if (t.capability !== capability) continue;
+          const params = t.params ?? {};
+          const inputAssets: GalleryInputAsset[] = [];
+          for (const asset of t.inputAssets ?? []) {
+            const url = assetSrc(asset);
+            if (!url) continue;
+            inputAssets.push({
+              id: asset.id,
+              url,
+              name: asset.sourceUrl?.split('/').pop() || undefined,
+            });
+          }
+          const base = {
+            id: t.id,
+            parentTaskId: t.parentTaskId ?? null,
+            createdAt: t.createdAt,
+            params,
+            prompt: promptOf(params),
+            caption: captionRef.current?.(params) || undefined,
+            inputUrls: inputAssets.map((asset) => asset.url),
+            inputAssets,
+          };
+          if (t.status !== 'succeeded') {
+            // 生成中的任务也要进列表: 离开页面再回来时, 占位卡由服务端状态回填
+            if (t.status === 'running' || t.status === 'queued') {
+              next.push({ ...base, status: t.status, url: '' });
+            } else if (includeFailed && (t.status === 'failed' || t.status === 'cancelled')) {
+              next.push({ ...base, status: t.status, url: '' });
+            }
+            continue;
+          }
+          const url = assetSrc(t.outputAsset);
+          if (!url) {
+            /*
+             * 任务成功但产出素材地址缺失（素材被下架 / 记录缺失）时不能整条
+             * 丢弃：那会让批次凭空少一格，用户只看到「少了一张」却不知道原因。
+             * 按失败格展示，保留模块标签与批次计数。
+             */
+            if (includeFailed) next.push({ ...base, status: 'failed', url: '' });
+            continue;
+          }
+          next.push({
+            ...base,
+            status: 'succeeded',
             url,
-            name: asset.sourceUrl?.split('/').pop() || undefined,
+            assetId: t.outputAsset?.id,
+            format: t.outputAsset?.format,
+            width: t.outputAsset?.width ?? null,
+            height: t.outputAsset?.height ?? null,
           });
         }
-        const base = {
-          id: t.id,
-          parentTaskId: t.parentTaskId ?? null,
-          createdAt: t.createdAt,
-          params,
-          prompt: promptOf(params),
-          caption: captionRef.current?.(params) || undefined,
-          inputUrls: inputAssets.map((asset) => asset.url),
-          inputAssets,
-        };
-        if (t.status !== 'succeeded') {
-          // 生成中的任务也要进列表: 离开页面再回来时, 占位卡由服务端状态回填
-          if (t.status === 'running' || t.status === 'queued') {
-            next.push({ ...base, status: t.status, url: '' });
-          } else if (includeFailed && (t.status === 'failed' || t.status === 'cancelled')) {
-            next.push({ ...base, status: t.status, url: '' });
-          }
-          continue;
-        }
-        const url = assetSrc(t.outputAsset);
-        if (!url) continue;
-        next.push({
-          ...base,
-          status: 'succeeded',
-          url,
-          assetId: t.outputAsset?.id,
-          format: t.outputAsset?.format,
-          width: t.outputAsset?.width ?? null,
-          height: t.outputAsset?.height ?? null,
-        });
+        setItems(next);
+        setError(null);
+        const active = next.filter((x) => x.status === 'running' || x.status === 'queued').length;
+        activeRef.current = active;
+        return active;
+      } catch (e) {
+        // 旧请求的失败不覆盖新一轮的状态
+        if (seq !== loadSeqRef.current) return activeRef.current;
+        // 保留上一次结果: 刷新失败不该把已看到的图清空
+        setError((e as Error).message || '历史生成图加载失败');
+        return activeRef.current;
+      } finally {
+        // 静默轮询不置 true, 但首次静默加载要把初始的 true 收掉
+        if (seq === loadSeqRef.current) setLoading(false);
       }
-      setItems(next);
-      setError(null);
-      const active = next.filter((x) => x.status === 'running' || x.status === 'queued').length;
-      activeRef.current = active;
-      return active;
-    } catch (e) {
-      // 旧请求的失败不覆盖新一轮的状态
-      if (seq !== loadSeqRef.current) return activeRef.current;
-      // 保留上一次结果: 刷新失败不该把已看到的图清空
-      setError((e as Error).message || '历史生成图加载失败');
-      return activeRef.current;
-    } finally {
-      // 静默轮询不置 true, 但首次静默加载要把初始的 true 收掉
-      if (seq === loadSeqRef.current) setLoading(false);
-    }
-  }, [capability, token, includeFailed]);
+    },
+    [capability, token, includeFailed],
+  );
 
   const reload = useCallback(() => load(false), [load]);
 

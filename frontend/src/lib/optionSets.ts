@@ -1,5 +1,5 @@
-import { capabilityById } from './capabilities';
 import type { ParamOption, PlatformDetailSpec } from '../types/api';
+import { capabilityById } from './capabilities';
 
 /**
  * 参数选项集 —— 从后端能力清单读回，消除前端重复定义。
@@ -77,9 +77,14 @@ export function ratioOptions(capabilityId?: string): ParamOption[] {
   return own.length ? own : optionsOf('main_image', 'ratio');
 }
 
-/** 画质档位。取自商品主图能力（param key 为 `size`）。 */
-export function qualityOptions(): ParamOption[] {
-  return optionsOf('main_image', 'size');
+/**
+ * 画质档位。优先读当前能力自己的 `size` 枚举；未声明时回落到商品主图。
+ * 固定读 main_image 会在两类能力的档位分叉后把不支持的档位放进页面，
+ * 提交时被后端枚举校验拒绝。
+ */
+export function qualityOptions(capabilityId?: string): ParamOption[] {
+  const own = capabilityId ? optionsOf(capabilityId, 'size') : [];
+  return own.length ? own : optionsOf('main_image', 'size');
 }
 
 export type ResolutionOption = ParamOption & {
@@ -102,23 +107,37 @@ export type ResolutionOption = ParamOption & {
  * 后端不认的档位靠前端兜，直接调接口传 `size=4k` 会被 sanitizeParams
  * 静默回落成默认值，而界面看起来是可选的。
  *
- * 可用性由该能力此刻的实际路由决定（`runtime.remoteAvailable`）：
- *   - 4K 档：有模型通道 → 可选；没有模型通道 → 禁用并说明
- *     不隐藏 —— 隐藏会让用户以为没这个档位
- *   - 其余档位：有模型通道即可选
- * 不传 capabilityId 时按「拿不到证据就不放开」处理：4K 禁用。
+ * 可用性优先按所选模型的 `imageResolution` 合同（`supportedValues`）判定，
+ * 未提供时才回落到该能力此刻的实际路由（`runtime.remoteAvailable`）：
+ *   - 模型合同声明了可取档位 → 不在清单里的档位禁用并说明；
+ *   - 未声明 → 4K 有模型通道才可选，其余档位有通道即可选；
+ *   - 都不提供 → 「拿不到证据就不放开」，4K 禁用。
+ *     不隐藏 —— 隐藏会让用户以为没这个档位。
  *
  * 副文（2026-10-28 改）：多图融合按参考站 `billing-config` 使用
  * `1K=1倍 / 2K=2倍 / 4K=3倍`，后端扣费同口径；其它能力仍按基础价 1 倍。
  */
-export function resolutionOptions(capabilityId?: string): ResolutionOption[] {
+export function resolutionOptions(
+  capabilityId?: string,
+  supportedValues?: readonly unknown[] | null,
+): ResolutionOption[] {
   const remote = capabilityId
     ? capabilityById(capabilityId)?.runtime?.remoteAvailable === true
     : false;
   const fusion = capabilityId === 'multi_fusion';
-  return qualityOptions().map((o) => {
+  /*
+   * 模型能力合同声明了 `imageResolution` 时以它为准：只看「能力有没有任意
+   * 健康线路」会把不支持的 4K 放出来，提交后要么被拒、要么被静默降档。
+   * 未声明时才回落到原来的能力级可用性。
+   */
+  const supported =
+    supportedValues && supportedValues.length > 0
+      ? new Set(supportedValues.map((value) => String(value).trim().toLowerCase()))
+      : null;
+  const allowAll = supported?.has('*') ?? false;
+  return qualityOptions(capabilityId).map((o) => {
     const multiplier = fusion
-      ? { '1k': 1, '2k': 2, '4k': 3 }[String(o.value).toLowerCase()] ?? 1
+      ? ({ '1k': 1, '2k': 2, '4k': 3 }[String(o.value).toLowerCase()] ?? 1)
       : 1;
     const base: ResolutionOption = {
       ...o,
@@ -126,7 +145,15 @@ export function resolutionOptions(capabilityId?: string): ResolutionOption[] {
       multiplier,
       sub: `${multiplier}倍消耗`,
     };
-    if (o.value !== '4k' || remote) return base;
-    return { ...base, disabled: true, disabledReason: '4K 需要支持该规格的模型通道，当前通道不可用' };
+    const value = String(o.value).trim().toLowerCase();
+    const allowed = supported ? allowAll || supported.has(value) : value !== '4k' || remote;
+    if (allowed) return base;
+    return {
+      ...base,
+      disabled: true,
+      disabledReason: supported
+        ? '当前模型不支持该画质'
+        : '4K 需要支持该规格的模型通道，当前通道不可用',
+    };
   });
 }

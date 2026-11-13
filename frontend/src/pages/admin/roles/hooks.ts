@@ -15,5 +15,9 @@ export {
 } from '../../../hooks/useUnsavedGuard';
 
 export {
+  useConfirm,
+} from '../../../admin-ui/providers/ConfirmProvider';
+
+export {
   useAdminResource,
 } from '../../../admin-ui/primitives';

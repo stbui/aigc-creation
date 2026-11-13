@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { imageOptions } from '../model-mapping';
-import { DetailImage } from './detail_image';
+import { DetailImage, validateDetailSections } from './detail_image';
 import { DETAIL_SECTIONS } from './param-options';
 
 const base = {
@@ -105,6 +105,30 @@ describe('detail_image 提示词', () => {
     expect(prompt).toContain('本图文案闭集是文字上限，画面目标中更严格的文字限制仍然生效');
   });
 
+  it('显式传入非法模块或超过上限时拒绝提交，不静默回落默认项', () => {
+    expect(() => validateDetailSections('hero,typo')).toThrow(/包含模块取值无效/);
+    expect(() => validateDetailSections('hero')).not.toThrow();
+    expect(() => validateDetailSections('')).not.toThrow();
+    expect(() => validateDetailSections(undefined)).not.toThrow();
+
+    const tooMany = DETAIL_SECTIONS.slice(0, 11)
+      .map((section) => section.value)
+      .join(',');
+    expect(() => validateDetailSections(tooMany)).toThrow(/最多选择 10 项/);
+  });
+
+  it('outputPlan 为每个模块写入 sectionPrompt（无补充时为空串），阻断顶层注入广播', () => {
+    const outputs = DetailImage.outputPlan?.({
+      ...base,
+      sections: 'hero,selling_points',
+    });
+
+    expect(outputs?.map((output) => output.params.sectionPrompt)).toEqual(['', '']);
+    // 准入合并顺序：sanitized → outputPlan.params，空串会覆盖调用方塞入的顶层值
+    const prompt = DetailImage.buildPrompt({ ...base, section: 'hero', sectionPrompt: '' }, 1);
+    expect(prompt).not.toContain('本模块补充要求');
+  });
+
   it('每个模块都把固定版式与补充要求合并成一条完整、互不串线的提示词', () => {
     const modules = [
       { section: 'hero', prompt: '首屏标题更醒目，商品居中并保留右侧留白' },
@@ -149,7 +173,7 @@ describe('detail_image 提示词', () => {
       sections: 'hero',
       sectionPrompts: '{not-json',
     });
-    expect(outputs?.[0].params.sectionPrompt).toBeUndefined();
+    expect(outputs?.[0].params.sectionPrompt).toBe('');
     const prompt = DetailImage.buildPrompt({ ...base, ...outputs?.[0].params }, 1);
     expect(prompt).toContain('【模块任务与画面要求】');
     expect(prompt).not.toContain('本模块补充要求');

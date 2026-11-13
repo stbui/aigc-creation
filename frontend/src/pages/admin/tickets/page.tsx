@@ -371,6 +371,20 @@ export function AdminTicketsPage() {
   const appliedPriority = params.priority as string | undefined;
   const appliedAssignee = params.assigneeId as string | undefined;
   const appliedQ = (params.q as string | undefined) ?? '';
+  const appliedFilters = {
+    status: appliedStatus,
+    type: appliedType,
+    priority: appliedPriority,
+    assigneeId: appliedAssignee,
+    q: appliedQ || undefined,
+  };
+  const draftFilters = {
+    status: draft.status,
+    type: draft.type,
+    priority: draft.priority,
+    assigneeId: draft.assigneeId,
+    q: qDraft.trim() || undefined,
+  };
   const appliedChips: AppliedFilter[] = [
     appliedStatus
       ? {
@@ -478,13 +492,9 @@ export function AdminTicketsPage() {
 
       <SavedViewBar
         pageKey="tickets"
-        currentFilters={{
-          status: appliedStatus,
-          type: appliedType,
-          priority: appliedPriority,
-          assigneeId: appliedAssignee,
-          q: appliedQ || undefined,
-        }}
+        appliedFilters={appliedFilters}
+        draftFilters={draftFilters}
+        onApplyDraft={applyFilters}
         onApply={(filters) => {
           appliedUrlStatus.current = filters.status;
           setQDraft(filters.q ?? '');

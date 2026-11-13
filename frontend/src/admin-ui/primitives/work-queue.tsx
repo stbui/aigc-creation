@@ -111,7 +111,7 @@ export function WorkQueue({
       <div className={cn('flex flex-col items-center rounded-lg border border-border bg-card px-4 py-8 text-center', className)}>
         <CheckCircle2 className="mb-2 size-6 text-success-text" aria-hidden />
         <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{emptyDescription}</p>
+        <p className="mt-1 text-[13px] leading-5 text-muted-foreground">{emptyDescription}</p>
       </div>
     );
   }
@@ -138,7 +138,7 @@ export function WorkQueue({
               {amount && <span className="text-xs tabular-nums text-muted-foreground">涉及 {amount}</span>}
               <Link
                 to={group.link}
-                className="ml-auto inline-flex items-center gap-1 text-xs text-brand hover:underline"
+                className="ml-auto inline-flex items-center gap-1 text-[13px] text-brand hover:underline"
               >
                 查看全部
                 <ArrowRight className="size-3.5" aria-hidden />
@@ -146,7 +146,7 @@ export function WorkQueue({
             </div>
 
             {group.items.length === 0 ? (
-              <div className="px-4 py-3 text-xs text-muted-foreground">
+              <div className="px-4 py-3 text-[13px] text-muted-foreground">
                 该类没有可展开的实体行，点击「查看全部」处理。
               </div>
             ) : (
@@ -167,7 +167,7 @@ export function WorkQueue({
                         <span className={cn('size-1.5 shrink-0 rounded-full', style.dot)} aria-hidden />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-foreground">{item.title}</span>
-                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.subtitle}</span>
+                          <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">{item.subtitle}</span>
                         </span>
                         {extraMeta.length > 0 && (
                           <span className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground xl:flex">
@@ -188,7 +188,7 @@ export function WorkQueue({
                           </span>
                         )}
                         {/* 分组头是「查看全部 →」，行内动作也该带方向，否则蓝色「处理」读起来像状态词 */}
-                        <span className="inline-flex shrink-0 items-center gap-0.5 text-xs text-brand">
+                        <span className="inline-flex shrink-0 items-center gap-0.5 text-[13px] text-brand">
                           处理
                           <ArrowRight className="size-3" aria-hidden />
                         </span>
@@ -222,7 +222,7 @@ export function WorkQueueSection({
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+          {description && <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">{description}</p>}
         </div>
         {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
       </div>

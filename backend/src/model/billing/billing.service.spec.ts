@@ -20,10 +20,23 @@ describe('isBillingOrderReviewable', () => {
     ).toBe(true);
   });
 
-  it('已有产物时，uncertain 账单也不可核对', () => {
+  it('已有产物时，退款不可核对但结算必须可核对', () => {
+    const task = {
+      status: 'succeeded',
+      outputAssetId: 'asset-1',
+      pendingResult: null,
+      mediaRecoveryError: null,
+    };
+    const order = { status: 'uncertain' as const, updatedAt: new Date(now) };
+
+    expect(isBillingOrderReviewable(order, task, now, 'refund')).toBe(false);
+    expect(isBillingOrderReviewable(order, task, now, 'settle')).toBe(true);
+  });
+
+  it('已交付但账单停在 reserved 时也能人工结算', () => {
     expect(
       isBillingOrderReviewable(
-        { status: 'uncertain', updatedAt: new Date(now) },
+        { status: 'reserved', updatedAt: new Date(now) },
         {
           status: 'succeeded',
           outputAssetId: 'asset-1',
@@ -31,8 +44,9 @@ describe('isBillingOrderReviewable', () => {
           mediaRecoveryError: null,
         },
         now,
+        'settle',
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('仍在补交付时，超时 running 账单不可核对', () => {
@@ -228,7 +242,12 @@ describe('BillingService 人工核对', () => {
       channelId: 'channel-1',
       scene: 'create',
     };
-    const settled = { ...order, status: 'refunded', resolvedBy: 'admin-1', resolutionNote: 'confirmed' };
+    const settled = {
+      ...order,
+      status: 'refunded',
+      resolvedBy: 'admin-1',
+      resolutionNote: 'confirmed',
+    };
     tx.billingOrder.findUnique.mockResolvedValue(order);
     tx.billingOrder.updateMany
       .mockResolvedValueOnce({ count: 1 })
@@ -240,7 +259,9 @@ describe('BillingService 人工核对', () => {
     expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(tx.billingOrder.updateMany).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ where: { id: 'bill-1', status: { in: ['reserved', 'running', 'uncertain'] } } }),
+      expect.objectContaining({
+        where: { id: 'bill-1', status: { in: ['reserved', 'running', 'uncertain'] } },
+      }),
     );
     expect(tx.billingOrder.updateMany).toHaveBeenNthCalledWith(
       2,
@@ -369,7 +390,11 @@ describe('BillingService 换线账单原子替换', () => {
       billingOrder: {
         findUnique: vi
           .fn()
-          .mockResolvedValueOnce({ ...oldOrder, status: options.oldStatus ?? 'running', userId: options.oldUserId ?? 'user-1' })
+          .mockResolvedValueOnce({
+            ...oldOrder,
+            status: options.oldStatus ?? 'running',
+            userId: options.oldUserId ?? 'user-1',
+          })
           .mockResolvedValueOnce(refunded),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         create: vi.fn().mockResolvedValue(newOrder),
@@ -404,12 +429,16 @@ describe('BillingService 换线账单原子替换', () => {
     const { service, prisma, wallet, tx } = setup();
     const afterSwap = vi.fn().mockResolvedValue(undefined);
 
-    await expect(service.replaceTaskBilling(params(afterSwap))).resolves.toMatchObject({ order: newOrder });
+    await expect(service.replaceTaskBilling(params(afterSwap))).resolves.toMatchObject({
+      order: newOrder,
+    });
 
     expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(wallet.refund).toHaveBeenCalledOnce();
     expect(wallet.reserve).toHaveBeenCalledOnce();
-    expect(wallet.refund.mock.invocationCallOrder[0]).toBeLessThan(wallet.reserve.mock.invocationCallOrder[0]);
+    expect(wallet.refund.mock.invocationCallOrder[0]).toBeLessThan(
+      wallet.reserve.mock.invocationCallOrder[0],
+    );
     expect(tx.generationTask.updateMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ billingOrderId: 'bill-old', leaseOwner: 'worker-1' }),
@@ -423,7 +452,9 @@ describe('BillingService 换线账单原子替换', () => {
     const { service, tx } = setup();
     const withPromotion = { ...params(), promotionId: 'campaign-free-1' };
 
-    await expect(service.replaceTaskBilling(withPromotion)).resolves.toMatchObject({ order: newOrder });
+    await expect(service.replaceTaskBilling(withPromotion)).resolves.toMatchObject({
+      order: newOrder,
+    });
 
     expect(tx.billingOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -447,7 +478,9 @@ describe('BillingService 换线账单原子替换', () => {
     const { service, wallet } = setup({ taskCasCount: 0 });
     const afterSwap = vi.fn().mockResolvedValue(undefined);
 
-    await expect(service.replaceTaskBilling(params(afterSwap))).rejects.toMatchObject({ code: 40900 });
+    await expect(service.replaceTaskBilling(params(afterSwap))).rejects.toMatchObject({
+      code: 40900,
+    });
 
     expect(wallet.refund).toHaveBeenCalledOnce();
     expect(wallet.reserve).toHaveBeenCalledOnce();

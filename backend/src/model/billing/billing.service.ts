@@ -16,20 +16,32 @@
 
 import { Injectable } from '@nestjs/common';
 import type { BillingOrder, Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
 import { AppError } from '../../common/app.exception';
-import { CreditWalletService } from './credit-wallet.service';
-import { BASIS_POINTS_SCALE, CREDIT_SCALE, creditAmount, convertCurrencyPrice, tokenAmount } from '../infra/microcredits';
-import { badRequest } from '../domain/json';
-import { normalizeCapability } from '../domain/capability-config';
-import type { ModelRequestIntent } from '../intent/spec-types';
-import type { UserGroupAccess } from '../user-groups/user-group.service';
-import type { CachedChannelModel, CachedPriceTier, RoutedModel } from '../routing/routing.types';
-import { PriceTierService } from '../routing/price-tier.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { estimateTextTokens, requestedBillingQuantity } from '../catalog/quote.service';
+import { normalizeCapability } from '../domain/capability-config';
+import { badRequest } from '../domain/json';
+import {
+  BASIS_POINTS_SCALE,
+  CREDIT_SCALE,
+  convertCurrencyPrice,
+  creditAmount,
+  tokenAmount,
+} from '../infra/microcredits';
+import type { ModelRequestIntent } from '../intent/spec-types';
+import { PriceTierService } from '../routing/price-tier.service';
+import type { CachedChannelModel, CachedPriceTier, RoutedModel } from '../routing/routing.types';
+import type { UserGroupAccess } from '../user-groups/user-group.service';
+import { CreditWalletService } from './credit-wallet.service';
 
 /** 账单状态机：reserved → running → settled / refunded，异常停在 uncertain */
-export const BILLING_STATUSES = ['reserved', 'running', 'settled', 'refunded', 'uncertain'] as const;
+export const BILLING_STATUSES = [
+  'reserved',
+  'running',
+  'settled',
+  'refunded',
+  'uncertain',
+] as const;
 export type BillingStatus = (typeof BILLING_STATUSES)[number];
 
 /**
@@ -66,38 +78,50 @@ export interface BillingReviewTask {
 }
 
 /**
- * 人工核对资格的唯一判定口径。
+ * 人工处置资格的唯一判定口径。
  *
  * 列表、详情、批量选择和真正执行 resolve 都必须调用这一处：
- *   · 已有作品或仍在补交付的任务永远不可核对；
- *   · uncertain 永远可核对；
- *   · running 仅在超过 40 分钟时视为执行者可能已死；
- *   · reserved 只有在对应任务明确 failed / cancelled 时才可核对。
+ *   · 仍在补交付（running + pendingResult / mediaRecoveryError）的任务永远不可核对；
+ *   · 退款：已有产出的订单一律不可退，避免「拿到图又退钱」；
+ *   · 结算：已交付的订单必须可结算 —— 结算失败或进程在落结果与结算之间崩溃时，
+ *     账单会停在 reserved / running / uncertain，若按「已有产出」一刀切拒绝，
+ *     这笔预授权就永远没有人工出口；
+ *   · uncertain 永远可核对；running 仅在超过 40 分钟时视为执行者可能已死；
+ *   · reserved 只有在对应任务明确 failed / cancelled 时才可**退款**（不可结算）。
  *
  * 单纯的 reserved / 新鲜 running 仍可能正常执行，提前人工退款会让平台
  * 白付上游成本，并可能在任务继续执行时造成重复交付。
  */
+export type BillingReviewAction = 'settle' | 'refund';
+
 export function isBillingOrderReviewable(
   order: Pick<BillingOrder, 'status' | 'updatedAt'>,
   task?: BillingReviewTask | null,
   now = Date.now(),
+  action: BillingReviewAction = 'refund',
 ): boolean {
   // `mediaRecoveryError` 也被普通失败路径用作错误说明；只有任务仍在运行且
-  // 结果已暂存 / 正在重试落盘时才算「正在补交付」。
-  const hasDeliverable =
-    task?.outputAssetId != null ||
+  // 正在重试落盘时才算「正在补交付」。`pendingResult` 无论任务状态如何都存在
+  // 二次交付可能，必须一并排除。
+  const recovering =
     task?.pendingResult != null ||
-    (task != null &&
-      task.mediaRecoveryError != null &&
-      task.status === 'running');
-  if (hasDeliverable) return false;
+    (task != null && task.status === 'running' && task.mediaRecoveryError != null);
+  if (recovering) return false;
+  if (order.status === 'settled' || order.status === 'refunded') return false;
+
+  const delivered = task?.outputAssetId != null;
+  if (delivered) {
+    // 已交付只能结算，不能退款；非终态账单都允许结算。
+    return action === 'settle';
+  }
 
   if (order.status === 'uncertain') return true;
   if (order.status === 'running') {
     return now - order.updatedAt.getTime() > REVIEW_RUNNING_STALE_MS;
   }
   if (order.status === 'reserved') {
-    return task?.status === 'failed' || task?.status === 'cancelled';
+    // 预授权对应的任务已失败 / 取消时，只能退款；结算会把一次未交付的任务变成收费。
+    return action === 'refund' && (task?.status === 'failed' || task?.status === 'cancelled');
   }
   return false;
 }
@@ -163,7 +187,10 @@ export function estimatedTextUsage(intent: ModelRequestIntent): BillingUsage {
 }
 
 /** 授权上限是否生效：显式设置过即生效（含授权为 0 的免费单） */
-export function chargeLimitApplies(order: { chargeLimitSet: boolean; chargeLimitMicrocredits: bigint }): boolean {
+export function chargeLimitApplies(order: {
+  chargeLimitSet: boolean;
+  chargeLimitMicrocredits: bigint;
+}): boolean {
   return order.chargeLimitSet || order.chargeLimitMicrocredits > 0n;
 }
 
@@ -314,7 +341,8 @@ export class BillingService {
   ): BillingDraft {
     const capability = normalizeCapability(channelModel.capability);
     if (!capability) throw badRequest('模型能力类型无效');
-    if (!tier || !tier.priceConfigured) throw badRequest('当前模型尚未配置价格，暂不能通过中转调用');
+    if (!tier || !tier.priceConfigured)
+      throw badRequest('当前模型尚未配置价格，暂不能通过中转调用');
 
     // 分组是账单的强校验边界：看不到的渠道即使知道地址也不能预留积分
     access.requireChannel(channelModel.channelId);
@@ -331,16 +359,28 @@ export class BillingService {
       priceTierVersion: tier.priceVersion,
       priceSelectorJson: tier.selectorJson,
       priceVersion: channelModel.priceVersion,
-      unitPriceMicrocredits: convertCurrencyPrice(tier.unitPriceMicrocredits, pricing.rateMicrocredits),
+      unitPriceMicrocredits: convertCurrencyPrice(
+        tier.unitPriceMicrocredits,
+        pricing.rateMicrocredits,
+      ),
       multiplierBasisPoints: pricing.multiplierBasisPoints,
       userGroup: access.groupCode,
       priceCurrency: pricing.currency,
       currencyRateMicrocredits: pricing.rateMicrocredits,
       quantity: 1n,
       amountMicrocredits: 0n,
-      inputTokenPriceMicrocredits: convertCurrencyPrice(tier.inputTokenPriceMicrocredits, pricing.rateMicrocredits),
-      outputTokenPriceMicrocredits: convertCurrencyPrice(tier.outputTokenPriceMicrocredits, pricing.rateMicrocredits),
-      cachedTokenPriceMicrocredits: convertCurrencyPrice(tier.cachedTokenPriceMicrocredits, pricing.rateMicrocredits),
+      inputTokenPriceMicrocredits: convertCurrencyPrice(
+        tier.inputTokenPriceMicrocredits,
+        pricing.rateMicrocredits,
+      ),
+      outputTokenPriceMicrocredits: convertCurrencyPrice(
+        tier.outputTokenPriceMicrocredits,
+        pricing.rateMicrocredits,
+      ),
+      cachedTokenPriceMicrocredits: convertCurrencyPrice(
+        tier.cachedTokenPriceMicrocredits,
+        pricing.rateMicrocredits,
+      ),
       inputTokens: 0n,
       outputTokens: 0n,
       cachedTokens: 0n,
@@ -359,7 +399,11 @@ export class BillingService {
   }
 
   /** 按计费方式补全数量、估算用量与预授权金额 */
-  private withAmount(draft: BillingDraft, intent: ModelRequestIntent, tierPriced: boolean): BillingDraft {
+  private withAmount(
+    draft: BillingDraft,
+    intent: ModelRequestIntent,
+    tierPriced: boolean,
+  ): BillingDraft {
     const mode = draft.billingMode;
 
     if (mode === 'token') {
@@ -368,8 +412,10 @@ export class BillingService {
         // 当前没有 Token 计价的视频线路，先显式拒绝，不生成金额为 0 的假账单。
         throw badRequest('视频 Token 计费暂未开放');
       }
-      if (draft.capability !== 'text') throw badRequest('当前供应线路不支持该能力的 Token 计费方式');
-      if (draft.outputTokenPriceMicrocredits <= 0n) throw badRequest('当前模型尚未配置输出 Token 价格');
+      if (draft.capability !== 'text')
+        throw badRequest('当前供应线路不支持该能力的 Token 计费方式');
+      if (draft.outputTokenPriceMicrocredits <= 0n)
+        throw badRequest('当前模型尚未配置输出 Token 价格');
       const usage = estimatedTextUsage(intent);
       return {
         ...draft,
@@ -398,7 +444,11 @@ export class BillingService {
       return {
         ...draft,
         quantity: BigInt(quantity),
-        amountMicrocredits: creditAmount(draft.unitPriceMicrocredits, quantity, draft.multiplierBasisPoints),
+        amountMicrocredits: creditAmount(
+          draft.unitPriceMicrocredits,
+          quantity,
+          draft.multiplierBasisPoints,
+        ),
         // 按秒计费的成本随秒数放大
         costQuantity: BigInt(quantity),
       };
@@ -407,7 +457,8 @@ export class BillingService {
     if (mode !== 'fixed_request') throw badRequest('当前模型计费方式暂不支持');
     if (draft.unitPriceMicrocredits < 0n) throw badRequest('模型价格无效');
     // 渠道策略下价格为 0 意味着档位未配置；unified 的 0 是合法的免费模型
-    if (tierPriced && draft.unitPriceMicrocredits === 0n) throw badRequest('当前模型尚未配置所选规格的价格');
+    if (tierPriced && draft.unitPriceMicrocredits === 0n)
+      throw badRequest('当前模型尚未配置所选规格的价格');
     return {
       ...draft,
       amountMicrocredits: creditAmount(draft.unitPriceMicrocredits, 1, draft.multiplierBasisPoints),
@@ -449,10 +500,16 @@ export class BillingService {
     } catch (error) {
       if ((error as { code?: string })?.code === 'P2002') {
         const existing = await this.prisma.billingOrder.findUnique({
-          where: { userId_idempotencyKey: { userId: params.userId, idempotencyKey: params.idempotencyKey } },
+          where: {
+            userId_idempotencyKey: { userId: params.userId, idempotencyKey: params.idempotencyKey },
+          },
         });
         if (existing) {
-          return { order: existing, reserved: existing.reservedAmountMicrocredits, idempotentHit: true };
+          return {
+            order: existing,
+            reserved: existing.reservedAmountMicrocredits,
+            idempotentHit: true,
+          };
         }
       }
       throw error;
@@ -709,7 +766,11 @@ export class BillingService {
    */
   async settle(
     billingOrderId: string,
-    options: { providerRequestId?: string; audioDurationMs?: number; deliveredQuantity?: number } = {},
+    options: {
+      providerRequestId?: string;
+      audioDurationMs?: number;
+      deliveredQuantity?: number;
+    } = {},
   ): Promise<BillingOrderRow> {
     if (!billingOrderId) throw new AppError(40001, '账单 id 不能为空', 400);
 
@@ -744,7 +805,9 @@ export class BillingService {
     onObserved: (value: { usage: BillingUsage; source: string; actual: bigint }) => void,
   ): Promise<BillingOrderRow> {
     const reserved =
-      order.reservedAmountMicrocredits > 0n ? order.reservedAmountMicrocredits : order.amountMicrocredits;
+      order.reservedAmountMicrocredits > 0n
+        ? order.reservedAmountMicrocredits
+        : order.amountMicrocredits;
     let actual = order.amountMicrocredits;
     let quantity = order.quantity;
     let usage: BillingUsage | null = null;
@@ -781,11 +844,14 @@ export class BillingService {
         note = 'Token 实际用量超过预授权，已补扣差额';
       }
       if (usageSource === USAGE_SOURCE_VIDEO_FORMULA) {
-        note = note ? `按提交时的视频 Token 公式快照结算；${note}` : '按提交时的视频 Token 公式快照结算';
+        note = note
+          ? `按提交时的视频 Token 公式快照结算；${note}`
+          : '按提交时的视频 Token 公式快照结算';
       }
     } else if (
       order.billingMode === 'per_second' &&
-      (order.capability === 'audio' || (order.capability === 'video' && options.audioDurationMs !== undefined))
+      (order.capability === 'audio' ||
+        (order.capability === 'video' && options.audioDurationMs !== undefined))
     ) {
       const mediaLabel = order.capability === 'video' ? '视频' : '音频';
       const durationMs = options.audioDurationMs ?? 0;
@@ -798,10 +864,7 @@ export class BillingService {
         throw new AppError(40909, `${mediaLabel}实际费用超过本次授权上限，需人工核对`, 409);
       }
       note = `${mediaLabel}按实际输出时长结算`;
-    } else if (
-      order.capability === 'multi_fusion' &&
-      options.deliveredQuantity !== undefined
-    ) {
+    } else if (order.capability === 'multi_fusion' && options.deliveredQuantity !== undefined) {
       const requested = Number(order.quantity);
       const delivered = Math.trunc(options.deliveredQuantity);
       if (!Number.isSafeInteger(requested) || requested <= 0) {
@@ -813,8 +876,7 @@ export class BillingService {
       quantity = BigInt(Math.min(requested, delivered));
       // 预留金额已按「请求张数 × 画质倍率」缩放，按实际张数占比结算即可；
       // 向上取整保证至少一张的金额不会被浮点/截断吞掉。
-      actual =
-        (order.amountMicrocredits * quantity + order.quantity - 1n) / order.quantity;
+      actual = (order.amountMicrocredits * quantity + order.quantity - 1n) / order.quantity;
       validateChargeLimit(order, actual);
       if (quantity < order.quantity) {
         note = `按实际交付 ${quantity.toString()}/${order.quantity.toString()} 张结算`;
@@ -829,7 +891,12 @@ export class BillingService {
       reservedMicrocredits: reserved,
       actualMicrocredits: actual,
       note,
-      meta: { taskId: order.taskId, model: order.model, channelId: order.channelId, scene: order.scene },
+      meta: {
+        taskId: order.taskId,
+        model: order.model,
+        channelId: order.channelId,
+        scene: order.scene,
+      },
     });
 
     const refund = reserved > actual ? reserved - actual : 0n;
@@ -903,7 +970,9 @@ export class BillingService {
       // 已退款账单不再动钱包，但仍要补写核对信息：扫描器原先就是先 refund()
       // 再单独 updateMany()，对历史「已退但未核对」的行同样会补标记。
       const refunded =
-        order.status === 'refunded' ? order : await this.refundInTransaction(tx, order, errorText, reason);
+        order.status === 'refunded'
+          ? order
+          : await this.refundInTransaction(tx, order, errorText, reason);
       if (resolution) {
         await tx.billingOrder.updateMany({
           where: { id: order.id, resolvedBy: '' },
@@ -930,14 +999,21 @@ export class BillingService {
     reason: RefundReason,
   ): Promise<BillingOrderRow> {
     const amount =
-      order.reservedAmountMicrocredits > 0n ? order.reservedAmountMicrocredits : order.amountMicrocredits;
+      order.reservedAmountMicrocredits > 0n
+        ? order.reservedAmountMicrocredits
+        : order.amountMicrocredits;
     if (amount > 0n) {
       await this.wallet.refund(tx, {
         userId: order.userId,
         billingOrderId: order.id,
         amountMicrocredits: amount,
         note: errorText || '任务失败退款',
-        meta: { taskId: order.taskId, model: order.model, channelId: order.channelId, scene: order.scene },
+        meta: {
+          taskId: order.taskId,
+          model: order.model,
+          channelId: order.channelId,
+          scene: order.scene,
+        },
       });
     }
     const updated = await tx.billingOrder.updateMany({
@@ -978,7 +1054,8 @@ export class BillingService {
   ): Promise<BillingOrderRow> {
     const reason = String(note ?? '').trim();
     if (!reason) throw new AppError(40001, '请填写核对依据', 400);
-    if (action !== 'settle' && action !== 'refund') throw new AppError(40001, '请选择结算或退款', 400);
+    if (action !== 'settle' && action !== 'refund')
+      throw new AppError(40001, '请选择结算或退款', 400);
 
     let observed: { usage: BillingUsage; source: string; actual: bigint } | null = null;
     try {
@@ -997,10 +1074,12 @@ export class BillingService {
               },
             })
           : null;
-        if (!isBillingOrderReviewable(order, task)) {
+        if (!isBillingOrderReviewable(order, task, Date.now(), action)) {
           throw new AppError(
             40909,
-            '当前账单不满足人工核对条件：任务仍可执行、已有作品或正在补交付；仅结果不明、超时运行，或预授权对应的任务已失败/取消时才可核对',
+            action === 'refund'
+              ? '当前账单不满足退款条件：已交付作品不可退款，或任务仍可执行 / 正在补交付；仅结果不明、超时运行，或预授权对应的任务已失败/取消时才可退款'
+              : '当前账单不满足结算条件：任务仍在补交付，或账单已是终态',
             409,
           );
         }
@@ -1046,7 +1125,10 @@ export class BillingService {
 
   async orderOfTask(taskId: string): Promise<BillingOrderRow | null> {
     if (!taskId) return null;
-    return this.prisma.billingOrder.findFirst({ where: { taskId }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.billingOrder.findFirst({
+      where: { taskId },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   /**
@@ -1055,7 +1137,11 @@ export class BillingService {
    * 超时、连接中断、以及「任务里已有成功的可计费调用」都说明上游可能已经干活，
    * 自动退款等于平台白付一次调用费。
    */
-  async failureRequiresReview(billingOrderId: string, taskId: string, error?: unknown): Promise<boolean> {
+  async failureRequiresReview(
+    billingOrderId: string,
+    taskId: string,
+    error?: unknown,
+  ): Promise<boolean> {
     if (!billingOrderId) return false;
     if (billingFailureUncertain(error)) return true;
     const order = await this.prisma.billingOrder.findUnique({
@@ -1083,7 +1169,11 @@ export class BillingService {
     if (order.capability !== 'video') {
       if (!log) return null;
       return {
-        usage: { inputTokens: log.inputTokens, outputTokens: log.outputTokens, cachedTokens: log.cachedTokens },
+        usage: {
+          inputTokens: log.inputTokens,
+          outputTokens: log.outputTokens,
+          cachedTokens: log.cachedTokens,
+        },
         source: USAGE_SOURCE_PROVIDER,
       };
     }
@@ -1125,7 +1215,8 @@ export class BillingService {
         order.multiplierBasisPoints,
       );
     }
-    const inputOnly = usage.inputTokens > usage.cachedTokens ? usage.inputTokens - usage.cachedTokens : 0n;
+    const inputOnly =
+      usage.inputTokens > usage.cachedTokens ? usage.inputTokens - usage.cachedTokens : 0n;
     return tokenAmount(
       {
         inputTokens: Number(inputOnly),
@@ -1143,5 +1234,3 @@ export class BillingService {
 function truncate(value: string, max: number): string {
   return [...value].slice(0, max).join('');
 }
-
-

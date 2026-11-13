@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bookmark, Plus, X } from 'lucide-react';
+import { Bookmark, CircleAlert, Plus, X } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { ActionButton, TextField } from './form';
 import { ModalDialog } from './overlay';
@@ -32,13 +32,19 @@ function normalized(filters: AdminViewFilters): string {
  */
 export function SavedViewBar({
   pageKey,
-  currentFilters,
+  appliedFilters,
+  draftFilters,
   onApply,
+  onApplyDraft,
   className,
 }: {
   pageKey: string;
-  currentFilters: AdminViewFilters;
+  /** 已生效、正在决定列表结果的筛选；活动视图与保存都以它为准。 */
+  appliedFilters: AdminViewFilters;
+  /** 输入框中的草稿；仅用于提示“修改尚未查询”，不参与活动态或保存。 */
+  draftFilters?: AdminViewFilters;
   onApply: (filters: AdminViewFilters) => void;
+  onApplyDraft?: () => void;
   className?: string;
 }) {
   const { me } = useAdmin();
@@ -51,7 +57,9 @@ export function SavedViewBar({
   }, [me?.id, pageKey]);
 
   const builtins = ADMIN_BUILTIN_VIEWS[pageKey] ?? [];
-  const currentKey = normalized(currentFilters);
+  const currentKey = normalized(appliedFilters);
+  const hasUnappliedChanges =
+    draftFilters !== undefined && normalized(draftFilters) !== currentKey;
 
   const items = useMemo(
     () =>
@@ -67,7 +75,8 @@ export function SavedViewBar({
   };
 
   const save = () => {
-    const next = createSavedView(name, currentFilters);
+    if (hasUnappliedChanges) return;
+    const next = createSavedView(name, appliedFilters);
     if (!next.name) return;
     const merged = [...views, next];
     setViews(merged);
@@ -84,7 +93,7 @@ export function SavedViewBar({
 
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5', className)} data-testid="admin-saved-views">
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1 text-[13px] text-muted-foreground">
         <Bookmark className="size-3.5" aria-hidden />
         视图
       </span>
@@ -92,13 +101,18 @@ export function SavedViewBar({
         <span
           key={view.id}
           className={cn(
-            'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors',
+            'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[13px] transition-colors',
             active
               ? 'border-brand/30 bg-accent text-brand'
               : 'border-border bg-card text-muted-foreground hover:bg-muted',
           )}
         >
-          <button type="button" className="outline-none" onClick={() => apply(view)}>
+          <button
+            type="button"
+            aria-pressed={active}
+            className="outline-none"
+            onClick={() => apply(view)}
+          >
             {view.name}
           </button>
           {!view.builtin && (
@@ -113,11 +127,26 @@ export function SavedViewBar({
           )}
         </span>
       ))}
+      {hasUnappliedChanges && (
+        <span
+          role="status"
+          data-testid="admin-saved-view-draft"
+          className="inline-flex items-center gap-1 rounded-md border border-warn-border bg-warn-soft px-2 py-1 text-[13px] text-warn-text"
+        >
+          <CircleAlert className="size-3.5" aria-hidden />
+          筛选有未应用修改
+          {onApplyDraft && (
+            <button type="button" className="font-semibold underline underline-offset-2" onClick={onApplyDraft}>
+              应用筛选
+            </button>
+          )}
+        </span>
+      )}
       <ActionButton
         variant="ghost"
         size="sm"
         icon={Plus}
-        disabled={!me?.id}
+        disabled={!me?.id || hasUnappliedChanges}
         onClick={() => setSaveOpen(true)}
       >
         保存当前筛选
@@ -130,7 +159,7 @@ export function SavedViewBar({
           if (!open) setName('');
         }}
         title="保存当前筛选为视图"
-        description="视图只保存在本机浏览器，不改变其他同事看到的内容。"
+        description="只保存已应用的筛选；视图保存在本机浏览器，不改变其他同事看到的内容。"
         width={420}
         footer={
           <div className="flex justify-end gap-2">

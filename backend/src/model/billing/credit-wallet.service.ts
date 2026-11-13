@@ -63,7 +63,10 @@ export class CreditWalletService {
   async ensureAccount(db: WalletDb, userId: string): Promise<void> {
     const id = String(userId ?? '').trim();
     if (!id) throw new AppError(40001, '用户不存在', 400);
-    const existing = await db.creditAccount.findUnique({ where: { userId: id }, select: { userId: true } });
+    const existing = await db.creditAccount.findUnique({
+      where: { userId: id },
+      select: { userId: true },
+    });
     if (existing) return;
     try {
       await db.creditAccount.create({ data: { userId: id } });
@@ -171,7 +174,11 @@ export class CreditWalletService {
    * 唯一用途是「退款扣回」：扣回要按订单批次优先，顺序由业务决定，
    * 不能套用钱包的统一 FEFO。余额不足说明批次与账户已不一致，必须显式失败。
    */
-  async debitAccountOnly(db: WalletDb, userId: string, amountMicrocredits: bigint): Promise<WalletBalance> {
+  async debitAccountOnly(
+    db: WalletDb,
+    userId: string,
+    amountMicrocredits: bigint,
+  ): Promise<WalletBalance> {
     if (amountMicrocredits <= 0n) return this.balanceOf(db, userId);
     await this.ensureAccount(db, userId);
     const updated = await db.creditAccount.updateMany({
@@ -252,6 +259,9 @@ export class CreditWalletService {
     const reserved = params.reservedMicrocredits;
     const actual = params.actualMicrocredits;
     if (reserved < 0n || actual < 0n) throw new AppError(50001, '结算金额无效', 500);
+    // 0 元订单（限时免费 / 免费能力）在建单时跳过了 reserve，用户可能还没有
+    // CreditAccount 行；结算前补建空账户，避免一次正常交付因缺行被迫转人工核对。
+    if (reserved === 0n && actual === 0n) await this.ensureAccount(db, params.userId);
     const refund = reserved > actual ? reserved - actual : 0n;
     const supplement = actual > reserved ? actual - reserved : 0n;
 
@@ -307,11 +317,20 @@ export class CreditWalletService {
       });
     }
     if (restored.expired > 0n) {
-      await this.writeEntry(db, params.userId, 'expire', -restored.expired, -restored.expired, 0n, after, {
-        ...params.meta,
-        billingOrderId: params.billingOrderId,
-        note: '退款差额命中已过期批次，立即作废',
-      });
+      await this.writeEntry(
+        db,
+        params.userId,
+        'expire',
+        -restored.expired,
+        -restored.expired,
+        0n,
+        after,
+        {
+          ...params.meta,
+          billingOrderId: params.billingOrderId,
+          note: '退款差额命中已过期批次，立即作废',
+        },
+      );
     }
     return { refund, supplement, balance: after };
   }
@@ -351,7 +370,7 @@ export class CreditWalletService {
       note:
         expired > 0n
           ? `${params.note?.trim() || '退款'}（其中 ${formatAmount(expired)} 积分因批次已过期作废）`
-          : params.note ?? '',
+          : (params.note ?? ''),
     });
     if (expired > 0n) {
       await this.writeEntry(db, params.userId, 'expire', -expired, -expired, 0n, after, {
@@ -364,10 +383,7 @@ export class CreditWalletService {
   }
 
   /** 到期回收：批次剩余清零，可用余额同步减少，写 expire 流水；返回实际回收量 */
-  async expireLot(
-    db: WalletDb,
-    lot: { id: string; userId: string },
-  ): Promise<bigint> {
+  async expireLot(db: WalletDb, lot: { id: string; userId: string }): Promise<bigint> {
     /*
      * 必须在事务内读取当前剩余量。调用方在事务外扫描到期批次，扫描与逐条
      * 回收之间可能已有结算 / 退款把差额回填进同一批次；沿用扫描时的旧值会
@@ -559,7 +575,10 @@ export class CreditWalletService {
   }
 }
 
-function snapshot(account: { availableMicrocredits: bigint; reservedMicrocredits: bigint }): WalletBalance {
+function snapshot(account: {
+  availableMicrocredits: bigint;
+  reservedMicrocredits: bigint;
+}): WalletBalance {
   return {
     availableMicrocredits: account.availableMicrocredits,
     reservedMicrocredits: account.reservedMicrocredits,

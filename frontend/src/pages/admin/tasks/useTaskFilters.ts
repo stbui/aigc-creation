@@ -187,6 +187,37 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     });
   };
 
+  /** 应用保存视图：草稿与已生效查询一次性覆盖，避免两次 setState 读到旧值。 */
+  const applyView = (next: {
+    status?: string;
+    capability?: string;
+    userId?: string;
+    projectId?: string;
+    errorCode?: string;
+    from?: string;
+    to?: string;
+  }) => {
+    appliedUrlStatus.current = next.status;
+    appliedUrlProject.current = next.projectId ?? '';
+    setStatus(next.status);
+    setCapability(next.capability);
+    setOwner(next.userId ?? '');
+    setProject(next.projectId ?? '');
+    setErrorCode(next.errorCode ?? '');
+    setFrom(next.from ?? '');
+    setTo(next.to ?? '');
+    notifyQueryChange();
+    setQuery({
+      status: next.status,
+      capability: next.capability,
+      userId: next.userId,
+      projectId: next.projectId,
+      errorCode: next.errorCode,
+      from: next.from,
+      to: next.to,
+    });
+  };
+
   const clearStatus = () => {
     appliedUrlStatus.current = undefined;
     setStatus(undefined);
@@ -312,6 +343,25 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     toast,
   ]);
 
+  const appliedFilters = {
+    status: appliedStatus,
+    capability: appliedCapability,
+    userId: appliedOwner || undefined,
+    projectId: appliedProject || undefined,
+    errorCode: appliedErrorCode || undefined,
+    from: appliedFrom || undefined,
+    to: appliedTo || undefined,
+  };
+  const draftFilters = {
+    status,
+    capability,
+    userId: owner.trim() || undefined,
+    projectId: project.trim() || undefined,
+    errorCode: errorCode.trim() || undefined,
+    from: from || undefined,
+    to: to || undefined,
+  };
+
   return {
     status,
     setStatus,
@@ -328,6 +378,8 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     to,
     setTo,
     capOptions,
+    appliedFilters,
+    draftFilters,
     appliedChips,
     hasFilter,
     data,
@@ -340,6 +392,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     setPage,
     reload,
     applyFilters,
+    applyView,
     resetFilters,
     exportTasks,
   };

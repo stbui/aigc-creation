@@ -251,65 +251,10 @@ export class MembershipService {
   }
 
   // ── 权益落地: 并发上限 ────────────────────────────────────────────
-
-  /**
-   * 校验并发任务数上限。
-   *
-   * 计数口径: status ∈ ('queued','running') 的全部任务，**按张计数** ——
-   * 一次提交拆成 5 张图就是 5 个任务、占 5 个并发名额，不按「一次提交」
-   * 折算成 1 个。并发描述的是同时交给模型处理的任务数，与用户点了几次
-   * 提交无关。
-   *
-   * 已排队未开始的也占位，否则用户狂点提交可以无限堆积任务；本次请求
-   * 即将创建的任务数由 `incoming` 传入，与现有任务一起比较上限，避免
-   * 「当前 8/10 还能提交 5 张」造成实际 13 个任务同时在途。
-   *
-   * @returns 当前并发数与上限; 超出时抛 400
-   */
-  async checkConcurrency(
-    userId: string,
-    db: Prisma.TransactionClient | PrismaService = this.prisma,
-    /**
-     * 调用方已解析的权益。
-     *
-     * 建任务链路会先取一次 `perksOf()`（要写进任务参数），紧接着又要校验并发；
-     * 不传时这里会再按同一用户查两遍会员/订单周期。传入即可复用同一次解析结果，
-     * 事务内的复核仍不传，保证看到的是锁内最新权益。
-     */
-    knownPerks?: Perks,
-    /** 本次请求即将创建的任务数；单张能力为 1 */
-    incoming = 1,
-  ): Promise<{ current: number; limit: number }> {
-    const perks = knownPerks ?? (await this.resolve(userId)).perks;
-    const current = await this.countActive(userId, db);
-    if (perks.maxConcurrent <= 0) {
-      // 不限 —— 仍返回当前数供 UI 展示
-      return { current, limit: 0 };
-    }
-    const needed = Math.max(1, Math.trunc(incoming));
-    if (current + needed > perks.maxConcurrent) {
-      throw new AppError(
-        40003,
-        `超出会员并发上限（上限 ${perks.maxConcurrent} 个，当前 ${current} 个进行中，本次需要 ${needed} 个），请等待完成或升级会员`,
-        400,
-      );
-    }
-    return { current, limit: perks.maxConcurrent };
-  }
-
-  private async countActive(
-    userId: string,
-    db: Prisma.TransactionClient | PrismaService = this.prisma,
-  ): Promise<number> {
-    return db.generationTask.count({
-      // ⚠ GenerationTask 用 ownerId 而非 userId (与 Asset 一致)。
-      // 写成 userId 时 Prisma 报 `Unknown argument 'userId'` → 500, 而非 400。
-      //
-      // 按张计数：批量生成的子任务同样占用并发名额。多图提交会一次性
-      // 创建 N 个任务，因此建任务前必须把 N 一起算进上限。
-      where: { ownerId: userId, status: { in: ['queued', 'running'] } },
-    });
-  }
+  //
+  // 并发不在会员服务里做提交闸门：准入层把 `maxConcurrent` 写进任务快照
+  // （`__memberConcurrency`），worker 领取任务时按「用户 + 渠道」分批调度。
+  // 提交阶段不因并发上限拒绝请求，超出部分留在 queued 等下一批。
 
   // ── 权益落地: 加油包折扣 ──────────────────────────────────────────
 

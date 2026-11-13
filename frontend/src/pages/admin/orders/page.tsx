@@ -64,6 +64,8 @@ export function AdminOrdersPage() {
 
   const {
     values,
+    appliedFilters,
+    draftFilters,
     updateFilter,
     applyQuery,
     applyView,
@@ -385,15 +387,9 @@ export function AdminOrdersPage() {
 
       <SavedViewBar
         pageKey="orders"
-        currentFilters={{
-          status: values.status,
-          refundState: values.refundState,
-          orderNo: values.orderNo || undefined,
-          email: values.email || undefined,
-          channel: values.channel,
-          from: values.from || undefined,
-          to: values.to || undefined,
-        }}
+        appliedFilters={appliedFilters}
+        draftFilters={draftFilters}
+        onApplyDraft={applyQuery}
         onApply={(next) => {
           setSelected([]);
           applyView({
@@ -402,6 +398,8 @@ export function AdminOrdersPage() {
             orderNo: next.orderNo,
             email: next.email,
             channel: next.channel,
+            productId: next.productId,
+            productName: next.productName,
             from: next.from,
             to: next.to,
           });

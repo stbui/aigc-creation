@@ -12,20 +12,20 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
-import { CreateGenerationDto } from './dto/create-generation.dto';
-import { StorageService } from '../storage/storage.service';
 import { SignedUrlService } from '../common/signed-url.service';
 import { resolveUploadsDir } from '../config/env-files';
-import type { StorageBackend } from '../storage/storage.provider';
 import { isBillingOrderReviewable } from '../model/billing/billing.service';
 import { TaskAdmissionService } from '../model/tasks/task-admission.service';
-import { TaskLifecycleService, TASK_ERROR } from '../model/tasks/task-lifecycle.service';
+import { TASK_ERROR, TaskLifecycleService } from '../model/tasks/task-lifecycle.service';
 import { TaskWorkerService } from '../model/tasks/task-worker.service';
+import { PrismaService } from '../prisma/prisma.service';
+import type { StorageBackend } from '../storage/storage.provider';
+import { StorageService } from '../storage/storage.service';
+import { CreateGenerationDto } from './dto/create-generation.dto';
 
 /**
  * 任务读接口只取展示所需的列。
@@ -140,7 +140,10 @@ export class GenerateService {
             status: 'queued',
             stage: '排队中',
             inputAssetIds: origin.inputAssetIds,
-            params: origin.params,
+            // 重试任务独立成一行：批次归属由 `parentTaskId` 表达，不能复用
+            // 原批次的 batchId/batchIndex，否则结果页会出现两个同序号模块，
+            // 删除原批次也带不走它。
+            params: withoutBatchFields(origin.params),
             creditCost: 0,
             modelKey: origin.modelKey,
             channelModelId: origin.channelModelId,
@@ -234,19 +237,13 @@ export class GenerateService {
     const outputAssets = outputIds
       .map((assetId) => outputById.get(assetId))
       // 与列表口径一致：后台已下架的产出不能在详情接口借已知任务 id 绕过。
-      .filter(
-        (asset): asset is NonNullable<typeof asset> =>
-          asset?.status === 'visible',
-      )
+      .filter((asset): asset is NonNullable<typeof asset> => asset?.status === 'visible')
       .map((asset) => this.serializeOutputAsset(asset, task.ownerId));
 
     const inputById = new Map(inputRows.map((asset) => [asset.id, asset]));
     const inputAssets = inputAssetIds
       .map((assetId) => inputById.get(assetId))
-      .filter(
-        (asset): asset is NonNullable<typeof asset> =>
-          asset?.status === 'visible',
-      )
+      .filter((asset): asset is NonNullable<typeof asset> => asset?.status === 'visible')
       .map((asset) => this.serializeOutputAsset(asset, task.ownerId));
 
     return {
@@ -286,7 +283,7 @@ export class GenerateService {
      * 的孤立残片, 用户没法再选中整条记录删掉。删除某张子任务时只删它自己。
      */
     const batch = await this.prisma.generationTask.findMany({
-      where: { OR: [{ id: task.id }, { parentTaskId: task.id }] },
+      where: { ownerId, OR: [{ id: task.id }, { parentTaskId: task.id }] },
       select: {
         id: true,
         status: true,
@@ -342,19 +339,26 @@ export class GenerateService {
       throw new AppError(40901, '任务积分账单尚未结清或待人工核对，暂不能删除；请先处理账单', 409);
     }
 
-    const outputIds = targets.flatMap((row) => orderedOutputIds(row.outputAssetId, row.outputAssetIds));
+    const outputIds = targets.flatMap((row) =>
+      orderedOutputIds(row.outputAssetId, row.outputAssetIds),
+    );
     const outputs = outputIds.length
-      ? await this.prisma.asset.findMany({ where: { id: { in: outputIds } } })
+      ? await this.prisma.asset.findMany({ where: { id: { in: outputIds }, ownerId } })
       : [];
 
-    await this.prisma.generationTask.deleteMany({ where: { id: { in: targets.map((row) => row.id) } } });
+    /*
+     * 任务行与素材行必须同生共死：先删任务再删素材，中途失败会留下
+     * 「任务已消失、素材还在」的孤儿记录；素材删除失败被吞掉时同样如此。
+     * 放进一个事务，任何一步失败都整体回滚。
+     */
+    await this.prisma.$transaction(async (tx) => {
+      await tx.generationTask.deleteMany({ where: { id: { in: targets.map((row) => row.id) } } });
+      if (outputs.length > 0) {
+        await tx.asset.deleteMany({ where: { id: { in: outputs.map((asset) => asset.id) } } });
+      }
+    });
 
     const removedAsset = outputs.length > 0;
-    if (outputs.length > 0) {
-      await this.prisma.asset
-        .deleteMany({ where: { id: { in: outputs.map((asset) => asset.id) } } })
-        .catch(() => undefined);
-    }
 
     /*
      * 文件按**写入时的后端**删除，失败不阻塞（库已删，留文件无害）。
@@ -364,9 +368,15 @@ export class GenerateService {
     for (const out of outputs) {
       if (out.storageKey) {
         const backend = (out.storageBackend as StorageBackend) ?? 'local';
-        await this.storage.get(backend)?.delete(out.storageKey).catch(() => undefined);
+        await this.storage
+          .get(backend)
+          ?.delete(out.storageKey)
+          .catch(() => undefined);
       } else if (out.sourceUrl?.startsWith('/uploads/')) {
-        const parts = out.sourceUrl.replace(/^\/uploads\//, '').split('/').filter(Boolean);
+        const parts = out.sourceUrl
+          .replace(/^\/uploads\//, '')
+          .split('/')
+          .filter(Boolean);
         if (parts.length === 2 && !parts.some((p) => p.includes('..'))) {
           await unlink(join(resolveUploadsDir(), parts[0], parts[1])).catch(() => undefined);
         }
@@ -470,10 +480,7 @@ export class GenerateService {
       const inputAssetIds = inputIdsByTask.get(t.id) ?? [];
       const inputAssets = inputAssetIds
         .map((assetId) => inputById.get(assetId))
-        .filter(
-          (asset): asset is NonNullable<typeof asset> =>
-            asset?.status === 'visible',
-        )
+        .filter((asset): asset is NonNullable<typeof asset> => asset?.status === 'visible')
         .map((asset) => this.serializeOutputAsset(asset, t.ownerId));
       /*
        * 产出素材被后台下架（status='hidden'）的不再下发。没有产出的任务
@@ -571,4 +578,25 @@ function orderedOutputIds(primaryId: string | null, idsJson: string | null | und
     // 历史脏数据：只剩首项可用
   }
   return ids;
+}
+
+/**
+ * 后台重试：参数原样复制，但去掉批次字段。
+ *
+ * 重试任务没有 `parentTaskId`，若继续携带原批次的 `batchId/batchIndex`，
+ * 结果页会按 batchId 把它并入原批次，出现重复序号；删除原父任务时也带不走它。
+ * 保留 `section/sectionPrompt/sectionLabel`，确保重试的仍是同一个模块。
+ */
+function withoutBatchFields(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return raw;
+    const params = parsed as Record<string, unknown>;
+    delete params.batchId;
+    delete params.batchIndex;
+    delete params.batchSize;
+    return JSON.stringify(params);
+  } catch {
+    return raw;
+  }
 }

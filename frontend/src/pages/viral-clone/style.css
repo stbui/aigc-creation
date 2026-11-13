@@ -5,43 +5,33 @@
  * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
  */
 
-/* 复刻要求 textarea (实拍: 400x80 rows3, padding 5px 36px 5px 12px, radius4) */
-.vc-requirement-textarea {
-  width: 100%;
-  min-height: 80px;
-  padding: 5px 36px 5px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tag);
-  font-size: 14px;
-  line-height: 22px;
-  color: var(--wb-text);
-  resize: none;
-  background: var(--card-bg);
-  font-family: inherit;
+/* 复刻程度 (与商品详情「包含模块」同一套分组: 两列 gap16, 选项 var(--surface) + radius8)
+ *
+ * 选项由 shadcn ToggleGroup 渲染, 会带上一组 buttonVariants 原子类; 这些原子类在
+ * `@layer utilities` 里, 未分层的本段规则天然优先, 因此这里只写最终值即可。
+ */
+.vc-degree-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
-.vc-requirement-textarea:focus {
-  outline: none;
-  border-color: var(--brand-light);
-}
-
-.vc-requirement-textarea::placeholder {
-  color: var(--text-10);
-}
-
-/* 复刻程度 (实拍: 2 列 x 192 gap16 由 pk-section-picker 提供; 选项 192x86 var(--surface) radius8) */
 .vc-degree-option {
   min-height: 86px;
+  height: auto;
   background: var(--surface);
   border: none;
   border-radius: var(--radius-control);
   padding: 8px 16px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: flex-start;
+  /* 两档说明文案行数不同: 内容顶对齐, 标题行才会在同一水平线 */
+  justify-content: flex-start;
   gap: 8px;
   cursor: pointer;
   text-align: left;
+  white-space: normal;
   font-family: inherit;
 }
 
@@ -49,8 +39,8 @@
   background: var(--border);
 }
 
-.vc-degree-option-active,
-  .vc-degree-option-active:hover {
+.vc-degree-option[data-state='on'],
+  .vc-degree-option[data-state='on']:hover {
   background: var(--brand-bg);
 }
 
@@ -74,12 +64,12 @@
   box-sizing: border-box;
 }
 
-.vc-degree-option-active .vc-degree-dot {
+.vc-degree-option[data-state='on'] .vc-degree-dot {
   border: 4px solid var(--brand-accent);
   background: var(--card-bg);
 }
 
-.vc-degree-option small {
+.vc-degree-desc {
   font-size: 12px;
   color: var(--text-desc);
   line-height: 20px;
@@ -538,157 +528,17 @@
 }
 
 /*
- * 爆款复刻 · shadcn 工作台布局
+ * 工作台骨架不再在这里声明
  *
- * 页面骨架由 Card / CardHeader / CardContent / CardFooter 组合；
- * 这里只负责复刻工作台视口尺寸与 Card 默认内边距的页面级覆盖，
- * 结果对照缩略图、上传区等业务控件继续复用上方既有 .vc-* / .pk-* 样式。
+ * 左栏此前由 Card / CardHeader / CardContent / CardFooter 组合，页面另写了一套
+ * `.vc-workspace` / `.vc-editor-*` 覆盖：整栏一张带描边与阴影的卡、栏内分组铺平、
+ * 提交区圆角被抹成 0。结果是同一个左栏在商品主图 / 商品详情是「多张白卡 + 10px
+ * 间距」，在爆款复刻是「一整张卡 + 16px 间距」，两页并排看明显不是一套组件。
+ *
+ * 现在骨架统一走 `tool-workspace.css` 里的 `pk-workspace` / `pk-input-pane` /
+ * `pk-form-card` / `pk-form-scroll` / `pk-config-card`，本文件只保留爆款复刻
+ * 特有的控件皮肤（复刻程度选项、结果对照行）。
  */
-.vc-workspace {
-  margin: -24px -24px -32px;
-  padding: 16px 24px 16px 16px;
-  box-sizing: border-box;
-  height: calc(100vh - var(--workspace-topbar-height));
-  min-height: 620px;
-  display: grid;
-  grid-template-columns: 432px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.vc-input-pane {
-  width: 432px;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.vc-editor-card {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.vc-editor-header {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-}
-
-.vc-editor-tabs {
-  display: none;
-}
-
-.vc-editor-content {
-  flex: 1;
-  min-height: 0;
-  padding: 16px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.vc-editor-content > [data-slot='separator'],
-  .vc-editor-card > [data-slot='separator'] {
-  flex: none;
-}
-
-.vc-editor-footer {
-  display: block;
-  padding: 0;
-}
-
-.vc-editor-footer .pk-submit-actions {
-  border-radius: 0;
-}
-
-.vc-submit-alert {
-  margin: 12px 16px 0;
-}
-
-.vc-config-section,
-  .vc-generation-settings,
-  .vc-requirement-section,
-  .vc-degree-section {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.vc-config-section {
-  gap: 16px;
-}
-
-.vc-generation-settings {
-  gap: 12px;
-}
-
-.vc-generation-settings-grid {
-  min-width: 0;
-}
-
-.vc-requirement-section {
-  gap: 0;
-}
-
-.vc-requirement-input {
-  min-height: 80px;
-  align-items: flex-start;
-  border-radius: var(--radius-control);
-  background: var(--card-bg);
-}
-
-.vc-requirement-input textarea {
-  min-height: 80px;
-  padding: 8px 44px 8px 12px;
-  font-size: 14px;
-  line-height: 22px;
-}
-
-.vc-degree-section {
-  gap: 12px;
-  /*
-   * FieldSet 底层是 <fieldset>：浏览器默认 padding(0.35em/0.75em/0.625em)、
-   * margin-inline 与 legend 的 2px 内边距会把整块内容右移并多出上下留白，
-   * 与「生成设置 / 复刻要求」的标题和控件对不齐。这里清掉默认盒模型。
-   */
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.vc-degree-section > legend {
-  padding: 0;
-}
-
-.vc-degree-toggle {
-  min-height: 86px;
-  height: auto;
-  padding: 8px 16px;
-  /* 两档说明文案行数不同：内容顶对齐，标题行才会在同一水平线 */
-  justify-content: flex-start;
-  text-align: left;
-  white-space: normal;
-  background: var(--surface);
-  border-color: transparent;
-  border-radius: var(--radius-control);
-}
-
-.vc-degree-toggle:hover {
-  background: var(--border);
-}
-
-.vc-degree-toggle[data-state='on'] {
-  background: var(--brand-bg);
-}
 
 .vc-result-alert {
   flex: none;
@@ -755,38 +605,9 @@
 }
 
 @media (max-width: 1024px) {
-  .vc-workspace {
-    height: auto;
-    min-height: 0;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto;
-  }
-
-  .vc-editor-tabs {
-    display: flex;
-  }
-
-  .vc-input-pane {
-    width: 100%;
-    height: auto;
-  }
-
-  .vc-editor-card {
-    height: auto;
-  }
-
-  .vc-editor-content {
-    overflow: visible;
-  }
-
+  /* 单列文档流下结果列表不内滚，交给页面整体滚动 */
   .vc-result-list {
     overflow: visible;
-  }
-}
-
-@media (max-width: 900px) {
-  .vc-workspace {
-    margin: 0;
   }
 }
 
