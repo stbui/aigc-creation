@@ -112,8 +112,8 @@ SidebarInset（内容区）
 | 顶栏 | 高 56px（`data-testid="admin-header"`），内容区顶部：折叠开关 + 面包屑（分组 / 页面），右侧告警铃铛与环境标识 |
 | 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），品牌头与底部账号菜单不参与 |
 | 底部区 | 侧栏底、上边框分隔；账号菜单固定在底部，折叠态只留头像 |
-| 分组标题 | 11px / 600 / `tracking-[0.08em]`，当前分组带品牌色圆点；可点击折叠/展开；首次进入只展开当前页所在分组，之后沿用写入 `localStorage` 的用户偏好；侧栏折叠态隐藏标题并改用分隔线 |
-| 菜单项 | 高 34px，圆角 8px，13px / 500 文字，padding `0 10px`，左侧 16px 图标 + 10px 间距 |
+| 分组标题 | 14px / 600 / `tracking-[0.08em]`，当前分组带品牌色圆点；分组容器内边距 2px、组间不额外留白；可点击折叠/展开；首次进入只展开当前页所在分组，之后沿用写入 `localStorage` 的用户偏好；侧栏折叠态隐藏标题并改用分隔线 |
+| 菜单项 | 高 36px，圆角 8px，14px / 500 文字，padding `0 10px`；子菜单相对父级缩进 20px 并带左侧引导线，形成清晰的树状层级 |
 | 悬停 | 底 `bg-sidebar-accent`，字 `text-sidebar-accent-foreground` |
 | 选中 | 底 `bg-sidebar-accent`、字 `text-sidebar-accent-foreground` / 600，左侧 3px 品牌色竖条 |
 | 折叠态 | 只留图标并居中，`tooltip` 给全称；分组之间用分隔线代替标题；`Ctrl/Cmd + B` 与顶栏开关均可切换 |

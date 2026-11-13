@@ -20,7 +20,7 @@ export function ViralCloneDegreeCard({
           if (value) onDegreeChange(value as CloneDegree);
         }}
         aria-label="复刻程度"
-        className="vc-degree-options grid w-full grid-cols-2 gap-3"
+        className="vc-degree-options grid w-full grid-cols-2 items-stretch gap-3"
         itemClassName="vc-degree-toggle group h-auto min-h-20 w-full flex-col items-start justify-center gap-2 whitespace-normal rounded-lg border-border bg-secondary px-4 py-2.5 text-left font-normal hover:bg-muted data-[state=on]:border-primary data-[state=on]:bg-accent"
         options={CLONE_DEGREES.map((d) => ({
           value: d.value,

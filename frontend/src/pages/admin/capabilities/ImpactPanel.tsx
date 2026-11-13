@@ -10,13 +10,21 @@ import { bindingCanRun, runtimeTone } from './utils';
 export function ImpactPanel({
   capability,
   bindings,
+  bindingsLoading = false,
+  bindingsError = null,
   pricing,
+  pricingLoading = false,
+  pricingError = null,
   bindingsReadable = true,
   pricingReadable = true,
 }: {
   capability: AdminCapabilityControl;
   bindings: AdminCapabilityModelListView | null;
+  bindingsLoading?: boolean;
+  bindingsError?: string | null;
   pricing: CapabilityPricingView | null;
+  pricingLoading?: boolean;
+  pricingError?: string | null;
   bindingsReadable?: boolean;
   pricingReadable?: boolean;
 }) {
@@ -24,6 +32,18 @@ export function ImpactPanel({
   const executable = rows.filter(bindingCanRun);
   const blocked = rows.filter((row) => !bindingCanRun(row));
   const invalidCount = bindings?.invalidCount ?? 0;
+  const bindingsPending = bindingsReadable && bindingsLoading && bindings === null;
+  const bindingsFailed = bindingsReadable && !bindingsLoading && Boolean(bindingsError) && bindings === null;
+  const bindingsReady = bindingsReadable && bindings !== null;
+  const bindingValue = (value: number) => {
+    if (!bindingsReadable) return '—';
+    if (bindingsPending) return '读取中…';
+    if (bindingsFailed) return '读取失败';
+    if (bindings === null) return '—';
+    return value;
+  };
+  const pricingPending = pricingReadable && pricingLoading && pricing === null;
+  const pricingFailed = pricingReadable && !pricingLoading && Boolean(pricingError) && pricing === null;
 
   return (
     <Panel title="影响面" extra={<span className="text-xs text-muted-foreground">改价 / 下线前必看</span>}>
@@ -32,18 +52,18 @@ export function ImpactPanel({
           columns={4}
           items={[
             { key: 'consumer', label: 'C 端结果', value: RUNTIME_LABELS[capability.runtime.effective] ?? capability.runtime.effective },
-            { key: 'executable', label: '可切换线路', value: bindingsReadable ? executable.length : '—' },
+            { key: 'executable', label: '可切换线路', value: bindingValue(executable.length) },
             {
               key: 'blocked',
               label: '不可执行绑定',
-              value: bindingsReadable ? blocked.length : '—',
-              tone: bindingsReadable && blocked.length > 0 ? 'warn' : undefined,
+              value: bindingValue(blocked.length),
+              tone: bindingsReady && blocked.length > 0 ? 'warn' : undefined,
             },
             {
               key: 'invalid',
               label: '失效绑定',
-              value: bindingsReadable ? invalidCount : '—',
-              tone: bindingsReadable && invalidCount > 0 ? 'danger' : undefined,
+              value: bindingValue(invalidCount),
+              tone: bindingsReady && invalidCount > 0 ? 'danger' : undefined,
             },
           ]}
         />
@@ -69,7 +89,15 @@ export function ImpactPanel({
           </Notice>
         )}
 
-        {bindingsReadable && invalidCount > 0 && (
+        {bindingsReadable && bindingsError && (
+          <Notice tone="warn" className="mb-0">
+            {bindings
+              ? `绑定刷新失败，下面是上一次成功获取的数据：${bindingsError}`
+              : `绑定读取失败：${bindingsError}`}
+          </Notice>
+        )}
+
+        {bindingsReady && invalidCount > 0 && (
           <Notice tone="warn" className="mb-0">
             另有 {invalidCount} 条失效绑定，已排除在可执行线路之外。保存绑定不会自动删除它们，请到「绑定」页确认后显式清理。
           </Notice>
@@ -82,13 +110,21 @@ export function ImpactPanel({
             <span>选路</span>
             <span>可执行</span>
           </div>
-          {rows.length === 0 ? (
-            <div className="px-3 py-8 text-center text-xs text-muted-foreground">
-              没有有效绑定。当前能力无法承接真实请求。
-            </div>
-          ) : !bindingsReadable ? (
+          {!bindingsReadable ? (
             <div className="px-3 py-8 text-center text-xs text-muted-foreground">
               无绑定读取权限
+            </div>
+          ) : bindingsPending ? (
+            <div className="px-3 py-8 text-center text-xs text-muted-foreground">
+              正在读取绑定配置…
+            </div>
+          ) : bindingsFailed ? (
+            <div className="px-3 py-8 text-center text-xs text-muted-foreground">
+              绑定配置读取失败，请稍后重试。
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="px-3 py-8 text-center text-xs text-muted-foreground">
+              没有有效绑定。当前能力无法承接真实请求。
             </div>
           ) : (
             rows.map((row) => {
@@ -122,13 +158,18 @@ export function ImpactPanel({
         </div>
 
         <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-          {pricingReadable ? (
-            <>
-              能力售价：{pricing?.configured ? '已配置' : '默认价'} · {pricing?.billingMode ?? '读取中'}
-              {pricing ? ` · ${toCredits(pricing.unitPriceMicrocredits)} 积分 / 单位` : ''}
-            </>
-          ) : (
+          {!pricingReadable ? (
             '能力售价：无读取权限'
+          ) : pricingPending ? (
+            '能力售价：读取中…'
+          ) : pricingFailed ? (
+            `能力售价：读取失败${pricingError ? `（${pricingError}）` : ''}`
+          ) : (
+            <>
+              能力售价：{pricing ? (pricing.configured ? '已配置' : '默认价') : '未知'} · {pricing?.billingMode ?? '未知'}
+              {pricing ? ` · ${toCredits(pricing.unitPriceMicrocredits)} 积分 / 单位` : ''}
+              {pricingError ? ' · 刷新失败，展示上次数据' : ''}
+            </>
           )}
         </div>
       </div>

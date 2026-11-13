@@ -20,7 +20,7 @@ import type {
   AdminCapabilityModelCandidateView,
 } from '../../../types/model';
 import type { BindingDraft } from './types';
-import { bindingIssue } from './utils';
+import { bindingCostHint, bindingIssue } from './utils';
 
 function toDraft(row: AdminCapabilityModelListView['bindings'][number]): BindingDraft {
   return {
@@ -34,6 +34,22 @@ function toDraft(row: AdminCapabilityModelListView['bindings'][number]): Binding
     channelEnabled: row.channelEnabled,
     modelEnabled: row.modelEnabled,
     priceConfigured: row.priceConfigured,
+  };
+}
+
+/** 候选商品 → 绑定草稿；成本配置只做提示，不作为可执行门槛。 */
+export function candidateToDraft(item: AdminCapabilityModelCandidateView): BindingDraft {
+  return {
+    channelModelId: item.channelModelId,
+    enabled: true,
+    priority: 0,
+    weight: 100,
+    modelKey: item.modelKey,
+    displayName: item.displayName,
+    channelName: item.channelName,
+    channelEnabled: item.channelEnabled,
+    modelEnabled: item.enabled,
+    priceConfigured: item.priceConfigured,
   };
 }
 
@@ -81,21 +97,7 @@ export function BindingPanel({
   }));
 
   const addCandidate = (item: AdminCapabilityModelCandidateView) => {
-    setDraft((current) => [
-      ...current,
-      {
-        channelModelId: item.channelModelId,
-        enabled: true,
-        priority: 0,
-        weight: 100,
-        modelKey: item.modelKey,
-        displayName: item.displayName,
-        channelName: item.channelName,
-        channelEnabled: item.channelEnabled,
-        modelEnabled: item.enabled,
-        priceConfigured: false,
-      },
-    ]);
+    setDraft((current) => [...current, candidateToDraft(item)]);
     setCandidateId('');
   };
 
@@ -180,10 +182,18 @@ export function BindingPanel({
       width: 128,
       render: (row) => {
         const issue = bindingIssue(row);
-        return issue === null ? (
-          <StatusTag status="enabled" tone="success" label="可执行" />
-        ) : (
-          <StatusTag status="disabled" tone="warn" label={issue} />
+        const costHint = bindingCostHint(row);
+        return (
+          <div className="flex flex-col items-start gap-1">
+            {issue === null ? (
+              <StatusTag status="enabled" tone="success" label="可执行" />
+            ) : (
+              <StatusTag status="disabled" tone="warn" label={issue} />
+            )}
+            {costHint && (
+              <span className="text-[10px] leading-3 text-muted-foreground">{costHint}</span>
+            )}
+          </div>
         );
       },
     },

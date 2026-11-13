@@ -98,6 +98,32 @@ describe('CapabilityModelAdminService 失效绑定生命周期', () => {
     expect(catalogVersion.invalidate).toHaveBeenCalledOnce();
   });
 
+  it('候选商品回传真实成本配置状态', async () => {
+    const prisma = {
+      capabilityModelBinding: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      channelModel: {
+        findMany: vi.fn().mockResolvedValue([{ ...validModel, priceConfigured: false }]),
+      },
+      modelChannel: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'ch-1', name: '主供应商', enabled: true, deletedAt: null },
+        ]),
+      },
+    };
+    const { service } = serviceWith(prisma);
+
+    const result = await service.list('expand');
+
+    expect(result.candidates).toEqual([
+      expect.objectContaining({
+        channelModelId: 'cm-valid',
+        priceConfigured: false,
+      }),
+    ]);
+  });
+
   it('只有显式 pruneInvalid 才删除商品缺失的绑定', async () => {
     const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
     const prisma = {

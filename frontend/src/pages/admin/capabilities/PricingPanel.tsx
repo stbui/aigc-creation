@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActionButton,
   Descriptions,
+  ListError,
   Notice,
   Panel,
   SelectField,
+  SkeletonBody,
   StaleError,
   TextField,
 } from '~/admin-ui/primitives';
@@ -105,11 +107,37 @@ export function PricingPanel({
 
   const sourceLabel = data?.configured ? '能力售价（已配置）' : '能力默认价';
 
+  if (loading && data === null) {
+    return (
+      <Panel title="能力售价" extra={<span className="text-xs text-muted-foreground">切换线路不改价</span>}>
+        <div aria-busy="true" aria-live="polite" className="flex flex-col gap-3">
+          <SkeletonBody rows={4} />
+          <p className="text-center text-xs text-muted-foreground">正在读取能力售价…</p>
+        </div>
+      </Panel>
+    );
+  }
+
+  if (error && data === null) {
+    return (
+      <Panel title="能力售价" extra={<span className="text-xs text-muted-foreground">切换线路不改价</span>}>
+        <ListError error={error} onRetry={() => void onRetry()} />
+      </Panel>
+    );
+  }
+
+  if (data === null) {
+    return (
+      <Panel title="能力售价" extra={<span className="text-xs text-muted-foreground">切换线路不改价</span>}>
+        <ListError error="未读取到能力售价，请稍后重试" onRetry={() => void onRetry()} />
+      </Panel>
+    );
+  }
+
   return (
     <Panel title="能力售价" extra={<span className="text-xs text-muted-foreground">切换线路不改价</span>}>
-      {error ? (
-        <StaleError error={error} onRetry={() => void onRetry()} />
-      ) : (
+      <>
+        {error && <StaleError error={error} onRetry={() => void onRetry()} />}
         <div className="flex flex-col gap-4">
           <Notice tone={data?.configured ? 'info' : 'warn'} className="mb-0">
             {data?.configured
@@ -183,7 +211,7 @@ export function PricingPanel({
             {!writable && <span className="text-xs text-muted-foreground">当前账号无 product.price 权限，仅可查看</span>}
           </div>
         </div>
-      )}
+      </>
     </Panel>
   );
 }

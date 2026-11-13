@@ -16,7 +16,11 @@ import { bindingCanRun, formatUpdatedAt, runtimeTone } from './utils';
 export function CapabilityOverview({
   capability,
   bindings,
+  bindingsLoading = false,
+  bindingsError = null,
   pricing,
+  pricingLoading = false,
+  pricingError = null,
   bindingsReadable,
   pricingReadable,
   capabilityWritable,
@@ -25,7 +29,11 @@ export function CapabilityOverview({
 }: {
   capability: AdminCapabilityControl;
   bindings: AdminCapabilityModelListView | null;
+  bindingsLoading?: boolean;
+  bindingsError?: string | null;
   pricing: CapabilityPricingView | null;
+  pricingLoading?: boolean;
+  pricingError?: string | null;
   bindingsReadable: boolean;
   pricingReadable: boolean;
   capabilityWritable: boolean;
@@ -35,11 +43,47 @@ export function CapabilityOverview({
   const validBindings = bindings?.bindings ?? [];
   const executable = validBindings.filter(bindingCanRun).length;
   const invalidCount = bindings?.invalidCount ?? 0;
-  const pricingHint = pricing
-    ? pricing.configured
-      ? `能力售价已配置 · ${pricing.billingMode}`
-      : `使用默认价 · ${pricing.billingMode}`
-    : '售价读取中…';
+  const bindingsPending = bindingsReadable && bindingsLoading && bindings === null;
+  const bindingsFailed = bindingsReadable && !bindingsLoading && Boolean(bindingsError) && bindings === null;
+  const bindingsReady = bindingsReadable && bindings !== null;
+  const bindingValue = (value: number) => {
+    if (!bindingsReadable) return '—';
+    if (bindingsPending) return '读取中…';
+    if (bindingsFailed) return '读取失败';
+    if (bindings === null) return '—';
+    return value;
+  };
+  const bindingHint = (readyHint: string) => {
+    if (!bindingsReadable) return '无绑定读取权限';
+    if (bindingsPending) return '正在读取绑定配置';
+    if (bindingsFailed) return `读取失败：${bindingsError || '未知错误'}`;
+    if (bindingsError) return `${readyHint} · 刷新失败，展示上次数据`;
+    return readyHint;
+  };
+  const pricingPending = pricingReadable && pricingLoading && pricing === null;
+  const pricingFailed = pricingReadable && !pricingLoading && Boolean(pricingError) && pricing === null;
+  const pricingSource = !pricingReadable
+    ? '—'
+    : pricingPending
+      ? '读取中…'
+      : pricingFailed
+        ? '读取失败'
+        : pricing?.configured
+          ? '能力售价'
+          : pricing
+            ? '默认价'
+            : '未知';
+  const pricingHint = !pricingReadable
+    ? '无售价读取权限'
+    : pricingPending
+      ? '正在读取能力售价'
+      : pricingFailed
+        ? `读取失败：${pricingError || '未知错误'}`
+        : pricing
+          ? `${pricing.configured ? '能力售价已配置' : '使用默认价'} · ${pricing.billingMode}${
+              pricingError ? ' · 刷新失败，展示上次数据' : ''
+            }`
+          : '售价未知';
 
   return (
     <div className="flex flex-col gap-3">
@@ -56,29 +100,33 @@ export function CapabilityOverview({
           {
             key: 'executable',
             label: '可执行商品',
-            value: bindingsReadable ? executable : '—',
-            hint: bindingsReadable
-              ? capability.runtime.remoteAvailable
-                ? `${validBindings.length} 条有效绑定，最终线路以模拟选路为准`
-                : `${validBindings.length} 条有效绑定；运行侧暂不可用，请模拟选路`
-              : '无绑定读取权限',
+            value: bindingValue(executable),
+            hint: bindingHint(
+              !bindingsReady
+                ? '绑定配置尚未就绪'
+                : capability.runtime.remoteAvailable
+                  ? `${validBindings.length} 条有效绑定，最终线路以模拟选路为准`
+                  : `${validBindings.length} 条有效绑定；运行侧暂不可用，请模拟选路`,
+            ),
           },
           {
             key: 'invalid',
             label: '失效绑定',
-            value: bindingsReadable ? invalidCount : '—',
-            hint: bindingsReadable
-              ? invalidCount > 0
-                ? '保存绑定不会自动删除，需显式清理'
-                : '无待清理项'
-              : '无绑定读取权限',
-            tone: bindingsReadable && invalidCount > 0 ? 'danger' : undefined,
+            value: bindingValue(invalidCount),
+            hint: bindingHint(
+              !bindingsReady
+                ? '绑定配置尚未就绪'
+                : invalidCount > 0
+                  ? '保存绑定不会自动删除，需显式清理'
+                  : '无待清理项',
+            ),
+            tone: bindingsReady && invalidCount > 0 ? 'danger' : undefined,
           },
           {
             key: 'pricing',
             label: '售价来源',
-            value: pricingReadable ? (pricing?.configured ? '能力售价' : '默认价') : '—',
-            hint: pricingReadable ? pricingHint : '无售价读取权限',
+            value: pricingSource,
+            hint: pricingHint,
           },
         ]}
       />
@@ -87,8 +135,8 @@ export function CapabilityOverview({
         <Notice tone={capability.runtime.effective === 'disabled' ? 'warn' : 'danger'} title="C 端当前不可提交">
           {capability.runtime.reason}
           {capability.runtime.effective === 'unavailable'
-            ? ' 请先补齐候选商品、商品状态与售价，再用“模拟选路”确认线路。'
-            : ' 上线后最多 3 秒恢复；已创建任务不受影响。'}
+            ? ' 请先检查候选商品、商品状态与能力售价，再用“模拟选路”确认线路。'
+            : ' 上线后目录最多 3 秒内刷新；能否恢复承接仍以运行结论与模拟选路为准。已创建任务不受影响。'}
         </Notice>
       )}
 
@@ -137,7 +185,7 @@ export function CapabilityOverview({
               {savingEnabled ? '保存中…' : capability.enabled ? '下线能力' : '上线能力'}
             </ActionButton>
             <span className="text-xs text-muted-foreground">
-              {capability.enabled ? '下线会先展示影响面并二次确认' : '上线后按当前绑定与售价立即恢复'}
+              {capability.enabled ? '确认下线后会切到影响面，便于继续核对' : '上线后按当前绑定与售价刷新目录'}
             </span>
           </div>
         )}

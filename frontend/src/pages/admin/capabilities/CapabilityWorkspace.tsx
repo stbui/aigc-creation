@@ -116,7 +116,11 @@ export function CapabilityWorkspace({
         <CapabilityOverview
           capability={capability}
           bindings={bindings.data}
+          bindingsLoading={bindings.loading}
+          bindingsError={bindings.error}
           pricing={pricing.data}
+          pricingLoading={pricing.loading}
+          pricingError={pricing.error}
           bindingsReadable={bindingReadable}
           pricingReadable={pricingReadable}
           capabilityWritable={capabilityWritable}
@@ -165,7 +169,11 @@ export function CapabilityWorkspace({
         <ImpactPanel
           capability={capability}
           bindings={bindings.data}
+          bindingsLoading={bindings.loading}
+          bindingsError={bindings.error}
           pricing={pricing.data}
+          pricingLoading={pricing.loading}
+          pricingError={pricing.error}
           bindingsReadable={bindingReadable}
           pricingReadable={pricingReadable}
         />

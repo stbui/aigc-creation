@@ -34,9 +34,11 @@ import type { ShoppableCarouselTemplate } from '../../types/api';
 /**
  * AI 带货图文工作台
  *
- * 页面结构对齐参考站实拍（`docs/shoppable-carousel-design.md`）：
+ * 内容与交互对齐参考站实拍（`docs/shoppable-carousel-design.md`）：
  *   左配置栏（上传 / 生成设置 / 卖点文案 / 生成模式 / 附加功能 / 张数）
  *   + 右侧模板区（分类 tab + 模板网格），右栏另开「创作结果」页签承载历史记录。
+ * 外框与商品主图 / 商品详情 / 写真模板统一：432px 左栏、白卡配置 + 独立提交卡，
+ * 右栏网格直接铺在页面底色上，历史记录为独立白卡。
  *
  * 生成链路与站内其它能力同源：一次提交由后端 `outputPlan` 拆成 N 个任务，
  * 每张各计一次价、共享 batchId；页面只负责收集输入与展示。

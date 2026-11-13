@@ -145,9 +145,11 @@
 | GET | `/api/v1/admin/channel-models/health?channelId=` | 线路**历史表现**：一行 = 一条渠道模型，给 24h / 7d 两个窗口的成功率与 P95 耗时 + 最近 10 条终态样本，`channel.model_read`。与 `/admin/channels/health` 的分工：后者是「现在」（启停 / 协议 / 冷却），本端点是「过去」（成功率 / 耗时），值班时两个都要看。成功率 = `success` ÷ 终态次数（`pending` / `canceled` 不计入分母），**无终态样本时为 `null`**（不是 0 ——「没数据」与「全失败」要分得开）；P95 用最近邻法（不插值），样本被采样上限截断时 `sampled=true` |
 | POST | `/api/v1/admin/channels/:id/models/import` | 导入勾选的上游商品。请求体 `{ models, config?, capabilitiesByModel? }`；`config`（类型 / 接入方式 / 计费与售价 / `enabled`）优先于供应商默认配置，两者都没有则只建骨架行；`capabilitiesByModel` 给出时导入后立即写入能力绑定。返回 `{ models, added, configured, bindings }`。配置应用失败的商品回落为骨架行，不阻断整次导入；`channel.model_write` |
 | POST | `/api/v1/admin/channels/:id/models/batch-reprice` | 批量调价：只改**已启用规格的售价**，不动成本价 / 启停 / 上游键。请求体 `{ models: [{ modelId, priceVersion, priceTiers: [{ id, priceVersion, prices }] }] }`，单次 ≤ 100 个模型。`priceVersion` 是乐观并发令牌：任一模型或规格版本过期 → **整批拒绝**（40001，不部分落库）；`prices` 必须恰好是当前计费方式的全部售价字段（按次/按时长 → `unitPriceMicrocredits`；Token 非视频 → 输入/输出/缓存三项；Token 视频 → 仅输出），少一项或多夹一项都拒绝；规格缺成本价或售价未配置时拒绝。成功返回 `{ updated }`，`channel.model_write` |
-| GET/PUT | `/api/v1/admin/capabilities/:id/models` | 能力候选池：读取绑定与兼容商品候选 / 整体替换绑定（`channelModelId`、`enabled`、`priority`、`weight`）；`logical_model.read` / `logical_model.write`（权限值沿用，语义为能力绑定） |
+| GET/PUT | `/api/v1/admin/capabilities/:id/models` | 能力候选池：读取绑定与兼容商品候选 / 整体替换绑定（`channelModelId`、`enabled`、`priority`、`weight`）；候选商品带真实 `priceConfigured`（成本档是否配置，缺失不阻断选路）；`logical_model.read` / `logical_model.write`（权限值沿用，语义为能力绑定） |
+| POST | `/api/v1/admin/capabilities/:id/models/prune-invalid` | 清理单个能力下指向已删除 / 不存在商品的失效绑定，返回 `{ removed }`；只影响失效项，需 `logical_model.write` |
+| POST | `/api/v1/admin/capability-models/prune-invalid` | 跨能力清理失效绑定（商品缺失 / 已删除，或能力定义已不存在），返回 `{ removed }`；需 `logical_model.write` |
 | GET/PUT | `/api/v1/admin/capabilities/:id/pricing` | 能力售价：按次 / 按秒 / Token 与四项单价（微积分）；`product.price` |
-| POST | `/api/v1/admin/capabilities/:id/simulate` | 能力选路模拟（只读）：返回分组、逐条线路的健康分层 / 有效优先级 / 匹配原因与最终选中线路；需 `logical_model.read` |
+| POST | `/api/v1/admin/capabilities/:id/simulate` | 能力选路模拟（只读）：返回分组、逐条线路的健康分层 / 有效优先级 / 匹配原因与最终选中线路。`selectedTier=true` 表示进入最终候选层（同层可多条），本次唯一命中线路看顶层 `selectedChannelModelId`；需 `logical_model.read` |
 | GET | `/api/v1/admin/capability-models/consumption` | 商品被哪些能力消费（渠道台账影响面）；`logical_model.read` |
 | GET | `/api/v1/admin/channel-models/:id/capabilities` | 商品兼容能力预览；`channel.model_read` |
 | POST | `/api/v1/admin/channel-models/:id/publish` | 商品绑定到能力（幂等 upsert）；`logical_model.write` |

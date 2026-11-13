@@ -751,9 +751,18 @@
   color: var(--text-desc);
 }
 
+/*
+ * 步进器走共享 `NumberStepper`（shadcn InputGroup 组合件）。
+ * 旧版三段网格的 24×24 覆盖会把两侧灰块切成悬空的小方块，与组合件的
+ * 边框/高度对不齐；这里让按钮撑满内高，只保留灰底，几何交给组合件。
+ */
+.sc-form-footer [data-slot='number-stepper'] {
+  flex: none;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
 .sc-form-footer [data-slot='number-stepper'] button {
-  width: 24px;
-  height: 24px;
   background: var(--surface-soft);
   font-size: 18px;
 }
@@ -849,6 +858,9 @@
 .sc-footer-row .sc-count-row {
   display: flex;
   align-items: center;
+  /* 基础规则是 space-between（用于其它位置的左右分列）; 底栏里步进器必须紧跟
+     张数文案，否则中间会空出一大段，看起来像控件脱队。 */
+  justify-content: flex-start;
   gap: 10px;
   min-width: 0;
   flex: 1;
@@ -864,10 +876,6 @@
   white-space: nowrap;
   font-size: 12px;
   color: var(--text-desc);
-}
-
-.sc-footer-row [data-slot='number-stepper'] {
-  flex: none;
 }
 
 /* 提示文案可压缩, 保证步进器与高级设置不被挤出底栏 */

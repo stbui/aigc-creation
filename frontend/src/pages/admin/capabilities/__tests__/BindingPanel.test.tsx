@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmProvider } from '~/admin-ui/providers/ConfirmProvider';
 import { ToastProvider } from '~/admin-ui/providers/ToastProvider';
-import { BindingPanel } from '../BindingPanel';
+import { BindingPanel, candidateToDraft } from '../BindingPanel';
 import type { AdminCapabilityModelListView } from '../../../../types/model';
 
 const data: AdminCapabilityModelListView = {
@@ -28,6 +28,74 @@ const data: AdminCapabilityModelListView = {
   invalidCount: 1,
   candidates: [],
 };
+
+describe('BindingPanel 候选与成本状态', () => {
+  it('新加入候选沿用接口返回的真实成本配置状态', () => {
+    const draft = candidateToDraft({
+      channelModelId: 'cm-new',
+      modelKey: 'image-new',
+      displayName: '新候选商品',
+      icon: '',
+      channelId: 'channel-1',
+      channelName: '主供应商',
+      enabled: true,
+      channelEnabled: true,
+      priceConfigured: true,
+      bound: false,
+      compatible: true,
+      reason: '',
+    });
+
+    expect(draft.priceConfigured).toBe(true);
+    expect(draft.modelEnabled).toBe(true);
+  });
+
+  it('成本未配置仍显示可执行，并单独提示毛利不可算', () => {
+    const unconfiguredCostData: AdminCapabilityModelListView = {
+      ...data,
+      invalidBindings: [],
+      invalidCount: 0,
+      bindings: [
+        {
+          id: 'binding-2',
+          capabilityId: 'expand',
+          channelModelId: 'cm-live',
+          modelKey: 'image-live',
+          modelGroupKey: 'image-live',
+          displayName: '可用但无成本档商品',
+          channelId: 'channel-1',
+          channelName: '主供应商',
+          enabled: true,
+          priority: 0,
+          weight: 100,
+          channelEnabled: true,
+          modelEnabled: true,
+          priceConfigured: false,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    render(
+      <ToastProvider>
+        <ConfirmProvider>
+          <BindingPanel
+            capabilityId="expand"
+            data={unconfiguredCostData}
+            loading={false}
+            error={null}
+            writable
+            onRetry={vi.fn()}
+            onChanged={vi.fn()}
+          />
+        </ConfirmProvider>
+      </ToastProvider>,
+    );
+
+    expect(screen.getByText('可执行')).toBeTruthy();
+    expect(screen.getByText('成本未配置，毛利不可算')).toBeTruthy();
+    expect(screen.queryByText('商品未定价')).toBeNull();
+  });
+});
 
 describe('BindingPanel 失效绑定展示', () => {
   it('优先展示商品名、模型与供应商，同时保留原绑定 ID 供排查', () => {

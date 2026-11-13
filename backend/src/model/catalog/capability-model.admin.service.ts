@@ -143,6 +143,7 @@ export class CapabilityModelAdminService {
           channelName: channel?.name ?? '',
           enabled: model.enabled,
           channelEnabled: Boolean(channel?.enabled && !channel.deletedAt),
+          priceConfigured: model.priceConfigured,
           bound: bound.has(model.id),
           compatible: checked.matched,
           reason: checked.reason,

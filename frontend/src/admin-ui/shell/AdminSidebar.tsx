@@ -51,7 +51,7 @@ function NavItem({
         aria-current={isActive ? 'page' : undefined}
         onClick={() => onNavigate(item.path)}
         className={cn(
-          'relative h-[34px] gap-2.5 px-2.5 text-[13px] font-medium data-[active=true]:font-semibold',
+          'relative h-9 gap-2.5 px-2.5 text-sm font-medium data-[active=true]:font-semibold',
           'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center',
         )}
       >
@@ -113,15 +113,15 @@ function SidebarNav({
         data-testid="admin-nav-scroll"
         role="navigation"
         aria-label="后台导航"
-        className="adm-nav-scroll gap-0 py-2"
+        className="adm-nav-scroll gap-0 py-1.5"
         // shadcn 折叠态默认给导航区 `overflow-hidden`；本后台分组多，
         // 图标栏必须还能纵向滚动，否则 1280×800 下底部入口被裁掉。
         style={{ overflowX: 'hidden', overflowY: 'auto' }}
       >
         {groups.map((group, index) => (
           <div key={group.name}>
-            {index > 0 && <SidebarSeparator className="my-1" />}
-            <SidebarGroup className="px-2 py-1">
+            {index > 0 && <SidebarSeparator className="my-0.5" />}
+            <SidebarGroup className="px-2 py-0.5">
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0.5">
                   {group.items.map((item) => (
@@ -147,11 +147,11 @@ function SidebarNav({
       data-testid="admin-nav-scroll"
       role="navigation"
       aria-label="后台导航"
-      className="adm-nav-scroll gap-1 py-2"
+      className="adm-nav-scroll gap-0 py-1.5"
     >
       {groups.map((group, index) => (
         <Collapsible key={group.name} open={group.open}>
-          <SidebarGroup className="p-1.5">
+          <SidebarGroup className="p-0.5">
             <SidebarGroupLabel asChild>
               <button
                 type="button"
@@ -160,7 +160,7 @@ function SidebarNav({
                 onClick={() => onToggleGroup(group.name)}
                 data-active={group.name === activeGroupName ? 'true' : undefined}
                 className={cn(
-                  'w-full justify-between gap-2 text-[11px] font-semibold tracking-[0.08em] outline-none transition-colors',
+                  'w-full justify-between gap-2 text-sm! font-semibold tracking-[0.08em] outline-none transition-colors',
                   'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                   'data-[active=true]:text-sidebar-accent-foreground',
                 )}
@@ -185,7 +185,7 @@ function SidebarNav({
               </button>
             </SidebarGroupLabel>
             <CollapsibleContent id={`admin-nav-group-${index}`}>
-              <SidebarGroupContent className="mt-1">
+              <SidebarGroupContent className="mt-0.5 ml-8 w-auto border-l border-sidebar-border">
                 <SidebarMenu className="gap-0.5">
                   {group.items.map((item) => (
                     <NavItem
@@ -233,7 +233,7 @@ function AccountMenu({
             {initial}
           </span>
           <span className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-xs font-medium">{email ?? '加载中…'}</span>
+            <span className="truncate text-sm font-medium">{email ?? '加载中…'}</span>
             <span className="mt-0.5 truncate text-[12px] text-muted-foreground">
               {roleLabel}
             </span>
@@ -315,7 +315,7 @@ export function AdminSidebar({
             >
               <img className="size-7 shrink-0" src="/brand/huojue-mark.svg" alt="" />
               <span className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-sm font-semibold text-sidebar-foreground">
+                <span className="truncate text-[15px] font-semibold text-sidebar-foreground">
                   货觉AI
                 </span>
                 <span className="truncate text-[12px] text-muted-foreground">运营后台</span>

@@ -404,6 +404,8 @@ export interface AdminCapabilityModelCandidateView {
   channelName: string;
   enabled: boolean;
   channelEnabled: boolean;
+  /** 是否至少有一个可用成本档；缺失不影响选路，只影响毛利可算性。 */
+  priceConfigured: boolean;
   bound: boolean;
   compatible: boolean;
   reason: string;

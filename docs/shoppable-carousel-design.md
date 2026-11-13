@@ -12,6 +12,10 @@
 >
 > 原始产物：`/tmp/designkit-shoppable-carousel/{layout-1440,layout-1920,interact,final,history}.json`、`shot-*.png`。
 > 本文只记录**实测值**，不做设计发挥；本站取值一律映射到 `frontend/src/styles/global.css` 的 `var(--token)`。
+>
+> **2026-11-13 外框统一**：左栏 416 → 432px，配置内容收进白色圆角卡、提交区独立成卡；
+> 右栏网格直接铺在页面底色上，「最近生成」为独立白卡。与商品主图 / 商品详情 / 写真模板一致。
+> 下文第 1/3/5 节的 416px、通栏白底、固定底栏等数值是**参考站实测记录**，不再是本站现状。
 
 ---
 
@@ -40,7 +44,7 @@ div.social-media-page-J-DPOa            1440×900  @0,0     ← 页面根，不�
 | `.social-media-sidebarScroll` | 721 | 826 | 左栏内容区（1440×900 实测） |
 | `.social-media-recipeBody` | 735 | 3573 | 右栏模板网格区 |
 
-> 本站落地：左栏用既有 `.pk-form-scroll`（内部滚动），右栏新增 `.sc-showcase-body`（内部滚动），页面根不滚动。
+> 本站落地：左栏 `.sc-form-scroll`（内部滚动），右栏 `.sc-showcase`（flex 列：分类页签 + 网格滚动区 + 历史卡），页面根不滚动。
 
 ## 2. 分栏宽度与栅格（两视口实测）
 

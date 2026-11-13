@@ -219,12 +219,11 @@ export class RouterService {
     const selected = eligible.length > 0
       ? weightedRoute(eligible.map((item) => ({ ...item, weight: item.line.weight }))).line
       : null;
-    const best = eligible[0];
+    const selectedTierIds = new Set(eligible.map((item) => item.line.id));
     for (const item of diagnostics) {
-      item.selectedTier = Boolean(
-        best &&
-          item.bindingId === best.line.id,
-      );
+      // selectedTier 表示「进入最终候选层」，同层内还会按权重随机选一条。
+      // 不能只标 eligible[0]，否则顶层 selectedChannelModelId 可能与标记不一致。
+      item.selectedTier = selectedTierIds.has(item.bindingId);
     }
 
     const groups = capability.orderedGroupKeys.map((key) => {

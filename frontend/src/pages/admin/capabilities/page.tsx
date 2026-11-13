@@ -145,7 +145,7 @@ export function AdminCapabilitiesPage() {
       description="能力是售卖单元：绑定可承接的渠道模型，设置能力级售价，运行时自动切换线路。"
       actions={
         <>
-          {bindingWritable && (
+          {bindingReadable && bindingWritable && (
             <ActionButton
               variant="secondary"
               size="sm"
@@ -219,6 +219,7 @@ export function AdminCapabilitiesPage() {
           <div className="min-w-0">
             {selected ? (
               <CapabilityWorkspace
+                key={selected.capabilityId}
                 capability={selected}
                 tab={tab}
                 onTabChange={setTab}

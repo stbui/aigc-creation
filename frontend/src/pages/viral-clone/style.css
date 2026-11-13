@@ -655,13 +655,26 @@
 
 .vc-degree-section {
   gap: 12px;
+  /*
+   * FieldSet 底层是 <fieldset>：浏览器默认 padding(0.35em/0.75em/0.625em)、
+   * margin-inline 与 legend 的 2px 内边距会把整块内容右移并多出上下留白，
+   * 与「生成设置 / 复刻要求」的标题和控件对不齐。这里清掉默认盒模型。
+   */
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vc-degree-section > legend {
+  padding: 0;
 }
 
 .vc-degree-toggle {
   min-height: 86px;
   height: auto;
   padding: 8px 16px;
-  justify-content: center;
+  /* 两档说明文案行数不同：内容顶对齐，标题行才会在同一水平线 */
+  justify-content: flex-start;
   text-align: left;
   white-space: normal;
   background: var(--surface);

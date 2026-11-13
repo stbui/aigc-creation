@@ -359,6 +359,7 @@ TTL 30 秒、最大过期 5 分钟、首次装载失败直接报错；写入后 
       effectivePriority: number;
       weight: number;
       eligible: boolean;
+      selectedTier: boolean;
       reason: string;
     }>;
   }>;
@@ -367,6 +368,10 @@ TTL 30 秒、最大过期 5 分钟、首次装载失败直接报错；写入后 
   reason: string;
 }
 ```
+
+`selectedTier=true` 表示该线路进入最终候选层；同层内仍会按权重随机选择，
+因此可能出现多条线路同时为 `true`。真正本次命中的唯一线路以顶层
+`selectedChannelModelId` 为准，不能用 `selectedTier` 反推「已经选中」。
 
 模拟与真实选路共用同一套过滤与排序函数；测试断言两者选同一条线路。
 
