@@ -135,8 +135,6 @@ export interface CapabilitiesResponse {
  * ⚠️ `source` 恒为 'gateway' —— 文本没有本地兜底, 通道不可用即报错,
  * 不编造模板文案。`model` 是渠道回报的实际模型名 (请求时填的可能只是别名)。
  */
-export type { PromptPreviewItem, PromptPreviewResult } from './prompt-preview';
-
 export interface PromptToolResult {
   /** 产出的文本 */
   text: string;

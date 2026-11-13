@@ -308,7 +308,6 @@ export function TicketsPage() {
         <StateError
           title="工单加载失败"
           desc="没能取回你的工单列表，重试一次即可。"
-          detail={error}
           onRetry={() => void load()}
         />
       )}

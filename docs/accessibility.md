@@ -123,6 +123,7 @@ WCAG 2.2 AA 要求：
 - [ ] 状态不只靠颜色，且有 `aria-live` / `role`。
 - [ ] 200% 缩放与 320px 宽下无内容丢失（C 端）。
 - [ ] 关键页面用 VoiceOver 抽查一次标题、地标、表单与错误提示。
+- [ ] `npm run verify:conventions` 通过（字号 ≥12px）。
 - [ ] `npm run lint` 未新增 a11y warning。
 
 ## 12. 已知缺口

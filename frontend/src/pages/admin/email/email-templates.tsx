@@ -434,13 +434,13 @@ function TemplateCard({
 
       <CardContent className="flex flex-col gap-3 border-t border-border px-4 py-3">
         <div>
-          <p className="m-0 text-[11px] font-medium text-muted-foreground">邮件主题</p>
+          <p className="m-0 text-xs font-medium text-muted-foreground">邮件主题</p>
           <p className="m-0 mt-0.5 truncate text-[13px] font-medium text-foreground" title={subject}>
             {subject}
           </p>
         </div>
         <div>
-          <p className="m-0 text-[11px] font-medium text-muted-foreground">正文预览</p>
+          <p className="m-0 text-xs font-medium text-muted-foreground">正文预览</p>
           <p className="m-0 mt-0.5 line-clamp-3 whitespace-pre-line text-[12px] leading-5 text-muted-foreground">
             {body}
           </p>
@@ -449,7 +449,7 @@ function TemplateCard({
           {meta.variables.map((variable) => (
             <code
               key={variable.key}
-              className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+              className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
               title={variable.label}
             >
               {templatePlaceholder(meta, variable.key)}
@@ -496,7 +496,7 @@ function TemplatePreview({
       </h3>
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="border-b border-border bg-muted/30 px-4 py-3">
-          <p className="m-0 text-[11px] text-muted-foreground">主题</p>
+          <p className="m-0 text-xs text-muted-foreground">主题</p>
           <p className="m-0 mt-1 whitespace-pre-wrap break-words text-[13px] font-semibold text-foreground">
             {renderEmailTemplatePreview(meta, subject) || '未填写邮件主题'}
           </p>

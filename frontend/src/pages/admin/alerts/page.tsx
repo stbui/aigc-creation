@@ -197,7 +197,7 @@ export function AdminAlertsPage() {
                         title={item.detail}
                       >
                         {/* 来源用小字前缀，代替第二枚 badge —— 标题行已经没地方了 */}
-                        <span className="shrink-0 rounded bg-muted px-1 py-px text-[11px] leading-4">
+                        <span className="shrink-0 rounded bg-muted px-1 py-px text-xs leading-4">
                           {ALERT_CATEGORY_LABEL[item.category]}
                         </span>
                         <span className="truncate">{item.detail}</span>

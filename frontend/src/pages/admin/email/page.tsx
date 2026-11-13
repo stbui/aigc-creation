@@ -300,7 +300,7 @@ export function AdminEmailPage() {
         <span className="inline-flex items-center gap-1.5">
           <ListChecks className="size-3.5" aria-hidden />
           业务用途
-          <span className="rounded-full bg-muted px-1.5 text-[11px] leading-5 text-muted-foreground tabular-nums">
+          <span className="rounded-full bg-muted px-1.5 text-xs leading-5 text-muted-foreground tabular-nums">
             {enabledEventCount}/{eventKeys.length}
           </span>
         </span>

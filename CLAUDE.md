@@ -35,6 +35,11 @@
 | 可访问性规范 | `docs/accessibility.md`；a11y 规则基线在 `biome.json` |
 | 安全与权限规范 | `docs/security.md`；权限点唯一事实源是 `backend/src/admin/permissions.ts` |
 | 数据库规范 | `docs/database.md`；表结构唯一事实源是 `backend/prisma/schema.prisma` |
+| 生成提示词规范 | `docs/prompt-engineering.md`；唯一入口是 `CapabilityPlugin.buildPrompt`，多图拆分看 `outputPlan` |
+| 可观测性规范 | `docs/observability.md`；告警阈值唯一事实源是 `backend/src/admin/alert-thresholds.ts` |
+| 发布与版本规范 | `docs/release.md`；执行卡在 `docs/development-workflow.md` §2.13，运维命令在 `docs/docker-deployment.md` §5 |
+| 数据分析事件规范 | `docs/analytics-events.md`；财务口径以 `FinanceAnalyticsService` 为准 |
+| 媒体资产规范 | `docs/media-assets.md`；格式白名单唯一事实源是 `backend/src/common/image-formats.ts` |
 | 测试清单与覆盖矩阵 | `docs/testing.md`；文档分类地图见 `docs/README.md` |
 
 **数量口径（最易腐化，改代码后必须复核）**：本文件的数字以下表口径为准，与代码不符以代码为准并顺手改这里。
@@ -184,6 +189,7 @@ npm run check
 npm run lint                # 全量 lint，warning 可见，仅 error 失败
 npm run lint:ci             # 只显示 error，CI 与 npm run check 使用
 npm run lint:fix            # 应用安全修复
+npm run verify:conventions  # 仓库级约定：字号 ≥12px、C 端无 StateError detail、四包版本一致
 npx biome format --write <files>   # 只格式化本次改动的文件
 npm run format              # 全仓格式化（仅专门的全仓格式化提交时用）
 
@@ -224,7 +230,7 @@ npm run e2e                 # Playwright
 
 关键字段：`id / name / group / summary / sidebarHint / badge / mode / modality / model / buildPrompt / outputPlan / creditCost / inputs(0|1|2) / inWorkbench / help / params[]`。**不存在 `localImpl` / `localFallback`**。
 
-**一次提交出 N 张 → 声明 `outputPlan`，由准入层拆任务**：不声明 = 一次生成一张。声明后 `model/tasks/task-admission.service.ts` 按返回值把一次提交拆成 N 个独立任务，**每张各建一张账单、各扣一份 `creditCost`**，失败 / 取消各自按账单退款，共享 `batchId / batchIndex / batchSize`，前端按批次聚合成「一次生成」。当前 `detail_image`（按勾选模块数）与 `shoppable_carousel`（按张数 6–10）用到。一个任务只调一次上游、产不出不同版式 —— 要多样版式必须拆任务，不要试图用提示词拼多图。
+**一次提交出 N 张 → 声明 `outputPlan`，由准入层拆任务**：不声明 = 一次生成一张。声明后 `model/tasks/task-admission.service.ts` 按返回值把一次提交拆成 N 个独立任务，**每张各建一张账单、各扣一份 `creditCost`**，失败 / 取消各自按账单退款，共享 `batchId / batchIndex / batchSize`，前端按批次聚合成「一次生成」。当前 `detail_image`（按勾选模块数）、`main_image`（按勾选变体数）与 `shoppable_carousel`（按张数 6–10）用到。一个任务只调一次上游、产不出不同版式 —— 要多样版式必须拆任务，不要试图用提示词拼多图。
 
 - `mode`（实现程度）：`real` 已接真实模型；`mock` / `planned` 保留枚举但当前 0 项。
 - `modality`（产出介质），与 `mode` 正交：当前 **17 项 `image` + 1 项 `video`**（合计 18）；`text` 用于提示词工具等非能力项。
@@ -433,7 +439,7 @@ npm run e2e                 # Playwright
 | --- | --- |
 | 需求 | `prd.md`（整站）、`admin-prd.md`（后台） |
 | 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md`；`shoppable-carousel-design.md`（+ 模板来源 `shoppable-carousel-template-sources.md`）；品牌：`brand/brand-basics.md` |
-| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`error-copy.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md`、`copywriting.md`、`feedback-states.md`、`code-style.md`、`accessibility.md`、`security.md`、`database.md`、`mask-canvas-sdk.md` |
+| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`error-copy.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md`、`copywriting.md`、`feedback-states.md`、`code-style.md`、`accessibility.md`、`security.md`、`database.md`、`prompt-engineering.md`、`observability.md`、`release.md`、`analytics-events.md`、`media-assets.md`、`mask-canvas-sdk.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |
 | 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`channel-model-automation-design.md`（已实施：去掉前台模型层，渠道模型直接售卖与自动切换）；`admin-workflow-design.md`（P0 已实施）、`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |

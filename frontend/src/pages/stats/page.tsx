@@ -70,7 +70,6 @@ export function StatsPage() {
         <StateError
           title="创作数据加载失败"
           desc="没能取回你的创作记录。可能是网络暂时不稳定，重试一次即可。"
-          detail={error}
           onRetry={reload}
         />
       </PersonalPage>

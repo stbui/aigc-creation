@@ -17,7 +17,6 @@ import {
 } from './components';
 import { ProductKitExamplePanel } from './ProductKitExamplePanel';
 import { ProductKitInputPane } from './ProductKitInputPane';
-import { ProductKitPromptPreview } from './ProductKitPromptPreview';
 import {
   hasActiveGalleryItems,
   useAuth,
@@ -32,7 +31,6 @@ import {
 import { generateApi, resolveModel } from './api';
 import {
   buildVariantPlan,
-  buildVariantsParam,
   countGenerations,
   formSnapshotOf,
   imageInputCountError,
@@ -119,7 +117,6 @@ export function ProductKitPage() {
 
   // ── 弹窗状态 ──
   const [expandOpen, setExpandOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
 
   // AI 分析：走文本通道的「图片转提示词」，对首张商品图做真实识别
   const { analyzing, analyze: runAiAnalyze } = useImageToPromptAnalysis({
@@ -293,8 +290,6 @@ export function ProductKitPage() {
         generating={generating}
         formValid={formValid}
         creditLabel={creditLabel}
-        onPreviewPrompt={() => setPreviewOpen(true)}
-        previewingPrompt={false}
         onSubmit={() => void submit()}
       />
 
@@ -328,21 +323,6 @@ export function ProductKitPage() {
 
       {/* 手机上传弹窗 (二维码方案) */}
       <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
-
-      {/* 生成提示词预览（不建任务、不扣费） */}
-      <ProductKitPromptPreview
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        productName={productName}
-        brand={brand}
-        platform={platform}
-        language={language}
-        description={description}
-        ratio={ratio}
-        resolution={resolution}
-        variants={buildVariantsParam(counts)}
-        refCount={images.length}
-      />
 
       {/* 商品描述放大编辑 */}
       <ExpandTextModal

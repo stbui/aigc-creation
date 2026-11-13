@@ -45,7 +45,7 @@ export function WorkbenchDashboard({
           {loading ? (
             <StateSkeleton variant="panel" count={4} />
           ) : error ? (
-            <StateError title="数据加载失败" desc="没能取回创作数据。可能是后端未启动或网络异常，重试一次即可。" detail={error} onRetry={onRetry} compact />
+            <StateError title="数据加载失败" desc="没能取回创作数据。可能是后端未启动或网络异常，重试一次即可。" onRetry={onRetry} compact />
           ) : stats ? (
             <>
               <div className="wb-dashboard-stats">

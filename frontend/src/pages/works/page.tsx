@@ -345,7 +345,6 @@ export function WorksPage() {
         <StateError
           title="作品列表加载失败"
           desc="没能取回你的作品列表。可能是后端未启动或网络异常，重试一次即可。"
-          detail={error}
           onRetry={() => void load()}
         />
       ) : !token ? (

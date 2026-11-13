@@ -341,7 +341,7 @@ export function LibraryPage() {
           <LibraryLoadingState />
         ) : error ? (
           /* 「没连上」不是「没素材」 */
-          <LibraryErrorState detail={error} onRetry={() => void load()} />
+          <LibraryErrorState onRetry={() => void load()} />
         ) : shown.length === 0 ? (
           <LibraryEmptyState
             copy={emptyState}

@@ -97,7 +97,6 @@ export function PackagesPage() {
           <StateError
             title="商品加载失败"
             desc="没能取回积分包价目。可能是后端未启动或网络异常，重试一次即可。"
-            detail={error}
             onRetry={() => void reload()}
           />
         )}

@@ -126,7 +126,7 @@ export function EmailOverview({
             </p>
           </div>
           <div className="rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-right">
-            <p className="text-[11px] font-medium tracking-wide text-muted-foreground">当前选择</p>
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">当前选择</p>
             <p className="mt-0.5 text-sm font-semibold text-foreground">{meta.label}</p>
           </div>
         </div>
@@ -171,7 +171,7 @@ function OverviewCell({
           : 'text-foreground';
   return (
     <div className="min-w-0 border-r border-border px-4 py-3 last:border-r-0 even:border-r-0 lg:even:border-r lg:last:border-r-0">
-      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd
         className={`mt-1 truncate text-[13px] font-semibold ${toneClass} ${mono ? 'font-mono' : ''}`}
         title={value}
@@ -232,7 +232,7 @@ export function ChannelSelector({
                   <Check className="size-3" aria-hidden />
                 </span>
               ) : (
-                <span className="text-[10px] font-semibold tracking-wider text-muted-foreground">
+                <span className="text-xs font-semibold tracking-wider text-muted-foreground">
                   {provider.shortLabel}
                 </span>
               )}

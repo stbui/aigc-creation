@@ -312,7 +312,6 @@ export function OrdersPage() {
         <StateError
           title="订单加载失败"
           desc="没能取回订单列表。可能是后端未启动或网络异常，重试一次即可。"
-          detail={error}
           onRetry={() => void load()}
         />
       )}

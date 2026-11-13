@@ -287,7 +287,6 @@ export function CheckoutPage() {
                 ? '没能取回该会员套餐的信息。套餐可能已下架，请回到会员页重新选择。'
                 : '没能取回该商品的信息。可能是后端未启动、链接有误或商品已下架。'
             }
-            detail={error ?? undefined}
             action={
               <button type="button" className="state-btn is-ghost" onClick={() => navigate('/packages')}>
                 返回积分商城

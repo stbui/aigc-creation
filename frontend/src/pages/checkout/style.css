@@ -535,7 +535,7 @@
 
 .co-coupon-tip {
   margin: 6px 0 0 22px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
   color: var(--text-desc);
 }
@@ -834,7 +834,7 @@
   }
 
   .co-trust {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .co-card,

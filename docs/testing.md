@@ -34,7 +34,7 @@ node -e "console.log(require('./scripts/db-url').resolveDbPath())"
 
 ## 3. 自动化闸口
 
-静态检查先行：根目录 `npm run lint:ci`（Biome，error 级；规则基线见 [`code-style.md`](code-style.md)），已包含在 `npm run check` 中。首次或锁文件变更后先执行根目录 `npm ci`。格式检查尚未进入门禁，原因见该文 §5。
+静态检查先行：根目录 `npm run verify:conventions`（仓库级约定）与 `npm run lint:ci`（Biome，error 级；规则基线见 [`code-style.md`](code-style.md)），均已包含在 `npm run check` 中。首次或锁文件变更后先执行根目录 `npm ci`。格式检查尚未进入门禁，原因见该文 §5。
 
 ### 3.1 构建与类型（L1）
 

@@ -226,6 +226,8 @@ docker compose -f docker-compose.production.yml up -d
 
 ## 5. 升级与回滚
 
+版本号、镜像 tag 与发布记录规范见 [`release.md`](release.md)。
+
 ```bash
 # 1. 先备份（见上一节）
 # 2. 拉取固定 tag 的镜像（镜像需已由 CI 推送到 HUOJUE_IMAGE_PREFIX 指向的 registry）

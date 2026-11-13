@@ -89,5 +89,6 @@
 ## 7. 相关文档
 
 - 变量矩阵（`ASSET_SIGNING_SECRET` / `RATE_LIMIT_*` / `ERROR_WEBHOOK_URL`）：`docs/environments.md`
+- 可观测性口径、告警阈值与排障路径：`docs/observability.md`
 - 响应信封与错误码：`docs/api-contract.md`
 - 渠道（邮件 / 短信）适配器：`docs/environments.md`「邮件 / 短信通道」

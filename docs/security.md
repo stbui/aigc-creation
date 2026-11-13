@@ -66,6 +66,8 @@
 - 压缩包读取必须防 zip-slip：解出的路径不得越出目标目录。
 - 备份使用 SQLite `VACUUM INTO` 生成一致性快照并记录 SHA-256；**备份文件本身未加密**。
 
+完整的格式、存储 key、缩略图与删除规则见 [`media-assets.md`](media-assets.md)。
+
 ## 6. 支付与回调
 
 - 支付宝：RSA2 验签，签名串按官方规则构造（去空值、去 `sign` / `sign_type`、字典序）。

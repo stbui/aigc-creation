@@ -209,6 +209,21 @@ export const MainImage: CapabilityPlugin = {
       .filter(Boolean)
       .join('；');
 
+    /*
+     * 白底 / 场景 / 其他图虽然不写字，仍需要理解商品是什么，才能选择正确
+     * 的场景、视角与画面重点。卖点图已在文案闭集里注入 description，这里
+     * 不再重复；描述只作为理解信息，不能被模型渲染成画面文字。
+     */
+    const productContext =
+      description && !mainImageVariantAllowsText(variant)
+        ? [
+            '',
+            '【商品信息｜画面理解】',
+            `商品描述：${description}`,
+            '以上描述仅用于理解商品属性、适用场景、构图与卖点表达，不在画面中生成文字。',
+          ]
+        : [];
+
     return [
       '【任务】',
       `生成一张电商商品主图。${subjectText(p)}。`,
@@ -216,6 +231,7 @@ export const MainImage: CapabilityPlugin = {
       '【本图类型】',
       `本次只生成「${variantLabel(variant)}」这一张主图，不生成其它类型。`,
       `画面要求：${mainImageVariantBrief(variant)}`,
+      ...productContext,
       '',
       '【商品一致性｜硬约束】',
       '商品结构、颜色、材质、纹理、logo、包装与可见配件必须与参考图一致；',

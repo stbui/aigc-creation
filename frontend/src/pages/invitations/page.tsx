@@ -278,7 +278,7 @@ export function InvitationsPage() {
 
   // 加载失败: 如实说明, 不编造任何数字
   if (!data) {
-    return <InviteErrorState error={error} onRetry={load} />;
+    return <InviteErrorState onRetry={load} />;
   }
 
   const { rule, metrics, enabled } = data;

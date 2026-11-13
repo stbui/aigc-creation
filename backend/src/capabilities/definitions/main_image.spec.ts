@@ -90,6 +90,27 @@ describe('main_image 变体 → 提示词', () => {
 });
 
 describe('main_image 文案闭集', () => {
+  it('非卖点图把商品描述作为画面理解信息，但明确要求不生成文字', () => {
+    for (const variant of ['white_background', 'scene', 'other']) {
+      const prompt = MainImage.buildPrompt({ ...base, variant }, 1);
+
+      expect(prompt).toContain('【商品信息｜画面理解】');
+      expect(prompt).toContain(`商品描述：${base.description}`);
+      expect(prompt).toContain(
+        '以上描述仅用于理解商品属性、适用场景、构图与卖点表达，不在画面中生成文字。',
+      );
+      expect(prompt).toContain('本图不写字');
+      expect(prompt.split(base.description)).toHaveLength(2);
+    }
+
+    const withoutDescription = MainImage.buildPrompt(
+      { ...base, description: '', variant: 'scene' },
+      1,
+    );
+    expect(withoutDescription).not.toContain('【商品信息｜画面理解】');
+    expect(withoutDescription).not.toContain('商品描述：');
+  });
+
   it('商品事实只注入一次，来源标签不会被要求写进画面', () => {
     const prompt = MainImage.buildPrompt({ ...base, variant: 'selling_point' }, 1);
     const facts = '三档风速，低噪运行，USB 供电';

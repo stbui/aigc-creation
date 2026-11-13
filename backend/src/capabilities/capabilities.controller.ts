@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import {
   CAPABILITIES,
   CAPABILITY_GROUPS,
@@ -12,8 +12,6 @@ import { defaultCreditCostOf, getCapability } from './capability.registry';
 import { normalizeCapability } from '../model/domain/capability-config';
 import { CapabilityAvailabilityService } from './capability-availability.service';
 import { OptionalJwtAuthGuard } from '../common/optional-jwt-auth.guard';
-import { PromptPreviewDto } from './dto/prompt-preview.dto';
-import { PromptPreviewService } from './prompt-preview.service';
 
 /**
  * 能力清单下发接口 (公开, 免登录)。
@@ -28,7 +26,6 @@ export class CapabilitiesController {
     private readonly price: CreditPriceService,
     private readonly availability: CapabilityAvailabilityService,
     private readonly prisma: PrismaService,
-    private readonly promptPreview: PromptPreviewService,
   ) {}
 
   /**
@@ -74,23 +71,5 @@ export class CapabilitiesController {
       items,
       workbenchIds: WORKBENCH_CAPABILITIES.map((c) => c.id),
     };
-  }
-
-  /**
-   * 提示词预览 —— 回放「最终会发给模型的那条提示词」。
-   *
-   * 公开、免登录（与能力清单同一口径）：提示词里只含用户自己填的
-   * 商品信息，不含任何账号数据，登录与否看到的是同一份东西。
-   *
-   * **不建任务、不选路、不扣费。** 存在的唯一目的是让用户在提交前
-   * 看到模型到底会收到什么 —— 尤其是商品主图这类「一次出多张、
-   * 每张画面要求不同」的能力。
-   *
-   * 走能力自己的 `buildPrompt` 与 `outputPlan`，因此预览与真实提交
-   * **不可能漂移**；前端不得复刻一份提示词模板。
-   */
-  @Post(':id/prompt-preview')
-  preview(@Param('id') id: string, @Body() dto: PromptPreviewDto) {
-    return this.promptPreview.preview(id, dto.params, dto.refCount);
   }
 }

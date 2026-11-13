@@ -5,7 +5,6 @@ import { ModelModule } from '../model/model.module';
 import { CapabilitiesController } from './capabilities.controller';
 import { ShoppableCarouselController } from './shoppable-carousel.controller';
 import { CapabilityAvailabilityService } from './capability-availability.service';
-import { PromptPreviewService } from './prompt-preview.service';
 
 /**
  * 能力清单模块。
@@ -22,7 +21,7 @@ import { PromptPreviewService } from './prompt-preview.service';
 @Module({
   imports: [CreditsModule, PricingModule, ModelModule],
   controllers: [CapabilitiesController, ShoppableCarouselController],
-  providers: [CapabilityAvailabilityService, PromptPreviewService],
-  exports: [CapabilityAvailabilityService, PromptPreviewService],
+  providers: [CapabilityAvailabilityService],
+  exports: [CapabilityAvailabilityService],
 })
 export class CapabilitiesModule {}

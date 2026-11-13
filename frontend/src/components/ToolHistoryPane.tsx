@@ -87,7 +87,6 @@ export function ToolHistoryGrid({
             compact
             title="历史记录加载失败"
             desc="已有任务不会受影响，可稍后重试。"
-            detail={error}
             onRetry={onRetry}
           />
         ) : tasks.length === 0 ? (

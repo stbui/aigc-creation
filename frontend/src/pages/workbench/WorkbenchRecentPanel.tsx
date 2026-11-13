@@ -47,7 +47,7 @@ export function WorkbenchRecentPanel({
           {loading ? (
             <StateSkeleton variant="row" count={3} />
           ) : error ? (
-            <StateError title="加载失败" desc="没能取回最近任务列表。" detail={error} onRetry={onRetry} compact />
+            <StateError title="加载失败" desc="没能取回最近任务列表。" onRetry={onRetry} compact />
           ) : stats && stats.recentTasks.length > 0 ? (
             <div className="wb-jobs-list">
               {stats.recentTasks.slice(0, 4).map((t) => (

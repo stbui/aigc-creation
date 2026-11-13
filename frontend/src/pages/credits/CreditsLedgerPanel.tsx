@@ -111,7 +111,6 @@ export function CreditsLedgerPanel({
         <StateError
           title="积分流水加载失败"
           desc="没能取回当前筛选下的积分流水。可能是后端未启动或网络异常，重试一次即可。"
-          detail={error}
           onRetry={onRetry}
         />
       ) : rows.length === 0 ? (

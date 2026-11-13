@@ -65,6 +65,7 @@
 | [`runtime-infrastructure.md`](runtime-infrastructure.md) | AIGC 标识、签名 URL、限流、健康检查、请求追踪、日志落盘 |
 | [`development-workflow.md`](development-workflow.md) | Agent 执行手册：阶段执行卡、闸口命令、证据标准、交人边界、Git 工作流（分支 / 提交 / PR / 回滚） |
 | [`frontend-module-conventions.md`](frontend-module-conventions.md) | 前端多文件功能目录的分层、入口文件、导入方向与新增文件落位 |
+| [`main-image-generation.md`](main-image-generation.md) | `/product-kit` 商品主图：变体互斥、字段到提示词的映射、文案闭集与禁字、按变体拆批与计费、结果聚合、删除与回填 |
 | [`product-detail-generation.md`](product-detail-generation.md) | `/product-detail` 商品详情图：模块拆批、任务与账单、提示词、执行状态机、轮询聚合、删除与失败边界 |
 | [`typography.md`](typography.md) | 字体、主题桥接、圆角阴影与组件微规格 |
 | [`design-tokens.md`](design-tokens.md) | 设计令牌标准：基础 / 通用 / 组件三层、命名、引用规则、新增流程与审计命令 |
@@ -74,6 +75,11 @@
 | [`accessibility.md`](accessibility.md) | 可访问性规范：键盘与焦点、语义结构、表单、图像与媒体、动态反馈、对比度、验证清单与已知缺口 |
 | [`security.md`](security.md) | 安全与权限规范：鉴权链、令牌与密钥、SSRF、上传、支付回调、注入、限流、日志脱敏与检查清单 |
 | [`database.md`](database.md) | 数据库规范：Prisma / SQLite 约束、命名、主键与时间、关系级联、索引、金额精度、状态、JSON、事务、迁移与种子 |
+| [`prompt-engineering.md`](prompt-engineering.md) | 生成提示词规范：buildPrompt / outputPlan、事实闭集、参数槽位、文本工具、协议边界、测试与已知缺口 |
+| [`observability.md`](observability.md) | 可观测性规范：日志、请求追踪、调用记录、指标、健康检查、告警、定时任务与排障路径 |
+| [`release.md`](release.md) | 发布与版本规范：版本号、发布单元、发布记录、兼容性、回滚、热修与 CI/CD 缺口 |
+| [`analytics-events.md`](analytics-events.md) | 数据分析事件规范：事件目录、属性、指标口径、归因、采集门槛与已知缺口 |
+| [`media-assets.md`](media-assets.md) | 媒体资产规范：上传格式与上限、存储 key、缩略图、签名访问、AIGC 标识、视频与删除保留 |
 | [`mask-canvas-sdk.md`](mask-canvas-sdk.md) | 遮罩画布 SDK：标记 / 手势 / 遮罩 / 导出内核、两条通知通道、适配层职责与约束 |
 
 目录结构、能力清单、环境坑等与代码强相关的坐标速查表放在仓库根 `CLAUDE.md`；接口清单与错误码在 [`api-contract.md`](api-contract.md)。

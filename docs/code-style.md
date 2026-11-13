@@ -25,6 +25,7 @@
 | `npx biome format --write <files>` | 格式化指定文件（推荐：只格式化本次改动） | — |
 | `npm run format` | 格式化全仓（仅用于专门的全仓格式化提交） | — |
 | `npm run format:check` | 只检查不写入 | 需要格式化的文件存在时非零 |
+| `npm run verify:conventions` | 仓库级约定：字号 ≥12px、C 端 `StateError` 无 `detail`、四包版本一致 | 有违规时非零 |
 
 根目录首次使用或锁文件变更后先执行 `npm ci`；`npm run check` 已包含 `lint:ci`。
 
@@ -100,6 +101,18 @@ warnings 不计入门禁，但**新增代码不应增加 warn 数量**。批量�
 
 关闭项必须在此登记原因；新增 off 项同样要写。
 
+### 4.4 仓库级约定（Biome 之外）
+
+Biome 无法表达部分产品与设计硬约束，由 `scripts/verify-conventions.mjs` 检查，已接入 `npm run check`：
+
+| 规则 | 检查内容 | 事实源 |
+| --- | --- | --- |
+| 最小字号 | 禁止 `text-[10px]` / `text-[11px]`、`font-size < 12px`、`fontSize < 12` | `CLAUDE.md` 样式规范 |
+| C 端错误详情 | `frontend/src` 非后台区域禁止 `<StateError detail=...>` | [`feedback-states.md`](feedback-states.md) §5 |
+| 版本一致 | 根 / backend / frontend / agent 的 `package.json` 版本必须相同 | [`release.md`](release.md) §1 |
+
+新增仓库级规则时优先扩展该脚本，不要把规则只写在文档里；扫描范围与排除项（`__tests__`、后台目录）必须在脚本中显式声明。
+
 ## 5. 格式化策略
 
 Biome formatter 已配置，但**暂不进入门禁**：
@@ -131,7 +144,7 @@ Biome formatter 已配置，但**暂不进入门禁**：
 `quality` job：
 
 1. 根目录 `npm ci` 安装 Biome；
-2. `npm run check` → `check:node` → `verify:deps` → **`lint:ci`** → `build` → `test`。
+2. `npm run check` → `check:node` → `verify:deps` → **`verify:conventions`** → **`lint:ci`** → `build` → `test`。
 
 `e2e-smoke` 与 `docker-build` 不依赖 Biome。本地提交前至少跑 `npm run lint:ci`；改动涉及类型或运行时行为时按 [`testing.md`](testing.md) 的闸口清单执行。
 
@@ -145,6 +158,7 @@ Biome formatter 已配置，但**暂不进入门禁**：
 
 - 587 条 warning 未收敛，尚不能作为失败门禁。
 - 878 个文件未按 Biome formatter 格式化，格式门禁未接入。
+- 裸 hex、`adm-*` 类名、状态组件复用尚未纳入 `verify:conventions`；当前仍靠评审与既有约束。
 - Biome 只覆盖语法与通用正确性；以下仓库硬规则仍需评审与既有测试守住：
   - 最小字号 12px、禁止裸 hex、只用设计令牌（见 `CLAUDE.md` 与 [`typography.md`](typography.md)）；
   - 后台页面不得新增 `adm-*` 类、只从 `admin-ui/primitives` 取件；

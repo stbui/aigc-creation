@@ -60,7 +60,6 @@ export function WorkbenchAccountPanel({
             <StateError
               title="数据加载失败"
               desc="没能取回账号与作品数据。可能是后端未启动或网络异常，重试一次即可。"
-              detail={error}
               onRetry={onRetry}
               compact
             />

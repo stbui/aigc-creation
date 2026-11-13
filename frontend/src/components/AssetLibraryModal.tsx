@@ -397,7 +397,6 @@ export function AssetLibraryModal({
                     compact
                     title="素材库加载失败"
                     desc="素材库加载失败，请稍后重试。"
-                    detail={error}
                   />
                 </div>
               ) : visible.length === 0 ? (
