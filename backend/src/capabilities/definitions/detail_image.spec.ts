@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-
+import { imageOptions } from '../model-mapping';
 import { DetailImage } from './detail_image';
 import { DETAIL_SECTIONS } from './param-options';
-import { imageOptions } from '../model-mapping';
 
 const base = {
   productName: '轻音桌面循环扇',
@@ -47,7 +46,9 @@ describe('detail_image 提示词', () => {
 
     expect(prompt).toContain('商品事实：三档风速，低噪运行，USB 供电；扇叶直径 18cm。');
     expect(prompt).toContain('字段和数值仅从商品事实提取，缺项直接删行');
-    expect(prompt).toContain('不得补写未提供的型号、材质、尺寸、参数、认证、销量、价格、优惠或售后承诺');
+    expect(prompt).toContain(
+      '不得补写未提供的型号、材质、尺寸、参数、认证、销量、价格、优惠或售后承诺',
+    );
     expect(prompt).toContain('信息不足时减少信息项');
     expect(prompt).toContain('适配淘宝平台（详情长图建议宽度 750px）');
     expect(prompt).toContain('画面比例：3:4');
@@ -63,7 +64,9 @@ describe('detail_image 提示词', () => {
     expect(prompt.split(factText)).toHaveLength(2);
     expect(prompt).toContain('“商品名称”“品牌”“商品事实”只是来源标签，不得原样写入画面');
     expect(prompt).toContain('只能对上述素材做不改变含义的压缩，或按目标语言做等价翻译');
-    expect(prompt).not.toContain(`电商详情页单模块图生成。商品「轻音桌面循环扇」（品牌 清风）。商品事实：`);
+    expect(prompt).not.toContain(
+      `电商详情页单模块图生成。商品「轻音桌面循环扇」（品牌 清风）。商品事实：`,
+    );
   });
 
   it('参考图只约束商品外观，不携带原图版式和文字', () => {
@@ -72,6 +75,34 @@ describe('detail_image 提示词', () => {
     expect(prompt).toContain('参考图仅作为商品外观依据，不是版式、场景或文案参考');
     expect(prompt).toContain('商品结构、颜色、材质、logo、包装和配件必须与参考图一致');
     expect(prompt).toContain('不复制参考图的背景、桌面、人物、构图、文字、水印和拍摄角度');
+  });
+
+  it('参考图张数进入提示词，没有参考图时不写张数', () => {
+    expect(DetailImage.buildPrompt({ ...base, section: 'hero' }, 3)).toContain(
+      '共参考上传的 3 张商品图',
+    );
+    expect(DetailImage.buildPrompt({ ...base, section: 'hero' }, 0)).not.toContain('共参考上传');
+  });
+
+  it('模块键缺失时仍产出单模块提示词，不回落成详情长图', () => {
+    const prompt = DetailImage.buildPrompt({ ...base }, 1);
+
+    expect(prompt).toContain('电商详情页单模块图生成');
+    expect(prompt).toContain('只生成一张独立版块图，不生成整张详情长图');
+    expect(prompt).not.toContain('纵向长图');
+    expect(prompt).not.toContain('按模块分区排版');
+  });
+
+  it('单模块产出与文案闭集不可被补充要求覆盖，闭集只作为文字上限', () => {
+    const prompt = DetailImage.buildPrompt(
+      { ...base, section: 'scene_atmosphere', sectionPrompt: '加上三条使用提示' },
+      1,
+    );
+
+    expect(prompt).toContain(
+      '只生成当前模块、商品事实、参考图一致性和本图文案闭集是不可覆盖的硬约束',
+    );
+    expect(prompt).toContain('本图文案闭集是文字上限，画面目标中更严格的文字限制仍然生效');
   });
 
   it('每个模块都把固定版式与补充要求合并成一条完整、互不串线的提示词', () => {
@@ -93,7 +124,8 @@ describe('detail_image 提示词', () => {
       modules.map((item) => item.prompt),
     );
 
-    const prompts = outputs?.map((output) => DetailImage.buildPrompt({ ...base, ...output.params }, 1)) ?? [];
+    const prompts =
+      outputs?.map((output) => DetailImage.buildPrompt({ ...base, ...output.params }, 1)) ?? [];
     expect(prompts).toHaveLength(modules.length);
     expect(new Set(prompts).size).toBe(modules.length);
 
@@ -135,10 +167,7 @@ describe('detail_image 提示词', () => {
   });
 
   it('缺少品牌与效果事实时，模块不得编造品牌故事或前后对比', () => {
-    const brandPrompt = DetailImage.buildPrompt(
-      { ...base, brand: '', section: 'brand_story' },
-      1,
-    );
+    const brandPrompt = DetailImage.buildPrompt({ ...base, brand: '', section: 'brand_story' }, 1);
     const comparePrompt = DetailImage.buildPrompt(
       { ...base, description: '商品为单色哑光材质', section: 'effect_compare' },
       1,
@@ -174,6 +203,18 @@ describe('detail_image 提示词', () => {
     expect(prompt).toContain('仅根据商品名称与参考图呈现商品外观，不补充参数事实');
     expect(prompt).not.toContain('（品牌');
     expect(prompt).toContain('只生成「首屏主视觉」这一张独立版块图');
+
+    // 降级说明只能出现在规则区，不能进入「可写文案」闭集，否则会被当成文案画进图里
+    const copyBlock = prompt.split('【本图允许文案】')[1].split('【文案规则】')[0];
+    expect(copyBlock).not.toContain('仅根据商品名称');
+    expect(copyBlock).toContain('商品名称「轻音桌面循环扇」');
+  });
+
+  it('完全没有可写素材时明确禁字，不把空闭集留给模型自由发挥', () => {
+    const prompt = DetailImage.buildPrompt({ section: 'hero' }, 1);
+
+    expect(prompt).toContain('用户未提供商品文案素材：画面不出现任何文字、数字、标签或水印');
+    expect(prompt).not.toContain('画面文字只能取自以下素材');
   });
 
   it('比例与画质是两个独立参数', () => {

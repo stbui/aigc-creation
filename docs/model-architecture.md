@@ -91,7 +91,7 @@ TaskWorkerService（领取 / 轮询 / 切线 / 收尾）
 | --- | --- | --- |
 | 1 | 能力存在且启用（`CapabilityControl`，无行 = 启用） | `40005` + 下线原因 |
 | 2 | 输入数量（`inputs`）与模态 | `40001` |
-| 3 | 会员并发上限 | `40003` |
+| 3 | 会员并发上限（已有任务数 + 本次拆单张数） | `40003` |
 | 4 | 项目 / 素材归属 | `40001` / `403` |
 | 5 | 遮罩与参数白名单（`sanitizeParams` + 能力定义） | `40001` |
 | 6 | 解析 `capability + modelKey` 并选中线路（`RouterService.resolve`） | `40005`（模型不存在 / 无可用线路 / 参数不匹配） |
@@ -101,9 +101,10 @@ TaskWorkerService（领取 / 轮询 / 切线 / 收尾）
 - 扣费发生在**建任务时**，任务快照 `creditCost` 与账单金额同源。
 - 任何一步失败都不产生任务，也不动积分。
 - 建任务与预留是同一个 Prisma 事务：余额不足整批回滚、进程崩溃整体回滚。
+- 会员并发按**任务（图片）**计数：一次多图提交展开成 N 个任务就占 N 个并发名额，校验为「已有 `queued` / `running` 任务数 + N ≤ `maxConcurrent`」；`parentTaskId` 只用于批次归属，不参与并发折算。
 
 **多图产出（`outputPlan`）**：能力插件可声明 `outputPlan(params)`，把一次提交拆成 N 个任务
-（当前只有商品详情图与带货图文）。**按张计费**：每张任务一条自己的账单，各扣一份
+（当前商品主图、商品详情图与带货图文在用）。**按张计费**：每张任务一条自己的账单，各扣一份
 `creditCost`；其余任务 `parentTaskId` 指向父任务，共享 `batchId / batchIndex / batchSize`。
 某张切线只换它自己的账单；父任务失败会中止未派发的兄弟任务并各自退款。
 
@@ -117,7 +118,7 @@ running ──nextPollAt 到期──► 回查上游
 ```
 
 - 每步只做一件事就把执行位让出去，长轮询不占进程。
-- 本进程并发上限来自 `MODEL_ACTIVE_TASK_LIMIT`（默认 2）。
+- 本进程执行位固定为 8（`task-worker.service.ts` 的 `MAX_ACTIVE_TASKS`），全局先进先出领取，不按用户分配；`MODEL_ACTIVE_TASK_LIMIT` 当前未被 worker 读取。
 - 轮询间隔与总时限按能力模态固定：图像 3s / 15min，视频 5s / 60min，文本 1s / 10min，音频 2s / 20min。
 
 ### 5.3 一次尝试（`task-executor.service.ts`）
@@ -280,7 +281,7 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 | `MODEL_PLUGIN_DIR` | `plugins` | 随代码入库的插件目录（不可卸载） |
 | `MODEL_PLUGIN_INSTALL_DIR` | `plugins-installed` | 后台上传插件的安装目录（可卸载） |
 | `MODEL_PROVIDER_CATALOG_URL` | 空 | 服务商目录来源 |
-| `MODEL_ACTIVE_TASK_LIMIT` | 2 | 本进程同时执行的任务数 |
+| `MODEL_ACTIVE_TASK_LIMIT` | 2 | 预留的进程执行位配置；当前 worker 未读取，实际固定为 8 |
 | `MODEL_HTTP_TIMEOUT_MS` | 120000 | 单次上游请求超时 |
 | `MODEL_MEDIA_TIMEOUT_MS` | 180000 | 媒体下载超时 |
 | `MODEL_WORKER_INTERVAL_MS` | 1000 | 调度节拍 |

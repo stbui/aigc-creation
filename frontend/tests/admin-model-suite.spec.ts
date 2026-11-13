@@ -293,7 +293,7 @@ test.describe('渠道与模型 P5', () => {
     expect(tierAfter.unitPriceMicrocredits).toBe(expected);
   });
 
-  test('能力与模型：候选池、能力售价与模拟选路', async ({ page }) => {
+  test('能力与模型：候选池、能力售价与可用商品检查', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/capabilities`);
     await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({ timeout: 20000 });
@@ -308,9 +308,11 @@ test.describe('渠道与模型 P5', () => {
       timeout: 15000,
     });
 
-    // 模拟选路是只读：要么给出命中的模型/线路，要么给出「没有可用线路」
-    await page.getByRole('button', { name: '模拟选路' }).click();
-    await expect(page.getByText(/命中模型|没有可用线路/).first()).toBeVisible({ timeout: 15000 });
+    // 可用商品检查是只读：要么给出当前会使用的商品，要么明确当前没有可用商品
+    await page.getByRole('button', { name: '检查可用商品' }).click();
+    await expect(page.getByText(/当前任务会使用|当前没有可用商品/).first()).toBeVisible({
+      timeout: 15000,
+    });
 
     await page.getByRole('tab', { name: '能力售价' }).click();
     await expect(page.getByRole('heading', { name: '能力售价' })).toBeVisible();

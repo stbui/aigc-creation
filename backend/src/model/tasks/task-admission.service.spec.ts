@@ -219,11 +219,11 @@ describe('TaskAdmissionService 商品主图自定义配置拆单', () => {
       promptTools as never,
     );
 
-    return { service, prisma, billing, createdTasks, updatedTasks };
+    return { service, prisma, billing, createdTasks, updatedTasks, membership };
   }
 
   it('6 张配置创建 6 个独立任务并各预留一份积分', async () => {
-    const { service, billing, createdTasks, updatedTasks } = setup();
+    const { service, billing, createdTasks, updatedTasks, membership } = setup();
 
     const result = await service.admit({
       ownerId: 'user-1',
@@ -245,6 +245,11 @@ describe('TaskAdmissionService 商品主图自定义配置拆单', () => {
     });
 
     expect(createdTasks).toHaveLength(VARIANTS.length);
+    // 并发按张占位：一次提交 6 张，事务外与事务内两次校验都要带上本次任务数。
+    expect(membership.checkConcurrency.mock.calls.map((call) => call[3])).toEqual([
+      VARIANTS.length,
+      VARIANTS.length,
+    ]);
     const taskParams = createdTasks.map(({ data }) => JSON.parse(data.params));
     for (const params of taskParams) {
       expect(params).toMatchObject({

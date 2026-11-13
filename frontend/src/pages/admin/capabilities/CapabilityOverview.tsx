@@ -43,7 +43,8 @@ export function CapabilityOverview({
   const inactiveCount = validBindings.length - configAvailable.length;
   const invalidCount = bindings?.invalidCount ?? 0;
   const bindingsPending = bindingsReadable && bindingsLoading && bindings === null;
-  const bindingsFailed = bindingsReadable && !bindingsLoading && Boolean(bindingsError) && bindings === null;
+  const bindingsFailed =
+    bindingsReadable && !bindingsLoading && Boolean(bindingsError) && bindings === null;
   const bindingsReady = bindingsReadable && bindings !== null;
 
   const bindingValue = (value: number) => {
@@ -55,14 +56,15 @@ export function CapabilityOverview({
   };
   const bindingHint = (readyHint: string) => {
     if (!bindingsReadable) return '无绑定读取权限';
-    if (bindingsPending) return '正在读取绑定配置';
+    if (bindingsPending) return '正在读取商品配置';
     if (bindingsFailed) return `读取失败：${bindingsError || '未知错误'}`;
     if (bindingsError) return `${readyHint} · 刷新失败，展示上次数据`;
     return readyHint;
   };
 
   const pricingPending = pricingReadable && pricingLoading && pricing === null;
-  const pricingFailed = pricingReadable && !pricingLoading && Boolean(pricingError) && pricing === null;
+  const pricingFailed =
+    pricingReadable && !pricingLoading && Boolean(pricingError) && pricing === null;
   const pricingValue = !pricingReadable
     ? '—'
     : pricingPending
@@ -78,38 +80,42 @@ export function CapabilityOverview({
         ? `读取失败：${pricingError || '未知错误'}`
         : pricing
           ? pricing.configured
-            ? '能力售价 · 所有线路共用'
+            ? '能力售价 · 所有商品共用'
             : '能力默认价 · 可在「售价」页配置'
           : '售价未知';
 
   const inactiveHint =
     inactiveCount > 0
-      ? `${inactiveCount} 条因供应商、商品或绑定开关停用未参与选路`
-      : '全部参与选路';
+      ? `${inactiveCount} 条商品因供应商、商品或商品开关停用而不可用`
+      : '全部商品可用';
 
   return (
     <div className="flex flex-col gap-3">
       <StatCards
         columns="auto"
+        inline
+        minWidth={190}
         items={[
           {
             key: 'available',
-            label: '配置可用线路',
+            label: '可用商品',
             value: bindingValue(configAvailable.length),
-            hint: bindingHint('仅校验启停，实际以模拟选路为准'),
+            hint: bindingHint('仅校验商品开关，实际可用性以商品绑定页为准'),
           },
           {
             key: 'bindings',
-            label: '绑定商品',
+            label: '商品',
             value: bindingValue(validBindings.length),
             hint: bindingHint(inactiveHint),
             tone: bindingsReady && inactiveCount > 0 ? 'warn' : undefined,
           },
           {
             key: 'invalid',
-            label: '失效绑定',
+            label: '失效商品',
             value: bindingValue(invalidCount),
-            hint: bindingHint(invalidCount > 0 ? '不参与选路，请在「商品绑定」页清理' : '无待清理项'),
+            hint: bindingHint(
+              invalidCount > 0 ? '不用于生成，请在「商品绑定」页清理' : '无待清理项',
+            ),
             tone: bindingsReady && invalidCount > 0 ? 'danger' : undefined,
           },
           {
@@ -122,27 +128,28 @@ export function CapabilityOverview({
       />
 
       {capability.runtime.effective === 'disabled' ? (
-        <Notice tone="warn" title="能力已下线，C 端不可提交" className="mb-0">
-          {capability.reason || DEFAULT_OFFLINE_REASON}
-          {' '}重新上线后请模拟选路，确认线路可承接后再放量。
+        <Notice tone="warn" title="能力已下线，用户不能提交" className="mb-0">
+          {capability.reason || DEFAULT_OFFLINE_REASON}{' '}
+          重新上线前，请到「商品绑定」页确认有可用商品。
         </Notice>
       ) : capability.runtime.effective === 'unavailable' ? (
-        <Notice tone="danger" title="暂不可承接请求" className="mb-0">
+        <Notice tone="danger" title="当前不能提交新任务" className="mb-0">
           {bindingsReadable
-            ? '请到「商品绑定」页启用商品与供应商，再模拟选路确认。'
-            : '当前账号无绑定读取权限。请联系管理员检查商品与绑定开关，再模拟选路确认。'}
+            ? '请到「商品绑定」页启用商品和供应商，确认有可用商品后再试。'
+            : '当前账号没有商品配置查看权限。请联系管理员确认商品和供应商开关。'}
         </Notice>
       ) : (
-        <Notice tone="success" title="运行正常，C 端可正常提交" className="mb-0">
+        <Notice tone="success" title="运行正常，用户可以提交新任务" className="mb-0">
           {bindingsReadable
-            ? '调整绑定后请重新模拟选路。改价只影响后续请求，已创建任务按原账单结算。'
-            : '当前账号无绑定读取权限，无法确认具体线路。请联系管理员开通后复核。'}
+            ? '调整商品后请确认仍有可用商品。改价只影响新提交的任务，已创建任务仍按原价格结算。'
+            : '当前账号没有商品配置查看权限，无法确认是否还有可用商品。请联系管理员开通后复核。'}
         </Notice>
       )}
 
       {bindingsReady && invalidCount > 0 && (
         <Notice tone="warn" className="mb-0">
-          有 {invalidCount} 条绑定指向已删除或不存在的商品，已排除在选路之外。请到「商品绑定」页确认后清理。
+          有 {invalidCount}{' '}
+          条商品配置指向已删除或不存在的商品，不会用于生成。请到「商品绑定」页确认并清理。
         </Notice>
       )}
 
@@ -154,7 +161,7 @@ export function CapabilityOverview({
             .map((row) => `${row.displayName || row.modelKey}：${bindingIssue(row)}`)
             .join('；')}
           {inactiveCount > 3 ? ` 等 ${inactiveCount} 条` : ''}
-          。请到「商品绑定」页处理后再模拟选路。
+          。请到「商品绑定」页启用相关商品或供应商。
         </Notice>
       )}
 
@@ -164,7 +171,7 @@ export function CapabilityOverview({
             <div className="text-sm font-semibold text-foreground">能力开关</div>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
               {capability.enabled
-                ? '下线后 C 端立即停止提交，已创建任务不受影响。'
+                ? '下线后用户立即无法提交新任务，已创建任务不受影响。'
                 : `当前下线提示：「${capability.reason || DEFAULT_OFFLINE_REASON}」`}
             </p>
             {capability.updatedAt && (

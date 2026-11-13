@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmProvider } from '~/admin-ui/providers/ConfirmProvider';
 import { ToastProvider } from '~/admin-ui/providers/ToastProvider';
-import { BindingPanel, candidateToDraft } from '../BindingPanel';
 import type { AdminCapabilityModelListView } from '../../../../types/model';
+import { BindingPanel, candidateToDraft } from '../BindingPanel';
 
 const data: AdminCapabilityModelListView = {
   capabilityId: 'expand',
@@ -97,7 +97,7 @@ describe('BindingPanel 候选与成本状态', () => {
   });
 });
 
-describe('BindingPanel 失效绑定展示', () => {
+describe('BindingPanel 失效商品展示', () => {
   it('优先展示商品名、模型与供应商，同时保留原绑定 ID 供排查', () => {
     render(
       <ToastProvider>

@@ -152,7 +152,7 @@ https://域名/api/v1/payments/callback/zpay/{configId}
 | `MODEL_SECRET_KEY` | 空 | 空 | **必填** | base64 编码的 32 字节密钥，AES-256-GCM 加密渠道凭证。留空时在 `data/.model-secret-key` 生成并持久化（换钥匙 = 全部凭证作废） |
 | `MODEL_PLUGIN_DIR` / `MODEL_PLUGIN_INSTALL_DIR` | `plugins` / `plugins-installed` | 同开发 | 同开发 | 内置包（随代码入库、不可卸载）与后台上传包两个目录，分开扫描 |
 | `MODEL_PROVIDER_CATALOG_URL` | 空 | 空 | 空 | 服务商目录远端 JSON；留空 = 后台目录为空态，不内置任何厂商条目 |
-| `MODEL_ACTIVE_TASK_LIMIT` | `2` | `2` | 按实例配额调 | 本进程同时执行的任务数（1–64） |
+| `MODEL_ACTIVE_TASK_LIMIT` | `2` | `2` | 按实例配额调 | 预留的进程执行位配置（1–64）；当前 worker 未读取，实际固定为 8 |
 | `MODEL_HTTP_TIMEOUT_MS` / `MODEL_MEDIA_TIMEOUT_MS` | `120000` / `180000` | `30000` / `60000` | 按上游调 | 单次上游请求 / 产物下载超时 |
 | `MODEL_WORKER_INTERVAL_MS` / `MODEL_LEASE_MS` | `1000` / `120000` | `200` / `30000` | 同开发 | 调度节拍与任务租约（租约另有 45s 代码下限） |
 | `MODEL_SLOT_WAIT_MS` | `60000` | `60000` | `60000` | 渠道并发槽等槽上限；超时即切线（任务）或 `429`（中转），验收脚本会压到百毫秒级 |

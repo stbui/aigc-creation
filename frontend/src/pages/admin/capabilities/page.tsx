@@ -1,11 +1,10 @@
+import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search } from 'lucide-react';
-import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
-import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import {
   ActionButton,
   AdminPage,
+  type AppliedFilter,
   AppliedFilters,
   Button,
   ClearableField,
@@ -17,18 +16,15 @@ import {
   SelectField,
   useAdminResource,
   useAdminUrlFilterSync,
-  type AppliedFilter,
 } from '~/admin-ui/primitives';
+import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
+import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { useAdmin } from '../../../context/AdminContext';
 import { adminCapabilitiesApi, adminCapabilityModelsApi } from '../../../lib/api';
 import type { AdminCapabilityControl } from '../../../types/api';
 import { CapabilityList } from './CapabilityList';
 import { CapabilityWorkspace } from './CapabilityWorkspace';
-import {
-  RUNTIME_FILTER_OPTIONS,
-  isCapabilityTab,
-  isRuntimeFilter,
-} from './constants';
+import { isCapabilityTab, isRuntimeFilter, RUNTIME_FILTER_OPTIONS } from './constants';
 import type { CapabilityRuntimeFilter, CapabilityTab } from './types';
 import { matchesCapabilityFilters } from './utils';
 
@@ -100,9 +96,9 @@ export function AdminCapabilitiesPage() {
 
   const pruneAllInvalid = async () => {
     const confirmed = await confirm({
-      title: '清理全部失效绑定？',
+      title: '清理全部失效商品？',
       description:
-        '将清理所有能力中指向缺失 / 已删除商品的绑定，以及能力定义已不存在的绑定。有效绑定、能力售价与上线状态不会改变；此操作不可撤销。',
+        '将清理所有能力中指向缺失或已删除商品的配置，以及能力定义已不存在的配置。可用商品、能力售价与上线状态不会改变；此操作不可撤销。',
       confirmText: '确认清理',
       danger: true,
     });
@@ -111,7 +107,7 @@ export function AdminCapabilitiesPage() {
     setPruningAll(true);
     try {
       const result = await adminCapabilityModelsApi.pruneAllInvalid();
-      toast.success(`已清理 ${result.removed} 条失效绑定`);
+      toast.success(`已清理 ${result.removed} 条失效商品`);
       setWorkspaceRevision((value) => value + 1);
       await list.reload();
     } catch (error) {
@@ -142,7 +138,7 @@ export function AdminCapabilitiesPage() {
   return (
     <AdminPage
       title="能力与模型"
-      description="维护能力的承接线路与售价。改动即时影响 C 端下单，已创建任务按提交时的快照结算。"
+      description="维护能力的可用商品与售价。改动只影响新提交的任务，已创建任务继续按原价格和原商品执行。"
       actions={
         <>
           {bindingReadable && bindingWritable && (
@@ -152,7 +148,7 @@ export function AdminCapabilitiesPage() {
               disabled={pruningAll}
               onClick={() => void pruneAllInvalid()}
             >
-              {pruningAll ? '清理中…' : '清理全部失效绑定'}
+              {pruningAll ? '清理中…' : '清理全部失效商品'}
             </ActionButton>
           )}
           <Button asChild variant="outline" size="sm">
@@ -173,9 +169,7 @@ export function AdminCapabilitiesPage() {
         <SelectField
           ariaLabel="运行状态"
           value={runtime}
-          onChange={(value) =>
-            setRuntime(isRuntimeFilter(value) ? value : undefined)
-          }
+          onChange={(value) => setRuntime(isRuntimeFilter(value) ? value : undefined)}
           options={[...RUNTIME_FILTER_OPTIONS]}
           clearLabel="全部运行状态"
           allowClear
@@ -185,12 +179,7 @@ export function AdminCapabilitiesPage() {
           <span className="text-xs tabular-nums text-muted-foreground">
             {list.loading ? '读取中…' : `${filtered.length} 项能力`}
           </span>
-          <ActionButton
-            variant="secondary"
-            size="sm"
-            disabled={!hasFilters}
-            onClick={resetFilters}
-          >
+          <ActionButton variant="secondary" size="sm" disabled={!hasFilters} onClick={resetFilters}>
             重置
           </ActionButton>
         </FilterActions>

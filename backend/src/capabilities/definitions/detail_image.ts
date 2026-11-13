@@ -8,14 +8,14 @@
 import type { CapabilityPlugin } from '../capability-plugin.type';
 import { generateImageIntent } from '../model-mapping';
 import {
-  DETAIL_SECTIONS,
   DETAIL_RATIOS,
+  DETAIL_SECTIONS,
   LANGUAGES,
-  PLATFORMS,
-  QUALITY_OPTIONS,
   languageText,
+  PLATFORMS,
   parseDetailSections,
   platformDetailSpecText,
+  QUALITY_OPTIONS,
   ratioText,
   sizeText,
   subjectText,
@@ -114,7 +114,8 @@ function parseSectionPrompts(raw: unknown): Map<string, string> {
   const prompts = new Map<string, string>();
   for (const [sectionRaw, promptRaw] of entries) {
     const section = typeof sectionRaw === 'string' ? sectionRaw.trim() : '';
-    const prompt = typeof promptRaw === 'string' ? promptRaw.trim().slice(0, MAX_SECTION_PROMPT_LEN) : '';
+    const prompt =
+      typeof promptRaw === 'string' ? promptRaw.trim().slice(0, MAX_SECTION_PROMPT_LEN) : '';
     if (validSections.has(section) && prompt) prompts.set(section, prompt);
   }
   return prompts;
@@ -125,11 +126,16 @@ export function detailSectionLabel(key: string): string {
   return SECTION_LABELS.get(key) ?? key;
 }
 
-/** 旧口径: 不分模块时用一句通用提示词 (后台重试改造前的存量任务会走到这里) */
-function legacyPrompt(p: Record<string, any>): string {
+/**
+ * 模块键缺失时的兜底 (装配期自检、后台重建存量任务会走到这里)。
+ *
+ * 仍按「一张图一个模块」的语义生成，不回落成整张详情长图 —— 长图产出口径
+ * 已被模块化拆分取代，回落成长图会让调用方拿到与页面契约相反的结果。
+ */
+function fallbackPrompt(p: Record<string, any>): string {
   return (
-    `电商详情长图生成：${subjectText(p)}，${p.description || '把参数与卖点转成可视化内容'}。` +
-    `按模块分区排版（首屏主视觉 / 卖点 / 参数细节 / 售后），纵向长图${ratioText(p.ratio)}${sizeText(p.size)}` +
+    `电商详情页单模块图生成：${subjectText(p)}，${p.description || '按商品属性与参考图呈现商品外观'}。` +
+    `只生成一张独立版块图，不生成整张详情长图${ratioText(p.ratio)}${sizeText(p.size)}` +
     `${platformDetailSpecText(p)}${languageText(p.language)}`
   );
 }
@@ -143,7 +149,12 @@ export const DetailImage: CapabilityPlugin = {
   mode: 'real',
   creditCost: 10, // 单张模块图价格；一次提交按模块数各扣一份（见 outputPlan）
   params: [
-    { key: 'productName', label: '商品名称', type: 'text', placeholder: '例如：夏季轻音桌面循环扇' },
+    {
+      key: 'productName',
+      label: '商品名称',
+      type: 'text',
+      placeholder: '例如：夏季轻音桌面循环扇',
+    },
     { key: 'brand', label: '品牌（选填）', type: 'text', placeholder: '请输入品牌（选填）' },
     { key: 'platform', label: '投放平台', type: 'enum', default: 'taobao', options: PLATFORMS },
     { key: 'language', label: '输出语言', type: 'enum', default: 'zh-CN', options: LANGUAGES },
@@ -168,7 +179,13 @@ export const DetailImage: CapabilityPlugin = {
     { key: 'size', label: '输出画质', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
     // ── 批次技术字段 (页面不填, 准入层按 outputPlan 代填) ──
     { key: 'section', label: '模块键', type: 'text', hidden: true, help: '本张图负责的模块键' },
-    { key: 'sectionLabel', label: '模块名称', type: 'text', hidden: true, help: '结果行图片下方的标签' },
+    {
+      key: 'sectionLabel',
+      label: '模块名称',
+      type: 'text',
+      hidden: true,
+      help: '结果行图片下方的标签',
+    },
     {
       key: 'sectionPrompts',
       label: '模块提示词',
@@ -186,29 +203,45 @@ export const DetailImage: CapabilityPlugin = {
       help: '批次拆分后写入本任务，仅供该模块拼装完整提示词',
     },
     { key: 'batchId', label: '批次 ID', type: 'text', hidden: true, maxLength: 128 },
-    { key: 'batchIndex', label: '批次序号', type: 'number', hidden: true, min: 1, max: 10, step: 1 },
+    {
+      key: 'batchIndex',
+      label: '批次序号',
+      type: 'number',
+      hidden: true,
+      min: 1,
+      max: 10,
+      step: 1,
+    },
     { key: 'batchSize', label: '批次数量', type: 'number', hidden: true, min: 1, max: 10, step: 1 },
   ],
-  buildPrompt: (p) => {
+  buildPrompt: (p, refCount = 0) => {
     const section = typeof p.section === 'string' ? p.section.trim() : '';
-    if (!section) return legacyPrompt(p);
+    if (!section) return fallbackPrompt(p);
     const label = detailSectionLabel(section);
     const brief =
       SECTION_BRIEFS[section] || '按该版块的常见电商版式组织画面，信息不足时减少内容项，不编造事实';
     const sectionPrompt = typeof p.sectionPrompt === 'string' ? p.sectionPrompt.trim() : '';
-    const facts = (String(p.description ?? '').trim() ||
-      '仅根据商品名称与参考图呈现商品外观，不补充参数事实').replace(/[。；;]+$/, '');
+    /*
+     * 商品描述只进入「可写文案」闭集一次。描述为空时不能把降级说明塞进闭集 ——
+     * 该区块的语义是「画面文字只能取自以下素材」，模型会把说明当成文案画进图里。
+     */
+    const description = String(p.description ?? '')
+      .trim()
+      .replace(/[。；;]+$/, '');
     const productName = String(p.productName ?? '').trim();
     const brand = String(p.brand ?? '').trim();
     const allowedCopy = [
       productName ? `商品名称「${productName}」` : '',
       brand ? `品牌「${brand}」` : '',
-      `商品事实：${facts}`,
+      description ? `商品事实：${description}` : '',
     ]
       .filter(Boolean)
       .join('；');
     const ratio = String(p.ratio ?? '').trim() || '3:4';
-    const quality = String(p.size ?? '').trim().toUpperCase() || '1K';
+    const quality =
+      String(p.size ?? '')
+        .trim()
+        .toUpperCase() || '1K';
     const deliverySpec = platformDetailSpecText(p).replace(/^，/, '');
     const deliveryText = deliverySpec
       ? `${deliverySpec}；该宽度只用于生成后的缩放或裁切，不作为模型输出画质`
@@ -221,10 +254,13 @@ export const DetailImage: CapabilityPlugin = {
       `画面目标：${brief}。\n` +
       (sectionPrompt ? `本模块补充要求：${sectionPrompt}\n` : '') +
       (sectionPrompt
-        ? '以上内容属于同一张图的同一条执行指令：先满足商品事实、参考图一致性和本图文案闭集；' +
-          '没有硬约束冲突时优先执行本模块补充要求，默认版式仅补充未被明确覆盖的部分。\n'
-        : '以上约束构成同一张图的完整执行指令：商品事实、参考图一致性和本图文案闭集优先于默认版式。\n') +
+        ? '以上内容属于同一张图的同一条执行指令：只生成当前模块、商品事实、参考图一致性和本图文案闭集是不可覆盖的硬约束；' +
+          '没有硬约束冲突时优先执行本模块补充要求，默认版式仅补充未被明确覆盖的部分。' +
+          '本图文案闭集是文字上限，画面目标中更严格的文字限制仍然生效。\n'
+        : '以上约束构成同一张图的完整执行指令：只生成当前模块、商品事实、参考图一致性和本图文案闭集是不可覆盖的硬约束；' +
+          '本图文案闭集是文字上限，画面目标中更严格的文字限制仍然生效。\n') +
       '【参考图】\n' +
+      (refCount > 0 ? `共参考上传的 ${refCount} 张商品图。` : '') +
       '参考图仅作为商品外观依据，不是版式、场景或文案参考。' +
       '商品结构、颜色、材质、logo、包装和配件必须与参考图一致；' +
       '不复制参考图的背景、桌面、人物、构图、文字、水印和拍摄角度。\n' +
@@ -232,10 +268,13 @@ export const DetailImage: CapabilityPlugin = {
       '从参考图提取主色、光影和材质特征，保持统一的品牌视觉；' +
       '同一商品的各模块只改变版式，不改变视觉语言。\n' +
       '【本图允许文案】\n' +
-      `画面文字只能取自以下素材；“商品名称”“品牌”“商品事实”只是来源标签，不得原样写入画面：${allowedCopy}。` +
-      '只能对上述素材做不改变含义的压缩，或按目标语言做等价翻译；' +
-      '除压缩或翻译后的素材外，不生成任何文字、数字、标签或水印。\n' +
+      (allowedCopy
+        ? `画面文字只能取自以下素材；“商品名称”“品牌”“商品事实”只是来源标签，不得原样写入画面：${allowedCopy}。` +
+          '只能对上述素材做不改变含义的压缩，或按目标语言做等价翻译；' +
+          '除压缩或翻译后的素材外，不生成任何文字、数字、标签或水印。\n'
+        : '用户未提供商品文案素材：画面不出现任何文字、数字、标签或水印，用构图、图标与商品本体表达本模块信息。\n') +
       '【文案规则】\n' +
+      (description ? '' : '仅根据商品名称与参考图呈现商品外观，不补充参数事实；') +
       '只选取与本模块直接相关的信息；' +
       '不得补写未提供的型号、材质、尺寸、参数、认证、销量、价格、优惠或售后承诺。' +
       '信息不足时减少信息项，用短标题、图标或留白处理，不要编造具体数字。\n' +

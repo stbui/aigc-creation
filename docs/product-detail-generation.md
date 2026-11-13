@@ -22,8 +22,8 @@
 | --- | --- | --- |
 | 页面 | `frontend/src/pages/product-detail/page.tsx` | 表单、校验、提交、结果页签、批次删除 |
 | 页面 API | `frontend/src/pages/product-detail/api.ts` | 固定能力 id、请求参数组装、删除父任务 |
-| 页面常量 | `frontend/src/pages/product-detail/constants.ts` | 上传上限、字段长度、16 个模块、默认模块、单模块提示词默认值 |
-| 页面 hooks | `frontend/src/pages/product-detail/hooks.ts` | 模块选择、模块提示词保留、价签、页签落位 |
+| 页面常量 | `frontend/src/pages/product-detail/constants.ts` | 上传上限、字段长度、16 个模块、默认模块 |
+| 页面 hooks | `frontend/src/pages/product-detail/hooks.ts` | 模块选择、价签、页签落位 |
 | 能力定义 | `backend/src/capabilities/definitions/detail_image.ts` | 参数、提示词、`outputPlan`、模型意图、默认积分价 |
 | 通用准入 | `backend/src/model/tasks/task-admission.service.ts` | 权限、素材、模型、线路、价格、拆批、建任务与预留积分 |
 | 请求构建 | `backend/src/model/tasks/task-request.service.ts` | 按任务参数调用能力 `buildPrompt` 并构造上游请求 |
@@ -46,7 +46,7 @@
 | 品牌 | 选填，最多 100 字符 |
 | 商品描述 | 必填，最多 5000 字符 |
 | 模块 | 至少 1 个，最多 10 个；页面默认选择前 6 个 |
-| 模块提示词 | 每个已选模块必填；单模块最多 1000 字符 |
+| 模块提示词（仅 API） | 选填；单模块最多 1000 字符。当前页面不提供编辑入口，也不发送该参数 |
 | 画面比例 | 由能力参数枚举约束 |
 | 画质 | `1k` / `2k` / `4k`；实际可选值还要受前台模型能力限制 |
 
@@ -79,8 +79,7 @@ usage_tips
 
 - 默认选择前 6 项。
 - 选择顺序归一化为固定模块顺序，不按点击先后排列。
-- 取消勾选后仍保留该模块提示词，重新勾选时恢复原内容。
-- 每个已选模块展示一个独立的“各模块画面要求”编辑框；输入的是该模块的画面补充要求，不是最终发送给模型的完整提示词。
+- 页面只提交模块选择；不展示、不编辑、也不发送各模块提示词。
 
 后端：
 
@@ -89,9 +88,9 @@ usage_tips
 - 保留调用方传入顺序。
 - 没有合法模块时回落到默认前 6 项。
 
-### 3.3 模块提示词
+### 3.3 模块提示词（仅 API）
 
-页面把每个已选模块的提示词序列化为 JSON 字符串：
+当前页面不发送模块提示词。API 调用方可以把每个已选模块的补充要求序列化为 JSON 字符串：
 
 ```json
 [
@@ -108,13 +107,14 @@ usage_tips
 - 单模块提示词截断到 1000 字符。
 - `outputPlan()` 为每个模块生成一个独立任务，只把对应模块的 `sectionPrompt` 写入该任务参数。
 
-`buildPrompt()` 在真正请求模型时，把固定模块版式、该模块补充要求、商品事实、参考图约束、文案闭集和交付规格合并成**一条完整提示词**。用户要求不再作为独立的“第二段提示词”拼接，而是进入 `【模块任务与画面要求】`，并与当前模块的固定目标共同生效。
+`buildPrompt()` 在真正请求模型时，把固定模块版式、该模块补充要求、商品事实、参考图约束、文案闭集和交付规格合并成**一条完整提示词**。用户要求不再作为独立的“第二段提示词”拼接，而是进入 `【模块任务与画面要求】`，并与当前模块的固定目标共同生效。参考图张数以 `refCount` 显式进入 `【参考图】` 区块。
 
 冲突优先级：
 
-1. 商品事实、参考图一致性和本图文案闭集是不可覆盖的硬约束。
-2. 未与硬约束冲突时，用户填写的模块补充要求优先于默认版式建议。
+1. 只生成当前模块、商品事实、参考图一致性和本图文案闭集是不可覆盖的硬约束。
+2. 未与硬约束冲突时，API 传入的模块补充要求优先于默认版式建议。
 3. 默认版式只补充用户未明确覆盖的部分，不把其它模块的要求带进当前任务。
+4. 本图文案闭集是**文字上限**：画面目标中更严格的文字限制（如“只允许品牌名或一句短标题”）仍然生效。
 
 ## 4. 提交与幂等契约
 
@@ -124,13 +124,13 @@ usage_tips
 
 - 已有登录态或提交动作可先唤起登录。
 - 能力运行时未处于不可提交状态。
-- 商品图、商品名称、商品描述、模块及各模块提示词均通过校验。
+- 商品图、商品名称、商品描述与模块均通过校验。
 - 当前结果列表中没有 `queued` 或 `running` 的详情图任务。
 
 提交时页面切换到“创作结果”页签，再依次执行：
 
 1. `ensureProject()` 确保任务落入有效项目。
-2. `resolveModelId('detail_image')` 获取用户当前选择的前台模型。
+2. `resolveModelKey(DETAIL_CAPABILITY)` 获取用户当前选择的模型线路。
 3. 组装请求参数并计算完整输入指纹。
 4. 同一指纹的网络重试复用同一个幂等键；输入变化后生成新幂等键。
 5. 调用 `POST /api/v1/generate`。
@@ -148,7 +148,7 @@ Content-Type: application/json
 {
   "projectId": "project-id",
   "capability": "detail_image",
-  "logicalModelId": "logical-model-id",
+  "modelKey": "channel-model-key",
   "inputAssetIds": ["asset-1"],
   "idempotencyKey": "3a2f3d2e-...",
   "params": {
@@ -158,7 +158,6 @@ Content-Type: application/json
     "language": "zh-CN",
     "description": "三档风速，低噪运行，USB 供电",
     "sections": "hero,selling_points,usage_scene,multi_angle,scene_atmosphere,product_detail",
-    "sectionPrompts": "[{\"section\":\"hero\",\"prompt\":\"首屏标题更醒目，商品居中并保留右侧留白\"},{\"section\":\"selling_points\",\"prompt\":\"用三张图标卡片展示三个核心卖点\"}]",
     "ratio": "3:4",
     "size": "1k"
   }
@@ -196,14 +195,14 @@ Content-Type: application/json
 3. 按能力参数白名单校验并清洗参数。
 4. 校验能力上下线状态；下架原因必须在扣费前返回。
 5. 校验输入素材数量、空 id、重复 id 和最低输入数。
-6. 校验会员并发限制。
+6. 展开 `outputPlan` 得到本次 N 个任务，并按「已有任务数 + N」校验会员并发限制。
 7. 校验项目和素材归属。
 8. 校验遮罩、标注等能力特有输入。
 9. 校验所选前台模型存在、未归档、启用且支持当前能力。
 10. 校验模型输入图片范围。
 11. 解析生成意图并解析路由；无可用线路时在扣费前失败。
 12. 解析后台覆盖价、线路价和限时免费活动。
-13. 调用能力 `outputPlan` 生成模块输出计划。
+13. 复用第 6 步展开的模块输出计划建任务。
 14. 同一事务内创建任务、创建每张图的账单并预留积分。
 
 任何一步失败都不得留下“已建任务但无账单”或“已扣费但无任务”的半成品。

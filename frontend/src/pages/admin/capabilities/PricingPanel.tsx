@@ -37,7 +37,7 @@ function draftFromView(view: CapabilityPricingView | null): PricingDraft {
   };
 }
 
-/** 能力级售价：所有绑定线路共用这一份价格，切换线路不改价。 */
+/** 能力级售价：所有可用商品共用这一份价格，切换商品不改价。 */
 export function PricingPanel({
   capabilityId,
   capabilityName,
@@ -83,7 +83,7 @@ export function PricingPanel({
 
     const confirmed = await confirm({
       title: `确认修改「${capabilityName}」售价？`,
-      description: '新售价立即作用于后续请求；已创建任务按原账单快照结算，候选线路不会改变。',
+      description: '新售价立即作用于后续请求；已创建任务按原账单快照结算，已选商品不会改变。',
       confirmText: '保存售价',
     });
     if (confirmed === null) return;
@@ -106,7 +106,9 @@ export function PricingPanel({
     }
   };
 
-  const panelExtra = <span className="text-xs text-muted-foreground">按能力计价，不随线路变化</span>;
+  const panelExtra = (
+    <span className="text-xs text-muted-foreground">按能力计价，不随商品变化</span>
+  );
 
   if (loading && data === null) {
     return (
@@ -142,7 +144,7 @@ export function PricingPanel({
         <div className="flex flex-col gap-4">
           <Notice tone={data.configured ? 'info' : 'warn'} className="mb-0">
             {data.configured
-              ? '已配置能力级售价，所有绑定线路共用这一价格；修改只影响后续请求。'
+              ? '已配置能力级售价，所有商品共用这一价格；修改只影响后续请求。'
               : '尚未配置能力售价，当前按能力默认价计费。保存后立即生效。'}
           </Notice>
 
@@ -181,7 +183,10 @@ export function PricingPanel({
             </FormField>
 
             {pricing.billingMode !== 'token' ? (
-              <FormField label={unitLabel} hint={pricing.billingMode === 'per_second' ? '积分 / 秒' : '积分 / 次'}>
+              <FormField
+                label={unitLabel}
+                hint={pricing.billingMode === 'per_second' ? '积分 / 秒' : '积分 / 次'}
+              >
                 <TextField
                   ariaLabel={unitLabel}
                   value={pricing.unitPrice}
@@ -195,7 +200,9 @@ export function PricingPanel({
                   <TextField
                     ariaLabel="输入 Token 价格"
                     value={pricing.inputPrice}
-                    onChange={(value) => setPricing((current) => ({ ...current, inputPrice: value }))}
+                    onChange={(value) =>
+                      setPricing((current) => ({ ...current, inputPrice: value }))
+                    }
                     placeholder="积分 / Token"
                   />
                 </FormField>
@@ -203,7 +210,9 @@ export function PricingPanel({
                   <TextField
                     ariaLabel="输出 Token 价格"
                     value={pricing.outputPrice}
-                    onChange={(value) => setPricing((current) => ({ ...current, outputPrice: value }))}
+                    onChange={(value) =>
+                      setPricing((current) => ({ ...current, outputPrice: value }))
+                    }
                     placeholder="积分 / Token"
                   />
                 </FormField>
@@ -211,7 +220,9 @@ export function PricingPanel({
                   <TextField
                     ariaLabel="缓存 Token 价格"
                     value={pricing.cachedPrice}
-                    onChange={(value) => setPricing((current) => ({ ...current, cachedPrice: value }))}
+                    onChange={(value) =>
+                      setPricing((current) => ({ ...current, cachedPrice: value }))
+                    }
                     placeholder="积分 / Token"
                   />
                 </FormField>

@@ -20,7 +20,7 @@ const capability: AdminCapabilityControl = {
     enabled: true,
     remoteAvailable: true,
     effective: 'remote',
-    reason: '线路可用',
+    reason: '商品可用',
   },
 };
 
@@ -59,10 +59,15 @@ function binding(overrides: Partial<AdminCapabilityModelListView['bindings'][num
   };
 }
 
-function bindingView(overrides: Partial<AdminCapabilityModelListView> = {}): AdminCapabilityModelListView {
+function bindingView(
+  overrides: Partial<AdminCapabilityModelListView> = {},
+): AdminCapabilityModelListView {
   return {
     capabilityId: 'expand',
-    bindings: [binding(), binding({ id: 'bind-2', channelModelId: 'cm-2', modelKey: 'gpt-image-2.5-sunburst' })],
+    bindings: [
+      binding(),
+      binding({ id: 'bind-2', channelModelId: 'cm-2', modelKey: 'gpt-image-2.5-sunburst' }),
+    ],
     invalidBindings: [],
     invalidCount: 0,
     candidates: [],
@@ -109,7 +114,9 @@ describe('CapabilityOverview 读取状态', () => {
     expect(screen.getAllByText('无绑定读取权限').length).toBeGreaterThan(0);
     expect(screen.getByText('无售价读取权限')).toBeTruthy();
     expect(
-      screen.getByText('当前账号无绑定读取权限，无法确认具体线路。请联系管理员开通后复核。'),
+      screen.getByText(
+        '当前账号没有商品配置查看权限，无法确认是否还有可用商品。请联系管理员开通后复核。',
+      ),
     ).toBeTruthy();
     expect(screen.queryByText('0')).toBeNull();
   });
@@ -128,10 +135,10 @@ describe('CapabilityOverview 读取状态', () => {
       />,
     );
 
-    expect(screen.getByText('配置可用线路')).toBeTruthy();
-    expect(screen.getByText('绑定商品')).toBeTruthy();
+    expect(screen.getByText('可用商品')).toBeTruthy();
+    expect(screen.getByText('商品')).toBeTruthy();
     expect(screen.getByText('2 积分 / 次')).toBeTruthy();
-    expect(screen.getByText('运行正常，C 端可正常提交')).toBeTruthy();
+    expect(screen.getByText('运行正常，用户可以提交新任务')).toBeTruthy();
     expect(screen.getByText('下线能力')).toBeTruthy();
   });
 
@@ -151,8 +158,8 @@ describe('CapabilityOverview 读取状态', () => {
       />,
     );
 
-    expect(screen.getByText(/gpt-image-2\.5-flare：未参与选路/)).toBeTruthy();
-    expect(screen.getByText(/1 条因供应商、商品或绑定开关停用未参与选路/)).toBeTruthy();
+    expect(screen.getByText(/gpt-image-2\.5-flare：商品开关已关闭/)).toBeTruthy();
+    expect(screen.getByText(/1 条商品因供应商、商品或商品开关停用而不可用/)).toBeTruthy();
   });
 
   it('下线状态展示下线原因，并提示恢复后的验证动作', () => {
@@ -179,7 +186,7 @@ describe('CapabilityOverview 读取状态', () => {
       />,
     );
 
-    expect(screen.getByText('能力已下线，C 端不可提交')).toBeTruthy();
+    expect(screen.getByText('能力已下线，用户不能提交')).toBeTruthy();
     expect(screen.getAllByText(/供应商通道维护中/).length).toBeGreaterThan(0);
     expect(screen.getByText('上线能力')).toBeTruthy();
   });

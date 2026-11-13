@@ -142,9 +142,21 @@ export class TaskAdmissionService {
     // 先解析一次权益，供并发校验与任务参数复用 —— 两者此前各查一遍
     // 会员 / 订单周期，同一请求内是纯重复读。
     const perks = await this.membership.perksOf(ownerId);
-    const concurrency = await this.membership.checkConcurrency(ownerId, undefined, perks);
+    /*
+     * 参数清洗提前到这里：并发按「本次实际要创建的任务数」占名额，
+     * 必须先展开 `outputPlan` 才知道这次是 1 张还是 N 张。
+     */
+    const sanitized = sanitizeParams(dto.capability, dto.params);
+    const planned = def.outputPlan?.(sanitized) ?? [];
+    const incoming = planned.length > 0 ? planned.length : 1;
+    const concurrency = await this.membership.checkConcurrency(
+      ownerId,
+      undefined,
+      perks,
+      incoming,
+    );
     if (concurrency.limit > 0) {
-      this.log.debug(`并发校验: ${concurrency.current}/${concurrency.limit}`);
+      this.log.debug(`并发校验: ${concurrency.current}/${concurrency.limit}，本次 ${incoming}`);
     }
 
     // 6. 项目与素材归属（两条查询互不依赖，并行取回）
@@ -176,7 +188,6 @@ export class TaskAdmissionService {
 
     // 7. 遮罩与局部重绘标注（都是生成输入，必须在扣费前确认可用）
     await this.validateMask(ownerId, dto, assets);
-    const sanitized = sanitizeParams(dto.capability, dto.params);
     const sourceAsset = assets.find((asset: { id: string }) => asset.id === dto.inputAssetIds[0]);
     await this.validateAnnotations(ownerId, dto, sourceAsset);
     this.assertLocalRedrawHasInput(dto, sanitized);
@@ -237,7 +248,9 @@ export class TaskAdmissionService {
     // **每张各自计费**。价目表里的价是「一张图」的价：勾 6 个模块就是 6 × 单价。
     // 每张都有自己的账单，失败 / 取消各自按自己的账单退款 —— 一张失败不连累
     // 同批其它图，也不会出现「整套没出来却只退了一张的钱」。
-    const planned = def.outputPlan?.(sanitized) ?? [];
+    //
+    // `planned` 已在并发校验前展开，这里直接复用，避免同一请求两次执行
+    // `outputPlan` 得到不一致的任务数。
     const outputs = planned.length > 0 ? planned : null;
     const batchId = outputs && outputs.length > 1 ? randomUUID() : undefined;
     const batchSize = outputs?.length ?? 0;
@@ -344,6 +357,8 @@ export class TaskAdmissionService {
     freeCampaignId?: string;
   }): Promise<string[]> {
     const { ownerId, idempotencyKey, requestFingerprint, creditCost, taskBase, paramsFor, outputs, draft } = params;
+    // 本次事务要创建的任务数：多图提交按张占并发名额，单图为 1。
+    const incoming = outputs && outputs.length > 0 ? outputs.length : 1;
     return this.prisma.$transaction(async (tx) => {
       // 项目校验与任务落库之间可能隔着模型解析、计价等步骤；后台软删项目
       // 若恰好发生在这段窗口内，必须在扣费事务内再次拒绝，避免任务/账单
@@ -363,10 +378,13 @@ export class TaskAdmissionService {
        * 读到旧数量并各自建任务，实际并发会超过会员上限。先用 no-op UPDATE
        * 取得用户行写锁（与 OrderService.create 同一口径），再在锁内统计，
        * 让同一用户的建任务串行化；超限时整个事务回滚，不留任务/账单。
+       *
+       * 复核同样带上本次要创建的任务数：多图提交一次建 N 个任务，只比较
+       * 「当前数量」会让 8/10 的用户再建 5 个任务。
        */
       await tx.$executeRaw`
         UPDATE "User" SET "name" = "name" WHERE id = ${ownerId}`;
-      await this.membership.checkConcurrency(ownerId, tx);
+      await this.membership.checkConcurrency(ownerId, tx, undefined, incoming);
 
       const ids: string[] = [];
       const parent = await tx.generationTask.create({

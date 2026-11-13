@@ -13,14 +13,14 @@ const available = {
   priceConfigured: true,
 };
 
-describe('能力绑定配置可用口径', () => {
-  it('按供应商、商品、参与选路顺序给出阻断原因', () => {
+describe('能力商品配置可用口径', () => {
+  it('按供应商、商品、商品开关顺序给出阻断原因', () => {
     expect(bindingIssue({ ...available, channelEnabled: false })).toBe('供应商已停用');
     expect(bindingIssue({ ...available, modelEnabled: false })).toBe('商品已停用');
-    expect(bindingIssue({ ...available, enabled: false })).toBe('未参与选路');
+    expect(bindingIssue({ ...available, enabled: false })).toBe('商品开关已关闭');
   });
 
-  it('三个运行开关全部就绪即参与选路', () => {
+  it('三个运行开关全部就绪即配置可用', () => {
     expect(bindingConfigAvailable(available)).toBe(true);
     expect(bindingConfigAvailable({ ...available, enabled: false })).toBe(false);
   });
@@ -38,14 +38,14 @@ describe('能力售价摘要', () => {
     expect(
       capabilityPriceText({ billingMode: 'fixed_request', unitPriceMicrocredits: 2_000_000 }),
     ).toBe('2 积分 / 次');
-    expect(
-      capabilityPriceText({ billingMode: 'per_second', unitPriceMicrocredits: 500_000 }),
-    ).toBe('0.5 积分 / 秒');
+    expect(capabilityPriceText({ billingMode: 'per_second', unitPriceMicrocredits: 500_000 })).toBe(
+      '0.5 积分 / 秒',
+    );
   });
 
   it('按 Token 计价时不用单值价格冒充售价', () => {
-    expect(
-      capabilityPriceText({ billingMode: 'token', unitPriceMicrocredits: 0 }),
-    ).toBe('按 Token 计费');
+    expect(capabilityPriceText({ billingMode: 'token', unitPriceMicrocredits: 0 })).toBe(
+      '按 Token 计费',
+    );
   });
 });

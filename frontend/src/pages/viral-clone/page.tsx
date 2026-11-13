@@ -184,7 +184,7 @@ export function ViralClonePage() {
         return;
       }
       const projectId = await ensureProject();
-      const modelKey = model.id;
+      const modelKey = model.modelKey;
       const payload = {
         projectId,
         capability: 'hot_remake',

@@ -44,14 +44,14 @@ type BindingExecutionFields = {
 /**
  * 单个绑定的**配置可执行性**。
  *
- * 最终能否选到这条线路仍以运行结论 / 模拟选路为准（运行时还会叠加健康分层、
- * 能力合同等条件）；这里只统一后台三个显式开关的展示口径，避免概览、绑定和
- * 影响面各算一套。成本档只影响毛利可算性，按能力级售价体系不阻断选路。
+ * 最终能否用于生成仍以运行结论 / 可用性检查为准（运行时还会叠加健康分层、
+ * 能力合同等条件）；这里只统一后台三个显式开关的展示口径，避免概览、商品绑定
+ * 和影响面各算一套。成本档只影响毛利可算性，按能力级售价体系不阻断使用。
  */
 export function bindingIssue(row: BindingExecutionFields): string | null {
   if (!row.channelEnabled) return '供应商已停用';
   if (!row.modelEnabled) return '商品已停用';
-  if (!row.enabled) return '未参与选路';
+  if (!row.enabled) return '商品开关已关闭';
   return null;
 }
 
@@ -59,7 +59,7 @@ export function bindingConfigAvailable(row: BindingExecutionFields): boolean {
   return bindingIssue(row) === null;
 }
 
-/** 成本档缺失不是阻断项；只提示运营该线路的毛利无法计算。 */
+/** 成本档缺失不是阻断项；只提示运营该商品的毛利无法计算。 */
 export function bindingCostHint(row: { priceConfigured: boolean }): string | null {
   return row.priceConfigured ? null : '成本未配置，毛利不可算';
 }

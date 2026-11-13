@@ -67,6 +67,7 @@
 | [`frontend-module-conventions.md`](frontend-module-conventions.md) | 前端多文件功能目录的分层、入口文件、导入方向与新增文件落位 |
 | [`main-image-generation.md`](main-image-generation.md) | `/product-kit` 商品主图：变体互斥、字段到提示词的映射、文案闭集与禁字、按变体拆批与计费、结果聚合、删除与回填 |
 | [`product-detail-generation.md`](product-detail-generation.md) | `/product-detail` 商品详情图：模块拆批、任务与账单、提示词、执行状态机、轮询聚合、删除与失败边界 |
+| [`gen-prompt.md`](gen-prompt.md) | 生图链路与提示词：主图 / 详情图字段映射、变体与模块拆批、提示词结构、并发生图与配额、可见性与效果评估现状 |
 | [`typography.md`](typography.md) | 字体、主题桥接、圆角阴影与组件微规格 |
 | [`design-tokens.md`](design-tokens.md) | 设计令牌标准：基础 / 通用 / 组件三层、命名、引用规则、新增流程与审计命令 |
 | [`copywriting.md`](copywriting.md) | 用户可见文案规范：任务边界、写作基准、禁止项、分场景写法、语言规范、执行与自检 |

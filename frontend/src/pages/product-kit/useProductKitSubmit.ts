@@ -117,7 +117,7 @@ export function useProductKitSubmit({
     return {
       ok: true,
       projectId,
-      modelKey: model.id,
+      modelKey: model.modelKey,
       inputAssetIds: preparedImages.map((image) => image.id),
     };
   }, [form.images, ensureProject, onReplaceImage]);

@@ -9,16 +9,21 @@ export const CAPABILITY_TABS: ReadonlyArray<{ value: CapabilityTab; label: strin
 ];
 
 /**
- * 后台运行结论。
+ * 后台运行状态。
  *
- * C 端顶部沿用的 `RUNTIME_LABELS` 是「云端模型 / 已下线」的实现口径；运营
- * 在这里关心的是「现在能不能承接下单」，所以单独用业务口径，不改 C 端文案。
+ * 正常状态不需要额外标签，只有已下线 / 暂不可用这类异常需要主动提示。
+ * 筛选器仍保留正常状态，便于运营只看异常能力。
  */
 export const ADMIN_RUNTIME_LABELS: Record<CapabilityRuntime['effective'], string> = {
-  remote: '可承接',
+  remote: '运行正常',
   disabled: '已下线',
   unavailable: '暂不可用',
 };
+
+/** 能力卡片和页头只在异常时展示状态标签。 */
+export function runtimeStatusLabel(effective: CapabilityRuntime['effective']): string | null {
+  return effective === 'remote' ? null : ADMIN_RUNTIME_LABELS[effective];
+}
 
 export const RUNTIME_FILTER_OPTIONS: ReadonlyArray<{
   value: CapabilityRuntimeFilter;
@@ -39,5 +44,5 @@ export function isRuntimeFilter(
   return RUNTIME_FILTER_OPTIONS.some((option) => option.value === value);
 }
 
-/** 下线不要求运营手填原因，统一给 C 端一句可读提示。 */
+/** 下线不要求运营手填原因，统一给用户一句可读提示。 */
 export const DEFAULT_OFFLINE_REASON = '该能力已暂时下线，请稍后再试。';

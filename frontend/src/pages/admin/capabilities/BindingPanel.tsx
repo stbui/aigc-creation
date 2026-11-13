@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActionButton,
+  type AdminColumn,
   AdminDataTable,
   Notice,
   NumberField,
@@ -10,14 +11,13 @@ import {
   StaleError,
   StatusTag,
   SwitchField,
-  type AdminColumn,
 } from '~/admin-ui/primitives';
 import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { adminCapabilityModelsApi } from '../../../lib/api';
 import type {
-  AdminCapabilityModelListView,
   AdminCapabilityModelCandidateView,
+  AdminCapabilityModelListView,
 } from '../../../types/model';
 import type { BindingDraft } from './types';
 import { bindingCostHint, bindingIssue } from './utils';
@@ -53,7 +53,7 @@ export function candidateToDraft(item: AdminCapabilityModelCandidateView): Bindi
   };
 }
 
-/** 候选池：展示失效绑定、维护优先级 / 权重，并支持只读模拟选路。 */
+/** 候选池：展示失效商品、维护优先级 / 权重，并支持只读检查可用商品。 */
 export function BindingPanel({
   capabilityId,
   data,
@@ -91,7 +91,8 @@ export function BindingPanel({
   const candidates = useMemo(
     () =>
       (data?.candidates ?? []).filter(
-        (item) => item.compatible && !draft.some((row) => row.channelModelId === item.channelModelId),
+        (item) =>
+          item.compatible && !draft.some((row) => row.channelModelId === item.channelModelId),
       ),
     [data, draft],
   );
@@ -124,7 +125,7 @@ export function BindingPanel({
           weight: row.weight,
         })),
       );
-      toast.success('绑定已保存。请模拟选路确认命中线路。');
+      toast.success('绑定已保存。请检查这些商品是否可用。');
       await onRetry();
       onChanged();
     } catch (error) {
@@ -138,9 +139,9 @@ export function BindingPanel({
     const count = data?.invalidCount ?? 0;
     if (count === 0) return;
     const confirmed = await confirm({
-      title: `清理 ${count} 条失效绑定？`,
+      title: `清理 ${count} 条失效商品？`,
       description:
-        '只清理当前能力下指向已删除或不存在的商品的绑定；有效绑定、能力与售价不会改变。能力定义已失效的记录需使用页面顶部的「清理全部失效绑定」。',
+        '只清理当前能力下指向已删除或不存在商品的配置；可用商品、能力与售价不会改变。能力定义已失效的记录需使用页面顶部的「清理全部失效商品」。',
       confirmText: '清理当前能力失效项',
       danger: true,
     });
@@ -148,7 +149,7 @@ export function BindingPanel({
     setPruning(true);
     try {
       const result = await adminCapabilityModelsApi.pruneInvalid(capabilityId);
-      toast.success(`已清理 ${result.removed} 条失效绑定，可继续保存其它绑定。`);
+      toast.success(`已清理 ${result.removed} 条失效商品，可继续保存其它绑定。`);
       await onRetry();
       onChanged();
     } catch (error) {
@@ -167,11 +168,11 @@ export function BindingPanel({
       };
       setSimulate(
         result.selectedChannelModelId
-          ? `已保存配置命中 ${result.selectedModelKey || '可用商品'}`
-          : result.reason || '当前没有可参与选路的商品',
+          ? `当前任务会使用 ${result.selectedModelKey || '可用商品'}`
+          : result.reason || '当前没有可用商品',
       );
     } catch (error) {
-      setSimulate(error instanceof Error ? error.message : '模拟失败');
+      setSimulate(error instanceof Error ? error.message : '检查失败');
     }
   };
 
@@ -225,7 +226,9 @@ export function BindingPanel({
           onChange={(value) =>
             setDraft((current) =>
               current.map((item) =>
-                item.channelModelId === row.channelModelId ? { ...item, priority: Number(value) || 0 } : item,
+                item.channelModelId === row.channelModelId
+                  ? { ...item, priority: Number(value) || 0 }
+                  : item,
               ),
             )
           }
@@ -243,7 +246,9 @@ export function BindingPanel({
           onChange={(value) =>
             setDraft((current) =>
               current.map((item) =>
-                item.channelModelId === row.channelModelId ? { ...item, weight: Number(value) || 1 } : item,
+                item.channelModelId === row.channelModelId
+                  ? { ...item, weight: Number(value) || 1 }
+                  : item,
               ),
             )
           }
@@ -252,11 +257,11 @@ export function BindingPanel({
     },
     {
       key: 'enabled',
-      title: '参与选路',
+      title: '是否可用',
       width: 88,
       render: (row) => (
         <SwitchField
-          ariaLabel={`${row.modelKey} 参与选路`}
+          ariaLabel={`${row.modelKey} 是否可用`}
           checked={row.enabled}
           onChange={(checked) =>
             setDraft((current) =>
@@ -292,11 +297,11 @@ export function BindingPanel({
 
   return (
     <Panel
-      title="承接商品"
+      title="商品绑定"
       extra={
         <div className="flex items-center gap-2">
           <ActionButton variant="secondary" size="xs" onClick={() => void runSimulate()}>
-            模拟选路
+            检查可用商品
           </ActionButton>
           <ActionButton
             variant="default"
@@ -311,20 +316,16 @@ export function BindingPanel({
     >
       <div className="flex flex-col gap-3">
         <p className="text-xs leading-5 text-muted-foreground">
-          选路先按模型分组与健康分层筛选。同层内优先级越小越优先，再按权重分流。保存后请重新模拟选路。
+          系统会优先使用数字更小的商品；同一优先级内按权重分配任务。保存后请重新检查可用商品。
         </p>
         {simulate && <Notice tone="info">{simulate}</Notice>}
         {error && <StaleError error={error} onRetry={onRetry} />}
 
         {(data?.invalidCount ?? 0) > 0 && (
-          <Notice
-            tone="warn"
-            title={`失效绑定 ${data?.invalidCount ?? 0} 条`}
-            className="mb-0"
-          >
+          <Notice tone="warn" title={`失效商品 ${data?.invalidCount ?? 0} 条`} className="mb-0">
             <div className="flex flex-col gap-2">
               <div>
-                这些绑定指向已删除或不存在的商品，已不参与选路。保存其它绑定不会自动删除，
+                这些配置指向已删除或不存在的商品，不会用于生成。保存其它绑定不会自动删除，
                 确认不再需要这条记录后再清理。
               </div>
               <div className="max-h-40 overflow-auto rounded border border-warn-soft bg-card">

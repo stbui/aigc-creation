@@ -1,7 +1,5 @@
-import type { ReactNode } from 'react';
 import { AlertTriangle, Inbox, RotateCcw } from 'lucide-react';
-
-import { cn } from '../lib/cn';
+import type { ReactNode } from 'react';
 import { Alert } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader } from '../components/ui/card';
@@ -13,6 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '../components/ui/empty';
+import { cn } from '../lib/cn';
 
 /**
  * 后台页面骨架件：页头 / 面板 / 统计卡 / 保存条 / 空态与失败态。
@@ -54,10 +53,7 @@ export function PageHeader({
   return (
     <header
       data-testid="admin-page-header"
-      className={cn(
-        ' flex items-start justify-between pb-4',
-        className,
-      )}
+      className={cn(' flex items-start justify-between pb-4', className)}
     >
       <div
         className={cn(
@@ -132,16 +128,12 @@ export function Panel({
                 {title}
               </h2>
             )}
-            {note && (
-              <CardDescription className="mt-0.5 text-[12px]">{note}</CardDescription>
-            )}
+            {note && <CardDescription className="mt-0.5 text-[12px]">{note}</CardDescription>}
           </div>
           {extra && <div className="flex shrink-0 items-center gap-2">{extra}</div>}
         </CardHeader>
       )}
-      <CardContent
-        className={cn('p-4', (title || extra) && 'border-t border-border')}
-      >
+      <CardContent className={cn('p-4', (title || extra) && 'border-t border-border')}>
         {children}
       </CardContent>
     </Card>
@@ -161,31 +153,42 @@ export function StatCard({
   value,
   hint,
   tone,
+  inline = false,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
   tone?: 'danger' | 'warn';
+  /** 指标卡内容较少时，把标签和值并排放置，避免多占一行。 */
+  inline?: boolean;
 }) {
+  const valueClassName = cn(
+    'font-semibold text-foreground tabular-nums',
+    tone === 'danger' && 'text-danger-text',
+    tone === 'warn' && 'text-warn-text',
+  );
+
   return (
     <Card
       data-testid="admin-stat-card"
       className={cn(
-        'min-h-[92px] w-full justify-center gap-0 rounded-lg border-border bg-card px-4 py-3 shadow-card',
+        'w-full justify-center gap-0 rounded-lg border-border bg-card px-4 py-3 shadow-card',
+        inline ? 'min-h-0' : 'min-h-[92px]',
         tone === 'danger' && 'border-danger-soft bg-danger-soft/40',
         tone === 'warn' && 'border-warn-soft bg-warn-soft/40',
       )}
     >
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div
-        className={cn(
-          'mt-1 text-[22px] leading-7 font-semibold text-foreground tabular-nums',
-          tone === 'danger' && 'text-danger-text',
-          tone === 'warn' && 'text-warn-text',
-        )}
-      >
-        {value}
-      </div>
+      {inline ? (
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="shrink-0 text-xs font-medium text-muted-foreground">{label}</div>
+          <div className={cn(valueClassName, 'whitespace-nowrap text-lg leading-6')}>{value}</div>
+        </div>
+      ) : (
+        <>
+          <div className="text-xs font-medium text-muted-foreground">{label}</div>
+          <div className={cn(valueClassName, 'mt-1 text-[22px] leading-7')}>{value}</div>
+        </>
+      )}
       {hint && <div className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{hint}</div>}
     </Card>
   );
@@ -220,16 +223,22 @@ export function StatCards({
   columns = 'auto',
   minWidth = 170,
   className,
+  inline = false,
 }: {
   items: readonly StatCardItem[];
   columns?: keyof typeof STAT_COLUMNS_CLASS | 'auto';
   minWidth?: number;
   className?: string;
+  inline?: boolean;
 }) {
   return (
     <div
       data-testid="admin-stat-grid"
-      className={cn('grid gap-3', columns === 'auto' ? undefined : STAT_COLUMNS_CLASS[columns], className)}
+      className={cn(
+        'grid gap-3',
+        columns === 'auto' ? undefined : STAT_COLUMNS_CLASS[columns],
+        className,
+      )}
       style={
         columns === 'auto'
           ? { gridTemplateColumns: `repeat(auto-fit, minmax(${minWidth}px, 1fr))` }
@@ -243,6 +252,7 @@ export function StatCards({
           value={item.value}
           hint={item.hint}
           tone={item.tone}
+          inline={inline}
         />
       ))}
     </div>

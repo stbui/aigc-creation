@@ -255,8 +255,14 @@ export class MembershipService {
   /**
    * 校验并发任务数上限。
    *
-   * 计数口径: status ∈ ('pending','running') —— 已排队未开始的也算占位,
-   * 否则用户狂点提交可以无限堆积任务, 上限形同虚设。
+   * 计数口径: status ∈ ('queued','running') 的全部任务，**按张计数** ——
+   * 一次提交拆成 5 张图就是 5 个任务、占 5 个并发名额，不按「一次提交」
+   * 折算成 1 个。并发描述的是同时交给模型处理的任务数，与用户点了几次
+   * 提交无关。
+   *
+   * 已排队未开始的也占位，否则用户狂点提交可以无限堆积任务；本次请求
+   * 即将创建的任务数由 `incoming` 传入，与现有任务一起比较上限，避免
+   * 「当前 8/10 还能提交 5 张」造成实际 13 个任务同时在途。
    *
    * @returns 当前并发数与上限; 超出时抛 400
    */
@@ -271,18 +277,20 @@ export class MembershipService {
      * 事务内的复核仍不传，保证看到的是锁内最新权益。
      */
     knownPerks?: Perks,
+    /** 本次请求即将创建的任务数；单张能力为 1 */
+    incoming = 1,
   ): Promise<{ current: number; limit: number }> {
     const perks = knownPerks ?? (await this.resolve(userId)).perks;
+    const current = await this.countActive(userId, db);
     if (perks.maxConcurrent <= 0) {
       // 不限 —— 仍返回当前数供 UI 展示
-      const current = await this.countActive(userId, db);
       return { current, limit: 0 };
     }
-    const current = await this.countActive(userId, db);
-    if (current >= perks.maxConcurrent) {
+    const needed = Math.max(1, Math.trunc(incoming));
+    if (current + needed > perks.maxConcurrent) {
       throw new AppError(
         40003,
-        `已达会员并发上限 (${perks.maxConcurrent} 个任务进行中),请等待完成或升级会员`,
+        `超出会员并发上限（上限 ${perks.maxConcurrent} 个，当前 ${current} 个进行中，本次需要 ${needed} 个），请等待完成或升级会员`,
         400,
       );
     }
@@ -297,9 +305,9 @@ export class MembershipService {
       // ⚠ GenerationTask 用 ownerId 而非 userId (与 Asset 一致)。
       // 写成 userId 时 Prisma 报 `Unknown argument 'userId'` → 500, 而非 400。
       //
-      // 只数用户真正发起的生成: 批量生成的第 2..N 张挂在父任务下 (parentTaskId),
-      // 算成一个并发会让「一次生成」按 6 个任务占额度, 会员套餐的并发权益直接失效。
-      where: { ownerId: userId, status: { in: ['queued', 'running'] }, parentTaskId: null },
+      // 按张计数：批量生成的子任务同样占用并发名额。多图提交会一次性
+      // 创建 N 个任务，因此建任务前必须把 N 一起算进上限。
+      where: { ownerId: userId, status: { in: ['queued', 'running'] } },
     });
   }
 
