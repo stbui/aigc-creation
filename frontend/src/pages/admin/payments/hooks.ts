@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * 支付充值的 hook 入口 —— 目录内文件的唯一外部 hook 来源。
+ * 支付配置的 hook 入口 —— 目录内文件的唯一外部 hook 来源。
  *
  * 约定：`payments/` 下的文件不从 `src/admin-ui/providers` / `src/context` /
  * `src/admin-ui/primitives` 直接取 hook，一律经由本文件 —— 页面用到的外部 hook

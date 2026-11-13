@@ -6,19 +6,23 @@
  */
 import {
   Activity,
+  AlertTriangle,
   BellRing,
   Boxes,
   CalendarClock,
+  ClipboardCheck,
   Clock,
   Coins,
   Crown,
   DatabaseBackup,
   FileSpreadsheet,
   FileText,
+  HandCoins,
   HardDrive,
   Images,
   LayoutDashboard,
   ListTree,
+  Mail,
   MessagesSquare,
   MessageSquareText,
   Network,
@@ -74,19 +78,13 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
     ],
   },
   {
-    name: "运营",
+    name: "运营与内容",
     items: [
       {
         path: "/admin/users",
         label: "用户管理",
         icon: Users,
         permission: "user.read",
-      },
-      {
-        path: "/admin/assets",
-        label: "素材管理",
-        icon: Images,
-        permission: "asset.read",
       },
       {
         path: "/admin/tasks",
@@ -100,12 +98,36 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         icon: MessagesSquare,
         permission: "ticket.read",
       },
+      {
+        path: "/admin/assets",
+        label: "素材管理",
+        icon: Images,
+        permission: "asset.read",
+      },
+      {
+        path: "/admin/notifications",
+        label: "站内消息",
+        icon: MessageSquareText,
+        permission: "message.write",
+      },
+      {
+        path: "/admin/templates",
+        label: "写真模板",
+        icon: Images,
+        permission: "template.read",
+      },
+      {
+        path: "/admin/aigc-label",
+        label: "AI 标识",
+        icon: Tag,
+        permission: "setting.read",
+      },
     ],
   },
   {
-    name: "模型与渠道",
+    name: "模型与能力",
     items: [
-      // 供应侧 → 产品侧 → 协议 → 能力与模型 → 人群 → 排障
+      // 供应侧 → 能力 → 扩展 → 人群 → 排障
       {
         path: "/admin/channels",
         label: "模型商品",
@@ -113,16 +135,16 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         permission: "channel.read",
       },
       {
-        path: "/admin/plugins",
-        label: "插件",
-        icon: Puzzle,
-        permission: "plugin.read",
-      },
-      {
         path: "/admin/capabilities",
         label: "能力与模型",
         icon: Boxes,
         permission: ["capability.read", "logical_model.read", "product.price"],
+      },
+      {
+        path: "/admin/plugins",
+        label: "插件",
+        icon: Puzzle,
+        permission: "plugin.read",
       },
       {
         path: "/admin/user-groups",
@@ -139,7 +161,7 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
     ],
   },
   {
-    name: "交易",
+    name: "商品与交易",
     items: [
       {
         path: "/admin/products",
@@ -186,15 +208,33 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
     ],
   },
   {
-    name: "财务",
+    name: "资金与财务",
     items: [
-      // 收钱 → 开票 → 对账 → 分析：账单口径统一留在财务，不再散落在模型组
       {
-        path: "/admin/payments",
-        label: "支付充值",
+        path: "/admin/payments?tab=providers",
+        label: "收款设置",
         icon: Wallet,
         permission: "payment.read",
       },
+      {
+        path: "/admin/payments?tab=reconciliation",
+        label: "交易核对",
+        icon: ClipboardCheck,
+        permission: "payment.read",
+      },
+      {
+        path: "/admin/payments?tab=exceptions",
+        label: "异常处理",
+        icon: AlertTriangle,
+        permission: "payment.read",
+      },
+      {
+        path: "/admin/payment-rules",
+        label: "支付与退费",
+        icon: HandCoins,
+        permission: "setting.read",
+      },
+      // 开票 → 生成账单 → 分析：支付配置已拆为独立运营入口
       {
         path: "/admin/invoices",
         label: "发票管理",
@@ -217,29 +257,6 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
     ],
   },
   {
-    name: "内容与合规",
-    items: [
-      {
-        path: "/admin/notifications",
-        label: "站内消息",
-        icon: MessageSquareText,
-        permission: "message.write",
-      },
-      {
-        path: "/admin/templates",
-        label: "写真模板",
-        icon: Images,
-        permission: "template.read",
-      },
-      {
-        path: "/admin/aigc-label",
-        label: "AI 标识",
-        icon: Tag,
-        permission: "setting.read",
-      },
-    ],
-  },
-  {
     name: "系统",
     items: [
       {
@@ -252,6 +269,12 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         path: "/admin/settings",
         label: "系统设置",
         icon: Settings,
+        permission: "setting.read",
+      },
+      {
+        path: "/admin/email",
+        label: "邮箱配置",
+        icon: Mail,
         permission: "setting.read",
       },
       {
@@ -269,7 +292,7 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
     ],
   },
   {
-    name: "数据安全",
+    name: "数据与安全",
     items: [
       {
         path: "/admin/backups",
@@ -288,13 +311,46 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
 ];
 
 export function findAdminMenuItem(path: string): AdminMenuItem | undefined {
-  return ADMIN_MENU.flatMap((group) => group.items).find(
-    (item) => item.path === path,
-  );
+  return ADMIN_MENU.flatMap((group) => group.items)
+    .sort((a, b) => menuPathSpecificity(b.path) - menuPathSpecificity(a.path))
+    .find((item) => isAdminMenuPathActive(item.path, path));
 }
 
 export function findAdminMenuGroup(path: string): AdminMenuGroup | undefined {
-  return ADMIN_MENU.find((group) =>
-    group.items.some((item) => item.path === path),
-  );
+  const item = findAdminMenuItem(path);
+  if (!item) return undefined;
+  return ADMIN_MENU.find((group) => group.items.includes(item));
+}
+
+/** 子路由（如 `/admin/email/preview`）也应点亮并定位到对应主菜单。 */
+export function isAdminMenuPathActive(itemPath: string, path: string): boolean {
+  const item = splitAdminPath(itemPath);
+  const current = splitAdminPath(path);
+
+  // `/admin` 是所有后台页面的前缀，但只能精确匹配概览，否则会抢占面包屑。
+  if (item.pathname === '/admin') return current.pathname === '/admin';
+
+  const pathMatched =
+    current.pathname === item.pathname || current.pathname.startsWith(`${item.pathname}/`);
+  if (!pathMatched) return false;
+  if (item.search.size === 0) return true;
+
+  // 带查询参数的菜单项必须命中全部参数；额外的筛选参数（如 status=failed）
+  // 不改变所属菜单，因此允许存在。
+  return [...item.search].every(([key, value]) => current.search.get(key) === value);
+}
+
+function splitAdminPath(path: string): { pathname: string; search: URLSearchParams } {
+  const queryIndex = path.indexOf('?');
+  const rawPathname = queryIndex === -1 ? path : path.slice(0, queryIndex);
+  const search = queryIndex === -1 ? '' : path.slice(queryIndex + 1);
+  return {
+    pathname: rawPathname.replace(/\/$/, '') || '/admin',
+    search: new URLSearchParams(search),
+  };
+}
+
+function menuPathSpecificity(path: string): number {
+  const { pathname, search } = splitAdminPath(path);
+  return pathname.length * 100 + search.size;
 }

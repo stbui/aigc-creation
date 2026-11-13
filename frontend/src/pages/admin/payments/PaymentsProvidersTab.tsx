@@ -24,13 +24,10 @@ import { PaymentsProviderSummary } from './PaymentsProviderSummary';
 import { PaymentsVisibleMethodsCard } from './PaymentsVisibleMethodsCard';
 
 /**
- * 支付渠道标签。
+ * 收款设置标签。
  *
- * 渠道配置**加密落库并版本化**：每次保存追加一个新版本，历史订单固定用
- * 下单时的版本（换密钥后旧订单的回调仍要能验签）。渠道只做实例管理，不做删除。
- *
- * 每个渠道可包含多个服务商实例；概览状态按 `instances[]` 聚合，不能只看顶层
- * `enabled/configured` 兼容投影。
+ * 页面按运营工作流组织：先看客户能否付款，再看每个收款来源下的通道状态。
+ * 来源配置仍加密落库并版本化，历史订单固定使用下单时的版本。
  */
 
 /** 列表默认按「需要处理」的优先级排序，异常渠道永远先出现。 */
@@ -113,25 +110,29 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
-  if (!data || providers.length === 0) return <EmptyState title="没有发现支付渠道" />;
+  if (!data || providers.length === 0) {
+    return <EmptyState title="当前还没有收款来源" />;
+  }
 
   return (
     <div className="flex flex-col gap-3">
       {error && <StaleError error={error} onRetry={() => void reload()} />}
 
-      <PaymentsProviderSummary providers={providers} />
+      <div className="grid grid-cols-[minmax(280px,0.78fr)_minmax(0,1.55fr)] items-stretch gap-3">
+        <PaymentsProviderSummary providers={providers} />
 
-      <PaymentsVisibleMethodsCard
-        providers={providers}
-        writable={writable}
-        onSaved={() => void reload()}
-      />
+        <PaymentsVisibleMethodsCard
+          providers={providers}
+          writable={writable}
+          onSaved={() => void reload()}
+        />
+      </div>
 
       <div className="flex items-center justify-between gap-4 px-0.5">
         <div className="flex items-baseline gap-2">
-          <h2 className="m-0 text-[13px] font-semibold text-foreground">渠道列表</h2>
+          <h2 className="m-0 text-[13px] font-semibold text-foreground">收款来源</h2>
           <span className="text-[12px] text-muted-foreground tabular-nums">
-            {visibleProviders.length} 个
+            {visibleProviders.length} 个来源
           </span>
         </div>
         {filterOptions.length > 2 && (
@@ -139,13 +140,13 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
             value={stateFilter}
             onChange={setStateFilter}
             options={filterOptions}
-            ariaLabel="按渠道状态筛选"
+            ariaLabel="按收款状态筛选"
           />
         )}
       </div>
 
       {visibleProviders.length === 0 ? (
-        <EmptyState title="该状态下暂无渠道" />
+        <EmptyState title="该状态下暂无收款来源" />
       ) : (
         <div
           data-testid="admin-provider-grid"

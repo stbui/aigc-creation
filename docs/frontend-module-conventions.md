@@ -78,9 +78,13 @@ pages/admin/channels/
 - 页面 CSS 在全局 CSS **之后**加载，同优先级规则会覆盖全局规则；迁移时不要
   把需要被全局规则兜底的选择器搬进来。
 - `styles/global.css` 只是分层入口（`@layer` 顺序 + `@import`），不写具体规则：
-  令牌进 `tokens.css`，基础元素与 chrome 高度进 `base.css`，跨页工具皮肤进
+  令牌进 `tokens.css`，基础元素、chrome 高度与通用工具类进 `base.css`，跨页工具皮肤进
   `tool-workspace.css`，`ui-*` 兼容层进 `ui-compat.css`。新增页面专属规则直接写进
   对应目录的 `style.css` 或同名页面 CSS。
+- 通用工具类只放 `base.css`，**类名必须带 `u-` 前缀**（`u-font-12` / `u-px-8` /
+  `u-p-4`）。`base.css` 是未分层样式，会压过 Tailwind 的 `@layer utilities`；不带前缀
+  会静默改写后台与 C 端 shadcn 组件里的同名类（`px-4` / `py-2` 等），且不报错。
+  工具类只承载重复出现的字面间距 / 字号 / 尺寸，不替代语义类。
 - 共享组件的样式放组件同名 CSS（`components/ImageLightbox.css` 等），由组件文件
   顶部 `import './<Component>.css';` 引入；被多个组件共用的类（如结果画廊的
   `fc-result-*`）放共用 CSS，由使用它的组件各自引入。
@@ -140,6 +144,13 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
 | 新的纯函数（无 React） | `utils.ts` |
 | 多组件共用的取数逻辑 | `hooks.ts`，或独立 `useXxx.ts` 只在本目录引用 |
 
+### 后台页面宽度
+
+后台页面根容器必须铺满 `.adm-content` 的可用宽度，**不设置页面级最大宽度**
+（不在 `AdminPage` 上传入 `max-w-*`）。数据密集页需要利用横向空间，窄内容应
+通过内部栅格、段落宽度或表格列宽自行组织，而不是把整页内容限宽居中。单元格
+内用于截断文本的 `max-w-* truncate`、弹窗和抽屉的尺寸约束不受此规则影响。
+
 ## 5. 校验
 
 - `frontend/src/test/namedImportAudit.ts` 是共用的对账实现（读源码核对具名导入，
@@ -149,20 +160,26 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     （`src/admin-ui` / `src/components/admin` / `src/pages/admin`）；
   - `frontend/src/pages/product-detail/__tests__/product-detail-modules.test.ts` ——
     C 端详情图目录（`src/pages/product-detail` / `src/components` / `src/hooks` / `src/lib` /
-    `src/context`）；
+    `src/context`；左栏 `DetailInputPane` 复用共享 `ProductFormSection` /
+    `ToolGenerationSubmitBar` / `ToolTypeTabs`，右栏复用共享 `ToolBatchOutputPane`；
+    包含模块多选保留 `DetailSectionPicker`，AI 分析 / 生成设置 / 价签 / 幂等键走共享 hook）；
   - `frontend/src/pages/product-kit/__tests__/product-kit-modules.test.ts` ——
     C 端主图目录（`src/pages/product-kit` / `src/components` / `src/hooks` / `src/lib` /
-    `src/context`）；
+    `src/context`；左栏 `ProductKitInputPane` 复用共享 `ProductFormSection` /
+    `ToolGenerationSubmitBar` / `ToolTypeTabs`，自定义配置保留 `ProductKitVariantConfig`，
+    右栏复用共享 `ToolBatchOutputPane`；批量提交保留 `useProductKitSubmit`）；
   - `frontend/src/pages/viral-clone/__tests__/viral-clone-modules.test.ts` ——
     C 端爆款复刻目录（`src/pages/viral-clone` / `src/components` / `src/hooks` / `src/lib` /
-    `src/context`）；
+    `src/context`；左栏 `ViralCloneInputPane` 复用共享 `ToolGenerationSubmitBar` /
+    `ToolTypeTabs` / `ProductFieldsGrid`，右栏保留本页「商品图 → 参考图 → 生成图」对照
+    `ViralCloneResultList`；双图片位上传与素材库 / 手机定向回填落 `useViralCloneAssets`）；
   - `frontend/src/pages/creative-image/__tests__/creative-image-modules.test.ts` ——
     C 端创意生图 / 自由创作目录（`src/pages/creative-image` / `src/components` /
     `src/hooks` / `src/lib` / `src/context`；页面按板块拆成 `CreativeImageInputPane` /
     `CreativeImageOutputPane` 两栏，左栏再拆 `CreativeImageUploadSection`（原子缩略图
-    `CreativeImageReferenceThumb`）/ `CreativeImagePromptField` / `CreativeImageSubmitBar`，
-    提示词放大为 `CreativeImagePromptModal`；状态与上传 / 提交 / 删除等写操作仍留在
-    `page.tsx`）；
+    `CreativeImageReferenceThumb`）/ `CreativeImagePromptField`；提交区复用共享
+    `ToolGenerationSubmitBar`，提示词放大复用共享 `ExpandTextModal`，上传 / 素材库 /
+    手机回填 / 排序复用共享 `useImageUpload`；状态与提交 / 删除等写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/product-sku/__tests__/product-sku-modules.test.ts` ——
     C 端商品 SKU 图目录（`src/pages/product-sku` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`；页面按板块拆成 `ProductSkuWorkspace`（三栏外壳）内的
@@ -171,8 +188,9 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     清单再拆行 `ProductSkuListItem` → 区域 `ProductSkuVariantRow`（参考图原子件
     `ProductSkuReferenceThumb` / `ProductSkuReferenceUploadButton`）；使用步骤文案落
     `constants.ts` 的 `SKU_STEPS`，历史恢复与变体更新落 `utils.ts`，打包下载落
-    `hooks.ts` 的 `useSkuDownload`，状态与上传 / 提交 / 删除等写操作仍留在
-    `page.tsx`）；
+    `hooks.ts` 的 `useSkuDownload`，草稿状态与清单编辑落 `useSkuDraft.ts`（经 `hooks.ts`
+    转出），素材库 / 手机定向回填复用共享 `useTargetedAssetPicker`；提交 / 历史恢复等
+    跨模块写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/local-redraw/__tests__/local-redraw-modules.test.ts` ——
     C 端局部重绘目录（`src/pages/local-redraw` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，含本页画布组件 `MaskPainter` 与页面的导入；画布舞台
@@ -220,7 +238,11 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `lib/promptToolMessages` 的转出；页面按板块拆成 `MultiFusionSceneGateway` /
     `MultiFusionEditorHeader` / `MultiFusionUploadCard` / `MultiFusionAnalysisCard` /
     `MultiFusionParameterCard` / `MultiFusionSubmitBar` / `MultiFusionResultPanel`
-    七个展示块，状态与写操作仍留在 `page.tsx`）；
+    七个展示块，块内再拆 `MultiFusionSlotActions` / `MultiFusionImageThumb`（上传卡）、
+    `MultiFusionOutputSettings`（高级设置浮层）、`MultiFusionResultStage`（结果舞台）；
+    图位状态落 `useMultiFusionAssets.ts`（复用共享 `useTargetedAssetPicker`）、
+    画面描述与 AI 分析落 `useMultiFusionPrompt.ts`、提交 / 轮询 / 超时重查落
+    `useMultiFusionTask.ts`，三者经 `hooks.ts` 转出，`page.tsx` 只做两步流编排与价签换算）；
   - `frontend/src/pages/landing/__tests__/landing-modules.test.ts` ——
     C 端营销首页目录（`src/pages/landing` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`；静态素材与案例清单落 `constants.ts`，去重与路径映射

@@ -2,55 +2,46 @@ import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelPicker } from '../ModelPicker';
-import { loadModels, type PublicLogicalModel } from '../../lib/models';
+import { loadModels, type PublicModelGroup } from '../../lib/models';
 
 vi.mock('../../lib/models', async () => {
   const actual = await vi.importActual<typeof import('../../lib/models')>('../../lib/models');
   return { ...actual, loadModels: vi.fn() };
 });
 
-const imageModel: PublicLogicalModel = {
-  id: 'model-main-image',
-  code: 'main-image',
+const imageModel: PublicModelGroup = {
+  id: 'main_image:main-image',
+  modelKey: 'main-image',
   name: '仿真图像·main_image',
   icon: '',
   description: '',
   capability: 'main_image',
   sortOrder: 0,
-  pricePolicy: 'fixed',
-  pricingMode: 'fixed',
   displayPrice: 10,
   priceLabel: '10 积分',
-  billingMode: 'per_image',
-  unitPriceMicrocredits: 10_000_000,
-  inputPriceMicrocredits: 0,
-  outputPriceMicrocredits: 0,
-  cachedPriceMicrocredits: 0,
-  priceTiers: [],
-  legacyModelIds: [],
+  billingMode: 'fixed_request',
   capabilitySpec: {
     version: 1,
     capability: 'image',
     inputs: { image: { min: 1, max: 4 } },
   },
-  capabilityProfiles: [],
-  defaultOptions: {},
+  supplyCount: 1,
   available: true,
 };
 
-const redrawModelWithoutMask: PublicLogicalModel = {
+const redrawModelWithoutMask: PublicModelGroup = {
   ...imageModel,
-  id: 'model-redraw-image-only',
-  code: 'redraw-image-only',
+  id: 'local_redraw:redraw-image-only',
+  modelKey: 'redraw-image-only',
   name: '仿真图像·不支持遮罩',
   capability: 'local_redraw',
   sortOrder: 0,
 };
 
-const redrawModelWithMask: PublicLogicalModel = {
+const redrawModelWithMask: PublicModelGroup = {
   ...imageModel,
-  id: 'model-redraw-mask',
-  code: 'redraw-mask',
+  id: 'local_redraw:redraw-mask',
+  modelKey: 'redraw-mask',
   name: '仿真图像·支持遮罩',
   capability: 'local_redraw',
   sortOrder: 1,

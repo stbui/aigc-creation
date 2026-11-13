@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
-
 /**
  * 商品主图工作台页面的 hooks —— 目录内文件的唯一 hooks 入口。
  *

@@ -1,295 +1,149 @@
 /**
- * 前台目录：把后台配置的模型投影成创作端可见的列表与价格。
+ * C 端公开目录：能力下的模型分组。
  *
- * 移植自 open-ai-canvas `logical_models_catalog.go`。
- *
- * 三条投影规则：
- *   1. **只发布当前分组可见线路上的能力**：分组看不到的渠道不参与能力合并，
- *      否则会承诺一个该用户永远走不到的规格；
- *   2. **价格按分组换算后下发**：目录价必须等于实际扣费，`channel` 策略下
- *      每条价格档都要按该档的计价货币与分组倍率换算；
- *   3. **能力画像是去重后的匿名投影**：不暴露供应渠道、上游模型或线路关系。
+ * 前台模型层删除后，C 端看到的「模型」是同一能力下 `modelGroupKey` 相同的
+ * 渠道模型集合。分组只是读取时的投影，没有主键、没有 revision：
+ *   · 名称 / 图标取绑定优先级最高、排序最靠前的商品；
+ *   · 能力合同由分组内线路的合同合并（参数预设取并集）；
+ *   · 可用性按当前分组是否有可承接线路判定；
+ *   · 售价来自能力级 `CapabilityPricing`，同一分组 / 不同线路同价。
  */
 
 import { Injectable } from '@nestjs/common';
-import { convertCurrencyPrice, creditAmount, toSafeNumber } from '../infra/microcredits';
-import { decodeSkuSelector, validateChannelModelPrice, type SkuSelector } from '../domain/selector';
-import { validateImageParameterPriceSelector } from '../domain/image-parameters';
-import {
-  capabilityFingerprint,
-  capabilitySpecWithRoutePresets,
-  logicalModelCapabilityCovered,
-} from '../intent/capability-spec';
-import { matchCapability } from '../intent/capability-match';
+import { getCapability } from '../../capabilities/capability.registry';
+import { capabilitySpecWithRoutePresets } from '../intent/capability-spec';
+import { normalizeCapability } from '../domain/capability-config';
 import type { CapabilitySpec, ModelRequestIntent } from '../intent/spec-types';
 import type { UserGroupAccess } from '../user-groups/user-group.service';
-import { RouteCatalogService } from './route-catalog.service';
+import { CapabilityCatalogService } from './capability-catalog.service';
 import { RouterService } from '../routing/router.service';
-import type { CachedLogicalModel, CachedLogicalRoute } from '../routing/routing.types';
+import type { CachedCapability, CachedCapabilityPricing, CachedModelGroup } from '../routing/routing.types';
 
-export interface PublicLogicalModelPriceTier {
-  selector: SkuSelector;
-  resolution: string;
-  videoSeconds: number;
-  billingMode: string;
-  unitPriceMicrocredits: number;
-  inputTokenPriceMicrocredits: number;
-  outputTokenPriceMicrocredits: number;
-  cachedTokenPriceMicrocredits: number;
-}
-
-export interface PublicLogicalModel {
+export interface PublicModelGroup {
+  /** 稳定标识：`capability:modelKey`，前端记忆与选择都用它 */
   id: string;
-  code: string;
+  capability: string;
+  modelKey: string;
   name: string;
   icon: string;
   description: string;
-  capability: string;
-  sortOrder: number;
-  pricePolicy: string;
-  pricingMode: string;
-  displayPrice: number | null;
-  priceLabel: string;
-  billingMode: string;
-  unitPriceMicrocredits: number;
-  inputPriceMicrocredits: number;
-  outputPriceMicrocredits: number;
-  cachedPriceMicrocredits: number;
-  priceTiers: PublicLogicalModelPriceTier[];
-  legacyModelIds: string[];
-  capabilitySpec: CapabilitySpec;
-  capabilityProfiles: CapabilitySpec[];
-  defaultOptions: Record<string, unknown>;
   available: boolean;
+  billingMode: string;
+  priceLabel: string;
+  displayPrice: number | null;
+  /** 分组展示排序：取组内最优线路的 sortOrder */
+  sortOrder: number;
+  capabilitySpec: CapabilitySpec;
+  /** 该分组当前可供货的渠道数（不暴露渠道名） */
+  supplyCount: number;
 }
 
 @Injectable()
 export class CatalogService {
   constructor(
-    private readonly routeCatalog: RouteCatalogService,
+    private readonly catalog: CapabilityCatalogService,
     private readonly router: RouterService,
   ) {}
 
-  /** 公开目录：全部可见模型（`intent` 给出时按意图过滤并重算 available） */
-  async publicModels(access: UserGroupAccess, intent?: ModelRequestIntent): Promise<PublicLogicalModel[]> {
-    const snapshot = await this.routeCatalog.snapshotOrThrow();
-    const result: PublicLogicalModel[] = [];
-    for (const id of snapshot.ordered) {
-      const cached = snapshot.models.get(id);
-      if (!cached) continue;
-      const projected = this.projectForGroup(access, cached);
-      if (!projected) continue;
-      const available = this.computeAvailable(access, projected, intent);
-      if (intent && !available) continue;
-      result.push(this.toPublicModel(projected, available));
-    }
-    return result;
-  }
-
-  /** 单个模型的公开投影；不存在或分组不可见返回 null */
-  async publicModel(access: UserGroupAccess, logicalModelId: string): Promise<PublicLogicalModel | null> {
-    const snapshot = await this.routeCatalog.snapshotOrThrow();
-    const cached = snapshot.models.get(String(logicalModelId ?? '').trim());
-    if (!cached) return null;
-    const projected = this.projectForGroup(access, cached);
-    if (!projected) return null;
-    return this.toPublicModel(projected, this.computeAvailable(access, projected));
-  }
-
-  /**
-   * 按分组过滤线路并换算价格（返回副本，不修改共享快照）。
-   * 没有任何可见线路时返回 null —— 该模型对当前分组不存在。
-   */
-  projectForGroup(access: UserGroupAccess, cached: CachedLogicalModel): CachedLogicalModel | null {
-    const multiplier = access.pricing('credits', [cached.code]).multiplierBasisPoints;
-    const routes: CachedLogicalRoute[] = [];
-    for (const route of cached.routes) {
-      if (!access.allowsChannel(route.channelModel.channelId)) continue;
-      if (cached.pricePolicy !== 'channel') {
-        routes.push(route);
-        continue;
-      }
-      const pricing = access.pricing(route.channelModel.priceCurrency, [cached.code, route.channelModel.modelKey]);
-      routes.push({
-        ...route,
-        channelModel: {
-          ...route.channelModel,
-          priceTiers: route.channelModel.priceTiers.map((tier) => ({
-            ...tier,
-            // 先按计价货币换算成微积分，再叠分组倍率 —— 顺序反过来会把倍率乘进货币口径
-            unitPriceMicrocredits: applyMultiplier(
-              toSafeNumber(convertCurrencyPrice(tier.unitPriceMicrocredits, pricing.rateMicrocredits)),
-              multiplier,
-            ),
-            inputTokenPriceMicrocredits: applyMultiplier(
-              toSafeNumber(convertCurrencyPrice(tier.inputTokenPriceMicrocredits, pricing.rateMicrocredits)),
-              multiplier,
-            ),
-            outputTokenPriceMicrocredits: applyMultiplier(
-              toSafeNumber(convertCurrencyPrice(tier.outputTokenPriceMicrocredits, pricing.rateMicrocredits)),
-              multiplier,
-            ),
-            cachedTokenPriceMicrocredits: applyMultiplier(
-              toSafeNumber(convertCurrencyPrice(tier.cachedTokenPriceMicrocredits, pricing.rateMicrocredits)),
-              multiplier,
-            ),
-          })),
-        },
-      });
-    }
-    if (routes.length === 0 && cached.routes.length > 0) return null;
-
-    const result: CachedLogicalModel = { ...cached, routes };
-    if (cached.pricePolicy !== 'channel') {
-      result.unitPriceMicrocredits = applyMultiplier(cached.unitPriceMicrocredits, multiplier);
-      result.inputPriceMicrocredits = applyMultiplier(cached.inputPriceMicrocredits, multiplier);
-      result.outputPriceMicrocredits = applyMultiplier(cached.outputPriceMicrocredits, multiplier);
-      result.cachedPriceMicrocredits = applyMultiplier(cached.cachedPriceMicrocredits, multiplier);
-    }
-    return result;
-  }
-
-  /** 可用性：结构覆盖 + 存在健康线路；给出意图时还要求有线路能承接 */
-  computeAvailable(
-    access: UserGroupAccess,
-    cached: CachedLogicalModel,
+  /** 某能力的模型分组；`intent` 给出时只保留可承接该参数组合的分组 */
+  async publicGroups(
+    access: UserGroupAccess | null,
+    capabilityId: string,
     intent?: ModelRequestIntent,
-  ): boolean {
-    const structuralSpecs = cached.routes
-      .filter((route) => route.enabled && route.weight > 0)
-      .map((route) => route.channelModel.capabilitySpec);
-    const coverageValid = logicalModelCapabilityCovered(cached.productSpec, structuralSpecs);
-    const healthy = this.router.hasHealthyRoute(cached.routes);
-    if (!intent) return coverageValid && healthy;
-    if (!coverageValid) return false;
-    if (!matchCapability(cached.productSpec, intent).matched) return false;
-    const resolved = this.router.resolveIntent(cached, intent);
-    return this.router.hasCompatibleRoute(access, cached, resolved);
-  }
-
-  /** 公开投影：能力含各线路预设并集，画像按指纹去重 */
-  toPublicModel(cached: CachedLogicalModel, available: boolean): PublicLogicalModel {
-    const enabledSpecs = cached.routes
-      .filter((route) => route.enabled && route.weight > 0)
-      .map((route) => route.channelModel.capabilitySpec);
-    const productSpec = capabilitySpecWithRoutePresets(cached.productSpec, enabledSpecs);
-    const profiles: CapabilitySpec[] = [];
-    const seen = new Set<string>();
-    for (const spec of enabledSpecs) {
-      const key = capabilityFingerprint(spec);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      profiles.push(spec);
+  ): Promise<PublicModelGroup[]> {
+    const snapshot = await this.catalog.snapshotOrThrow();
+    const capability = snapshot.capabilities.get(String(capabilityId ?? '').trim());
+    if (!capability) return [];
+    // 入参的 capability 是产品能力 id；匹配合同要用产出模态
+    const matchedIntent = intent
+      ? { ...intent, capability: capabilityModality(capability.id) }
+      : null;
+    const result: PublicModelGroup[] = [];
+    for (const key of capability.orderedGroupKeys) {
+      const group = capability.groups.get(key);
+      if (!group) continue;
+      const available = await this.router.groupAvailable(access, capability.id, key, matchedIntent);
+      if (intent && !available) continue;
+      result.push(this.project(capability, group, available));
     }
-    const priceTiers = this.publicPriceTiers(cached);
-    const { pricingMode, displayPrice, priceLabel } = computeModelPriceDisplay(cached, priceTiers);
-    return {
-      id: cached.id,
-      code: cached.code,
-      name: cached.name,
-      icon: cached.icon,
-      description: cached.description,
-      capability: cached.capability,
-      sortOrder: cached.sortOrder,
-      pricePolicy: cached.pricePolicy,
-      pricingMode,
-      displayPrice,
-      priceLabel,
-      billingMode: cached.billingMode,
-      unitPriceMicrocredits: cached.unitPriceMicrocredits,
-      inputPriceMicrocredits: cached.inputPriceMicrocredits,
-      outputPriceMicrocredits: cached.outputPriceMicrocredits,
-      cachedPriceMicrocredits: cached.cachedPriceMicrocredits,
-      priceTiers,
-      legacyModelIds: cached.legacyModelIds,
-      capabilitySpec: productSpec,
-      capabilityProfiles: profiles,
-      defaultOptions: cached.defaults,
-      available,
-    };
+    return result;
   }
 
-  /** 价格档投影：只保留启用且已配置价格、且选择器合法的档，按规格去重 */
-  private publicPriceTiers(cached: CachedLogicalModel): PublicLogicalModelPriceTier[] {
-    if (cached.pricePolicy !== 'channel') return [];
-    const result: PublicLogicalModelPriceTier[] = [];
-    const seen = new Set<string>();
-    for (const route of cached.routes) {
-      if (!route.enabled || route.weight <= 0) continue;
-      const parameters = route.channelModel.capabilitySpec.imageParameters;
-      for (const tier of route.channelModel.priceTiers) {
-        if (!tier.enabled || !tier.priceConfigured) continue;
-        // 发布前做价格合法性校验：历史脏档（按秒非视频、token 非 text/video）
-        // 不能被目录展示成「可成交」，否则展示价与选路结果会分叉。
-        if (!validateChannelModelPrice(tier.billingMode, tier)) continue;
-        const selector = parameters ? decodeSkuSelector(tier.selectorJson) : tier.selector;
-        if (parameters) {
-          try {
-            validateImageParameterPriceSelector(parameters, selector as Record<string, string>);
-          } catch {
-            continue;
-          }
-        }
-        const key = JSON.stringify({
-          selector,
-          billingMode: tier.billingMode,
-          unit: tier.unitPriceMicrocredits,
-          input: tier.inputTokenPriceMicrocredits,
-          output: tier.outputTokenPriceMicrocredits,
-          cached: tier.cachedTokenPriceMicrocredits,
-        });
-        if (seen.has(key)) continue;
-        seen.add(key);
-        result.push({
-          selector,
-          resolution: tier.resolution,
-          videoSeconds: tier.videoSeconds,
-          billingMode: tier.billingMode,
-          unitPriceMicrocredits: tier.unitPriceMicrocredits,
-          inputTokenPriceMicrocredits: tier.inputTokenPriceMicrocredits,
-          outputTokenPriceMicrocredits: tier.outputTokenPriceMicrocredits,
-          cachedTokenPriceMicrocredits: tier.cachedTokenPriceMicrocredits,
-        });
+  /** 单个分组 */
+  async publicGroup(
+    access: UserGroupAccess | null,
+    capabilityId: string,
+    modelKey: string,
+  ): Promise<PublicModelGroup | null> {
+    const snapshot = await this.catalog.snapshotOrThrow();
+    const capability = snapshot.capabilities.get(String(capabilityId ?? '').trim());
+    const group = capability?.groups.get(String(modelKey ?? '').trim());
+    if (!capability || !group) return null;
+    const available = await this.router.groupAvailable(access, capability.id, group.modelKey, null);
+    return this.project(capability, group, available);
+  }
+
+  /** 全量目录：按能力平铺，供工作台首屏一次取回 */
+  async publicAll(access: UserGroupAccess | null): Promise<PublicModelGroup[]> {
+    const snapshot = await this.catalog.snapshotOrThrow();
+    const result: PublicModelGroup[] = [];
+    for (const capability of snapshot.capabilities.values()) {
+      for (const key of capability.orderedGroupKeys) {
+        const group = capability.groups.get(key);
+        if (!group) continue;
+        const available = await this.router.groupAvailable(access, capability.id, key, null);
+        result.push(this.project(capability, group, available));
       }
     }
     return result;
   }
-}
 
-function applyMultiplier(price: number, multiplierBasisPoints: bigint): number {
-  if (price <= 0) return price;
-  return toSafeNumber(creditAmount(price, 1, multiplierBasisPoints));
-}
-
-/** 价格展示：channel 策略看档，unified 看标量价与计费方式 */
-export function computeModelPriceDisplay(
-  model: Pick<CachedLogicalModel, 'pricePolicy' | 'billingMode' | 'unitPriceMicrocredits' | 'inputPriceMicrocredits' | 'outputPriceMicrocredits'>,
-  priceTiers: PublicLogicalModelPriceTier[],
-): { pricingMode: string; displayPrice: number | null; priceLabel: string } {
-  if (model.pricePolicy === 'channel') {
-    if (priceTiers.length === 0) return { pricingMode: 'provider', displayPrice: null, priceLabel: '未配置' };
-    if (priceTiers.length === 1) {
-      const unit = tierDisplayPrice(priceTiers[0]);
-      if (unit > 0) return { pricingMode: 'provider', displayPrice: unit, priceLabel: '' };
-    }
-    return { pricingMode: 'provider', displayPrice: null, priceLabel: '按渠道规格计费' };
-  }
-  if ((model.billingMode === 'fixed_request' || model.billingMode === 'per_second') && model.unitPriceMicrocredits > 0) {
+  private project(
+    capability: CachedCapability,
+    group: CachedModelGroup,
+    available: boolean,
+  ): PublicModelGroup {
+    const specs = group.lines.map((line) => line.channelModel.capabilitySpec).filter(Boolean);
+    const base: CapabilitySpec = specs[0] ?? { version: 1, capability: capabilityModality(capability.id) };
+    const capabilitySpec = specs.length > 0
+      ? capabilitySpecWithRoutePresets(base, specs)
+      : (base as CapabilitySpec);
+    const pricing = capability.pricing;
+    const display = displayOf(pricing);
     return {
-      pricingMode: 'unified',
-      displayPrice: model.unitPriceMicrocredits,
-      priceLabel: model.billingMode === 'per_second' ? '按秒' : '',
+      id: `${capability.id}:${group.modelKey}`,
+      capability: capability.id,
+      modelKey: group.modelKey,
+      name: group.displayName || group.modelKey,
+      icon: group.icon,
+      description: '',
+      available: available && pricing.configured,
+      billingMode: pricing.billingMode,
+      priceLabel: pricing.configured ? display.label : '未配置',
+      displayPrice: pricing.configured ? display.price : null,
+      sortOrder: Math.min(...group.lines.map((line) => line.channelModel.sortOrder), Number.MAX_SAFE_INTEGER),
+      capabilitySpec,
+      supplyCount: group.lines.filter(
+        (line) => line.enabled && line.channelModel.enabled && line.channelModel.channelEnabled,
+      ).length,
     };
   }
-  if (model.billingMode === 'token' && (model.inputPriceMicrocredits > 0 || model.outputPriceMicrocredits > 0)) {
-    return { pricingMode: 'unified', displayPrice: null, priceLabel: '按 Token' };
-  }
-  return { pricingMode: 'unified', displayPrice: null, priceLabel: '未配置' };
 }
 
-function tierDisplayPrice(tier: PublicLogicalModelPriceTier): number {
-  if (tier.billingMode === 'fixed_request' || tier.billingMode === 'per_second') return tier.unitPriceMicrocredits;
-  if (tier.outputTokenPriceMicrocredits > 0) return tier.outputTokenPriceMicrocredits;
-  if (tier.inputTokenPriceMicrocredits > 0) return tier.inputTokenPriceMicrocredits;
-  return 0;
+function capabilityModality(capabilityId: string): string {
+  return normalizeCapability(getCapability(capabilityId)?.model?.capability ?? '');
+}
+
+function displayOf(pricing: CachedCapabilityPricing): { price: number | null; label: string } {
+  if (pricing.billingMode === 'fixed_request') {
+    return { price: pricing.unitPriceMicrocredits, label: '' };
+  }
+  if (pricing.billingMode === 'per_second') {
+    return { price: pricing.unitPriceMicrocredits, label: '按秒' };
+  }
+  if (pricing.billingMode === 'token') {
+    const price = pricing.outputTokenPriceMicrocredits || pricing.inputTokenPriceMicrocredits;
+    return { price: price > 0 ? price : null, label: '按 Token' };
+  }
+  return { price: null, label: '未配置' };
 }

@@ -89,7 +89,6 @@ import type {
   CreditLedgerEntry,
   CreditLedgerPage,
   SandboxPayResult,
-  AdminCreditPrice,
   AdminCapabilityControl,
   MembershipPlan,
   MyMembership,
@@ -126,7 +125,6 @@ import type {
   AdminChannelModelListItem,
   AdminChannelModelView,
   AdminChannelView,
-  AdminLogicalModelView,
   ApiLogListResult,
   BillingBatchResolveResult,
   BillingOrderListResult,
@@ -146,7 +144,6 @@ import type {
   ProviderVerifyResult,
   ProtocolCatalogEntryView,
   ProtocolTestResultView,
-  SimulateResultView,
   SystemChannelExportView,
   SystemChannelImportResultView,
   UpstreamModelPreview,
@@ -365,31 +362,6 @@ export const creditsApi = {
     if (params.direction) qs.set("direction", params.direction);
     return request<CreditLedgerPage>(`/credits/ledger?${qs.toString()}`);
   },
-};
-
-/**
- * 能力消耗价 (后台)。
- *
- * 与 C 端 `/capabilities` 下发的 creditCost 是**同一份数据** ——
- * 后台改价后前者立刻变化, 后者只是把变化传播给前端展示。
- * 两处独立维护必然出现「后台改了、用户看到的没改」。
- */
-export const adminCreditPricesApi = {
-  list: () => request<AdminCreditPrice[]>("/admin/credit-prices"),
-  update: (items: Array<{ capabilityId: string; cost: number }>) =>
-    request<{ updated: Array<{ capabilityId: string; cost: number }> }>(
-      "/admin/credit-prices",
-      {
-        method: "PUT",
-        body: { items },
-      },
-    ),
-  /** 回落代码默认值 */
-  reset: (capabilityId: string) =>
-    request<{ capabilityId: string; cost: number }>(
-      `/admin/credit-prices/${encodeURIComponent(capabilityId)}/reset`,
-      { method: "POST" },
-    ),
 };
 
 /**
@@ -742,4 +714,4 @@ export type { OAuthProviderInfo, AssetSourceFields } from "./api-tools";
 export { adminUsersApi, adminRolesApi, adminSettingsApi, adminAigcLabelApi, adminTasksApi, adminBackupsApi, adminAssetsApi, adminStorageApi, adminTemplateCatalogApi } from "./api-admin-system";
 export { marketingApi, myMarketingApi, adminSchedulerApi, adminProductsApi, adminMembershipPlansApi, adminOrdersApi, adminCreditsApi, adminRetentionApi, adminInvoicesApi } from "./api-admin-commerce";
 export { meApi, notificationsApi, adminNotificationsApi, ticketsApi, adminTicketsApi } from "./api-account";
-export { adminChannelsApi, adminChannelModelsApi, adminLogicalModelsApi, adminUserGroupsApi, adminPluginsApi, adminProviderCatalogApi, adminBillingOrdersApi } from "./api-admin-channels";
+export { adminChannelsApi, adminChannelModelsApi, adminCapabilityModelsApi, adminModelCommerceApi, adminUserGroupsApi, adminPluginsApi, adminProviderCatalogApi, adminBillingOrdersApi } from "./api-admin-channels";

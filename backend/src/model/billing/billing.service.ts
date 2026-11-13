@@ -25,6 +25,7 @@ import { normalizeCapability } from '../domain/capability-config';
 import type { ModelRequestIntent } from '../intent/spec-types';
 import type { UserGroupAccess } from '../user-groups/user-group.service';
 import type { CachedChannelModel, CachedPriceTier, RoutedModel } from '../routing/routing.types';
+import { PriceTierService } from '../routing/price-tier.service';
 import { estimateTextTokens, requestedBillingQuantity } from '../catalog/quote.service';
 
 /** 账单状态机：reserved → running → settled / refunded，异常停在 uncertain */
@@ -213,6 +214,7 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallet: CreditWalletService,
+    private readonly priceTiers: PriceTierService,
   ) {}
 
   /**
@@ -235,116 +237,62 @@ export class BillingService {
    * `channel` 策略读价格档单价并按分组货币换算；`unified` 读前台模型标量价。
    * 两种策略都必须用同一次 `routed` —— 换一条线路就是换一份价格，
    * 账单与目录报价必须同源，否则「看到的价」与「扣的钱」会打架。
-   *
-   * ## `overrideCreditCost`：后台改价的唯一落点
-   *
-   * 后台「能力消耗价」(`SystemSetting['creditPrice.<capabilityId>']`) 与
-   * 线路价 / 模型标量价是**两套价格**，此前只影响 `/capabilities` 下发
-   * 给用户看的数字，扣费仍走线路价 —— 表现为「后台显示已保存，用户却仍按
-   * 旧价扣费」。这个参数由调用方从 `CreditPriceService.resolve()` 取来传入，
-   * 把能力维度的覆盖价接进真正的计费路径。
-   *
-   * 只对**固定价**（`fixed_request`）生效，且仅在 `unified` 策略下：
-   *   · `per_second` / `token` 是按量计价，能力维度的「一次多少钱」无法直接
-   *     换算成每秒 / 每 token 单价，强行覆盖会让按量账单算出荒谬金额；
-   *   · `channel` 策略的价格是渠道成本 + 加价的结果，绕过渠道价等于让渠道
-   *     结算与账单脱钩。
-   * 这两种情况下覆盖价**不生效**，由后台改价页的 `source` 字段透出真实来源，
-   * 运营能看出「这一项不是能力价在管」。
-   *
-   * @param overrideCreditCost 能力维度覆盖价（积分）。null/undefined = 不覆盖
+   * 售价唯一来源是能力目录里的 `CapabilityPricing`。
    */
-  buildDraft(
-    access: UserGroupAccess,
-    routed: RoutedModel,
-    overrideCreditCost?: number | null,
-  ): BillingDraft {
+  buildDraft(access: UserGroupAccess, routed: RoutedModel): BillingDraft {
     const capability = normalizeCapability(routed.intent.capability);
     if (!capability) throw badRequest('模型能力类型无效');
-    const base: Omit<BillingDraft, 'billingMode' | 'amountMicrocredits'> = {
-      model: routed.logicalModel.code,
-      capability,
-      scene: truncate(String(routed.intent.operation ?? capability), 80),
-      channelId: routed.channelModel.channelId,
-      channelModelId: routed.channelModel.id,
-      priceTierId: '',
-      priceTierVersion: 0,
-      priceSelectorJson: '{}',
-      priceVersion: routed.catalogVersion,
-      unitPriceMicrocredits: 0n,
-      multiplierBasisPoints: BASIS_POINTS_SCALE,
-      userGroup: access.groupCode,
-      priceCurrency: 'credits',
-      currencyRateMicrocredits: CREDIT_SCALE,
-      quantity: 1n,
-      inputTokenPriceMicrocredits: 0n,
-      outputTokenPriceMicrocredits: 0n,
-      cachedTokenPriceMicrocredits: 0n,
-      inputTokens: 0n,
-      outputTokens: 0n,
-      cachedTokens: 0n,
-      videoFormulaTokens: 0n,
-      costConfigured: false,
-      costUnitPriceMicrocredits: 0n,
-      costInputTokenPriceMicrocredits: 0n,
-      costOutputTokenPriceMicrocredits: 0n,
-      costCachedTokenPriceMicrocredits: 0n,
-      costBillingMode: '',
-      costQuantity: 0n,
-      costVideoFormulaTokens: 0n,
-    };
+    if (!routed.pricing.configured) throw badRequest('当前能力尚未配置售价');
 
     // 分组是账单的强校验边界：目录里看不到的渠道，即使被直接提交也不能预留积分
     access.requireChannel(routed.channelModel.channelId);
 
-    if (routed.logicalModel.pricePolicy === 'channel') {
-      const tier = routed.priceTier;
-      if (!tier) throw badRequest('当前模型尚未配置所选规格的有效价格');
-      const pricing = access.pricing(routed.channelModel.priceCurrency, [
-        routed.logicalModel.code,
-        routed.channelModel.modelKey,
-      ]);
-      const draft: BillingDraft = {
-        ...base,
-        billingMode: tier.billingMode,
-        priceTierId: tier.id,
-        priceTierVersion: tier.priceVersion,
-        priceSelectorJson: tier.selectorJson,
-        multiplierBasisPoints: pricing.multiplierBasisPoints,
-        priceCurrency: pricing.currency,
-        currencyRateMicrocredits: pricing.rateMicrocredits,
-        unitPriceMicrocredits: convertCurrencyPrice(tier.unitPriceMicrocredits, pricing.rateMicrocredits),
-        inputTokenPriceMicrocredits: convertCurrencyPrice(tier.inputTokenPriceMicrocredits, pricing.rateMicrocredits),
-        outputTokenPriceMicrocredits: convertCurrencyPrice(tier.outputTokenPriceMicrocredits, pricing.rateMicrocredits),
-        cachedTokenPriceMicrocredits: convertCurrencyPrice(tier.cachedTokenPriceMicrocredits, pricing.rateMicrocredits),
-        amountMicrocredits: 0n,
-        // 成本价恒为微积分：不叠分组倍率、不做货币换算，也不参与售价计算
-        costConfigured: tier.costConfigured,
-        costUnitPriceMicrocredits: BigInt(tier.costUnitPriceMicrocredits),
-        costInputTokenPriceMicrocredits: BigInt(tier.costInputTokenPriceMicrocredits),
-        costOutputTokenPriceMicrocredits: BigInt(tier.costOutputTokenPriceMicrocredits),
-        costCachedTokenPriceMicrocredits: BigInt(tier.costCachedTokenPriceMicrocredits),
-        costBillingMode: tier.billingMode,
-      };
-      return this.withAmount(draft, routed.intent, true);
-    }
+    /*
+     * 售价在能力级；成本快照按本次意图命中的成本档记录，仅用于后台毛利分析。
+     */
+    const pricing = access.pricing('credits', [
+      routed.capabilityId,
+      routed.modelKey,
+      routed.channelModel.modelKey,
+    ]);
+    const costTier = this.priceTiers.tierForIntent(routed.channelModel, routed.intent);
 
-    if (routed.logicalModel.pricePolicy !== 'unified') throw badRequest('当前模型价格策略无效');
-    const model = routed.logicalModel;
-    const pricing = access.pricing('credits', [model.code]);
     const draft: BillingDraft = {
-      ...base,
-      billingMode: model.billingMode,
+      model: routed.modelKey,
+      capability,
+      scene: truncate(String(routed.intent.operation ?? capability), 80),
+      billingMode: routed.pricing.billingMode,
+      channelId: routed.channelModel.channelId,
+      channelModelId: routed.channelModel.id,
+      priceTierId: costTier?.id ?? '',
+      priceTierVersion: costTier?.priceVersion ?? 0,
+      priceSelectorJson: costTier?.selectorJson ?? '{}',
+      priceVersion: routed.catalogVersion,
+      unitPriceMicrocredits: BigInt(routed.pricing.unitPriceMicrocredits),
       multiplierBasisPoints: pricing.multiplierBasisPoints,
+      userGroup: access.groupCode,
       priceCurrency: pricing.currency,
       currencyRateMicrocredits: pricing.rateMicrocredits,
-      unitPriceMicrocredits: BigInt(model.unitPriceMicrocredits),
-      inputTokenPriceMicrocredits: BigInt(model.inputPriceMicrocredits),
-      outputTokenPriceMicrocredits: BigInt(model.outputPriceMicrocredits),
-      cachedTokenPriceMicrocredits: BigInt(model.cachedPriceMicrocredits),
+      quantity: 1n,
       amountMicrocredits: 0n,
+      inputTokenPriceMicrocredits: BigInt(routed.pricing.inputTokenPriceMicrocredits),
+      outputTokenPriceMicrocredits: BigInt(routed.pricing.outputTokenPriceMicrocredits),
+      cachedTokenPriceMicrocredits: BigInt(routed.pricing.cachedTokenPriceMicrocredits),
+      inputTokens: 0n,
+      outputTokens: 0n,
+      cachedTokens: 0n,
+      videoFormulaTokens: 0n,
+      // 成本价恒为微积分：不叠分组倍率、不做货币换算，也不参与售价计算
+      costConfigured: Boolean(costTier?.costConfigured),
+      costUnitPriceMicrocredits: BigInt(costTier?.costUnitPriceMicrocredits ?? 0),
+      costInputTokenPriceMicrocredits: BigInt(costTier?.costInputTokenPriceMicrocredits ?? 0),
+      costOutputTokenPriceMicrocredits: BigInt(costTier?.costOutputTokenPriceMicrocredits ?? 0),
+      costCachedTokenPriceMicrocredits: BigInt(costTier?.costCachedTokenPriceMicrocredits ?? 0),
+      costBillingMode: costTier?.billingMode ?? routed.pricing.billingMode,
+      costQuantity: 0n,
+      costVideoFormulaTokens: 0n,
     };
-    return this.withAmount(withCreditPriceOverride(draft, overrideCreditCost, pricing), routed.intent, false);
+    return this.withAmount(draft, routed.intent, false);
   }
 
   /**
@@ -1196,29 +1144,4 @@ function truncate(value: string, max: number): string {
   return [...value].slice(0, max).join('');
 }
 
-/**
- * 把能力维度的后台覆盖价挂到草案上。
- *
- * 只在「固定价 + unified 策略」时生效，理由见 `buildDraft` 的注释：
- * 按量计价无法把「一次多少钱」换算成每秒 / 每 token 单价，
- * 渠道价策略则会绕过渠道结算。
- *
- * 覆盖价以**积分**为单位传入，这里换算成微积分并保留分组倍率 ——
- * 倍率是用户分组的权益（会员折扣 / 加价），不应该因为是后台改的价就失效。
- */
-function withCreditPriceOverride(
-  draft: BillingDraft,
-  overrideCreditCost: number | null | undefined,
-  pricing: { multiplierBasisPoints: bigint },
-): BillingDraft {
-  if (overrideCreditCost === null || overrideCreditCost === undefined) return draft;
-  if (draft.billingMode !== 'fixed_request') return draft;
-  const cost = Number(overrideCreditCost);
-  if (!Number.isFinite(cost) || cost < 0) return draft;
-  return {
-    ...draft,
-    unitPriceMicrocredits: BigInt(Math.trunc(cost)) * CREDIT_SCALE,
-    // 覆盖价是最终成交价的基准，倍率仍按用户分组叠加
-    multiplierBasisPoints: pricing.multiplierBasisPoints,
-  };
-}
+

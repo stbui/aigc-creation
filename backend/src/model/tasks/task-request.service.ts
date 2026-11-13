@@ -5,11 +5,11 @@
  * `buildProviderRequest`：任务只存**用户参数**与供应侧快照，执行时按当时的
  * 能力合同重新投影成 `GenerationRequest`。
  *
- * 为什么不在建任务时把请求整体落库：能力合同、图片参数绑定都会随模型 revision
- * 变化，落一份旧请求等于把过去的字段布局冻结到未来。快照里只记
- * `logicalModelId / revisionId / routeId`，执行时按当前合同重建 —— 但重建结果
- * 必须来自**同一条线路的合同**（`route.channelModel.capabilitySpec`），
- * 否则「选路匹配的参数」与「发给上游的参数」会分叉。
+ * 为什么不在建任务时把请求整体落库：能力合同、图片参数绑定都会随商品配置
+ * 变化，落一份旧请求等于把过去的字段布局冻结到未来。快照里只记能力与
+ * `channelModelId`，执行时按当前合同重建 —— 重建结果必须来自**同一条线路的
+ * 合同**（`channelModel.capabilitySpec`），否则「选路匹配的参数」与
+ * 「发给上游的参数」会分叉。
  */
 
 import { Injectable } from '@nestjs/common';
@@ -20,9 +20,8 @@ import { normalizeImageSizeIntent, restrictIntentToSpec } from '../intent/model-
 import type { ModelRequestIntent } from '../intent/spec-types';
 import type { GenerationRequest, MediaReference } from '../protocol/runtime';
 import type { ManifestCapability } from '../protocol/types';
-import type { CachedLogicalRoute } from '../routing/routing.types';
-import { RouterService } from '../routing/router.service';
-import { RouteCatalogService } from '../catalog/route-catalog.service';
+import type { CachedChannelModel } from '../routing/routing.types';
+import { CapabilityCatalogService } from '../catalog/capability-catalog.service';
 import { TaskMediaService } from './task-media.service';
 
 /** 执行一个任务所需的上下文 */
@@ -32,8 +31,8 @@ export interface TaskExecutionContext {
   capability: string;
   params: Record<string, any>;
   inputAssetIds: string[];
-  logicalModelId: string;
-  routeId: string;
+  /** 任务快照里命中的渠道模型 id */
+  channelModelId: string;
   /** 渠道模型对外模型键（发给上游） */
   providerModelKey: string;
 }
@@ -41,7 +40,7 @@ export interface TaskExecutionContext {
 /** 构建结果：请求 + 本次线路的能力合同 + 归一后的意图 */
 export interface BuiltTaskRequest {
   request: GenerationRequest;
-  route: CachedLogicalRoute;
+  channelModel: CachedChannelModel;
   intent: ModelRequestIntent;
   mask: MediaReference | null;
 }
@@ -50,8 +49,7 @@ export interface BuiltTaskRequest {
 export class TaskRequestService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly router: RouterService,
-    private readonly catalog: RouteCatalogService,
+    private readonly catalog: CapabilityCatalogService,
     private readonly media: TaskMediaService,
   ) {}
 
@@ -64,12 +62,10 @@ export class TaskRequestService {
   async build(context: TaskExecutionContext): Promise<BuiltTaskRequest> {
     const def = getCapability(context.capability);
     if (!def) throw new Error(`能力不存在：${context.capability}`);
-    const model = await this.router.findModel(context.logicalModelId);
-    if (!model) throw new Error('前台模型已下线，无法继续执行该任务');
-    const route = await this.catalog.findRoute(context.routeId);
-    if (!route) throw new Error('任务选中的线路已不存在');
+    const channelModel = await this.catalog.findChannelModel(context.channelModelId);
+    if (!channelModel) throw new Error('任务选中的商品已不存在');
 
-    const spec = route.channelModel.capabilitySpec;
+    const spec = channelModel.capabilitySpec;
     // 执行请求必须按**已选线路**的能力合同投影。产品合同只描述前台承诺的可选
     // 范围，可能不重复声明线路参数（如多图融合的 count）；拿它裁剪会让线路
     // 明明支持 4 张，实际请求却退回上游默认 1 张。
@@ -120,7 +116,7 @@ export class TaskRequestService {
         intentOptions: options,
       },
     };
-    return { request, route, intent, mask: mask ?? null };
+    return { request, channelModel, intent, mask: mask ?? null };
   }
 
   /** 遮罩素材 id（局部重绘沿用 `modelGuideAssetId`，通用入口是 `maskAssetId`） */

@@ -32,7 +32,7 @@ export { ExpandTextModal } from '../../components/ExpandTextModal';
 /** 模型选择 */
 export { ModelPicker } from '../../components/ModelPicker';
 /** 模型选择器上报的前台模型类型 */
-export type { PublicLogicalModel } from '../../lib/models';
+export type { PublicModelGroup } from '../../lib/models';
 /** 素材库选择弹窗 */
 export { AssetLibraryModal } from '../../components/AssetLibraryModal';
 /** 手机扫码上传弹窗 */

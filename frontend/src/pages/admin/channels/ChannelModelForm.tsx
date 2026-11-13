@@ -187,6 +187,10 @@ export function ChannelModelForm({
         />
       </Panel>
 
+      <Notice tone="info" title="生成扣费按能力售价">
+        本页售价与成本档只用于成本 / 毛利核算；C 端实际扣费与报价以「能力与模型」页的能力售价为准。
+      </Notice>
+
       <ChannelModelPriceTierEditor
         control={control}
         tierError={errors.tiers?.root?.message}

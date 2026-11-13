@@ -265,13 +265,12 @@ async function api() {
   if (!sourceAssetId) throw new Error(`上传失败: ${JSON.stringify(up).slice(0, 200)}`);
 
   /*
-   * 新模型层：建任务必须带前台模型 id。`/models/available` 的 capability
-   * 是请求意图（text/image/video/audio），不能传前台产品能力 main_image；
-   * 公开目录已经带 available，直接选可跑的前台模型即可。
+   * 建任务带能力 + 模型分组键（`modelKey`）。公开目录已经带 available，
+   * 直接选该能力下可跑的模型分组即可。
    */
   const catalog = await call('GET', '/models', token);
   const model = (catalog.data?.models ?? []).find((m) => m.capability === 'main_image' && m.available === true);
-  check('存在可用的 main_image 前台模型', Boolean(model), `status=${catalog.httpStatus} ${catalog.message || ''}`);
+  check('存在可用的 main_image 模型分组', Boolean(model), `status=${catalog.httpStatus} ${catalog.message || ''}`);
   if (!model) {
     await cleanup();
     return;
@@ -280,7 +279,7 @@ async function api() {
   const created = await call('POST', '/generate', token, {
     projectId,
     capability: 'main_image',
-    logicalModelId: model.id,
+    modelKey: model.modelKey,
     inputAssetIds: [sourceAssetId],
     params: { platform: 'taobao', size: '1k', ratio: '1:1' },
   });

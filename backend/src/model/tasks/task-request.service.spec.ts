@@ -40,18 +40,10 @@ describe('TaskRequestService 线路参数投影', () => {
         },
       ],
     };
-    const router = {
-      findModel: vi.fn().mockResolvedValue({
-        id: 'model-gpt-image-2',
-        productSpec,
-      }),
-    };
     const catalog = {
-      findRoute: vi.fn().mockResolvedValue({
-        id: 'route-openai-images',
-        channelModel: {
-          capabilitySpec: routeSpec,
-        },
+      findChannelModel: vi.fn().mockResolvedValue({
+        id: 'channel-model-1',
+        capabilitySpec: routeSpec,
       }),
     };
     const media = {
@@ -62,7 +54,6 @@ describe('TaskRequestService 线路参数投影', () => {
     };
     const service = new TaskRequestService(
       {} as never,
-      router as never,
       catalog as never,
       media as never,
     );
@@ -73,8 +64,7 @@ describe('TaskRequestService 线路参数投影', () => {
       capability: 'multi_fusion',
       params: { scene: 'print_pattern', variantCount: '4', ratio: '1:1', size: '1k' },
       inputAssetIds: ['asset-subject', 'asset-accent'],
-      logicalModelId: 'model-gpt-image-2',
-      routeId: 'route-openai-images',
+      channelModelId: 'channel-model-gpt-image-2',
       providerModelKey: 'gpt-image-2',
     });
 
@@ -123,18 +113,10 @@ describe('TaskRequestService 线路参数投影', () => {
         ],
       },
     };
-    const router = {
-      findModel: vi.fn().mockResolvedValue({
-        id: 'model-detail-image',
-        productSpec,
-      }),
-    };
     const catalog = {
-      findRoute: vi.fn().mockResolvedValue({
-        id: 'route-openai-images',
-        channelModel: {
-          capabilitySpec: routeSpec,
-        },
+      findChannelModel: vi.fn().mockResolvedValue({
+        id: 'channel-model-1',
+        capabilitySpec: routeSpec,
       }),
     };
     const media = {
@@ -144,7 +126,6 @@ describe('TaskRequestService 线路参数投影', () => {
     };
     const service = new TaskRequestService(
       {} as never,
-      router as never,
       catalog as never,
       media as never,
     );
@@ -161,8 +142,7 @@ describe('TaskRequestService 线路参数投影', () => {
         size: '1k',
       },
       inputAssetIds: ['asset-product'],
-      logicalModelId: 'model-detail-image',
-      routeId: 'route-openai-images',
+      channelModelId: 'channel-model-detail-image',
       providerModelKey: 'gpt-image-2',
     });
 

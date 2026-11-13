@@ -895,20 +895,19 @@ model GenerationTask {
   /// "任务还在跑" 与 "有人改了一下这行"。
   heartbeatAt DateTime?
 
-  // ── 模型路由快照 (P4-b) ────────────────────────────────────────────
+  // ── 模型供应快照 (P4-b) ────────────────────────────────────────────
   //
-  // 任务一旦建成，供应侧字段就是**快照**: 后台改价 / 换线路 / 归档模型
-  // 都不影响已建任务；重试只复用 logicalModelId 重新解析当前 revision。
-  /// 前台模型 id（`LogicalModel.id`）。新建任务必填，存量历史任务为空。
-  logicalModelId         String?
-  /// 解析时命中的 revision id —— 同一次重试必须回到同一份能力合同
-  logicalModelRevisionId String?
-  /// 命中的线路 id（`LogicalRoute.id`）
-  routeId                String?
+  // 任务一旦建成，供应侧字段就是**快照**: 后台改价 / 换线路 / 停用模型
+  // 都不影响已建任务。能力 id 存 `capability`，模型分组存 `modelKey`。
+  /// C 端所选模型分组键（`ChannelModel.modelGroupKey`，空则 modelKey）。
+  /// 故障切换只更新 channelModelId / channelId，不改 modelKey。
+  modelKey String?
   /// 命中的渠道模型 id（`ChannelModel.id`）
-  channelModelId         String?
-  /// 尝试轮次：用户手动重试 +1，故障切换不变（见 docs/channel-model-design.md §5.7）
-  routeRun               Int     @default(1)
+  channelModelId String?
+  /// 命中的渠道 id（`Channel.id`）
+  channelId      String?
+  /// 尝试轮次：用户手动重试 +1，故障切换不变
+  routeRun       Int    @default(1)
 
   /// 账单 id（`BillingOrder.id`）。故障切换会替换账单，故这里存**当前**账单。
   billingOrderId    String?
@@ -1461,8 +1460,8 @@ model Notification {
 /// 「模板表为空」不能让支付成功的通知消失。
 model MessageTemplate {
   id        String   @id @default(cuid())
-  /// 唯一编码，如 payment_success / task_failed_refund
-  code      String   @unique
+  /// 业务事件编码，如 payment_success / task_failed_refund
+  code      String
   /// inapp | email | sms
   channel   String
   subject   String?
@@ -1473,6 +1472,7 @@ model MessageTemplate {
   createdAt DateTime @default(now())
 
   @@index([channel, enabled])
+  @@unique([code, channel])
 }
 
 /// 能力上下线管控（后台可关停单项能力）。
@@ -1596,7 +1596,7 @@ model AigcLabelConfig {
 // 渠道与模型子系统（移植自 open-ai-canvas，2026-10-31）
 //
 // 层次：渠道 ModelChannel → 渠道模型 ChannelModel → 价格档 ChannelModelPriceTier
-//      → 前台模型 LogicalModel / Revision / Route → 任务快照 RouteAttempt
+//      → 能力绑定 CapabilityModelBinding / 能力定价 CapabilityPricing → 任务快照 RouteAttempt
 //
 // 约定（与全仓一致）：
 //   · 无 enum，状态类字段一律 String，取值由 DTO/service 白名单约束；
@@ -1696,6 +1696,9 @@ model ChannelModel {
   /// 模型能力合同（JSON），价格档选择器与运行期参数校验都读它
   capabilityConfigJson String @default("")
   capabilityVersion    Int    @default(0)
+  /// C 端模型分组键；空串 = 使用 modelKey。
+  /// 同一上游模型在多条渠道使用不同上游键时，靠它合并成一个 C 端选项。
+  modelGroupKey        String @default("")
   /// 来自服务商目录的推荐模型 key（排查来源用）
   catalogModelKey      String @default("")
 
@@ -1753,81 +1756,39 @@ model ChannelModelPriceTier {
   @@index([deletedAt])
 }
 
-/// 前台模型：C 端可售卖的 SKU。价格策略 `pricePolicy=unified` 用标量价，
-/// `channel` 跟随所选渠道模型的价格档（此时标量价只读）。
-model LogicalModel {
-  id          String  @id @default(cuid())
-  code        String
-  /// 存活且未归档时 = code 小写；归档/删除时置 null
-  activeKey   String?
-  name        String
-  icon        String  @default("")
-  description String  @default("")
-  capability  String
-  enabled     Boolean @default(true)
-  sortOrder   Int     @default(0)
+/// 能力候选池：某 C 端能力允许使用哪些渠道模型。
+/// 既是后台的「选模型」结果，也是运行时唯一的候选来源。
+model CapabilityModelBinding {
+  id             String  @id @default(cuid())
+  /// C 端能力 id：free_create / main_image / ...
+  capabilityId   String
+  channelModelId String
+  enabled        Boolean @default(true)
+  /// 手工分层：数字越小越优先；运行时健康分层在其之上叠加
+  priority       Int     @default(0)
+  /// 同层加权随机
+  weight         Int     @default(100)
 
-  /// 已分配的 revision 版本号，由数据库原子递增（update increment）
-  revisionSequence     Int    @default(0)
-  activeRevisionId     String @default("")
-  /// 由哪个渠道模型投影而来（仅用于来源展示与重建）
-  sourceChannelModelId String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  /// 'unified' 统一价 | 'channel' 跟随渠道价格档
-  pricePolicy             String @default("unified")
-  billingMode             String @default("fixed_request")
-  unitPriceMicrocredits   BigInt @default(0)
-  inputPriceMicrocredits  BigInt @default(0)
-  outputPriceMicrocredits BigInt @default(0)
-  cachedPriceMicrocredits BigInt @default(0)
-  /// 旧 SKU 选择的无缝映射（JSON 字符串数组）
-  legacyModelIdsJson      String @default("[]")
-
-  /// 归档后仅从可选目录隐藏；历史任务仍可读取
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@unique([activeKey])
-  @@index([capability, enabled])
-  @@index([sortOrder])
-  @@index([archivedAt])
-  /// 目录加载按生效 revision 反查线路；没有索引会退化成全表扫
-  @@index([activeRevisionId])
-  /// 一个渠道模型最多投影出一个未归档前台模型（应用层另有校验）
-  @@index([sourceChannelModelId])
-}
-
-/// 前台模型 revision：一次发布的能力合同与默认参数，创建后不可变。
-model LogicalModelRevision {
-  id                 String   @id @default(cuid())
-  logicalModelId     String
-  version            Int
-  /// 能力合同 JSON（CapabilitySpec）
-  capabilitySpecJson String   @default("{}")
-  /// 默认参数 JSON
-  defaultOptionsJson String   @default("{}")
-  createdBy          String   @default("")
-  createdAt          DateTime @default(now())
-
-  @@unique([logicalModelId, version])
-  @@index([logicalModelId])
-}
-
-/// 路线：前台模型 revision 可用的渠道模型，`priority` 硬分层、同层按 `weight` 加权。
-model LogicalModelRoute {
-  id                     String   @id @default(cuid())
-  logicalModelRevisionId String
-  channelModelId         String
-  enabled                Boolean  @default(true)
-  priority               Int      @default(0)
-  weight                 Int      @default(100)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  @@unique([logicalModelRevisionId, channelModelId])
-  @@index([enabled, priority])
+  @@unique([capabilityId, channelModelId])
+  @@index([capabilityId, enabled])
   @@index([channelModelId])
+}
+
+/// 能力级售价：一个能力一套价格，切换线路不改价。
+model CapabilityPricing {
+  capabilityId                 String   @id
+  /// 'fixed_request' | 'per_second' | 'token'
+  billingMode                  String   @default("fixed_request")
+  unitPriceMicrocredits        BigInt   @default(0)
+  inputTokenPriceMicrocredits  BigInt   @default(0)
+  outputTokenPriceMicrocredits BigInt   @default(0)
+  cachedTokenPriceMicrocredits BigInt   @default(0)
+  updatedBy                    String   @default("")
+  updatedAt                    DateTime @updatedAt
+  createdAt                    DateTime @default(now())
 }
 
 /// 路由尝试：一次任务在一条线路上的派发记录。`dispatchState` 决定能否安全切换。
@@ -1838,9 +1799,8 @@ model RouteAttempt {
   routeRun      Int
   attemptNumber Int
 
-  logicalModelId         String @default("")
-  logicalModelRevisionId String @default("")
-  routeId                String @default("")
+  capabilityId           String @default("")
+  modelKey               String @default("")
   channelModelId         String @default("")
   channelId              String @default("")
 

@@ -376,11 +376,11 @@ export interface GenerateRequest {
   projectId: string;
   capability: Capability;
   /**
-   * 前台模型 id（`LogicalModel.id`）。
+   * 模型分组键（`ChannelModel.modelGroupKey`，空则回落到 modelKey）。
    *
-   * 必填：渠道、协议、价格一律由服务端按所选模型解析，前端只表达「用哪个模型」。
+   * 必填：具体渠道与线路由服务端在同一能力的候选池里解析。
    */
-  logicalModelId: string;
+  modelKey: string;
   inputAssetIds: string[];
   params: Record<string, unknown>;
   /** 客户端请求幂等键；网络超时重试时复用同一值。 */
@@ -421,11 +421,11 @@ export interface Task {
   params?: Record<string, unknown>;
   errorCode?: string | null;
   /**
-   * 建任务时选定的前台模型 id（`LogicalModel.id`）。
+   * 建任务时选定的模型分组键。
    * 作品页「重新生成」沿用它，保证重试落在与原任务相同的模型上；
-   * 改造前的存量任务为 null。
+   * 存量任务为 null。
    */
-  logicalModelId?: string | null;
+  modelKey?: string | null;
   /** 本次实际扣掉的积分快照。改价不影响已创建的任务 */
   creditCost?: number;
   /** 该能力的产出模态（后端按能力下发），轮询上限据此区分图像/视频 */
@@ -610,6 +610,6 @@ export interface AdminTemplateCatalog {
 }
 
 // 按域拆分后的聚合出口
-export type { AdminRole, UserStatus, AdminCapabilityMode, AdminMe, AdminPermissionCatalog, AdminAlertSeverity, AdminAlertItem, AdminAlertsResult, AdminWorkbenchRoleView, AdminWorkbenchSeverity, AdminWorkbenchGroupKey, AdminWorkbenchItem, AdminWorkbenchGroup, AdminWorkbench, AdminOverview, AdminUserListResult, AdminUserStats, AdminLoginLogItem, AdminLoginLogResult, AdminPasswordReset, AdminRoleItem, AdminSettingValue, AdminSettingsUpdatePayload, AdminSettingsUpdateResult, AdminSettings, AdminSettingImageUpload, AigcLabelPosition, AigcLabelSpec, AdminAigcLabel, PublicAigcLabel, Modality, Product, ProductsResponse, OrderStatus, OrderItemView, PaymentView, RefundView, OrderListResult, Order, CreditBalance, CreditLot, CreditLedgerEntry, CreditLedgerPage, AdminCreditPrice, AdminCapabilityControl, SandboxPayResult, MembershipPlan, MyMembership, AdminUserDetail } from "./admin-console";
+export type { AdminRole, UserStatus, AdminCapabilityMode, AdminMe, AdminPermissionCatalog, AdminAlertSeverity, AdminAlertItem, AdminAlertsResult, AdminWorkbenchRoleView, AdminWorkbenchSeverity, AdminWorkbenchGroupKey, AdminWorkbenchItem, AdminWorkbenchGroup, AdminWorkbench, AdminOverview, AdminUserListResult, AdminUserStats, AdminLoginLogItem, AdminLoginLogResult, AdminPasswordReset, AdminRoleItem, AdminSettingValue, AdminSettingsUpdatePayload, AdminSettingsUpdateResult, AdminSettings, AdminSettingImageUpload, AigcLabelPosition, AigcLabelSpec, AdminAigcLabel, PublicAigcLabel, Modality, Product, ProductsResponse, OrderStatus, OrderItemView, PaymentView, RefundView, OrderListResult, Order, CreditBalance, CreditLot, CreditLedgerEntry, CreditLedgerPage, AdminCapabilityControl, SandboxPayResult, MembershipPlan, MyMembership, AdminUserDetail } from "./admin-console";
 export type { AdminTask, AdminTaskCongestion, AdminTaskListResult, AdminTaskDetail, AdminBackup, AdminBackupStats, AdminCleanupLog, StorageBackendId, AssetStatus, AdminAssetListResult, AdminAssetStats, AdminProjectListResult, AdminProject, AdminStorageStatus, CouponType, CouponScope, CouponStatus, CampaignType, CampaignStatus, AdminCoupon, UpsertCouponPayload, AdminCampaign, UpsertCampaignPayload, AdminInviteListResult, AdminCheckinListResult, InviteRule, CheckinRule, MyInvites, CheckinStatus, MarketingQuote, PopupCampaign, PromoCampaign, AdminSchedulerTask, AdminSchedulerStatus } from "./admin-ops";
-export type { AdminProduct, CreateProductPayload, UpdateProductPayload, AdminMembershipPerks, AdminMembershipPlan, AdminMembershipPlanList, AdminMembershipPlanPayload, CreateAdminMembershipPlanPayload, AdminOrderStatus, AdminOrderRow, AdminOrderListResult, AdminOrderPayment, AdminOrderRefund, AdminOrderDetail, AdminCreditRow, AdminCreditListResult, AdminCreditLotRow, AdminCreditLedgerRow, AdminBatchAdjustResult, AdminRetentionTarget, MyProfile, DeletionPreview, NotificationItem, NotificationList, MessageTemplateItem, DeliveryChannelStatus, DeliveryChannelStatusMap, TicketType, TicketStatus, TicketPriority, TicketReplyItem, AdminTicketAssignee, Ticket, TicketListResult, CreateTicketPayload, AdminTicketRow, AdminTicketListResult, AdminTicketDetail, TicketStats, BatchItemResult, BatchSummary, CreditImportResult } from "./admin-support";
+export type { AdminProduct, CreateProductPayload, UpdateProductPayload, AdminMembershipPerks, AdminMembershipPlan, AdminMembershipPlanList, AdminMembershipPlanPayload, CreateAdminMembershipPlanPayload, AdminOrderStatus, AdminOrderRow, AdminOrderListResult, AdminOrderPayment, AdminOrderRefund, AdminOrderDetail, AdminCreditRow, AdminCreditListResult, AdminCreditLotRow, AdminCreditLedgerRow, AdminBatchAdjustResult, AdminRetentionTarget, MyProfile, DeletionPreview, NotificationItem, NotificationList, MessageTemplateItem, DeliveryChannelStatus, DeliveryChannelStatusMap, BroadcastPayload, BroadcastResult, EmailTestResult, TicketType, TicketStatus, TicketPriority, TicketReplyItem, AdminTicketAssignee, Ticket, TicketListResult, CreateTicketPayload, AdminTicketRow, AdminTicketListResult, AdminTicketDetail, TicketStats, BatchItemResult, BatchSummary, CreditImportResult } from "./admin-support";

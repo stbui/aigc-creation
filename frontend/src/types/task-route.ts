@@ -3,9 +3,8 @@ export interface AdminTaskRouteAttempt {
   id: string;
   routeRun: number;
   attemptNumber: number;
-  logicalModelId: string;
-  logicalModelRevisionId: string;
-  routeId: string;
+  capabilityId: string;
+  modelKey: string;
   channelId: string;
   channelModelId: string;
   status: 'selected' | 'dispatching' | 'succeeded' | 'failed';

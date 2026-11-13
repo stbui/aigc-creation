@@ -6,8 +6,12 @@
  * 目录内新增共享常量时在这里补一行 re-export。
  */
 
-/** 单张图片体积上限 (MB), 全站上传校验共用 */
-export { MAX_IMAGE_MB } from '../../lib/constants';
+/** 单张图片体积上限 (MB) 与字段长度, 全站上传校验共用 */
+export {
+  MAX_IMAGE_MB,
+  MAX_PRODUCT_DESCRIPTION_LEN as MAX_DESC_LEN,
+  MAX_PRODUCT_NAME_LEN as MAX_NAME_LEN,
+} from '../../lib/constants';
 
 // ───────────────── 上传与字段长度 (参考站实拍) ─────────────────
 
@@ -16,11 +20,6 @@ export const PRODUCT_KIT_CAPABILITY = 'main_image';
 
 /** 一次提交最多上传的商品图张数 */
 export const MAX_IMAGES = 5;
-/** 商品名称 / 品牌输入上限 */
-export const MAX_NAME_LEN = 100;
-/** 商品描述输入上限 */
-export const MAX_DESC_LEN = 5000;
-
 // ───────────────── 自定义配置 ─────────────────
 
 /**

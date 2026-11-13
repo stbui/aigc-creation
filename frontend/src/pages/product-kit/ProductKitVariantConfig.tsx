@@ -19,11 +19,11 @@ export function ProductKitVariantConfig({
   return (
     <section className="pk-config-card">
       <div className="pk-section">
-        <strong className="pk-section-title">自定义配置</strong>
+        <strong className="pk-section-title u-font-14">自定义配置</strong>
         <div className="pk-count-grid">
           {VARIANT_FIELDS.map((v) => (
             <div key={v.key} className="pk-count-field">
-              <span className="pk-count-label">{v.label}</span>
+              <span className="pk-count-label u-font-14">{v.label}</span>
               <NumberStepper
                 label={v.label}
                 value={counts[v.key] ?? 0}

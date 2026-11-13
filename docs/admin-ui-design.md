@@ -13,7 +13,7 @@
 | 项 | 事实源 |
 | --- | --- |
 | 外壳组件 | `frontend/src/admin-ui/shell/AdminBoardLayout.tsx` |
-| 菜单数据 | `frontend/src/components/admin/adminNav.ts`（8 组 / 31 条） |
+| 菜单数据 | `frontend/src/components/admin/adminNav.ts`（7 组 / 35 条） |
 | 页面取用层 | `frontend/src/admin-ui/primitives/index.ts`（页面**只从这里**取件） |
 | 基础件 | `frontend/src/admin-ui/components/ui/`（shadcn CLI 生成，`scripts/post-shadcn.mjs` 后处理） |
 | 类名合并 | `frontend/src/admin-ui/lib/cn.ts`（官方 `cn` 包的 `createCn` + 项目 token 补登） |
@@ -87,7 +87,7 @@ Tailwind v4 的默认阶梯与项目规定对不齐，`admin.css` 的 `@theme in
 ```
 Sidebar 232px（折叠 60px，≤1280px 自动折叠；h-svh 全高）
 ├── 品牌头：56px，标记 + 「货觉AI 运营后台」
-├── 导航：8 个分组（总览 / 运营 / 模型与渠道 / 交易 / 财务 / 内容与合规 / 系统 / 数据安全），可折叠，按权限点过滤；导航区自身滚动
+├── 导航：7 个分组（总览 / 运营与内容 / 模型与能力 / 商品与交易 / 资金与财务 / 系统 / 数据与安全），可折叠，按权限点过滤；导航区自身滚动
 └── 底：账号菜单（品牌紫头像 + 邮箱 / 角色，菜单含返回前台 / 退出登录）
 
 SidebarInset（内容区）
@@ -112,7 +112,7 @@ SidebarInset（内容区）
 | 顶栏 | 高 56px（`data-testid="admin-header"`），内容区顶部：折叠开关 + 面包屑（分组 / 页面），右侧告警铃铛与环境标识 |
 | 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），品牌头与底部账号菜单不参与 |
 | 底部区 | 侧栏底、上边框分隔；账号菜单固定在底部，折叠态只留头像 |
-| 分组标题 | 12px / 600 `text-muted-foreground` / `tracking-wider`，可点击折叠/展开；首次进入默认展开全部分组，之后沿用写入 `localStorage` 的用户偏好；侧栏折叠态隐藏标题并改用分隔线 |
+| 分组标题 | 11px / 600 / `tracking-[0.08em]`，当前分组带品牌色圆点；可点击折叠/展开；首次进入只展开当前页所在分组，之后沿用写入 `localStorage` 的用户偏好；侧栏折叠态隐藏标题并改用分隔线 |
 | 菜单项 | 高 34px，圆角 8px，13px / 500 文字，padding `0 10px`，左侧 16px 图标 + 10px 间距 |
 | 悬停 | 底 `bg-sidebar-accent`，字 `text-sidebar-accent-foreground` |
 | 选中 | 底 `bg-sidebar-accent`、字 `text-sidebar-accent-foreground` / 600，左侧 3px 品牌色竖条 |

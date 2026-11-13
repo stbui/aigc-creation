@@ -41,7 +41,7 @@
 ## 支付通道（后台多通道配置）
 
 支付通道不再由单一 `PAYMENT_PROVIDER` 切换。当前支持站点内沙箱、支付宝、微信支付、
-PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付充值 → 支付渠道」中启用并保存版本化配置；
+PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付配置 → 收款设置」中启用并保存版本化配置；
 环境变量只在数据库**首次没有该渠道配置**时导入为 v1，后续轮换凭据以后台保存的新版本为准。
 
 | 变量 | 开发 | 测试 | 生产 | 说明 |
@@ -172,13 +172,18 @@ https://域名/api/v1/payments/callback/zpay/{configId}
 
 同支付一样是「适配器 + 控制台兜底」：默认 `console` **不真实投递**，正文写入
 `backend/logs/outbox/{email,sms}-*.log`，冒烟脚本据此校验验证码 / 重置链接。
-配置 `http` + 服务商 HTTP API，或 `aliyun` + 阿里云 AccessKey 即真实调用（`backend/src/channels/`）。
+配置 `smtp` + 邮箱客户端授权码、`http` + 服务商 HTTP API，或 `aliyun` + 阿里云 AccessKey 即真实调用（`backend/src/channels/`）。
 
 | 变量 | 开发 | 测试 | 生产 | 说明 |
 |---|---|---|---|---|
-| `EMAIL_PROVIDER` | `console` | `console` | `http` / `aliyun` | `console` 打 WARN 表明不会投递；`aliyun` 走 DirectMail `SingleSendMail` |
+| `EMAIL_PROVIDER` | `console` | `console` | `smtp` / `http` / `aliyun` | `console` 打 WARN 表明不会投递；`smtp` 走标准 SMTP；`aliyun` 走 DirectMail `SingleSendMail` |
 | `EMAIL_API_URL` / `EMAIL_API_KEY` | 空 | 空 | 按需 | 服务商 HTTP 接口（15s 超时 + 3 次指数退避） |
-| `EMAIL_FROM` | `noreply@huojue.local` | 同 | 真实发信地址 | 发件人显示名（`aliyun` 下显示名用 `ALIYUN_DM_FROM_ALIAS`） |
+| `EMAIL_FROM` | `noreply@huojue.local` | 同 | 真实发信地址 | 发件邮箱地址；后台“发件人名称”控制显示名，阿里云环境变量为 `ALIYUN_DM_FROM_ALIAS` |
+| `EMAIL_SMTP_HOST` | 空 | 空 | 如 `smtp.163.com` | 选择 `smtp` 时必填 |
+| `EMAIL_SMTP_PORT` | `465` | 同 | 按服务商要求 | SSL 直连通常为 465，STARTTLS 通常为 587 |
+| `EMAIL_SMTP_SECURE` | `true` | 同 | 按端口匹配 | `true` 表示从连接开始使用 TLS；587+STARTTLS 通常为 `false` |
+| `EMAIL_SMTP_USER` | 空 | 空 | 完整邮箱地址 | SMTP 身份认证账号 |
+| `EMAIL_SMTP_PASSWORD` | 空 | 空 | 客户端授权码 | 163 等邮箱必须使用授权码，不能使用网页登录密码 |
 | `SMS_PROVIDER` | `console` | `console` | `http` / `aliyun` | `aliyun` 走短信服务 `SendSms` |
 | `SMS_API_URL` / `SMS_API_KEY` | 空 | 空 | 按需 | 短信服务商接口 |
 | `SMS_SIGN` | `货觉AI` | 同 | 已备案签名 | 短信签名（`aliyun` 下 `ALIYUN_SMS_SIGN_NAME` 优先） |
@@ -198,7 +203,11 @@ https://域名/api/v1/payments/callback/zpay/{configId}
 
 **回退语义与支付相反**：支付通道凭据缺失一律 503、绝不降级沙箱；邮件/短信不是核心链路（忘记密码仍可走另一条通道或联系客服），因此 `aliyun` 缺凭据时**告警 + 回落 console**，由 `status()` 的 `delivers: false` 与 `/health` 的 channels 分项暴露「其实没在发」。`/admin/notifications` 页顶部的通道状态读同一份 `status()`。
 
-**刻意不手写 SMTP**：TLS 分片与认证流程的自研实现风险高于收益，邮件走服务商 HTTP API。阿里云 RPC 签名（HMAC-SHA1 + 排序 canonical query）有离线复算脚本：`cd backend && npx ts-node -T scripts/verify-channel-signatures.ts`，但它**只验签名与请求形状，不代表已真实投递**。
+**SMTP 使用成熟库处理连接协议**：TLS 分片、STARTTLS、认证与连接超时由 `nodemailer` 负责，不在业务代码中手写。阿里云 RPC 签名（HMAC-SHA1 + 排序 canonical query）另有离线复算脚本：`cd backend && npx ts-node -T scripts/verify-channel-signatures.ts`，但它**只验签名与请求形状，不代表已真实投递**。
+
+**163 邮箱推荐配置**：登录 163 网页版，在“设置 → POP3/SMTP/IMAP”开启 SMTP 服务并生成客户端授权码；后台“邮箱配置 → 投递配置”选择“SMTP 邮箱”，服务器填 `smtp.163.com`，端口 `465`，开启 SSL/TLS 直连，账号填完整邮箱地址，密码填授权码。保存后先向自己的另一个邮箱发送测试邮件，再启用各业务用途。
+
+**收件能力边界**：当前邮件通道用于向用户发送验证码、找回密码、支付成功、工单回复和活动通知，不轮询 IMAP/POP3 收件箱。163 的 IMAP 配置不影响站内发信；若未来需要把用户回信写入工单，应新增独立的收件同步与线程归并流程。
 
 ## 第三方登录（`OAUTH_*`）
 

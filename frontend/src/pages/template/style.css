@@ -1,108 +1,111 @@
 /**
  * template 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
  *
- * 布局对齐 AI 带货图文工作台：左配置栏固定 400px，右栏是常驻模板区 +
- * 底部历史条，页面本身不滚动、两栏各自内部滚动。
+ * 外层两列网格与左栏骨架和商品主图 / 商品详情一致：留白沿用
+ * `pk-workspace` 的 16px / 24px，左栏是 `pk-input-pane`（白卡
+ * `pk-config-card` 上浮，提交区独立成卡）。本文件只保留本页独有的
+ * 模板回显与右栏模板区样式，不重复左栏皮肤。
  * 颜色一律引用 `styles/tokens.css` 的 `:root` 令牌，不写裸色值。
  */
 
 .tpl-workspace {
   margin: -24px -24px -32px;
-  padding: 0;
+  padding: 16px 24px 16px 16px;
   box-sizing: border-box;
   height: calc(100vh - var(--workspace-topbar-height));
   min-height: 620px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  /* 左栏 432px + 16px 间距，与 `.pk-workspace` 完全一致 */
+  grid-template-columns: 432px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 0;
+  gap: 16px;
   align-items: stretch;
 }
 
-.tpl-body {
-  display: grid;
-  grid-template-columns: 400px minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-}
+/* ── 左栏内的页面专属块（白卡与提交区由 pk-* 共享皮肤提供） ── */
 
-@media (max-width: 900px) {
-  .tpl-workspace {
-    margin: 0;
-  }
-
-  .tpl-body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .tpl-input-pane {
-    width: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-/* ── 左栏 ── */
-.tpl-input-pane {
-  width: 400px;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--card-bg);
-  border-right: 1px solid var(--border);
-}
-
-.tpl-form-card {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-}
-
-.tpl-form-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: grid;
-  gap: 24px;
-  align-content: start;
-  padding: 18px 16px 24px 24px;
-}
-
-.tpl-section {
+/* 拍摄建议：卡片内的普通区块，标题沿用 `.pk-section-title`，不加底色与边框 */
+.tpl-tips {
   display: grid;
   gap: 10px;
-  min-width: 0;
 }
 
-.tpl-section .pk-section-title {
-  display: block;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-strong);
-  margin-bottom: 2px;
+.tpl-tips .pk-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tpl-tips .pk-section-title svg {
+  color: var(--brand);
+}
+
+.tpl-tips-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tpl-tips-list li {
+  position: relative;
+  padding-left: 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+.tpl-tips-list li::before {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  background: var(--brand);
+  border-radius: 50%;
+  opacity: 0.6;
+  content: '';
 }
 
 /* 已选模板回显 */
 .tpl-selected {
   display: flex;
   gap: 12px;
-  padding: 10px;
+  padding: 12px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
 }
 
-.tpl-selected img {
+.tpl-selected-thumb {
   flex: none;
-  width: 72px;
-  height: 96px;
+  width: 76px;
+  height: 100px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--card-bg);
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: zoom-in;
+}
+
+.tpl-selected-thumb:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.tpl-selected-thumb img {
+  display: block;
+  width: 76px;
+  height: 100px;
   object-fit: cover;
   border-radius: var(--radius-control);
-  background: var(--card-bg);
+  transition: transform 0.2s ease;
+}
+
+.tpl-selected-thumb:hover img {
+  transform: scale(1.04);
 }
 
 .tpl-selected-copy {
@@ -112,17 +115,47 @@
   min-width: 0;
 }
 
-.tpl-selected-copy strong {
+.tpl-selected-path {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-desc);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tpl-selected-name {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-strong);
 }
 
+.tpl-selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tpl-selected-tag {
+  padding: 1px 7px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-brand-1);
+  background: var(--brand-bg);
+  border-radius: var(--radius-pill);
+}
+
+.tpl-selected-tag.is-more {
+  color: var(--text-desc);
+  background: var(--surface);
+}
+
 .tpl-selected-clear {
   align-self: flex-start;
-  margin-top: auto;
+  margin-top: 4px;
   padding: 0;
   font-size: 12px;
+  line-height: 18px;
   color: var(--brand);
   background: transparent;
   border: none;
@@ -136,29 +169,41 @@
 .tpl-selected-empty {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 96px;
-  padding: 12px;
-  font-size: 13px;
-  color: var(--text-desc);
+  gap: 12px;
+  min-height: 100px;
+  padding: 16px;
   background: var(--surface-soft);
   border: 1px dashed var(--border);
   border-radius: var(--radius-card);
 }
 
-/* 固定底栏: 高级设置 + 提交 */
-.tpl-form-footer {
+.tpl-selected-empty-icon {
   flex: none;
-  padding: 12px 16px 16px 24px;
-  background: var(--card-bg);
-  border-top: 1px solid var(--border);
-}
-
-.tpl-footer-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  margin-bottom: 10px;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-radius: 50%;
+}
+
+.tpl-selected-empty-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.tpl-selected-empty-copy strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.tpl-selected-empty-copy small {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
 }
 
 /* ── 右栏 ── */
@@ -171,15 +216,19 @@
   background: var(--page-bg);
 }
 
+/*
+ * 右栏与商品主图 / 商品详情同构：分类页签留在页面底色上，
+ * 模板网格与底部「最近生成」各是一张白色圆角卡。
+ */
 .tpl-categories {
   display: flex;
   flex-wrap: wrap;
-  column-gap: 20px;
-  padding: 10px 24px 0;
+  column-gap: 22px;
+  padding: 0 0 12px;
 }
 
 .tpl-category {
-  padding: 6px 0 10px;
+  padding: 6px 0 8px;
   font-size: 14px;
   color: var(--text-muted);
   background: transparent;
@@ -203,7 +252,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 0 24px 10px;
+  padding: 0 0 12px;
 }
 
 .tpl-subcategory {
@@ -217,6 +266,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .tpl-subcategory:hover {
@@ -237,11 +287,12 @@
   color: var(--text-desc);
 }
 
+/* 网格直接铺在页面底色上：不再套白卡，只保留底部留白 */
 .tpl-template-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px 24px 24px;
+  padding: 0 0 20px;
 }
 
 .tpl-template-grid {
@@ -250,51 +301,164 @@
   gap: 16px;
 }
 
-.tpl-template-empty {
-  padding: 40px 0;
+/* ── 空态 / 错误态 / 骨架屏 ── */
+.tpl-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 320px;
+  padding: 40px 24px;
   text-align: center;
-  font-size: 14px;
+  background: var(--card-bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.tpl-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 2px;
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-radius: 50%;
+}
+
+.tpl-state-icon.is-error {
+  color: var(--danger-text);
+  background: var(--danger-soft-bg);
+}
+
+.tpl-state-card strong {
+  font-size: 15px;
+  color: var(--text-strong);
+}
+
+.tpl-state-card p {
+  max-width: 360px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
   color: var(--text-desc);
 }
 
-.tpl-template-error {
-  display: grid;
-  justify-items: start;
-  gap: 10px;
-}
-
-.tpl-template-retry {
-  padding: 5px 14px;
+.tpl-state-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 7px 16px;
   font-size: 13px;
-  color: var(--brand);
-  background: var(--card-bg);
-  border: 1px solid var(--border-brand, var(--brand));
+  font-weight: 600;
+  color: var(--on-brand);
+  background: var(--brand);
+  border: none;
   border-radius: var(--radius-control);
   cursor: pointer;
 }
 
-.tpl-template-retry:hover {
-  color: var(--brand-hover);
-  border-color: var(--brand-hover);
+.tpl-state-action:hover {
+  background: var(--brand-hover);
+}
+
+.tpl-template-card.is-skeleton {
+  pointer-events: none;
+}
+
+.tpl-skeleton-cover,
+.tpl-skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--surface-soft) 25%,
+    var(--surface) 37%,
+    var(--surface-soft) 63%
+  );
+  background-size: 400% 100%;
+  animation: tpl-shimmer 1.4s ease infinite;
+}
+
+.tpl-skeleton-cover {
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-control);
+}
+
+.tpl-skeleton-line {
+  width: 62%;
+  height: 12px;
+  border-radius: 6px;
+}
+
+/* 滚动加载更多的哨兵：进入视口前 480px 时追加一页 */
+.tpl-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 0 4px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.tpl-load-more-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: tpl-spin 0.8s linear infinite;
+}
+
+@keyframes tpl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tpl-load-more-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+@keyframes tpl-shimmer {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tpl-skeleton-cover,
+  .tpl-skeleton-line,
+  .tpl-template-cover img {
+    animation: none;
+  }
 }
 
 .tpl-template-card {
   display: flex;
   flex-direction: column;
-  padding: 7px 7px 9px;
+  padding: 7px 7px 10px;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .tpl-template-card:hover {
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-card);
 }
 
 .tpl-template-card.is-selected {
   border-color: var(--brand);
-  box-shadow: inset 0 0 0 1px var(--brand);
+  box-shadow: 0 0 0 1px var(--brand), 0 8px 24px rgba(85, 70, 216, 0.12);
 }
 
 .tpl-template-cover {
@@ -306,6 +470,7 @@
 }
 
 .tpl-template-cover-btn {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
@@ -315,39 +480,152 @@
   cursor: pointer;
 }
 
+/* 看大图：左上角，hover / 键盘聚焦时浮现，触屏与选中态常驻 */
+.tpl-template-preview {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.92);
+  border: none;
+  border-radius: var(--radius-control);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  opacity: 0;
+  cursor: zoom-in;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.tpl-template-card:hover .tpl-template-preview,
+.tpl-template-preview:focus-visible,
+.tpl-template-card.is-selected .tpl-template-preview {
+  opacity: 1;
+}
+
+.tpl-template-preview:hover {
+  color: var(--brand);
+}
+
+@media (hover: none) {
+  .tpl-template-preview {
+    opacity: 1;
+  }
+}
+
 .tpl-template-cover img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.25s ease;
+  opacity: 0;
+  /*
+   * 懒加载占位：图片解码前用自身背景做 shimmer（img 尺寸已由卡片撑开），
+   * 加载完成后停掉动画，避免几十张卡片长期空转。
+   */
+  background: linear-gradient(
+    90deg,
+    var(--surface-soft) 25%,
+    var(--surface) 37%,
+    var(--surface-soft) 63%
+  );
+  background-size: 400% 100%;
+  animation: tpl-shimmer 1.4s ease infinite;
+  transition: opacity 0.3s ease, transform 0.25s ease;
+}
+
+.tpl-template-cover img.is-loaded {
+  opacity: 1;
+  background: none;
+  animation: none;
 }
 
 .tpl-template-card:hover .tpl-template-cover img {
-  transform: scale(1.02);
+  transform: scale(1.03);
+}
+
+/* hover / 选中时浮出的操作提示，点击仍落在整张封面上 */
+.tpl-template-hover {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-brand);
+  white-space: nowrap;
+  background: rgba(23, 26, 43, 0.72);
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.tpl-template-card:hover .tpl-template-hover,
+.tpl-template-cover-btn:focus-visible .tpl-template-hover,
+.tpl-template-card.is-selected .tpl-template-hover {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.tpl-template-card.is-selected .tpl-template-hover {
+  background: var(--brand);
+}
+
+.tpl-template-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--on-brand);
+  background: var(--brand);
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(85, 70, 216, 0.35);
 }
 
 .tpl-template-content {
   display: grid;
-  gap: 6px;
-  padding: 10px 2px 0;
+  gap: 2px;
+  padding: 9px 3px 0;
 }
 
 .tpl-template-title {
   font-size: 14px;
   font-weight: 600;
+  line-height: 20px;
   color: var(--text-strong);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ── 底部历史条 ── */
+.tpl-template-meta {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-desc);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 底部历史条（独立白卡，与上方网格卡留 12px 间距） ── */
 .tpl-history {
   flex: none;
-  padding: 10px 24px 12px;
+  margin-top: 12px;
+  padding: 12px 20px;
   background: var(--card-bg);
-  border-top: 1px solid var(--border);
+  border-radius: var(--radius-panel);
 }
 
 .tpl-history-head {
@@ -411,7 +689,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 62px;
+  height: 48px;
   font-size: 12px;
   color: var(--text-desc);
 }
@@ -470,4 +748,75 @@
   color: var(--text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * 桌面窄档（901–1024）：外框仍是两列，但共享皮肤在 <=1024 把左栏改成了
+ * 「高度自适应、不内部滚动」。这里把左栏恢复为固定行高内滚动，避免表单
+ * 内容溢出工作区高度；<=900 的单列文档流不受影响。
+ */
+@media (min-width: 901px) and (max-width: 1024px) {
+  .tpl-workspace .pk-input-pane {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .tpl-workspace .pk-form-scroll {
+    overflow-y: auto;
+  }
+}
+
+/*
+ * 窄档（<=1240）右栏可用宽度不足：220px 会退化成两列大卡，
+ * 降到 180px 保持三列 / 两列的小卡密度。
+ */
+@media (max-width: 1240px) {
+  .tpl-template-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+/*
+ * 窄屏：左右两栏改为上下堆叠。
+ *
+ * 页面在窄屏下改为自然滚动，不再锁死 `100vh`。
+ */
+@media (max-width: 900px) {
+  .tpl-workspace {
+    margin: 0;
+    padding: 12px 16px 16px;
+    height: auto;
+    min-height: calc(100vh - var(--workspace-topbar-height));
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .tpl-showcase {
+    height: auto;
+    min-height: 560px;
+  }
+
+  .tpl-categories,
+  .tpl-subcategories {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .tpl-template-scroll {
+    padding: 0 0 16px;
+    overflow: visible;
+  }
+
+  .tpl-template-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .tpl-state-card {
+    min-height: 240px;
+  }
+
+  .tpl-history {
+    padding: 12px 16px;
+  }
 }

@@ -40,6 +40,10 @@ export const DEFAULT_PROJECT_NAME = '默认项目';
  */
 export const MAX_IMAGE_MB = 10;
 export const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+/** 商品名称 / 品牌输入上限 —— 商品主图、商品详情、爆款复刻共用 */
+export const MAX_PRODUCT_NAME_LEN = 100;
+/** 商品描述输入上限 —— 商品主图、商品详情共用 */
+export const MAX_PRODUCT_DESCRIPTION_LEN = 5000;
 /** 后端图片解码与生成通道接受的三种真实格式；GIF 不在其中。 */
 export const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export const SUPPORTED_IMAGE_ACCEPT = SUPPORTED_IMAGE_TYPES.join(',');

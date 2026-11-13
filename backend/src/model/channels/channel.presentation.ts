@@ -112,6 +112,7 @@ export interface ChannelModelRowLike {
   id: string;
   channelId: string;
   modelKey: string;
+  modelGroupKey?: string;
   providerModelKey: string;
   displayName: string;
   channelLabel: string;
@@ -171,6 +172,7 @@ export function channelModelView(row: ChannelModelRowLike, tiers: PriceTierRowLi
     id: row.id,
     channelId: row.channelId,
     modelKey: row.modelKey,
+    modelGroupKey: row.modelGroupKey ?? '',
     providerModelKey: row.providerModelKey,
     displayName: row.displayName,
     channelLabel: row.channelLabel,

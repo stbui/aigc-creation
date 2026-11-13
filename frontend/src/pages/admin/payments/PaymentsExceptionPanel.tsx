@@ -37,7 +37,7 @@ import {
 import { adminOrderDetailHref, moneyText, providerLabel } from './utils';
 
 /**
- * 支付异常标签。
+ * 资金异常待办标签。
  *
  * 异常队列承接「需要人工兜底的真资金差异」：已取消仍扣款、退款失败、渠道与
  * 本地流水对不上等。自动退款只处理能精确匹配到本订单成功支付流水的场景，
@@ -123,11 +123,11 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
         if (outcome === 'succeeded') {
           toast.success('已确认渠道退款成功；订单状态和积分未变更');
         } else {
-          toast.warning('已确认渠道退款失败，异常单仍需继续人工处理');
+          toast.warning('已确认渠道退款失败，资金异常待办仍需继续处理');
         }
       } else {
         await adminPaymentExceptionsApi.close(row.id, resolution.trim());
-        toast.success('异常单已结案');
+        toast.success('资金异常待办已结案');
       }
       setConfirm(null);
       setResolution('');
@@ -144,7 +144,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
     setBusyId(row.id);
     try {
       await adminPaymentExceptionsApi.claim(row.id);
-      toast.success('异常单已认领');
+      toast.success('资金异常待办已认领');
       await reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '认领失败');
@@ -179,7 +179,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
     },
     {
       key: 'providerId',
-      title: '渠道',
+      title: '收款来源',
       width: 90,
       render: (row) => providerLabel(row.providerId),
     },
@@ -194,7 +194,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
     },
     {
       key: 'kind',
-      title: '差异类型',
+      title: '问题类型',
       width: 145,
       render: (row) => PAYMENT_EXCEPTION_KIND_LABELS[row.kind] ?? row.kind,
     },
@@ -221,7 +221,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
     },
     {
       key: 'slaDueAt',
-      title: 'SLA',
+      title: '处理时限',
       width: 160,
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-xs tabular-nums">
@@ -242,7 +242,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
     },
     {
       key: 'refundStatus',
-      title: '退款状态',
+      title: '退款进度',
       width: 170,
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-xs">
@@ -268,7 +268,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
     },
     {
       key: 'lastError',
-      title: '最近错误 / 依据',
+      title: '最近问题 / 处理依据',
       width: 240,
       render: (row) => (
         <span className="line-clamp-2 text-xs text-muted-foreground">
@@ -357,9 +357,9 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
 
   return (
     <div className="flex flex-col gap-3">
-      <Notice tone="warn" title="真实资金差异必须闭环">
-        自动退款只处理能精确匹配到本订单成功支付流水的已取消订单；匹配不到、金额或币种不一致、
-        渠道退款失败的情况一律保留在这里，禁止只在对账明细或日志中“消账”。
+      <Notice tone="warn" title="资金异常必须处理完">
+        系统只会自动处理能准确匹配到原支付记录的取消订单；匹配不到、金额或币种不一致、
+        退款失败的情况都会保留在这里，不能只在对账明细或日志中标记完成。
       </Notice>
 
       <FilterBar>
@@ -368,32 +368,28 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
           onChange={(value) => updateFilter('status', value)}
           options={PAYMENT_EXCEPTION_STATUS_OPTIONS}
           allowClear
-          className="w-[140px]"
-          ariaLabel="筛选异常状态"
+          className="w-[140px]" ariaLabel="筛选待办状态" clearLabel="全部状态"
         />
         <SelectField
           value={values.providerId}
           onChange={(value) => updateFilter('providerId', value)}
           options={ORDER_PROVIDERS}
           allowClear
-          className="w-[130px]"
-          ariaLabel="筛选异常渠道"
+          className="w-[130px]" ariaLabel="筛选收款来源" clearLabel="全部来源"
         />
         <SelectField
           value={values.priority}
           onChange={(value) => updateFilter('priority', value)}
           options={PAYMENT_EXCEPTION_PRIORITY_OPTIONS}
           allowClear
-          className="w-[120px]"
-          ariaLabel="筛选异常优先级"
+          className="w-[120px]" ariaLabel="筛选待办优先级" clearLabel="全部优先级"
         />
         <SelectField
           value={values.overdue}
           onChange={(value) => updateFilter('overdue', value)}
           options={PAYMENT_EXCEPTION_OVERDUE_OPTIONS}
           allowClear
-          className="w-[120px]"
-          ariaLabel="筛选 SLA"
+          className="w-[120px]" ariaLabel="筛选处理时限" clearLabel="全部时限"
         />
         <FilterActions>
           <ActionButton onClick={applyFilters}>查询</ActionButton>
@@ -408,7 +404,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
         <p className="text-xs text-warn-text">筛选条件已修改，请点击「查询」以应用。</p>
       )}
 
-      <Panel title="支付异常单" note={`SLA 2 小时；逾期单优先展示 · 共 ${data?.total ?? 0} 条`}>
+      <Panel title="资金异常待办" note={`处理时限 2 小时；逾期待办优先展示 · 共 ${data?.total ?? 0} 条`}>
         {error && data && <StaleError error={error} onRetry={() => void reload()} />}
         <AdminDataTable
           columns={columns}
@@ -419,8 +415,8 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
           onRetry={() => void reload()}
           emptyText={
             appliedChips.length > 0
-              ? '当前筛选下没有支付异常单，清除筛选后再试'
-              : '当前没有支付异常单'
+              ? '当前筛选下没有资金异常待办，清除筛选后再试'
+              : '当前没有资金异常待办'
           }
           emptyAction={
             appliedChips.length > 0 ? (
@@ -482,7 +478,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
           ) : confirm?.kind === 'confirm-succeeded' ? (
             <p>仅代表已到渠道商户后台核对退款成功；不会修改订单状态，也不会回收或恢复积分。</p>
           ) : confirm?.kind === 'confirm-failed' ? (
-            <p>确认失败后异常单会保留在人工队列，仍需继续核对或处置，不会自动改订单或积分。</p>
+            <p>确认失败后资金异常待办会保留，仍需继续核对或处置，不会自动改订单或积分。</p>
           ) : (
             <p>结案只代表财务已核对处置，不会自动改订单或积分。请填写可追溯的处置依据。</p>
           )
@@ -516,7 +512,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
             </>
           ) : undefined
         }
-        impact={[`异常单：${confirm?.row.merchantOrderNo ?? ''}`, '操作会记录处理依据']}
+        impact={[`资金异常待办：${confirm?.row.merchantOrderNo ?? ''}`, '操作会记录处理依据']}
       />
     </div>
   );

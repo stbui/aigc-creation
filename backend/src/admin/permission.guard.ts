@@ -6,7 +6,11 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { AppError } from "../common/app.exception";
-import { IDENTITY_ONLY_KEY, PERMISSION_KEY } from "./admin.decorator";
+import {
+  ANY_PERMISSION_KEY,
+  IDENTITY_ONLY_KEY,
+  PERMISSION_KEY,
+} from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
 
 /**
@@ -52,9 +56,37 @@ export class PermissionGuard implements CanActivate {
     if (!url.split("?")[0].includes("/admin")) return true;
 
     const targets = [context.getHandler(), context.getClass()];
+    const anyRequired = this.reflector.getAllAndOverride<
+      string | string[] | undefined
+    >(ANY_PERMISSION_KEY, targets);
     const required = this.reflector.getAllAndOverride<
       string | string[] | undefined
     >(PERMISSION_KEY, targets);
+
+    if (
+      !required &&
+      anyRequired &&
+      (!Array.isArray(anyRequired) || anyRequired.length > 0)
+    ) {
+      const adminUser = request.adminUser;
+      if (!adminUser) {
+        throw new AppError(40301, "需要管理员权限", 403);
+      }
+      const permissions = await this.roles.getPermissions(adminUser.role);
+      const anyPermissions = Array.isArray(anyRequired)
+        ? anyRequired
+        : [anyRequired];
+      const allowed = anyPermissions.some(
+        (permission) => permissions.includes(permission),
+      );
+      if (!allowed) {
+        this.logger.warn(
+          `权限不足: ${adminUser.email} (${adminUser.role}) 需要任一权限 ${anyPermissions.join(", ")}`,
+        );
+        throw new AppError(40301, "无操作权限", 403);
+      }
+      return true;
+    }
 
     if (!required || (Array.isArray(required) && required.length === 0)) {
       const identityOnly = this.reflector.getAllAndOverride<boolean>(

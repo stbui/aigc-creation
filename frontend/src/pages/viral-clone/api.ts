@@ -19,6 +19,6 @@ export {
   toAbsoluteUrl,
 } from '../../lib/api';
 
-/** 前台模型目录数据层: 建任务必须解析出 `logicalModelId` */
-export { modelImageInputLimit, resolveModel, resolveModelId } from '../../lib/models';
-export type { PublicLogicalModel } from '../../lib/models';
+/** 前台模型目录数据层: 建任务必须解析出 `modelKey` */
+export { modelImageInputLimit, resolveModel, resolveModelKey } from '../../lib/models';
+export type { PublicModelGroup } from '../../lib/models';

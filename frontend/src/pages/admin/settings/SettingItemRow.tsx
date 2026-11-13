@@ -4,6 +4,7 @@ import { Image as ImageIcon } from 'lucide-react';
 import {
   formatDateTime,
   ActionButton,
+  CheckboxField,
   FilePicker,
   NumberField,
   SelectField,
@@ -16,6 +17,61 @@ import type { AdminSettingValue } from '../../../types/api';
 import type { SettingItem } from './constants';
 import { displayValue } from './utils';
 import { adminSettingsApi } from '../../../lib/api';
+
+const IMAGE_FORMAT_OPTIONS = [
+  { value: 'jpg', label: 'JPG' },
+  { value: 'png', label: 'PNG' },
+  { value: 'webp', label: 'WebP' },
+] as const;
+
+function ImageFormatsControl({
+  item,
+  value,
+  editable,
+  onChange,
+}: {
+  item: SettingItem;
+  value: AdminSettingValue;
+  editable: boolean;
+  onChange: (value: AdminSettingValue) => void;
+}) {
+  const selected = new Set(
+    String(value ?? '')
+      .split(',')
+      .map((format) => format.trim().toLowerCase())
+      .map((format) => (format === 'jpeg' ? 'jpg' : format))
+      .filter(Boolean),
+  );
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2" role="group" aria-label={item.label}>
+      {IMAGE_FORMAT_OPTIONS.map((option) => {
+        const checked = selected.has(option.value);
+        const isOnlySelected = checked && selected.size === 1;
+        return (
+          <CheckboxField
+            key={option.value}
+            checked={checked}
+            disabled={!editable || isOnlySelected}
+            label={option.label}
+            ariaLabel={`允许 ${option.label}`}
+            onChange={(nextChecked) => {
+              const next = new Set(selected);
+              if (nextChecked) next.add(option.value);
+              else next.delete(option.value);
+              if (next.size === 0) return;
+              onChange(
+                IMAGE_FORMAT_OPTIONS.filter((candidate) => next.has(candidate.value))
+                  .map((candidate) => candidate.value)
+                  .join(','),
+              );
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
 /** 帮助图片上传：选中即上传，上传成功后只把稳定引用写进本地草稿。 */
 function ImageUploadControl({
@@ -66,7 +122,7 @@ function ImageUploadControl({
   };
 
   return (
-    <div className="w-full space-y-2">
+    <div className="flex w-full flex-col gap-2">
       <div className="flex h-28 w-full items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40">
         {previewUrl ? (
           <img
@@ -116,6 +172,25 @@ function ImageUploadControl({
   );
 }
 
+/** 设置说明来自代码定义，允许用 `**重点**` 标记关键限制，但不应把原始标记直接显示给运营。 */
+function SettingDescription({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
+  return (
+    <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+      {parts.map((part, index) =>
+        part.startsWith('**') && part.endsWith('**') ? (
+          <strong key={index} className="font-medium text-foreground/80">
+            {part.slice(2, -2)}
+          </strong>
+        ) : (
+          part
+        ),
+      )}
+    </p>
+  );
+}
+
 function renderControl({
   item,
   value,
@@ -128,10 +203,16 @@ function renderControl({
   onChange: (value: AdminSettingValue) => void;
 }) {
   if (item.readOnly) {
-    /* 只读值不画成输入框：它不是可编辑控件，画成禁用输入框会让人反复去点 */
+    /* 只读值不画成输入框：用带「当前值」标签的静态块，避免用户反复尝试点击。 */
     return (
-      <span className="inline-flex min-h-8 items-center text-right text-[13px] font-medium text-foreground">
-        {displayValue(item.value, item.type)}
+      <span
+        className="inline-flex min-h-8 max-w-full items-center gap-2 rounded-md border border-border/70 bg-muted/40 px-2.5 text-[12px] text-muted-foreground"
+        title={displayValue(item.value, item.type)}
+      >
+        <span className="shrink-0 text-[12px]">当前值</span>
+        <span className="truncate text-[13px] font-medium text-foreground">
+          {displayValue(item.value, item.type)}
+        </span>
       </span>
     );
   }
@@ -139,6 +220,40 @@ function renderControl({
   if (item.control === 'image-upload') {
     return (
       <ImageUploadControl
+        item={item}
+        value={value}
+        editable={editable}
+        onChange={onChange}
+      />
+    );
+  }
+
+  if (item.control === 'password') {
+    const configured = Boolean(item.hasSecret || item.overridden);
+    return (
+      <div className="flex w-full flex-col gap-1">
+        <TextField
+          type="password"
+          value={String(value ?? '')}
+          onChange={onChange}
+          disabled={!editable}
+          ariaLabel={item.label}
+          maxLength={item.maxLength}
+          placeholder={configured ? '留空保持不变' : '请输入配置值'}
+          className="w-full"
+        />
+        <p className="text-[12px] leading-4 text-muted-foreground">
+          {configured
+            ? `已配置${item.secretMask ? ` ${item.secretMask}` : ''}，留空保持不变`
+            : '尚未配置'}
+        </p>
+      </div>
+    );
+  }
+
+  if (item.control === 'image-formats') {
+    return (
+      <ImageFormatsControl
         item={item}
         value={value}
         editable={editable}
@@ -235,12 +350,20 @@ export function SettingItemRow({
   onClear: () => void;
 }) {
   const showActions = !item.readOnly && (isDraft || isClearing || (item.overridden && editable));
+  const changeControl = (next: AdminSettingValue) => {
+    // 敏感值留空表示“保持原值”，不能生成一个提交后会把密钥覆盖为空串的草稿。
+    if (item.sensitive && String(next ?? '') === '') {
+      onRevert();
+      return;
+    }
+    onChange(next);
+  };
 
   return (
-    <div className="flex items-start gap-6 border-b border-border py-4 first:pt-0 last:border-b-0 last:pb-0">
+    <div className="flex items-start gap-5 border-b border-border py-4 first:pt-0 last:border-b-0 last:pb-0">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-medium text-foreground">{item.label}</span>
+          <span className="text-[13px] font-semibold text-foreground">{item.label}</span>
           {item.readOnly && <ToneBadge tone="neutral">只读</ToneBadge>}
           {item.overridden && !isClearing && (
             <ToneBadge tone="brand">
@@ -249,9 +372,14 @@ export function SettingItemRow({
           )}
           {isClearing && <ToneBadge tone="warn">待恢复默认</ToneBadge>}
         </div>
-        <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{item.description}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
-          <span>默认值：{displayValue(item.default, item.type)}</span>
+        <SettingDescription text={item.description} />
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
+          <span>
+            默认值：
+            <span className="font-medium text-foreground/75">
+              {displayValue(item.default, item.type)}
+            </span>
+          </span>
           {item.type === 'number' && (item.min !== undefined || item.max !== undefined) && (
             <span>
               取值范围 {item.min ?? '—'} ~ {item.max ?? '—'}
@@ -272,8 +400,8 @@ export function SettingItemRow({
       </div>
 
       {/* 控件列固定 240：不同分组的输入框右边缘落在同一条竖线上 */}
-      <div className="flex w-[240px] shrink-0 flex-col items-end gap-1">
-        <div className="flex w-full justify-end">{renderControl({ item, value, editable, onChange })}</div>
+      <div className="flex w-[240px] shrink-0 flex-col items-end gap-1.5">
+        <div className="flex w-full justify-end">{renderControl({ item, value, editable, onChange: changeControl })}</div>
         {showActions && (
           <div className="flex items-center gap-1">
             {(isDraft || isClearing) && (

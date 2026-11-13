@@ -1,7 +1,7 @@
 import { VARIANT_FIELDS, VARIANT_LABELS, MAX_PER_VARIANT } from './constants';
 import { assetsApi, assetSrc, type Asset } from './api';
 import type { GalleryItem, UploadedImage } from './hooks';
-import { modelImageInputLimit, type PublicLogicalModel } from '../../lib/models';
+import { modelImageInputLimit, type PublicModelGroup } from '../../lib/models';
 import {
   buildProductBatchRows,
   countGenerations as countGenerationsOf,
@@ -40,7 +40,7 @@ export { modelImageInputLimit } from '../../lib/models';
  * 否则用户会误以为 5 张都参与了生成。
  */
 export function imageInputCountError(
-  model: Pick<PublicLogicalModel, 'name' | 'capabilitySpec'>,
+  model: Pick<PublicModelGroup, 'name' | 'capabilitySpec'>,
   imageCount: number,
 ): string | null {
   const max = modelImageInputLimit(model);

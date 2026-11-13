@@ -25,16 +25,16 @@ import {
   useTemplateCatalog,
   type GalleryItem,
 } from './hooks';
-import { generateApi, newIdempotencyKey, resolveModelId } from './api';
+import { generateApi, newIdempotencyKey, resolveModelKey } from './api';
 import { flattenCatalog, isUncertainSubmitError, type TemplateEntry } from './utils';
 import { Modal, useApp } from '../../ui';
 
 /**
  * 婚纱写真模板工作台
  *
- * 页面结构对齐 AI 带货图文（`/shoppable-carousel`）：
- *   左配置栏（上传人像照片 + 已选模板回显 + 高级设置 + 提交）
- *   + 右侧模板区（分类 tab + 模板网格：图片 + 名称），底部常驻「最近生成」。
+ * 页面结构：`.tpl-workspace` 两列网格（432px 左配置栏 + 右模板区），
+ * 左栏（上传人像照片 + 已选模板回显 + 提交区）与右栏（分类 tab + 模板网格 +
+ * 底部常驻「最近生成」）各自内部滚动，页面本身不滚动。
  *
  * 生成规则：至少上传 1 张人物照片；提交的参数只有模板 id，服务端按模板
  * 查回提示词，与上传照片一起组成模型请求。模板清单由后端下发，前端不存副本；
@@ -152,7 +152,7 @@ export function TemplatePage() {
 
     try {
       const projectId = await ensureProject();
-      const logicalModelId = await resolveModelId(CAPABILITY_ID);
+      const modelKey = await resolveModelKey(CAPABILITY_ID);
       const params = {
         templateId: selectedTemplateId,
         ratio,
@@ -167,7 +167,7 @@ export function TemplatePage() {
       const fingerprint = JSON.stringify({
         capability: CAPABILITY_ID,
         projectId,
-        logicalModelId,
+        modelKey,
         inputAssetIds,
         params,
       });
@@ -179,7 +179,7 @@ export function TemplatePage() {
       await generateApi.start({
         projectId,
         capability: CAPABILITY_ID,
-        logicalModelId,
+        modelKey,
         inputAssetIds,
         idempotencyKey,
         params,
@@ -233,8 +233,8 @@ export function TemplatePage() {
         : undefined;
 
   return (
-    <div className="tpl-workspace">
-      <div className="tpl-body">
+    <>
+      <div className="tpl-workspace">
         {/* ── 左: 配置栏 ── */}
         <TemplateInputPane
           images={images}
@@ -262,26 +262,24 @@ export function TemplatePage() {
         />
 
         {/* ── 右: 模板展示（常驻）+ 底部历史记录 ── */}
-        <section className="tpl-showcase">
-          <TemplateShowcase
-            catalog={catalog}
-            categoryId={categoryId}
-            groupId={groupId}
-            onCategoryChange={selectCategory}
-            onGroupChange={setGroupId}
-            allTemplates={allTemplates}
-            selectedTemplateId={selectedTemplateId}
-            onSelectTemplate={selectTemplate}
-            templatesLoading={templatesLoading}
-            templatesError={templatesError}
-            onRetryTemplates={() => void reloadTemplates()}
-            galleryItems={gallery.items}
-            galleryLoading={gallery.loading}
-            galleryError={gallery.error}
-            onRefreshGallery={refreshGallery}
-            onOpenAll={() => setHistoryOpen(true)}
-          />
-        </section>
+        <TemplateShowcase
+          catalog={catalog}
+          categoryId={categoryId}
+          groupId={groupId}
+          onCategoryChange={selectCategory}
+          onGroupChange={setGroupId}
+          allTemplates={allTemplates}
+          selectedTemplateId={selectedTemplateId}
+          onSelectTemplate={selectTemplate}
+          templatesLoading={templatesLoading}
+          templatesError={templatesError}
+          onRetryTemplates={() => void reloadTemplates()}
+          galleryItems={gallery.items}
+          galleryLoading={gallery.loading}
+          galleryError={gallery.error}
+          onRefreshGallery={refreshGallery}
+          onOpenAll={() => setHistoryOpen(true)}
+        />
       </div>
 
       {/* 素材库选择弹窗（真实数据） */}
@@ -323,6 +321,6 @@ export function TemplatePage() {
           downloadNamePrefix="wedding-template"
         />
       </Modal>
-    </div>
+    </>
   );
 }

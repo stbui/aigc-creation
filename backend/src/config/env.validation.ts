@@ -107,18 +107,23 @@ export const ENV_SPECS: readonly Spec[] = [
 
   // ── 外部消息通道（邮件 / 短信）────────────────────────────────────────
   // 默认 console：不发网络请求，正文写入 logs/outbox/（见 channels/）。
-  // 三档实现：console / http（通用网关）/ aliyun（阿里云 SendSms、SingleSendMail）。
+  // 邮件支持 console / SMTP / HTTP（通用网关）/ 阿里云；短信支持 console / HTTP / 阿里云。
   // 填了真实通道却缺凭据会回落 console 并告警，`status().delivers` 如实报 false。
   {
     key: 'channel.email.provider',
     env: 'EMAIL_PROVIDER',
     type: 'string',
     def: 'console',
-    oneOf: ['console', 'http', 'aliyun'],
+    oneOf: ['console', 'smtp', 'http', 'aliyun'],
   },
   { key: 'channel.email.apiUrl', env: 'EMAIL_API_URL', type: 'string', def: '' },
   { key: 'channel.email.apiKey', env: 'EMAIL_API_KEY', type: 'string', def: '' },
   { key: 'channel.email.from', env: 'EMAIL_FROM', type: 'string', def: 'noreply@huojue.local' },
+  { key: 'channel.email.smtpHost', env: 'EMAIL_SMTP_HOST', type: 'string', def: '' },
+  { key: 'channel.email.smtpPort', env: 'EMAIL_SMTP_PORT', type: 'number', def: 465, min: 1, max: 65535 },
+  { key: 'channel.email.smtpSecure', env: 'EMAIL_SMTP_SECURE', type: 'boolean', def: true },
+  { key: 'channel.email.smtpUser', env: 'EMAIL_SMTP_USER', type: 'string', def: '' },
+  { key: 'channel.email.smtpPassword', env: 'EMAIL_SMTP_PASSWORD', type: 'string', def: '' },
   {
     key: 'channel.sms.provider',
     env: 'SMS_PROVIDER',

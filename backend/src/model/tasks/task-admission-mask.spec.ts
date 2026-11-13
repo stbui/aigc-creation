@@ -68,7 +68,6 @@ function setup(opts: SetupOptions = {}) {
   };
   const availability = { runtimeOf: vi.fn().mockResolvedValue(undefined) };
   const price = {
-    resolveOverride: vi.fn().mockResolvedValue(null),
     freeCampaignIdOf: vi.fn().mockResolvedValue(undefined),
   };
   const billing = {
@@ -84,22 +83,15 @@ function setup(opts: SetupOptions = {}) {
     imageToPrompt: vi.fn().mockResolvedValue({ text: '一张金属材质的参考图' }),
   };
   const router = {
-    findModel: vi.fn().mockResolvedValue({
-      id: 'model-lr',
-      name: '局部重绘模型',
-      capability: 'local_redraw',
-      archivedAt: null,
-      enabled: true,
-      productSpec: { version: 1, capability: 'image', inputs: { image: { min: 1, max: 1 } } },
-    }),
     resolve: vi.fn().mockResolvedValue({
-      logicalModel: { id: 'model-lr' },
-      revisionId: 'rev-1',
-      route: { id: 'route-1' },
-      channelModel: { id: 'cm-1' },
+      capabilityId: 'local_redraw',
+      modelKey: 'model-lr',
+      channelModel: { id: 'cm-1', channelId: 'ch-1' },
+      pricing: { configured: true, billingMode: 'fixed_request', unitPriceMicrocredits: 10_000_000 },
       capabilitySpec: {
         inputs: opts.resolveReturnsMaskInput ? { image: {}, mask: {} } : { image: {} },
       },
+      intent: { capability: 'image' },
     }),
   };
 
@@ -117,7 +109,7 @@ function setup(opts: SetupOptions = {}) {
   const dto = {
     projectId: 'project-1',
     capability: 'local_redraw',
-    logicalModelId: 'model-lr',
+    modelKey: 'model-lr',
     inputAssetIds: [SOURCE_ID],
     params: opts.params ?? { region: 'center', prompt: '把背景换成纯白', maskAssetId: MASK_ID },
   };

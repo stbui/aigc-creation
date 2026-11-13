@@ -25,6 +25,8 @@ import {
   instanceLabel,
   instanceState,
   missingRequiredLabels,
+  paymentConfigDescription,
+  paymentWarningText,
   togglePaymentMethod,
 } from './utils';
 
@@ -76,7 +78,7 @@ export function draftFromInstance(
   };
 }
 
-/** 新实例草稿：默认停用，服务商实例创建后由用户补齐凭据再启用。 */
+/** 新通道草稿：默认停用，添加后由运营补齐接入参数再启用。 */
 export function draftForNewInstance(
   provider: AdminPaymentProviderView,
 ): InstanceDraft {
@@ -122,7 +124,7 @@ export function instanceDraftChanged(
 }
 
 /**
- * 单个实例编辑器。
+ * 单个收款通道编辑器。
  *
  * 金额按元输入、按分提交；密文字段始终以空值开始，避免把「未修改」误存成
  * 清空密钥。启用前会在前端先按当前草稿校验必填项，减少一次可解释的 400。
@@ -204,10 +206,7 @@ export function PaymentsProviderInstanceEditor({
             />
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
-            <code className="font-mono">{instance.instanceId}</code>
-            <span>
-              {instance.version == null ? '尚未保存' : `配置 v${instance.version}`}
-            </span>
+            <span>{instance.version == null ? '配置尚未保存' : '配置已保存'}</span>
             {instance.hasOpenOrders && <span>已有在途订单</span>}
           </div>
         </div>
@@ -227,7 +226,7 @@ export function PaymentsProviderInstanceEditor({
               tone={warning.level === 'danger' ? 'danger' : 'warn'}
               className="mb-0"
             >
-              {warning.message}
+              {paymentWarningText(warning.message)}
             </Notice>
           ))}
         </div>
@@ -235,36 +234,36 @@ export function PaymentsProviderInstanceEditor({
 
       <div className="flex flex-col gap-4">
         <FormField
-          label="实例名称"
-          hint="用于后台识别；留空时显示「默认实例」或实例 ID。改名不影响历史订单。"
+          label="通道名称"
+          hint="用于后台识别；留空时显示「默认通道」或「未命名通道」。改名不影响历史订单。"
         >
           <TextField
             id="payment-instance-name"
             value={draft.name}
             onChange={(name) => onDraftChange({ ...draft, name })}
             maxLength={80}
-            placeholder={instance.instanceId === 'default' ? '默认实例' : '例如：支付宝主账号'}
+            placeholder={instance.instanceId === 'default' ? '默认通道' : '例如：支付宝主账号'}
             disabled={!writable || saving}
           />
         </FormField>
 
         <div className="grid grid-cols-2 gap-4">
           <FormField
-            label="启用实例"
-            hint={draft.enabled ? '可用实例会参与负载均衡' : '停用后不参与新订单分配'}
+            label="启用通道"
+            hint={draft.enabled ? '可用通道会承接客户付款' : '停用后不再承接新付款'}
           >
             <SwitchField
               checked={draft.enabled}
               onChange={(enabled) => onDraftChange({ ...draft, enabled })}
               label={draft.enabled ? '已启用' : '已停用'}
               disabled={!writable || saving}
-              ariaLabel="启用服务商实例"
+              ariaLabel="启用收款通道"
             />
           </FormField>
 
           <FormField
             label="退款功能"
-            hint="关闭后该实例不再发起退款；历史退款仍可查询。"
+            hint="关闭后该通道不再发起退款；历史退款仍可查询。"
           >
             <SwitchField
               checked={draft.refundEnabled}
@@ -273,7 +272,7 @@ export function PaymentsProviderInstanceEditor({
               }
               label={draft.refundEnabled ? '允许退款' : '禁止退款'}
               disabled={!writable || saving}
-              ariaLabel="服务商实例退款功能"
+              ariaLabel="收款通道退款功能"
             />
           </FormField>
         </div>
@@ -303,11 +302,11 @@ export function PaymentsProviderInstanceEditor({
               max={1440}
               step={5}
               disabled={!writable || saving}
-              ariaLabel="实例订单超时分钟数"
+              ariaLabel="通道订单超时分钟数"
             />
           </FormField>
           <div className="grid grid-cols-1 gap-4">
-            <FormField label="支付方式" hint="至少保留一个；官方渠道只能选择对应方式。">
+            <FormField label="支付方式" hint="至少保留一个；官方收款来源只能选择对应方式。">
               <div className="flex flex-wrap gap-4 pt-1">
                 {allowedMethods.map((method) => {
                   const checked = draft.paymentMethods.includes(method);
@@ -338,7 +337,7 @@ export function PaymentsProviderInstanceEditor({
               min={0}
               step={0.01}
               disabled={!writable || saving}
-              ariaLabel="实例单笔最小金额"
+              ariaLabel="通道单笔最小金额"
             />
           </FormField>
           <FormField label="单笔最大（元）" hint="留空表示不限">
@@ -348,7 +347,7 @@ export function PaymentsProviderInstanceEditor({
               min={0}
               step={0.01}
               disabled={!writable || saving}
-              ariaLabel="实例单笔最大金额"
+              ariaLabel="通道单笔最大金额"
             />
           </FormField>
           <FormField label="每日限额（元）" hint="留空表示不限">
@@ -358,7 +357,7 @@ export function PaymentsProviderInstanceEditor({
               min={0}
               step={0.01}
               disabled={!writable || saving}
-              ariaLabel="实例每日限额"
+              ariaLabel="通道每日限额"
             />
           </FormField>
         </div>
@@ -367,7 +366,7 @@ export function PaymentsProviderInstanceEditor({
       {provider.configFields.length > 0 && (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
           <div>
-            <span className="text-xs font-medium text-foreground">服务商参数</span>
+            <span className="text-xs font-medium text-foreground">接入参数</span>
             <span className="mt-0.5 block text-[12px] text-muted-foreground">
               密钥类字段不回显；留空表示沿用上一次保存的值。
             </span>
@@ -395,7 +394,7 @@ export function PaymentsProviderInstanceEditor({
             onClick={onSave}
             disabled={!canSave || !dirty}
           >
-            {saving ? '保存中…' : '保存实例'}
+            {saving ? '保存中…' : '保存通道'}
           </ActionButton>
         </div>
       </div>
@@ -421,7 +420,7 @@ function renderConfigField({
   const hint = locked
     ? '已有订单绑定，不能修改'
     : [
-        field.description,
+        paymentConfigDescription(field.description),
         field.secret && secretConfigured ? '已配置，留空表示沿用' : null,
       ]
         .filter(Boolean)

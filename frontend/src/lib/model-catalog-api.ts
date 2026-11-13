@@ -5,22 +5,30 @@ import type {
   PublicChannelView,
   PublicModelCatalogResult,
 } from "../types/model";
-import type { PublicLogicalModel } from "./models";
+import type { PublicModelGroup } from "./models";
 
 /** 前台模型目录（产品视角，`/models*`） */
 export const modelsApi = {
-  list: () => request<{ models: PublicLogicalModel[] }>("/models"),
+  list: (capability?: string) =>
+    request<{ models: PublicModelGroup[] }>(
+      capability ? `/models?capability=${encodeURIComponent(capability)}` : "/models",
+    ),
 
-  available: (intent: ModelIntentPayload) =>
-    request<{ models: PublicLogicalModel[] }>("/models/available", {
+  available: (intent: ModelIntentPayload & { capability: string }) =>
+    request<{ models: PublicModelGroup[] }>("/models/available", {
       method: "POST",
       body: intent,
     }),
 
-  quote: (id: string, intent: ModelIntentPayload) =>
-    request<{ quote: ModelQuoteView }>(`/models/${id}/quote`, {
+  /** 能力报价：能力 id + 模型分组 + 参数；不指定 modelKey 时按第一个可用分组 */
+  quote: (
+    capability: string,
+    modelKey: string,
+    intent: Omit<ModelIntentPayload, "capability">,
+  ) =>
+    request<{ quote: ModelQuoteView }>("/models/quote", {
       method: "POST",
-      body: intent,
+      body: { ...intent, capability, modelKey },
     }),
 };
 

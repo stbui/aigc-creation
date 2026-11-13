@@ -1,5 +1,5 @@
 import { DEGREE_LABEL, MAX_IMAGES } from './constants';
-import { modelImageInputLimit, type PublicLogicalModel } from './api';
+import { modelImageInputLimit, type PublicModelGroup } from './api';
 
 /**
  * 爆款复刻工作台页面的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
@@ -37,7 +37,7 @@ export function viralCloneProductImageLimit(totalImageMax: number | null): numbe
 
 /** 商品图 + 参考图总数超过模型能力合同时的可读原因。 */
 export function viralCloneImageInputError(
-  model: Pick<PublicLogicalModel, 'name' | 'capabilitySpec'>,
+  model: Pick<PublicModelGroup, 'name' | 'capabilitySpec'>,
   imageCount: number,
 ): string | null {
   const max = modelImageInputLimit(model);

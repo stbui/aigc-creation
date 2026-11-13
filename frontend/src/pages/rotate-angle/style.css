@@ -393,28 +393,9 @@
   transform: translateX(-50%);
 }
 
-/* 旋转角度：上传操作行是 controls 的第一个 flex item。 */
+/* 旋转角度：上传操作行在卡片标题行右侧 (与其他修图页一致)。 */
 .pk-workspace.rotate-angle-page .pk-form-scroll {
   gap: 12px;
-}
-
-.pk-workspace.rotate-angle-page .pk-upload-actions-above {
-  display: inline-flex;
-  align-self: flex-end;
-  align-items: center;
-  gap: 8px;
-  height: 13px;
-  min-height: 13px;
-  /* 参考站该行是 13px 文本 + 12px 行距（合计 25px），上传卡因此落在 y=147。
-   * 本地给链接按钮保留了 15px 行高，少掉的 2px 在这里补回。 */
-  padding-bottom: 0;
-  box-sizing: content-box;
-}
-
-@media (min-width: 901px) {
-  .pk-workspace.rotate-angle-page .pk-upload-actions-above {
-    padding-bottom: 2px;
-  }
 }
 
 .pk-workspace.rotate-angle-page .pk-section {

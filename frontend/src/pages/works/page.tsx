@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { assetSrc, generateApi, newIdempotencyKey, resolveModelId } from './api';
+import { assetSrc, generateApi, newIdempotencyKey, resolveModelKey } from './api';
 import { StateError, StateSkeleton, type LightboxItem } from './components';
 import {
   notifyCreditsChanged,
@@ -208,12 +208,12 @@ export function WorksPage() {
         try {
           // 沿用原任务的模型：同一提示词换模型往往出完全不同的图，
           // 用户点的是「重新生成」而不是「换个模型试」。
-          const logicalModelId =
-            task.logicalModelId || (await resolveModelId(task.capability));
+          const modelKey =
+            task.modelKey || (await resolveModelKey(task.capability));
           const payload = {
             projectId: task.projectId,
             capability: task.capability,
-            logicalModelId,
+            modelKey,
             inputAssetIds: inputs,
             params: task.params ?? {},
           };
@@ -231,7 +231,7 @@ export function WorksPage() {
             projectId: task.projectId,
             capability: task.capability,
             status: 'queued',
-            logicalModelId,
+            modelKey,
             inputAssetIds: inputs,
             params: task.params ?? {},
             createdAt: new Date().toISOString(),

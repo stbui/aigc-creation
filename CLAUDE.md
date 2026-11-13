@@ -20,7 +20,7 @@
 | 退款与站点设置默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
 | 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
-| 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「能力与模型」「用户分组」）—— 代码里没有默认线路表 |
+| 渠道 / 能力绑定 / 能力定价 | 数据库（后台「渠道工作台」「能力与模型」「用户分组」）—— 代码里没有默认线路表 |
 | 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
 | 设计令牌 | `frontend/src/styles/tokens.css` 的 `:root`（由 `global.css` 入口 @import）；shadcn 语义变量经 `frontend/src/styles/admin.css` 的 `@theme inline` 桥接，不另定义色值 |
@@ -36,7 +36,7 @@
 | --- | --- | --- |
 | 107 包 / 115 provider | `backend/plugins/*/manifest.json` 的 `contributes.providers` | 3 个 `src-*` 镜像目录由 `plugin-manifest.store.ts` 跳过（`src-a6api` / `src-antigravity-proxy` / `src-metaso-h3`），不计入可用包；含它们的目录总数是 110 / 119 |
 | 18 能力 / 14 进工作台 / 17 image + 1 video | `definitions/index.ts` 的 `CAPABILITY_PLUGINS` | `*.spec.ts`、`*-options.ts`、`*.templates.ts` 同目录但不是能力定义 |
-| 32 页 / 8 分组 | `adminNav.ts` 的 `ADMIN_MENU` | `AdminShell.tsx`、`dashboard/AdminDashboardContent.tsx`、`__tests__/` 不算菜单页 |
+| 35 个菜单入口 / 7 分组 | `adminNav.ts` 的 `ADMIN_MENU` | `AdminShell.tsx`、`dashboard/AdminDashboardContent.tsx`、`__tests__/` 不算菜单页 |
 | 34 条壳内路由 | `App.tsx` 的 `Shell()` 内 `<Routes>` | catch-all 与另两组 `<Routes>`（3 条裸外壳页 / 6 条独立页）不计入 |
 
 ## 账号
@@ -61,8 +61,8 @@
 当前形态 = **C 端创作站 + 独立后台管理端 + 商业运营域 + 账户合规/服务域**：
 
 - **C 端创作站**：18 项能力（全部 `real`；17 image + 1 video；14 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
-- **生成通道**：唯一链路是 `src/model/**` —— 渠道 → 渠道模型 → 前台模型 revision/线路 → 路由/冷却 → 任务执行 → 账单。建任务必带 `logicalModelId`（来自 `GET /models`）；协议来自 `plugins/` 内置插件清单，代码里没有手写协议实现。旧三层（`src/providers/**`、`GATEWAY_*`、`ModelCallLog`、`/admin/model-config`）已整体删除，**不存在并存期**。
-- **后台管理端**（`/admin`）：31 个页面、8 个侧栏分组，权限点 + 定时任务 + 备份 + 存储切换。
+- **生成通道**：唯一链路是 `src/model/**` —— 渠道 → 渠道模型（商品）→ 能力绑定 → 能力目录选路/健康分层 → 任务执行 → 账单。建任务必带 `capability` + `modelKey`（来自 `GET /models?capability=`）；协议来自 `plugins/` 内置插件清单，代码里没有手写协议实现。前台模型层（`LogicalModel` / revision / route）已于 2026-11-13 整体删除，**不存在并存期**。
+- **后台管理端**（`/admin`）：33 个页面、9 个侧栏分组，权限点 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 支付对账。
 - **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单、后台全局搜索、批量动作与 CSV 导入导出。
@@ -100,7 +100,7 @@ aigc-creation/
 ├── docs/                     # 需求 / 产品 / 技术 / 测试 / 规划五类，地图见 docs/README.md
 │   ├── prd.md                # ★ 需求：整站产品需求、数据模型、非功能要求
 │   ├── environments.md       # ★ 技术：三环境变量矩阵 / 加载优先级 / 生产门禁 / Docker / 排查
-│   ├── model-architecture.md # ★ 技术：渠道/前台模型/路由/计费/代理 / 选路与失败语义 / 扩展 SOP
+│   ├── model-architecture.md # ★ 技术：渠道/能力绑定/能力定价/选路/计费/代理 / 选路与失败语义 / 扩展 SOP
 │   ├── api-contract.md       # ★ 技术：响应信封 / 错误码 / 接口清单 / 令牌时长
 │   ├── runtime-infrastructure.md # ★ 技术：AIGC 标识 / 签名 URL / 限流 / 健康 / 追踪 / 日志
 │   ├── testing.md            # ★ 测试：四层测试、闸口清单、覆盖矩阵、已知缺口
@@ -148,7 +148,7 @@ aigc-creation/
         │                     #   NotificationBell / UserAccountMenu / GuestPromoDialog / RouteExperience / hooks.ts
         ├── components/       # ToolShell / QrLoginPanel / 共享弹窗与页面片段 / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
         ├── pages/            # 12 个单文件页面（登录 / 工具页 …）
-        │   ├── admin/        # 后台 32 页：按域目录组织，含 AdminDashboardPage.tsx
+        │   ├── admin/        # 后台页面按域目录组织，含 AdminDashboardPage.tsx
         │   └── <域>/          # 26 个 C 端域目录，按 index / page / components / api / hooks / utils / constants 分层
         │                     #   product-kit / shoppable-carousel / product-detail / viral-clone / library / account / workbench …
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / money / poll / zip
@@ -225,21 +225,23 @@ npm run e2e                 # Playwright
 | --- | --- |
 | `remote` | 有可用模型线路，按下去走真实模型 |
 | `disabled` | 后台已下线（`CapabilityControl.enabled=false`） |
-| `unavailable` | 该能力没有配到任何可用的前台模型 / 线路：不可提交 |
+| `unavailable` | 该能力没有绑定任何可用的渠道模型：不可提交 |
 
 - 由 `capability-availability.service.ts` 合成，3s 缓存，后台写入即 `invalidate()`；**没有 `CapabilityControl` 行 = 启用**。
 - 下架原因由后台按统一下线提示自动生成并原样下发 C 端（不再要求人工填写）；`generate.service` 在**扣费之前**拦截并返回 `40005`。
 - 界面标注看 `effective`，不看 `mode`；`effective` 是事前预期，实际失败不回落本地产出。
 - **积分价**运行时一律走 `CreditPriceService.resolve()`（后台可改）；**限时免费**命中进行中的 `Campaign(type='limited_free')` 时直接返回 0，优先级高于后台覆盖价，缓存 3s 到点自动恢复。
 
-### 生成通道：渠道 → 前台模型 → 路由 → 账单
+### 生成通道：渠道 → 能力绑定 → 选路 → 账单
 
 > 完整分层、请求时序、选路规则、失败语义、计费口径见 **`docs/model-architecture.md`**；
-> 设计动机见 `docs/channel-model-design.md`。本节只留必须记住的约束。
+> 本轮重构方案见 `docs/channel-model-automation-design.md`。本节只留必须记住的约束。
 
-**四张表就是四个事实源**：`ModelChannel`（渠道，凭证加密）→ `ChannelModel` + `ChannelModelPriceTier`（供应侧线路 + 模型价格档）→ `LogicalModel` + `LogicalModelRevision` + `LogicalModelRoute`（C 端可见身份 + 发布快照 + 线路）。**代码里没有任何内置线路**，零配置 = 能力 `unavailable`。
+**四张表就是四个事实源**：`ModelChannel`（渠道，凭证加密）→ `ChannelModel` + `ChannelModelPriceTier`（商品 + 成本档）→ `CapabilityModelBinding`（能力 ↔ 商品候选池）→ `CapabilityPricing`（能力级售价）。**代码里没有任何内置线路**，零绑定 = 能力 `unavailable`。
 
-**命名空间必须分清**：`ChannelModel.capability` 是供应侧模态（`image/text/video/audio`）；`LogicalModel.capability` 是 C 端能力 id（`free_create` / `expand` / …）。混用表现为「有这个能力的模型，但模型不可用」。
+**命名空间必须分清**：`ChannelModel.capability` 是供应侧模态（`image/text/video/audio`）；`CapabilityModelBinding.capabilityId` 是 C 端能力 id（`free_create` / `expand` / …）。混用表现为「有这个能力的模型，但模型不可用」。
+
+**售价在能力级**：`CapabilityPricing` 是生成链路唯一售价来源，`CreditPriceService` 负责覆盖价、分组倍率、货币换算与限时免费；渠道价格档只保留成本（毛利），不再参与生成扣费。切换线路不改价。
 
 **渠道模型 `protocol` 存的是插件声明里的 provider id，不是插件 id**。`plugins/openai-images/manifest.json` 声明 `providers[0].id = "openai-image"`，渠道模型必须写 `openai-image`；写成 `openai-images` 派发时报 `channel_unavailable`（「协议尚未注册执行器」）。后台下拉读注册表，正常操作不会踩到 —— 手写库或导入时会。
 
@@ -247,17 +249,17 @@ npm run e2e                 # Playwright
 
 ### 选路与失败语义
 
-选路（`router.service.ts`）：产品能力合同匹配 → 候选池过滤（启用 / 权重 > 0 / 本轮未试 / 未冷却 / 分组可见 / `channel` 策略须命中价格档）→ **只保留最高 `priority` 一层** → 同层按 `weight` 加权随机（crypto + 拒绝采样）。选出来的 `RoutedModel` 一次带给任务快照、账单、调用日志，**下游任何一层都不许替换供应侧字段**。
+选路（`router.service.ts`）：意图裁剪到线路合同 → 候选池过滤（绑定/商品/渠道启用 / 权重 > 0 / 本轮未试 / 未冷却 / 分组可见 / 能力合同匹配）→ **分组优先**（选中 `modelKey` 先走，失败后才跨分组兜底）→ **健康分层**（`healthTier × 1000 + binding.priority`，24h 成功率 < 50% 沉到 2 层，50%–90% 为 1，其余为 0）→ 最优层内按 `weight` 加权随机（crypto + 拒绝采样）。选出来的 `RoutedModel` 一次带给任务快照、账单、调用日志，**下游任何一层都不许替换供应侧字段**。
 
 **切线只发生在 `rejected_no_job`**（请求没发出去 / DNS、代理、网络不可达、TCP 连接被拒 / 401 / 403 / 404 / 429）。建连前网络失败可安全换线；全部线路都失败时落 `42204` 并自动退款。超时、5xx、**建连后中断**一律判 **结果不明**（`42206`）：不切线、不自动退款，账单停 `uncertain` 等人工核对 —— 上游可能已经把图生成了，切线会二次计费、自动退款会白送一次产出。`ECONNREFUSED` 等建连前 errno 永远不能落 `42206`。
 
 **冷却只对明确可归因的失败生效**：401/403 冷却渠道 10min，404 冷却该渠道模型 10min，429 冷却 `Retry-After` 或 30s；建连前网络失败可以换线但不写冷却；**超时、5xx 与建连后中断永不冷却**（上游抖动时关 10 分钟会把一次偶发故障放大成整段不可用）。冷却存进程内存，多实例各自判定。
 
-**切线必须换账单**：新线路的价格档可能不同，沿用旧账单等于「按 A 的价收、走 B 的线路」。
+**切线仍替换账单**：售价在能力级、金额不变；替换账单用于把供应快照与成本档更新为实际线路。
 
 ### 目录快照与例外
 
-`route-catalog.service.ts` 是唯一读供给的入口：TTL 30s，库短暂不可用时沿用旧快照最多 5min，首次装载失败直接报错（**不把空目录当「全部不可用」**）。本进程写入后 `invalidateLocal()`，多进程最多滞后一个 TTL。排障第一条：**改完模型层不看快照就等于没改**。
+`capability-catalog.service.ts` 是唯一读供给的入口：TTL 30s，库短暂不可用时沿用旧快照最多 5min，首次装载失败直接报错（**不把空目录当「全部不可用」**）。本进程写入后 `invalidateLocal()`，多进程最多滞后一个 TTL。健康分层由 `RouteScoreService` 读 24h 指标，进程内缓存 30s。排障第一条：**改完模型层不看快照就等于没改**。
 
 **格式按字节魔数判定，不看 URL 后缀**（`src/model/media/image-format.ts`）：多家返回的链接无扩展名，猜错会把 PNG 字节以 `image/jpeg` 入库。
 
@@ -296,7 +298,7 @@ npm run e2e                 # Playwright
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-31 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
+33 个页面、9 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
 - 退款、手动调整积分、权限与系统设置、调价等确有业务依据要求的动作需填写原因；删除渠道 / 渠道模型只保留业务影响确认，不要求原因。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
@@ -345,7 +347,7 @@ npm run e2e                 # Playwright
 
 | 要做什么 | 必改的文件 | 同步/校验 |
 | --- | --- | --- |
-| 新增一项能力 | `capabilities/definitions/<id>.ts` + `definitions/index.ts` | 启动期 `assertCapabilityIntegrity`；`verify-capability-bootstrap`。之后还要在后台配前台模型，否则 `runtime.effective = unavailable` |
+| 新增一项能力 | `capabilities/definitions/<id>.ts` + `definitions/index.ts` | 启动期 `assertCapabilityIntegrity`；`verify-capability-bootstrap`。之后还要在后台把商品绑定到该能力并设置售价，否则 `runtime.effective = unavailable` |
 | 一次提交要多张产出 | 在 `definitions/<id>.ts` 声明 `outputPlan` | 准入层按返回值拆任务、每张各扣一份 `creditCost`，共享 `batchId` 供前端聚合；不要靠提示词拼多图 |
 | 接入一家厂商 | 新增 `backend/plugins/<plugin>/manifest.json`（或后台上传安装） | `verify-plugin-manifests` / `verify-protocol-runtime`；协议下拉按能力过滤自动可见 |
 | 新增后台页 | `admin/permissions.ts` → controller 挂 `@RequirePermission` → `adminNav.ts` → `pages/admin/<域>/` → 路由 → `lib/api.ts` | 前端 `can()` 只隐藏按钮，权限必须在后端 |
@@ -420,4 +422,4 @@ npm run e2e                 # Playwright
 | 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md`、`mask-canvas-sdk.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |
-| 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`channel-model-automation-design.md`（规划：去掉前台模型层，渠道模型直接售卖与自动切换）；`admin-workflow-design.md`（P0 已实施）、`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |
+| 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`channel-model-automation-design.md`（已实施：去掉前台模型层，渠道模型直接售卖与自动切换）；`admin-workflow-design.md`（P0 已实施）、`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |

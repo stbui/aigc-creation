@@ -5,11 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AppError } from '../common/app.exception';
 import { SignedUrlService } from '../common/signed-url.service';
-import {
-  inspectUploadedImage,
-  maxUploadBytes,
-  verifyDecodableImage,
-} from '../assets/image-validation';
+import { SettingsService, type UploadLimits } from '../common/settings.service';
+import { inspectUploadedImage, verifyDecodableImage } from '../assets/image-validation';
 
 /**
  * 手机上传会话服务 —— 参考站「手机上传」的会话侧。
@@ -45,6 +42,7 @@ export class MobileUploadService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly signedUrl: SignedUrlService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -156,7 +154,7 @@ export class MobileUploadService {
       throw new AppError(40001, `一次最多上传 ${MOBILE_UPLOAD_MAX_FILES} 张`, 400);
     }
 
-    // 这段状态切换发生在第一个 await 之前，形成会话内 CAS：并发提交的第二个
+    // 这段状态切换必须发生在第一个 await 之前，形成会话内 CAS：并发提交的第二个
     // 请求会看到 receiving，不会把同一会话写出两套素材。
     s.status = 'receiving';
     try {
@@ -173,6 +171,8 @@ export class MobileUploadService {
     s: MobileUploadSession,
     files: MobileUploadInputFile[],
   ): Promise<MobileUploadSession> {
+    // 同一批上传共用一份配置快照：保存设置后，下一次 receive 才读取新值。
+    const limits: UploadLimits = await this.settings.uploadLimits();
     const declaredTotal = files.reduce((sum, file) => sum + Math.max(0, file.size ?? 0), 0);
     if (declaredTotal > MOBILE_UPLOAD_MAX_TOTAL_BYTES) {
       throw new AppError(
@@ -220,16 +220,9 @@ export class MobileUploadService {
           400,
         );
       }
-      if (data.length > maxUploadBytes()) {
-        throw new AppError(
-          40001,
-          `单张不超过 ${Math.floor(maxUploadBytes() / 1024 / 1024)}MB`,
-          400,
-        );
-      }
       // 不信任扩展名和客户端 mimetype：文件头判真实格式，再完整解码一次，
       // 防止只有 PNG 魔数但像素数据损坏的“伪图”进入素材库。
-      const info = inspectUploadedImage(data, { maxBytes: maxUploadBytes() });
+      const info = inspectUploadedImage(data, limits);
       await verifyDecodableImage(data, info);
       prepared.push({
         file,

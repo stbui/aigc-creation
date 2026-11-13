@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { AdminChannelView, AdminLogicalModelView } from '../../../../types/model';
+import type { AdminChannelView } from '../../../../types/model';
 import {
   buildConsumptionIndex,
   buildConsumptionKeyIndex,
   channelConsumptionRefs,
   consumptionImpactText,
+  type ConsumptionRow,
   type ProductConsumptionRef,
 } from '../useProductConsumption';
 
 function ref(capabilityId: string, capabilityName: string): ProductConsumptionRef {
   return {
-    logicalModelId: `lm-${capabilityId}`,
-    modelName: `${capabilityName}售卖配置`,
+    modelKey: `cm-${capabilityId}`,
+    modelName: 'seedream-4.0',
     capabilityId,
     capabilityName,
     enabled: true,
@@ -19,67 +20,24 @@ function ref(capabilityId: string, capabilityName: string): ProductConsumptionRe
   };
 }
 
-function model(overrides: Partial<AdminLogicalModelView> = {}): AdminLogicalModelView {
+function row(overrides: Partial<ConsumptionRow> = {}): ConsumptionRow {
   return {
-    id: 'lm-1',
-    code: 'main-image-pro',
-    name: '电商主图 Pro',
-    icon: '',
-    description: '',
-    capability: 'main_image',
-    sortOrder: 0,
-    pricePolicy: 'channel',
-    pricingMode: 'per_request',
-    displayPrice: 10,
-    priceLabel: '',
-    billingMode: 'fixed_request',
-    unitPriceMicrocredits: 0,
-    inputPriceMicrocredits: 0,
-    outputPriceMicrocredits: 0,
-    cachedPriceMicrocredits: 0,
-    priceTiers: [],
-    legacyModelIds: [],
-    capabilitySpec: { version: 1, capability: 'image', operations: [] },
-    capabilityProfiles: [],
-    defaultOptions: {},
-    available: true,
-    enabled: true,
-    activeRevisionId: 'rev-1',
-    revisionVersion: 1,
-    configurationError: '',
-    availabilityError: '',
-    archivedAt: null,
-    routes: [
-      {
-        id: 'route-1',
-        channelModelId: 'cm-1',
-        channelId: 'ch-1',
-        channelName: '火山方舟',
-        channelModelKey: 'seedream-4.0',
-        channelModelName: '即梦 4.0',
-        enabled: true,
-        priority: 100,
-        weight: 100,
-        structurallyAvailable: true,
-        available: true,
-        capabilitySpec: { version: 1, capability: 'image', operations: [] },
-      },
-    ],
+    channelModelId: 'cm-1',
+    channelId: 'ch-1',
+    modelKey: 'seedream-4.0',
+    capabilityId: 'main_image',
+    capabilityName: '商品主图',
     ...overrides,
   };
 }
 
 describe('buildConsumptionIndex', () => {
   it('按渠道模型反查消费它的能力，并带上能力名', () => {
-    const index = buildConsumptionIndex(
-      [model()],
-      new Map([['main_image', '商品主图']]),
-    );
-
+    const index = buildConsumptionIndex([row()]);
     expect(index.get('cm-1')).toEqual([
       {
-        logicalModelId: 'lm-1',
-        modelName: '电商主图 Pro',
+        modelKey: 'cm-1',
+        modelName: 'seedream-4.0',
         capabilityId: 'main_image',
         capabilityName: '商品主图',
         enabled: true,
@@ -88,58 +46,23 @@ describe('buildConsumptionIndex', () => {
     ]);
   });
 
-  it('归档的前台模型不参与消费关系', () => {
-    const index = buildConsumptionIndex(
-      [model({ archivedAt: '2026-01-01T00:00:00.000Z' })],
-      new Map(),
-    );
-
-    expect(index.size).toBe(0);
-  });
-
-  it('缺少能力名时回落能力 id，多个模型可同时消费同一商品', () => {
-    const index = buildConsumptionIndex(
-      [
-        model(),
-        model({
-          id: 'lm-2',
-          name: '电商主图 Lite',
-          capability: 'main_image',
-          routes: [
-            {
-              ...model().routes[0],
-              id: 'route-2',
-              channelModelId: 'cm-1',
-            },
-          ],
-        }),
-      ],
-      new Map(),
-    );
-
-    expect(index.get('cm-1')?.map((ref) => ref.capabilityName)).toEqual([
-      'main_image',
-      'main_image',
+  it('同一商品被多个能力绑定时全部返回', () => {
+    const index = buildConsumptionIndex([
+      row(),
+      row({ capabilityId: 'poster', capabilityName: '营销海报' }),
+    ]);
+    expect(index.get('cm-1')?.map((item) => item.capabilityName)).toEqual([
+      '商品主图',
+      '营销海报',
     ]);
   });
 });
 
 describe('buildConsumptionKeyIndex', () => {
   it('按渠道 + 上游模型键反查，供供应商级影响面使用', () => {
-    const index = buildConsumptionKeyIndex(
-      [model()],
-      new Map([['main_image', '商品主图']]),
-    );
-
-    expect(index.get('ch-1:seedream-4.0')).toEqual([
-      {
-        logicalModelId: 'lm-1',
-        modelName: '电商主图 Pro',
-        capabilityId: 'main_image',
-        capabilityName: '商品主图',
-        enabled: true,
-        available: true,
-      },
+    const index = buildConsumptionKeyIndex([row()]);
+    expect(index.get('ch-1:seedream-4.0')?.map((item) => item.capabilityName)).toEqual([
+      '商品主图',
     ]);
   });
 });

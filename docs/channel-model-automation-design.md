@@ -1,6 +1,6 @@
 # 模型渠道能力重构实现方案（去掉前台模型层）
 
-> 状态：规划中，未实施。
+> 状态：已实施（2026-11-13）：前台模型三层已删除，`CapabilityModelBinding` / `CapabilityPricing` / 能力目录选路 / 后台能力绑定页已落地；单元、集成、构建与真实仿真网关链路验证通过。
 > 日期：2026-11-12
 > 决策：删除 `LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute` 三层；渠道模型（商品）即售卖供给，通过「能力 ↔ 渠道模型」绑定直接对 C 端提供模型选项；同能力内跨模型、跨渠道自动切换。
 > 关联：`docs/model-architecture.md`、`docs/channel-model-design.md`、`docs/api-contract.md`、`docs/testing.md`、`CLAUDE.md`

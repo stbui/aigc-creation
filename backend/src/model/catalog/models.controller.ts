@@ -1,23 +1,20 @@
 /**
- * 前台模型接口（`/api/v1/models`）。
+ * 能力模型目录（`/api/v1/models`）。
  *
- * 移植自 open-ai-canvas `handler/logical_models.go` 的公开部分：
- *   · `GET  /models`            全量目录
- *   · `POST /models/available`  按请求意图筛选可用模型
- *   · `POST /models/:id/quote`  报价（不建任务、不扣费）
+ * 前台模型层删除后，目录按「能力 + 模型分组」下发：
+ *   · `GET  /models?capability=`  某能力的模型分组（缺省返回全部）
+ *   · `POST /models/available`    按参数组合筛选当前真能跑的分组
+ *   · `POST /models/quote`        报价（不建任务、不扣费）
  *
- * 三个端点都用 `OptionalJwtAuthGuard`：未登录也能浏览目录（落地页、工作台
- * 首屏都要展示模型），登录后按会员分组过滤渠道并折算价格。**这些端点没有
- * 副作用**，把「可选身份」用在写接口上等于把接口暴露给匿名调用者。
- *
- * 意图入参统一走 `buildModelRequestIntent`：嵌套的 `inputs` / `options` 在
- * 全局 whitelist 下只能整体透传，形状校验必须在 controller 层先做掉。
+ * 三个端点都用 `OptionalJwtAuthGuard`：未登录也能浏览目录，登录后按会员分组
+ * 过滤渠道并折算价格。**这些端点没有副作用**。
  */
 
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Allow, IsOptional, IsString } from 'class-validator';
 import { OptionalJwtAuthGuard } from '../../common/optional-jwt-auth.guard';
 import { buildModelRequestIntent } from '../intent/model-intent';
+import { getCapability } from '../../capabilities/capability.registry';
 import type { ModelRequestIntent } from '../intent/spec-types';
 import { UserGroupService } from '../user-groups/user-group.service';
 import { CatalogService } from './catalog.service';
@@ -26,14 +23,19 @@ import { QuoteService } from './quote.service';
 /** 模型意图入参：能力 + 可选的参考素材数量与模型参数 */
 export class ModelIntentBodyDto {
   @IsOptional() @IsString() capability?: string;
+  @IsOptional() @IsString() modelKey?: string;
   @IsOptional() @IsString() operation?: string;
   @IsOptional() @Allow() inputs?: unknown;
   @IsOptional() @Allow() options?: unknown;
 }
 
-function toIntent(body: ModelIntentBodyDto | undefined): ModelRequestIntent {
+function toIntent(body: ModelIntentBodyDto | undefined, abilityId?: string): ModelRequestIntent {
+  // 入参 `capability` 对目录接口是产品能力 id；能力合同匹配要用产出模态
+  const modality = abilityId
+    ? getCapability(String(abilityId ?? '').trim())?.model?.capability
+    : body?.capability;
   return buildModelRequestIntent({
-    capability: body?.capability,
+    capability: modality,
     operation: body?.operation,
     inputs: body?.inputs,
     options: body?.options,
@@ -49,29 +51,47 @@ export class ModelsController {
     private readonly groups: UserGroupService,
   ) {}
 
-  /** 全量公开目录；登录用户按会员分组投影 */
+  /**
+   * 模型分组目录。
+   *
+   * `capability` 缺省时返回全部能力的分组，供工作台首屏一次取回；
+   * 单能力页传 `capability`，避免拉全量。
+   */
   @Get()
-  async list(@Req() req: { user?: { id: string } }) {
+  async list(
+    @Query('capability') capability: string | undefined,
+    @Req() req: { user?: { id: string } },
+  ) {
     const access = await this.groups.accessForUser(req.user?.id);
-    return { models: await this.catalog.publicModels(access) };
+    const models = capability
+      ? await this.catalog.publicGroups(access, capability)
+      : await this.catalog.publicAll(access);
+    return { models };
   }
 
-  /**
-   * 按意图筛选：只返回「这组参数现在真的能跑」的模型。
-   * 与工作台表单的联动靠这里 —— 不匹配的模型不下发，前端不需要再做猜算。
-   */
+  /** 按意图筛选：只返回「这组参数现在真的能跑」的分组 */
   @Post('available')
   async available(@Body() body: ModelIntentBodyDto, @Req() req: { user?: { id: string } }) {
     const access = await this.groups.accessForUser(req.user?.id);
-    return { models: await this.catalog.publicModels(access, toIntent(body)) };
+    const capability = String(body?.capability ?? '').trim();
+    if (!capability) return { models: [] };
+    return { models: await this.catalog.publicGroups(access, capability, toIntent(body, capability)) };
   }
 
-  /** 报价：返回该模型此组参数的应付积分，`estimated` 表示尚未结算 */
-  @Post(':id/quote')
-  async quote(@Param('id') id: string, @Body() body: ModelIntentBodyDto, @Req() req: { user?: { id: string } }) {
+  /** 报价：返回该能力此组参数的应付积分 */
+  @Post('quote')
+  async quote(@Body() body: ModelIntentBodyDto, @Req() req: { user?: { id: string } }) {
     const access = await this.groups.accessForUser(req.user?.id);
+    const capability = String(body?.capability ?? '').trim();
+    if (!capability) return { quote: null };
     return {
-      quote: await this.quotes.quoteLogicalModel(access, id, toIntent(body), req.user?.id),
+      quote: await this.quotes.quoteCapability(
+        access,
+        capability,
+        String(body?.modelKey ?? '').trim(),
+        toIntent(body, capability),
+        req.user?.id,
+      ),
     };
   }
 }

@@ -201,7 +201,7 @@ function BatchResultListImpl<Row extends BatchRow>({
     const state = cellState(item);
     const label = cellLabelOf?.(item, index) ?? labelOf(item);
     const caption = (
-      <figcaption className="pd-result-label" title={label}>
+      <figcaption className={isCardLayout ? 'pd-result-label u-font-14' : 'pd-result-label u-font-12'} title={label}>
         {label}
       </figcaption>
     );
@@ -234,13 +234,13 @@ function BatchResultListImpl<Row extends BatchRow>({
           </div>
         ) : (
           <div
-            className={`pd-result-thumb${state === 'failed' ? ' is-failed' : ' is-pending'}`}
+            className={`pd-result-thumb u-font-12${state === 'failed' ? ' is-failed' : ' is-pending'}`}
             role="status"
             aria-live="polite"
             aria-label={state === 'failed' ? `${label}生成失败` : `正在生成${label}`}
           >
             {state === 'failed' ? (
-              <span className="pd-result-failure-label">生成失败</span>
+              <span className="pd-result-failure-label u-font-12">生成失败</span>
             ) : (
               <>
                 <ImagePlus size={20} />
@@ -286,13 +286,13 @@ function BatchResultListImpl<Row extends BatchRow>({
                 <header className={`pd-result-head${isCardLayout ? ' pd-result-card-head' : ''}`}>
                   {isCardLayout ? (
                     renderRowTitle?.(row) ?? (
-                      <time className="pd-result-date" dateTime={row.createdAt}>
+                      <time className="pd-result-date u-font-12" dateTime={row.createdAt}>
                         {formatBatchDate(row.createdAt)}
                       </time>
                     )
                   ) : (
                     <>
-                      <time className="pd-result-date" dateTime={row.createdAt}>
+                      <time className="pd-result-date u-font-12" dateTime={row.createdAt}>
                         {formatBatchDate(row.createdAt)}
                       </time>
                       {renderRowMeta?.(row)}
@@ -314,7 +314,7 @@ function BatchResultListImpl<Row extends BatchRow>({
                   <>
                     {renderRowMeta && <div className="pd-result-card-meta">{renderRowMeta(row)}</div>}
 
-                    <div className="pd-result-card-source">
+                    <div className="pd-result-card-source u-p-10">
                       <div className="pd-result-card-source-main">
                         {row.sourceUrls.length > 0 ? (
                           <div className="pd-result-card-source-thumbs">
@@ -332,7 +332,7 @@ function BatchResultListImpl<Row extends BatchRow>({
                                 >
                                   <img src={assetThumbUrl(sourceUrl, 160)} alt={sourceLabel} loading="lazy" />
                                   {row.sourceUrls.length > 1 && (
-                                    <span className="pd-result-source-index" aria-hidden="true">
+                                    <span className="pd-result-source-index u-font-12" aria-hidden="true">
                                       {index + 1}
                                     </span>
                                   )}
@@ -341,13 +341,13 @@ function BatchResultListImpl<Row extends BatchRow>({
                             })}
                           </div>
                         ) : (
-                          <span className="pd-result-card-source-empty">原图已删除</span>
+                          <span className="pd-result-card-source-empty u-font-12">原图已删除</span>
                         )}
                       </div>
                       {onRegenerateRow && (
                         <button
                           type="button"
-                          className="pd-result-regenerate"
+                          className="pd-result-regenerate u-font-12"
                           disabled={row.pending}
                           title={row.pending ? '生成中，完成后可重新生成' : '把这次生成的参数带回左侧'}
                           onClick={() => onRegenerateRow(row)}
@@ -358,7 +358,7 @@ function BatchResultListImpl<Row extends BatchRow>({
                       )}
                       <button
                         type="button"
-                        className="pd-result-download-all"
+                        className="pd-result-download-all u-font-12"
                         aria-label={
                           downloadingRow === row.key
                             ? '正在打包本次生成的结果图'
@@ -402,7 +402,7 @@ function BatchResultListImpl<Row extends BatchRow>({
                               >
                                 <img src={assetThumbUrl(sourceUrl, 640)} alt={sourceLabel} loading="lazy" />
                                 {row.sourceUrls.length > 1 && (
-                                  <span className="pd-result-source-index" aria-hidden="true">
+                                  <span className="pd-result-source-index u-font-12" aria-hidden="true">
                                     {index + 1}
                                   </span>
                                 )}
@@ -411,11 +411,11 @@ function BatchResultListImpl<Row extends BatchRow>({
                           })}
                         </div>
                       ) : (
-                        <div className="pd-result-thumb is-empty">
+                        <div className="pd-result-thumb is-empty u-font-12">
                           <span className="pd-result-empty-tip">原图已删除</span>
                         </div>
                       )}
-                      <figcaption className="pd-result-label" title={sourceCaptionTitle?.(row)}>
+                      <figcaption className="pd-result-label u-font-12" title={sourceCaptionTitle?.(row)}>
                         {renderSourceCaption(row)}
                       </figcaption>
                     </figure>

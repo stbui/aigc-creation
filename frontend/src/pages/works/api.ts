@@ -10,4 +10,4 @@ export { generateApi, newIdempotencyKey } from '../../lib/api';
 /** 产出地址换算 (原图 / 缩略图) */
 export { assetSrc, assetThumbSrc } from '../../lib/api';
 /** 重试时解析原任务模型 */
-export { resolveModelId } from '../../lib/models';
+export { resolveModelKey } from '../../lib/models';

@@ -13,8 +13,6 @@ export { MAX_IMAGE_BYTES, MAX_IMAGE_MB, SUPPORTED_IMAGE_LABEL } from '../../lib/
 
 /** 一次提交最多上传的商品图张数 */
 export const MAX_IMAGES = 5;
-/** 商品名称 / 品牌输入上限 */
-export const MAX_NAME_LEN = 100;
 /** 复刻要求 textarea 上限 */
 export const MAX_REQUIREMENT_LEN = 1000;
 /** 复刻要求输入提示：只给可控的画面偏好，不示例复刻真实人物身份。 */

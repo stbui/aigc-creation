@@ -97,22 +97,78 @@ export function missingRequiredLabels(
     .map((f) => f.label);
 }
 
-/** 实例展示名：自定义名优先；default 与自动生成 id 都有可读兜底。 */
+/** 收款通道展示名：自定义名优先；技术编号不直接暴露给运营。 */
 export function instanceLabel(
   instance: Pick<AdminPaymentProviderInstanceView, 'instanceId' | 'name'>,
 ): string {
   const name = instance.name?.trim();
   if (name) return name;
-  return instance.instanceId === 'default' ? '默认实例' : instance.instanceId;
+  return instance.instanceId === 'default' ? '默认通道' : '未命名通道';
 }
 
-/** 单个实例的阻断项。后端告警是唯一事实源。 */
+/**
+ * 后端告警 → 运营提示。
+ *
+ * 告警仍以后端判定为唯一事实源，但展示层不能把字段名、环境变量、HTTP 状态码
+ * 直接丢给运营。已知告警给出明确影响与下一步；未知告警保留业务描述，只做基础
+ * 技术词清洗，避免未来新增告警时整段信息丢失。
+ */
+export function paymentWarningText(message: string): string {
+  const text = message.trim();
+  if (!text) return '通道配置存在待处理问题，请联系技术同事确认。';
+  if (text.startsWith('实例已启用但缺少必填项：')) {
+    return '通道已启用，但接入信息尚未补齐，客户付款会失败。请先补齐必填项。';
+  }
+  if (text.includes('未配置回调公网地址')) {
+    return '通道已启用，但回调公网地址尚未准备好，客户付款会失败。请先补齐回调地址。';
+  }
+  if (text.includes('PAYMENT_SECRET_KEY')) {
+    return '支付安全配置尚未完成，通道当前无法收款。请联系技术同事处理。';
+  }
+  if (text.includes('生产环境仍启用沙箱渠道')) {
+    return '当前为生产环境，沙箱通道不会产生真实资金流转。上线前请停用该通道。';
+  }
+  if (text.includes('存在未完成订单引用当前实例')) {
+    return '当前有未完成订单使用此通道；保存调整不会影响这些订单的查单与退款。';
+  }
+
+  return text
+    .replace(/PAYMENT_[A-Z_]+/g, '支付安全配置')
+    .replace(/发起支付会返回 503/g, '客户付款会失败')
+    .replace(/当前实例/g, '当前通道')
+    .replace(/\b实例\b/g, '通道');
+}
+
+/**
+ * 接入字段说明去技术化。
+ *
+ * 字段是否必填、如何取值仍由后端适配器定义；这里只把环境变量名、内部接口路径
+ * 等实现细节换成运营能理解的配置结果，不改动任何校验或提交值。
+ */
+export function paymentConfigDescription(
+  description: string | undefined,
+): string | undefined {
+  if (!description) return undefined;
+  return description
+    .replace(/留空使用 PAYMENT_NOTIFY_BASE/g, '留空使用系统统一的回调地址')
+    .replace(
+      /适配器自动拼接 \/mapi\.php 与 \/api\.php/g,
+      '系统会自动拼接支付接口路径',
+    )
+    .replace(
+      /会自动拼接 \/api\/createOrder 与 \/api\/getOrder/g,
+      '系统会自动拼接下单与查单接口路径',
+    )
+    .replace(/；?文档取值：.*$/g, '');
+}
+
+/** 单个通道的阻断项；文案已在展示层转为运营口径。 */
 export function instanceBlockingIssues(
   instance: Pick<AdminPaymentProviderInstanceView, 'warnings'>,
 ): string[] {
   return instance.warnings
     .filter((warning) => warning.level === 'danger')
-    .map((warning) => warning.message);
+    .map((warning) => paymentWarningText(warning.message));
 }
 
 /**
@@ -152,7 +208,7 @@ export function providerState(
   return 'unconfigured';
 }
 
-/** 渠道下所有实例的 danger 告警（去重，保留后端原文）。 */
+/** 渠道下所有通道的 danger 告警（去重，使用运营口径）。 */
 export function providerBlockingIssues(
   provider: AdminPaymentProviderView,
 ): string[] {
@@ -201,36 +257,42 @@ export function sourceAvailability(
   method: VisiblePaymentMethod,
   source: PaymentSource,
 ): { ok: boolean; reason: string } {
-  if (source === 'unset') return { ok: false, reason: '未选择支付来源' };
+  if (source === 'unset') return { ok: false, reason: '尚未选择收款来源' };
 
   const providerId = source === 'official' ? method : 'epay';
   const provider = providers.find((item) => item.id === providerId);
   if (!provider) {
     return {
       ok: false,
-      reason: `尚未创建${source === 'official' ? '对应官方' : '易支付'}渠道`,
+      reason: `尚未开通${source === 'official' ? '官方' : '易支付'}收款来源`,
     };
   }
   if (!provider.supportedCurrencies.includes(currency)) {
-    return { ok: false, reason: `${provider.name}不支持默认币种 ${currency}` };
+    return { ok: false, reason: `${provider.name}暂不支持当前结算币种 ${currency}` };
   }
   if (provider.instances.length === 0) {
-    return { ok: false, reason: `${provider.name}尚未创建服务商实例` };
+    return { ok: false, reason: `${provider.name}尚未添加收款通道` };
   }
 
   const candidates = provider.instances.filter((instance) =>
     instance.paymentMethods.includes(method),
   );
   if (candidates.length === 0) {
-    return { ok: false, reason: `${provider.name}没有实例选择${method === 'alipay' ? '支付宝' : '微信支付'}` };
+    return {
+      ok: false,
+      reason: `${provider.name}没有通道支持${method === 'alipay' ? '支付宝' : '微信支付'}`,
+    };
   }
   const enabled = candidates.filter((instance) => instance.enabled);
   if (enabled.length === 0) {
-    return { ok: false, reason: `${provider.name}没有已启用的${method === 'alipay' ? '支付宝' : '微信支付'}实例` };
+    return {
+      ok: false,
+      reason: `${provider.name}没有已启用的${method === 'alipay' ? '支付宝' : '微信支付'}收款通道`,
+    };
   }
   const configured = enabled.filter((instance) => instance.configured);
   if (configured.length === 0) {
-    return { ok: false, reason: `${provider.name}的已启用实例配置不完整` };
+    return { ok: false, reason: `${provider.name}的收款通道尚未准备完成` };
   }
   const danger = configured
     .flatMap(instanceBlockingIssues)

@@ -1,4 +1,4 @@
-/** 验证后台改价端点: SystemSetting 覆盖 → /capabilities 与生成扣费同步生效 */
+/** 验证能力改价端点: CapabilityPricing → /capabilities 与生成扣费同步生效 */
 process.env.PORT = '3012';
 /*
  * 档位跟随调用方（未指定时沿用开发档）。这里不能硬写 development：
@@ -67,18 +67,38 @@ function check(n: string, ok: boolean, d='') { if(ok){pass++;console.log(`  PASS
   }
 
   console.log('\n【C 端无权限改价 → 401】');
-  const noAuth = await call('PUT', '/admin/credit-prices', null, { items: [{ capabilityId: 'expand', cost: 99 }] });
+  const noAuth = await call('PUT', '/admin/capabilities/expand/pricing', null, {
+    billingMode: 'fixed_request',
+    unitPriceMicrocredits: 99_000_000,
+  });
   check('未登录改价被拒', noAuth.status === 401 || noAuth.status === 403, `HTTP ${noAuth.status}`);
 
   console.log('\n【非法参数被拒】');
-  const badCost = await call('PUT', '/admin/credit-prices', AT, { items: [{ capabilityId: 'expand', cost: -5 }] });
+  const badCost = await call('PUT', '/admin/capabilities/expand/pricing', AT, {
+    billingMode: 'fixed_request',
+    unitPriceMicrocredits: -5_000_000,
+  });
   check('负数消耗价被拒', badCost.status === 400, `HTTP ${badCost.status}`);
-  const badCap = await call('PUT', '/admin/credit-prices', AT, { items: [{ capabilityId: 'no_such_cap', cost: 5 }] });
+  const badCap = await call('PUT', '/admin/capabilities/no_such_cap/pricing', AT, {
+    billingMode: 'fixed_request',
+    unitPriceMicrocredits: 5_000_000,
+  });
   check('未知能力 id 被拒', badCap.status === 400, `HTTP ${badCap.status}`);
 
   console.log('\n【改价生效】');
-  const upd = await call('PUT', '/admin/credit-prices', AT, { items: [{ capabilityId: 'expand', cost: 77 }] });
+  const upd = await call('PUT', '/admin/capabilities/expand/pricing', AT, {
+    billingMode: 'fixed_request',
+    unitPriceMicrocredits: 77_000_000,
+    inputTokenPriceMicrocredits: 0,
+    outputTokenPriceMicrocredits: 0,
+    cachedTokenPriceMicrocredits: 0,
+  });
   check('改价成功', upd.status === 200 || upd.status === 201, JSON.stringify(upd.data ?? upd.message).slice(0,80));
+  check(
+    '定价视图标记为 CapabilityPricing',
+    upd.data?.configured === true && upd.data?.source === 'capability_pricing',
+    JSON.stringify(upd.data),
+  );
 
   // 缓存 3s TTL, 但改价会 invalidate(); 立即验证
   await new Promise(r => setTimeout(r, 500));
@@ -164,52 +184,60 @@ function check(n: string, ok: boolean, d='') { if(ok){pass++;console.log(`  PASS
       priceConfigured: false,
     },
   });
-  const logicalModel = await prisma.logicalModel.create({
-    data: {
-      code: `price-smoke-${Date.now()}`,
-      activeKey: `price-smoke-${Date.now()}`,
-      name: '改价验证模型',
-      capability: 'expand',
-      enabled: true,
-      pricePolicy: 'unified',
+  // 能力级夹具：绑定 + 能力售价（生成链路不再有前台模型）
+  await prisma.capabilityPricing.upsert({
+    where: { capabilityId: 'expand' },
+    create: {
+      capabilityId: 'expand',
+      billingMode: 'fixed_request',
+      unitPriceMicrocredits: 77n * 1_000_000n,
+    },
+    update: {
       billingMode: 'fixed_request',
       unitPriceMicrocredits: 77n * 1_000_000n,
     },
   });
-  const revision = await prisma.logicalModelRevision.create({
+  await prisma.capabilityModelBinding.create({
     data: {
-      logicalModelId: logicalModel.id,
-      version: 1,
-      capabilitySpecJson: JSON.stringify(
-        require('../src/model/intent/capability-spec').capabilitySpecFromModelCapabilityConfig(IMAGE_CONFIG, 'image'),
-      ),
-      defaultOptionsJson: '{}',
+      capabilityId: 'expand',
+      channelModelId: channelModel.id,
+      priority: 0,
+      weight: 100,
+      enabled: true,
     },
   });
-  await prisma.logicalModelRoute.create({
-    data: { logicalModelRevisionId: revision.id, channelModelId: channelModel.id, priority: 0, weight: 100, enabled: true },
-  });
-  await prisma.logicalModel.update({ where: { id: logicalModel.id }, data: { activeRevisionId: revision.id, revisionSequence: 1 } });
-  app.get(require('../src/model/catalog/route-catalog.service').RouteCatalogService).invalidateLocal();
+  app.get(require('../src/model/catalog/capability-catalog.service').CapabilityCatalogService).invalidateLocal();
 
-  const gen = await call('POST','/generate',T,{ projectId, capability:'expand', logicalModelId: logicalModel.id, inputAssetIds:[assetId], params:{ratio:'1:1'} });
+  const gen = await call('POST','/generate',T,{ projectId, capability:'expand', modelKey:'price-image-model', inputAssetIds:[assetId], params:{ratio:'1:1'} });
   check('按新价 77 扣费', gen.data?.creditCost === 77, `实际扣 ${gen.data?.creditCost}`);
   const bal = (await call('GET','/credits/balance',T)).data?.balance;
   check('余额 500-77=423', bal === 423, `余额 ${bal}`);
 
-  console.log('\n【回落默认值】');
-  const rst = await call('POST','/admin/credit-prices/expand/reset', AT);
-  check('回落成功', rst.status === 200 || rst.status === 201, `新价 ${rst.data?.cost}`);
+  console.log('\n【写回默认值】');
+  // CapabilityPricing 没有单独的后台 reset 端点：恢复默认价就是再次写入能力定义的默认值。
+  const rst = await call('PUT', '/admin/capabilities/expand/pricing', AT, {
+    billingMode: 'fixed_request',
+    unitPriceMicrocredits: 5_000_000,
+  });
+  check(
+    '写回默认价成功',
+    (rst.status === 200 || rst.status === 201) && rst.data?.configured === true,
+    `新价 ${rst.data?.unitPriceMicrocredits}`,
+  );
   await new Promise(r => setTimeout(r, 500));
   const caps2 = await call('GET','/capabilities');
   check('回落后 /capabilities 恢复 5', caps2.data.items.find((c:any)=>c.id==='expand').creditCost === 5,
     `当前 ${caps2.data.items.find((c:any)=>c.id==='expand').creditCost}`);
 
-  console.log('\n【列表带来源标记】');
-  const list = await call('GET','/admin/credit-prices', AT);
-  const item = Array.isArray(list.data) ? list.data.find((x:any)=>x.capabilityId==='matting') : null;
-  check('列表返回 source 字段', !!item && ['setting','registry'].includes(item.source), `source=${item?.source}`);
-  check('未覆盖项 source=registry', item?.source === 'registry', `source=${item?.source}`);
+  console.log('\n【定价视图带配置状态与来源】');
+  const pricing = await call('GET', '/admin/capabilities/matting/pricing', AT);
+  check(
+    '定价视图返回 configured/source',
+    pricing.status === 200 &&
+      typeof pricing.data?.configured === 'boolean' &&
+      ['default', 'capability_pricing'].includes(pricing.data?.source),
+    JSON.stringify(pricing.data),
+  );
 
   // 清理：任务 → 素材 → 项目 → 账号 → 模型夹具 → 系统设置覆盖
   await prisma.generationTask.deleteMany({ where: { ownerId: u.id } });
@@ -217,12 +245,10 @@ function check(n: string, ok: boolean, d='') { if(ok){pass++;console.log(`  PASS
   await prisma.project.deleteMany({ where: { id: projectId } });
   await require('./credit-fixture').clearCredits(prisma, u.id);
   await prisma.user.delete({ where: { id: u.id } });
-  await prisma.logicalModelRoute.deleteMany({ where: { logicalModelRevisionId: revision.id } });
-  await prisma.logicalModelRevision.deleteMany({ where: { logicalModelId: logicalModel.id } });
-  await prisma.logicalModel.deleteMany({ where: { id: logicalModel.id } });
+  await prisma.capabilityModelBinding.deleteMany({ where: { capabilityId: 'expand' } });
+  await prisma.capabilityPricing.deleteMany({ where: { capabilityId: 'expand' } });
   await prisma.channelModel.deleteMany({ where: { id: channelModel.id } });
   await prisma.modelChannel.deleteMany({ where: { id: channel.id } });
-  await prisma.systemSetting.deleteMany({ where: { key: { startsWith: 'creditPrice.' } } });
   await new Promise<void>((resolve) => modelServer.close(() => resolve()));
 
   console.log(`\n${'='.repeat(54)}`);

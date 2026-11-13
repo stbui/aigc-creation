@@ -63,19 +63,19 @@ export const PAYMENT_PROVIDER_STATE_META: Record<
   { label: string; tone: 'success' | 'danger' | 'warn' | 'muted'; hint: string }
 > = {
   usable: {
-    label: '可用',
+    label: '可收款',
     tone: 'success',
-    hint: '凭据齐全且已启用，可以发起支付',
+    hint: '通道资料齐全且已启用，客户可以正常付款',
   },
   misconfigured: {
-    label: '不可收款',
+    label: '收款异常',
     tone: 'danger',
-    hint: '开关已开但存在阻断项，发起支付会返回 503',
+    hint: '已有付款受影响，需要尽快处理报错通道',
   },
   unconfigured: {
-    label: '待配置',
+    label: '待开通',
     tone: 'warn',
-    hint: '凭据未填齐，启用前必须补齐必填项',
+    hint: '收款准备尚未完成，当前不会承接客户付款',
   },
   disabled: {
     label: '已停用',
@@ -160,18 +160,18 @@ export const PAYMENT_EXCEPTION_STATUS_OPTIONS = Object.entries(
   PAYMENT_EXCEPTION_STATUS_META,
 ).map(([value, meta]) => ({ value, label: meta.label }));
 
-/** 差异类型 → 中文；后端新增类型时前端自动回落原值，不阻塞展示。 */
+/** 问题类型 → 中文；后端新增类型时前端自动回落原值，不阻塞展示。 */
 export const PAYMENT_EXCEPTION_KIND_LABELS: Record<string, string> = {
   cancelled_but_paid: '已取消仍扣款',
   refund_failed: '退款失败',
   refund_processing: '退款异步处理中',
-  auto_reconcile_failed: '自动对账失败',
+  auto_reconcile_failed: '自动核对失败',
   local_order_not_found: '本地订单缺失',
-  provider_record_missing: '渠道流水缺失',
+  provider_record_missing: '收款流水缺失',
   amount_mismatch: '金额不一致',
   trade_no_mismatch: '交易号不一致',
   duplicate_charge: '疑似重复扣款',
-  credit_failed: '补发积分失败',
+  credit_failed: '自动补单失败',
 };
 
 export const PAYMENT_EXCEPTION_PRIORITY_OPTIONS = [
@@ -181,7 +181,7 @@ export const PAYMENT_EXCEPTION_PRIORITY_OPTIONS = [
 
 export const PAYMENT_EXCEPTION_OVERDUE_OPTIONS = [
   { value: 'true', label: '仅看逾期' },
-  { value: 'false', label: '全部 SLA' },
+  { value: 'false', label: '全部处理时限' },
 ];
 
 /** 异常单筛选草稿；`overdue` 保留下拉的字符串值，提交时才转布尔。 */

@@ -29,7 +29,7 @@ import {
   generateApi,
   modelImageInputLimit,
   resolveModel,
-  type PublicLogicalModel,
+  type PublicModelGroup,
 } from './api';
 import {
   degreeCaption,
@@ -92,7 +92,7 @@ export function ViralClonePage() {
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
   /** 当前实际会被提交的模型；图片上限必须读它的能力合同，不能只看页面上限。 */
-  const [selectedModel, setSelectedModel] = useState<PublicLogicalModel | null>(null);
+  const [selectedModel, setSelectedModel] = useState<PublicModelGroup | null>(null);
   // 价签按所选模型的实时报价优先，取不到才回落到能力基础价
   const { label: creditLabel, onModelQuoteChange } = useModelQuoteCreditLabel({
     capability: 'hot_remake',
@@ -184,11 +184,11 @@ export function ViralClonePage() {
         return;
       }
       const projectId = await ensureProject();
-      const logicalModelId = model.id;
+      const modelKey = model.id;
       const payload = {
         projectId,
         capability: 'hot_remake',
-        logicalModelId,
+        modelKey,
         // 顺序即语义: [0]=商品图, [1]=参考图 (后端 processTask 按提交序保序)
         inputAssetIds: [...images.map((x) => x.id), reference.id],
         params: {

@@ -1,5 +1,13 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { RequirePermission } from './admin.decorator';
 import { PERMISSIONS } from './permissions';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -22,6 +30,17 @@ class BroadcastDto {
   @IsString()
   @MaxLength(200)
   link?: string;
+
+  /** 默认只发站内；运营明确勾选后才逐人发送活动邮件。 */
+  @IsOptional()
+  @IsBoolean()
+  sendEmail?: boolean;
+}
+
+class TestEmailDto {
+  @IsEmail({}, { message: '请输入有效的邮箱地址' })
+  @MaxLength(200)
+  to: string;
 }
 
 class UpsertTemplateDto {
@@ -74,14 +93,21 @@ export class AdminNotificationsController {
    */
   @Get('channels')
   @RequirePermission(PERMISSIONS.messageWrite)
-  channels() {
-    return { email: this.email.status(), sms: this.sms.status() };
+  async channels() {
+    return { email: await this.email.status(), sms: this.sms.status() };
   }
 
   @Post('broadcast')
   @RequirePermission(PERMISSIONS.messageWrite)
   broadcast(@Body() dto: BroadcastDto) {
-    return this.notifications.broadcast(dto.title, dto.body, dto.link);
+    return this.notifications.broadcast(dto.title, dto.body, dto.link, dto.sendEmail ?? false);
+  }
+
+  /** 用当前运行时配置发送一封真实测试邮件，验证发件地址与凭据。 */
+  @Post('email/test')
+  @RequirePermission(PERMISSIONS.messageWrite)
+  testEmail(@Body() dto: TestEmailDto) {
+    return this.email.sendTestEmail(dto.to);
   }
 
   @Get('templates')

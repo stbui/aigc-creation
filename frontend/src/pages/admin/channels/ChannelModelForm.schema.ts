@@ -31,6 +31,7 @@ const tierSchema = z.object({
 export const modelDraftSchema = z
   .object({
     modelKey: z.string().trim().min(1, '请填写商品编号'),
+    modelGroupKey: z.string(),
     providerModelKey: z.string(),
     displayName: z.string(),
     channelLabel: z.string().max(80, '供应商内名称最多 80 字'),

@@ -61,9 +61,8 @@ export class TaskAttemptService {
       taskId: string;
       routeRun: number;
       attemptNumber: number;
-      logicalModelId: string;
-      logicalModelRevisionId: string;
-      routeId: string;
+      capabilityId: string;
+      modelKey: string;
       channelModelId: string;
       channelId: string;
     },
@@ -74,9 +73,8 @@ export class TaskAttemptService {
         taskId: input.taskId,
         routeRun: input.routeRun,
         attemptNumber: input.attemptNumber,
-        logicalModelId: input.logicalModelId,
-        logicalModelRevisionId: input.logicalModelRevisionId,
-        routeId: input.routeId,
+        capabilityId: input.capabilityId,
+        modelKey: input.modelKey,
         channelModelId: input.channelModelId,
         channelId: input.channelId,
         status: 'selected',
@@ -85,7 +83,7 @@ export class TaskAttemptService {
     });
   }
 
-  /** 本轮全部尝试（切换线路时用它们的 routeId 组成排除集） */
+  /** 本轮全部尝试（切换线路时用它们的 channelModelId 组成排除集） */
   async listRun(taskId: string, routeRun: number): Promise<RouteAttempt[]> {
     return this.prisma.routeAttempt.findMany({
       where: { taskId, routeRun },

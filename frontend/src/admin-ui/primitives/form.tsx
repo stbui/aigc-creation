@@ -116,12 +116,10 @@ export function FormField({
       </div>
       {control}
       {error ? (
-        <p id={errorId} className="text-xs text-destructive" role="alert">
-          {error}
-        </p>
-      ) : (
-        hint && <p className="text-xs text-muted-foreground">{hint}</p>
-      )}
+        <p id={errorId} className="min-w-0 break-words text-xs leading-5 text-destructive [overflow-wrap:anywhere]" role="alert">{error}</p>
+      ) : hint ? (
+        <p className="min-w-0 break-words text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -159,7 +157,7 @@ export function TextField({
   showCount?: boolean;
   onEnter?: () => void;
   /** 原生输入类型：日期 / 日期时间 / 密码走浏览器原生控件 */
-  type?: 'text' | 'date' | 'datetime-local' | 'password';
+  type?: 'text' | 'email' | 'date' | 'datetime-local' | 'password';
 } & ControlAriaProps) {
   return (
     <div className={cn('relative', className)}>

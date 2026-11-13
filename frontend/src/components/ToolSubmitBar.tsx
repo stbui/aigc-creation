@@ -58,7 +58,7 @@ export function ToolSubmitBar({
 
   return (
     <div className="pk-submit-actions">
-      {hint && <p className="tool-submit-hint">{hint}</p>}
+      {hint && <p className="tool-submit-hint u-font-12">{hint}</p>}
       {settings}
       <div className="pk-submit-row">
         {extra}
@@ -74,17 +74,17 @@ export function ToolSubmitBar({
           {submitting ? (
             <>
               <Spin size="small" />
-              <strong>生成中…</strong>
+              <strong className="u-font-14">生成中…</strong>
             </>
           ) : (
             <>
-              <strong>{guest ? guestLabel : label}</strong>
-              {!guest && creditLabel && <span className="pk-primary-credit">{creditLabel}</span>}
+              <strong className="u-font-14">{guest ? guestLabel : label}</strong>
+              {!guest && creditLabel && <span className="pk-primary-credit u-font-12">{creditLabel}</span>}
             </>
           )}
         </Button>
       </div>
-      {desc && <p className="tool-submit-desc">{desc}</p>}
+      {desc && <p className="tool-submit-desc u-font-12">{desc}</p>}
     </div>
   );
 }

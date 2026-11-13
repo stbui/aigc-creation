@@ -1,5 +1,7 @@
 import { memo } from 'react';
 
+import { ToolExampleCard, ToolExampleFactList, ToolExamplePanel } from './components';
+
 const CASES = '/landing/case';
 
 /** 三步流程: 与左侧表单一一对应, 不写成本页做不到的动作 */
@@ -39,65 +41,28 @@ const DEGREE_FACTS = [
  * 讲清「商品图 + 参考图 → 复刻结果」的链路, 并说明两档复刻程度的差异。
  *
  * 纯展示组件: 不读接口、不接受业务数据 —— 示例与用户数据必须分开,
- * 否则「示例」会被误认为自己的历史作品。内容全为常量, 用 memo 隔离
- * 左栏表单的按键重渲染。
+ * 否则「示例」会被误认为自己的历史作品。
  */
 function ViralCloneExamplePanelBase() {
   return (
-    <div className="pd-demo">
-      <header className="pd-demo-intro">
-        <h3>复刻爆款构图，换成你的商品</h3>
-        <p>上传商品图与参考图，选择复刻程度，由真实图像模型按参考图的构图与氛围重新生成。</p>
-        <ol className="pd-demo-steps">
-          {FLOW_STEPS.map((step, i) => (
-            <li key={step.title} className="pd-demo-step">
-              <span className="pd-demo-step-no">{String(i + 1).padStart(2, '0')}</span>
-              <div>
-                <strong>{step.title}</strong>
-                <small>{step.desc}</small>
-              </div>
-            </li>
+    <ToolExamplePanel
+      title="复刻爆款构图，换成你的商品"
+      description="上传商品图与参考图，选择复刻程度，由真实图像模型按参考图的构图与氛围重新生成。"
+      steps={FLOW_STEPS}
+      note="示例均为真实复刻产出，实际出图以模型输出为准。"
+    >
+      <ToolExampleCard step={1} title="复刻案例" tag="真实产出">
+        <div className="vc-demo-cases">
+          {CASE_SHOTS.map((shot) => (
+            <img key={shot.file} src={`${CASES}/${shot.file}`} alt={shot.alt} loading="lazy" />
           ))}
-        </ol>
-      </header>
+        </div>
+      </ToolExampleCard>
 
-      <div className="pd-demo-cards">
-        <article className="pd-demo-card">
-          <header className="pd-demo-card-head">
-            <h4>
-              <i className="pd-demo-dot" aria-hidden />
-              1. 复刻案例
-            </h4>
-            <span className="pd-demo-tag">真实产出</span>
-          </header>
-          <div className="vc-demo-cases">
-            {CASE_SHOTS.map((shot) => (
-              <img key={shot.file} src={`${CASES}/${shot.file}`} alt={shot.alt} loading="lazy" />
-            ))}
-          </div>
-        </article>
-
-        <article className="pd-demo-card">
-          <header className="pd-demo-card-head">
-            <h4>
-              <i className="pd-demo-dot" aria-hidden />
-              2. 两档复刻程度
-            </h4>
-            <span className="pd-demo-tag">按需选择</span>
-          </header>
-          <ul className="pd-demo-facts">
-            {DEGREE_FACTS.map((fact) => (
-              <li key={fact.label}>
-                <strong>{fact.label}：</strong>
-                {fact.value}
-              </li>
-            ))}
-          </ul>
-        </article>
-      </div>
-
-      <p className="pd-demo-note">示例均为真实复刻产出，实际出图以模型输出为准。</p>
-    </div>
+      <ToolExampleCard step={2} title="两档复刻程度" tag="按需选择">
+        <ToolExampleFactList facts={DEGREE_FACTS} />
+      </ToolExampleCard>
+    </ToolExamplePanel>
   );
 }
 

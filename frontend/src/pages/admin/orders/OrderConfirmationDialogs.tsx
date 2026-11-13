@@ -4,12 +4,12 @@ import { yuan } from './utils';
 import type { AdminOrderRefund, AdminOrderRow } from '../../../types/api';
 
 /**
- * 退款规则入口（后台「系统设置 → 退款」分组深链）。
+ * 退款规则入口（后台「支付与退费」独立工作台深链）。
  *
  * 退款被规则拒绝时（时间窗 / 比例上限 / 已消耗积分），运营要改的是规则本身。
- * 弹窗里直接给这个入口，省掉「先关弹窗、进设置、在八个页签里找『退款』」。
+ * 弹窗里直接给这个入口，省掉「先关弹窗、进设置、再找退款分组」。
  */
-export const REFUND_RULES_HREF = '/admin/settings?group=refund';
+export const REFUND_RULES_HREF = '/admin/payment-rules#refund-rules';
 
 export type RefundConfirmationTarget = {
   orderId: string;

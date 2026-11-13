@@ -21,7 +21,7 @@ import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { resolveUploadsDir } from '../config/env-files';
 import { AssetsService } from './assets.service';
 import { AppError } from '../common/app.exception';
-import { maxUploadBytes } from './image-validation';
+import { deploymentUploadMaxBytes } from '../common/image-formats';
 import { UploadAssetDto } from './dto/upload-asset.dto';
 import { MoveAssetsDto } from './dto/move-asset.dto';
 
@@ -48,7 +48,9 @@ export class AssetsController {
           cb(null, `${unique}${ext}`);
         },
       }),
-      limits: { fileSize: maxUploadBytes(), files: 1 },
+      // Multer 只负责挡在部署硬上限之外；运营配置的动态上限由 service 在
+      // 读取文件后按真实生效值校验，避免临时目录先收下超大文件。
+      limits: { fileSize: deploymentUploadMaxBytes(), files: 1 },
     }),
   )
   upload(

@@ -15,9 +15,9 @@ import { isValidReconciliationBillDate, providerLabel } from './utils';
 import { useDraftList, type ListParams } from './useDraftList';
 
 /**
- * 对账列表的筛选、URL 同步与导出。
+ * 交易核对列表的筛选、URL 同步与导出。
  *
- * 渠道与实例、账单日既是筛选条件，也是「执行对账 / 导入 CSV」的入参。执行成功
+ * 收款来源与通道、账单日既是筛选条件，也是「开始核对 / 导入 CSV」的入参。执行成功
  * 后页面调用 `applyFilters()` 把列表切到本次执行的条件，不再另设一组重复控件。
  */
 
@@ -72,15 +72,15 @@ function reconciliationChips(
   if (applied.providerId) {
     chips.push({
       key: 'providerId',
-      label: `渠道：${providerLabel(applied.providerId)}`,
-      // 渠道清空时一并清掉实例，避免留下不属于任何渠道的实例条件
+      label: `收款来源：${providerLabel(applied.providerId)}`,
+      // 来源清空时一并清掉通道，避免留下不属于任何来源的通道条件
       onClear: () => clear(['providerId', 'providerInstanceId']),
     });
   }
   if (applied.providerInstanceId) {
     chips.push({
       key: 'providerInstanceId',
-      label: `实例：${applied.providerInstanceId}`,
+      label: `通道：${applied.providerInstanceId}`,
       onClear: () => clear(['providerInstanceId']),
     });
   }

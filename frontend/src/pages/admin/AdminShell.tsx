@@ -23,6 +23,7 @@ import {
   AdminChannelsPage,
   AdminCouponsPage,
   AdminCreditsPage,
+  AdminEmailPage,
   AdminFinancePage,
   AdminInvoicesPage,
   AdminMarketingRulesPage,
@@ -31,6 +32,7 @@ import {
   AdminNotificationsPage,
   AdminOrdersPage,
   AdminPaymentsPage,
+  AdminPaymentRulesPage,
   AdminPluginsPage,
   AdminProductsPage,
   AdminRetentionPage,
@@ -111,7 +113,7 @@ export function AdminShell() {
     <AdminUIProvider>
       <AdminWorkbenchProvider>
         <AdminBoardLayout>
-          <ErrorBoundary resetKeys={[location.pathname]}>
+          <ErrorBoundary resetKeys={[`${location.pathname}${location.search}`]}>
           <Suspense fallback={<AdminLoading tip="加载页面…" />}>
             <Routes>
               {/*
@@ -129,7 +131,13 @@ export function AdminShell() {
               <Route path="alerts" element={<AdminAlertsPage />} />
               <Route path="users" element={<AdminUsersPage />} />
               <Route path="roles" element={<AdminRolesPage />} />
-              <Route path="settings" element={<AdminSettingsPage />} />
+              <Route path="email" element={<AdminEmailPage />} />
+              {/* 系统设置只接受四个显式页签路由；其他设置路径按未知页面处理。 */}
+              <Route path="settings" element={<Navigate to="/admin/settings/generate" replace />} />
+              <Route path="settings/generate" element={<AdminSettingsPage group="generate" />} />
+              <Route path="settings/upload" element={<AdminSettingsPage group="upload" />} />
+              <Route path="settings/backup" element={<AdminSettingsPage group="backup" />} />
+              <Route path="settings/security" element={<AdminSettingsPage group="security" />} />
               <Route path="backups" element={<AdminBackupPage />} />
               <Route path="assets" element={<AdminAssetsPage />} />
               <Route path="storage" element={<AdminStoragePage />} />
@@ -139,15 +147,6 @@ export function AdminShell() {
               <Route path="scheduler" element={<AdminSchedulerPage />} />
               {/* 模型层：渠道 → 能力与模型 → 分组 → 插件 → 账单 */}
               <Route path="channels" element={<AdminChannelsPage />} />
-              <Route
-                path="logical-models"
-                element={
-                  <Navigate
-                    to={`/admin/capabilities${location.search}${location.hash}`}
-                    replace
-                  />
-                }
-              />
               <Route path="user-groups" element={<AdminUserGroupsPage />} />
               <Route path="plugins" element={<AdminPluginsPage />} />
               <Route path="billing-orders" element={<AdminBillingOrdersPage />} />
@@ -170,8 +169,10 @@ export function AdminShell() {
               <Route path="orders" element={<AdminOrdersPage />} />
               <Route path="credits" element={<AdminCreditsPage />} />
               <Route path="retention" element={<AdminRetentionPage />} />
-              {/* 财务：支付充值（四标签）/ 发票审核 */}
+              {/* 支付：收款 / 核对 / 异常在侧栏各有独立入口，共用支付工作台 */}
               <Route path="payments" element={<AdminPaymentsPage />} />
+              <Route path="payment-rules" element={<AdminPaymentRulesPage />} />
+              {/* 财务：发票审核 */}
               <Route path="invoices" element={<AdminInvoicesPage />} />
               {/*
                * 旧路由重定向到新页面的对应标签。

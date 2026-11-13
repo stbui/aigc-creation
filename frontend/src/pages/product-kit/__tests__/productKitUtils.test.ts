@@ -16,7 +16,7 @@ import {
 } from '../utils';
 import type { GalleryItem, UploadedImage } from '../hooks';
 import type { Asset } from '../api';
-import type { PublicLogicalModel } from '../../../lib/models';
+import type { PublicModelGroup } from '../../../lib/models';
 
 /**
  * 商品主图「创作结果」归组与展示口径。
@@ -35,33 +35,24 @@ function item(over: Partial<GalleryItem> & { id: string }): GalleryItem {
   };
 }
 
-function mainImageModel(maxImages: number): PublicLogicalModel {
+function mainImageModel(maxImages: number): PublicModelGroup {
   return {
-    id: 'model-main-image',
-    code: 'main-image',
+    id: 'main_image:main-image',
+    modelKey: 'main-image',
     name: '仿真图像·main_image',
     icon: '',
     description: '',
     capability: 'main_image',
     sortOrder: 0,
-    pricePolicy: 'fixed',
-    pricingMode: 'fixed',
     displayPrice: 10,
     priceLabel: '10 积分',
-    billingMode: 'per_image',
-    unitPriceMicrocredits: 10_000_000,
-    inputPriceMicrocredits: 0,
-    outputPriceMicrocredits: 0,
-    cachedPriceMicrocredits: 0,
-    priceTiers: [],
-    legacyModelIds: [],
+    billingMode: 'fixed_request',
     capabilitySpec: {
       version: 1,
       capability: 'image',
       inputs: { image: { min: 1, max: maxImages } },
     },
-    capabilityProfiles: [],
-    defaultOptions: {},
+    supplyCount: 1,
     available: true,
   };
 }

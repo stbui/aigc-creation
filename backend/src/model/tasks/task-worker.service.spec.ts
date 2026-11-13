@@ -9,9 +9,8 @@ function attempt(overrides: Partial<RouteAttempt> = {}): RouteAttempt {
     taskId: 'task-1',
     routeRun: 1,
     attemptNumber: 1,
-    logicalModelId: 'logical-1',
-    logicalModelRevisionId: 'revision-1',
-    routeId: 'route-1',
+    capabilityId: 'free_create',
+    modelKey: 'gpt-image-2',
     channelModelId: 'channel-model-1',
     channelId: 'channel-1',
     status: 'selected',
@@ -85,19 +84,18 @@ function task(): GenerationTask {
     params: '{}',
     inputAssetIds: '[]',
     capability: 'free_create',
-    logicalModelId: 'logical-1',
-    logicalModelRevisionId: 'revision-1',
-    routeId: 'route-1',
+    modelKey: 'gpt-image-2',
     channelModelId: 'channel-model-1',
+    channelId: 'channel-1',
     createdAt: new Date(),
   } as GenerationTask;
 }
 
 const routed = {
-  logicalModel: { id: 'logical-1' },
-  revisionId: 'revision-1',
-  route: { id: 'route-1' },
+  capabilityId: 'free_create',
+  modelKey: 'gpt-image-2',
   channelModel: { id: 'channel-model-1', channelId: 'channel-1' },
+  pricing: {},
 } as never;
 
 describe('TaskWorkerService 派发状态机', () => {
@@ -175,7 +173,7 @@ describe('TaskWorkerService 派发状态机', () => {
     prisma.generationTask.findUnique.mockResolvedValue(current);
     const dispatch = vi.spyOn(worker as any, 'dispatch').mockResolvedValue('wait');
 
-    await expect((worker as any).switchRoute(current, {}, [], ['route-old'])).resolves.toBe('continue');
+    await expect((worker as any).switchRoute(current, {}, [], ['channel-model-old'])).resolves.toBe('continue');
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -184,7 +182,6 @@ describe('TaskWorkerService 派发状态机', () => {
     const current = task();
     (current as any).leaseOwner = (worker as any).owner;
     (current as any).billingOrderId = 'order-old';
-    (current as any).routeId = 'route-old';
     (current as any).channelModelId = 'channel-model-old';
     prisma.generationTask.findUnique.mockResolvedValue(current);
     attempts.listRun.mockResolvedValue([]);

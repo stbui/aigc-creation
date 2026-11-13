@@ -24,6 +24,7 @@ export { useLightboxIndex } from './useLightboxIndex';
 export { mediaHeightRatio, useMasonryColumns } from './useMasonryColumns';
 export { useMediaQuery } from './useMediaQuery';
 export { usePasteUpload } from './usePasteUpload';
+export { useTargetedAssetPicker } from './useTargetedAssetPicker';
 export { usePollAbort } from './usePollAbort';
 export { useProject } from './useProject';
 export {

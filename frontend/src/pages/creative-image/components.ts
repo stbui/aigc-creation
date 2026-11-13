@@ -5,18 +5,15 @@
  * 页面用到的共享控件集中可见, 替换或加埋点只改一处。
  * 目录内新增共享组件引用时在这里补一行 re-export。
  *
- * 第三方 UI 库 (antd / lucide-react) 不经本文件 —— 它们不是本项目的共享控件,
+ * 第三方 UI 库 (lucide-react) 不经本文件 —— 它们不是本项目的共享控件,
  * 与 `channels/` / `product-detail/` / `product-kit/` / `viral-clone/` 的做法一致。
  * 本目录自有的业务组件也不在此转出（避免循环引用），由页面直接 `./Xxx` 引入。
- * `useAssetLibrary` 属于 hook, 统一从 `./hooks` 取。
  */
 
-/** 底部提交栏 (生成按钮 + 价签 + 高级设置插槽) */
-export { ToolSubmitBar } from '../../components/ToolSubmitBar';
-/** 高级设置浮层 (比例 + 画质) */
-export { ToolSettingsPopover } from '../../components/ToolSettingsPopover';
-/** 模型选择 */
-export { ModelPicker } from '../../components/ModelPicker';
+/** 左栏底部提交区（高级设置 + 模型选择 + 主按钮） */
+export { ToolGenerationSubmitBar } from '../../components/ToolGenerationSubmitBar';
+/** 文本放大编辑弹窗 */
+export { ExpandTextModal } from '../../components/ExpandTextModal';
 /** 素材库选择弹窗 */
 export { AssetLibraryModal } from '../../components/AssetLibraryModal';
 /** 手机扫码上传弹窗 */

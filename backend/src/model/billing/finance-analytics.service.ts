@@ -48,6 +48,8 @@ export interface FinanceBreakdownRow {
   chargedMicrocredits: number;
   refundedMicrocredits: number;
   netMicrocredits: number;
+  costMicrocredits: number | null;
+  marginMicrocredits: number | null;
 }
 
 export interface FinanceDayRow {
@@ -58,6 +60,8 @@ export interface FinanceDayRow {
   chargedMicrocredits: number;
   refundedMicrocredits: number;
   netMicrocredits: number;
+  costMicrocredits: number | null;
+  marginMicrocredits: number | null;
 }
 
 export interface FinanceAnalyticsView {
@@ -72,8 +76,9 @@ export interface FinanceAnalyticsView {
     chargedMicrocredits: number;
     refundedMicrocredits: number;
     netMicrocredits: number;
-    costMicrocredits: number;
-    marginMicrocredits: number;
+    /** 存在已结算但成本快照不可计算时为 null，不能只累加已知部分 */
+    costMicrocredits: number | null;
+    marginMicrocredits: number | null;
     inputTokens: number;
     outputTokens: number;
     cachedTokens: number;
@@ -94,6 +99,8 @@ interface AggregateBucket {
   refundedOrders: number;
   charged: bigint;
   refunded: bigint;
+  cost: bigint;
+  costUnknown: boolean;
 }
 
 @Injectable()
@@ -143,6 +150,7 @@ export class FinanceAnalyticsService {
       charged: 0n,
       refunded: 0n,
       cost: 0n,
+      costUnknown: false,
       inputTokens: 0,
       outputTokens: 0,
       cachedTokens: 0,
@@ -169,19 +177,21 @@ export class FinanceAnalyticsService {
       }
       totals.charged += charged;
       totals.refunded += refunded;
-      if (row.status === 'settled' && row.costConfigured) {
-        const cost = costAmount(row);
-        if (cost !== null) totals.cost += cost;
+      let cost: bigint | null = null;
+      if (row.status === 'settled') {
+        cost = costAmount(row);
+        if (cost === null) totals.costUnknown = true;
+        else totals.cost += cost;
       }
       totals.inputTokens += Number(row.inputTokens ?? 0n);
       totals.outputTokens += Number(row.outputTokens ?? 0n);
       totals.cachedTokens += Number(row.cachedTokens ?? 0n);
 
-      accumulate(dayMap, dayKey(row.createdAt), row.status, charged, refunded, isRouteSwitch);
-      accumulate(modelMap, row.model || '(未命名模型)', row.status, charged, refunded, isRouteSwitch);
-      accumulate(channelMap, row.channelId || '(无渠道)', row.status, charged, refunded, isRouteSwitch);
-      accumulate(capabilityMap, row.capability || '(未声明)', row.status, charged, refunded, isRouteSwitch);
-      accumulate(sceneMap, row.scene || '(未声明)', row.status, charged, refunded, isRouteSwitch);
+      accumulate(dayMap, dayKey(row.createdAt), row.status, charged, refunded, cost, isRouteSwitch);
+      accumulate(modelMap, row.model || '(未命名模型)', row.status, charged, refunded, cost, isRouteSwitch);
+      accumulate(channelMap, row.channelId || '(无渠道)', row.status, charged, refunded, cost, isRouteSwitch);
+      accumulate(capabilityMap, row.capability || '(未声明)', row.status, charged, refunded, cost, isRouteSwitch);
+      accumulate(sceneMap, row.scene || '(未声明)', row.status, charged, refunded, cost, isRouteSwitch);
     }
 
     const net = totals.charged - totals.refunded;
@@ -197,8 +207,8 @@ export class FinanceAnalyticsService {
         chargedMicrocredits: micro(totals.charged),
         refundedMicrocredits: micro(totals.refunded),
         netMicrocredits: micro(net),
-        costMicrocredits: micro(totals.cost),
-        marginMicrocredits: micro(totals.charged - totals.cost),
+        costMicrocredits: totals.costUnknown ? null : micro(totals.cost),
+        marginMicrocredits: totals.costUnknown ? null : micro(net - totals.cost),
         inputTokens: totals.inputTokens,
         outputTokens: totals.outputTokens,
         cachedTokens: totals.cachedTokens,
@@ -254,12 +264,21 @@ function accumulate(
   status: string,
   charged: bigint,
   refunded: bigint,
+  cost: bigint | null,
   /** 换线的旧账单退款不计「退款订单」 */
   isRouteSwitchRefund = false,
 ): void {
   let bucket = target.get(key);
   if (!bucket) {
-    bucket = { orders: 0, settledOrders: 0, refundedOrders: 0, charged: 0n, refunded: 0n };
+    bucket = {
+      orders: 0,
+      settledOrders: 0,
+      refundedOrders: 0,
+      charged: 0n,
+      refunded: 0n,
+      cost: 0n,
+      costUnknown: false,
+    };
     target.set(key, bucket);
   }
   bucket.orders += 1;
@@ -267,6 +286,8 @@ function accumulate(
   if (status === 'refunded' && !isRouteSwitchRefund) bucket.refundedOrders += 1;
   bucket.charged += charged;
   bucket.refunded += refunded;
+  if (cost === null && status === 'settled') bucket.costUnknown = true;
+  else if (cost !== null) bucket.cost += cost;
 }
 
 function rank(map: Map<string, AggregateBucket>): FinanceBreakdownRow[] {
@@ -284,6 +305,10 @@ function toView(bucket: AggregateBucket): Omit<FinanceBreakdownRow, 'key' | 'lab
     chargedMicrocredits: micro(bucket.charged),
     refundedMicrocredits: micro(bucket.refunded),
     netMicrocredits: micro(bucket.charged - bucket.refunded),
+    costMicrocredits: bucket.costUnknown ? null : micro(bucket.cost),
+    marginMicrocredits: bucket.costUnknown
+      ? null
+      : micro(bucket.charged - bucket.refunded - bucket.cost),
   };
 }
 

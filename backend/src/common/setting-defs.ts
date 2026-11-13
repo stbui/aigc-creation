@@ -30,6 +30,8 @@ export interface SettingDef {
   nullable?: boolean;
   min?: number;
   max?: number;
+  /** 数字项是否只接受整数 */
+  integer?: boolean;
   maxLength?: number;
   /** 允许取值的枚举。命中时优先于 min/max —— 调度器等消费方按白名单判定 */
   enum?: number[];
@@ -38,7 +40,12 @@ export interface SettingDef {
   /** 字符串枚举值的展示文案；仅影响后台，不改变落库值 */
   optionLabels?: Record<string, string>;
   /** 后台控件覆盖；缺省为文本输入 */
-  control?: 'text' | 'image-upload';
+  control?: 'text' | 'password' | 'image-upload' | 'image-formats';
+  /**
+   * 敏感项：值在库内加密，后台读取只返回 hasSecret，不回显明文。
+   * 留空提交表示保留原值；需要清空时走 `clears` 删除运行时覆盖。
+   */
+  sensitive?: boolean;
   /** 分组, 前端按此渲染 Tab */
   group: SettingGroup;
   /** 只读项：真实旋钮在别处，页面上只作「配置地图」并给出跳转 */
@@ -58,89 +65,56 @@ export interface SettingDef {
  * 新增一组设置时, 这里与 SETTING_GROUP_LABELS 必须同时加。
  */
 export type SettingGroup =
-  | 'site'
   | 'upload'
   | 'generate'
   | 'refund'
   | 'payment'
+  | 'email'
   | 'backup'
-  | 'retention'
-  | 'security';
+  | 'retention';
 
 export const SETTING_DEFS: SettingDef[] = [
-  // ── 站点 ────────────────────────────────────────────────────────────
-  {
-    key: 'site.name',
-    label: '站点名称',
-    description:
-      '显示在页面标题与页脚。改品牌名需同时改扩展语言包、发票抬头与 AIGC 角标声明（合规动作），当前固定在代码里',
-    type: 'string',
-    default: '货觉AI',
-    maxLength: 40,
-    group: 'site',
-    readOnly: true,
-  },
-  {
-    key: 'site.maintenance',
-    label: '维护模式',
-    description:
-      '开启后 C 端只读，生成接口返回 503。用户仍可查看订单与申请退款。**闸门尚未上线，当前改动不生效**',
-    type: 'boolean',
-    default: false,
-    group: 'site',
-    // 闸门（全局 Guard）随下一版本上线。在那之前这里必须只读 ——
-    // 一个能拖动却不生效的开关，正是本轮要消灭的那类「配置与行为分叉」。
-    readOnly: true,
-  },
-
   // ── 上传 ────────────────────────────────────────────────────────────
   {
     key: 'upload.maxSizeMb',
-    label: '单文件大小上限',
-    description: '前端提示与后端校验同源，以后端为准',
+    label: '单文件大小上限（MB）',
+    description:
+      '限制单张图片的字节数，填写 1–100 的整数 MB。前端会提前提示，后端仍按此值校验。',
     type: 'number',
     default: 10,
     min: 1,
     max: 100,
+    integer: true,
     group: 'upload',
     public: true,
   },
   {
     key: 'upload.maxPixels',
-    label: '单图像素上限',
-    description: '超过此像素数的图片会被拒绝（解码炸弹防护）。单位：万像素',
+    label: '单图像素总量上限',
+    description:
+      '限制宽 × 高的像素总数，填写 1,000,000–200,000,000 的整数。超过后后端拒绝上传，避免解码超大图片。',
     type: 'number',
-    default: 4000,
-    min: 100,
-    max: 20000,
+    default: 40_000_000,
+    min: 1_000_000,
+    max: 200_000_000,
+    integer: true,
     group: 'upload',
     public: true,
   },
   {
     key: 'upload.allowedTypes',
-    label: '允许的文件类型',
-    description: '逗号分隔的扩展名，如 jpg,jpeg,png,webp',
+    label: '允许的图片格式',
+    description:
+      '至少保留一种格式。后端按文件内容识别真实格式，并把 JPEG 统一按 JPG 保存。',
     type: 'string',
-    default: 'jpg,jpeg,png,webp',
+    default: 'jpg,png,webp',
     maxLength: 200,
+    control: 'image-formats',
     group: 'upload',
     public: true,
   },
 
   // ── 生成 ────────────────────────────────────────────────────────────
-  {
-    key: 'generate.maxConcurrent',
-    label: '并发任务上限',
-    description:
-      '非会员用户的并发上限。会员按套餐权益计（会员套餐页配置）。0 = 不限',
-    type: 'number',
-    default: 0,
-    min: 0,
-    max: 20,
-    group: 'generate',
-    readOnly: true,
-    linkTo: '/admin/membership-plans',
-  },
   /*
    * 旧的 `generate.pollIntervalMs` / `generate.maxPolls` 随 P6 删除：
    * 轮询节奏由协议运行时决定（渠道模型上的 pollIntervalMs / maxPolls），
@@ -151,8 +125,7 @@ export const SETTING_DEFS: SettingDef[] = [
     key: 'generate.billingAutoRefund',
     label: '冻结积分自动退回',
     description:
-      '开启后，每分钟把「待核对」队列里确定没有交付的冻结积分自动退回：结果不明、运行超过 40 分钟、任务已失败/取消但仍预留。' +
-      '已出作品或正在补交付的订单会被排除。默认关闭 —— 待核对订单可能已在上游产生费用，是否自动退是运营口径，不是技术默认',
+      '开启后，账单清扫任务每 5 分钟检查一次：结果不明、运行超过 40 分钟，或任务已失败/取消但仍预留的冻结积分会自动退回。已出作品或正在补交付的订单不自动退回；关闭后保留在待核对队列，由后台人工处理。',
     type: 'boolean',
     default: false,
     group: 'generate',
@@ -358,6 +331,222 @@ export const SETTING_DEFS: SettingDef[] = [
     group: 'payment',
   },
 
+  // ── 邮件 ────────────────────────────────────────────────────────────
+  {
+    key: 'email.enabled',
+    label: '启用邮件通知',
+    description:
+      '总开关。关闭后注册验证码、找回密码、支付成功、工单回复与活动邮件都会停止真实投递；站内消息不受影响',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+  {
+    key: 'email.provider',
+    label: '投递通道',
+    description:
+      '选择邮件发送方式。“部署环境配置”沿用部署时设置的邮件服务；“SMTP 邮箱”支持 163 等标准 SMTP 服务；“本地记录”仅保存邮件内容，不实际发送；“自定义邮件接口”通过已对接的邮件服务接口发送；“阿里云邮件推送”通过阿里云邮件推送服务发送',
+    type: 'string',
+    options: ['env', 'smtp', 'console', 'http', 'aliyun'],
+    optionLabels: {
+      env: '部署环境配置',
+      smtp: 'SMTP 邮箱',
+      console: '本地记录',
+      http: '自定义邮件接口',
+      aliyun: '阿里云邮件推送',
+    },
+    default: 'env',
+    group: 'email',
+  },
+  {
+    key: 'email.from',
+    label: '发件地址',
+    description:
+      '用户在收件箱中看到的发件邮箱。SMTP 通道留空时使用 SMTP 登录账号；163 邮箱应填写完整邮箱地址。自定义邮件接口直接使用；阿里云邮件推送必须使用控制台已审核的发信地址',
+    type: 'string',
+    default: '',
+    maxLength: 200,
+    group: 'email',
+  },
+  {
+    key: 'email.fromAlias',
+    label: '发件人名称',
+    description: '邮件客户端展示的名称，如「货觉AI」。留空则只展示发件地址',
+    type: 'string',
+    default: '',
+    maxLength: 60,
+    group: 'email',
+  },
+  {
+    key: 'email.smtpHost',
+    label: 'SMTP 服务器',
+    description:
+      '选择 SMTP 邮箱时必填。163 邮箱填写 smtp.163.com；其他服务商请填写其官方 SMTP 服务器地址',
+    type: 'string',
+    default: '',
+    maxLength: 200,
+    group: 'email',
+  },
+  {
+    key: 'email.smtpPort',
+    label: 'SMTP 端口',
+    description:
+      'SMTP 服务端口。163 邮箱的 SSL 直连端口为 465；若服务商要求 STARTTLS，通常使用 587 并关闭 SSL 直连',
+    type: 'number',
+    default: 465,
+    min: 1,
+    max: 65535,
+    group: 'email',
+  },
+  {
+    key: 'email.smtpSecure',
+    label: 'SSL/TLS 直连',
+    description:
+      '开启后从建立连接起即使用 TLS，适用于 163 邮箱的 465 端口。587 等 STARTTLS 端口应关闭此选项',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+  {
+    key: 'email.smtpUser',
+    label: 'SMTP 登录账号',
+    description:
+      '通常是完整邮箱地址，例如 yourname@163.com。163 邮箱必须先在网页版设置中开启 SMTP 服务',
+    type: 'string',
+    default: '',
+    maxLength: 200,
+    group: 'email',
+  },
+  {
+    key: 'email.smtpPassword',
+    label: 'SMTP 客户端授权码',
+    description:
+      '163 邮箱需填写在网页版“设置 → POP3/SMTP/IMAP”中生成的客户端授权码，不能填写网页登录密码。授权码加密保存，读取接口不会回显',
+    type: 'string',
+    default: '',
+    maxLength: 1000,
+    group: 'email',
+    control: 'password',
+    sensitive: true,
+  },
+  {
+    key: 'email.httpApiUrl',
+    label: '自定义邮件接口地址',
+    description: '选择自定义邮件接口时必填。系统会按约定格式提交发件地址、收件人、主题与正文，并使用访问密钥完成身份验证',
+    type: 'string',
+    default: '',
+    maxLength: 500,
+    group: 'email',
+  },
+  {
+    key: 'email.httpApiKey',
+    label: '接口访问密钥',
+    description: '仅加密保存，读取接口不会回显。留空表示保持已保存的密钥不变',
+    type: 'string',
+    default: '',
+    maxLength: 1000,
+    group: 'email',
+    control: 'password',
+    sensitive: true,
+  },
+  {
+    key: 'email.aliyunAccessKeyId',
+    label: '阿里云 AccessKey ID',
+    description: '仅加密保存，读取接口不会回显。建议使用只授权邮件推送的最小权限子账号',
+    type: 'string',
+    default: '',
+    maxLength: 500,
+    group: 'email',
+    control: 'password',
+    sensitive: true,
+  },
+  {
+    key: 'email.aliyunAccessKeySecret',
+    label: '阿里云 AccessKey Secret',
+    description: '仅加密保存，读取接口不会回显。留空表示保持已保存的密钥不变',
+    type: 'string',
+    default: '',
+    maxLength: 1000,
+    group: 'email',
+    control: 'password',
+    sensitive: true,
+  },
+  {
+    key: 'email.aliyunDmAccountName',
+    label: '阿里云发信地址',
+    description: '阿里云邮件推送控制台已配置的发信地址；缺失时不能选择阿里云通道',
+    type: 'string',
+    default: '',
+    maxLength: 200,
+    group: 'email',
+  },
+  {
+    key: 'email.aliyunDmAddressType',
+    label: '阿里云地址类型',
+    description: '1 = 随机账号（发信地址）；0 = 批量发信。通常保持 1',
+    type: 'string',
+    options: ['1', '0'],
+    optionLabels: { '1': '随机账号（1）', '0': '批量发信（0）' },
+    default: '1',
+    group: 'email',
+  },
+  {
+    key: 'email.events.welcome',
+    label: '注册欢迎邮件',
+    description: '注册成功后发送欢迎与账号使用提示',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+  {
+    key: 'email.events.paymentSuccess',
+    label: '支付成功邮件',
+    description: '订单支付成功后发送金额、订单号与到账信息。邮箱发送失败不影响支付与积分入账',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+  {
+    key: 'email.events.creditGranted',
+    label: '积分到账邮件',
+    description: '积分实际到账时发送通知',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+  {
+    key: 'email.events.ticketReply',
+    label: '工单回复邮件',
+    description: '客服回复工单后通知用户。内部备注不会触发',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+  {
+    key: 'email.events.taskFailed',
+    label: '任务失败邮件',
+    description: '生成任务失败并完成积分处理结果后通知用户',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+  {
+    key: 'email.events.membershipExpired',
+    label: '会员到期邮件',
+    description: '会员到期状态迁移后通知用户',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+  {
+    key: 'email.events.broadcast',
+    label: '活动广播邮件',
+    description: '后台广播时可同时投递邮件；实际是否发送仍由广播弹窗中的勾选项决定',
+    type: 'boolean',
+    default: true,
+    group: 'email',
+  },
+
   // ── 退款 ────────────────────────────────────────────────────────────
   {
     key: 'refund.windowDays',
@@ -394,37 +583,15 @@ export const SETTING_DEFS: SettingDef[] = [
   // ── 数据安全 ────────────────────────────────────────────────────────
   {
     key: 'backup.frequencyDays',
-    label: '备份频次',
-    description: '每隔多少天自动备份一次。可选 1 / 7 / 30',
+    label: '自动备份周期（天）',
+    description:
+      '每隔 1 / 7 / 30 天执行一次自动备份。调度器每 10 分钟检查一次，到期后的下一个检查周期执行。',
     type: 'number',
     default: 1,
     enum: [1, 7, 30],
     group: 'backup',
   },
 
-  // ── 安全 ────────────────────────────────────────────────────────────
-  {
-    key: 'security.sessionTtlDays',
-    label: '会话有效期',
-    description: 'JWT 有效期，由环境变量 JWT_TTL 控制（当前 7d）。改代码里的环境变量并重启后生效',
-    type: 'number',
-    default: 7,
-    min: 1,
-    max: 30,
-    group: 'security',
-    readOnly: true,
-  },
-  {
-    key: 'security.passwordMinLength',
-    label: '密码最小长度',
-    description: '代码内三个 DTO 统一为 6 位（注册 / 重置密码 / 改密码）。改动需发版',
-    type: 'number',
-    default: 6,
-    min: 6,
-    max: 32,
-    group: 'security',
-    readOnly: true,
-  },
 ];
 
 export const SETTING_KEYS = SETTING_DEFS.map((d) => d.key);
@@ -434,14 +601,13 @@ export function findSettingDef(key: string): SettingDef | undefined {
 }
 
 export const SETTING_GROUP_LABELS: Record<SettingGroup, string> = {
-  site: '站点',
-  upload: '上传',
-  generate: '生成',
+  upload: '上传限制',
+  generate: '运行与生成',
   refund: '退款',
   payment: '支付',
+  email: '邮件',
   backup: '备份',
   retention: '保留期',
-  security: '安全',
 };
 
 /** 可下发 C 端的设置项（`GET /api/v1/settings` 只返回这些） */
@@ -475,6 +641,9 @@ export function validateSettingValue(def: SettingDef, raw: unknown): SettingValu
     const n = Number(raw);
     if (!Number.isFinite(n)) {
       throw new AppError(40001, `${def.label} 必须是数字`, 400);
+    }
+    if (def.integer && !Number.isInteger(n)) {
+      throw new AppError(40001, `${def.label} 必须是整数`, 400);
     }
     // 枚举优先于区间：`backup.frequencyDays` 只允许 1/7/30，
     // 区间校验放行 5 会让调度器静默跳过备份（静默停摆比报错危险得多）

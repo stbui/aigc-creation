@@ -69,7 +69,6 @@ export function RotateAnglePage() {
       capability="rotate"
       pageClass="product-retouch-page rotate-angle-page rotate-angle-grid"
       inputPaneClassName="rotate-angle-controls"
-      uploadActionsPlacement="above"
       title="旋转角度"
       desc="视角平滑旋转，细节立体呈现"
       upload={{ title: '上传图片', required: true, max: 1, hint: '支持 JPG、PNG、WebP，最多 1 张' }}

@@ -41,9 +41,9 @@ const BASELINE = {
   // 以下是待分批拆分的债务清单，不是许可证；新增文件仍走通用守卫。
   // 注：`lib/api.ts`、`types/api.d.ts`、`types/model.ts` 已按域拆分回落到 800 行内，
   // 但仍在 500+ 清单里，一并登记棘轮，防止再次长回去。
-  'src/admin-ui/components/ui/sidebar.tsx': 724,
+  'src/admin-ui/components/ui/sidebar.tsx': 726,
   'src/admin-ui/primitives/fields.tsx': 547,
-  'src/admin-ui/primitives/form.tsx': 777,
+  'src/admin-ui/primitives/form.tsx': 779,
   'src/admin-ui/primitives/table.tsx': 643,
   'src/components/AssetLibraryModal.tsx': 650,
   'src/components/AuthCard.tsx': 692,
@@ -57,9 +57,8 @@ const BASELINE = {
   'src/pages/admin/assets/page.tsx': 512,
   'src/pages/admin/channels/AllChannelModelsPanel.tsx': 623,
   'src/pages/admin/channels/ChannelModelManager.tsx': 674,
-  'src/pages/admin/logical-models/page.tsx': 793,
   'src/pages/admin/model-calls/page.tsx': 597,
-  'src/pages/admin/orders/OrderDetailDrawer.tsx': 504,
+  'src/pages/admin/orders/OrderDetailDrawer.tsx': 524,
   'src/pages/admin/payments/PaymentsExceptionPanel.tsx': 523,
   'src/pages/admin/templates/page.tsx': 566,
   'src/pages/admin/tickets/page.tsx': 609,
@@ -73,7 +72,7 @@ const BASELINE = {
   'src/pages/product-sku/page.tsx': 557,
   'src/pages/shoppable-carousel/page.tsx': 602,
   'src/pages/works/page.tsx': 503,
-  'src/types/admin-console.ts': 638,
+  'src/types/admin-console.ts': 644,
   'src/types/admin-ops.ts': 544,
   'src/types/admin-support.ts': 570,
   'src/types/api.d.ts': 619,

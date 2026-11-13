@@ -117,7 +117,7 @@ async function bootstrap(): Promise<void> {
     origin: cors.origin,
     credentials: true,
     /*
-     * ⚠ 必须包含 PUT: `PUT /api/v1/admin/credit-prices` 与营销规则更新
+     * ⚠ 必须包含 PUT: `PUT /api/v1/admin/capabilities/:id/pricing` 与营销规则更新
      * (`PUT /admin/invites/rules`、`PUT /admin/checkin/rules`) 都是 PUT。
      * 缺少它时浏览器预检直接失败, 表现为"跨域部署下这两页保存不生效",
      * 而本地同源开发 (Vite 代理) 一切正常 —— 典型的只在部署后复现的缺陷。

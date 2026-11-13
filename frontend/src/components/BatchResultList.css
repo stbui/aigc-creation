@@ -38,7 +38,6 @@
 
 .pd-result-date {
   flex: none;
-  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--text-body);
@@ -51,7 +50,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
   color: var(--text-desc);
 }
 
@@ -106,7 +104,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-strong);
-  font-size: 16px;
   font-weight: 700;
   line-height: 1.5;
 }
@@ -114,7 +111,6 @@
 .pd-result-card-title time {
   flex: none;
   color: var(--text-desc);
-  font-size: 12px;
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
 }
@@ -136,7 +132,6 @@
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-body);
-  font-size: 12px;
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
@@ -171,7 +166,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px;
   margin-bottom: 12px;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-control);
@@ -202,7 +196,6 @@
 .pd-result-card-source-empty {
   flex: none;
   color: var(--text-desc);
-  font-size: 12px;
 }
 
 .pd-result-regenerate {
@@ -217,7 +210,6 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--brand);
-  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -245,7 +237,6 @@
   border-radius: var(--radius-control);
   background: var(--brand);
   color: var(--card-bg);
-  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
@@ -278,7 +269,6 @@
 /* 模块名作为每张生成图的标题, 放在图片上方并提高层级 */
 .pd-result-card-grid .pd-result-label {
   color: var(--text-strong);
-  font-size: 14px;
   font-weight: 650;
 }
 
@@ -411,7 +401,6 @@
   border-radius: 9px;
   background: color-mix(in srgb, var(--text-strong) 72%, transparent);
   color: var(--card-bg);
-  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -425,7 +414,6 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 12px;
   color: var(--text-desc);
   cursor: default;
 }
@@ -472,7 +460,6 @@
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--danger-soft-bg) 78%, var(--card-bg));
   color: var(--danger-soft-text);
-  font-size: 12px;
   font-weight: 600;
   line-height: 1;
 }
@@ -510,7 +497,6 @@
 }
 
 .pd-result-label {
-  font-size: 12px;
   line-height: 1.5;
   color: var(--text-muted);
   text-align: center;
@@ -564,7 +550,6 @@
 /* 结果列表里的模板标签 */
 .pd-result-template {
   flex: none;
-  font-size: 12px;
   color: var(--brand);
   background: var(--brand-bg);
   border-radius: var(--radius-tag);

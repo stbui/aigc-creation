@@ -7,7 +7,7 @@ import {
   type VariantParam,
 } from './constants';
 import type { SkuResultItem, ToolAsset, ToolSettings } from './components';
-import { generateApi, newIdempotencyKey, resolveModelId } from './api';
+import { generateApi, newIdempotencyKey, resolveModelKey } from './api';
 import type { GalleryItem } from '../../hooks/useResultGallery';
 import { useProject } from '../../hooks/useProject';
 import { useGenerateError } from '../../hooks/useGenerateError';
@@ -53,6 +53,10 @@ export { useCreditCost } from '../../hooks/useCreditLabel';
 export { notifyCreditsChanged } from '../../context/CreditsContext';
 /** 素材库取数 */
 export { useAssetLibrary } from '../../hooks';
+/** 素材库 / 手机上传到指定图片位的通用接线 */
+export { useTargetedAssetPicker } from '../../hooks/useTargetedAssetPicker';
+/** SKU 草稿：模板图 / 区域 / 清单及编辑动作 */
+export { useSkuDraft } from './useSkuDraft';
 
 /**
  * SKU 批量生成：批次状态 + 建单 → 轮询 → 结果回填。
@@ -130,7 +134,7 @@ export function useSkuBatch({
         const projectId = await ensureProject();
         // 整批 SKU 共用同一个模型：版式一致性依赖同一线路，逐张解析可能在
         // 目录缓存过期时把一批图拆到两个模型上
-        const logicalModelId = await resolveModelId('sku_image');
+        const modelKey = await resolveModelKey('sku_image');
         const startResults = await Promise.allSettled(
           targets.map(async (planIndex) => {
             const item = plan.items[planIndex];
@@ -163,7 +167,7 @@ export function useSkuBatch({
             const { taskId } = await generateApi.start({
               projectId,
               capability: 'sku_image',
-              logicalModelId,
+              modelKey,
               idempotencyKey,
               inputAssetIds: [
                 plan.template.id,

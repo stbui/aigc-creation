@@ -167,7 +167,7 @@ export interface ProductBatchRow extends BatchRowBase {
 
 /** 按 batchId 归组商品图批次（主图 / 详情图字段完全一致） */
 export function buildProductBatchRows(items: GalleryItem[]): ProductBatchRow[] {
-  return buildBatchRows<ProductBatchRow>(
+  return buildBatchRows<Omit<ProductBatchRow, keyof BatchRowBase>>(
     items,
     (item) => ({
       prompt: textParam(item, 'description'),
@@ -175,7 +175,7 @@ export function buildProductBatchRows(items: GalleryItem[]): ProductBatchRow[] {
       meta: resultMetaOf(item),
     }),
     rowKeyOf,
-  );
+  ) as ProductBatchRow[];
 }
 
 /** 从任务参数提取结果卡参数摘要。缺失字段不补默认值，避免把旧任务伪装成新参数。 */

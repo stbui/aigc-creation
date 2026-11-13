@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 
 import { DETAIL_CAPABILITY } from './api';
-import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
+import { MAX_DESC_LEN, MAX_IMAGES } from './constants';
 import { ProductFormSection, ToolGenerationSubmitBar, ToolTypeTabs } from './components';
 import type { UploadedImage } from './hooks';
 import { DetailSectionPicker } from './DetailSectionPicker';
@@ -105,7 +105,6 @@ export function DetailInputPane({
           <ProductFormSection
             images={images}
             max={MAX_IMAGES}
-            maxMb={MAX_IMAGE_MB}
             uploading={uploading}
             fileInputRef={fileInputRef}
             onFiles={onFiles}

@@ -14,7 +14,7 @@ import {
 import { providerLabel } from './utils';
 import { useDraftList, type ListParams } from './useDraftList';
 
-/** 支付异常单的筛选与地址栏同步。 */
+/** 资金异常待办的筛选与地址栏同步。 */
 
 type PaymentExceptionQuery = {
   status?: string;
@@ -73,7 +73,7 @@ function exceptionChips(
   if (applied.providerId) {
     chips.push({
       key: 'providerId',
-      label: `渠道：${providerLabel(applied.providerId)}`,
+      label: `收款来源：${providerLabel(applied.providerId)}`,
       onClear: () => clear(['providerId']),
     });
   }
@@ -87,7 +87,7 @@ function exceptionChips(
   if (applied.overdue !== undefined) {
     chips.push({
       key: 'overdue',
-      label: `SLA：${applied.overdue === 'true' ? '已逾期' : '含未逾期'}`,
+      label: `处理时限：${applied.overdue === 'true' ? '已逾期' : '含未逾期'}`,
       onClear: () => clear(['overdue']),
     });
   }

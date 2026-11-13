@@ -13,8 +13,8 @@ export { ApiError, generateApi, newIdempotencyKey } from '../../lib/api';
 /** 模板清单接口；模板事实源在后端，前端不复制清单 */
 export { templateApi } from '../../lib/api';
 
-/** 前台模型目录数据层：建任务必须解析出 `logicalModelId` */
-export { resolveModelId } from '../../lib/models';
+/** 前台模型目录数据层：建任务必须解析出 `modelKey` */
+export { resolveModelKey } from '../../lib/models';
 
 export type {
   PortraitTemplatesResult,

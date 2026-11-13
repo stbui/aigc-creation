@@ -311,7 +311,7 @@ test.describe('营销中心', () => {
 test.describe('营销中心权限', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
-  test('侧栏「交易」分组含三个营销入口', async ({ page }) => {
+  test('侧栏「商品与交易」分组含三个营销入口', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/coupons`);
     const nav = page.getByTestId('admin-sider');
@@ -321,6 +321,6 @@ test.describe('营销中心权限', () => {
       });
     }
     // 分组标题仍在（宽视口不折叠）
-    await expect(nav.getByText('交易', { exact: true })).toBeVisible();
+    await expect(nav.getByText('商品与交易', { exact: true })).toBeVisible();
   });
 });

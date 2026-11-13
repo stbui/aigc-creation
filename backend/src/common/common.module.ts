@@ -2,6 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { SignedUrlService } from './signed-url.service';
 import { SettingsService } from './settings.service';
 import { SettingImageService } from './setting-image.service';
+import { SecretCipher } from '../model/infra/secret-cipher';
+import { SettingsController } from './settings.controller';
 
 /**
  * 横切关注点模块（B5）。
@@ -15,7 +17,8 @@ import { SettingImageService } from './setting-image.service';
  */
 @Global()
 @Module({
-  providers: [SignedUrlService, SettingsService, SettingImageService],
-  exports: [SignedUrlService, SettingsService, SettingImageService],
+  controllers: [SettingsController],
+  providers: [SignedUrlService, SettingsService, SettingImageService, SecretCipher],
+  exports: [SignedUrlService, SettingsService, SettingImageService, SecretCipher],
 })
 export class CommonModule {}

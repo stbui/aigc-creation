@@ -65,7 +65,7 @@ export function ToolEmptyState({
 /** 流程步骤条（配置参数 → 提交生成 → 查看结果），参考站结果栏空态的固定三步 */
 export function ToolWorkflowSteps() {
   return (
-    <div className="pk-workflow-steps">
+    <div className="pk-workflow-steps u-font-12">
       <span>
         <CircleCheck size={14} /> 配置参数
       </span>
@@ -95,7 +95,7 @@ export function ToolGeneratingState({ tip = '正在生成，请稍候…' }: { t
   return (
     <div className="pk-result-generating">
       <StateSkeleton variant="block" count={1} />
-      <p className="pk-result-generating-tip">{tip}</p>
+      <p className="pk-result-generating-tip u-font-12">{tip}</p>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { ListChecks, Settings2, ShieldAlert } from 'lucide-react';
+import { ChevronRight, ListChecks, ShieldAlert } from 'lucide-react';
 
 import {
   ActionButton,
@@ -16,13 +16,13 @@ import {
   type PaymentProviderState,
 } from './constants';
 import {
-  enabledInstanceCount,
+  instanceState,
   providerBlockingIssues,
   providerState,
   usableInstanceCount,
 } from './utils';
 
-/** 渠道图标：内联小方块，避免拉外链图片（后台不该有第三方资源依赖） */
+/** 来源图标：内联小方块，避免拉外链图片（后台不该有第三方资源依赖） */
 const PROVIDER_ACCENTS: Record<string, string> = {
   alipay: 'bg-brand/10 text-brand',
   wechat: 'bg-success-soft text-success-text',
@@ -38,12 +38,18 @@ const PROVIDER_GLYPHS: Record<string, string> = {
   zpay: 'Z',
 };
 
-/** 卡片顶边只做状态锚点，颜色仍由统一的语义令牌控制。 */
 const STATE_ACCENTS: Record<PaymentProviderState, string> = {
   usable: 'from-success-text via-success-text/50 to-transparent',
   misconfigured: 'from-danger-text via-danger-text/50 to-transparent',
   unconfigured: 'from-warn-text via-warn-text/50 to-transparent',
   disabled: 'from-border via-border/70 to-transparent',
+};
+
+const STATE_STORY: Record<PaymentProviderState, string> = {
+  usable: '客户可以正常付款，系统会优先使用可用通道。',
+  misconfigured: '已有付款受到影响，请尽快处理报错通道。',
+  unconfigured: '收款准备尚未完成，当前不会承接客户付款。',
+  disabled: '已停止承接新付款，历史交易不受影响。',
 };
 
 function ProviderIcon({ icon }: { icon: string }) {
@@ -61,10 +67,10 @@ function ProviderIcon({ icon }: { icon: string }) {
 }
 
 /**
- * 单个支付渠道卡片。
+ * 单个收款来源卡片。
  *
- * 双列卡片只承载运营扫读所需的信息：渠道身份、是否可收款、基础参数与
- * 阻断原因。动作收在卡片底部，避免每张卡都出现一块厚重按钮区。
+ * 卡片先回答「客户能不能付款」「还有多少通道要处理」，把实例 ID、版本号等
+ * 技术细节收进「查看并调整」，避免运营在一屏里读配置参数。
  */
 export function PaymentsProviderCard({
   provider,
@@ -83,8 +89,11 @@ export function PaymentsProviderCard({
   const fullMessage = blocking.join('；');
   const summary = blocking[0]?.split(/[：:]/, 1)[0];
   const totalInstances = provider.instances.length;
-  const enabledInstances = enabledInstanceCount(provider);
   const usableInstances = usableInstanceCount(provider);
+  const attentionInstances = provider.instances.filter((instance) => {
+    const instanceStatus = instanceState(instance);
+    return instanceStatus === 'misconfigured' || instanceStatus === 'unconfigured';
+  }).length;
 
   return (
     <Card
@@ -94,10 +103,10 @@ export function PaymentsProviderCard({
       data-usable={usable ? 'true' : 'false'}
       data-state={state}
       data-instance-count={totalInstances}
-      data-enabled-instance-count={enabledInstances}
+      data-enabled-instance-count={provider.instances.filter((instance) => instance.enabled).length}
       data-usable-instance-count={usableInstances}
       className={cn(
-        'group relative h-full min-h-[146px] gap-0 overflow-hidden rounded-xl border bg-card py-0 shadow-card transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+        'group relative h-full min-h-[184px] gap-0 overflow-hidden rounded-xl border bg-card py-0 shadow-card transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg',
         danger
           ? 'border-danger-soft bg-danger-soft/10 hover:border-danger-text/25'
           : 'border-border hover:border-primary/20',
@@ -117,9 +126,15 @@ export function PaymentsProviderCard({
           <CardTitle className="truncate text-[15px] leading-5 font-semibold">
             {provider.name}
           </CardTitle>
-          <code className="mt-1 block truncate font-mono text-[12px] leading-4 text-muted-foreground">
-            {provider.id}
-          </code>
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+            <span className="truncate">支持 {provider.supportedCurrencies.join(' / ')}</span>
+            {provider.supportsReconciliation && (
+              <span className="flex items-center gap-1">
+                <ListChecks className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden />
+                自动核对
+              </span>
+            )}
+          </div>
         </div>
         <StatusTag
           status={state}
@@ -129,30 +144,37 @@ export function PaymentsProviderCard({
         />
       </CardHeader>
 
-      <CardContent className="px-4 pb-0">
-        <div className="grid grid-cols-3 divide-x divide-border/60 border-y border-border/60">
-          <div className="min-w-0 py-2.5 pr-3">
-            <div className="text-[12px] leading-4 text-muted-foreground">实例总数</div>
-            <div className="mt-0.5 truncate text-[13px] leading-4 font-semibold text-foreground tabular-nums">
-              {totalInstances} 个
+      <CardContent className="flex flex-1 flex-col px-4 pb-2">
+        <p className="m-0 text-[12px] leading-5 text-muted-foreground">
+          {STATE_STORY[state]}
+        </p>
+
+        <div className="mt-3 grid grid-cols-2 divide-x divide-border/60 rounded-lg border border-border/60 bg-muted/20">
+          <div className="min-w-0 px-3 py-2.5">
+            <div className="text-[12px] leading-4 text-muted-foreground">可用通道</div>
+            <div className="mt-0.5 truncate text-[14px] leading-5 font-semibold text-foreground tabular-nums">
+              {usableInstances}
+              <span className="ml-1 text-[12px] font-normal text-muted-foreground">
+                / {totalInstances} 条
+              </span>
             </div>
           </div>
           <div className="min-w-0 px-3 py-2.5">
-            <div className="text-[12px] leading-4 text-muted-foreground">已启用</div>
-            <div className="mt-0.5 truncate text-[13px] leading-4 font-semibold text-foreground tabular-nums">
-              {enabledInstances} 个
-            </div>
-          </div>
-          <div className="min-w-0 py-2.5 pl-3">
-            <div className="text-[12px] leading-4 text-muted-foreground">可用实例</div>
-            <div className="mt-0.5 truncate text-[13px] leading-4 font-semibold text-foreground tabular-nums">
-              {usableInstances} 个
+            <div className="text-[12px] leading-4 text-muted-foreground">需要处理</div>
+            <div
+              className={cn(
+                'mt-0.5 truncate text-[14px] leading-5 font-semibold tabular-nums',
+                attentionInstances > 0 ? 'text-danger-text' : 'text-foreground',
+              )}
+            >
+              {attentionInstances}
+              <span className="ml-1 text-[12px] font-normal text-muted-foreground">条通道</span>
             </div>
           </div>
         </div>
 
         {blocking.length > 0 && (
-          <div className="flex min-w-0 items-start gap-1.5 py-2.5 text-danger-text">
+          <div className="mt-2 flex min-w-0 items-start gap-1.5 text-danger-text">
             <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             <span className="truncate text-[12px] leading-5" title={fullMessage}>
               {summary}
@@ -161,29 +183,20 @@ export function PaymentsProviderCard({
         )}
       </CardContent>
 
-      <CardFooter className="mt-auto flex items-center justify-between gap-3 px-4 pt-2 pb-3">
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
-          <span className="truncate">支持 {provider.supportedCurrencies.join(' / ')}</span>
-          {provider.supportsReconciliation && (
-            <span className="flex items-center gap-1.5">
-              <ListChecks className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden />
-              自动对账
-            </span>
-          )}
-        </span>
+      <CardFooter className="mt-auto flex items-center justify-end gap-3 px-4 pt-2 pb-3">
         <ActionButton
           variant="ghost"
           size="xs"
-          icon={Settings2}
+          icon={ChevronRight}
           onClick={onConfigure}
           ariaLabel={
             writable
-              ? `管理${provider.name}的服务商实例`
-              : `查看${provider.name}的服务商实例`
+              ? `查看并调整${provider.name}收款来源`
+              : `查看${provider.name}收款来源`
           }
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
-          {writable ? '管理实例' : '查看实例'}
+          {writable ? '查看并调整' : '查看详情'}
         </ActionButton>
       </CardFooter>
     </Card>

@@ -45,7 +45,7 @@ export function ShoppableCarouselShowcase({
   );
 
   return (
-    <>
+    <section className="sc-showcase" aria-label="带货图文模板">
       <nav className="sc-categories" aria-label="模板分类">
         <button
           type="button"
@@ -86,6 +86,6 @@ export function ShoppableCarouselShowcase({
         onRefresh={onRefreshGallery}
         onOpenAll={onOpenAll}
       />
-    </>
+    </section>
   );
 }

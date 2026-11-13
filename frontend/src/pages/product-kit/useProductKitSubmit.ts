@@ -67,12 +67,12 @@ export interface UseProductKitSubmitOptions {
 }
 
 type PreparedInputs =
-  | { ok: true; projectId: string; logicalModelId: string; inputAssetIds: string[] }
+  | { ok: true; projectId: string; modelKey: string; inputAssetIds: string[] }
   | { ok: false; reason: string };
 
 interface BatchContext {
   projectId: string;
-  logicalModelId: string;
+  modelKey: string;
   inputAssetIds: string[];
   baseParams: Record<string, string>;
   plan: string[];
@@ -88,12 +88,12 @@ interface BatchContext {
  * 但重拉列表能看到已创建的任务。
  */
 async function createTasks(context: BatchContext, onCreated: () => void): Promise<void> {
-  const { projectId, logicalModelId, inputAssetIds, baseParams, plan, batchId, keys } = context;
+  const { projectId, modelKey, inputAssetIds, baseParams, plan, batchId, keys } = context;
   for (let i = 0; i < plan.length; i += 1) {
     await generateApi.start({
       projectId,
       capability: PRODUCT_KIT_CAPABILITY,
-      logicalModelId,
+      modelKey,
       inputAssetIds,
       idempotencyKey: keys[i],
       params: {
@@ -163,7 +163,7 @@ export function useProductKitSubmit({
     return {
       ok: true,
       projectId,
-      logicalModelId: model.id,
+      modelKey: model.id,
       inputAssetIds: preparedImages.map((image) => image.id),
     };
   }, [form.images, ensureProject, onReplaceImage]);
@@ -195,7 +195,7 @@ export function useProductKitSubmit({
       const plan = buildVariantPlan(form.counts);
       const batchInput = {
         projectId: prepared.projectId,
-        logicalModelId: prepared.logicalModelId,
+        modelKey: prepared.modelKey,
         inputAssetIds: prepared.inputAssetIds,
         baseParams,
         plan,

@@ -5,7 +5,7 @@ import { generationRequestFingerprint, TaskAdmissionService } from './task-admis
 const DTO = {
   projectId: 'project-1',
   capability: 'main_image',
-  logicalModelId: 'model-1',
+  modelKey: 'model-1',
   inputAssetIds: ['asset-1', 'asset-2'],
   params: { prompt: '商品图', options: { ratio: '1:1', quality: 'high' } },
 };
@@ -71,7 +71,7 @@ describe('TaskAdmissionService 请求指纹幂等', () => {
 
   it.each([
     ['参数', { ...DTO, params: { ...DTO.params, prompt: '另一张图' } }],
-    ['模型', { ...DTO, logicalModelId: 'model-2' }],
+    ['模型', { ...DTO, modelKey: 'model-2' }],
     ['素材顺序', { ...DTO, inputAssetIds: ['asset-2', 'asset-1'] }],
   ])('%s不同时拒绝复用幂等键', async (_label, changed) => {
     const { service } = setup({

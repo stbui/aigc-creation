@@ -41,18 +41,18 @@ import { ReconciliationDetailDrawer } from './ReconciliationDetailDrawer';
 import { ReconciliationToolbar } from './ReconciliationToolbar';
 
 /**
- * 支付对账标签。
+ * 交易核对标签。
  *
  * 与旧版「人工导入账单 + 逐笔处置」是两种东西：
  *
  * 旧版让人上传渠道账单 CSV，逐条勾「已处理 / 已忽略」—— 处置动作只改数据库
  * 状态，钱一分没动，看板上却消失了。
  *
- * 新版由系统每天 10:15 自动下载渠道账单并比对，发现「渠道已收款但本地没入账」
- * 会自动补发积分；失败可在同一账单日重跑。**页面只展示结果，不提供改钱入口**。
+ * 新版由系统每天 10:15 自动下载交易流水并比对，发现「渠道已收款但本地没入账」
+ * 会自动补单；失败可在同一账单日重新核对。**页面只展示结果，不提供改钱入口**。
  * 人工要处理的是「渠道重复扣款」「本地多记了一笔」这类真异常，走订单退款流程。
  *
- * 执行与筛选共用工具栏里的同一套渠道 + 账单日（见 `ReconciliationToolbar`），
+ * 执行与筛选共用工具栏里的同一套收款来源 + 账单日（见 `ReconciliationToolbar`），
  * 执行成功后列表切到本次执行的条件。
  */
 
@@ -101,7 +101,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
   const runProvider = filterValues.providerId;
   const runProviderInstance = filterValues.providerInstanceId;
   const runBillDate = filterValues.billDate;
-  const runProviderLabel = runProvider ? providerLabel(runProvider) : '所选渠道';
+  const runProviderLabel = runProvider ? providerLabel(runProvider) : '所选收款来源';
 
   /** 可参与对账的分组：渠道支持账单下载，且至少有一个配置完整的实例。 */
   const reconcilableGroups = useMemo(
@@ -168,7 +168,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
   );
   const runInstanceLabel = runInstance
     ? instanceLabel(runInstance)
-    : (runProviderInstance ?? '所选实例');
+    : (runProviderInstance ?? '所选通道');
 
   const importGroup = reconcilableGroups.find(
     (group) => group.provider.id === importProvider,
@@ -194,7 +194,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
     },
     {
       key: 'provider',
-      title: '渠道 / 实例',
+      title: '收款来源 / 通道',
       width: 170,
       render: (row) => (
         <div className="min-w-0">
@@ -227,7 +227,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
     },
     {
       key: 'recoveredItems',
-      title: '自动补发',
+      title: '自动补单',
       width: 90,
       render: (row) => (
         <span
@@ -241,7 +241,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
     },
     {
       key: 'errorItems',
-      title: '异常',
+      title: '待处理差异',
       width: 70,
       render: (row) => (
         <span
@@ -268,7 +268,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       title: '操作',
       width: 80,
       render: (row) => (
-        <ActionButton onClick={() => setDetailId(row.id)} ariaLabel="查看对账明细">
+        <ActionButton onClick={() => setDetailId(row.id)} ariaLabel="查看交易核对明细">
           查看
         </ActionButton>
       ),
@@ -311,10 +311,10 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       />
 
       {providers.error && (
-        <Notice tone="danger" title="支付渠道实例加载失败">
+        <Notice tone="danger" title="收款来源加载失败">
           <div className="flex items-center gap-2">
             <span className="min-w-0 flex-1">
-              {providers.error}。执行对账、导入与渠道筛选暂不可用。
+              {providers.error}。开始核对、导入与收款来源筛选暂不可用。
             </span>
             <ActionButton
               variant="secondary"
@@ -332,8 +332,8 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       )}
 
       <Panel
-        title="对账运行"
-        note="系统每天 10:15 后自动对账昨日账单；渠道账单自动下载比对，异常项会补发积分，失败可在同一账单日重跑"
+        title="交易核对记录"
+        note="系统每天 10:15 后自动核对昨日交易；发现已付款未入账会自动补单，失败可在同一账单日重新核对"
       >
         {error && data && <StaleError error={error} onRetry={() => void reload()} />}
         <AdminDataTable
@@ -344,7 +344,9 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
           error={data ? null : error}
           onRetry={() => void reload()}
           emptyText={
-            appliedChips.length > 0 ? '当前筛选下没有对账记录，清除筛选后再试' : '还没有对账记录'
+            appliedChips.length > 0
+              ? '当前筛选下没有交易核对记录，清除筛选后再试'
+              : '还没有交易核对记录'
           }
           emptyAction={
             appliedChips.length > 0 ? (
@@ -365,12 +367,12 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
 
       <ConfirmDialog
         open={runOpen}
-        title="执行对账"
-        description={`系统会向${runProviderLabel} / ${runInstanceLabel} 下载 ${runBillDate || '—'} 的交易流水并与本地支付记录比对。若发现渠道已收款但本地未入账，会幂等补发积分。`}
+        title="开始交易核对"
+        description={`系统会下载${runProviderLabel} · ${runInstanceLabel} 在 ${runBillDate || '—'} 的交易流水，并与本地支付记录比对。若发现渠道已收款但本地未入账，会自动补单。`}
         impact={[
-          '下载并比对渠道账单',
-          '发现已支付未入账的订单会自动补发积分',
-          '同一账单日重复执行会新增一次运行记录',
+          '下载并比对收款交易流水',
+          '发现已付款未入账的订单会自动补单',
+          '同一账单日重复核对会新增一条记录',
         ]}
         confirmText="确认执行"
         loading={busy}
@@ -386,13 +388,15 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
               billDate: runBillDate,
             });
             toast.success(
-              result.reused ? '该账单日已有一次成功的运行记录，已复用' : '对账已执行完成',
+              result.reused
+                ? '该账单日已有一次成功的核对记录，已复用'
+                : '交易核对已完成',
             );
             setRunOpen(false);
             // 执行条件与列表筛选同源：成功后把列表切到本次执行的渠道 + 账单日
             applyFilters();
           } catch (e) {
-            toast.error(e instanceof Error ? e.message : '执行失败');
+            toast.error(e instanceof Error ? e.message : '核对失败');
           } finally {
             setBusy(false);
           }
@@ -401,8 +405,8 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
 
       <ConfirmDialog
         open={importOpen}
-        title="导入对账单"
-        description="渠道账单接口不可用时的兜底入口。导入后仍会逐笔核对，不一致的行进入差异列表。"
+        title="导入交易流水"
+        description="自动获取流水失败时的兜底入口。导入后仍会逐笔核对，不一致的记录会进入待处理差异。"
         impact={['按商户订单号与本地订单比对', '支付宝支持 ZIP 内的 CSV', '超过 10000 行会拒绝导入']}
         confirmText="确认导入"
         confirmDisabled={
@@ -420,7 +424,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
               providerInstanceId: importInstance,
               billDate: importBillDate,
             });
-            toast.success('对账单已导入');
+            toast.success('交易流水已导入');
             setImportOpen(false);
             reload();
           } catch (e) {
@@ -431,7 +435,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         }}
         extra={
           <div className="flex flex-col gap-3">
-            <FormField label="渠道" required>
+            <FormField label="收款来源" required>
               <SelectField
                 value={importProvider || undefined}
                 onChange={(value) => {
@@ -439,17 +443,17 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
                   setImportInstance('');
                 }}
                 options={reconcilableProviders}
-                placeholder="选择渠道"
-                ariaLabel="导入对账渠道"
+                placeholder="选择收款来源"
+                ariaLabel="导入收款来源"
               />
             </FormField>
-            <FormField label="服务商实例" required>
+            <FormField label="收款通道" required>
               <SelectField
                 value={importInstance || undefined}
                 onChange={(value) => setImportInstance(value ?? '')}
                 options={importInstanceOptions}
-                placeholder={importProvider ? '选择实例' : '先选渠道'}
-                ariaLabel="导入对账服务商实例"
+                placeholder={importProvider ? '选择通道' : '先选收款来源'}
+                ariaLabel="导入收款通道"
                 disabled={!importProvider}
               />
             </FormField>
@@ -463,7 +467,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
               />
             </FormField>
             <FormField
-              label="对账单文件"
+              label="交易流水文件"
               required
               hint={importProvider === 'alipay' ? 'CSV，或支付宝导出的 ZIP' : 'CSV'}
             >
@@ -472,7 +476,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
                 accept={importProvider === 'alipay' ? '.csv,.zip' : '.csv'}
                 onPick={setImportFile}
                 onClear={() => setImportFile(null)}
-                label="选择对账单"
+                label="选择交易流水"
                 hint={importProvider === 'alipay' ? 'CSV / ZIP' : 'CSV'}
               />
             </FormField>

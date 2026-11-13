@@ -68,10 +68,10 @@ export function BatchResultCardList<Row extends BatchCardRow>({
       cellLabelOf={(item) => labelOf(item)}
       renderRowTitle={(row) => (
         <div className="pd-result-card-title">
-          <strong title={`商品：${row.productName || '未命名商品'}`}>
+          <strong className="u-font-16" title={`商品：${row.productName || '未命名商品'}`}>
             商品：{row.productName || '未命名商品'}
           </strong>
-          <time dateTime={row.createdAt}>{formatBatchDate(row.createdAt) || '时间未知'}</time>
+          <time className="u-font-12" dateTime={row.createdAt}>{formatBatchDate(row.createdAt) || '时间未知'}</time>
         </div>
       )}
       renderRowMeta={(row) => {
@@ -80,12 +80,12 @@ export function BatchResultCardList<Row extends BatchCardRow>({
           <>
             {META_KEYS.map((key) =>
               row.meta?.[key] ? (
-                <span className="pd-result-meta-chip" key={key}>
+                <span className="pd-result-meta-chip u-font-12" key={key}>
                   {row.meta[key]}
                 </span>
               ) : null,
             )}
-            <span className={`pd-result-status is-${status.tone}`}>{status.label}</span>
+            <span className={`pd-result-status u-font-12 is-${status.tone}`}>{status.label}</span>
           </>
         );
       }}

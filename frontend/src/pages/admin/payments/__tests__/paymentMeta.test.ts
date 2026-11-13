@@ -11,11 +11,15 @@ import {
 } from '../constants';
 import {
   allowedPaymentMethods,
+  instanceBlockingIssues,
+  instanceLabel,
   instanceState,
   isValidReconciliationBillDate,
   missingRequiredLabels,
   moneyText,
   ninetyDaysAgo,
+  paymentConfigDescription,
+  paymentWarningText,
   providerLabel,
   providerState,
   providerWithInstances,
@@ -92,6 +96,64 @@ describe('标签映射', () => {
         label: meta.label,
       })),
     );
+  });
+});
+
+describe('收款通道运营文案', () => {
+  it('未命名通道不展示内部编号', () => {
+    expect(instanceLabel({ instanceId: 'default', name: null })).toBe('默认通道');
+    expect(instanceLabel({ instanceId: 'inst_01JABCDEF', name: null })).toBe('未命名通道');
+    expect(instanceLabel({ instanceId: 'inst_01JABCDEF', name: '支付宝主账号' })).toBe(
+      '支付宝主账号',
+    );
+  });
+
+  it('后端技术告警转换为运营可执行的提示', () => {
+    expect(
+      paymentWarningText(
+        '实例已启用但缺少必填项：appId, privateKey。发起支付会返回 503。',
+      ),
+    ).toBe('通道已启用，但接入信息尚未补齐，客户付款会失败。请先补齐必填项。');
+    expect(
+      paymentWarningText(
+        '实例已启用但未配置回调公网地址：请在实例配置填写 publicBaseUrl，或设置 PAYMENT_NOTIFY_BASE；否则发起支付会返回 503。',
+      ),
+    ).toBe('通道已启用，但回调公网地址尚未准备好，客户付款会失败。请先补齐回调地址。');
+    expect(
+      paymentWarningText(
+        '生产环境未配置 PAYMENT_SECRET_KEY，支付实例凭据无法安全加密/解密。',
+      ),
+    ).toBe('支付安全配置尚未完成，通道当前无法收款。请联系技术同事处理。');
+  });
+
+  it('阻断项只取危险告警并统一为通道口径', () => {
+    expect(
+      instanceBlockingIssues({
+        warnings: [
+          { level: 'warn', message: '提醒信息' },
+          {
+            level: 'danger',
+            message: '实例已启用但缺少必填项：merchantId。发起支付会返回 503。',
+          },
+        ],
+      }),
+    ).toEqual(['通道已启用，但接入信息尚未补齐，客户付款会失败。请先补齐必填项。']);
+  });
+
+  it('接入字段说明不暴露环境变量与内部接口路径', () => {
+    expect(
+      paymentConfigDescription(
+        '例如 https://pay.example.com；留空使用 PAYMENT_NOTIFY_BASE',
+      ),
+    ).toBe('例如 https://pay.example.com；留空使用系统统一的回调地址');
+    expect(
+      paymentConfigDescription(
+        '默认 https://zpayz.cn；适配器自动拼接 /mapi.php 与 /api.php',
+      ),
+    ).toBe('默认 https://zpayz.cn；系统会自动拼接支付接口路径');
+    expect(
+      paymentConfigDescription('文档取值：支付宝 alipay，微信支付 wxpay'),
+    ).toBe('');
   });
 });
 
@@ -343,13 +405,13 @@ describe('多实例支付渠道规则', () => {
     });
     expect(sourceAvailability([epay], 'CNY', 'alipay', 'official')).toEqual({
       ok: false,
-      reason: '尚未创建对应官方渠道',
+      reason: '尚未开通官方收款来源',
     });
 
     const official = provider();
     expect(sourceAvailability([official], 'CNY', 'alipay', 'epay')).toEqual({
       ok: false,
-      reason: '尚未创建易支付渠道',
+      reason: '尚未开通易支付收款来源',
     });
   });
 
@@ -359,7 +421,7 @@ describe('多实例支付渠道规则', () => {
     });
     expect(sourceAvailability([disabled], 'CNY', 'alipay', 'official')).toEqual({
       ok: false,
-      reason: '支付宝官方没有已启用的支付宝实例',
+      reason: '支付宝官方没有已启用的支付宝收款通道',
     });
 
     const missing = provider({
@@ -367,7 +429,7 @@ describe('多实例支付渠道规则', () => {
     });
     expect(sourceAvailability([missing], 'CNY', 'alipay', 'official')).toEqual({
       ok: false,
-      reason: '支付宝官方的已启用实例配置不完整',
+      reason: '支付宝官方的收款通道尚未准备完成',
     });
   });
 

@@ -407,6 +407,7 @@ export class TicketsService {
       fallbackTitle: '工单有新回复',
       fallbackBody: `工单 ${ticket.ticketNo} 已由客服回复。`,
       link: '/tickets',
+      emailEvent: 'ticket_reply',
     });
 
     return this.adminDetail(id);

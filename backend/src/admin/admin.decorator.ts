@@ -7,6 +7,9 @@ import {
 /** 权限点元数据键 */
 export const PERMISSION_KEY = "admin:permission";
 
+/** 「任一权限即可」元数据键 */
+export const ANY_PERMISSION_KEY = "admin:anyPermission";
+
 /** 「只要求后台身份」标记的元数据键 */
 export const IDENTITY_ONLY_KEY = "admin:identityOnly";
 
@@ -28,6 +31,17 @@ export const RequirePermission = (permission: string) =>
  */
 export const RequireAllPermissions = (...permissions: string[]) =>
   SetMetadata(PERMISSION_KEY, permissions);
+
+/**
+ * 声明端点满足任意一个权限点即可访问。
+ *
+ * 用于同一份只读数据存在多个合法入口权限的场景，例如「能力与模型」：
+ * 能力运营有 `capability.read`，模型运营有 `logical_model.read`，两者都应
+ * 能查看同一份能力清单。写操作仍必须使用 `@RequirePermission`，不能因为
+ * 读权限放宽而连带放开写权限。
+ */
+export const RequireAnyPermissions = (...permissions: string[]) =>
+  SetMetadata(ANY_PERMISSION_KEY, permissions);
 
 /**
  * 声明该端点**只需后台身份, 不需要权限点**。

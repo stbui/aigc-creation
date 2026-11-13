@@ -10,7 +10,7 @@ import { PricingModule } from './pricing.module';
  *
  * CreditService 被 OrderService(发积分/退款扣回) 与 GenerateService(生成扣费) 共用,
  * 因此导出 —— 多实例会导致两处看到不同的余额快照。
- * CreditPriceService 同样导出: 生成链路要在建任务前取价, 改价链路在后台。
+ * CreditPriceService 同样导出: 生成链路在准入与报价时判定限时免费。
  *
  * 批次与流水由 `ModelModule` 导出的 `CreditWalletService` 落账（微积分口径），
  * 本模块不再直接写 `CreditLot` / `CreditLedgerEntry`。

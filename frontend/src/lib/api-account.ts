@@ -1,5 +1,5 @@
 import { request, toQuery, downloadCsv } from "./api";
-import type { AdminTicketAssignee, AdminTicketDetail, AdminTicketListResult, CreateTicketPayload, DeletionPreview, DeliveryChannelStatusMap, MessageTemplateItem, MyProfile, NotificationList, Ticket, TicketListResult, TicketStats } from "../types/api";
+import type { AdminTicketAssignee, AdminTicketDetail, AdminTicketListResult, BroadcastPayload, BroadcastResult, CreateTicketPayload, DeletionPreview, DeliveryChannelStatusMap, EmailTestResult, MessageTemplateItem, MyProfile, NotificationList, Ticket, TicketListResult, TicketStats } from "../types/api";
 
 /**
  * 账户自助 (B4)。
@@ -56,10 +56,16 @@ export const notificationsApi = {
 
 /** 后台：站内消息广播与模板 */
 export const adminNotificationsApi = {
-  broadcast: (data: { title: string; body: string; link?: string }) =>
-    request<{ sent: number; users: number }>("/admin/notifications/broadcast", {
+  broadcast: (data: BroadcastPayload) =>
+    request<BroadcastResult>("/admin/notifications/broadcast", {
       method: "POST",
       body: data,
+    }),
+
+  testEmail: (to: string) =>
+    request<EmailTestResult>("/admin/notifications/email/test", {
+      method: "POST",
+      body: { to },
     }),
 
   templates: () =>

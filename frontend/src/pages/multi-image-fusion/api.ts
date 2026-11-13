@@ -21,5 +21,5 @@ export {
   toAbsoluteUrl,
 } from '../../lib/api';
 
-/** 前台模型目录数据层: 建任务必须解析出 `logicalModelId` */
-export { resolveModelId } from '../../lib/models';
+/** 前台模型目录数据层: 建任务必须解析出 `modelKey` */
+export { resolveModelKey } from '../../lib/models';

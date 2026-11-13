@@ -166,6 +166,7 @@ export function AdminChannelsPage() {
               <Suspense fallback={<SkeletonBody rows={8} />}>
                 <AllChannelModelsPanel
                   writable={modelWritable}
+                  canTest={canTest}
                   consumption={consumption}
                   onChanged={() => void reload()}
                   onOpenChannel={openChannel}

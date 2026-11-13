@@ -175,18 +175,11 @@ export async function deleteChannelModels(
   });
   if (existing.length !== unique.length) throw new ChannelNotFoundError();
 
-  // 前台模型生效中的 revision 仍引用这些渠道模型时不允许删除
-  const activeRevisions = await tx.logicalModel.findMany({
-    where: { archivedAt: null, activeRevisionId: { not: '' } },
-    select: { activeRevisionId: true },
+  // 能力绑定仍引用这些渠道模型时不允许删除：删掉会让该能力的候选池凭空少一条
+  const references = await tx.capabilityModelBinding.count({
+    where: { channelModelId: { in: unique } },
   });
-  const revisionIds = activeRevisions.map((row) => row.activeRevisionId);
-  if (revisionIds.length > 0) {
-    const references = await tx.logicalModelRoute.count({
-      where: { logicalModelRevisionId: { in: revisionIds }, channelModelId: { in: unique } },
-    });
-    if (references > 0) throw new ChannelModelInUseError();
-  }
+  if (references > 0) throw new ChannelModelInUseError();
   // 进行中任务引用：排队 / 执行中的任务正在用这些线路，删掉会让任务派发失败、
   // 上游已消耗成本而用户只能退款。任务表已有 channelModelId 列，这里做真实校验。
   const runningTasks = await tx.generationTask.count({

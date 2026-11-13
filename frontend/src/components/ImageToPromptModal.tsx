@@ -1,12 +1,6 @@
 import './ImageToPromptModal.css';
 import './PromptPolishModal.css';
-import {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_ACCEPT,
-  SUPPORTED_IMAGE_LABEL,
-  isSupportedImageFile,
-} from '../lib/constants';
+import { useUploadLimits } from '../context/UploadLimitsContext';
 import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, X } from 'lucide-react';
 import { assetsApi, promptToolsApi, toAbsoluteUrl } from '../lib/api';
@@ -55,6 +49,7 @@ export interface ImageToPromptModalProps {
 export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptModalProps) {
   const { message } = useApp();
   const { ensureProject } = useProject();
+  const { accept, allowedLabel, maxMb, validateImageFile } = useUploadLimits();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
@@ -82,14 +77,11 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
     }
   }, [open]);
 
-  const pickFile = (f: File | undefined | null) => {
+  const pickFile = async (f: File | undefined | null) => {
     if (!f) return;
-    if (!isSupportedImageFile(f)) {
-      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
-      return;
-    }
-    if (f.size > MAX_IMAGE_BYTES) {
-      message.error(`单张不超过 ${MAX_IMAGE_MB}MB`);
+    const validationError = await validateImageFile(f);
+    if (validationError) {
+      message.error(`${f.name}：${validationError}`);
       return;
     }
     setFile(f);
@@ -144,10 +136,10 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
         <input
           ref={fileInputRef}
           type="file"
-          accept={SUPPORTED_IMAGE_ACCEPT}
+          accept={accept}
           hidden
           onChange={(e) => {
-            pickFile(e.target.files?.[0]);
+            void pickFile(e.target.files?.[0]);
             e.target.value = '';
           }}
         />
@@ -167,7 +159,7 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
         </button>
         <div className="pt-i2p-upload-text">
           <strong>{file ? file.name : '上传一张图片'}</strong>
-          <span>支持 {SUPPORTED_IMAGE_LABEL}，单张不超过 {MAX_IMAGE_MB}MB</span>
+          <span>支持 {allowedLabel}，单张不超过 {maxMb}MB</span>
         </div>
       </div>
 

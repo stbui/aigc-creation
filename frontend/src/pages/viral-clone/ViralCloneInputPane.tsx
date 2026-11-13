@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import { CircleAlert } from 'lucide-react';
 
-import type { PublicLogicalModel } from './api';
+import type { PublicModelGroup } from './api';
 import type { AssetSlot, CloneDegree } from './constants';
 import {
   InlineAlert,
@@ -66,7 +66,7 @@ export interface ViralCloneInputPaneProps {
   resolution: string;
   onResolutionChange: (value: string) => void;
   onModelQuoteChange: (credits: number | null) => void;
-  onModelChange: (model: PublicLogicalModel | null) => void;
+  onModelChange: (model: PublicModelGroup | null) => void;
 
   // ── 提交 ──
   generating: boolean;

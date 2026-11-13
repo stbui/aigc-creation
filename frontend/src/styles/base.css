@@ -83,3 +83,89 @@ body {
     --mif-workspace-topbar-height: 54px;
   }
 }
+
+/* ── 通用基础工具类 ────────────────────────────────────────────────
+ * 4px 基准的间距 / 字号 / 方块尺寸, 供页面在 JSX 上直接消费。
+ *
+ * 必须带 `u-` 前缀: base.css 是未分层样式, 会压过 Tailwind 的
+ * `@layer utilities`。若直接叫 `.px-4` / `.py-2`, 会静默改写后台与
+ * C 端 shadcn 组件里的同名 Tailwind 类 (实测后台按钮 px-4 py-2
+ * 被算成 2px 4px), 且不报错。带前缀后两套工具类互不干扰。
+ *
+ * 数值口径: 间距按 px 字面值 (0/2/4/6/8/10/12), 字号 12/14/16,
+ * 方块 10/12/16。新增档位保持同一命名, 不要引入 Tailwind 的 4px 倍数口径。 */
+
+.u-px-0 { padding-left: 0; padding-right: 0; }
+.u-py-0 { padding-top: 0; padding-bottom: 0; }
+.u-mx-0 { margin-left: 0; margin-right: 0; }
+.u-my-0 { margin-top: 0; margin-bottom: 0; }
+.u-p-0 { padding: 0; }
+.u-m-0 { margin: 0; }
+
+.u-px-2 { padding-left: 2px; padding-right: 2px; }
+.u-py-2 { padding-top: 2px; padding-bottom: 2px; }
+.u-mx-2 { margin-left: 2px; margin-right: 2px; }
+.u-my-2 { margin-top: 2px; margin-bottom: 2px; }
+.u-p-2 { padding: 2px; }
+.u-m-2 { margin: 2px; }
+
+.u-px-4 { padding-left: 4px; padding-right: 4px; }
+.u-py-4 { padding-top: 4px; padding-bottom: 4px; }
+.u-mx-4 { margin-left: 4px; margin-right: 4px; }
+.u-my-4 { margin-top: 4px; margin-bottom: 4px; }
+.u-p-4 { padding: 4px; }
+.u-m-4 { margin: 4px; }
+
+.u-px-6 { padding-left: 6px; padding-right: 6px; }
+.u-py-6 { padding-top: 6px; padding-bottom: 6px; }
+.u-mx-6 { margin-left: 6px; margin-right: 6px; }
+.u-my-6 { margin-top: 6px; margin-bottom: 6px; }
+.u-p-6 { padding: 6px; }
+.u-m-6 { margin: 6px; }
+
+.u-px-8 { padding-left: 8px; padding-right: 8px; }
+.u-py-8 { padding-top: 8px; padding-bottom: 8px; }
+.u-mx-8 { margin-left: 8px; margin-right: 8px; }
+.u-my-8 { margin-top: 8px; margin-bottom: 8px; }
+.u-p-8 { padding: 8px; }
+.u-m-8 { margin: 8px; }
+
+.u-px-10 { padding-left: 10px; padding-right: 10px; }
+.u-py-10 { padding-top: 10px; padding-bottom: 10px; }
+.u-mx-10 { margin-left: 10px; margin-right: 10px; }
+.u-my-10 { margin-top: 10px; margin-bottom: 10px; }
+.u-p-10 { padding: 10px; }
+.u-m-10 { margin: 10px; }
+
+.u-px-12 { padding-left: 12px; padding-right: 12px; }
+.u-py-12 { padding-top: 12px; padding-bottom: 12px; }
+.u-mx-12 { margin-left: 12px; margin-right: 12px; }
+.u-my-12 { margin-top: 12px; margin-bottom: 12px; }
+.u-p-12 { padding: 12px; }
+.u-m-12 { margin: 12px; }
+
+.u-font-12 { font-size: 12px; }
+.u-font-14 { font-size: 14px; }
+.u-font-16 { font-size: 16px; }
+
+.u-rect-10 { width: 10px; height: 10px; }
+.u-rect-12 { width: 12px; height: 12px; }
+.u-rect-16 { width: 16px; height: 16px; }
+
+.display-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.display-left {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.display-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}

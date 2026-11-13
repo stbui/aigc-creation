@@ -151,8 +151,8 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | 脚本 | 断言什么 |
 | --- | --- |
 | `verify-capability-bootstrap.ts` | 能力定义能真实加载并通过 `assertCapabilityIntegrity`，且没有能力再声明本地图像实现；平台 / 语言必须换成展示名进入提示词（`main_image` / `detail_image` / `hot_remake`）；9 个平台都必须声明主图规格（比例 / 画质 / 最短边）与详情图规格（宽度 / 画质），主图与爆款复刻在比例、画质与平台常规一致时补规格、冲突时不硬拗，详情图同理；图片翻译的目标语言同理 |
-| `verify-credit-deduction.ts` | 生成扣费 / 失败退款 / 余额一致性（同进程起 Nest 打真实 HTTP）：建任务即预留并落账单、余额不足不产生任务 |
-| `verify-credit-price.ts` | 后台改价 → `/capabilities` 与生成扣费同步生效 |
+| `verify-credit-deduction.ts` | 生成扣费 / 失败退款 / 余额一致性（同进程起 Nest 打真实 HTTP）：建任务即预留并落账单、余额不足不产生任务、401 切线退款、5xx 转 `uncertain`、无通道 `42204` 退款、沙箱支付发积分（脚本内自行开启 `payment.enabled`） |
+| `verify-credit-price.ts` | 能力改价：后台覆盖价 → `/capabilities` 与生成扣费同步；夹具按「能力绑定 + `CapabilityPricing`」创建 |
 | `verify-tool-contracts.ts` | 8 个修图工具的能力定义、默认值、hidden 字段、严格参数校验、标注解析、上传头与遮罩尺寸校验 |
 | `verify-payment-signatures.ts` | 支付宝 RSA2 / 微信 v3 AES-GCM 按公开规范独立复算，防「自己签自己验」 |
 | `verify-payment-bills.ts` | 支付宝账单解析：ZIP stored/deflate、直接 CSV、GB18030、表头前说明行、ZIP 路径穿越拒绝、ZIP 内缺少 CSV 的明确失败；离线运行 |
@@ -162,8 +162,8 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | `verify-channel-flow.ts` | 渠道全链路（同进程起 Nest 打真实 HTTP）：建渠道 → 建模型含两档价格 → **图片价格档必须落在协议声明的计价参数内（省略 `capabilityConfig.image.parameters` 时按协议清单归一化后校验，越界拒绝）** → 上游键改名级联 → 复制 → **复制「只有 `modelsJson` 名单、没有模型行」的旧渠道时补停用骨架行并保留兼容名单** → 导出断言无凭证 → 改名导入 → **批量调价（`priceVersion` 过期整批拒绝 / 售价字段与计费方式不匹配拒绝 / 规格提交不完整拒绝，且三次拒绝后售价未被改动；成功调价后档位售价生效、模型与档位 `priceVersion` 各 +1、成本价不变）** → **渠道与渠道模型删除不要求填写原因** → 批量删除 → 删渠道 → **公开渠道连接信息脱敏（匿名视角渠道名 / 归属账号 / provider id / 并发配额 / 凭证标记全不下发、地址改写为中转入口、凭证恒为 `system`；管理员视角给出真实名称与上游地址但仍不回显凭证）** → **线路健康指标（按渠道模型出表、带两个观测窗口、无样本时成功率为 `null`、支持按 `channelId` 过滤）** |
 | `verify-protocol-runtime.ts` | 协议运行时：115 个已注册 provider 的 `buildCreate` 冒烟、成功 / 异步 / 失败三类响应归一化；本地假上游走真实接口跑通 `POST /admin/channels/:id/models/test`（image 同步 + video 轮询）与 `POST /admin/channels/:id/models/{fetch,import}`，校验 `ApiCallLog`（`billable=false` / 无明文凭证）、导入默认停用未定价、重复导入不新增；假上游只在回环地址，脚本内临时打开 `MODEL_ALLOW_PRIVATE_UPSTREAMS` |
 | `verify-billing.ts` | 计费账本：预留（含幂等）、固定价结算、Token 差额退回 / 超预授权补扣 / 授权上限截断、按秒计费按实际时长重算、失败全额退款（幂等）、已结算拒绝自动退款、`uncertain` 保留冻结后人工核对、余额不足 `40002`、**「待核对」队列口径（uncertain ∪ running 超 40 分钟 ∪ reserved 但任务已失败/取消，普通预留单不入队）**、**批量核对（逐条独立处置、成功与失败条数分别计数、失败条目带原因、核对人与系统生成原因落库、空列表被拒）**、**冻结积分自动退回开关（默认关闭不退、开启后退 uncertain 单、正在补交付的订单排除、退款归类 `auto_sweep`、操作人记 `system:auto-refund`）**；每一步后校验 `CreditAccount.available == Σ CreditLot.remaining` |
-| `verify-route-catalog.ts` | 前台模型与选路：priority 硬分层与下沉、同层加权分布、SKU 选择（精确 / 通配 / 1.5K 相邻 / 停用档）、冷却三键与不冷却码、`simulate` 与 `resolve` 选中同一条线路与价格档、目录投影的渠道可见性与「先换货币再乘倍率」；后半段同进程起 Nest 打真实 HTTP 校验 `/models`、`/models/available`、`/models/:id/quote` 与后台模拟接口的接线与守卫。`VERIFY_HTTP=0` 可只跑纯逻辑 |
-| `verify-task-runtime.ts` | 任务运行时端到端：起本机 HTTP mock 上游，经真实 `ProtocolExecutor` / 出站层跑四条路径——同步成功（产物落盘、格式按字节嗅探、AIGC 标识、`settled`、按目录价扣费）、上游 401 切线（`rejected_no_job` + `upstream_401`、旧账单退回、新账单按新线路价结算、`task.creditCost` 同步、**旧账单标记 `refundReason='route_switch'` 且不计入财务「已退」**）、轮询超时（`42206` / `uncertain`、**不切线**、备份线路零调用）、唯一线路 429（`42204`、全额退款、余额回正），末尾校验「可用余额 == Σ 批次剩余」；夹具全部自建并按外键序清理（含产物文件） |
+| `verify-route-catalog.ts` | 能力选路：分组优先、跨分组兜底、健康分层、手工优先级只在同健康层内生效、冷却剔除、加权分布、`simulate` 与 `resolve` 同选、停用绑定不参与 |
+| `verify-task-runtime.ts` | 任务运行时端到端：起本机 HTTP mock 上游，经真实 `ProtocolExecutor` / 出站层跑同步成功、401 切线、超时 `42206`、唯一线路 429、余额不足回滚、未派发 / 已派发取消、租约恢复与钱包不变量；夹具按「能力绑定 + 能力定价」自建并清理 |
 | `verify-proxy-runtime.ts` | 中转与运营（P6）：**A 段纯逻辑**（`validateCustomRelayUrl` 的 SSRF 判定 / `resolveOutboundHost` 的 IPv6 与 localhost 拦截 / 路径白名单与密钥查询参数 / 并发槽 / 插件包解析拒绝分支）、**B 段同进程起 Nest + 本机 mock 上游**（`GET /models` 不计费、密钥查询参数剥离、渠道自定义头、服务端凭证注入；`POST` 的 `reserved → settled` 与调用记录；SSE 透传；500 退款；524 `uncertain` 不退款；渠道并发槽 `429`；自定义中转成功 / JSON 与 SSE 脱敏 / 不计费、401 `40101`、SSRF `40301`、上游错误原样透传、用户并发槽 `429`；系统中转限流 `42901`；分组可见性 `40301` 且不建账单；清扫 `reserved → refunded` / `running → uncertain` 且不碰任务账单；钱包恒等式；财务口径与 `BillingOrder` 聚合逐项一致；插件安装 / 重复 `40909` / 被引用拒卸 `40909` / 内置 `40001` / 卸载成功）。`VERIFY_HTTP=0` 只跑 A 段 |
 | `probe-environments.ts` | 三环境解析：档位顺序、不回落 `.env`、空串语义等（不连数据库） |
 
@@ -187,8 +187,8 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | 扫码登录 | `smoke-qr-login.js` | 扫码≠授权、一次性兑换 `consumed`、过期、未登录 401、登录记录 `reason=qr` |
 | 账户与合规 | `smoke-account.js` | `/me` 只认令牌、资料更正白名单、导出、注销后订单保留 |
 | | `smoke-notifications.js` | 消息用户隔离、支付成功产生消息；邮件/短信通道状态只读 |
-| | `smoke-aigc.js` | PNG chunk CRC / JPEG XMP / 可见角标像素差 / 角标样式可配 / 角标可关闭 / 公开配置接口 / 真实生成链路落盘核对 |
-| | `smoke-signed-url.js` | 另起带密钥实例：无签名 403、带签名 200、篡改 403、过期 410、HEAD 200 |
+| | `smoke-aigc.js` | PNG chunk CRC / JPEG XMP / 可见角标像素差 / 角标样式可配 / 角标可关闭 / 公开配置接口 / 真实生成链路落盘核对（按 `capability + modelKey` 提交） |
+| | `smoke-signed-url.js` | 另起带密钥实例：无签名 403、带签名 200、篡改 403、过期 410、HEAD 200（按 `capability + modelKey` 建任务） |
 | | `smoke-rate-limit.js` | 短信 1/分、换号不换配额、伪造 XFF 无效、找回密码 3/时 |
 | | `smoke-health-tracing.js` | 健康分项、请求号回显与替换、异常信封 `requestId`、日志 `[rid=]` 串联 |
 | 能力 | `smoke-capability-runtime.js` | `runtime` 只有 `enabled / remoteAvailable / effective / reason`（不残留 `route` / `localQuality`）、无线路不预告产出、上下线 `40005`、限时免费 0 积分 |
@@ -216,11 +216,11 @@ cd test && npm test             # 网关自测
 cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 ```
 
-后台「渠道工作台」新建渠道并把基址指到 `http://127.0.0.1:3900`（只填根域，不要带 `/v1`），协议按能力选 `openai-image` / `chat-completion` / `minimax-video`，再到「能力与模型」为前台模型挂一条线路。`smoke-aigc` 需要可用的 image 线路；没有线路时它会如实报 `42204`，不能当产品缺陷。
+后台「渠道工作台」新建渠道并把基址指到 `http://127.0.0.1:3900`（只填根域，不要带 `/v1`），协议按能力选 `openai-image` / `chat-completion` / `minimax-video`，再到「能力与模型」把商品绑定到能力并设置售价。`smoke-aigc` 需要可用的 image 线路；没有线路时它会如实报 `42204`，不能当产品缺陷。
 
 ### 3.5 浏览器 E2E（L4）
 
-配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 17 个 spec：
+配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 21 个 spec：
 
 > ⚠ 后台用例**必须**用 `playwright.admin.config.ts`（带 `storageState` 与
 > `admin-auth` setup 依赖）。`playwright.local.config.ts` 没有这两项，后台页会全部
@@ -234,8 +234,9 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `admin-backup.spec.ts` | 未通过恢复验证的备份不可下载 |
 | `admin-layout.spec.ts` | 后台布局回归 |
 | `admin-marketing.spec.ts` | 营销中心三条约束 |
-| `admin-payments.spec.ts` | 支付充值五标签：切换只改 URL 不重载、深链直达指定标签、非法标签回落、旧路由重定向不 404、七渠道适配器渲染、无退款入口、对账执行区与状态深链回显 |
-| `admin-model-suite.spec.ts` | 渠道 / 模型 P5 五页与 C 端选型：渠道工作台的主从布局（左列渠道导航 `admin-channel-item`、`aria-pressed` 标记选中、右侧 `#admin-channel-detail` 内联模型清单，不出现抽屉）、**新建渠道的三道必填前置（名称 → Base URL → API Key，留空逐级调用人话原因）与结构化请求头（`authorization` 这类系统托管的头在提交前拦下并指出是哪一行）**、**渠道详情头部的完整动作集（编辑 / 复制 / 导出 / 停用|启用 / 删除），停用先出确认弹窗并说明「退出路由目录但保留在列表」、取消不落库**、**模型清单的检索、筛选与稳定性列（关键字无命中给空态文案；状态筛选后的页脚总数与接口数据一致；重置恢复；清单带「稳定性（24h）」列，与「全部模型」同源）、复制模型（弹窗预填 `-copy` 标识且默认停用，取消不落库）、停用前确认（点击行内「停用」先出影响范围，不直接断电）**、**上游目录导入弹窗（已存在的模型带标记且默认不勾选、导入按钮只数新模型、搜索后「全选匹配的 / 取消选中匹配的」只作用于匹配项）**、**统一调价（勾选模型 → 按成本重算 → 保存 → 回读断言新售价 = 成本 × 1.1，不要求填写变更原因）**、**渠道排序（弹窗可开合；顺序没变时保存按钮禁用，移动后启用）**、**排序的并发保护（`expectedIds` 与库中不一致 → HTTP 409 / `40900`，一致才 `{ ok: true }`）**、**模型详情区的批量删除入口（未勾选时禁用；勾选后可用，删除确认展示影响范围但不要求填写原因）**、**全部模型视图（跨渠道行数与 `GET /admin/channel-models?includeDisabled=1` 一致、渠道列可解析、按模型状态筛选、工具条计数形如「N 个模型 · M 个可用」、排序与参考实现同序（显示名 → 模型标识 → 渠道名，按同一比较器在测试里重算期望首行）、停用先出确认且取消不落库、「编辑」一步切回「按渠道」并弹出该模型的编辑器、点渠道名一步跳回「按渠道」并选中该渠道；行数按 `admin-all-models` 容器取）**、前台模型的路由模拟、用户分组与插件页渲染、生成账单与调用记录的筛选和详情、工具页 `ModelPicker` 选型后报价随之变化；生成段需要可用 image 线路，无线路时该段跳过 |
+| `admin-payments.spec.ts` | 支付配置三标签：切换只改 URL 不重载、深链直达指定标签、非法标签回落、旧路由重定向不 404、七渠道适配器渲染、无退款入口、对账执行区与状态深链回显 |
+| `admin-payment-rules.spec.ts` | 支付与退费独立运营工作台：左侧支付分组双入口、旧设置深链重定向、系统设置隐藏支付/退款分组、未保存离页保护、保存只提交本页白名单且不接管渠道来源字段 |
+| `admin-model-suite.spec.ts` | 渠道 / 模型 P5 五页与 C 端选型：渠道工作台的主从布局（左列渠道导航 `admin-channel-item`、`aria-pressed` 标记选中、右侧 `#admin-channel-detail` 内联模型清单，不出现抽屉）、**新建渠道的三道必填前置（名称 → Base URL → API Key，留空逐级调用人话原因）与结构化请求头（`authorization` 这类系统托管的头在提交前拦下并指出是哪一行）**、**渠道详情头部的完整动作集（编辑 / 复制 / 导出 / 停用|启用 / 删除），停用先出确认弹窗并说明「退出路由目录但保留在列表」、取消不落库**、**模型清单的检索、筛选与稳定性列（关键字无命中给空态文案；状态筛选后的页脚总数与接口数据一致；重置恢复；清单带「稳定性（24h）」列，与「全部模型」同源）、复制模型（弹窗预填 `-copy` 标识且默认停用，取消不落库）、停用前确认（点击行内「停用」先出影响范围，不直接断电）**、**上游目录导入弹窗（已存在的模型带标记且默认不勾选、导入按钮只数新模型、搜索后「全选匹配的 / 取消选中匹配的」只作用于匹配项）**、**统一调价（勾选模型 → 按成本重算 → 保存 → 回读断言新售价 = 成本 × 1.1，不要求填写变更原因）**、**渠道排序（弹窗可开合；顺序没变时保存按钮禁用，移动后启用）**、**排序的并发保护（`expectedIds` 与库中不一致 → HTTP 409 / `40900`，一致才 `{ ok: true }`）**、**模型详情区的批量删除入口（未勾选时禁用；勾选后可用，删除确认展示影响范围但不要求填写原因）**、**全部模型视图（跨渠道行数与 `GET /admin/channel-models?includeDisabled=1` 一致、渠道列可解析、按模型状态筛选、工具条计数形如「N 个模型 · M 个可用」、排序与参考实现同序（显示名 → 模型标识 → 渠道名，按同一比较器在测试里重算期望首行）、停用先出确认且取消不落库、「编辑」一步切回「按渠道」并弹出该模型的编辑器、点渠道名一步跳回「按渠道」并选中该渠道；行数按 `admin-all-models` 容器取）**、能力选路模拟、用户分组与插件页渲染、生成账单与调用记录的筛选和详情、工具页 `ModelPicker` 选型后报价随之变化；生成段需要可用 image 线路，无线路时该段跳过 |
 | `admin-scheduler.spec.ts` | 定时任务可观测（静默失败可见） |
 | `admin-screenshots.spec.ts` | 后台逐页截图取证 |
 | `admin-ux.spec.ts` | 筛选深链与逐条清除（含工单/商品/对账/能力/告警）、订单/任务/模型线路宽表在 1440px 无横向滚动、页面/编辑抽屉/工单回复/积分调整的未保存保护、角色权限未保存拦截、概览任务直达、任务详情到积分账本及项目筛选的跨模块深链、详情 `?id=` 刷新恢复与关闭移除 |
@@ -267,7 +268,7 @@ node scripts/verify-deps.js --quiet   # 仅结论，有致命问题 exit 1
 | 功能域 | L2 | L3 | L4 |
 | --- | --- | --- | --- |
 | 能力注册表 / 生成链路 | capability-bootstrap、credit-*、tool-contracts | capability-runtime | product-capabilities、product-parameters、state-contract |
-| 模型层（渠道 / 选路 / 计费 / 任务） | plugin-manifests、model-consistency、channel-flow、protocol-runtime、route-catalog、billing、task-runtime | 暂无（见 5.5） | admin-model-suite |
+| 模型层（渠道 / 能力绑定 / 选路 / 计费 / 任务） | plugin-manifests、model-consistency、channel-flow、protocol-runtime、route-catalog、billing、credit-price、credits、task-runtime | L3 暂无 `smoke-model-layer` | admin-model-suite |
 | 身份与账户 | — | auth、qr-login、account、rate-limit | admin、free-creation-submit |
 | 第三方登录（OAuth） | — | 暂无自动化闸口（见 5.3） | — |
 | 交易与权益 | credit-deduction、credit-price、payment-signatures | commerce、membership、membership-order、payments、refund-rules | admin、admin-marketing |
@@ -286,7 +287,7 @@ L1.5 / L1.6 不按功能域铺矩阵：前端覆盖清单见 3.2，后端纯逻�
 
 ### 5.1 局部重绘遮罩
 
-遮罩路径要求：① 前台模型的 revision 能力合同把图片参考声明为 `maskSupported: true`（派生为意图里的 `inputs.mask`）；② 渠道模型的上游协议真的接受 `images/edits` 形态；③ 遮罩素材是 PNG 且与原图同尺寸。仓库默认没有带遮罩能力的线路，因此只能验到代码层：
+遮罩路径要求：① 绑定的渠道模型能力合同把图片参考声明为 `maskSupported: true`（派生为意图里的 `inputs.mask`）；② 渠道模型的上游协议真的接受 `images/edits` 形态；③ 遮罩素材是 PNG 且与原图同尺寸。仓库默认没有带遮罩能力的线路，因此只能验到代码层：
 
 - `capability-config.ts` 的 `maskSupported` → `capability-spec.ts` 的 `inputs.mask` 派生；
 - 准入阶段「任务带遮罩但线路合同没有 `inputs.mask`」→ `42205`（`task-admission.service.ts`）；
@@ -311,14 +312,14 @@ L1.5 / L1.6 不按功能域铺矩阵：前端覆盖清单见 3.2，后端纯逻�
 | `admin-model-suite.spec.ts` 的「生成 → 账单核对」段 | 后台存在一条启用且有价格的 image 线路（`cd test && node server.js` 指到 `http://127.0.0.1:3900`）；无线路时该段跳过，其余断言照常执行 |
 | 真实支付宝 / 微信回调与退款 | 商户号与可公网访问的回调地址 |
 | 第三方登录（OAuth2 / OIDC） | 真实 provider 的 `clientId` / `clientSecret` 与可公网访问的回调地址；离线只能验「未配置时 `/auth/oauth/providers` 返回空、登录页不渲染按钮」 |
-| `product-parameters` / `product-capabilities` / `state-contract` 等 C 端提交类用例 | 前台模型目录里该能力**有一条 `available=true` 的线路**。`resolveModelId()` 在没有可用线路时抛错，提交在 `/generate` 之前就中止 —— 页面上按钮可点，但请求发不出去，用例表现为「提交后等不到结果」 |
+| `product-parameters` / `product-capabilities` / `state-contract` 等 C 端提交类用例 | 前台模型目录里该能力**有一条 `available=true` 的线路**。`resolveModelKey()` 在没有可用线路时抛错，提交在 `/generate` 之前就中止 —— 页面上按钮可点，但请求发不出去，用例表现为「提交后等不到结果」 |
 
 ### 5.3.1 「提交后等不到结果」怎么定性
 C 端提交类用例挂住时，先分清是**环境缺线路**还是**代码回归**：打开该能力在
 `GET /api/v1/models` 里的目录项，看有没有 `available: true` 的模型。全为 `false`
 （或该能力一条模型都没有）时，提交在模型解析阶段就中止，与页面代码无关。
 
-`dev.db` 默认不带任何 image 线路（`LogicalModel` 表为空或只有 smoke 残留），
+`dev.db` 默认不带任何 image 线路（能力绑定为空或只有 smoke 残留），
 因此上述用例在裸开发库上必然红。判据是**与基线对比**：在同一套后端与同一份库上，
 先跑重建前的基线前端，再跑当前前端，两边的失败集合必须逐条相同；多出来的才是回归。
 
@@ -376,15 +377,15 @@ C 端提交类用例挂住时，先分清是**环境缺线路**还是**代码回
 
 ### 5.4 模型层的覆盖边界
 
-`verify-billing.ts` 钉住**账本本身**（状态机 + 资金变动 + 不变量），`verify-task-runtime.ts` 钉住**任务侧**（准入 → 派发 → 切线 → 轮询 → 收尾的四条路径）。两者合起来覆盖了「钱怎么走」与「任务怎么跑」，但仍有空白：
+`verify-billing.ts` 钉住**账本本身**（状态机 + 资金变动 + 不变量）。前台模型层删除后，`verify-route-catalog.ts` / `verify-task-runtime.ts` / `verify-credit-price.ts` / `verify-credit-deduction.ts` 与 smoke 脚本均已切到「能力绑定 + 能力定价」口径。本次重构的验证证据是：后端 76 个 spec（672 用例）、前端 121 个 spec（606 用例）、根 `npm run check` 全绿，`verify-route-catalog`（10 项）、`verify-task-runtime`（66 项）、`verify-credit-price`（15 项）、`verify-credit-deduction`（75 项）全过，以及真实后端 + 仿真网关跑通「导入商品 → 绑定能力 → 目录/报价 → 生成成功 → 断线自动切线 → 账单金额不变」。
 
 - **L3 没有模型层的 HTTP 冒烟**：渠道工作台 / 能力与模型 / 用户分组 / 插件 / 生成账单 / 调用记录五个后台页面只有 Playwright 用例（`admin-model-suite.spec.ts`）与 `verify-channel-flow.ts` 的接口级断言，没有 `smoke-*.js`；
-- **准入的失败分支**只在 `verify-route-catalog` / `verify-task-runtime` 的部分路径上覆盖，参数白名单与非 JSON 选项的拒绝路径依赖 `verify-tool-contracts`；
-- **`models/*` 公开接口的分组可见性**由 `verify-route-catalog` 的纯逻辑部分保证，多分组并存的 HTTP 组合未单独断言；
+- **准入的失败分支**原本由待重写的 `verify-route-catalog` / `verify-task-runtime` 覆盖，参数白名单与非 JSON 选项的拒绝路径依赖 `verify-tool-contracts`；
+- **`models/*` 公开接口的分组可见性**目前由路由单测与真实 HTTP 手工验证覆盖，多分组并存的自动化 HTTP 组合待新脚本补；
 - **「建任务 + 建单 + 预留」同事务的回滚语义没有故障注入用例**：脚本证明的是「成功路径三步都落库」，没有证明「预留失败时任务也一起回滚」。补闸口时应在 `reserveBatchBilling` 里注入一次余额不足，断言 `GenerationTask` 没有残留行；
 - **后台批量核对的 HTTP 层**（`POST /admin/billing-orders/batch-resolve` 的权限点 / DTO 校验）只有 service 级断言，控制器层靠 Playwright 补。
 
-补测时优先补一条 `smoke-model-layer.js`（渠道 → 前台模型 → 选路 → 生成 → 账单 → 调用记录），而不是继续堆纯逻辑断言。
+补测时优先补一条 `smoke-model-layer.js`（渠道 → 能力绑定 → 选路 → 生成 → 账单 → 调用记录），而不是继续堆纯逻辑断言。
 
 ### 5.5 断言假阳性防范
 

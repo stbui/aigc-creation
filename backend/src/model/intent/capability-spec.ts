@@ -4,7 +4,7 @@
  * 移植自 open-ai-canvas：
  *   · `internal/app/model_capability.go`  —— 能力配置 → 合同
  *   · `internal/app/model_router_capability.go` —— 归一与匹配
- *   · `internal/app/logical_models_coverage.go` —— 产品合同必须被线路覆盖
+ *   · `internal/app/logical_models_coverage.go` —— 能力合同必须被绑定线路覆盖
  *   · `internal/app/image_parameters.go` —— 图片参数合同投影
  *
  * 一条铁律：**前台模型承诺的能力必须被至少一条可用线路真实承接**。
@@ -507,52 +507,6 @@ export function capabilityFingerprint(spec: CapabilitySpec): string {
     copy.imageParameters = [...spec.imageParameters].sort((left, right) => (left.name < right.name ? -1 : 1));
   }
   return JSON.stringify(copy);
-}
-
-/**
- * 产品合同必须被线路合同完整覆盖；不满足时抛错（保存期拒绝）或返回 false（装载期剔除）。
- */
-export function validateProductSpecWithinRoutes(product: CapabilitySpec, routeSpecs: CapabilitySpec[]): void {
-  for (const routeSpec of routeSpecs) {
-    if (normalizeCapability(routeSpec.capability) !== normalizeCapability(product.capability)) {
-      throw badRequest('供应线路能力类型与前台模型不一致');
-    }
-  }
-  const productOperations = product.operations ?? [];
-  if (productOperations.length === 0) {
-    if (!routeSpecs.some((routeSpec) => (routeSpec.operations ?? []).length === 0)) {
-      throw badRequest('创作端生成方式必须从供应线路支持的选项中选择');
-    }
-  } else {
-    for (const operation of productOperations) {
-      const supported = routeSpecs.some(
-        (routeSpec) =>
-          (routeSpec.operations ?? []).length === 0 ||
-          containsCapabilityString(routeSpec.operations ?? [], operation),
-      );
-      if (!supported) throw badRequest(`创作端生成方式不受任何供应线路支持：${operation}`);
-    }
-  }
-  for (const [name, constraint] of Object.entries(product.inputs ?? {})) {
-    if (!inputConstraintCovered(constraint, name, routeSpecs)) {
-      throw badRequest(`创作端输入范围超出供应线路能力：${name}`);
-    }
-  }
-  for (const [name, constraint] of Object.entries(product.options ?? {})) {
-    if (!optionConstraintCovered(constraint, name, routeSpecs)) {
-      throw badRequest(`创作端参数超出供应线路能力：${name}`);
-    }
-  }
-}
-
-export function logicalModelCapabilityCovered(product: CapabilitySpec, routeSpecs: CapabilitySpec[]): boolean {
-  if (routeSpecs.length === 0) return false;
-  try {
-    validateProductSpecWithinRoutes(product, routeSpecs);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function inputConstraintCovered(candidate: InputConstraint, name: string, routeSpecs: CapabilitySpec[]): boolean {

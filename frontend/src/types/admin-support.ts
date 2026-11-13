@@ -370,17 +370,49 @@ export interface MessageTemplateItem {
  * `configured: false` = 填了真实 provider 但凭据不全，已告警并回落 console。
  */
 export interface DeliveryChannelStatus {
+  /** 通道总开关；关闭时验证码、找回密码和业务通知都不会真实投递 */
+  enabled?: boolean;
   provider: string;
   delivers: boolean;
   configured: boolean;
   /** 邮件：发件地址；短信：签名 */
   from?: string;
   sign?: string;
+  /** 面向运营的状态说明，不包含地址、正文或凭据 */
+  message?: string;
 }
 
 export interface DeliveryChannelStatusMap {
   email: DeliveryChannelStatus;
   sms: DeliveryChannelStatus;
+}
+
+/** POST /api/v1/admin/notifications/broadcast */
+export interface BroadcastPayload {
+  title: string;
+  body: string;
+  link?: string;
+  /** 默认 false；明确勾选后才逐人发送活动邮件 */
+  sendEmail?: boolean;
+}
+
+export interface BroadcastResult {
+  /** 站内消息实际写入条数 */
+  sent: number;
+  /** 命中的活跃账号数 */
+  users: number;
+  emailSent: number;
+  emailFailed: number;
+  emailSkipped: number;
+}
+
+/** POST /api/v1/admin/notifications/email/test */
+export interface EmailTestResult {
+  ok: boolean;
+  provider: string;
+  delivered: boolean;
+  messageId?: string;
+  error?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

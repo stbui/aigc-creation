@@ -1,7 +1,9 @@
+import { X } from 'lucide-react';
+
 import { MAX_REF_IMAGES, type CreationCapability } from './constants';
+import { ToolGenerationSubmitBar } from './components';
 import type { ToolAsset } from './components';
 import { CreativeImagePromptField } from './CreativeImagePromptField';
-import { CreativeImageSubmitBar } from './CreativeImageSubmitBar';
 import { CreativeImageUploadSection } from './CreativeImageUploadSection';
 
 interface CreativeImageInputPaneProps {
@@ -36,7 +38,8 @@ interface CreativeImageInputPaneProps {
 /**
  * 左栏输入区：标题、参考图上传、创作提示词与底部提交区。
  *
- * 状态与上传 / 提交等写操作仍留在 `page.tsx`，本组件只做板块编排。
+ * 状态与上传 / 提交等写操作仍留在 `page.tsx`，本组件只做板块编排；
+ * 提交区走共享 `ToolGenerationSubmitBar`，本页只保留提示词与登录墙文案。
  */
 export function CreativeImageInputPane({
   capability,
@@ -97,19 +100,44 @@ export function CreativeImageInputPane({
           </section>
         </div>
 
-        <CreativeImageSubmitBar
+        <ToolGenerationSubmitBar
+          capability={capability}
           generating={generating}
           disabled={submitDisabled}
+          guestLabel="登录免费生成"
           creditLabel={creditLabel}
-          unavailableReason={unavailableReason}
+          className="fc-actions"
+          notice={
+            unavailableReason && !generating ? (
+              <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
+            ) : null
+          }
           settingsOpen={settingsOpen}
           onToggleSettings={onToggleSettings}
           ratio={ratio}
           onRatioChange={onRatioChange}
           resolution={resolution}
           onResolutionChange={onResolutionChange}
-          capability={capability}
           onModelQuoteChange={onModelQuoteChange}
+          settingsProps={{
+            popoverClassName: 'fc-settings-popover',
+            popoverRole: 'dialog',
+            popoverAriaLabel: '高级设置',
+            header: (
+              <div className="fc-settings-popover-head">
+                <h2>高级设置</h2>
+                <button
+                  type="button"
+                  className="fc-settings-close"
+                  aria-label="关闭高级设置"
+                  title="关闭"
+                  onClick={() => onToggleSettings()}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            ),
+          }}
           onSubmit={onSubmit}
         />
       </div>

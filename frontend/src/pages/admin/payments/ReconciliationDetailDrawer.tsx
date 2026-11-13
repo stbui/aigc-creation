@@ -17,7 +17,7 @@ import { useAdmin, useAdminResource, useToast } from './hooks';
 import { adminOrderDetailHref, moneyText } from './utils';
 import { RECONCILIATION_RESULT_LABELS, type AdminReconciliationItem } from '../../../types/payment';
 
-/** 对账明细抽屉 */
+/** 交易核对明细抽屉。 */
 export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; onClose: () => void }) {
   const toast = useToast();
   const { can } = useAdmin();
@@ -62,7 +62,7 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
     },
     {
       key: 'providerTradeNo',
-      title: '渠道交易号',
+      title: '收款交易号',
       width: 200,
       render: (row) => <code className="font-mono text-[12px]">{row.providerTradeNo ?? '—'}</code>,
     },
@@ -85,8 +85,8 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
     <Drawer
       open
       onClose={onClose}
-      title="对账明细"
-      description="差异由系统比对得出；需要人工处理的异常走订单退款流程"
+      title="交易核对明细"
+      description="差异由系统自动比对得出；需要人工处理的资金问题请到订单管理跟进"
       size="xl"
       footer={
         <div className="flex items-center justify-end gap-2">
@@ -133,7 +133,7 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
             columns={columns}
             rowKey={(row) => row.id}
             loading={loading}
-            emptyText="没有差异明细"
+            emptyText="当前没有差异记录"
             minWidth={860}
             pagination={{
               current: data?.page ?? 1,
@@ -148,7 +148,7 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
         )}
 
         <Notice tone="info" title="本页不改钱">
-          对账发现「渠道已收款但本地未入账」时系统会自动补发积分；重复扣款等异常请到
+          核对发现「渠道已收款但本地未入账」时系统会自动补单；重复扣款等资金异常请到
           <Link className="text-brand hover:underline" to="/admin/orders">
             订单管理
           </Link>

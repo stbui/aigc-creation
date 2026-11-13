@@ -18,6 +18,7 @@ import { CAPABILITY_OPTIONS, CURRENCY_OPTIONS, type ModelDraft } from './constan
 
 type BasicTextFieldName =
   | 'modelKey'
+  | 'modelGroupKey'
   | 'providerModelKey'
   | 'displayName'
   | 'channelLabel'
@@ -176,6 +177,14 @@ export function ChannelModelBasicFields({
           hint="用于关联消费它的能力；创建后建议保持不变"
           ariaLabel="商品编号"
           placeholder="如 seedream-4.0"
+        />
+        <ControlledTextField
+          control={control}
+          name="modelGroupKey"
+          label="模型分组键"
+          hint="C 端合并同名模型的标识；留空则使用商品编号"
+          ariaLabel="模型分组键"
+          placeholder="如 gpt-image-2"
         />
         <ControlledTextField
           control={control}

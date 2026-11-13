@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RouteCatalogService } from '../model/catalog/route-catalog.service';
-import type { CachedLogicalModel, RouteCatalogSnapshot } from '../model/routing/routing.types';
-import { RouteHealthService } from '../model/routing/route-health.service';
+import { RouterService } from '../model/routing/router.service';
 import { CAPABILITIES, getCapability } from './capability.registry';
 import { AppError } from '../common/app.exception';
 
@@ -14,7 +12,7 @@ import { AppError } from '../common/app.exception';
  * `mode` 是代码里的一个字符串，回答「这项能力实现到什么程度」。但用户真正
  * 关心的是「我现在按下去会发生什么」，它由两件**运行时**的事共同决定：
  *   1. 后台是否把这项能力下线了（CapabilityControl）
- *   2. 路由目录里有没有**这项能力**的可用线路（前台模型 → revision → 线路 → 渠道模型）
+ *   2. 能力目录里有没有**这项能力**的可用绑定线路
  *
  * 把两者合成 `runtime.effective` 下发，前端就不用（也无法）靠 `mode` 猜：
  * `mode: 'real'` 的能力在没有任何可用线路时实际不可提交。混淆两者会让界面上
@@ -22,13 +20,13 @@ import { AppError } from '../common/app.exception';
  *
  * ## 可用性口径来自路由目录
  *
- * 判断「有没有可用线路」**必须**与调度器看同一份数据：`RouteCatalogService`
+ * 判断「有没有可用线路」**必须**与调度器看同一份数据：`CapabilityCatalogService`
  * 的快照已经在装载期剔除了停用的渠道、停用的渠道模型、没有价格档的线路。
  * 若这里另查一张表，就会出现「界面说可用、提交后 42204」——用户看到的是
  * 一个反复失败却仍显示绿灯的按钮。
  *
- * 口径是**能力 id**（`LogicalModel.capability`）而不是模态：前台模型按能力发布，
- * 一个模态下可能只有部分能力配了模型。按模态判定会把「没配模型的能力」标成可用。
+ * 口径是**能力 id** 而不是模态：一个模态下可能只有部分能力绑定了商品。
+ * 按模态判定会把「没配模型的能力」标成可用。
  *
  * ## 与任务状态的分工
  *
@@ -85,22 +83,9 @@ export class CapabilityAvailabilityService {
   /** 每项能力的线路可用性缓存（能力 id → 结论） */
   private readonly remoteCache = new Map<string, { at: number; info: RemoteInfo }>();
 
-  /**
-   * 快照内的「能力 id → 前台模型」索引，按快照引用懒构建。
-   *
-   * `runtimeAll()` 会对 18 项能力逐个调用 `remoteOf`，每次都从
-   * `snapshot.ordered` 全量扫描一遍；模型数量增长后这是 17 × N 的无谓重复。
-   * 按能力分桶后每项只看自己的模型，判定逻辑与逐条扫描完全一致。
-   */
-  private modelIndex: {
-    snapshot: RouteCatalogSnapshot;
-    byCapability: Map<string, CachedLogicalModel[]>;
-  } | null = null;
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly catalog: RouteCatalogService,
-    private readonly health: RouteHealthService,
+    private readonly router: RouterService,
   ) {}
 
   /**
@@ -115,40 +100,14 @@ export class CapabilityAvailabilityService {
 
     let info: RemoteInfo = { available: false, label: '' };
     try {
-      const snapshot = await this.catalog.snapshotOrThrow();
-      if (!this.modelIndex || this.modelIndex.snapshot !== snapshot) {
-        const byCapability = new Map<string, CachedLogicalModel[]>();
-        for (const id of snapshot.ordered) {
-          const model = snapshot.models.get(id);
-          if (!model) continue;
-          const list = byCapability.get(model.capability) ?? [];
-          list.push(model);
-          byCapability.set(model.capability, list);
-        }
-        this.modelIndex = { snapshot, byCapability };
-      }
-      for (const model of this.modelIndex.byCapability.get(capabilityId) ?? []) {
-        const route = model.routes.find(
-          (item) =>
-            item.enabled &&
-            item.weight > 0 &&
-            // 冷却中的线路与选路器一样不可用；否则界面会亮绿灯、提交后选路失败。
-            !this.health.isBlocked({
-              channelId: item.channelModel.channelId,
-              channelModelId: item.channelModel.id,
-              routeId: item.id,
-            }),
-        );
-        if (!route) continue;
-        info = {
-          available: true,
-          label: `模型线路可用（${model.name} · ${route.channelModel.displayName}）`,
-        };
-        break;
+      // 与选路共用同一份能力目录与同一条过滤逻辑，避免「界面绿灯、提交失败」
+      const available = await this.router.hasHealthyLine(null, capabilityId);
+      if (available) {
+        info = { available: true, label: '模型线路可用' };
       }
     } catch (e) {
       // 目录读失败只影响「预期徽标」，不能让 /capabilities 整个 500
-      this.log.warn(`读取路由目录失败, ${capabilityId} 按无可用线路处理 — ${(e as Error).message}`);
+      this.log.warn(`读取能力目录失败, ${capabilityId} 按无可用线路处理 — ${(e as Error).message}`);
     }
     this.remoteCache.set(capabilityId, { at: Date.now(), info });
     return info;
@@ -158,7 +117,6 @@ export class CapabilityAvailabilityService {
   invalidate(): void {
     this.cache = null;
     this.remoteCache.clear();
-    this.modelIndex = null;
   }
 
   private async controls(): Promise<Map<string, ControlRow>> {

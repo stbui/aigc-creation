@@ -1,11 +1,11 @@
 import type { RefObject } from 'react';
 
-import { MAX_DESC_LEN, MAX_IMAGE_MB, PRODUCT_KIT_CAPABILITY } from './constants';
+import { MAX_DESC_LEN, PRODUCT_KIT_CAPABILITY } from './constants';
 import {
   ProductFormSection,
   ToolGenerationSubmitBar,
   ToolTypeTabs,
-  type PublicLogicalModel,
+  type PublicModelGroup,
 } from './components';
 import type { UploadedImage } from './hooks';
 import { ProductKitVariantConfig } from './ProductKitVariantConfig';
@@ -58,7 +58,7 @@ export interface ProductKitInputPaneProps {
   resolution: string;
   onResolutionChange: (value: string) => void;
   onModelQuoteChange: (credits: number | null) => void;
-  onModelChange: (model: PublicLogicalModel | null) => void;
+  onModelChange: (model: PublicModelGroup | null) => void;
 
   // ── 提交 ──
   generating: boolean;
@@ -114,7 +114,6 @@ export function ProductKitInputPane({
           <ProductFormSection
             images={images}
             max={maxImages}
-            maxMb={MAX_IMAGE_MB}
             uploading={uploading}
             fileInputRef={fileInputRef}
             onFiles={onFiles}

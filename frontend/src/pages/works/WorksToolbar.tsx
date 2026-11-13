@@ -52,6 +52,7 @@ export function WorksToolbar({
     taskOpen,
     setTaskOpen,
     selectedTaskIds,
+    setSelectedTaskIds,
     matchedTasks,
     activeFilterCount,
     closeAll,

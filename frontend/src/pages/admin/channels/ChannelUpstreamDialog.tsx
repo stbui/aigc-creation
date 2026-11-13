@@ -11,6 +11,7 @@ import {
   TextField,
 } from '~/admin-ui/primitives';
 import { useProtocolCatalog } from './useChannelModels';
+import { useCapabilities } from './hooks';
 import { parseCredits, toCreditsInput } from './utils';
 import {
   BILLING_MODE_OPTIONS,
@@ -29,7 +30,11 @@ interface ChannelUpstreamDialogProps {
   defaultConfig?: AdminChannelDefaultModelView | null;
   importing: boolean;
   onClose: () => void;
-  onImport: (ids: string[], config?: BatchImportConfig) => void;
+  onImport: (
+    ids: string[],
+    config?: BatchImportConfig,
+    capabilitiesByModel?: Record<string, string[]>,
+  ) => void;
 }
 
 /** 可批量写默认合同的能力；video 的参数组合差异太大，留给逐条配置 */
@@ -66,6 +71,8 @@ export function ChannelUpstreamDialog({
   const [cachedPrice, setCachedPrice] = useState('');
   const [enabled, setEnabled] = useState(false);
   const [configError, setConfigError] = useState('');
+  const [bindCapabilities, setBindCapabilities] = useState<string[]>([]);
+  const capabilities = useCapabilities();
   /** 记住上一次能力值：预填默认配置时不能触发「切换能力清空协议」 */
   const previousCapability = useRef<'' | 'image' | 'text'>('');
 
@@ -93,6 +100,7 @@ export function ChannelUpstreamDialog({
     setCachedPrice(preset ? toCreditsInput(preset.cachedTokenPriceMicrocredits) : '');
     setEnabled(preset?.enabled ?? false);
     setConfigError('');
+    setBindCapabilities([]);
   }, [open, models, existingKeys, defaultConfig]);
 
   useEffect(() => {
@@ -156,10 +164,18 @@ export function ChannelUpstreamDialog({
     };
   };
 
+  const capabilityOptions = (capabilities.data?.items ?? []).filter(
+    (item) => !capability || item.modality === capability,
+  );
+
   const submit = () => {
     const config = buildConfig();
     if (config === null) return;
-    onImport(selected, config);
+    const binding =
+      bindCapabilities.length > 0
+        ? Object.fromEntries(selected.map((id) => [id, bindCapabilities]))
+        : undefined;
+    onImport(selected, config, binding);
   };
 
   return (
@@ -310,6 +326,35 @@ export function ChannelUpstreamDialog({
             onChange={setEnabled}
           />
           {configError && <p className="text-[12px] text-danger-text">{configError}</p>}
+        </section>
+
+        <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
+          <div>
+            <div className="text-xs font-semibold text-foreground">导入后绑定到能力（可选）</div>
+            <div className="text-[12px] text-muted-foreground">
+              勾选后本次导入的商品会直接进入这些能力的候选池；不勾选可稍后在「能力与模型」页添加。
+            </div>
+          </div>
+          {capabilityOptions.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">选择模型类型后可勾选对应能力。</p>
+          ) : (
+            <div className="grid max-h-36 grid-cols-2 gap-x-4 gap-y-1 overflow-y-auto">
+              {capabilityOptions.map((item) => (
+                <CheckboxField
+                  key={item.id}
+                  size="sm"
+                  checked={bindCapabilities.includes(item.id)}
+                  onChange={(checked) =>
+                    setBindCapabilities((prev) =>
+                      checked ? [...prev, item.id] : prev.filter((id) => id !== item.id),
+                    )
+                  }
+                  ariaLabel={`绑定到 ${item.name}`}
+                  label={item.name}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto rounded-lg border border-border p-2">

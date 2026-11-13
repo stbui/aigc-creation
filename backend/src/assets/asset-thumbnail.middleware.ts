@@ -28,7 +28,8 @@ import { dirname, join, resolve } from 'path';
 import type { NextFunction, Request, Response } from 'express';
 import { Jimp, JimpMime } from 'jimp';
 import { assertSafeKey } from '../storage/storage.provider';
-import { detectImageMime, maxUploadPixels, readImageDimensions } from './image-validation';
+import { detectImageMime, readImageDimensions } from './image-validation';
+import { deploymentUploadMaxPixels } from '../common/image-formats';
 
 const MIN_SIZE = 32;
 const MAX_SIZE = 1280;
@@ -168,7 +169,7 @@ export function createAssetThumbnailMiddleware(
         if (!mime) return null;
         const dims = readImageDimensions(source, mime);
         // 解码炸弹防护: 与上传侧同一像素上限, 超限不解码
-        if (!dims || dims.width * dims.height > maxUploadPixels()) return null;
+        if (!dims || dims.width * dims.height > deploymentUploadMaxPixels()) return null;
 
         const image = await Jimp.read(source);
         if (h === null) {

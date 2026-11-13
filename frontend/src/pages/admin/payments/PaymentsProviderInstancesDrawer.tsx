@@ -60,7 +60,7 @@ function moveInstances(
 }
 
 /**
- * 渠道实例管理抽屉。
+ * 收款通道管理抽屉。
  *
  * 列表与编辑共用同一份本地 provider 投影：新建 / 保存 / 排序成功后先用接口返回
  * 的实例数据刷新抽屉，父级渠道卡片再异步重取列表。这样连续编辑多个实例时，
@@ -167,7 +167,7 @@ export function PaymentsProviderInstancesDrawer({
   const createInstanceNow = async () => {
     if (!writable || busy) return;
     if (orderDirty) {
-      toast.error('请先保存实例排序，再新建实例');
+      toast.error('请先保存通道排序，再添加通道');
       return;
     }
     setCreating(true);
@@ -185,10 +185,10 @@ export function PaymentsProviderInstancesDrawer({
       setSelectedId(instance.instanceId);
       setDraft(nextDraft);
       setBaseline(nextDraft);
-      toast.success('实例已创建，当前默认停用');
+      toast.success('通道已添加，当前默认停用');
       onChanged(nextProvider);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '新建实例失败');
+      toast.error(error instanceof Error ? error.message : '添加通道失败');
     } finally {
       setCreating(false);
     }
@@ -197,7 +197,7 @@ export function PaymentsProviderInstancesDrawer({
   const requestCreate = () => {
     if (!writable || busy) return;
     if (orderDirty) {
-      toast.error('请先保存实例排序，再新建实例');
+      toast.error('请先保存通道排序，再添加通道');
       return;
     }
     runAfterDraftDiscard(() => void createInstanceNow());
@@ -206,7 +206,7 @@ export function PaymentsProviderInstancesDrawer({
   const saveInstance = async () => {
     if (!writable || busy || !selectedInstance || !draft) return;
     if (orderDirty) {
-      toast.error('请先保存实例排序，再保存实例配置');
+      toast.error('请先保存通道排序，再保存通道配置');
       return;
     }
     setSaving(true);
@@ -220,17 +220,17 @@ export function PaymentsProviderInstancesDrawer({
       const saved = nextInstances.find(
         (instance) => instance.instanceId === selectedInstance.instanceId,
       );
-      if (!saved) throw new Error('保存后未找到当前实例');
+      if (!saved) throw new Error('保存后未找到当前通道');
       const nextDraft = draftFromInstance(result.provider, saved);
       setCurrentProvider(result.provider);
       setInstances(nextInstances);
       setOriginalIds(nextInstances.map((instance) => instance.instanceId));
       setDraft(nextDraft);
       setBaseline(nextDraft);
-      toast.success(result.unchanged ? '实例配置未变化' : '实例配置已保存');
+      toast.success(result.unchanged ? '通道配置未变化' : '通道配置已保存');
       onChanged(result.provider);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '保存实例失败');
+      toast.error(error instanceof Error ? error.message : '保存通道失败');
     } finally {
       setSaving(false);
     }
@@ -247,7 +247,7 @@ export function PaymentsProviderInstancesDrawer({
   const saveOrder = async () => {
     if (!writable || busy || !orderDirty) return;
     if (draftDirty) {
-      toast.error('请先保存实例配置，再保存排序');
+      toast.error('请先保存通道配置，再保存排序');
       return;
     }
     setSorting(true);
@@ -268,10 +268,10 @@ export function PaymentsProviderInstancesDrawer({
         setDraft(nextDraft);
         setBaseline(nextDraft);
       }
-      toast.success('实例排序已保存');
+      toast.success('通道排序已保存');
       onChanged(nextProvider);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '保存实例排序失败');
+      toast.error(error instanceof Error ? error.message : '保存通道排序失败');
     } finally {
       setSorting(false);
     }
@@ -281,13 +281,13 @@ export function PaymentsProviderInstancesDrawer({
     <Drawer
       open={open}
       onClose={requestClose}
-      title={`${initialProvider.name} · 服务商实例`}
-      description="同一渠道可配置多个独立实例，前台支付来源只会在当前来源内选择可用实例，不会跨来源回退。"
+      title={`${initialProvider.name} · 收款通道`}
+      description="同一收款来源可添加多个通道；客户付款时只会在当前来源内选择可用通道，不会跨来源回退。"
       size="lg"
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <span className="text-[12px] text-muted-foreground">
-            {instances.length} 个实例 · {instances.filter((item) => item.enabled).length} 个已启用
+            {instances.length} 条通道 · {instances.filter((item) => item.enabled).length} 条已启用
           </span>
           <ActionButton onClick={requestClose} disabled={busy}>
             关闭
@@ -298,9 +298,9 @@ export function PaymentsProviderInstancesDrawer({
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="m-0 text-[13px] font-semibold text-foreground">实例列表</h3>
+            <h3 className="m-0 text-[13px] font-semibold text-foreground">通道列表</h3>
             <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
-              拖拽或使用上下箭头调整顺序；排序决定默认轮询起点。
+              拖动或使用上下箭头调整顺序；系统会按此顺序轮询可用通道。
             </p>
           </div>
           <ActionButton
@@ -309,20 +309,20 @@ export function PaymentsProviderInstancesDrawer({
             onClick={requestCreate}
             disabled={!writable || busy}
           >
-            {creating ? '新建中…' : '新建实例'}
+            {creating ? '添加中…' : '添加通道'}
           </ActionButton>
         </div>
 
         {orderDirty && (
           <Notice tone="warn" className="mb-0">
             <div className="flex items-center justify-between gap-3">
-              <span>实例顺序尚未保存。</span>
+              <span>通道顺序尚未保存。</span>
               <ActionButton
                 size="xs"
                 onClick={() => void saveOrder()}
                 disabled={!writable || busy || draftDirty}
                 ariaLabel={
-                  draftDirty ? '请先保存当前实例配置，再保存排序' : '保存实例排序'
+                  draftDirty ? '请先保存当前通道配置，再保存排序' : '保存通道排序'
                 }
               >
                 {sorting ? '保存中…' : '保存排序'}
@@ -333,11 +333,11 @@ export function PaymentsProviderInstancesDrawer({
 
         {instances.length === 0 ? (
           <EmptyState
-            title="该渠道还没有服务商实例"
-            description={writable ? '新建一个实例并补齐凭据后即可启用。' : undefined}
+            title="该收款来源还没有通道"
+            description={writable ? '添加一条通道并补齐接入参数后即可启用。' : undefined}
           />
         ) : (
-          <div className="flex flex-col gap-2" role="list" aria-label="服务商实例">
+          <div className="flex flex-col gap-2" role="list" aria-label="收款通道">
             {instances.map((instance, index) => {
               const state = instanceState(instance);
               const meta = PAYMENT_PROVIDER_STATE_META[state];
@@ -390,13 +390,12 @@ export function PaymentsProviderInstancesDrawer({
                         {instanceLabel(instance)}
                       </span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted-foreground">
-                        <code className="font-mono">{instance.instanceId}</code>
                         <span>
                           {instance.paymentMethods
                             .map((method) => PAYMENT_METHOD_LABELS[method])
                             .join(' / ')}
                         </span>
-                        {instance.version == null && <span>尚未保存</span>}
+                        {instance.version == null && <span>配置尚未保存</span>}
                       </span>
                     </span>
                     <StatusTag
@@ -442,7 +441,7 @@ export function PaymentsProviderInstancesDrawer({
         ) : (
           !busy &&
           instances.length > 0 && (
-            <EmptyState title="选择上方实例进行配置" />
+            <EmptyState title="选择上方通道进行配置" />
           )
         )}
       </div>

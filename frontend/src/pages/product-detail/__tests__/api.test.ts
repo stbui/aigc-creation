@@ -12,7 +12,7 @@ describe('startDetailGeneration', () => {
 
     await startDetailGeneration({
       projectId: 'project-1',
-      logicalModelId: 'model-1',
+      modelKey: 'model-1',
       inputAssetIds: ['asset-1'],
       productName: ' 轻音循环扇 ',
       brand: ' 清风 ',

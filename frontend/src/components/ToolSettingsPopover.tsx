@@ -101,13 +101,13 @@ export function ToolSettingsPopover({
     <div className="pk-settings-shell" ref={shellRef}>
       <Button
         type="text"
-        className={`pk-settings-summary${open ? ' pk-settings-summary-open' : ''}`}
+        className={`pk-settings-summary u-font-12${open ? ' pk-settings-summary-open' : ''}`}
         aria-expanded={open}
         onClick={onToggle}
       >
-        <span className="pk-settings-label">高级设置</span>
-        {showRatio && ratio && <span className="pk-settings-chip">比例 {ratioLabel(ratio)}</span>}
-        {showResolution && <span className="pk-settings-chip">画质 {resolution.toUpperCase()}</span>}
+        <span className="pk-settings-label u-font-12">高级设置</span>
+        {showRatio && ratio && <span className="pk-settings-chip u-font-12">比例 {ratioLabel(ratio)}</span>}
+        {showResolution && <span className="pk-settings-chip u-font-12">画质 {resolution.toUpperCase()}</span>}
         <ChevronDown size={15} className="pk-settings-chevron size-[15px]" />
       </Button>
 
@@ -119,7 +119,7 @@ export function ToolSettingsPopover({
         >
           {header ?? (
             <div className="pk-settings-popover-head">
-              <h2>高级设置</h2>
+              <h2 className="u-font-16">高级设置</h2>
               <Button
                 type="text"
                 className="pk-settings-close"
@@ -161,7 +161,7 @@ export function ToolSettingsPopover({
                   <Button
                     key={String(o.value)}
                     type="text"
-                    className={`pk-resolution-option${o.value === resolution ? ' pk-option-active' : ''}`}
+                    className={`pk-resolution-option u-p-8${o.value === resolution ? ' pk-option-active' : ''}`}
                     aria-pressed={o.value === resolution}
                     disabled={o.disabled}
                     title={o.disabled ? o.disabledReason : undefined}
@@ -171,7 +171,7 @@ export function ToolSettingsPopover({
                         放进 116px 宽的卡片里会在中间折行), 具体像素值放副文。
                         非 "1k/2k/4k" 形态的取值仍回落到后端 label, 不硬造缩写。 */}
                     <strong>{shortResolutionLabel(o.value, o.label)}</strong>
-                    <span>{o.sub}</span>
+                    <span className="u-font-12">{o.sub}</span>
                   </Button>
                 ))}
               </div>

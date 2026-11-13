@@ -41,8 +41,14 @@ const SIDEBAR_GROUPS_KEY = 'huojue.admin.sidebar-groups';
  * 会失配、用户已保存的展开态被重置；读档时一次性映射到新组名。
  */
 const LEGACY_SIDEBAR_GROUP_NAMES: Record<string, string> = {
-  '模型': '模型与渠道',
-  '内容': '内容与合规',
+  '模型': '模型与能力',
+  '模型与渠道': '模型与能力',
+  '内容': '运营与内容',
+  '内容与合规': '运营与内容',
+  '交易': '商品与交易',
+  '支付': '资金与财务',
+  '财务': '资金与财务',
+  '数据安全': '数据与安全',
 };
 
 /**
@@ -60,7 +66,8 @@ const LEGACY_SIDEBAR_GROUP_NAMES: Record<string, string> = {
  * - 按权限点过滤导航项；
  * - 有未保存变更时，站内跳转先确认再放行（按钮与页内 `<a href>` 都拦）；
  * - 环境标识只在非生产出现，避免把测试库当生产看；
- * - 分组展开状态写入 localStorage，首次进入默认全展开。
+ * - 分组展开状态写入 localStorage；首次进入只展开当前页所在分组，避免长菜单
+ *   一开始就把高频与低频入口全部铺满。
  */
 
 function EnvironmentTag() {
@@ -112,10 +119,13 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener('change', apply);
   }, []);
 
-  // 精确匹配，避免 /admin/users 同时点亮「平台概览」
-  const activePath = location.pathname.replace(/\/$/, '') || '/admin';
-  const currentGroup = findAdminMenuGroup(activePath);
+  // 查询参数参与菜单匹配：支付域的三个入口共用同一路径，靠 `tab` 区分。
+  // 最长路径 / 最多查询参数优先，确保子路由不会同时点亮父级菜单。
+  const activePath = `${location.pathname.replace(/\/$/, '') || '/admin'}${location.search}`;
   const currentItem = findAdminMenuItem(activePath);
+  const currentGroup = findAdminMenuGroup(activePath);
+  const activeMenuPath = currentItem?.path ?? activePath;
+  const currentGroupName = currentGroup?.name;
 
   const permissionGroups = useMemo(
     () =>
@@ -135,12 +145,13 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
     () =>
       permissionGroups.map((group) => ({
         ...group,
-        open: openGroups === null || openGroups.includes(group.name),
+        open:
+          openGroups === null
+            ? group.name === currentGroupName
+            : openGroups.includes(group.name),
       })),
-    [openGroups, permissionGroups],
+    [currentGroupName, openGroups, permissionGroups],
   );
-
-  const currentGroupName = currentGroup?.name;
 
   const leave = useCallback(
     async (to: string) => {
@@ -182,9 +193,9 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
 
   const toggleGroup = (name: string) => {
     setOpenGroups((current) => {
-      // 未保存偏好时全部分组都是展开的；首次切换要基于“全部已展开”
-      // 计算，否则会误把其余分组一起收起。
-      const expanded = current ?? groups.map((group) => group.name);
+      // 未保存偏好时只有当前分组展开；首次手动切换要基于当前可见状态，
+      // 否则会把默认收起的分组误当成已展开。
+      const expanded = current ?? groups.filter((group) => group.open).map((group) => group.name);
       return expanded.includes(name)
         ? expanded.filter((group) => group !== name)
         : [...expanded, name];
@@ -224,7 +235,8 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
 
       <AdminSidebar
         groups={groups}
-        activePath={activePath}
+        activePath={activeMenuPath}
+        activeGroupName={currentGroupName}
         email={me?.email}
         roleLabel={me?.roleLabel}
         onNavigate={(path) => void leave(path)}

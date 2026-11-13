@@ -18,6 +18,11 @@ import {
 import { toCredits } from '../../../lib/microcredits';
 import type { FinanceAnalyticsView, FinanceBreakdownRow, FinanceDayRow } from '../../../types/model';
 
+/** null 表示成本快照不可计算；这里必须显示「—」，不能把未知写成 0。 */
+function creditsOrUnknown(value: number | null | undefined): string {
+  return value === null || value === undefined ? '—' : toCredits(value);
+}
+
 /**
  * 财务分析（`/admin/finance`）。
  *
@@ -235,8 +240,11 @@ export function AdminFinancePage() {
           },
           {
             label: '成本（积分）',
-            value: toCredits(totals?.costMicrocredits ?? 0),
-            hint: `毛利 ${toCredits(totals?.marginMicrocredits ?? 0)}`,
+            value: creditsOrUnknown(totals?.costMicrocredits),
+            hint:
+              totals?.costMicrocredits === null
+                ? '毛利 —（存在成本未知的已结算账单）'
+                : `毛利 ${creditsOrUnknown(totals?.marginMicrocredits)}`,
           },
         ]}
       />

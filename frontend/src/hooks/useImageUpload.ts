@@ -3,7 +3,7 @@ import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 import { useProject } from './useProject';
 import { usePasteUpload } from './usePasteUpload';
 import { useAssetLibrary } from './useAssetLibrary';
-import { SUPPORTED_IMAGE_LABEL, isSupportedImageFile } from '../lib/constants';
+import { useUploadLimits } from '../context/UploadLimitsContext';
 import type { Asset, MobileUploadAsset } from '../types/api';
 import { useApp } from '../ui';
 
@@ -23,8 +23,8 @@ export interface UploadedImage {
 interface Options {
   /** 数量上限 */
   max: number;
-  /** 单张体积上限 (MB) */
-  maxMb: number;
+  /** @deprecated 上传限制由系统设置统一下发；保留字段仅为兼容旧调用。 */
+  maxMb?: number;
   /** 提示文案里的名词, 如「商品图片」/「参考图片」 */
   noun?: string;
   /** 初始已有素材 (从历史记录恢复时用) */
@@ -43,9 +43,14 @@ interface Options {
  * 并明确写了「多任务/多结果页面仍各自维护提交流程」。本 hook 只管**输入侧**，
  * 不碰提交流程，两者在 `hooks/` 下并列。
  */
-export function useImageUpload({ max, maxMb, noun = '商品图片', initial = [] }: Options) {
+export function useImageUpload({ max, noun = '商品图片', initial = [] }: Options) {
   const { message } = useApp();
   const { ensureProject } = useProject();
+  const {
+    allowedLabel,
+    isSupportedImageFile,
+    validateImageFile,
+  } = useUploadLimits();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<UploadedImage[]>(initial);
@@ -76,7 +81,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
       }
       const list = Array.from(files).filter(isSupportedImageFile);
       if (list.length === 0) {
-        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+        message.warning(`请选择 ${allowedLabel} 格式的图片`);
         return;
       }
       // 用同步镜像计算剩余额度：连续触发两次时 state 还是旧值
@@ -87,16 +92,18 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
       }
       const accepted = list.slice(0, room);
       if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
-      const oversize = accepted.filter((f) => f.size > maxMb * 1024 * 1024);
-      if (oversize.length > 0) {
-        message.error(`单张不超过 ${maxMb}MB：${oversize.map((f) => f.name).join('、')}`);
-        return;
-      }
 
       uploadingRef.current = true;
       setUploading(true);
       const seq = resetSeqRef.current;
       try {
+        for (const file of accepted) {
+          const validationError = await validateImageFile(file);
+          if (validationError) {
+            message.error(`${file.name}：${validationError}`);
+            return;
+          }
+        }
         const projectId = await ensureProject();
         if (seq !== resetSeqRef.current) return;
         const uploaded: UploadedImage[] = [];
@@ -122,7 +129,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
         setUploading(false);
       }
     },
-    [max, maxMb, noun, ensureProject, message],
+    [allowedLabel, ensureProject, isSupportedImageFile, max, message, noun, validateImageFile],
   );
 
   const removeImage = useCallback((id: string) => {

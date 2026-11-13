@@ -76,6 +76,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log(`[验证] 后端已在 ${BASE} 启动\n`);
 
   const prisma = app.get(require('../src/prisma/prisma.service').PrismaService);
+  // 本脚本覆盖沙箱支付；支付总开关默认关闭，先像运营一样显式打开
+  await prisma.systemSetting.upsert({
+    where: { key: 'payment.enabled' },
+    create: { key: 'payment.enabled', value: 'true' },
+    update: { value: 'true' },
+  });
+  app.get(require('../src/common/settings.service').SettingsService).invalidate();
   const health = app.get(require('../src/model/routing/route-health.service').RouteHealthService);
   const billing = app.get(require('../src/model/billing/billing.service').BillingService);
   const bcrypt = require('bcryptjs');
@@ -167,7 +174,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('素材已上传', !!assetId, assetId ?? JSON.stringify(upJson).slice(0, 100));
 
   /*
-   * 新模型层夹具：渠道 → 渠道模型 → 前台模型（revision + 线路）。
+   * 夹具：渠道 → 渠道模型 → 能力绑定 + 能力售价。
    *
    * 协议填**插件声明的 provider id**（`openai-image`）而不是插件 id
    * （`openai-images`）—— 注册表按 provider 注册，填插件 id 会在派发时
@@ -216,46 +223,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       priceConfigured: false,
     },
   });
-  const logicalModel = await prisma.logicalModel.create({
-    data: {
-      code: `credit-smoke-${Date.now()}`,
-      activeKey: `credit-smoke-${Date.now()}`,
-      name: '扣费验证模型',
-      // 准入按「前台模型 capability == 请求能力 id」校验
-      capability: 'expand',
-      enabled: true,
-      pricePolicy: 'unified',
+  // 能力级夹具：绑定 + 能力售价（前台模型层已删除）
+  await prisma.capabilityPricing.upsert({
+    where: { capabilityId: 'expand' },
+    create: {
+      capabilityId: 'expand',
+      billingMode: 'fixed_request',
+      unitPriceMicrocredits: BigInt(cost) * MICRO,
+    },
+    update: {
       billingMode: 'fixed_request',
       unitPriceMicrocredits: BigInt(cost) * MICRO,
     },
   });
-  const revision = await prisma.logicalModelRevision.create({
-    data: {
-      logicalModelId: logicalModel.id,
-      version: 1,
-      capabilitySpecJson: JSON.stringify(
-        require('../src/model/intent/capability-spec').capabilitySpecFromModelCapabilityConfig(IMAGE_CONFIG, 'image'),
-      ),
-      defaultOptionsJson: '{}',
-    },
+  await prisma.capabilityModelBinding.deleteMany({ where: { capabilityId: 'expand' } });
+  await prisma.capabilityModelBinding.create({
+    data: { capabilityId: 'expand', channelModelId: channelModel.id, priority: 0, weight: 100, enabled: true },
   });
-  await prisma.logicalModelRoute.create({
-    data: { logicalModelRevisionId: revision.id, channelModelId: channelModel.id, priority: 0, weight: 100, enabled: true },
-  });
-  await prisma.logicalModel.update({
-    where: { id: logicalModel.id },
-    data: { activeRevisionId: revision.id, revisionSequence: 1 },
-  });
-  const logicalModelId = logicalModel.id;
+  const modelKey = 'smoke-image-model';
   // 本进程直接写库，目录快照不会自己失效
-  app.get(require('../src/model/catalog/route-catalog.service').RouteCatalogService).invalidateLocal();
+  app.get(require('../src/model/catalog/capability-catalog.service').CapabilityCatalogService).invalidateLocal();
 
   // ── 余额不足 ──────────────────────────────────────────────────────
   console.log('\n【余额不足 → 402 且不建任务】');
   check('新用户余额为 0', (await call('GET', '/credits/balance', T)).data?.balance === 0);
   const before = await prisma.generationTask.count({ where: { ownerId: user.id } });
   const poor = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', modelKey, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('余额不足返回 402', poor.status === 402, `HTTP ${poor.status} ${poor.message ?? ''}`);
   const after = await prisma.generationTask.count({ where: { ownerId: user.id } });
@@ -297,7 +291,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   });
 
   const ok = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', modelKey, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('余额充足时创建成功', ok.status === 200 || ok.status === 201, `HTTP ${ok.status} ${ok.message ?? ''}`);
   check('响应带扣费快照', ok.data?.creditCost === cost, `返回 ${ok.data?.creditCost} / 期望 ${cost}`);
@@ -315,7 +309,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await sleep(300);
   }
   check('模型桩返回后任务成功', normalTask?.status === 'succeeded', normalTask?.status);
-  check('新任务带前台模型快照', Boolean(normalTask?.logicalModelId), normalTask?.logicalModelId);
+  check('新任务带模型分组快照', Boolean(normalTask?.modelKey), normalTask?.modelKey);
 
   // ── 幂等创建：重放与并发都只能扣一次 ──────────────────────────────
   console.log('\n【幂等创建 → 只扣一次、只建一个任务】');
@@ -326,7 +320,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const idemPayload = {
     projectId,
     capability: 'expand',
-    logicalModelId,
+    modelKey,
     inputAssetIds: [assetId],
     params: { ratio: 'original', occupy: 80, position: 'center' },
     idempotencyKey: idemKey,
@@ -394,7 +388,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const balBeforeFail = (await call('GET', '/credits/balance', T)).data?.balance;
 
   const ok2 = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', modelKey, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('余额充足时仍可建任务', ok2.status === 200 || ok2.status === 201, `HTTP ${ok2.status}`);
   const taskId2 = ok2.data?.taskId;
@@ -475,7 +469,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const balBeforeUncertain = (await call('GET', '/credits/balance', T)).data?.balance;
   const uncertainCreate = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', modelKey, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('5xx 用例同样可以先建任务', uncertainCreate.status === 200 || uncertainCreate.status === 201,
     `HTTP ${uncertainCreate.status}`);
@@ -523,11 +517,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
    * 正是要验的「线路在派发前失效」路径。
    */
   // 先回源一份新快照：停用渠道后 30s 内不会重载，准入才能看到这条线路
-  await app.get(require('../src/model/catalog/route-catalog.service').RouteCatalogService).snapshotNow();
+  await app.get(require('../src/model/catalog/capability-catalog.service').CapabilityCatalogService).snapshotNow();
   await prisma.modelChannel.update({ where: { id: channel.id }, data: { enabled: false } });
   const balBeforeNoChannel = (await call('GET', '/credits/balance', T)).data?.balance;
   const noChannel = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', modelKey, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('直调仍可建任务 (由执行期判失败)', noChannel.status === 200 || noChannel.status === 201, `HTTP ${noChannel.status}`);
   let noChannelTask = null;
@@ -654,10 +648,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await prisma.creditReservationItem.deleteMany({ where: { billingOrderId: { in: orderIds } } });
   await prisma.billingOrder.deleteMany({ where: { userId: user.id } });
   await prisma.apiCallLog.deleteMany({ where: { userId: user.id } });
-  // 模型夹具：线路 → 渠道模型 → 渠道 → 前台模型（revision 随模型级联）
-  await prisma.logicalModelRoute.deleteMany({ where: { logicalModelRevisionId: revision.id } });
-  await prisma.logicalModelRevision.deleteMany({ where: { logicalModelId: logicalModel.id } });
-  await prisma.logicalModel.deleteMany({ where: { id: logicalModel.id } });
+  // 模型夹具：能力绑定 → 渠道模型 → 渠道 → 能力售价
+  await prisma.capabilityModelBinding.deleteMany({ where: { channelModelId: channelModel.id } });
+  await prisma.capabilityPricing.deleteMany({ where: { capabilityId: 'expand' } });
   await prisma.channelModel.deleteMany({ where: { id: channelModel.id } });
   await prisma.modelChannel.deleteMany({ where: { id: channel.id } });
   // 登录写登录日志、退款失败给站内消息 —— 两者都直接引用 User,

@@ -107,13 +107,6 @@ export interface Props {
   pageClass?: string;
   /** 输入栏附加 class (如参考站 rotate-angle-controls) */
   inputPaneClassName?: string;
-  /**
-   * 上传辅助操作的位置。
-   *
-   * 旋转角度页把「从素材库导入 / 手机上传」渲染为上传卡上方的独立 13px 行；
-   * 其余页面仍在卡片标题行内。两种结构都由同一份按钮节点渲染。
-   */
-  uploadActionsPlacement?: 'inside' | 'above';
   /** 页标题 (空态 h3 与结果栏标题) */
   title: string;
   /** 提交按钮下方的一句话描述 (参考站各页固定文案) */

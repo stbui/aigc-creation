@@ -91,7 +91,7 @@ describe('BillingService 多图融合部分交付结算', () => {
       settle: vi.fn().mockResolvedValue({}),
       refund: vi.fn().mockResolvedValue({}),
     };
-    const service = new BillingService(prisma as never, wallet as never);
+    const service = new BillingService(prisma as never, wallet as never, {} as never);
 
     await expect(service.settle('bill-fusion', { deliveredQuantity: 1 })).resolves.toBe(settled);
 
@@ -160,7 +160,7 @@ describe('BillingService 限时免费结算', () => {
       settle: vi.fn().mockResolvedValue({}),
       refund: vi.fn().mockResolvedValue({}),
     };
-    const service = new BillingService(prisma as never, wallet as never);
+    const service = new BillingService(prisma as never, wallet as never, {} as never);
 
     await service.settle('bill-free-video', { audioDurationMs: 6_000 });
 
@@ -214,7 +214,7 @@ describe('BillingService 人工核对', () => {
       settle: vi.fn().mockResolvedValue({}),
       refund: vi.fn().mockResolvedValue({}),
     };
-    service = new BillingService(prisma as never, wallet as never);
+    service = new BillingService(prisma as never, wallet as never, {} as never);
   });
 
   it('退款与核对人标记在同一事务内完成', async () => {
@@ -383,7 +383,7 @@ describe('BillingService 换线账单原子替换', () => {
       refund: vi.fn().mockResolvedValue({ balance: {} }),
       reserve: vi.fn().mockResolvedValue({ balance: {} }),
     };
-    const service = new BillingService(prisma as never, wallet as never);
+    const service = new BillingService(prisma as never, wallet as never, {} as never);
     return { service, prisma, tx, wallet };
   }
 

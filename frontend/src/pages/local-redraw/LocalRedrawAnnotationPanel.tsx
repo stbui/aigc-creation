@@ -35,7 +35,7 @@ export function LocalRedrawAnnotationPanel({
     <ToolCard
       title={
         <>
-          <i className="pk-required-mark">*</i>重绘描述
+          <i className="pk-required-mark u-font-14">*</i>重绘描述
         </>
       }
       actions={

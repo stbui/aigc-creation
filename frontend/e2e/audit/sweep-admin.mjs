@@ -12,7 +12,7 @@ const ROUTES = [
   'alerts', 'users', 'roles', 'settings', 'backups', 'assets', 'storage',
   'coupons', 'campaigns', 'marketing-rules', 'scheduler', 'channels', 'logical-models',
   'user-groups', 'plugins', 'billing-orders', 'finance', 'model-calls', 'capabilities',
-  'tasks', 'tickets', 'credit-prices', 'products', 'membership-plans', 'orders', 'credits',
+  'tasks', 'tickets', 'products', 'membership-plans', 'orders', 'credits',
   'retention', 'payments', 'invoices', 'legal', 'notifications',
   'aigc-label',
 ];

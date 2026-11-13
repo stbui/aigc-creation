@@ -9,11 +9,11 @@
  * 它们只服务这里的分页与健康汇总, 不是通用接口。
  */
 
-import { adminChannelModelsApi, adminChannelsApi, adminLogicalModelsApi } from '../../../lib/api';
+import { ApiError, adminChannelModelsApi, adminChannelsApi, adminCapabilityModelsApi, adminModelCommerceApi } from '../../../lib/api';
 import type { AdminChannelView } from '../../../types/model';
 
 // 本文件既要用这些接口对象，也要把它们转给目录内其它文件
-export { adminChannelModelsApi, adminChannelsApi, adminLogicalModelsApi };
+export { ApiError, adminChannelModelsApi, adminChannelsApi, adminCapabilityModelsApi, adminModelCommerceApi };
 
 /** 渠道数量在几十的量级，100 足够一次拿完；后续翻页只作兜底 */
 const CHANNEL_PAGE_SIZE = 100;

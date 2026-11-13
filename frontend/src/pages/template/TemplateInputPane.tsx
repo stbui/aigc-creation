@@ -1,7 +1,8 @@
 import type { RefObject } from 'react';
+import { Lightbulb } from 'lucide-react';
 
 import { CAPABILITY_ID, MAX_IMAGES, MAX_IMAGE_MB } from './constants';
-import { ModelPicker, ToolImageDropzone, ToolSettingsPopover, ToolSubmitBar } from './components';
+import { ToolGenerationSubmitBar, ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
 import type { TemplateEntry } from './utils';
 import { TemplateSelectedCard } from './TemplateSelectedCard';
@@ -31,7 +32,7 @@ interface TemplateInputPaneProps {
   onSubmit: () => void;
 }
 
-/** 左栏：人像上传、已选模板回显与固定底栏（高级设置 + 提交）。 */
+/** 左栏：人像上传、已选模板回显与提交区（高级设置 + 提交）。 */
 export function TemplateInputPane({
   images,
   uploading,
@@ -57,9 +58,9 @@ export function TemplateInputPane({
   onSubmit,
 }: TemplateInputPaneProps) {
   return (
-    <aside className="tpl-input-pane">
-      <div className="tpl-form-card">
-        <div className="tpl-form-scroll">
+    <aside className="pk-input-pane">
+      <div className="pk-form-scroll">
+        <section className="pk-config-card">
           <ToolImageDropzone
             title="上传人像照片"
             noun="人像照片"
@@ -77,38 +78,39 @@ export function TemplateInputPane({
           />
 
           <TemplateSelectedCard template={selectedTemplate} onClear={onClearTemplate} />
-        </div>
 
-        <div className="tpl-form-footer">
-          <div className="tpl-footer-row">
-            <ToolSettingsPopover
-              open={settingsOpen}
-              onToggle={onToggleSettings}
-              ratio={ratio}
-              onRatioChange={onRatioChange}
-              resolution={resolution}
-              onResolutionChange={onResolutionChange}
-              capabilityId={CAPABILITY_ID}
-              modelPicker={
-                <ModelPicker
-                  capability={CAPABILITY_ID}
-                  options={{ ratio, size: resolution }}
-                  onQuoteChange={onModelQuoteChange}
-                />
-              }
-            />
+          <div className="tpl-tips">
+            <strong className="pk-section-title u-font-14">
+              <Lightbulb size={14} />
+              拍摄建议
+            </strong>
+            <ul className="tpl-tips-list">
+              <li>正脸清晰、五官无遮挡，生成的相似度更高</li>
+              <li>光线均匀的日常照、证件照都可以直接使用</li>
+              <li>选好模板后，可点封面左上角的眼睛查看大图</li>
+            </ul>
           </div>
-          <ToolSubmitBar
-            submitting={generating}
-            disabled={submitDisabled}
-            label="生成婚纱写真"
-            guestLabel={guestLabel}
-            creditLabel={creditLabel ?? undefined}
-            hint={hint}
-            onSubmit={onSubmit}
-          />
-        </div>
+        </section>
       </div>
+
+      {/* 高级设置 + 提交（与商品主图 / 商品详情同一块共享组件） */}
+      <ToolGenerationSubmitBar
+        capability={CAPABILITY_ID}
+        generating={generating}
+        disabled={submitDisabled}
+        label="生成婚纱写真"
+        guestLabel={guestLabel}
+        creditLabel={creditLabel}
+        hint={hint}
+        settingsOpen={settingsOpen}
+        onToggleSettings={onToggleSettings}
+        ratio={ratio}
+        onRatioChange={onRatioChange}
+        resolution={resolution}
+        onResolutionChange={onResolutionChange}
+        onModelQuoteChange={onModelQuoteChange}
+        onSubmit={onSubmit}
+      />
     </aside>
   );
 }

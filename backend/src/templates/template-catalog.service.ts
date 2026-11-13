@@ -3,11 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { SettingImageService } from '../common/setting-image.service';
 import { StorageService } from '../storage/storage.service';
-import {
-  inspectUploadedImage,
-  maxUploadBytes,
-  verifyDecodableImage,
-} from '../assets/image-validation';
+import { SettingsService } from '../common/settings.service';
+import { inspectUploadedImage, verifyDecodableImage } from '../assets/image-validation';
 import type {
   CreateTemplateCategoryDto,
   CreateTemplateGroupDto,
@@ -54,6 +51,7 @@ export class TemplateCatalogService {
     private readonly prisma: PrismaService,
     private readonly settingImages: SettingImageService,
     private readonly storage: StorageService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -286,7 +284,8 @@ export class TemplateCatalogService {
     const buffer = file?.buffer;
     if (!buffer?.length) throw new AppError(40001, '请选择要上传的图片', 400);
 
-    const info = inspectUploadedImage(buffer, { maxBytes: maxUploadBytes() });
+    const limits = await this.settings.uploadLimits();
+    const info = inspectUploadedImage(buffer, limits);
     /*
      * Jimp 1.6 没有内置 WebP 解码器；WebP 已经过文件头、尺寸与像素上限校验，
      * 存储与浏览器展示不依赖服务端解码，故跳过 Jimp 二次解码。

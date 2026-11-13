@@ -157,6 +157,32 @@ export const ALL_MODELS_STATUS_OPTIONS: Array<{ value: AllModelsStatusFilter; la
   { value: 'cooling', label: '冷却中' },
 ];
 
+/**
+ * 经营筛选：与商品状态正交，答案来自近 7 天账单聚合。
+ *
+ * 状态回答「能不能卖」，经营筛选回答「卖得怎么样 / 哪里还没准备好」。
+ * 同一个商品可以同时是「可用」与「无调用」。
+ */
+export type AllModelsCommerceFilter =
+  | 'pending-pricing'
+  | 'no-calls'
+  | 'low-margin'
+  | 'high-refund'
+  | 'invalid-binding'
+  | 'supplier-disabled';
+
+export const ALL_MODELS_COMMERCE_OPTIONS: Array<{
+  value: AllModelsCommerceFilter;
+  label: string;
+}> = [
+  { value: 'pending-pricing', label: '待定价' },
+  { value: 'no-calls', label: '无调用' },
+  { value: 'low-margin', label: '低毛利' },
+  { value: 'high-refund', label: '高退款' },
+  { value: 'invalid-binding', label: '失效绑定' },
+  { value: 'supplier-disabled', label: '供应商停用' },
+];
+
 /** 跨渠道清单每页条数：数据已全量在内存，页大一点少翻页 */
 export const ALL_MODELS_PAGE_SIZE = 50;
 
@@ -194,6 +220,8 @@ export interface TierDraft {
 
 export interface ModelDraft {
   modelKey: string;
+  /** C 端模型分组键；留空 = 使用商品编号 */
+  modelGroupKey: string;
   providerModelKey: string;
   displayName: string;
   channelLabel: string;
@@ -236,6 +264,7 @@ export const EMPTY_TIER: TierDraft = {
 
 export const EMPTY_MODEL_DRAFT: ModelDraft = {
   modelKey: '',
+  modelGroupKey: '',
   providerModelKey: '',
   displayName: '',
   channelLabel: '',

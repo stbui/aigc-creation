@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppError } from '../common/app.exception';
-import { IDENTITY_ONLY_KEY, PERMISSION_KEY } from './admin.decorator';
+import { ANY_PERMISSION_KEY, IDENTITY_ONLY_KEY, PERMISSION_KEY } from './admin.decorator';
 import { PermissionGuard } from './permission.guard';
 
 type GuardContext = Parameters<PermissionGuard['canActivate']>[0];
@@ -51,6 +51,38 @@ describe('PermissionGuard', () => {
       guard.canActivate(
         makeContext({
           originalUrl: '/api/v1/admin/users/export',
+          adminUser: { id: 'admin-1', email: 'admin@example.com', role: 'operator' },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 40301 });
+  });
+
+  it('任一权限满足时放行（capability.read / logical_model.read）', async () => {
+    reflector.getAllAndOverride.mockImplementation((key: string) =>
+      key === ANY_PERMISSION_KEY ? ['capability.read', 'logical_model.read'] : undefined,
+    );
+    roles.getPermissions.mockResolvedValue(['logical_model.read']);
+
+    await expect(
+      guard.canActivate(
+        makeContext({
+          originalUrl: '/api/v1/admin/capabilities',
+          adminUser: { id: 'admin-1', email: 'admin@example.com', role: 'operator' },
+        }),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it('任一权限均不满足时拒绝', async () => {
+    reflector.getAllAndOverride.mockImplementation((key: string) =>
+      key === ANY_PERMISSION_KEY ? ['capability.read', 'logical_model.read'] : undefined,
+    );
+    roles.getPermissions.mockResolvedValue(['product.price']);
+
+    await expect(
+      guard.canActivate(
+        makeContext({
+          originalUrl: '/api/v1/admin/capabilities',
           adminUser: { id: 'admin-1', email: 'admin@example.com', role: 'operator' },
         }),
       ),

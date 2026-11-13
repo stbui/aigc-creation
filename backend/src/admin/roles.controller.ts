@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
-import { maxUploadBytes } from "../assets/image-validation";
+import { deploymentUploadMaxBytes } from "../common/image-formats";
 import { RequirePermission, AdminUser } from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
 import { AdminSettingsService } from "./settings.service";
@@ -96,7 +96,7 @@ export class AdminSettingsController {
   @UseInterceptors(
     FileInterceptor("file", {
       storage: memoryStorage(),
-      limits: { fileSize: maxUploadBytes(), files: 1 },
+      limits: { fileSize: deploymentUploadMaxBytes(), files: 1 },
     }),
   )
   async upload(

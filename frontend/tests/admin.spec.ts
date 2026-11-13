@@ -213,11 +213,130 @@ test.describe('后台管理端', () => {
     await page.goto(`${UI}/admin/settings`);
     await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('tab').first()).toBeVisible();
-    // 默认分组「站点」是只读配置地图，不渲染输入框；切到「上传」才应出现可编辑控件。
+    await expect(page).toHaveURL(/\/admin\/settings\/generate$/);
+    await expect(page.getByRole('tab', { name: '运行与生成' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    // 默认进入运行与生成；切到上传限制后出现可编辑控件。
     await page.getByRole('tab', { name: /上传/ }).click();
+    await expect(page).toHaveURL(/\/admin\/settings\/upload$/);
     const panel = page.getByTestId('admin-panel').first();
     await expect(panel).toBeVisible();
-    await expect(panel.locator('input').first()).toBeVisible();
+    const firstInput = panel.locator('input').first();
+    await expect(firstInput).toBeVisible();
+
+    // 分组路由切换不能让同一页面的草稿丢失。
+    await firstInput.fill('42');
+    await page.getByRole('tab', { name: /生成/ }).click();
+    await expect(page).toHaveURL(/\/admin\/settings\/generate$/);
+    await page.getByRole('tab', { name: /上传/ }).click();
+    await expect(page.getByTestId('admin-panel').first().locator('input').first()).toHaveValue('42');
+  });
+
+  test('系统设置分组可直接刷新且不再混入邮箱配置', async ({ page }) => {
+    await page.goto(`${UI}/admin/settings/upload`);
+    await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15000 });
+    await expect(page).toHaveURL(/\/admin\/settings\/upload$/);
+    await expect(page.getByRole('tab', { name: /上传/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    // 邮箱已经从系统设置分组拆成独立工作台。
+    await expect(page.getByRole('tab', { name: /邮件/ })).toHaveCount(0);
+
+    await page.reload();
+    await expect(page).toHaveURL(/\/admin\/settings\/upload$/);
+    await expect(page.getByRole('tab', { name: /上传/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  test('系统设置不识别旧路径与 group 查询参数', async ({ page }) => {
+    await page.goto(`${UI}/admin/settings/email`);
+    await expect(page.getByRole('heading', { name: '页面不存在' })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page).toHaveURL(/\/admin\/settings\/email$/);
+
+    await page.goto(`${UI}/admin/settings?group=refund`);
+    await expect(page).toHaveURL(/\/admin\/settings\/generate$/);
+    await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByRole('tab', { name: '运行与生成' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  test('邮箱配置使用独立页面与侧栏路由', async ({ page }) => {
+    await page.goto(`${UI}/admin/settings/generate`);
+    await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15000 });
+    await page.getByRole('button', { name: '邮箱配置', exact: true }).click();
+
+    await expect(page).toHaveURL(/\/admin\/email$/);
+    await expect(page.getByRole('heading', { name: '邮箱配置' })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByTestId('email-overview')).toBeVisible();
+    await expect(page.getByRole('tab', { name: /投递配置/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await page.getByRole('tab', { name: /业务用途/ }).click();
+    await expect(page).toHaveURL(/\/admin\/email\?tab=usage$/);
+    await expect(page.getByRole('heading', { name: '业务邮件用途' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '账号与安全' })).toBeVisible();
+    await page.getByRole('tab', { name: /邮件模板/ }).click();
+    await expect(page).toHaveURL(/\/admin\/email\?tab=templates$/);
+    await expect(page.getByRole('heading', { name: '邮件模板' })).toBeVisible();
+    await expect(page.getByTestId('email-template-email_verification')).toBeVisible();
+    await page
+      .getByTestId('email-template-password_reset')
+      .getByRole('button', { name: '编辑', exact: true })
+      .click();
+    await expect(page.getByLabel('邮件主题')).toBeVisible();
+    await expect(page.getByText('必须保留 {{resetUrl}}')).toBeVisible();
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(page.getByRole('tab', { name: /^邮件$/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '邮箱配置', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(page.getByRole('button', { name: '系统设置', exact: true })).not.toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(page.getByTestId('admin-breadcrumb')).toContainText('邮箱配置');
+
+    await page.reload();
+    await expect(page).toHaveURL(/\/admin\/email\?tab=templates$/);
+    await expect(page.getByRole('tab', { name: /邮件模板/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.getByRole('heading', { name: '邮箱配置' })).toBeVisible({
+      timeout: 15000,
+    });
+  });
+
+  test('邮箱配置提供 163 SMTP 推荐参数与加密选项', async ({ page }) => {
+    await page.goto(`${UI}/admin/email`);
+    await expect(page.getByRole('heading', { name: '邮箱配置' })).toBeVisible({
+      timeout: 15000,
+    });
+
+    await page.getByRole('radio', { name: /SMTP 邮箱/ }).click();
+    await expect(page.getByLabel('SMTP 服务器')).toBeVisible();
+    await expect(page.getByLabel('SMTP 登录账号')).toBeVisible();
+    await expect(page.getByLabel('SMTP 客户端授权码')).toBeVisible();
+
+    await page.getByRole('button', { name: '使用 163 推荐参数' }).click();
+    await expect(page.getByLabel('SMTP 服务器')).toHaveValue('smtp.163.com');
+    await expect(page.getByLabel('SMTP 端口')).toHaveValue('465');
+    await expect(page.getByRole('switch', { name: 'SSL/TLS 直连' })).toBeChecked();
   });
 
   /*
@@ -227,7 +346,7 @@ test.describe('后台管理端', () => {
    * 首屏既没有弹窗/抽屉，也没有常驻的操作条；否则整页会被挡住或占位。
    */
   for (const [path, heading] of [
-    ['/admin/notifications', '站内消息'],
+    ['/admin/notifications', '消息通知'],
   ] as const) {
     test(`${heading}页不得常驻确认弹窗或操作条`, async ({ page }) => {
       await page.goto(`${UI}${path}`);

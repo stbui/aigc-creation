@@ -38,6 +38,7 @@ import {
   type RateLimitOptions,
 } from "../../common/rate-limit.guard";
 import { PERMISSIONS } from "../../admin/permissions";
+import { CapabilityModelAdminService } from "../catalog/capability-model.admin.service";
 import { ProtocolCatalogService } from "../protocol/protocol-catalog.service";
 import {
   ProtocolTestService,
@@ -81,6 +82,7 @@ export class ChannelWriteBodyDto {
 /** 渠道模型创建 / 更新入参 */
 export class ChannelModelWriteBodyDto {
   @IsOptional() @IsString() modelKey?: string;
+  @IsOptional() @IsString() modelGroupKey?: string;
   @IsOptional() @IsString() providerModelKey?: string;
   @IsOptional() @IsString() displayName?: string;
   @IsOptional() @IsString() channelLabel?: string;
@@ -106,6 +108,7 @@ export class ChannelModelTestBodyDto {
   /** 已保存模型 id；给出时未填字段以库内配置为准 */
   @IsOptional() @IsString() modelId?: string;
   @IsOptional() @IsString() modelKey?: string;
+  @IsOptional() @IsString() modelGroupKey?: string;
   @IsOptional() @IsString() providerModelKey?: string;
   @IsOptional() @IsString() capability?: string;
   @IsOptional() @IsString() protocol?: string;
@@ -120,6 +123,8 @@ export class ChannelModelImportBodyDto {
   @IsArray() @IsString({ each: true }) models!: string[];
   /** 本次导入统一配置；省略 = 使用供应商默认配置 */
   @IsOptional() @Allow() config?: unknown;
+  /** 商品键 → 能力 id 列表；给出时导入后立即写入能力绑定 */
+  @IsOptional() @IsObject() @Allow() capabilitiesByModel?: Record<string, string[]>;
 }
 
 export class ChannelEnabledBodyDto {
@@ -216,6 +221,7 @@ export class AdminChannelsController {
     private readonly protocols: ProtocolCatalogService,
     private readonly health: ChannelHealthService,
     private readonly metrics: ChannelModelMetricsService,
+    private readonly capabilityModels: CapabilityModelAdminService,
   ) {}
 
   /* ── 渠道 ─────────────────────────────────────────────── */
@@ -395,11 +401,15 @@ export class AdminChannelsController {
   @Post(":id/models/import")
   @RequirePermission(PERMISSIONS.channelModelWrite)
   @RateLimit(RL_CHANNEL_IMPORT)
-  importModels(
+  async importModels(
     @Param("id") id: string,
     @Body() body: ChannelModelImportBodyDto,
   ) {
-    return this.catalog.import(id, body.models ?? [], body.config);
+    const result = await this.catalog.import(id, body.models ?? [], body.config);
+    const bindings = body.capabilitiesByModel
+      ? await this.capabilityModels.publishByKeys(id, body.capabilitiesByModel)
+      : [];
+    return { ...result, bindings };
   }
 
   @Patch(":id/models/:modelId")

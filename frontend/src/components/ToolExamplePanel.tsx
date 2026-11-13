@@ -36,11 +36,11 @@ export function ToolExamplePanel({
         <p>{description}</p>
         <ol className="pd-demo-steps">
           {steps.map((step, index) => (
-            <li key={step.title} className="pd-demo-step">
-              <span className="pd-demo-step-no">{String(index + 1).padStart(2, '0')}</span>
+            <li key={step.title} className="pd-demo-step u-py-10 u-px-12">
+              <span className="pd-demo-step-no u-font-12">{String(index + 1).padStart(2, '0')}</span>
               <div>
                 <strong>{step.title}</strong>
-                <small>{step.desc}</small>
+                <small className="u-font-12">{step.desc}</small>
               </div>
             </li>
           ))}
@@ -49,7 +49,7 @@ export function ToolExamplePanel({
 
       <div className="pd-demo-cards">{children}</div>
 
-      <p className="pd-demo-note">{note}</p>
+      <p className="pd-demo-note u-font-12">{note}</p>
     </div>
   );
 }
@@ -73,7 +73,7 @@ export function ToolExampleCard({
           <i className="pd-demo-dot" aria-hidden />
           {step}. {title}
         </h4>
-        <span className="pd-demo-tag">{tag}</span>
+        <span className="pd-demo-tag u-font-12">{tag}</span>
       </header>
       {children}
     </article>
@@ -96,7 +96,7 @@ export function ToolExampleSource({
     <div className="pd-demo-source">
       <figure className="pd-demo-shot">
         <img src={src} alt={alt} loading="lazy" />
-        <figcaption>{caption}</figcaption>
+        <figcaption className="u-py-2 u-px-8 u-font-12">{caption}</figcaption>
       </figure>
       <ToolExampleFactList facts={facts} />
     </div>

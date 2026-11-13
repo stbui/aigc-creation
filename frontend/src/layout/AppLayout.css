@@ -23,6 +23,15 @@
   align-items: stretch;
 }
 
+/* 路由进场动画（base.css 的 route-enter）会把整块 .app-content 向下平移 6px。
+ * 固定视口高度的页面（工具页 pk-workspace 撑满 100vh - 顶栏）平移后底边超出视口，
+ * 文档临时长出纵向滚动条，滚动条占去的宽度又让内容横向重排一次 —— 打开页面时
+ * 「先出滚动条、再消失、页面一抖」即由此而来。动画窗口内把 app-body 的溢出裁掉：
+ * overflow: clip 不建立滚动容器，不影响 .app-content 自身的内部滚动。 */
+.app-body:has(> .app-content.is-route-entering) {
+  overflow: clip;
+}
+
 .app-content {
   /* 与侧栏同排时占满剩余宽度; 没有 min-width:0 时宽表/长词会把整列撑出视口 */
   flex: 1 1 auto;

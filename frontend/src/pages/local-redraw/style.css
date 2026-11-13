@@ -186,8 +186,7 @@
  *
  * 局部重绘：reference local-redraw 收起历史时仍保留第三列 192px，只隐藏列表；
  * 标题行继续作为「展开」按钮。≤1180 才切到浮动按钮 + Drawer。
- * 旋转角度：image-tool-upload-actions 是上传卡上方的独立 13px flex 行
- * (13 + 12 gap = 25px)，不是卡片内标题行；设置卡按参考站 12px gap 排列。 */
+ * 旋转角度：上传辅助操作在卡片标题行右侧 (与其他修图页一致)；设置卡按参考站 12px gap 排列。 */
 
 .pk-workspace.local-redraw-page.history-collapsed {
   grid-template-columns: 432px minmax(560px, 1fr) 192px;

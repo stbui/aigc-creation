@@ -1,5 +1,5 @@
 import { request, toQuery } from "./api";
-import type { AdminChannelModelListItem, AdminChannelModelView, AdminChannelView, AdminLogicalModelView, BillingBatchResolveResult, BillingOrderListResult, BillingOrderView, ChannelHealthRowView, ChannelModelFetchResultView, ChannelModelHealthRowView, ChannelModelRepriceInput, ChannelOrderItemView, ChannelPageResult, ModelIntentPayload, PluginListResult, PluginVerifyResultView, PluginView, ProtocolCatalogEntryView, ProtocolTestResultView, ProviderCatalogView, ProviderVerifyResult, SimulateResultView, SystemChannelExportView, SystemChannelImportResultView, UpstreamModelPreview, UserGroupView } from "../types/model";
+import type { AdminCapabilityModelListView, AdminChannelModelListItem, AdminChannelModelView, AdminChannelView, BillingBatchResolveResult, BillingOrderListResult, BillingOrderView, CapabilityPricingView, ChannelHealthRowView, ChannelModelFetchResultView, ChannelModelHealthRowView, ChannelModelRepriceInput, ChannelOrderItemView, ChannelPageResult, ModelCommerceOverviewView, ModelIntentPayload, PluginListResult, PluginVerifyResultView, PluginView, ProtocolCatalogEntryView, ProtocolTestResultView, ProviderCatalogView, ProviderVerifyResult, SystemChannelExportView, SystemChannelImportResultView, UpstreamModelPreview, UserGroupView } from "../types/model";
 
 /* ══════════════════════ 渠道与模型域（`src/model/**`） ══════════════════════ */
 
@@ -156,12 +156,21 @@ export const adminChannelsApi = {
    * `config` 为本次统一配置；省略时后端套用供应商默认商品配置。配置应用
    * 失败不会阻断导入，未套用的商品回落为骨架行。
    */
-  importModels: (id: string, models: string[], config?: unknown) =>
+  importModels: (
+    id: string,
+    models: string[],
+    config?: unknown,
+    capabilitiesByModel?: Record<string, string[]>,
+  ) =>
     request<ChannelModelFetchResultView>(
       `/admin/channels/${id}/models/import`,
       {
         method: 'POST',
-        body: config ? { models, config } : { models },
+        body: {
+          models,
+          ...(config ? { config } : {}),
+          ...(capabilitiesByModel ? { capabilitiesByModel } : {}),
+        },
       },
     ),
 
@@ -208,39 +217,85 @@ export const adminChannelModelsApi = {
     ),
 };
 
-/** 后台前台模型（`/admin/logical-models`）：保存即写新 revision 并重建线路 */
-export const adminLogicalModelsApi = {
-  list: (includeArchived = false) =>
-    request<AdminLogicalModelView[]>(
-      `/admin/logical-models${toQuery({ includeArchived: includeArchived ? "1" : undefined })}`,
+/** 能力 ↔ 商品绑定、能力定价与模拟（前台模型层删除后的售卖配置） */
+export const adminCapabilityModelsApi = {
+  consumption: () =>
+    request<{
+      items: Array<{
+        channelModelId: string;
+        channelId: string;
+        modelKey: string;
+        capabilityId: string;
+        capabilityName: string;
+      }>;
+    }>("/admin/capability-models/consumption"),
+
+  list: (capabilityId: string) =>
+    request<AdminCapabilityModelListView>(`/admin/capabilities/${encodeURIComponent(capabilityId)}/models`),
+
+  replace: (
+    capabilityId: string,
+    bindings: Array<{ channelModelId: string; enabled: boolean; priority: number; weight: number }>,
+  ) =>
+    request<unknown>(`/admin/capabilities/${encodeURIComponent(capabilityId)}/models`, {
+      method: "PUT",
+      body: { bindings },
+    }),
+
+  pruneInvalid: (capabilityId: string) =>
+    request<{ removed: number }>(
+      `/admin/capabilities/${encodeURIComponent(capabilityId)}/models/prune-invalid`,
+      { method: "POST" },
     ),
 
-  get: (id: string) =>
-    request<AdminLogicalModelView>(`/admin/logical-models/${id}`),
+  /** 跨能力清理：商品缺失 / 已删除，以及能力定义已不存在的全部失效绑定。 */
+  pruneAllInvalid: () =>
+    request<{ removed: number }>("/admin/capability-models/prune-invalid", {
+      method: "POST",
+    }),
 
-  create: (body: Record<string, unknown>) =>
-    request<AdminLogicalModelView>("/admin/logical-models", {
+  pricing: (capabilityId: string) =>
+    request<CapabilityPricingView>(`/admin/capabilities/${encodeURIComponent(capabilityId)}/pricing`),
+
+  setPricing: (
+    capabilityId: string,
+    body: {
+      billingMode: string;
+      unitPriceMicrocredits: number;
+      inputTokenPriceMicrocredits?: number;
+      outputTokenPriceMicrocredits?: number;
+      cachedTokenPriceMicrocredits?: number;
+    },
+  ) =>
+    request<CapabilityPricingView>(`/admin/capabilities/${encodeURIComponent(capabilityId)}/pricing`, {
+      method: "PUT",
+      body,
+    }),
+
+  simulate: (capabilityId: string, body: Record<string, unknown>) =>
+    request<unknown>(`/admin/capabilities/${encodeURIComponent(capabilityId)}/simulate`, {
       method: "POST",
       body,
     }),
 
-  update: (id: string, body: Record<string, unknown>) =>
-    request<AdminLogicalModelView>(`/admin/logical-models/${id}`, {
-      method: "PATCH",
-      body,
-    }),
+  compatibility: (channelModelId: string) =>
+    request<{
+      channelModelId: string;
+      modelKey: string;
+      capabilities: Array<{ capabilityId: string; name: string; matched: boolean; reason: string }>;
+    }>(`/admin/channel-models/${encodeURIComponent(channelModelId)}/capabilities`),
 
-  archive: (id: string) =>
-    request<{ ok: boolean }>(`/admin/logical-models/${id}`, {
-      method: "DELETE",
-    }),
-
-  /** 路由模拟（只读）：回答「这组参数会落到哪条线路、为什么没落」 */
-  simulate: (id: string, body: ModelIntentPayload) =>
-    request<SimulateResultView>(`/admin/logical-models/${id}/simulate`, {
+  publish: (channelModelId: string, capabilities: string[]) =>
+    request<unknown>(`/admin/channel-models/${encodeURIComponent(channelModelId)}/publish`, {
       method: "POST",
-      body,
+      body: { capabilities },
     }),
+};
+
+/** 商品经营总览（商品台账的调用、收入、毛利与运营待办）。 */
+export const adminModelCommerceApi = {
+  overview: (days = 7) =>
+    request<ModelCommerceOverviewView>(`/admin/model-commerce/overview${toQuery({ days })}`),
 };
 
 /** 用户分组：倍率、渠道可见范围与按模型的价格覆盖 */

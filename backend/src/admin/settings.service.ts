@@ -4,7 +4,8 @@ import { AppError } from "../common/app.exception";
 import { SettingsService } from "../common/settings.service";
 import { SettingImageService } from "../common/setting-image.service";
 import { StorageService } from "../storage/storage.service";
-import { inspectUploadedImage, maxUploadBytes, verifyDecodableImage } from "../assets/image-validation";
+import { SecretCipher } from "../model/infra/secret-cipher";
+import { inspectUploadedImage, verifyDecodableImage } from "../assets/image-validation";
 import {
   SETTING_DEFS,
   SETTING_GROUP_LABELS,
@@ -13,7 +14,7 @@ import {
   type SettingDef,
   type SettingValue,
 } from "../common/setting-defs";
-import { unknownAllowedExts } from "../common/image-formats";
+import { canonicalAllowedTypes, unknownAllowedExts } from "../common/image-formats";
 
 /**
  * 后台系统设置 —— 写路径。
@@ -43,6 +44,7 @@ export class AdminSettingsService {
     private readonly settings: SettingsService,
     private readonly storage: StorageService,
     private readonly settingImages: SettingImageService,
+    private readonly cipher: SecretCipher,
   ) {}
 
   /** 分组读取全部设置项 + 当前生效值 */
@@ -62,6 +64,8 @@ export class AdminSettingsService {
             updatedBy: string | null;
             updatedAt: string | null;
             previewUrl?: string | null;
+            hasSecret?: boolean;
+            secretMask?: string | null;
           }
         >;
       }
@@ -76,7 +80,27 @@ export class AdminSettingsService {
         label: SETTING_GROUP_LABELS[def.group] ?? def.group,
         items: [],
       });
-      const value = overridden ? this.parseValue(row!.value, def) : def.default;
+      let value = def.sensitive
+        ? ""
+        : overridden
+          ? this.parseValue(row!.value, def)
+          : def.default;
+      let hasSecret: boolean | undefined;
+      let secretMask: string | null | undefined;
+      if (def.sensitive) {
+        // 敏感项永远不返回明文。掩码只从服务端解密结果生成；密文损坏时
+        // 仍展示固定占位，不能因为一条坏数据让整个设置页 500。
+        hasSecret = overridden;
+        secretMask = null;
+        if (row) {
+          try {
+            secretMask = this.cipher.mask(this.cipher.decrypt(row.value));
+          } catch {
+            secretMask = "••••••••";
+            this.logger.warn(`敏感设置解密失败，已隐藏明文: ${def.key}`);
+          }
+        }
+      }
       group.items.push({
         ...def,
         value,
@@ -86,6 +110,7 @@ export class AdminSettingsService {
         ...(def.control === "image-upload"
           ? { previewUrl: await this.settingImages.displayUrl(String(value ?? "")) }
           : {}),
+        ...(def.sensitive ? { hasSecret, secretMask } : {}),
       });
     }
 
@@ -104,7 +129,8 @@ export class AdminSettingsService {
       throw new AppError(40001, "请选择要上传的图片", 400);
     }
 
-    const info = inspectUploadedImage(buffer, { maxBytes: maxUploadBytes() });
+    const limits = await this.settings.uploadLimits();
+    const info = inspectUploadedImage(buffer, limits);
     await verifyDecodableImage(buffer, info);
 
     const provider = this.storage.getActive();
@@ -156,13 +182,32 @@ export class AdminSettingsService {
     // ── 先全部校验，一个不通过就整批拒绝 ────────────────────────────────
     // 部分成功会让运营误以为整批生效。校验必须覆盖清单项 ——
     // 否则「恢复一个不存在的键」会静默成功。
-    const normalized = entries.map(([key, value]) => {
+    const requested = entries.map(([key, value]) => {
       const def = findSettingDef(key);
       if (!def) throw new AppError(40001, `未知设置项: ${key}`, 400);
       if (def.readOnly)
         throw new AppError(40001, `${def.label} 为只读项, 不可修改`, 400);
       return { key, def, value: this.validate(def, value) };
     });
+
+    /*
+     * 敏感项留空代表「保持已保存的密钥不变」。前端本来就不应把空草稿提交上来，
+     * 但管理 API 也必须独立成立：直接调用接口时，空串不能覆盖成空配置。
+     */
+    const normalized = requested
+      .filter((entry) => !(entry.def.sensitive && entry.value === ""))
+      .map((entry) => ({
+        ...entry,
+        storedValue: entry.def.sensitive
+          ? this.cipher.encrypt(String(entry.value))
+          : entry.value === null
+            ? ""
+            : String(entry.value),
+      }));
+
+    if (normalized.length === 0 && clearList.length === 0) {
+      throw new AppError(40001, "没有需要更新的设置项", 400);
+    }
 
     for (const key of clearList) {
       const def = findSettingDef(key);
@@ -195,11 +240,18 @@ export class AdminSettingsService {
     const changes: SettingChange[] = [];
 
     await this.prisma.$transaction(async (tx) => {
-      for (const { key, def, value } of normalized) {
+      for (const { key, def, value, storedValue } of normalized) {
         const prev = beforeByKey.get(key);
-        const prevValue = prev ? this.parseValue(prev.value, def) : def.default;
+        // 敏感项只展示配置状态，绝不把明文放进响应或日志。
+        const prevValue = def.sensitive
+          ? prev
+            ? "已配置"
+            : "未配置"
+          : prev
+            ? this.parseValue(prev.value, def)
+            : def.default;
 
-        const data = { value: value === null ? "" : String(value), updatedBy: actorName };
+        const data = { value: storedValue, updatedBy: actorName };
         if (prev) {
           await tx.systemSetting.update({ where: { key }, data });
         } else {
@@ -209,7 +261,7 @@ export class AdminSettingsService {
           key,
           label: def.label,
           before: prevValue,
-          after: value,
+          after: def.sensitive ? "已更新" : value,
           action: "update",
         });
       }
@@ -222,19 +274,21 @@ export class AdminSettingsService {
           changes.push({
             key,
             label: def.label,
-            before: def.default,
-            after: def.default,
+            before: def.sensitive ? "未配置" : def.default,
+            after: def.sensitive ? "已清除" : def.default,
             action: "clear",
           });
           continue;
         }
-        const prevValue = this.parseValue(prev.value, def);
+        const prevValue = def.sensitive
+          ? "已配置"
+          : this.parseValue(prev.value, def);
         await tx.systemSetting.delete({ where: { key } });
         changes.push({
           key,
           label: def.label,
           before: prevValue,
-          after: def.default,
+          after: def.sensitive ? "已清除" : def.default,
           action: "clear",
         });
       }
@@ -292,9 +346,13 @@ export class AdminSettingsService {
           400,
         );
       }
-      if (!String(raw ?? "").trim()) {
+      // 落库前统一别名与顺序，避免 jpeg/jpg、重复值等写法让页面显示与实际
+      // 生效格式不一致。空串与纯分隔符归一后也为空，必须拒绝。
+      const canonical = canonicalAllowedTypes(String(raw ?? ""));
+      if (!canonical) {
         throw new AppError(40001, "至少要允许一种文件类型", 400);
       }
+      return validateSettingValue(def, canonical);
     }
     return validateSettingValue(def, raw);
   }

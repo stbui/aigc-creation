@@ -18,7 +18,7 @@ function consumptionTip(refs: ProductConsumptionRef[]) {
   return (
     <div className="flex flex-col gap-1 text-[12px]">
       {refs.map((ref) => (
-        <div key={ref.logicalModelId}>
+        <div key={ref.modelKey}>
           {ref.capabilityName} · {ref.modelName}
           {!ref.enabled || !ref.available ? '（暂不可用）' : ''}
         </div>
@@ -31,7 +31,7 @@ function consumptionTip(refs: ProductConsumptionRef[]) {
  * 「消费能力」单元格：这个商品正被哪些能力使用。
  *
  * 标签最多两个，其余数字悬停展开；点击跳到能力页并带上关键词。
- * 没有 `logical_model.read` 时显示 `—`，不把商品表变成权限错误页。
+ * 没有 `logical_model.read`（能力绑定读权限）时显示 `—`，不把商品表变成权限错误页。
  */
 export function ProductConsumptionCell({
   refs,

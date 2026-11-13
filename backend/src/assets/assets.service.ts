@@ -6,8 +6,9 @@ import { AppError } from '../common/app.exception';
 import { StorageService } from '../storage/storage.service';
 import { resolveUploadsDir } from '../config/env-files';
 import { SignedUrlService } from '../common/signed-url.service';
+import { SettingsService } from '../common/settings.service';
 import type { StorageBackend } from '../storage/storage.provider';
-import { inspectUploadedImage, maxUploadBytes, verifyDecodableImage } from './image-validation';
+import { inspectUploadedImage, verifyDecodableImage } from './image-validation';
 import { detachAssetFromTasks } from './task-output-links';
 
 export interface UploadedFileMeta {
@@ -46,6 +47,7 @@ export class AssetsService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly signedUrl: SignedUrlService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -90,10 +92,9 @@ export class AssetsService {
       // 上传接口只负责把文件落到临时目录；这里以文件头为准重新判定真实格式。
       // 客户端声明的 originalname / mimetype 均不可信，不能直接用来决定扩展名。
       const buf = await fsp.readFile(tempPath);
-      const info = inspectUploadedImage(buf, { maxBytes: maxUploadBytes() });
-      if (file.size > maxUploadBytes()) {
-        throw new AppError(40001, `图片不能超过 ${Math.floor(maxUploadBytes() / 1024 / 1024)} MB`, 400);
-      }
+      // 每张图读取一次当前生效配置；运营保存后无需重启，下一次上传即采用新值。
+      const limits = await this.settings.uploadLimits();
+      const info = inspectUploadedImage(buf, limits);
       await verifyDecodableImage(buf, info);
 
       provider = this.storage.getActive();

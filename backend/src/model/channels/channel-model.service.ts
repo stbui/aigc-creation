@@ -228,6 +228,9 @@ export class ChannelModelService {
     const modelFields = {
       modelKey,
       activeKey: channelModelActiveKey(modelKey),
+      modelGroupKey: String(effectiveReq.modelGroupKey ?? existing?.modelGroupKey ?? '')
+        .trim()
+        .toLowerCase(),
       providerModelKey,
       displayName: String(effectiveReq.displayName ?? '').trim() || '未分类',
       channelLabel,

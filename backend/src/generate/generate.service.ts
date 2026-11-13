@@ -45,7 +45,7 @@ const TASK_VIEW_SELECT = {
   params: true,
   parentTaskId: true,
   errorCode: true,
-  logicalModelId: true,
+  modelKey: true,
   creditCost: true,
   createdAt: true,
   updatedAt: true,
@@ -92,7 +92,7 @@ export class GenerateService {
    * 抢同一个唯一键。重试不二次扣费，因此 `creditCost` 记 0、不建账单；
    * worker 对「零价且无账单」的任务照常执行，失败也不会退款（本来就没扣）。
    *
-   * 改造前创建的存量任务没有 `logicalModelId`，无法重新解析线路，明确拒绝
+   * 改造前创建的存量任务没有 `modelKey`，无法重新解析线路，明确拒绝
    * 而不是让它排队后立刻 42204 —— 那样运营会以为「重试过了」。
    */
   async retryTask(id: string) {
@@ -103,8 +103,8 @@ export class GenerateService {
       // 上游可能已经受理并计费；直接重试会二次计费，必须先人工核对账单
       throw new AppError(40000, '结果不明的任务不能直接重试，请先核对上游账单', 400);
     }
-    if (!origin.logicalModelId) {
-      throw new AppError(40000, '改造前创建的存量任务没有模型快照，无法重试', 400);
+    if (!origin.modelKey) {
+      throw new AppError(40000, '存量任务没有模型快照，无法重试', 400);
     }
 
     const retryKey = `task-retry:${origin.id}`;
@@ -142,10 +142,9 @@ export class GenerateService {
             inputAssetIds: origin.inputAssetIds,
             params: origin.params,
             creditCost: 0,
-            logicalModelId: origin.logicalModelId,
-            logicalModelRevisionId: origin.logicalModelRevisionId,
-            routeId: origin.routeId,
+            modelKey: origin.modelKey,
             channelModelId: origin.channelModelId,
+            channelId: origin.channelId,
             // 新的一轮：attempt 编号从 1 重来，历史尝试留在原任务上可追溯
             routeRun: origin.routeRun + 1,
             retriedFromId: origin.id,
@@ -261,8 +260,8 @@ export class GenerateService {
       parentTaskId: task.parentTaskId,
       params: JSON.parse(task.params || '{}'),
       errorCode: task.errorCode,
-      // 作品页「重新生成」凭它沿用原模型；改造前的存量任务为 null
-      logicalModelId: task.logicalModelId,
+      // 作品页「重新生成」凭它沿用原模型分组；存量任务为 null
+      modelKey: task.modelKey,
       // 本次实际扣掉的积分快照：前端结果卡据此显示「本次消耗 N 积分」，
       // 与建任务时的价一致，不受后续改价影响
       creditCost: task.creditCost,
@@ -495,7 +494,7 @@ export class GenerateService {
         parentTaskId: t.parentTaskId,
         params: JSON.parse(t.params || '{}'),
         errorCode: t.errorCode,
-        logicalModelId: t.logicalModelId,
+        modelKey: t.modelKey,
         creditCost: t.creditCost,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,

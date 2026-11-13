@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { ModelPicker } from './ModelPicker';
 import { ToolSettingsPopover, type ToolSettingsPopoverProps } from './ToolSettingsPopover';
 import { ToolSubmitBar } from './ToolSubmitBar';
-import type { PublicLogicalModel } from '../lib/models';
+import type { PublicModelGroup } from '../lib/models';
 
 export interface ToolGenerationSubmitBarProps {
   /** 能力 id（与后端 capability.registry 一致） */
@@ -25,7 +25,7 @@ export interface ToolGenerationSubmitBarProps {
   resolution: string;
   onResolutionChange: (value: string) => void;
   onModelQuoteChange: (credits: number | null) => void;
-  onModelChange?: (model: PublicLogicalModel | null) => void;
+  onModelChange?: (model: PublicModelGroup | null) => void;
   /** 高级设置浮层的差异项（自定义头部 / 类名等） */
   settingsProps?: Partial<ToolSettingsPopoverProps>;
   /** 外层容器类名；不传时不额外包一层 DOM */

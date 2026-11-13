@@ -61,15 +61,15 @@
 | GET | `/api/v1/assets` | 素材库列表（`kind`/`capability`/`limit`/`offset`） |
 | PATCH | `/api/v1/assets/move` | 批量移动素材到另一项目（`{ ids: string[], projectId }`，≤100），返回 `{ moved, missing, projectId }`；只改素材分组，不动任务归属 |
 | DELETE | `/api/v1/assets/:id` | 删除素材（生成图连带删除产出它的任务） |
-| POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`logicalModelId` 必填（前台模型 id，来自 `/models`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前为商品详情图与 AI 带货图文）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
+| POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`capability` 与 `modelKey` 必填（模型分组键来自 `/models?capability=`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前为商品详情图与 AI 带货图文）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
 | GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图；`errorCode` 取 `42201`–`42206` |
 | GET | `/api/v1/tasks` | 任务列表（含 `outputAsset`，历史页缩略图依赖它） |
 | GET | `/api/v1/tasks/page` | 任务列表分页（`projectId` / `capability` / `excludeFailed` / `limit` / `offset`），返回 `{ items, total, limit, offset }`；`excludeFailed=1` 时列表与总数都排除失败任务。**必须注册在 `/tasks/:id` 之前**，否则 `page` 会被当成 id |
 | DELETE | `/api/v1/tasks/:id` | 删除作品（连带产物与磁盘文件） |
 | GET | `/api/v1/stats/overview` | 数据中心聚合（含按能力缩略图） |
-| GET | `/api/v1/models` | 前台模型目录（匿名可读；带 token 时按会员分组过滤线路并折算价格，不暴露渠道字段） |
-| POST | `/api/v1/models/available` | 按请求意图（`capability` / `inputs` / `options`）筛选可用模型 |
-| POST | `/api/v1/models/:id/quote` | 前台模型报价，返回 `{ quote: { amountMicrocredits, billingMode, estimated, ... } }`；`estimated=true` 表示按估算用量报价 |
+| GET | `/api/v1/models?capability=` | 能力下的模型分组（匿名可读；带 token 时按会员分组过滤线路并折算价格，不暴露渠道字段）。同一 `modelGroupKey` 的多条渠道商品合并成一个选项 |
+| POST | `/api/v1/models/available` | 按请求意图（`capability` 为产品能力 id，另带 `inputs` / `options`）筛选当前真能跑的分组 |
+| POST | `/api/v1/models/quote` | 能力报价：`{ capability, modelKey?, inputs?, options? }` → `{ quote: { amountMicrocredits, billingMode, estimated, ... } }`；金额来自 `CapabilityPricing`，与建任务账单同源 |
 | GET | `/api/v1/model-catalog` | 渠道模型目录（供应视角）：`models` 恒为空数组，模型在 `channels[].models` 内；渠道名恒为空串，不带凭证 |
 | POST | `/api/v1/model-catalog/available` | 按请求意图筛选可用的渠道模型 |
 | POST | `/api/v1/model-catalog/quote` | 渠道模型报价（`channelId` + `modelKey` + 意图），供「模型商品」预览价格 |
@@ -96,6 +96,7 @@
 | GET | `/api/v1/me/deletion-preview` | 注销影响面（项目 / 作品 / 素材 / 订单 / 消息） |
 | GET/POST | `/api/v1/notifications`、`/notifications/:id/read`、`/read-all` | 我的站内消息 / 标记已读 |
 | GET | `/api/v1/aigc-label` | 生效的可见角标参数（公开；前端视频播放器角标用） |
+| GET | `/api/v1/settings` | 公开上传限制：仅返回 `upload` 域，包含 `maxSizeMb` / `maxBytes` / `maxPixels` / `allowedTypes` / `allowedMimes` / `allowedLabels`，不携带支付、邮件等后台配置 |
 | GET/POST | `/api/v1/tickets`、`/tickets/:id`、`/tickets/:id/replies`、`/tickets/:id/close` | 我的工单 / 详情 / 回复 / 关闭（越权 404） |
 | GET | `/api/v1/health`、`/health/ready` | 健康分项（db/storage/channels）/ 就绪探针（未就绪 503），均免登录 |
 | POST | `/api/v1/test/rate-limit/reset` | **仅测试档**（其他环境 404）+ `x-test-token`，清空限流计数 |
@@ -142,10 +143,14 @@
 | GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔使用，`channel.read` |
 | POST | `/api/v1/admin/channels/health/reset` | 解除本进程内全部线路冷却，返回 `{ cleared }`；只清内存不动数据库，多实例部署只影响处理本次请求的实例，`channel.write`， |
 | GET | `/api/v1/admin/channel-models/health?channelId=` | 线路**历史表现**：一行 = 一条渠道模型，给 24h / 7d 两个窗口的成功率与 P95 耗时 + 最近 10 条终态样本，`channel.model_read`。与 `/admin/channels/health` 的分工：后者是「现在」（启停 / 协议 / 冷却），本端点是「过去」（成功率 / 耗时），值班时两个都要看。成功率 = `success` ÷ 终态次数（`pending` / `canceled` 不计入分母），**无终态样本时为 `null`**（不是 0 ——「没数据」与「全失败」要分得开）；P95 用最近邻法（不插值），样本被采样上限截断时 `sampled=true` |
-| POST | `/api/v1/admin/channels/:id/models/import` | 导入勾选的上游商品。请求体 `{ models, config? }`；`config`（类型 / 接入方式 / 计费与售价 / `enabled`）优先于供应商默认配置，两者都没有则只建骨架行。返回 `{ models, added, configured }`。配置应用失败的商品回落为骨架行，不阻断整次导入；`channel.model_write` |
+| POST | `/api/v1/admin/channels/:id/models/import` | 导入勾选的上游商品。请求体 `{ models, config?, capabilitiesByModel? }`；`config`（类型 / 接入方式 / 计费与售价 / `enabled`）优先于供应商默认配置，两者都没有则只建骨架行；`capabilitiesByModel` 给出时导入后立即写入能力绑定。返回 `{ models, added, configured, bindings }`。配置应用失败的商品回落为骨架行，不阻断整次导入；`channel.model_write` |
 | POST | `/api/v1/admin/channels/:id/models/batch-reprice` | 批量调价：只改**已启用规格的售价**，不动成本价 / 启停 / 上游键。请求体 `{ models: [{ modelId, priceVersion, priceTiers: [{ id, priceVersion, prices }] }] }`，单次 ≤ 100 个模型。`priceVersion` 是乐观并发令牌：任一模型或规格版本过期 → **整批拒绝**（40001，不部分落库）；`prices` 必须恰好是当前计费方式的全部售价字段（按次/按时长 → `unitPriceMicrocredits`；Token 非视频 → 输入/输出/缓存三项；Token 视频 → 仅输出），少一项或多夹一项都拒绝；规格缺成本价或售价未配置时拒绝。成功返回 `{ updated }`，`channel.model_write` |
-| GET/POST/PATCH/DELETE | `/api/v1/admin/logical-models*` | 前台模型列表 / 保存（新 revision + 线路重建）/ 归档；`logical_model.read` / `logical_model.write` |
-| POST | `/api/v1/admin/logical-models/:id/simulate` | 路由模拟（只读）：返回产品能力匹配结果与逐条线路的判定原因；需 `logical_model.read`。入参 `capability` 是**模态**（`image` / `video` / `text`），不是产品能力 id（`expand` / `main_image`）——两层命名空间不能混；省略时**按模型自己的能力合同取模态**，传了产品能力 id 也按省略处理（模型是权威源，客户端不该改） |
+| GET/PUT | `/api/v1/admin/capabilities/:id/models` | 能力候选池：读取绑定与兼容商品候选 / 整体替换绑定（`channelModelId`、`enabled`、`priority`、`weight`）；`logical_model.read` / `logical_model.write`（权限值沿用，语义为能力绑定） |
+| GET/PUT | `/api/v1/admin/capabilities/:id/pricing` | 能力售价：按次 / 按秒 / Token 与四项单价（微积分）；`product.price` |
+| POST | `/api/v1/admin/capabilities/:id/simulate` | 能力选路模拟（只读）：返回分组、逐条线路的健康分层 / 有效优先级 / 匹配原因与最终选中线路；需 `logical_model.read` |
+| GET | `/api/v1/admin/capability-models/consumption` | 商品被哪些能力消费（渠道台账影响面）；`logical_model.read` |
+| GET | `/api/v1/admin/channel-models/:id/capabilities` | 商品兼容能力预览；`channel.model_read` |
+| POST | `/api/v1/admin/channel-models/:id/publish` | 商品绑定到能力（幂等 upsert）；`logical_model.write` |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/user-groups*` | 用户分组（倍率 / 可见渠道 / 按模型覆盖）；`user_group.read` / `user_group.write`，`code` 创建后不可改 |
 | GET/PATCH/POST/DELETE | `/api/v1/admin/plugins*`、`/plugins/:id/verify`、`/plugins/install` | 插件清单 / 启停（立即重注册协议）/ 契约校验 / 上传安装（multipart `file`，`origin='installed'`）/ 卸载（内置包 40001，仍被渠道模型引用 40909）；`plugin.read` / `plugin.write`。清单每项带 `availability: { available, reason }`：本环境不可用时 `reason` 是**人话**说明（停用 / 声明了本仓未内置的 `host:<engine>` 引擎 / 只贡献支付短信等非模型能力而本仓独立实现），不允许「插件列在那里但就是不工作」这种静默缺失 |
 | GET/POST | `/api/v1/admin/provider-catalog`、`/refresh`、`/:id/{verify,install}` | 服务商目录（插件包上游清单）：未配置 `MODEL_PROVIDER_CATALOG_URL` 时返回空态与原因；安装走与上传安装同一套校验；`plugin.read` / `plugin.write` |
@@ -163,9 +168,10 @@
 | POST | `/api/v1/admin/{users,assets,tasks,orders}/batch` | 批量动作，逐条结果（≤ 100 条，使用各领域动作权限） |
 | GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,invoices,coupons,campaigns}/export` | CSV 导出（BOM，领域读权限 + `data.export`；上限 5000 行，筛选口径与列表一致）。调用记录是 `/admin/api-logs/export` |
 | POST | `/api/v1/admin/credits/import` | 积分 CSV 导入（multipart，按邮箱匹配，`credit.adjust`） |
-| GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`） |
+| GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`）。广播请求可带 `sendEmail: true`，返回 `sent/users/emailSent/emailFailed/emailSkipped`；模板按 `code + channel` 独立维护 |
+| POST | `/api/v1/admin/notifications/email/test` | 用当前运行时邮件配置发送测试邮件（`{ to }`，`message.write`），返回 `ok/provider/delivered/messageId/error`；`delivered=false` 表示仅落 console outbox 或配置失败 |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/templates/*` | 写真模板目录：`catalog` 读取；`categories` / `groups` / `items` 三层 CRUD；`upload` 上传预览图。读需 `template.read`，写需 `template.write` |
-| GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`provider` / `delivers` / `configured`，不含凭据；`message.write`） |
+| GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`enabled` / `provider` / `delivers` / `configured` / `message`，不含凭据；`message.write`） |
 | GET/POST | `/api/v1/admin/{storage,scheduler,backups,roles,settings}*` | 系统管理 |
 
 #### 任务全链路查询口径

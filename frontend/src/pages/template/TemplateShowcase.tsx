@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import type { TemplateCatalogCategory } from './api';
+import { ALL_CATEGORY, ALL_GROUP } from './constants';
 import type { GalleryItem } from './hooks';
 import { filterCatalog, type TemplateEntry } from './utils';
 import { TemplateCategoryNav } from './TemplateCategoryNav';
@@ -52,27 +53,45 @@ export function TemplateShowcase({
     [catalog, categoryId],
   );
 
+  /** 切换分类 / 分组后回到顶部，避免停在上一组的滚动位置 */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [categoryId, groupId]);
+
   const visibleTemplates = useMemo(
     () => filterCatalog(catalog, categoryId, groupId),
     [catalog, categoryId, groupId],
   );
 
+  /** 分类 / 分组筛选导致空网格时，给一个回到全量的出口 */
+  const filtered = categoryId !== ALL_CATEGORY || groupId !== ALL_GROUP;
+  const showAll = filtered
+    ? () => {
+        onCategoryChange(ALL_CATEGORY);
+        onGroupChange(ALL_GROUP);
+      }
+    : undefined;
+
   return (
-    <>
+    <section className="tpl-showcase" aria-label="写真模板">
       <TemplateCategoryNav catalog={catalog} categoryId={categoryId} onSelect={onCategoryChange} />
 
       {activeCategory && activeCategory.groups.length > 0 && (
         <TemplateGroupNav groups={activeCategory.groups} groupId={groupId} onChange={onGroupChange} />
       )}
 
-      <div className="tpl-template-scroll">
+      <div className="tpl-template-scroll" ref={scrollRef}>
         <TemplateGallery
+          /* 换分类 / 分组时重挂载：分页条数、大图状态立即归零，不残留上一组 */
+          key={`${categoryId}|${groupId}`}
           templates={visibleTemplates}
           selectedId={selectedTemplateId}
           onSelect={onSelectTemplate}
           error={templatesError}
           loading={templatesLoading}
           onRetry={onRetryTemplates}
+          onShowAll={showAll}
         />
       </div>
 
@@ -84,6 +103,6 @@ export function TemplateShowcase({
         onRefresh={onRefreshGallery}
         onOpenAll={onOpenAll}
       />
-    </>
+    </section>
   );
 }

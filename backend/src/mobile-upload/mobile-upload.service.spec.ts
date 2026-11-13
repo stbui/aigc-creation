@@ -32,8 +32,23 @@ function setup(options: { transactionError?: unknown } = {}) {
     buildKey: vi.fn((_category: string, ext: string) => `original/test.${ext}`),
   };
   const signedUrl = { sign: vi.fn().mockReturnValue('signed://asset') };
-  const service = new MobileUploadService(prisma as never, storage as never, signedUrl as never);
-  return { service, prisma, provider, create };
+  const settings = {
+    uploadLimits: vi.fn().mockResolvedValue({
+      maxSizeMb: 10,
+      maxBytes: 10 * 1024 * 1024,
+      maxPixels: 40_000_000,
+      allowedTypes: 'jpg,png,webp',
+      allowedMimes: ['image/jpeg', 'image/png', 'image/webp'],
+      allowedLabels: ['JPG', 'PNG', 'WebP'],
+    }),
+  };
+  const service = new MobileUploadService(
+    prisma as never,
+    storage as never,
+    signedUrl as never,
+    settings as never,
+  );
+  return { service, prisma, provider, create, settings };
 }
 
 async function newSession(service: MobileUploadService) {

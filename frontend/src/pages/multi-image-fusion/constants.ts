@@ -27,6 +27,9 @@ export interface SceneDef {
   desc: string;
 }
 
+/** 两个图片位：主体图（单张）/ 搭配图（1-5 张） */
+export type MultiFusionSlot = 'subject' | 'accent';
+
 /** §4.1 实测原文: 分组标题仅 h2, 无描述文案 (见 D-13) */
 export const SCENE_GROUPS: Array<{ name: string; scenes: SceneDef[] }> = [
   {

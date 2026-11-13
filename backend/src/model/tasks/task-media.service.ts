@@ -21,6 +21,11 @@ import { StorageService } from '../../storage/storage.service';
 import { AigcLabelService } from '../../aigc-label/aigc-label.service';
 import { AigcVisibleLabelError, labelGeneratedImage, type AigcMeta } from '../../common/aigc-label';
 import { inspectMaskImage, inspectUploadedImage } from '../../assets/image-validation';
+import {
+  SUPPORTED_IMAGE_MIMES,
+  deploymentUploadMaxBytes,
+  deploymentUploadMaxPixels,
+} from '../../common/image-formats';
 import { detectImageFormat } from '../media/image-format';
 import { multiFusionOutputDimensions } from '../../capabilities/definitions/multi_fusion';
 import { resolveUploadsDir } from '../../config/env-files';
@@ -135,7 +140,12 @@ export class TaskMediaService {
     if (!sourceAsset) throw new Error('应用遮罩时缺少原图素材');
 
     const sourceBuffer = await this.readAssetBytes(sourceAsset as never);
-    const sourceInfo = inspectUploadedImage(sourceBuffer);
+    // 历史素材不受当前运营上传白名单影响；只按部署硬上限确认文件仍可安全读取。
+    const sourceInfo = inspectUploadedImage(sourceBuffer, {
+      maxBytes: deploymentUploadMaxBytes(),
+      maxPixels: deploymentUploadMaxPixels(),
+      allowedMimes: SUPPORTED_IMAGE_MIMES,
+    });
     const buffer = await this.readAssetBytes(asset);
     inspectMaskImage(buffer, { width: sourceInfo.width, height: sourceInfo.height });
 

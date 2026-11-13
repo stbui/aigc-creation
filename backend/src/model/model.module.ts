@@ -16,7 +16,6 @@
 import { Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
-import { SecretCipher } from './infra/secret-cipher';
 import { configureOutboundPolicy } from './infra/outbound';
 import { CatalogVersionService } from './infra/catalog-version.service';
 import { ProtocolRegistry } from './protocol/registry';
@@ -35,17 +34,18 @@ import { ChannelRuntimeService } from './channels/channel-runtime.service';
 import { TextToolService } from './text/text-tool.service';
 import { AdminChannelModelsController, AdminChannelsController } from './channels/channel.controller';
 import { PublicChannelsController } from './channels/public-channels.controller';
-import { RouteCatalogService } from './catalog/route-catalog.service';
+import { CapabilityCatalogService } from './catalog/capability-catalog.service';
 import { CatalogService } from './catalog/catalog.service';
 import { QuoteService } from './catalog/quote.service';
 import { ModelsController } from './catalog/models.controller';
 import { ModelCatalogController } from './catalog/model-catalog.controller';
 import { PublicModelCatalogService } from './catalog/public-model-catalog.service';
-import { AdminLogicalModelsController } from './catalog/admin-logical-model.controller';
-import { LogicalModelAdminService } from './catalog/logical-model.admin.service';
+import { AdminCapabilityModelsController } from './catalog/capability-model.admin.controller';
+import { CapabilityModelAdminService } from './catalog/capability-model.admin.service';
 import { RouteHealthService } from './routing/route-health.service';
 import { PriceTierService } from './routing/price-tier.service';
 import { RouterService } from './routing/router.service';
+import { RouteScoreService } from './routing/route-score.service';
 import { UserGroupService } from './user-groups/user-group.service';
 import { UserGroupAdminService } from './user-groups/user-group.admin.service';
 import { AdminUserGroupsController } from './user-groups/user-group.controller';
@@ -60,6 +60,8 @@ import { BillingAdminService } from './billing/billing-admin.service';
 import { AdminApiLogsController, AdminBillingOrdersController } from './billing/billing-admin.controller';
 import { AdminAnalyticsController } from './billing/analytics.controller';
 import { FinanceAnalyticsService } from './billing/finance-analytics.service';
+import { ModelCommerceController } from './billing/model-commerce.controller';
+import { ModelCommerceService } from './billing/model-commerce.service';
 import { BillingSweeperService } from './billing/billing-sweeper.service';
 
 /** 启动期把配置层策略注入出站模块（避免两处各读一次环境变量） */
@@ -96,19 +98,19 @@ export class ModelBootstrapService implements OnModuleInit {
     AdminChannelsController,
     AdminChannelModelsController,
     PublicChannelsController,
-    AdminLogicalModelsController,
+    AdminCapabilityModelsController,
     AdminUserGroupsController,
     AdminPluginsController,
     AdminProviderCatalogController,
     AdminBillingOrdersController,
     AdminApiLogsController,
     AdminAnalyticsController,
+    ModelCommerceController,
     ModelsController,
     ModelCatalogController,
   ],
   providers: [
     ModelBootstrapService,
-    SecretCipher,
     ProtocolRegistry,
     PluginManifestStore,
     PluginProtocolService,
@@ -128,22 +130,23 @@ export class ModelBootstrapService implements OnModuleInit {
     UserGroupAdminService,
     PluginAdminService,
     ProviderCatalogService,
-    RouteCatalogService,
+    CapabilityCatalogService,
     RouteHealthService,
     PriceTierService,
     RouterService,
+    RouteScoreService,
     CatalogService,
     PublicModelCatalogService,
-    LogicalModelAdminService,
+    CapabilityModelAdminService,
     QuoteService,
     CreditWalletService,
     BillingService,
     BillingAdminService,
     FinanceAnalyticsService,
+    ModelCommerceService,
     BillingSweeperService,
   ],
   exports: [
-    SecretCipher,
     ProtocolRegistry,
     PluginManifestStore,
     PluginProtocolService,
@@ -159,10 +162,11 @@ export class ModelBootstrapService implements OnModuleInit {
     ChannelService,
     ChannelHealthService,
     UserGroupService,
-    RouteCatalogService,
+    CapabilityCatalogService,
     RouteHealthService,
     PriceTierService,
     RouterService,
+    RouteScoreService,
     CatalogService,
     QuoteService,
     CreditWalletService,

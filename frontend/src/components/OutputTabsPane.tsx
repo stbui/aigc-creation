@@ -45,7 +45,7 @@ export function OutputTabsPane({
         activeKey={value}
         onChange={(key) => onChange(key as OutputTab)}
         className="pd-right-tabs"
-        tabBarClassName="pd-tabs"
+        tabBarClassName="pd-tabs u-p-4"
         tabBarAriaLabel={ariaLabel}
         items={[
           {
@@ -58,7 +58,7 @@ export function OutputTabsPane({
             label: (
               <>
                 创作结果
-                {generationCount > 0 && <span className="pd-tab-count">{generationCount}</span>}
+                {generationCount > 0 && <span className="pd-tab-count u-font-12">{generationCount}</span>}
               </>
             ),
             children: <div className="pd-right-panel">{results}</div>,

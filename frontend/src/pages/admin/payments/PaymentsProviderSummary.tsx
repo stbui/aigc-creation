@@ -1,6 +1,13 @@
-import { CircleCheck, CircleDashed, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { CircleDashed, ShieldAlert, ShieldCheck } from 'lucide-react';
 
-import { Card, Meter, StatusTag } from '~/admin-ui/primitives';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  Meter,
+  StatusTag,
+} from '~/admin-ui/primitives';
 import { cn } from '~/admin-ui/lib/cn';
 import { PAYMENT_PROVIDER_STATE_META, type PaymentProviderState } from './constants';
 import type { AdminPaymentProviderView } from '../../../types/payment';
@@ -12,28 +19,6 @@ const STATE_ORDER: readonly PaymentProviderState[] = [
   'unconfigured',
   'disabled',
 ];
-
-const STATE_VISUAL: Record<
-  PaymentProviderState,
-  { Icon: typeof ShieldCheck; iconClassName: string }
-> = {
-  usable: {
-    Icon: ShieldCheck,
-    iconClassName: 'bg-success-soft text-success-text',
-  },
-  misconfigured: {
-    Icon: ShieldAlert,
-    iconClassName: 'bg-danger-soft text-danger-text',
-  },
-  unconfigured: {
-    Icon: CircleDashed,
-    iconClassName: 'bg-warn-soft text-warn-text',
-  },
-  disabled: {
-    Icon: CircleCheck,
-    iconClassName: 'bg-muted text-muted-foreground',
-  },
-};
 
 const HEALTH_VISUAL = {
   danger: {
@@ -52,13 +37,13 @@ const HEALTH_VISUAL = {
     meterTone: 'success' as const,
   },
   brand: {
-    Icon: ShieldCheck,
+    Icon: CircleDashed,
     iconClassName: 'bg-accent text-accent-foreground',
     meterTone: 'brand' as const,
   },
 };
 
-/** 渠道状态总览：保留「能不能收款」的结论与分档数量，去掉重复说明。 */
+/** 收款来源总览：先给运营「客户现在能不能付款」的结论，再列状态分布。 */
 export function PaymentsProviderSummary({
   providers,
   className,
@@ -79,62 +64,85 @@ export function PaymentsProviderSummary({
   );
   const total = providers.length;
   const readiness = total > 0 ? Math.round((counts.usable / total) * 100) : 0;
+  const attention = counts.misconfigured + counts.unconfigured;
   const health =
     counts.misconfigured > 0
       ? 'danger'
       : counts.usable === 0
         ? 'warn'
-        : counts.usable === total
+        : attention === 0
           ? 'success'
           : 'brand';
   const visual = HEALTH_VISUAL[health];
+  const conclusion =
+    counts.misconfigured > 0
+      ? `${attention} 个收款来源需要处理，部分客户付款可能受影响`
+      : counts.usable === 0
+        ? '当前没有可收款的来源，客户暂时无法完成充值'
+        : attention > 0
+          ? `客户可以付款，另有 ${attention} 个来源尚未准备完成`
+          : '所有收款来源状态正常，客户可以顺畅付款';
 
   return (
     <Card
       data-testid="admin-provider-summary"
       className={cn(
-        'flex flex-row items-center gap-4 rounded-lg border-border bg-card px-4 py-3 shadow-card',
+        'flex h-full flex-col gap-0 rounded-xl border-border bg-card py-0 shadow-card',
         className,
       )}
     >
-      <span
-        className={cn(
-          'flex size-9 shrink-0 items-center justify-center rounded-lg',
-          visual.iconClassName,
-        )}
-      >
-        <visual.Icon className="size-4.5" aria-hidden />
-      </span>
-
-      <div className="flex shrink-0 items-baseline gap-1.5">
-        <span className="text-[12px] font-medium text-muted-foreground">收款就绪度</span>
-        <span className="text-[24px] leading-7 font-semibold tracking-tight text-foreground tabular-nums">
-          {counts.usable}
+      <CardHeader className="flex items-start justify-between gap-4 px-4 pt-4 pb-3">
+        <div className="min-w-0">
+          <CardDescription className="text-[12px] font-medium">
+            当前收款状态
+          </CardDescription>
+          <div className="mt-1.5 flex items-end gap-1.5">
+            <span className="text-[32px] leading-9 font-semibold tracking-tight text-foreground tabular-nums">
+              {counts.usable}
+            </span>
+            <span className="pb-1 text-[12px] text-muted-foreground tabular-nums">
+              / {total} 个来源可收款
+            </span>
+          </div>
+          <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{conclusion}</p>
+        </div>
+        <span
+          className={cn(
+            'flex size-10 shrink-0 items-center justify-center rounded-xl',
+            visual.iconClassName,
+          )}
+        >
+          <visual.Icon className="size-5" aria-hidden />
         </span>
-        <span className="text-[12px] text-muted-foreground tabular-nums">/ {total}</span>
-      </div>
+      </CardHeader>
 
-      <Meter
-        value={readiness}
-        tone={visual.meterTone}
-        decorative
-        className="mx-1 h-1.5 flex-1"
-      />
-
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        {visible.map((state) => {
-          const meta = PAYMENT_PROVIDER_STATE_META[state];
-          return (
-            <StatusTag
-              key={state}
-              status={state}
-              tone={meta.tone}
-              label={`${meta.label} ${counts[state]}`}
-              showDot={state === 'usable'}
-            />
-          );
-        })}
-      </div>
+      <CardContent className="mt-auto border-t border-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {visible.map((state) => {
+              const meta = PAYMENT_PROVIDER_STATE_META[state];
+              return (
+                <StatusTag
+                  key={state}
+                  status={state}
+                  tone={meta.tone}
+                  label={`${meta.label} ${counts[state]}`}
+                  showDot={state === 'usable'}
+                />
+              );
+            })}
+          </div>
+          <span className="text-[12px] text-muted-foreground tabular-nums">
+            可用占比 {readiness}%
+          </span>
+        </div>
+        <Meter
+          value={readiness}
+          tone={visual.meterTone}
+          decorative
+          className="mt-2.5 h-1.5"
+        />
+      </CardContent>
     </Card>
   );
 }

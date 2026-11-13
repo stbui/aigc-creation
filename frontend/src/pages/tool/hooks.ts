@@ -14,6 +14,7 @@ import { useCreditLabel } from '../../hooks/useCreditLabel';
 import { useGenerateError } from '../../hooks/useGenerateError';
 import { usePollAbort } from '../../hooks/usePollAbort';
 import { useProject } from '../../hooks/useProject';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { notifyCreditsChanged } from '../../context/CreditsContext';
 import { useApp } from '../../ui';
 import {
@@ -23,13 +24,9 @@ import {
   assetsApi,
   generateApi,
   newIdempotencyKey,
-  resolveModelId,
+  resolveModelKey,
 } from './api';
 import {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_LABEL,
-  isSupportedImageFile,
   taskErrorText,
   waitForTask,
 } from './utils';
@@ -63,6 +60,7 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const pollSignal = usePollAbort();
+  const { allowedLabel, isSupportedImageFile, validateImageFile } = useUploadLimits();
 
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -135,15 +133,15 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
   }
 
   /** antd 兼容 Upload 的 beforeUpload：校验后走自身上传逻辑 */
-  const beforeUpload = (file: File): boolean | string => {
+  const beforeUpload = async (file: File): Promise<boolean | string> => {
     if (generating) return Upload.LIST_IGNORE;
     if (!isSupportedImageFile(file)) {
-      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+      message.warning(`请选择图片文件（${allowedLabel}）`);
       return Upload.LIST_IGNORE;
     }
-    // 体积上限与定制工具页同源; 超限直接拦下, 不再"传上去再说"
-    if (file.size > MAX_IMAGE_BYTES) {
-      message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${file.name}`);
+    const validationError = await validateImageFile(file);
+    if (validationError) {
+      message.error(`${file.name}：${validationError}`);
       return Upload.LIST_IGNORE;
     }
     setUploadingCount((count) => count + 1);
@@ -192,12 +190,12 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
     try {
       const params = form.getFieldsValue();
       const projectId = await ensureProject();
-      const logicalModelId = await resolveModelId(def.id);
+      const modelKey = await resolveModelKey(def.id);
       const inputAssetIds = assetsRef.current.map((asset) => asset.id);
       const fingerprint = JSON.stringify({
         projectId,
         capability: def.id,
-        logicalModelId,
+        modelKey,
         inputAssetIds,
         params,
       });
@@ -211,7 +209,7 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
         projectId,
         inputAssetIds,
         capability: def.id,
-        logicalModelId,
+        modelKey,
         params,
         idempotencyKey,
       });

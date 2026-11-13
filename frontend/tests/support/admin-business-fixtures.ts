@@ -322,7 +322,7 @@ export async function createAdminTaskHistoryFixture(): Promise<AdminTaskHistoryF
             body: JSON.stringify({
               projectId,
               capability: 'free_create',
-              logicalModelId: modelFixture!.freeCreateId,
+              modelKey: modelFixture!.modelKey,
               inputAssetIds: [],
               params: { prompt: `E2E 后台任务分页夹具 #${created + index + 1}` },
             }),

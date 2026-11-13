@@ -6,7 +6,7 @@ import {
   viralCloneImageInputError,
   viralCloneProductImageLimit,
 } from '../utils';
-import type { PublicLogicalModel } from '../api';
+import type { PublicModelGroup } from '../api';
 
 describe('splitCloneInputs', () => {
   it('空输入返回空商品图与空参考图', () => {
@@ -46,33 +46,24 @@ describe('splitCloneInputs', () => {
 });
 
 
-function hotRemakeModel(maxImages: number): PublicLogicalModel {
+function hotRemakeModel(maxImages: number): PublicModelGroup {
   return {
-    id: 'model-hot-remake',
-    code: 'mock-sim-hot-remake',
+    id: 'hot_remake:hot-remake',
+    modelKey: 'hot-remake',
     name: '仿真图像·hot_remake',
     icon: '',
     description: '',
     capability: 'hot_remake',
     sortOrder: 0,
-    pricePolicy: 'fixed',
-    pricingMode: 'fixed',
     displayPrice: 10,
     priceLabel: '10 积分',
-    billingMode: 'per_image',
-    unitPriceMicrocredits: 10_000_000,
-    inputPriceMicrocredits: 0,
-    outputPriceMicrocredits: 0,
-    cachedPriceMicrocredits: 0,
-    priceTiers: [],
-    legacyModelIds: [],
+    billingMode: 'fixed_request',
     capabilitySpec: {
       version: 1,
       capability: 'image',
       inputs: { image: { min: 2, max: maxImages } },
     },
-    capabilityProfiles: [],
-    defaultOptions: {},
+    supplyCount: 1,
     available: true,
   };
 }

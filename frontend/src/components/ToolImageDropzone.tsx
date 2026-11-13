@@ -1,6 +1,6 @@
 import { useState, type RefObject } from 'react';
 import { ImagePlus, Plus, X } from 'lucide-react';
-import { SUPPORTED_IMAGE_ACCEPT } from '../lib/constants';
+import { useUploadLimits } from '../context/UploadLimitsContext';
 import { assetThumbUrl } from '../lib/api';
 import { Button, Spin } from '../ui';
 
@@ -35,8 +35,8 @@ interface Props {
   images: ToolUploadImage[];
   /** 数量上限 */
   max: number;
-  /** 单张体积上限 (MB) */
-  maxMb: number;
+  /** @deprecated 上传上限由系统设置统一下发；保留字段仅为兼容旧调用。 */
+  maxMb?: number;
   uploading: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
@@ -66,7 +66,6 @@ export function ToolImageDropzone({
   required = true,
   images,
   max,
-  maxMb,
   uploading,
   fileInputRef,
   onFiles,
@@ -74,7 +73,7 @@ export function ToolImageDropzone({
   onOpenLibrary,
   onOpenMobile,
   noun = '商品图片',
-  accept = SUPPORTED_IMAGE_ACCEPT,
+  accept,
   sectionClassName,
   dropzoneClassName,
   single = false,
@@ -82,28 +81,30 @@ export function ToolImageDropzone({
   emptyHint,
 }: Props) {
   const [dragging, setDragging] = useState(false);
+  const { accept: configuredAccept, maxMb } = useUploadLimits();
+  const effectiveAccept = accept ?? configuredAccept;
 
   return (
     <div className={`pk-section${sectionClassName ? ` ${sectionClassName}` : ''}`}>
       <div className="pk-upload-title-row">
-        <strong className="pk-section-title">
-          {required && <i className="pk-required-mark">*</i>}
+        <strong className="pk-section-title u-font-14">
+          {required && <i className="pk-required-mark u-font-14">*</i>}
           {title}
         </strong>
         <div className="pk-upload-title-actions">
-          <Button type="text" className="pk-text-link" onClick={onOpenLibrary}>
+          <Button type="text" className="pk-text-link u-font-12" onClick={onOpenLibrary}>
             从素材库导入
           </Button>
           <Button
             type="text"
-            className="pk-text-link"
+            className="pk-text-link u-font-12"
             title="用手机扫码上传，图片回填到上方"
             onClick={onOpenMobile}
           >
             手机上传
           </Button>
           {showCount && (
-            <span className="pk-upload-count">
+            <span className="pk-upload-count u-font-16">
               {images.length}/{max}
             </span>
           )}
@@ -127,7 +128,7 @@ export function ToolImageDropzone({
         <input
           ref={fileInputRef}
           type="file"
-          accept={accept}
+          accept={effectiveAccept}
           multiple={!single}
           hidden
           onChange={(e) => {
@@ -143,8 +144,8 @@ export function ToolImageDropzone({
         {images.length === 0 ? (
           <label className="pk-upload-prompt">
             <ImagePlus size={14} />
-            <span>点击、拖拽或粘贴{noun}到此处上传</span>
-            <small>{emptyHint ?? `最多可上传 ${max} 张${noun}，单张不超过 ${maxMb}MB`}</small>
+            <span className="u-font-14">点击、拖拽或粘贴{noun}到此处上传</span>
+            <small className="u-font-12">{emptyHint ?? `最多可上传 ${max} 张${noun}，单张不超过 ${maxMb}MB`}</small>
           </label>
         ) : (
           <div className={`pk-thumb-grid${single ? ' pk-thumb-grid-single' : ''}`}>

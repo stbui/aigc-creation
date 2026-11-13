@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ArrowUpRight, ChevronDown, ChevronsUpDown, LogOut } from 'lucide-react';
 
 import { cn } from '../lib/cn';
@@ -81,19 +82,34 @@ function NavItem({
 function SidebarNav({
   groups,
   activePath,
+  activeGroupName,
   onNavigate,
   onToggleGroup,
 }: {
   groups: Array<AdminMenuGroup & { open: boolean }>;
   activePath: string;
+  activeGroupName?: string;
   onNavigate: (path: string) => void;
   onToggleGroup: (name: string) => void;
 }) {
   const { state } = useSidebar();
+  const navRef = useRef<HTMLDivElement>(null);
+
+  // 深链或从页内跳转进入底部菜单时，把当前项带回可视区；只在导航状态
+  // 变化时做 nearest 对齐，不抢用户正在进行的滚动手势。
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      navRef.current
+        ?.querySelector<HTMLElement>('[aria-current="page"]')
+        ?.scrollIntoView({ block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activePath, groups, state]);
 
   if (state === 'collapsed') {
     return (
       <SidebarContent
+        ref={navRef}
         data-testid="admin-nav-scroll"
         role="navigation"
         aria-label="后台导航"
@@ -127,22 +143,38 @@ function SidebarNav({
 
   return (
     <SidebarContent
+      ref={navRef}
       data-testid="admin-nav-scroll"
       role="navigation"
       aria-label="后台导航"
       className="adm-nav-scroll gap-1 py-2"
     >
-      {groups.map((group) => (
+      {groups.map((group, index) => (
         <Collapsible key={group.name} open={group.open}>
-          <SidebarGroup className="p-2">
+          <SidebarGroup className="p-1.5">
             <SidebarGroupLabel asChild>
               <button
                 type="button"
                 aria-expanded={group.open}
+                aria-controls={`admin-nav-group-${index}`}
                 onClick={() => onToggleGroup(group.name)}
-                className="w-full justify-between text-xs font-semibold tracking-wider outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                data-active={group.name === activeGroupName ? 'true' : undefined}
+                className={cn(
+                  'w-full justify-between gap-2 text-[11px] font-semibold tracking-[0.08em] outline-none transition-colors',
+                  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                  'data-[active=true]:text-sidebar-accent-foreground',
+                )}
               >
-                <span className="truncate">{group.name}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className={cn(
+                      'size-1.5 shrink-0 rounded-full transition-colors',
+                      group.name === activeGroupName ? 'bg-primary' : 'bg-transparent',
+                    )}
+                    aria-hidden
+                  />
+                  <span className="truncate">{group.name}</span>
+                </span>
                 <ChevronDown
                   className={cn(
                     'size-3.5 shrink-0 transition-transform',
@@ -152,7 +184,7 @@ function SidebarNav({
                 />
               </button>
             </SidebarGroupLabel>
-            <CollapsibleContent>
+            <CollapsibleContent id={`admin-nav-group-${index}`}>
               <SidebarGroupContent className="mt-1">
                 <SidebarMenu className="gap-0.5">
                   {group.items.map((item) => (
@@ -248,6 +280,7 @@ function AccountMenu({
 export function AdminSidebar({
   groups,
   activePath,
+  activeGroupName,
   email,
   roleLabel,
   onNavigate,
@@ -258,6 +291,7 @@ export function AdminSidebar({
 }: {
   groups: Array<AdminMenuGroup & { open: boolean }>;
   activePath: string;
+  activeGroupName?: string;
   email?: string;
   roleLabel?: string;
   onNavigate: (path: string) => void;
@@ -294,6 +328,7 @@ export function AdminSidebar({
       <SidebarNav
         groups={groups}
         activePath={activePath}
+        activeGroupName={activeGroupName}
         onNavigate={onNavigate}
         onToggleGroup={onToggleGroup}
       />

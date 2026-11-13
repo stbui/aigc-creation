@@ -10,8 +10,8 @@ import {
   type FormInstance,
   type UploadFile,
 } from './components';
-import { MAX_IMAGE_MB, SUPPORTED_IMAGE_ACCEPT } from './utils';
 import { ToolParamField } from './ToolParamField';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 
 const { Text } = Typography;
 
@@ -24,7 +24,7 @@ interface ToolUploadCardProps {
   assets: Asset[];
   generating: boolean;
   uploadingCount: number;
-  beforeUpload: (file: File) => boolean | string;
+  beforeUpload: (file: File) => boolean | string | Promise<boolean | string>;
   onRemoveFile: (file: UploadFile) => void;
   onOpenLibrary: () => void;
   onSubmit: () => void;
@@ -46,13 +46,14 @@ export function ToolUploadCard({
   onSubmit,
 }: ToolUploadCardProps) {
   const busy = generating || uploadingCount > 0;
+  const { accept, maxMb } = useUploadLimits();
 
   return (
     <Card className="tool-form-card" title={inputs > 1 ? '输入素材' : '上传商品图'}>
       <Upload
         listType="picture-card"
         fileList={fileList}
-        accept={SUPPORTED_IMAGE_ACCEPT}
+        accept={accept}
         multiple={inputs > 1}
         maxCount={inputs}
         disabled={generating}
@@ -63,7 +64,7 @@ export function ToolUploadCard({
           <UploadIcon size={20} />
           <span>上传图片</span>
           <Text type="secondary" className="tool-upload-hint">
-            ≤ {MAX_IMAGE_MB}MB
+            ≤ {maxMb}MB
           </Text>
         </div>
       </Upload>

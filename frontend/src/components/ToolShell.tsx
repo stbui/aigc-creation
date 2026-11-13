@@ -14,14 +14,8 @@ import { ResultMedia, formatDuration } from './ResultMedia';
 import { ImageCompare } from './ImageCompare';
 import { ImageLightbox } from './ImageLightbox';
 import { ProductCardGenerating, ProductCardResult } from './ToolResultCards';
-import {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_ACCEPT,
-  SUPPORTED_IMAGE_LABEL,
-  isSupportedImageFile,
-  taskErrorText,
-} from '../lib/constants';
+import { taskErrorText } from '../lib/constants';
+import { useUploadLimits } from '../context/UploadLimitsContext';
 import type { Asset, MobileUploadAsset, Task } from '../types/api';
 import { useApp, Spin } from '../ui';
 import { ToolTrailingContext } from './toolShellTypes';
@@ -64,7 +58,6 @@ export function ToolShell(props: Props) {
     capability,
     pageClass,
     inputPaneClassName,
-    uploadActionsPlacement = 'inside',
     title,
     desc,
     upload,
@@ -99,6 +92,12 @@ export function ToolShell(props: Props) {
 
   const { message } = useApp();
   const { ensureProject } = useProject();
+  const {
+    accept: allowedAccept,
+    allowedLabel,
+    isSupportedImageFile,
+    validateImageFile,
+  } = useUploadLimits();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [images, setImages] = useState<ToolAsset[]>([]);
@@ -222,16 +221,11 @@ export function ToolShell(props: Props) {
       const all = Array.from(files);
       const list = all.filter(isSupportedImageFile);
       if (list.length === 0) {
-        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+        message.warning(`请选择 ${allowedLabel} 格式的图片`);
         return;
       }
       if (list.length !== all.length) {
-        message.warning(`已忽略不支持的文件，仅支持 ${SUPPORTED_IMAGE_LABEL}`);
-      }
-      const oversize = list.filter((f) => f.size > MAX_IMAGE_BYTES);
-      if (oversize.length > 0) {
-        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
-        return;
+        message.warning(`已忽略不支持的文件，仅支持 ${allowedLabel}`);
       }
       const current = imagesRef.current;
       const replacing = replaceUpload && upload.max === 1 && current.length > 0;
@@ -244,6 +238,13 @@ export function ToolShell(props: Props) {
       if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
       setUploading(true);
       try {
+        for (const file of accepted) {
+          const validationError = await validateImageFile(file);
+          if (validationError) {
+            message.error(`${file.name}：${validationError}`);
+            return;
+          }
+        }
         const projectId = await ensureProject();
         const uploaded: ToolAsset[] = [];
         for (const file of accepted) {
@@ -260,7 +261,7 @@ export function ToolShell(props: Props) {
         setUploading(false);
       }
     },
-    [ensureProject, message, replaceUpload, upload],
+    [allowedLabel, ensureProject, isSupportedImageFile, message, replaceUpload, upload, validateImageFile],
   );
 
   // 粘贴上传 (参考站支持直接粘贴)
@@ -362,19 +363,19 @@ export function ToolShell(props: Props) {
 
   const uploadActionLinks = upload ? (
     <>
-      <button type="button" className="pk-text-link" onClick={openLibrary}>
+      <button type="button" className="pk-text-link u-font-12" onClick={openLibrary}>
         从素材库导入
       </button>
       <button
         type="button"
-        className="pk-text-link pk-mobile-upload-link"
+        className="pk-text-link pk-mobile-upload-link u-font-12"
         title="用手机扫码上传，图片回填到左侧"
         onClick={() => setMobileOpen(true)}
       >
         手机上传
       </button>
       {upload.max > 1 && (
-        <span className="pk-upload-count">
+        <span className="pk-upload-count u-font-16">
           {images.length}/{upload.max}
         </span>
       )}
@@ -391,21 +392,16 @@ export function ToolShell(props: Props) {
       <aside className={`pk-input-pane${inputPaneClassName ? ` ${inputPaneClassName}` : ''}`}>
         <div className="pk-form-card">
           <div className="pk-form-scroll">
-            {upload && uploadActionsPlacement === 'above' && (
-              <div className="image-tool-upload-actions pk-upload-actions-above">{uploadActionLinks}</div>
-            )}
             {/* 上传卡 (页面自带上传区时跳过) */}
             {upload && (
               <section className="pk-config-card">
                 <div className="pk-section">
                   <div className="pk-upload-title-row">
-                    <strong className="pk-section-title">
-                      {upload.required && <i className="pk-required-mark">*</i>}
+                    <strong className="pk-section-title u-font-14">
+                      {upload.required && <i className="pk-required-mark u-font-14">*</i>}
                       {upload.title}
                     </strong>
-                    {uploadActionsPlacement !== 'above' && (
-                      <div className="pk-upload-title-actions">{uploadActionLinks}</div>
-                    )}
+                    <div className="pk-upload-title-actions">{uploadActionLinks}</div>
                   </div>
 
                   <div
@@ -425,7 +421,7 @@ export function ToolShell(props: Props) {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept={upload.accept ?? SUPPORTED_IMAGE_ACCEPT}
+                      accept={upload.accept ?? allowedAccept}
                       multiple={upload.max > 1}
                       hidden
                       onChange={(e) => {

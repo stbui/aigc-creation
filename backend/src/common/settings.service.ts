@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SecretCipher } from '../model/infra/secret-cipher';
 import { AppError } from './app.exception';
 import {
   SETTING_DEFS,
@@ -8,6 +9,14 @@ import {
   type SettingDef,
   type SettingValue,
 } from './setting-defs';
+import {
+  allowedTypeLabels,
+  canonicalAllowedTypes,
+  deploymentUploadMaxBytes,
+  deploymentUploadMaxPixels,
+  parseAllowedMimes,
+  type SupportedImageMime,
+} from './image-formats';
 
 /**
  * 系统设置的运行时读取 —— **业务侧读设置值只走这里**。
@@ -29,13 +38,16 @@ const CACHE_TTL_MS = 3000;
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
 
-  /** key → 生效值（已按 SettingDef 归一化） */
-  private cache = new Map<string, SettingValue>();
+  /** key → 数据库原始值。敏感项必须保留密文，不能在这里提前解密或归一化。 */
+  private cache = new Map<string, string>();
   /** key → 上次修改的操作人，供设置页显示「上次由 X 改」 */
   private actorCache = new Map<string, { updatedBy: string | null; updatedAt: Date | null }>();
   private cacheAt = 0;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cipher: SecretCipher,
+  ) {}
 
   /** 后台改设置后立即失效缓存。不调也能等 TTL，但改设置应即时生效 */
   invalidate(): void {
@@ -53,12 +65,34 @@ export class SettingsService {
   async get<T = SettingValue>(key: string): Promise<T> {
     const def = findSettingDef(key);
     if (!def) throw new AppError(40400, `未知设置项: ${key}`, 404);
+    if (def.sensitive) return '' as T;
 
-    if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
-      await this.refresh();
+    await this.ensureFresh();
+    const raw = this.cache.get(key);
+    return (raw === undefined ? def.default : parseSettingValue(raw, def)) as T;
+  }
+
+  /**
+   * 读取敏感设置的明文，仅供服务端基础设施使用。
+   *
+   * 普通 `get()` / `getAll()` 永远返回空串，避免设置页、调试日志或通用序列化
+   * 意外把密钥带出去。解密失败只记键名并返回空串，让邮件等可选通道回落
+   * 到环境变量；一条损坏的密文不能让整个设置页或业务接口 500。
+   */
+  async getSecret(key: string): Promise<string> {
+    const def = findSettingDef(key);
+    if (!def) throw new AppError(40400, `未知设置项: ${key}`, 404);
+    if (!def.sensitive) throw new AppError(40001, `设置项不是敏感配置: ${key}`, 400);
+
+    await this.ensureFresh();
+    const raw = this.cache.get(key);
+    if (!raw) return '';
+    try {
+      return this.cipher.decrypt(raw);
+    } catch {
+      this.logger.warn(`敏感设置解密失败，已忽略运行时值: ${key}`);
+      return '';
     }
-    const cached = this.cache.get(key);
-    return (cached === undefined ? def.default : cached) as T;
   }
 
   /** 读取数值型设置；值非法或显式留空时回落定义里的默认值 */
@@ -104,22 +138,52 @@ export class SettingsService {
 
   /** 一次性读全部设置项的生效值（含缓存） */
   async getAll(): Promise<Record<string, SettingValue>> {
-    if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
-      await this.refresh();
-    }
+    await this.ensureFresh();
     const out: Record<string, SettingValue> = {};
     for (const def of SETTING_DEFS) {
-      const v = this.cache.get(def.key);
-      out[def.key] = v === undefined ? def.default : v;
+      if (def.sensitive) {
+        out[def.key] = '';
+        continue;
+      }
+      const raw = this.cache.get(def.key);
+      out[def.key] = raw === undefined ? def.default : parseSettingValue(raw, def);
     }
     return out;
   }
 
+  /**
+   * 上传限制快照，供上传校验与公开配置接口共用。
+   *
+   * 数据库中的值可能被手工改坏；这里统一归一，并且始终以部署硬上限封顶。
+   */
+  async uploadLimits(): Promise<UploadLimits> {
+    const [rawMaxSizeMb, rawMaxPixels, rawAllowedTypes] = await Promise.all([
+      this.getNumber('upload.maxSizeMb'),
+      this.getNumber('upload.maxPixels'),
+      this.get<string>('upload.allowedTypes'),
+    ]);
+
+    const maxSizeMb = Math.min(Math.max(Math.round(rawMaxSizeMb), 1), 100);
+    const maxPixels = Math.min(
+      Math.max(Math.round(rawMaxPixels), 1_000_000),
+      deploymentUploadMaxPixels(),
+    );
+    const allowedTypes = canonicalAllowedTypes(rawAllowedTypes) || 'jpg,png,webp';
+    const allowedMimes = parseAllowedMimes(allowedTypes);
+
+    return {
+      maxSizeMb,
+      maxBytes: Math.min(maxSizeMb * 1024 * 1024, deploymentUploadMaxBytes()),
+      maxPixels,
+      allowedTypes,
+      allowedMimes,
+      allowedLabels: allowedTypeLabels(allowedMimes),
+    };
+  }
+
   /** 某项的最后修改人 / 修改时间 */
   async getMeta(key: string): Promise<{ updatedBy: string | null; updatedAt: Date | null }> {
-    if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
-      await this.refresh();
-    }
+    await this.ensureFresh();
     return this.actorCache.get(key) ?? { updatedBy: null, updatedAt: null };
   }
 
@@ -219,17 +283,23 @@ export class SettingsService {
    * 只取本模块定义的键 —— SystemSetting 表里还混着 `creditPrice.*`
    * （积分价有自己的缓存与键空间），全表扫进来再丢弃是白读。
    */
+  private async ensureFresh(): Promise<void> {
+    if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
+      await this.refresh();
+    }
+  }
+
   private async refresh(): Promise<void> {
     const known = new Set(SETTING_DEFS.map((d) => d.key));
     const rows = await this.prisma.systemSetting.findMany();
-    const cache = new Map<string, SettingValue>();
+    const cache = new Map<string, string>();
     const actors = new Map<string, { updatedBy: string | null; updatedAt: Date | null }>();
 
     for (const row of rows) {
       if (!known.has(row.key)) continue;
       const def = findSettingDef(row.key);
       if (!def) continue;
-      cache.set(row.key, parseSettingValue(row.value, def));
+      cache.set(row.key, row.value);
       actors.set(row.key, { updatedBy: row.updatedBy, updatedAt: row.updatedAt });
     }
 
@@ -238,15 +308,15 @@ export class SettingsService {
     this.cacheAt = Date.now();
   }
 
-  /**
-   * 解析库里的字符串值为目标类型。
-   *
-   * 存量数据可能格式不合法 (手工改过库), 此时回退到代码默认值 ——
-   * 一个坏配置不应让整页设置加载失败。
-   */
-  private parseValue(raw: string, def: SettingDef): SettingValue {
-    return parseSettingValue(raw, def);
-  }
+}
+
+export interface UploadLimits {
+  maxBytes: number;
+  maxPixels: number;
+  allowedMimes: SupportedImageMime[];
+  maxSizeMb: number;
+  allowedTypes: string;
+  allowedLabels: string[];
 }
 
 export interface PaymentRules {

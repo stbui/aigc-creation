@@ -14,7 +14,7 @@ import { memoryStorage } from 'multer';
 
 import { RequirePermission } from '../admin/admin.decorator';
 import { PERMISSIONS } from '../admin/permissions';
-import { maxUploadBytes } from '../assets/image-validation';
+import { deploymentUploadMaxBytes } from '../common/image-formats';
 import {
   CreateTemplateCategoryDto,
   CreateTemplateGroupDto,
@@ -107,7 +107,7 @@ export class TemplateAdminController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: maxUploadBytes(), files: 1 },
+      limits: { fileSize: deploymentUploadMaxBytes(), files: 1 },
     }),
   )
   upload(@UploadedFile() file: { buffer?: Buffer; originalname?: string } | undefined) {

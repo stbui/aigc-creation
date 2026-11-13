@@ -22,7 +22,7 @@ import { MobileUploadService } from './mobile-upload.service';
 import { AppError } from '../common/app.exception';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { IsOptional } from 'class-validator';
-import { maxUploadBytes } from '../assets/image-validation';
+import { deploymentUploadMaxBytes } from '../common/image-formats';
 
 const MOBILE_UPLOAD_TMP_DIR = join(tmpdir(), 'huojue-mobile-upload');
 mkdirSync(MOBILE_UPLOAD_TMP_DIR, { recursive: true });
@@ -105,7 +105,7 @@ export class MobileUploadController {
         destination: MOBILE_UPLOAD_TMP_DIR,
         filename: (_req, _file, cb) => cb(null, randomUUID()),
       }),
-      limits: { fileSize: maxUploadBytes(), files: 9 },
+      limits: { fileSize: deploymentUploadMaxBytes(), files: 9 },
     }),
   )
   async receive(

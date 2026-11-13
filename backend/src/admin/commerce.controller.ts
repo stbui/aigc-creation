@@ -6,7 +6,6 @@ import {
   Param,
   Patch,
   Post,
-  Put,
   Query,
   Res,
   UploadedFile,
@@ -33,7 +32,6 @@ import { AdminUser, RequireAllPermissions, RequirePermission } from "./admin.dec
 import { AppError } from "../common/app.exception";
 import { OrderService } from "../orders/order.service";
 import { CreditService } from "../credits/credit.service";
-import { CreditPriceService } from "../credits/credit-price.service";
 import { AdminCommerceService } from "./commerce-admin.service";
 import { AdminSettingsService } from "./settings.service";
 import { PERMISSIONS } from "./permissions";
@@ -188,23 +186,6 @@ export class BatchAdjustDto {
   @IsOptional() @IsInt() @Min(0) validDays?: number;
 }
 
-/** 单项消耗价 */
-export class CreditPriceItemDto {
-  @IsString() @MaxLength(40) capabilityId!: string;
-  /** 非负整数。0 = 该能力免费 */
-  @IsInt() @Min(0) @Max(10000) cost!: number;
-}
-
-/**
- * 批量改价 (commerce-design.md §8.2 `PUT /admin/credit-prices`)。
- *
- * 数组而非对象: class-validator 的属性名不能带点号, 消耗价的 key 是
- * `creditPrice.<capabilityId>` 这种动态形式, 走扁平 DTO 表达不了。
- */
-export class UpdateCreditPricesDto {
-  @IsArray() @ArrayMaxSize(50) items!: CreditPriceItemDto[];
-}
-
 /** 批量核销订单。 */
 export class OrderBatchDto {
   @IsArray()
@@ -260,49 +241,8 @@ export class AdminCommerceController {
     private readonly orders: OrderService,
     private readonly commerce: AdminCommerceService,
     private readonly credit: CreditService,
-    private readonly creditPrice: CreditPriceService,
     private readonly settings: AdminSettingsService,
   ) {}
-
-  // ── 能力消耗价 (commerce-design.md §4.4) ──────────────────────────
-
-  /**
-   * 全站能力消耗价。
-   *
-   * 每项同时返回 `cost`(生效价) / `registryDefault`(代码默认) / `source`,
-   * 让运营一眼看出「这个价现在是谁在管」—— 改价页上不标明来源,
-   * 就会出现「我改了没生效」时无法判断该改哪一层。
-   */
-  @Get("credit-prices")
-  @RequirePermission(PERMISSIONS.productPrice)
-  creditPrices() {
-    return this.creditPrice.adminList();
-  }
-
-  /**
-   * 批量改价。逐项落库并即时失效缓存 —— 改完立刻生效, 不必等 3s TTL。
-   *
-   * 定价是影响收入的关键操作，必须使用独立权限。
-   */
-  @Put("credit-prices")
-  @RequirePermission(PERMISSIONS.productPrice)
-  async updateCreditPrices(@Body() dto: UpdateCreditPricesDto) {
-    if (!dto.items?.length) {
-      throw new AppError(40001, "没有需要更新的消耗价", 400);
-    }
-    const updated = [];
-    for (const it of dto.items) {
-      updated.push(await this.creditPrice.setPrice(it.capabilityId, it.cost));
-    }
-    return { updated };
-  }
-
-  /** 单项回落默认值 (删掉 SystemSetting 覆盖, 回到 registry) */
-  @Post("credit-prices/:capabilityId/reset")
-  @RequirePermission(PERMISSIONS.productPrice)
-  resetCreditPrice(@Param("capabilityId") capabilityId: string) {
-    return this.creditPrice.resetPrice(capabilityId);
-  }
 
   // ── 商品 (B-34~B-36) ────────────────────────────────────────────
 

@@ -1081,6 +1081,15 @@ export class MembershipService {
         if (outcome.issued > 0) {
           creditsGranted += 1;
           creditsIssued += outcome.issued;
+          await this.notifications.notify({
+            userId: m.userId,
+            type: 'credit_granted',
+            vars: { credits: outcome.issued },
+            fallbackTitle: '积分到账',
+            fallbackBody: `本次获得 ${outcome.issued} 积分。`,
+            link: '/credits',
+            emailEvent: 'credit_granted',
+          });
         }
         if (outcome.projectionChanged) membershipProjectionChanged = true;
       } catch (e) {
@@ -1101,6 +1110,7 @@ export class MembershipService {
         fallbackTitle: '会员已到期',
         fallbackBody: `你的会员已于 ${m.expiresAt.toISOString().slice(0, 10)} 到期。`,
         link: '/packages',
+        emailEvent: 'membership_expired',
       });
     }
 

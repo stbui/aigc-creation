@@ -1081,6 +1081,7 @@ export class OrderService {
       fallbackTitle: '支付成功',
       fallbackBody: `订单 ${updated.orderNo} 已支付 ¥${(updated.paidCents / 100).toFixed(2)}。`,
       link: updated.membershipPlanId ? '/packages' : '/credits',
+      emailEvent: 'payment_success',
     });
 
     return { order: updated, idempotentHit: false, message: '支付成功' };

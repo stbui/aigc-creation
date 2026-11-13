@@ -17,6 +17,7 @@ import { SmsLoginDto } from './dto/sms-login.dto';
 import { AccountTokenService } from './account-token.service';
 import { normalizePhone } from './phone';
 import { normalizeEmail } from './email';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface PublicUser {
   id: string;
@@ -53,6 +54,7 @@ export class AuthService {
     private readonly tokens: AccountTokenService,
     private readonly email: EmailService,
     private readonly sms: SmsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // 注册后直接签发 token (前端 LoginPage 注册模式同样消费 accessToken 自动登录)
@@ -122,6 +124,17 @@ export class AuthService {
           emailVerifiedAt: new Date(),
           ...(phone ? { phone, phoneVerifiedAt: new Date() } : {}),
         },
+      });
+
+      // 欢迎消息失败不影响注册；邮箱通道自身也会逐层捕获异常。
+      await this.notifications.notify({
+        userId: user.id,
+        type: 'welcome',
+        vars: { name: user.name },
+        fallbackTitle: '欢迎加入货觉AI',
+        fallbackBody: `${user.name}，欢迎加入货觉AI。`,
+        link: '/',
+        emailEvent: 'welcome',
       });
 
       const accessToken = JwtService.sign({

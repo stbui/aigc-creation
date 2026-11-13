@@ -1,41 +1,41 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import {
   CREATION_CAPABILITY_LABELS,
   CREATION_DOWNLOAD_PREFIX,
-  MAX_IMAGE_BYTES,
+  CREATION_PROMPT_PLACEHOLDER,
   MAX_IMAGE_MB,
+  MAX_PROMPT_LEN,
   MAX_REF_IMAGES,
-  SUPPORTED_IMAGE_LABEL,
   type CreationCapability,
 } from './constants';
 import {
   AssetLibraryModal,
+  ExpandTextModal,
   ImageToPromptModal,
   MobileUploadModal,
   PromptPolishModal,
-  type ToolAsset,
 } from './components';
 import {
+  hasActiveGalleryItems,
   notifyCreditsChanged,
-  useAssetLibrary,
   useAuth,
   useCapabilityRuntime,
-  useCreditLabel,
+  useDeleteGalleryItem,
   useGenerateError,
-  usePasteUpload,
+  useIdempotencyKey,
+  useImageUpload,
+  useModelQuoteCreditLabel,
   usePollAbort,
   useProject,
   useResultGallery,
   type GalleryItem,
 } from './hooks';
-import { assetsApi, assetSrc, generateApi, newIdempotencyKey, resolveModelId, toAbsoluteUrl } from './api';
-import { isSupportedImageFile, pollToResult, resolveCreationCapability, taskErrorText } from './utils';
+import { generateApi, resolveModelKey } from './api';
+import { pollToResult, resolveCreationCapability, taskErrorText } from './utils';
 import { CreativeImageInputPane } from './CreativeImageInputPane';
 import { CreativeImageOutputPane } from './CreativeImageOutputPane';
-import { CreativeImagePromptModal } from './CreativeImagePromptModal';
-import type { Asset, MobileUploadAsset } from '../../types/api';
 import { useApp } from '../../ui';
 
 /**
@@ -69,49 +69,30 @@ import { useApp } from '../../ui';
  *   提示词为空时按钮 disabled 且视觉置灰 (opacity .55 + not-allowed)。
  *
  * 板块拆分见 `docs/frontend-module-conventions.md`：输入栏 `CreativeImageInputPane`
- * （上传 `CreativeImageUploadSection` / 缩略图 `CreativeImageReferenceThumb` /
- * 提交 `CreativeImageSubmitBar`）、结果栏 `CreativeImageOutputPane`、
- * 提示词放大 `CreativeImagePromptModal`。状态与写操作只留在本文件。
+ * （上传 `CreativeImageUploadSection` / 缩略图 `CreativeImageReferenceThumb`）、
+ * 结果栏 `CreativeImageOutputPane`。上传 / 素材库 / 手机回填 / 排序统一走共享
+ * `useImageUpload`；提示词放大走共享 `ExpandTextModal`。状态与写操作只留在本文件。
  */
 
 export function CreativeImagePage({ capability: capabilityProp }: { capability?: CreationCapability } = {}) {
-  const { message, modal } = useApp();
+  const { message } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token, openLogin } = useAuth();
   const [searchParams] = useSearchParams();
   // 独立路由 `/creative-image` 直接带能力; 保留的 `/free-creation` 走查询参数,
-  // 未知参数回落到自由创作, 避免把任意串透传给后端。
+  // 未知参数回落到自由创作，避免把任意串透传给后端。
   const capability = capabilityProp ?? resolveCreationCapability(searchParams.get('capability'));
   const capabilityLabel = CREATION_CAPABILITY_LABELS[capability];
-  /**
-   * 建单幂等键。请求超时/连接重置但服务端已落单时，用户重试必须复用同一个 key，
-   * 否则同一个提示词会生成两次、扣两次费；拿到 taskId 后清空。
-   */
-  const pendingStartRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  // 同一次提交的网络重试复用同一个 key，避免重复建单扣费
+  const { keyFor: idempotencyKeyFor, reset: resetIdempotencyKey } = useIdempotencyKey();
   // 消耗价优先用所选模型实时报价，取不到才回落到能力基础价
-  const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
-  const baseCreditLabel = useCreditLabel(capability);
-  const creditLabel =
-    modelQuoteCredits == null
-      ? baseCreditLabel
-      : modelQuoteCredits === 0
-        ? '免费'
-        : `本次约 ${modelQuoteCredits} 积分（按所选模型）`;
+  const { label: creditLabel, onModelQuoteChange } = useModelQuoteCreditLabel({ capability });
 
   // ── 表单状态 ──
-  const [images, setImages] = useState<ToolAsset[]>([]);
-  /**
-   * 参考图位的同步镜像。
-   *
-   * 素材库「确定」是同步 for 循环逐个调 onPick, 期间不重渲染 —— 只读 state
-   * 会让一次勾选超过剩余位数的图全部进列表 (每张都读到同一份旧值)。
-   */
-  const imagesRef = useRef<ToolAsset[]>(images);
-  useEffect(() => {
-    imagesRef.current = images;
-  }, [images]);
-  const [uploading, setUploading] = useState(false);
+  // 上传 (三重校验 / 素材库回填 / 粘贴 / 排序) 统一由 useImageUpload 处理
+  const { images, uploading, uploadFiles, removeImage, moveImage, replaceImages, library, mobile } =
+    useImageUpload({ max: MAX_REF_IMAGES, maxMb: MAX_IMAGE_MB, noun: '参考图片' });
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('1:1');
   const [resolution, setResolution] = useState('1k');
@@ -121,7 +102,6 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
   const [expandOpen, setExpandOpen] = useState(false);
   const [polishOpen, setPolishOpen] = useState(false);
   const [i2pOpen, setI2pOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
@@ -132,8 +112,8 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
   // ── 右侧「全部生成图」(本页能力的历史产出) ──
   // 数据取自 /tasks 而非 /assets: 生成记录以任务为准 (创作时间、尺寸口径都在任务上)。
   const gallery = useResultGallery({ capability, token });
-  // 服务端仍有 running/pending 任务时也算生成中: 离开页面再回来, 禁用态与标题不丢
-  const generating = submitting || gallery.items.some((item) => !item.url);
+  // 服务端仍有 queued/running 任务时也算生成中: 离开页面再回来, 禁用态与标题不丢
+  const generating = submitting || hasActiveGalleryItems(gallery.items);
 
   // 参考站该页: 参考图选填 (标题无必填星号), 提示词必填 (label ::before 星)
   const formValid = prompt.trim().length > 0;
@@ -143,98 +123,6 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
    * 避免一次网络抖动就让整页不可用。
    */
   const { blocked: capabilityBlocked, reason: unavailableReason } = useCapabilityRuntime(capability);
-
-  // ── 上传: 参考图 (点击/拖拽/粘贴, 最多 4 张, 顺序保留) ──
-  const uploadFiles = useCallback(
-    async (files: FileList | File[]) => {
-      const list = Array.from(files).filter(isSupportedImageFile);
-      if (list.length === 0) {
-        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
-        return;
-      }
-      const room = MAX_REF_IMAGES - images.length;
-      if (room <= 0) {
-        message.warning(`最多上传 ${MAX_REF_IMAGES} 张参考图片`);
-        return;
-      }
-      const accepted = list.slice(0, room);
-      if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
-      const oversize = accepted.filter((file) => file.size > MAX_IMAGE_BYTES);
-      if (oversize.length > 0) {
-        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((file) => file.name).join('、')}`);
-        return;
-      }
-
-      setUploading(true);
-      try {
-        const projectId = await ensureProject();
-        const uploaded: ToolAsset[] = [];
-        for (const file of accepted) {
-          const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
-        }
-        setImages((prev) => [...prev, ...uploaded]);
-        message.success(`已上传 ${uploaded.length} 张参考图片`);
-      } catch (error) {
-        message.error((error as Error).message || '上传失败');
-      } finally {
-        setUploading(false);
-      }
-    },
-    [images.length, ensureProject, message],
-  );
-
-  const removeImage = (id: string) => setImages((prev) => prev.filter((item) => item.id !== id));
-
-  /** 调整参考图顺序 (参考站缩略图左右箭头; 边界禁用) */
-  const moveImage = (index: number, direction: -1 | 1) => {
-    setImages((prev) => {
-      const target = index + direction;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-  };
-
-  // 拖拽 & 粘贴 (本页唯一上传区即参考图区, 粘贴直接进参考图)
-  usePasteUpload(uploadFiles);
-
-  // ── 素材库导入 (真实数据) ──
-  //
-  // ⚠️ **必须返回 false 表示拒绝** (不是 undefined):
-  // 素材库选择器是**多选**的, 「确定」时逐个调用本函数;
-  // 只有显式返回 false 才能让选择器知道"这张没进", 从而中止整批并保持弹窗打开。
-  // 返回 undefined 会被当成"接受" —— 超额的那张会静默进入, 上限失效。
-  const pickFromLibrary = (asset: Asset): boolean => {
-    const current = imagesRef.current;
-    if (current.length >= MAX_REF_IMAGES) {
-      message.warning(`最多上传 ${MAX_REF_IMAGES} 张参考图片`);
-      return false;
-    }
-    if (current.some((item) => item.id === asset.id)) {
-      message.info('该素材已在列表中');
-      return false;
-    }
-    const next: ToolAsset = {
-      id: asset.id,
-      url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
-      name: asset.sourceUrl.split('/').pop() ?? '素材',
-    };
-    imagesRef.current = [...current, next];
-    setImages((prev) => (prev.some((item) => item.id === next.id) ? prev : [...prev, next]));
-    return true;
-  };
-
-  // 素材库弹窗 (通用组件; 各页只提供点选回填逻辑)
-  const {
-    open: libraryOpen,
-    loading: libraryLoading,
-    items: libraryItems,
-    error: libraryError,
-    openLibrary,
-    closeLibrary,
-  } = useAssetLibrary(pickFromLibrary);
 
   // ── AI润色 / 图片转提示词 / 手机上传: 三个真实入口 ──
   //
@@ -262,96 +150,47 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
 
   const runMobileUpload = () => {
     if (!requireLogin()) return;
-    setMobileOpen(true);
+    mobile.openMobile();
   };
 
-  /**
-   * 手机端传回图片 → 进入参考图位 (与网页上传同构, 走同一份图片数组)。
-   *
-   * 支持一次多张 (参考站手机端可多选), **顺序即构图顺序** ——
-   * 手机端排的序就是电脑端参考图位的先后。
-   *
-   * ⚠️ 超出位数的部分**如实告知被截断**, 不静默丢弃:
-   * 用户在手机上精心排了 5 张, 电脑端只进 2 张却不说, 是最难受的一种失败。
-   */
-  const addMobileAssets = useCallback(
-    (assets: MobileUploadAsset[]) => {
-      setImages((prev) => {
-        const room = MAX_REF_IMAGES - prev.length;
-        if (room <= 0) {
-          message.warning(`参考图位已满 (${MAX_REF_IMAGES} 张), 手机上传的图片未加入`);
-          return prev;
-        }
-        const fresh = assets.filter((asset) => !prev.some((item) => item.id === asset.id));
-        const accepted = fresh.slice(0, room);
-        const dropped = fresh.length - accepted.length;
-        if (dropped > 0) {
-          message.warning(`参考图位只剩 ${room} 个, ${dropped} 张未加入`);
-        }
-        return [
-          ...prev,
-          ...accepted.map((asset) => ({
-            id: asset.id,
-            url: toAbsoluteUrl(asset.signedUrl || asset.url) ?? '',
-            name: asset.filename,
-          })),
-        ];
-      });
-      setMobileOpen(false);
-      message.success(`已从手机接收 ${assets.length} 张图片`);
-    },
-    [message],
-  );
-
-  // ── 结果图右键操作 ──
+  // ── 结果图操作 ──
   //
   // 「查看大图 / 复制地址 / 下载 / 删除」由结果栏组件提供, 本页只补
-  // 本页独有的「用作参考图」与删除时的连带清理 —— 每个动作都用已有接口与状态,
-  // 不新增后端能力。
+  // 本页独有的「用作参考图」与删除时的连带清理。
 
   /** 把这张生成图放进左侧参考图位 */
-  const useAsReference = (item: GalleryItem) => {
-    const assetId = item.assetId;
-    if (images.length >= MAX_REF_IMAGES) {
-      message.warning(`最多上传 ${MAX_REF_IMAGES} 张参考图片`);
-      return;
-    }
-    if (!assetId) {
-      // 任务还在但素材已被清理 (后台删过素材): 不能拿一个空 id 去提交
-      message.error('这张图片的素材已不存在，无法用作参考图');
-      return;
-    }
-    if (images.some((image) => image.id === assetId)) {
-      message.info('该图片已在参考图位');
-      return;
-    }
-    setImages((prev) => [...prev, { id: assetId, url: item.url, name: `生成图-${item.id.slice(-6)}` }]);
-    message.success('已加入参考图位，下一轮生成会带上它');
-  };
+  const useAsReference = useCallback(
+    (item: GalleryItem) => {
+      const assetId = item.assetId;
+      if (images.length >= MAX_REF_IMAGES) {
+        message.warning(`最多上传 ${MAX_REF_IMAGES} 张参考图片`);
+        return;
+      }
+      if (!assetId) {
+        // 任务还在但素材已被清理 (后台删过素材): 不能拿一个空 id 去提交
+        message.error('这张图片的素材已不存在，无法用作参考图');
+        return;
+      }
+      if (images.some((image) => image.id === assetId)) {
+        message.info('该图片已在参考图位');
+        return;
+      }
+      replaceImages([...images, { id: assetId, url: item.url, name: `生成图-${item.id.slice(-6)}` }]);
+      message.success('已加入参考图位，下一轮生成会带上它');
+    },
+    [images, message, replaceImages],
+  );
 
-  const deleteImage = (item: GalleryItem) => {
-    modal.confirm({
-      title: '删除这张作品？',
-      content: '生成图与本地文件会一并删除，不可恢复。',
-      okText: '删除',
-      okButtonProps: { danger: true },
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          await generateApi.remove(item.id);
-          gallery.removeItem(item.id);
-          /*
-           * 产出素材随之被删, 若它已被「用作参考图」放进左侧参考图位,
-           * 必须同步摘掉 —— 否则下一次生成会带着一个已不存在的 assetId 提交。
-           */
-          if (item.assetId) setImages((prev) => prev.filter((image) => image.id !== item.assetId));
-          message.success('已删除作品及其生成图');
-        } catch (error) {
-          message.error((error as Error).message || '删除失败');
-        }
-      },
-    });
-  };
+  /**
+   * 删除作品 —— 产出素材若正占着参考图位，必须同步摘掉；
+   * 否则下一次生成会带着一个已不存在的 assetId 提交。
+   */
+  const deleteImage = useDeleteGalleryItem({
+    removeItem: gallery.removeItem,
+    onDeleted: (item) => {
+      if (item.assetId) removeImage(item.assetId);
+    },
+  });
 
   // ── 生成 ──
   const pollTask = useCallback((taskId: string) => pollToResult(taskId, { signal: pollSignal }), [pollSignal]);
@@ -367,11 +206,11 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
     setFailureNotice(null);
     try {
       const projectId = await ensureProject();
-      const logicalModelId = await resolveModelId(capability);
+      const modelKey = await resolveModelKey(capability);
       const payload = {
         projectId,
         capability,
-        logicalModelId,
+        modelKey,
         // 参考图选填 0~4 张; 顺序即构图顺序 (provider 顶部条带按序横排)
         inputAssetIds: images.map((image) => image.id),
         params: {
@@ -380,12 +219,9 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
           size: resolution,
         },
       };
-      const fingerprint = JSON.stringify(payload);
-      const idempotencyKey =
-        pendingStartRef.current?.fingerprint === fingerprint ? pendingStartRef.current.key : newIdempotencyKey();
-      pendingStartRef.current = { fingerprint, key: idempotencyKey };
+      const idempotencyKey = idempotencyKeyFor(JSON.stringify(payload));
       const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
-      pendingStartRef.current = null;
+      resetIdempotencyKey();
       const done = await pollTask(taskId);
       /*
        * 新图**直接插到列表首位**, 不再回头重拉列表。
@@ -441,7 +277,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
         onUploadFiles={uploadFiles}
         onRemoveImage={removeImage}
         onMoveImage={moveImage}
-        onOpenLibrary={openLibrary}
+        onOpenLibrary={library.openLibrary}
         onOpenMobile={runMobileUpload}
         prompt={prompt}
         onPromptChange={setPrompt}
@@ -458,7 +294,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
         onRatioChange={setRatio}
         resolution={resolution}
         onResolutionChange={setResolution}
-        onModelQuoteChange={setModelQuoteCredits}
+        onModelQuoteChange={onModelQuoteChange}
         onSubmit={() => void submit()}
       />
 
@@ -478,12 +314,12 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
 
       {/* 素材库选择弹窗 (真实数据; 多选, 上限与参考图位一致) */}
       <AssetLibraryModal
-        open={libraryOpen}
-        loading={libraryLoading}
-        items={libraryItems}
-        error={libraryError}
-        onCancel={closeLibrary}
-        onPick={pickFromLibrary}
+        open={library.open}
+        loading={library.loading}
+        items={library.items}
+        error={library.error}
+        onCancel={library.closeLibrary}
+        onPick={library.pick}
         maxSelectable={MAX_REF_IMAGES}
       />
 
@@ -511,11 +347,14 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
       />
 
       {/* 手机上传弹窗 (二维码方案) —— 手机端传回后进入参考图位 */}
-      <MobileUploadModal open={mobileOpen} onReceived={addMobileAssets} onCancel={() => setMobileOpen(false)} />
+      <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
 
-      <CreativeImagePromptModal
+      <ExpandTextModal
         open={expandOpen}
+        title="编辑创作提示词"
         value={prompt}
+        maxLength={MAX_PROMPT_LEN}
+        placeholder={CREATION_PROMPT_PLACEHOLDER}
         onChange={setPrompt}
         onClose={() => setExpandOpen(false)}
       />

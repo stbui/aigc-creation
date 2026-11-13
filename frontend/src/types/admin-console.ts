@@ -299,6 +299,8 @@ export interface AdminSettings {
       nullable?: boolean;
       min?: number;
       max?: number;
+      /** 数字项是否只接受整数 */
+      integer?: boolean;
       maxLength?: number;
       /** 允许取值的枚举；存在时渲染下拉而不是自由输入 */
       enum?: number[];
@@ -307,7 +309,13 @@ export interface AdminSettings {
       /** 字符串枚举值的展示文案；键为落库值 */
       optionLabels?: Record<string, string>;
       /** 控件覆盖；缺省为文本输入 */
-      control?: "text" | "image-upload";
+      control?: "text" | "password" | "image-upload" | "image-formats";
+      /** 敏感项：读取接口只返回配置状态，不回显明文 */
+      sensitive?: boolean;
+      /** 敏感项是否已有加密值 */
+      hasSecret?: boolean;
+      /** 服务端生成的脱敏提示，仅用于识别已配置值 */
+      secretMask?: string | null;
       /** 只读项：真实旋钮在别处，页面只展示当前值并给出跳转 */
       readOnly?: boolean;
       /** 只读项的跳转目标（后台路由） */
@@ -545,24 +553,6 @@ export interface CreditLedgerPage {
   total: number;
   limit: number;
   offset: number;
-}
-
-/** 能力消耗价一行 (后台改价用) */
-export interface AdminCreditPrice {
-  capabilityId: string;
-  capabilityName: string;
-  /** 运行时生效价 */
-  cost: number;
-  /**
-   * setting = 后台覆盖中; registry = 用代码默认值;
-   * campaign = 被进行中的限时免费活动覆盖（此时 cost 恒为 0，改价不生效）
-   */
-  source: "setting" | "registry" | "campaign";
-  overridden: boolean;
-  /** 代码默认值, 供「回落」时对照 */
-  registryDefault: number;
-  /** 是否被进行中的限时免费活动覆盖 */ freeCampaign: boolean;
-  /** 免费活动是否只对未付费新用户生效 */ freeCampaignOnlyNewUsers: boolean;
 }
 
 /** 后台「能力与模型」中的能力管控列表行（GET /admin/capabilities） */

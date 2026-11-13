@@ -400,6 +400,7 @@ export function buildPriceTiers(
 export function toModelDraft(model: AdminChannelModelView): ModelDraft {
   return {
     modelKey: model.modelKey,
+    modelGroupKey: model.modelGroupKey ?? '',
     providerModelKey: model.providerModelKey,
     displayName: model.displayName,
     channelLabel: model.channelLabel,

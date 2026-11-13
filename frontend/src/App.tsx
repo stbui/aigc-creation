@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AdminProvider } from './context/AdminContext';
 import { CreditsProvider } from './context/CreditsContext';
+import { UploadLimitsProvider } from './context/UploadLimitsContext';
 import { AppLayout, RouteExperience } from './layout';
 import { LoginModalHost } from './components/LoginModal';
 import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
@@ -422,6 +423,7 @@ export default function App() {
     <AuthProvider>
       {/* CreditsProvider 依赖 useAuth 的 token, 故必须包在 AuthProvider 内 */}
       <CreditsProvider>
+        <UploadLimitsProvider>
       <BrowserRouter>
         {/* 登录弹窗宿主必须在 Router 之内: 卡片里的 useNavigate 依赖路由上下文。
             放在 AuthProvider 里 (Router 之外) 会让弹窗渲染即抛错、点登录毫无反应。 */}
@@ -457,6 +459,7 @@ export default function App() {
           </ErrorBoundary>
         </AdminProvider>
       </BrowserRouter>
+        </UploadLimitsProvider>
           </CreditsProvider>
 </AuthProvider>
   );

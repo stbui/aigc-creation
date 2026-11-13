@@ -242,6 +242,7 @@ export const WatermarkMaskEditor = memo(function WatermarkMaskEditor({
           />
           <div className="mask-layer" aria-hidden="true">
             {marks.map((mark) => {
+              if (mark.kind !== 'shape') return null;
               const selected = selectedId === mark.id;
               const index = regionIndex.get(mark.id);
               return (

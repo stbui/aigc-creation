@@ -170,7 +170,7 @@ function check(name, ok, detail = '') {
   const overLimit = await call('POST', '/generate', T, {
     projectId: project.id,
     capability: 'main_image',
-    logicalModelId: 'concurrency-probe',
+    modelKey: 'concurrency-probe',
     inputAssetIds: [asset.id],
     params: {},
   });

@@ -47,20 +47,20 @@ export function CreativeImageUploadSection({
   return (
     <div className="pk-section fc-upload-section">
       <div className="pk-upload-title-row">
-        <strong className="pk-section-title">上传参考图</strong>
+        <strong className="pk-section-title u-font-14">上传参考图</strong>
         <div className="pk-upload-title-actions">
-          <button type="button" className="pk-text-link" onClick={onOpenLibrary}>
+          <button type="button" className="pk-text-link u-font-12" onClick={onOpenLibrary}>
             从素材库导入
           </button>
           <button
             type="button"
-            className="pk-text-link"
+            className="pk-text-link u-font-12"
             title="扫码在手机上选择图片，接收后自动进入参考图位"
             onClick={onOpenMobile}
           >
             手机上传
           </button>
-          <span className="pk-upload-count">
+          <span className="pk-upload-count u-font-16">
             {images.length}/{maxImages}
           </span>
         </div>

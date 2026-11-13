@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Maximize2, Sparkles } from 'lucide-react';
 
 import { ToolImageDropzone } from './ToolImageDropzone';
+import { MAX_PRODUCT_NAME_LEN } from '../lib/constants';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 import type { UploadedImage } from '../hooks/useImageUpload';
-import { Button, Input, Select, Textarea } from '../ui';
+import { Input, Select, Textarea } from '../ui';
 
 export interface ProductFieldsGridProps {
   productName: string;
@@ -39,16 +40,16 @@ export function ProductFieldsGrid({
   required = true,
   showTitle = true,
 }: ProductFieldsGridProps) {
-  const mark = required ? <i className="pk-required-mark">*</i> : null;
+  const mark = required ? <i className="pk-required-mark u-font-14">*</i> : null;
   return (
     <div className="pk-section">
-      {showTitle && <strong className="pk-section-title">{mark}生成设置</strong>}
+      {showTitle && <strong className="pk-section-title u-font-14">{mark}生成设置</strong>}
       <div className="pk-form-grid">
         <label className="pk-field">
           <span className="pk-field-label">{mark}商品名称</span>
           <Input
             value={productName}
-            maxLength={100}
+            maxLength={MAX_PRODUCT_NAME_LEN}
             placeholder={required ? '* 请输入商品名称' : '请输入商品名称'}
             onChange={(event) => onProductNameChange(event.target.value)}
           />
@@ -57,7 +58,7 @@ export function ProductFieldsGrid({
           <span className="pk-field-label">品牌（选填）</span>
           <Input
             value={brand}
-            maxLength={100}
+            maxLength={MAX_PRODUCT_NAME_LEN}
             placeholder={required ? '请输入品牌（选填）' : '请输入品牌'}
             onChange={(event) => onBrandChange(event.target.value)}
           />
@@ -117,17 +118,17 @@ export function ProductDescriptionField({
   return (
     <div className="pk-section">
       <div className="pk-field-label-row">
-        <span className="pk-section-title">
-          <i className="pk-required-mark">*</i>商品描述
+        <span className="pk-section-title u-font-14">
+          <i className="pk-required-mark u-font-14">*</i>商品描述
         </span>
         <div className="pk-desc-actions">
-          <button type="button" className="pk-ai-btn" disabled={analyzing} onClick={onAnalyze}>
+          <button type="button" className="pk-ai-btn u-font-12 u-py-4 u-px-10" disabled={analyzing} onClick={onAnalyze}>
             <Sparkles size={12} />
             <span>{analyzing ? '分析中…' : 'AI分析'}</span>
           </button>
         </div>
       </div>
-      <div className="pk-desc-editor">
+      <div className={`pk-desc-editor${rows >= 5 ? ' pk-desc-editor-tall' : ''}`}>
         <Textarea
           rows={rows}
           maxLength={maxLength}
@@ -153,9 +154,8 @@ export interface ProductImageFieldProps {
   images: UploadedImage[];
   /** 当前模型能力合同允许的图片数（已与页面上限取较小值） */
   max: number;
-  maxMb: number;
   uploading: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
   onRemove: (id: string) => void;
   onOpenLibrary: () => void;
@@ -170,7 +170,6 @@ export interface ProductImageFieldProps {
 export function ProductImageField({
   images,
   max,
-  maxMb,
   uploading,
   fileInputRef,
   onFiles,
@@ -187,7 +186,6 @@ export function ProductImageField({
         title={title}
         images={images}
         max={max}
-        maxMb={maxMb}
         uploading={uploading}
         fileInputRef={fileInputRef}
         onFiles={onFiles}
@@ -197,7 +195,7 @@ export function ProductImageField({
         noun={noun}
       />
       {limitError && (
-        <p className="pk-image-limit-error" role="alert">
+        <p className="pk-image-limit-error u-font-12" role="alert">
           {limitError}
         </p>
       )}
@@ -234,7 +232,6 @@ export interface ProductFormSectionProps extends ProductImageFieldProps {
 export function ProductFormSection({
   images,
   max,
-  maxMb,
   uploading,
   fileInputRef,
   onFiles,
@@ -264,7 +261,6 @@ export function ProductFormSection({
       <ProductImageField
         images={images}
         max={max}
-        maxMb={maxMb}
         uploading={uploading}
         fileInputRef={fileInputRef}
         onFiles={onFiles}

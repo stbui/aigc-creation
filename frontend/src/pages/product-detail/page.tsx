@@ -30,7 +30,7 @@ import {
 import {
   DETAIL_CAPABILITY,
   removeDetailGeneration,
-  resolveModelId,
+  resolveModelKey,
   startDetailGeneration,
 } from './api';
 import {
@@ -170,7 +170,7 @@ export function ProductDetailPage() {
     showResults();
     try {
       const projectId = await ensureProject();
-      const logicalModelId = await resolveModelId(DETAIL_CAPABILITY);
+      const modelKey = await resolveModelKey(DETAIL_CAPABILITY);
       /*
        * 服务端按勾选模块把这次提交拆成 N 个任务 (每张各扣一次单价),
        * 每个任务携带自己的模块提示词并发执行,
@@ -180,7 +180,7 @@ export function ProductDetailPage() {
        */
       const input = {
         projectId,
-        logicalModelId,
+        modelKey,
         inputAssetIds: images.map((x) => x.id),
         productName,
         brand,

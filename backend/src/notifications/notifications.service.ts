@@ -1,23 +1,30 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import type { MessageTemplate } from '@prisma/client';
+import { EmailService } from '../channels/email/email.service';
+import { maskEmail } from '../channels/channel.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../common/settings.service';
 
 /**
- * 站内消息。
+ * 站内消息与业务邮件。
  *
- * 与邮件/短信并行的通道，不是替代：邮件会进垃圾箱、短信有成本，
- * 而「支付成功」「任务失败已退款」「会员即将到期」这类与钱相关的通知
- * 必须在站内能随时查到 —— 客服工单里最高频的一句是「我没收到通知」。
+ * 两个通道必须彼此隔离：
+ *   · 邮件会进垃圾箱、短信有成本，支付成功、积分退回、工单回复等消息仍要在
+ *     站内随时可查；
+ *   · 邮件服务商抖动、凭据过期或网络超时，不能阻断注册、支付、任务结算。
  *
- * 三条设计约束：
- *
- * 1. **通知失败不阻断主流程**。写通知是副作用，不是事务的一部分；
- *    数据库抖动时不能因为一条通知让支付回调失败（那会让渠道一直重试）。
- *    因此 `notify()` 吞异常只记日志。
- * 2. **模板表可不完整**。模板缺失时用代码内置兜底文案，
- *    「后台没配模板」不能让支付成功的通知消失。
- * 3. **变量替换走白名单**。`{orderNo}` 这类占位符只从调用方给的 vars 取，
- *    不接受任意表达式 —— 模板是后台可编辑内容，等于半个用户输入。
+ * 因此 `notify()` 分别捕获站内与邮件异常。模板表也不是必配项：邮件模板缺失
+ * 时回落到站内模板，再回落到调用方文案与代码内置文案。
  */
+
+export type EmailEvent =
+  | 'welcome'
+  | 'payment_success'
+  | 'credit_granted'
+  | 'ticket_reply'
+  | 'task_failed'
+  | 'membership_expired'
+  | 'broadcast';
 
 export interface NotifyInput {
   userId: string;
@@ -29,29 +36,70 @@ export interface NotifyInput {
   /** 兜底标题/正文（模板缺失时使用） */
   fallbackTitle: string;
   fallbackBody?: string;
-  /** 站内相对路径 */
+  /** 站内相对路径；邮件中会转换为绝对地址 */
   link?: string;
+  /** 需要同步发送业务邮件时指定事件；不传则只写站内消息 */
+  emailEvent?: EmailEvent;
+}
+
+export interface BroadcastResult {
+  sent: number;
+  users: number;
+  emailSent: number;
+  emailFailed: number;
+  emailSkipped: number;
 }
 
 /** 内置兜底文案。key = type */
 const FALLBACK: Record<string, { title: string; body: string; link?: string }> = {
-  payment_success: { title: '支付成功', body: '订单 {orderNo} 已支付，积分已到账。', link: '/orders' },
-  credit_granted: { title: '积分到账', body: '本次获得 {credits} 积分。', link: '/credits' },
+  welcome: {
+    title: '欢迎加入货觉AI',
+    body: '{name}，欢迎加入货觉AI。你可以从创建作品、生成图片或查看会员权益开始。',
+    link: '/',
+  },
+  payment_success: {
+    title: '支付成功',
+    body: '订单 {orderNo} 已支付，积分已到账。',
+    link: '/orders',
+  },
+  credit_granted: {
+    title: '积分到账',
+    body: '本次获得 {credits} 积分。',
+    link: '/credits',
+  },
   task_failed: {
     title: '生成失败',
     body: '任务「{capability}」执行失败，积分处理结果请查看任务账单。',
     link: '/works',
   },
-  membership_expired: { title: '会员已到期', body: '你的会员已于 {date} 到期。', link: '/packages' },
-  ticket_reply: { title: '工单有新回复', body: '工单 {ticketNo} 已由客服回复。', link: '/tickets' },
+  membership_expired: {
+    title: '会员已到期',
+    body: '你的会员已于 {date} 到期。',
+    link: '/packages',
+  },
+  ticket_reply: {
+    title: '工单有新回复',
+    body: '工单 {ticketNo} 已由客服回复。',
+    link: '/tickets',
+  },
   broadcast: { title: '平台公告', body: '', link: '/' },
+};
+
+const EMAIL_EVENT_SETTINGS: Record<EmailEvent, string> = {
+  welcome: 'email.events.welcome',
+  payment_success: 'email.events.paymentSuccess',
+  credit_granted: 'email.events.creditGranted',
+  ticket_reply: 'email.events.ticketReply',
+  task_failed: 'email.events.taskFailed',
+  membership_expired: 'email.events.membershipExpired',
+  broadcast: 'email.events.broadcast',
 };
 
 /** 把 `{name}` 替换成 vars 里的值；未提供的占位符原样保留（便于发现漏传） */
 export function renderTemplate(text: string, vars: Record<string, string | number> = {}): string {
-  return text.replace(/\{(\w+)\}/g, (m, key: string) => {
-    const v = vars[key];
-    return v === undefined || v === null ? m : String(v);
+  return text.replace(/\{(\w+)\}/g, (match, key: string) => {
+    const value = vars[key];
+    return value === undefined || value === null ? match : String(value);
   });
 }
 
@@ -59,38 +107,127 @@ export function renderTemplate(text: string, vars: Record<string, string | numbe
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+    private readonly settings: SettingsService,
+  ) {}
 
   /**
-   * 写一条站内消息。
+   * 写一条站内消息，并在指定 `emailEvent` 时同步发送业务邮件。
    *
-   * **永不抛异常**。调用点遍布支付回调、任务执行、调度任务，
-   * 任何一处因为它失败而回滚，都比"少一条通知"严重得多。
+   * **永不抛异常**。调用点遍布支付回调、任务执行、调度任务，任何一处因为它
+   * 失败而回滚，都比少一条通知严重得多。
    */
   async notify(input: NotifyInput): Promise<void> {
+    const code = input.templateCode ?? input.type;
+    const templates = await this.loadTemplates(code);
+
     try {
-      const code = input.templateCode ?? input.type;
-      const tpl = await this.prisma.messageTemplate.findFirst({
-        where: { code, channel: 'inapp', enabled: true },
-      });
-      const vars = input.vars ?? {};
-      const fallback = FALLBACK[input.type];
+      await this.writeInApp(input, templates.inapp);
+    } catch (error) {
+      this.logger.warn(
+        `站内通知写入失败 (${input.type} → ${input.userId}): ${(error as Error).message}`,
+      );
+    }
 
-      const title = renderTemplate(tpl?.subject || input.fallbackTitle || fallback?.title || '通知', vars);
-      const rawBody = tpl?.body || input.fallbackBody || fallback?.body || '';
-      const body = renderTemplate(rawBody, vars);
+    if (!input.emailEvent) return;
+    try {
+      await this.sendEmail(input, templates);
+    } catch (error) {
+      this.logger.warn(`业务邮件发送失败 (${input.type}): ${(error as Error).message}`);
+    }
+  }
 
-      await this.prisma.notification.create({
-        data: {
-          userId: input.userId,
-          type: input.type,
-          title: title.slice(0, 120),
-          body: body ? body.slice(0, 2000) : null,
-          link: input.link ?? fallback?.link ?? null,
-        },
+  private async writeInApp(input: NotifyInput, template?: MessageTemplate): Promise<void> {
+    const vars = input.vars ?? {};
+    const fallback = FALLBACK[input.type];
+    const title = renderTemplate(
+      template?.subject || input.fallbackTitle || fallback?.title || '通知',
+      vars,
+    );
+    const body = renderTemplate(
+      template?.body || input.fallbackBody || fallback?.body || '',
+      vars,
+    );
+
+    await this.prisma.notification.create({
+      data: {
+        userId: input.userId,
+        type: input.type,
+        title: title.slice(0, 120),
+        body: body ? body.slice(0, 2000) : null,
+        link: input.link ?? fallback?.link ?? null,
+      },
+    });
+  }
+
+  private async sendEmail(
+    input: NotifyInput,
+    templates: { inapp?: MessageTemplate; email?: MessageTemplate },
+  ): Promise<void> {
+    if (!input.emailEvent) return;
+
+    const [emailEnabled, eventEnabled] = await Promise.all([
+      this.settings.getBoolean('email.enabled'),
+      this.settings.getBoolean(EMAIL_EVENT_SETTINGS[input.emailEvent]),
+    ]);
+    if (!emailEnabled || !eventEnabled) return;
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { email: true, status: true },
+    });
+    if (!user || user.status !== 'active' || !user.email?.trim()) return;
+
+    const vars = input.vars ?? {};
+    const fallback = FALLBACK[input.type];
+    const subject = renderTemplate(
+      templates.email?.subject ||
+        templates.inapp?.subject ||
+        input.fallbackTitle ||
+        fallback?.title ||
+        '通知',
+      vars,
+    );
+    const rawBody = renderTemplate(
+      templates.email?.body ||
+        templates.inapp?.body ||
+        input.fallbackBody ||
+        fallback?.body ||
+        subject,
+      vars,
+    );
+    const link = this.absoluteLink(input.link ?? fallback?.link);
+    const text = link ? `${rawBody}\n\n查看详情：\n${link}` : rawBody;
+
+    const result = await this.email.sendNotificationEmail({
+      to: user.email,
+      subject,
+      text,
+    });
+    if (!result.delivered) {
+      this.logger.warn(
+        `业务邮件未真实投递 (${input.type} → ${maskEmail(user.email)}): ${result.error ?? result.provider}`,
+      );
+    }
+  }
+
+  private async loadTemplates(
+    code: string,
+  ): Promise<{ inapp?: MessageTemplate; email?: MessageTemplate }> {
+    try {
+      const rows = await this.prisma.messageTemplate.findMany({
+        where: { code, channel: { in: ['inapp', 'email'] }, enabled: true },
       });
-    } catch (e) {
-      this.logger.warn(`站内通知写入失败 (${input.type} → ${input.userId}): ${(e as Error).message}`);
+      return {
+        inapp: rows.find((row) => row.channel === 'inapp'),
+        email: rows.find((row) => row.channel === 'email'),
+      };
+    } catch (error) {
+      // 模板读取失败时继续用调用方文案与内置兜底，不能因此丢掉通知。
+      this.logger.warn(`消息模板读取失败 (${code}): ${(error as Error).message}`);
+      return {};
     }
   }
 
@@ -108,9 +245,9 @@ export class NotificationsService {
 
   /** 标记单条已读（只能标自己的） */
   async markRead(userId: string, id: string) {
-    const n = await this.prisma.notification.findFirst({ where: { id, userId } });
-    if (!n) return { id, read: false };
-    if (!n.readAt) {
+    const notification = await this.prisma.notification.findFirst({ where: { id, userId } });
+    if (!notification) return { id, read: false };
+    if (!notification.readAt) {
       await this.prisma.notification.update({ where: { id }, data: { readAt: new Date() } });
     }
     const unread = await this.prisma.notification.count({ where: { userId, readAt: null } });
@@ -119,50 +256,111 @@ export class NotificationsService {
 
   /** 全部标为已读 */
   async markAllRead(userId: string) {
-    const r = await this.prisma.notification.updateMany({
+    const result = await this.prisma.notification.updateMany({
       where: { userId, readAt: null },
       data: { readAt: new Date() },
     });
-    return { updated: r.count, unread: 0 };
+    return { updated: result.count, unread: 0 };
   }
 
   /**
    * 后台：全站广播。
    *
-   * 用 `createMany` 一次性写入；用户量大时分批（SQLite 单条 INSERT 上限
-   * 受变量数限制，1000 一批足够安全）。
+   * 站内消息按 500 人一批写入；邮件逐人发送，绝不能把多个收件人塞进一封邮件
+   * （既泄露地址，也会让退订与退信归因失真）。两个通道分别容错。
    */
-  async broadcast(title: string, body: string, link?: string) {
+  async broadcast(
+    title: string,
+    body: string,
+    link?: string,
+    sendEmail = false,
+  ): Promise<BroadcastResult> {
     const users = await this.prisma.user.findMany({
       where: { status: 'active' },
-      select: { id: true },
+      select: { id: true, email: true, name: true },
     });
-    const chunks: string[][] = [];
-    for (let i = 0; i < users.length; i += 500) {
-      chunks.push(users.slice(i, i + 500).map((u) => u.id));
-    }
+
     let sent = 0;
-    for (const ids of chunks) {
-      const r = await this.prisma.notification.createMany({
-        data: ids.map((userId) => ({
-          userId,
-          type: 'broadcast',
-          title: title.slice(0, 120),
-          body: body.slice(0, 2000),
-          link: link ?? null,
-        })),
-      });
-      sent += r.count;
+    for (let i = 0; i < users.length; i += 500) {
+      const chunk = users.slice(i, i + 500);
+      try {
+        const result = await this.prisma.notification.createMany({
+          data: chunk.map((user) => ({
+            userId: user.id,
+            type: 'broadcast',
+            title: title.slice(0, 120),
+            body: body.slice(0, 2000),
+            link: link ?? null,
+          })),
+        });
+        sent += result.count;
+      } catch (error) {
+        this.logger.warn(`站内广播写入失败，批次 ${i / 500 + 1}: ${(error as Error).message}`);
+      }
     }
-    return { sent, users: users.length };
+
+    const result: BroadcastResult = {
+      sent,
+      users: users.length,
+      emailSent: 0,
+      emailFailed: 0,
+      emailSkipped: 0,
+    };
+    if (!sendEmail) return result;
+
+    const [emailEnabled, eventEnabled, template] = await Promise.all([
+      this.settings.getBoolean('email.enabled'),
+      this.settings.getBoolean(EMAIL_EVENT_SETTINGS.broadcast),
+      this.prisma.messageTemplate
+        .findFirst({ where: { code: 'broadcast', channel: 'email', enabled: true } })
+        .catch(() => null),
+    ]);
+    if (!emailEnabled || !eventEnabled) {
+      result.emailSkipped = users.length;
+      return result;
+    }
+
+    const absoluteLink = this.absoluteLink(link);
+    for (const user of users) {
+      if (!user.email?.trim()) {
+        result.emailSkipped += 1;
+        continue;
+      }
+      try {
+        const vars = { title, body, name: user.name || '用户' };
+        const subject = renderTemplate(template?.subject || title, vars);
+        const renderedBody = renderTemplate(template?.body || body, vars);
+        const text = absoluteLink
+          ? `${renderedBody}\n\n查看详情：\n${absoluteLink}`
+          : renderedBody;
+        const delivery = await this.email.sendNotificationEmail({
+          to: user.email,
+          subject,
+          text,
+        });
+        if (delivery.delivered) {
+          result.emailSent += 1;
+        } else {
+          result.emailFailed += 1;
+        }
+      } catch (error) {
+        result.emailFailed += 1;
+        this.logger.warn(
+          `广播邮件发送失败 (${maskEmail(user.email)}): ${(error as Error).message}`,
+        );
+      }
+    }
+    return result;
   }
 
   /** 后台：模板列表 */
   async templates() {
-    return this.prisma.messageTemplate.findMany({ orderBy: [{ channel: 'asc' }, { code: 'asc' }] });
+    return this.prisma.messageTemplate.findMany({
+      orderBy: [{ channel: 'asc' }, { code: 'asc' }],
+    });
   }
 
-  /** 后台：新建或按 code 更新模板 */
+  /** 后台：按 code + channel 新建或更新模板；同一编码可为站内与邮件各存一份 */
   async upsertTemplate(input: {
     code: string;
     channel: string;
@@ -170,21 +368,50 @@ export class NotificationsService {
     body: string;
     enabled?: boolean;
   }) {
+    if (
+      input.channel === 'email' &&
+      input.code === 'email_verification' &&
+      !input.body.includes('{{code}}')
+    ) {
+      throw new BadRequestException(
+        '邮箱验证码模板正文必须保留 {{code}} 变量，否则用户无法看到验证码',
+      );
+    }
+    if (
+      input.channel === 'email' &&
+      input.code === 'password_reset' &&
+      !input.body.includes('{{resetUrl}}')
+    ) {
+      throw new BadRequestException(
+        '找回密码模板正文必须保留 {{resetUrl}} 变量，否则用户无法打开重置链接',
+      );
+    }
+
+    const codeChannel = { code: input.code, channel: input.channel };
     return this.prisma.messageTemplate.upsert({
-      where: { code: input.code },
+      where: { code_channel: codeChannel },
       update: {
-        channel: input.channel,
         subject: input.subject ?? null,
         body: input.body,
         enabled: input.enabled ?? true,
       },
       create: {
-        code: input.code,
-        channel: input.channel,
+        ...codeChannel,
         subject: input.subject ?? null,
         body: input.body,
         enabled: input.enabled ?? true,
       },
     });
+  }
+
+  private absoluteLink(link?: string | null): string | null {
+    const value = String(link ?? '').trim();
+    if (!value) return null;
+    try {
+      return new URL(value).toString();
+    } catch {
+      const base = (process.env.WEB_BASE_URL || 'http://localhost:5100').replace(/\/+$/, '');
+      return `${base}${value.startsWith('/') ? value : `/${value}`}`;
+    }
   }
 }

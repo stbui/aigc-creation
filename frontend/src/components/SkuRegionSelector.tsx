@@ -120,7 +120,7 @@ export function SkuRegionSelector({ url, alt = 'SKU 模板图', regions, max = 3
         </span>
         <button
           type="button"
-          className="pk-text-link product-sku-region-clear"
+          className="pk-text-link product-sku-region-clear u-font-12"
           disabled={regions.length === 0}
           onClick={() => onChange([])}
         >

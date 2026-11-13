@@ -91,7 +91,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly groups: UserGroupService,
     private readonly health: RouteHealthService,
     private readonly billing: BillingService,
-    /** 后台能力覆盖价：换线重建账单必须与首次建单同一套定价 */
+    /** 限时免费判定：换线重建账单必须与首次建单同一套优惠口径 */
     private readonly price: CreditPriceService,
     private readonly channels: ChannelRuntimeService,
     private readonly slots: ChannelSlotService,
@@ -390,12 +390,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
           await this.uncertainOwned(task.id, '上游已受理并可能已产出，但结果未能落盘');
           return;
         }
-        const switched = await this.switchRoute(fresh, params, inputIds, runAttempts.map((item) => item.routeId));
+        const switched = await this.switchRoute(fresh, params, inputIds, runAttempts.map((item) => item.channelModelId));
         if (switched !== 'continue') return;
         continue;
       }
       if (begin.action === 'switch') {
-        const switched = await this.switchRoute(fresh, params, inputIds, runAttempts.map((item) => item.routeId));
+        const switched = await this.switchRoute(fresh, params, inputIds, runAttempts.map((item) => item.channelModelId));
         if (switched !== 'continue') return;
         continue;
       }
@@ -421,18 +421,13 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     inputIds: string[],
     tried: Set<string>,
   ): Promise<RoutedModel | null> {
-    if (!task.logicalModelId) return null;
-    const model = await this.router.findModel(task.logicalModelId);
-    if (!model || !model.enabled || model.archivedAt !== null) return null;
+    if (!task.modelKey) return null;
     const def = getCapability(task.capability);
     if (!def) return null;
-    const intent = restrictIntentToSpec(
-      model.productSpec,
-      def.model.intent(params, { image: inputIds.length, video: 0 }),
-    );
+    const intent = def.model.intent(params, { image: inputIds.length, video: 0 });
     const access = await this.groups.accessForUser(task.ownerId);
     try {
-      return await this.router.resolve(access, task.logicalModelId, intent, tried);
+      return await this.router.resolve(access, task.capability, task.modelKey, intent, tried);
     } catch (error) {
       this.log.warn(`任务 ${task.id} 选路失败: ${(error as Error).message}`);
       return null;
@@ -444,8 +439,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     const hasMask = this.requests.maskAssetId(params) !== '';
     await this.failOwned(task.id, {
       errorCode: hasMask ? TASK_ERROR.maskUnsupported : TASK_ERROR.noRoute,
-      errorMessage: !task.logicalModelId
-        ? '任务未绑定前台模型（改造前创建的任务无法继续执行）'
+      errorMessage: !task.modelKey
+        ? '任务未绑定模型分组（改造前创建的任务无法继续执行）'
         : hasMask
           ? '当前没有支持遮罩重绘的可用线路'
           : '当前没有可承接该请求的模型线路',
@@ -455,11 +450,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private routeSnapshotDiffers(task: GenerationTask, routed: RoutedModel): boolean {
-    return (
-      task.logicalModelRevisionId !== routed.revisionId ||
-      task.routeId !== routed.route.id ||
-      task.channelModelId !== routed.channelModel.id
-    );
+    return task.channelModelId !== routed.channelModel.id || task.channelId !== routed.channelModel.channelId;
   }
 
   private async startAttempt(
@@ -474,9 +465,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
             taskId: task.id,
             routeRun: task.routeRun,
             attemptNumber,
-            logicalModelId: routed.logicalModel.id,
-            logicalModelRevisionId: routed.revisionId,
-            routeId: routed.route.id,
+            capabilityId: task.capability,
+            modelKey: routed.modelKey,
             channelModelId: routed.channelModel.id,
             channelId: routed.channelModel.channelId,
           },
@@ -485,9 +475,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         const updated = await tx.generationTask.updateMany({
           where: { id: task.id, status: 'running', leaseOwner: this.owner },
           data: {
-            logicalModelRevisionId: routed.revisionId,
-            routeId: routed.route.id,
+            modelKey: routed.modelKey,
             channelModelId: routed.channelModel.id,
+            channelId: routed.channelModel.channelId,
             attempts: { increment: 1 },
             stage: 'dispatch',
             progress: 10,
@@ -546,12 +536,10 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     let freeCampaignId: string | undefined;
     try {
       /*
-       * 换线重建账单必须与首次建单走同一套定价：后台覆盖价在这里同样要生效，
-       * 否则「首次按 77 扣、换线后又按线路原价 5 扣」，用户会看到金额莫名变小，
-       * 财务上则是同一任务两笔口径不同的账。
+       * 换线重建账单必须与首次建单走同一套能力级定价，不能回落到线路价格档，
+       * 否则同一任务会出现两笔口径不同的账。
        */
-      const overrideCost = await this.price.resolveOverride(task.capability);
-      draft = this.billing.buildDraft(access, routed, overrideCost);
+      draft = this.billing.buildDraft(access, routed);
       if (task.capability === 'multi_fusion') {
         draft = scaleMultiFusionDraft(draft, safeJson<Record<string, unknown>>(task.params, {}));
       }
@@ -615,9 +603,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
               taskId: task.id,
               routeRun: task.routeRun,
               attemptNumber,
-              logicalModelId: routed.logicalModel.id,
-              logicalModelRevisionId: routed.revisionId,
-              routeId: routed.route.id,
+              capabilityId: task.capability,
+              modelKey: routed.modelKey,
               channelModelId: routed.channelModel.id,
               channelId: routed.channelModel.channelId,
             },
@@ -631,9 +618,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
               billingOrderId: swapped.order.id,
             },
             data: {
-              logicalModelRevisionId: routed.revisionId,
-              routeId: routed.route.id,
+              modelKey: routed.modelKey,
               channelModelId: routed.channelModel.id,
+              channelId: routed.channelModel.channelId,
               attempts: { increment: 1 },
               stage: 'dispatch',
               progress: 10,
@@ -700,8 +687,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         capability: task.capability,
         params,
         inputAssetIds: inputIds,
-        logicalModelId: task.logicalModelId ?? '',
-        routeId: attempt.routeId,
+        channelModelId: attempt.channelModelId,
         providerModelKey: channel.providerModelKey,
       });
       request = built.request;
@@ -716,7 +702,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       });
       if (unavailable) {
         const routes = await this.attempts.listRun(task.id, task.routeRun);
-        return this.switchRoute(task, params, inputIds, routes.map((item) => item.routeId));
+        return this.switchRoute(task, params, inputIds, routes.map((item) => item.channelModelId));
       }
       await this.failOwned(task.id, {
         errorCode: TASK_ERROR.generationFailed,
@@ -734,7 +720,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         rejectedNoJob: true,
       });
       const routes = await this.attempts.listRun(task.id, task.routeRun);
-      return this.switchRoute(task, params, inputIds, routes.map((item) => item.routeId));
+      return this.switchRoute(task, params, inputIds, routes.map((item) => item.channelModelId));
     }
 
     // 渠道准备与并发排队期间后台可能已终止任务；发送前必须再做一次租约闸门。
@@ -809,7 +795,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         task,
         params,
         inputIds,
-        routes.map((item) => item.routeId),
+        routes.map((item) => item.channelModelId),
       );
     }
     await this.uncertainOwned(
@@ -865,8 +851,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
         capability: task.capability,
         params,
         inputAssetIds: inputIds,
-        logicalModelId: task.logicalModelId ?? '',
-        routeId: attempt.routeId,
+        channelModelId: attempt.channelModelId,
         providerModelKey: channel.providerModelKey,
       });
       request = built.request;
@@ -986,7 +971,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       {
         channelId: attempt.channelId,
         channelModelId: attempt.channelModelId,
-        routeId: attempt.routeId,
+        routeId: attempt.id,
       },
       retryAfter,
     );

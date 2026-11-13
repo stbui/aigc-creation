@@ -114,12 +114,10 @@
   border-radius: var(--radius-control);
   background: var(--warn-bg);
   color: var(--warn-text);
-  font-size: 12px;
   line-height: 18px;
 }
 
 .pk-section-title {
-  font-size: 14px;
   font-weight: 700;
   color: var(--wb-text);
   line-height: 13px;
@@ -127,7 +125,6 @@
 
 .pk-required-mark {
   font-style: normal;
-  font-size: 14px;
   font-weight: 700;
   color: var(--danger-ref);
   margin-right: 3px;
@@ -150,7 +147,6 @@
 
 .pk-text-link {
   position: relative;
-  font-size: 12px;
   color: var(--text-body);
   background: none;
   border: none;
@@ -181,7 +177,6 @@
 }
 
 .pk-upload-count {
-  font-size: 16px;
   color: var(--text-strong);
   line-height: 24px;
 }
@@ -242,14 +237,12 @@
 }
 
 .pk-upload-prompt span {
-  font-size: 14px;
   line-height: 22px;
   color: var(--text-strong);
   text-align: center;
 }
 
 .pk-upload-prompt small {
-  font-size: 12px;
   line-height: 20px;
   color: var(--text-desc);
   text-align: center;
@@ -379,12 +372,10 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 12px;
   color: var(--tool-text-brand-2);
   background: var(--card-bg);
   border: 1px solid var(--tool-border-brand-2);
   border-radius: var(--radius-control);
-  padding: 4px 10px;
   flex-shrink: 0;
   white-space: nowrap;
   cursor: pointer;
@@ -477,7 +468,6 @@
 }
 
 .pk-count-label {
-  font-size: 14px;
   color: var(--text-muted);
   line-height: 13px;
 }
@@ -509,7 +499,6 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-size: 12px;
   /* 参考站实拍 rgb(104,113,130) ≈ --text-muted #667085 (差 2 个色阶, 肉眼不可辨, 沿用 token) */
   color: var(--text-muted);
 }
@@ -521,14 +510,12 @@
 /* 参考站 .image-output-settings-summary-label 实拍 rgb(69,76,89), 比 --text-body #4e5969 更深一档 */
 
 .pk-settings-label {
-  font-size: 12px;
   font-weight: 600;
   color: var(--mif-settings-summary-label);
   margin-right: auto;
 }
 
 .pk-settings-chip {
-  font-size: 12px;
   /* 参考站 .image-output-settings-chip 实拍 rgb(72,80,94) + radius 5px
      (token --text-body #4e5969 / --radius-tag 4px 各差一档) @2026-10-19 */
   color: var(--mif-settings-chip);
@@ -580,7 +567,6 @@
 
 .pk-settings-popover-head h2 {
   margin: 0;
-  font-size: 16px;
   line-height: 20px;
   color: var(--text-2);
   font-weight: 700;
@@ -676,7 +662,6 @@
   border-radius: var(--radius-control);
   border: 1px solid var(--border);
   background: var(--card-bg);
-  padding: 8px;
   display: grid;
   gap: 4px;
   align-content: center;
@@ -692,7 +677,6 @@
 }
 
 .pk-resolution-option span {
-  font-size: 12px;
   line-height: 16px;
   /* 参考站 .image-output-resolution-option span: rgb(124,132,147)
      (此前继承 strong 的 --text-body, 副文与主文同色, 卡片看起来是一整块) @2026-10-21 */
@@ -760,7 +744,6 @@
 }
 
 .pk-primary-btn strong {
-  font-size: 14px;
   font-weight: 700;
   line-height: 22px;
 }
@@ -1020,8 +1003,6 @@
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-tag);
-  padding: 8px 12px;
-  font-size: 14px;
   font-family: inherit;
   line-height: 22px;
   color: var(--wb-text);
@@ -1192,7 +1173,6 @@
     justify-content: center;
     gap: 18px;
     padding-top: 12px;
-    font-size: 12px;
     color: var(--tool-text-3);
   }
 
@@ -1221,7 +1201,6 @@
   margin: 0;
   padding: 6px 10px;
   border-radius: var(--radius-control);
-  font-size: 12px;
   line-height: 20px;
 }
 
@@ -1236,7 +1215,6 @@
 /* 主按钮积分角标 + 提交区提示/描述 */
 
 .pk-primary-credit {
-  font-size: 12px;
   font-weight: 500;
   opacity: 0.85;
   margin-left: 2px;
@@ -1244,14 +1222,12 @@
 }
 
 .tool-submit-hint {
-  font-size: 12px;
   line-height: 18px;
   color: var(--text-desc);
   margin: 0;
 }
 
 .tool-submit-desc {
-  font-size: 12px;
   line-height: 18px;
   color: var(--text-desc);
   text-align: center;
@@ -1469,7 +1445,6 @@
 .pk-result-generating-tip {
   margin: 0;
   text-align: center;
-  font-size: 12px;
   line-height: 20px;
   color: var(--text-desc);
 }

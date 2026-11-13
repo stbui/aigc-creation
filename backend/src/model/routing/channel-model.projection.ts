@@ -1,7 +1,7 @@
 /**
  * 渠道模型数据库行 → 运行期快照投影。
  *
- * 路由目录（`RouteCatalogService`）与中转计费（`src/model/proxy/**`）都按
+ * 能力目录（`CapabilityCatalogService`）与中转计费（`src/model/proxy/**`）都按
  * 这一份规则把 `ChannelModel` + 价格档转成 `CachedChannelModel`：两处各写一次
  * 的结果就是「目录价」与「中转账单」在改价后对不上，且很难判断哪一边是旧的。
  *
@@ -55,9 +55,15 @@ export function projectCachedChannelModel(
   return {
     id: row.id,
     channelId: row.channelId,
+    channelName: '',
     modelKey: row.modelKey,
+    modelGroupKey: (row as { modelGroupKey?: string }).modelGroupKey ?? '',
     providerModelKey: row.providerModelKey,
     displayName: row.displayName,
+    icon: (row as { icon?: string }).icon ?? '',
+    sortOrder: (row as { sortOrder?: number }).sortOrder ?? 0,
+    enabled: (row as { enabled?: boolean }).enabled ?? true,
+    channelEnabled: true,
     capability: row.capability,
     protocol: row.protocol,
     priceCurrency: row.priceCurrency,

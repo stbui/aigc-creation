@@ -8,12 +8,8 @@
 
 /** 上传区 (拖拽 / 粘贴 / 素材库 / 手机上传入口) */
 export { ToolImageDropzone } from '../../components/ToolImageDropzone';
-/** 底部提交栏 (生成按钮 + 价签 + 高级设置插槽) */
-export { ToolSubmitBar } from '../../components/ToolSubmitBar';
-/** 高级设置浮层 (比例 + 画质) */
-export { ToolSettingsPopover } from '../../components/ToolSettingsPopover';
-/** 模型选择 */
-export { ModelPicker } from '../../components/ModelPicker';
+/** 底部提交栏 (高级设置 + 模型选择 + 生成按钮 + 价签)，商品主图 / 商品详情同款 */
+export { ToolGenerationSubmitBar } from '../../components/ToolGenerationSubmitBar';
 /** 素材库选择弹窗 */
 export { AssetLibraryModal } from '../../components/AssetLibraryModal';
 /** 手机扫码上传弹窗 */

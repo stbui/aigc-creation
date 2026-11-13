@@ -16,5 +16,5 @@ export { generateApi, newIdempotencyKey, promptToolsApi } from '../../lib/api';
 export { assetsApi, assetSrc, toAbsoluteUrl } from '../../lib/api';
 export type { Asset } from '../../types/api';
 
-/** 前台模型目录数据层: 建任务必须解析出真实模型与 `logicalModelId` */
-export { resolveModel, resolveModelId } from '../../lib/models';
+/** 前台模型目录数据层: 建任务必须解析出真实模型与 `modelKey` */
+export { resolveModel, resolveModelKey } from '../../lib/models';

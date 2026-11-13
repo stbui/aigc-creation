@@ -436,6 +436,7 @@ export class TaskLifecycleService {
           ? `任务「${capabilityName}」失败，${credits} 积分已退回。`
           : `任务「${capabilityName}」失败，未增加可用积分，过期部分已作废。`,
         link: '/works',
+        emailEvent: 'task_failed',
       });
     } catch (error) {
       this.log.warn(`任务失败通知发送失败 task=${taskId}: ${(error as Error).message}`);

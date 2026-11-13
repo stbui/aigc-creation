@@ -104,8 +104,8 @@ test.describe('后台高频动线', () => {
       ['/admin/products?status=active', '商品管理', ['状态：在售']],
       [
         '/admin/payments?tab=reconciliation&providerId=alipay&status=failed&billDate=2026-10-31',
-        '支付充值',
-        ['渠道：支付宝', '状态：失败', '账单日：2026-10-31'],
+        '支付配置',
+        ['收款来源：支付宝', '状态：失败', '账单日：2026-10-31'],
       ],
       ['/admin/capabilities?q=image&runtime=unavailable', '能力与模型', ['关键词：image', '运行结论：暂不可用']],
     ] as const;
@@ -208,13 +208,14 @@ test.describe('后台高频动线', () => {
     await expect(page.getByTestId('admin-capability-card').first()).toBeVisible();
   });
 
-  test('核心宽表与渠道工作区在 1440px 下无需横向滚动', async ({ page }) => {
+  test('核心宽表与商品工作区在 1440px 下无需横向滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     for (const [path, heading, scrollTestId, rowTestId] of [
       ['/admin/orders', '订单管理', 'admin-table-scroll', 'admin-table-row'],
       ['/admin/tasks', '任务监控', 'admin-table-scroll', 'admin-table-row'],
       ['/admin/model-calls', '调用记录', 'admin-table-scroll', 'admin-table-row'],
-      // 模型商品默认是商品台账；供应商视图仍是左列供应商 + 右侧商品详情的主从布局。
+      // 模型商品的默认台账与供应商主从视图都要在 1440px 内容区内完整展示。
+      ['/admin/channels', '模型商品', 'admin-all-models', 'admin-table-row'],
       ['/admin/channels?view=channels', '模型商品', 'admin-channel-workspace', 'admin-channel-item'],
     ] as const) {
       await page.goto(`${UI}${path}`);
@@ -247,7 +248,7 @@ test.describe('后台高频动线', () => {
     await inviter.fill(String(Number(original || '0') + 1));
     await expect(page.getByRole('button', { name: '放弃变更', exact: true })).toBeVisible();
 
-    await navigateViaSider(page, '运营', '用户管理');
+    await navigateViaSider(page, '运营与内容', '用户管理');
     const dialog = page.getByRole('dialog').filter({ hasText: '有未保存的变更' });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: '留下继续编辑' }).click();
@@ -255,7 +256,7 @@ test.describe('后台高频动线', () => {
 
     await page.getByRole('button', { name: '放弃变更', exact: true }).click();
     await expect(inviter).toHaveValue(original);
-    await navigateViaSider(page, '运营', '用户管理');
+    await navigateViaSider(page, '运营与内容', '用户管理');
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
   });
 
@@ -292,7 +293,7 @@ test.describe('后台高频动线', () => {
     const cases = [
       ['/admin/coupons', '优惠券', '新建优惠券', '券名称', '新建优惠券'],
       ['/admin/campaigns', '限时活动', '新建活动', '活动名称', '新建活动'],
-      ['/admin/notifications', '站内消息', '新建模板', '模板编码', '新建消息模板'],
+      ['/admin/notifications', '消息通知', '新建模板', '模板编码', '新建消息模板'],
     ] as const;
 
     for (const [path, heading, openButton, fieldLabel, drawerTitle] of cases) {
@@ -383,7 +384,7 @@ test.describe('后台高频动线', () => {
     await expect(saveBar.getByRole('textbox', { name: '变更原因' })).toHaveCount(0);
     await expect(saveButton).toBeEnabled();
 
-    await navigateViaSider(page, '运营', '用户管理');
+    await navigateViaSider(page, '运营与内容', '用户管理');
     await expect(page.getByText('有未保存的变更')).toBeVisible();
     await page.getByRole('button', { name: '留下继续编辑' }).click();
     await expect(page).toHaveURL(/\/admin\/roles/);

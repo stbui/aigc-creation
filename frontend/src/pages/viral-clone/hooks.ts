@@ -12,13 +12,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
-import { useAssetLibrary } from '../../hooks';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import type { UploadedImage } from '../../hooks/useImageUpload';
 import { usePasteUpload } from '../../hooks/usePasteUpload';
 import { useProject } from '../../hooks/useProject';
+import { useTargetedAssetPicker } from '../../hooks/useTargetedAssetPicker';
 import { runtimeOf } from '../../lib/constants';
-import type { Asset, MobileUploadAsset } from '../../types/api';
 import { assetsApi, assetSrc, toAbsoluteUrl } from './api';
 import {
   MAX_IMAGE_BYTES,
@@ -61,8 +60,6 @@ export { useModelQuoteCreditLabel } from '../../hooks/useModelQuoteCreditLabel';
 export { useGenerationSettings } from '../../hooks/useGenerationSettings';
 /** 删除单张作品（确认框 + 接口 + 本地摘除） */
 export { useDeleteGalleryItem } from '../../hooks/useDeleteGalleryItem';
-/** 素材库取数 */
-export { useAssetLibrary };
 /** 登录态: 判断是否已登录 (访客点提交先走登录弹窗) */
 export { useAuth } from '../../context/AuthContext';
 /** 余额变更通知: 扣费 / 退款后通知积分上下文刷新 */
@@ -91,11 +88,6 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [reference, setReference] = useState<UploadedImage | null>(null);
   const [uploading, setUploading] = useState(false);
-  /** 素材库双通道: 本次导入写入商品图还是参考图（由触发按钮决定） */
-  const [libraryTarget, setLibraryTarget] = useState<AssetSlot>('product');
-  /** 手机上传双通道: 与素材库同理, 由触发按钮决定回填到哪一栏 */
-  const [mobileTarget, setMobileTarget] = useState<AssetSlot>('product');
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   // 浏览器扩展「图片复刻」直接带参考图进来（地址参数由 hook 自行清理）
   useCollectedReferenceAsset(setReference);
@@ -179,13 +171,11 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
   // 两个拖拽高亮态均已下沉到 ToolImageDropzone 内部, 页面不再持有
   usePasteUpload(uploadFiles);
 
-  // ── 素材库导入 (商品图 / 参考图共用) ──
-
-  /** 返回 false = 拒绝本次选择(弹窗保持打开, 让用户改选) */
-  const pickFromLibrary = useCallback(
-    (asset: Asset): boolean => {
+  // ── 素材库 / 手机上传 (商品图 / 参考图共用) ──
+  const { libraryTarget, library, openLibraryFor, mobile } = useTargetedAssetPicker<AssetSlot>({
+    onLibraryPick: (target, asset) => {
       const name = asset.sourceUrl.split('/').pop() ?? '素材';
-      if (libraryTarget === 'reference') {
+      if (target === 'reference') {
         setReference({ id: asset.id, url: assetSrc(asset) ?? '', name });
         return true;
       }
@@ -200,44 +190,14 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
       setImages((prev) => [...prev, { id: asset.id, url: assetSrc(asset) ?? '', name }]);
       return true;
     },
-    [imageMax, images, libraryTarget, message, modelImageMax],
-  );
-
-  const {
-    open: libraryOpen,
-    loading: libraryLoading,
-    items: libraryItems,
-    error: libraryError,
-    openLibrary,
-    closeLibrary,
-    pick,
-  } = useAssetLibrary(pickFromLibrary);
-
-  const openLibraryFor = useCallback(
-    (target: AssetSlot) => {
-      setLibraryTarget(target);
-      openLibrary();
-    },
-    [openLibrary],
-  );
-
-  // ── 手机上传 (与素材库同一套双通道语义) ──
-  const openMobileFor = useCallback((target: AssetSlot) => {
-    setMobileTarget(target);
-    setMobileOpen(true);
-  }, []);
-
-  /** 手机端传回图片 → 按本次触发按钮决定写入商品图还是参考图。 */
-  const addMobileAssets = useCallback(
-    (assets: MobileUploadAsset[]) => {
-      const toAsset = (a: MobileUploadAsset) => ({
+    onMobileReceive: (target, assets) => {
+      const toAsset = (a: typeof assets[number]) => ({
         id: a.id,
         url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
         name: a.filename,
       });
-      if (mobileTarget === 'reference') {
+      if (target === 'reference') {
         const first = assets[0];
-        setMobileOpen(false);
         if (!first) return;
         if (assets.length > 1) message.warning('参考图位只有 1 个，仅取第 1 张');
         setReference(toAsset(first));
@@ -248,7 +208,6 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
       const room = imageMax - images.length;
       if (room <= 0) {
         message.warning(`商品图位已满 (${imageMax} 张), 手机上传的图片未加入`);
-        setMobileOpen(false);
         return;
       }
       const fresh = assets.filter((a) => !images.some((x) => x.id === a.id));
@@ -257,13 +216,9 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
         message.warning(`商品图位只剩 ${room} 个, ${fresh.length - accepted.length} 张未加入`);
       }
       setImages((prev) => [...prev, ...accepted.map(toAsset)]);
-      setMobileOpen(false);
       if (accepted.length > 0) message.success(`已从手机接收 ${accepted.length} 张图片`);
     },
-    [imageMax, images, message, mobileTarget],
-  );
-
-  const closeMobile = useCallback(() => setMobileOpen(false), []);
+  });
 
   return {
     images,
@@ -279,21 +234,9 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
     removeReferenceAsset,
     /** 素材库可选项上限: 参考图是单张位, 只允许选 1 张 */
     libraryMaxSelectable: libraryTarget === 'reference' ? 1 : imageMax,
-    library: {
-      open: libraryOpen,
-      loading: libraryLoading,
-      items: libraryItems,
-      error: libraryError,
-      closeLibrary,
-      pick,
-    },
+    library,
     openLibraryFor,
-    mobile: {
-      open: mobileOpen,
-      openMobile: openMobileFor,
-      addAssets: addMobileAssets,
-      closeMobile,
-    },
+    mobile,
   };
 }
 

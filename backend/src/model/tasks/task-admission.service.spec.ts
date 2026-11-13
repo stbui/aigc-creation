@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { TaskAdmissionService } from './task-admission.service';
+import { AppError } from '../../common/app.exception';
 
 /**
  * 任务准入的素材归属边界。
@@ -9,7 +10,7 @@ import { TaskAdmissionService } from './task-admission.service';
  * 自己其他项目中的素材，同时仍然拒绝不属于当前用户的素材。
  */
 describe('TaskAdmissionService 输入素材归属', () => {
-  function setup(assets: Array<{ id: string }>, model: Record<string, unknown> | null = null) {
+  function setup(assets: Array<{ id: string }>, routed: Record<string, unknown> | null = null) {
     const prisma = {
       generationTask: { findUnique: vi.fn().mockResolvedValue(null) },
       project: {
@@ -23,8 +24,9 @@ describe('TaskAdmissionService 输入素材归属', () => {
     };
     const availability = { runtimeOf: vi.fn().mockResolvedValue(undefined) };
     const router = {
-      findModel: vi.fn().mockResolvedValue(model),
-      resolve: vi.fn(),
+      resolve: routed
+        ? vi.fn().mockResolvedValue(routed)
+        : vi.fn().mockRejectedValue(new AppError(40005, '所选模型不可用，请重新选择', 400)),
     };
     const service = new TaskAdmissionService(
       prisma as never,
@@ -33,7 +35,7 @@ describe('TaskAdmissionService 输入素材归属', () => {
       {} as never,
       {} as never,
       router as never,
-      {} as never,
+      { accessForUser: vi.fn().mockResolvedValue({}) } as never,
       {} as never,
     );
 
@@ -49,7 +51,7 @@ describe('TaskAdmissionService 输入素材归属', () => {
         dto: {
           projectId: 'project-current',
           capability: 'main_image',
-          logicalModelId: 'model-1',
+          modelKey: 'model-1',
           inputAssetIds: ['asset-from-another-project'],
           params: { productName: '测试商品' },
         },
@@ -78,7 +80,7 @@ describe('TaskAdmissionService 输入素材归属', () => {
         dto: {
           projectId: 'project-current',
           capability: 'main_image',
-          logicalModelId: 'model-1',
+          modelKey: 'model-1',
           inputAssetIds: ['asset-of-another-user'],
           params: { productName: '测试商品' },
         },
@@ -91,16 +93,16 @@ describe('TaskAdmissionService 输入素材归属', () => {
     const { service, router } = setup(
       ids.map((id) => ({ id })),
       {
-        id: 'model-hot-remake',
-        name: '仿真图像·hot_remake',
-        capability: 'hot_remake',
-        archivedAt: null,
-        enabled: true,
-        productSpec: {
+        capabilityId: 'hot_remake',
+        modelKey: '仿真图像·hot_remake',
+        channelModel: { id: 'cm-1', channelId: 'ch-1' },
+        pricing: { configured: true, billingMode: 'fixed_request', unitPriceMicrocredits: 1 },
+        capabilitySpec: {
           version: 1,
           capability: 'image',
           inputs: { image: { min: 2, max: 4 } },
         },
+        intent: { capability: 'image' },
       },
     );
 
@@ -110,7 +112,7 @@ describe('TaskAdmissionService 输入素材归属', () => {
         dto: {
           projectId: 'project-current',
           capability: 'hot_remake',
-          logicalModelId: 'model-hot-remake',
+          modelKey: 'hot-remake',
           inputAssetIds: ids,
           params: {},
         },
@@ -119,6 +121,6 @@ describe('TaskAdmissionService 输入素材归属', () => {
       '所选模型「仿真图像·hot_remake」仅支持 2-4 张输入图片（当前 5 张），请调整图片数量或更换模型',
     );
 
-    expect(router.resolve).not.toHaveBeenCalled();
+    expect(router.resolve).toHaveBeenCalled();
   });
 });

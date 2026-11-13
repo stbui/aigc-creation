@@ -1,6 +1,5 @@
 import { ChevronLeft } from 'lucide-react';
 
-import { ALL_SCENES } from './constants';
 import { sceneLabel } from './utils';
 
 /**
@@ -15,7 +14,6 @@ export function MultiFusionEditorHeader({
   scene: string;
   onBack: () => void;
 }) {
-  const sceneDef = ALL_SCENES.find((s) => s.value === scene);
   return (
     <header className="multi-image-fusion-editor-head">
       <div className="multi-image-fusion-editor-title">
@@ -29,7 +27,7 @@ export function MultiFusionEditorHeader({
           <ChevronLeft size={16} />
         </button>
         <div>
-          <h1>{sceneDef?.label ?? sceneLabel(scene)}</h1>
+          <h1>{sceneLabel(scene)}</h1>
           <p>上传主体图和搭配图，AI 将多张图片融合为一张新图</p>
         </div>
       </div>

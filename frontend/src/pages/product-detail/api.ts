@@ -1,4 +1,4 @@
-import { generateApi, promptToolsApi } from '../../lib/api';
+import { generateApi } from '../../lib/api';
 import type { GenerateResponse, KnownCapability } from '../../types/api';
 
 /**
@@ -12,19 +12,19 @@ import type { GenerateResponse, KnownCapability } from '../../types/api';
  * 目录内新增调用时在这里补一行 re-export。
  */
 
-/** 通用接口模块 (生成 / 提示词工具) */
-export { generateApi, newIdempotencyKey, promptToolsApi } from '../../lib/api';
+/** 通用接口模块 (生成 / 幂等键) */
+export { generateApi, newIdempotencyKey } from '../../lib/api';
 
-/** 前台模型目录数据层: 建任务必须解析出 `logicalModelId` */
-export { resolveModelId } from '../../lib/models';
+/** 前台模型目录数据层: 建任务必须解析出 `modelKey` */
+export { resolveModelKey } from '../../lib/models';
 
 export const DETAIL_CAPABILITY: KnownCapability = 'detail_image';
 
 /** 一次详情图提交的输入 (已由页面校验 / 归一化) */
 export interface DetailGenerationInput {
   projectId: string;
-  /** 前台模型 id; 由 `resolveModelId('detail_image')` 解析 */
-  logicalModelId: string;
+  /** 前台模型 id; 由 `resolveModelKey('detail_image')` 解析 */
+  modelKey: string;
   inputAssetIds: string[];
   productName: string;
   brand: string;
@@ -51,7 +51,7 @@ export function startDetailGeneration(input: DetailGenerationInput): Promise<Gen
   return generateApi.start({
     projectId: input.projectId,
     capability: DETAIL_CAPABILITY,
-    logicalModelId: input.logicalModelId,
+    modelKey: input.modelKey,
     inputAssetIds: input.inputAssetIds,
     idempotencyKey: input.idempotencyKey,
     params: {
@@ -76,14 +76,4 @@ export function startDetailGeneration(input: DetailGenerationInput): Promise<Gen
  */
 export function removeDetailGeneration(taskId: string) {
   return generateApi.remove(taskId);
-}
-
-/**
- * 「AI分析」—— 走文本通道的「图片转提示词」, 对首张商品图做真实识别。
- *
- * 失败语义: 文本通道没配时后端返回 502, 由页面如实抛给用户;
- * 绝不退回「用文件名拼一段描述」—— 那会让用户以为模型看过图。
- */
-export function analyzeImageToPrompt(assetId: string) {
-  return promptToolsApi.imageToPrompt(assetId);
 }

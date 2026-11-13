@@ -9,4 +9,4 @@ export { ToolCard, PillOptions } from '../../components/ToolWidgets';
 export { ModelPicker, type ModelPickerProps } from '../../components/ModelPicker';
 export { ResultMedia, formatDuration } from '../../components/ResultMedia';
 export { ToolEmptyState, ToolGeneratingState } from '../../components/ToolEmptyState';
-export type { PublicLogicalModel } from '../../lib/models';
+export type { PublicModelGroup } from '../../lib/models';

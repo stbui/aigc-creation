@@ -82,11 +82,11 @@ export const CAPABILITY_GROUPS: Array<{ id: CapabilityGroup; name: string; desc:
 export { parseDetailSections };
 
 /**
- * 能力的代码默认消耗价 (未读 SystemSetting 的裸值)。
+ * 能力的代码默认消耗价。
  *
  * 与 `CapabilityPlugin.creditCost` 读的是同一个字段, 单列出来是为了让调用方
- * 意图明确 —— 要「当前生效价」请用 CreditPriceService.resolve(),
- * 不要在业务里直接取 def.creditCost, 否则后台改价对生成链路不生效。
+ * 意图明确 —— 该值只用于固定价能力缺少 `CapabilityPricing` 时兜底；
+ * 后台售价、分组倍率、货币换算与限时免费都不在本函数内完成。
  */
 export function defaultCreditCostOf(id: string): number {
   const raw = BY_ID.get(id)?.creditCost;

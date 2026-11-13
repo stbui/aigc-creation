@@ -89,7 +89,7 @@ export class UserGroupAccess {
 
   /**
    * 取该分组对某模型的价格因子。
-   * `modelKeys` 按优先级匹配覆盖项（前台模型 code 优先于渠道模型 key）。
+   * `modelKeys` 按优先级匹配覆盖项（能力 id 优先于模型 key）。
    */
   pricing(currency: string, modelKeys: string[] = []): GroupPricing {
     const normalized = normalizePriceCurrency(currency);

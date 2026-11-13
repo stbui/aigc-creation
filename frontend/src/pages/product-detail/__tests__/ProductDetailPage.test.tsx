@@ -153,10 +153,9 @@ vi.mock('../DetailSectionPicker', () => ({ DetailSectionPicker: () => null }));
 
 vi.mock('../api', () => ({
   DETAIL_CAPABILITY: 'detail_image',
-  analyzeImageToPrompt: vi.fn(),
   newIdempotencyKey: () => 'idem-test',
   removeDetailGeneration: vi.fn(),
-  resolveModelId: vi.fn(async () => 'model-1'),
+  resolveModelKey: vi.fn(async () => 'model-1'),
   startDetailGeneration: vi.fn(async () => ({
     taskId: 'task-1',
     status: 'queued',

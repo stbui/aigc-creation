@@ -62,11 +62,11 @@ test.describe('数据备份', () => {
     ).toContainText('数据备份');
   });
 
-  test('侧栏「数据安全」分组已注册', async ({ page }) => {
+  test('侧栏「数据与安全」分组已注册', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/backups`);
     const nav = page.getByTestId('admin-sider');
-    await expect(nav.getByText('数据安全', { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(nav.getByText('数据与安全', { exact: true })).toBeVisible({ timeout: 15000 });
     await expect(nav.getByRole('button', { name: '数据备份', exact: true })).toBeVisible();
   });
 

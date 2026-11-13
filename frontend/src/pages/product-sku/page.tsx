@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import {
-  MAX_REGIONS,
-  MAX_SKUS,
-  MAX_SKU_NAME,
-  SUPPORTED_IMAGE_LABEL,
-  type LibraryTarget,
-  type SkuItem,
-} from './constants';
+import { MAX_REGIONS, type LibraryTarget } from './constants';
 import {
   AssetLibraryModal,
   ImageLightbox,
@@ -24,63 +17,36 @@ import { ProductSkuWorkspace } from './ProductSkuWorkspace';
 import { ProductSkuListSection } from './ProductSkuListSection';
 import { ProductSkuStepsCard } from './ProductSkuStepsCard';
 import {
-  useAssetLibrary,
   useAuth,
-  useGenerateError,
-  usePasteUpload,
-  usePollAbort,
-  useProject,
-  useResultGallery,
   useSkuBatch,
   useSkuDownload,
+  useSkuDraft,
+  useTargetedAssetPicker,
+  usePasteUpload,
+  usePollAbort,
+  useResultGallery,
 } from './hooks';
+import { assetsApi, fileNameFromUrl, generateApi, toToolAsset } from './api';
 import {
-  assetsApi,
-  fileNameFromUrl,
-  generateApi,
-  toToolAsset,
-} from './api';
-import {
-  cloneSkuItem,
-  createSkuItem,
   downloadDirect,
   groupContainsTask,
   groupSkuHistory,
-  isSupportedImageFile,
-  patchSkuVariant,
   resultFromGallery,
   restoreSkuDraft,
-  syncVariants,
   type SkuBatchGroup,
 } from './utils';
-import type { Asset, MobileUploadAsset } from '../../types/api';
 import { useApp, Spin } from '../../ui';
 
 export function ProductSkuPage() {
   const { message } = useApp();
-  const reportError = useGenerateError();
-  const { ensureProject } = useProject();
   const { token } = useAuth();
   const [searchParams] = useSearchParams();
   const submissionId = searchParams.get('submissionId');
 
   const templateInputRef = useRef<HTMLInputElement>(null);
-  const libraryTargetRef = useRef<LibraryTarget | null>(null);
-  const mobileTargetRef = useRef<LibraryTarget | null>(null);
   const restoredSubmissionRef = useRef(false);
   const pollSignal = usePollAbort();
-
-  const [template, setTemplate] = useState<ToolAsset | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [regions, setRegions] = useState<SkuRegion[]>([]);
-  const [items, setItems] = useState<SkuItem[]>([createSkuItem([])]);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [referenceBusy, setReferenceBusy] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
-  const [settingsSeed, setSettingsSeed] = useState(0);
-  const [defaultRatio, setDefaultRatio] = useState('1:1');
-  const [defaultResolution, setDefaultResolution] = useState('1k');
 
   const gallery = useResultGallery({
     capability: 'sku_image',
@@ -105,178 +71,65 @@ export function ProductSkuPage() {
   } = useSkuBatch({ pollSignal, prependGallery: gallery.prepend });
   const downloadZip = useSkuDownload();
 
-  const historyGroups = useMemo(() => groupSkuHistory(gallery.items), [gallery.items]);
+  // 模板图 / 区域 / SKU 清单及其编辑动作收口在独立 hook
+  const {
+    template,
+    uploading,
+    regions,
+    items,
+    editorOpen,
+    previewUrl,
+    referenceBusy,
+    settingsSeed,
+    defaultRatio,
+    defaultResolution,
+    applyTemplate,
+    uploadTemplate,
+    setVariantReference,
+    uploadReferenceFile,
+    confirmRegions,
+    closeEditor,
+    updateItemName,
+    updateInstruction,
+    addSku,
+    removeSku,
+    duplicateNames,
+    validationMessage,
+    applyDraft,
+    setPreviewUrl,
+    setEditorOpen,
+  } = useSkuDraft({ onResetBatch: clearBatch });
 
-  const applyTemplate = useCallback((next: ToolAsset) => {
-    setTemplate(next);
-    setRegions([]);
-    setItems([createSkuItem([])]);
-    clearBatch();
-    setEditorOpen(true);
-  }, [clearBatch]);
-
-  const uploadTemplate = useCallback(async (files: FileList | File[]) => {
-    const file = Array.from(files).find(isSupportedImageFile);
-    if (!file) {
-      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
-      return;
-    }
-    setUploading(true);
-    try {
-      const projectId = await ensureProject();
-      const asset = await assetsApi.upload(file, projectId);
-      applyTemplate(toToolAsset(asset, file.name));
-      message.success('模板图已上传，请框选变体区域');
-    } catch (error) {
-      reportError(error);
-    } finally {
-      setUploading(false);
-    }
-  }, [applyTemplate, ensureProject, message, reportError]);
+  // 素材库 / 手机上传：先记住触发按钮对应的图片位，再回填到模板图或变体区域
+  const { library, openLibraryFor, mobile } = useTargetedAssetPicker<LibraryTarget>({
+    onLibraryPick: (target, asset) => {
+      const picked = toToolAsset(asset, fileNameFromUrl(asset.sourceUrl, '素材'));
+      if (target.kind === 'template') {
+        applyTemplate(picked);
+        message.success('已从素材库设为模板图');
+      } else {
+        setVariantReference(target.itemKey, target.regionId, picked);
+        message.success('已添加参考图');
+      }
+      return true;
+    },
+    onMobileReceive: (target, assets) => {
+      const first = assets[0];
+      if (!first) return;
+      const picked = toToolAsset(first, first.filename);
+      if (target.kind === 'template') {
+        applyTemplate(picked);
+        message.success('已从手机接收模板图');
+      } else {
+        setVariantReference(target.itemKey, target.regionId, picked);
+        message.success('已从手机接收参考图');
+      }
+    },
+  });
 
   usePasteUpload((files) => uploadTemplate(files));
 
-  const setVariantReference = useCallback((itemKey: number, regionId: string, reference: ToolAsset | undefined) => {
-    setItems((current) => patchSkuVariant(current, itemKey, regionId, { reference }));
-  }, []);
-
-  const pickFromLibrary = useCallback((asset: Asset) => {
-    const target = libraryTargetRef.current;
-    if (!target) return false;
-    const picked = toToolAsset(asset, fileNameFromUrl(asset.sourceUrl, '素材'));
-    if (target.kind === 'template') {
-      applyTemplate(picked);
-      message.success('已从素材库设为模板图');
-    } else {
-      setVariantReference(target.itemKey, target.regionId, picked);
-      message.success('已添加参考图');
-    }
-    libraryTargetRef.current = null;
-    return true;
-  }, [applyTemplate, message, setVariantReference]);
-
-  const {
-    open: libraryOpen,
-    loading: libraryLoading,
-    items: libraryItems,
-    error: libraryError,
-    openLibrary,
-    closeLibrary,
-    pick,
-  } = useAssetLibrary(pickFromLibrary);
-
-  const openLibraryFor = useCallback((target: LibraryTarget) => {
-    libraryTargetRef.current = target;
-    openLibrary();
-  }, [openLibrary]);
-
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const addMobileAsset = useCallback((assets: MobileUploadAsset[]) => {
-    setMobileOpen(false);
-    const target = mobileTargetRef.current;
-    const first = assets[0];
-    mobileTargetRef.current = null;
-    if (!first || !target) return;
-    const picked = toToolAsset(first, first.filename);
-    if (target.kind === 'template') {
-      applyTemplate(picked);
-      message.success('已从手机接收模板图');
-    } else {
-      setVariantReference(target.itemKey, target.regionId, picked);
-      message.success('已从手机接收参考图');
-    }
-  }, [applyTemplate, message, setVariantReference]);
-
-  const openMobileFor = useCallback((target: LibraryTarget) => {
-    mobileTargetRef.current = target;
-    setMobileOpen(true);
-  }, []);
-
-  const uploadReferenceFile = useCallback(async (
-    file: File | undefined,
-    itemKey: number,
-    regionId: string,
-    input: HTMLInputElement,
-  ) => {
-    input.value = '';
-    if (!file) return;
-    if (!isSupportedImageFile(file)) {
-      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
-      return;
-    }
-    const busyKey = `${itemKey}:${regionId}`;
-    setReferenceBusy(busyKey);
-    try {
-      const projectId = await ensureProject();
-      const asset = await assetsApi.upload(file, projectId);
-      setVariantReference(itemKey, regionId, toToolAsset(asset, file.name));
-      message.success('参考图已上传');
-    } catch (error) {
-      reportError(error);
-    } finally {
-      setReferenceBusy((current) => current === busyKey ? null : current);
-    }
-  }, [ensureProject, message, reportError, setVariantReference]);
-
-  const confirmRegions = useCallback((next: SkuRegion[]) => {
-    setRegions(next);
-    setItems((current) => syncVariants(current.length > 0 ? current : [createSkuItem(next)], next));
-    setEditorOpen(false);
-  }, []);
-
-  const handleEditorClose = useCallback(() => setEditorOpen(false), []);
-
-  const updateItemName = (key: number, name: string) => {
-    setItems((current) => current.map((item) => item.key === key ? { ...item, name } : item));
-  };
-
-  const updateInstruction = (itemKey: number, regionId: string, instruction: string) => {
-    setItems((current) => patchSkuVariant(current, itemKey, regionId, { instruction }));
-  };
-
-  const addSku = () => {
-    if (items.length >= MAX_SKUS) {
-      message.warning(`最多添加 ${MAX_SKUS} 个 SKU`);
-      return;
-    }
-    const source = items[items.length - 1] ?? createSkuItem(regions);
-    setItems((current) => [...current, cloneSkuItem(source, `SKU ${current.length + 1}`)]);
-  };
-
-  const removeSku = (key: number) => {
-    if (items.length <= 1) return;
-    setItems((current) => current.filter((item) => item.key !== key));
-  };
-
-  /** 与其它行重名的规范化名称（小写），供清单做即时提示 */
-  const duplicateNames = useMemo(() => {
-    const seen = new Set<string>();
-    const duplicates = new Set<string>();
-    for (const item of items) {
-      const name = item.name.trim().toLowerCase();
-      if (!name) continue;
-      if (seen.has(name)) duplicates.add(name);
-      else seen.add(name);
-    }
-    return duplicates;
-  }, [items]);
-
-  const validationMessage = useMemo(() => {
-    if (items.length === 0) return '请至少添加 1 个 SKU';
-    for (const [index, item] of items.entries()) {
-      const name = item.name.trim();
-      if (!name) return `请填写 SKU ${index + 1} 的名称`;
-      if (name.length > MAX_SKU_NAME) return `SKU ${index + 1} 名称不能超过 ${MAX_SKU_NAME} 个字符`;
-      if (duplicateNames.has(name.toLowerCase())) return `SKU 名称「${name}」重复`;
-      for (const [regionIndex, region] of regions.entries()) {
-        const variant = item.variants[region.id];
-        if (!variant?.instruction.trim() && !variant?.reference) {
-          return `请为 SKU ${index + 1} 的区域 ${regionIndex + 1} 填写说明或上传参考图`;
-        }
-      }
-    }
-    return null;
-  }, [items, duplicateNames, regions]);
+  const historyGroups = useMemo(() => groupSkuHistory(gallery.items), [gallery.items]);
 
   const submitFromForm = useCallback(
     async (_inputs: ToolAsset[], settings: ToolSettings) => {
@@ -309,12 +162,7 @@ export function ProductSkuPage() {
       );
 
       const draft = restoreSkuDraft(tasks, (id) => assetsById.get(id), group);
-      setTemplate(draft.template);
-      setRegions(draft.regions);
-      setItems(draft.items.length > 0 ? draft.items : [createSkuItem(draft.regions)]);
-      setDefaultRatio(draft.defaultRatio);
-      setDefaultResolution(draft.defaultResolution);
-      setSettingsSeed((value) => value + 1);
+      applyDraft(draft);
       setFailedNotice(null);
       openHistoryResult(group);
       message.success(
@@ -327,7 +175,7 @@ export function ProductSkuPage() {
     } finally {
       setRestoringId(null);
     }
-  }, [message, openHistoryResult]);
+  }, [applyDraft, message, openHistoryResult, setFailedNotice]);
 
   useEffect(() => {
     if (!submissionId || restoredSubmissionRef.current || gallery.loading) return;
@@ -335,7 +183,7 @@ export function ProductSkuPage() {
     const group = historyGroups.find((entry) => groupContainsTask(entry, submissionId));
     if (group) openHistoryResult(group);
     else setFailedNotice('未找到该历史提交，可能已被删除或不属于当前账号');
-  }, [gallery.loading, historyGroups, openHistoryResult, submissionId]);
+  }, [gallery.loading, historyGroups, openHistoryResult, setFailedNotice, submissionId]);
 
   const downloadHistoryGroup = useCallback(async (group: SkuBatchGroup) => {
     const ready = group.items.filter((item) => item.status !== 'failed' && item.url);
@@ -389,7 +237,7 @@ export function ProductSkuPage() {
           templateInputRef={templateInputRef}
           onUpload={(files) => void uploadTemplate(files)}
           onOpenLibrary={() => openLibraryFor({ kind: 'template' })}
-          onOpenMobile={() => openMobileFor({ kind: 'template' })}
+          onOpenMobile={() => mobile.openMobile({ kind: 'template' })}
           onEditRegions={() => setEditorOpen(true)}
           onPreview={setPreviewUrl}
         />
@@ -413,7 +261,7 @@ export function ProductSkuPage() {
               openLibraryFor({ kind: 'reference', itemKey, regionId })
             }
             onOpenReferenceMobile={(itemKey, regionId) =>
-              openMobileFor({ kind: 'reference', itemKey, regionId })
+              mobile.openMobile({ kind: 'reference', itemKey, regionId })
             }
             onRemoveReference={(itemKey, regionId) =>
               setVariantReference(itemKey, regionId, undefined)
@@ -429,30 +277,24 @@ export function ProductSkuPage() {
         alt={template?.name}
         initialRegions={regions}
         max={MAX_REGIONS}
-        onClose={handleEditorClose}
+        onClose={closeEditor}
         onConfirm={confirmRegions}
       />
 
       <AssetLibraryModal
-        open={libraryOpen}
-        loading={libraryLoading}
-        items={libraryItems}
-        error={libraryError}
-        onCancel={() => {
-          libraryTargetRef.current = null;
-          closeLibrary();
-        }}
-        onPick={pick}
+        open={library.open}
+        loading={library.loading}
+        items={library.items}
+        error={library.error}
+        onCancel={library.closeLibrary}
+        onPick={library.pick}
         maxSelectable={1}
       />
 
       <MobileUploadModal
-        open={mobileOpen}
-        onReceived={addMobileAsset}
-        onCancel={() => {
-          mobileTargetRef.current = null;
-          setMobileOpen(false);
-        }}
+        open={mobile.open}
+        onReceived={mobile.addAssets}
+        onCancel={mobile.closeMobile}
       />
 
       {restoringId && (

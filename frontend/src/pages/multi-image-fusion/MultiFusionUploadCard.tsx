@@ -1,14 +1,16 @@
 import { useRef, useState } from 'react';
-import { ImagePlus, X } from 'lucide-react';
+import { ImagePlus } from 'lucide-react';
 
 import {
   MAX_ACCENTS,
   MAX_TOTAL,
   SUPPORTED_IMAGE_ACCEPT,
   UPLOAD_SUBJECT_HINT,
+  type MultiFusionSlot,
 } from './constants';
 import type { ToolAsset } from './components';
-import { assetThumbUrl } from './api';
+import { MultiFusionImageThumb } from './MultiFusionImageThumb';
+import { MultiFusionSlotActions } from './MultiFusionSlotActions';
 
 /**
  * 上传卡 —— 主体图（1 张）+ 搭配图（1-5 张）两个图位。
@@ -32,15 +34,17 @@ export function MultiFusionUploadCard({
   uploading: boolean;
   totalCount: number;
   /** 拿到文件后由页面统一走校验 + 上传 */
-  onUploadFiles: (target: 'subject' | 'accent', files: FileList | File[]) => void;
+  onUploadFiles: (target: MultiFusionSlot, files: FileList | File[]) => void;
   onRemoveSubject: () => void;
   onRemoveAccent: (id: string) => void;
-  onOpenLibrary: (target: 'subject' | 'accent') => void;
-  onOpenMobile: (target: 'subject' | 'accent') => void;
+  onOpenLibrary: (target: MultiFusionSlot) => void;
+  onOpenMobile: (target: MultiFusionSlot) => void;
 }) {
   const subjectInputRef = useRef<HTMLInputElement>(null);
   const accentInputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
+  // 两个图位各自维护拖拽态：拖到主体位不该连带高亮搭配位
+  const [subjectDragging, setSubjectDragging] = useState(false);
+  const [accentDragging, setAccentDragging] = useState(false);
   /**
    * 参考站搭配图空态只有一个添加入口，槽内文案明确剩余额度。
    * 已满 5 张时不再渲染添加入口。
@@ -64,56 +68,32 @@ export function MultiFusionUploadCard({
         <div className="multi-image-fusion-field-label">
           <span>主体图</span>
           <small>必传 · 1 张</small>
-          <span className="multi-image-fusion-field-actions">
-            <button
-              type="button"
-              className="multi-image-fusion-field-link"
-              title="从已上传的素材里选一张作为主体图"
-              onClick={() => onOpenLibrary('subject')}
-            >
-              从素材库导入
-            </button>
-            <button
-              type="button"
-              className="multi-image-fusion-field-link multi-image-fusion-mobile-upload-link"
-              title="扫码在手机上选择图片，接收后进入主体图位"
-              onClick={() => onOpenMobile('subject')}
-            >
-              手机上传
-            </button>
-          </span>
+          <MultiFusionSlotActions
+            target="subject"
+            onOpenLibrary={onOpenLibrary}
+            onOpenMobile={onOpenMobile}
+          />
         </div>
         {subject ? (
-          <div className="multi-image-fusion-image-card">
-            <img
-              src={assetThumbUrl(subject.url, 320) ?? subject.url}
-              alt={subject.name}
-              loading="lazy"
-              decoding="async"
-            />
-            <button
-              type="button"
-              className="multi-image-fusion-remove"
-              aria-label="移除主体图"
-              onClick={onRemoveSubject}
-            >
-              <X size={12} />
-            </button>
-            {uploading && <span className="multi-image-fusion-uploading">上传中</span>}
-          </div>
+          <MultiFusionImageThumb
+            asset={subject}
+            uploading={uploading}
+            removeLabel="移除主体图"
+            onRemove={onRemoveSubject}
+          />
         ) : (
           <button
             type="button"
-            className="multi-image-fusion-upload-empty"
+            className={`multi-image-fusion-upload-empty${subjectDragging ? ' is-dragging' : ''}`}
             onClick={() => subjectInputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault();
-              setDragging(true);
+              setSubjectDragging(true);
             }}
-            onDragLeave={() => setDragging(false)}
+            onDragLeave={() => setSubjectDragging(false)}
             onDrop={(e) => {
               e.preventDefault();
-              setDragging(false);
+              setSubjectDragging(false);
               if (e.dataTransfer.files.length) onUploadFiles('subject', e.dataTransfer.files);
             }}
           >
@@ -132,53 +112,33 @@ export function MultiFusionUploadCard({
         <div className="multi-image-fusion-field-label">
           <span>搭配图</span>
           <small>必传 · 1-5 张</small>
-          <span className="multi-image-fusion-field-actions">
-            <button
-              type="button"
-              className="multi-image-fusion-field-link"
-              title="从已上传的素材里挑选搭配图"
-              onClick={() => onOpenLibrary('accent')}
-            >
-              从素材库导入
-            </button>
-            <button
-              type="button"
-              className="multi-image-fusion-field-link multi-image-fusion-mobile-upload-link"
-              title="扫码在手机上选择图片，接收后进入搭配图位"
-              onClick={() => onOpenMobile('accent')}
-            >
-              手机上传
-            </button>
-          </span>
+          <MultiFusionSlotActions
+            target="accent"
+            onOpenLibrary={onOpenLibrary}
+            onOpenMobile={onOpenMobile}
+          />
         </div>
         <div
-          className={`multi-image-fusion-accessory-grid${dragging ? ' is-dragging' : ''}`}
-          onDragOver={(e) => e.preventDefault()}
-          onDragLeave={() => setDragging(false)}
+          className={`multi-image-fusion-accessory-grid${accentDragging ? ' is-dragging' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setAccentDragging(true);
+          }}
+          onDragLeave={() => setAccentDragging(false)}
           onDrop={(e) => {
             e.preventDefault();
-            setDragging(false);
+            setAccentDragging(false);
             if (e.dataTransfer.files.length) onUploadFiles('accent', e.dataTransfer.files);
           }}
         >
           {accents.map((a) => (
-            <div key={a.id} className="multi-image-fusion-image-card">
-              <img
-                src={assetThumbUrl(a.url, 320) ?? a.url}
-                alt={a.name}
-                loading="lazy"
-                decoding="async"
-              />
-              <button
-                type="button"
-                className="multi-image-fusion-remove"
-                aria-label={`移除 ${a.name}`}
-                onClick={() => onRemoveAccent(a.id)}
-              >
-                <X size={12} />
-              </button>
-              {uploading && <span className="multi-image-fusion-uploading">上传中</span>}
-            </div>
+            <MultiFusionImageThumb
+              key={a.id}
+              asset={a}
+              uploading={uploading}
+              removeLabel={`移除 ${a.name}`}
+              onRemove={() => onRemoveAccent(a.id)}
+            />
           ))}
           {/* 参考站空态只有一个添加入口，并在槽内写明剩余额度 */}
           {accentRoom > 0 && (

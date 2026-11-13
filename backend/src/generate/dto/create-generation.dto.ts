@@ -13,14 +13,15 @@ export class CreateGenerationDto {
   capability: string;
 
   /**
-   * 前台模型 id（`LogicalModel.id`）。
+   * C 端模型分组键（`ChannelModel.modelGroupKey`，空则回落 modelKey）。
    *
-   * 必填：客户端只能表达「用哪个模型 + 什么参数」，渠道、协议、价格一律由
-   * 服务端目录解析 —— 这是「展示的模型」与「实际执行并扣费的模型」同源的唯一保证。
+   * 必填：客户端只能表达「用哪个模型分组 + 什么参数」，具体渠道与线路由
+   * 服务端在同一能力的候选池里解析 —— 这是「展示的模型」与「实际执行并
+   * 扣费的线路」同源的唯一保证。
    */
   @IsString()
-  @Length(1, 64)
-  logicalModelId: string;
+  @Length(1, 120)
+  modelKey: string;
 
   @IsArray()
   @IsString({ each: true })

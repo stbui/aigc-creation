@@ -13,7 +13,7 @@ import type { GalleryItem } from './hooks';
  * 渲染本体在 `components/BatchResultList`(与详情图 / 商品主图共用),
  * 这里只提供带货图文的页面语义: 行头带模板与卖点, 原图格用固定文案。
  *
- * 归组逻辑与 `ProductKitResultList` 同源 (batchId 归组 / batchIndex 排序);
+ * 归组逻辑与共享 `ToolBatchResultList` 同源 (batchId 归组 / batchIndex 排序);
  * 差异只在于行头信息与原图格图注, 通过插槽注入, 组件内没有页面分支。
  */
 
@@ -49,9 +49,9 @@ function ShoppableCarouselResultListImpl({
       labelOf={labelOf}
       renderRowMeta={(row) => (
         <>
-          {row.templateName && <span className="pd-result-template">模板：{row.templateName}</span>}
+          {row.templateName && <span className="pd-result-template u-font-12">模板：{row.templateName}</span>}
           {row.sellingPoints && (
-            <span className="pd-result-prompt" title={row.sellingPoints}>
+            <span className="pd-result-prompt u-font-12" title={row.sellingPoints}>
               卖点：{row.sellingPoints}
             </span>
           )}

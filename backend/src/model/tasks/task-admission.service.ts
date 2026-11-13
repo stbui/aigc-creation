@@ -181,36 +181,25 @@ export class TaskAdmissionService {
     await this.validateAnnotations(ownerId, dto, sourceAsset);
     this.assertLocalRedrawHasInput(dto, sanitized);
 
-    // 8. 模型解析：只有目录里真实可用、且支持该能力的模型才允许建单
-    const logicalModelId = String(dto.logicalModelId ?? '').trim();
-    if (!logicalModelId) {
+    // 8. 模型解析：能力 + 所选模型分组；具体线路由选路器在同一候选池内决定
+    const modelKey = String(dto.modelKey ?? '').trim();
+    if (!modelKey) {
       throw new AppError(40005, '请选择用于本次生成的模型', 400);
     }
-    const model = await this.router.findModel(logicalModelId);
-    if (!model) throw new AppError(40005, '所选模型不可用，请重新选择', 400);
-    if (model.archivedAt !== null) throw new AppError(40005, '所选模型已归档，请重新选择', 400);
-    if (!model.enabled) throw new AppError(40005, '所选模型已下线，请重新选择', 400);
-    if (model.capability !== dto.capability) {
-      throw new AppError(40001, '所选模型不支持该能力', 400);
-    }
-    const imageInput = model.productSpec.inputs?.image;
+    const access = await this.groups.accessForUser(ownerId);
+    const intent = def.model.intent(sanitized, { image: dto.inputAssetIds.length, video: 0 });
+    // 选路失败（模型不存在 / 无可用线路 / 参数组合无线路可承接）由 router 抛可读原因
+    const routed = await this.router.resolve(access, dto.capability, modelKey, intent);
+    const imageInput = routed.capabilitySpec.inputs?.image;
     const imageCount = dto.inputAssetIds.length;
     if (imageInput && (imageCount < imageInput.min || imageCount > imageInput.max)) {
       const range = imageInput.min === imageInput.max ? `${imageInput.max}` : `${imageInput.min}-${imageInput.max}`;
       throw new AppError(
         40001,
-        `所选模型「${model.name}」仅支持 ${range} 张输入图片（当前 ${imageCount} 张），请调整图片数量或更换模型`,
+        `所选模型「${routed.modelKey}」仅支持 ${range} 张输入图片（当前 ${imageCount} 张），请调整图片数量或更换模型`,
         400,
       );
     }
-
-    const intent = restrictIntentToSpec(
-      model.productSpec,
-      def.model.intent(sanitized, { image: dto.inputAssetIds.length, video: 0 }),
-    );
-    const access = await this.groups.accessForUser(ownerId);
-    // 选路失败（无可用线路 / 参数组合无线路可承接）由 router 抛出可读原因
-    const routed = await this.router.resolve(access, logicalModelId, intent);
 
     // 9. 遮罩线路能力：没有编辑端点的线路做遮罩重绘等于整图重绘
     const maskAssetId = this.maskAssetId(sanitized);
@@ -219,16 +208,10 @@ export class TaskAdmissionService {
     }
 
     /*
-     * 10. 计价：价格快照与目录报价同源；后台覆盖价与限时免费优先。
-     *
-     * 顺序不能颠倒：
-     *   · 先取后台能力覆盖价（`creditPrice.<capabilityId>`），再建草案 ——
-     *     早先只把覆盖价用在 `/capabilities` 下发上，扣费仍走线路价，
-     *     表现为「后台改完价用户没少花钱」；
-     *   · 限时免费在草案之后把金额直接置 0，并记下活动 id 供账单追溯。
+     * 10. 计价：价格快照与目录报价同源；能力售价由 `CapabilityPricing` 唯一提供。
+     * 限时免费在草案之后把金额直接置 0，并记下活动 id 供账单追溯。
      */
-    const overrideCost = await this.price.resolveOverride(dto.capability);
-    let draft = this.billing.buildDraft(access, routed, overrideCost);
+    let draft = this.billing.buildDraft(access, routed);
     if (dto.capability === 'multi_fusion') {
       draft = scaleMultiFusionDraft(draft, sanitized);
     }
@@ -273,10 +256,9 @@ export class TaskAdmissionService {
       stage: '排队中',
       progress: 0,
       inputAssetIds: JSON.stringify(dto.inputAssetIds),
-      logicalModelId: routed.logicalModel.id,
-      logicalModelRevisionId: routed.revisionId,
-      routeId: routed.route.id,
+      modelKey: routed.modelKey,
       channelModelId: routed.channelModel.id,
+      channelId: routed.channelModel.channelId,
       routeRun: 1,
       heartbeatAt: new Date(),
     };
@@ -647,12 +629,12 @@ function toIdempotentResult(
  * 素材或任一参数发生变化时会被识别为冲突。
  */
 export function generationRequestFingerprint(
-  dto: Pick<CreateGenerationDto, 'projectId' | 'capability' | 'logicalModelId' | 'inputAssetIds' | 'params'>,
+  dto: Pick<CreateGenerationDto, 'projectId' | 'capability' | 'modelKey' | 'inputAssetIds' | 'params'>,
 ): string {
   const canonical = {
     projectId: String(dto.projectId ?? ''),
     capability: String(dto.capability ?? ''),
-    logicalModelId: String(dto.logicalModelId ?? '').trim(),
+    modelKey: String(dto.modelKey ?? '').trim(),
     inputAssetIds: (dto.inputAssetIds ?? []).map((id) => String(id)),
     params: canonicalizeJson(dto.params ?? {}),
   };

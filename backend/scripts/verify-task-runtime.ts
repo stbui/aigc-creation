@@ -38,7 +38,7 @@ const { PrismaService } = require('../src/prisma/prisma.service');
 const { TaskAdmissionService } = require('../src/model/tasks/task-admission.service');
 const { TaskLifecycleService } = require('../src/model/tasks/task-lifecycle.service');
 const { TaskWorkerService } = require('../src/model/tasks/task-worker.service');
-const { RouteCatalogService } = require('../src/model/catalog/route-catalog.service');
+const { CapabilityCatalogService } = require('../src/model/catalog/capability-catalog.service');
 const { RouterService } = require('../src/model/routing/router.service');
 const { RouteHealthService } = require('../src/model/routing/route-health.service');
 const { BillingService } = require('../src/model/billing/billing.service');
@@ -159,7 +159,7 @@ async function main() {
   const admission = app.get(TaskAdmissionService);
   const lifecycle = app.get(TaskLifecycleService);
   const worker = app.get(TaskWorkerService);
-  const catalog = app.get(RouteCatalogService);
+  const catalog = app.get(CapabilityCatalogService);
   const router = app.get(RouterService);
   const groups = app.get(UserGroupService);
   const billing = app.get(BillingService);
@@ -185,7 +185,6 @@ async function main() {
     projectIds: [] as string[],
     channelIds: [] as string[],
     channelModelIds: [] as string[],
-    logicalModelIds: [] as string[],
   };
 
   /** 建用户 + 项目（余额不足场景只需要账号，不发放积分） */
@@ -254,44 +253,35 @@ async function main() {
   }
 
   /**
-   * 建前台模型：一次发布 = 一个 revision + 若干线路。
+   * 建能力夹具：绑定一组渠道模型，并写入能力售价。
    *
-   * @param pricePolicy `unified` 用标量价；`channel` 跟随线路价格档
+   * 前台模型层删除后，售价在能力级；同一场景内所有线路同价。
+   * 返回的 `modelKey` 取第一条绑定的商品键，供准入「选中分组」使用。
    */
-  async function makeLogicalModel(input: {
+  async function makeCapabilityFixture(input: {
     code: string;
     pricePolicy?: 'unified' | 'channel';
     priceCredits?: number;
     routes: Array<{ channelModelId: string; priority: number }>;
   }) {
-    const spec = capabilitySpecFromModelCapabilityConfig(IMAGE_CONFIG, 'image');
-    const model = await prisma.logicalModel.create({
-      data: {
-        code: input.code,
-        activeKey: input.code.toLowerCase(),
-        name: `验收模型 ${input.code}`,
-        // 准入按「前台模型 capability == 请求能力 id」校验，这里必须是 C 端能力 id
-        // 而不是模态；模态在 revision 的能力合同里（`capability: 'image'`）。
-        capability: 'free_create',
-        enabled: true,
-        pricePolicy: input.pricePolicy ?? 'unified',
+    const priceCredits = input.priceCredits ?? 0;
+    await prisma.capabilityModelBinding.deleteMany({ where: { capabilityId: 'free_create' } });
+    await prisma.capabilityPricing.upsert({
+      where: { capabilityId: 'free_create' },
+      create: {
+        capabilityId: 'free_create',
         billingMode: 'fixed_request',
-        unitPriceMicrocredits: BigInt(input.priceCredits ?? 0) * MICRO,
+        unitPriceMicrocredits: BigInt(priceCredits) * MICRO,
       },
-    });
-    created.logicalModelIds.push(model.id);
-    const revision = await prisma.logicalModelRevision.create({
-      data: {
-        logicalModelId: model.id,
-        version: 1,
-        capabilitySpecJson: JSON.stringify(spec),
-        defaultOptionsJson: '{}',
+      update: {
+        billingMode: 'fixed_request',
+        unitPriceMicrocredits: BigInt(priceCredits) * MICRO,
       },
     });
     for (const route of input.routes) {
-      await prisma.logicalModelRoute.create({
+      await prisma.capabilityModelBinding.create({
         data: {
-          logicalModelRevisionId: revision.id,
+          capabilityId: 'free_create',
           channelModelId: route.channelModelId,
           priority: route.priority,
           weight: 100,
@@ -299,23 +289,20 @@ async function main() {
         },
       });
     }
-    const published = await prisma.logicalModel.update({
-      where: { id: model.id },
-      data: { activeRevisionId: revision.id, revisionSequence: 1 },
-    });
-    // 本进程直接写库，目录快照不会自己失效
     catalog.invalidateLocal();
-    return published;
+    const first = await prisma.channelModel.findUnique({ where: { id: input.routes[0].channelModelId } });
+    const modelKey = first?.modelKey ?? input.code;
+    return { id: modelKey, modelKey, capabilityId: 'free_create' };
   }
 
   /** 提交一次任务（走真实准入：能力裁剪 → 选路 → 计价 → 预留） */
-  async function admitTask(ownerId: string, projectId: string, logicalModelId: string, label: string) {
+  async function admitTask(ownerId: string, projectId: string, modelKey: string, label: string) {
     return admission.admit({
       ownerId,
       dto: {
         projectId,
         capability: 'free_create',
-        logicalModelId,
+        modelKey,
         inputAssetIds: [],
         params: { prompt: `验收 ${label}：一张干净的产品主图`, ratio: '1:1', size: '1k' },
       },
@@ -365,7 +352,7 @@ async function main() {
     {
       const channel = await makeChannel('rt-ok');
       const channelModel = await makeChannelModel(channel.id, `mock-ok-a-${stamp}`);
-      const model = await makeLogicalModel({ code: `rt-ok-${stamp}`, priceCredits: 7, routes: [{ channelModelId: channelModel.id, priority: 0 }] });
+      const model = await makeCapabilityFixture({ code: `rt-ok-${stamp}`, priceCredits: 7, routes: [{ channelModelId: channelModel.id, priority: 0 }] });
 
       const admitted = await admitTask(user.id, project.id, model.id, 'A');
       check('A 准入返回 queued', admitted.status === 'queued', admitted.status);
@@ -411,9 +398,10 @@ async function main() {
       const rejectModel = await makeChannelModel(reject.id, `mock-reject401-${stamp}`, 9);
       const okChannel = await makeChannel('rt-fallback');
       const okModel = await makeChannelModel(okChannel.id, `mock-ok-b-${stamp}`, 4);
-      const model = await makeLogicalModel({
+      const model = await makeCapabilityFixture({
         code: `rt-switch-${stamp}`,
         pricePolicy: 'channel',
+        priceCredits: 4,
         routes: [
           { channelModelId: rejectModel.id, priority: 1 },
           { channelModelId: okModel.id, priority: 0 },
@@ -421,7 +409,7 @@ async function main() {
       });
 
       const admitted = await admitTask(user.id, project.id, model.id, 'B');
-      check('B 首轮命中高价线路（9 积分）', admitted.creditCost === 9, admitted.creditCost);
+      check('B 首轮按能力价 4 积分预留', admitted.creditCost === 4, admitted.creditCost);
 
       await kickWorkerOnce();
       const task = await waitTerminal(admitted.taskId);
@@ -445,7 +433,7 @@ async function main() {
 
       const orders = await prisma.billingOrder.findMany({ where: { taskId: admitted.taskId }, orderBy: { createdAt: 'asc' } });
       check('B 账单被替换（共 2 单）', orders.length === 2, orders.length);
-      check('B 旧账单按原额退回', orders[0]?.status === 'refunded' && orders[0]?.amountMicrocredits === 9n * MICRO, {
+      check('B 旧账单按原额退回', orders[0]?.status === 'refunded' && orders[0]?.amountMicrocredits === 4n * MICRO, {
         status: orders[0]?.status,
         amount: orders[0]?.amountMicrocredits?.toString(),
       });
@@ -497,9 +485,10 @@ async function main() {
       const channelModel = await makeChannelModel(channel.id, `mock-ok-c1-${stamp}`, 5);
       const backupChannel = await makeChannel('rt-timeout-backup');
       const backupModel = await makeChannelModel(backupChannel.id, `mock-ok-c2-${stamp}`, 5);
-      const model = await makeLogicalModel({
+      const model = await makeCapabilityFixture({
         code: `rt-timeout-${stamp}`,
         pricePolicy: 'channel',
+        priceCredits: 5,
         routes: [
           { channelModelId: channelModel.id, priority: 1 },
           { channelModelId: backupModel.id, priority: 0 },
@@ -509,10 +498,9 @@ async function main() {
       // 参数必须过一遍能力和参数的清洗与裁剪，否则测的就成了「手搓意图能否选路」
       const def = getCapability('free_create');
       const params = sanitizeParams('free_create', { prompt: '验收 C', ratio: '1:1', size: '1k' });
-      const cached = await router.findModel(model.id);
       const access = await groups.accessForUser(user.id);
-      const intent = restrictIntentToSpec(cached.productSpec, def.model.intent(params, { image: 0, video: 0 }));
-      const routed = await router.resolve(access, model.id, intent);
+      const intent = def.model.intent(params, { image: 0, video: 0 });
+      const routed = await router.resolve(access, 'free_create', model.modelKey, intent);
       const draft = billing.buildDraft(access, routed);
 
       const task = await prisma.generationTask.create({
@@ -527,10 +515,9 @@ async function main() {
           inputAssetIds: '[]',
           params: JSON.stringify(params),
           creditCost: Number(draft.amountMicrocredits / MICRO),
-          logicalModelId: model.id,
-          logicalModelRevisionId: routed.revisionId,
-          routeId: routed.route.id,
+          modelKey: model.modelKey,
           channelModelId: routed.channelModel.id,
+          channelId: routed.channelModel.channelId,
           routeRun: 1,
           leaseOwner: '',
           nextPollAt: new Date(Date.now() - 1000),
@@ -552,9 +539,8 @@ async function main() {
           taskId: task.id,
           routeRun: 1,
           attemptNumber: 1,
-          logicalModelId: model.id,
-          logicalModelRevisionId: routed.revisionId,
-          routeId: routed.route.id,
+          capabilityId: 'free_create',
+          modelKey: model.modelKey,
           channelModelId: routed.channelModel.id,
           channelId: routed.channelModel.channelId,
           // 上游已受理：此后任何失败都不允许切线
@@ -589,7 +575,7 @@ async function main() {
     {
       const channel = await makeChannel('rt-refund');
       const channelModel = await makeChannelModel(channel.id, `mock-reject429-${stamp}`);
-      const model = await makeLogicalModel({ code: `rt-refund-${stamp}`, priceCredits: 6, routes: [{ channelModelId: channelModel.id, priority: 0 }] });
+      const model = await makeCapabilityFixture({ code: `rt-refund-${stamp}`, priceCredits: 6, routes: [{ channelModelId: channelModel.id, priority: 0 }] });
 
       const admitted = await admitTask(user.id, project.id, model.id, 'D');
       await kickWorkerOnce();
@@ -629,9 +615,10 @@ async function main() {
       created.projectIds.push(poorProject.id);
       const channel = await makeChannel('rt-poor-route');
       const channelModel = await makeChannelModel(channel.id, `mock-ok-e-${stamp}`, 50);
-      const model = await makeLogicalModel({
+      const model = await makeCapabilityFixture({
         code: `rt-poor-${stamp}`,
         pricePolicy: 'channel',
+        priceCredits: 50,
         routes: [{ channelModelId: channelModel.id, priority: 0 }],
       });
 
@@ -664,7 +651,7 @@ async function main() {
     {
       const channel = await makeChannel('rt-cancel-not-sent');
       const channelModel = await makeChannelModel(channel.id, `mock-cancel-not-sent-${stamp}`);
-      const model = await makeLogicalModel({
+      const model = await makeCapabilityFixture({
         code: `rt-cancel-not-sent-${stamp}`,
         priceCredits: 3,
         routes: [{ channelModelId: channelModel.id, priority: 0 }],
@@ -700,7 +687,7 @@ async function main() {
     {
       const channel = await makeChannel('rt-cancel-accepted');
       const channelModel = await makeChannelModel(channel.id, `mock-cancel-accepted-${stamp}`);
-      const model = await makeLogicalModel({
+      const model = await makeCapabilityFixture({
         code: `rt-cancel-accepted-${stamp}`,
         priceCredits: 5,
         routes: [{ channelModelId: channelModel.id, priority: 0 }],
@@ -726,9 +713,8 @@ async function main() {
           taskId: admitted.taskId,
           routeRun: queued?.routeRun ?? 1,
           attemptNumber: 1,
-          logicalModelId: queued?.logicalModelId ?? '',
-          logicalModelRevisionId: queued?.logicalModelRevisionId ?? '',
-          routeId: queued?.routeId ?? '',
+          capabilityId: queued?.capability ?? 'free_create',
+          modelKey: queued?.modelKey ?? '',
           channelModelId: queued?.channelModelId ?? '',
           channelId: channel.id,
           status: 'dispatching',
@@ -765,7 +751,7 @@ async function main() {
     {
       const channel = await makeChannel('rt-lease-recovery');
       const channelModel = await makeChannelModel(channel.id, `mock-lease-recovery-${stamp}`);
-      const model = await makeLogicalModel({
+      const model = await makeCapabilityFixture({
         code: `rt-lease-recovery-${stamp}`,
         priceCredits: 2,
         routes: [{ channelModelId: channelModel.id, priority: 0 }],
@@ -791,9 +777,8 @@ async function main() {
           taskId: admitted.taskId,
           routeRun: queued?.routeRun ?? 1,
           attemptNumber: 1,
-          logicalModelId: queued?.logicalModelId ?? '',
-          logicalModelRevisionId: queued?.logicalModelRevisionId ?? '',
-          routeId: queued?.routeId ?? '',
+          capabilityId: queued?.capability ?? 'free_create',
+          modelKey: queued?.modelKey ?? '',
           channelModelId: queued?.channelModelId ?? '',
           channelId: channel.id,
           status: 'dispatching',
@@ -893,16 +878,11 @@ async function main() {
       await prisma.project.deleteMany({ where: { ownerId: { in: created.userIds } } });
       for (const userId of created.userIds) await clearCredits(prisma, userId).catch(() => undefined);
       await prisma.notification.deleteMany({ where: { userId: { in: created.userIds } } }).catch(() => undefined);
+      await prisma.capabilityModelBinding.deleteMany({ where: { channelModelId: { in: created.channelModelIds } } });
+      await prisma.capabilityPricing.deleteMany({ where: { capabilityId: 'free_create' } });
       await prisma.channelModelPriceTier.deleteMany({ where: { channelModelId: { in: created.channelModelIds } } });
       await prisma.channelModel.deleteMany({ where: { id: { in: created.channelModelIds } } });
       await prisma.modelChannel.deleteMany({ where: { id: { in: created.channelIds } } });
-      const revisions = await prisma.logicalModelRevision.findMany({
-        where: { logicalModelId: { in: created.logicalModelIds } },
-        select: { id: true },
-      });
-      await prisma.logicalModelRoute.deleteMany({ where: { logicalModelRevisionId: { in: revisions.map((r: any) => r.id) } } });
-      await prisma.logicalModelRevision.deleteMany({ where: { id: { in: revisions.map((r: any) => r.id) } } });
-      await prisma.logicalModel.deleteMany({ where: { id: { in: created.logicalModelIds } } });
       await prisma.user.deleteMany({ where: { id: { in: created.userIds } } });
       catalog.invalidateLocal();
     } catch (error) {

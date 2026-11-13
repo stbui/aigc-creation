@@ -293,58 +293,27 @@ test.describe('渠道与模型 P5', () => {
     expect(tierAfter.unitPriceMicrocredits).toBe(expected);
   });
 
-  test('能力消耗价：旧地址重定向到能力页定价标签', async ({ page }) => {
+  test('能力与模型：候选池、能力售价与模拟选路', async ({ page }) => {
     await login(page);
-    await page.goto(`${UI}/admin/credit-prices`);
-    await expect(page).toHaveURL(`${UI}/admin/capabilities?tab=pricing`);
-    await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({
-      timeout: 20000,
+    await page.goto(`${UI}/admin/capabilities`);
+    await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({ timeout: 20000 });
+
+    // 左侧能力清单加载后选中 free_create；绑定与售价是独立页签，不再同时挂载
+    const target = page.getByRole('button', { name: /自由创作/ }).first();
+    await expect(target).toBeVisible({ timeout: 15000 });
+    await target.click();
+    await page.getByRole('tab', { name: '绑定' }).click();
+    await expect(page.getByRole('heading', { name: '候选模型' })).toBeVisible();
+    await expect(page.getByText('gpt-image-2', { exact: false }).first()).toBeVisible({
+      timeout: 15000,
     });
-    await expect(page.getByRole('tab', { name: '能力消耗价' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-    await expect(page.getByRole('heading', { name: '能力消耗价' })).toBeVisible();
 
-    // 两个工作区同时挂载：切到能力页再回来，未保存的定价草稿不能丢。
-    const priceInput = page.getByRole('spinbutton', { name: /生效消耗价/ }).first();
-    const original = await priceInput.inputValue();
-    const draft = original === '0' ? '1' : String(Number(original) + 1);
-    await priceInput.fill(draft);
-    await page.getByRole('tab', { name: '能力与模型' }).click();
-    await expect(page).toHaveURL(`${UI}/admin/capabilities`);
-    await expect(page.getByRole('heading', { name: '能力与商品清单' })).toBeVisible();
-    await page.getByRole('tab', { name: '能力消耗价' }).click();
-    await expect(page).toHaveURL(`${UI}/admin/capabilities?tab=pricing`);
-    await expect(priceInput).toHaveValue(draft);
+    // 模拟选路是只读：要么给出命中的模型/线路，要么给出「没有可用线路」
+    await page.getByRole('button', { name: '模拟选路' }).click();
+    await expect(page.getByText(/命中模型|没有可用线路/).first()).toBeVisible({ timeout: 15000 });
 
-    // 复原草稿后回到默认标签，保持既有 `/admin/capabilities` 深链形态。
-    await priceInput.fill(original);
-    await page.getByRole('tab', { name: '能力与模型' }).click();
-    await expect(page).toHaveURL(`${UI}/admin/capabilities`);
-  });
-
-  test('能力与模型：旧地址重定向、清单与消费测试', async ({ page }) => {
-    await login(page);
-    await page.goto(`${UI}/admin/logical-models`);
-    await expect(page).toHaveURL(`${UI}/admin/capabilities`);
-    await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(page.getByRole('heading', { name: '能力与商品清单' })).toBeVisible();
-
-    // 同样是异步列表：等第一行真的出现再决定要不要跳过
-    await expect
-      .poll(async () => rows(page).count(), { timeout: 15000, message: '前台模型列表应至少有一行' })
-      .toBeGreaterThan(0);
-
-    await rows(page).first().getByRole('button', { name: '测试消费', exact: true }).click();
-    await expect(page.getByTestId('admin-drawer')).toContainText('消费测试 · ');
-    await page.getByRole('button', { name: '开始测试' }).click();
-
-    // 消费测试是只读：要么给出候选/选中商品，要么给出「为什么没落」
-    await expect(page.getByTestId('admin-drawer')).toContainText('候选商品', { timeout: 15000 });
-    await expect(page.getByTestId('admin-drawer')).toContainText('结论');
+    await page.getByRole('tab', { name: '能力售价' }).click();
+    await expect(page.getByRole('heading', { name: '能力售价' })).toBeVisible();
   });
 
   test('用户分组与插件：分组清单与契约校验结果可见', async ({ page }) => {
@@ -417,16 +386,16 @@ test.describe('渠道与模型 P5', () => {
     const auth = { Authorization: `Bearer ${userToken}` };
 
     // 选型：按目录找当前真能跑的 free_create 模型（无参考图，链路最短）
-    const modelsRes = await request.get(`${API}/api/v1/models`, { headers: auth });
+    const modelsRes = await request.get(`${API}/api/v1/models?capability=free_create`, { headers: auth });
     expect(modelsRes.ok()).toBeTruthy();
     const models = (await modelsRes.json()).data.models as Array<{
       id: string;
-      code: string;
+      modelKey: string;
       name: string;
       capability: string;
       available: boolean;
     }>;
-    const model = models.find((entry) => entry.id === requireFixture().freeCreateId);
+    const model = models.find((entry) => entry.modelKey === requireFixture().modelKey);
     expect(model, '夹具 free_create 模型未出现在用户模型目录').toBeTruthy();
     expect(model!.capability).toBe('free_create');
     expect(model!.available, '夹具 free_create 模型必须路由到可用线路').toBe(true);
@@ -439,10 +408,9 @@ test.describe('渠道与模型 P5', () => {
     expect(adjustRes.ok(), `credit adjust ${adjustRes.status()}: ${await adjustRes.text()}`).toBeTruthy();
 
     // 报价：同一模型同一参数下，报价必须先于建任务给出确定金额
-    const quoteRes = await request.post(`${API}/api/v1/models/${model!.id}/quote`, {
+    const quoteRes = await request.post(`${API}/api/v1/models/quote`, {
       headers: auth,
-      // 报价 / 选路意图按供应侧模态（image），生成接口仍按产品能力（free_create）
-      data: { capability: 'image' },
+      data: { capability: 'free_create', modelKey: model!.modelKey },
     });
     const quoteBody = await quoteRes.text();
     expect(quoteRes.ok(), `model quote ${quoteRes.status()}: ${quoteBody}`).toBeTruthy();
@@ -464,7 +432,7 @@ test.describe('渠道与模型 P5', () => {
       data: {
         projectId,
         capability: 'free_create',
-        logicalModelId: model!.id,
+        modelKey: model!.modelKey,
         inputAssetIds: [],
         params: { prompt: 'E2E：白色背景的陶瓷杯，商品摄影' },
       },
@@ -499,7 +467,7 @@ test.describe('渠道与模型 P5', () => {
     await expect(drawer).toContainText('账单详情');
     await expect(drawer).toContainText(task.taskId);
     // 账单里的模型口径是前台模型 code（`BillingOrder.model`），不是渠道模型
-    await expect(drawer).toContainText(model!.code);
+    await expect(drawer).toContainText(model!.modelKey);
   });
 
   test('渠道排序：弹窗可开合、顺序变了才允许保存', async ({ page, request }) => {

@@ -1,7 +1,7 @@
 import { RefreshCw, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../types/api';
-import { Button, Card, ResultMedia, StateEmpty, Typography, formatDuration } from './components';
+import { Button, Card, ResultMedia, StateEmpty, StateSkeleton, Typography, formatDuration } from './components';
 import { useApp } from './hooks';
 
 const { Text } = Typography;

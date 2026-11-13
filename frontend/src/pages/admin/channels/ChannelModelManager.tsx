@@ -238,6 +238,7 @@ export function ChannelModelManager({
     }
     const body = {
       modelKey,
+      modelGroupKey: draft.modelGroupKey.trim().toLowerCase(),
       providerModelKey: draft.providerModelKey.trim() || modelKey,
       displayName: draft.displayName.trim(),
       channelLabel: draft.channelLabel.trim(),
@@ -399,14 +400,18 @@ export function ChannelModelManager({
    * 配置应用统一由后端完成（本次弹窗配置 > 供应商默认配置 > 只建骨架行）：
    * 前端不再「导入后再逐条回写」，少一轮竞态，也不会误改已存在的商品。
    */
-  const runImport = async (ids: string[], config?: BatchImportConfig) => {
+  const runImport = async (
+    ids: string[],
+    config?: BatchImportConfig,
+    capabilitiesByModel?: Record<string, string[]>,
+  ) => {
     if (ids.length === 0) {
       toast.error('请勾选要导入的商品');
       return;
     }
     setImporting(true);
     try {
-      const res = await adminChannelsApi.importModels(channelId, ids, config);
+      const res = await adminChannelsApi.importModels(channelId, ids, config, capabilitiesByModel);
 
       if (res.added === 0) {
         toast.success('没有新增商品：所选商品都已存在');
@@ -557,7 +562,7 @@ export function ChannelModelManager({
           <ConfirmDialog
             open={disableTarget !== null}
             title={`停用商品 ${disableTarget?.modelKey ?? ''}？`}
-            description="停用后新任务不再使用该商品，消费它的能力会切换到其他可用商品；价格与配置保留，可随时重新启用。"
+            description="停用后新任务不再使用该商品，消费它的售卖配置可能切换到其他可用商品；若没有替代线路，能力会暂时不可用。价格与配置保留，可随时重新启用。"
             impact={[
               consumptionImpactText(
                 consumption.byModelId.get(disableTarget?.id ?? '') ?? [],

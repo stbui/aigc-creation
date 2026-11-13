@@ -13,7 +13,7 @@ const taskViewSelect = {
   params: true,
   parentTaskId: true,
   errorCode: true,
-  logicalModelId: true,
+  modelKey: true,
   creditCost: true,
   createdAt: true,
   updatedAt: true,
@@ -38,7 +38,7 @@ function task(overrides: Record<string, unknown> = {}) {
     parentTaskId: null,
     params: "{}",
     errorCode: null,
-    logicalModelId: null,
+    modelKey: null,
     creditCost: 10,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:01.000Z"),
@@ -228,10 +228,9 @@ describe("GenerateService 任务读取与重试", () => {
     prisma.generationTask.findUnique.mockResolvedValue(
       task({
         status: "failed",
-        logicalModelId: "model-1",
-        logicalModelRevisionId: "revision-1",
-        routeId: "route-1",
+        modelKey: "model-1",
         channelModelId: "channel-model-1",
+        channelId: "channel-1",
         routeRun: 1,
       }),
     );
@@ -254,10 +253,9 @@ describe("GenerateService 任务读取与重试", () => {
     prisma.generationTask.findUnique.mockResolvedValue(
       task({
         status: "failed",
-        logicalModelId: "model-1",
-        logicalModelRevisionId: "revision-1",
-        routeId: "route-1",
+        modelKey: "model-1",
         channelModelId: "channel-model-1",
+        channelId: "channel-1",
         routeRun: 1,
       }),
     );
@@ -283,7 +281,7 @@ describe("GenerateService 任务读取与重试", () => {
     prisma.generationTask.findUnique.mockResolvedValue(
       task({
         status: "failed",
-        logicalModelId: "model-1",
+        modelKey: "model-1",
         routeRun: 1,
       }),
     );
@@ -307,7 +305,7 @@ describe("GenerateService 任务读取与重试", () => {
       .mockResolvedValueOnce(
         task({
           status: "failed",
-          logicalModelId: "model-1",
+          modelKey: "model-1",
           routeRun: 1,
         }),
       )
@@ -333,7 +331,7 @@ describe("GenerateService 任务读取与重试", () => {
       .mockResolvedValueOnce(
         task({
           status: "failed",
-          logicalModelId: "model-1",
+          modelKey: "model-1",
           routeRun: 1,
         }),
       )

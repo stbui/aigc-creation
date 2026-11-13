@@ -89,7 +89,7 @@ describe('channel default model config', () => {
     ).toThrow('仅支持图像或文本');
     expect(() =>
       normalizeDefaultModelConfig({ capability: 'image', protocol: '' }, fakeProtocols()),
-    ).toThrow('请选择接入方式');
+    ).toThrow('默认商品配置需要选择接入方式');
     expect(() =>
       normalizeDefaultModelConfig(
         {

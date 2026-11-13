@@ -1,4 +1,14 @@
 import { AppError } from '../common/app.exception';
+import {
+  DEPLOYMENT_UPLOAD_MAX_BYTES,
+  DEPLOYMENT_UPLOAD_MAX_PIXELS,
+  MIME_TO_EXT,
+  SUPPORTED_IMAGE_MIMES,
+  allowedTypeLabels,
+  deploymentUploadMaxBytes,
+  deploymentUploadMaxPixels,
+  type SupportedImageMime,
+} from '../common/image-formats';
 
 /**
  * 用户上传图片的格式与像素边界校验。
@@ -8,7 +18,7 @@ import { AppError } from '../common/app.exception';
  * 真实格式并读取尺寸，在 Jimp 完整解码前拒绝超限图片。
  */
 
-export type SupportedImageMime = 'image/png' | 'image/jpeg' | 'image/webp';
+export type { SupportedImageMime } from '../common/image-formats';
 
 export interface UploadedImageInfo {
   mime: SupportedImageMime;
@@ -18,23 +28,12 @@ export interface UploadedImageInfo {
   pixels: number;
 }
 
-/** 与前端 `lib/constants.ts` 的 MAX_IMAGE_MB 保持一致；可通过环境变量上调。 */
-const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
-const DEFAULT_MAX_PIXELS = 40_000_000;
-
-function envPositiveInt(name: string, fallback: number, max: number): number {
-  const value = Number(process.env[name]);
-  if (!Number.isFinite(value) || value <= 0) return fallback;
-  return Math.min(Math.floor(value), max);
-}
-
-export function maxUploadBytes(): number {
-  return envPositiveInt('ASSET_MAX_UPLOAD_BYTES', DEFAULT_MAX_BYTES, 100 * 1024 * 1024);
-}
-
-export function maxUploadPixels(): number {
-  return envPositiveInt('ASSET_MAX_PIXELS', DEFAULT_MAX_PIXELS, 200_000_000);
-}
+export {
+  DEPLOYMENT_UPLOAD_MAX_BYTES as DEPLOYMENT_MAX_UPLOAD_BYTES,
+  DEPLOYMENT_UPLOAD_MAX_PIXELS as DEPLOYMENT_MAX_UPLOAD_PIXELS,
+  deploymentUploadMaxBytes,
+  deploymentUploadMaxPixels,
+};
 
 /** 受支持图片的真实格式；无法识别时返回 null，不做“按 JPEG 猜”的兜底。 */
 export function detectImageMime(buf: Buffer): SupportedImageMime | null {
@@ -132,22 +131,42 @@ export function readImageDimensions(
   return webpDimensions(buf);
 }
 
+/** 运行时限制必须为正的有限数；坏值不能把部署硬上限变成 NaN。 */
+function boundedUploadLimit(value: number | undefined, deploymentLimit: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return deploymentLimit;
+  }
+  return Math.min(value, deploymentLimit);
+}
+
 /** 校验用户上传图；失败抛 40001，调用方不得继续落库或扣费。 */
 export function inspectUploadedImage(
   buf: Buffer,
-  opts: { maxBytes?: number; maxPixels?: number } = {},
+  opts: {
+    maxBytes?: number;
+    maxPixels?: number;
+    allowedMimes?: readonly SupportedImageMime[];
+  } = {},
 ): UploadedImageInfo {
-  const maxBytes = opts.maxBytes ?? maxUploadBytes();
-  const maxPixels = opts.maxPixels ?? maxUploadPixels();
+  const maxBytes = boundedUploadLimit(opts.maxBytes, deploymentUploadMaxBytes());
+  const maxPixels = boundedUploadLimit(opts.maxPixels, deploymentUploadMaxPixels());
+  const allowedMimes = opts.allowedMimes ?? SUPPORTED_IMAGE_MIMES;
+
   if (!buf.length) throw new AppError(40001, '上传文件为空', 400);
+
+  // 必须先按文件头识别真实格式，再检查运营白名单；客户端 MIME 与扩展名都不可信。
+  const mime = detectImageMime(buf);
+  if (!mime) {
+    throw new AppError(40001, '文件内容不是有效的 PNG、JPG 或 WebP 图片', 400);
+  }
+  if (!allowedMimes.includes(mime)) {
+    const labels = allowedTypeLabels(allowedMimes);
+    throw new AppError(40001, `当前仅允许上传 ${labels.join(' / ')} 图片`, 400);
+  }
   if (buf.length > maxBytes) {
     throw new AppError(40001, `图片不能超过 ${Math.floor(maxBytes / 1024 / 1024)} MB`, 400);
   }
 
-  const mime = detectImageMime(buf);
-  if (!mime) {
-    throw new AppError(40001, '仅支持真实的 PNG、JPEG 或 WebP 图片', 400);
-  }
   const dims = readImageDimensions(buf, mime);
   if (!dims) {
     throw new AppError(40001, '图片文件头损坏或缺少有效尺寸', 400);
@@ -156,13 +175,13 @@ export function inspectUploadedImage(
   if (!Number.isSafeInteger(pixels) || pixels > maxPixels) {
     throw new AppError(
       40001,
-      `图片像素超过限制（${dims.width}×${dims.height}，最多 ${maxPixels} 像素）`,
+      `图片像素总量超过限制（${dims.width}×${dims.height}，最多 ${maxPixels.toLocaleString('en-US')} 像素）`,
       400,
     );
   }
   return {
     mime,
-    ext: mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg',
+    ext: MIME_TO_EXT[mime] as UploadedImageInfo['ext'],
     width: dims.width,
     height: dims.height,
     pixels,
@@ -174,10 +193,11 @@ export function inspectMaskImage(
   buf: Buffer,
   expected: { width: number; height: number },
 ): UploadedImageInfo {
-  const info = inspectUploadedImage(buf);
-  if (info.mime !== 'image/png') {
-    throw new AppError(40001, '遮罩必须是 PNG 图片', 400);
-  }
+  const info = inspectUploadedImage(buf, {
+    maxBytes: deploymentUploadMaxBytes(),
+    maxPixels: deploymentUploadMaxPixels(),
+    allowedMimes: ['image/png'],
+  });
   if (info.width !== expected.width || info.height !== expected.height) {
     throw new AppError(
       40001,

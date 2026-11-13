@@ -28,7 +28,7 @@ function DetailSectionPickerBase({ selected, onToggle }: DetailSectionPickerProp
     <section className="pk-config-card pk-detail-card">
       <div className="pk-section">
         <div className="pk-section-title-row">
-          <strong className="pk-section-title">包含模块（多选）</strong>
+          <strong className="pk-section-title u-font-14">包含模块（多选）</strong>
           <span className="pk-section-counter">
             已选 {selected.length}/{MAX_SECTIONS}
           </span>

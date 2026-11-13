@@ -174,9 +174,9 @@ const VALID_EFFECTIVE = ['remote', 'disabled', 'unavailable'];
 
   const gen = await call('POST', '/generate', U, {
     projectId,
-    // DTO 层要求 logicalModelId 非空；这里故意给一个不存在的 id，
+    // DTO 层要求 modelKey 非空；这里故意给一个不存在的分组，
     // 用来证明「下线」在模型解析与素材校验之前就把它拦下了。
-    logicalModelId: 'smoke-offline-model',
+    modelKey: 'smoke-offline-model',
     inputAssetIds: ['no-such-asset'],
     capability: TARGET,
     params: {},
@@ -210,10 +210,6 @@ const VALID_EFFECTIVE = ['remote', 'disabled', 'unavailable'];
   await new Promise((r) => setTimeout(r, 3200));
   const priceDuring = (await call('GET', '/capabilities', null)).data.items.find((c) => c.id === FREE_TARGET)?.creditCost;
   check('活动期内生效价为 0', priceDuring === 0, `${priceBefore} → ${priceDuring}`);
-
-  const adminPrices = (await call('GET', '/admin/credit-prices', T)).data;
-  const row = adminPrices.find((r) => r.capabilityId === FREE_TARGET);
-  check('改价页标出 campaign 来源', row?.source === 'campaign' && row?.freeCampaign === true, JSON.stringify(row));
 
   if (campaignId) await call('PATCH', `/admin/campaigns/${campaignId}/toggle`, T);
   await new Promise((r) => setTimeout(r, 3200));

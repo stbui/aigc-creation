@@ -1,6 +1,6 @@
 import { AlertCircle } from 'lucide-react';
 
-import type { PublicLogicalModel } from './components';
+import type { PublicModelGroup } from './components';
 import { ModelPicker, PillOptions, ToolCard } from './components';
 import {
   PROMPT_MAX_LENGTH,
@@ -21,7 +21,7 @@ interface VideoSettingsCardProps {
   runtime?: CapabilityRuntime;
   values: VideoParamValues;
   onChange: (key: string, value: string) => void;
-  onModelChange: (model: PublicLogicalModel | null) => void;
+  onModelChange: (model: PublicModelGroup | null) => void;
   onQuoteChange: (credits: number | null) => void;
 }
 

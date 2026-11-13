@@ -67,7 +67,7 @@ test.describe('后台布局', () => {
     });
   }
 
-  test('侧栏首次默认全展开，折叠分组互不影响', async ({ page }) => {
+  test('侧栏首次仅展开当前分组，其他分组按需展开', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${UI}/admin`);
     await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
@@ -77,13 +77,13 @@ test.describe('后台布局', () => {
     await page.reload();
     const nav = page.getByTestId('admin-sider');
     const overview = nav.getByRole('button', { name: '总览', exact: true });
-    const operations = nav.getByRole('button', { name: '运营', exact: true });
+    const operations = nav.getByRole('button', { name: '运营与内容', exact: true });
 
     await expect(overview).toHaveAttribute('aria-expanded', 'true');
-    await expect(operations).toHaveAttribute('aria-expanded', 'true');
+    await expect(operations).toHaveAttribute('aria-expanded', 'false');
 
-    await overview.click();
-    await expect(overview).toHaveAttribute('aria-expanded', 'false');
+    await operations.click();
+    await expect(overview).toHaveAttribute('aria-expanded', 'true');
     await expect(operations).toHaveAttribute('aria-expanded', 'true');
     await expect(nav.getByRole('button', { name: '用户管理', exact: true })).toBeVisible();
   });

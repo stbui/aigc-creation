@@ -117,7 +117,7 @@ export function ShoppableCarouselConfig({
 
         {/* ── 2. 生成设置（2×2 四组下拉 + 不加文字开关） ── */}
         <div className="pk-section">
-          <strong className="pk-section-title">生成设置</strong>
+          <strong className="pk-section-title u-font-14">生成设置</strong>
           <div className="pk-form-grid">
             {/* Select 不用 <label> 包裹: label 会把点击转发给内部 input,
                 已知会让下拉「打开即关闭」; 无障碍名走 aria-label */}
@@ -172,11 +172,11 @@ export function ShoppableCarouselConfig({
       {/* ── 3. 商品卖点 & 生成要求 ── */}
         <div className="pk-section">
         <div className="pk-field-label-row">
-          <span className="pk-section-title">商品卖点&生成要求</span>
+          <span className="pk-section-title u-font-14">商品卖点&生成要求</span>
           <div className="pk-desc-actions">
             <button
               type="button"
-              className="pk-ai-btn"
+              className="pk-ai-btn u-font-12 u-py-4 u-px-10"
               disabled={analyzing}
               onClick={onAnalyze}
             >
@@ -198,7 +198,7 @@ export function ShoppableCarouselConfig({
 
         {/* ── 4. 生成模式（两选一卡片） ── */}
         <div className="pk-section">
-          <strong className="pk-section-title">生成模式</strong>
+          <strong className="pk-section-title u-font-14">生成模式</strong>
           <div className="sc-mode-grid">
             <button
               type="button"
@@ -259,7 +259,7 @@ export function ShoppableCarouselConfig({
 
       {/* ── 5. 附加功能 ── */}
         <div className="pk-section">
-          <strong className="pk-section-title">附加功能</strong>
+          <strong className="pk-section-title u-font-14">附加功能</strong>
           {/* 参考站「附加功能」是**普通行**（无灰底块），只有「图片不加文字」带灰底 */}
           <div className="sc-toggle-row sc-toggle-row-plain">
             <span className="sc-toggle-label">社媒帖子发布文案</span>

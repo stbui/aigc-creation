@@ -232,7 +232,7 @@ async function signedServer() {
     // 数据中心缩略图只来自真实产出任务，不能用手工伪造的 Asset 代替。
     const catalog = await call('GET', '/models', token);
     const model = (catalog.data?.models ?? []).find((m) => m.capability === 'main_image' && m.available === true);
-    check('存在可用的 main_image 前台模型', Boolean(model), `status=${catalog.httpStatus} ${catalog.message || ''}`);
+    check('存在可用的 main_image 模型分组', Boolean(model), `status=${catalog.httpStatus} ${catalog.message || ''}`);
 
     let taskId = null;
     if (model && asset?.id) {
@@ -240,7 +240,7 @@ async function signedServer() {
       const created = await call('POST', '/generate', token, {
         projectId,
         capability: 'main_image',
-        logicalModelId: model.id,
+        modelKey: model.modelKey,
         inputAssetIds: [asset.id],
         params: { platform: 'taobao', size: '1k', ratio: '1:1' },
       });

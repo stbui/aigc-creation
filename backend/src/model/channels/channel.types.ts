@@ -102,6 +102,8 @@ export interface ChannelModelPriceTierRequest {
 
 export interface ChannelModelRequest {
   modelKey?: string;
+  /** C 端模型分组键；空串 = 使用 modelKey */
+  modelGroupKey?: string;
   providerModelKey?: string;
   displayName?: string;
   channelLabel?: string;
@@ -221,6 +223,7 @@ export interface ChannelModelView {
   id: string;
   channelId: string;
   modelKey: string;
+  modelGroupKey: string;
   providerModelKey: string;
   displayName: string;
   channelLabel: string;

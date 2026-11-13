@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { modelsApi } from '../lib/api';
 import { toCredits } from '../lib/microcredits';
-import { loadModels, modelsForCapability, type PublicLogicalModel } from '../lib/models';
+import { loadModels, modelsForCapability, type PublicModelGroup } from '../lib/models';
 import {
   readSelectedModelId,
   subscribeModelSelection,
@@ -13,9 +13,9 @@ import { Button } from '../ui';
 /**
  * 前台模型选择器。
  *
- * 用户在这里选的是**产品**（名称 / 图标 / 价格），不是上游渠道或模型 id ——
+ * 用户在这里选的是**模型分组**（名称 / 图标 / 价格），不是上游渠道或线路 ——
  * 渠道信息不出现在 C 端任何位置。选择按能力记忆（`lib/modelSelection`），
- * 建任务时由 `resolveModelId` 读取，因此各入口的默认模型一致。
+ * 建任务时由 `resolveModelKey` 读取，因此各入口的默认模型一致。
  *
  * 不可用模型仍然列出但置灰：用户需要知道「有更贵的模型，只是现在没线路」，
  * 直接隐藏会让人以为产品只有一档。
@@ -44,12 +44,12 @@ export interface ModelPickerProps {
    * 当前真正会被 `resolveModel` 选中的模型。目录尚未加载或加载失败时为 null。
    * 上传数量等模型相关约束应从这里读，不能假设前端的页面上限就等于模型上限。
    */
-  onModelChange?: (model: PublicLogicalModel | null) => void;
+  onModelChange?: (model: PublicModelGroup | null) => void;
   className?: string;
 }
 
 /** 价格文案：优先展示后端给的口径，避免前端自己拼「起」字造成误导 */
-function priceText(model: PublicLogicalModel): string {
+function priceText(model: PublicModelGroup): string {
   if (model.priceLabel) return model.priceLabel;
   if (model.displayPrice !== null) return `${model.displayPrice} 积分`;
   return '按渠道价格档';
@@ -63,7 +63,7 @@ export function ModelPicker({
   onModelChange,
   className,
 }: ModelPickerProps) {
-  const [models, setModels] = useState<PublicLogicalModel[]>([]);
+  const [models, setModels] = useState<PublicModelGroup[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [quote, setQuote] = useState<ModelQuoteView | null>(null);
   const [quoteFailed, setQuoteFailed] = useState(false);
@@ -144,15 +144,12 @@ export function ModelPicker({
     const timer = window.setTimeout(() => {
       setQuoteFailed(false);
       /*
-       * 报价接口的 `capability` 是模型供应侧模态（image/video/text/audio），
-       * 不是产品能力 id（main_image / detail_image …）。直接传产品 id 会被
-       * 后端拒绝，报价永远回落到能力 registry 价。这里取所选模型的
-       * capabilitySpec.capability，报价与建单的模型语义一致。
+       * 报价按「能力 id + 模型分组」：售价在能力级，切换线路不改价；
+       * 报价与建任务共用同一份能力定价。
        */
       const quoteModel = candidates.find((model) => model.id === selectedId);
-      const quoteCapability = quoteModel?.capabilitySpec?.capability || capability;
       modelsApi
-        .quote(selectedId, { capability: quoteCapability, options })
+        .quote(capability, quoteModel?.modelKey ?? selectedId, { options })
         .then((result) => {
           if (alive) {
             setQuote(result.quote);

@@ -1,5 +1,5 @@
 /**
- * 路由目录快照与解析结果的数据形状。
+ * 能力目录快照与解析结果的数据形状。
  *
  * 快照是**只读**的内存投影：装载时把 BigInt 金额转成 number，后续匹配、
  * 计价、展示都读同一份。任何写路径都不能改快照对象 —— 改价后应当递增
@@ -26,14 +26,6 @@ export interface CachedPriceTier extends TierSummarySource {
   enabled: boolean;
   /** 价格档版本：改价时递增，账单用它区分「同一档位的哪一版价格」 */
   priceVersion: number;
-  /**
-   * 成本价（仅后台可见，不叠倍率、不参与售价）。
-   *
-   * 与参考实现 `CreditCostPricing` 同口径：建单时快照进账单，用于毛利核算。
-   * 缺失时 `costConfigured=false`，账单成本留空而不是按 0 记账。
-   *
-   * 可选：公开目录（`public-model-catalog`）刻意不带成本，故这里不设为必填。
-   */
   costConfigured?: boolean;
   costUnitPriceMicrocredits?: number;
   costInputTokenPriceMicrocredits?: number;
@@ -41,28 +33,51 @@ export interface CachedPriceTier extends TierSummarySource {
   costCachedTokenPriceMicrocredits?: number;
 }
 
-/** 快照里的渠道模型（含能力合同与价格档） */
+/** 快照里的渠道模型（含能力合同与成本档） */
 export interface CachedChannelModel {
   id: string;
   channelId: string;
+  /** 渠道名（后台诊断与账单展示用；公开目录不下发） */
+  channelName: string;
   modelKey: string;
+  /** C 端模型分组键；空串时调用方回落到 modelKey */
+  modelGroupKey: string;
   providerModelKey: string;
   displayName: string;
+  icon: string;
+  sortOrder: number;
+  /** 商品自身启停 */
+  enabled: boolean;
+  /** 所属渠道启停 */
+  channelEnabled: boolean;
   capability: string;
   protocol: string;
   /** 'credits' | 'USD' | 'CNY' */
   priceCurrency: string;
   billingMode: string;
   priceConfigured: boolean;
-  /** 渠道模型价格版本：任何售价字段变更都会递增 */
+  /** 渠道模型价格版本：任何成本字段变更都会递增 */
   priceVersion: number;
   priceTiers: CachedPriceTier[];
   capabilitySpec: CapabilitySpec;
 }
 
-/** 前台模型 revision 的一条线路 */
-export interface CachedLogicalRoute {
+/** 能力级售价快照 */
+export interface CachedCapabilityPricing {
+  capabilityId: string;
+  billingMode: string;
+  unitPriceMicrocredits: number;
+  inputTokenPriceMicrocredits: number;
+  outputTokenPriceMicrocredits: number;
+  cachedTokenPriceMicrocredits: number;
+  /** false = 未配置且没有可用的默认价（Token 计费能力） */
+  configured: boolean;
+}
+
+/** 能力 ↔ 渠道模型绑定（候选线路） */
+export interface CachedCapabilityBinding {
   id: string;
+  capabilityId: string;
   channelModelId: string;
   enabled: boolean;
   priority: number;
@@ -70,49 +85,50 @@ export interface CachedLogicalRoute {
   channelModel: CachedChannelModel;
 }
 
-/** 快照里的前台模型（含已发布的 revision 与可用线路） */
-export interface CachedLogicalModel {
-  id: string;
-  code: string;
-  name: string;
+/** 同一能力下、同一分组键的候选线路集合 */
+export interface CachedModelGroup {
+  modelKey: string;
+  displayName: string;
   icon: string;
-  description: string;
-  capability: string;
-  sortOrder: number;
-  enabled: boolean;
-  pricePolicy: string;
-  billingMode: string;
-  unitPriceMicrocredits: number;
-  inputPriceMicrocredits: number;
-  outputPriceMicrocredits: number;
-  cachedPriceMicrocredits: number;
-  legacyModelIds: string[];
-  revisionId: string;
-  revisionVersion: number;
-  productSpec: CapabilitySpec;
-  defaults: Record<string, unknown>;
-  routes: CachedLogicalRoute[];
-  archivedAt: number | null;
+  lines: CachedCapabilityBinding[];
 }
 
-export interface RouteCatalogSnapshot {
-  models: Map<string, CachedLogicalModel>;
-  ordered: string[];
+/** 一个能力的完整运行时投影 */
+export interface CachedCapability {
+  id: string;
+  pricing: CachedCapabilityPricing;
+  groups: Map<string, CachedModelGroup>;
+  orderedGroupKeys: string[];
+}
+
+export interface CapabilityCatalogSnapshot {
+  capabilities: Map<string, CachedCapability>;
+  channelModels: Map<string, CachedChannelModel>;
   loadedAt: number;
   catalogVersion: number;
 }
 
 /** 一次选路的完整结果：调用方不得替换其中任何供应侧字段 */
 export interface RoutedModel {
-  logicalModel: CachedLogicalModel;
-  revisionId: string;
-  revisionVersion: number;
-  route: CachedLogicalRoute;
+  capabilityId: string;
+  /** C 端所选模型分组键 */
+  modelKey: string;
+  binding: CachedCapabilityBinding;
   channelModel: CachedChannelModel;
   capabilitySpec: CapabilitySpec;
-  priceTier: CachedPriceTier | null;
-  defaults: Record<string, unknown>;
+  pricing: CachedCapabilityPricing;
   intent: ModelRequestIntent;
   /** 解析时读取的目录版本；账单 `priceVersion` 记录它，便于回溯「哪一版目录算出的价」 */
   catalogVersion: number;
+}
+
+/** 模型分组的公开投影 */
+export interface PublicModelGroup {
+  modelKey: string;
+  displayName: string;
+  icon: string;
+  billingMode: string;
+  priceLabel: string;
+  amountMicrocredits: number | null;
+  available: boolean;
 }

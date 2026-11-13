@@ -59,7 +59,7 @@ frontend/src/components/admin/
 ├── DutyContext.tsx                 # 概览首屏值班塔的数据轮询
 └── statusMeta.ts                   # 状态 → 文案 / 色调映射
 
-frontend/src/pages/admin/            # 32 个页面 + channels/、payments/ 子目录
+frontend/src/pages/admin/            # 33 个页面 + channels/、payments/、payment-rules/ 子目录
 ```
 
 ### 0.2 守卫链
@@ -316,7 +316,7 @@ partial_refunded → refunded | partial_refunded
 
 ### 10.3 退款被拒时的两类拒绝
 
-`40001`（金额超上限）是**硬约束**，只有改金额能解；`40905` / `40906` / `40907` 是**可配规则**（时间窗 / 比例上限 / 已消耗积分），要去「系统设置 → 退款」改规则。状态码只能分 400 与 409，分不出是哪条规则，因此前端 `ApiError` 带后端业务码（响应体 `code`），退款失败时按码给出可执行的下一步，并在退款弹窗里给出规则设置的深链入口（`/admin/settings?group=refund`）。**绝不允许两类拒绝在 UI 上同形** —— 运营只能反复改金额试。
+`40001`（金额超上限）是**硬约束**，只有改金额能解；`40905` / `40906` / `40907` 是**可配规则**（时间窗 / 比例上限 / 已消耗积分），要去「支付与退费 → 退款处理边界」改规则。状态码只能分 400 与 409，分不出是哪条规则，因此前端 `ApiError` 带后端业务码（响应体 `code`），退款失败时按码给出可执行的下一步，并在退款弹窗里给出规则设置的深链入口（`/admin/payment-rules#refund-rules`）。**绝不允许两类拒绝在 UI 上同形** —— 运营只能反复改金额试。
 
 ### 10.4 退款顺序不可反
 
@@ -332,9 +332,9 @@ partial_refunded → refunded | partial_refunded
 
 ## 11. 支付与财务
 
-### 11.1 支付充值 `/admin/payments`
+### 11.1 支付配置 `/admin/payments`
 
-三标签共用一个页面（`frontend/src/pages/admin/payments/`）：**支付渠道 / 支付对账 / 支付异常**。URL 的 `?tab=` 是标签的事实源，非法值回落到「支付渠道」；旧路由 `/admin/payment-channels` 与 `/admin/reconciliation` 改为重定向。
+同一个支付工作台（`frontend/src/pages/admin/payments/`）承载 **收款设置 / 交易核对 / 异常处理**，侧栏拆成三个独立菜单入口并分别指向 `?tab=providers` / `?tab=reconciliation` / `?tab=exceptions`；页内标签只负责快速切换。URL 的 `?tab=` 是视图的事实源，非法值回落到「收款设置」；旧路由 `/admin/payment-channels` 与 `/admin/reconciliation` 改为重定向。
 
 **商品与订单不在这里**：充值商品就是 `Product` 表，统一在「商品管理」（`/admin/products`）维护；支付订单就是 `Order` 表，统一在「订单管理」（`/admin/orders`）查看与操作。两边各有一套列表时字段与动作必然分叉，运营会按页面而不是按数据判断状态。
 
@@ -350,7 +350,15 @@ partial_refunded → refunded | partial_refunded
 
 对账运行状态只有 `running` / `completed` / `failed`；旧的 `imported` / `resolved` 语义已随新模型下线（人工处置走订单退款流程，不在页面上改钱）。
 
-### 11.2 发票
+支付体验与退款规则不放在本页，统一由 `支付与退费` 独立工作台维护；本页保留客户可选支付方式、交易核对和真实资金异常处理。
+
+### 11.2 支付与退费 `/admin/payment-rules`
+
+`setting.read` / `setting.write`。页面从系统设置中独立出来，采用运营工作台而非设置页的分组结构：顶部展示客户支付是否开放、充值金额范围、每日限额与退款边界；正文分为客户支付体验、退款处理边界、下单与取消限制、支付能力策略；右侧展示待保存变更及对客户的影响。所有修改先在本地形成草稿，保存前二次确认，离页时拦截未保存变更。
+
+页面只提交白名单内的 `payment.*` / `refund.*` 配置，并明确排除 `payment.alipaySource` / `payment.wechatSource` —— 客户可选支付方式仍由 `/admin/payments` 的「收款设置」维护。支付与退款不再出现在系统设置中，也不保留旧设置路径的兼容跳转。
+
+### 11.3 发票
 
 `/admin/invoices`（`invoice.write`）。同一订单保留历史但最多一张有效票（`activeOrderId @unique`），金额取申请时 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具不要求填写原因；驳回要求填写原因，原因会回显给用户。存在 `processing` 退款时禁止开具；开具事务内重新校验订单状态和剩余可开票余额，退款后票面超余额必须驳回重提。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`invoice.write + data.export`）。
 
@@ -381,7 +389,18 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ## 14. 系统设置 `/admin/settings`
 
-`GET|PATCH /admin/settings`（`setting.read` / `setting.write`）。默认值与键名只在 `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` 定义，包括：站点信息、上传限制、生成超时与轮询、退款规则（`refund.windowDays` / `refund.maxRatioBps` / `refund.allowConsumedTask`）、备份频次与保留份数。
+`GET|PATCH /admin/settings`（`setting.read` / `setting.write`）。默认值与键名只在 `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` 定义。页面按独立路由分为四个页签：
+
+| 页签 | 路由 | 运行时配置 |
+| --- | --- | --- |
+| 运行与生成 | `/admin/settings/generate` | `generate.billingAutoRefund`：账单清扫任务每 5 分钟读取一次；关闭时任务账单保留在待核对队列 |
+| 上传限制 | `/admin/settings/upload` | `upload.maxSizeMb` / `upload.maxPixels` / `upload.allowedTypes`：下一次上传请求起生效，后端与网页端使用同一份快照 |
+| 备份 | `/admin/settings/backup` | `backup.frequencyDays`：调度器每 10 分钟检查一次，按最近一次成功备份判断是否到期 |
+| 安全 | `/admin/settings/security` | 只读策略说明：令牌有效期由 `JWT_TTL` 控制，密码最小长度由发布版本中的后端 DTO 校验；本页不提供运行时编辑 |
+
+上传限制的部署硬上限为 100 MB、200,000,000 像素，后台配置只能在此范围内收紧；大小与像素总量必须填写整数。格式白名单只接受 JPG / PNG / WebP，`jpeg` 归一为 `jpg`，不允许保存空白名单或后端无法识别的格式。
+
+公开的 `GET /api/v1/settings` 只返回 `upload` 域（`maxSizeMb` / `maxBytes` / `maxPixels` / `allowedTypes` / `allowedMimes` / `allowedLabels`），不转发支付、邮件或其他后台配置。网页端据此预检格式、大小与像素总量；后端仍按真实文件头、尺寸和部署上限复核。
 
 设置图片先走 `POST /admin/settings/upload`（multipart 字段 `file`，`setting.write`）：服务端校验图片、写入当前存储后端并返回 `{ value, previewUrl, width, height, sizeBytes }`。`value` 是稳定存储引用，只有用户保存设置时才写入 `payment.helpImage`，上传动作本身不改配置。
 
@@ -389,10 +408,10 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 - 写入载荷为 `{ settings: Record<key, value>, clears?: string[] }`；`settings` 用点号键，`clears` 删除运行时覆盖并回落代码默认值。
 - 写入前按 `SETTING_DEFS` 做类型与范围校验，非法值整体拒绝；同一键不能同时出现在 `settings` 与 `clears`。
-- 只读项（`readOnly`）不渲染可编辑控件，只展示当前值并给出 `linkTo` 入口。
+- 只读项（`readOnly`）不渲染可编辑控件，只展示当前值并给出 `linkTo` 入口；安全页签没有运行时配置项，不伪造保存入口。
 - 退款规则的读取方是 `order.service.refund`，规则对象由后台控制器取好后传入，订单域不依赖 admin 层。
 - 保存不要求填写变更原因。
-- **分组深链**：`?group=<分组键>` 直达某一组配置（如 `/admin/settings?group=refund`）。分组是本页唯一的页内状态，切换页签时用 `replace` 写回地址栏（不压历史），URL 上的分组不存在时回落到首个分组。退款规则被拒时运营要改的就是那一组，深链省掉「先进设置再在八个页签里找『退款』」。
+- **固定页签路由**：仅 `/admin/settings` 与 `/admin/settings/generate|upload|backup|security` 有效；访问 `/admin/settings` 时以 `replace` 进入 `/admin/settings/generate`。切换页签同样使用 `replace` 更新地址，不堆叠历史。页面不读取 `?group=`，旧设置路径与未知分组均不兼容，由后台路由显示 404。
 
 ### 14.1 角色权限 `/admin/roles`
 

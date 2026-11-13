@@ -26,7 +26,7 @@ import {
   useShoppableCarouselTemplates,
   type GalleryItem,
 } from './hooks';
-import { generateApi, newIdempotencyKey, promptToolsApi, resolveModelId } from './api';
+import { generateApi, newIdempotencyKey, promptToolsApi, resolveModelKey } from './api';
 import { clampCount, isUncertainSubmitError } from './utils';
 import { Modal, useApp } from '../../ui';
 import type { ShoppableCarouselTemplate } from '../../types/api';
@@ -246,7 +246,7 @@ export function ShoppableCarouselPage() {
 
     try {
       const projectId = await ensureProject();
-      const logicalModelId = await resolveModelId(CAPABILITY_ID);
+      const modelKey = await resolveModelKey(CAPABILITY_ID);
       const shotCount = clampCount(count, countRange.min, countRange.max);
 
       const baseParams = {
@@ -271,7 +271,7 @@ export function ShoppableCarouselPage() {
       const fingerprint = JSON.stringify({
         capability: CAPABILITY_ID,
         projectId,
-        logicalModelId,
+        modelKey,
         inputAssetIds,
         baseParams,
       });
@@ -289,7 +289,7 @@ export function ShoppableCarouselPage() {
       await generateApi.start({
         projectId,
         capability: CAPABILITY_ID,
-        logicalModelId,
+        modelKey,
         inputAssetIds,
         idempotencyKey,
         params: baseParams,
@@ -375,12 +375,12 @@ export function ShoppableCarouselPage() {
       : undefined;
 
   return (
-    <div className="sc-workspace">
-      <div className="sc-body">
+    <>
+      <div className="sc-workspace">
         {/* ── 左: 配置栏 ── */}
         <aside className="sc-input-pane">
-          <div className="sc-form-card">
-            <div className="sc-form-scroll">
+          <div className="sc-form-scroll">
+            <section className="pk-config-card">
               <ShoppableCarouselConfig
                 images={images}
                 uploading={uploading}
@@ -410,48 +410,46 @@ export function ShoppableCarouselPage() {
                 socialCaption={socialCaption}
                 onSocialCaptionChange={setSocialCaption}
               />
-            </div>
-
-            <ShoppableCarouselFooter
-              count={count}
-              min={countRange.min}
-              max={countRange.max}
-              onCountChange={onCountChange}
-              settingsOpen={settingsOpen}
-              onToggleSettings={() => setSettingsOpen((open) => !open)}
-              ratio={ratio}
-              onRatioChange={setRatio}
-              resolution={resolution}
-              onResolutionChange={setResolution}
-              onModelQuoteChange={setModelQuoteCredits}
-              generating={generating}
-              submitDisabled={!formValid || blocked}
-              guestLabel={guestLabel}
-              creditLabel={creditLabel}
-              hint={hint}
-              onSubmit={() => void submit()}
-            />
+            </section>
           </div>
+
+          <ShoppableCarouselFooter
+            count={count}
+            min={countRange.min}
+            max={countRange.max}
+            onCountChange={onCountChange}
+            settingsOpen={settingsOpen}
+            onToggleSettings={() => setSettingsOpen((open) => !open)}
+            ratio={ratio}
+            onRatioChange={setRatio}
+            resolution={resolution}
+            onResolutionChange={setResolution}
+            onModelQuoteChange={setModelQuoteCredits}
+            generating={generating}
+            submitDisabled={!formValid || blocked}
+            guestLabel={guestLabel}
+            creditLabel={creditLabel}
+            hint={hint}
+            onSubmit={() => void submit()}
+          />
         </aside>
 
         {/* ── 右: 模板展示（常驻）+ 底部历史记录 ── */}
-        <section className="sc-showcase">
-          <ShoppableCarouselShowcase
-            categories={categories}
-            categoryId={categoryId}
-            onCategoryChange={setCategoryId}
-            templates={templates}
-            selectedTemplateId={selectedTemplateId}
-            onSelectTemplate={selectTemplate}
-            templatesError={templatesError}
-            templatesLoading={templatesLoading}
-            galleryItems={gallery.items}
-            galleryLoading={gallery.loading}
-            galleryError={gallery.error}
-            onRefreshGallery={refreshGallery}
-            onOpenAll={() => setHistoryOpen(true)}
-          />
-        </section>
+        <ShoppableCarouselShowcase
+          categories={categories}
+          categoryId={categoryId}
+          onCategoryChange={setCategoryId}
+          templates={templates}
+          selectedTemplateId={selectedTemplateId}
+          onSelectTemplate={selectTemplate}
+          templatesError={templatesError}
+          templatesLoading={templatesLoading}
+          galleryItems={gallery.items}
+          galleryLoading={gallery.loading}
+          galleryError={gallery.error}
+          onRefreshGallery={refreshGallery}
+          onOpenAll={() => setHistoryOpen(true)}
+        />
       </div>
 
       {/* 素材库选择弹窗（真实数据） */}
@@ -490,6 +488,6 @@ export function ShoppableCarouselPage() {
           onDeleteRow={deleteRow}
         />
       </Modal>
-    </div>
+    </>
   );
 }

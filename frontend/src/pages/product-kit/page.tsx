@@ -13,7 +13,7 @@ import {
   MobileUploadModal,
   ToolBatchOutputPane,
   ToolWorkflowSteps,
-  type PublicLogicalModel,
+  type PublicModelGroup,
 } from './components';
 import { ProductKitExamplePanel } from './ProductKitExamplePanel';
 import { ProductKitInputPane } from './ProductKitInputPane';
@@ -53,7 +53,7 @@ export function ProductKitPage() {
    * 当前模型的能力合同决定实际可提交的图片数。页面上限仍保留 5，
    * 既兼容未来支持 5 张的模型，也避免已有 5 张素材被静默删除。
    */
-  const [selectedModel, setSelectedModel] = useState<PublicLogicalModel | null>(null);
+  const [selectedModel, setSelectedModel] = useState<PublicModelGroup | null>(null);
   /*
    * 模型选择器位于默认收起的高级设置里，不能依赖它挂载后才上报约束。
    * 页面进入时先解析一次真实模型，上传区才能从第一张图起就按模型上限工作。
