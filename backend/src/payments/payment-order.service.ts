@@ -201,7 +201,7 @@ export class PaymentOrderService {
       throw new AppError(40301, "无权支付该订单", 403);
     if (order.status === "paid") throw new AppError(40901, "订单已支付", 409);
     if (order.status !== "pending") {
-      throw new AppError(40901, `订单当前状态不可支付: ${order.status}`, 409);
+      throw new AppError(40901, "订单状态已变化，请刷新后重试", 409);
     }
 
     const currency = (order.currency || "CNY") as PaymentCurrency;
@@ -327,7 +327,7 @@ export class PaymentOrderService {
       if (latest.status === "paid")
         throw new AppError(40901, "订单已支付", 409);
       if (latest.status !== "pending")
-        throw new AppError(40901, `订单当前状态不可支付: ${latest.status}`, 409);
+        throw new AppError(40901, "订单状态已变化，请刷新后重试", 409);
       if (latest.expiresAt.getTime() <= Date.now())
         throw new AppError(40901, "订单已超时关闭", 409);
       if (latest.closeStartedAt)
@@ -347,7 +347,7 @@ export class PaymentOrderService {
       if (!fresh) throw new AppError(40400, "订单不存在", 404);
       if (fresh.status === "paid") throw new AppError(40901, "订单已支付", 409);
       if (fresh.status !== "pending")
-        throw new AppError(40901, `订单当前状态不可支付: ${fresh.status}`, 409);
+        throw new AppError(40901, "订单状态已变化，请刷新后重试", 409);
       if (fresh.expiresAt.getTime() <= Date.now())
         throw new AppError(40901, "订单已超时关闭", 409);
       order = fresh;
@@ -430,7 +430,7 @@ export class PaymentOrderService {
         this.logger.error(
           `发起支付失败 (${providerId}) 订单 ${order.orderNo}: ${message}`,
         );
-        throw new AppError(50302, `发起支付失败: ${message}`, 503);
+        throw new AppError(50302, "发起支付失败，请稍后重试", 503);
       }
 
       const checkoutValue =
@@ -673,7 +673,7 @@ export class PaymentOrderService {
       return this.view(await this.loadOrder(order.id, input.actor));
     }
     if (order.status !== "pending") {
-      throw new AppError(40901, `订单当前状态不可关闭: ${order.status}`, 409);
+      throw new AppError(40901, "订单状态已变化，无法关闭，请刷新后重试", 409);
     }
 
     const closeLeaseAt = new Date();
@@ -925,7 +925,7 @@ export class PaymentOrderService {
       return { applied: false, idempotentHit: true };
     }
     if (order.status !== "pending") {
-      throw new AppError(40901, `订单当前状态不可入账: ${order.status}`, 409);
+      throw new AppError(40901, "订单状态已变化，无法入账，请刷新后重试", 409);
     }
     if (!input.tradeNo) throw new AppError(40001, "缺少渠道交易号", 400);
     if (input.amountCents !== order.paidCents) {

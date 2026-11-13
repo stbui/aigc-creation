@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { MAX_TOTAL } from './constants';
 import type { ToolAsset, ToolResult } from './components';
 import { generateApi, resolveModelKey } from './api';
-import { downloadFilenameOf, outputsOf, resultsOf, type FusionFailureKind, type PolledResult } from './utils';
+import { downloadFilenameOf, outputsOf, resultsOf, taskErrorText, type FusionFailureKind, type PolledResult } from './utils';
 import { notifyCreditsChanged } from '../../context/CreditsContext';
 import { useGenerateError } from '../../hooks/useGenerateError';
 import { useIdempotencyKey } from '../../hooks/useIdempotencyKey';
@@ -77,7 +77,7 @@ export function useMultiFusionTask({
         }
         setTimedOutTaskId(null);
         setLastFailure({ kind: 'generation', result: done });
-        message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
+        message.error(taskErrorText(done.errorCode));
         return;
       }
 

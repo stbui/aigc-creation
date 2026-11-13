@@ -10,9 +10,6 @@ import { formatDate, formatHm, formatMonthDayTime } from '../../../admin-ui/lib/
 /** 队列最多列几条：再多就不叫队列，剩下的去任务页筛 */
 export const QUEUE_LIMIT = 6;
 
-/** 产出条最多几帧：1440 宽下正好两行 */
-export const FRAME_LIMIT = 24;
-
 /** 支付渠道 → 中文。未登记的原样显示，便于发现新增渠道 */
 export const CHANNEL_LABELS: Record<string, string> = {
   alipay: '支付宝',

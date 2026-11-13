@@ -1,12 +1,11 @@
 import { Link } from 'react-router-dom';
 import { Notice, Panel, StatCards, StatusTag } from '~/admin-ui/primitives';
-import { RUNTIME_LABELS } from '../../../lib/constants';
-import { toCredits } from '../../../lib/microcredits';
 import type { AdminCapabilityControl } from '../../../types/api';
 import type { AdminCapabilityModelListView, CapabilityPricingView } from '../../../types/model';
-import { bindingCanRun, runtimeTone } from './utils';
+import { ADMIN_RUNTIME_LABELS } from './constants';
+import { bindingCanRun, capabilityPriceText } from './utils';
 
-/** 影响面：改绑定、改价、下线前，先明确 C 端与已绑定商品会受什么影响。 */
+/** 影响面：改绑定、改价、下线前，先明确 C 端与已创建任务会受什么影响。 */
 export function ImpactPanel({
   capability,
   bindings,
@@ -44,6 +43,8 @@ export function ImpactPanel({
   };
   const pricingPending = pricingReadable && pricingLoading && pricing === null;
   const pricingFailed = pricingReadable && !pricingLoading && Boolean(pricingError) && pricing === null;
+  const runtimeLabel =
+    ADMIN_RUNTIME_LABELS[capability.runtime.effective] ?? capability.runtime.effective;
 
   return (
     <Panel title="影响面" extra={<span className="text-xs text-muted-foreground">改价 / 下线前必看</span>}>
@@ -51,11 +52,11 @@ export function ImpactPanel({
         <StatCards
           columns={4}
           items={[
-            { key: 'consumer', label: 'C 端结果', value: RUNTIME_LABELS[capability.runtime.effective] ?? capability.runtime.effective },
-            { key: 'executable', label: '可切换线路', value: bindingValue(executable.length) },
+            { key: 'consumer', label: 'C 端提交', value: runtimeLabel },
+            { key: 'executable', label: '可承接线路', value: bindingValue(executable.length) },
             {
               key: 'blocked',
-              label: '不可执行绑定',
+              label: '未参与选路',
               value: bindingValue(blocked.length),
               tone: bindingsReady && blocked.length > 0 ? 'warn' : undefined,
             },
@@ -71,14 +72,16 @@ export function ImpactPanel({
         <Notice tone={capability.runtime.effective === 'remote' ? 'info' : 'danger'} className="mb-0">
           <div className="flex flex-col gap-1.5">
             <div>
-              当前结论：<strong>{RUNTIME_LABELS[capability.runtime.effective] ?? capability.runtime.effective}</strong>
-              。{capability.runtime.reason}
+              当前结论：<strong>{runtimeLabel}</strong>。{capability.runtime.reason}
             </div>
             <div>
               下线影响：C 端立即不可提交，且不会自动退款；已创建任务继续按原账单快照执行。
             </div>
             <div>
               改价影响：只影响后续请求，候选线路不变；已创建任务按原价格结算。
+            </div>
+            <div>
+              改绑定影响：保存后下一批请求按新线路选路；已创建任务仍使用提交时的线路快照。
             </div>
           </div>
         </Notice>
@@ -99,7 +102,7 @@ export function ImpactPanel({
 
         {bindingsReady && invalidCount > 0 && (
           <Notice tone="warn" className="mb-0">
-            另有 {invalidCount} 条失效绑定，已排除在可执行线路之外。保存绑定不会自动删除它们，请到「绑定」页确认后显式清理。
+            另有 {invalidCount} 条失效绑定，已排除在可执行线路之外。保存绑定不会自动删除它们，请到「商品绑定」页确认后显式清理。
           </Notice>
         )}
 
@@ -108,7 +111,7 @@ export function ImpactPanel({
             <span>绑定商品</span>
             <span>供应商</span>
             <span>选路</span>
-            <span>可执行</span>
+            <span>可承接</span>
           </div>
           {!bindingsReadable ? (
             <div className="px-3 py-8 text-center text-xs text-muted-foreground">
@@ -159,15 +162,15 @@ export function ImpactPanel({
 
         <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
           {!pricingReadable ? (
-            '能力售价：无读取权限'
+            '当前售价：无读取权限'
           ) : pricingPending ? (
-            '能力售价：读取中…'
+            '当前售价：读取中…'
           ) : pricingFailed ? (
-            `能力售价：读取失败${pricingError ? `（${pricingError}）` : ''}`
+            `当前售价：读取失败${pricingError ? `（${pricingError}）` : ''}`
           ) : (
             <>
-              能力售价：{pricing ? (pricing.configured ? '已配置' : '默认价') : '未知'} · {pricing?.billingMode ?? '未知'}
-              {pricing ? ` · ${toCredits(pricing.unitPriceMicrocredits)} 积分 / 单位` : ''}
+              当前售价：{capabilityPriceText(pricing)}
+              {pricing ? `（${pricing.configured ? '能力售价' : '能力默认价'}）` : ''}
               {pricingError ? ' · 刷新失败，展示上次数据' : ''}
             </>
           )}

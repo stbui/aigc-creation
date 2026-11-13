@@ -18,7 +18,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppError } from '../../common/app.exception';
 import { createHash } from 'node:crypto';
-import { outboundRequest, OutboundError } from '../infra/outbound';
+import { outboundRequest } from '../infra/outbound';
 import { PluginAdminService, type PluginView } from './plugin.admin.service';
 
 /** 目录文件很小；超过这个尺寸说明地址填错了 */
@@ -118,7 +118,7 @@ export class ProviderCatalogService {
     } catch (error) {
       // 缓存保留：远端暂时不可用不应该让页面变成空白（旧目录仍可浏览）
       this.log.warn(`服务商目录拉取失败：${messageOf(error)}`);
-      throw new AppError(50201, `服务商目录拉取失败：${outboundMessage(error)}`, 502);
+      throw new AppError(50201, '服务商目录拉取失败，请检查网络后重试', 502);
     }
     const entries = normalizeCatalog(raw);
     const fetchedAt = new Date().toISOString();
@@ -153,7 +153,10 @@ export class ProviderCatalogService {
       maxBodyBytes: PACKAGE_MAX_BYTES,
     });
     if (!('status' in response) || response.status < 200 || response.status >= 300) {
-      throw new AppError(50201, `插件包下载失败（HTTP ${'status' in response ? response.status : 0}）`, 502);
+      this.log.warn(
+        `插件包下载失败（${entry.id} / HTTP ${'status' in response ? response.status : 0}）`,
+      );
+      throw new AppError(50201, '插件包下载失败，请稍后重试', 502);
     }
     this.log.log(`安装服务商 ${entry.id} 的插件包（${sha256(response.body).slice(0, 12)}…）`);
     return this.plugins.install(response.body, actorUserId);
@@ -212,10 +215,6 @@ function normalizeCatalog(raw: unknown): ProviderCatalogEntry[] {
 
 function sha256(data: Buffer): string {
   return createHash('sha256').update(data).digest('hex');
-}
-
-function outboundMessage(error: unknown): string {
-  return error instanceof OutboundError ? error.message : messageOf(error);
 }
 
 function messageOf(error: unknown): string {

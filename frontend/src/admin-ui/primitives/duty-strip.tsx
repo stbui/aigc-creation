@@ -19,7 +19,7 @@ import { formatDuration, formatNumber, tickHeight } from '../lib/format';
  *    财务模式五个（待付 / 退款中 / 账单待核对 / 待开票 / 待对账），
  *    每个都能点进对应列表。
  * 3. **主动作**：有异常就「接手最早异常」直达那条任务，没有就给「查看最近
- *    产出」。按钮跟着数据走，不留一个点不动的按钮。
+ *    任务」。按钮跟着数据走，不留一个点不动的按钮。
  *
  * 数据源是 `DutyContext`（30 秒轮询），不新增请求；轮询失败不清空快照，
  * 只在上方说明「这批没有刷新」。
@@ -69,7 +69,7 @@ export function DutyStrip() {
     const earliest = earliestFailure(data.tasks);
     return earliest
       ? { label: '接手最早异常', to: `/admin/tasks?id=${encodeURIComponent(earliest.id)}` }
-      : { label: '查看最近产出', to: '/admin/tasks' };
+      : { label: '查看最近任务', to: '/admin/tasks' };
   }, [data]);
 
   // 无任务读权也无订单读权：Provider 不注入，这里什么都不渲染
@@ -77,7 +77,7 @@ export function DutyStrip() {
 
   const failed = ticks.filter((t) => t.status === 'failed').length;
   const sub = data
-    ? `${MODE_LABEL[data.mode] ?? '值班'} · ${
+    ? `${
         data.mode === 'finance'
           ? '近 6 笔待办'
           : `最近 ${Math.min(data.tasks.length, FULL_TICKS)} 条任务`
@@ -93,7 +93,9 @@ export function DutyStrip() {
     >
       <header className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
         <div className="flex min-w-0 flex-1 items-baseline gap-2">
-          <h2 className="text-sm font-semibold text-card-foreground">值班</h2>
+          <h2 className="text-sm font-semibold text-card-foreground">
+            {data ? (MODE_LABEL[data.mode] ?? '值班') : '值班'}
+          </h2>
           <span className="truncate text-xs text-muted-foreground">{sub}</span>
         </div>
         {action && (

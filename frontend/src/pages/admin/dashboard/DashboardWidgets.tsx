@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { assetThumbUrl } from '../../../lib/api';
 import { formatNumber, formatDateTime, Meter, formatDuration } from '../../../admin-ui/primitives';
 import { taskErrorLabel } from '../../../lib/admin-error-codes';
 import { adminOrderDetailHref, adminTaskHref } from '../../../lib/admin-links';
 import type { DutyTask } from '../../../components/admin/DutyContext';
 import type { AdminOrderRow, AdminOverview } from '../../../types/api';
-import { FRAME_LIMIT, QUEUE_LIMIT, hhmm, queueTime, yuan } from './utils';
+import { QUEUE_LIMIT, hhmm, queueTime, yuan } from './utils';
 
 /**
  * 概览页首屏构件与展示小节。
@@ -16,17 +15,12 @@ import { FRAME_LIMIT, QUEUE_LIMIT, hhmm, queueTime, yuan } from './utils';
  * 取数、权限判定与页面编排留在 `AdminDashboardContent`。
  */
 
-/** 首屏以下的折叠区，用来与需要动作的首屏拉开优先级。 */
-export function Fold({ children }: { children: ReactNode }) {
-  return <div className="mt-1">{children}</div>;
-}
-
 /** 小节副标题：标题 + 口径说明 */
-export function Subhead({ title, note }: { title: string; note: string }) {
+export function Subhead({ title, note }: { title: string; note?: string }) {
   return (
     <div className="mb-2.5 flex items-baseline gap-2 text-xs font-semibold text-foreground">
       <span>{title}</span>
-      <span className="text-[12px] font-normal text-muted-foreground">{note}</span>
+      {note && <span className="text-[12px] font-normal text-muted-foreground">{note}</span>}
     </div>
   );
 }
@@ -196,40 +190,6 @@ export function MachineStats({ tasks }: { tasks: DutyTask[] }) {
         </dd>
       </div>
     </dl>
-  );
-}
-
-/** 产出条：最近成功的图，点开就是那条任务的详情 */
-export function OutputStrip({ tasks }: { tasks: DutyTask[] }) {
-  const frames = tasks.filter((t) => t.status === 'succeeded' && t.thumbnailUrl).slice(0, FRAME_LIMIT);
-
-  if (frames.length === 0) {
-    return <EmptyInline>最近的任务还没有产出图。</EmptyInline>;
-  }
-
-  return (
-    <ul className="grid list-none grid-cols-12 gap-1.5">
-      {frames.map((t) => (
-        <li key={t.id}>
-          <Link
-            className="group relative block aspect-square overflow-hidden rounded-md border border-border bg-muted focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-1"
-            to={adminTaskHref(t.id)}
-            title={`${t.capabilityName} · ${formatDateTime(t.createdAt)}`}
-            aria-label={`查看产出任务：${t.capabilityName}`}
-          >
-            <img
-              className="block size-full object-cover transition-transform duration-300 group-hover:scale-105"
-              src={assetThumbUrl(t.thumbnailUrl, 320)}
-              alt=""
-              loading="lazy"
-            />
-            <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-foreground/70 px-1 text-[12px] leading-[15px] text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-              {hhmm(t.createdAt)}
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
   );
 }
 

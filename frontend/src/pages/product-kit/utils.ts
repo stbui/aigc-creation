@@ -68,6 +68,20 @@ export function buildVariantPlan(counts: Record<string, number>): string[] {
   return plan;
 }
 
+/**
+ * 自定义配置计数 → 服务端的 `variants` 参数。
+ *
+ * 一次提交由服务端按这个清单拆成 N 个任务（每张各自计费、各自退款），
+ * 与商品详情图的 `sections` 是同一套机制。前端只表达「要哪几类、各几张」，
+ * **不自己建 N 个任务** —— 那样中途失败会留下「已扣费但页面以为没提交」的
+ * 半套状态，且整批任务与账单不在一个事务里。
+ *
+ * 展开顺序与后端 `parseMainImageVariants` 一致（`VARIANT_FIELDS` 顺序）。
+ */
+export function buildVariantsParam(counts: Record<string, number>): string {
+  return buildVariantPlan(counts).join(',');
+}
+
 /* ------------------------------------------------------------------------- */
 /* 输入素材归属                                                             */
 /* ------------------------------------------------------------------------- */

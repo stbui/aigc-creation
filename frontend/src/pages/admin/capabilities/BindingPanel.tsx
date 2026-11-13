@@ -91,10 +91,16 @@ export function BindingPanel({
     [data, draft],
   );
 
-  const candidateOptions = candidates.map((item) => ({
-    value: item.channelModelId,
-    label: `${item.displayName || item.modelKey} · ${item.channelName || '未知渠道'}`,
-  }));
+  const candidateOptions = candidates.map((item) => {
+    const modelName =
+      item.displayName && item.displayName !== item.modelKey
+        ? `${item.displayName} · ${item.modelKey}`
+        : item.modelKey;
+    return {
+      value: item.channelModelId,
+      label: `${modelName} · ${item.channelName || '未知渠道'}`,
+    };
+  });
 
   const addCandidate = (item: AdminCapabilityModelCandidateView) => {
     setDraft((current) => [...current, candidateToDraft(item)]);
@@ -113,7 +119,7 @@ export function BindingPanel({
           weight: row.weight,
         })),
       );
-      toast.success('候选池已保存');
+      toast.success('绑定已保存');
       await onRetry();
       onChanged();
     } catch (error) {
@@ -156,8 +162,8 @@ export function BindingPanel({
       };
       setSimulate(
         result.selectedChannelModelId
-          ? `命中模型 ${result.selectedModelKey}，线路 ${result.selectedChannelModelId}`
-          : result.reason || '没有可用线路',
+          ? `当前配置命中 ${result.selectedModelKey || '可用商品'}`
+          : result.reason || '当前没有可参与选路的商品',
       );
     } catch (error) {
       setSimulate(error instanceof Error ? error.message : '模拟失败');
@@ -170,16 +176,22 @@ export function BindingPanel({
       title: '商品',
       render: (row) => (
         <div className="min-w-0">
-          <div className="truncate font-medium text-foreground">{row.displayName || row.modelKey}</div>
-          <div className="truncate font-mono text-[12px] text-muted-foreground">{row.modelKey}</div>
+          <div className="truncate font-medium text-foreground">
+            {row.displayName || row.modelKey}
+          </div>
+          {row.displayName && row.displayName !== row.modelKey && (
+            <div className="truncate font-mono text-[12px] text-muted-foreground">
+              {row.modelKey}
+            </div>
+          )}
         </div>
       ),
     },
-    { key: 'channel', title: '渠道', width: 160, render: (row) => row.channelName || '—' },
+    { key: 'channel', title: '渠道', width: 144, render: (row) => row.channelName || '—' },
     {
       key: 'status',
       title: '状态',
-      width: 128,
+      width: 112,
       render: (row) => {
         const issue = bindingIssue(row);
         const costHint = bindingCostHint(row);
@@ -200,7 +212,7 @@ export function BindingPanel({
     {
       key: 'priority',
       title: '优先级',
-      width: 96,
+      width: 88,
       render: (row) => (
         <NumberField
           ariaLabel={`${row.modelKey} 优先级`}
@@ -218,7 +230,7 @@ export function BindingPanel({
     {
       key: 'weight',
       title: '权重',
-      width: 96,
+      width: 88,
       render: (row) => (
         <NumberField
           ariaLabel={`${row.modelKey} 权重`}
@@ -236,7 +248,7 @@ export function BindingPanel({
     {
       key: 'enabled',
       title: '参与选路',
-      width: 96,
+      width: 88,
       render: (row) => (
         <SwitchField
           ariaLabel={`${row.modelKey} 参与选路`}
@@ -254,14 +266,18 @@ export function BindingPanel({
     {
       key: 'ops',
       title: '操作',
-      width: 72,
+      width: 80,
       render: (row) => (
         <ActionButton
           variant="ghost"
           size="sm"
           icon={Trash2}
           disabled={!writable}
-          onClick={() => setDraft((current) => current.filter((item) => item.channelModelId !== row.channelModelId))}
+          onClick={() =>
+            setDraft((current) =>
+              current.filter((item) => item.channelModelId !== row.channelModelId),
+            )
+          }
         >
           移除
         </ActionButton>
@@ -271,7 +287,7 @@ export function BindingPanel({
 
   return (
     <Panel
-      title="候选模型"
+      title="承接商品"
       extra={
         <div className="flex items-center gap-2">
           <ActionButton variant="secondary" size="xs" onClick={() => void runSimulate()}>
@@ -289,6 +305,9 @@ export function BindingPanel({
       }
     >
       <div className="flex flex-col gap-3">
+        <p className="text-xs leading-5 text-muted-foreground">
+          优先级数字越小越先尝试；同一优先级内按权重分流。保存后请用「模拟选路」确认命中线路。
+        </p>
         {simulate && <Notice tone="info">{simulate}</Notice>}
         {error && <StaleError error={error} onRetry={onRetry} />}
 
@@ -300,8 +319,8 @@ export function BindingPanel({
           >
             <div className="flex flex-col gap-2">
               <div>
-                这些绑定指向已删除或不存在的商品，不参与选路。保存其它绑定不会删除它们；
-                确认不再需要这条排查线索后再清理。
+                这些绑定指向已删除或不存在的商品，已不参与选路。保存其它绑定不会自动删除，
+                确认不再需要这条记录后再清理。
               </div>
               <div className="max-h-40 overflow-auto rounded border border-warn-soft bg-card">
                 {(data?.invalidBindings ?? []).map((row) => (
@@ -373,7 +392,7 @@ export function BindingPanel({
           rowKey={(row) => row.channelModelId}
           loading={loading}
           emptyText="还没有绑定任何商品"
-          minWidth={860}
+          minWidth={780}
         />
       </div>
     </Panel>

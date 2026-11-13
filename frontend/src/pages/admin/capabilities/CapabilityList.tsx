@@ -1,6 +1,6 @@
 import { StaleError, StatusTag } from '~/admin-ui/primitives';
-import { RUNTIME_LABELS } from '../../../lib/constants';
 import type { AdminCapabilityControl } from '../../../types/api';
+import { ADMIN_RUNTIME_LABELS } from './constants';
 import { runtimeTone } from './utils';
 
 /** 左侧能力清单；筛选由页面完成，这里只负责选择与运行结论。 */
@@ -24,7 +24,9 @@ export function CapabilityList({
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-foreground">能力清单</div>
-          <div className="mt-0.5 text-[12px] text-muted-foreground">按运行结论定位售卖单元</div>
+          <div className="mt-0.5 text-[12px] text-muted-foreground">
+            按能力查看线路、售价与影响面
+          </div>
         </div>
         <span className="text-xs tabular-nums text-muted-foreground">{rows.length} 项</span>
       </div>
@@ -51,11 +53,13 @@ export function CapabilityList({
               <StatusTag
                 status={row.runtime.effective}
                 tone={runtimeTone(row.runtime.effective)}
-                label={RUNTIME_LABELS[row.runtime.effective] ?? row.runtime.effective}
+                label={ADMIN_RUNTIME_LABELS[row.runtime.effective] ?? row.runtime.effective}
               />
             </div>
-            <div className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">
-              {row.capabilityId} · {row.group}
+            <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
+              <span className="font-mono">{row.capabilityId}</span>
+              {' · '}
+              {row.groupName}
             </div>
           </button>
         ))}

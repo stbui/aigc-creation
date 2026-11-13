@@ -134,7 +134,7 @@ export function AdminCapabilitiesPage() {
       RUNTIME_FILTER_OPTIONS.find((option) => option.value === runtime)?.label ?? runtime;
     appliedFilters.push({
       key: 'runtime',
-      label: `运行结论：${label}`,
+      label: `运行状态：${label}`,
       onClear: () => setRuntime(undefined),
     });
   }
@@ -142,7 +142,7 @@ export function AdminCapabilitiesPage() {
   return (
     <AdminPage
       title="能力与模型"
-      description="能力是售卖单元：绑定可承接的渠道模型，设置能力级售价，运行时自动切换线路。"
+      description="维护能力的承接线路与售价。改动即时影响 C 端下单，已创建任务按提交时的快照结算。"
       actions={
         <>
           {bindingReadable && bindingWritable && (
@@ -171,13 +171,13 @@ export function AdminCapabilitiesPage() {
           className="w-64"
         />
         <SelectField
-          ariaLabel="运行结论"
+          ariaLabel="运行状态"
           value={runtime}
           onChange={(value) =>
             setRuntime(isRuntimeFilter(value) ? value : undefined)
           }
           options={[...RUNTIME_FILTER_OPTIONS]}
-          clearLabel="全部运行结论"
+          clearLabel="全部运行状态"
           allowClear
           className="w-40"
         />
@@ -243,7 +243,7 @@ export function AdminCapabilitiesPage() {
                   }
                   description={
                     hasFilters
-                      ? '换一个关键词或运行结论，也可以直接清除全部筛选。'
+                      ? '换一个关键词或运行状态，也可以直接清除全部筛选。'
                       : '能力清单由后端能力定义提供，当前没有可展示的售卖单元。'
                   }
                   action={

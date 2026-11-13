@@ -148,10 +148,11 @@ export function runtimeOfId(
 }
 
 /**
- * 任务失败码 → 用户可读文案（2026-10-21）。
+ * 任务失败码 → 用户可读文案（2026-10-21，2026-11-13 补未知码兜底）。
  *
- * 未登记的码原样显示，和后台任务页同一个取向：隐藏未知错误码会让
- * 「出了问题」看起来像「没有问题」。
+ * 未登记的码不再原样显示数字码：C 端用户看不懂，也无法据此行动。
+ * 兜底话术只承诺「可查看与可求助」，不猜测退款结果；原始码仍可在后台
+ * 任务页与日志中查到。
  */
 const TASK_ERROR_TEXT: Record<string, string> = {
   // 生成侧异常 (42201) / 中断回收失败 (42202) / AIGC 角标失败 (42203) / 无通道 (42204)
@@ -167,9 +168,10 @@ const TASK_ERROR_TEXT: Record<string, string> = {
   POLL_TIMEOUT: '等待超时：任务可能仍在后台生成，请稍后到「我的作品」查看（若失败会自动退回积分）',
 };
 
+const TASK_ERROR_FALLBACK = '任务未完成，请稍后在「我的作品」查看；若积分有异常，请联系客服';
+
 export function taskErrorText(code?: string | null): string {
-  if (!code) return '未知错误';
-  return TASK_ERROR_TEXT[code] ?? code;
+  return (code && TASK_ERROR_TEXT[code]) || TASK_ERROR_FALLBACK;
 }
 
 /**

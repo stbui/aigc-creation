@@ -104,7 +104,7 @@ export class BackupService {
     const target = join(this.backupDir, filename);
 
     if (!existsSync(this.dbPath)) {
-      throw new AppError(50000, `数据库文件不存在: ${this.dbPath}`, 500);
+      throw new AppError(50000, '数据库文件不存在，请检查备份配置', 500);
     }
 
     const sourceSize = await this.fileSize(this.dbPath);
@@ -153,7 +153,7 @@ export class BackupService {
       // 清理半成品文件, 避免残留占磁盘
       await fs.unlink(target).catch(() => undefined);
       this.logger.error(`备份失败: ${message}`);
-      throw new AppError(50001, `备份失败: ${message}`, 500);
+      throw new AppError(50001, '备份失败，请稍后重试', 500);
     }
   }
 
@@ -446,7 +446,7 @@ export class BackupService {
           },
         })
         .catch(() => undefined);
-      throw new AppError(50002, `清理失败: ${message}`, 500);
+      throw new AppError(50002, '清理失败，请稍后重试', 500);
     }
   }
 

@@ -7,7 +7,9 @@ import { ImpactPanel } from '../ImpactPanel';
 const capability: AdminCapabilityControl = {
   capabilityId: 'expand',
   name: '智能扩图',
+  summary: '自然补全画面边缘与展示空间。',
   group: 'ai_retouch',
+  groupName: 'AI修图',
   modality: 'image',
   mode: 'real',
   enabled: true,

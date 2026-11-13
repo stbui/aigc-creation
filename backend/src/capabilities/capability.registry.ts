@@ -8,7 +8,8 @@ import {
   type ParamOption,
   type ParamType,
 } from './capability-plugin.type';
-import { parseDetailSections } from './definitions/param-options';
+import { MAIN_IMAGE_VARIANTS, parseDetailSections } from './definitions/param-options';
+import { parseMainImageVariants } from './definitions/main_image';
 import { shoppableCarouselTemplate } from './definitions/shoppable_carousel';
 import { portraitTemplate } from './definitions/template.templates';
 import type { Modality } from '../common/modality';
@@ -246,6 +247,37 @@ export function validateCapabilityParams(
     const targetColor = input.targetColor || input.customColor;
     if (targetColor === undefined || targetColor === null || targetColor === '') {
       throw new AppError(40001, '选择自定义颜色时必须填写有效的 HEX 颜色', 400);
+    }
+  }
+
+  /*
+   * 商品主图的 `variants` 是「自定义配置」计数展开后的变体清单。
+   *
+   * 它声明成 text（可重复，故不是 enum），因此白名单在这里失效：
+   * 传一个不存在的变体键会被 `parseMainImageVariants` 静默过滤掉，
+   * 用户提交「3 张白底图」却只出 1 张，且已经扣过费。
+   *
+   * 同时挡住「一个变体都没选」—— 展开后为空则不会产生任何任务，
+   * 用户看到的是「已提交」但结果区永远空着。
+   */
+  if (id === 'main_image') {
+    const raw = String(input.variants ?? '').trim();
+    if (raw) {
+      const valid = new Set(MAIN_IMAGE_VARIANTS.map((option) => String(option.value)));
+      const unknown = raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item && !valid.has(item));
+      if (unknown.length > 0) {
+        throw new AppError(
+          40001,
+          `主图类型取值无效（允许：${MAIN_IMAGE_VARIANTS.map((o) => o.value).join('、')}）`,
+          400,
+        );
+      }
+      if (parseMainImageVariants(raw).length === 0) {
+        throw new AppError(40001, '请至少选择一种主图类型', 400);
+      }
     }
   }
 

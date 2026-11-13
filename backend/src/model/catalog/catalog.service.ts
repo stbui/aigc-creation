@@ -13,6 +13,7 @@ import { Injectable } from '@nestjs/common';
 import { getCapability } from '../../capabilities/capability.registry';
 import { capabilitySpecWithRoutePresets } from '../intent/capability-spec';
 import { normalizeCapability } from '../domain/capability-config';
+import { CREDIT_SCALE } from '../infra/microcredits';
 import type { CapabilitySpec, ModelRequestIntent } from '../intent/spec-types';
 import type { UserGroupAccess } from '../user-groups/user-group.service';
 import { CapabilityCatalogService } from './capability-catalog.service';
@@ -30,6 +31,13 @@ export interface PublicModelGroup {
   available: boolean;
   billingMode: string;
   priceLabel: string;
+  /**
+   * 展示价（单位：积分）。
+   *
+   * 前端直接拼成「N 积分」，且报价 / 账单口径也是积分；定价表里存的是
+   * 微积分，`displayOf` 已换算，不要再下发原始微积分（会显示成
+   * 「10000000 积分」）。Token 计费给的是单 Token 价。
+   */
   displayPrice: number | null;
   /** 分组展示排序：取组内最优线路的 sortOrder */
   sortOrder: number;
@@ -135,15 +143,17 @@ function capabilityModality(capabilityId: string): string {
 }
 
 function displayOf(pricing: CachedCapabilityPricing): { price: number | null; label: string } {
+  // 定价表以微积分存储，对外展示价是积分：不换算会把 10 积分显示成 10000000。
+  const toCredits = (microcredits: number) => microcredits / Number(CREDIT_SCALE);
   if (pricing.billingMode === 'fixed_request') {
-    return { price: pricing.unitPriceMicrocredits, label: '' };
+    return { price: toCredits(pricing.unitPriceMicrocredits), label: '' };
   }
   if (pricing.billingMode === 'per_second') {
-    return { price: pricing.unitPriceMicrocredits, label: '按秒' };
+    return { price: toCredits(pricing.unitPriceMicrocredits), label: '按秒' };
   }
   if (pricing.billingMode === 'token') {
     const price = pricing.outputTokenPriceMicrocredits || pricing.inputTokenPriceMicrocredits;
-    return { price: price > 0 ? price : null, label: '按 Token' };
+    return { price: price > 0 ? toCredits(price) : null, label: '按 Token' };
   }
   return { price: null, label: '未配置' };
 }

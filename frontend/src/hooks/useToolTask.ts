@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { ApiError, generateApi, newIdempotencyKey } from '../lib/api';
+import { taskErrorText } from '../lib/constants';
 import { resolveModelKey } from '../lib/models';
 import { useProject } from './useProject';
 import { useGenerateError } from './useGenerateError';
@@ -82,7 +83,7 @@ export function useToolTask({ capability, successMessage, minInputs = 1 }: UseTo
         const done = await poll(taskId);
         setResult(done);
         if (done.status === 'failed') {
-          message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
+          message.error(taskErrorText(done.errorCode));
         } else {
           message.success(successMessage);
         }

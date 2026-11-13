@@ -25,9 +25,12 @@
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
 | 设计令牌 | `frontend/src/styles/tokens.css` 的 `:root`（由 `global.css` 入口 @import）；shadcn 语义变量经 `frontend/src/styles/admin.css` 的 `@theme inline` 桥接，不另定义色值 |
 | 令牌分层 / 命名 / 引用规则 | `docs/design-tokens.md` |
+| 用户可见文案规范 | `docs/copywriting.md` |
 | AIGC 角标默认样式 | `backend/src/common/aigc-label.config.ts` 的 `AIGC_LABEL_DEFAULTS`；运行期由后台「AI 标识」页覆盖 |
 | 后台侧栏与页面分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 接口清单 / 错误码 / 响应信封 | `docs/api-contract.md` |
+| 错误码 → 用户文案映射 | `docs/error-copy.md`；任务码实现见 `frontend/src/lib/constants.ts`（C 端）与 `frontend/src/lib/admin-error-codes.ts`（后台） |
+| 状态与反馈规格 | `docs/feedback-states.md`；状态文案与色调见 `frontend/src/components/admin/statusMeta.ts` 的 `STATUS_META`，任务失败文案见 `frontend/src/lib/constants.ts` |
 | 测试清单与覆盖矩阵 | `docs/testing.md`；文档分类地图见 `docs/README.md` |
 
 **数量口径（最易腐化，改代码后必须复核）**：本文件的数字以下表口径为准，与代码不符以代码为准并顺手改这里。
@@ -419,7 +422,7 @@ npm run e2e                 # Playwright
 | --- | --- |
 | 需求 | `prd.md`（整站）、`admin-prd.md`（后台） |
 | 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md`；`shoppable-carousel-design.md`（+ 模板来源 `shoppable-carousel-template-sources.md`）；品牌：`brand/brand-basics.md` |
-| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md`、`mask-canvas-sdk.md` |
+| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`error-copy.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md`、`copywriting.md`、`feedback-states.md`、`mask-canvas-sdk.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |
 | 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`channel-model-automation-design.md`（已实施：去掉前台模型层，渠道模型直接售卖与自动切换）；`admin-workflow-design.md`（P0 已实施）、`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |

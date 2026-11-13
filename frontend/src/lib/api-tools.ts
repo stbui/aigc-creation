@@ -1,6 +1,6 @@
 import { request, toQuery } from "./api";
 import { API_ROOT } from "./http";
-import type { Asset, AssetListResult, AssetUploadResponse, AuthResponse, GenerateRequest, GenerateResponse, LoginRequest, MobileUploadSessionCreated, MobileUploadSessionStatus, PortraitTemplatesResult, Project, ProjectListItem, PromptToolResult, QrCreateResult, QrStatusResult, RegisterRequest, ShoppableCarouselTemplatesResult, SmsLoginRequest, SmsPurpose, StatsOverview, Task, TaskListResult, TaskPageResult } from "../types/api";
+import type { Asset, AssetListResult, AssetUploadResponse, AuthResponse, GenerateRequest, GenerateResponse, LoginRequest, MobileUploadSessionCreated, MobileUploadSessionStatus, PortraitTemplatesResult, Project, ProjectListItem, PromptPreviewResult, PromptToolResult, QrCreateResult, QrStatusResult, RegisterRequest, ShoppableCarouselTemplatesResult, SmsLoginRequest, SmsPurpose, StatsOverview, Task, TaskListResult, TaskPageResult } from "../types/api";
 
 function asList<T>(res: TaskListResult | undefined): T[] {
   if (!res) return [];
@@ -221,6 +221,24 @@ export function newIdempotencyKey(): string {
   const random = () => Math.random().toString(36).slice(2, 12);
   return `gen-${Date.now().toString(36)}-${random()}-${random()}`;
 }
+
+/**
+ * 提示词预览 (公开, 免登录)。
+ *
+ * 回放「最终会发给模型的那条提示词」—— **不建任务、不选路、不扣费**。
+ *
+ * 存在的理由：提示词是能力定义的一部分, 过去只在任务执行期才被拼出来,
+ * 用户看不到「模型到底会收到什么」。前端复刻一份模板必然与后端漂移,
+ * 所以预览必须走后端同一份 `buildPrompt`。
+ */
+export const promptPreviewApi = {
+  preview: (capability: string, params: Record<string, unknown>, refCount = 0) =>
+    request<PromptPreviewResult>(`/capabilities/${capability}/prompt-preview`, {
+      method: "POST",
+      showRequestIdInMessage: false,
+      body: { params, refCount },
+    }),
+};
 
 export const statsApi = {
   overview: () => request<StatsOverview>("/stats/overview"),

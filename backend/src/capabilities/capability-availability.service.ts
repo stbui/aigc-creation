@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RouterService } from '../model/routing/router.service';
-import { CAPABILITIES, getCapability } from './capability.registry';
+import { CAPABILITIES, CAPABILITY_GROUPS, getCapability } from './capability.registry';
 import { AppError } from '../common/app.exception';
 
 /**
@@ -181,12 +181,16 @@ export class CapabilityAvailabilityService {
     const runtime = await this.runtimeAll();
     const rows = await this.prisma.capabilityControl.findMany();
     const byId = new Map(rows.map((r) => [r.capabilityId, r]));
+    // 分组中文名与能力简介都来自注册表，前端不再维护第二份展示文案。
+    const groupNames = new Map(CAPABILITY_GROUPS.map((group) => [group.id, group.name]));
     return CAPABILITIES.map((c) => {
       const row = byId.get(c.id);
       return {
         capabilityId: c.id,
         name: c.name,
+        summary: c.summary,
         group: c.group,
+        groupName: groupNames.get(c.group) ?? c.group,
         modality: c.modality,
         mode: c.mode,
         enabled: row ? row.enabled : true,

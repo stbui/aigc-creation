@@ -4,6 +4,7 @@ import {
   batchIndexOf,
   buildRows,
   buildVariantPlan,
+  buildVariantsParam,
   cellState,
   countGenerations,
   downloadFileName,
@@ -446,5 +447,22 @@ describe('buildVariantPlan', () => {
   it('缺省或为 0 的变体不产生任务', () => {
     expect(buildVariantPlan({})).toEqual([]);
     expect(buildVariantPlan({ white_background: 0, scene: 0 })).toEqual([]);
+  });
+});
+
+describe('buildVariantsParam', () => {
+  it('把变体清单序列化成逗号串，服务端据此拆成 N 个任务', () => {
+    expect(buildVariantsParam({ white_background: 1, scene: 2, selling_point: 0, other: 3 })).toBe(
+      'white_background,scene,scene,other,other,other',
+    );
+  });
+
+  it('顺序稳定，与 buildVariantPlan 同源', () => {
+    const counts = { white_background: 1, scene: 1, selling_point: 1, other: 0 };
+    expect(buildVariantsParam(counts).split(',')).toEqual(buildVariantPlan(counts));
+  });
+
+  it('全为 0 时传空串（服务端据此判定「请至少选择一种主图类型」）', () => {
+    expect(buildVariantsParam({})).toBe('');
   });
 });

@@ -17,6 +17,7 @@ import {
 } from './components';
 import { ProductKitExamplePanel } from './ProductKitExamplePanel';
 import { ProductKitInputPane } from './ProductKitInputPane';
+import { ProductKitPromptPreview } from './ProductKitPromptPreview';
 import {
   hasActiveGalleryItems,
   useAuth,
@@ -31,6 +32,7 @@ import {
 import { generateApi, resolveModel } from './api';
 import {
   buildVariantPlan,
+  buildVariantsParam,
   countGenerations,
   formSnapshotOf,
   imageInputCountError,
@@ -117,6 +119,7 @@ export function ProductKitPage() {
 
   // ── 弹窗状态 ──
   const [expandOpen, setExpandOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // AI 分析：走文本通道的「图片转提示词」，对首张商品图做真实识别
   const { analyzing, analyze: runAiAnalyze } = useImageToPromptAnalysis({
@@ -190,14 +193,16 @@ export function ProductKitPage() {
   const generating = submitting || galleryRunning;
 
   /**
-   * 删除一次生成 —— 主图批次由多个独立任务组成, 没有 parentTaskId,
-   * 因此必须逐张删除；成功的本地摘除, 失败的保留并提示刷新重试。
+   * 删除一次生成 —— 服务端按 outputPlan 建的是「父任务 + 子任务」，
+   * 子任务通过 parentTaskId 指向父任务。只删父任务，服务端会连带删除
+   * 整批子任务；逐张删会先删掉父任务导致后续子任务 404。
    *
    * DELETE /tasks/:id 会连带删掉产出素材与磁盘文件, 删除不可逆。
    */
   const deleteRow = useCallback(
     (items: GalleryItem[]) => {
-      if (items.length === 0) return;
+      const parent = items.find((item) => Number(item.params?.batchIndex) === 1) ?? items[0];
+      if (!parent) return;
       modal.confirm({
         title: `删除这次生成的 ${items.length} 张图？`,
         content: '生成图与本地文件会一并删除，不可恢复。',
@@ -205,23 +210,19 @@ export function ProductKitPage() {
         okButtonProps: { danger: true },
         cancelText: '取消',
         onOk: async () => {
-          const results = await Promise.allSettled(items.map((item) => generateApi.remove(item.id)));
-          let removed = 0;
-          results.forEach((result, index) => {
-            if (result.status !== 'fulfilled') return;
-            gallery.removeItem(items[index].id);
-            removed += 1;
-          });
-          if (removed === items.length) {
-            message.success('已删除这次生成的全部图片');
+          try {
+            await generateApi.remove(parent.id);
+          } catch (e) {
+            message.error((e as Error).message || '删除失败，请刷新后重试');
             return;
           }
-          message.error(`已删除 ${removed} 张，其余删除失败，请刷新后重试`);
-          await gallery.reload();
+          // 逐张摘除是批内 N 次 setState, React 会合并成一次渲染
+          for (const item of items) gallery.removeItem(item.id);
+          message.success('已删除这次生成的全部图片');
         },
       });
     },
-    [modal, message, gallery.removeItem, gallery.reload],
+    [modal, message, gallery.removeItem],
   );
 
   /**
@@ -292,6 +293,8 @@ export function ProductKitPage() {
         generating={generating}
         formValid={formValid}
         creditLabel={creditLabel}
+        onPreviewPrompt={() => setPreviewOpen(true)}
+        previewingPrompt={false}
         onSubmit={() => void submit()}
       />
 
@@ -325,6 +328,21 @@ export function ProductKitPage() {
 
       {/* 手机上传弹窗 (二维码方案) */}
       <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
+
+      {/* 生成提示词预览（不建任务、不扣费） */}
+      <ProductKitPromptPreview
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        productName={productName}
+        brand={brand}
+        platform={platform}
+        language={language}
+        description={description}
+        ratio={ratio}
+        resolution={resolution}
+        variants={buildVariantsParam(counts)}
+        refCount={images.length}
+      />
 
       {/* 商品描述放大编辑 */}
       <ExpandTextModal

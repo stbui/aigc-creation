@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActionButton,
   Descriptions,
+  FormField,
   ListError,
   Notice,
   Panel,
@@ -16,7 +17,7 @@ import { adminCapabilityModelsApi } from '../../../lib/api';
 import { BILLING_MODE_OPTIONS } from '../../../lib/billing-mode';
 import { parseCredits, toCredits, toCreditsInput } from '../../../lib/microcredits';
 import type { CapabilityPricingView } from '../../../types/model';
-import { formatUpdatedAt } from './utils';
+import { capabilityPriceText, formatUpdatedAt } from './utils';
 
 interface PricingDraft {
   billingMode: string;
@@ -36,7 +37,7 @@ function draftFromView(view: CapabilityPricingView | null): PricingDraft {
   };
 }
 
-/** 能力售价：CapabilityPricing 是唯一事实源；切换线路不改价。 */
+/** 能力级售价：所有绑定线路共用这一份价格，切换线路不改价。 */
 export function PricingPanel({
   capabilityId,
   capabilityName,
@@ -105,11 +106,11 @@ export function PricingPanel({
     }
   };
 
-  const sourceLabel = data?.configured ? '能力售价（已配置）' : '能力默认价';
+  const panelExtra = <span className="text-xs text-muted-foreground">按能力计价，不随线路变化</span>;
 
   if (loading && data === null) {
     return (
-      <Panel title="能力售价" extra={<span className="text-xs text-muted-foreground">切换线路不改价</span>}>
+      <Panel title="售价" extra={panelExtra}>
         <div aria-busy="true" aria-live="polite" className="flex flex-col gap-3">
           <SkeletonBody rows={4} />
           <p className="text-center text-xs text-muted-foreground">正在读取能力售价…</p>
@@ -120,7 +121,7 @@ export function PricingPanel({
 
   if (error && data === null) {
     return (
-      <Panel title="能力售价" extra={<span className="text-xs text-muted-foreground">切换线路不改价</span>}>
+      <Panel title="售价" extra={panelExtra}>
         <ListError error={error} onRetry={() => void onRetry()} />
       </Panel>
     );
@@ -128,73 +129,99 @@ export function PricingPanel({
 
   if (data === null) {
     return (
-      <Panel title="能力售价" extra={<span className="text-xs text-muted-foreground">切换线路不改价</span>}>
+      <Panel title="售价" extra={panelExtra}>
         <ListError error="未读取到能力售价，请稍后重试" onRetry={() => void onRetry()} />
       </Panel>
     );
   }
 
   return (
-    <Panel title="能力售价" extra={<span className="text-xs text-muted-foreground">切换线路不改价</span>}>
+    <Panel title="售价" extra={panelExtra}>
       <>
         {error && <StaleError error={error} onRetry={() => void onRetry()} />}
         <div className="flex flex-col gap-4">
-          <Notice tone={data?.configured ? 'info' : 'warn'} className="mb-0">
-            {data?.configured
-              ? '当前使用 CapabilityPricing 中的能力级售价；所有绑定线路共用这一份价格。'
-              : '当前尚未写入能力售价，按能力定义默认价计费。保存后会创建唯一售价记录。'}
+          <Notice tone={data.configured ? 'info' : 'warn'} className="mb-0">
+            {data.configured
+              ? '已配置能力级售价，所有绑定线路共用这一价格；修改只影响后续请求。'
+              : '尚未配置能力售价，当前按能力默认价计费。保存后立即生效。'}
           </Notice>
 
           <Descriptions
-            columns={2}
+            columns={3}
             items={[
-              { label: '定价来源', value: sourceLabel },
               {
-                label: '默认单次价',
-                value: `${toCredits(data?.defaultUnitPriceMicrocredits ?? 0)} 积分`,
+                label: '当前售价',
+                value: `${capabilityPriceText(data)}（${data.configured ? '能力售价' : '能力默认价'}）`,
               },
-              { label: '更新人', value: data?.updatedBy || '—' },
-              { label: '更新时间', value: formatUpdatedAt(data?.updatedAt ?? null) },
+              {
+                label: '默认价',
+                value: capabilityPriceText({
+                  billingMode: data.billingMode,
+                  unitPriceMicrocredits: data.defaultUnitPriceMicrocredits,
+                }),
+              },
+              {
+                label: '最后调整',
+                value: data.updatedAt
+                  ? `${formatUpdatedAt(data.updatedAt)}${data.updatedBy ? ` · ${data.updatedBy}` : ''}`
+                  : '—',
+              },
             ]}
           />
 
-          <div className="grid grid-cols-4 gap-3">
-            <SelectField
-              ariaLabel="计费方式"
-              value={pricing.billingMode}
-              onChange={(value) =>
-                setPricing((current) => ({ ...current, billingMode: value ?? 'fixed_request' }))
-              }
-              options={BILLING_MODE_OPTIONS}
-            />
+          <div
+            className={
+              pricing.billingMode === 'token'
+                ? 'grid grid-cols-4 gap-3'
+                : 'grid max-w-lg grid-cols-2 gap-3'
+            }
+          >
+            <FormField label="计费方式">
+              <SelectField
+                ariaLabel="计费方式"
+                value={pricing.billingMode}
+                onChange={(value) =>
+                  setPricing((current) => ({ ...current, billingMode: value ?? 'fixed_request' }))
+                }
+                options={BILLING_MODE_OPTIONS}
+              />
+            </FormField>
 
             {pricing.billingMode !== 'token' ? (
-              <TextField
-                ariaLabel={unitLabel}
-                value={pricing.unitPrice}
-                onChange={(value) => setPricing((current) => ({ ...current, unitPrice: value }))}
-                placeholder="积分"
-              />
+              <FormField label={unitLabel} hint={pricing.billingMode === 'per_second' ? '积分 / 秒' : '积分 / 次'}>
+                <TextField
+                  ariaLabel={unitLabel}
+                  value={pricing.unitPrice}
+                  onChange={(value) => setPricing((current) => ({ ...current, unitPrice: value }))}
+                  placeholder="积分"
+                />
+              </FormField>
             ) : (
               <>
-                <TextField
-                  ariaLabel="输入 Token 价格"
-                  value={pricing.inputPrice}
-                  onChange={(value) => setPricing((current) => ({ ...current, inputPrice: value }))}
-                  placeholder="积分 / Token"
-                />
-                <TextField
-                  ariaLabel="输出 Token 价格"
-                  value={pricing.outputPrice}
-                  onChange={(value) => setPricing((current) => ({ ...current, outputPrice: value }))}
-                  placeholder="积分 / Token"
-                />
-                <TextField
-                  ariaLabel="缓存 Token 价格"
-                  value={pricing.cachedPrice}
-                  onChange={(value) => setPricing((current) => ({ ...current, cachedPrice: value }))}
-                  placeholder="积分 / Token"
-                />
+                <FormField label="输入 Token 价格" hint="积分 / Token">
+                  <TextField
+                    ariaLabel="输入 Token 价格"
+                    value={pricing.inputPrice}
+                    onChange={(value) => setPricing((current) => ({ ...current, inputPrice: value }))}
+                    placeholder="积分 / Token"
+                  />
+                </FormField>
+                <FormField label="输出 Token 价格" hint="积分 / Token">
+                  <TextField
+                    ariaLabel="输出 Token 价格"
+                    value={pricing.outputPrice}
+                    onChange={(value) => setPricing((current) => ({ ...current, outputPrice: value }))}
+                    placeholder="积分 / Token"
+                  />
+                </FormField>
+                <FormField label="缓存 Token 价格" hint="积分 / Token">
+                  <TextField
+                    ariaLabel="缓存 Token 价格"
+                    value={pricing.cachedPrice}
+                    onChange={(value) => setPricing((current) => ({ ...current, cachedPrice: value }))}
+                    placeholder="积分 / Token"
+                  />
+                </FormField>
               </>
             )}
           </div>

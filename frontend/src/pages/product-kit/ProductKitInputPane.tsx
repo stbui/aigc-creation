@@ -49,6 +49,10 @@ export interface ProductKitInputPaneProps {
   // ── 自定义配置 ──
   counts: Record<string, number>;
   onCountChange: (key: string, value: number) => void;
+  /** 打开提示词预览（不扣费、不生成） */
+  onPreviewPrompt: () => void;
+  /** 预览请求进行中 */
+  previewingPrompt: boolean;
 
   // ── 高级设置 ──
   settingsOpen: boolean;
@@ -92,6 +96,8 @@ export function ProductKitInputPane({
   onExpandDescription,
   counts,
   onCountChange,
+  onPreviewPrompt,
+  previewingPrompt,
   settingsOpen,
   onToggleSettings,
   ratio,
@@ -139,7 +145,12 @@ export function ProductKitInputPane({
           />
 
           {/* 自定义配置 */}
-          <ProductKitVariantConfig counts={counts} onCountChange={onCountChange} />
+          <ProductKitVariantConfig
+            counts={counts}
+            onCountChange={onCountChange}
+            onPreviewPrompt={onPreviewPrompt}
+            previewing={previewingPrompt}
+          />
         </div>
 
         {/* 高级设置 + 提交 (sticky 底部) */}

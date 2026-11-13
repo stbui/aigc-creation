@@ -12,6 +12,10 @@
 /** 通用接口模块 (生成 / 提示词工具 / 幂等键) */
 export { generateApi, newIdempotencyKey, promptToolsApi } from '../../lib/api';
 
+/** 提示词预览: 回放最终发给模型的提示词 (不建任务、不扣费) */
+export { promptPreviewApi } from '../../lib/api';
+export type { PromptPreviewItem, PromptPreviewResult } from '../../types/api';
+
 /** 素材读取 / 上传与地址换算: 提交前把跨项目输入复制到当前项目 */
 export { assetsApi, assetSrc, toAbsoluteUrl } from '../../lib/api';
 export type { Asset } from '../../types/api';

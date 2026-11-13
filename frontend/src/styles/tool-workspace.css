@@ -472,6 +472,103 @@
   line-height: 13px;
 }
 
+/* 自定义配置：标题行 + 张数合计 */
+
+.pk-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pk-section-count {
+  color: var(--text-muted);
+  line-height: 13px;
+}
+
+/* 提示词预览入口 */
+
+.pk-preview-prompt-btn {
+  justify-self: start;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-desc);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.pk-preview-prompt-btn:hover:not(:disabled) {
+  color: var(--brand);
+  border-color: var(--brand-light);
+}
+
+.pk-preview-prompt-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 提示词预览弹窗 */
+
+.pk-prompt-preview {
+  display: grid;
+  gap: 14px;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.pk-prompt-preview-hint {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 18px;
+}
+
+.pk-prompt-preview-state {
+  padding: 20px 0;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.pk-prompt-preview-state.is-error {
+  color: var(--danger-ref);
+}
+
+.pk-prompt-preview-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.pk-prompt-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--wb-text);
+}
+
+.pk-prompt-preview-index {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.pk-prompt-preview-text {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--fill-quaternary, rgba(0, 0, 0, 0.03));
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
 /* 高级设置 + 提交 */
 
 .pk-submit-actions {

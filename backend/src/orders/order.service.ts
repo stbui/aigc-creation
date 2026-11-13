@@ -659,7 +659,7 @@ export class OrderService {
       return { order: this.toOrderView(order), idempotentHit: true, message: '订单已支付' };
     }
     if (order.status !== 'pending') {
-      throw new AppError(40901, `订单当前状态不可支付: ${order.status}`, 409);
+      throw new AppError(40901, '订单状态已变化，请刷新后重试', 409);
     }
     // 超时订单不可再支付
     if (new Date() > order.expiresAt) {
@@ -802,7 +802,7 @@ export class OrderService {
       return { order: this.toOrderView(order), idempotentHit: true, message: '订单已支付' };
     }
     if (order.status !== 'pending') {
-      throw new AppError(40901, `订单当前状态不可支付: ${order.status}`, 409);
+      throw new AppError(40901, '订单状态已变化，请刷新后重试', 409);
     }
 
     /*
@@ -1015,7 +1015,7 @@ export class OrderService {
         if (current.status === 'paid') {
           return { order: current, idempotentHit: true, message: '订单已支付' };
         }
-        throw new AppError(40901, `订单当前状态不可支付: ${current.status}`, 409);
+        throw new AppError(40901, '订单状态已变化，请刷新后重试', 409);
       }
     } catch (e) {
       /*
@@ -1177,7 +1177,7 @@ export class OrderService {
     });
     if (!order) throw new AppError(40400, '订单不存在', 404);
     if (order.status !== 'paid' && order.status !== 'partial_refunded') {
-      throw new AppError(40901, `订单当前状态不可退款: ${order.status}`, 409);
+      throw new AppError(40901, '订单状态已变化，无法退款，请刷新后重试', 409);
     }
     if (params.amountCents <= 0) {
       throw new AppError(40001, '退款金额必须大于 0', 400);
@@ -1227,7 +1227,7 @@ export class OrderService {
         },
       });
       if (!fresh || (fresh.status !== 'paid' && fresh.status !== 'partial_refunded')) {
-        throw new AppError(40901, `订单当前状态不可退款: ${fresh?.status ?? 'missing'}`, 409);
+        throw new AppError(40901, '订单状态已变化，无法退款，请刷新后重试', 409);
       }
 
       const policy = await this.assertRefundPolicy({
@@ -1517,7 +1517,7 @@ export class OrderService {
         throw new AppError(40400, '退款单不存在或不属于该订单', 404);
       }
       if (refund.status !== 'processing') {
-        throw new AppError(40909, `退款单当前状态不可人工核销: ${refund.status}`, 409);
+        throw new AppError(40909, '退款单状态已变化，无法人工核销，请刷新后重试', 409);
       }
 
       const confirmedAt = new Date().toISOString();
@@ -1625,12 +1625,12 @@ export class OrderService {
         throw new AppError(40400, '退款单不存在或不属于该订单', 404);
       }
       if (refund.status !== 'processing') {
-        throw new AppError(40909, `退款单当前状态不可核销: ${refund.status}`, 409);
+        throw new AppError(40909, '退款单状态已变化，无法核销，请刷新后重试', 409);
       }
 
       const order = refund.order;
       if (order.status !== 'paid' && order.status !== 'partial_refunded') {
-        throw new AppError(40901, `订单当前状态不可退款: ${order.status}`, 409);
+        throw new AppError(40901, '订单状态已变化，无法退款，请刷新后重试', 409);
       }
       /*
        * 会员订单必须先锁用户，再写退款/订单状态。订阅激活也是 User → Order，
@@ -2197,7 +2197,7 @@ export class OrderService {
       if (current.status !== 'pending') {
         throw new AppError(
           40901,
-          `订单当前状态不可关闭: ${current.status}`,
+          '订单状态已变化，无法关闭，请刷新后重试',
           409,
         );
       }

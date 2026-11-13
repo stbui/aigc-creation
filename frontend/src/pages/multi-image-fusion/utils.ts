@@ -160,7 +160,7 @@ export function fusionResultStatusOf(input: {
   };
 }
 
-/** 结果面板失败文案；未知错误码原样显示，避免把真实故障藏成“未知”。 */
+/** 结果面板失败文案；未知错误码使用统一兜底话术，不向用户展示数字码。 */
 export function fusionFailureText(code?: string | null): string {
   if (code === 'EMPTY_OUTPUT') return '模型没有返回可用图片，请重试';
   if (code === 'GENERATE_FAILED') return '生成请求失败，请稍后重试';

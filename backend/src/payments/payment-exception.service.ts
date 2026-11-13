@@ -161,7 +161,7 @@ export class PaymentExceptionService {
         throw new AppError(40001, '该异常单不是已取消订单扣款，不能执行自动退款核销', 400);
       }
       if (row.status !== 'auto_refund_pending' && row.status !== 'manual_review') {
-        throw new AppError(40901, `异常单当前状态不可核销: ${row.status}`, 409);
+        throw new AppError(40901, '异常单状态已变化，无法核销，请刷新后重试', 409);
       }
       if (!row.refundId) {
         throw new AppError(40901, '异常单尚未绑定退款单，请先重试退款', 409);
@@ -179,13 +179,13 @@ export class PaymentExceptionService {
         throw new AppError(40909, '退款单与异常单订单不一致，禁止核销', 409);
       }
       if (order.status !== 'cancelled') {
-        throw new AppError(40901, `订单当前状态不可做自动退款核销: ${order.status}`, 409);
+        throw new AppError(40901, '订单状态已变化，无法自动退款核销，请刷新后重试', 409);
       }
       if ((row.currency || 'CNY') !== (order.currency || 'CNY')) {
         throw new AppError(40909, '异常单币种与订单币种不一致，禁止核销', 409);
       }
       if (refund.status !== 'processing' && refund.status !== 'failed') {
-        throw new AppError(40909, `退款单当前状态不可人工核销: ${refund.status}`, 409);
+        throw new AppError(40909, '退款单状态已变化，无法人工核销，请刷新后重试', 409);
       }
       const detail = parseJsonObject(refund.detail);
       if (

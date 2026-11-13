@@ -559,7 +559,11 @@ export interface CreditLedgerPage {
 export interface AdminCapabilityControl {
   capabilityId: string;
   name: string;
+  /** 能力一句话说明，来自后端注册表 */
+  summary: string;
   group: string;
+  /** 分组中文名，来自后端注册表 */
+  groupName: string;
   modality: "image" | "text" | "video";
   mode: CapabilityMode;
   /** 后台开关（无记录 = true） */

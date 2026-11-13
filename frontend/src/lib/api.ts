@@ -709,7 +709,7 @@ export const adminAnalyticsApi = {
 export { modelCatalogApi, modelsApi, publicChannelsApi } from "./model-catalog-api";
 
 // 按域拆分后的聚合出口（沿用 api-payments / model-catalog-api 模式）
-export { authApi, oauthAuthorizeUrl, projectsApi, assetsApi, generateApi, newIdempotencyKey, statsApi, shoppableCarouselApi, templateApi, promptToolsApi, mobileUploadApi } from "./api-tools";
+export { authApi, oauthAuthorizeUrl, projectsApi, assetsApi, generateApi, newIdempotencyKey, statsApi, shoppableCarouselApi, templateApi, promptToolsApi, promptPreviewApi, mobileUploadApi } from "./api-tools";
 export type { OAuthProviderInfo, AssetSourceFields } from "./api-tools";
 export { adminUsersApi, adminRolesApi, adminSettingsApi, adminAigcLabelApi, adminTasksApi, adminBackupsApi, adminAssetsApi, adminStorageApi, adminTemplateCatalogApi } from "./api-admin-system";
 export { marketingApi, myMarketingApi, adminSchedulerApi, adminProductsApi, adminMembershipPlansApi, adminOrdersApi, adminCreditsApi, adminRetentionApi, adminInvoicesApi } from "./api-admin-commerce";
