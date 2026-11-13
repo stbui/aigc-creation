@@ -87,12 +87,6 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         permission: "user.read",
       },
       {
-        path: "/admin/tasks",
-        label: "任务监控",
-        icon: Activity,
-        permission: "task.read",
-      },
-      {
         path: "/admin/tickets",
         label: "工单处理",
         icon: MessagesSquare,
@@ -127,7 +121,7 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
   {
     name: "模型与能力",
     items: [
-      // 供应侧 → 能力 → 扩展 → 人群 → 排障
+      // 供应侧 → 能力 → 扩展 → 人群 → 排障（调用记录 → 任务）
       {
         path: "/admin/channels",
         label: "模型商品",
@@ -157,6 +151,12 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         label: "调用记录",
         icon: ListTree,
         permission: "model.call_read",
+      },
+      {
+        path: "/admin/tasks",
+        label: "任务监控",
+        icon: Activity,
+        permission: "task.read",
       },
     ],
   },

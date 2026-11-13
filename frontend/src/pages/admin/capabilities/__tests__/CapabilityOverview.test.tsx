@@ -108,6 +108,9 @@ describe('CapabilityOverview 读取状态', () => {
 
     expect(screen.getAllByText('无绑定读取权限').length).toBeGreaterThan(0);
     expect(screen.getByText('无售价读取权限')).toBeTruthy();
+    expect(
+      screen.getByText('当前账号无绑定读取权限，无法确认具体线路。请联系管理员开通后复核。'),
+    ).toBeTruthy();
     expect(screen.queryByText('0')).toBeNull();
   });
 
@@ -125,7 +128,7 @@ describe('CapabilityOverview 读取状态', () => {
       />,
     );
 
-    expect(screen.getByText('可承接线路')).toBeTruthy();
+    expect(screen.getByText('配置可用线路')).toBeTruthy();
     expect(screen.getByText('绑定商品')).toBeTruthy();
     expect(screen.getByText('2 积分 / 次')).toBeTruthy();
     expect(screen.getByText('运行正常，C 端可正常提交')).toBeTruthy();
@@ -149,7 +152,7 @@ describe('CapabilityOverview 读取状态', () => {
     );
 
     expect(screen.getByText(/gpt-image-2\.5-flare：未参与选路/)).toBeTruthy();
-    expect(screen.getByText(/1 条因供应商、商品或绑定停用未参与选路/)).toBeTruthy();
+    expect(screen.getByText(/1 条因供应商、商品或绑定开关停用未参与选路/)).toBeTruthy();
   });
 
   it('下线状态展示下线原因，并提示恢复后的验证动作', () => {

@@ -167,6 +167,22 @@ export interface AdminAssetListResult {
     projectId: string;
     projectName: string;
     createdAt: string;
+    /**
+     * 生成图才有：产出它的任务快照。
+     *
+     * 提示词是由任务参数经能力定义重建的实际下发文本；比例 / 画质是
+     * 能力参数选项的展示名。原始上传恒为 null。
+     */
+    generation: {
+      taskId: string;
+      /** 实际线路展示名（渠道模型 displayName → modelKey） */
+      modelName: string;
+      /** C 端模型分组键 */
+      modelKey: string | null;
+      prompt: string;
+      ratio: string | null;
+      quality: string | null;
+    } | null;
   }>;
   total: number;
   page: number;

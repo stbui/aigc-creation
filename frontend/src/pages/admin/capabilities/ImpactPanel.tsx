@@ -3,7 +3,7 @@ import { Notice, Panel, StatCards, StatusTag } from '~/admin-ui/primitives';
 import type { AdminCapabilityControl } from '../../../types/api';
 import type { AdminCapabilityModelListView, CapabilityPricingView } from '../../../types/model';
 import { ADMIN_RUNTIME_LABELS } from './constants';
-import { bindingCanRun, capabilityPriceText } from './utils';
+import { bindingConfigAvailable, capabilityPriceText } from './utils';
 
 /** 影响面：改绑定、改价、下线前，先明确 C 端与已创建任务会受什么影响。 */
 export function ImpactPanel({
@@ -28,8 +28,8 @@ export function ImpactPanel({
   pricingReadable?: boolean;
 }) {
   const rows = bindings?.bindings ?? [];
-  const executable = rows.filter(bindingCanRun);
-  const blocked = rows.filter((row) => !bindingCanRun(row));
+  const configAvailable = rows.filter(bindingConfigAvailable);
+  const inactive = rows.filter((row) => !bindingConfigAvailable(row));
   const invalidCount = bindings?.invalidCount ?? 0;
   const bindingsPending = bindingsReadable && bindingsLoading && bindings === null;
   const bindingsFailed = bindingsReadable && !bindingsLoading && Boolean(bindingsError) && bindings === null;
@@ -47,18 +47,25 @@ export function ImpactPanel({
     ADMIN_RUNTIME_LABELS[capability.runtime.effective] ?? capability.runtime.effective;
 
   return (
-    <Panel title="影响面" extra={<span className="text-xs text-muted-foreground">改价 / 下线前必看</span>}>
+    <Panel
+      title="影响面"
+      extra={<span className="text-xs text-muted-foreground">改绑定 / 改价 / 下线前确认</span>}
+    >
       <div className="flex flex-col gap-3">
         <StatCards
-          columns={4}
+          columns="auto"
           items={[
             { key: 'consumer', label: 'C 端提交', value: runtimeLabel },
-            { key: 'executable', label: '可承接线路', value: bindingValue(executable.length) },
             {
-              key: 'blocked',
+              key: 'available',
+              label: '配置可用线路',
+              value: bindingValue(configAvailable.length),
+            },
+            {
+              key: 'inactive',
               label: '未参与选路',
-              value: bindingValue(blocked.length),
-              tone: bindingsReady && blocked.length > 0 ? 'warn' : undefined,
+              value: bindingValue(inactive.length),
+              tone: bindingsReady && inactive.length > 0 ? 'warn' : undefined,
             },
             {
               key: 'invalid',
@@ -102,7 +109,7 @@ export function ImpactPanel({
 
         {bindingsReady && invalidCount > 0 && (
           <Notice tone="warn" className="mb-0">
-            另有 {invalidCount} 条失效绑定，已排除在可执行线路之外。保存绑定不会自动删除它们，请到「商品绑定」页确认后显式清理。
+            另有 {invalidCount} 条失效绑定，已排除在配置可用线路之外。保存绑定不会自动删除它们，请到「商品绑定」页确认后显式清理。
           </Notice>
         )}
 
@@ -110,8 +117,8 @@ export function ImpactPanel({
           <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_100px_100px] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
             <span>绑定商品</span>
             <span>供应商</span>
-            <span>选路</span>
-            <span>可承接</span>
+            <span>绑定开关</span>
+            <span>配置可用</span>
           </div>
           {!bindingsReadable ? (
             <div className="px-3 py-8 text-center text-xs text-muted-foreground">
@@ -131,7 +138,7 @@ export function ImpactPanel({
             </div>
           ) : (
             rows.map((row) => {
-              const canRun = bindingCanRun(row);
+              const configAvailable = bindingConfigAvailable(row);
               return (
                 <div
                   key={row.channelModelId}
@@ -139,7 +146,9 @@ export function ImpactPanel({
                 >
                   <div className="min-w-0">
                     <div className="truncate font-medium text-foreground">{row.displayName || row.modelKey}</div>
-                    <div className="truncate font-mono text-[11px] text-muted-foreground">{row.modelKey}</div>
+                    <div className="truncate font-mono text-xs text-muted-foreground">
+                      {row.modelKey}
+                    </div>
                   </div>
                   <Link
                     to={`/admin/channels?view=channels&id=${encodeURIComponent(row.channelId)}`}
@@ -148,11 +157,13 @@ export function ImpactPanel({
                   >
                     {row.channelName || row.channelId}
                   </Link>
-                  <span className="text-xs text-muted-foreground">{row.enabled ? '参与' : '关闭'}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {row.enabled ? '开启' : '关闭'}
+                  </span>
                   <StatusTag
-                    status={canRun ? 'impact-ok' : 'impact-blocked'}
-                    tone={canRun ? 'success' : 'warn'}
-                    label={canRun ? '是' : '否'}
+                    status={configAvailable ? 'impact-ok' : 'impact-blocked'}
+                    tone={configAvailable ? 'success' : 'warn'}
+                    label={configAvailable ? '可用' : '不参与'}
                   />
                 </div>
               );

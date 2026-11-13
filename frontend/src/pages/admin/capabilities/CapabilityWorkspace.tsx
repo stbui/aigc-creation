@@ -51,7 +51,7 @@ function CapabilityContext({ capability }: { capability: AdminCapabilityControl 
         <span>
           分组 <span className="text-foreground">{capability.groupName}</span>
         </span>
-        {capability.updatedAt && <span>最近调整 {formatUpdatedAt(capability.updatedAt)}</span>}
+        {capability.updatedAt && <span>开关更新 {formatUpdatedAt(capability.updatedAt)}</span>}
       </div>
     </div>
   );
@@ -108,7 +108,7 @@ export function CapabilityWorkspace({
         next,
         next ? undefined : DEFAULT_OFFLINE_REASON,
       );
-      toast.success(next ? '能力已上线' : '能力已下线');
+      toast.success(next ? '能力已上线，可继续检查绑定线路。' : '能力已下线，C 端已停止提交。');
       onChanged();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '更新失败');
@@ -181,7 +181,7 @@ export function CapabilityWorkspace({
             />
           ) : (
             <Notice tone="locked" title="无法查看候选商品">
-              需要 logical_model.read 权限。当前仍可查看能力运行结论，但不能判断具体线路。
+              当前账号没有商品绑定读取权限。仍可查看能力状态与影响面，但无法判断具体线路。
             </Notice>
           )}
         </TabsContent>
@@ -199,7 +199,7 @@ export function CapabilityWorkspace({
             />
           ) : (
             <Notice tone="locked" title="无法查看能力售价">
-              需要 product.price 权限。当前账号可查看能力状态，但不能读取或修改售价。
+              当前账号没有售价查看权限。仍可查看能力状态与影响面，但无法读取或修改售价。
             </Notice>
           )}
         </TabsContent>

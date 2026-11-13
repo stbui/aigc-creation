@@ -46,6 +46,12 @@ import type { AdminAssetListResult, AssetStatus } from '../../../types/api';
  * 删除会同步移除对象存储文件且不可恢复。单张删除先展示影响（大小、关联任务、
  * 存储后端），批量删除展示条数；「下架」仍是即时动作，可恢复。
  *
+ * ## 生成信息由产出任务反查
+ *
+ * 素材表只存结果，提示词 / 模型 / 比例 / 画质都在产出它的任务参数快照里。
+ * 列表接口一次性反查后下发 `generation`：网格与表格展示「模型 · 比例 · 画质」，
+ * 大图预览复用查看器自带的提示词面板查看与复制，原始上传不受影响。
+ *
  * ## 模块划分
  *
  * 网格 / 表格 / 大图预览 / 统计卡 / 删除确认各自独立成组件；本文件只保留
@@ -144,12 +150,17 @@ export function AdminAssetsPage() {
         width: a.width,
         height: a.height,
         createdAt: a.createdAt,
+        // 提示词由查看器自带的「提示词」面板展示与复制，长文本不挤进底栏
+        prompt: a.generation?.prompt,
         meta: [
-          // 只保留技术信息：大小与存储位置。能力、上下架状态、格式、所属用户、
-          // 项目都属于业务属性，放在查看器里会干扰看图。
+          // 生成信息是运营复核图片的主要依据：模型、比例、画质，再补大小与存储位置。
+          // 能力、上下架状态、格式、所属用户、项目属于列表属性，仍不放进查看器。
+          a.generation?.modelName,
+          a.generation?.ratio,
+          a.generation?.quality,
           fmtBytes(a.sizeBytes),
           BACKEND_LABEL[a.storageBackend] ?? a.storageBackend,
-        ],
+        ].filter((value): value is string => Boolean(value)),
       })),
     [items],
   );

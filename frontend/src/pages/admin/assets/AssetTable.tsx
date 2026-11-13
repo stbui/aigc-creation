@@ -8,7 +8,7 @@ import {
 } from '~/admin-ui/primitives';
 import { AssetThumb } from './AssetThumb';
 import { BACKEND_LABEL, type AssetRow } from './constants';
-import { assetLabel, fmtBytes, fmtFormat, thumbSrc } from './utils';
+import { assetLabel, fmtBytes, fmtFormat, generationLine, thumbSrc } from './utils';
 import type { AssetStatus } from '../../../types/api';
 
 /**
@@ -93,6 +93,20 @@ export function AssetTable({
         width: 130,
         cellTitle: (row) => row.capability ?? undefined,
         render: (row) => row.capability ?? <span className="text-muted-foreground">—</span>,
+      },
+      {
+        key: 'generation',
+        title: '模型 / 比例 / 画质',
+        width: 180,
+        cellTitle: (row) => (row.generation ? generationLine(row.generation) : undefined),
+        render: (row) =>
+          row.generation ? (
+            <span className="block max-w-[170px] truncate text-[12px] leading-5">
+              {generationLine(row.generation)}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
       },
       {
         key: 'dim',
@@ -194,7 +208,7 @@ export function AssetTable({
       loading={loading}
       error={error}
       onRetry={onRetry}
-      minWidth={1300}
+      minWidth={1480}
       rowClassName={(row) => (row.status === 'hidden' ? 'bg-warn-soft/40' : undefined)}
       selectable={selectable}
       selected={selected}

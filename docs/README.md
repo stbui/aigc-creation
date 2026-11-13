@@ -70,6 +70,7 @@
 | [`design-tokens.md`](design-tokens.md) | 设计令牌标准：基础 / 通用 / 组件三层、命名、引用规则、新增流程与审计命令 |
 | [`copywriting.md`](copywriting.md) | 用户可见文案规范：任务边界、写作基准、禁止项、分场景写法、语言规范、执行与自检 |
 | [`feedback-states.md`](feedback-states.md) | 状态与反馈规范：加载 / 空 / 失败 / 进行中 / 成功 / 结果不明的判定顺序、组件取用与文案 |
+| [`code-style.md`](code-style.md) | 代码风格与静态检查：Biome 工具链、规则基线、CI 门禁、格式化策略与收紧流程 |
 | [`mask-canvas-sdk.md`](mask-canvas-sdk.md) | 遮罩画布 SDK：标记 / 手势 / 遮罩 / 导出内核、两条通知通道、适配层职责与约束 |
 
 目录结构、能力清单、环境坑等与代码强相关的坐标速查表放在仓库根 `CLAUDE.md`；接口清单与错误码在 [`api-contract.md`](api-contract.md)。

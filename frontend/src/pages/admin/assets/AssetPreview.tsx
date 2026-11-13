@@ -1,5 +1,16 @@
-import { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Download, Eye, EyeOff, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  FileText,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { ImageLightbox, type LightboxItem } from '~/components/ImageLightbox';
 import { Button } from '~/ui';
 import type { AssetRow } from './constants';
@@ -109,6 +120,25 @@ function VideoPreview({
   onClose: () => void;
 }) {
   const item = items[index];
+  /** 视频查看器没有 ImageLightbox 的提示词面板，这里补一份等价交互 */
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
+
+  useEffect(() => {
+    // 换视频时收起提示词，避免把上一个视频的文本留在屏幕上
+    setPromptOpen(false);
+    setPromptCopied(false);
+  }, [item?.id]);
+
+  const copyPrompt = async () => {
+    if (!item?.prompt) return;
+    try {
+      await navigator.clipboard.writeText(item.prompt);
+      setPromptCopied(true);
+    } catch {
+      setPromptCopied(false);
+    }
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -197,8 +227,42 @@ function VideoPreview({
           <Download size={15} />
           <span className="img-viewer-download-text">下载原视频</span>
         </a>
+        {item?.prompt && (
+          <Button
+            type="text"
+            className="img-viewer-action"
+            aria-label={promptOpen ? '收起提示词' : '查看提示词'}
+            aria-expanded={promptOpen}
+            onClick={() => setPromptOpen((open) => !open)}
+          >
+            <FileText size={15} className="size-[15px]" />
+            <span>提示词</span>
+          </Button>
+        )}
         {actions}
       </div>
+
+      {item?.prompt && promptOpen && (
+        <div
+          className="img-viewer-prompt"
+          role="region"
+          aria-label="生成提示词"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="img-viewer-prompt-head">
+            <strong>生成提示词</strong>
+            <Button type="text" onClick={() => void copyPrompt()}>
+              {promptCopied ? (
+                <Check size={14} className="size-[14px]" />
+              ) : (
+                <Copy size={14} className="size-[14px]" />
+              )}
+              {promptCopied ? '已复制' : '复制'}
+            </Button>
+          </div>
+          <p>{item.prompt}</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -27,9 +27,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: |
+            package-lock.json
             agent/package-lock.json
             backend/package-lock.json
             frontend/package-lock.json
+      - name: Install root tooling
+        run: npm ci
       - name: Install backend dependencies
         run: npm --prefix backend ci
       - name: Generate Prisma client

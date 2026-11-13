@@ -154,9 +154,9 @@ export function AdminShell() {
               <Route path="model-calls" element={<AdminModelCallsPage />} />
               {/* 能力与模型：能力上下线与所属前台模型同一工作台 */}
               <Route path="capabilities" element={<AdminCapabilitiesPage />} />
-              {/* 任务监控 */}
+              {/* 任务监控：与调用记录同组（模型与能力的排障入口） */}
               <Route path="tasks" element={<AdminTasksPage />} />
-              {/* 工单处理：客服队列，与任务监控同组 */}
+              {/* 工单处理：客服队列 */}
               <Route path="tickets" element={<AdminTicketsPage />} />
               {/* 能力消耗价已并入能力与模型，保留旧地址深链 */}
               <Route

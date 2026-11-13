@@ -34,6 +34,8 @@ node -e "console.log(require('./scripts/db-url').resolveDbPath())"
 
 ## 3. 自动化闸口
 
+静态检查先行：根目录 `npm run lint:ci`（Biome，error 级；规则基线见 [`code-style.md`](code-style.md)），已包含在 `npm run check` 中。首次或锁文件变更后先执行根目录 `npm ci`。格式检查尚未进入门禁，原因见该文 §5。
+
 ### 3.1 构建与类型（L1）
 
 ```bash
@@ -53,7 +55,7 @@ npm run test:watch      # watch
 npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitignore）
 ```
 
-当前 41 个用例文件：
+当前 129 个用例文件，下表列出与闸口直接相关的部分：
 
 | 用例 | 守住什么 |
 | --- | --- |
@@ -76,6 +78,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `lib/multiFusionBilling.test.ts` | 多图融合变体数 × 积分计费 |
 | `lib/optionSets.test.ts` | 平台/语言/比例等选项集合的默认值与排序 |
 | `lib/poll.test.ts` | 轮询重试、超时、视频上限放宽、中止语义 |
+| `lib/task-error-text.test.ts` | 任务失败文案：C 端已知码有专属文案、未知码不暴露数字码；后台保留原始码便于排障 |
 | `lib/routePreload.test.ts` | 路由预加载：精确路由只预热一次、通配路由匹配 |
 | `lib/skuBatches.test.ts` | SKU 行批量展开与坐标映射 |
 | `lib/unsaved-guard.test.ts` | 离开页面时的未保存拦截 |

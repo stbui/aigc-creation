@@ -13,6 +13,10 @@ import {
   orderedOutputIds,
   taskOutputReferenceWhere,
 } from '../assets/task-output-links';
+import {
+  describeGeneration,
+  type AssetGenerationInfo,
+} from './asset-generation-info';
 
 /** 素材管理 (admin-prd.md §3.4 B-21~B-27) */
 @Injectable()
@@ -194,6 +198,8 @@ export class AdminAssetsService {
       this.prisma.asset.count({ where }),
     ]);
 
+    const generationById = await this.generationInfoOf(items);
+
     return paginate(
       items.map((a) => ({
         id: a.id,
@@ -212,10 +218,82 @@ export class AdminAssetsService {
         projectId: a.projectId,
         projectName: a.project.name,
         createdAt: a.createdAt,
+        generation: generationById.get(a.id) ?? null,
       })),
       total,
       page,
     );
+  }
+
+  /**
+   * 按素材反查产出任务，汇总「提示词 / 模型 / 比例 / 画质」。
+   *
+   * 一页最多 60 张图，逐张查任务会打出 N+1；这里用一次 `OR` 粗筛
+   * （`outputAssetId` 等值 + `outputAssetIds` 包含）再在内存里按
+   * `orderedOutputIds` 精确配对 —— JSON 数组没有外键，SQL 层无法直接 join。
+   *
+   * 同一素材被多个任务引用时取**最近创建**的一条：重试会新建任务，
+   * 历史任务上的参数才是最终交付那份结果的来源。
+   */
+  private async generationInfoOf(
+    items: Array<{ id: string; kind: string }>,
+  ): Promise<Map<string, AssetGenerationInfo>> {
+    const ids = items.filter((a) => a.kind === 'generated').map((a) => a.id);
+    if (ids.length === 0) return new Map();
+
+    const tasks = await this.prisma.generationTask.findMany({
+      where: { OR: ids.map((id) => taskOutputReferenceWhere(id)) },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        capability: true,
+        params: true,
+        inputAssetIds: true,
+        outputAssetId: true,
+        outputAssetIds: true,
+        modelKey: true,
+        channelModelId: true,
+      },
+    });
+    if (tasks.length === 0) return new Map();
+
+    const taskByAsset = new Map<string, (typeof tasks)[number]>();
+    for (const task of tasks) {
+      for (const assetId of orderedOutputIds(task.outputAssetId, task.outputAssetIds)) {
+        if (!taskByAsset.has(assetId)) taskByAsset.set(assetId, task);
+      }
+    }
+
+    const channelModelIds = [
+      ...new Set(
+        tasks
+          .map((task) => task.channelModelId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const channelModels =
+      channelModelIds.length > 0
+        ? await this.prisma.channelModel.findMany({
+            where: { id: { in: channelModelIds } },
+            select: { id: true, displayName: true, modelKey: true },
+          })
+        : [];
+    const modelById = new Map(channelModels.map((model) => [model.id, model]));
+
+    const info = new Map<string, AssetGenerationInfo>();
+    for (const [assetId, task] of taskByAsset) {
+      const params = parseJsonObject(task.params);
+      const refCount = parseJsonArray(task.inputAssetIds).length;
+      const described = describeGeneration(task.capability, params, refCount);
+      const model = task.channelModelId ? modelById.get(task.channelModelId) : undefined;
+      info.set(assetId, {
+        taskId: task.id,
+        modelName: model?.displayName || model?.modelKey || task.modelKey || '—',
+        modelKey: task.modelKey || model?.modelKey || null,
+        ...described,
+      });
+    }
+    return info;
   }
 
   /**
@@ -412,4 +490,24 @@ function parseDate(v: unknown): Date | undefined {
   if (typeof v !== 'string' || !v) return undefined;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+/** 任务参数 JSON → 对象；历史脏数据按空对象处理，不让整页列表失败 */
+function parseJsonObject(raw: string | null): Record<string, any> {
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** 任务输入素材 JSON 数组；历史脏数据按空数组处理 */
+function parseJsonArray(raw: string | null): string[] {
+  try {
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }

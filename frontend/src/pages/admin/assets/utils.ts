@@ -25,6 +25,18 @@ export function assetLabel(a: AssetRow): string {
 }
 
 /**
+ * 生成信息单行摘要：模型 · 比例 · 画质。
+ *
+ * 网格卡片一行放不下三项时逐项截断由容器负责；缺项直接跳过，
+ * 不输出「—」占位 —— 原始上传没有生成信息，显示空串比显示破折号更干净。
+ */
+export function generationLine(generation: NonNullable<AssetRow['generation']>): string {
+  return [generation.modelName, generation.ratio, generation.quality]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/**
  * 缩略图 URL —— 复用 lib/api 的 toAbsoluteUrl。
  *
  * 不自己拼：本地路径要加 API_BASE，云端签名 URL 要原样透传，

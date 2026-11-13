@@ -97,7 +97,7 @@ export function PricingPanel({
         outputTokenPriceMicrocredits: output,
         cachedTokenPriceMicrocredits: cached,
       });
-      toast.success('能力售价已保存');
+      toast.success('能力售价已保存，后续请求按新价格计费。');
       await onRetry();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '保存失败');
@@ -147,18 +147,11 @@ export function PricingPanel({
           </Notice>
 
           <Descriptions
-            columns={3}
+            columns={2}
             items={[
               {
                 label: '当前售价',
                 value: `${capabilityPriceText(data)}（${data.configured ? '能力售价' : '能力默认价'}）`,
-              },
-              {
-                label: '默认价',
-                value: capabilityPriceText({
-                  billingMode: data.billingMode,
-                  unitPriceMicrocredits: data.defaultUnitPriceMicrocredits,
-                }),
               },
               {
                 label: '最后调整',
@@ -172,8 +165,8 @@ export function PricingPanel({
           <div
             className={
               pricing.billingMode === 'token'
-                ? 'grid grid-cols-4 gap-3'
-                : 'grid max-w-lg grid-cols-2 gap-3'
+                ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4'
+                : 'grid max-w-lg grid-cols-1 gap-3 sm:grid-cols-2'
             }
           >
             <FormField label="计费方式">
@@ -235,7 +228,11 @@ export function PricingPanel({
             >
               {saving ? '保存中…' : '保存售价'}
             </ActionButton>
-            {!writable && <span className="text-xs text-muted-foreground">当前账号无 product.price 权限，仅可查看</span>}
+            {!writable && (
+              <span className="text-xs text-muted-foreground">
+                当前账号无售价修改权限，仅可查看。
+              </span>
+            )}
           </div>
         </div>
       </>

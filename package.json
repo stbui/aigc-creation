@@ -7,13 +7,18 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "setup": "npm --prefix backend ci && npm --prefix backend run prisma:generate && npm --prefix frontend ci && npm --prefix agent ci",
+    "setup": "npm ci && npm --prefix backend ci && npm --prefix backend run prisma:generate && npm --prefix frontend ci && npm --prefix agent ci",
     "dev": "./start.sh",
     "dev:test": "./start.sh --env test",
     "build": "npm run build:backend && npm run build:frontend",
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build:prod",
     "typecheck": "npm --prefix frontend run typecheck",
+    "lint": "biome lint",
+    "lint:ci": "biome lint --diagnostic-level=error",
+    "lint:fix": "biome lint --write",
+    "format": "biome format --write",
+    "format:check": "biome format",
     "test": "npm run test:backend && npm run test:frontend && npm run test:agent && npm run test:gateway",
     "test:backend": "npm --prefix backend test",
     "test:frontend": "npm --prefix frontend test",
@@ -25,6 +30,9 @@
     "verify:payment-bills": "npm --prefix backend run verify:payment-bills",
     "verify:payment-signatures": "npm --prefix backend run verify:payment-signatures",
     "check:node": "node scripts/check-node-version.mjs",
-    "check": "npm run check:node && npm run verify:deps && npm run build && npm run test"
+    "check": "npm run check:node && npm run verify:deps && npm run lint:ci && npm run build && npm run test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.7"
   }
 }

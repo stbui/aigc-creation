@@ -83,6 +83,11 @@ export function BindingPanel({
     setDraft((data?.bindings ?? []).map(toDraft));
   }, [data]);
 
+  // 模拟结果是已保存配置的快照；草稿一改，旧结果就不再代表当前页面内容。
+  useEffect(() => {
+    setSimulate('');
+  }, [draft]);
+
   const candidates = useMemo(
     () =>
       (data?.candidates ?? []).filter(
@@ -119,7 +124,7 @@ export function BindingPanel({
           weight: row.weight,
         })),
       );
-      toast.success('绑定已保存');
+      toast.success('绑定已保存。请模拟选路确认命中线路。');
       await onRetry();
       onChanged();
     } catch (error) {
@@ -143,7 +148,7 @@ export function BindingPanel({
     setPruning(true);
     try {
       const result = await adminCapabilityModelsApi.pruneInvalid(capabilityId);
-      toast.success(`已清理 ${result.removed} 条失效绑定`);
+      toast.success(`已清理 ${result.removed} 条失效绑定，可继续保存其它绑定。`);
       await onRetry();
       onChanged();
     } catch (error) {
@@ -162,7 +167,7 @@ export function BindingPanel({
       };
       setSimulate(
         result.selectedChannelModelId
-          ? `当前配置命中 ${result.selectedModelKey || '可用商品'}`
+          ? `已保存配置命中 ${result.selectedModelKey || '可用商品'}`
           : result.reason || '当前没有可参与选路的商品',
       );
     } catch (error) {
@@ -198,12 +203,12 @@ export function BindingPanel({
         return (
           <div className="flex flex-col items-start gap-1">
             {issue === null ? (
-              <StatusTag status="enabled" tone="success" label="可执行" />
+              <StatusTag status="enabled" tone="success" label="配置可用" />
             ) : (
               <StatusTag status="disabled" tone="warn" label={issue} />
             )}
             {costHint && (
-              <span className="text-[10px] leading-3 text-muted-foreground">{costHint}</span>
+              <span className="text-xs leading-4 text-muted-foreground">{costHint}</span>
             )}
           </div>
         );
@@ -306,7 +311,7 @@ export function BindingPanel({
     >
       <div className="flex flex-col gap-3">
         <p className="text-xs leading-5 text-muted-foreground">
-          优先级数字越小越先尝试；同一优先级内按权重分流。保存后请用「模拟选路」确认命中线路。
+          选路先按模型分组与健康分层筛选。同层内优先级越小越优先，再按权重分流。保存后请重新模拟选路。
         </p>
         {simulate && <Notice tone="info">{simulate}</Notice>}
         {error && <StaleError error={error} onRetry={onRetry} />}
@@ -333,7 +338,7 @@ export function BindingPanel({
                       <div className="truncate text-[12px] font-medium text-foreground">
                         {row.displayName || row.modelKey || '未知商品'}
                       </div>
-                      <div className="truncate text-[11px] text-muted-foreground">
+                      <div className="truncate text-xs text-muted-foreground">
                         {[
                           row.modelKey ? `模型 ${row.modelKey}` : '',
                           row.channelName ? `供应商 ${row.channelName}` : '',
@@ -343,7 +348,7 @@ export function BindingPanel({
                           .join(' · ')}
                       </div>
                     </div>
-                    <span className="shrink-0 text-[11px] text-warn-text">{row.reason}</span>
+                    <span className="shrink-0 text-xs text-warn-text">{row.reason}</span>
                   </div>
                 ))}
               </div>

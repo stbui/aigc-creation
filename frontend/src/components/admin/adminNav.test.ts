@@ -16,9 +16,15 @@ describe('后台导航分组', () => {
 
   it('高频运营入口排在内容配置之前', () => {
     const items = findAdminMenuGroup('/admin/users')?.items.map((item) => item.label) ?? [];
-    expect(items.slice(0, 4)).toEqual(['用户管理', '任务监控', '工单处理', '素材管理']);
+    expect(items.slice(0, 3)).toEqual(['用户管理', '工单处理', '素材管理']);
     expect(items).toContain('站内消息');
     expect(items).toContain('AI 标识');
+  });
+
+  it('任务监控归入模型与能力，排在调用记录之后', () => {
+    const items = findAdminMenuGroup('/admin/tasks')?.items.map((item) => item.label) ?? [];
+    expect(findAdminMenuGroup('/admin/tasks')?.name).toBe('模型与能力');
+    expect(items.slice(-2)).toEqual(['调用记录', '任务监控']);
   });
 });
 

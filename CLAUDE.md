@@ -31,6 +31,7 @@
 | 接口清单 / 错误码 / 响应信封 | `docs/api-contract.md` |
 | 错误码 → 用户文案映射 | `docs/error-copy.md`；任务码实现见 `frontend/src/lib/constants.ts`（C 端）与 `frontend/src/lib/admin-error-codes.ts`（后台） |
 | 状态与反馈规格 | `docs/feedback-states.md`；状态文案与色调见 `frontend/src/components/admin/statusMeta.ts` 的 `STATUS_META`，任务失败文案见 `frontend/src/lib/constants.ts` |
+| 代码风格 / 静态检查 | `biome.json` 的规则基线；说明与收紧流程见 `docs/code-style.md` |
 | 测试清单与覆盖矩阵 | `docs/testing.md`；文档分类地图见 `docs/README.md` |
 
 **数量口径（最易腐化，改代码后必须复核）**：本文件的数字以下表口径为准，与代码不符以代码为准并顺手改这里。
@@ -173,8 +174,15 @@ aigc-creation/
                             #      --backend-only / --frontend-only / --no-follow
                             #      --daemon（PID 记 .run/start.pids）/ --stop（只停）
 
-# 工程门禁（根目录；Node 版本 + 依赖审计 + 构建 + 后端/前端/agent 单测 + 仿真网关）
+# 工程门禁（根目录；Node 版本 + 依赖审计 + 静态检查 + 构建 + 后端/前端/agent 单测 + 仿真网关）
 npm run check
+
+# 静态检查（Biome；规则基线与收紧路径见 docs/code-style.md）
+npm run lint                # 全量 lint，warning 可见，仅 error 失败
+npm run lint:ci             # 只显示 error，CI 与 npm run check 使用
+npm run lint:fix            # 应用安全修复
+npx biome format --write <files>   # 只格式化本次改动的文件
+npm run format              # 全仓格式化（仅专门的全仓格式化提交时用）
 
 # 后端
 cd backend && npm run build && node dist/main.js   # 不要用 nest start（会拒绝清空 dist）
@@ -422,7 +430,7 @@ npm run e2e                 # Playwright
 | --- | --- |
 | 需求 | `prd.md`（整站）、`admin-prd.md`（后台） |
 | 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md`；`shoppable-carousel-design.md`（+ 模板来源 `shoppable-carousel-template-sources.md`）；品牌：`brand/brand-basics.md` |
-| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`error-copy.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md`、`copywriting.md`、`feedback-states.md`、`mask-canvas-sdk.md` |
+| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`error-copy.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`design-tokens.md`、`copywriting.md`、`feedback-states.md`、`code-style.md`、`mask-canvas-sdk.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |
 | 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`、`canvas-port-design.md`（规划）；`channel-model-automation-design.md`（已实施：去掉前台模型层，渠道模型直接售卖与自动切换）；`admin-workflow-design.md`（P0 已实施）、`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |

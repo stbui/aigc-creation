@@ -50,7 +50,7 @@ describe('BindingPanel 候选与成本状态', () => {
     expect(draft.modelEnabled).toBe(true);
   });
 
-  it('成本未配置仍显示可执行，并单独提示毛利不可算', () => {
+  it('成本未配置仍显示配置可用，并单独提示毛利不可算', () => {
     const unconfiguredCostData: AdminCapabilityModelListView = {
       ...data,
       invalidBindings: [],
@@ -91,7 +91,7 @@ describe('BindingPanel 候选与成本状态', () => {
       </ToastProvider>,
     );
 
-    expect(screen.getByText('可执行')).toBeTruthy();
+    expect(screen.getByText('配置可用')).toBeTruthy();
     expect(screen.getByText('成本未配置，毛利不可算')).toBeTruthy();
     expect(screen.queryByText('商品未定价')).toBeNull();
   });

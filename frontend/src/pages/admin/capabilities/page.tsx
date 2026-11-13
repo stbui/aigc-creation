@@ -201,13 +201,13 @@ export function AdminCapabilitiesPage() {
         <Panel title="能力">
           <EmptyState
             title="无能力读取权限"
-            description="需要 capability.read 或 logical_model.read 权限。"
+            description="当前账号没有能力或商品绑定读取权限，请联系管理员开通。"
           />
         </Panel>
       ) : list.error && rows.length === 0 ? (
         <ListError error={list.error} onRetry={() => void list.reload()} />
       ) : (
-        <div className="grid grid-cols-[280px_minmax(0,1fr)] items-start gap-4">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
           <CapabilityList
             rows={filtered}
             loading={list.loading}

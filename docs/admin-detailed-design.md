@@ -200,6 +200,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 ### 3.2 规则
 
 - 素材按 `kind`（`original` / `generated`）、能力、用户、时间筛选；列表要同时支持缩略图网格与表格视图。
+- **生成图附带生成信息**：列表项 `generation` 由产出它的 `GenerationTask` 快照重建，含 `prompt`（`buildPrompt` 的实际下发文本）、`modelName`（渠道模型展示名）、`ratio` / `quality`（能力参数选项的展示名）。网格与表格直接展示「模型 · 比例 · 画质」，大图预览通过查看器自带面板查看并复制提示词；原始上传为 `null`。
 - **下架**置 `Asset.status='hidden'`，C 端列表过滤。这是后台唯一会改变 C 端可见性的动作。
 - **删除**连带磁盘文件与对象存储对象；生成图删除时连带删除产出它的任务。
 - 图片地址走 `displayUrl()` / 签名 URL 服务，不暴露磁盘路径。

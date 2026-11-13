@@ -3,7 +3,12 @@ import { ActionButton, Notice, StatCards } from '~/admin-ui/primitives';
 import type { AdminCapabilityControl } from '../../../types/api';
 import type { AdminCapabilityModelListView, CapabilityPricingView } from '../../../types/model';
 import { DEFAULT_OFFLINE_REASON } from './constants';
-import { bindingCanRun, bindingIssue, capabilityPriceText, formatUpdatedAt } from './utils';
+import {
+  bindingConfigAvailable,
+  bindingIssue,
+  capabilityPriceText,
+  formatUpdatedAt,
+} from './utils';
 
 /** 能力概览：先回答“现在能不能卖”，再给出下一步该做什么。 */
 export function CapabilityOverview({
@@ -34,8 +39,8 @@ export function CapabilityOverview({
   onToggle: (next: boolean) => void;
 }) {
   const validBindings = bindings?.bindings ?? [];
-  const executable = validBindings.filter(bindingCanRun);
-  const blockedCount = validBindings.length - executable.length;
+  const configAvailable = validBindings.filter(bindingConfigAvailable);
+  const inactiveCount = validBindings.length - configAvailable.length;
   const invalidCount = bindings?.invalidCount ?? 0;
   const bindingsPending = bindingsReadable && bindingsLoading && bindings === null;
   const bindingsFailed = bindingsReadable && !bindingsLoading && Boolean(bindingsError) && bindings === null;
@@ -77,28 +82,28 @@ export function CapabilityOverview({
             : '能力默认价 · 可在「售价」页配置'
           : '售价未知';
 
-  const blockedHint =
-    blockedCount > 0
-      ? `${blockedCount} 条因供应商、商品或绑定停用未参与选路`
+  const inactiveHint =
+    inactiveCount > 0
+      ? `${inactiveCount} 条因供应商、商品或绑定开关停用未参与选路`
       : '全部参与选路';
 
   return (
     <div className="flex flex-col gap-3">
       <StatCards
-        columns={4}
+        columns="auto"
         items={[
           {
-            key: 'executable',
-            label: '可承接线路',
-            value: bindingValue(executable.length),
-            hint: bindingHint(`共 ${validBindings.length} 条绑定`),
+            key: 'available',
+            label: '配置可用线路',
+            value: bindingValue(configAvailable.length),
+            hint: bindingHint('仅校验启停，实际以模拟选路为准'),
           },
           {
             key: 'bindings',
             label: '绑定商品',
             value: bindingValue(validBindings.length),
-            hint: bindingHint(blockedHint),
-            tone: bindingsReady && blockedCount > 0 ? 'warn' : undefined,
+            hint: bindingHint(inactiveHint),
+            tone: bindingsReady && inactiveCount > 0 ? 'warn' : undefined,
           },
           {
             key: 'invalid',
@@ -119,15 +124,19 @@ export function CapabilityOverview({
       {capability.runtime.effective === 'disabled' ? (
         <Notice tone="warn" title="能力已下线，C 端不可提交" className="mb-0">
           {capability.reason || DEFAULT_OFFLINE_REASON}
-          {' '}重新上线后，请在「商品绑定」页模拟选路，确认线路可以承接再放量。
+          {' '}重新上线后请模拟选路，确认线路可承接后再放量。
         </Notice>
       ) : capability.runtime.effective === 'unavailable' ? (
         <Notice tone="danger" title="暂不可承接请求" className="mb-0">
-          当前没有可执行的模型线路。请到「商品绑定」页启用商品与供应商，再用「模拟选路」确认。
+          {bindingsReadable
+            ? '请到「商品绑定」页启用商品与供应商，再模拟选路确认。'
+            : '当前账号无绑定读取权限。请联系管理员检查商品与绑定开关，再模拟选路确认。'}
         </Notice>
       ) : (
         <Notice tone="success" title="运行正常，C 端可正常提交" className="mb-0">
-          调整绑定后请用「模拟选路」确认线路；改价只影响后续请求，已创建任务按原账单结算。
+          {bindingsReadable
+            ? '调整绑定后请重新模拟选路。改价只影响后续请求，已创建任务按原账单结算。'
+            : '当前账号无绑定读取权限，无法确认具体线路。请联系管理员开通后复核。'}
         </Notice>
       )}
 
@@ -137,14 +146,14 @@ export function CapabilityOverview({
         </Notice>
       )}
 
-      {bindingsReady && blockedCount > 0 && (
+      {bindingsReady && inactiveCount > 0 && (
         <Notice tone="warn" className="mb-0">
           {validBindings
-            .filter((row) => !bindingCanRun(row))
+            .filter((row) => !bindingConfigAvailable(row))
             .slice(0, 3)
             .map((row) => `${row.displayName || row.modelKey}：${bindingIssue(row)}`)
             .join('；')}
-          {blockedCount > 3 ? ` 等 ${blockedCount} 条` : ''}
+          {inactiveCount > 3 ? ` 等 ${inactiveCount} 条` : ''}
           。请到「商品绑定」页处理后再模拟选路。
         </Notice>
       )}
@@ -159,8 +168,8 @@ export function CapabilityOverview({
                 : `当前下线提示：「${capability.reason || DEFAULT_OFFLINE_REASON}」`}
             </p>
             {capability.updatedAt && (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                最近调整 {formatUpdatedAt(capability.updatedAt)}
+              <p className="mt-1 text-xs text-muted-foreground">
+                开关更新 {formatUpdatedAt(capability.updatedAt)}
                 {capability.updatedBy ? ` · ${capability.updatedBy}` : ''}
               </p>
             )}

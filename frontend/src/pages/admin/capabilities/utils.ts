@@ -55,7 +55,7 @@ export function bindingIssue(row: BindingExecutionFields): string | null {
   return null;
 }
 
-export function bindingCanRun(row: BindingExecutionFields): boolean {
+export function bindingConfigAvailable(row: BindingExecutionFields): boolean {
   return bindingIssue(row) === null;
 }
 

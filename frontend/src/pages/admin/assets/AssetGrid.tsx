@@ -7,7 +7,7 @@ import {
   Pagination,
 } from '~/admin-ui/primitives';
 import { AssetThumb } from './AssetThumb';
-import { assetLabel, cn, fmtBytes, thumbSrc } from './utils';
+import { assetLabel, cn, fmtBytes, generationLine, thumbSrc } from './utils';
 import type { AssetRow } from './constants';
 
 /**
@@ -290,6 +290,14 @@ export function AssetGrid({
                 <div className="truncate text-[12px] leading-4 text-muted-foreground tabular-nums">
                   {fmtBytes(a.sizeBytes)}
                 </div>
+                {a.generation && (
+                  <div
+                    className="truncate text-[12px] leading-4 text-muted-foreground"
+                    title={generationLine(a.generation)}
+                  >
+                    {generationLine(a.generation)}
+                  </div>
+                )}
                 <div
                   className="truncate text-[12px] leading-4 text-muted-foreground"
                   title={`${a.ownerEmail} · ${a.projectName}`}

@@ -108,7 +108,7 @@ export function ProductKitPromptPreview({
     >
       <div className="pk-prompt-preview">
         <p className="pk-prompt-preview-hint">
-          下面是本次提交会**逐张**发给模型的提示词。预览不生成图片、不扣积分。
+          下面是本次提交会逐张发给模型的提示词。预览不生成图片、不扣积分。
         </p>
 
         {state.status === 'loading' && (
