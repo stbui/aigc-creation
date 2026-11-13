@@ -1,8 +1,8 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { ModelPicker } from '../ModelPicker';
+import { modelsApi } from '../../lib/api';
 import { loadModels, type PublicModelGroup } from '../../lib/models';
+import { ModelPicker } from '../ModelPicker';
 
 vi.mock('../../lib/models', async () => {
   const actual = await vi.importActual<typeof import('../../lib/models')>('../../lib/models');
@@ -17,8 +17,8 @@ const imageModel: PublicModelGroup = {
   description: '',
   capability: 'main_image',
   sortOrder: 0,
-  displayPrice: 10,
-  priceLabel: '10 积分',
+  displayPrice: 2,
+  priceLabel: '',
   billingMode: 'fixed_request',
   capabilitySpec: {
     version: 1,
@@ -60,12 +60,7 @@ describe('ModelPicker 模型输入能力上报', () => {
 
   it('目录加载后把真实选中的模型交给页面读取能力上限', async () => {
     const onModelChange = vi.fn();
-    render(
-      <ModelPicker
-        capability="main_image"
-        onModelChange={onModelChange}
-      />,
-    );
+    render(<ModelPicker capability="main_image" onModelChange={onModelChange} />);
 
     await waitFor(() => expect(onModelChange).toHaveBeenLastCalledWith(imageModel));
   });
@@ -82,5 +77,26 @@ describe('ModelPicker 模型输入能力上报', () => {
     );
 
     await waitFor(() => expect(onModelChange).toHaveBeenLastCalledWith(redrawModelWithMask));
+  });
+
+  it('报价明确标成单次价格，避免与按钮的整批总价混淆', async () => {
+    vi.spyOn(modelsApi, 'quote').mockResolvedValue({
+      quote: {
+        capabilityId: 'main_image',
+        modelKey: 'main-image',
+        billingMode: 'fixed_request',
+        quantity: 1,
+        amountMicrocredits: 2_000_000,
+        estimated: false,
+        note: '',
+      },
+    });
+
+    render(<ModelPicker capability="main_image" options={{ ratio: '1:1', resolution: '1k' }} />);
+
+    await waitFor(() => expect(screen.getByTestId('model-option')).toHaveTextContent('2 积分/次'));
+    await waitFor(() =>
+      expect(screen.getByTestId('model-quote')).toHaveTextContent('单次约 2 积分'),
+    );
   });
 });

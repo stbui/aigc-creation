@@ -1,5 +1,17 @@
-import type { Project } from "./api";
 import type { AdminTaskRouteAttempt } from "./task-route";
+import type { StorageBackendId } from "./admin-assets";
+
+// 素材 / 项目 / 存储后端类型按域拆到 admin-assets，仍从这里原样再导出，
+// 调用方继续从 types/api 取件即可。
+export type {
+  AdminAssetGeneration,
+  AdminAssetListResult,
+  AdminAssetStats,
+  AdminProject,
+  AdminProjectListResult,
+  AssetStatus,
+  StorageBackendId,
+} from "./admin-assets";
 
 /** 列表行。字段与后端 tasks-admin.service list() 返回一一对应 */
 export interface AdminTask {
@@ -136,83 +148,8 @@ export interface AdminCleanupLog {
 }
 
 /* ────────────────────────────────────────────────────────────────
-   素材管理 + 存储后端 (admin-prd.md §3.4 B-21~27 / §3.11 B-62/63)
+   存储后端 (admin-prd.md §3.11 B-62/63)
    ──────────────────────────────────────────────────────────────── */
-
-/** 存储后端标识 */
-export type StorageBackendId = "local" | "oss" | "minio";
-
-/** 素材上架状态。hidden = 已下架, 用户端不可见但记录与文件保留 */
-export type AssetStatus = "visible" | "hidden";
-
-/** GET /api/v1/admin/assets */
-export interface AdminAssetListResult {
-  items: Array<{
-    id: string;
-    kind: "original" | "generated";
-    capability: string | null;
-    width: number | null;
-    height: number | null;
-    format: string;
-    sizeBytes: number;
-    status: AssetStatus;
-    /** 可访问 URL。本地为 /uploads/key, 云端为签名 URL(会过期, 不入库) */
-    sourceUrl: string;
-    /** 写入时的后端 —— 切换默认后端后老素材仍从这里读 */
-    storageBackend: StorageBackendId;
-    /** 存储内相对 key, 唯一真相, 不含域名 */
-    storageKey: string | null;
-    ownerId: string;
-    ownerEmail: string;
-    projectId: string;
-    projectName: string;
-    createdAt: string;
-    /**
-     * 生成图才有：产出它的任务快照。
-     *
-     * 提示词是由任务参数经能力定义重建的实际下发文本；比例 / 画质是
-     * 能力参数选项的展示名。原始上传恒为 null。
-     */
-    generation: {
-      taskId: string;
-      /** 实际线路展示名（渠道模型 displayName → modelKey） */
-      modelName: string;
-      /** C 端模型分组键 */
-      modelKey: string | null;
-      prompt: string;
-      ratio: string | null;
-      quality: string | null;
-    } | null;
-  }>;
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-/** GET /api/v1/admin/assets/stats */
-export interface AdminAssetStats {
-  total: number;
-  totalBytes: number;
-  totalMb: number;
-  byStatus: Record<string, number>;
-  byBackend: Record<string, number>;
-  byKind: Record<string, number>;
-}
-
-/** GET /api/v1/admin/projects */
-export interface AdminProjectListResult {
-  items: AdminProject[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-export interface AdminProject extends Project {
-  ownerEmail: string;
-  ownerName: string;
-  assetCount: number;
-  taskCount: number;
-}
 
 /** GET /api/v1/admin/storage/status */
 export interface AdminStorageStatus {

@@ -16,7 +16,6 @@ import {
   type AssetDeleteTarget,
   type AssetRow,
 } from './constants';
-import { assetLabel, fmtBytes, thumbOf } from './utils';
 import { AssetFilterBar } from './AssetFilterBar';
 import { AssetGrid } from './AssetGrid';
 import { AssetTable } from './AssetTable';
@@ -50,7 +49,7 @@ import type { AdminAssetListResult, AssetStatus } from '../../../types/api';
  *
  * 素材表只存结果，提示词 / 模型 / 比例 / 画质都在产出它的任务参数快照里。
  * 列表接口一次性反查后下发 `generation`：网格与表格展示「模型 · 比例 · 画质」，
- * 大图预览复用查看器自带的提示词面板查看与复制，原始上传不受影响。
+ * 大图预览固定两栏 —— 左侧看图、右侧看提示词与全部信息，原始上传显示占位说明。
  *
  * ## 模块划分
  *
@@ -141,29 +140,6 @@ export function AdminAssetsPage() {
   const visibleAssetIds = useMemo(() => items.map((item) => item.id), [items]);
   useSelectionPrune(setSelected, visibleAssetIds);
 
-  const previewItems = useMemo(
-    () =>
-      items.map((a) => ({
-        id: a.id,
-        url: thumbOf(a.sourceUrl),
-        alt: `${assetLabel(a)}素材预览`,
-        width: a.width,
-        height: a.height,
-        createdAt: a.createdAt,
-        // 提示词由查看器自带的「提示词」面板展示与复制，长文本不挤进底栏
-        prompt: a.generation?.prompt,
-        meta: [
-          // 生成信息是运营复核图片的主要依据：模型、比例、画质，再补大小与存储位置。
-          // 能力、上下架状态、格式、所属用户、项目属于列表属性，仍不放进查看器。
-          a.generation?.modelName,
-          a.generation?.ratio,
-          a.generation?.quality,
-          fmtBytes(a.sizeBytes),
-          BACKEND_LABEL[a.storageBackend] ?? a.storageBackend,
-        ].filter((value): value is string => Boolean(value)),
-      })),
-    [items],
-  );
   const previewIndex = previewId ? items.findIndex((a) => a.id === previewId) : -1;
 
   const appliedKeyword = (params.keyword as string | undefined) ?? '';
@@ -495,7 +471,6 @@ export function AdminAssetsPage() {
       {previewIndex >= 0 && (
         <AssetPreview
           assets={items}
-          items={previewItems}
           index={previewIndex}
           statusBusyId={statusBusyId}
           canHide={can('asset.hide')}

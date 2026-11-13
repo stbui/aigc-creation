@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { modelsApi } from '../lib/api';
 import { toCredits } from '../lib/microcredits';
-import { loadModels, modelsForCapability, type PublicModelGroup } from '../lib/models';
 import {
   readSelectedModelId,
   subscribeModelSelection,
   writeSelectedModelId,
 } from '../lib/modelSelection';
+import { loadModels, modelsForCapability, type PublicModelGroup } from '../lib/models';
 import type { ModelQuoteView } from '../types/model';
 import { Button } from '../ui';
 
@@ -48,10 +48,10 @@ export interface ModelPickerProps {
   className?: string;
 }
 
-/** 价格文案：优先展示后端给的口径，避免前端自己拼「起」字造成误导 */
+/** 价格文案：优先展示后端给的口径；固定请求价明确标成单次价 */
 function priceText(model: PublicModelGroup): string {
   if (model.priceLabel) return model.priceLabel;
-  if (model.displayPrice !== null) return `${model.displayPrice} 积分`;
+  if (model.displayPrice !== null) return `${model.displayPrice} 积分/次`;
   return '按渠道价格档';
 }
 
@@ -185,9 +185,15 @@ export function ModelPicker({
 
   if (candidates.length === 0) {
     return (
-      <div className={`pk-settings-group${className ? ` ${className}` : ''}`} data-testid="model-picker">
+      <div
+        className={`pk-settings-group${className ? ` ${className}` : ''}`}
+        data-testid="model-picker"
+      >
         <strong className="pk-settings-group-label">模型</strong>
-        <p style={{ fontSize: 12, color: 'var(--text-desc)', margin: 0 }} data-testid="model-picker-empty">
+        <p
+          style={{ fontSize: 12, color: 'var(--text-desc)', margin: 0 }}
+          data-testid="model-picker-empty"
+        >
           {requiredInputs.includes('mask')
             ? '当前没有支持遮罩重绘的模型，稍后再试。'
             : '该能力当前没有可用模型，稍后再试。'}
@@ -197,7 +203,10 @@ export function ModelPicker({
   }
 
   return (
-    <div className={`pk-settings-group${className ? ` ${className}` : ''}`} data-testid="model-picker">
+    <div
+      className={`pk-settings-group${className ? ` ${className}` : ''}`}
+      data-testid="model-picker"
+    >
       <strong className="pk-settings-group-label">模型</strong>
       <div className="pk-resolution-grid">
         {candidates.map((model) => {
@@ -229,9 +238,12 @@ export function ModelPicker({
         })}
       </div>
       {selected && options && (
-        <p style={{ fontSize: 12, color: 'var(--text-desc)', margin: '6px 0 0' }} data-testid="model-quote">
+        <p
+          style={{ fontSize: 12, color: 'var(--text-desc)', margin: '6px 0 0' }}
+          data-testid="model-quote"
+        >
           {quote && quote.amountMicrocredits !== null
-            ? `本次约 ${toCredits(quote.amountMicrocredits)} 积分${quote.estimated ? '（预估）' : ''}`
+            ? `单次约 ${toCredits(quote.amountMicrocredits)} 积分${quote.estimated ? '（预估）' : ''}`
             : quoteFailed
               ? '当前参数下价格待定'
               : '正在计算价格…'}

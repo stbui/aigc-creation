@@ -70,19 +70,19 @@ extension/**/*.js
 
 ### 4.2 Warn（存量债务，不阻塞门禁）
 
-当前 549 条，按数量排序的主要来源：
+当前 587 条（数量随代码演进，以 `npm run lint --reporter=json` 实际输出为准；下表用于判断收敛优先级）：
 
 | 规则 | 数量 | 收敛方向 |
 | --- | --- | --- |
 | `complexity/useOptionalChain` | 78 | 逐文件改为 `?.` |
-| `correctness/useExhaustiveDependencies` | 58 | 补依赖或改用稳定引用，改动需逐项验证 |
+| `correctness/useExhaustiveDependencies` | 59 | 补依赖或改用稳定引用，改动需逐项验证 |
 | `suspicious/noDoubleEquals` | 53 | 改为 `===`；`== null` 的意图需显式写清 |
 | `correctness/noUnusedImports` | 45 | 删除 |
 | `correctness/noComponentHookFactories` | 41 | 组件内不要条件式创建 hook |
 | `suspicious/noArrayIndexKey` | 40 | 静态骨架可保留，数据列表改用稳定 id |
 | `correctness/noUnusedVariables` | 38 | 删除或前缀 `_` |
-| `a11y/*` | 94 | 语义元素、label 关联、键盘可达 |
-| 其余 | 102 | 见 `npm run lint` |
+| `a11y/*` | 136 | 语义元素、label 关联、键盘可达 |
+| 其余 | 97 | 见 `npm run lint` |
 
 warnings 不计入门禁，但**新增代码不应增加 warn 数量**。批量清理后把对应规则提升为 error。
 
@@ -143,7 +143,7 @@ Biome formatter 已配置，但**暂不进入门禁**：
 
 ## 10. 已知缺口
 
-- 549 条 warning 未收敛，尚不能作为失败门禁。
+- 587 条 warning 未收敛，尚不能作为失败门禁。
 - 878 个文件未按 Biome formatter 格式化，格式门禁未接入。
 - Biome 只覆盖语法与通用正确性；以下仓库硬规则仍需评审与既有测试守住：
   - 最小字号 12px、禁止裸 hex、只用设计令牌（见 `CLAUDE.md` 与 [`typography.md`](typography.md)）；

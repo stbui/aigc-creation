@@ -96,13 +96,20 @@
         "useMathMinMax": "off"
       },
       "a11y": {
+        "useAltText": "warn",
+        "useHtmlLang": "warn",
+        "noPositiveTabindex": "warn",
         "useSemanticElements": "warn",
         "useAriaPropsSupportedByRole": "warn",
         "noLabelWithoutControl": "warn",
         "useKeyWithClickEvents": "warn",
         "noStaticElementInteractions": "warn",
+        "noNoninteractiveElementInteractions": "warn",
         "useValidAnchor": "warn",
-        "noNoninteractiveTabindex": "warn"
+        "noNoninteractiveTabindex": "warn",
+        "useFocusableInteractive": "warn",
+        "noRedundantRoles": "warn",
+        "useButtonType": "warn"
       },
       "performance": {
         "useDomNodeTextContent": "warn"
