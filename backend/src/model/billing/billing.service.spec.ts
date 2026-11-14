@@ -1,6 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BillingService, isBillingOrderReviewable } from './billing.service';
+import { BillingService, creativeBusinessTypeOf, isBillingOrderReviewable } from './billing.service';
+
+describe('creativeBusinessTypeOf', () => {
+  /*
+   * 三组创意能力（电商生图 / AI修图 / AI视频）在产品口径上统一叫
+   * 「创意生图扣费」, 因此只按模态判定, 不区分能力归属。
+   */
+  it('图片与视频扣费归「创意生图扣费」', () => {
+    expect(creativeBusinessTypeOf('image')).toBe('creative_image');
+    expect(creativeBusinessTypeOf('video')).toBe('creative_image');
+  });
+
+  it('文本与音频扣费不得标成创意生图', () => {
+    expect(creativeBusinessTypeOf('text')).toBe('other');
+    expect(creativeBusinessTypeOf('audio')).toBe('other');
+    // 未归一化的值同样兜底, 不能默认当成生图
+    expect(creativeBusinessTypeOf('')).toBe('other');
+  });
+});
 
 describe('isBillingOrderReviewable', () => {
   const now = Date.parse('2026-01-01T00:00:00.000Z');

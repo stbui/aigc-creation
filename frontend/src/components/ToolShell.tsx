@@ -1,25 +1,20 @@
 import '../styles/redraw.css';
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Download, ImagePlus, Maximize2, Plus, RefreshCw, X } from 'lucide-react';
-import { assetsApi, assetSrc, assetThumbUrl, toAbsoluteUrl } from '../lib/api';
-import { useAssetLibrary, useCapabilityRuntime, useCreditLabel, usePasteUpload, useProject } from '../hooks';
+import { useMemo, useState } from 'react';
+import { Maximize2 } from 'lucide-react';
+import { useCapabilityRuntime, useCreditLabel } from '../hooks';
 import { useAuth } from '../context/AuthContext';
 import { AssetLibraryModal } from './AssetLibraryModal';
 import { MobileUploadModal } from './MobileUploadModal';
 import { ToolSettingsPopover } from './ToolSettingsPopover';
 import { ModelPicker } from './ModelPicker';
 import { ToolSubmitBar } from './ToolSubmitBar';
-import { ToolEmptyState, ToolGeneratingState } from './ToolEmptyState';
-import { ResultMedia, formatDuration } from './ResultMedia';
-import { ImageCompare } from './ImageCompare';
 import { ImageLightbox } from './ImageLightbox';
-import { ProductCardGenerating, ProductCardResult } from './ToolResultCards';
-import { taskErrorText } from '../lib/constants';
-import { useUploadLimits } from '../context/UploadLimitsContext';
-import type { Asset, MobileUploadAsset, Task } from '../types/api';
-import { useApp, Spin } from '../ui';
+import { ToolUploadCard } from './ToolUploadCard';
+import { ToolResultPane } from './ToolResultPane';
+import { useToolUploadSlots } from '../hooks/useToolUploadSlots';
+import { useApp } from '../ui';
 import { ToolTrailingContext } from './toolShellTypes';
-import type { Props, ToolAsset, ToolResult } from './toolShellTypes';
+import type { Props, ToolAsset, ToolResult, ToolTrailingControl } from './toolShellTypes';
 
 /**
  * 修图系工具页共享骨架 —— 1:1 复刻参考站 local-redraw / background-remove 等页的公共结构:
@@ -29,6 +24,10 @@ import type { Props, ToolAsset, ToolResult } from './toolShellTypes';
  *              → 历史记录 (可折叠, 真实任务数据)
  *   右栏: 结果预览 (空态插画 + 说明 / 生成结果 + 重新生成)
  * 上传/设置/提交/结果的视觉与 pk-* (product-kit) 完全同源, 业务差异由 children 与配置注入。
+ *
+ * 2026-11-14 按单一职责拆分（对外 API 与 DOM 一行未改）：
+ * `useToolUploadSlots`（图片位状态与写操作）/ `ToolUploadCard`（上传卡）/
+ * `ToolResultPane`（结果三态）；本文件只负责组合、设置项与提交。
  */
 
 export function ToolShell(props: Props) {
@@ -91,187 +90,29 @@ export function ToolShell(props: Props) {
   } = props;
 
   const { message } = useApp();
-  const { ensureProject } = useProject();
-  const {
-    accept: allowedAccept,
-    allowedLabel,
-    isSupportedImageFile,
-    validateImageFile,
-  } = useUploadLimits();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [images, setImages] = useState<ToolAsset[]>([]);
+  const {
+    allowedAccept,
+    images,
+    uploading,
+    dragging,
+    setDragging,
+    fileInputRef,
+    mobileOpen,
+    setMobileOpen,
+    library,
+    pickFromLibrary,
+    uploadFiles,
+    removeImage,
+    addMobileAssets,
+    reuseHistoryTask,
+  } = useToolUploadSlots({ upload, replaceUpload, onImagesChange, onHistoryReuse });
+
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [trailingCollapsed, setTrailingCollapsed] = useState(false);
-  const [dragging, setDragging] = useState(false);
   const [ratio, setRatio] = useState(settings?.defaultRatio ?? 'original');
   const [resolution, setResolution] = useState(settings?.defaultResolution ?? '1k');
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  /** 手机上传弹窗 (二维码方案, 手机端传回后进入图片位) */
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  /**
-   * 图片位的同步镜像。
-   *
-   * 素材库弹窗「确定」时是**同步 for 循环**逐个调 onPick, 期间不会重渲染 ——
-   * 只读 `images` 会让「最多 1 张」的页面把一次勾选的 3 张全部收下 (每张都读到
-   * 同一份旧 state)。故用 ref 记下本轮已接受的结果, 渲染后再与 state 对齐。
-   */
-  const imagesRef = useRef<ToolAsset[]>(images);
-  useEffect(() => {
-    imagesRef.current = images;
-  }, [images]);
-
-  useEffect(() => {
-    onImagesChange?.(images);
-  }, [images, onImagesChange]);
-
-  /**
-   * 素材库点选回填。
-   *
-   * ⚠️ 拒绝时必须显式 `return false`: undefined 会被选择器当成「接受」,
-   * 上限与去重就形同虚设 (AssetLibraryModal 的调用约定)。
-   */
-  const pickFromLibrary = useCallback(
-    (asset: Asset): boolean => {
-      if (!upload) return false;
-      const current = imagesRef.current;
-      const replacing = replaceUpload && upload.max === 1 && current.length > 0;
-      if (!replacing && current.length >= upload.max) {
-        message.warning(`最多上传 ${upload.max} 张图片`);
-        return false;
-      }
-      if (current.some((x) => x.id === asset.id)) {
-        if (replacing) return true;
-        message.info('该素材已在列表中');
-        return false;
-      }
-      const next: ToolAsset = {
-        id: asset.id,
-        url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
-        name: asset.sourceUrl.split('/').pop() ?? '素材',
-      };
-      const nextImages = replacing ? [next] : [...current, next];
-      imagesRef.current = nextImages;
-      // 用 updater 追加: 一轮多选时前一张还没进 state, 直接读 images 会丢。
-      // 单图替换则必须覆盖旧图，否则「素材库导入」会永远被额度拒绝。
-      setImages((prev) => (replacing ? [next] : prev.some((x) => x.id === next.id) ? prev : [...prev, next]));
-      return true;
-    },
-    [message, replaceUpload, upload],
-  );
-
-  // 素材库弹窗 (通用组件; 本页只提供额度与去重规则)
-  const {
-    open: libraryOpen,
-    loading: libraryLoading,
-    items: libraryItems,
-    error: libraryError,
-    openLibrary,
-    closeLibrary,
-  } = useAssetLibrary(pickFromLibrary);
-
-  /**
-   * 手机端传回图片 → 进入图片位。
-   *
-   * 超出位数的部分**如实告知被截断**, 不静默丢弃: 用户在手机上挑好了 5 张,
-   * 电脑端只进 1 张却不说, 是最难受的一种失败。
-   */
-  const addMobileAssets = useCallback(
-    (assets: MobileUploadAsset[]) => {
-      const max = upload?.max ?? 0;
-      const prev = imagesRef.current;
-      const replacing = replaceUpload && max === 1 && prev.length > 0;
-      const room = max - prev.length + (replacing ? 1 : 0);
-      if (room <= 0) {
-        message.warning(`图片位已满 (${max} 张), 手机上传的图片未加入`);
-        setMobileOpen(false);
-        return;
-      }
-      const fresh = assets.filter((a) => !prev.some((x) => x.id === a.id));
-      const accepted = fresh.slice(0, room);
-      const dropped = fresh.length - accepted.length;
-      if (dropped > 0) message.warning(`图片位只剩 ${room} 个, ${dropped} 张未加入`);
-
-      const added: ToolAsset[] = accepted.map((a) => ({
-        id: a.id,
-        url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
-        name: a.filename,
-      }));
-      if (added.length === 0) {
-        setMobileOpen(false);
-        return;
-      }
-      const nextImages = replacing ? added.slice(0, 1) : [...prev, ...added];
-      imagesRef.current = nextImages;
-      setImages((cur) =>
-        replacing ? added.slice(0, 1) : [...cur, ...added.filter((a) => !cur.some((x) => x.id === a.id))],
-      );
-      setMobileOpen(false);
-      if (added.length > 0) message.success(`已从手机接收 ${added.length} 张图片`);
-    },
-    [message, replaceUpload, upload],
-  );
-
-  const uploadFiles = useCallback(
-    async (files: FileList | File[]) => {
-      if (!upload) return;
-      const all = Array.from(files);
-      const list = all.filter(isSupportedImageFile);
-      if (list.length === 0) {
-        message.warning(`请选择 ${allowedLabel} 格式的图片`);
-        return;
-      }
-      if (list.length !== all.length) {
-        message.warning(`已忽略不支持的文件，仅支持 ${allowedLabel}`);
-      }
-      const current = imagesRef.current;
-      const replacing = replaceUpload && upload.max === 1 && current.length > 0;
-      const room = upload.max - current.length + (replacing ? 1 : 0);
-      if (room <= 0) {
-        message.warning(`最多上传 ${upload.max} 张图片`);
-        return;
-      }
-      const accepted = list.slice(0, room);
-      if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
-      setUploading(true);
-      try {
-        for (const file of accepted) {
-          const validationError = await validateImageFile(file);
-          if (validationError) {
-            message.error(`${file.name}：${validationError}`);
-            return;
-          }
-        }
-        const projectId = await ensureProject();
-        const uploaded: ToolAsset[] = [];
-        for (const file of accepted) {
-          const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
-        }
-        const next = replacing ? uploaded.slice(0, 1) : [...imagesRef.current, ...uploaded];
-        imagesRef.current = next;
-        setImages(next);
-        message.success(`已上传 ${uploaded.length} 张图片`);
-      } catch (e) {
-        message.error((e as Error).message || '上传失败');
-      } finally {
-        setUploading(false);
-      }
-    },
-    [allowedLabel, ensureProject, isSupportedImageFile, message, replaceUpload, upload, validateImageFile],
-  );
-
-  // 粘贴上传 (参考站支持直接粘贴)
-  usePasteUpload(uploadFiles);
-
-  const removeImage = (id: string) => {
-    const next = imagesRef.current.filter((x) => x.id !== id);
-    imagesRef.current = next;
-    setImages(next);
-  };
 
   /** 必填图片位是否已满足；各页无需重复判断，避免出现“空图也能提交”。 */
   const uploadSatisfied = !upload?.required || images.length >= 1;
@@ -288,99 +129,45 @@ export function ToolShell(props: Props) {
     await onSubmit(images, { ratio, resolution });
   };
 
-  /**
-   * 历史结果 → 当前输入。
-   *
-   * 参考站会先取回历史图片、再作为一次新的上传，而不是直接重放旧任务
-   * （旧参数可能已经失效，且跨项目素材不能直接作为新项目输入）。
-   * 这里沿用该语义：优先复制到当前项目成为 original 素材；签名图床
-   * 不允许跨域读取时，只有同项目素材才退回直接引用，跨项目明确报错。
-   */
-  const reuseHistoryTask = useCallback(
-    async (task: Task): Promise<boolean> => {
-      if (!upload) {
-        message.warning('当前页面不支持复用历史结果');
-        return false;
-      }
-      const output = task.outputAsset;
-      if (!output?.id) {
-        message.warning('这条历史记录没有可复用的图片');
-        return false;
-      }
-      const src = assetSrc(output) ?? toAbsoluteUrl(output.sourceUrl);
-      if (!src) {
-        message.warning('历史结果地址不可用');
-        return false;
-      }
-
-      const projectId = await ensureProject();
-      let next: ToolAsset | null = null;
-      try {
-        const response = await fetch(src, { mode: 'cors', credentials: 'omit' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
-        if (!blob.size) throw new Error('图片内容为空');
-        const mime = blob.type || output.format || 'image/png';
-        const extension = (mime.split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/\+.*$/, '');
-        const file = new File([blob], `history-${task.id}.${extension}`, { type: mime });
-        const asset = await assetsApi.upload(file, projectId);
-        next = {
-          id: asset.id,
-          url: assetSrc(asset) ?? src,
-          name: `历史结果-${task.id.slice(-6)}.${extension}`,
-        };
-      } catch {
-        if (task.projectId !== projectId) {
-          throw new Error('历史结果属于其他项目，复制失败，请稍后重试');
-        }
-        next = {
-          id: output.id,
-          url: src,
-          name: `历史结果-${task.id.slice(-6)}`,
-        };
-      }
-
-      imagesRef.current = [next];
-      setImages([next]);
-      onHistoryReuse?.();
-      message.success('已把历史结果加入上传位，可调整参数后继续生成');
-      return true;
-    },
-    [ensureProject, message, onHistoryReuse, upload],
+  /** 结果归一化：单条 / 多条 / 空 都收成数组，供三态判断与灯箱共用。 */
+  const results = useMemo<ToolResult[]>(
+    () => (result === null ? [] : Array.isArray(result) ? result : [result]),
+    [result],
   );
 
-  const results: ToolResult[] = result === null ? [] : Array.isArray(result) ? result : [result];
-  const showResult = results.length > 0;
-  const lightboxItems = results
-    .filter((item) => item.status === 'succeeded' && item.url && item.modality !== 'video')
-    .map((item) => ({
-      id: item.url!,
-      url: item.url!,
-      width: item.width,
-      height: item.height,
-    }));
+  /** 灯箱只收「已成功且是图片」的产出，视频与失败态不参与左右切换。 */
+  const lightboxItems = useMemo(
+    () =>
+      results
+        .filter((item) => item.status === 'succeeded' && item.url && item.modality !== 'video')
+        .map((item) => ({
+          id: item.url!,
+          url: item.url!,
+          width: item.width,
+          height: item.height,
+        })),
+    [results],
+  );
   const lightboxIndex = lightboxUrl ? lightboxItems.findIndex((item) => item.url === lightboxUrl) : -1;
 
-  const uploadActionLinks = upload ? (
-    <>
-      <button type="button" className="pk-text-link u-font-12" onClick={openLibrary}>
-        从素材库导入
-      </button>
-      <button
-        type="button"
-        className="pk-text-link pk-mobile-upload-link u-font-12"
-        title="用手机扫码上传，图片回填到左侧"
-        onClick={() => setMobileOpen(true)}
-      >
-        手机上传
-      </button>
-      {upload.max > 1 && (
-        <span className="pk-upload-count u-font-16">
-          {images.length}/{upload.max}
-        </span>
-      )}
-    </>
-  ) : null;
+  /**
+   * 附加栏控制值。
+   *
+   * 稳定引用：`trailingPane` 是页面传进来的节点，`ToolHistoryPane` 消费这个
+   * context；此前每次 ToolShell 重渲染（上传进度、拖拽高亮）都会新建 value，
+   * 让整条历史列表跟着重渲。折叠态或复用函数变化时才更新。
+   */
+  const trailingControl = useMemo<ToolTrailingControl | null>(
+    () =>
+      trailingPane
+        ? {
+            collapsed: trailingCollapsed,
+            toggle: () => setTrailingCollapsed((value) => !value),
+            reuseTask: reuseHistoryTask,
+          }
+        : null,
+    [reuseHistoryTask, trailingCollapsed, trailingPane],
+  );
 
   return (
     <div
@@ -394,99 +181,22 @@ export function ToolShell(props: Props) {
           <div className="pk-form-scroll">
             {/* 上传卡 (页面自带上传区时跳过) */}
             {upload && (
-              <section className="pk-config-card">
-                <div className="pk-section">
-                  <div className="pk-upload-title-row">
-                    <strong className="pk-section-title u-font-14">
-                      {upload.required && <i className="pk-required-mark u-font-14">*</i>}
-                      {upload.title}
-                    </strong>
-                    <div className="pk-upload-title-actions">{uploadActionLinks}</div>
-                  </div>
-
-                  <div
-                    className={`pk-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${images.length > 0 ? ' pk-dropzone-filled' : ''}`}
-                    onClick={() => images.length < upload.max && fileInputRef.current?.click()}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragging(true);
-                    }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragging(false);
-                      void uploadFiles(e.dataTransfer.files);
-                    }}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={upload.accept ?? allowedAccept}
-                      multiple={upload.max > 1}
-                      hidden
-                      onChange={(e) => {
-                        if (e.target.files) void uploadFiles(e.target.files);
-                        e.target.value = '';
-                      }}
-                    />
-                    {uploading && (
-                      <div className="pk-dropzone-loading">
-                        <Spin size="small" />
-                      </div>
-                    )}
-                    {images.length === 0 ? (
-                      <label className="pk-upload-prompt">
-                        {upload.promptIcon ?? <Plus size={22} />}
-                        <span>{upload.prompt ?? '点击或拖拽图片到此处上传'}</span>
-                        <small>{upload.hint}</small>
-                      </label>
-                    ) : renderUploadPreview ? (
-                      renderUploadPreview(images, {
-                        open: () => fileInputRef.current?.click(),
-                        remove: removeImage,
-                        preview: (image) => setLightboxUrl(image.url),
-                        uploading,
-                      })
-                    ) : (
-                      <div className={`pk-thumb-grid${images.length === 1 ? ' pk-thumb-grid-single' : ''}`}>
-                        {images.map((img) => (
-                          <div key={img.id} className="pk-thumb">
-                            <img
-                              src={assetThumbUrl(img.url, 320) ?? img.url}
-                              alt={img.name}
-                              loading="lazy"
-                              decoding="async"
-                            />
-                            <button
-                              type="button"
-                              className="pk-thumb-remove"
-                              aria-label={`移除 ${img.name}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeImage(img.id);
-                              }}
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ))}
-                        {images.length < upload.max && (
-                          <button
-                            type="button"
-                            className="pk-thumb-add"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              fileInputRef.current?.click();
-                            }}
-                          >
-                            <ImagePlus size={18} />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
+              <ToolUploadCard
+                upload={upload}
+                images={images}
+                uploading={uploading}
+                dragging={dragging}
+                allowedAccept={allowedAccept}
+                fileInputRef={fileInputRef}
+                renderUploadPreview={renderUploadPreview}
+                onDragStateChange={setDragging}
+                onDropFiles={(files) => void uploadFiles(files)}
+                onPickFiles={(files) => void uploadFiles(files)}
+                onOpenLibrary={library.openLibrary}
+                onOpenMobile={() => setMobileOpen(true)}
+                onRemove={removeImage}
+                onPreview={(image: ToolAsset) => setLightboxUrl(image.url)}
+              />
             )}
 
             {/* 业务卡 (函数形态可读到已上传图片, 供画布类页面当底图) */}
@@ -543,189 +253,31 @@ export function ToolShell(props: Props) {
 
       {/* ── 右: 结果栏 (页面可注入共享结果网格) ── */}
       {resultPane ?? (
-        <section className="pk-result-pane">
-          {/*
-          三态必须分开 (2026-10-20 修)。
-
-          此前只有「有结果 / 没结果」两态, 而提交任务时 `useToolTask.run` 会先
-          `setResult(null)`, 于是结果栏在生成期间整块退回空态插画,
-          文案还写着「提交任务后，生成结果将在此处展示」—— 用户明明已经点了生成,
-          却看到"你还没提交"。这是**欺骗性 UI**: 慢模型(数秒到数十秒)下尤其刺眼,
-          用户会以为按钮没生效而重复点击。
-
-          现在: 生成中 → 骨架占位; 失败 → 失败卡; 成功 → 结果图; 都没发生 → 空态。
-        */}
-          {submitting && !showResult && !keepSourceWhileSubmitting ? (
-            resultView === 'product-card' ? (
-              <ProductCardGenerating aspect={generatingAspect} />
-            ) : (
-              <ToolGeneratingState />
-            )
-          ) : !showResult ? (
-            ((sourcePane ? (typeof sourcePane === 'function' ? sourcePane(images) : sourcePane) : null) ??
-            (emptyVideo ? (
-              <div className="pk-preview-placeholder">
-                <div className="pk-preview-inner">
-                  <video
-                    className="image-tool-empty-state-media"
-                    src={emptyVideo}
-                    /* 受限浏览器 (无 H.264 解码) 会报 MEDIA_ERR_SRC_NOT_SUPPORTED,
-                     留下 480×480 的纯黑块; 首帧 poster 保证此时仍有内容可看。 */
-                    poster={emptyVideo.replace(/\.mp4$/, '-poster.jpg')}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    aria-label={`${title}演示`}
-                  />
-                  <h3>{title}</h3>
-                  <p>{desc || emptyDesc}</p>
-                </div>
-              </div>
-            ) : (
-              <ToolEmptyState title={title} desc={desc || emptyDesc} capability={capability} />
-            )))
-          ) : resultView === 'product-card' &&
-            results.length === 1 &&
-            results[0].status === 'succeeded' &&
-            results[0].url ? (
-            <ProductCardResult
-              result={results[0]}
-              title={title}
-              badge={resultBadge ?? resultTag ?? `${title}结果`}
-              fallbackAspect={generatingAspect}
-              onPreview={() => setLightboxUrl(results[0].url!)}
-            />
-          ) : resultView === 'canvas' && results.length === 1 && results[0].status === 'succeeded' && results[0].url ? (
-            <div className="pk-source-pane redraw-stage redraw-result-stage">
-              <div className="redraw-stage-topbar result-actions-only">
-                <div className="stage-actions">
-                  {resultActions}
-                  <button type="button" disabled={submitting} onClick={() => void submit()}>
-                    <RefreshCw size={14} />
-                    重新生成
-                  </button>
-                </div>
-              </div>
-              <div className="redraw-stage-main">
-                <div
-                  className="redraw-canvas-wrap"
-                  style={
-                    {
-                      '--redraw-image-aspect':
-                        generatingAspect ||
-                        (results[0].width && results[0].height ? results[0].width / results[0].height : 1),
-                    } as CSSProperties
-                  }
-                >
-                  <button
-                    type="button"
-                    className="redraw-result-preview"
-                    aria-label={`预览${title}结果`}
-                    onClick={() => setLightboxUrl(results[0].url!)}
-                  >
-                    <ResultMedia
-                      url={results[0].url}
-                      modality={results[0].modality}
-                      alt={`${title}结果`}
-                      className="redraw-result-image"
-                      priority
-                    />
-                  </button>
-                  <a
-                    className="redraw-result-download"
-                    href={results[0].url}
-                    download
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`下载${title}结果`}
-                    title="下载"
-                  >
-                    <Download size={16} />
-                  </a>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="pk-result-body">
-              <div className="pk-result-toolbar">
-                <div className="pk-result-title">
-                  生成结果
-                  {resultTag && <span className="pk-result-count">{resultTag}</span>}
-                </div>
-                <div className="tool-result-actions">
-                  {resultActions}
-                  <button type="button" className="pk-result-regen" disabled={submitting} onClick={() => void submit()}>
-                    <RefreshCw size={13} />
-                    重新生成
-                  </button>
-                </div>
-              </div>
-              <div className="pk-result-detail-scroll">
-                <div className={`tool-result-grid${results.length > 1 ? ' tool-result-grid-multi' : ''}`}>
-                  {results.map((r, i) =>
-                    r.status === 'succeeded' && r.url ? (
-                      <div key={i} className="pk-result-card pk-result-card-detail">
-                        <div className="pk-result-detail-media">
-                          {resultCompare && results.length === 1 ? (
-                            <ImageCompare
-                              beforeUrl={resultCompare.beforeUrl}
-                              afterUrl={r.url}
-                              beforeLabel={resultCompare.beforeLabel}
-                              afterLabel={resultCompare.afterLabel}
-                            />
-                          ) : r.modality === 'video' ? (
-                            <ResultMedia url={r.url} modality={r.modality} alt={`${title}结果 ${i + 1}`} />
-                          ) : (
-                            <button
-                              type="button"
-                              className="pk-result-preview"
-                              aria-label={`预览${title}结果 ${i + 1}`}
-                              onClick={() => setLightboxUrl(r.url!)}
-                            >
-                              <ResultMedia url={r.url} modality={r.modality} alt={`${title}结果 ${i + 1}`} />
-                            </button>
-                          )}
-                        </div>
-                        <div className="pk-result-meta">
-                          <span className="pk-result-variant">{title}结果</span>
-                          <span className="pk-result-params">
-                            {r.width && r.height ? `${r.width}×${r.height}` : ''}
-                            {/* 视频没有宽高可显示 (Jimp 不解视频), 故显示时长 */}
-                            {formatDuration(r.durationMs) ? ` · ${formatDuration(r.durationMs)}` : ''}
-                          </span>
-                        </div>
-                        <a className="pk-result-download" href={r.url} download target="_blank" rel="noreferrer">
-                          下载原图
-                        </a>
-                      </div>
-                    ) : (
-                      <div key={i} className="pk-result-card pk-result-card-detail">
-                        <div className="pk-result-detail-media pk-result-failed">
-                          <X size={20} />
-                          <span>生成失败：{taskErrorText(r.errorCode)}</span>
-                        </div>
-                      </div>
-                    ),
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
+        <ToolResultPane
+          title={title}
+          desc={desc}
+          emptyDesc={emptyDesc}
+          capability={capability}
+          submitting={submitting}
+          results={results}
+          images={images}
+          resultView={resultView}
+          generatingAspect={generatingAspect}
+          resultTag={resultTag}
+          resultBadge={resultBadge}
+          resultActions={resultActions}
+          resultCompare={resultCompare}
+          sourcePane={sourcePane}
+          keepSourceWhileSubmitting={keepSourceWhileSubmitting}
+          emptyVideo={emptyVideo}
+          onPreview={setLightboxUrl}
+          onRegenerate={() => void submit()}
+        />
       )}
 
       {/* ── 右: 附加栏 (局部重绘历史记录; 其他页面不传则为空) ── */}
-      {trailingPane && (
-        <ToolTrailingContext.Provider
-          value={{
-            collapsed: trailingCollapsed,
-            toggle: () => setTrailingCollapsed((value) => !value),
-            reuseTask: reuseHistoryTask,
-          }}
-        >
-          {trailingPane}
-        </ToolTrailingContext.Provider>
+      {trailingPane && trailingControl && (
+        <ToolTrailingContext.Provider value={trailingControl}>{trailingPane}</ToolTrailingContext.Provider>
       )}
 
       {lightboxIndex >= 0 && (
@@ -739,11 +291,11 @@ export function ToolShell(props: Props) {
 
       {/* 素材库选择弹窗 (真实数据; 可选张数 = 剩余图片位) */}
       <AssetLibraryModal
-        open={libraryOpen}
-        loading={libraryLoading}
-        items={libraryItems}
-        error={libraryError}
-        onCancel={closeLibrary}
+        open={library.open}
+        loading={library.loading}
+        items={library.items}
+        error={library.error}
+        onCancel={library.closeLibrary}
         onPick={pickFromLibrary}
         maxSelectable={
           upload
@@ -766,7 +318,9 @@ export function ToolShell(props: Props) {
  * 与拆分前逐一对齐，9 个工具页、`ToolHistoryPane` 与 `MattingResultEditor` 的
  * `from '../components/ToolShell'` 导入无需改动。实现分别落在：
  * `toolShellTypes.ts`（契约）/ `ToolResultCards.tsx`（产品卡）/
- * `ExpandTextModal.tsx`（放大编辑）/ `hooks/useTaskPoller.ts`（轮询）。
+ * `ExpandTextModal.tsx`（放大编辑）/ `hooks/useTaskPoller.ts`（轮询）/
+ * `hooks/useToolUploadSlots.ts`（图片位）/ `ToolUploadCard.tsx`（上传卡）/
+ * `ToolResultPane.tsx`（结果三态）。
  */
 export type {
   Props,

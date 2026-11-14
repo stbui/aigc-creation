@@ -8,13 +8,14 @@ import {
   StateSkeleton,
   Table,
 } from './components';
+import { LEDGER_FILTER_OPTIONS, PAGE_SIZE, type LedgerFilter } from './constants';
 import {
-  LEDGER_FILTER_OPTIONS,
-  LEDGER_LABEL,
-  PAGE_SIZE,
-  type LedgerFilter,
-} from './constants';
-import { formatDateTime, ledgerReference, ledgerRemark, shortId } from './utils';
+  formatDateTime,
+  ledgerReference,
+  ledgerRemark,
+  ledgerTypeLabel,
+  shortId,
+} from './utils';
 import { CreditsLedgerList } from './CreditsLedgerList';
 
 interface CreditsLedgerPanelProps {
@@ -58,10 +59,15 @@ export function CreditsLedgerPanel({
       render: (value: string | null) => formatDateTime(value),
     },
     {
+      /*
+       * 「业务类型」优先（连续签到奖励 / 创意生图扣费 …）, 只有 `other` 才回退到
+       * 账本动作文案。不新增物理列: 现表已 6 列、scroll.x=850 接近窄屏截断阈值,
+       * 业务口径塞进同一格比多一列更稳。
+       */
       title: '类型',
-      dataIndex: 'type',
+      key: 'businessType',
       width: 120,
-      render: (value: string) => LEDGER_LABEL[value] ?? value,
+      render: (_value: unknown, row: CreditLedgerEntry) => ledgerTypeLabel(row),
     },
     {
       // 关联单据三选一（账单 / 支付订单 / 生成任务）；短 ID 可读，完整 id 放 title

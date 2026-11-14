@@ -373,6 +373,9 @@ export class TaskLifecycleService {
           taskId: task.id,
           idempotencyKey: `refund:task:${task.id}`,
           reason: labels[reason],
+          // 补偿退款: 展示为「退款相关」而不是「发放」。type 仍是 grant（无账单行），
+          // 绑定关系在 `resolveBusinessType` 的 refund 项里已放行。
+          businessType: 'refund',
         });
       }
     } catch (error) {

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CreditService, emptyBalanceSummary } from './credit.service';
+import {
+  CreditService,
+  emptyBalanceSummary,
+  fallbackBusinessType,
+  projectEntry,
+  resolveBusinessType,
+} from './credit.service';
 
 describe('CreditService 积分查询口径', () => {
   it('批量汇总余额时排除过期批次，并按正向流水计算累计获得', async () => {
@@ -426,6 +432,70 @@ describe('CreditService 并发幂等', () => {
       service.grant({ userId: 'u1', credits: 10, source: 'grant', idempotencyKey: 'k3' }),
     ).rejects.toThrow('database is locked');
     expect(prisma.creditLedgerEntry.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('积分业务类型口径', () => {
+  it('已注册业务类型与流水类型、方向一致时放行', () => {
+    expect(resolveBusinessType('grant', 'checkin_streak', 10_000_000n)).toBe('checkin_streak');
+    expect(resolveBusinessType('consume', 'creative_image', -1_000_000n)).toBe('creative_image');
+    // 0 元订单也会落一条 consume 流水, 方向校验必须放行 0
+    expect(resolveBusinessType('consume', 'creative_image', 0n)).toBe('creative_image');
+  });
+
+  it('业务类型与流水类型错配时拒绝写入', () => {
+    expect(() => resolveBusinessType('grant', 'creative_image', 10_000_000n)).toThrow(
+      '不能绑定流水类型',
+    );
+  });
+
+  it('方向相反时拒绝写入', () => {
+    expect(() => resolveBusinessType('grant', 'checkin_streak', -10_000_000n)).toThrow('方向应为');
+  });
+
+  it('缺省或未注册的业务类型按流水类型兜底，不阻断交易', () => {
+    expect(resolveBusinessType('grant', undefined, 10_000_000n)).toBe('other');
+    expect(resolveBusinessType('expire', '', -5_000_000n)).toBe('credit_expire');
+    expect(resolveBusinessType('refund', 'not_registered', 5_000_000n)).toBe('refund');
+  });
+
+  it('历史退款以 grant 记账时仍归「退款相关」', () => {
+    expect(resolveBusinessType('grant', 'refund', 5_000_000n)).toBe('refund');
+  });
+
+  it('兜底映射只认唯一对应的流水类型', () => {
+    expect(fallbackBusinessType('purchase')).toBe('purchase');
+    expect(fallbackBusinessType('expire')).toBe('credit_expire');
+    expect(fallbackBusinessType('refund_reclaim')).toBe('refund');
+    // grant / consume / reserve 是一对多, 不猜测具体场景
+    expect(fallbackBusinessType('grant')).toBe('other');
+    expect(fallbackBusinessType('consume')).toBe('other');
+    expect(fallbackBusinessType('reserve')).toBe('other');
+  });
+
+  it('投影时业务类型恒有值：落库值合法用落库值，否则兜底', () => {
+    const base = {
+      id: 'e1',
+      userId: 'u1',
+      amountMicrocredits: -1_000_000n,
+      availableAfterMicrocredits: 0n,
+      paymentOrderId: '',
+      billingOrderId: '',
+      lotId: '',
+      taskId: '',
+      note: '',
+      actorUserId: '',
+      createdAt: new Date(),
+    };
+    expect(projectEntry({ ...base, type: 'expire' }).businessType).toBe('credit_expire');
+    expect(projectEntry({ ...base, type: 'consume' }).businessType).toBe('other');
+    expect(
+      projectEntry({ ...base, type: 'consume', businessType: 'creative_image' }).businessType,
+    ).toBe('creative_image');
+    // 脏值不透给前端
+    expect(projectEntry({ ...base, type: 'grant', businessType: 'legacy' }).businessType).toBe(
+      'other',
+    );
   });
 });
 

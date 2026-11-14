@@ -30,6 +30,14 @@ export const SOURCE_LABEL: Record<string, string> = {
   admin_adjust: '客服调整',
 };
 
+/**
+ * 流水类型 → 中文。**兜底文案**, 只在业务类型缺失（`other`）时展示。
+ *
+ * ⚠ 这是「动作」口径而非「业务」口径: `consume` 覆盖全平台生成, 包括文本/音频
+ * 代理计费。因此这里保持「生成消耗」, 不写「创意生图扣费」—— 后者由
+ * `BUSINESS_TYPE_LABEL.creative_image` 承载。若两处都写「创意生图扣费」,
+ * 一次文本调用扣费会被误标成生图扣费, 比不显示更糟。
+ */
 export const LEDGER_LABEL: Record<string, string> = {
   purchase: '购买获得',
   grant: '发放',
@@ -37,8 +45,27 @@ export const LEDGER_LABEL: Record<string, string> = {
   refund_reclaim: '退款扣回',
   reserve: '预授权冻结',
   refund: '预授权退回',
-  expire: '到期回收',
+  expire: '积分过期',
   admin_adjust: '客服调整',
+};
+
+/**
+ * 业务类型 → 中文（展示口径, 优先级高于 `LEDGER_LABEL`）。
+ *
+ * 扣费类只有一个 `creative_image`: 电商生图 / AI修图 / AI视频三组能力在产品
+ * 口径上统一叫「创意生图扣费」, 不按能力再细分。
+ */
+export const BUSINESS_TYPE_LABEL: Record<string, string> = {
+  checkin_streak: '连续签到奖励',
+  new_user_gift: '新用户赠送',
+  purchase: '购买获得',
+  membership_grant: '会员月度积分',
+  invite_reward: '邀请奖励',
+  creative_image: '创意生图扣费',
+  credit_expire: '积分过期',
+  admin_adjust: '客服调整',
+  refund: '退款相关',
+  other: '其他',
 };
 
 export const LOT_STATUS: Record<CreditLot['status'], string> = {
@@ -57,5 +84,5 @@ export const LEDGER_FILTER_OPTIONS: Array<{ value: LedgerFilter; label: string }
   { value: 'purchase', label: '购买获得' },
   { value: 'consume', label: '生成消耗' },
   { value: 'admin_adjust', label: '客服调整' },
-  { value: 'expire', label: '到期回收' },
+  { value: 'expire', label: '积分过期' },
 ];

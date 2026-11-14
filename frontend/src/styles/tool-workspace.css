@@ -7,7 +7,7 @@
 
 .tool-result-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 /* ───────── 商品主图工作台 (1:1 复刻 ijihua.cn/product-kit, 数值来自实拍 computed styles) ───────── */
@@ -17,7 +17,7 @@
      (参考站 workspace-main-content 实测 padding:16px 24px 16px 16px;
       上下原为 24 会整体下移 8px —— free-creation 对拍 2026-10-21) */
   margin: -24px -24px -32px;
-  padding: 16px 24px 16px 16px;
+  padding: var(--space-16) var(--space-24) var(--space-16) var(--space-16);
   /* 本项目没有 preflight 的 `* { box-sizing: border-box }`。height 是「视口减顶栏」的
      定值，若按内容盒计，上下 28~32px padding 会追加在高度之外，页面凭空多出一截
      纵向滚动，提交卡底部被视口裁掉（局部重绘 / 去水印早就单独立了 border-box，
@@ -33,7 +33,7 @@
      auto 行会被内容撑到 1200px+，右侧空态/结果区也跟着变长，
      与其他工具页的固定预览区不一致。minmax(0, 1fr) 同时允许内部滚动。 */
   grid-template-rows: minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--space-16);
   align-items: start;
 }
 
@@ -50,7 +50,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .pk-form-card {
@@ -73,7 +73,7 @@
   background: transparent;
   border: none;
   border-radius: var(--radius-panel);
-  padding: 11px 12px;
+  padding: 11px var(--space-12);
   cursor: pointer;
 }
 
@@ -87,30 +87,30 @@
   min-height: 0;
   overflow-y: auto;
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
   align-content: start;
 }
 
 .pk-config-card {
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 16px;
+  padding: var(--space-16);
   display: grid;
-  gap: 24px;
+  gap: var(--space-24);
   /* 窄屏时配置卡是 grid 项, 默认 min-width:auto 会被内部固定宽子项顶开 */
   min-width: 0;
 }
 
 .pk-section {
   display: grid;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 /* 模型能力合同比页面上限小时，已选素材不能静默删除，也不能继续提交 */
 
 .pk-image-limit-error {
   margin: -12px 0 0;
-  padding: 7px 10px;
+  padding: 7px var(--space-10);
   border-radius: var(--radius-control);
   background: var(--warn-bg);
   color: var(--warn-text);
@@ -136,13 +136,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .pk-upload-title-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .pk-text-link {
@@ -187,7 +187,7 @@
   border: 1px dashed var(--border);
   border-radius: var(--radius-control);
   background: var(--surface);
-  padding: 16px;
+  padding: var(--space-16);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -231,7 +231,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   cursor: pointer;
   color: var(--text-body);
 }
@@ -251,7 +251,7 @@
 .pk-thumb-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: var(--space-8);
   width: 100%;
 }
 
@@ -313,12 +313,12 @@
 .pk-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .pk-field {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
 }
 
@@ -336,7 +336,7 @@
   height: 32px;
   border: 1px solid var(--border);
   border-radius: var(--radius-tag);
-  padding: 5px 12px;
+  padding: 5px var(--space-12);
   font-size: 14px;
   font-family: inherit;
   color: var(--wb-text);
@@ -354,7 +354,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-10);
   min-height: 16px;
 }
 
@@ -362,7 +362,7 @@
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 /* AI 分析按钮: 对齐参考站 input-pane .ai-analyze-btn (白底 #8b73ff 边 #6b4eff 字 / radius8) (2026-10-18 对拍, 原为无边框文字链) */
@@ -371,7 +371,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   color: var(--tool-text-brand-2);
   background: var(--card-bg);
   border: 1px solid var(--tool-border-brand-2);
@@ -405,7 +405,7 @@
   height: 80px;
   border: 1px solid var(--border);
   border-radius: var(--radius-tag);
-  padding: 5px 36px 5px 12px;
+  padding: 5px 36px 5px var(--space-12);
   font-size: 14px;
   font-family: inherit;
   line-height: 22px;
@@ -456,13 +456,13 @@
 .pk-count-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .pk-count-field {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--space-16);
   align-items: center;
   height: 32px;
 }
@@ -478,7 +478,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .pk-section-count {
@@ -491,7 +491,7 @@
 .pk-submit-actions {
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 14px 16px 16px;
+  padding: 14px var(--space-16) var(--space-16);
   display: grid;
   gap: 14px;
 }
@@ -508,10 +508,10 @@
      (非 0 12px) —— 差值 2px 会让两个 chip 横向左移 2px, 对拍 @2026-10-19 */
   border-radius: 7px;
   background: var(--card-bg);
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   cursor: pointer;
   /* 参考站实拍 rgb(104,113,130) ≈ --text-muted #667085 (差 2 个色阶, 肉眼不可辨, 沿用 token) */
   color: var(--text-muted);
@@ -561,7 +561,7 @@
   max-width: 100%;
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 17px 16px;
+  padding: 17px var(--space-16);
   box-shadow: rgba(61, 66, 86, 0.2) 0 8px 24px;
   display: grid;
   /* 参考站头部与分组分属两层: head margin-bottom 16 + settings gap 19。
@@ -574,9 +574,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 24px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-16);
 }
 
 .pk-settings-popover-head h2 {
@@ -605,7 +605,7 @@
 
 .pk-settings-group {
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .pk-settings-group + .pk-settings-group {
@@ -622,7 +622,7 @@
 .pk-ratio-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .pk-ratio-option {
@@ -668,7 +668,7 @@
 .pk-resolution-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .pk-resolution-option {
@@ -677,7 +677,7 @@
   border: 1px solid var(--border);
   background: var(--card-bg);
   display: grid;
-  gap: 4px;
+  gap: var(--space-4);
   align-content: center;
   justify-items: center;
   cursor: pointer;
@@ -740,9 +740,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-8);
   cursor: pointer;
-  padding: 8px 16px;
+  padding: var(--space-8) var(--space-16);
 }
 
 /* hover 对齐参考站 .free-actions .primary-btn.ready:hover → translateY(-1px) + shadow 0 14px 30px #5546d84d (2026-10-18 对拍, 原为 filter brightness) */
@@ -785,12 +785,12 @@
   width: 360px;
   max-width: 100%;
   min-height: 260px;
-  padding: 0 16px;
+  padding: 0 var(--space-16);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-8);
   text-align: center;
 }
 
@@ -843,10 +843,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-16);
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 16px;
+  padding: var(--space-16);
 }
 
 /* 结果栏顶部提示行 (「本次有 N 张生成失败」等)。
@@ -857,19 +857,19 @@
 .pk-result-notice {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .pk-result-notice-standalone {
   width: 100%;
-  margin-top: 4px;
+  margin-top: var(--space-4);
 }
 
 .pk-result-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .pk-result-title {
@@ -878,7 +878,7 @@
   color: var(--wb-text);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .pk-result-count {
@@ -887,15 +887,15 @@
   color: var(--text-desc);
   background: var(--surface);
   border-radius: var(--radius-pill);
-  padding: 1px 8px;
+  padding: 1px var(--space-8);
 }
 
 .pk-result-regen {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 28px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   font-size: 12px;
   color: var(--brand);
   background: var(--card-bg);
@@ -921,8 +921,8 @@
   align-content: start;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
-  padding-bottom: 4px;
+  gap: var(--space-16);
+  padding-bottom: var(--space-4);
 }
 
 .pk-result-card {
@@ -950,7 +950,7 @@
   position: absolute;
   right: 8px;
   bottom: 44px; /* 让开原生播放控件条 */
-  padding: 2px 8px;
+  padding: var(--space-2) var(--space-8);
   border-radius: var(--radius-tag);
   background: rgba(23, 26, 43, 0.72);
   color: var(--card-bg);
@@ -967,18 +967,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   color: var(--text-desc);
   font-size: 12px;
-  padding: 16px;
+  padding: var(--space-16);
   text-align: center;
 }
 
 .pk-result-meta {
-  padding: 8px 10px 6px;
+  padding: var(--space-8) var(--space-10) var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
 }
 
 .pk-result-variant {
@@ -987,7 +987,7 @@
   color: var(--wb-text);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .pk-result-params {
@@ -997,7 +997,7 @@
 
 .pk-result-download {
   margin-top: auto;
-  padding: 6px 10px;
+  padding: var(--space-6) var(--space-10);
   font-size: 12px;
   color: var(--brand);
   text-align: center;
@@ -1029,7 +1029,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 20px;
 }
 
@@ -1042,17 +1042,17 @@
 .pk-section-picker {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .pk-section-option {
   min-height: 66px;
   background: var(--surface);
   border-radius: var(--radius-control);
-  padding: 8px 8px 8px 16px;
+  padding: var(--space-8) var(--space-8) var(--space-8) var(--space-16);
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--space-8);
   cursor: pointer;
 }
 
@@ -1067,7 +1067,7 @@
   .pk-section-option input[type='checkbox'] {
   width: 14px;
   height: 14px;
-  margin: 4px 0 0;
+  margin: var(--space-4) 0 0;
   flex-shrink: 0;
   accent-color: var(--brand-accent);
   cursor: pointer;
@@ -1116,7 +1116,7 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 0 8px 8px;
+  padding: 0 var(--space-8) var(--space-8);
 }
 
 .pk-result-card-detail {
@@ -1174,19 +1174,19 @@
 
   .pk-editor-tabs {
     display: flex;
-    gap: 8px;
+    gap: var(--space-8);
     background: var(--card-bg);
     border: 1px solid var(--tool-border-7);
     border-radius: var(--radius-panel);
-    padding: 6px;
-    margin-bottom: 12px;
+    padding: var(--space-6);
+    margin-bottom: var(--space-12);
   }
 
   .pk-workflow-steps {
     display: flex;
     justify-content: center;
     gap: 18px;
-    padding-top: 12px;
+    padding-top: var(--space-12);
     color: var(--tool-text-3);
   }
 
@@ -1201,7 +1201,7 @@
 /* 参考图上传区: plus 图标下移 20px (实拍 .viral-clone-reference-upload icon margin-bottom 20) */
 
 .pk-dropzone-reference .pk-upload-prompt svg {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-20);
 }
 
 /* 参考图单张缩略图: 不按 4 列网格铺开, 只占一个单元 */
@@ -1213,7 +1213,7 @@
 
 .tool-submit-notice {
   margin: 0;
-  padding: 6px 10px;
+  padding: var(--space-6) var(--space-10);
   border-radius: var(--radius-control);
   line-height: 20px;
 }
@@ -1231,7 +1231,7 @@
 .pk-primary-credit {
   font-weight: 500;
   opacity: 0.85;
-  margin-left: 2px;
+  margin-left: var(--space-2);
   white-space: nowrap;
 }
 
@@ -1252,7 +1252,7 @@
 
 .tool-result-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--space-16);
   justify-items: start;
 }
 
@@ -1269,7 +1269,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-10);
   min-height: 20px;
 }
 
@@ -1326,7 +1326,7 @@
   overflow: auto;
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 18px 20px;
+  padding: 18px var(--space-20);
   display: flex;
   flex-direction: column;
 }
@@ -1335,7 +1335,7 @@
 
 .tool-custom-color {
   display: grid;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .tool-custom-color > span {
@@ -1348,7 +1348,7 @@
   height: 32px;
   border: 1px solid var(--border);
   border-radius: var(--radius-tag);
-  padding: 5px 12px;
+  padding: 5px var(--space-12);
   font-size: 14px;
   font-family: inherit;
   color: var(--wb-text);
@@ -1386,7 +1386,7 @@
 .retouch-mode-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .retouch-mode-options button {
@@ -1452,8 +1452,8 @@
   flex-direction: column;
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 16px;
-  gap: 12px;
+  padding: var(--space-16);
+  gap: var(--space-12);
 }
 
 .pk-result-generating-tip {
@@ -1473,12 +1473,12 @@
 
   .pk-count-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+    gap: var(--space-10);
   }
 
   .pk-count-field {
     grid-template-columns: 52px minmax(0, 1fr);
-    gap: 12px;
+    gap: var(--space-12);
   }
 }
 
@@ -1489,7 +1489,7 @@
   .pk-settings-popover {
     width: min(400px, calc(100vw - 48px));
     /* 参考站窄屏弹层 padding-inline 12px（桌面 16px），比例/画质卡片随之变宽。 */
-    padding-inline: 12px;
+    padding-inline: var(--space-12);
     max-height: calc(100dvh - 140px);
     overflow-y: auto;
   }
@@ -1499,7 +1499,7 @@
   .pk-result-toolbar {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: var(--space-8);
   }
 
   .pk-result-title {

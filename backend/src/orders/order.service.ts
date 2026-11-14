@@ -1004,6 +1004,8 @@ export class OrderService {
             source: 'purchase',
             validDays: item.validDaysSnapshot,
             orderId: order.id,
+            // 付费购买到账: 与会员月度发放（grant）区分开, 便于按「充值/订阅」分账
+            businessType: 'purchase',
           }, tx);
         }
 

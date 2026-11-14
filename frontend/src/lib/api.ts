@@ -353,6 +353,8 @@ export const creditsApi = {
       offset?: number;
       type?: string;
       direction?: "income" | "expense";
+      /** 业务类型筛选；与 type 取交集 */
+      businessType?: string;
     } = {},
   ) => {
     const qs = new URLSearchParams();
@@ -360,6 +362,7 @@ export const creditsApi = {
     qs.set("offset", String(params.offset ?? 0));
     if (params.type) qs.set("type", params.type);
     if (params.direction) qs.set("direction", params.direction);
+    if (params.businessType) qs.set("businessType", params.businessType);
     return request<CreditLedgerPage>(`/credits/ledger?${qs.toString()}`);
   },
 };

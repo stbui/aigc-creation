@@ -22,7 +22,7 @@ export class CreditsController {
     return this.credit.lotsOf(user.id, include !== 'false');
   }
 
-  /** 流水查询 (B-51，支持 limit/offset 分页与 type/direction 筛选) */
+  /** 流水查询 (B-51，支持 limit/offset 分页与 type/direction/businessType 筛选) */
   @Get('ledger')
   ledger(
     @CurrentUser() user: AuthUser,
@@ -30,6 +30,8 @@ export class CreditsController {
     @Query('offset') offset?: string,
     @Query('type') type?: string,
     @Query('direction') direction?: 'income' | 'expense',
+    /** 业务类型（展示口径）：连续签到奖励 / 创意生图扣费 等，与 type 取交集 */
+    @Query('businessType') businessType?: string,
   ) {
     const n = Number(limit ?? 50);
     const skip = Number(offset ?? 0);
@@ -40,6 +42,7 @@ export class CreditsController {
         offset: Number.isFinite(skip) ? Math.max(skip, 0) : 0,
         type,
         direction,
+        businessType,
       },
     );
   }

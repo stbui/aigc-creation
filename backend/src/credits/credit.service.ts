@@ -111,7 +111,12 @@ const BUSINESS_TYPE_BINDING: Record<
   creative_image: { types: ['consume'], direction: 'expense' },
   credit_expire: { types: ['expire'], direction: 'expense' },
   admin_adjust: { types: ['admin_adjust'], direction: 'both' },
-  refund: { types: ['refund', 'refund_reclaim'], direction: 'both' },
+  /**
+   * `grant` 是**历史退款路径**: P4-b 之前的任务没有账单行, 退款只能以 grant 补记
+   * （见 `task-lifecycle.service.ts:369` 的 `refund()`）。它与 refund/refund_reclaim 同属
+   * 「退款相关」, 因此在绑定里放行, 而不是让那批任务退化成「其他」。
+   */
+  refund: { types: ['refund', 'refund_reclaim', 'grant'], direction: 'both' },
   other: { types: ['grant', 'purchase', 'consume', 'expire', 'refund', 'refund_reclaim', 'admin_adjust'], direction: 'both' },
 };
 
@@ -447,6 +452,8 @@ export class CreditService {
       offset?: number;
       type?: string;
       direction?: LedgerDirection;
+      /** 业务类型筛选（展示口径）。与 `type` 同时给出时取交集。 */
+      businessType?: string;
     } = {},
   ) {
     const parsedLimit = Number(limit);
@@ -462,12 +469,25 @@ export class CreditService {
     if (options.direction && options.direction !== 'income' && options.direction !== 'expense') {
       throw new AppError(40001, `未知积分流水方向：${options.direction}`, 400);
     }
+    if (
+      options.businessType &&
+      !(CREDIT_BUSINESS_TYPES as readonly string[]).includes(options.businessType)
+    ) {
+      throw new AppError(40001, `未知积分业务类型：${options.businessType}`, 400);
+    }
 
     const where: Prisma.CreditLedgerEntryWhereInput = { userId };
     if (options.type) where.type = options.type as CEndLedgerType;
     else if (!options.includeReserve) where.type = { not: 'reserve' };
     if (options.direction === 'income') where.amountMicrocredits = { gt: 0n };
     if (options.direction === 'expense') where.amountMicrocredits = { lt: 0n };
+    /*
+     * 严格按落库值过滤, **不**把历史空串按 `type` 猜进来。
+     * 历史 `consume` 无法区分图片/视频与文本/音频, 猜成「创意生图扣费」会把
+     * 代理类计费也算进去。历史行的展示走 `projectEntry` 的 fallback,
+     * 但不出现在业务类型筛选结果里 —— 需要时用一次性回填解决, 而不是在查询里猜。
+     */
+    if (options.businessType) where.businessType = options.businessType;
 
     const [rows, total] = await Promise.all([
       this.prisma.creditLedgerEntry.findMany({
@@ -738,6 +758,7 @@ export class CreditService {
         reason,
         operatorId: params.operatorId,
         idempotencyKey: params.idempotencyKey,
+        businessType: 'admin_adjust',
       });
       if (granted.idempotentHit) {
         return { balance: granted.balance, idempotentHit: true };
@@ -751,6 +772,7 @@ export class CreditService {
         reason,
         operatorId: params.operatorId,
         idempotencyKey: params.idempotencyKey,
+        businessType: 'admin_adjust',
       });
       // 幂等命中时钱包没有真正扣钱，consumed 为 0 —— 直接返回当前余额，不再记日志
       if (consumed.consumed === 0 && params.idempotencyKey) {
@@ -981,6 +1003,8 @@ export function projectEntry(row: {
   id: string;
   userId: string;
   type: string;
+  /** 历史行可能为空串; 可选以便测试用手工构造 */
+  businessType?: string;
   amountMicrocredits: bigint;
   availableAfterMicrocredits: bigint;
   paymentOrderId: string;
@@ -995,6 +1019,13 @@ export function projectEntry(row: {
     id: row.id,
     userId: row.userId,
     type: row.type,
+    /**
+     * 业务类型恒有值: 落库值合法则用落库值, 否则按 `type` 兜底。
+     * 空串与脏值走同一条兜底 —— 前端不该为「这个版本还没有该字段」再写一次判断。
+     */
+    businessType: (CREDIT_BUSINESS_TYPES as readonly string[]).includes(row.businessType ?? '')
+      ? (row.businessType as CreditBusinessType)
+      : fallbackBusinessType(row.type),
     amount: microcreditsToCredits(row.amountMicrocredits),
     balanceAfter: microcreditsToCredits(row.availableAfterMicrocredits),
     lotId: row.lotId || null,

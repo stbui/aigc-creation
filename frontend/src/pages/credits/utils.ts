@@ -3,10 +3,27 @@
  */
 
 import type { CreditLedgerEntry } from '../../types/api';
-import type { LedgerFilter } from './constants';
+import { BUSINESS_TYPE_LABEL, LEDGER_LABEL, type LedgerFilter } from './constants';
 
 /** 日期格式化（桌面表格与窄屏列表共用） */
 export { formatDate, formatDateTime } from '../../lib/format';
+
+/**
+ * 流水行的展示文案：业务类型优先，`other` 才回退到动作类型。
+ *
+ * 后端保证 `businessType` 恒有值（历史行按 `type` 兜底推导），所以正常路径
+ * 展示的是「连续签到奖励」「创意生图扣费」这类业务口径；只有无法归类的
+ * 扣费（如文本/音频代理计费）才落到 `other`，这时用「生成消耗」这类动作文案。
+ *
+ * 末尾仍保留 `?? row.type`：后端尚未升级时前端不显示空白。
+ */
+export function ledgerTypeLabel(row: { type: string; businessType?: string | null }): string {
+  if (row.businessType && row.businessType !== 'other') {
+    const business = BUSINESS_TYPE_LABEL[row.businessType];
+    if (business) return business;
+  }
+  return LEDGER_LABEL[row.type] ?? row.type;
+}
 
 /** 筛选项 → 后端查询参数；全部时不带任何过滤 */
 export function ledgerFilterParams(filter: LedgerFilter): {

@@ -1,6 +1,5 @@
 import type { CreditLedgerEntry } from '../../types/api';
-import { LEDGER_LABEL } from './constants';
-import { formatDateTime, ledgerRemark } from './utils';
+import { formatDateTime, ledgerRemark, ledgerTypeLabel } from './utils';
 
 interface CreditsLedgerListProps {
   rows: CreditLedgerEntry[];
@@ -21,7 +20,7 @@ export function CreditsLedgerList({ rows }: CreditsLedgerListProps) {
         return (
           <li key={row.id} className="credits-mobile-item">
             <div className="credits-mobile-line">
-              <span className="credits-mobile-title">{LEDGER_LABEL[row.type] ?? row.type}</span>
+              <span className="credits-mobile-title">{ledgerTypeLabel(row)}</span>
               <span className={`credits-amount ${row.amount >= 0 ? 'is-plus' : 'is-minus'}`}>
                 {row.amount >= 0 ? `+${row.amount}` : row.amount}
               </span>

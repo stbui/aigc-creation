@@ -53,7 +53,9 @@ export class StorageService implements OnModuleInit {
       this.logger.error(`STORAGE_BACKEND 非法: ${raw}（可选 local/oss/minio），已回落 local`);
       this.active = 'local';
     } else {
-      this.active = raw ?? 'local';
+      // raw 经上方 isStorageBackend 校验后只可能是合法后端或 undefined;
+      // process.env 取值为 string, 此处断言收窄(运行时行为与 `raw ?? 'local` 完全一致)。
+      this.active = (raw ?? 'local') as StorageBackend;
     }
 
     // 本地根目录取自 UPLOAD_DIR: 三环境必须各写各的目录, 否则 test 跑一次

@@ -559,12 +559,14 @@ export class AdminCommerceController {
   ledger(
     @Param("userId") userId: string,
     @Query("type") type?: string,
+    @Query("businessType") businessType?: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
     @Query("limit") limit?: string,
   ) {
     return this.commerce.creditLedger(userId, {
       type,
+      businessType,
       from,
       to,
       limit: num(limit),

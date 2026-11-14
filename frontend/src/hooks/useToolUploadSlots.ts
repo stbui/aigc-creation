@@ -279,6 +279,8 @@ export function useToolUploadSlots({
     mobileOpen,
     setMobileOpen,
     library,
+    /** 素材库逐项回填（返回 false 表示拒绝该次选择，弹窗保持打开）。 */
+    pickFromLibrary,
     uploadFiles,
     removeImage,
     addMobileAssets,

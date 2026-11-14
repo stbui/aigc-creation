@@ -483,6 +483,7 @@ export class MembershipService {
             orderId: params.orderId,
             idempotencyKey: `membership-initial:${params.orderId}`,
             reason: `会员订阅积分 (${plan.name})`,
+            businessType: 'membership_grant',
           },
           tx,
         );
@@ -1009,6 +1010,7 @@ export class MembershipService {
               orderId: creditOrder.id,
               idempotencyKey: `membership-monthly:${current.id}:${dueAt.toISOString()}`,
               reason: '会员月度积分',
+              businessType: 'membership_grant',
             },
             tx,
           );

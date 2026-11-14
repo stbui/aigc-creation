@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import {
+  CREDIT_BUSINESS_TYPES,
   CreditService,
   emptyBalanceSummary,
   microcreditsToCredits,
@@ -93,6 +94,8 @@ export interface PaymentListQuery {
 
 export interface CreditLedgerQuery {
   type?: string;
+  /** 业务类型（展示口径）。与 `type` 同时给出时取交集 */
+  businessType?: string;
   from?: string;
   to?: string;
   limit?: number;
@@ -1132,6 +1135,12 @@ export class AdminCommerceService {
         throw new AppError(40001, `流水类型非法: ${query.type}`, 400);
       }
       where.type = query.type;
+    }
+    if (query.businessType) {
+      if (!(CREDIT_BUSINESS_TYPES as readonly string[]).includes(query.businessType)) {
+        throw new AppError(40001, `业务类型非法: ${query.businessType}`, 400);
+      }
+      where.businessType = query.businessType;
     }
     const range = this.dateRange(query.from, query.to);
     if (range) where.createdAt = range;

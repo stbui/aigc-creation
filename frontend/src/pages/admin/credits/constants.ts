@@ -11,7 +11,7 @@ export const LEDGER_LABELS: Record<string, string> = {
   grant: '发放',
   consume: '生成消耗',
   admin_adjust: '人工调整',
-  expire: '到期回收',
+  expire: '积分过期',
   refund_reclaim: '退款扣回',
   reserve: '预授权冻结',
   refund: '预授权退回',

@@ -126,6 +126,25 @@ export function isBillingOrderReviewable(
   return false;
 }
 
+/**
+ * 账单模态 → 积分业务类型（展示口径）。
+ *
+ * 电商生图 / AI修图 / AI视频三组能力（共 17 个 capability）的扣费，在产品口径上
+ * 统一叫「创意生图扣费」，因此这里**只用模态判定、不解析 capability 归属组**：
+ * 模态是稳定的小集合（`normalizeCapability` 白名单），能力组则随能力增减变化，
+ * 按组或不按组都不影响本函数，新增能力无需改这里。
+ *
+ * `text` / `audio` 必须落到 `other`：代理链路允许任意 capability 计费，
+ * 把一次文本调用标成「创意生图扣费」比不标更糟 —— 用户会认为系统记错了账。
+ *
+ * **已知降级**：极少数历史账单存的是 capability id（如 `multi_fusion`）而非模态，
+ * 这类会落 `other`。新流程的 `draft.capability` 恒为归一化模态，不受影响；
+ * 为这点存量引入 capability 注册表依赖不划算，宁可少标也不错标。
+ */
+export function creativeBusinessTypeOf(modality: string): 'creative_image' | 'other' {
+  return modality === 'image' || modality === 'video' ? 'creative_image' : 'other';
+}
+
 /** 一次结算所用的上游用量 */
 export interface BillingUsage {
   inputTokens: bigint;
@@ -720,6 +739,8 @@ export class BillingService {
           model: params.draft.model,
           channelId: params.draft.channelId,
           scene: params.draft.scene,
+          // 预授权是中间态（C 端不展示），仍记业务类型：结算失败转人工时后台可读
+          businessType: creativeBusinessTypeOf(params.draft.capability),
         },
       });
     }
@@ -896,6 +917,12 @@ export class BillingService {
         model: order.model,
         channelId: order.channelId,
         scene: order.scene,
+        /*
+         * 结算写的是 `consume` 流水，业务类型按账单模态判定。
+         * 退款与「命中已过期批次」两条流水由钱包层强制覆盖成 refund / credit_expire ——
+         * 它们与消费不是同一业务，透传本字段会让方向校验失败。
+         */
+        businessType: creativeBusinessTypeOf(order.capability),
       },
     });
 

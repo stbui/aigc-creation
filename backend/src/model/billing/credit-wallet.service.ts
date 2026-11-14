@@ -341,6 +341,8 @@ export class CreditWalletService {
         {
           ...params.meta,
           billingOrderId: params.billingOrderId,
+          // 同 refund: 覆盖消费侧业务类型, 这里发生的是「积分过期」
+          businessType: 'credit_expire',
           note: '退款差额命中已过期批次，立即作废',
         },
       );
@@ -380,6 +382,7 @@ export class CreditWalletService {
     await this.writeEntry(db, params.userId, 'refund', amount, amount, -amount, after, {
       ...params.meta,
       billingOrderId: params.billingOrderId,
+      businessType: 'refund',
       note:
         expired > 0n
           ? `${params.note?.trim() || '退款'}（其中 ${formatAmount(expired)} 积分因批次已过期作废）`
