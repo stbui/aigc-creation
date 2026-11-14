@@ -36,7 +36,7 @@
 
 .account-card {
   min-width: 0;
-  padding: 18px 20px;
+  padding: 18px var(--space-20);
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
@@ -45,7 +45,7 @@
 .account-card-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   margin-bottom: 14px;
   color: var(--text-strong);
 }
@@ -72,7 +72,7 @@
 .account-identity-head {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
   flex-wrap: wrap;
 }
 
@@ -87,7 +87,7 @@
 .account-identity-info {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   flex: 1 1 240px;
   min-width: 0;
 }
@@ -95,7 +95,7 @@
 .account-identity-name {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   flex-wrap: wrap;
 }
 
@@ -112,7 +112,7 @@
 .account-pill {
   display: inline-flex;
   align-items: center;
-  padding: 1px 8px;
+  padding: 1px var(--space-8);
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 500;
@@ -142,7 +142,7 @@
 .account-identity-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 16px;
+  gap: var(--space-2) var(--space-16);
   font-size: 12px;
   color: var(--text-desc);
 }
@@ -150,21 +150,21 @@
 .account-quick {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-8);
   margin-left: auto;
 }
 
 /* 身份卡下排: 可改 / 不可改的资料行 */
 .account-fields {
   margin-top: 18px;
-  padding-top: 4px;
+  padding-top: var(--space-4);
   border-top: 1px solid var(--border-row);
 }
 
 .account-field {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: var(--space-16);
   padding: 9px 0;
   font-size: 13px;
 }
@@ -182,7 +182,7 @@
 .account-field-value {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   flex-wrap: wrap;
   flex: 1;
   min-width: 0;
@@ -204,7 +204,7 @@
 }
 
 .account-desc {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-12);
   font-size: 13px;
   line-height: 1.7;
   color: var(--text-muted);
@@ -214,15 +214,15 @@
 .account-assets {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .account-asset {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
-  padding: 16px 18px;
+  gap: var(--space-6);
+  padding: var(--space-16) 18px;
   border: 1px solid var(--border-row);
   border-radius: var(--radius-card);
   background: var(--surface);
@@ -257,23 +257,23 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: var(--space-8);
 }
 
 /* 我的数据: 每格都是入口, 所以是 button 而不是 div; 描边 + 箭头给出可点的暗示 */
 .account-stats {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .account-stat {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: var(--space-6);
+  padding: var(--space-12) 14px;
   border: 1px solid var(--border-row);
   border-radius: var(--radius-control);
   background: var(--card-bg);
@@ -296,7 +296,7 @@
 .account-stat-label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -331,7 +331,7 @@
 .account-split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--space-16);
   align-items: stretch;
 }
 
@@ -342,15 +342,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .account-order {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
   border: 1px solid var(--border-row);
   border-radius: var(--radius-control);
   background: var(--card-bg);
@@ -368,7 +368,7 @@
 .account-order-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
   flex: 1;
   min-width: 0;
 }
@@ -395,7 +395,7 @@
 
 .account-order-status {
   flex: none;
-  padding: 2px 8px;
+  padding: var(--space-2) var(--space-8);
   border-radius: var(--radius-tag);
   font-size: 12px;
   background: var(--surface);
@@ -426,15 +426,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .account-msg {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--space-10);
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
   border: 1px solid var(--border-row);
   border-radius: var(--radius-control);
   background: var(--card-bg);
@@ -453,7 +453,7 @@
   flex: none;
   width: 6px;
   height: 6px;
-  margin-top: 6px;
+  margin-top: var(--space-6);
   border-radius: 50%;
   background: transparent;
 }
@@ -465,7 +465,7 @@
 .account-msg-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
   flex: 1;
   min-width: 0;
 }
@@ -502,7 +502,7 @@
 
 .account-empty {
   margin: 0;
-  padding: 12px 0 2px;
+  padding: var(--space-12) 0 var(--space-2);
   font-size: 13px;
   color: var(--text-desc);
 }
@@ -519,8 +519,8 @@
 .account-actions > li {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 12px 0;
+  gap: var(--space-20);
+  padding: var(--space-12) 0;
 }
 
 .account-actions > li:first-child {
@@ -546,7 +546,7 @@
 .account-action-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: 13px;
   font-weight: 500;
   color: var(--text-strong);
@@ -572,13 +572,13 @@
 .account-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .account-delete-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 @media (max-width: 900px) {
@@ -600,15 +600,15 @@
 
 @media (max-width: 640px) {
   .account-card {
-    padding: 16px;
+    padding: var(--space-16);
   }
   .account-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .account-field {
     flex-direction: column;
-    gap: 2px;
-    padding: 10px 0;
+    gap: var(--space-2);
+    padding: var(--space-10) 0;
   }
   .account-field-label {
     flex: none;
@@ -624,7 +624,7 @@
   .account-actions > li {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: var(--space-10);
   }
 }
 

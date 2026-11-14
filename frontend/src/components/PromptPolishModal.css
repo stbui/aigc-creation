@@ -21,7 +21,7 @@
 .pt-modal-head {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
 }
 
 .pt-modal-eyebrow {
@@ -42,7 +42,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 32px;
   padding: 0 14px;
   border-radius: var(--radius-control);
@@ -84,18 +84,18 @@
 }
 
 .pt-polish-source {
-  margin-top: 4px;
+  margin-top: var(--space-4);
   background: var(--surface);
   border-radius: var(--radius-control);
-  padding: 12px;
+  padding: var(--space-12);
 }
 
 .pt-polish-source-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: var(--space-12);
+  margin-bottom: var(--space-8);
 }
 
 .pt-polish-source-label {
@@ -138,7 +138,7 @@
 /* 输出区 */
 .pt-polish-output {
   position: relative;
-  margin-top: 12px;
+  margin-top: var(--space-12);
 }
 
 .pt-polish-textarea {
@@ -146,7 +146,7 @@
   min-height: 180px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
   font-size: 13px;
   font-family: inherit;
   line-height: 21px;
@@ -176,8 +176,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
+  gap: var(--space-12);
+  margin-top: var(--space-12);
 }
 
 .pt-polish-count {
@@ -189,12 +189,12 @@
 .pt-polish-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 /* 产出来源披露: 文本无本地兜底, 输出必来自真实模型 —— 说清是哪个模型 */
 .pt-polish-source-note {
-  margin: 10px 0 0;
+  margin: var(--space-10) 0 0;
   font-size: 12px;
   line-height: 16px;
   color: var(--text-desc);

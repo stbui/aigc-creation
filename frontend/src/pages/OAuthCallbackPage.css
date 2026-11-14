@@ -8,7 +8,7 @@
 .oauth-callback-card {
   width: min(480px, calc(100vw - 32px));
   margin: 12vh auto 0;
-  padding: 40px 32px;
+  padding: var(--space-40) var(--space-32);
   border-radius: 16px;
   background: var(--card-bg);
   box-shadow: 0 10px 30px rgba(35, 39, 74, 0.12);
@@ -16,13 +16,13 @@
 }
 
 .oauth-callback-card h1 {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-12);
   font-size: 20px;
   font-weight: 600;
   color: var(--text-strong);
 }
 
 .oauth-callback-card p {
-  margin: 16px 0;
+  margin: var(--space-16) 0;
   color: var(--text-muted);
 }

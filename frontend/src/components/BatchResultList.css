@@ -16,13 +16,13 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-bottom: 4px;
+  gap: var(--space-12);
+  padding-bottom: var(--space-4);
 }
 
 .pd-result-row {
   flex: none;
-  padding: 12px 14px 14px;
+  padding: var(--space-12) 14px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--card-bg);
@@ -31,9 +31,9 @@
 .pd-result-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   min-width: 0;
-  margin-bottom: 10px;
+  margin-bottom: var(--space-10);
 }
 
 .pd-result-date {
@@ -81,12 +81,12 @@
  * 第一行商品名 + 时间, 第二行任务参数 + 状态, 第三行原图 + 一键下载,
  * 之后是五列生成图。信息按阅读顺序分层, 不再把参数挤在横向缩略图行头。 */
 .pd-result-card {
-  padding: 16px;
+  padding: var(--space-16);
 }
 
 .pd-result-card-head {
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-8);
 }
 
 .pd-result-card-title {
@@ -95,7 +95,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .pd-result-card-title strong {
@@ -119,8 +119,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: var(--space-6);
+  margin-bottom: var(--space-12);
 }
 
 .pd-result-meta-chip,
@@ -128,7 +128,7 @@
   display: inline-flex;
   align-items: center;
   height: 22px;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-body);
@@ -165,8 +165,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-12);
+  margin-bottom: var(--space-12);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-control);
   background: var(--surface);
@@ -177,13 +177,13 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .pd-result-card-source-thumbs {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .pd-result-card-source-thumbs .pd-result-source-thumb {
@@ -205,7 +205,7 @@
   justify-content: center;
   gap: 5px;
   height: 30px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 1px solid var(--brand);
   border-radius: var(--radius-control);
   background: transparent;
@@ -232,7 +232,7 @@
   justify-content: center;
   gap: 5px;
   height: 30px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 1px solid var(--brand);
   border-radius: var(--radius-control);
   background: var(--brand);
@@ -257,7 +257,7 @@
 .pd-result-card-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .pd-result-card-grid .pd-result-cell {
@@ -279,9 +279,9 @@
 .pd-result-strip {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-12);
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: var(--space-2);
 }
 
 /* 列宽可伸缩: 默认 6 个模块 + 原图正好铺满一行; 选到 10 个模块时
@@ -293,7 +293,7 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 /* 缩略图统一 3:4: 原图与模块图同高, 标签才会落在同一基线上 */
@@ -347,7 +347,7 @@
 .pd-result-source-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
+  gap: var(--space-4);
 }
 
 .pd-result-source-grid.is-single {
@@ -397,7 +397,7 @@
   place-items: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 4px;
+  padding: 0 var(--space-4);
   border-radius: 9px;
   background: color-mix(in srgb, var(--text-strong) 72%, transparent);
   color: var(--card-bg);
@@ -413,7 +413,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-6);
   color: var(--text-desc);
   cursor: default;
 }
@@ -430,7 +430,7 @@
 }
 
 .pd-result-thumb.is-failed {
-  padding: 12px;
+  padding: var(--space-12);
   border-style: dashed;
   border-color: color-mix(in srgb, var(--danger-soft-text) 18%, var(--border));
   background:
@@ -520,12 +520,12 @@
 
 @media (max-width: 640px) {
   .pd-result-row {
-    padding: 10px 12px 12px;
+    padding: var(--space-10) var(--space-12) var(--space-12);
   }
   .pd-result-card-title {
     align-items: flex-start;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-2);
   }
   .pd-result-card-source {
     align-items: flex-start;
@@ -538,7 +538,7 @@
     align-self: stretch;
   }
   .pd-result-card-grid {
-    gap: 8px;
+    gap: var(--space-8);
   }
   /* 手机宽度再收一档, 两格半可见即可 */
   .pd-result-cell {
@@ -553,5 +553,5 @@
   color: var(--brand);
   background: var(--brand-bg);
   border-radius: var(--radius-tag);
-  padding: 1px 6px;
+  padding: 1px var(--space-6);
 }

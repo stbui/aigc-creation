@@ -60,7 +60,7 @@
   position: absolute;
   left: 8px;
   bottom: 8px;
-  padding: 2px 7px;
+  padding: var(--space-2) 7px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.68);
   color: var(--on-brand);
@@ -71,7 +71,7 @@
 .image-to-video-upload-meta {
   min-width: 0;
   display: grid;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .image-to-video-upload-meta strong {
@@ -94,13 +94,13 @@
 .image-to-video-upload-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 2px;
+  gap: var(--space-8);
+  margin-top: var(--space-2);
 }
 
 .image-to-video-upload-actions button {
   height: 30px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card-bg);
@@ -128,7 +128,7 @@
 
 .image-to-video-settings-loading {
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .image-to-video-loading-line {
@@ -149,8 +149,8 @@
   .image-to-video-runtime-notice {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 10px 11px;
+  gap: var(--space-8);
+  padding: var(--space-10) 11px;
   border-radius: 9px;
   font-size: 12px;
   line-height: 19px;
@@ -175,7 +175,7 @@
 
 .image-to-video-runtime-notice div {
   display: grid;
-  gap: 2px;
+  gap: var(--space-2);
 }
 
 .image-to-video-runtime-notice strong {
@@ -204,7 +204,7 @@
   box-sizing: border-box;
   width: 100%;
   min-height: 86px;
-  padding: 10px 11px;
+  padding: var(--space-10) 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
   outline: none;
@@ -233,14 +233,14 @@
 
 .image-to-video-param {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .image-to-video-param-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .image-to-video-param-head span {
@@ -282,7 +282,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-16);
   padding: 18px;
   background:
     radial-gradient(circle at 82% 6%, rgba(127, 101, 255, 0.11), transparent 28%),
@@ -293,7 +293,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .image-to-video-result-head > div {
@@ -427,7 +427,7 @@
 
 .image-to-video-idle-copy {
   display: grid;
-  gap: 4px;
+  gap: var(--space-4);
   text-align: center;
 }
 
@@ -452,14 +452,14 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .image-to-video-ready-tags span,
   .image-to-video-result-tags span {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   height: 24px;
   padding: 0 9px;
   border-radius: 999px;
@@ -483,8 +483,8 @@
   position: relative;
   display: grid;
   justify-items: center;
-  gap: 8px;
-  padding: 32px;
+  gap: var(--space-8);
+  padding: var(--space-32);
   text-align: center;
 }
 
@@ -535,7 +535,7 @@
   height: 52px;
   display: grid;
   place-items: center;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-4);
   border-radius: 999px;
   background: var(--warn-bg);
   color: var(--warn-text);
@@ -544,7 +544,7 @@
 .image-to-video-success {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .image-to-video-video-stage {
@@ -593,7 +593,7 @@
   color: var(--on-brand);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: 12px;
   font-weight: 600;
   text-decoration: none;
@@ -635,7 +635,7 @@
 @media (max-width: 600px) {
   .image-to-video-upload-preview {
     grid-template-columns: 112px minmax(0, 1fr);
-    gap: 10px;
+    gap: var(--space-10);
   }
 
   .image-to-video-upload-frame {
@@ -647,7 +647,7 @@
   }
 
   .image-to-video-idle {
-    padding: 12px 0;
+    padding: var(--space-12) 0;
   }
 
   .image-to-video-idle-visual {

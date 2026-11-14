@@ -27,7 +27,7 @@
 .credits-stat-label {
   font-size: 12px;
   color: var(--text-muted, var(--text-muted));
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
 }
 
 .credits-stat-value {
@@ -70,7 +70,7 @@
 .credits-ledger-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .credits-ledger-toolbar .ui-select-trigger {
@@ -110,7 +110,7 @@
 }
 
 .credits-hero-value {
-  margin-top: 2px;
+  margin-top: var(--space-2);
   font-size: 30px;
   line-height: 1.2;
   font-weight: 700;
@@ -119,7 +119,7 @@
 }
 
 .credits-hero-note {
-  margin-top: 4px;
+  margin-top: var(--space-4);
   font-size: 13px;
   line-height: 20px;
   color: var(--text-body);
@@ -137,7 +137,7 @@
 
 .credits-hero-warn {
   display: inline-block;
-  padding: 4px 10px;
+  padding: var(--space-4) var(--space-10);
   border-radius: var(--radius-pill);
   background: var(--warn-bg);
   color: var(--warn-text);
@@ -149,7 +149,7 @@
 }
 
 .credits-stat-card .credits-stat-label {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-4);
 }
 
 .credits-list-card {
@@ -178,7 +178,7 @@
 }
 
 .credits-mobile-item {
-  padding: 10px 2px;
+  padding: var(--space-10) var(--space-2);
   border-bottom: 1px solid var(--border);
 }
 
@@ -190,7 +190,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 22px;
 }
 
@@ -207,8 +207,8 @@
 .credits-mobile-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 12px;
-  margin-top: 2px;
+  gap: var(--space-2) var(--space-12);
+  margin-top: var(--space-2);
   font-size: 13px;
   line-height: 20px;
   color: var(--text-muted);
@@ -216,7 +216,7 @@
 }
 
 .credits-mobile-note {
-  margin-top: 2px;
+  margin-top: var(--space-2);
   font-size: 13px;
   line-height: 20px;
   color: var(--text-muted);
@@ -225,23 +225,23 @@
 .credits-mobile-pager {
   display: flex;
   justify-content: center;
-  padding-top: 12px;
+  padding-top: var(--space-12);
 }
 
 .credits-hero .ui-card-body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 20px 24px;
+  gap: var(--space-20);
+  padding: var(--space-20) var(--space-24);
 }
 
 .credits-stat-card .ui-card-body {
-  padding: 14px 16px;
+  padding: 14px var(--space-16);
 }
 
 .credits-list-card .ui-card-body {
-  padding: 16px 20px 20px;
+  padding: var(--space-16) var(--space-20) var(--space-20);
 }
 
 @media (max-width: 900px) {
@@ -251,7 +251,7 @@
     padding: 18px;
   }
   .credits-list-card .ui-card-body {
-    padding: 12px 14px 16px;
+    padding: var(--space-12) 14px var(--space-16);
   }
 }
 
@@ -259,7 +259,7 @@
 .credits-status.ui-tag {
   margin-inline-end: 0;
   height: 22px;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   border: none;
   border-radius: var(--radius-pill);
   font-size: 12px;
@@ -269,8 +269,8 @@
 
 /* 积分 Tabs：与「我的作品」同款线形页签（品牌色下划线），不用 shadcn 默认灰底胶囊 */
 .credits-list-card .ui-tabs-list {
-  gap: 24px;
-  margin-bottom: 12px;
+  gap: var(--space-24);
+  margin-bottom: var(--space-12);
   padding: 0;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
@@ -280,7 +280,7 @@
 .credits-list-card .ui-tabs-list [data-slot='tabs-trigger'] {
   flex: none;
   height: auto;
-  padding: 0 0 12px;
+  padding: 0 0 var(--space-12);
   border-radius: 0;
   color: var(--text-desc);
   font-size: 14px;

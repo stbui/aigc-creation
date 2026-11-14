@@ -191,9 +191,9 @@
   left: 50%;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   transform: translate(-50%, -50%);
-  padding: 6px 14px;
+  padding: var(--space-6) 14px;
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.72);
@@ -218,9 +218,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   width: min(360px, calc(100% - 48px));
-  padding: 20px;
+  padding: var(--space-20);
   border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.8);
@@ -237,7 +237,7 @@
 
 .img-viewer-failed button {
   height: 28px;
-  padding: 0 16px;
+  padding: 0 var(--space-16);
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--brand);
@@ -259,11 +259,11 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 16px;
-  row-gap: 4px;
+  gap: var(--space-16);
+  row-gap: var(--space-4);
   width: max-content;
   max-width: calc(100% - 32px);
-  padding: 6px 8px 6px 16px;
+  padding: var(--space-6) var(--space-8) var(--space-6) var(--space-16);
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(12px);
@@ -278,7 +278,7 @@
   z-index: 4;
   width: min(720px, calc(100% - 32px));
   max-height: min(40vh, 320px);
-  padding: 14px 16px;
+  padding: 14px var(--space-16);
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-card);
@@ -292,8 +292,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 8px;
+  gap: var(--space-16);
+  margin-bottom: var(--space-8);
 }
 
 .img-viewer-prompt-head strong {
@@ -304,9 +304,9 @@
 .img-viewer-prompt-head button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   height: 26px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   border: 0;
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.12);
@@ -338,8 +338,8 @@
 .img-viewer-zoom {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 0 4px;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
@@ -417,8 +417,8 @@
 .img-viewer-actions {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding-left: 10px;
+  gap: var(--space-2);
+  padding-left: var(--space-10);
   border-left: 1px solid rgba(255, 255, 255, 0.16);
 }
 
@@ -427,7 +427,7 @@
   align-items: center;
   gap: 5px;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.06);
@@ -470,7 +470,7 @@
 /* 窄屏: 左右翻页按钮收进底栏上方, 舞台左右留白减小 */
 @media (max-width: 720px) {
   .img-viewer-stage {
-    padding: 52px 12px 104px;
+    padding: 52px var(--space-12) 104px;
   }
   .img-viewer-nav {
     top: auto;
@@ -487,8 +487,8 @@
   }
   .img-viewer-bar {
     bottom: 12px;
-    gap: 10px;
-    padding-left: 12px;
+    gap: var(--space-10);
+    padding-left: var(--space-12);
     width: calc(100% - 24px);
     max-width: none;
     border-radius: 18px;
@@ -511,8 +511,8 @@
     justify-content: center;
   }
   .img-viewer-actions {
-    gap: 4px;
-    padding-left: 8px;
+    gap: var(--space-4);
+    padding-left: var(--space-8);
   }
   .img-viewer-prompt {
     bottom: 90px;

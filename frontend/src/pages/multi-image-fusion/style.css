@@ -60,14 +60,14 @@
 
   .multi-image-fusion-accessory-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: var(--space-8);
     padding: 0;
   }
 
   .multi-image-fusion-accessory-grid .multi-image-fusion-upload-empty {
     box-sizing: border-box;
     min-height: 96px;
-    padding: 8px;
+    padding: var(--space-8);
   }
 
   .multi-image-fusion-accessory-grid .multi-image-fusion-image-card > img {
@@ -75,7 +75,7 @@
   }
 
   .app-content > .multi-image-fusion-page {
-    padding-left: 24px;
+    padding-left: var(--space-24);
   }
 }
 
@@ -88,7 +88,7 @@
 @media (max-width: 900px) {
   .multi-image-fusion-page {
     min-height: 0;
-    padding: 18px 20px 32px;
+    padding: 18px var(--space-20) var(--space-32);
   }
 
   .multi-image-fusion-layout {
@@ -102,7 +102,7 @@
   .multi-image-fusion-page {
     height: auto;
     min-height: calc(100vh - var(--mif-workspace-topbar-height));
-    padding-bottom: 24px;
+    padding-bottom: var(--space-24);
     overflow: visible;
   }
 
@@ -120,7 +120,7 @@
   .multi-image-fusion-page.is-scene-selection {
     height: auto;
     min-height: calc(100vh - var(--mif-workspace-topbar-height));
-    padding: 16px 16px 24px;
+    padding: var(--space-16) var(--space-16) var(--space-24);
   }
 
   .multi-image-fusion-scene-grid {
@@ -155,13 +155,13 @@
     min-width: 0;
     max-width: none;
     margin: 0;
-    padding: 12px 0 24px;
+    padding: var(--space-12) 0 var(--space-24);
   }
 
   .multi-image-fusion-layout,
   .multi-image-fusion-page.is-editor .multi-image-fusion-layout {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+    gap: var(--space-10);
     width: 100%;
     height: auto;
     min-height: 0;
@@ -185,8 +185,8 @@
   }
 
   .multi-image-fusion-page.is-scene-selection {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: var(--space-16);
+    padding-right: var(--space-16);
   }
 }
 
@@ -265,11 +265,11 @@
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
-    padding: 12px 0 24px;
+    padding: var(--space-12) 0 var(--space-24);
   }
 
   .multi-image-fusion-page.is-scene-selection {
-    padding-inline: 16px;
+    padding-inline: var(--space-16);
   }
 
   .multi-image-fusion-scene-selection {
@@ -280,9 +280,9 @@
   .multi-image-fusion-editor-head {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
-    gap: 8px;
+    gap: var(--space-8);
     height: auto;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-10);
     display: grid;
   }
 
@@ -298,7 +298,7 @@
 
   .multi-image-fusion-editor-title p {
     max-width: none;
-    margin-top: 2px;
+    margin-top: var(--space-2);
     font-size: var(--mif-small-size);
     line-height: 16px;
   }
@@ -310,7 +310,7 @@
 
   .multi-image-fusion-layout {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+    gap: var(--space-10);
   }
 
   .multi-image-fusion-control-column,
@@ -328,11 +328,11 @@
     border-radius: 14px;
     width: 100%;
     max-width: 100%;
-    padding: 12px;
+    padding: var(--space-12);
   }
 
   .multi-image-fusion-card-heading {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-12);
   }
 
   .multi-image-fusion-upload-section + .multi-image-fusion-upload-section {
@@ -340,8 +340,8 @@
   }
 
   .multi-image-fusion-field-label {
-    gap: 8px;
-    margin-bottom: 6px;
+    gap: var(--space-8);
+    margin-bottom: var(--space-6);
   }
 
   .multi-image-fusion-field-label small {
@@ -353,7 +353,7 @@
     box-sizing: border-box;
     max-width: 100%;
     min-height: 120px;
-    padding: 12px;
+    padding: var(--space-12);
   }
 
   .multi-image-fusion-image-card > img {
@@ -362,7 +362,7 @@
 
   .multi-image-fusion-accessory-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: var(--space-8);
     padding: 0;
   }
 
@@ -376,25 +376,25 @@
 
   .multi-image-fusion-analysis-card,
   .multi-image-fusion-parameter-card {
-    padding-top: 12px;
-    padding-bottom: 12px;
+    padding-top: var(--space-12);
+    padding-bottom: var(--space-12);
   }
 
   .multi-image-fusion-parameter-group + .multi-image-fusion-parameter-group {
-    margin-top: 12px;
+    margin-top: var(--space-12);
   }
 
   .multi-image-fusion-ratio-options {
-    gap: 6px;
+    gap: var(--space-6);
   }
 
   .multi-image-fusion-ratio-options button {
     min-height: 46px;
-    padding: 6px;
+    padding: var(--space-6);
   }
 
   .multi-image-fusion-submit-area {
-    padding: 12px 0 0;
+    padding: var(--space-12) 0 0;
   }
 
   .multi-image-fusion-editor-title p {
@@ -416,7 +416,7 @@
 
   .multi-image-fusion-page.is-editor .multi-image-fusion-layout {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+    gap: var(--space-10);
     width: 100%;
     height: auto;
     min-height: 0;
@@ -442,7 +442,7 @@
   .multi-image-fusion-page.is-scene-selection,
   .multi-image-fusion-card,
   .multi-image-fusion-result-panel {
-    padding-inline: 10px;
+    padding-inline: var(--space-10);
   }
 
   .multi-image-fusion-editor-title p {
@@ -488,7 +488,7 @@
   box-sizing: border-box;
   color: var(--mif-text-page);
   margin: 0 auto;
-  padding: 26px 32px 42px;
+  padding: 26px var(--space-32) 42px;
 }
 
 /* 后定义段: 参考站 rule #151, 覆盖上面的 width/padding 并接管高度与溢出 */
@@ -497,7 +497,7 @@
   height: calc(100vh - var(--mif-workspace-topbar-height));
   min-height: 0;
   margin: 0;
-  padding: 16px;
+  padding: var(--space-16);
   overflow: hidden;
 }
 
@@ -505,7 +505,7 @@
 .multi-image-fusion-page.is-scene-selection {
   height: calc(100vh - var(--mif-workspace-topbar-height));
   min-height: 0;
-  padding: 16px;
+  padding: var(--space-16);
   overflow: hidden auto;
 }
 
@@ -535,7 +535,7 @@
 
 .multi-image-fusion-scene-group h2 {
   color: var(--mif-text-title-2);
-  margin: 0 0 10px 2px;
+  margin: 0 0 var(--space-10) var(--space-2);
   font-size: var(--mif-h4-size);
   font-weight: var(--mif-h4-weight);
   line-height: var(--mif-h4-lh);
@@ -543,7 +543,7 @@
 
 .multi-image-fusion-scene-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-12);
   display: grid;
 }
 
@@ -608,7 +608,7 @@
 
 .multi-image-fusion-scene-copy {
   gap: 3px;
-  padding: 9px 2px 1px;
+  padding: 9px var(--space-2) 1px;
   display: grid;
 }
 
@@ -637,9 +637,9 @@
 .multi-image-fusion-editor-head {
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
   height: 38px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
   display: flex;
 }
 
@@ -711,7 +711,7 @@
     minmax(var(--mif-col-min), var(--mif-col-narrow-max))
     minmax(0, 1fr);
   align-items: stretch;
-  gap: 16px;
+  gap: var(--space-16);
   height: 100%;
   min-height: 0;
 }
@@ -750,7 +750,7 @@
 
 .multi-image-fusion-card-heading > div {
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--space-10);
   min-width: 0;
   display: flex;
 }
@@ -793,7 +793,7 @@
   align-items: center;
   gap: var(--mif-gap-field);
   min-height: 22px;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-8);
   font-size: var(--mif-label-size);
   font-weight: var(--mif-label-weight);
   display: flex;
@@ -808,7 +808,7 @@
 .multi-image-fusion-field-actions {
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   margin-left: auto;
   display: inline-flex;
 }
@@ -888,7 +888,7 @@
   align-items: center;
   width: var(--mif-icon-size);
   height: var(--mif-icon-size);
-  margin-bottom: 2px;
+  margin-bottom: var(--space-2);
   display: inline-flex;
 }
 
@@ -950,7 +950,7 @@
   border: 1px solid var(--mif-border-transparent);
   border-radius: var(--mif-radius-scene);
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--space-8);
   padding: 3px;
   transition:
     border-color var(--mif-motion-fast),
@@ -961,7 +961,7 @@
 .multi-image-fusion-accessory-grid .multi-image-fusion-upload-empty {
   border-radius: var(--mif-radius-upload-sm);
   min-height: var(--mif-upload-min-height-sm);
-  padding: 8px;
+  padding: var(--space-8);
 }
 
 .multi-image-fusion-accessory-grid .multi-image-fusion-upload-icon {
@@ -1008,7 +1008,7 @@
   background: transparent;
   border: 0;
   margin-top: 9px;
-  padding: 2px 0;
+  padding: var(--space-2) 0;
   font: inherit;
   font-size: var(--mif-small-size);
   text-align: left;
@@ -1043,8 +1043,8 @@
 .multi-image-fusion-analysis-input {
   display: block;
   width: 100%;
-  margin-top: 12px;
-  padding: 8px 10px;
+  margin-top: var(--space-12);
+  padding: var(--space-8) var(--space-10);
   font: inherit;
   font-size: var(--mif-sub-size);
   line-height: 1.5;
@@ -1065,7 +1065,7 @@
 }
 
 .multi-image-fusion-analysis-hint {
-  margin: 8px 0 0;
+  margin: var(--space-8) 0 0;
   font-size: 12px;
   line-height: 1.5;
   color: var(--mif-text-sub);
@@ -1074,12 +1074,12 @@
 /* ══ H. 输出参数（比例 / 变体） ══ */
 .multi-image-fusion-analysis-card,
   .multi-image-fusion-parameter-card {
-  padding-top: 16px;
-  padding-bottom: 16px;
+  padding-top: var(--space-16);
+  padding-bottom: var(--space-16);
 }
 
 .multi-image-fusion-parameter-group + .multi-image-fusion-parameter-group {
-  margin-top: 16px;
+  margin-top: var(--space-16);
 }
 
 .multi-image-fusion-ratio-options,
@@ -1116,9 +1116,9 @@
 
 .multi-image-fusion-ratio-options button {
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
   min-height: 49px;
-  padding: 8px;
+  padding: var(--space-8);
   font-size: 13px;
 }
 
@@ -1162,7 +1162,7 @@
   background: var(--mif-surface-submit-ref);
   flex: none;
   margin-top: auto;
-  padding: 16px 2px 2px;
+  padding: var(--space-16) var(--space-2) var(--space-2);
   position: sticky;
   bottom: 0;
 }
@@ -1178,7 +1178,7 @@
   width: 100%;
   min-width: 0;
   margin-top: auto;
-  padding: 14px 16px 16px;
+  padding: 14px var(--space-16) var(--space-16);
   display: grid;
   position: sticky;
   bottom: 0;
@@ -1203,7 +1203,7 @@
 
 .multi-image-fusion-message {
   min-height: 18px;
-  margin: 8px 2px 10px;
+  margin: var(--space-8) var(--space-2) var(--space-10);
   font-size: var(--mif-small-size);
   line-height: 18px;
 }
@@ -1231,13 +1231,13 @@
   border: 0;
   border-radius: 7px;
   min-height: 34px;
-  padding-inline: 10px;
+  padding-inline: var(--space-10);
 }
 
 /* 画质选项: 沿用参考站 .image-output-resolution-* 的字面值 */
 .multi-image-fusion-resolution-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--space-10);
   display: grid;
 }
 
@@ -1248,10 +1248,10 @@
   border: 1px solid var(--mif-resolution-option-border);
   border-radius: var(--mif-radius-option);
   place-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   min-width: 0;
   min-height: 62px;
-  padding: 8px;
+  padding: var(--space-8);
   display: grid;
 }
 
@@ -1319,7 +1319,7 @@
 .multi-image-fusion-result-meta {
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
+  gap: var(--space-4) var(--space-8);
   display: flex;
 }
 
@@ -1332,7 +1332,7 @@
   border-radius: var(--mif-radius-pill);
   align-items: center;
   min-height: 22px;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   font-size: var(--mif-small-size);
   font-weight: 600;
   line-height: 1;
@@ -1378,7 +1378,7 @@
 
 /* D-71/D-72: 结果标题 18px/700, 副标题 12px/19px #9897aa (本地原先缺副标题) */
 .multi-image-fusion-result-heading h2 {
-  margin-top: 2px;
+  margin-top: var(--space-2);
   font-size: var(--mif-h2-size);
   font-weight: var(--mif-h2-weight);
   line-height: var(--mif-h2-lh);
@@ -1386,7 +1386,7 @@
 
 .multi-image-fusion-result-heading p {
   color: var(--mif-text-dim);
-  margin: 4px 0 0;
+  margin: var(--space-4) 0 0;
   font-size: var(--mif-sub-size);
   line-height: var(--mif-sub-lh);
 }
@@ -1407,7 +1407,7 @@
   align-items: center;
   gap: 5px;
   height: var(--mif-result-btn-h);
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   font-size: var(--mif-small-size);
   transition:
     border-color var(--mif-motion-fast),
@@ -1488,7 +1488,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   display: flex;
 }
 
@@ -1509,9 +1509,9 @@
   background: var(--mif-surface-preview-size);
   border-radius: var(--mif-radius-pill);
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   min-height: 25px;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   font-size: var(--mif-tiny-size);
   display: inline-flex;
   position: absolute;
@@ -1523,7 +1523,7 @@
   grid-template-columns: repeat(4, max-content);
   justify-content: center;
   gap: 9px;
-  margin-top: 12px;
+  margin-top: var(--space-12);
   display: grid;
 }
 
@@ -1608,7 +1608,7 @@
 .multi-image-fusion-empty-art {
   width: 96px;
   height: 78px;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-8);
   position: relative;
 }
 
@@ -1667,7 +1667,7 @@
 
 /* ══ M. 诚实披露（D-85 / §10.10: 移出空态区, 默认折叠） ══ */
 .multi-image-fusion-disclosure {
-  margin-top: 12px;
+  margin-top: var(--space-12);
   color: var(--mif-text-dim-2);
   font-size: var(--mif-tiny-size);
   line-height: 16px;
@@ -1696,7 +1696,7 @@
 }
 
 .multi-image-fusion-disclosure > p {
-  margin: 6px 0 0;
+  margin: var(--space-6) 0 0;
 }
 
 /* ══ M2. 2026-10-27 参考站复核对齐 ══ */
@@ -1705,9 +1705,9 @@
 .multi-image-fusion-page .image-output-settings-popover-head {
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 20px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-16);
   display: flex;
 }
 
@@ -1798,10 +1798,10 @@
   border: 1px solid var(--mif-resolution-option-border);
   border-radius: var(--mif-radius-option);
   place-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   min-width: 0;
   min-height: 62px;
-  padding: 8px;
+  padding: var(--space-8);
   display: grid;
 }
 
@@ -1835,8 +1835,8 @@
 /* AI 分析默认只占 106px 左右；描述编辑器只在分析成功后出现 */
 .multi-image-fusion-description {
   color: var(--mif-text-3);
-  gap: 6px;
-  margin-top: 12px;
+  gap: var(--space-6);
+  margin-top: var(--space-12);
   font-size: var(--mif-small-size);
   font-weight: 600;
   display: grid;
@@ -1854,7 +1854,7 @@
   width: 100%;
   min-height: 160px;
   max-height: 320px;
-  padding: 11px 12px;
+  padding: 11px var(--space-12);
   font-family: inherit;
   font-size: 12px;
   font-weight: 400;

@@ -6,11 +6,11 @@
 .app-header {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-24);
   background: var(--color-card);
   /* 参考站实拍 border-bottom 1px #f2f3f5 —— 比全局 --color-border(#e2e8f0) 更浅 */
   border-bottom: 1px solid var(--color-border-soft);
-  padding: 0 24px; /* 参考站 padding 0 24 (原 0 20, 品牌块 x 差 4px) */
+  padding: 0 var(--space-24); /* 参考站 padding 0 24 (原 0 20, 品牌块 x 差 4px) */
   height: 64px;
   /* antd <Header> 默认 line-height:64px 会被子元素继承, 使 .app-quota / .app-user 的
      行盒撑到 64px (再加 padding 即 72px), 溢出 64px 顶栏上下各 4px —— 2026-10-19 实测复现, 此处归零 */
@@ -29,7 +29,7 @@
 .app-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   text-decoration: none;
   color: var(--text-strong);
   flex-shrink: 0;
@@ -66,7 +66,7 @@
 .app-topnav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   flex: 1;
 }
 
@@ -80,7 +80,7 @@
   height: 32px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   border-radius: var(--radius-control);
   white-space: nowrap;
   flex: none;
@@ -94,7 +94,7 @@
 .app-topnav-item-row {
   display: inline-flex;
   align-items: center;
-  gap: 10px; /* 参考站下拉条目 gap 10 (icon 20 ↔ 文字) */
+  gap: var(--space-10); /* 参考站下拉条目 gap 10 (icon 20 ↔ 文字) */
 }
 
 /* 顶栏动作控件统一底座：32px 高、透明底、悬停品牌淡紫。
@@ -103,7 +103,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-8);
   height: 32px;
   padding: 0;
   border: 0;
@@ -122,7 +122,7 @@
 
 /* guest「登录/注册」纯文字钮: 参考站 #workspace-logout (68x32 / pad 8 / radius 6 / 13-700 #667085) */
 .app-guest-login {
-  padding: 8px;
+  padding: var(--space-8);
   border-radius: 6px;
   font-size: 13px;
   font-weight: 700;
@@ -139,7 +139,7 @@
 .app-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   margin-left: auto;
 }
 
@@ -153,9 +153,9 @@
 .app-quota {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 32px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   font-size: 12px;
   color: var(--text-muted);
   background: var(--color-card);
@@ -213,7 +213,7 @@
   .app-header {
     height: 54px;
     padding: 0 14px;
-    gap: 12px;
+    gap: var(--space-12);
   }
   .app-topnav,
   .app-quota,
@@ -241,7 +241,7 @@
 /* 顶部导航下拉：Radix Content 取代 .ant-dropdown-menu */
 .app-topnav-dropdown.ui-dropdown-content {
   min-width: 137px;
-  padding: 10px 8px;
+  padding: var(--space-10) var(--space-8);
   border-radius: 12px;
   border: 1px solid var(--border-2);
   background: var(--card-bg);
@@ -250,9 +250,9 @@
 
 .app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item {
   height: 36px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border-radius: 9px;
-  gap: 10px;
+  gap: var(--space-10);
   font-size: 13px;
   font-weight: 600;
   color: var(--text-3);
@@ -287,13 +287,13 @@
    这一段只收内边距与间距：顶栏左右 24 → 12、导航项 14 → 8、导航间距 10 → 2；
    字号与 8 项导航不动 —— 参考站 900 档同样显示全部 8 项。 */
   .app-header {
-    padding: 0 12px;
+    padding: 0 var(--space-12);
   }
   .app-topnav {
-    gap: 2px;
+    gap: var(--space-2);
   }
   .app-topnav .app-topnav-item,
   .app-topnav .ui-btn.app-topnav-item {
-    padding: 0 8px;
+    padding: 0 var(--space-8);
   }
 }

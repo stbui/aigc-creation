@@ -65,7 +65,7 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  padding: 4px 9px;
+  padding: var(--space-4) 9px;
   border-radius: 12px;
   background: rgba(38, 42, 52, 0.72);
   color: var(--card-bg);
@@ -132,7 +132,7 @@
   left: 12px;
   right: auto;
   width: max-content;
-  padding: 4px 9px;
+  padding: var(--space-4) 9px;
   border-radius: 12px;
   background: rgba(38, 42, 52, 0.72);
   color: var(--card-bg);
@@ -148,9 +148,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   height: 32px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 0;
   border-radius: 8px;
   background: var(--brand);

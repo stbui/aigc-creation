@@ -13,13 +13,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
+  padding: var(--space-48) var(--space-24);
   min-height: 60vh;
 }
 
 .exc.is-full {
   min-height: 100vh;
-  padding: 80px 24px;
+  padding: 80px var(--space-24);
   /* 极浅品牌紫晕染: 整屏异常页需要一点色彩锚点, 否则纯白底显得像没加载出来 */
   background:
     radial-gradient(120% 80% at 50% 0%, var(--brand-bg) 0%, var(--page-bg) 62%);
@@ -42,7 +42,7 @@
   letter-spacing: 6px;
   color: var(--brand);
   opacity: 0.16;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-4);
   user-select: none;
 }
 
@@ -52,7 +52,7 @@
 }
 
 .exc-title {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-8);
   font-size: 20px;
   font-weight: 600;
   line-height: 28px;
@@ -60,7 +60,7 @@
 }
 
 .exc-desc {
-  margin: 0 0 24px;
+  margin: 0 0 var(--space-24);
   font-size: 14px;
   line-height: 22px;
   color: var(--text-muted);
@@ -72,17 +72,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: var(--space-12);
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-20);
 }
 
 .exc-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 36px;
-  padding: 0 20px;
+  padding: 0 var(--space-20);
   border-radius: var(--radius-control);
   border: 1px solid transparent;
   font-size: 14px;
@@ -125,7 +125,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-top: 12px;
+  margin-top: var(--space-12);
   font-size: 13px;
   color: var(--text-desc);
   text-decoration: none;
@@ -138,7 +138,7 @@
 /* 技术详情: 默认收起, 展开后限高可滚 —— componentStack 可能几十行, 不限高会顶穿整屏 */
 .exc-detail {
   width: 100%;
-  margin-top: 4px;
+  margin-top: var(--space-4);
   text-align: left;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
@@ -150,7 +150,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: var(--space-8) var(--space-12);
 }
 
 .exc-detail-toggle,
@@ -182,7 +182,7 @@
 
 .exc-detail-body {
   margin: 0;
-  padding: 12px;
+  padding: var(--space-12);
   border-top: 1px solid var(--border);
   background: var(--card-bg);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -197,7 +197,7 @@
 
 .exc-footnote {
   margin: 0;
-  padding: 8px 12px;
+  padding: var(--space-8) var(--space-12);
   border-top: 1px solid var(--border);
   font-size: 12px;
   line-height: 18px;

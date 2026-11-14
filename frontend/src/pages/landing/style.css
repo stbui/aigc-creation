@@ -16,7 +16,7 @@
     justify-content: space-between;
     height: 54px;
     padding: 0 14px;
-    gap: 10px;
+    gap: var(--space-10);
     background: var(--card-bg);
     box-shadow: 0 1px var(--color-border-soft);
   }
@@ -24,8 +24,8 @@
   .landing-brand {
     width: auto;
     height: 34px;
-    gap: 8px;
-    padding: 1px 6px;
+    gap: var(--space-8);
+    padding: 1px var(--space-6);
     font-size: 14px;
   }
 
@@ -79,10 +79,10 @@
     right: 14px;
     box-sizing: border-box;
     display: grid;
-    gap: 10px;
+    gap: var(--space-10);
     width: min(320px, calc(100vw - 24px));
     max-height: calc(100vh - 68px);
-    padding: 10px;
+    padding: var(--space-10);
     overflow-y: auto;
     overscroll-behavior: contain;
     background: var(--card-bg);
@@ -107,17 +107,17 @@
 
   .landing-mobile-section {
     display: grid;
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   .landing-mobile-section + .landing-mobile-section {
-    padding-top: 8px;
+    padding-top: var(--space-8);
     border-top: 1px solid var(--border-3);
   }
 
   .landing-mobile-section-title {
     display: block;
-    margin: 0 4px 1px;
+    margin: 0 var(--space-4) 1px;
     color: var(--lp-text-2);
     font-size: 12px;
     font-weight: 700;
@@ -128,17 +128,17 @@
   .landing-mobile-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 3px 6px;
+    gap: 3px var(--space-6);
   }
 
   .landing-mobile-item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-6);
     width: 100%;
     min-width: 0;
     height: 35px;
-    padding: 0 8px;
+    padding: 0 var(--space-8);
     border: 0;
     border-radius: 9px;
     background: transparent;
@@ -203,7 +203,7 @@
   box-sizing: border-box;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 56px 24px 48px;
+  padding: 56px var(--space-24) var(--space-48);
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   align-items: center;
@@ -213,8 +213,8 @@
 .lp-eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-12);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--card-bg);
@@ -224,7 +224,7 @@
 }
 
 .lp-hero h1 {
-  margin: 20px 0 0;
+  margin: var(--space-20) 0 0;
   font-size: 50px;
   font-weight: 700;
   line-height: 1.18;
@@ -256,14 +256,14 @@
   margin-top: 30px;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .lp-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 46px;
   padding: 0 22px;
   border: 0;
@@ -311,7 +311,7 @@
   list-style: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 22px;
+  gap: var(--space-8) 22px;
   font-size: 13px;
   color: var(--text-body);
 }
@@ -319,7 +319,7 @@
 .lp-hero-proof li {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .lp-hero-proof svg {
@@ -330,8 +330,8 @@
 .lp-hero-visual {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  padding: 24px 0;
+  gap: var(--space-16);
+  padding: var(--space-24) 0;
 }
 
 .lp-hero-shot {
@@ -372,7 +372,7 @@
   position: absolute;
   left: 10px;
   bottom: 10px;
-  padding: 4px 10px;
+  padding: var(--space-4) var(--space-10);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--text-strong) 66%, transparent);
   color: var(--card-bg);
@@ -386,7 +386,7 @@
   box-sizing: border-box;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 88px 24px 0;
+  padding: 88px var(--space-24) 0;
 }
 
 .lp-section-tight {
@@ -414,7 +414,7 @@
   .lp-tools-head h2,
   .lp-packages-head h2,
   .lp-cases-head h2 {
-  margin: 10px 0 0;
+  margin: var(--space-10) 0 0;
   font-size: 30px;
   font-weight: 700;
   line-height: 1.3;
@@ -424,7 +424,7 @@
 
 .lp-section-head p,
   .lp-packages-head p {
-  margin: 10px 0 0;
+  margin: var(--space-10) 0 0;
   font-size: 14.5px;
   line-height: 1.75;
   color: var(--text-muted);
@@ -432,10 +432,10 @@
 
 /* 2. 核心场景 */
 .lp-scene-grid {
-  margin-top: 32px;
+  margin-top: var(--space-32);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
+  gap: var(--space-20);
 }
 
 .lp-scene-card {
@@ -473,10 +473,10 @@
 }
 
 .lp-scene-body {
-  padding: 20px 22px 18px;
+  padding: var(--space-20) 22px 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   flex: 1;
 }
 
@@ -484,7 +484,7 @@
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   font-size: 17px;
   font-weight: 600;
   color: var(--text-strong);
@@ -508,7 +508,7 @@
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   padding: 0;
   border: 0;
   background: none;
@@ -520,7 +520,7 @@
 }
 
 .lp-scene-link:hover {
-  gap: 6px;
+  gap: var(--space-6);
   color: var(--brand-hover);
 }
 
@@ -529,13 +529,13 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
+  gap: var(--space-24);
 }
 
 .lp-text-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   padding: 0;
   border: 0;
   background: none;
@@ -552,16 +552,16 @@
 }
 
 .lp-tool-grid {
-  margin-top: 24px;
+  margin-top: var(--space-24);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .lp-tool {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   height: 60px;
   padding: 0 18px;
   border: 1px solid var(--border);
@@ -593,7 +593,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 28px;
-  padding: 36px 40px;
+  padding: 36px var(--space-40);
   border: 1px solid var(--border);
   border-radius: var(--radius-hero);
   background: linear-gradient(120deg, var(--brand-bg) 0%, var(--card-bg) 72%);
@@ -619,10 +619,10 @@
 }
 
 .lp-step-copy h3 {
-  margin: 2px 0 0;
+  margin: var(--space-2) 0 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: 15.5px;
   font-weight: 600;
   color: var(--text-strong);
@@ -633,7 +633,7 @@
 }
 
 .lp-step-copy p {
-  margin: 6px 0 0;
+  margin: var(--space-6) 0 0;
   font-size: 13.5px;
   line-height: 1.7;
   color: var(--text-muted);
@@ -645,22 +645,22 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
+  gap: var(--space-24);
   flex-wrap: wrap;
 }
 
 .lp-tabs {
   margin-top: 28px;
   display: inline-flex;
-  gap: 4px;
-  padding: 4px;
+  gap: var(--space-4);
+  padding: var(--space-4);
   border-radius: var(--radius-pill);
   background: var(--surface);
 }
 
 .lp-tabs button {
   height: 34px;
-  padding: 0 20px;
+  padding: 0 var(--space-20);
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
@@ -682,13 +682,13 @@
 }
 
 .lp-packages-body {
-  margin-top: 24px;
+  margin-top: var(--space-24);
 }
 
 .lp-empty {
   grid-column: 1 / -1;
   margin: 0;
-  padding: 36px 12px;
+  padding: 36px var(--space-12);
   text-align: center;
   font-size: 13px;
   color: var(--text-muted);
@@ -704,7 +704,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 24px 22px 20px;
+  padding: var(--space-24) 22px var(--space-20);
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
@@ -773,14 +773,14 @@
 }
 
 .lp-plan-credits {
-  margin: 8px 0 0;
+  margin: var(--space-8) 0 0;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--brand);
 }
 
 .lp-plan-perks {
-  margin: 16px 0 20px;
+  margin: var(--space-16) 0 var(--space-20);
   padding: 0;
   list-style: none;
   display: flex;
@@ -798,7 +798,7 @@
 }
 
 .lp-plan-perks svg {
-  margin-top: 2px;
+  margin-top: var(--space-2);
   flex-shrink: 0;
   color: var(--brand);
 }
@@ -823,7 +823,7 @@
 .lp-addon-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .lp-addon-card {
@@ -831,7 +831,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 20px 20px;
+  padding: var(--space-24) var(--space-20) var(--space-20);
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
@@ -852,18 +852,18 @@
 }
 
 .lp-addon-card h3 {
-  margin: 12px 0 0;
+  margin: var(--space-12) 0 0;
   font-size: 15px;
   font-weight: 600;
   color: var(--text-strong);
 }
 
 .lp-addon-price {
-  margin-top: 8px;
+  margin-top: var(--space-8);
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 2px;
+  gap: var(--space-2);
   color: var(--text-strong);
 }
 
@@ -878,13 +878,13 @@
 }
 
 .lp-addon-price del {
-  margin-left: 6px;
+  margin-left: var(--space-6);
   font-size: 12px;
   color: var(--text-desc);
 }
 
 .lp-addon-meta {
-  margin: 10px 0 0;
+  margin: var(--space-10) 0 0;
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--text-muted);
@@ -903,7 +903,7 @@
   position: absolute;
   top: 12px;
   left: 12px;
-  padding: 2px 9px;
+  padding: var(--space-2) 9px;
   border-radius: var(--radius-pill);
   background: var(--brand);
   color: var(--card-bg);
@@ -915,14 +915,14 @@
 .lp-case-groups {
   margin-top: 36px;
   display: grid;
-  gap: 40px;
+  gap: var(--space-40);
 }
 
 .lp-case-group-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-16);
   margin-bottom: 14px;
 }
 
@@ -969,7 +969,7 @@
   position: absolute;
   left: 10px;
   bottom: 10px;
-  padding: 4px 10px;
+  padding: var(--space-4) var(--space-10);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--text-strong) 70%, transparent);
   color: var(--card-bg);
@@ -989,14 +989,14 @@
 
 /* 7. 产品特性 */
 .lp-feature-wide {
-  margin-top: 32px;
+  margin-top: var(--space-32);
   padding: 28px;
   display: grid;
   /* 媒体列偏重: 拼贴只有 584px 宽时主图不足 290px, 会被读成缩略图碎片。
      0.6 / 1.4 让主图接近 370px, 文案列仍能容纳标题与三条要点。 */
   grid-template-columns: minmax(0, 0.6fr) minmax(0, 1.4fr);
   align-items: center;
-  gap: 32px;
+  gap: var(--space-32);
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-hero);
@@ -1013,12 +1013,12 @@
 
 .lp-feature-copy ul,
   .lp-feature-card ul {
-  margin: 16px 0 0;
+  margin: var(--space-16) 0 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .lp-feature-copy li,
@@ -1043,7 +1043,7 @@
 }
 
 .lp-feature-copy .lp-btn {
-  margin-top: 24px;
+  margin-top: var(--space-24);
   height: 42px;
 }
 
@@ -1051,7 +1051,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--space-10);
   /* 行高原本由「子项 height:100% + 自动行」循环决定, 实测塌到 287px
      (主图 287×287、其余 139×139, 像缩略图碎片)。给容器一个确定高度,
      行高才能解析为 1fr; 单列断点下再用 max-height 防止主图被拉得过高。 */
@@ -1076,10 +1076,10 @@
 }
 
 .lp-feature-grid {
-  margin-top: 20px;
+  margin-top: var(--space-20);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: var(--space-20);
 }
 
 .lp-feature-card {
@@ -1102,11 +1102,11 @@
   box-sizing: border-box;
   max-width: 1200px;
   margin: 96px auto 0;
-  padding: 0 24px;
+  padding: 0 var(--space-24);
 }
 
 .lp-cta-inner {
-  padding: 56px 32px;
+  padding: 56px var(--space-32);
   border-radius: var(--radius-hero);
   background: linear-gradient(120deg, var(--brand) 0%, var(--brand-light) 100%);
   color: var(--card-bg);
@@ -1121,7 +1121,7 @@
 }
 
 .lp-cta p {
-  margin: 12px 0 0;
+  margin: var(--space-12) 0 0;
   font-size: 14.5px;
   opacity: 0.86;
 }
@@ -1133,7 +1133,7 @@
 /* 页脚 */
 .landing-footer {
   background: var(--card-bg);
-  padding: 32px 32px 28px;
+  padding: var(--space-32) var(--space-32) 28px;
   margin-top: 96px;
 }
 
@@ -1142,7 +1142,7 @@
   margin: 0 auto;
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 24px;
+  gap: var(--space-24);
 }
 
 .landing-footer-brand strong {
@@ -1152,16 +1152,16 @@
 }
 
 .landing-footer-brand p {
-  margin: 8px 0 0;
+  margin: var(--space-8) 0 0;
   font-size: 13px;
   color: var(--text-muted);
 }
 
 .landing-footer-logos {
-  margin-top: 20px;
+  margin-top: var(--space-20);
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .landing-footer-logos img {
@@ -1173,11 +1173,11 @@
 .landing-footer-col {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .landing-footer-col h4 {
-  margin: 0 0 2px;
+  margin: 0 0 var(--space-2);
   font-size: 14px;
   font-weight: 600;
   color: var(--text-strong);
@@ -1197,7 +1197,7 @@
 
 .landing-footer-copy {
   max-width: 1226px;
-  margin: 24px auto 0;
+  margin: var(--space-24) auto 0;
   font-size: 12px;
   color: var(--text-desc);
 }
@@ -1221,11 +1221,11 @@
 @media (max-width: 900px) {
   .lp-hero-inner {
     grid-template-columns: 1fr;
-    padding: 48px 20px 40px;
+    padding: var(--space-48) var(--space-20) var(--space-40);
   }
   .lp-hero-visual {
     max-width: 520px;
-    margin: 8px auto 0;
+    margin: var(--space-8) auto 0;
   }
   .lp-hero h1 {
     font-size: 38px;
@@ -1246,7 +1246,7 @@
     padding: 28px;
   }
   .lp-section {
-    padding: 64px 20px 0;
+    padding: 64px var(--space-20) 0;
   }
   .lp-section-tight {
     padding-top: 44px;
@@ -1256,7 +1256,7 @@
   .lp-cases-head {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: var(--space-16);
   }
 }
 
@@ -1279,7 +1279,7 @@
   }
   .lp-case-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: var(--space-10);
   }
   .lp-case-groups {
     margin-top: 28px;
@@ -1287,10 +1287,10 @@
   }
   .lp-feature-wide,
   .lp-feature-card {
-    padding: 20px;
+    padding: var(--space-20);
   }
   .lp-cta-inner {
-    padding: 40px 24px;
+    padding: var(--space-40) var(--space-24);
   }
   .lp-cta h2 {
     font-size: 25px;
@@ -1307,7 +1307,7 @@
   box-sizing: border-box;
   height: 64px;
   background: var(--card-bg);
-  padding: 0 32px;
+  padding: 0 var(--space-32);
   display: grid;
   grid-template-columns: 266px minmax(0, 1fr) 182px;
   align-items: center;
@@ -1318,10 +1318,10 @@
 .landing-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   width: 266px;
   text-decoration: none;
-  padding: 1px 6px;
+  padding: 1px var(--space-6);
   height: 38px;
   font-size: 16px;
   font-weight: 700;
@@ -1353,7 +1353,7 @@
 .landing-nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   min-width: 0;
   padding: 14px 0;
   overflow-x: auto;
@@ -1382,7 +1382,7 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   white-space: nowrap;
 }
 
@@ -1428,13 +1428,13 @@
   left: 50%;
   width: max-content;
   max-width: calc(100vw - 32px);
-  padding: 10px 8px;
+  padding: var(--space-10) var(--space-8);
   background: var(--card-bg);
   border: 1px solid var(--border-2);
   border-radius: 12px;
   box-shadow: 0 18px 42px rgba(31, 41, 55, 0.14);
   display: grid;
-  gap: 2px;
+  gap: var(--space-2);
   z-index: 120;
   opacity: 0;
   visibility: hidden;
@@ -1454,11 +1454,11 @@
 .landing-nav-menu-item {
   display: flex;
   flex-direction: row;
-  gap: 10px;
+  gap: var(--space-10);
   align-items: center;
   width: 100%;
   height: 36px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -1506,13 +1506,13 @@
   justify-self: end;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-24);
   background: var(--card-bg);
 }
 
 .landing-quota-pill {
   height: 32px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border-radius: var(--radius-pill);
   border: 1px solid var(--lp-border-brand);
   background: var(--brand-bg);
@@ -1528,7 +1528,7 @@
 
 .landing-account {
   height: 32px;
-  padding: 8px;
+  padding: var(--space-8);
   border-radius: 6px;
   color: var(--text-muted);
   font-size: 13px;
@@ -1562,13 +1562,13 @@
      同时收起纯装饰的算力胶囊, 给导航多留 ~170px。 */
   .landing-topbar {
     grid-template-columns: 266px minmax(0, 1fr) max-content;
-    padding: 0 20px;
+    padding: 0 var(--space-20);
   }
   .landing-nav {
-    gap: 8px;
+    gap: var(--space-8);
   }
   .landing-topbar-right {
-    gap: 12px;
+    gap: var(--space-12);
   }
   .landing-quota-pill {
     display: none;

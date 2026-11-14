@@ -2,10 +2,12 @@ import '../styles/auth.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Form, FormItem, Input, useApp, useForm, useWatch } from '../ui';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, X, Smartphone, ShieldCheck } from 'lucide-react';
+import { ShieldCheck, X } from 'lucide-react';
 import { authApi, oauthAuthorizeUrl, type OAuthProviderInfo } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { QrLoginPanel } from './QrLoginPanel';
+import { AuthFormFields } from './AuthFormFields';
+import { LoginGiftArt } from './LoginGiftArt';
 import type { SmsPurpose } from '../types/api';
 
 interface AuthForm {
@@ -395,114 +397,14 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
             requiredMark={false}
             className="login-form"
           >
-            {/*
-             * 昵称 —— 注册时必填 (2026-10-21 修)。
-             *
-             * 此前这个字段是 `hidden` 的: 用户看不到、也不会填, 提交的
-             * `values.name` 恒为 undefined, 而后端 RegisterDto 要求它是字符串
-             * —— **注册必然失败**, 报错还是看不懂的英文校验文案。
-             *
-             * 修法是把字段还给用户而不是把后端改选填: 昵称会出现在作品、
-             * 邀请与订单等所有对外位置, 缺省值拼得难看还会撞名。
-             */}
-            {mode === 'register' && (
-              <FormItem
-                name="name"
-                label="昵称"
-                className="login-field"
-                rules={[
-                  { required: true, message: '请输入昵称', whitespace: true },
-                  { max: 20, message: '昵称最多 20 个字符' },
-                ]}
-              >
-                <Input prefix={<User size={15} />} placeholder="展示名称" maxLength={20} />
-              </FormItem>
-            )}
-
-            {mode !== 'sms' && (
-              <FormItem
-                name="email"
-                label="邮箱"
-                className="login-field"
-                rules={[
-                  { required: true, message: '请输入邮箱' },
-                  { type: 'email', message: '邮箱格式不正确' },
-                ]}
-              >
-                <Input
-                  ref={emailRef}
-                  prefix={<Mail size={15} />}
-                  placeholder="账号（邮箱）"
-                  autoComplete="username"
-                />
-              </FormItem>
-            )}
-
-            {mode === 'register' && emailCodeField}
-
-            {mode === 'sms' && (
-              <FormItem
-                name="phone"
-                label="手机号"
-                className="login-field"
-                rules={[
-                  { required: true, message: '请输入手机号' },
-                  { pattern: /^(\+?86[\s-]?)?1[3-9]\d{9}$/, message: '手机号格式不正确' },
-                ]}
-              >
-                <Input
-                  prefix={<Smartphone size={15} />}
-                  placeholder="已绑定的手机号"
-                  maxLength={14}
-                  inputMode="tel"
-                  autoComplete="tel"
-                />
-              </FormItem>
-            )}
-
-            {mode !== 'sms' && (
-              <FormItem
-                name="password"
-                label="密码"
-                className="login-field"
-                rules={[
-                  { required: true, message: '请输入密码' },
-                  { min: 6, message: '密码至少 6 位' },
-                ]}
-              >
-                <Input.Password
-                  prefix={<Lock size={15} />}
-                  placeholder="请输入密码"
-                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                />
-              </FormItem>
-            )}
-
-            {/* 注册时的可选手机号 —— 填了才出现验证码（后端强校验归属才能绑定） */}
-            {mode === 'register' && (
-              <FormItem
-                name="phone"
-                label="手机号（选填）"
-                className="login-field"
-                rules={[{ pattern: /^(\+?86[\s-]?)?1[3-9]\d{9}$/, message: '手机号格式不正确' }]}
-              >
-                <Input
-                  prefix={<Smartphone size={15} />}
-                  placeholder="选填，用于短信登录"
-                  maxLength={14}
-                  inputMode="tel"
-                  autoComplete="tel"
-                />
-              </FormItem>
-            )}
-
-            {mode === 'sms' && codeField('login')}
-            {needPhoneCode && codeField('verify')}
-
-            {/* 参考站 .auth-submit: 340x48 / linear-gradient(90deg,#8064f6,#5546d8) / 14px 600 / radius 8 */}
-            <Button type="primary" htmlType="submit" block className="login-submit" loading={submitting}>
-              {mode === 'login' ? '登录' : mode === 'sms' ? '登录' : '注册并登录'}
-            </Button>
+            <AuthFormFields
+              mode={mode}
+              emailRef={emailRef}
+              emailCodeField={emailCodeField}
+              codeField={codeField}
+              needPhoneCode={needPhoneCode}
+              submitting={submitting}
+            />
           </Form>
           )}
 
@@ -559,77 +461,5 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
         </div>
       </div>
     </section>
-  );
-}
-
-/**
- * 左栏礼盒插画 —— 原创内联 SVG (参考站 .auth-showcase-gift 实测 221x214)。
- * 不引参考站位图资源, 同 ToolEmptyIllustration 的纪律。
- * 参考站原图是紫色礼盒 + 金币 + 宝石的插画, 这里用同构的矢量版本重绘。
- */
-function LoginGiftArt() {
-  return (
-    <svg
-      className="login-showcase-gift"
-      width="221"
-      height="214"
-      viewBox="0 0 221 214"
-      fill="none"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="lg-box" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#a78bfa" />
-          <stop offset="1" stopColor="#6d5bd8" />
-        </linearGradient>
-        <linearGradient id="lg-lid" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#b9a2fb" />
-          <stop offset="1" stopColor="#7c6ae0" />
-        </linearGradient>
-        <linearGradient id="lg-coin" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffe08a" />
-          <stop offset="1" stopColor="#f5a524" />
-        </linearGradient>
-      </defs>
-
-      {/* 投影 */}
-      <ellipse cx="112" cy="186" rx="66" ry="11" fill="#5546d8" opacity="0.14" />
-
-      {/* 盒身 */}
-      <rect x="54" y="92" width="116" height="88" rx="12" fill="url(#lg-box)" />
-      {/* 盒盖 */}
-      <rect x="42" y="70" width="140" height="30" rx="10" fill="url(#lg-lid)" />
-      {/* 竖丝带 */}
-      <rect x="100" y="70" width="22" height="110" fill="#ffd666" opacity="0.95" />
-      <rect x="100" y="70" width="7" height="110" fill="#ffe9a8" opacity="0.9" />
-
-      {/* 蝴蝶结 */}
-      <path d="M111 70 C 96 50, 68 44, 66 58 C 64 70, 90 72, 111 70 Z" fill="#8b7ae8" />
-      <path d="M111 70 C 126 50, 154 44, 156 58 C 158 70, 132 72, 111 70 Z" fill="#7a68dd" />
-      <circle cx="111" cy="68" r="8" fill="#a78bfa" />
-
-      {/* 金币 */}
-      <circle cx="58" cy="128" r="17" fill="url(#lg-coin)" />
-      <path
-        d="M58 119 v18 M52 124 h12 M52 132 h12"
-        stroke="#b45309"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-      <circle cx="166" cy="132" r="13" fill="url(#lg-coin)" />
-      <path
-        d="M166 125 v14 M162 129 h8 M162 135 h8"
-        stroke="#b45309"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-      <circle cx="74" cy="160" r="9" fill="url(#lg-coin)" />
-
-      {/* 宝石点缀 */}
-      <path d="M186 66 l5 11 11 5 -11 5 -5 11 -5 -11 -11 -5 11 -5 Z" fill="#67e8f9" opacity="0.9" />
-      <circle cx="30" cy="108" r="4" fill="#ffffff" opacity="0.75" />
-      <circle cx="196" cy="104" r="3" fill="#ffffff" opacity="0.6" />
-      <circle cx="40" cy="46" r="2.5" fill="#ffffff" opacity="0.55" />
-    </svg>
   );
 }

@@ -6,20 +6,26 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import {
-  Columns2,
-  Download,
-  Eraser,
-  Hand,
-  Minus,
-  Plus,
-  Redo2,
-  RotateCcw,
-  Undo2,
-  Wrench,
-} from 'lucide-react';
 import { Spin, useApp } from '../ui';
-import { COLOR_HEX, DEFAULT_CUSTOM_COLOR, normalizeHexColor } from '../lib/colorPalette';
+import {
+  appendPaintPoint,
+  backdropOf,
+  clamp,
+  paintCanvas,
+  ratioValue,
+  renderMattingExport,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  type EditorTool,
+  type PaintAction,
+  type PaintGesture,
+  type PanGesture,
+  type ZoomTarget,
+} from '../lib/mattingEditor';
+import { MattingResultToolbar } from './MattingResultToolbar';
+import { MattingResultFooter } from './MattingResultFooter';
+import { MattingResultOverlay } from './MattingResultOverlay';
+import { useMattingSource } from './useMattingSource';
 
 /**
  * 一键抠图结果编辑器 —— 对齐参考站 background-remove 的结果态。
@@ -34,113 +40,6 @@ import { COLOR_HEX, DEFAULT_CUSTOM_COLOR, normalizeHexColor } from '../lib/color
  *
  * 编辑器只改像素，不改变服务端任务记录；刷新或重新生成会回到原始抠图结果。
  */
-
-type EditorTool = 'hand' | 'eraser' | 'repair';
-type ZoomTarget = 'subject' | 'canvas';
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface PaintAction {
-  tool: Exclude<EditorTool, 'hand'>;
-  points: Point[];
-  /** 笔刷半径，单位是结果画布像素 */
-  radius: number;
-}
-
-interface PaintGesture {
-  pointerId: number;
-  action: PaintAction;
-}
-
-interface PanGesture {
-  pointerId: number;
-  startX: number;
-  startY: number;
-  originX: number;
-  originY: number;
-  target: ZoomTarget;
-}
-
-const BRUSH_MIN = 10;
-const BRUSH_MAX = 60;
-const ZOOM_MIN = 50;
-const ZOOM_MAX = 200;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function normalizeHex(value: string): string {
-  return normalizeHexColor(value) ?? DEFAULT_CUSTOM_COLOR;
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const normalized = normalizeHex(hex);
-  const value = Number.parseInt(normalized.slice(1), 16);
-  const r = (value >> 16) & 255;
-  const g = (value >> 8) & 255;
-  const b = value & 255;
-  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 100) / 100})`;
-}
-
-function backdropOf(selectedColor: string, customColor: string, customAlpha: number): string | null {
-  if (selectedColor === 'transparent') return null;
-  if (selectedColor === 'custom') {
-    if (customAlpha <= 0) return null;
-    return hexToRgba(customColor, customAlpha);
-  }
-  return COLOR_HEX[selectedColor] ?? normalizeHex(selectedColor);
-}
-
-function ratioValue(ratio: string, naturalRatio: number): number {
-  if (!ratio || ratio === 'original') return naturalRatio;
-  const [w, h] = ratio.split(':').map(Number);
-  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return naturalRatio;
-  return w / h;
-}
-
-function loadImage(url: string, crossOrigin = false): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    if (crossOrigin) image.crossOrigin = 'anonymous';
-    image.decoding = 'async';
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('结果图片加载失败'));
-    image.src = url;
-  });
-}
-
-/**
- * 优先用 fetch 取回 Blob，再把 Blob URL 画进 canvas。
- *
- * 这样签名图床即使没有返回 ACAO，也还有一次「匿名 img」的退路；最终若仍
- * 被 canvas 安全策略污染，下载阶段会明确提示，而不是悄悄导出一张空白图。
- */
-async function loadCanvasSource(url: string): Promise<{ image: HTMLImageElement; release: () => void }> {
-  try {
-    const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    try {
-      return { image: await loadImage(objectUrl), release: () => URL.revokeObjectURL(objectUrl) };
-    } catch (error) {
-      URL.revokeObjectURL(objectUrl);
-      throw error;
-    }
-  } catch {
-    try {
-      const image = await loadImage(url, true);
-      return { image, release: () => undefined };
-    } catch {
-      const image = await loadImage(url);
-      return { image, release: () => undefined };
-    }
-  }
-}
 
 export function MattingResultEditor({
   resultUrl,
@@ -158,8 +57,6 @@ export function MattingResultEditor({
   outputRatio: string;
 }) {
   const { message } = useApp();
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const actionsRef = useRef<PaintAction[]>([]);
@@ -167,9 +64,6 @@ export function MattingResultEditor({
   const paintGestureRef = useRef<PaintGesture | null>(null);
   const panGestureRef = useRef<PanGesture | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [tool, setTool] = useState<EditorTool>('hand');
   const [compare, setCompare] = useState(false);
@@ -185,67 +79,12 @@ export function MattingResultEditor({
   const [, setRevision] = useState(0);
 
   const bump = useCallback(() => setRevision((value) => value + 1), []);
-  const backdrop = useMemo(
-    () => backdropOf(selectedColor, customColor, customAlpha),
-    [selectedColor, customColor, customAlpha],
-  );
-  const previewRatio = useMemo(() => {
-    const natural = naturalSize.width && naturalSize.height ? naturalSize.width / naturalSize.height : 1;
-    return ratioValue(outputRatio, natural);
-  }, [naturalSize, outputRatio]);
 
-  const redraw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const base = baseCanvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !base || !ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(base, 0, 0);
-
-    for (const action of actionsRef.current) {
-      if (!action.points.length) continue;
-      ctx.save();
-      if (action.tool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.fillStyle = '#000';
-        ctx.strokeStyle = '#000';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = action.radius * 2;
-        if (action.points.length === 1) {
-          const point = action.points[0];
-          ctx.beginPath();
-          ctx.arc(point.x, point.y, action.radius, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(action.points[0].x, action.points[0].y);
-          for (let i = 1; i < action.points.length; i += 1) {
-            ctx.lineTo(action.points[i].x, action.points[i].y);
-          }
-          ctx.stroke();
-        }
-      } else {
-        // 修补 = 用原始抠图结果回填笔刷覆盖的像素，恢复被误擦掉的主体边缘。
-        ctx.beginPath();
-        for (const point of action.points) {
-          ctx.moveTo(point.x + action.radius, point.y);
-          ctx.arc(point.x, point.y, action.radius, 0, Math.PI * 2);
-        }
-        ctx.clip();
-        ctx.drawImage(base, 0, 0, canvas.width, canvas.height);
-      }
-      ctx.restore();
-    }
-  }, []);
-
-  // 载入结果图，并保留一份不可编辑的底座供「修补/重置」回填。
-  useEffect(() => {
-    let cancelled = false;
-    let release: () => void = () => undefined;
-    setLoading(true);
-    setLoadError('');
+  /**
+   * 换图时把编辑现场归零：工具、对比、缩放、平移、撤销栈与未完成手势。
+   * 载入流程（`useMattingSource`）在拉图前调用一次，避免旧位移与新画幅错位。
+   */
+  const resetEditorState = useCallback(() => {
     setCursor(null);
     setCompare(false);
     setCompareSplit(50);
@@ -259,41 +98,29 @@ export function MattingResultEditor({
     paintGestureRef.current = null;
     panGestureRef.current = null;
     bump();
+  }, [bump]);
 
-    void (async () => {
-      try {
-        const loaded = await loadCanvasSource(resultUrl);
-        release = loaded.release;
-        if (cancelled) return;
-        const image = loaded.image;
-        if (!image.naturalWidth || !image.naturalHeight) throw new Error('结果图片尺寸无效');
+  const { canvasRef, baseCanvasRef, loading, loadError, naturalSize } = useMattingSource({
+    resultUrl,
+    reset: resetEditorState,
+  });
+  const backdrop = useMemo(
+    () => backdropOf(selectedColor, customColor, customAlpha),
+    [selectedColor, customColor, customAlpha],
+  );
+  const previewRatio = useMemo(() => {
+    const natural = naturalSize.width && naturalSize.height ? naturalSize.width / naturalSize.height : 1;
+    return ratioValue(outputRatio, natural);
+  }, [naturalSize, outputRatio]);
 
-        const canvas = canvasRef.current;
-        if (!canvas) throw new Error('结果画布尚未就绪');
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
-        canvas.getContext('2d')?.drawImage(image, 0, 0);
+  const redraw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const base = baseCanvasRef.current;
+    if (!canvas || !base) return;
+    paintCanvas(canvas, base, actionsRef.current);
+  }, []);
 
-        const base = document.createElement('canvas');
-        base.width = image.naturalWidth;
-        base.height = image.naturalHeight;
-        base.getContext('2d')?.drawImage(image, 0, 0);
-        baseCanvasRef.current = base;
 
-        setNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
-        setLoading(false);
-      } catch (error) {
-        if (cancelled) return;
-        setLoadError(error instanceof Error ? error.message : '结果图片加载失败');
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      release();
-    };
-  }, [bump, resultUrl]);
 
   // 比例变化时重置视图，避免旧平移量让新画幅跑出可视区 (参考站同行为)。
   useEffect(() => {
@@ -342,22 +169,6 @@ export function MattingResultEditor({
     };
   }, []);
 
-  const appendPaintPoint = (action: PaintAction, point: Point) => {
-    const previous = action.points[action.points.length - 1];
-    if (!previous) {
-      action.points.push(point);
-      return;
-    }
-    const distance = Math.hypot(point.x - previous.x, point.y - previous.y);
-    const spacing = Math.max(1, action.radius * 0.35);
-    const steps = Math.min(400, Math.max(1, Math.ceil(distance / spacing)));
-    for (let i = 1; i <= steps; i += 1) {
-      action.points.push({
-        x: previous.x + ((point.x - previous.x) * i) / steps,
-        y: previous.y + ((point.y - previous.y) * i) / steps,
-      });
-    }
-  };
 
   const startPan = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -537,35 +348,7 @@ export function MattingResultEditor({
     setDownloading(true);
     try {
       redraw();
-      const natural = canvas.width / canvas.height;
-      const aspect = ratioValue(outputRatio, natural);
-      const out = document.createElement('canvas');
-      const maxSide = Math.max(canvas.width, canvas.height);
-      out.width = aspect >= 1 ? maxSide : Math.max(1, Math.round(maxSide * aspect));
-      out.height = aspect >= 1 ? Math.max(1, Math.round(maxSide / aspect)) : maxSide;
-      const ctx = out.getContext('2d');
-      if (!ctx) throw new Error('无法创建导出画布');
-      if (backdrop) {
-        ctx.fillStyle = backdrop;
-        ctx.fillRect(0, 0, out.width, out.height);
-      }
-      const scale = Math.min(out.width / canvas.width, out.height / canvas.height) * (subjectZoom / 100);
-      const drawWidth = canvas.width * scale;
-      const drawHeight = canvas.height * scale;
-      /*
-       * 主体平移是结果的一部分，而画布平移只是视口。导出时只映射
-       * subjectPan，并保持导出画布尺寸与当前舞台一致，否则用户调整过
-       * 主体位置后下载到的图会与所见不一致。
-       */
-      const offsetX = subjectPan.x * (out.width / Math.max(stageSize.width, 1));
-      const offsetY = subjectPan.y * (out.height / Math.max(stageSize.height, 1));
-      ctx.drawImage(
-        canvas,
-        (out.width - drawWidth) / 2 + offsetX,
-        (out.height - drawHeight) / 2 + offsetY,
-        drawWidth,
-        drawHeight,
-      );
+      const out = renderMattingExport(canvas, { outputRatio, backdrop, subjectZoom, subjectPan, stageSize });
       out.toBlob((blob) => {
         if (!blob) {
           setDownloading(false);
@@ -595,71 +378,20 @@ export function MattingResultEditor({
   const canRedo = redoRef.current.length > 0;
   const activeZoom = zoomTarget === 'canvas' ? canvasZoom : subjectZoom;
   const previewBackground = backdrop ?? undefined;
-  const rangeProgress = `${((brushSize - BRUSH_MIN) / (BRUSH_MAX - BRUSH_MIN)) * 100}%`;
 
   return (
     <div className="matting-result-editor" aria-label="一键抠图结果编辑">
       {!loading && !loadError && (
-        <div className="background-result-toolbar" role="toolbar" aria-label="一键抠图结果工具">
-          <button
-            type="button"
-            className={tool === 'hand' && !compare ? 'active' : ''}
-            aria-pressed={tool === 'hand' && !compare}
-            onClick={() => selectTool('hand')}
-          >
-            <Hand size={16} />
-            抓手
-          </button>
-          <button
-            type="button"
-            className={compare ? 'active' : ''}
-            aria-pressed={compare}
-            onClick={() => setCompare((value) => !value)}
-          >
-            <Columns2 size={16} />
-            对比
-          </button>
-          <b />
-          <button
-            type="button"
-            className={tool === 'eraser' && !compare ? 'active' : ''}
-            aria-pressed={tool === 'eraser' && !compare}
-            onClick={() => selectTool('eraser')}
-          >
-            <Eraser size={16} />
-            擦除
-          </button>
-          <button
-            type="button"
-            className={tool === 'repair' && !compare ? 'active' : ''}
-            aria-pressed={tool === 'repair' && !compare}
-            onClick={() => selectTool('repair')}
-          >
-            <Wrench size={16} />
-            修补
-          </button>
-          <input
-            aria-label="工具大小"
-            type="range"
-            min={BRUSH_MIN}
-            max={BRUSH_MAX}
-            value={brushSize}
-            style={{ ['--range-progress' as string]: rangeProgress }}
-            onChange={(e) => setBrushSize(Number(e.target.value))}
-          />
-          <output>{brushSize}</output>
-          <b />
-          <button
-            type="button"
-            className="background-result-download-icon"
-            aria-label="下载图片"
-            title="下载图片"
-            disabled={downloading}
-            onClick={download}
-          >
-            <Download size={16} />
-          </button>
-        </div>
+        <MattingResultToolbar
+          tool={tool}
+          compare={compare}
+          brushSize={brushSize}
+          downloading={downloading}
+          onSelectTool={selectTool}
+          onToggleCompare={() => setCompare((value) => !value)}
+          onBrushSizeChange={setBrushSize}
+          onDownload={download}
+        />
       )}
 
       <div ref={stageRef} className="background-remove-stage has-result" aria-busy={loading}>
@@ -701,41 +433,15 @@ export function MattingResultEditor({
                   aria-label="一键抠图结果"
                 />
 
-                {compare && (
-                  <>
-                    <div
-                      className="background-original-compare"
-                      style={{ clipPath: `inset(0 ${100 - compareSplit}% 0 0)` }}
-                    >
-                      <img src={originalUrl} alt="原图" draggable={false} />
-                    </div>
-                    <span className="background-before-label">原图</span>
-                    <span className="background-after-label">结果图</span>
-                    <div className="background-compare-line" style={{ left: `${compareSplit}%` }} aria-hidden="true" />
-                    <input
-                      className="background-compare-range"
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={compareSplit}
-                      aria-label="调整原图与结果图的对比位置"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onChange={(e) => setCompareSplit(Number(e.target.value))}
-                    />
-                  </>
-                )}
-
-                {!compare && cursor && tool !== 'hand' && (
-                  <i
-                    className={`background-result-cursor ${tool}`}
-                    style={{
-                      left: cursor.x,
-                      top: cursor.y,
-                      width: brushSize,
-                      height: brushSize,
-                    }}
-                  />
-                )}
+                <MattingResultOverlay
+                  compare={compare}
+                  compareSplit={compareSplit}
+                  originalUrl={originalUrl}
+                  cursor={cursor}
+                  tool={tool}
+                  brushSize={brushSize}
+                  onCompareSplitChange={setCompareSplit}
+                />
               </div>
             </div>
         </div>
@@ -757,46 +463,17 @@ export function MattingResultEditor({
         )}
 
         {!loading && !loadError && (
-          <div className="background-result-footer">
-            <button type="button" onClick={undo} disabled={!canUndo} title="撤回 (Ctrl+Z)">
-              <Undo2 size={16} />
-              撤回
-            </button>
-            <button type="button" onClick={redo} disabled={!canRedo} title="恢复 (Ctrl+Shift+Z)">
-              <Redo2 size={16} />
-              恢复
-            </button>
-            <button type="button" onClick={reset} title="重置视图与编辑">
-              <RotateCcw size={16} />
-              重置
-            </button>
-            <b />
-            <div className="background-zoom-target" role="group" aria-label="缩放对象">
-              <button
-                type="button"
-                className={zoomTarget === 'subject' ? 'active' : ''}
-                aria-pressed={zoomTarget === 'subject'}
-                onClick={() => setZoomTarget('subject')}
-              >
-                主体
-              </button>
-              <button
-                type="button"
-                className={zoomTarget === 'canvas' ? 'active' : ''}
-                aria-pressed={zoomTarget === 'canvas'}
-                onClick={() => setZoomTarget('canvas')}
-              >
-                画布
-              </button>
-            </div>
-            <button type="button" aria-label="缩小" title="缩小 (-)" onClick={() => changeZoom(-10)}>
-              <Minus size={16} />
-            </button>
-            <span>{activeZoom}%</span>
-            <button type="button" aria-label="放大" title="放大 (+)" onClick={() => changeZoom(10)}>
-              <Plus size={16} />
-            </button>
-          </div>
+          <MattingResultFooter
+            canUndo={canUndo}
+            canRedo={canRedo}
+            zoomTarget={zoomTarget}
+            activeZoom={activeZoom}
+            onUndo={undo}
+            onRedo={redo}
+            onReset={reset}
+            onZoomTargetChange={setZoomTarget}
+            onChangeZoom={changeZoom}
+          />
         )}
 
         {!loading && !loadError && (

@@ -17,7 +17,7 @@
 /* 工作区: 两栏, 页面本身不滚动 (与参考站 documentElement.scrollHeight === innerHeight 一致) */
 .sc-workspace {
   margin: -24px -24px -32px;
-  padding: 16px 24px 16px 16px;
+  padding: var(--space-16) var(--space-24) var(--space-16) var(--space-16);
   box-sizing: border-box;
   height: calc(100vh - var(--workspace-topbar-height));
   min-height: 620px;
@@ -25,7 +25,7 @@
   /* 左栏 432px + 16px 间距，与 `.pk-workspace` / 写真模板页一致 */
   grid-template-columns: 432px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--space-16);
   align-items: stretch;
 }
 
@@ -33,9 +33,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   height: 54px;
-  padding: 0 24px;
+  padding: 0 var(--space-24);
   background: var(--card-bg);
   border-bottom: 1px solid var(--border);
 }
@@ -50,7 +50,7 @@
 @media (max-width: 900px) {
   .sc-workspace {
     margin: 0;
-    padding: 12px 16px 16px;
+    padding: var(--space-12) var(--space-16) var(--space-16);
     height: auto;
     min-height: calc(100vh - var(--workspace-topbar-height));
     grid-template-columns: minmax(0, 1fr);
@@ -65,7 +65,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .sc-new-task {
@@ -74,7 +74,7 @@
   background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  padding: 5px 12px;
+  padding: 5px var(--space-12);
   cursor: pointer;
 }
 
@@ -92,14 +92,14 @@
   min-height: 0;
   overflow-y: auto;
   display: grid;
-  gap: 24px;
+  gap: var(--space-24);
   align-content: start;
 }
 
 /* 5 个区块: 无卡片边框, 直接落在左栏白底上 */
 .sc-sections {
   display: grid;
-  gap: 24px;
+  gap: var(--space-24);
   align-content: start;
   min-width: 0;
 }
@@ -111,16 +111,16 @@
   font-size: 15px;
   font-weight: 700;
   color: var(--text-strong);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 /* 区块内的表单网格间距 (参考站 basicsGrid gap 12px 10px) */
 .sc-sections .pk-form-grid {
-  gap: 12px 10px;
+  gap: var(--space-12) var(--space-10);
 }
 
 .sc-sections .pk-section {
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 /*
@@ -132,16 +132,16 @@
   flex: none;
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 14px 16px 16px;
+  padding: 14px var(--space-16) var(--space-16);
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .sc-form-footer .pk-submit-actions {
   background: transparent;
   border-radius: 0;
   padding: 0;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 /* 开关行 (「图片不加文字」/「社媒帖子发布文案」) */
@@ -149,10 +149,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 36px;
-  margin-top: 12px;
-  padding: 12px;
+  margin-top: var(--space-12);
+  padding: var(--space-12);
   background: var(--surface-soft);
   border-radius: var(--radius-control);
 }
@@ -160,7 +160,7 @@
 .sc-toggle-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -185,16 +185,16 @@
 .sc-mode-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .sc-mode-option {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
   align-items: flex-start;
   text-align: left;
-  padding: 12px;
+  padding: var(--space-12);
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
@@ -227,7 +227,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 /* ── 右栏 ── */
@@ -244,12 +244,12 @@
 .sc-categories {
   display: flex;
   flex-wrap: wrap;
-  column-gap: 20px;
-  padding: 0 0 12px;
+  column-gap: var(--space-20);
+  padding: 0 0 var(--space-12);
 }
 
 .sc-category {
-  padding: 6px 0 8px;
+  padding: var(--space-6) 0 var(--space-8);
   font-size: 14px;
   color: var(--text-muted);
   background: transparent;
@@ -273,7 +273,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 0 20px;
+  padding: 0 0 var(--space-20);
 }
 
 .sc-template-grid {
@@ -283,11 +283,11 @@
    * 窄档在 1240 降到 180 保证两列，移动端 140。
    */
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .sc-template-grid-empty {
-  padding: 40px 0;
+  padding: var(--space-40) 0;
   text-align: center;
   font-size: 14px;
   color: var(--text-desc);
@@ -317,7 +317,7 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  gap: var(--space-4);
   overflow: hidden;
   background: var(--surface-soft);
   border-radius: var(--radius-control);
@@ -369,13 +369,13 @@
 .sc-template-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .sc-template-group-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
   padding: 0;
   background: transparent;
   border: none;
@@ -406,14 +406,14 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 1px 0;
+  gap: var(--space-8);
+  padding: var(--space-8) 1px 0;
 }
 
 .sc-template-details {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -436,7 +436,7 @@
 
 .sc-template-use {
   flex: none;
-  padding: 5px 12px;
+  padding: 5px var(--space-12);
   font-size: 13px;
   color: var(--card-bg);
   background: var(--brand);
@@ -458,7 +458,7 @@
   background: var(--surface-soft);
   border-color: transparent;
   border-radius: var(--radius-card);
-  padding: 6px 12px;
+  padding: var(--space-6) var(--space-12);
 }
 
 .sc-copy-editor textarea:focus {
@@ -469,7 +469,7 @@
 .sc-count-label {
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-8);
   font-size: 14px;
   color: var(--text-body);
 }
@@ -504,8 +504,8 @@
 .sc-template-echo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--space-10);
+  padding: var(--space-12);
   background: var(--surface-soft);
   border-radius: var(--radius-card);
 }
@@ -529,7 +529,7 @@
 .sc-echo-details {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
   min-width: 0;
   flex: 1;
 }
@@ -557,7 +557,7 @@
   color: var(--brand);
   background: transparent;
   border: none;
-  padding: 4px 0;
+  padding: var(--space-4) 0;
   cursor: pointer;
 }
 
@@ -596,7 +596,7 @@
   border-color: var(--border-2);
   border-radius: var(--radius-card);
   background: var(--card-bg);
-  padding: 12px;
+  padding: var(--space-12);
 }
 
 .sc-sections .pk-upload-prompt small {
@@ -627,12 +627,12 @@
 /* 上传区: 104 高, 内容居中, 提示 14px */
 .sc-sections .pk-dropzone {
   min-height: 104px;
-  padding: 8px;
+  padding: var(--space-8);
 }
 
 .sc-sections .pk-upload-prompt {
   min-height: 0;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .sc-sections .pk-upload-prompt span {
@@ -646,7 +646,7 @@
   border-radius: var(--radius-control);
   background: var(--surface-soft);
   border-color: transparent;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
 }
 
 /* 带货图文: 底栏第一行 = 张数步进器 + 高级设置入口（同一行） */
@@ -654,7 +654,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 32px;
 }
 
@@ -665,7 +665,7 @@
 .sc-footer-row .pk-settings-summary {
   width: auto;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   font-size: 12px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
@@ -729,7 +729,7 @@
   /* 基础规则是 space-between（用于其它位置的左右分列）; 底栏里步进器必须紧跟
      张数文案，否则中间会空出一大段，看起来像控件脱队。 */
   justify-content: flex-start;
-  gap: 10px;
+  gap: var(--space-10);
   min-width: 0;
   flex: 1;
 }
@@ -813,7 +813,7 @@
   }
 
   .sc-template-scroll {
-    padding: 0 0 16px;
+    padding: 0 0 var(--space-16);
     overflow: visible;
   }
 

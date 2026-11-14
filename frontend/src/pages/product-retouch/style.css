@@ -18,7 +18,7 @@
   min-height: calc(100vh - var(--workspace-topbar-height, 64px));
   max-height: none;
   padding: 18px;
-  gap: 16px;
+  gap: var(--space-16);
   grid-template-columns: 432px minmax(0, 1fr) 192px;
   grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
@@ -35,16 +35,16 @@
 }
 
 .pk-workspace.product-retouch-page .pk-config-card {
-  padding: 16px;
+  padding: var(--space-16);
   border-radius: 16px;
 }
 
 .pk-workspace.product-retouch-page .pk-section {
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .pk-workspace.product-retouch-page .pk-submit-actions {
-  padding: 14px 16px 16px;
+  padding: 14px var(--space-16) var(--space-16);
   gap: 14px;
 }
 
@@ -72,8 +72,8 @@
 }
 
 .pk-workspace.product-retouch-page .pk-preview-inner h3 {
-  margin-top: 32px;
-  margin-bottom: 8px;
+  margin-top: var(--space-32);
+  margin-bottom: var(--space-8);
   font-size: 14px;
   line-height: 20px;
 }
@@ -115,7 +115,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  gap: var(--space-24);
   width: 100%;
   height: 160px;
 }
@@ -149,7 +149,7 @@
 .pk-workspace.product-retouch-page .source-row > div {
   display: grid;
   flex: none;
-  gap: 10px;
+  gap: var(--space-10);
   width: auto;
 }
 
@@ -161,7 +161,7 @@
   width: 88px;
   min-width: 88px;
   height: 40px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 0;
   border-radius: 8px;
   background: var(--color-border-soft);
@@ -190,7 +190,7 @@
   .pk-workspace.product-retouch-page .source-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: var(--space-10);
     height: auto;
   }
 
@@ -209,7 +209,7 @@
 
 @media (max-width: 900px) {
   .pk-workspace.product-retouch-page .source-row {
-    gap: 12px;
+    gap: var(--space-12);
   }
 
   .pk-workspace.product-retouch-page .source-row > .product-retouch-source-preview {
@@ -223,7 +223,7 @@
 
   .pk-workspace.product-retouch-page {
     grid-template-columns: minmax(340px, 420px) minmax(0, 1fr) 192px;
-    gap: 12px;
+    gap: var(--space-12);
   }
 
   .pk-workspace.product-retouch-page .pk-section-title {
@@ -235,11 +235,11 @@
   }
 
   .pk-workspace.product-retouch-page .pk-upload-title-row {
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   .pk-workspace.product-retouch-page .pk-upload-title-actions {
-    gap: 4px;
+    gap: var(--space-4);
   }
 }
 
@@ -261,8 +261,8 @@
     min-height: 0;
     max-height: none;
     margin: -16px -10px -24px;
-    padding: 16px;
-    gap: 12px;
+    padding: var(--space-16);
+    gap: var(--space-12);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;
     align-content: start;
@@ -270,8 +270,8 @@
   }
 
   .pk-workspace.product-retouch-page {
-    padding: 10px;
-    gap: 10px;
+    padding: var(--space-10);
+    gap: var(--space-10);
   }
 
   .pk-workspace.product-retouch-page .pk-input-pane,
@@ -291,11 +291,11 @@
   }
 
   .pk-workspace.product-retouch-page .pk-section {
-    gap: 10px;
+    gap: var(--space-10);
   }
 
   .pk-workspace.product-retouch-page .pk-submit-actions {
-    padding: 12px 14px 14px;
+    padding: var(--space-12) 14px 14px;
   }
 
   .pk-workspace.product-retouch-page .pk-primary-btn {
@@ -305,7 +305,7 @@
 
 @media (max-width: 620px) {
   .pk-workspace.product-retouch-page {
-    padding: 10px;
+    padding: var(--space-10);
   }
 }
 
@@ -333,7 +333,7 @@
 
 .pk-workspace.product-retouch-page .pk-dropzone {
   padding: 0;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .pk-workspace.product-retouch-page .pk-thumb-grid-single {
@@ -349,11 +349,11 @@
 
   .pk-workspace.product-retouch-page .pk-form-scroll {
     display: grid;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-10);
   }
 
   .pk-workspace.product-retouch-page .pk-dropzone {
-    padding: 16px;
+    padding: var(--space-16);
   }
 
   .pk-workspace.product-retouch-page .pk-thumb-grid-single {
@@ -393,7 +393,7 @@
 
   .pk-workspace.rotate-angle-page .rotate-angle-result .product-retouch-result-state {
     box-sizing: border-box;
-    padding: 24px 18px;
+    padding: var(--space-24) 18px;
   }
 
   .pk-workspace.rotate-angle-page .rotate-angle-result .product-retouch-result-card {
@@ -406,7 +406,7 @@
 @media (min-width: 901px) {
   .pk-workspace.product-retouch-page .pk-input-pane {
     box-sizing: border-box;
-    padding-right: 4px;
+    padding-right: var(--space-4);
   }
 }
 
@@ -419,18 +419,18 @@
 /* 产品系卡片流：aside gap 12；移动端提交区与最后一张卡之间同为 12。 */
 
 .pk-workspace.product-retouch-page .pk-form-scroll {
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 @media (min-width: 901px) {
   .pk-workspace.product-retouch-page .pk-form-scroll {
-    gap: 10px;
+    gap: var(--space-10);
   }
 }
 
 @media (max-width: 900px) {
   .pk-workspace.product-retouch-page .pk-form-scroll {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-12);
   }
 }
 
@@ -441,7 +441,7 @@
 
 .pk-workspace.product-retouch-main-page .local-redraw-card.tool-card .card-title-row {
   min-height: 20px;
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-12);
 }
 
 .pk-workspace.product-retouch-main-page .local-redraw-card.tool-card .card-title-row h2 {
@@ -451,12 +451,12 @@
 }
 
 .pk-workspace.product-retouch-main-page .retouch-mode-options {
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .pk-workspace.product-retouch-main-page .retouch-mode-options button {
   height: 32px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   font-size: 12px;
   line-height: 20px;
 }
@@ -485,6 +485,6 @@
 @media (max-width: 900px) {
   .pk-workspace.product-retouch-main-page .product-retouch-card > textarea {
     height: 72px;
-    padding: 9px 10px;
+    padding: 9px var(--space-10);
   }
 }

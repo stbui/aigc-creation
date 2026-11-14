@@ -12,9 +12,9 @@
 .local-redraw-card {
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 16px;
+  padding: var(--space-16);
   display: grid;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 /* 局部重绘页的整页包裹：用于承载固定历史入口与弹层，不影响 ToolShell 自身布局 */
@@ -31,8 +31,8 @@
   height: calc(100vh - var(--workspace-topbar-height));
   min-height: 0;
   max-height: calc(100vh - var(--workspace-topbar-height));
-  padding: 16px;
-  gap: 16px;
+  padding: var(--space-16);
+  gap: var(--space-16);
   grid-template-columns: 432px minmax(560px, 1fr) 192px;
   grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
@@ -73,11 +73,11 @@
   }
 
   .pk-workspace.local-redraw-page .pk-upload-title-row {
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   .pk-workspace.local-redraw-page .pk-upload-title-actions {
-    gap: 4px;
+    gap: var(--space-4);
   }
 }
 
@@ -99,8 +99,8 @@
     min-height: 0;
     max-height: none;
     margin: -16px -10px -24px;
-    padding: 16px;
-    gap: 12px;
+    padding: var(--space-16);
+    gap: var(--space-12);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;
     align-content: start;
@@ -147,13 +147,13 @@
 
 .pk-workspace.local-redraw-page .pk-dropzone {
   padding: 0;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .pk-workspace.local-redraw-page .pk-dropzone > .pk-upload-prompt {
   width: 100%;
   min-height: 0;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .pk-workspace.local-redraw-page .pk-thumb-grid-single {
@@ -169,7 +169,7 @@
 
   .pk-workspace.local-redraw-page .pk-form-scroll {
     display: grid;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-10);
   }
 
   .pk-workspace.local-redraw-page .pk-input-pane {
@@ -214,15 +214,15 @@
   }
 
   .pk-workspace.image-translate-page .local-redraw-card.tool-card {
-    padding-bottom: 24px;
+    padding-bottom: var(--space-24);
   }
 
   .pk-workspace.local-redraw-page .pk-form-scroll {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-12);
   }
 
   .pk-workspace.local-redraw-page .pk-submit-actions {
-    padding: 12px 14px 14px;
+    padding: var(--space-12) 14px 14px;
   }
 }
 
@@ -245,7 +245,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  gap: var(--space-24);
   width: 100%;
   height: 160px;
   position: relative;
@@ -287,12 +287,12 @@
 
 .pk-workspace.local-redraw-page .source-row > div {
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .pk-workspace.local-redraw-page .source-row > div button {
   height: 40px;
-  padding: 0 16px;
+  padding: 0 var(--space-16);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card-bg);
@@ -319,7 +319,7 @@
 
 .pk-workspace.local-redraw-page .prompt-card {
   display: grid;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .pk-workspace.local-redraw-page .prompt-card .card-title-row > span {
@@ -329,7 +329,7 @@
 
 .pk-workspace.local-redraw-page .prompt-card .card-title-row {
   min-height: 22px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-16);
 }
 
 .pk-workspace.local-redraw-page .prompt-card .card-title-row h2 {
@@ -494,32 +494,32 @@
 @media (min-width: 901px) and (max-width: 1366px) {
   .pk-workspace.local-redraw-page .source-row {
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-10);
   }
 
   .pk-workspace.local-redraw-page .source-row > div {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: var(--space-8);
     width: 100%;
   }
 
   .pk-workspace.local-redraw-page .source-row > div button {
     width: 100%;
     min-width: 0;
-    padding: 0 6px;
+    padding: 0 var(--space-6);
     font-size: 12px;
   }
 }
 
 @media (max-width: 900px) {
   .pk-workspace.local-redraw-page .source-row {
-    gap: 12px;
+    gap: var(--space-12);
   }
 
   .pk-workspace.local-redraw-page .source-row > div button {
     width: 88px;
     min-width: 88px;
-    padding: 0 12px;
+    padding: 0 var(--space-12);
   }
 
   .pk-workspace.local-redraw-page .redraw-prompt {
@@ -538,10 +538,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   cursor: pointer;
   color: var(--text-desc);
-  padding: 16px;
+  padding: var(--space-16);
 }
 
 .local-redraw-source-upload:hover {

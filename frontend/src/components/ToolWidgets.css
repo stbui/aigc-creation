@@ -8,7 +8,7 @@
 .background-color-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .background-color-option {
@@ -77,12 +77,12 @@
 }
 
 .background-color-options {
-  gap: 10px 16px;
+  gap: var(--space-10) var(--space-16);
 }
 
 /* 一键抠图：标题行 22px 行高 + 16px 底距；色板换行后卡片高 176。 */
 .pk-workspace.background-remove-page .background-color-card .card-title-row {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-16);
 }
 
 .pk-workspace.background-remove-page .background-color-card .card-title-row h2 {
@@ -96,7 +96,7 @@
   .background-color-options {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px 8px;
+    gap: var(--space-10) var(--space-8);
   }
   .background-color-option,
   .background-custom-picker,

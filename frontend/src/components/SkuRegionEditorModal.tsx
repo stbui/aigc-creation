@@ -24,51 +24,27 @@ import {
 } from 'lucide-react';
 import { useApp } from '../ui';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import {
+  boundsOfPoints,
+  clamp01,
+  createRegionId,
+  MAX_HISTORY,
+  MIN_SIZE,
+  normalizeBox,
+  resizeBox,
+  round4,
+  type SkuRegion,
+  type Draft,
+  type Interaction,
+  type Point,
+  type SkuHandle as Handle,
+  type SkuTool as Tool,
+} from '../lib/skuRegionGeometry';
+import { SkuRegionToolbarButton as ToolbarButton } from './SkuRegionToolbarButton';
+import { SkuRegionOverlay } from './SkuRegionOverlay';
 
-export type SkuRegionType = 'rect' | 'ellipse' | 'brush';
-
-export interface SkuRegionPoint {
-  x: number;
-  y: number;
-}
-
-/** 归一化坐标 (0~1)，与模板图原始像素尺寸无关。 */
-export interface SkuRegion {
-  id: string;
-  type: SkuRegionType;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  points?: SkuRegionPoint[];
-}
-
-type Tool = 'hand' | 'rect' | 'ellipse' | 'brush' | 'eraser';
-type Handle = 'nw' | 'ne' | 'sw' | 'se';
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Draft {
-  type: 'rect' | 'ellipse' | 'brush';
-  startX: number;
-  startY: number;
-  currentX: number;
-  currentY: number;
-  points: SkuRegionPoint[];
-}
-
-interface Interaction {
-  kind: 'move' | 'resize';
-  id: string;
-  pointerId: number;
-  start: Point;
-  original: SkuRegion;
-  snapshot: SkuRegion[];
-  handle?: Handle;
-}
+/** 区域坐标模型与几何运算的唯一来源是 `lib/skuRegionGeometry`，此处按原路径再导出。 */
+export type { SkuRegion, SkuRegionPoint, SkuRegionType } from '../lib/skuRegionGeometry';
 
 interface Props {
   open: boolean;
@@ -78,94 +54,6 @@ interface Props {
   max?: number;
   onClose: () => void;
   onConfirm: (regions: SkuRegion[]) => void;
-}
-
-const MIN_SIZE = 0.025;
-const MAX_HISTORY = 40;
-
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
-function round4(value: number): number {
-  return Math.round(value * 10000) / 10000;
-}
-
-function normalizeBox(start: Point, end: Point) {
-  const left = clamp01(Math.min(start.x, end.x));
-  const top = clamp01(Math.min(start.y, end.y));
-  const right = clamp01(Math.max(start.x, end.x));
-  const bottom = clamp01(Math.max(start.y, end.y));
-  return {
-    x: round4(left),
-    y: round4(top),
-    width: round4(right - left),
-    height: round4(bottom - top),
-  };
-}
-
-function boundsOfPoints(points: SkuRegionPoint[]) {
-  if (points.length === 0) return null;
-  let minX = 1;
-  let minY = 1;
-  let maxX = 0;
-  let maxY = 0;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return normalizeBox({ x: minX, y: minY }, { x: maxX, y: maxY });
-}
-
-function resizeBox(region: SkuRegion, handle: Handle, dx: number, dy: number) {
-  let left = region.x;
-  let top = region.y;
-  let right = region.x + region.width;
-  let bottom = region.y + region.height;
-  if (handle.includes('w')) left = Math.min(right - MIN_SIZE, Math.max(0, left + dx));
-  if (handle.includes('e')) right = Math.max(left + MIN_SIZE, Math.min(1, right + dx));
-  if (handle.includes('n')) top = Math.min(bottom - MIN_SIZE, Math.max(0, top + dy));
-  if (handle.includes('s')) bottom = Math.max(top + MIN_SIZE, Math.min(1, bottom + dy));
-  return {
-    ...region,
-    x: round4(left),
-    y: round4(top),
-    width: round4(right - left),
-    height: round4(bottom - top),
-  };
-}
-
-function createRegionId(): string {
-  return `region-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function ToolbarButton({
-  active,
-  disabled,
-  label,
-  onClick,
-  children,
-}: {
-  active?: boolean;
-  disabled?: boolean;
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      className={active ? 'active' : undefined}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
 }
 
 export function SkuRegionEditorModal({
@@ -576,79 +464,16 @@ export function SkuRegionEditorModal({
             onPointerCancel={cancelPointer}
           >
             <img src={url} alt={alt} draggable={false} />
-            {regions.map((region, index) => {
-              const selected = selectedId === region.id;
-              return (
-                <div
-                  key={region.id}
-                  className={`product-sku-editor-region ${region.type}${selected ? ' is-selected' : ''}`}
-                  data-region-id={region.id}
-                  style={{
-                    left: `${region.x * 100}%`,
-                    top: `${region.y * 100}%`,
-                    width: `${region.width * 100}%`,
-                    height: `${region.height * 100}%`,
-                  }}
-                  onPointerDown={(event) => onRegionPointerDown(event, region)}
-                >
-                  {region.type === 'brush' && region.points?.map((point, pointIndex) => (
-                    <i
-                      key={`${pointIndex}-${point.x}-${point.y}`}
-                      style={{
-                        left: `${((point.x - region.x) / Math.max(region.width, 0.0001)) * 100}%`,
-                        top: `${((point.y - region.y) / Math.max(region.height, 0.0001)) * 100}%`,
-                        width: brushSize,
-                        height: brushSize,
-                      }}
-                    />
-                  ))}
-                  <b>{index + 1}</b>
-                  {selected && region.type !== 'brush' && (['nw', 'ne', 'sw', 'se'] as Handle[]).map((handle) => (
-                    <button
-                      key={handle}
-                      type="button"
-                      className={`resize-handle ${handle}`}
-                      aria-label={`调整区域 ${index + 1}`}
-                      onPointerDown={(event) => onHandlePointerDown(event, region, handle)}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    className="product-sku-editor-region-remove"
-                    aria-label={`删除区域 ${index + 1}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      removeRegion(region.id);
-                    }}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              );
-            })}
-            {draftBox && (
-              <div
-                className={`product-sku-editor-region draft ${draft?.type === 'ellipse' ? 'ellipse' : 'rect'}`}
-                style={{
-                  left: `${draftBox.x * 100}%`,
-                  top: `${draftBox.y * 100}%`,
-                  width: `${draftBox.width * 100}%`,
-                  height: `${draftBox.height * 100}%`,
-                }}
-              />
-            )}
-            {draft?.type === 'brush' && draft.points.map((point, index) => (
-              <i
-                key={`${index}-${point.x}-${point.y}`}
-                className="product-sku-editor-brush-dot"
-                style={{
-                  left: `${point.x * 100}%`,
-                  top: `${point.y * 100}%`,
-                  width: brushSize,
-                  height: brushSize,
-                }}
-              />
-            ))}
+            <SkuRegionOverlay
+              regions={regions}
+              selectedId={selectedId}
+              draftBox={draftBox}
+              draft={draft}
+              brushSize={brushSize}
+              onRegionPointerDown={onRegionPointerDown}
+              onHandlePointerDown={onHandlePointerDown}
+              onRemoveRegion={removeRegion}
+            />
           </div>
         </div>
 

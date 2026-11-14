@@ -35,7 +35,7 @@
 
 .state-skeleton {
   display: grid;
-  gap: 16px;
+  gap: var(--space-16);
   width: 100%;
 }
 
@@ -46,7 +46,7 @@
 .state-skeleton.is-row,
   .state-skeleton.is-panel {
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .state-skeleton.is-block {
@@ -58,7 +58,7 @@
 .state-skeleton-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
 }
 
@@ -114,8 +114,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 48px 16px;
+  gap: var(--space-12);
+  padding: var(--space-48) var(--space-16);
   min-height: 180px;
   color: var(--text-muted);
   font-size: 13px;
@@ -151,15 +151,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 48px 24px;
+  gap: var(--space-10);
+  padding: var(--space-48) var(--space-24);
   text-align: center;
   color: var(--text-muted);
 }
 
 .state-empty.is-compact {
-  padding: 32px 16px;
-  gap: 8px;
+  padding: var(--space-32) var(--space-16);
+  gap: var(--space-8);
 }
 
 .state-empty-title {
@@ -179,7 +179,7 @@
 }
 
 .state-empty-action {
-  margin-top: 6px;
+  margin-top: var(--space-6);
 }
 
 /* ── 失败态 ────────────────────────────────────────────────────── */
@@ -188,14 +188,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 48px 24px;
+  gap: var(--space-10);
+  padding: var(--space-48) var(--space-24);
   text-align: center;
 }
 
 .state-error.is-compact {
-  padding: 32px 16px;
-  gap: 8px;
+  padding: var(--space-32) var(--space-16);
+  gap: var(--space-8);
 }
 
 .state-error-title {
@@ -216,7 +216,7 @@
 
 .state-error-detail {
   margin: 0;
-  padding: 8px 12px;
+  padding: var(--space-8) var(--space-12);
   border-radius: var(--radius-control);
   background: var(--danger-soft-bg);
   color: var(--danger-soft-text);
@@ -227,7 +227,7 @@
 }
 
 .state-error-action {
-  margin-top: 6px;
+  margin-top: var(--space-6);
 }
 
 /* ── 状态按钮 (与 .exc-btn 同一套视觉) ────────────────────────── */
@@ -235,9 +235,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 36px;
-  padding: 0 20px;
+  padding: 0 var(--space-20);
   border-radius: var(--radius-control);
   border: 1px solid transparent;
   font-size: 14px;
@@ -297,7 +297,7 @@
 .state-page {
   max-width: 960px;
   margin: 0 auto;
-  padding: 32px 24px 64px;
+  padding: var(--space-32) var(--space-24) 64px;
   box-sizing: border-box;
 }
 
@@ -310,7 +310,7 @@
   width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 24px;
+  padding: var(--space-24);
   color: var(--text-desc);
   font-size: 12px;
   line-height: 22px;

@@ -29,14 +29,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 4px 0 8px;
+  gap: var(--space-12);
+  padding: var(--space-4) 0 var(--space-8);
 }
 
 .pt-mu-loading {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   height: 220px;
   font-size: 13px;
   color: var(--text-desc);
@@ -62,7 +62,7 @@
 .pt-mu-tip {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   margin: 0;
   font-size: 12px;
   line-height: 18px;
@@ -81,7 +81,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   height: 220px;
   justify-content: center;
 }
@@ -133,7 +133,7 @@
 }
 
 .mum-title {
-  margin: 10px 0 8px;
+  margin: var(--space-10) 0 var(--space-8);
   font-size: 20px;
   line-height: 28px;
   font-weight: 700;
@@ -168,7 +168,7 @@
 .mum-qr-state {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   font-size: 13px;
   color: var(--text-7);
 }
@@ -195,7 +195,7 @@
   align-items: center;
   gap: 5px;
   margin-top: 14px;
-  padding: 8px 14px;
+  padding: var(--space-8) 14px;
   border: 0;
   border-radius: 8px;
   background: var(--surface-brand-2);
@@ -211,7 +211,7 @@
 
 .mum-expiry {
   display: block;
-  margin-top: 12px;
+  margin-top: var(--space-12);
   font-size: 12px;
   color: var(--mum-text-3);
 }

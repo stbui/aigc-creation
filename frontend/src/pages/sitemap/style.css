@@ -10,7 +10,7 @@
 @media (max-width: 900px) {
   .sitemap-grid {
     grid-template-columns: 1fr;
-    gap: 32px;
+    gap: var(--space-32);
   }
 
   .sitemap-hero h1 {
@@ -28,7 +28,7 @@
 
 .sitemap-topbar {
   height: 64px;
-  padding: 0 24px;
+  padding: 0 var(--space-24);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -38,7 +38,7 @@
 .sitemap-topbar-brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   font-size: 16px;
   color: var(--text-strong);
   text-decoration: none;
@@ -60,7 +60,7 @@
 .sitemap-topbar-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .sitemap-topbar-note {
@@ -82,7 +82,7 @@
   width: 1100px;
   max-width: 100%;
   margin: 0 auto;
-  padding: 58px 0 40px;
+  padding: 58px 0 var(--space-40);
 }
 
 .sitemap-hero {
@@ -98,7 +98,7 @@
 }
 
 .sitemap-hero h1 {
-  margin: 12px 0 0;
+  margin: var(--space-12) 0 0;
   font-size: 68px;
   font-weight: 780;
   line-height: 66.64px;
@@ -116,7 +116,7 @@
 .sitemap-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 48px 96px;
+  gap: var(--space-48) 96px;
 }
 
 .sitemap-section-no {
@@ -126,10 +126,10 @@
 }
 
 .sitemap-section-head {
-  margin-top: 10px;
+  margin-top: var(--space-10);
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .sitemap-section-head h2 {
@@ -150,7 +150,7 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .sitemap-item {
@@ -158,8 +158,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 8px 12px;
+  gap: var(--space-16);
+  padding: var(--space-8) var(--space-12);
   border-radius: var(--radius-card);
   text-decoration: none;
   /* 2026-10-19 修 antd 蓝泄漏: 本选择器作用于 react-router <Link>, 原先只设了
@@ -187,7 +187,7 @@
 
 .sitemap-footer {
   margin-top: auto;
-  padding: 24px;
+  padding: var(--space-24);
   border-top: 1px solid var(--surface);
   display: flex;
   align-items: center;

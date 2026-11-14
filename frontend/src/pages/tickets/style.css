@@ -12,13 +12,13 @@
 .ticket-load-more {
   display: flex;
   justify-content: center;
-  margin: 16px 0 8px;
+  margin: var(--space-16) 0 var(--space-8);
 }
 
 @media (max-width: 900px) {
   .ticket-compose {
     grid-template-columns: 1fr;
-    padding: 16px;
+    padding: var(--space-16);
   }
 
   .ticket-compose label.is-full {
@@ -47,9 +47,9 @@
 .ticket-status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   flex: none;
-  padding: 3px 10px;
+  padding: 3px var(--space-10);
   border-radius: var(--radius-pill);
   font-size: 12px;
   line-height: 18px;
@@ -90,16 +90,16 @@
 .ticket-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--space-8);
+  margin-bottom: var(--space-16);
 }
 
 .ticket-filter {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 32px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--card-bg);
@@ -133,7 +133,7 @@
 }
 
 .ticket-filter-empty {
-  padding: 40px 0;
+  padding: var(--space-40) 0;
   margin: 0;
   text-align: center;
   font-size: 13px;
@@ -143,9 +143,9 @@
 .ticket-compose {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 16px;
-  padding: 22px 24px 24px;
-  margin-bottom: 16px;
+  gap: 14px var(--space-16);
+  padding: 22px var(--space-24) var(--space-24);
+  margin-bottom: var(--space-16);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--card-bg);
@@ -155,7 +155,7 @@
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border-row);
 }
@@ -177,7 +177,7 @@
 .ticket-compose label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: 13px;
   color: var(--text-muted);
 }
@@ -193,7 +193,7 @@
   .ticket-reply .login-textarea-count {
   position: static;
   display: block;
-  padding: 2px 2px 0;
+  padding: var(--space-2) var(--space-2) 0;
   text-align: right;
   font-size: 12px;
   color: var(--text-desc);
@@ -204,21 +204,21 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .ticket-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .ticket-card {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
   width: 100%;
-  padding: 16px 18px;
+  padding: var(--space-16) 18px;
   text-align: left;
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -239,7 +239,7 @@
 .ticket-card-main {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   flex: 1;
   min-width: 0;
 }
@@ -247,7 +247,7 @@
 .ticket-card-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
 }
 
@@ -263,7 +263,7 @@
 /* 只有「高」才单独标记: 中/低是默认值, 逐个标反而噪声 */
 .ticket-card-flag {
   flex: none;
-  padding: 1px 6px;
+  padding: 1px var(--space-6);
   border-radius: var(--radius-tag);
   background: var(--warn-bg);
   color: var(--warn-text);
@@ -276,7 +276,7 @@
 .ticket-card-sub {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 6px;
+  gap: 0 var(--space-6);
   font-size: 12px;
   line-height: 18px;
   color: var(--text-desc);
@@ -284,7 +284,7 @@
 
 .ticket-card-sub > span + span::before {
   content: '·';
-  margin-right: 6px;
+  margin-right: var(--space-6);
   color: var(--text-desc);
   opacity: 0.6;
 }
@@ -292,7 +292,7 @@
 .ticket-card-side {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   flex: none;
 }
 
@@ -303,12 +303,12 @@
 .ticket-thread {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 /* 左侧 3px 色条区分「客服 / 我」: 深色底 + 色条比整块换色更不刺眼 */
 .ticket-msg {
-  padding: 14px 16px;
+  padding: 14px var(--space-16);
   border: 1px solid var(--border);
   border-left: 3px solid var(--border);
   border-radius: var(--radius-card);
@@ -325,14 +325,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: var(--space-12);
+  margin-bottom: var(--space-8);
 }
 
 .ticket-msg-author {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   font-size: 13px;
   font-weight: 500;
   color: var(--text-strong);
@@ -373,9 +373,9 @@
 .ticket-reply {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
-  padding: 20px;
+  gap: var(--space-12);
+  margin-top: var(--space-16);
+  padding: var(--space-20);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--card-bg);
@@ -385,13 +385,13 @@
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: var(--space-4) var(--space-10);
 }
 
 .ticket-reply-head h3 {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   margin: 0;
   font-size: 14px;
   font-weight: 600;
@@ -411,7 +411,7 @@
 .ticket-reply-actions {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
   flex-wrap: wrap;
 }
 
@@ -419,9 +419,9 @@
 .ticket-closed-note {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 16px 0 0;
-  padding: 14px 16px;
+  gap: var(--space-8);
+  margin: var(--space-16) 0 0;
+  padding: 14px var(--space-16);
   border: 1px dashed var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
@@ -430,7 +430,7 @@
 }
 
 .ticket-error {
-  margin: 8px 0;
+  margin: var(--space-8) 0;
   font-size: 13px;
   color: var(--danger-soft-text);
 }
@@ -440,14 +440,14 @@
   .ticket-filters {
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding-bottom: var(--space-4);
     scrollbar-width: thin;
   }
   .ticket-filter {
     flex: none;
   }
   .ticket-card {
-    gap: 10px;
+    gap: var(--space-10);
     padding: 14px;
   }
   /* 标题让出两行: 单行省略在 390 屏上会把长标题截成半句 */
@@ -461,10 +461,10 @@
     white-space: normal;
   }
   .ticket-msg {
-    padding: 12px 14px;
+    padding: var(--space-12) 14px;
   }
   .ticket-reply,
   .ticket-compose {
-    padding: 16px;
+    padding: var(--space-16);
   }
 }

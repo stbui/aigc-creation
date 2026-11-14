@@ -13,15 +13,15 @@
 
 .tool-back {
   margin-left: -8px;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-4);
   color: var(--color-text-secondary);
 }
 
 .tool-header {
   display: flex;
-  gap: 12px;
+  gap: var(--space-12);
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .tool-header-icon {
@@ -37,7 +37,7 @@
 
 .tool-header-title {
   font-size: 20px !important;
-  margin: 0 0 2px !important;
+  margin: 0 0 var(--space-2) !important;
 }
 
 .tool-header-sub {
@@ -70,10 +70,10 @@
   background: rgba(234, 88, 12, 0.06);
   border: 1px solid rgba(234, 88, 12, 0.2);
   color: var(--color-cta-hover);
-  padding: 8px 12px;
+  padding: var(--space-8) var(--space-12);
   border-radius: var(--radius-control);
   font-size: 12px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .tool-notice-help {
@@ -84,7 +84,7 @@
 .tool-body {
   display: grid;
   grid-template-columns: minmax(320px, 420px) 1fr;
-  gap: 16px;
+  gap: var(--space-16);
   align-items: start;
 }
 
@@ -98,7 +98,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   color: var(--color-text-secondary);
   font-size: 13px;
 }
@@ -114,7 +114,7 @@
 .tool-param-number {
   display: grid;
   grid-template-columns: 1fr 88px;
-  gap: 12px;
+  gap: var(--space-12);
   align-items: center;
 }
 
@@ -132,19 +132,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 10px;
+  margin-top: var(--space-10);
   font-size: 12px;
 }
 
 .tool-param-field {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-20);
 }
 
 .tool-param-label {
   display: block;
   font-size: 13px;
   color: var(--color-text-secondary);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-6);
 }
 
 /* 通用工具页结果卡「生成中」骨架 (2026-10-20) */
@@ -153,7 +153,7 @@
      改用骨架屏占位后, 块内是骨架 + 提示文字的竖排, 需 flex-column。 */
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .tool-result-loading .state-skeleton.is-block {
@@ -175,7 +175,7 @@
 /* 工具页提交栏的消耗价提示 (通用 ToolPage) */
 .tool-credit-hint {
   display: block;
-  margin-top: 8px;
+  margin-top: var(--space-8);
   text-align: center;
   font-size: 12px;
 }

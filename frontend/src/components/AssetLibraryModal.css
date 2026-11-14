@@ -71,14 +71,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
   padding: 22px 26px 18px;
 }
 
 .alp-header-main {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
 }
 
 .alp-title {
@@ -113,7 +113,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
   padding: 14px 26px;
   background: var(--alp-surface-info);
   /* 参考站 .asset-library-picker-toolbar **无**下边框 (只有 #fbfcfe 底)",
@@ -123,7 +123,7 @@
 .alp-groups {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -136,9 +136,9 @@
 .alp-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 34px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   flex: none;
   font-size: 13px;
   font-family: inherit;
@@ -164,7 +164,7 @@
 .alp-toolbar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   flex: none;
 }
 
@@ -174,14 +174,14 @@
   align-items: center;
   gap: 1px;
   height: 34px;
-  padding: 2px;
+  padding: var(--space-2);
   background: var(--surface-4);
   border: 1px solid var(--border-soft);
   border-radius: 9px;
 }
 
 .alp-filter-label {
-  padding: 0 6px 0 5px;
+  padding: 0 var(--space-6) 0 5px;
   font-size: 12px;
   line-height: 28px;
   color: var(--alp-text-10);
@@ -189,7 +189,7 @@
 
 .alp-date-option {
   height: 28px;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   border: 0;
   border-radius: 7px;
   font-size: 12px;
@@ -218,7 +218,7 @@
   gap: 7px;
   width: 250px;
   height: 34px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   color: var(--alp-text-11);
   background: var(--card-bg);
   border: 1px solid var(--alp-border-4);
@@ -246,7 +246,7 @@
   height: auto;
   /* 浏览器对 input 的默认内边距是 1px 2px; shadcn Input 的 px-3/py-1 已被覆盖,
      这里写回参考站实测值 —— 写 0 会让文字整体上移 1px、行高变矮 2px */
-  padding: 1px 2px;
+  padding: 1px var(--space-2);
   /* 覆盖 shadcn Input 自带的 rounded-md(8px) —— 参考站这个内在 input 是方角,
      圆角只属于外层外壳 (9px) */
   border-radius: 0;
@@ -298,7 +298,7 @@
   flex: 0 0 184px;
   width: 184px;
   box-sizing: border-box;
-  padding: 18px 12px 20px;
+  padding: 18px var(--space-12) var(--space-20);
   background: var(--alp-surface-brand-6);
   border-right: 1px solid var(--alp-border-8);
   overflow: auto;
@@ -308,36 +308,36 @@
   .alp-sidebar-section > strong {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px 14px;
+  gap: var(--space-8);
+  padding: 0 var(--space-10) 14px;
   font-size: 14px;
   line-height: 20px;
   color: var(--alp-text-2);
 }
 
 .alp-sidebar-section {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: var(--space-12);
+  padding-top: var(--space-12);
   border-top: 1px solid var(--alp-border-8);
 }
 
 .alp-sidebar-section > strong {
-  padding-bottom: 6px;
+  padding-bottom: var(--space-6);
 }
 
 .alp-sidebar nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
 }
 
 .alp-sidebar nav button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
   min-height: 38px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   text-align: left;
   font-size: 13px;
   font-family: inherit;
@@ -358,7 +358,7 @@
 .alp-sidebar-count {
   flex: none;
   min-width: 20px;
-  padding: 1px 6px;
+  padding: 1px var(--space-6);
   border-radius: var(--radius-pill);
   color: var(--alp-text-10);
   background: var(--surface-4);
@@ -393,7 +393,7 @@
 
 .alp-sidebar-section nav button {
   min-height: 31px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   font-size: 12px;
 }
 
@@ -408,7 +408,7 @@
 .alp-content {
   flex: auto;
   min-height: 280px;
-  padding: 20px 26px 24px;
+  padding: var(--space-20) 26px var(--space-24);
   overflow: auto;
 }
 
@@ -417,7 +417,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   min-height: 280px;
   color: var(--alp-text-9);
   font-size: 13px;
@@ -543,7 +543,7 @@
   position: absolute;
   top: 8px;
   left: 8px;
-  padding: 2px 7px;
+  padding: var(--space-2) 7px;
   border-radius: var(--radius-pill);
   color: var(--card-bg);
   font-size: 12px;
@@ -582,7 +582,7 @@
   bottom: 8px;
   left: 8px;
   max-width: calc(100% - 16px);
-  padding: 2px 7px;
+  padding: var(--space-2) 7px;
   border-radius: var(--radius-pill);
   color: var(--brand);
   background: color-mix(in srgb, var(--card-bg) 90%, transparent);
@@ -602,7 +602,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
   padding: 14px 26px 18px;
   font-size: 12px;
   color: var(--alp-text-9);
@@ -612,7 +612,7 @@
 .alp-footer-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .alp-clear {
@@ -632,12 +632,12 @@
 .alp-footer-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .alp-btn {
   height: 36px;
-  padding: 0 16px;
+  padding: 0 var(--space-16);
   border-radius: 9px;
   font-size: 13px;
   font-family: inherit;
@@ -679,8 +679,8 @@
   .alp-toolbar,
   .alp-content,
   .alp-footer {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: var(--space-16);
+    padding-right: var(--space-16);
   }
   .alp-toolbar {
     flex-direction: column;
@@ -699,18 +699,18 @@
   .alp-sidebar {
     flex-basis: 124px;
     width: 124px;
-    padding-left: 8px;
-    padding-right: 8px;
+    padding-left: var(--space-8);
+    padding-right: var(--space-8);
   }
   .alp-sidebar > strong,
   .alp-sidebar-section > strong {
-    padding-left: 6px;
-    padding-right: 6px;
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
     font-size: 12px;
   }
   .alp-sidebar nav button {
-    padding-left: 8px;
-    padding-right: 8px;
+    padding-left: var(--space-8);
+    padding-right: var(--space-8);
     font-size: 12px;
   }
   .alp-footer {

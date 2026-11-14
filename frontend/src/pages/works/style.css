@@ -52,7 +52,7 @@
   /* 参考站页面自身只扣 64px 顶栏；开启促销条时仍保持该 min-height，
      由外壳提供剩余 40px 背景，不把促销条高度算进页面。 */
   min-height: calc(100vh - 64px);
-  padding: 24px 24px 56px;
+  padding: var(--space-24) var(--space-24) 56px;
   box-sizing: border-box;
 }
 
@@ -61,14 +61,14 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-16);
   margin-bottom: 18px;
 }
 
 .my-works-heading {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   min-width: 0;
 }
 
@@ -92,9 +92,9 @@
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 34px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--card-bg);
@@ -124,14 +124,14 @@
 .my-works-tabs {
   display: flex;
   align-items: center;
-  gap: 24px;
-  margin: 0 0 16px;
+  gap: var(--space-24);
+  margin: 0 0 var(--space-16);
   border-bottom: 1px solid var(--border);
 }
 
 .my-works-tabs button {
   position: relative;
-  padding: 0 0 12px;
+  padding: 0 0 var(--space-12);
   border: 0;
   background: none;
   color: var(--text-desc);
@@ -166,8 +166,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--card-bg);
@@ -181,9 +181,9 @@
 .my-works-filter-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 34px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--card-bg);
@@ -227,7 +227,7 @@
   z-index: 30;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-12);
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
@@ -255,7 +255,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 20px;
 }
 
@@ -273,10 +273,10 @@
 .my-works-business-all {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   width: 100%;
   min-height: 32px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   border: 0;
   border-radius: var(--radius-control);
   background: none;
@@ -310,7 +310,7 @@
 .my-works-option-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .my-works-option-group-title {
@@ -324,14 +324,14 @@
   .my-works-status-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .my-works-option-chip,
   .my-works-date-pills button,
   .my-works-status-pills button {
   height: 30px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--card-bg);
@@ -359,8 +359,8 @@
 .my-works-custom-date {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-top: 12px;
+  gap: var(--space-8);
+  padding-top: var(--space-12);
   border-top: 1px solid var(--border-row);
 }
 
@@ -372,7 +372,7 @@
 .my-works-date-fields {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   color: var(--text-desc);
   font-size: 12px;
 }
@@ -380,7 +380,7 @@
 .my-works-date-fields input {
   flex: 1;
   height: 32px;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--card-bg);
@@ -403,9 +403,9 @@
 .my-works-task-search {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   height: 32px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   color: var(--text-desc);
@@ -425,7 +425,7 @@
 .my-works-task-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
   max-height: 220px;
   overflow-y: auto;
 }
@@ -434,8 +434,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
+  gap: var(--space-8);
+  padding: 7px var(--space-10);
   border: 0;
   border-radius: var(--radius-control);
   background: none;
@@ -459,7 +459,7 @@
 }
 
 .my-works-task-empty {
-  padding: 12px;
+  padding: var(--space-12);
   color: var(--text-desc);
   font-size: 12px;
   text-align: center;
@@ -496,7 +496,7 @@
 
 .my-works-filter-clear {
   height: 34px;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   border: 0;
   background: none;
   color: var(--text-muted);
@@ -512,9 +512,9 @@
 .my-works-selection-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 8px 8px 8px 14px;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+  padding: var(--space-8) var(--space-8) var(--space-8) 14px;
   border-radius: var(--radius-control);
   background: var(--brand-bg);
   color: var(--brand-hover);
@@ -530,7 +530,7 @@
   align-items: center;
   gap: 5px;
   height: 28px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 0;
   border-radius: var(--radius-control);
   background: var(--brand);
@@ -558,14 +558,14 @@
 .my-works-count-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 16px 0 12px;
+  gap: var(--space-12);
+  margin: var(--space-16) 0 var(--space-12);
   color: var(--text-body);
   font-size: 13px;
 }
 
 .my-works-count-extra {
-  margin-left: 6px;
+  margin-left: var(--space-6);
   color: var(--text-desc);
   font-size: 12px;
   font-style: normal;
@@ -585,21 +585,21 @@
 .my-works-grid {
   display: grid;
   grid-template-columns: repeat(var(--works-columns, 5), minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--space-16);
   align-items: start;
 }
 
 .my-works-column {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-16);
   min-width: 0;
 }
 
 @media (max-width: 640px) {
   .my-works-grid,
   .my-works-column {
-    gap: 10px;
+    gap: var(--space-10);
   }
 }
 
@@ -680,7 +680,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-6);
   background: var(--surface);
   color: var(--text-desc);
   font-size: 12px;
@@ -718,7 +718,7 @@
   flex-direction: row;
   align-items: flex-start;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-8);
   inset: 8px 8px auto auto;
   padding: 0;
 }
@@ -733,10 +733,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-8);
   width: 100%;
   aspect-ratio: 1;
-  padding: 16px;
+  padding: var(--space-16);
   color: var(--text-muted);
   text-align: center;
   line-height: 1.5;
@@ -764,8 +764,8 @@
   justify-content: center;
   gap: 5px;
   height: 28px;
-  margin-top: 2px;
-  padding: 0 12px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-12);
   border: 1px solid var(--brand-light);
   border-radius: var(--radius-control);
   background: var(--brand-bg);
@@ -792,7 +792,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 8px;
+  padding: var(--space-8);
   opacity: 0;
   transition: opacity 0.15s;
   /*
@@ -816,7 +816,7 @@
 .my-work-hover-top,
   .my-work-hover-bottom {
   display: flex;
-  gap: 6px;
+  gap: var(--space-6);
   /* 容器本身也不吃点击, 否则底部长条会盖住图片下半部分的「看大图 / 播放」 */
   pointer-events: none;
 }
@@ -903,8 +903,8 @@
 .my-work-caption {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px 9px;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-10) 9px;
   border-top: 1px solid var(--border-row);
   background: var(--card-bg);
   pointer-events: none;
@@ -934,7 +934,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-6);
   width: 100%;
   min-height: 44px;
   margin-top: 14px;
@@ -958,9 +958,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: var(--space-10);
   min-height: 300px;
-  padding: 48px 24px;
+  padding: var(--space-48) var(--space-24);
   color: var(--text-muted);
   text-align: center;
 }
@@ -988,8 +988,8 @@
 
 .my-works-empty-action {
   height: 36px;
-  margin-top: 6px;
-  padding: 0 20px;
+  margin-top: var(--space-6);
+  padding: 0 var(--space-20);
   border: 0;
   border-radius: var(--radius-control);
   background: var(--brand);
@@ -1018,7 +1018,7 @@
    同一选择器的全局媒体查询会被这里的基础规则覆盖。 */
 @media (max-width: 900px) {
   .my-works-page {
-    padding: 16px 16px 52px;
+    padding: var(--space-16) var(--space-16) 52px;
   }
 
   .my-works-heading h1 {
@@ -1031,15 +1031,15 @@
 @media (max-width: 700px) {
   .my-works-count-row {
     flex-wrap: wrap;
-    row-gap: 6px;
+    row-gap: var(--space-6);
   }
 }
 
 /* 窄屏: 筛选器两列排布，下载通栏；恢复参考站 14px 工具栏内边距与 10px 间距。 */
 @media (max-width: 640px) {
   .my-works-toolbar {
-    gap: 10px;
-    padding: 12px 14px;
+    gap: var(--space-10);
+    padding: var(--space-12) 14px;
   }
 
   .my-works-filter-wrap {
@@ -1059,7 +1059,7 @@
 
   .my-works-filter-clear {
     width: 100%;
-    padding: 0 4px;
+    padding: 0 var(--space-4);
     text-align: left;
   }
 

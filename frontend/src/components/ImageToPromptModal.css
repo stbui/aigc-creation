@@ -8,11 +8,11 @@
 .pt-i2p-upload {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 4px;
+  gap: var(--space-12);
+  margin-top: var(--space-4);
   background: var(--surface);
   border-radius: var(--radius-control);
-  padding: 12px;
+  padding: var(--space-12);
 }
 
 .pt-i2p-upload-btn {
@@ -27,7 +27,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
@@ -54,7 +54,7 @@
 .pt-i2p-upload-text {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
   min-width: 0;
 }
 

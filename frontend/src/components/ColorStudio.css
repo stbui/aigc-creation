@@ -6,8 +6,8 @@
 
 .color-studio-panel {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--space-10);
+  padding: var(--space-12);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
@@ -16,7 +16,7 @@
 .color-studio-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .color-studio-native {
@@ -53,9 +53,9 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   height: 36px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--card-bg);
@@ -116,7 +116,7 @@
 
 .color-studio-slider {
   display: grid;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .color-studio-slider > span {
@@ -163,15 +163,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .color-studio-clear {
   height: 28px;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-tag);
   background: var(--card-bg);
@@ -189,7 +189,7 @@
 .color-studio-preview {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -213,5 +213,5 @@
 /* ───────── 自定义颜色面板 (参考站取色 / 色相 / 透明度交互) ───────── */
 .color-studio {
   display: grid;
-  gap: 12px;
+  gap: var(--space-12);
 }

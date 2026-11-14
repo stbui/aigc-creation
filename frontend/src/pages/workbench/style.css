@@ -37,13 +37,13 @@
   .wb-hero {
     height: auto;
     min-height: 196px;
-    padding: 22px 20px;
+    padding: 22px var(--space-20);
   }
 
   .wb-hero-title {
     font-size: 24px;
     line-height: 1.4;
-    margin-bottom: 12px;
+    margin-bottom: var(--space-12);
     letter-spacing: 0;
   }
 
@@ -59,7 +59,7 @@
 
   .wb-workflow-banner {
     height: 160px;
-    padding: 18px 20px;
+    padding: 18px var(--space-20);
     background-position: 65%;
   }
 
@@ -96,10 +96,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: var(--space-24);
   height: 212px;
   padding: 0 100px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-16);
   border-radius: var(--radius-panel);
   background: linear-gradient(90deg, var(--hero-grad-1) 0%, var(--hero-grad-2) 55%, var(--hero-grad-3) 100%);
   overflow: hidden;
@@ -117,7 +117,7 @@
   font-weight: 500;
   line-height: 20px;
   color: var(--wb-text-hero);
-  margin: 0 0 24px;
+  margin: 0 0 var(--space-24);
   letter-spacing: 0.2px;
 }
 
@@ -134,7 +134,7 @@
 @media (max-width: 1200px) {
   /* 窄容器放不下 440px 拼贴: 收起拼贴, hero 保留渐变 + 文案 (不塞假图) */
   .wb-hero {
-    padding: 0 48px;
+    padding: 0 var(--space-48);
   }
   .wb-hero-collage,
   .wb-hero-art {
@@ -193,8 +193,8 @@
   z-index: 4;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: var(--space-6);
+  padding: var(--space-10) var(--space-12);
   border-radius: var(--radius-card);
   background: var(--wb-card, var(--card-bg));
   box-shadow: 0 10px 24px rgba(35, 39, 74, 0.14);
@@ -203,7 +203,7 @@
 .wb-hero-chip-bar {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: var(--space-4);
   height: 34px;
 }
 
@@ -259,7 +259,7 @@
 
 @media (max-width: 700px) {
   .wb-hero {
-    padding: 24px;
+    padding: var(--space-24);
   }
   .wb-hero-title {
     font-size: 24px;
@@ -270,8 +270,8 @@
 .wb-tools {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
 }
 
 @media (max-width: 1100px) {
@@ -290,7 +290,7 @@
   .wb-tools {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     /* 参考站 390 实测 gap 8 (卡 181 = (370-8)/2), 桌面 16 在 2 列下过疏 */
-    gap: 8px;
+    gap: var(--space-8);
   }
 }
 
@@ -403,7 +403,7 @@
 .wb-card-body {
   box-sizing: border-box;
   height: 108px;
-  padding: 40px 16px 24px;
+  padding: var(--space-40) var(--space-16) var(--space-24);
   /* 关键: .wb-card 是 column flex 容器, body 作为 flex item 的自动最小尺寸 (min-width:auto)
      会解析成 min-content —— 而里面的 .wb-card-desc 是 nowrap, min-content 就是整句描述宽度。
      不置 0 的话 body 撑到 min-content (实测 200px) 冲出 178px 卡片, ellipsis 形同虚设。
@@ -424,7 +424,7 @@
   font-size: 12px;
   color: var(--text-desc);
   line-height: 20px;
-  margin-top: 8px;
+  margin-top: var(--space-8);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -437,9 +437,9 @@
 .wb-panels {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
-  gap: 16px;
-  margin-top: 16px;
-  margin-bottom: 16px;
+  gap: var(--space-16);
+  margin-top: var(--space-16);
+  margin-bottom: var(--space-16);
 }
 
 @media (max-width: 900px) {
@@ -451,7 +451,7 @@
 .wb-panel {
   background: var(--wb-card, var(--card-bg));
   border-radius: var(--radius-card);
-  padding: 24px;
+  padding: var(--space-24);
   min-height: 268px;
   display: flex;
   flex-direction: column;
@@ -472,8 +472,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
 }
 
 .wb-panel-link {
@@ -497,11 +497,11 @@
 .wb-metric-block {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
   min-width: 0;
   background: var(--wb-surface);
   border-radius: var(--radius-control);
-  padding: 20px 24px;
+  padding: var(--space-20) var(--space-24);
 }
 
 .wb-stat-label {
@@ -526,7 +526,7 @@
 
 /* 账号流水表: 版式取参考站 wb-account th/td + wb-flow-type */
 .wb-flow-table-wrap {
-  margin-top: 16px;
+  margin-top: var(--space-16);
   overflow-x: auto;
 }
 
@@ -540,7 +540,7 @@
   color: var(--wb-text-body);
   text-align: left;
   background: var(--wb-surface);
-  padding: 9px 12px;
+  padding: 9px var(--space-12);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -548,7 +548,7 @@
 .wb-flow-table td {
   color: var(--wb-text-body);
   border-bottom: 1px solid var(--border-row);
-  padding: 9px 12px;
+  padding: 9px var(--space-12);
   white-space: nowrap;
 }
 
@@ -556,13 +556,13 @@
   text-align: center;
   color: var(--wb-text-muted);
   border-bottom: 0;
-  padding: 18px 12px;
+  padding: 18px var(--space-12);
 }
 
 .wb-flow-type {
   display: inline-block;
   border-radius: var(--radius-tag);
-  padding: 2px 7px;
+  padding: var(--space-2) 7px;
   font-size: 12px;
   line-height: 15px;
   background: var(--wb-brand-bg);
@@ -583,7 +583,7 @@
   margin: 14px 0 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: 12px;
   color: var(--wb-text-muted);
 }
@@ -595,7 +595,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
 }
 
 .wb-job-name {
@@ -618,7 +618,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-8);
   font-size: 14px;
   line-height: 16px;
   color: var(--wb-text-muted);
@@ -639,12 +639,12 @@
   color: var(--wb-text-muted);
   border: 1px solid var(--wb-border);
   border-radius: var(--radius-panel);
-  padding: 7px 12px;
+  padding: 7px var(--space-12);
   font-size: 12px;
 }
 
 .wb-chart-title {
-  margin: 24px 0 12px;
+  margin: var(--space-24) 0 var(--space-12);
   font-size: 13px;
   color: var(--wb-text);
 }
@@ -654,7 +654,7 @@
   height: 210px;
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .wb-trend-col {
@@ -664,7 +664,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .wb-trend-count {
@@ -722,7 +722,7 @@
   color: var(--wb-text-muted);
   font-size: 17px;
   line-height: 31px;
-  margin: 24px 0 0;
+  margin: var(--space-24) 0 0;
 }
 
 /* 工具卡: 参考 .wb-tool-card / .wb-tool-visual / .wb-tool-copy / .wb-tool-icon。
@@ -807,7 +807,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .wb-panel-head h3 {
@@ -841,7 +841,7 @@
   background: var(--wb-surface);
   border-radius: var(--radius-control);
   min-width: 0;
-  padding: 20px 24px;
+  padding: var(--space-20) var(--space-24);
 }
 
 .wb-metric-block .wb-stat-label {
@@ -857,7 +857,7 @@
   font-size: 22px;
   font-weight: 600;
   line-height: 27px;
-  margin: 8px 0;
+  margin: var(--space-8) 0;
 }
 
 .wb-metric-block .wb-stat-foot {
@@ -872,14 +872,14 @@
 .wb-flow-table th {
   color: var(--wb-text-body);
   background: var(--wb-surface);
-  padding: 9px 12px;
+  padding: 9px var(--space-12);
   font-weight: 500;
 }
 
 .wb-flow-table td {
   color: var(--wb-text-body);
   border-bottom: 1px solid var(--wb-border-row);
-  padding: 9px 12px;
+  padding: 9px var(--space-12);
 }
 
 .wb-flow-type.flow-income {
@@ -911,7 +911,7 @@
   color: var(--wb-text-desc);
   font-size: 12px;
   line-height: 20px;
-  margin-top: 8px;
+  margin-top: var(--space-8);
 }
 
 .wb-job-status.status-succeeded {
@@ -931,19 +931,19 @@
    ⚠️ 网格列由第一套 .wb-dashboard-stats 规则管辖 (含 ≤900px 两列断点),
    此处曾静态重复 repeat(6,...) 把断点压死 (2026-10-19 拆除) */
 .wb-dashboard-stats .wb-metric-block {
-  padding: 24px;
+  padding: var(--space-24);
 }
 
 .wb-dashboard-chip {
   color: var(--wb-text-muted);
   border: 1px solid var(--wb-border);
   border-radius: 14px;
-  padding: 7px 12px;
+  padding: 7px var(--space-12);
   font-size: 12px;
 }
 
 .wb-chart-title {
-  margin: 24px 0 12px;
+  margin: var(--space-24) 0 var(--space-12);
   font-size: 13px;
 }
 
@@ -970,7 +970,7 @@
 
 .workbench-content {
   min-width: 0;
-  padding: 24px 24px 64px;
+  padding: var(--space-24) var(--space-24) 64px;
   color: var(--wb-text);
   font-size: 16px;
   line-height: normal;
@@ -981,7 +981,7 @@
   display: flex;
   align-items: center;
   height: 212px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-16);
   padding: 0 100px;
   border-radius: 16px;
   background: var(--hero-grad-1)  50% / cover no-repeat;
@@ -996,7 +996,7 @@
 }
 
 .wb-workflow-banner p {
-  margin: 24px 0 0;
+  margin: var(--space-24) 0 0;
   color: var(--text-muted);
   font-size: 17px;
   line-height: 31px;
@@ -1004,13 +1004,13 @@
 
 /* 工具卡：6 列、2:1 示例图、40×40 跨界图标、108 高文字区。 */
 .wb-tool-section {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-16);
 }
 
 .wb-tool-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .wb-tool-card {
@@ -1111,7 +1111,7 @@
 .wb-tool-copy {
   box-sizing: border-box;
   height: 108px;
-  padding: 40px 16px 24px;
+  padding: var(--space-40) var(--space-16) var(--space-24);
 }
 
 .wb-tool-title {
@@ -1119,7 +1119,7 @@
   align-items: center;
   /* 两个角标（免费 + 暂不可用）并排时 6 列卡片的标题会被压成「一键…」，
      收紧到 4px 让 4 字标题在 1440 下仍能完整显示。 */
-  gap: 4px;
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -1137,7 +1137,7 @@
 
 .wb-tool-title em {
   flex: none;
-  padding: 1px 4px;
+  padding: 1px var(--space-4);
   border-radius: 8px;
   background: var(--wb-badge-bg);
   color: var(--card-bg);
@@ -1149,7 +1149,7 @@
 
 .wb-tool-copy > span {
   display: block;
-  margin-top: 8px;
+  margin-top: var(--space-8);
   overflow: hidden;
   color: var(--text-desc);
   font-size: 12px;
@@ -1166,8 +1166,8 @@
 .wb-data-layout {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
-  gap: 16px;
-  margin: 16px 0;
+  gap: var(--space-16);
+  margin: var(--space-16) 0;
 }
 
 .wb-panel.wb-account,
@@ -1175,7 +1175,7 @@
   .wb-panel.wb-dashboard {
   display: block;
   min-height: auto;
-  padding: 24px;
+  padding: var(--space-24);
 }
 
 .wb-panel.wb-recent {
@@ -1188,7 +1188,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .wb-panel-title strong,
@@ -1215,8 +1215,8 @@
 .wb-user {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 20px 0;
+  gap: var(--space-12);
+  margin: var(--space-20) 0;
   color: var(--wb-text);
   font-size: 14px;
 }
@@ -1237,12 +1237,12 @@
 .wb-account-metrics {
   display: grid;
   grid-template-columns: 1fr 1fr 1.35fr;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .wb-account-metrics > div {
   min-width: 0;
-  padding: 20px 24px;
+  padding: var(--space-20) var(--space-24);
   border-radius: 8px;
   background: var(--surface);
 }
@@ -1256,7 +1256,7 @@
 
 .wb-account-metrics b {
   display: block;
-  margin: 8px 0;
+  margin: var(--space-8) 0;
   color: var(--wb-text);
   font-size: 22px;
   font-weight: 600;
@@ -1264,7 +1264,7 @@
 }
 
 .wb-flow-head {
-  margin: 24px 0 12px;
+  margin: var(--space-24) 0 var(--space-12);
   font-size: 14px;
 }
 
@@ -1280,7 +1280,7 @@
 }
 
 .wb-account th {
-  padding: 9px 12px;
+  padding: 9px var(--space-12);
   background: var(--surface);
   color: var(--wb-text-body);
   font-weight: 500;
@@ -1288,14 +1288,14 @@
 }
 
 .wb-account td {
-  padding: 9px 12px;
+  padding: 9px var(--space-12);
   border-bottom: 1px solid var(--border-row);
   color: var(--wb-text-body);
 }
 
 .wb-flow-type {
   display: inline-block;
-  padding: 2px 7px;
+  padding: var(--space-2) 7px;
   border-radius: 4px;
   font-size: 12px;
   line-height: 15px;
@@ -1310,7 +1310,7 @@
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 16px;
+  gap: var(--space-16);
   min-height: 220px;
   text-align: center;
 }
@@ -1322,7 +1322,7 @@
 }
 
 .wb-login-prompt button {
-  padding: 8px 16px;
+  padding: var(--space-8) var(--space-16);
   border: 0;
   border-radius: 6px;
   background: var(--wb-flow-income-fg);
@@ -1333,11 +1333,11 @@
 .wb-dashboard-head > div:first-child {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .wb-dashboard-head > div:first-child > span {
-  padding: 7px 12px;
+  padding: 7px var(--space-12);
   border: 1px solid var(--border);
   border-radius: 14px;
   color: var(--text-muted);
@@ -1347,13 +1347,13 @@
 .wb-dashboard-stats {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 24px;
+  gap: var(--space-16);
+  margin-top: var(--space-24);
 }
 
 .wb-dashboard-stats > div {
   min-width: 0;
-  padding: 24px;
+  padding: var(--space-24);
   border-radius: 8px;
   background: var(--surface);
 }
@@ -1369,7 +1369,7 @@
 }
 
 .wb-dashboard-stats b {
-  margin-top: 12px;
+  margin-top: var(--space-12);
   color: var(--wb-text);
   font-size: 22px;
   font-weight: 600;
@@ -1378,14 +1378,14 @@
 .wb-jobs-list {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  margin-top: 24px;
+  gap: var(--space-24);
+  margin-top: var(--space-24);
 }
 
 .wb-job {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
   width: 100%;
   height: 80px;
   padding: 0;
@@ -1439,7 +1439,7 @@
 }
 
 .wb-job-copy > span {
-  margin-top: 8px;
+  margin-top: var(--space-8);
   color: var(--text-desc);
   font-size: 12px;
   line-height: 20px;
@@ -1449,7 +1449,7 @@
   display: inline-flex;
   flex: 0 0 80px;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   width: 80px;
   font-size: 14px;
   line-height: 16px;

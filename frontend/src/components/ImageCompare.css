@@ -46,7 +46,7 @@
   position: absolute;
   top: 14px;
   z-index: 4;
-  padding: 4px 9px;
+  padding: var(--space-4) 9px;
   border-radius: 12px;
   background: rgba(38, 42, 52, 0.58);
   color: var(--card-bg);

@@ -21,8 +21,8 @@
   .invite-hero {
     flex-direction: column;
     align-items: stretch;
-    gap: 24px;
-    padding: 24px;
+    gap: var(--space-24);
+    padding: var(--space-24);
   }
 
   .invite-hero-qr {
@@ -35,7 +35,7 @@
 .invite-load-more {
   display: flex;
   justify-content: center;
-  margin: 16px 0 8px;
+  margin: var(--space-16) 0 var(--space-8);
 }
 
 @media (max-width: 900px) {
@@ -54,10 +54,10 @@
 }
 
 .invite-page {
-  padding: 24px 0 8px;
+  padding: var(--space-24) 0 var(--space-8);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 /* 页头: 左文案 / 右二维码。二维码与「邀请码」并置, 电脑上复制链接、
@@ -66,8 +66,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 32px;
-  padding: 30px 32px;
+  gap: var(--space-32);
+  padding: 30px var(--space-32);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background:
@@ -90,7 +90,7 @@
 }
 
 .invite-hero p {
-  margin: 12px 0 0;
+  margin: var(--space-12) 0 0;
   max-width: 560px;
   font-size: 14px;
   line-height: 24px;
@@ -101,13 +101,13 @@
   margin-top: 22px;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .invite-hero-qr {
   flex: none;
   width: 188px;
-  padding: 12px;
+  padding: var(--space-12);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--card-bg);
@@ -128,8 +128,8 @@
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 6px;
-  margin-top: 10px;
+  gap: var(--space-6);
+  margin-top: var(--space-10);
   font-size: 12px;
   color: var(--text-desc);
 }
@@ -142,7 +142,7 @@
 }
 
 .invite-hero-qr p {
-  margin: 4px 0 0;
+  margin: var(--space-4) 0 0;
   max-width: none;
   font-size: 12px;
   line-height: 16px;
@@ -161,11 +161,11 @@
   width: 100%;
   height: 40px;
   justify-content: center;
-  margin-top: 16px;
+  margin-top: var(--space-16);
 }
 
 .invite-poster-note {
-  margin: 10px 0 0;
+  margin: var(--space-10) 0 0;
   font-size: 12px;
   line-height: 18px;
   color: var(--text-desc);
@@ -176,15 +176,15 @@
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  padding: 22px 24px 24px;
+  padding: 22px var(--space-24) var(--space-24);
 }
 
 .invite-block-head {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-bottom: 16px;
+  gap: var(--space-4) var(--space-12);
+  margin-bottom: var(--space-16);
 }
 
 .invite-block h2 {
@@ -196,7 +196,7 @@
      未内嵌图标的标题同样适用, 故不另开类名 */
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .invite-block h2 svg {
@@ -215,13 +215,13 @@
   display: flex;
   align-items: stretch;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .invite-checkin-stats {
   display: flex;
   flex: 1 1 320px;
-  gap: 12px;
+  gap: var(--space-12);
   min-width: 0;
 }
 
@@ -229,9 +229,9 @@
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   min-width: 0;
-  padding: 14px 16px;
+  padding: 14px var(--space-16);
   border-radius: var(--radius-card);
   background: var(--page-bg);
 }
@@ -245,7 +245,7 @@
 }
 
 .invite-checkin-value em {
-  margin-left: 4px;
+  margin-left: var(--space-4);
   font-size: 12px;
   font-style: normal;
   font-weight: 500;
@@ -271,8 +271,8 @@
 .invite-checkin-days {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  margin: 16px 0 0;
+  gap: var(--space-8);
+  margin: var(--space-16) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -281,8 +281,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 10px 6px;
+  gap: var(--space-2);
+  padding: var(--space-10) var(--space-6);
   border-radius: var(--radius-control);
   background: var(--page-bg);
 }
@@ -323,14 +323,14 @@
   list-style: none;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .invite-step {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 16px;
+  gap: var(--space-6);
+  padding: var(--space-16);
   border-radius: var(--radius-card);
   background: var(--page-bg);
 }
@@ -363,7 +363,7 @@
   padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
   font-size: 13px;
   line-height: 22px;
   color: var(--text-body);
@@ -372,14 +372,14 @@
 .invite-metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .invite-metric {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 16px;
+  gap: var(--space-6);
+  padding: var(--space-16);
   border-radius: var(--radius-card);
   background: var(--page-bg);
 }
@@ -387,7 +387,7 @@
 .invite-metric-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -415,8 +415,8 @@
 .invite-relation {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--space-12);
+  padding: var(--space-12) 0;
   border-top: 1px solid var(--border-row);
   font-size: 13px;
 }
@@ -450,7 +450,7 @@
 .invite-relation-status {
   flex: none;
   min-width: 60px;
-  padding: 2px 8px;
+  padding: var(--space-2) var(--space-8);
   border-radius: var(--radius-pill);
   font-size: 12px;
   text-align: center;
@@ -473,11 +473,11 @@
 
 @media (max-width: 640px) {
   .invite-block {
-    padding: 18px 16px 20px;
+    padding: 18px var(--space-16) var(--space-20);
   }
   .invite-checkin {
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-12);
   }
   /* 竖排后 flex-basis 落在高度轴上, 320px 会把两块数据撑成空轮胎 */
   .invite-checkin-stats {
@@ -492,18 +492,18 @@
     grid-auto-flow: column;
     grid-auto-columns: 68px;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding-bottom: var(--space-4);
     scrollbar-width: thin;
   }
   .invite-relation {
-    gap: 8px;
+    gap: var(--space-8);
   }
 }
 
 /* 邀请页 */
 .invite-hero-actions .ui-btn {
   height: 36px;
-  padding-inline: 16px;
+  padding-inline: var(--space-16);
   border-radius: var(--radius-control);
 }
 
@@ -513,7 +513,7 @@
 }
 
 .invite-poster-download {
-  margin-top: 16px;
+  margin-top: var(--space-16);
   height: 40px;
 }
 

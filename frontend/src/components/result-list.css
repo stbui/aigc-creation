@@ -39,7 +39,7 @@
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .fc-result-gallery {
@@ -51,9 +51,9 @@
      minmax(0, 1fr) 保证窄容器下图片能收缩, 不会被内容撑出横向滚动。 */
   --fc-cols: 4;
   grid-template-columns: repeat(var(--fc-cols), minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-12);
   align-content: start;
-  padding: 0 4px 4px;
+  padding: 0 var(--space-4) var(--space-4);
 }
 
 .fc-result-gallery.fc-cols-3 {
@@ -76,16 +76,16 @@
 .fc-grid-size {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-2);
   height: 28px;
-  padding: 0 4px 0 10px;
+  padding: 0 var(--space-4) 0 var(--space-10);
   background: var(--card-bg);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-control);
 }
 
 .fc-grid-size-label {
-  margin-right: 4px;
+  margin-right: var(--space-4);
   font-size: 12px;
   color: var(--text-desc);
 }
@@ -93,7 +93,7 @@
 .fc-grid-size-btn {
   min-width: 22px;
   height: 22px;
-  padding: 0 4px;
+  padding: 0 var(--space-4);
   border: 0;
   border-radius: var(--radius-tag);
   background: transparent;
@@ -164,8 +164,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px;
+  gap: var(--space-6);
+  padding: var(--space-8);
   font-size: 12px;
   line-height: 18px;
   text-align: center;
@@ -185,7 +185,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-8);
   aspect-ratio: 1 / 1;
   border-style: dashed;
   border-color: var(--border);
@@ -289,7 +289,7 @@
     top: auto;
     right: 6px;
     bottom: 6px;
-    padding: 2px 4px;
+    padding: var(--space-2) var(--space-4);
   }
   .fc-result-item-prompt-text {
     display: none;

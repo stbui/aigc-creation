@@ -17,7 +17,7 @@
   }
 
   .pk-workspace.rotate-angle-page .pk-form-scroll {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-12);
   }
 
   .pk-workspace.rotate-angle-page .rotate-angle-result {
@@ -27,7 +27,7 @@
 
 .rotate-angle-range {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .rotate-angle-range > span {
@@ -38,7 +38,7 @@
 .rotate-angle-range > span b {
   color: var(--text-strong);
   font-weight: 600;
-  margin-left: 2px;
+  margin-left: var(--space-2);
 }
 
 .rotate-angle-range input[type='range'] {
@@ -84,7 +84,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .rotate-angle-settings-head h2 {
@@ -114,10 +114,10 @@
 
 .rotate-angle-tabs {
   display: inline-flex;
-  gap: 2px;
+  gap: var(--space-2);
   background: var(--surface);
   border-radius: var(--radius-control);
-  padding: 2px;
+  padding: var(--space-2);
 }
 
 .rotate-angle-tabs button {
@@ -395,11 +395,11 @@
 
 /* 旋转角度：上传操作行在卡片标题行右侧 (与其他修图页一致)。 */
 .pk-workspace.rotate-angle-page .pk-form-scroll {
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .pk-workspace.rotate-angle-page .pk-section {
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .pk-workspace.rotate-angle-page .pk-config-card {
@@ -410,8 +410,8 @@
   display: flex;
   flex-direction: column;
   flex: none;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: var(--space-12);
+  padding: 14px var(--space-16);
   border: 0;
   border-radius: 14px;
   background: var(--card-bg);
@@ -476,8 +476,8 @@
 
 .pk-workspace.rotate-angle-page .rotate-angle-range {
   display: grid;
-  gap: 8px;
-  padding-top: 10px;
+  gap: var(--space-8);
+  padding-top: var(--space-10);
   border-top: 1px solid var(--tool-border-8);
 }
 
@@ -530,7 +530,7 @@
   display: flex;
   gap: 7px;
   margin: 0;
-  padding-top: 2px;
+  padding-top: var(--space-2);
   color: var(--tool-text-5);
   font-size: 12px;
   line-height: 17px;
@@ -544,16 +544,16 @@
 
 @media (max-width: 900px) {
   .pk-workspace.rotate-angle-page .pk-config-card {
-    padding: 16px;
+    padding: var(--space-16);
   }
   .pk-workspace.rotate-angle-page .source-row {
-    gap: 24px;
+    gap: var(--space-24);
   }
   .pk-workspace.rotate-angle-page .source-row > div > button {
     flex: 0 0 90px;
     width: 90px;
     min-width: 90px;
-    padding: 0 16px;
+    padding: 0 var(--space-16);
   }
   .pk-workspace.rotate-angle-page .rotate-angle-settings {
     padding: 14px;

@@ -8,7 +8,7 @@
 /* ───────── 图片翻译: 语言字段 + 保护开关 (参考站 image-translate-settings) ───────── */
 .image-translate-language-field {
   display: grid;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .image-translate-language-field > span {
@@ -21,7 +21,7 @@
   height: 32px;
   border: 1px solid var(--border);
   border-radius: var(--radius-tag);
-  padding: 5px 12px;
+  padding: 5px var(--space-12);
   font-size: 14px;
   font-family: inherit;
   color: var(--wb-text);
@@ -37,7 +37,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .image-translate-protect > span {
@@ -51,7 +51,7 @@
   border-radius: var(--radius-pill);
   border: none;
   background: var(--border);
-  padding: 2px;
+  padding: var(--space-2);
   cursor: pointer;
   transition: background 0.15s;
   display: flex;
@@ -98,7 +98,7 @@
 .pk-workspace.image-translate-page .image-translate-language-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .pk-workspace.image-translate-page .image-translate-language-field > span,
@@ -110,7 +110,7 @@
 .pk-workspace.image-translate-page .image-translate-language-field select {
   box-sizing: border-box;
   height: 36px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   font-size: 13px;
 }
 

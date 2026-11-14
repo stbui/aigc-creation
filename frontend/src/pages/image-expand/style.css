@@ -11,7 +11,7 @@
 .smart-expand-position-grid {
   display: grid;
   grid-template-columns: repeat(3, 36px);
-  gap: 6px;
+  gap: var(--space-6);
 }
 .smart-expand-position-grid button {
   width: 36px;
@@ -40,8 +40,8 @@
 /* 参考站是两张 smart-expand-card (gap12 / padding14 16)，
  * 占比快捷值与自定义输入同排；九宫格 28px x 3 + 4px gap。 */
 .smart-expand-card {
-  gap: 12px;
-  padding: 14px 16px;
+  gap: var(--space-12);
+  padding: 14px var(--space-16);
 }
 .smart-expand-card h2 {
   margin: 0;
@@ -52,13 +52,13 @@
 }
 .smart-expand-section {
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
 }
 .smart-expand-scale-options {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 .smart-expand-scale-options button,
   .smart-expand-scale-options label {
@@ -73,7 +73,7 @@
 }
 .smart-expand-scale-options button {
   min-width: 40px;
-  padding: 0 10px;
+  padding: 0 var(--space-10);
   cursor: pointer;
 }
 .smart-expand-scale-options button.active {
@@ -135,7 +135,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  gap: var(--space-24);
   width: 100%;
   height: 160px;
 }
@@ -182,7 +182,7 @@
   width: 88px;
   min-width: 88px;
   height: 40px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 0;
   border-radius: 8px;
   background: var(--color-border-soft);
@@ -201,7 +201,7 @@
 }
 .smart-expand-position-grid {
   grid-template-columns: repeat(3, 28px);
-  gap: 4px;
+  gap: var(--space-4);
   width: 96px;
 }
 .smart-expand-position-grid button {
@@ -229,9 +229,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   height: 32px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 0;
   border-radius: 8px;
   background: var(--brand);
@@ -313,7 +313,7 @@
   .pk-workspace.smart-expand-page .smart-expand-source-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: var(--space-10);
     height: auto;
   }
   .pk-workspace.smart-expand-page .smart-expand-source-thumb {
@@ -332,7 +332,7 @@
     padding: 14px;
   }
   .pk-workspace.smart-expand-page .smart-expand-card h2 {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-12);
     font-size: 14px;
     line-height: 20px;
   }
@@ -340,7 +340,7 @@
     padding: 0;
   }
   .pk-workspace.smart-expand-page .smart-expand-source-row {
-    gap: 12px;
+    gap: var(--space-12);
   }
   .pk-workspace.smart-expand-page .smart-expand-source-thumb {
     flex-basis: min(160px, 48vw);

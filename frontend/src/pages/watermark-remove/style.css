@@ -12,8 +12,8 @@
   height: calc(100vh - var(--workspace-topbar-height));
   min-height: 0;
   max-height: calc(100vh - var(--workspace-topbar-height));
-  padding: 16px;
-  gap: 16px;
+  padding: var(--space-16);
+  gap: var(--space-16);
   grid-template-columns: 432px minmax(560px, 1fr) 192px;
   grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
@@ -49,11 +49,11 @@
   }
 
   .pk-workspace.watermark-removal-page .pk-upload-title-row {
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   .pk-workspace.watermark-removal-page .pk-upload-title-actions {
-    gap: 4px;
+    gap: var(--space-4);
   }
 }
 
@@ -75,8 +75,8 @@
     min-height: 0;
     max-height: none;
     margin: -16px -10px -24px;
-    padding: 16px;
-    gap: 12px;
+    padding: var(--space-16);
+    gap: var(--space-12);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;
     align-content: start;
@@ -119,7 +119,7 @@
 
 .pk-workspace.watermark-removal-page .pk-dropzone {
   padding: 0;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .pk-workspace.watermark-removal-page .pk-thumb-grid-single {
@@ -135,7 +135,7 @@
 
   .pk-workspace.watermark-removal-page .pk-form-scroll {
     display: grid;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-10);
   }
 
   .pk-workspace.watermark-removal-page .pk-input-pane {
@@ -148,11 +148,11 @@
   }
 
   .pk-workspace.watermark-removal-page .pk-form-scroll {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-12);
   }
 
   .pk-workspace.watermark-removal-page .pk-submit-actions {
-    padding: 12px 14px 14px;
+    padding: var(--space-12) 14px 14px;
   }
 }
 
@@ -198,8 +198,8 @@
   max-width: calc(100% - 32px);
   height: 40px;
   min-height: 40px;
-  padding: 0 16px;
-  gap: 6px;
+  padding: 0 var(--space-16);
+  gap: var(--space-6);
   flex-wrap: nowrap;
   justify-content: center;
   overflow: hidden;
@@ -216,8 +216,8 @@
   box-sizing: border-box;
   align-self: center;
   height: 30px;
-  padding: 4px;
-  gap: 4px;
+  padding: var(--space-4);
+  gap: var(--space-4);
   border-radius: 6px;
   color: var(--text-5);
   font-size: 12px;
@@ -295,21 +295,21 @@
 }
 
 .pk-workspace.watermark-removal-page .source-row {
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .pk-workspace.watermark-removal-page .source-row > div button {
   min-width: 88px;
   height: 40px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
 }
 
 .pk-workspace.watermark-removal-page .watermark-mark-card {
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .pk-workspace.watermark-removal-page .watermark-mark-card .pk-required-mark {
-  margin-right: 8px;
+  margin-right: var(--space-8);
 }
 
 .pk-workspace.watermark-removal-page .watermark-annotation-row .redraw-prompt-label {
@@ -353,8 +353,8 @@
 
 .pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer {
   height: 40px;
-  padding: 0 16px;
-  gap: 8px;
+  padding: 0 var(--space-16);
+  gap: var(--space-8);
   bottom: 45px;
   background: var(--card-bg);
   border-radius: 8px;
@@ -365,7 +365,7 @@
   width: 51px;
   height: 18px;
   padding: 0;
-  gap: 4px;
+  gap: var(--space-4);
   justify-content: center;
   color: var(--text-desc);
   font-size: 12px;
@@ -426,7 +426,7 @@
     box-sizing: border-box;
     width: 40px;
     height: 18.5px;
-    padding: 1px 6px;
+    padding: 1px var(--space-6);
   }
   .pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer .redraw-tool-divider {
     width: 0;
@@ -435,7 +435,7 @@
     box-sizing: border-box;
     width: 12.5px;
     height: 18px;
-    padding: 1px 6px;
+    padding: 1px var(--space-6);
   }
   .pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer .redraw-zoom-value {
     width: 30.9px;

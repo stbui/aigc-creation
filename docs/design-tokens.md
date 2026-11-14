@@ -107,5 +107,6 @@ EOF
 ## 6. 与代码同步
 
 - 令牌改动只改 `tokens.css`；`global.css` 只负责 `@import` 顺序，不承载声明。
+- 间距令牌化现状（2026-11-15）：共享层 `tool-workspace.css` 82 处、前台页面与组件样式 51 个文件 1433 处声明已改为 `var(--space-*)`，**数值未变**（零视觉差异）。off-scale 值（11/14/17/18/19/22 等）仍是字面值，收敛前需按页对拍参考站。
 - 页面规格文档与 `tokens.css` 冲突时，以 `tokens.css` 为准。
 - 后台 `styles/admin.css` 与前台 `ui/styles.css` 的 `@theme inline` 只做语义桥接，不另定义色值。

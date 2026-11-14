@@ -5,7 +5,7 @@
  */
 
 .personal-page-back {
-  margin: 0 0 8px -8px !important;
+  margin: 0 0 var(--space-8) -8px !important;
   color: var(--text-muted) !important;
 }
 
@@ -13,14 +13,14 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: var(--space-16);
+  margin-bottom: var(--space-20);
 }
 
 .personal-page-heading {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-6);
   min-width: 0;
 }
 
@@ -29,13 +29,13 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .personal-page-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-16);
   min-width: 0;
 }
 
@@ -70,7 +70,7 @@
   width: 100%;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 4px 0 48px;
+  padding: var(--space-4) 0 var(--space-48);
   box-sizing: border-box;
 }
 
@@ -94,12 +94,12 @@
 
 @media (max-width: 900px) {
 .personal-page {
-    padding-bottom: 32px;
+    padding-bottom: var(--space-32);
   }
 .personal-page-head {
     flex-direction: column;
-    gap: 10px;
-    margin-bottom: 16px;
+    gap: var(--space-10);
+    margin-bottom: var(--space-16);
   }
 .personal-page-extra {
     width: 100%;

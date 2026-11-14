@@ -25,15 +25,15 @@
 
 .pk-workspace.product-recolor-page .product-recolor-color-card {
   padding: 14px;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .pk-workspace.product-recolor-page .product-recolor-color-card .card-title-row {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-16);
 }
 
 .pk-workspace.product-recolor-page .product-recolor-color-card .card-title-row h2 {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-12);
   font-size: 14px;
   line-height: 20px;
 }

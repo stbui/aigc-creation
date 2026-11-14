@@ -25,14 +25,14 @@
 .product-sku-card {
   background: var(--card-bg);
   border-radius: var(--radius-panel);
-  padding: 16px;
+  padding: var(--space-16);
   display: grid;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .product-sku-card-heading {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .product-sku-card-heading-top h2 {
@@ -46,7 +46,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 8px;
+  margin-top: var(--space-8);
 }
 
 .product-sku-template-actions button {
@@ -76,7 +76,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .product-sku-region-count {
@@ -134,7 +134,7 @@
   position: absolute;
   left: -1px;
   top: -1px;
-  padding: 2px 6px;
+  padding: var(--space-2) var(--space-6);
   border-radius: 4px 0 4px 0;
   background: var(--brand-active);
   color: var(--card-bg);
@@ -178,7 +178,7 @@
   left: 50%;
   bottom: 10px;
   transform: translateX(-50%);
-  padding: 4px 9px;
+  padding: var(--space-4) 9px;
   border-radius: var(--radius-pill);
   background: rgba(17, 24, 39, 0.62);
   color: var(--card-bg);
@@ -234,7 +234,7 @@ ol.product-sku-steps {
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .product-sku-step {
@@ -242,7 +242,7 @@ ol.product-sku-steps {
   position: relative;
   padding-left: 28px;
   display: grid;
-  gap: 2px;
+  gap: var(--space-2);
 }
 
 .product-sku-step::before {
@@ -264,15 +264,15 @@ ol.product-sku-steps {
 /* SKU 清单编辑器 */
 .product-sku-rows {
   display: grid;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .product-sku-row {
   border: 1px solid var(--surface);
   border-radius: var(--radius-card);
-  padding: 12px;
+  padding: var(--space-12);
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .product-sku-row-head {
@@ -288,7 +288,7 @@ ol.product-sku-steps {
 
 .product-sku-row-field {
   display: grid;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .product-sku-row-field > span {
@@ -302,7 +302,7 @@ ol.product-sku-steps {
   height: 32px;
   border: 1px solid var(--border);
   border-radius: var(--radius-tag);
-  padding: 5px 12px;
+  padding: 5px var(--space-12);
   font-size: 14px;
   font-family: inherit;
   color: var(--wb-text);
@@ -332,8 +332,8 @@ ol.product-sku-steps {
   min-height: 620px;
   grid-template-columns: minmax(360px, 432px) minmax(0, 1fr) 192px;
   grid-template-rows: minmax(0, 1fr);
-  gap: 12px;
-  padding: 16px;
+  gap: var(--space-12);
+  padding: var(--space-16);
   overflow: hidden;
   background: var(--page-bg);
   color: var(--sku-text-1);
@@ -344,7 +344,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-page .pk-form-scroll {
-  gap: 10px;
+  gap: var(--space-10);
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -374,14 +374,14 @@ ol.product-sku-steps {
 
 .product-sku-card-heading {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .product-sku-card-heading-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .product-sku-card-heading h2,
@@ -406,7 +406,7 @@ ol.product-sku-steps {
 .product-sku-card-heading-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .product-sku-card-heading-actions .workspace-material-library-trigger,
@@ -429,7 +429,7 @@ ol.product-sku-steps {
 .product-sku-template-upload-wrap {
   position: relative;
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .product-sku-template-upload {
@@ -440,7 +440,7 @@ ol.product-sku-steps {
   gap: 5px;
   width: 100%;
   min-height: 158px;
-  padding: 16px;
+  padding: var(--space-16);
   border: 1px dashed var(--sku-border-3);
   border-radius: 8px;
   background: var(--surface-4);
@@ -481,7 +481,7 @@ ol.product-sku-steps {
 .product-sku-template-ready {
   display: flex;
   align-items: flex-start;
-  gap: 24px;
+  gap: var(--space-24);
   min-height: 160px;
 }
 
@@ -507,17 +507,17 @@ ol.product-sku-steps {
 .product-sku-template-ready > div {
   display: grid;
   grid-auto-rows: 40px;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .product-sku-template-ready > div > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   min-width: 88px;
   min-height: 40px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card-bg);
@@ -534,21 +534,21 @@ ol.product-sku-steps {
 
 /* ── 使用步骤 ── */
 .product-sku-steps-card {
-  padding: 16px;
+  padding: var(--space-16);
 }
 
 .product-sku-steps-card h2 {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-16);
 }
 
 ol.product-sku-steps {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-24);
   width: 100%;
   margin: 0;
-  padding: 8px 0;
+  padding: var(--space-8) 0;
   list-style: none;
 }
 
@@ -557,10 +557,10 @@ ol.product-sku-steps {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-16);
   width: 100%;
   min-height: 44px;
-  padding-left: 8px;
+  padding-left: var(--space-8);
 }
 
 .product-sku-step:not(:last-child)::after {
@@ -590,7 +590,7 @@ ol.product-sku-steps {
 .product-sku-step > div {
   display: grid;
   flex: 1;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
 }
 
@@ -622,8 +622,8 @@ ol.product-sku-steps {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 2px 12px;
+  gap: var(--space-8);
+  padding: var(--space-2) var(--space-12);
   background: var(--page-bg);
 }
 
@@ -651,7 +651,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-item-card {
-  padding: 16px;
+  padding: var(--space-16);
   border-radius: 14px;
   background: var(--card-bg);
 }
@@ -660,9 +660,9 @@ ol.product-sku-steps {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
   min-height: 20px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .product-sku-item-title-edit {
@@ -681,7 +681,7 @@ ol.product-sku-steps {
   flex: 1;
   width: 100%;
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 var(--space-8);
   border: 0;
   outline: 0;
   background: transparent;
@@ -695,7 +695,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-item-title-edit > span {
-  padding-right: 8px;
+  padding-right: var(--space-8);
   color: var(--sku-text-20);
   font-size: 12px;
 }
@@ -716,7 +716,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-item-error {
-  margin: -6px 0 10px;
+  margin: -6px 0 var(--space-10);
   color: var(--sku-text-danger);
   font-size: 12px;
   line-height: 16px;
@@ -726,20 +726,20 @@ ol.product-sku-steps {
   position: relative;
   box-sizing: border-box;
   min-height: 84px;
-  padding: 16px;
+  padding: var(--space-16);
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--surface-6);
 }
 
 .product-sku-variant-row + .product-sku-variant-row {
-  margin-top: 16px;
+  margin-top: var(--space-16);
 }
 
 .product-sku-variant-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
 }
 
@@ -768,7 +768,7 @@ ol.product-sku-steps {
   .product-sku-variant-title .mobile-upload-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-2);
   min-height: 20px;
   padding: 0;
   border: 0;
@@ -789,9 +789,9 @@ ol.product-sku-steps {
 .product-sku-variant-body {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 20px;
-  margin-top: 8px;
+  margin-top: var(--space-8);
 }
 
 .product-sku-variant-row:has(.product-sku-reference-thumb) .product-sku-variant-body {
@@ -874,13 +874,13 @@ ol.product-sku-steps {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-8);
   min-height: 26px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .product-sku-result-heading p {
-  margin: 2px 0 0;
+  margin: var(--space-2) 0 0;
   color: var(--sku-text-19);
   font-size: 12px;
 }
@@ -890,7 +890,7 @@ ol.product-sku-steps {
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .product-sku-result-retry,
@@ -898,9 +898,9 @@ ol.product-sku-steps {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   min-height: 40px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 1px solid var(--sku-border-brand-5);
   border-radius: 8px;
   background: var(--mif-surface-back-hover);
@@ -924,9 +924,9 @@ ol.product-sku-steps {
 .product-sku-result-download-all {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   min-height: 40px;
-  padding: 0 12px;
+  padding: 0 var(--space-12);
   border: 0;
   border-radius: 8px;
   background: var(--brand);
@@ -941,8 +941,8 @@ ol.product-sku-steps {
 }
 
 .product-sku-result-notice {
-  margin: -4px 0 10px;
-  padding: 8px 10px;
+  margin: -4px 0 var(--space-10);
+  padding: var(--space-8) var(--space-10);
   border-radius: 8px;
   background: var(--mif-surface-back-hover);
   color: var(--sku-text-brand-4);
@@ -970,7 +970,7 @@ ol.product-sku-steps {
   place-items: center;
   width: min(480px, calc(100% - 48px));
   aspect-ratio: 1;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-16);
   border-radius: 2px;
   background: var(--surface-2);
   color: var(--sku-text-22);
@@ -982,7 +982,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-result-empty p {
-  margin: 6px 0 0;
+  margin: var(--space-6) 0 0;
   color: var(--sku-text-16);
   font-size: 12px;
 }
@@ -1076,7 +1076,7 @@ ol.product-sku-steps {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  padding: 4px 8px;
+  padding: var(--space-4) var(--space-8);
   border-radius: 99px;
   background: rgba(25, 28, 41, 0.58);
   color: var(--card-bg);
@@ -1088,7 +1088,7 @@ ol.product-sku-steps {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   color: var(--sku-text-12);
   font-size: 12px;
 }
@@ -1109,8 +1109,8 @@ ol.product-sku-steps {
 
 .product-sku-stage-retry {
   min-height: 32px;
-  margin-top: 2px;
-  padding-inline: 10px;
+  margin-top: var(--space-2);
+  padding-inline: var(--space-10);
 }
 
 .product-sku-generating-pulse {
@@ -1125,8 +1125,8 @@ ol.product-sku-steps {
 .product-sku-result-thumbnails {
   display: flex;
   justify-content: center;
-  gap: 8px;
-  padding-top: 12px;
+  gap: var(--space-8);
+  padding-top: var(--space-12);
   overflow-x: auto;
 }
 
@@ -1161,7 +1161,7 @@ ol.product-sku-steps {
   bottom: 0;
   left: 0;
   overflow: hidden;
-  padding: 3px 2px;
+  padding: 3px var(--space-2);
   background: rgba(26, 29, 41, 0.56);
   font-size: 12px;
   line-height: 12px;
@@ -1195,7 +1195,7 @@ ol.product-sku-steps {
   flex: 0 0 48px;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
   min-height: 48px;
   padding: 0 11px;
   color: var(--sku-text-8);
@@ -1205,7 +1205,7 @@ ol.product-sku-steps {
 .product-sku-history > .history-title > span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
 }
 
 .product-sku-history > .history-title svg {
@@ -1271,7 +1271,7 @@ ol.product-sku-steps {
   position: absolute;
   top: 6px;
   left: 6px;
-  padding: 2px 6px;
+  padding: var(--space-2) var(--space-6);
   border-radius: 99px;
   background: rgba(85, 70, 216, 0.88);
   color: var(--card-bg);
@@ -1287,7 +1287,7 @@ ol.product-sku-steps {
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-2);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.16s, visibility 0.16s;
@@ -1332,14 +1332,14 @@ ol.product-sku-steps {
 .product-sku-history-state {
   display: grid;
   place-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   min-height: 140px;
   color: var(--sku-text-16);
   font-size: 12px;
 }
 
 .product-sku-history-state button {
-  padding: 4px 10px;
+  padding: var(--space-4) var(--space-10);
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   background: var(--card-bg);
@@ -1354,8 +1354,8 @@ ol.product-sku-steps {
   z-index: 2500;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: var(--space-8);
+  padding: var(--space-10) 14px;
   border-radius: 10px;
   background: var(--card-bg);
   color: var(--mif-settings-group-label);
@@ -1371,7 +1371,7 @@ ol.product-sku-steps {
   box-sizing: border-box;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: var(--space-24);
   background: rgba(21, 23, 29, 0.62);
 }
 
@@ -1383,7 +1383,7 @@ ol.product-sku-steps {
   width: min(1200px, 100%);
   height: min(800px, 100vh - 48px);
   min-height: 0;
-  padding: 33px 32px 22px;
+  padding: 33px var(--space-32) 22px;
   border-radius: 24px;
   background: var(--page-bg);
 }
@@ -1413,7 +1413,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-region-modal > p {
-  margin: 6px 0 0;
+  margin: var(--space-6) 0 0;
   color: var(--sku-text-17);
   font-size: 12px;
   line-height: 18px;
@@ -1423,7 +1423,7 @@ ol.product-sku-steps {
 .product-sku-editor-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-10);
   width: fit-content;
   max-width: 100%;
   min-height: 40px;
@@ -1435,12 +1435,12 @@ ol.product-sku-steps {
   display: flex;
   flex: 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   width: fit-content;
   min-width: 0;
   max-width: 100%;
   min-height: 40px;
-  padding: 5px 12px;
+  padding: 5px var(--space-12);
   overflow-x: auto;
   border-radius: 8px;
   background: var(--card-bg);
@@ -1451,7 +1451,7 @@ ol.product-sku-steps {
   .product-sku-editor-tool-wrap > button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   min-height: 24px;
   padding: 3px 0;
   border: 0;
@@ -1520,7 +1520,7 @@ ol.product-sku-steps {
 
 .product-sku-brush-size b {
   min-width: 20px;
-  padding: 2px 5px;
+  padding: var(--space-2) 5px;
   border-radius: 4px;
   background: var(--sku-surface-4);
   color: var(--sku-text-10);
@@ -1561,7 +1561,7 @@ ol.product-sku-steps {
   flex: 0 0 76px;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-4);
   width: 76px;
   min-height: 40px;
   padding: 0;
@@ -1735,7 +1735,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-editor-shortcut-hint {
-  margin: 8px 0 0;
+  margin: var(--space-8) 0 0;
   color: var(--text-9);
   font-size: 12px;
   line-height: 16px;
@@ -1748,7 +1748,7 @@ ol.product-sku-steps {
   bottom: 18px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   padding: 0;
   border: 0;
   background: transparent;
@@ -1803,8 +1803,8 @@ ol.product-sku-steps {
 
 @media (max-width: 900px) {
   .pk-workspace.product-sku-page {
-    gap: 10px;
-    padding: 10px;
+    gap: var(--space-10);
+    padding: var(--space-10);
   }
   .product-sku-template-thumb {
     flex-basis: 132px;
@@ -1813,7 +1813,7 @@ ol.product-sku-steps {
   }
   .product-sku-region-modal {
     min-height: 0;
-    padding: 20px 14px;
+    padding: var(--space-20) 14px;
     border-radius: 18px;
   }
   .product-sku-editor-actions {
@@ -1827,7 +1827,7 @@ ol.product-sku-steps {
   }
   .product-sku-editor-stage {
     height: min(60vh, 500px);
-    padding: 10px;
+    padding: var(--space-10);
   }
   .product-sku-editor-frame > img {
     max-height: min(54vh, 440px);
@@ -1835,24 +1835,24 @@ ol.product-sku-steps {
   .product-sku-editor-reset {
     position: static;
     justify-content: center;
-    margin-top: 6px;
-    padding: 6px;
+    margin-top: var(--space-6);
+    padding: var(--space-6);
   }
 }
 
 @media (max-width: 560px) {
   .pk-workspace.product-sku-page {
-    padding: 8px;
+    padding: var(--space-8);
   }
   .product-sku-card {
-    padding: 12px;
+    padding: var(--space-12);
   }
   .product-sku-template-upload {
     min-height: 130px;
   }
   .product-sku-result-panel {
     min-height: 520px;
-    padding: 12px;
+    padding: var(--space-12);
   }
   .product-sku-result-heading {
     align-items: flex-start;
@@ -1953,8 +1953,8 @@ ol.product-sku-steps {
     height: calc(100vh - var(--workspace-topbar-height));
     min-height: 0;
     grid-template-rows: minmax(0, 1fr);
-    padding-right: 24px;
-    padding-left: 24px;
+    padding-right: var(--space-24);
+    padding-left: var(--space-24);
     overflow: hidden;
   }
 
@@ -1970,9 +1970,9 @@ ol.product-sku-steps {
   .product-sku-page .pk-settings-summary {
     height: auto;
     min-height: 34px;
-    padding: 8px 10px;
+    padding: var(--space-8) var(--space-10);
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-6);
   }
   .product-sku-page .pk-settings-label {
     flex: 0 0 100%;
@@ -1981,7 +1981,7 @@ ol.product-sku-steps {
     flex: 1 1 0;
     min-width: 0;
     height: 24px;
-    padding-inline: 6px;
+    padding-inline: var(--space-6);
     justify-content: center;
     font-size: 12px;
   }
@@ -1989,26 +1989,26 @@ ol.product-sku-steps {
     flex: 0 0 14px;
   }
   .product-sku-card {
-    padding: 12px;
+    padding: var(--space-12);
   }
   .product-sku-card-heading {
-    margin-bottom: 10px;
+    margin-bottom: var(--space-10);
   }
   .product-sku-card-heading-top,
   .product-sku-card-heading-actions {
     flex-wrap: wrap;
   }
   .product-sku-card-heading-actions {
-    gap: 6px;
+    gap: var(--space-6);
   }
   .product-sku-card-heading-copy {
-    margin-top: 4px;
+    margin-top: var(--space-4);
     font-size: 12px;
     line-height: 16px;
   }
   .product-sku-template-ready {
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-10);
     min-height: 0;
   }
   .product-sku-template-thumb {
@@ -2020,29 +2020,29 @@ ol.product-sku-steps {
   .product-sku-template-ready > div {
     width: 100%;
     grid-auto-rows: 34px;
-    gap: 6px;
+    gap: var(--space-6);
   }
   .product-sku-template-ready > div > button {
     min-width: 0;
     min-height: 34px;
-    padding-inline: 8px;
+    padding-inline: var(--space-8);
     font-size: 12px;
   }
   .product-sku-steps-card {
-    padding: 12px;
+    padding: var(--space-12);
   }
   .product-sku-steps-card h2 {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-12);
   }
   .product-sku-steps {
-    gap: 16px;
-    padding-block: 6px;
+    gap: var(--space-16);
+    padding-block: var(--space-6);
   }
   .product-sku-step {
-    gap: 10px;
+    gap: var(--space-10);
     height: auto;
     min-height: 52px;
-    padding-left: 2px;
+    padding-left: var(--space-2);
   }
   .product-sku-step > b {
     flex-basis: 22px;
@@ -2052,7 +2052,7 @@ ol.product-sku-steps {
     line-height: 20px;
   }
   .product-sku-step > div {
-    gap: 4px;
+    gap: var(--space-4);
   }
   .product-sku-step strong {
     font-size: 12px;
@@ -2064,7 +2064,7 @@ ol.product-sku-steps {
     line-height: 16px;
   }
   .product-sku-item-card {
-    padding: 12px;
+    padding: var(--space-12);
   }
   .product-sku-item-title-edit > input {
     font-size: 12px;
@@ -2072,14 +2072,14 @@ ol.product-sku-steps {
   }
   .product-sku-variant-row {
     min-height: 72px;
-    padding: 12px;
+    padding: var(--space-12);
   }
   .product-sku-variant-row + .product-sku-variant-row {
-    margin-top: 12px;
+    margin-top: var(--space-12);
   }
   .product-sku-variant-title {
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-6);
   }
   .product-sku-variant-title strong {
     margin-right: 0;
@@ -2093,8 +2093,8 @@ ol.product-sku-steps {
     line-height: 13px;
   }
   .product-sku-variant-body {
-    gap: 8px;
-    margin-top: 6px;
+    gap: var(--space-8);
+    margin-top: var(--space-6);
   }
   .product-sku-variant-body > input {
     font-size: 12px;
@@ -2122,8 +2122,8 @@ ol.product-sku-steps {
     grid-template-rows: auto;
     grid-auto-rows: auto;
     align-items: start;
-    gap: 10px;
-    padding: 12px 16px 24px;
+    gap: var(--space-10);
+    padding: var(--space-12) var(--space-16) var(--space-24);
     overflow: visible;
   }
   .product-sku-page .pk-input-pane,
@@ -2150,11 +2150,11 @@ ol.product-sku-steps {
   .product-sku-template-ready > div {
     width: auto;
     grid-auto-rows: 40px;
-    gap: 10px;
+    gap: var(--space-10);
   }
   .product-sku-template-ready > div > button {
     min-height: 40px;
-    padding-inline: 12px;
+    padding-inline: var(--space-12);
     font-size: 14px;
   }
 }
@@ -2163,10 +2163,10 @@ ol.product-sku-steps {
   .pk-workspace.product-sku-page,
   .pk-workspace.product-sku-page.pk-workspace-trailing,
   .pk-workspace.product-sku-page.pk-workspace-trailing-collapsed {
-    padding: 8px;
+    padding: var(--space-8);
   }
   .product-sku-template-ready {
-    gap: 10px;
+    gap: var(--space-10);
   }
   .product-sku-template-thumb {
     flex-basis: 112px;
@@ -2175,7 +2175,7 @@ ol.product-sku-steps {
   }
   .product-sku-template-ready > div {
     grid-auto-rows: 34px;
-    gap: 6px;
+    gap: var(--space-6);
   }
   .product-sku-template-ready > div > button {
     min-height: 34px;
