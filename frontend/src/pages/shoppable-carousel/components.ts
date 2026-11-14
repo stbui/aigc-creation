@@ -27,3 +27,5 @@ export { ToolEmptyState, ToolWorkflowSteps } from '../../components/ToolEmptySta
 export { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
 /** 批次结果列表 (本页 / 详情图 / 商品主图共用) 与它的行类型 */
 export { BatchResultList, type BatchRow } from '../../components/BatchResultList';
+/** 右栏「创作灵感 / 创作结果」页签外壳 (与写真模板 / 商品主图共用) */
+export { OutputTabsPane, type OutputTab } from '../../components/OutputTabsPane';

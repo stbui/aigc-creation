@@ -8,8 +8,8 @@
 /* ───────── AI 带货图文工作台 (sc-*) ─────────
    内容与交互对齐参考站 designkit.cn/shoppable-carousel（见
    docs/shoppable-carousel-design.md）；外框与商品主图 / 商品详情 / 写真模板
-   统一：432px 左栏 + 16px 间距，左栏为白卡配置 + 独立提交卡，右栏网格
-   直接铺在页面底色上，历史记录是独立白卡。
+   统一：432px 左栏 + 16px 间距，左栏为白卡配置 + 独立提交卡；
+   右栏是「创作灵感 / 创作结果」两个页签，灵感页的模板网格铺在页面底色上。
 
    颜色一律引用 :root 令牌 —— 参考站的品牌蓝 (#3388ff) 不沿用,
    选中/强调统一走 --brand 一族。 */
@@ -567,165 +567,18 @@
 }
 
 /*
- * 右栏底部「最近生成」历史条：独立白卡，与上方网格留 12px 间距。
- *
- * 页面结构是「左侧配置栏 + 右侧模板展示 + 底部历史记录」——
- * 模板展示**常驻**，历史在底部，两者不互斥。完整列表放「全部记录」抽屉。
+ * 右栏页签面板（外壳复用 `OutputTabsPane`）：
+ * 「创作灵感」的模板区与「创作结果」的批次列表各自吃掉右栏剩余高度，
+ * 面板内部自行滚动。原右栏底部「最近生成」历史条及其白卡样式已删除。
  */
-.sc-history {
-  flex: none;
-  margin-top: 12px;
-  border-radius: var(--radius-panel);
-  background: var(--card-bg);
-  padding: 12px 20px;
+.pd-right-panel > .sc-showcase {
+  flex: 1;
+  min-height: 0;
 }
 
-.sc-history-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.sc-history-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sc-history-count {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--text-desc);
-}
-
-.sc-history-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.sc-history-link,
-  .sc-history-refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-body);
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.sc-history-link {
-  color: var(--brand);
-}
-
-.sc-history-link:hover,
-  .sc-history-refresh:hover {
-  color: var(--brand-hover);
-}
-
-.sc-history-link:disabled,
-  .sc-history-refresh:disabled {
-  color: var(--text-desc);
-  cursor: not-allowed;
-}
-
-.sc-history-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 62px;
-  font-size: 12px;
-  color: var(--text-desc);
-}
-
-.sc-history-strip {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.sc-history-card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: none;
-  width: 90px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-.sc-history-thumb {
-  position: relative;
-  display: block;
-  width: 90px;
-  height: 64px;
-  overflow: hidden;
-  border-radius: var(--radius-control);
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
-}
-
-.sc-history-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.sc-history-card:hover .sc-history-thumb {
-  border-color: var(--brand);
-}
-
-.sc-history-thumb-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-size: 12px;
-  color: var(--text-desc);
-}
-
-.sc-history-badge {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  padding: 0 4px;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--on-brand);
-  background: rgba(23, 26, 43, 0.72);
-  border-radius: var(--radius-tag);
-}
-
-.sc-history-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.sc-history-meta small {
-  font-size: 12px;
-  color: var(--text-desc);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sc-history-template {
-  color: var(--text-muted);
+.pd-right-panel > .pk-result-pane {
+  flex: 1;
+  min-height: 0;
 }
 
 /*
@@ -966,9 +819,5 @@
 
   .sc-template-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-
-  .sc-history {
-    padding: 12px 16px;
   }
 }

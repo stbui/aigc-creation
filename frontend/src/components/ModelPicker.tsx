@@ -7,7 +7,6 @@ import {
   writeSelectedModelId,
 } from '../lib/modelSelection';
 import { loadModels, modelsForCapability, type PublicModelGroup } from '../lib/models';
-import type { ModelQuoteView } from '../types/model';
 import { Button } from '../ui';
 
 /**
@@ -30,7 +29,7 @@ export interface ModelPickerProps {
   requiredInputs?: readonly string[];
   /**
    * 当前参数（比例 / 画质等）。给出时按所选模型实时报价，
-   * 让「换模型 = 换价」在点提交前就看见。
+   * 报价只驱动提交区按钮价签，让「换模型 = 换价」在点提交前就看见。
    */
   options?: Record<string, unknown>;
   /**
@@ -45,11 +44,6 @@ export interface ModelPickerProps {
    * 上传数量等模型相关约束应从这里读，不能假设前端的页面上限就等于模型上限。
    */
   onModelChange?: (model: PublicModelGroup | null) => void;
-  /**
-   * 是否展示「单次约 X 积分」实时报价行。默认展示；写真模板页不披露这一行，
-   * 但报价回调仍照常工作，提交按钮的价签不受影响。
-   */
-  showQuote?: boolean;
   className?: string;
 }
 
@@ -66,13 +60,10 @@ export function ModelPicker({
   options,
   onQuoteChange,
   onModelChange,
-  showQuote = true,
   className,
 }: ModelPickerProps) {
   const [models, setModels] = useState<PublicModelGroup[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
-  const [quote, setQuote] = useState<ModelQuoteView | null>(null);
-  const [quoteFailed, setQuoteFailed] = useState(false);
   // 回调通常是内联 setState，用 ref 避免它进入报价 effect 依赖导致重复请求
   const onQuoteChangeRef = useRef(onQuoteChange);
   const onModelChangeRef = useRef(onModelChange);
@@ -134,21 +125,20 @@ export function ModelPicker({
   );
 
   /**
-   * 报价：参数或模型变化后重算，400ms 防抖。
+   * 报价：参数或模型变化后重算，400ms 防抖；结果只回传给提交区价签，
+   * 高级设置里不再单独披露「单次约 X 积分」一行。
    *
    * 报价失败不是错误态 —— 未登录、参数还没填全时接口会拒绝，
-   * 此时不显示价格比显示一个错误更接近「还不知道多少钱」。
+   * 此时价签回落到能力基础价，不额外渲染错误。
    */
   const optionsKey = options ? JSON.stringify(options) : '';
   useEffect(() => {
     if (!selectedId || !options) {
-      setQuote(null);
       onQuoteChangeRef.current?.(null);
       return;
     }
     let alive = true;
     const timer = window.setTimeout(() => {
-      setQuoteFailed(false);
       /*
        * 报价按「能力 id + 模型分组」：售价在能力级，切换线路不改价；
        * 报价与建任务共用同一份能力定价。
@@ -158,7 +148,6 @@ export function ModelPicker({
         .quote(capability, quoteModel?.modelKey ?? selectedId, { options })
         .then((result) => {
           if (alive) {
-            setQuote(result.quote);
             onQuoteChangeRef.current?.(
               result.quote.amountMicrocredits === null
                 ? null
@@ -167,11 +156,7 @@ export function ModelPicker({
           }
         })
         .catch(() => {
-          if (alive) {
-            setQuote(null);
-            setQuoteFailed(true);
-            onQuoteChangeRef.current?.(null);
-          }
+          if (alive) onQuoteChangeRef.current?.(null);
         });
     }, 400);
     return () => {
@@ -243,18 +228,6 @@ export function ModelPicker({
           );
         })}
       </div>
-      {selected && options && showQuote && (
-        <p
-          style={{ fontSize: 12, color: 'var(--text-desc)', margin: '6px 0 0' }}
-          data-testid="model-quote"
-        >
-          {quote && quote.amountMicrocredits !== null
-            ? `单次约 ${toCredits(quote.amountMicrocredits)} 积分${quote.estimated ? '（预估）' : ''}`
-            : quoteFailed
-              ? '当前参数下价格待定'
-              : '正在计算价格…'}
-        </p>
-      )}
     </div>
   );
 }

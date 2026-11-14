@@ -353,7 +353,7 @@ test.describe('渠道与模型 P5', () => {
     await expect(page.getByTestId('admin-filter')).toBeVisible();
   });
 
-  test('C 端：高级设置里的模型选择器与实时报价', async ({ page }) => {
+  test('C 端：高级设置里的模型选择器（不披露实时报价行）', async ({ page }) => {
     await page.goto(`${UI}/product-kit`);
     const settings = page.getByRole('button', { name: /高级设置/ }).first();
     await expect(settings).toBeVisible({ timeout: 20000 });
@@ -366,16 +366,16 @@ test.describe('渠道与模型 P5', () => {
     const options = picker.getByTestId('model-option');
     await expect.poll(() => options.count()).toBeGreaterThan(0);
 
-    // 价格必须跟着所选模型走；加载中不算结果
-    await expect(page.getByTestId('model-quote')).toHaveText(/积分|待定/, { timeout: 20000 });
+    // 高级设置只展示模型档位；报价仍回传提交区价签，不再渲染「单次约 X 积分」
+    await expect(page.getByTestId('model-quote')).toHaveCount(0);
 
-    // 选另一档（若存在）后，选中态转移且价格重新计算
+    // 选另一档（若存在）后，选中态转移且仍不出现报价行
     if ((await options.count()) > 1) {
       const target = options.nth(1);
       if ((await target.getAttribute('data-available')) === 'true') {
         await target.click();
         await expect(target).toHaveAttribute('aria-pressed', 'true');
-        await expect(page.getByTestId('model-quote')).toHaveText(/积分|待定/, { timeout: 20000 });
+        await expect(page.getByTestId('model-quote')).toHaveCount(0);
       }
     }
   });

@@ -2005,6 +2005,15 @@ model CreditLedgerEntry {
   model          String  @default("")
   channelId      String  @default("")
   scene          String  @default("")
+  /// 积分业务类型 —— 展示与筛选口径，**不参与余额计算**。
+  /// 'checkin_streak' 连续签到奖励 | 'new_user_gift' 新用户赠送 | 'purchase' 购买获得
+  /// | 'membership_grant' 会员月度积分 | 'invite_reward' 邀请奖励
+  /// | 'creative_image' 创意生图扣费 | 'credit_expire' 积分过期
+  /// | 'admin_adjust' 客服调整 | 'refund' 退款相关 | 'other' 兜底
+  ///
+  /// 空串 = 历史流水（本列上线前写入），读取时按 `type` 推导兜底, 不回写。
+  /// 与 `type` 的区别: `type` 是账本动作, 本列是触发场景, 粒度更细且可按业务对账。
+  businessType   String  @default("")
   note           String  @default("")
   /// 幂等键（同一业务动作重复执行只落一条）
   referenceKey   String? @unique
@@ -2013,6 +2022,7 @@ model CreditLedgerEntry {
 
   @@index([userId, createdAt])
   @@index([userId, type])
+  @@index([userId, businessType])
   @@index([billingOrderId])
   @@index([lotId])
 }

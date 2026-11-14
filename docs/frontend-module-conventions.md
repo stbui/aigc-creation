@@ -256,8 +256,8 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     C 端 AI 带货图文目录（`src/pages/shoppable-carousel` / `src/components` /
     `src/hooks` / `src/lib` / `src/context`；左栏 `ShoppableCarouselConfig` 与底栏
     `ShoppableCarouselFooter`（张数步进 `ShoppableCarouselStepper`），右栏
-    `ShoppableCarouselShowcase`（模板网格 `TemplateGrid` + 历史
-    `ShoppableCarouselHistory`），全部记录抽屉 `ShoppableCarouselResultList`；
+    `ShoppableCarouselShowcase`（`OutputTabsPane` 页签外壳 + 模板网格
+    `TemplateGrid` + 创作结果批次列表 `ShoppableCarouselResultList`）；
     模板取数落 `hooks.ts` 的 `useShoppableCarouselTemplates`，提交 / 删除 / 文案生成
     等写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/template/__tests__/template-modules.test.ts` ——

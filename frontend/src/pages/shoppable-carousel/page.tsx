@@ -9,10 +9,9 @@ import {
   MAX_IMAGE_MB,
   MAX_IMAGES,
 } from './constants';
-import { AssetLibraryModal, MobileUploadModal } from './components';
+import { AssetLibraryModal, MobileUploadModal, type OutputTab } from './components';
 import { ShoppableCarouselConfig } from './ShoppableCarouselConfig';
 import { ShoppableCarouselFooter } from './ShoppableCarouselFooter';
-import { ShoppableCarouselResultList } from './ShoppableCarouselResultList';
 import { ShoppableCarouselShowcase } from './ShoppableCarouselShowcase';
 import {
   notifyCreditsChanged,
@@ -28,25 +27,23 @@ import {
 } from './hooks';
 import { generateApi, newIdempotencyKey, promptToolsApi, resolveModelKey } from './api';
 import { clampCount, isUncertainSubmitError } from './utils';
-import { Modal, useApp } from '../../ui';
+import { useApp } from '../../ui';
 import type { ShoppableCarouselTemplate } from '../../types/api';
 
 /**
  * AI 带货图文工作台
  *
- * 内容与交互对齐参考站实拍（`docs/shoppable-carousel-design.md`）：
- *   左配置栏（上传 / 生成设置 / 卖点文案 / 生成模式 / 附加功能 / 张数）
- *   + 右侧模板区（分类 tab + 模板网格），右栏另开「创作结果」页签承载历史记录。
  * 外框与商品主图 / 商品详情 / 写真模板统一：432px 左栏、白卡配置 + 独立提交卡，
- * 右栏网格直接铺在页面底色上，历史记录为独立白卡。
+ * 右栏是「创作灵感 / 创作结果」两个页签（与写真模板页同构）：灵感页 = 分类 tab
+ * + 模板网格，结果页 = 完整批次结果列表；底部「最近生成」历史条已删除。
  *
  * 生成链路与站内其它能力同源：一次提交由后端 `outputPlan` 拆成 N 个任务，
  * 每张各计一次价、共享 batchId；页面只负责收集输入与展示。
  *
  * 板块拆分见 `docs/frontend-module-conventions.md`：左栏配置 `ShoppableCarouselConfig`
  * 与底栏 `ShoppableCarouselFooter`（张数步进 `ShoppableCarouselStepper`），右栏
- * `ShoppableCarouselShowcase`（模板网格 `TemplateGrid` + 历史 `ShoppableCarouselHistory`），
- * 全部记录抽屉 `ShoppableCarouselResultList`；模板取数落 `hooks.ts` 的
+ * `ShoppableCarouselShowcase`（页签外壳 `OutputTabsPane` + 模板网格 `TemplateGrid`
+ * + 批次列表 `ShoppableCarouselResultList`）；模板取数落 `hooks.ts` 的
  * `useShoppableCarouselTemplates`，提交 / 删除 / 文案生成等写操作仍留在本文件。
  */
 export function ShoppableCarouselPage() {
@@ -94,8 +91,8 @@ export function ShoppableCarouselPage() {
   const [noText, setNoText] = useState(false);
   const [socialCaption, setSocialCaption] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  /** 「全部记录」抽屉 —— 底部历史条只放最近几次, 完整批次列表在这里 */
-  const [historyOpen, setHistoryOpen] = useState(false);
+  /** 右栏页签：首访落在「创作灵感」（模板是必需输入），提交后切到「创作结果」 */
+  const [rightTab, setRightTab] = useState<OutputTab>('demo');
   const [analyzing, setAnalyzing] = useState(false);
 
   // ── 任务状态 ──
@@ -121,9 +118,6 @@ export function ShoppableCarouselPage() {
     () => submitting || gallery.items.some((item) => item.status === 'queued' || item.status === 'running'),
     [submitting, gallery.items],
   );
-  const refreshGallery = useCallback(() => {
-    void gallery.reload();
-  }, [gallery.reload]);
 
   // ── 能力运行时（不可用时禁用提交并给出原因） ──
   const { blocked, reason } = useCapabilityRuntime(CAPABILITY_ID);
@@ -244,6 +238,8 @@ export function ShoppableCarouselPage() {
   const submit = async () => {
     if (!formValid || generating) return;
     setSubmitting(true);
+    // 占位卡在结果区，提交即切页签，避免用户留在灵感页看不到进度
+    setRightTab('results');
     let batchStarted = false;
 
     try {
@@ -436,8 +432,10 @@ export function ShoppableCarouselPage() {
           />
         </aside>
 
-        {/* ── 右: 模板展示（常驻）+ 底部历史记录 ── */}
+        {/* ── 右: 创作灵感 / 创作结果 两个页签 ── */}
         <ShoppableCarouselShowcase
+          activeTab={rightTab}
+          onTabChange={setRightTab}
           categories={categories}
           categoryId={categoryId}
           onCategoryChange={setCategoryId}
@@ -449,8 +447,12 @@ export function ShoppableCarouselPage() {
           galleryItems={gallery.items}
           galleryLoading={gallery.loading}
           galleryError={gallery.error}
-          onRefreshGallery={refreshGallery}
-          onOpenAll={() => setHistoryOpen(true)}
+          onDeleteRow={deleteRow}
+          emptyDesc={
+            token
+              ? '提交任务后，这次生成的带货图文会按批次陈列在这里'
+              : '登录后，你在这个页面生成过的图文都会显示在这里'
+          }
         />
       </div>
 
@@ -467,29 +469,6 @@ export function ShoppableCarouselPage() {
 
       {/* 手机上传弹窗（二维码方案） */}
       <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
-
-      {/* 全部记录抽屉：底部历史条只放最近几次，完整批次列表（含删除 / 下载）在这里 */}
-      <Modal
-        open={historyOpen}
-        title="全部生成记录"
-        width={960}
-        onCancel={() => setHistoryOpen(false)}
-        footer={null}
-        destroyOnHidden
-      >
-        <ShoppableCarouselResultList
-          items={gallery.items}
-          loading={gallery.loading}
-          error={gallery.error}
-          emptyTitle="还没有生成记录"
-          emptyDesc={
-            token
-              ? '提交任务后，这次生成的带货图文会按批次陈列在这里'
-              : '登录后，你在这个页面生成过的图文都会显示在这里'
-          }
-          onDeleteRow={deleteRow}
-        />
-      </Modal>
     </>
   );
 }

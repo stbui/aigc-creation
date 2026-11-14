@@ -42,6 +42,14 @@ export interface WalletEntryMeta {
   model?: string;
   channelId?: string;
   scene?: string;
+  /**
+   * 积分业务类型（展示/筛选用，不参与余额计算）。
+   *
+   * 由**发起侧**决定: 扣费按模态映射（image/video → creative_image），
+   * 发放按触发场景指定。钱包层只负责落库, 不做任何推导 ——
+   * 这里拿不到 capability 上下文, 猜出来的值会与真实业务不符。
+   */
+  businessType?: string;
   note?: string;
   referenceKey?: string;
 }
@@ -310,6 +318,11 @@ export class CreditWalletService {
       await this.writeEntry(db, params.userId, 'refund', refund, refund, 0n, after, {
         ...params.meta,
         billingOrderId: params.billingOrderId,
+        /*
+         * 必须覆盖: 调用方的 meta 带的是消费侧业务类型（creative_image），
+         * 直接透传会把「退款」记成「创意生图扣费」, 且方向相反。
+         */
+        businessType: 'refund',
         note:
           restored.expired > 0n
             ? `${refundNote}（其中 ${formatAmount(restored.expired)} 积分因批次已过期作废）`
@@ -421,6 +434,8 @@ export class CreditWalletService {
     const after = await this.balanceOf(db, lot.userId);
     await this.writeEntry(db, lot.userId, 'expire', -amount, -amount, 0n, after, {
       lotId: lot.id,
+      // 到期回收的业务类型是定义而非推导: 这个入口只服务积分过期
+      businessType: 'credit_expire',
       note: '积分到期回收',
     });
     return amount;
@@ -568,6 +583,7 @@ export class CreditWalletService {
         model: meta.model ?? '',
         channelId: meta.channelId ?? '',
         scene: meta.scene ?? '',
+        businessType: meta.businessType ?? '',
         note: meta.note ?? '',
         referenceKey: meta.referenceKey ?? null,
       },

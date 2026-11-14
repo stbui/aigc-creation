@@ -68,6 +68,102 @@ const C_END_LEDGER_TYPES = [
 
 type CEndLedgerType = (typeof C_END_LEDGER_TYPES)[number];
 
+/**
+ * 积分业务类型 —— 展示与筛选口径, **不参与余额计算**。
+ *
+ * 与 `type` 的分层: `type` 是账本动作（8 值）, 本枚举是触发场景。
+ *
+ * 扣费类**只有一个** `creative_image`: 电商生图 / AI修图 / AI视频三组能力
+ * （共 17 个 capability）的扣费在产品口径上统一叫「创意生图扣费」。判定依据是
+ * 模态而非能力组 —— `normalizeCapability()` 只给到 image/video/text/audio,
+ * 拿不到 group, 而模态已足够区分「创意生图」与文本/音频计费。
+ */
+export const CREDIT_BUSINESS_TYPES = [
+  'checkin_streak',
+  'new_user_gift',
+  'purchase',
+  'membership_grant',
+  'invite_reward',
+  'creative_image',
+  'credit_expire',
+  'admin_adjust',
+  'refund',
+  'other',
+] as const;
+
+export type CreditBusinessType = (typeof CREDIT_BUSINESS_TYPES)[number];
+
+/**
+ * 业务类型 → 允许绑定的账本动作 + 方向。
+ *
+ * `income` / `expense` 指金额符号, `both` 表示两个方向都合法（人工调整、退款）。
+ * 0 值一律放行: 0 元订单（限时免费）也会落一条 consume 流水。
+ */
+const BUSINESS_TYPE_BINDING: Record<
+  CreditBusinessType,
+  { types: readonly string[]; direction: 'income' | 'expense' | 'both' }
+> = {
+  checkin_streak: { types: ['grant'], direction: 'income' },
+  new_user_gift: { types: ['grant'], direction: 'income' },
+  purchase: { types: ['purchase'], direction: 'income' },
+  membership_grant: { types: ['grant'], direction: 'income' },
+  invite_reward: { types: ['grant'], direction: 'income' },
+  creative_image: { types: ['consume'], direction: 'expense' },
+  credit_expire: { types: ['expire'], direction: 'expense' },
+  admin_adjust: { types: ['admin_adjust'], direction: 'both' },
+  refund: { types: ['refund', 'refund_reclaim'], direction: 'both' },
+  other: { types: ['grant', 'purchase', 'consume', 'expire', 'refund', 'refund_reclaim', 'admin_adjust'], direction: 'both' },
+};
+
+/** 历史流水兜底: 无 `businessType` 时按 `type` 推导, 只在读取时用, 不回写 */
+export function fallbackBusinessType(type: string): CreditBusinessType {
+  switch (type) {
+    case 'purchase':
+      return 'purchase';
+    case 'expire':
+      return 'credit_expire';
+    case 'refund':
+    case 'refund_reclaim':
+      return 'refund';
+    case 'admin_adjust':
+      return 'admin_adjust';
+    // grant / consume 是一对多, 无法反推具体场景 —— 归兜底而不是猜一个最像的
+    default:
+      return 'other';
+  }
+}
+
+/**
+ * 写入前的业务类型裁决。
+ *
+ * 空值 / 未注册值 → 按 `type` 兜底（**不阻断**发放与扣费: 标签缺失是次要问题,
+ * 交易失败是主要问题）。已注册值 → 校验与 `type`、金额符号一致, 不一致直接抛错 ——
+ * 这是配置错误, 越早暴露越好, 否则会留下「收入类业务记成负数」的脏流水。
+ */
+export function resolveBusinessType(
+  type: string,
+  businessType: string | undefined | null,
+  amountMicrocredits: bigint,
+): CreditBusinessType {
+  const candidate = String(businessType ?? '').trim();
+  if (!candidate || !(CREDIT_BUSINESS_TYPES as readonly string[]).includes(candidate)) {
+    return fallbackBusinessType(type);
+  }
+  const binding = BUSINESS_TYPE_BINDING[candidate as CreditBusinessType];
+  if (!binding.types.includes(type)) {
+    throw new AppError(40001, `积分业务类型 ${candidate} 不能绑定流水类型 ${type}`, 400);
+  }
+  const direction = amountMicrocredits > 0n ? 'income' : amountMicrocredits < 0n ? 'expense' : null;
+  if (direction && binding.direction !== 'both' && direction !== binding.direction) {
+    throw new AppError(
+      40001,
+      `积分业务类型 ${candidate} 的方向应为 ${binding.direction}, 实际为 ${direction}`,
+      400,
+    );
+  }
+  return candidate as CreditBusinessType;
+}
+
 /** 单轮到期回收上限：一批一条事务，一轮做完留给下一轮，避免长时间占住事件循环 */
 const DEFAULT_EXPIRE_BATCH = 500;
 
@@ -413,6 +509,8 @@ export class CreditService {
       idempotencyKey?: string;
       reason?: string;
       operatorId?: string;
+      /** 业务类型（展示/筛选用）。缺省按 `type` 兜底，不阻断发放。 */
+      businessType?: string;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<{ lotId: string; balance: number; idempotentHit?: boolean }> {
@@ -450,6 +548,7 @@ export class CreditService {
           paymentOrderId: params.orderId ?? '',
           taskId: params.taskId ?? '',
           actorUserId: params.operatorId ?? '',
+          businessType: resolveBusinessType(type, params.businessType, amount),
           note: params.reason ?? '',
           referenceKey: referenceKey ?? undefined,
         },
@@ -526,6 +625,13 @@ export class CreditService {
       reason?: string;
       operatorId?: string;
       /**
+       * 业务类型（展示/筛选用）。缺省按 `type` 兜底。
+       *
+       * 生成扣费走 `BillingService` 的预留/结算, 不经本方法; 这里的
+       * `creative_image` 只用于人工误扣回滚等极少数需要手工补记的场景。
+       */
+      businessType?: string;
+      /**
        * 稳定幂等键；重复扣减直接返回已有结果，不再二次扣钱。
        *
        * 与 `grant` 的幂等键共用同一套「先查后写」语义：批量调整 / CSV 导入
@@ -567,6 +673,7 @@ export class CreditService {
           taskId: params.taskId ?? '',
           paymentOrderId: params.orderId ?? '',
           actorUserId: params.operatorId ?? '',
+          businessType: resolveBusinessType(type, params.businessType, -amount),
           note: params.reason ?? '',
           referenceKey: referenceKey ?? undefined,
         },
@@ -781,6 +888,8 @@ export class CreditService {
           reservedAfterMicrocredits: balance.reservedMicrocredits,
           paymentOrderId: orderId,
           actorUserId: operatorId,
+          // 退款扣回属「退款相关」——与退款差额退回共用同一业务类型, 便于按订单对账
+          businessType: 'refund',
           note: reason,
         },
       });

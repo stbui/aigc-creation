@@ -79,7 +79,7 @@ describe('ModelPicker 模型输入能力上报', () => {
     await waitFor(() => expect(onModelChange).toHaveBeenLastCalledWith(redrawModelWithMask));
   });
 
-  it('报价明确标成单次价格，避免与按钮的整批总价混淆', async () => {
+  it('实时报价只回传给提交区价签，高级设置不再展示「单次约 X 积分」', async () => {
     vi.spyOn(modelsApi, 'quote').mockResolvedValue({
       quote: {
         capabilityId: 'main_image',
@@ -91,12 +91,18 @@ describe('ModelPicker 模型输入能力上报', () => {
         note: '',
       },
     });
+    const onQuoteChange = vi.fn();
 
-    render(<ModelPicker capability="main_image" options={{ ratio: '1:1', resolution: '1k' }} />);
+    render(
+      <ModelPicker
+        capability="main_image"
+        options={{ ratio: '1:1', resolution: '1k' }}
+        onQuoteChange={onQuoteChange}
+      />,
+    );
 
     await waitFor(() => expect(screen.getByTestId('model-option')).toHaveTextContent('2 积分/次'));
-    await waitFor(() =>
-      expect(screen.getByTestId('model-quote')).toHaveTextContent('单次约 2 积分'),
-    );
+    await waitFor(() => expect(onQuoteChange).toHaveBeenCalledWith(2));
+    expect(screen.queryByTestId('model-quote')).toBeNull();
   });
 });
