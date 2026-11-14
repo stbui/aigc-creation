@@ -13,7 +13,7 @@ import {
   modalityOfFormat,
 } from './components';
 import { useApp } from './hooks';
-import { useNearViewport } from './useNearViewport';
+import { useNearViewport } from '../../hooks/useNearViewport';
 import { LibraryAssetActions } from './LibraryAssetActions';
 import { LibraryAssetMenu } from './LibraryAssetMenu';
 import { capabilityName } from './utils';

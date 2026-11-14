@@ -29,7 +29,8 @@ export function CreditsPage() {
   const { token, openLogin } = useAuth();
   /*
    * 表格在窄屏会被卡片右缘切断, 换成列表渲染 (见 CreditsLedgerList / CreditsLotList)。
-   * 767 是兼容层的 md 边界, 也是 680px 表宽能完整放下的下限。
+   * 767 是兼容层的 md 边界；表格加列后桌面段靠 Table 的横向滚动兜住，
+   * 不再要求整表塞进 767px。
    */
   const narrow = useMediaQuery('(max-width: 767px)');
   const {

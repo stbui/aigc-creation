@@ -604,6 +604,146 @@
   color: var(--danger-soft-text);
 }
 
+/* ── 结果行头 / 行级操作：与商品主图、商品详情的批次卡同口径 ─────────────
+ * 三格对照是本页特有语义，保留；行头的商品名、参数摘要、状态和
+ * 「重新生成 / 一键下载 / 删除」则与另两页保持一致，避免同一工作台里
+ * 右栏能做的事情因页面而异。
+ */
+.vc-result-row-head {
+  align-items: flex-start;
+}
+
+.vc-result-row-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vc-result-row-meta {
+  flex-wrap: wrap;
+  overflow: visible;
+  row-gap: 4px;
+}
+
+.vc-result-row-title {
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wb-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.vc-result-meta-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.vc-result-meta-chip {
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-desc);
+  line-height: 20px;
+}
+
+.vc-result-status {
+  flex: none;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-desc);
+  line-height: 20px;
+}
+
+.vc-result-status.is-done {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.vc-result-status.is-processing {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.vc-result-status.is-failed,
+  .vc-result-status.is-partial {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+
+.vc-result-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vc-result-regenerate,
+  .vc-result-download-all {
+  color: var(--text-desc);
+}
+
+.vc-result-regenerate:hover,
+  .vc-result-download-all:hover {
+  color: var(--brand);
+}
+
+/* 商品图 / 参考图的单格下载：与生成图的操作条同一套浮层皮肤 */
+.vc-source-actions {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.vc-compare-media:hover .vc-source-actions,
+  .vc-compare-media:focus-within .vc-source-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.vc-source-actions button {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 7px;
+  background: rgba(23, 26, 43, 0.72);
+  color: var(--card-bg);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.vc-source-actions button:hover {
+  background: var(--brand);
+}
+
+@media (hover: none) {
+  .vc-source-actions {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-source-actions {
+    transition: none;
+  }
+}
+
 @media (max-width: 1024px) {
   /* 单列文档流下结果列表不内滚，交给页面整体滚动 */
   .vc-result-list {

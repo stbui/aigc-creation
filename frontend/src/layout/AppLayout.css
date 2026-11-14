@@ -17,7 +17,7 @@
   display: flex;
   flex-direction: row;
   /* 必须跟随完整 chrome（桌面 64px / ≤900px 54px）。原先写死 64px，
-     固定视口高度的工具页（商品主图 / 详情图 / 创意生图 / 自由创作 / 多图融合）
+     固定视口高度的工具页（商品主图 / 详情图 / 自由创作 / 多图融合）
      会凭空多出一截纵向滚动。 */
   min-height: calc(100vh - var(--workspace-topbar-height, 64px));
   align-items: stretch;

@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { auditNamedImports, PROJECT_ROOT } from '../../../test/namedImportAudit';
-import { ledgerFilterParams, ledgerRemark } from '../utils';
+import { ledgerFilterParams, ledgerReference, ledgerRemark, shortId } from '../utils';
 import type { CreditLedgerEntry } from '../../../types/api';
 
 /**
@@ -40,5 +40,30 @@ describe('积分流水口径', () => {
       ledgerRemark({ type: 'consume', reason: '生成消耗' } as CreditLedgerEntry),
     ).toBe('生成消耗');
     expect(ledgerRemark({ type: 'consume', reason: null } as CreditLedgerEntry)).toBeNull();
+  });
+});
+
+describe('关联单据展示口径', () => {
+  it('短 ID 取末 8 位', () => {
+    expect(shortId('abcdefghijklmnop')).toBe('ijklmnop');
+  });
+
+  it('生成账单 > 支付订单 > 生成任务，都没有时返回 null', () => {
+    const base = {
+      billingOrderId: null,
+      paymentOrderId: null,
+      taskId: null,
+    } as CreditLedgerEntry;
+    expect(ledgerReference(base)).toBeNull();
+    expect(ledgerReference({ ...base, taskId: 'task-1' } as CreditLedgerEntry)).toEqual({
+      label: '生成任务',
+      id: 'task-1',
+    });
+    expect(
+      ledgerReference({ ...base, paymentOrderId: 'pay-1', taskId: 'task-1' } as CreditLedgerEntry),
+    ).toEqual({ label: '支付订单', id: 'pay-1' });
+    expect(
+      ledgerReference({ ...base, billingOrderId: 'bill-1', paymentOrderId: 'pay-1' } as CreditLedgerEntry),
+    ).toEqual({ label: '生成账单', id: 'bill-1' });
   });
 });

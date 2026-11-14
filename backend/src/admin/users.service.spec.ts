@@ -280,6 +280,43 @@ describe("AdminUsersService 用户生命周期与角色", () => {
     expect(tx.user.delete).toHaveBeenCalledWith({ where: { id: "user-1" } });
   });
 
+  it("批量注销必须带确认词，未带时不动账号", async () => {
+    await expect(
+      service.batchDelete(["user-1"], undefined, "actor-1"),
+    ).rejects.toThrow("批量注销需要确认词「删除」");
+    expect(lifecycle.softDelete).not.toHaveBeenCalled();
+  });
+
+  it("批量注销逐条执行，失败条目只影响自己", async () => {
+    lifecycle.softDelete
+      .mockResolvedValueOnce({ id: "user-1", deleted: true })
+      .mockRejectedValueOnce(new Error("至少保留一个启用的管理员"));
+
+    const summary = await service.batchDelete(
+      ["user-1", "user-2", "user-2"],
+      "删除",
+      "actor-1",
+    );
+
+    // 重复 id 去重后只剩两条
+    expect(summary).toMatchObject({ total: 2, succeeded: 1, failed: 1 });
+    expect(summary.results[1]).toMatchObject({
+      id: "user-2",
+      ok: false,
+      message: "至少保留一个启用的管理员",
+    });
+    expect(lifecycle.softDelete).toHaveBeenCalledTimes(2);
+  });
+
+  it("批量注销单次最多 20 条", async () => {
+    const ids = Array.from({ length: 21 }, (_, index) => `user-${index}`);
+
+    await expect(service.batchDelete(ids, "删除", "actor-1")).rejects.toThrow(
+      "单次批量最多 20 条",
+    );
+    expect(lifecycle.softDelete).not.toHaveBeenCalled();
+  });
+
   it("允许后台把账号降为普通用户", async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "user-1",

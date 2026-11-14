@@ -167,7 +167,7 @@
 | GET | `/api/v1/admin/tickets/assignees` | 可指派的启用后台账号（`ticket.handle`） |
 | POST | `/api/v1/admin/tickets/:id/transfer` | 转交：内部备注 + 指派 + `processing`，不改订单 / 积分 / 退款（`ticket.handle`） |
 | GET | `/api/v1/admin/search?q=` | 全局搜索五组各前 5 条（`data.search`，`q` < 2 返回空） |
-| POST | `/api/v1/admin/{users,assets,tasks,orders}/batch` | 批量动作，逐条结果（≤ 100 条，使用各领域动作权限） |
+| POST | `/api/v1/admin/{users,assets,tasks,orders}/batch` | 批量动作，逐条结果（≤ 100 条，使用各领域动作权限）。用户域 `action` 取 `disable` \| `enable` \| `delete`：`delete` 固定走软注销（清空作品与积分 + 匿名化，资金记录保留），**必须带 `confirm: "删除"`**，单次上限收紧到 20 条，权限点 `user.delete`；`disable` / `enable` 走 `user.disable` |
 | GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,invoices,coupons,campaigns}/export` | CSV 导出（BOM，领域读权限 + `data.export`；上限 5000 行，筛选口径与列表一致）。调用记录是 `/admin/api-logs/export` |
 | POST | `/api/v1/admin/credits/import` | 积分 CSV 导入（multipart，按邮箱匹配，`credit.adjust`） |
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`）。广播请求可带 `sendEmail: true`，返回 `sent/users/emailSent/emailFailed/emailSkipped`；模板按 `code + channel` 独立维护 |

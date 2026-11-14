@@ -8,7 +8,8 @@ import { resolveUploadsDir } from '../config/env-files';
 import { SignedUrlService } from '../common/signed-url.service';
 import { SettingsService } from '../common/settings.service';
 import type { StorageBackend } from '../storage/storage.provider';
-import { inspectUploadedImage, verifyDecodableImage } from './image-validation';
+import { inspectUploadedImage, decodeVerifiedImage } from './image-validation';
+import { warmThumbnails } from './thumb-render';
 import { detachAssetFromTasks } from './task-output-links';
 
 export interface UploadedFileMeta {
@@ -95,7 +96,9 @@ export class AssetsService {
       // 每张图读取一次当前生效配置；运营保存后无需重启，下一次上传即采用新值。
       const limits = await this.settings.uploadLimits();
       const info = inspectUploadedImage(buf, limits);
-      await verifyDecodableImage(buf, info);
+      // 保留解码结果：下面的缩略图预热直接复用它。一张 9MP 照片解码约 1s 以上，
+      // 为了预热再解码一次等于把上传耗时翻倍。
+      const decoded = await decodeVerifiedImage(buf, info);
 
       provider = this.storage.getActive();
       const key = this.storage.buildKey('original', info.ext);
@@ -131,6 +134,16 @@ export class AssetsService {
           },
         });
       });
+      // 缩略图提前算好并落盘缓存：素材库 / 工具页浏览时就是纯磁盘读（约 2ms），
+      // 而不是每张图按需解码 1–2s 把主线程占满（详见 thumb-render.ts 顶部说明）。
+      // 只对本地存储有意义 —— 云端 URL 带签名，前端原样使用，不走 ?w= 通道。
+      if (provider.backend === 'local') {
+        void warmThumbnails({
+          uploadsDir: resolveUploadsDir(),
+          key,
+          image: decoded,
+        }).catch(() => undefined);
+      }
       return this.decorate(created);
     } catch (error) {
       // 对象已写入但数据库失败时，删除对象避免留下无主文件；显式 best-effort，

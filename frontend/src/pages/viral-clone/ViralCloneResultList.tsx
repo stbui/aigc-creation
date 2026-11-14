@@ -6,6 +6,7 @@ import {
   Images,
   LoaderCircle,
   Maximize2,
+  RotateCcw,
   Trash2,
   X,
 } from 'lucide-react';
@@ -30,10 +31,20 @@ import {
   ToolWorkflowSteps,
   cn,
   formatBatchDate,
+  resultMetaOf,
+  resultStatusOf,
   type LightboxItem,
+  type ResultMeta,
+  type ResultStatusTone,
 } from './components';
 import type { GalleryItem, UploadedImage } from './hooks';
-import { downloadExtension, splitCloneInputs, taskErrorText, type PolledResult } from './utils';
+import {
+  downloadExtension,
+  downloadUrlsAsZip,
+  splitCloneInputs,
+  taskErrorText,
+  type PolledResult,
+} from './utils';
 import { triggerDownload } from '../../lib/download';
 
 type CompareState = 'ready' | 'generating' | 'failed' | 'idle';
@@ -86,6 +97,27 @@ function previewItemsOf(row: CompareRow): LightboxItem[] {
   return list;
 }
 
+/** 行头参数摘要口径与商品主图 / 商品详情的批次卡完全一致 */
+const META_KEYS: Array<keyof ResultMeta> = ['resolution', 'ratio', 'platform', 'country', 'language'];
+
+function productNameOf(item?: GalleryItem): string {
+  const name = item?.params?.productName;
+  return typeof name === 'string' && name.trim() ? name.trim() : '未命名商品';
+}
+
+function statusOf(row: CompareRow): { label: string; tone: ResultStatusTone } | null {
+  if (row.item) return resultStatusOf([row.item]);
+  if (row.state === 'generating') return { label: '生成中', tone: 'processing' };
+  if (row.state === 'failed') return { label: '生成失败', tone: 'failed' };
+  return null;
+}
+
+/** 输入素材 URL 的扩展名; 拿不到时按 PNG 兜底（上传区本来就只收图片） */
+function sourceExtension(url: string): string {
+  const ext = url.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  return /^[a-z0-9]{2,4}$/.test(ext) ? ext : 'png';
+}
+
 /**
  * 爆款复刻「创作结果」对照列表 —— 右栏「创作结果」页签的内容。
  *
@@ -111,8 +143,12 @@ export interface ViralCloneResultListProps {
   reference: UploadedImage | null;
   /** 本次提交的结果；只在生成中 / 失败时补一行 */
   result: PolledResult | null;
+  /** 本次任务 id；失败任务已被 gallery 收录后不再重复渲染占位行与失败提示 */
+  currentTaskId?: string | null;
   onDelete: (item: GalleryItem) => void;
   onUseAsReference: (item: GalleryItem) => void;
+  /** 重新生成：把这次历史生成的参数回填到左栏（与商品主图 / 商品详情一致） */
+  onRegenerateRow?: (item: GalleryItem) => void;
 }
 
 function ViralCloneResultListImpl({
@@ -123,10 +159,14 @@ function ViralCloneResultListImpl({
   images,
   reference,
   result,
+  currentTaskId,
   onDelete,
   onUseAsReference,
+  onRegenerateRow,
 }: ViralCloneResultListProps) {
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  /** 正在打包下载的批次 key，防止重复点击生成多个 zip */
+  const [downloadingRow, setDownloadingRow] = useState<string | null>(null);
 
   const historyRows = useMemo<CompareRow[]>(() => {
     return items.map((item) => {
@@ -153,11 +193,19 @@ function ViralCloneResultListImpl({
     result?.status === 'succeeded' &&
     Boolean(result.url) &&
     items.some((item) => item.url === result.url);
+  /*
+   * 失败任务现在也会进 gallery（与商品主图 / 商品详情同口径）。gallery 轮询到
+   * 这条正式失败行后，占位行和顶部失败提示都要撤下，否则同一次失败显示两次。
+   */
+  const failedInGallery =
+    result?.status === 'failed' &&
+    Boolean(currentTaskId && items.some((item) => item.id === currentTaskId));
+  const showFailureNotice = result?.status === 'failed' && !failedInGallery;
   // 成功后由 gallery.prepend 插入的正式记录承接展示；当前行只负责生成中、
   // 失败态，以及结果先于列表更新时的短暂兜底。未点击生成前不展示当前输入。
   const showCurrent =
     submitting ||
-    result?.status === 'failed' ||
+    (result?.status === 'failed' && !failedInGallery) ||
     (result?.status === 'succeeded' && !resultInGallery);
   const currentRow = useMemo<CompareRow>(
     () => ({
@@ -192,6 +240,55 @@ function ViralCloneResultListImpl({
     triggerDownload(toAbsoluteUrl(item.url) ?? item.url, `viral-clone-${item.id.slice(-6)}.${ext}`);
   };
 
+  /** 打包下载「商品图 + 参考图 + 生成图」；单张时直下，多张走 ZIP（与批次卡一致）。 */
+  const downloadRow = async (row: CompareRow) => {
+    if (downloadingRow) return;
+    const files = [
+      ...row.productUrls.map((url, index) => ({
+        name: `01-商品上传图-${index + 1}.${sourceExtension(url)}`,
+        url,
+      })),
+      ...(row.referenceUrl
+        ? [{ name: `02-参考图.${sourceExtension(row.referenceUrl)}`, url: row.referenceUrl }]
+        : []),
+      ...(row.outputUrl
+        ? [
+            {
+              name: `03-生成图.${downloadExtension(row.item?.format)}`,
+              url: row.outputUrl,
+            },
+          ]
+        : []),
+    ];
+    if (files.length === 0) return;
+
+    const absolute = (url: string) => toAbsoluteUrl(url) ?? url;
+    if (files.length === 1) {
+      triggerDownload(absolute(files[0].url), `viral-clone-${row.key.slice(-6)}-${files[0].name}`);
+      return;
+    }
+
+    setDownloadingRow(row.key);
+    try {
+      await downloadUrlsAsZip(
+        `viral-clone-${new Date().toISOString().slice(0, 10)}.zip`,
+        files.map((file) => ({ name: file.name, url: absolute(file.url) })),
+      );
+    } catch {
+      // 云端资源未开放 CORS 时 fetch 打包会失败；退回逐张下载，不阻断用户。
+      files.forEach((file, index) => {
+        window.setTimeout(() => triggerDownload(absolute(file.url), file.name), index * 180);
+      });
+    } finally {
+      setDownloadingRow(null);
+    }
+  };
+
+  /** 单格下载（商品图 / 参考图），与生成图的下载按钮同口径。 */
+  const downloadSource = (url: string, name: string) => {
+    triggerDownload(toAbsoluteUrl(url) ?? url, name);
+  };
+
   return (
     <section className="pk-result-pane">
       <div className="pk-result-body">
@@ -201,7 +298,7 @@ function ViralCloneResultListImpl({
             <InlineAlertDescription>历史生成图加载失败：{error}</InlineAlertDescription>
           </InlineAlert>
         )}
-        {result?.status === 'failed' && (
+        {showFailureNotice && (
           <InlineAlert variant="destructive" className="vc-result-alert">
             <CircleAlert />
             <InlineAlertDescription>
@@ -238,30 +335,86 @@ function ViralCloneResultListImpl({
           <div className="vc-result-list">
             {rows.map((row) => {
               const isCurrent = row.key === 'current';
+              const status = statusOf(row);
+              // 行头参数摘要与商品主图 / 商品详情的批次卡同口径；本次行尚无任务参数
+              const meta = row.item ? resultMetaOf(row.item) : null;
+              const readyCount = [row.productUrls[0], row.referenceUrl, row.outputUrl].filter(Boolean).length;
               return (
                 <Surface className={cn('vc-result-row', isCurrent && 'is-current')} key={row.key}>
                   <SurfaceHeader className="vc-result-row-head">
-                    <div className="vc-result-row-meta">
-                      {isCurrent && <strong className="text-sm font-semibold">本次复刻</strong>}
-                      {row.caption && (
-                        <StatusBadge className="vc-degree-badge" variant="secondary">
-                          {row.caption}
-                        </StatusBadge>
+                    <div className="vc-result-row-main">
+                      <div className="vc-result-row-meta">
+                        {isCurrent ? (
+                          <strong className="text-sm font-semibold">本次复刻</strong>
+                        ) : (
+                          <strong className="vc-result-row-title" title={`商品：${productNameOf(row.item)}`}>
+                            商品：{productNameOf(row.item)}
+                          </strong>
+                        )}
+                        {row.caption && (
+                          <StatusBadge className="vc-degree-badge" variant="secondary">
+                            {row.caption}
+                          </StatusBadge>
+                        )}
+                        {status && (
+                          <span className={`vc-result-status is-${status.tone} u-font-12`}>{status.label}</span>
+                        )}
+                        {row.createdAt && <time dateTime={row.createdAt}>{formatBatchDate(row.createdAt)}</time>}
+                      </div>
+                      {meta && (
+                        <div className="vc-result-meta-chips">
+                          {META_KEYS.map((key) =>
+                            meta[key] ? (
+                              <span className="vc-result-meta-chip u-font-12" key={key}>
+                                {meta[key]}
+                              </span>
+                            ) : null,
+                          )}
+                        </div>
                       )}
-                      {row.createdAt && <time dateTime={row.createdAt}>{formatBatchDate(row.createdAt)}</time>}
                     </div>
-                    {row.item?.url && (
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        className="vc-result-delete-action"
-                        aria-label="删除这次复刻结果"
-                        title="删除这次复刻结果"
-                        onClick={() => onDelete(row.item!)}
-                      >
-                        <Trash2 />
-                      </Button>
-                    )}
+                    <div className="vc-result-actions">
+                      {row.item && (
+                        <>
+                          {onRegenerateRow && (
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              className="vc-result-regenerate"
+                              aria-label="重新生成这次复刻"
+                              title="把这次生成的参数带回左侧"
+                              onClick={() => onRegenerateRow(row.item!)}
+                            >
+                              <RotateCcw />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            className="vc-result-download-all"
+                            aria-label="一键下载这次复刻的全部图片"
+                            title="打包下载商品图、参考图与生成图"
+                            aria-busy={downloadingRow === row.key}
+                            disabled={readyCount === 0 || Boolean(downloadingRow)}
+                            onClick={() => void downloadRow(row)}
+                          >
+                            <Download />
+                          </Button>
+                        </>
+                      )}
+                      {row.item && (
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          className="vc-result-delete-action"
+                          aria-label="删除这次复刻结果"
+                          title="删除这次复刻结果"
+                          onClick={() => onDelete(row.item!)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      )}
+                    </div>
                   </SurfaceHeader>
 
                   <SurfaceContent className="vc-result-row-content">
@@ -319,6 +472,23 @@ function ViralCloneResultListImpl({
                           {row.productUrls.length > 1 && (
                             <span className="vc-source-count">共 {row.productUrls.length} 张</span>
                           )}
+                          {row.productUrls.length > 0 && (
+                            <div className="vc-source-actions">
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label="下载商品上传图"
+                                title="下载商品上传图"
+                                onClick={() =>
+                                  row.productUrls.forEach((url, index) =>
+                                    downloadSource(url, `viral-clone-商品上传图-${index + 1}.${sourceExtension(url)}`),
+                                  )
+                                }
+                              >
+                                <Download />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                         <figcaption className="vc-compare-caption">
                           <span className="vc-compare-step">1</span>
@@ -351,6 +521,24 @@ function ViralCloneResultListImpl({
                             <div className="vc-compare-placeholder">
                               <ImagePlus size={22} />
                               <span>在上传区添加参考图</span>
+                            </div>
+                          )}
+                          {row.referenceUrl && (
+                            <div className="vc-source-actions">
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label="下载参考图"
+                                title="下载参考图"
+                                onClick={() =>
+                                  downloadSource(
+                                    row.referenceUrl!,
+                                    `viral-clone-参考图.${sourceExtension(row.referenceUrl!)}`,
+                                  )
+                                }
+                              >
+                                <Download />
+                              </Button>
                             </div>
                           )}
                         </div>

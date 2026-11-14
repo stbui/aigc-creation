@@ -26,3 +26,25 @@ export function ledgerRemark(row: CreditLedgerEntry): string | null {
   if (row.type === 'admin_adjust') return '客服调整';
   return row.reason ?? null;
 }
+
+/**
+ * 单据短 ID：cuid 前缀区分度低，取末 8 位（与后台任务列表同一口径）。
+ * 表格只放短 ID，完整值由调用方放进 title，便于复制与客服核对。
+ */
+export function shortId(id: string): string {
+  return id.slice(-8);
+}
+
+/**
+ * 流水关联单据：生成账单 / 支付订单 / 生成任务是三张不同的表，
+ * 只取与这笔变动最直接的一张，优先级 账单 > 订单 > 任务。
+ * 不把三者拼成一串裸 id —— 用户分不清哪个能拿去查。
+ */
+export function ledgerReference(
+  row: CreditLedgerEntry,
+): { label: string; id: string } | null {
+  if (row.billingOrderId) return { label: '生成账单', id: row.billingOrderId };
+  if (row.paymentOrderId) return { label: '支付订单', id: row.paymentOrderId };
+  if (row.taskId) return { label: '生成任务', id: row.taskId };
+  return null;
+}

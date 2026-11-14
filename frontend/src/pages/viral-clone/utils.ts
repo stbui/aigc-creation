@@ -1,5 +1,13 @@
-import { DEGREE_LABEL, MAX_IMAGES } from './constants';
+import {
+  languageOptions,
+  platformOptions,
+  platformSpec,
+  ratioOptions,
+  resolutionOptions,
+} from '../../lib/optionSets';
+import { CLONE_DEGREES, DEGREE_LABEL, MAX_IMAGES, type CloneDegree } from './constants';
 import { modelImageInputLimit, type PublicModelGroup } from './api';
+import type { GalleryItem, UploadedImage } from './hooks';
 
 /**
  * 爆款复刻工作台页面的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
@@ -13,8 +21,10 @@ import { modelImageInputLimit, type PublicModelGroup } from './api';
 export { isSupportedImageFile } from '../../lib/constants';
 /** 任务错误码 → 用户可读文案 */
 export { taskErrorText } from '../../lib/constants';
-/** 平台 / 语言 / 平台规格（读自后端能力清单） */
-export { languageOptions, platformOptions, platformSpec } from '../../lib/optionSets';
+/** 平台 / 语言 / 比例 / 画质 / 平台规格（读自后端能力清单） */
+export { languageOptions, platformOptions, platformSpec, ratioOptions, resolutionOptions };
+/** 多图打包下载（与商品主图 / 商品详情结果栏同源） */
+export { downloadUrlsAsZip } from '../../lib/zip';
 /** 任务轮询到终态; `PolledResult` 是本页「本次提交结果」的类型 */
 export { pollToResult, type PolledResult } from '../../lib/poll';
 
@@ -95,5 +105,67 @@ export function splitCloneInputs(inputUrls: string[] | undefined): {
   return {
     productUrls: urls.slice(0, -1),
     referenceUrl: urls[urls.length - 1] ?? null,
+  };
+}
+
+/** 「重新生成」回填左栏的快照；字段缺省时返回 undefined，由页面保留当前值。 */
+export interface CloneFormSnapshot {
+  productName: string;
+  brand: string;
+  requirement: string;
+  platform?: string;
+  language?: string;
+  degree?: CloneDegree;
+  ratio?: string;
+  resolution?: string;
+  /** 历史任务的商品图素材（带 assetId，可直接进图片位提交） */
+  productImages: UploadedImage[];
+  /** 历史任务末位的参考图素材 */
+  reference: UploadedImage | null;
+}
+
+function textParam(params: Record<string, unknown>, key: string): string {
+  const value = params[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function optionValue(value: string, options: Array<{ value: string | number }>): string | undefined {
+  return value && options.some((option) => String(option.value) === value) ? value : undefined;
+}
+
+function toUploaded(asset: { id: string; url: string; name?: string }): UploadedImage {
+  return { id: asset.id, url: asset.url, name: asset.name || '历史素材' };
+}
+
+/**
+ * 从一次历史生成反推左栏参数，供右栏「重新生成」回填。
+ *
+ * 与商品主图 / 商品详情同口径：只回填、不自动建任务；枚举值必须按当前能力
+ * 清单校验（平台 / 语言 / 比例 / 画质档位下架后原样写回会在提交时 400）。
+ * 素材只认 `inputAssets` —— 图片位存的是 assetId，光有 URL 无法提交。
+ * 后端保序为 `[商品图..., 参考图]`，与 `splitCloneInputs` 的展示口径一致。
+ */
+export function cloneSnapshotOf(item: GalleryItem): CloneFormSnapshot | null {
+  const params = item.params ?? {};
+  if (Object.keys(params).length === 0) return null;
+
+  const degree = textParam(params, 'degree');
+  const inputs = item.inputAssets ?? [];
+  const resolution = textParam(params, 'size');
+  const resolutionOption = resolutionOptions('hot_remake').find(
+    (option) => String(option.value) === resolution,
+  );
+
+  return {
+    productName: textParam(params, 'productName'),
+    brand: textParam(params, 'brand'),
+    requirement: textParam(params, 'requirement'),
+    platform: optionValue(textParam(params, 'platform'), platformOptions()),
+    language: optionValue(textParam(params, 'language'), languageOptions()),
+    degree: CLONE_DEGREES.some((d) => d.value === degree) ? (degree as CloneDegree) : undefined,
+    ratio: optionValue(textParam(params, 'ratio'), ratioOptions('hot_remake')),
+    resolution: resolutionOption && !resolutionOption.disabled ? resolution : undefined,
+    productImages: inputs.slice(0, -1).map(toUploaded),
+    reference: inputs.length > 0 ? toUploaded(inputs[inputs.length - 1]) : null,
   };
 }

@@ -34,7 +34,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     projectId: 'project-1',
     status: 'running',
     modality: 'image',
-    capability: 'creative_image',
+    capability: 'free_create',
     ...overrides,
   } as unknown as Task;
 }

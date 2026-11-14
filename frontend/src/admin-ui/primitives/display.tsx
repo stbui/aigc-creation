@@ -264,18 +264,36 @@ export function Meter({
 export function Descriptions({
   items,
   columns = 1,
+  inline = false,
 }: {
   items: Array<{ label: ReactNode; value: ReactNode }>;
   columns?: 1 | 2 | 3;
+  /**
+   * 标签与值同一行：左标签固定 80px，右值占满剩余宽度。默认 false 保持
+   * 「标签在上、值在下」，由需要压缩纵向高度的详情按需开启。
+   * 开启前确认每列可用宽度：扣掉标签 80px 与 gap 12px 后要留够值的宽度，
+   * 窄侧栏（<200px）需先放宽容器，否则长值会频繁折行。
+   */
+  inline?: boolean;
 }) {
   const colClass =
     columns === 3 ? 'sm:grid-cols-3' : columns === 2 ? 'sm:grid-cols-2' : '';
   return (
     <dl data-testid="admin-desc" className={cn('grid grid-cols-1 gap-x-6 gap-y-3', colClass)}>
       {items.map((item, index) => (
-        <div key={index} className="min-w-0">
-          <dt className="text-xs text-muted-foreground">{item.label}</dt>
-          <dd className="mt-0.5 text-sm break-words text-foreground">{item.value}</dd>
+        <div key={index} className={cn('min-w-0', inline && 'flex items-baseline gap-3')}>
+          <dt className={cn('text-xs text-muted-foreground', inline && 'w-20 shrink-0')}>
+            {item.label}
+          </dt>
+          <dd
+            className={
+              inline
+                ? 'min-w-0 flex-1 text-sm break-words text-foreground'
+                : 'mt-0.5 text-sm break-words text-foreground'
+            }
+          >
+            {item.value}
+          </dd>
         </div>
       ))}
     </dl>

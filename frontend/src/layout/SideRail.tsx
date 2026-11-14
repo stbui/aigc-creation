@@ -17,7 +17,6 @@ import {
   RotateCcw,
   Scissors,
   Sparkles,
-  Wand2,
   type LucideIcon,
 } from 'lucide-react';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
@@ -38,7 +37,6 @@ const SIDEBAR_ITEM_ORDER: Record<string, string[]> = {
     'main_image',
     'detail_image',
     'hot_remake',
-    'creative_image',
     'multi_fusion',
     'sku_image',
     'shoppable_carousel',
@@ -71,7 +69,6 @@ const SIDEBAR_ICONS: Record<string, string> = {
   main_image: '/menu/m_spzt.svg',
   detail_image: '/menu/m_spxq.svg',
   hot_remake: '/menu/m_bkfk.svg',
-  creative_image: '/menu/m_cyst.svg',
   multi_fusion: '/menu/m_dtrh.svg',
   sku_image: '/menu/m_sku.svg',
   local_redraw: '/menu/m_jbch.svg',
@@ -95,7 +92,6 @@ const ICONS: Record<string, LucideIcon> = {
   remove_watermark: Eraser,
   image_translate: Languages,
   hot_remake: Flame,
-  creative_image: Wand2,
   local_redraw: Brush,
   multi_fusion: Layers,
   free_create: LayoutGrid,

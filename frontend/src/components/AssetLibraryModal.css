@@ -503,6 +503,42 @@
   object-fit: cover;
 }
 
+/*
+ * 未进入视口（还没请求缩略图）时的占位。
+ *
+ * 纯灰块和「图坏了」长得一样 —— 用户会以为素材是坏的。加一层缓慢扫光把
+ * 「正在加载」表达出来；只动 background-position，不触发重排。
+ * `prefers-reduced-motion` 下停用动画，但保留渐变底色（仍与破图区分）。
+ */
+.alp-cover-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    var(--surface-4) 30%,
+    var(--surface-1) 50%,
+    var(--surface-4) 70%
+  );
+  background-size: 200% 100%;
+  animation: alp-cover-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes alp-cover-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alp-cover-placeholder {
+    animation: none;
+  }
+}
+
 .alp-origin-badge {
   position: absolute;
   top: 8px;

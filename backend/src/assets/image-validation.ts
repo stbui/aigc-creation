@@ -1,4 +1,5 @@
 import { AppError } from '../common/app.exception';
+import type { JimpInstance } from 'jimp';
 import {
   DEPLOYMENT_UPLOAD_MAX_BYTES,
   DEPLOYMENT_UPLOAD_MAX_PIXELS,
@@ -211,20 +212,33 @@ export function inspectMaskImage(
 /**
  * 文件头合法不代表像素数据可解码。完成尺寸/像素上限检查后再交给 Jimp；
  * 这样损坏文件会在上传阶段被拒绝，而不会等到生成任务创建后才发现。
+ *
+ * 返回值是**已解码的位图**：调用方若要顺手做别的像素工作（例如预热缩略图，
+ * 见 `warmThumbnails`），复用它即可，不必再解码一次 —— 一张 9MP 照片解码
+ * 约 1.0–1.3s，重复解码纯属浪费。
  */
-export async function verifyDecodableImage(
+export async function decodeVerifiedImage(
   buf: Buffer,
   expected: { width: number; height: number },
-): Promise<void> {
+): Promise<JimpInstance> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Jimp } = require('jimp');
-    const image = await Jimp.read(buf);
+    const image: JimpInstance = await Jimp.read(buf);
     if (image.bitmap.width !== expected.width || image.bitmap.height !== expected.height) {
       throw new AppError(40001, '图片声明的尺寸与实际解码尺寸不一致', 400);
     }
+    return image;
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError(40001, '图片无法解码或文件已损坏', 400);
   }
+}
+
+/** `decodeVerifiedImage` 的「只要校验、不要位图」版本（绝大多数调用点用这个）。 */
+export async function verifyDecodableImage(
+  buf: Buffer,
+  expected: { width: number; height: number },
+): Promise<void> {
+  await decodeVerifiedImage(buf, expected);
 }

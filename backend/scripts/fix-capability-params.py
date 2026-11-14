@@ -90,17 +90,6 @@ PARAMS['hot_remake'] = """    params: [
       { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
     ],"""
 
-PARAMS['creative_image'] = """    params: [
-      {
-        key: 'prompt',
-        label: '画面描述',
-        type: 'text',
-        placeholder: '例如：清晨窗边的木质桌面，柔和自然光，极简ins风',
-        help: '描述越具体，构图越可控',
-      },
-      { key: 'ratio', label: '画面比例', type: 'enum', default: '4:3', options: RATIOS },
-    ],"""
-
 PARAMS['multi_fusion'] = """    params: [
       { key: 'scene', label: '融合场景', type: 'enum', default: 'print_pattern', options: FUSION_SCENARIOS },
       { key: 'variantCount', label: '变体张数', type: 'enum', default: '4', options: FUSION_VARIANT_COUNTS },

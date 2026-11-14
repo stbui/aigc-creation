@@ -49,6 +49,14 @@ export const PAGE_SIZE_OPTIONS = [20, 50, 100].map((size) => ({
 /** 列表默认排序。后端默认与之一致，显式传参是为了让表头箭头与请求口径对得上。 */
 export const DEFAULT_SORT = 'createdAt:desc';
 
+/**
+ * 批量启停单次上限，与后端 `BATCH_LIMIT` 一致。
+ *
+ * 批量删除的固定确认词与单次上限不在这里：它由 `components/admin/BatchDeleteUsersDialog`
+ * 与积分账本页共用，写在那边避免两处口径分叉。
+ */
+export const BATCH_STATUS_LIMIT = 100;
+
 /** 登录方式 / 失败原因 → 中文 */
 export const LOGIN_REASON_LABEL: Record<string, string> = {
   password: '密码登录',

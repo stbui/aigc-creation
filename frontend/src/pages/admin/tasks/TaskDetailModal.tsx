@@ -202,6 +202,7 @@ export function TaskDetailModal({
             <DetailSection title="任务概要">
               <Descriptions
                 columns={3}
+                inline
                 items={[
                   {
                     label: '用户',
@@ -343,8 +344,10 @@ export function TaskDetailModal({
                       alt="任务产出图"
                     />
                   </Link>
-                  <div className="flex min-w-[168px] flex-col gap-3">
+                  {/* 一行式描述列表：标签占 80px + gap 12px，侧栏需留够值的宽度 */}
+                  <div className="flex min-w-[220px] flex-col gap-3">
                     <Descriptions
+                      inline
                       items={[
                         {
                           label: '尺寸',

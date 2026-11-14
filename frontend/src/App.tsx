@@ -76,7 +76,7 @@ const TemplatePage = lazyRoute('/template', () => import('./pages/template'), 'T
 const ProductDetailPage = lazyRoute('/product-detail', () => import('./pages/product-detail'), 'ProductDetailPage');
 const ViralClonePage = lazyRoute('/viral-clone', () => import('./pages/viral-clone'), 'ViralClonePage');
 const CreativeImagePage = lazyRoute(
-  ['/creative-image', '/free-creation'],
+  '/free-creation',
   () => import('./pages/creative-image'),
   'CreativeImagePage',
 );
@@ -237,12 +237,6 @@ function Shell() {
               path="/viral-clone"
               element={
                   <ViralClonePage />
-              }
-            />
-            <Route
-              path="/creative-image"
-              element={
-                  <CreativeImagePage capability="creative_image" />
               }
             />
             <Route

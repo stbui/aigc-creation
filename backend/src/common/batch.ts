@@ -20,6 +20,9 @@ import { AppError } from './app.exception';
  *
  * 再大应当走导入/导出任务，而不是一个可能超时的同步请求。上限放在
  * 这里而不是各控制器 —— 各写一份时总有一处会漏。
+ *
+ * 单条成本远高于普通更新的动作（例如注销：一次事务 + 对象存储删除）可以
+ * 用 `limit` 收紧，收紧值仍只在这里定义一次。
  */
 export const BATCH_LIMIT = 100;
 
@@ -44,17 +47,20 @@ export interface BatchSummary<T = unknown> {
  *
  * @param ids 目标 id 列表（自动去重、去空白）
  * @param run 单条动作。抛异常即视为该条失败，`message` 取异常信息。
+ * @param options.limit 本批上限，默认 {@link BATCH_LIMIT}；单条成本高的动作可收紧
  */
 export async function runBatch<T>(
   ids: string[],
   run: (id: string) => Promise<T>,
+  options: { limit?: number } = {},
 ): Promise<BatchSummary<T>> {
+  const limit = options.limit ?? BATCH_LIMIT;
   const list = [...new Set((ids ?? []).map((s) => String(s ?? '').trim()).filter(Boolean))];
   if (list.length === 0) {
     throw new AppError(40001, '请至少选择一条记录', 400);
   }
-  if (list.length > BATCH_LIMIT) {
-    throw new AppError(40001, `单次批量最多 ${BATCH_LIMIT} 条（当前 ${list.length} 条）`, 400);
+  if (list.length > limit) {
+    throw new AppError(40001, `单次批量最多 ${limit} 条（当前 ${list.length} 条）`, 400);
   }
 
   const results: BatchItemResult<T>[] = [];

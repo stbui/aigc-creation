@@ -12,7 +12,8 @@ import {
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { cn } from '~/admin-ui/lib/cn';
-import { PAGE_SIZE_OPTIONS } from './constants';
+import { BATCH_DELETE_LIMIT } from '~/components/admin/BatchDeleteUsersDialog';
+import { BATCH_STATUS_LIMIT, PAGE_SIZE_OPTIONS } from './constants';
 import { formatDateTime } from './utils';
 import { UserCard, type UserCardAction } from './UserCard';
 import type { AdminUserListResult } from '../../../types/api';
@@ -30,8 +31,13 @@ interface UserListSectionProps {
   selected: string[];
   onSelectedChange: (ids: string[]) => void;
   canBatch: boolean;
-  onBatch: (action: 'disable' | 'enable') => void;
+  /** 批量启停的目标由列表决定（已剔除自己与已注销账号），不读页面上的原始勾选 */
+  onBatch: (action: 'disable' | 'enable', ids: string[]) => void;
+  canBatchDelete: boolean;
+  onBatchDelete: (rows: AdminUserRow[]) => void;
   batchBusy: boolean;
+  /** 当前登录的管理员 id：自己不可被删除，也不进批量删除的候选集 */
+  selfId?: string | null;
   sort: string;
   onSortChange: (sort: string) => void;
   onRetry: () => void;
@@ -118,7 +124,10 @@ export function UserListSection({
   onSelectedChange,
   canBatch,
   onBatch,
+  canBatchDelete,
+  onBatchDelete,
   batchBusy,
+  selfId,
   sort,
   onSortChange,
   onRetry,
@@ -128,12 +137,25 @@ export function UserListSection({
   onPageChange,
 }: UserListSectionProps) {
   const rows = data?.items ?? [];
-  const selectableRows = rows.filter((row) => row.status !== 'deleted');
+  // 已注销的账号没有可再删除/禁用的对象；自己不能被自己注销，选进来只会
+  // 在批量里固定失败一条，因此两者都不进候选集。
+  const selectableRows = rows.filter(
+    (row) => row.status !== 'deleted' && row.id !== selfId,
+  );
+  const canSelect = canBatch || canBatchDelete;
   const allSelected =
     selectableRows.length > 0 &&
     selectableRows.every((row) => selected.includes(row.id));
   const someSelected = selectableRows.some((row) => selected.includes(row.id));
   const selectedSet = new Set(selected);
+  const selectedRows = selectableRows.filter((row) => selectedSet.has(row.id));
+  const deleteOverLimit = selectedRows.length > BATCH_DELETE_LIMIT;
+  const batchHint = [
+    canBatch ? `启停最多 ${BATCH_STATUS_LIMIT} 条` : null,
+    canBatchDelete ? `删除最多 ${BATCH_DELETE_LIMIT} 条` : null,
+  ]
+    .filter(Boolean)
+    .join('，');
 
   return (
     <>
@@ -171,7 +193,7 @@ export function UserListSection({
         <>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              {canBatch && selectableRows.length > 0 && (
+              {canSelect && selectableRows.length > 0 && (
                 <CheckboxField
                   checked={allSelected}
                   indeterminate={!allSelected && someSelected}
@@ -206,34 +228,61 @@ export function UserListSection({
             </div>
           </div>
 
-          {canBatch && selected.length > 0 && (
+          {canSelect && selectedRows.length > 0 && (
             <div
               data-testid="admin-user-batch-bar"
               className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2"
             >
               <span className="text-xs font-medium text-foreground">
-                已选 {selected.length} 位用户
+                已选 {selectedRows.length} 位用户
               </span>
-              <span className="text-xs text-muted-foreground">
-                单次最多 100 条，逐条返回结果
+              <span
+                className={cn(
+                  'text-xs',
+                  canBatchDelete && deleteOverLimit
+                    ? 'text-destructive'
+                    : 'text-muted-foreground',
+                )}
+              >
+                {canBatchDelete && deleteOverLimit
+                  ? `删除单次最多 ${BATCH_DELETE_LIMIT} 个账号，请分批处理`
+                  : `${batchHint ? `${batchHint}，` : ''}逐条返回结果`}
               </span>
               <div className="ml-auto flex items-center gap-1.5">
-                <ActionButton
-                  size="sm"
-                  variant="secondary"
-                  disabled={batchBusy}
-                  onClick={() => onBatch('enable')}
-                >
-                  批量启用
-                </ActionButton>
-                <ActionButton
-                  size="sm"
-                  variant="destructive"
-                  disabled={batchBusy}
-                  onClick={() => onBatch('disable')}
-                >
-                  批量禁用
-                </ActionButton>
+                {canBatch && (
+                  <>
+                    <ActionButton
+                      size="sm"
+                      variant="secondary"
+                      disabled={batchBusy}
+                      onClick={() =>
+                        onBatch('enable', selectedRows.map((row) => row.id))
+                      }
+                    >
+                      批量启用
+                    </ActionButton>
+                    <ActionButton
+                      size="sm"
+                      variant="destructive"
+                      disabled={batchBusy}
+                      onClick={() =>
+                        onBatch('disable', selectedRows.map((row) => row.id))
+                      }
+                    >
+                      批量禁用
+                    </ActionButton>
+                  </>
+                )}
+                {canBatchDelete && (
+                  <ActionButton
+                    size="sm"
+                    variant="destructive"
+                    disabled={batchBusy || deleteOverLimit}
+                    onClick={() => onBatchDelete(selectedRows)}
+                  >
+                    批量删除
+                  </ActionButton>
+                )}
                 <ActionButton
                   size="sm"
                   variant="ghost"
@@ -259,7 +308,7 @@ export function UserListSection({
                   user={row}
                   onOpen={() => onOpenUser(row.id)}
                   actions={actionsFor(row)}
-                  selectable={canBatch && row.status !== 'deleted'}
+                  selectable={canSelect && row.status !== 'deleted' && row.id !== selfId}
                   selected={selectedSet.has(row.id)}
                   onToggleSelected={(next) => {
                     onSelectedChange(
@@ -281,10 +330,12 @@ export function UserListSection({
               onRetry={onRetry}
               sort={sort}
               onSortChange={(next) => onSortChange(next ?? sort)}
-              selectable={canBatch}
+              selectable={canSelect}
               selected={selected}
               onSelectedChange={onSelectedChange}
-              isRowSelectable={(row) => canBatch && row.status !== 'deleted'}
+              isRowSelectable={(row) =>
+                canSelect && row.status !== 'deleted' && row.id !== selfId
+              }
               rowSelectLabel={(row) => `选择用户 ${row.email}`}
               onRowClick={(row) => onOpenUser(row.id)}
               rowClassName={(row) =>

@@ -30,7 +30,12 @@ import {
 } from './utils';
 import type { AdminLoginLogResult, AdminUserDetail } from '../../../types/api';
 
-/** 描述列表的一项 */
+/**
+ * 描述列表的一项：标签在左、内容在右，同一行。
+ *
+ * 标签固定 80px 让两列里的值对齐；内容用 min-w-0 flex-1 承接长 ID /
+ * 长分组名，窄空间内换行而不是把整列撑宽。
+ */
 function InfoItem({
   label,
   value,
@@ -41,9 +46,9 @@ function InfoItem({
   className?: string;
 }) {
   return (
-    <div className={cn('min-w-0', className)}>
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-[13px] leading-5 break-words text-foreground">{value}</dd>
+    <div className={cn('flex min-w-0 items-baseline gap-3', className)}>
+      <dt className="w-20 shrink-0 text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 flex-1 text-[13px] leading-5 break-words text-foreground">{value}</dd>
     </div>
   );
 }

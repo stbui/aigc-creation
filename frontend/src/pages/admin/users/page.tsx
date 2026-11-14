@@ -5,6 +5,7 @@ import { useAdminUserActions } from './useAdminUserActions';
 import { useAdminUserFilters } from './useAdminUserFilters';
 import { UserDetailDrawer } from './UserDetailDrawer';
 import { UserDeleteConfirm } from './UserDeleteConfirm';
+import { BatchDeleteUsersDialog } from '~/components/admin/BatchDeleteUsersDialog';
 import { UserFilters } from './UserFilters';
 import { UserListSection, type UserListView } from './UserListSection';
 import { UserLogoutConfirm } from './UserLogoutConfirm';
@@ -21,7 +22,7 @@ import { TempPasswordDialog } from './TempPasswordDialog';
  * 删除固定走软注销：清空作品数据并匿名化账号，资金记录依法保留。
  */
 export function AdminUsersPage() {
-  const { can } = useAdmin();
+  const { can, me } = useAdmin();
   const [detailId, setDetailId] = useAdminDetailParam();
   const [view, setView] = useState<UserListView>('cards');
   const [selected, setSelected] = useState<string[]>([]);
@@ -32,6 +33,11 @@ export function AdminUsersPage() {
   const actions = useAdminUserActions({
     reload: filters.reload,
     onDeleted: closeUser,
+    // 批量注销后列表里已经没有这些人，勾选与可能打开的抽屉都要一起清掉
+    onBatchDeleted: () => {
+      setSelected([]);
+      closeUser();
+    },
   });
 
   // 筛选/排序变化后，上一页勾选的 id 不再与屏幕对应；清空避免误操作。
@@ -113,8 +119,11 @@ export function AdminUsersPage() {
         selected={selected}
         onSelectedChange={setSelected}
         canBatch={can('user.disable')}
-        onBatch={(action) => void actions.batchStatus(selected, action)}
+        onBatch={(action, ids) => void actions.batchStatus(ids, action)}
+        canBatchDelete={can('user.delete')}
+        onBatchDelete={actions.openBatchDelete}
         batchBusy={actions.busy}
+        selfId={me?.id ?? null}
         sort={filters.sort}
         onSortChange={(sort) => filters.setQuery({ sort })}
         onRetry={filters.reload}
@@ -162,6 +171,15 @@ export function AdminUsersPage() {
           loading={actions.busy}
           onCancel={actions.closeDelete}
           onConfirm={() => void actions.confirmDelete()}
+        />
+      )}
+
+      {actions.batchDeleteTarget && (
+        <BatchDeleteUsersDialog
+          targets={actions.batchDeleteTarget}
+          loading={actions.busy}
+          onCancel={actions.closeBatchDelete}
+          onConfirm={() => void actions.confirmBatchDelete()}
         />
       )}
 

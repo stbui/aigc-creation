@@ -1,9 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ViralCloneResultList } from '../ViralCloneResultList';
-import type { UploadedImage } from '../hooks';
+import type { GalleryItem, UploadedImage } from '../hooks';
 import type { PolledResult } from '../utils';
 
 const images: UploadedImage[] = [
@@ -55,6 +55,50 @@ describe('ViralCloneResultList 本次复刻展示时机', () => {
 
     expect(screen.getByText('本次复刻')).toBeInTheDocument();
     expect(screen.getByAltText('商品上传图 1')).toBeInTheDocument();
-    expect(screen.getByText('生成失败')).toBeInTheDocument();
+    // 失败态在行头状态标签与生成图占位格各出现一次（与批次卡同口径）
+    expect(screen.getAllByText('生成失败').length).toBeGreaterThan(0);
+    expect(document.querySelector('.vc-result-status.is-failed')).not.toBeNull();
+  });
+
+  it('历史行展示商品名 / 状态 / 行级操作，重新生成回调透传该任务', () => {
+    const onRegenerateRow = vi.fn();
+    const item: GalleryItem = {
+      id: 'task-1',
+      url: '/uploads/generated/task-1/output-1.png',
+      caption: '高度复刻',
+      params: { productName: '蓝色手提包', degree: 'high_replica' },
+      createdAt: '2026-11-14T00:00:00.000Z',
+    };
+    render(<ViralCloneResultList {...listProps({ items: [item], onRegenerateRow })} />);
+
+    expect(screen.getByText('商品：蓝色手提包')).toBeInTheDocument();
+    expect(screen.getByText('已完成')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '一键下载这次复刻的全部图片' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重新生成这次复刻' }));
+    expect(onRegenerateRow).toHaveBeenCalledWith(item);
+  });
+
+  it('失败任务已进历史时撤下本次占位行与顶部失败提示，不重复显示', () => {
+    const item: GalleryItem = { id: 'task-x', url: '', status: 'failed' };
+    render(
+      <ViralCloneResultList
+        {...listProps({
+          items: [item],
+          result: { status: 'failed', errorCode: 'EMPTY_OUTPUT' },
+          currentTaskId: 'task-x',
+        })}
+      />,
+    );
+
+    expect(screen.queryByText('本次复刻')).not.toBeInTheDocument();
+    expect(screen.queryByText(/本次生成失败/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('生成失败').length).toBeGreaterThan(0);
+  });
+
+  it('失败的历史任务也能被删除（没有产出图）', () => {
+    const item: GalleryItem = { id: 'task-failed', url: '', status: 'failed' };
+    render(<ViralCloneResultList {...listProps({ items: [item] })} />);
+
+    expect(screen.getByRole('button', { name: '删除这次复刻结果' })).toBeInTheDocument();
   });
 });

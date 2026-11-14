@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../../../lib/api';
 import { useAdmin } from '../../../context/AdminContext';
@@ -37,24 +37,6 @@ import { WindowStrip, TotalsStrip } from './DashboardMetricStrips';
 import { CHANNEL_LABELS, queueTime, yuan } from './utils';
 import { taskErrorLabel } from '../../../lib/admin-error-codes';
 
-function ControlGroup({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex max-w-[280px] flex-col items-start gap-1">
-      <span className="text-[13px] font-medium text-foreground">{label}</span>
-      {children}
-      <span className="text-[13px] leading-5 text-muted-foreground">{hint}</span>
-    </div>
-  );
-}
-
 function DashboardControls({
   days,
   onDaysChange,
@@ -73,41 +55,32 @@ function DashboardControls({
   onRefresh: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-end gap-x-4 gap-y-3">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       {canSwitchView && (
-        <ControlGroup label="工作台视角" hint="仅预览版式，不改变账号权限">
-          <SegmentedTabs
-            ariaLabel="工作台视角"
-            value={view}
-            onChange={(value) => onViewChange(value as AdminWorkbenchRoleView)}
-            options={[
-              { value: 'admin', label: '管理员' },
-              { value: 'operator', label: '运营' },
-              { value: 'finance', label: '财务' },
-            ]}
-          />
-        </ControlGroup>
-      )}
-      <ControlGroup
-        label="指标窗口"
-        hint="仅影响经营指标与趋势；值班条和累计存量不受影响"
-      >
         <SegmentedTabs
-          ariaLabel="指标窗口"
-          value={String(days)}
-          onChange={(value) => onDaysChange(Number(value))}
-          options={[7, 30, 90].map((value) => ({
-            value: String(value),
-            label: `近 ${value} 天`,
-          }))}
+          ariaLabel="工作台视角"
+          value={view}
+          onChange={(value) => onViewChange(value as AdminWorkbenchRoleView)}
+          options={[
+            { value: 'admin', label: '管理员' },
+            { value: 'operator', label: '运营' },
+            { value: 'finance', label: '财务' },
+          ]}
         />
-      </ControlGroup>
-      <div className="flex items-center gap-2 pt-6">
-        <Button asChild variant="outline" size="sm">
-          <Link to="/admin/alerts">告警中心</Link>
-        </Button>
-        <RefreshButton variant="outline" loading={loading} onRefresh={onRefresh} />
-      </div>
+      )}
+      <SegmentedTabs
+        ariaLabel="指标窗口"
+        value={String(days)}
+        onChange={(value) => onDaysChange(Number(value))}
+        options={[7, 30, 90].map((value) => ({
+          value: String(value),
+          label: `近 ${value} 天`,
+        }))}
+      />
+      <Button asChild variant="outline" size="sm">
+        <Link to="/admin/alerts">告警中心</Link>
+      </Button>
+      <RefreshButton variant="outline" loading={loading} onRefresh={onRefresh} />
     </div>
   );
 }

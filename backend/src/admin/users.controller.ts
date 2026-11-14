@@ -10,7 +10,7 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
-import { ArrayMaxSize, IsArray, IsIn, IsString } from "class-validator";
+import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString } from "class-validator";
 import { AdminUser, RequireAllPermissions, RequirePermission } from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
 import { AdminUsersService } from "./users.service";
@@ -25,10 +25,12 @@ import {
 } from "./dto/user.dto";
 
 /**
- * 批量启用 / 禁用。
+ * 批量启用 / 禁用 / 注销。
  *
- * 刻意**不提供批量删除**：禁用可逆，删除不可逆，而批量删除是「点错一次
- * 影响 100 个人」的操作。需要清退账号时逐条走注销（有影响面预览与二次确认）。
+ * 三个动作共用一个端点，权限与前端确认强度不同：
+ * - `disable` / `enable` 可逆，走 `user.disable`，确认框只做数量提示；
+ * - `delete` 不可逆（软注销：清空作品与积分、匿名化账号），走 `user.delete`，
+ *   且必须带确认词，单次上限收紧到 20 条 —— 见 `AdminUsersService.batchDelete`。
  */
 export class UserBatchDto {
   @IsArray()
@@ -36,8 +38,15 @@ export class UserBatchDto {
   @IsString({ each: true })
   ids!: string[];
 
-  @IsIn(["disable", "enable"], { message: "action 只能是 disable 或 enable" })
-  action!: "disable" | "enable";
+  @IsIn(["disable", "enable", "delete"], {
+    message: "action 只能是 disable、enable 或 delete",
+  })
+  action!: "disable" | "enable" | "delete";
+
+  /** 仅 `action=delete` 必填：手工键入了「删除」才执行，防止全选后误点 */
+  @IsOptional()
+  @IsString()
+  confirm?: string;
 }
 
 /**
@@ -90,16 +99,22 @@ export class AdminUsersController {
   }
 
   /**
-   * 批量启用 / 禁用。
+   * 批量启用 / 禁用 / 注销。
    *
-   * 权限按 action 单独判定（`user.disable`）：路由上挂的是 `user.read`
-   * 作为入口权限，动作权限在处理器内用 AdminRoleService 显式校验 ——
+   * 权限按 action 单独判定（`user.disable` / `user.delete`）：路由上挂的是
+   * `user.read` 作为入口权限，动作权限在处理器内用 AdminRoleService 显式校验 ——
    * 一个端点承载多个动作时，静态装饰器表达不了「按 action 取权限」，
-   * 而把两者都放宽成 user.read 会让只读角色获得禁用能力。
+   * 而把两者都放宽成 user.read 会让只读角色获得禁用与注销能力。
    */
   @Post("batch")
   @RequirePermission(PERMISSIONS.userRead)
   async batch(@Body() dto: UserBatchDto, @AdminUser() actor: AdminUser) {
+    if (dto.action === "delete") {
+      if (!(await this.roles.hasPermission(actor.id, PERMISSIONS.userDelete))) {
+        throw new AppError(40301, "没有批量注销账号的权限", 403);
+      }
+      return this.users.batchDelete(dto.ids, dto.confirm, actor.id);
+    }
     if (!(await this.roles.hasPermission(actor.id, PERMISSIONS.userDisable))) {
       throw new AppError(40301, "没有批量启停账号的权限", 403);
     }

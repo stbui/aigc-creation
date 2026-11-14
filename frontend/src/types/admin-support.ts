@@ -228,6 +228,8 @@ export interface AdminCreditRow {
   userId: string;
   email: string;
   name: string;
+  /** 账号状态。列表口径不筛选，注销账号仍出现在账本里，但不能再次删除 */
+  status: 'active' | 'disabled' | 'deleted';
   balance: number;
   expiringSoon: number;
   totalEarned: number;

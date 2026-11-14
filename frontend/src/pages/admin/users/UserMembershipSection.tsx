@@ -38,11 +38,12 @@ function MembershipStatus({ status }: { status: string | null }) {
   );
 }
 
+/** 与账户信息一致：标签在左、内容在右，同一行。 */
 function MembershipFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-[13px] leading-5 text-foreground">{value}</dd>
+    <div className="flex min-w-0 items-baseline gap-3">
+      <dt className="w-20 shrink-0 text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 flex-1 text-[13px] leading-5 break-words text-foreground">{value}</dd>
     </div>
   );
 }

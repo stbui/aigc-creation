@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useAdmin, useToast } from './hooks';
 import { adminUsersApi } from './api';
+import { BATCH_DELETE_CONFIRM } from '~/components/admin/BatchDeleteUsersDialog';
 import type { UserCardAction } from './UserCard';
 import type { AdminUserRole, AdminUserRow } from './types';
 import type { AdminPasswordReset } from '../../../types/api';
@@ -8,6 +9,8 @@ import type { AdminPasswordReset } from '../../../types/api';
 interface Options {
   reload: () => void;
   onDeleted: () => void;
+  /** 批量注销成功后：清空勾选并关掉可能正打开的详情抽屉 */
+  onBatchDeleted: () => void;
 }
 
 /**
@@ -16,12 +19,15 @@ interface Options {
  * 所有写请求共用一把互斥锁，防止双击或快捷键在第一次请求完成前重复提交。
  * 确认框目标单独保存，关闭时不会误清空其它业务状态。
  */
-export function useAdminUserActions({ reload, onDeleted }: Options) {
+export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Options) {
   const toast = useToast();
   const { can, me } = useAdmin();
   const [statusTarget, setStatusTarget] = useState<AdminUserRow | null>(null);
   const [roleTarget, setRoleTarget] = useState<AdminUserRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
+  const [batchDeleteTarget, setBatchDeleteTarget] = useState<AdminUserRow[] | null>(
+    null,
+  );
   const [logoutTarget, setLogoutTarget] = useState<AdminUserRow | null>(null);
   const [tempPassword, setTempPassword] = useState<AdminPasswordReset | null>(
     null,
@@ -105,6 +111,36 @@ export function useAdminUserActions({ reload, onDeleted }: Options) {
     }, '删除失败');
   };
 
+  /**
+   * 批量注销：确认弹框只负责摊开影响面与收集意图，不再要求键入确认词；
+   * 真正的拦截在服务端（确认词、权限、上限 20 条、逐条规则），这里按成功/失败数回显，不吞失败明细。
+   */
+  const openBatchDelete = (rows: AdminUserRow[]) => {
+    if (rows.length === 0) return;
+    setBatchDeleteTarget(rows);
+  };
+
+  const confirmBatchDelete = async () => {
+    if (!batchDeleteTarget || batchDeleteTarget.length === 0) return;
+    const ids = batchDeleteTarget.map((row) => row.id);
+    await run(async () => {
+      const summary = await adminUsersApi.batch(ids, 'delete', BATCH_DELETE_CONFIRM);
+      setBatchDeleteTarget(null);
+      onBatchDeleted();
+      reload();
+      if (summary.failed > 0) {
+        const first = summary.results.find((item) => !item.ok)?.message;
+        toast.error(
+          `批量注销完成：成功 ${summary.succeeded} 个，失败 ${summary.failed} 个${first ? `（${first}）` : ''}`,
+        );
+      } else {
+        toast.success(
+          `已注销 ${summary.succeeded} 个账号，资金记录已匿名保留`,
+        );
+      }
+    }, '批量注销失败');
+  };
+
   const resetPassword = async (target: AdminUserRow) => {
     await run(async () => {
       const result = await adminUsersApi.resetPassword(target.id);
@@ -167,6 +203,7 @@ export function useAdminUserActions({ reload, onDeleted }: Options) {
     statusTarget,
     roleTarget,
     deleteTarget,
+    batchDeleteTarget,
     logoutTarget,
     tempPassword,
     busy,
@@ -177,9 +214,12 @@ export function useAdminUserActions({ reload, onDeleted }: Options) {
     confirmLogout,
     resetPassword,
     batchStatus,
+    openBatchDelete,
+    confirmBatchDelete,
     closeStatus: () => setStatusTarget(null),
     closeRole: () => setRoleTarget(null),
     closeDelete: () => setDeleteTarget(null),
+    closeBatchDelete: () => setBatchDeleteTarget(null),
     closeLogout: () => setLogoutTarget(null),
     closeTempPassword: () => setTempPassword(null),
   };

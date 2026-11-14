@@ -1,14 +1,13 @@
 import { useCallback, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 
 import {
-  CREATION_CAPABILITY_LABELS,
+  CREATION_CAPABILITY,
+  CREATION_CAPABILITY_LABEL,
   CREATION_DOWNLOAD_PREFIX,
   CREATION_PROMPT_PLACEHOLDER,
   MAX_IMAGE_MB,
   MAX_PROMPT_LEN,
   MAX_REF_IMAGES,
-  type CreationCapability,
 } from './constants';
 import {
   AssetLibraryModal,
@@ -33,16 +32,18 @@ import {
   type GalleryItem,
 } from './hooks';
 import { generateApi, resolveModelKey } from './api';
-import { pollToResult, resolveCreationCapability, taskErrorText } from './utils';
+import { pollToResult, taskErrorText } from './utils';
 import { CreativeImageInputPane } from './CreativeImageInputPane';
 import { CreativeImageOutputPane } from './CreativeImageOutputPane';
 import { useApp } from '../../ui';
 
 /**
- * 创意生图 / 自由创作工作台
- * `/creative-image` → creative_image，`/free-creation` → free_create。
+ * 自由创作工作台（唯一入口 `/free-creation`，唯一能力 `free_create`）。
  *
- * 结果栏展示「全部生成图」: 本页能力 (creative_image / free_create) 全部成功产出的网格,
+ * 2026-11-14: 原「创意生图」(creative_image / /creative-image) 与「自由创作」
+ * 合并，页面只保留一个路由、一个能力，不再按路由或查询参数切换能力。
+ *
+ * 结果栏展示「全部生成图」: 本页能力 free_create 全部成功产出的网格,
  * 数据取自 /tasks。
  * 新图由轮询结果**当场插入榜首** (不重拉列表, 避免占位撤下后旧图回弹的闪烁);
  * 点缩略图开大图预览 (原始比例 + 下载原图)。
@@ -53,7 +54,7 @@ import { useApp } from '../../ui';
  *
  * 产出来源不向用户展示: 创作统一走 API 调用模型, 新任务只来自真实模型线路。
  *
- * 没通道就失败: 两种能力都只允许模型生成。后端无可用模型通道时任务按 42204 失败并退款;
+ * 没通道就失败: 本能力只允许模型生成。后端无可用模型通道时任务按 42204 失败并退款;
  * 本页据此在 /capabilities 报 unavailable 时直接禁用提交并写明原因 ——
  * 不让用户点下去才失败, 也不交付任何冒充创作结果的东西。
  *
@@ -74,16 +75,13 @@ import { useApp } from '../../ui';
  * `useImageUpload`；提示词放大走共享 `ExpandTextModal`。状态与写操作只留在本文件。
  */
 
-export function CreativeImagePage({ capability: capabilityProp }: { capability?: CreationCapability } = {}) {
+export function CreativeImagePage() {
   const { message } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token, openLogin } = useAuth();
-  const [searchParams] = useSearchParams();
-  // 独立路由 `/creative-image` 直接带能力; 保留的 `/free-creation` 走查询参数,
-  // 未知参数回落到自由创作，避免把任意串透传给后端。
-  const capability = capabilityProp ?? resolveCreationCapability(searchParams.get('capability'));
-  const capabilityLabel = CREATION_CAPABILITY_LABELS[capability];
+  const capability = CREATION_CAPABILITY;
+  const capabilityLabel = CREATION_CAPABILITY_LABEL;
   // 同一次提交的网络重试复用同一个 key，避免重复建单扣费
   const { keyFor: idempotencyKeyFor, reset: resetIdempotencyKey } = useIdempotencyKey();
   // 消耗价优先用所选模型实时报价，取不到才回落到能力基础价
@@ -309,7 +307,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
         onRefresh={() => void gallery.reload()}
         onDelete={deleteImage}
         onUseAsReference={useAsReference}
-        downloadNamePrefix={CREATION_DOWNLOAD_PREFIX[capability]}
+        downloadNamePrefix={CREATION_DOWNLOAD_PREFIX}
       />
 
       {/* 素材库选择弹窗 (真实数据; 多选, 上限与参考图位一致) */}

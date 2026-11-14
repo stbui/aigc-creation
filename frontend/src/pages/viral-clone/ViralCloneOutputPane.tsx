@@ -27,8 +27,12 @@ export interface ViralCloneOutputPaneProps {
   images: UploadedImage[];
   reference: UploadedImage | null;
   result: PolledResult | null;
+  /** 本次提交的任务 id；失败行已进历史时不再重复渲染「本次复刻」占位 */
+  currentTaskId?: string | null;
   onDelete: (item: GalleryItem) => void;
   onUseAsReference: (item: GalleryItem) => void;
+  /** 重新生成：把这次历史生成的参数回填到左栏（与商品主图 / 商品详情一致） */
+  onRegenerateRow: (item: GalleryItem) => void;
 }
 
 export function ViralCloneOutputPane({
@@ -42,8 +46,10 @@ export function ViralCloneOutputPane({
   images,
   reference,
   result,
+  currentTaskId,
   onDelete,
   onUseAsReference,
+  onRegenerateRow,
 }: ViralCloneOutputPaneProps) {
   return (
     <OutputTabsPane
@@ -60,8 +66,10 @@ export function ViralCloneOutputPane({
           images={images}
           reference={reference}
           result={result}
+          currentTaskId={currentTaskId}
           onDelete={onDelete}
           onUseAsReference={onUseAsReference}
+          onRegenerateRow={onRegenerateRow}
         />
       }
     />

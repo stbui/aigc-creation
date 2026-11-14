@@ -105,6 +105,7 @@ export function ModelCallDetailDrawer({
               { label: '时间', value: formatDateTime(detail.createdAt) },
             ]}
             columns={2}
+            inline
           />
         </div>
       ) : (

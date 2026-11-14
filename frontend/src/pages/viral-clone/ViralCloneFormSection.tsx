@@ -87,7 +87,7 @@ export function ViralCloneFormSection({
         dropzoneClassName="pk-dropzone-reference"
         single
         showCount={false}
-        emptyHint={`上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过 ${MAX_IMAGE_MB}MB`}
+        emptyHint={`上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过${MAX_IMAGE_MB}MB`}
       />
 
       {/* 「生成设置」小标题由 ProductFieldsGrid 按 pk 皮肤渲染，与另两页同一字号/字重 */}

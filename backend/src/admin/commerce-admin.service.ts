@@ -1064,7 +1064,7 @@ export class AdminCommerceService {
         skip: page.skip,
         take: page.take,
         orderBy: { createdAt: "desc" },
-        select: { id: true, email: true, name: true, createdAt: true },
+        select: { id: true, email: true, name: true, status: true, createdAt: true },
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -1077,6 +1077,8 @@ export class AdminCommerceService {
         userId: u.id,
         email: u.email,
         name: u.name,
+        // 列表口径不筛状态（注销账号的历史仍可查），前端据此禁掉「再次删除」
+        status: u.status,
         balance: s?.balance ?? 0,
         expiringSoon: s?.expiringSoon ?? 0,
         totalEarned: s?.totalEarned ?? 0,

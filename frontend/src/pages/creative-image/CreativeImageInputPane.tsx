@@ -1,13 +1,13 @@
 import { X } from 'lucide-react';
 
-import { MAX_REF_IMAGES, type CreationCapability } from './constants';
+import { MAX_REF_IMAGES } from './constants';
 import { ToolGenerationSubmitBar } from './components';
 import type { ToolAsset } from './components';
 import { CreativeImagePromptField } from './CreativeImagePromptField';
 import { CreativeImageUploadSection } from './CreativeImageUploadSection';
 
 interface CreativeImageInputPaneProps {
-  capability: CreationCapability;
+  capability: string;
   capabilityLabel: string;
   images: ToolAsset[];
   uploading: boolean;

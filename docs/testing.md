@@ -90,7 +90,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `pages/product-detail/detailUtils.test.ts` | 详情图结果归组与展示口径：**一次生成 = 一行**（页签角标按批次计而非任务数）、批内按 `batchIndex` 排序、原图取任务输入素材而非产出素材、生成中标记 `pending`（删除按钮据此置灰）、下载扩展名跟真实格式走（缺格式兜底 png 不猜 jpg）、时间格式化与非法值回落 |
 | `pages/product-kit/product-kit-modules.test.ts` | 商品主图目录具名导入 / 导出对账（`product-kit/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
 | `pages/viral-clone/viral-clone-modules.test.ts` | 爆款复刻目录具名导入 / 导出对账（`viral-clone/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
-| `pages/creative-image/creative-image-modules.test.ts` | 创意生图 / 自由创作目录具名导入 / 导出对账（`creative-image/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/creative-image/creative-image-modules.test.ts` | 自由创作工作台目录具名导入 / 导出对账
 | `pages/product-sku/product-sku-modules.test.ts` | 商品 SKU 图目录具名导入 / 导出对账（`product-sku/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
 | `pages/local-redraw/local-redraw-modules.test.ts` | 局部重绘目录具名导入 / 导出对账（`local-redraw/` / `components/` / `hooks/` / `lib/` / `context/`）：页面与 `MaskPainter` 画布组件之间的每个相对导入都必须真实存在 |
 | `pages/background-remove/background-remove-modules.test.ts` | 一键抠图目录具名导入 / 导出对账（`background-remove/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |

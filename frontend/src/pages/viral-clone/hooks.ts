@@ -161,6 +161,14 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
   );
 
   const removeImage = useCallback((id: string) => setImages((prev) => prev.filter((x) => x.id !== id)), []);
+  /**
+   * 「重新生成」整体回填商品图位 —— 不是追加，否则旧图还在会超模型上限。
+   * 历史任务可能来自图片上限更高的旧模型，按当前 imageMax 截断。
+   */
+  const replaceImages = useCallback(
+    (next: UploadedImage[]) => setImages(next.slice(0, imageMax)),
+    [imageMax],
+  );
   const clearReference = useCallback(() => setReference(null), []);
   /** 产出素材被删除时, 若它正占着参考图位同步清掉 —— 否则下一轮会带着已不存在的 assetId 提交 */
   const removeReferenceAsset = useCallback((assetId: string) => {
@@ -229,6 +237,7 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
     uploadFiles,
     uploadReference,
     removeImage,
+    replaceImages,
     clearReference,
     replaceReference: setReference,
     removeReferenceAsset,

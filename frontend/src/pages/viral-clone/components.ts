@@ -30,8 +30,14 @@ export { MobileUploadModal } from '../../components/MobileUploadModal';
 export { ToolWorkflowSteps } from '../../components/ToolEmptyState';
 /** 右侧「功能示例 / 创作结果」页签外壳 (与商品详情 / 商品主图共用) */
 export { OutputTabsPane, type OutputTab } from '../../components/OutputTabsPane';
-/** 批次行头时间格式化 (与商品详情 / 商品主图共用) */
-export { formatBatchDate } from '../../components/batchResult';
+/** 批次行头口径 (与商品详情 / 商品主图共用): 时间 / 参数摘要 / 状态 */
+export {
+  formatBatchDate,
+  resultMetaOf,
+  resultStatusOf,
+  type ResultMeta,
+  type ResultStatusTone,
+} from '../../components/batchResult';
 /** 右侧结果网格 */
 export { ResultGalleryPane } from '../../components/ResultGalleryPane';
 /** 功能示例展示骨架 (与商品详情 / 商品主图共用) */

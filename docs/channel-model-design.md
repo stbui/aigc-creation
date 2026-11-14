@@ -464,7 +464,7 @@ model: {
 | 能力 | 模型能力 | 操作 | 输入 |
 | --- | --- | --- | --- |
 | `free_create` / `main_image` / `detail_image` / `sku_image` / `hot_remake` | image | `text_to_image`（带参考图 → `image_to_image`） | 0–1 |
-| `creative_image` / `recolor` / `rotate` / `image_translate` | image | `image_to_image` | 1 |
+| `local_redraw` / `recolor` / `rotate` / `image_translate` | image | `image_to_image` | 1 |
 | `enhance` / `expand` / `matting` / `remove_watermark` / `local_redraw` | image | `image_to_image` | 1（编辑底图） |
 | `multi_fusion` | image | `image_to_image` | 2（`imageCount` 影响价格档） |
 | `image_to_video` | video | `image_to_video` | 1 |

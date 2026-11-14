@@ -3,13 +3,18 @@ import { useEffect, useRef, useState } from 'react';
 /**
  * 元素接近视口时返回 `true` —— 素材卡片据此延迟挂载图片 / 视频。
  *
- * 浏览器原生 `loading="lazy"` 的预载距离很宽（Chrome 约 3000px），一屏 50 张
+ * 浏览器原生 `loading="lazy"` 的预载距离很宽（Chrome 约 1250–3000px），一屏 50 张
  * 瀑布流会一次性全部解码，滚动反而没有「随滚随出」的层次；素材量大时首屏
- * 还会和缩略图生成抢资源。这里用 IntersectionObserver 收紧到 600px：
+ * 还会和缩略图生成抢资源。这里用 IntersectionObserver 收紧：
  *
- * - 首屏前 5 张由调用方传 `priority` 直接挂载，不等观察器；
+ * - 首屏前 N 张由调用方传 `priority` 直接挂载，不等观察器；
  * - 一旦命中即保持 `true`，回滚时不卸载，避免媒体反复请求；
  * - 不支持 IntersectionObserver 时退化为立即挂载，功能不丢。
+ *
+ * 调用方：`/library` 网格（默认 600px）、素材库导入弹窗（300px，
+ * 一次拉 120 条且卡片更小，预载距离必须更紧）。
+ * root 用默认视口 —— 弹窗的滚动容器是视口的后代，祖先 overflow 裁切会一并计入
+ * 交叉矩形，无需显式传 root。
  */
 export function useNearViewport<T extends Element>(rootMargin = '600px 0px') {
   const ref = useRef<T | null>(null);

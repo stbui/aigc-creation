@@ -12,7 +12,7 @@ export const WORKBENCH_ART: Record<string, { image: string; icon: string }> = {
   main_image: { image: '/workbench/spzt.webp', icon: '/workbench/icons/m_spzt.svg' },
   detail_image: { image: '/workbench/spxq.webp', icon: '/workbench/icons/m_spxq.svg' },
   hot_remake: { image: '/workbench/bkfk.webp', icon: '/workbench/icons/m_bkfk.svg' },
-  creative_image: { image: '/workbench/cyst.webp', icon: '/workbench/icons/m_cyst.svg' },
+  free_create: { image: '/workbench/cyst.webp', icon: '/workbench/icons/m_cyst.svg' },
   local_redraw: { image: '/workbench/jbch.webp', icon: '/workbench/icons/m_jbch.svg' },
   expand: { image: '/workbench/znkt.webp', icon: '/workbench/icons/m_znkt.svg' },
   matting: { image: '/workbench/bjxc.webp', icon: '/workbench/icons/m_bjxc.svg' },

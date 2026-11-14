@@ -98,7 +98,7 @@ export function TemplateInputPane({
         capability={CAPABILITY_ID}
         generating={generating}
         disabled={submitDisabled}
-        label="生成婚纱写真"
+        label="生成写真"
         guestLabel={guestLabel}
         creditLabel={creditLabel}
         hint={hint}

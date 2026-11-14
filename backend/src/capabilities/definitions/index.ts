@@ -4,7 +4,7 @@ import { assertCapabilityIntegrity } from '../capability-plugin.type';
 import { MainImage } from './main_image';
 import { DetailImage } from './detail_image';
 import { HotRemake } from './hot_remake';
-import { CreativeImage } from './creative_image';
+import { FreeCreate } from './free_create';
 import { MultiFusion } from './multi_fusion';
 import { SkuImage } from './sku_image';
 import { LocalRedraw } from './local_redraw';
@@ -15,7 +15,6 @@ import { ImageTranslate } from './image_translate';
 import { Enhance } from './enhance';
 import { Recolor } from './recolor';
 import { Rotate } from './rotate';
-import { FreeCreate } from './free_create';
 import { ImageToVideo } from './image_to_video';
 import { ShoppableCarousel } from './shoppable_carousel';
 import { Template } from './template';
@@ -40,7 +39,7 @@ export const CAPABILITY_PLUGINS: CapabilityPlugin[] = [
   MainImage,
   DetailImage,
   HotRemake,
-  CreativeImage,
+  FreeCreate,
   MultiFusion,
   SkuImage,
   LocalRedraw,
@@ -51,7 +50,6 @@ export const CAPABILITY_PLUGINS: CapabilityPlugin[] = [
   Enhance,
   Recolor,
   Rotate,
-  FreeCreate,
   ImageToVideo,
   ShoppableCarousel,
   Template,

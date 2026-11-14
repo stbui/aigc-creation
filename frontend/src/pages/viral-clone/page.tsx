@@ -32,6 +32,7 @@ import {
   type PublicModelGroup,
 } from './api';
 import {
+  cloneSnapshotOf,
   degreeCaption,
   platformSpec,
   pollToResult,
@@ -80,6 +81,7 @@ export function ViralClonePage() {
     changeRatio,
     changeResolution,
     toggleSettings,
+    applySnapshot,
   } = useGenerationSettings({
     defaultRatio: '1:1',
     defaultResolution: '1k',
@@ -99,6 +101,11 @@ export function ViralClonePage() {
   });
   /** 最近这一次提交的结果 (只用于提示行; 历史产出由 gallery 维护) */
   const [result, setResult] = useState<PolledResult | null>(null);
+  /**
+   * 本次提交的任务 id。失败任务也会进入 gallery（与商品主图 / 商品详情同口径），
+   * 右栏据此判断「本次复刻」占位行是否已被正式失败行接管，避免同一条失败显示两次。
+   */
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const pollSignal = usePollAbort();
 
   /*
@@ -130,6 +137,7 @@ export function ViralClonePage() {
     uploadFiles,
     uploadReference,
     removeImage,
+    replaceImages,
     clearReference,
     replaceReference,
     removeReferenceAsset,
@@ -148,7 +156,13 @@ export function ViralClonePage() {
   // 创作结果按任务逐行陈列完整的「商品图 → 参考图 → 生成图」对照。
   // 首访落在功能示例; 有历史产出时自动切到创作结果, 用户点过页签后不再自动切换。
   const { token } = useAuth();
-  const gallery = useResultGallery({ capability: 'hot_remake', token, captionOf: degreeCaption });
+  // 失败任务也进结果列表：与商品主图 / 商品详情同口径，失败格就地展示并可删除
+  const gallery = useResultGallery({
+    capability: 'hot_remake',
+    token,
+    captionOf: degreeCaption,
+    includeFailed: true,
+  });
   const { rightTab, pick: pickRightTab, showResults } = useRightTab(gallery.items.length, gallery.loading);
   // 服务端仍有 queued/running 任务时也算生成中: 离开页面再回来, 禁用态不丢
   const generating =
@@ -172,6 +186,7 @@ export function ViralClonePage() {
     }
     setSubmitting(true);
     setResult(null);
+    setCurrentTaskId(null);
     // 提交后视线应落在结果区: 本次复刻的占位行在那里, 留在示例页看不到进度
     showResults();
     try {
@@ -204,11 +219,12 @@ export function ViralClonePage() {
       };
       const idempotencyKey = idempotencyKeyFor(JSON.stringify(payload));
       const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
+      setCurrentTaskId(taskId);
       resetIdempotencyKey();
       const done = await pollTask(taskId);
       setResult(done);
       /*
-       * 成功的图**直接插到网格首位**, 不回头重拉列表 (与创意生图 / 商品主图同款):
+       * 成功的图**直接插到网格首位**, 不回头重拉列表 (与自由创作 / 商品主图同款):
        * 重拉多一次往返, 占位撤下与新图到位之间会出现回弹闪烁。
        */
       if (done.status === 'succeeded' && done.url) {
@@ -272,6 +288,41 @@ export function ViralClonePage() {
     },
   });
 
+  /**
+   * 重新生成：把一次历史生成的参数回填到左栏，由用户确认后再提交。
+   *
+   * 与商品主图 / 商品详情同口径：只回填、不直接建任务（模型线路与价格可能
+   * 已经变化）；枚举值按当前能力清单清洗，历史素材缺失时保留当前图片位并
+   * 提示重传，不静默提交一次缺图任务。
+   */
+  const regenerateFromRow = useCallback(
+    (item: GalleryItem) => {
+      const snapshot = cloneSnapshotOf(item);
+      if (!snapshot) {
+        message.warning('这次生成没有可回填的参数');
+        return;
+      }
+      setProductName(snapshot.productName);
+      setBrand(snapshot.brand);
+      setRequirement(snapshot.requirement);
+      if (snapshot.language) setLanguage(snapshot.language);
+      if (snapshot.degree) setDegree(snapshot.degree);
+      applySnapshot({
+        platform: snapshot.platform,
+        ratio: snapshot.ratio,
+        resolution: snapshot.resolution,
+      });
+      if (snapshot.productImages.length > 0) {
+        replaceImages(snapshot.productImages);
+        if (snapshot.reference) replaceReference(snapshot.reference);
+        message.success('已带入这次生成的参数，可在左侧调整后重新生成');
+      } else {
+        message.warning('原图已不可用，已带入文字参数，请重新上传商品图和参考图');
+      }
+    },
+    [message, applySnapshot, replaceImages, replaceReference],
+  );
+
   return (
     <main className="pk-workspace">
       {/* ── 左: 输入栏 ── */}
@@ -327,8 +378,10 @@ export function ViralClonePage() {
         images={images}
         reference={reference}
         result={result}
+        currentTaskId={currentTaskId}
         onDelete={deleteImage}
         onUseAsReference={useAsReference}
+        onRegenerateRow={regenerateFromRow}
       />
 
       {/* 素材库选择弹窗 (按触发按钮决定写入商品图还是参考图;

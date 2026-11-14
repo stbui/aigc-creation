@@ -99,13 +99,22 @@ export const adminUsersApi = {
     } = {},
   ) => downloadCsv(`/admin/users/export${toQuery(params)}`),
 
-  /** 批量启用/禁用。逐条结果 —— 一条失败不影响其余 */
-  batch: (ids: string[], action: "disable" | "enable") =>
-    request<BatchSummary<{ id: string; status: string }>>(
+  /**
+   * 批量启用/禁用/注销。逐条结果 —— 一条失败不影响其余。
+   *
+   * `action=delete` 固定走软注销，必须带确认词（服务端校验），单次上限 20 条。
+   * 确认词由调用方固定传 `BATCH_DELETE_CONFIRM`，界面不再要求运营手工键入。
+   */
+  batch: (
+    ids: string[],
+    action: "disable" | "enable" | "delete",
+    confirm?: string,
+  ) =>
+    request<BatchSummary<{ id: string; status?: string; hard?: boolean }>>(
       "/admin/users/batch",
       {
         method: "POST",
-        body: { ids, action },
+        body: { ids, action, confirm },
       },
     ),
 };

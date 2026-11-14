@@ -21,6 +21,8 @@ import { StorageService } from '../../storage/storage.service';
 import { AigcLabelService } from '../../aigc-label/aigc-label.service';
 import { AigcVisibleLabelError, labelGeneratedImage, type AigcMeta } from '../../common/aigc-label';
 import { inspectMaskImage, inspectUploadedImage } from '../../assets/image-validation';
+import { warmThumbnails } from '../../assets/thumb-render';
+import { resolveUploadsDir } from '../../config/env-files';
 import {
   SUPPORTED_IMAGE_MIMES,
   deploymentUploadMaxBytes,
@@ -28,7 +30,6 @@ import {
 } from '../../common/image-formats';
 import { detectImageFormat } from '../media/image-format';
 import { multiFusionOutputDimensions } from '../../capabilities/definitions/multi_fusion';
-import { resolveUploadsDir } from '../../config/env-files';
 import { orderedOutputIds, taskOutputReferenceWhere } from '../../assets/task-output-links';
 import type { StorageBackend } from '../../storage/storage.provider';
 import type { MediaReference } from '../protocol/runtime';
@@ -285,6 +286,22 @@ export class TaskMediaService {
         throw error;
       }
       stored.push({ assetId: asset.id, buffer, format, aigcMeta, created: true });
+      /*
+       * 缩略图提前算好。
+       *
+       * 产出图就是用户接下来要在素材库 / 工具页里翻的那批图。等到打开弹窗时
+       * 再按需生成, 一屏 20 多张、每张解码 0.2–1.3s, 表现为「格子一直灰着」,
+       * 且同步解码会把主线程占满、接口一起变慢 (详见 assets/thumb-render.ts)。
+       * 这里在已经拿到产出字节的地方顺手算掉, 浏览时就是纯磁盘读。
+       * 只对本地存储有意义 —— 云端 URL 带签名, 前端不走 ?w= 通道。
+       */
+      if (storage.backend === 'local' && !isVideo) {
+        void warmThumbnails({
+          uploadsDir: resolveUploadsDir(),
+          key,
+          source: buffer,
+        }).catch(() => undefined);
+      }
     }
     return stored;
   }

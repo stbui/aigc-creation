@@ -7,7 +7,7 @@ import { prepareGuestSession } from './support/guest-session';
  * 覆盖本次收口的四条真实契约:
  *   1. 运营下线的能力从顶导/侧栏/工作台/首页/站点地图一起消失；
  *   2. 仅「暂无通道」的能力保留入口，并在工作台标注「暂不可用」；
- *   3. 创意生图走独立路由 /creative-image，提交能力 creative_image；自由创作仍走 /free-creation；
+ *   3. 创作类只有 /free-creation 一个入口，提交能力固定为 free_create；
  *   4. 失败任务不进入「我的作品」；
  *   5. ToolShell 页面只拦截已登录用户的不可用提交，访客仍能触发登录流程。
  *
@@ -91,7 +91,7 @@ async function mockModels(page: Page) {
         code: 0,
         data: {
           models: [
-            publicModel('creative_image', 'model-creative-e2e', '创意生图测试模型'),
+            publicModel('free_create', 'model-creative-e2e', '自由创作测试模型'),
             publicModel('local_redraw', 'model-redraw-e2e', '局部重绘测试模型'),
           ],
         },
@@ -170,7 +170,7 @@ test.describe('能力可见性与运行态', () => {
       effective: 'disabled',
       reason: '运营下线测试',
     });
-    patchRuntime(caps, 'creative_image', {
+    patchRuntime(caps, 'free_create', {
       enabled: true,
       remoteAvailable: false,
       localQuality: 'none',
@@ -183,35 +183,35 @@ test.describe('能力可见性与运行态', () => {
     // 首页：下线条目消失（工具入口 + 案例页签 + 顶导共用同一份能力清单）
     await page.goto(`${UI}/`);
     await expect(page.getByText('一键抠图', { exact: true })).toHaveCount(0);
-    // 顶部导航的能力项默认收在分组菜单里；先按真实交互展开包含「创意生图」的分组。
-    const creativeNavGroup = page.locator('.landing-nav-group').filter({ hasText: '创意生图' });
+    // 顶部导航的能力项默认收在分组菜单里；先按真实交互展开包含「自由创作」的分组。
+    const creativeNavGroup = page.locator('.landing-nav-group').filter({ hasText: '自由创作' });
     await creativeNavGroup.getByRole('button').first().click();
-    await expect(page.getByText('创意生图', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('自由创作', { exact: true }).first()).toBeVisible();
 
     // 工作台：下线卡片消失，不可用卡片保留并给出标注
     await page.goto(`${UI}/workbench`);
     const cards = page.locator('.wb-tool-grid .wb-tool-card');
     await expect(cards.filter({ hasText: '一键抠图' })).toHaveCount(0);
-    const creative = cards.filter({ hasText: '创意生图' });
+    const creative = cards.filter({ hasText: '自由创作' });
     await expect(creative).toBeVisible();
     await expect(creative.getByText('暂不可用')).toBeVisible();
 
     // 侧栏：与顶导同一口径
     await expect(page.locator('.app-sidebar-label', { hasText: '一键抠图' })).toHaveCount(0);
-    await expect(page.locator('.app-sidebar-label', { hasText: '创意生图' })).toBeVisible();
+    await expect(page.locator('.app-sidebar-label', { hasText: '自由创作' })).toBeVisible();
 
     // 站点地图：同样不再列出下线能力
     await page.goto(`${UI}/sitemap.html`);
     await expect(page.locator('a.sitemap-item[href="/background-remove"]')).toHaveCount(0);
-    await expect(page.locator('a.sitemap-item[href="/creative-image"]')).toBeVisible();
+    await expect(page.locator('a.sitemap-item[href="/free-creation"]')).toBeVisible();
   });
 
-  test('创意生图独立路由，提交 capability=creative_image', async ({ page, request }) => {
+  test('自由创作唯一入口，提交 capability=free_create', async ({ page, request }) => {
     const { token, email } = await register(request);
     const caps = await fetchCaps(request);
     // 本机测试环境没有真实模型通道；该用例验证的是入口上下文与请求映射，
     // 显式注入可用运行态，避免把「无通道时禁用提交」的正确保护当成回归。
-    patchRuntime(caps, 'creative_image', {
+    patchRuntime(caps, 'free_create', {
       enabled: true,
       remoteAvailable: true,
       localQuality: 'none',
@@ -243,7 +243,7 @@ test.describe('能力可见性与运行态', () => {
           data: {
             id: 'task-creative-e2e',
             projectId: 'p1',
-            capability: 'creative_image',
+            capability: 'free_create',
             status: 'succeeded',
             inputAssetIds: ['asset-1'],
             params: { prompt: '清晨窗边的木质桌面' },
@@ -286,8 +286,8 @@ test.describe('能力可见性与运行态', () => {
     );
 
     await authed(page, '/workbench', token, email);
-    await page.locator('.wb-tool-grid .wb-tool-card').filter({ hasText: '创意生图' }).click();
-    await expect(page).toHaveURL(/\/creative-image$/);
+    await page.locator('.wb-tool-grid .wb-tool-card').filter({ hasText: '自由创作' }).click();
+    await expect(page).toHaveURL(/\/free-creation$/);
 
     await page.locator('textarea').first().fill('清晨窗边的木质桌面');
     await expect(page.getByRole('button', { name: /立即生成/ })).toBeEnabled();
@@ -300,7 +300,7 @@ test.describe('能力可见性与运行态', () => {
     await page.locator('textarea').first().fill('清晨窗边的木质桌面');
     await page.getByRole('button', { name: /立即生成/ }).click();
 
-    await expect.poll(() => posted?.capability).toBe('creative_image');
+    await expect.poll(() => posted?.capability).toBe('free_create');
     expect(posted.inputAssetIds).toEqual(['asset-1']);
     expect(posted.params.prompt).toBe('清晨窗边的木质桌面');
 
@@ -413,7 +413,7 @@ test.describe('失败任务不进入我的作品', () => {
     const failed = {
       id: 'task-failed-e2e',
       projectId: 'project-e2e',
-      capability: 'creative_image',
+      capability: 'free_create',
       status: 'failed',
       inputAssetIds: ['asset-original'],
       params: { prompt: '原任务提示词', ratio: '4:3' },

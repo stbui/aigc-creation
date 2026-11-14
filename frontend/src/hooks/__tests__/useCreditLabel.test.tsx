@@ -26,54 +26,54 @@ describe('useCreditLabel', () => {
   it('清单未加载时返回 null，不冒充免费', () => {
     capsMock.mockReturnValue({ data: null, loading: true, error: null });
 
-    const { result } = renderHook(() => useCreditLabel('creative_image'));
+    const { result } = renderHook(() => useCreditLabel('free_create'));
     expect(result.current).toBeNull();
   });
 
   it('能力不存在时返回 null', () => {
     capsMock.mockReturnValue(capsWith([{ id: 'matting', creditCost: 3 }]));
 
-    const { result } = renderHook(() => useCreditLabel('creative_image'));
+    const { result } = renderHook(() => useCreditLabel('free_create'));
     expect(result.current).toBeNull();
   });
 
   it('0 积分显示「免费」', () => {
-    capsMock.mockReturnValue(capsWith([{ id: 'creative_image', creditCost: 0 }]));
+    capsMock.mockReturnValue(capsWith([{ id: 'free_create', creditCost: 0 }]));
 
-    const { result } = renderHook(() => useCreditLabel('creative_image'));
+    const { result } = renderHook(() => useCreditLabel('free_create'));
     expect(result.current).toBe('免费');
   });
 
   it('正数显示本次消耗，数字来自后端而非写死', () => {
-    capsMock.mockReturnValue(capsWith([{ id: 'creative_image', creditCost: 10 }]));
+    capsMock.mockReturnValue(capsWith([{ id: 'free_create', creditCost: 10 }]));
 
-    const { result } = renderHook(() => useCreditLabel('creative_image'));
+    const { result } = renderHook(() => useCreditLabel('free_create'));
     expect(result.current).toBe('本次消耗 10 积分');
   });
 
   it('creditCost 缺省按 0 处理', () => {
-    capsMock.mockReturnValue(capsWith([{ id: 'creative_image' }]));
+    capsMock.mockReturnValue(capsWith([{ id: 'free_create' }]));
 
-    const { result } = renderHook(() => useCreditLabel('creative_image'));
+    const { result } = renderHook(() => useCreditLabel('free_create'));
     expect(result.current).toBe('免费');
   });
 });
 
 describe('useCreditCost', () => {
   it('返回数字价用于提交前提示', () => {
-    capsMock.mockReturnValue(capsWith([{ id: 'creative_image', creditCost: 10 }]));
+    capsMock.mockReturnValue(capsWith([{ id: 'free_create', creditCost: 10 }]));
 
-    const { result } = renderHook(() => useCreditCost('creative_image'));
+    const { result } = renderHook(() => useCreditCost('free_create'));
     expect(result.current).toBe(10);
   });
 
   it('0 与「未加载」不混淆', () => {
-    capsMock.mockReturnValue(capsWith([{ id: 'creative_image', creditCost: 0 }]));
-    const free = renderHook(() => useCreditCost('creative_image'));
+    capsMock.mockReturnValue(capsWith([{ id: 'free_create', creditCost: 0 }]));
+    const free = renderHook(() => useCreditCost('free_create'));
     expect(free.result.current).toBe(0);
 
     capsMock.mockReturnValue({ data: null, loading: true, error: null });
-    const loading = renderHook(() => useCreditCost('creative_image'));
+    const loading = renderHook(() => useCreditCost('free_create'));
     expect(loading.result.current).toBeNull();
   });
 });

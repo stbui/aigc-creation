@@ -1,7 +1,7 @@
 /**
  * 工具页共享皮肤（pk-* / tool-* / pd-* / result-*）。
  *
- * 由 ToolShell、商品主图、商品详情、创意生图等页面共用，从 global.css 迁出。
+ * 由 ToolShell、商品主图、商品详情、自由创作等页面共用，从 global.css 迁出。
  * 只放跨页面复用的选择器；页面专属规则回到各自的 style.css。
  */
 

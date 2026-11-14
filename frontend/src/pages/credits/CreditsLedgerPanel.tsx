@@ -14,7 +14,7 @@ import {
   PAGE_SIZE,
   type LedgerFilter,
 } from './constants';
-import { formatDateTime, ledgerRemark } from './utils';
+import { formatDateTime, ledgerReference, ledgerRemark, shortId } from './utils';
 import { CreditsLedgerList } from './CreditsLedgerList';
 
 interface CreditsLedgerPanelProps {
@@ -62,6 +62,22 @@ export function CreditsLedgerPanel({
       dataIndex: 'type',
       width: 120,
       render: (value: string) => LEDGER_LABEL[value] ?? value,
+    },
+    {
+      // 关联单据三选一（账单 / 支付订单 / 生成任务）；短 ID 可读，完整 id 放 title
+      title: '关联单据',
+      key: 'reference',
+      width: 170,
+      ellipsis: true,
+      render: (_value: unknown, row: CreditLedgerEntry) => {
+        const reference = ledgerReference(row);
+        if (!reference) return '—';
+        return (
+          <span title={reference.id}>
+            {reference.label} {shortId(reference.id)}
+          </span>
+        );
+      },
     },
     {
       title: '变动',
@@ -156,7 +172,7 @@ export function CreditsLedgerPanel({
             hideOnSinglePage: true,
             onChange: onPageChange,
           }}
-          scroll={{ x: 680 }}
+          scroll={{ x: 850 }}
         />
       )}
     </>

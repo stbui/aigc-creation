@@ -174,7 +174,7 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `ToolTypeTabs` / `ProductFieldsGrid`，右栏保留本页「商品图 → 参考图 → 生成图」对照
     `ViralCloneResultList`；双图片位上传与素材库 / 手机定向回填落 `useViralCloneAssets`）；
   - `frontend/src/pages/creative-image/__tests__/creative-image-modules.test.ts` ——
-    C 端创意生图 / 自由创作目录（`src/pages/creative-image` / `src/components` /
+    C 端自由创作工作台目录（`src/pages/creative-image` / `src/components` /
     `src/hooks` / `src/lib` / `src/context`；页面按板块拆成 `CreativeImageInputPane` /
     `CreativeImageOutputPane` 两栏，左栏再拆 `CreativeImageUploadSection`（原子缩略图
     `CreativeImageReferenceThumb`）/ `CreativeImagePromptField`；提交区复用共享

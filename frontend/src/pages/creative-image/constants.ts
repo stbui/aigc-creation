@@ -1,5 +1,5 @@
 /**
- * 创意生图 / 自由创作工作台页面的常量 —— 目录内文件的唯一常量入口。
+ * 自由创作工作台页面的常量 —— 目录内文件的唯一常量入口。
  *
  * 约定: `creative-image/` 下的文件不从 `src/lib/constants` 直接取东西, 一律经由本文件 ——
  * 页面上传上限、字段长度与能力标签集中可见, 调整只改一处。
@@ -28,21 +28,14 @@ export const CREATION_PROMPT_PLACEHOLDER =
 // ───────────────── 能力上下文 ─────────────────
 
 /**
- * 本页支持的两个能力。
+ * 本页唯一能力。
  *
- * 页面外观同构, 但提交的任务能力不同 —— `creative_image` 是「创意生图」入口,
- * `free_create` 是「自由创作」入口。能力 id 必须与后端注册表一致。
+ * 2026-11-14: 「创意生图」(creative_image / /creative-image) 与「自由创作」
+ * (free_create / /free-creation) 合并为同一功能，只保留 free_create 与
+ * /free-creation。能力 id 必须与后端注册表一致。
  */
-export type CreationCapability = 'creative_image' | 'free_create';
-
-/** 能力 id → 页面标题 (与后端能力注册表的 name 同口径) */
-export const CREATION_CAPABILITY_LABELS: Record<CreationCapability, string> = {
-  creative_image: '创意生图',
-  free_create: '自由创作',
-};
-
-/** 能力 id → 结果下载文件名前缀 */
-export const CREATION_DOWNLOAD_PREFIX: Record<CreationCapability, string> = {
-  creative_image: 'creative-image',
-  free_create: 'free-create',
-};
+export const CREATION_CAPABILITY = 'free_create';
+/** 页面标题 (与后端能力注册表的 name 同口径) */
+export const CREATION_CAPABILITY_LABEL = '自由创作';
+/** 结果下载文件名前缀 */
+export const CREATION_DOWNLOAD_PREFIX = 'free-create';

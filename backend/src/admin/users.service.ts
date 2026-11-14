@@ -29,6 +29,18 @@ const SORTABLE = ["createdAt", "lastLoginAt", "email", "name"] as const;
 /** 计入实付/退款金额的订单状态。与平台概览的 GMV 口径一致 */
 const PAID_ORDER_STATUSES = ["paid", "partial_refunded", "refunded"];
 
+/**
+ * 批量注销单次上限。
+ *
+ * 与批量启停共用 100 的上限并不合适：注销的每一条都是一次独立事务
+ * （删任务 / 素材 / 积分批次 + 匿名化）再逐个删对象存储文件，20 条已经是
+ * 同步请求在弱网下的体感上限，再往上应当走导出核对 + 分批执行。
+ */
+export const USER_BATCH_DELETE_LIMIT = 20;
+
+/** 批量注销的确认词。与单条物理删除同一套口径：不可逆动作必须打字确认 */
+export const USER_BATCH_DELETE_CONFIRM = "删除";
+
 /** 成功率 (%)；无已结束任务时为 null 而非 0 —— 0% 会误导成「全挂了」 */
 function rateOf(succeeded: number, failed: number): number | null {
   const finished = succeeded + failed;
@@ -242,6 +254,30 @@ export class AdminUsersService {
     actorId: string,
   ) {
     return runBatch(ids, (id) => this.changeStatus(id, { status }, actorId));
+  }
+
+  /**
+   * 批量注销。
+   *
+   * 逐条调用 `remove(id, false, ...)`，因此单条的规则（不能删自己、已注销
+   * 不可重复删、末位管理员保护）在批量里同样生效，失败原因逐条回传。
+   *
+   * 与批量启停的差别只有两处，都是为了「点错一次影响一批人」这个风险：
+   * 1. 必须带确认词（`confirm === '删除'`），前端要求运营手工键入；
+   * 2. 上限收紧到 {@link USER_BATCH_DELETE_LIMIT}。
+   *
+   * 固定软注销：物理删除只对无资金记录的账号开放，还得逐条核对影响面，
+   * 不适合批量。
+   */
+  async batchDelete(ids: string[], confirm: string | undefined, actorId: string) {
+    if (confirm !== USER_BATCH_DELETE_CONFIRM) {
+      throw new AppError(40001, `批量注销需要确认词「${USER_BATCH_DELETE_CONFIRM}」`, 400);
+    }
+    return runBatch(
+      ids,
+      (id) => this.remove(id, false, undefined, actorId),
+      { limit: USER_BATCH_DELETE_LIMIT },
+    );
   }
 
   /**

@@ -236,12 +236,30 @@
   gap: 16px;
 }
 
-/* 付费档固定 6 张 (免费档已压成基线行): 3 列正好排成 3×2。
-   沿用 208px 基准会被挤成 5+1, 末行只剩一张卡。 */
+/* 会员套餐: 固定宽度单行横排。
+   后台现有 6 个付费档 (免费档已压成基线行), 此前按 33.333% 均分会折成 3×2
+   且卡片随容器涨到 378px, 和下方的积分包小卡完全不成比例。
+   固定 240px 后一行放不下就横向滚动 —— 档位是商品, 不能因为换行就把后半档
+   藏到第二屏, 也不能为了挤进一屏把卡片压到放不下权益文案。
+   justify-content 必须回到 flex-start: 居中 + 滚动容器会让溢出到左侧的
+   第一张卡永远滚不到 (flex 居中溢出时起始内容不可达)。 */
+.pkg-grid.is-plans {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  /* 给「当前方案」角标 (top:-10px) 与 hover 阴影留出不被裁切的空间 */
+  padding: 12px 2px 12px;
+  /* 抵消 padding-top, 保持与免费档基线行原本的 16px 间距 */
+  margin-top: -12px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
 .pkg-grid.is-plans .pkg-card {
-  flex: 0 1 calc(33.333% - 11px);
+  flex: 0 0 240px;
   min-width: 240px;
-  max-width: none;
+  max-width: 240px;
+  scroll-snap-align: start;
 }
 
 /* 免费档基线: 一行说清「免费能用到什么」, 不占卡片位 */
@@ -544,10 +562,11 @@
     max-width: none;
     padding: 18px 16px 16px;
   }
-  /* 覆盖 is-plans 的 4 列均分 (选择器优先级更高, 必须同权重重置) */
+  /* 会员套餐窄屏仍是固定宽度横滑, 不回退成一张占满整行 */
   .pkg-grid.is-plans .pkg-card {
-    flex-basis: 100%;
-    min-width: 0;
+    flex-basis: 240px;
+    min-width: 240px;
+    max-width: 240px;
   }
   .pkg-grid.is-products .pkg-card {
     flex-grow: 0;

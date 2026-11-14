@@ -7,6 +7,8 @@ import { AppError } from '../common/app.exception';
 import { SignedUrlService } from '../common/signed-url.service';
 import { SettingsService, type UploadLimits } from '../common/settings.service';
 import { inspectUploadedImage, verifyDecodableImage } from '../assets/image-validation';
+import { warmThumbnails } from '../assets/thumb-render';
+import { resolveUploadsDir } from '../config/env-files';
 
 /**
  * 手机上传会话服务 —— 参考站「手机上传」的会话侧。
@@ -258,6 +260,19 @@ export class MobileUploadService {
         }
         const key = this.storage.buildKey('original', item.ext);
         await provider.put(key, data, item.mime);
+        /*
+         * 缩略图预热：手机拍的原图多为 5–12MP，按需生成时一张解码就要 1s 以上，
+         * 用户回到电脑端打开素材库会看到长时间的空格子。这里趁 `data` 还在手里
+         * 就算掉（fire-and-forget），浏览时变成纯磁盘读。
+         * 只对本地存储有意义 —— 云端 URL 带签名，前端不走 ?w= 通道。
+         */
+        if (provider.backend === 'local') {
+          void warmThumbnails({
+            uploadsDir: resolveUploadsDir(),
+            key,
+            source: data,
+          }).catch(() => undefined);
+        }
         const url = await provider.url(key);
         storedFiles.push({ key, url, ...item });
       }

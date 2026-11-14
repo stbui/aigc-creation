@@ -23,6 +23,7 @@ export { useIsMobile } from './use-mobile';
 export { useLightboxIndex } from './useLightboxIndex';
 export { mediaHeightRatio, useMasonryColumns } from './useMasonryColumns';
 export { useMediaQuery } from './useMediaQuery';
+export { useNearViewport } from './useNearViewport';
 export { usePasteUpload } from './usePasteUpload';
 export { useTargetedAssetPicker } from './useTargetedAssetPicker';
 export { usePollAbort } from './usePollAbort';

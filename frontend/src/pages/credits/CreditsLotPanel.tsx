@@ -9,7 +9,7 @@ import {
   Tag,
 } from './components';
 import { LOT_STATUS, PAGE_SIZE, SOURCE_LABEL } from './constants';
-import { formatDate } from './utils';
+import { formatDate, shortId } from './utils';
 import { CreditsLotList } from './CreditsLotList';
 
 interface CreditsLotPanelProps {
@@ -40,6 +40,21 @@ export function CreditsLotPanel({
       dataIndex: 'source',
       width: 130,
       render: (value: string) => SOURCE_LABEL[value] ?? value,
+    },
+    {
+      title: '发放时间',
+      dataIndex: 'createdAt',
+      width: 130,
+      render: (value: string) => formatDate(value),
+    },
+    {
+      // 购买批次指向购买单；短 ID 可读，完整 id 放 title
+      title: '关联订单',
+      dataIndex: 'orderId',
+      width: 130,
+      ellipsis: true,
+      render: (value: string | null) =>
+        value ? <span title={value}>{shortId(value)}</span> : '—',
     },
     { title: '总额', dataIndex: 'totalCredits', width: 100, align: 'right' as const },
     { title: '剩余', dataIndex: 'remainingCredits', width: 100, align: 'right' as const },
@@ -108,7 +123,7 @@ export function CreditsLotPanel({
         hideOnSinglePage: true,
         onChange: onPageChange,
       }}
-      scroll={{ x: 620 }}
+      scroll={{ x: 850 }}
     />
   );
 }
