@@ -27,6 +27,9 @@ export function targetColorOf(color: string, customColor: string): string {
 
 /** 结果标签: 预设色查中文名, 自定义回落输入框里的 HEX 原值 (不做归一化)。 */
 export function colorLabelOf(color: string, customColor: string): string {
+  // COLOR_LABEL 也登记了 `custom` →「自定义」, 必须先把自定义档摘出来,
+  // 否则结果标签只显示「自定义」而看不到本次实际换成的颜色。
+  if (color === 'custom') return customColor;
   return COLOR_LABEL[color] ?? targetColorOf(color, customColor);
 }
 

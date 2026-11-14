@@ -99,7 +99,15 @@ export function AdminUsersPage() {
         }}
       />
 
-      <UserDetailDrawer detailId={detailId} onClose={closeUser} />
+      <UserDetailDrawer
+        detailId={detailId}
+        onClose={closeUser}
+        // 删除确认仍由页面统一承载：抽屉只发意图，不另起一套弹框与写锁
+        onDelete={
+          can('user.delete') && detailId !== me?.id ? actions.openDelete : undefined
+        }
+        deleteBusy={actions.busy}
+      />
 
       {actions.statusTarget && (
         <UserStatusConfirm

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
+  ActionButton,
   AdminDrawer,
   Button,
   Card,
@@ -29,6 +31,7 @@ import {
   formatDateTime,
 } from './utils';
 import type { AdminLoginLogResult, AdminUserDetail } from '../../../types/api';
+import type { DeleteUserTarget } from './types';
 
 /**
  * 描述列表的一项：标签在左、内容在右，同一行。
@@ -141,15 +144,24 @@ function RecentLoginsSection({ userId }: { userId: string }) {
 /**
  * 用户详情抽屉。
  *
- * 从页面拆出：详情的数据获取与列表筛选是两套生命周期；账号状态、角色、
- * 删除等写操作仍由页面统一承载，避免详情与行内菜单出现两个入口。
+ * 从页面拆出：详情的数据获取与列表筛选是两套生命周期。删除入口由页面按
+ * `user.delete` 权限与「不能删自己」下发 `onDelete`，点击后复用页面同一个
+ * `UserDeleteConfirm` 与写操作锁 —— 详情里不另起一套确认流程。
+ *
+ * 「最近登录」只保留独立的登录记录区块：账户信息里那个同名字段只是一次
+ * `lastLoginAt` 快照，与区块首条记录重复，去掉后账户信息正好两行。
  */
 export function UserDetailDrawer({
   detailId,
   onClose,
+  onDelete,
+  deleteBusy = false,
 }: {
   detailId: string | null;
   onClose: () => void;
+  /** 有值才渲染删除入口；页面已完成权限与「不能删自己」的过滤 */
+  onDelete?: (target: DeleteUserTarget) => void;
+  deleteBusy?: boolean;
 }) {
   const detailFetcher = useCallback(async () => {
     if (!detailId) throw new Error('用户不存在');
@@ -163,6 +175,19 @@ export function UserDetailDrawer({
       description="账号、会员、积分、消费与生成概览"
       onClose={onClose}
       fetcher={detailFetcher}
+      footer={(d) =>
+        onDelete && d.status !== 'deleted' ? (
+          <ActionButton
+            variant="destructive"
+            size="sm"
+            icon={Trash2}
+            disabled={deleteBusy}
+            onClick={() => onDelete({ id: d.id, email: d.email })}
+          >
+            删除用户
+          </ActionButton>
+        ) : undefined
+      }
     >
       {(d) => (
         <div className="flex flex-col gap-5">
@@ -216,10 +241,6 @@ export function UserDetailDrawer({
                 value={<span className="font-mono text-xs text-muted-foreground">{d.id}</span>}
               />
               <InfoItem label="注册时间" value={formatDateTime(d.createdAt)} />
-              <InfoItem
-                label="最近登录"
-                value={d.lastLoginAt ? formatDateTime(d.lastLoginAt) : '从未登录'}
-              />
             </dl>
           </DetailSection>
 

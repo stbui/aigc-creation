@@ -108,7 +108,7 @@ describe('写真模板页纯函数', () => {
   it('页面常量与后端声明的输入上限一致', () => {
     expect(CAPABILITY_ID).toBe('template');
     expect(MAX_IMAGES).toBe(5);
-    expect(DEFAULT_RATIO).toBe('3:4');
+    expect(DEFAULT_RATIO).toBe('9:16');
     expect(DEFAULT_SIZE).toBe('2k');
   });
 });

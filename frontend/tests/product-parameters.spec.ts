@@ -457,6 +457,9 @@ test.describe('8 个工具页参数与结果态', () => {
       detectionMode: 'MANUAL',
       outputFormat: 'PNG',
     });
+    // 后端 mode 枚举只认 auto / region，误传 manual 会被扣费前 40001 拒绝。
+    // 本用例把 /generate mock 成 200，只能靠 payload 断言守住前端契约。
+    expect(posted.params).not.toHaveProperty('mode');
     await expect(page.locator('.pk-result-card-detail')).toBeVisible({ timeout: 15000 });
   });
 

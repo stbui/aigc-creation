@@ -207,19 +207,19 @@
 }
 
 /* ── 右栏 ── */
+/*
+ * 右栏「创作灵感」面板：作为页签外壳的 flex 子项吃掉剩余高度，
+ * 分类页签留在页面底色上，模板网格内部滚动。
+ */
 .tpl-showcase {
   display: flex;
+  flex: 1;
   flex-direction: column;
   height: 100%;
   min-width: 0;
   min-height: 0;
   background: var(--page-bg);
 }
-
-/*
- * 右栏与商品主图 / 商品详情同构：分类页签留在页面底色上，
- * 模板网格与底部「最近生成」各是一张白色圆角卡。
- */
 .tpl-categories {
   display: flex;
   flex-wrap: wrap;
@@ -619,7 +619,20 @@
   white-space: nowrap;
 }
 
-/* ── 底部历史条（独立白卡，与上方网格卡留 12px 间距） ── */
+/* ── 「创作结果」页签：结果区独占右栏，缩略图换行铺开 ── */
+.pd-right-panel > .tpl-history {
+  flex: 1;
+  min-height: 0;
+  margin-top: 0;
+  overflow-y: auto;
+}
+
+.pd-right-panel > .tpl-history .tpl-history-strip {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+/* ── 结果区白卡（原底部「最近生成」历史条） ── */
 .tpl-history {
   flex: none;
   margin-top: 12px;
@@ -789,6 +802,20 @@
     min-height: calc(100vh - var(--workspace-topbar-height));
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
+  }
+
+  /* 窄屏自然滚动：页签外壳不再锁死 100% 高度，面板按内容撑开 */
+  .tpl-workspace .pd-right-pane {
+    height: auto;
+    min-height: 560px;
+  }
+
+  .tpl-workspace .pd-right-tabs {
+    flex: none;
+  }
+
+  .tpl-workspace .pd-right-panel {
+    height: auto;
   }
 
   .tpl-showcase {

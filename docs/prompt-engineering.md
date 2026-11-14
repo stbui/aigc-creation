@@ -98,7 +98,7 @@
 
 ## 8. 测试要求
 
-提示词相关能力的 spec 在 `backend/src/capabilities/definitions/*.spec.ts`，当前 7 个文件。新增或修改提示词至少覆盖：
+提示词相关能力的 spec 在 `backend/src/capabilities/definitions/*.spec.ts`，当前 13 个文件。新增或修改提示词至少覆盖：
 
 - [ ] 不同变体 / 模块的提示词互不相同。
 - [ ] 每个变体只要求自己的目标，不出现其他变体的要求。

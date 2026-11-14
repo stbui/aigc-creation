@@ -2,7 +2,7 @@ import type { RefObject } from 'react';
 import { Lightbulb } from 'lucide-react';
 
 import { CAPABILITY_ID, MAX_IMAGES, MAX_IMAGE_MB } from './constants';
-import { ToolGenerationSubmitBar, ToolImageDropzone } from './components';
+import { ModelPicker, ToolGenerationSubmitBar, ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
 import type { TemplateEntry } from './utils';
 import { TemplateSelectedCard } from './TemplateSelectedCard';
@@ -109,6 +109,17 @@ export function TemplateInputPane({
         resolution={resolution}
         onResolutionChange={onResolutionChange}
         onModelQuoteChange={onModelQuoteChange}
+        settingsProps={{
+          // 写真模板页不展示「单次约 X 积分」报价行；报价回调仍驱动按钮价签
+          modelPicker: (
+            <ModelPicker
+              capability={CAPABILITY_ID}
+              options={{ ratio, resolution }}
+              onQuoteChange={onModelQuoteChange}
+              showQuote={false}
+            />
+          ),
+        }}
         onSubmit={onSubmit}
       />
     </aside>

@@ -18,3 +18,7 @@ export { MobileUploadModal } from '../../components/MobileUploadModal';
 export { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
 /** 结果网格 (全部记录抽屉) */
 export { ResultGalleryPane } from '../../components/ResultGalleryPane';
+/** 右栏「创作灵感 / 创作结果」页签外壳（与商品主图 / 商品详情共用） */
+export { OutputTabsPane, type OutputTab } from '../../components/OutputTabsPane';
+/** 模型选择器（写真模板页隐藏实时报价行，见 TemplateInputPane） */
+export { ModelPicker } from '../../components/ModelPicker';

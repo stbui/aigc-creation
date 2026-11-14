@@ -27,6 +27,11 @@ export interface OutputTabsPaneProps {
   demo: ReactNode;
   /** 创作结果面板 */
   results: ReactNode;
+  /**
+   * 示例面板页签名。工具页默认「功能示例」；写真模板页的示例区是模板灵感，
+   * 故传「创作灵感」。结果页签名站内有统一口径，不开放覆盖。
+   */
+  demoLabel?: string;
   /** tablist 的可访问名称 */
   ariaLabel?: string;
 }
@@ -37,6 +42,7 @@ export function OutputTabsPane({
   generationCount,
   demo,
   results,
+  demoLabel = '功能示例',
   ariaLabel = '右侧面板',
 }: OutputTabsPaneProps) {
   return (
@@ -50,7 +56,7 @@ export function OutputTabsPane({
         items={[
           {
             key: 'demo',
-            label: '功能示例',
+            label: demoLabel,
             children: <div className="pd-right-panel">{demo}</div>,
           },
           {

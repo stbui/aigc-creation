@@ -1,27 +1,20 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, RotateCw } from 'lucide-react';
-import {
-  ActionButton,
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  SkeletonBody,
-} from '~/admin-ui/primitives';
+import { RotateCw } from 'lucide-react';
+import { ActionButton, SkeletonBody } from '~/admin-ui/primitives';
+import { DeleteUsersConfirmDialog } from '~/components/admin/DeleteUsersConfirmDialog';
 import { adminUsersApi } from './api';
 import type { AdminUserImpact } from '../../../types/admin-users';
-import type { AdminUserRow } from './types';
+import type { DeleteUserTarget } from './types';
 
 /**
  * 删除（注销）用户的二次确认。
  *
- * 管理端固定走软注销：后端使用与 C 端自助注销相同的生命周期实现。确认前
- * 必须展示将清除的作品数据和依法保留的资金记录，避免把「删除」误解成物理
- * 抹除，也避免运营在看不到影响面的情况下误操作。
+ * 弹框形态交给 `DeleteUsersConfirmDialog`，这里只负责三件事：实时拉影响面、
+ * 组装影响面内容、决定何时允许提交。资金记录的留存口径压成一行，确认框不会
+ * 比列表还长、把底部按钮挤出矮视口（回归见 `tests/admin.spec.ts`）。
+ *
+ * 影响面来自 `/admin/users/:id/impact`：加载失败可重试，加载完成前禁止提交，
+ * 防止在看不到数据的情况下误删。管理端固定走软注销。
  */
 export function UserDeleteConfirm({
   target,
@@ -29,7 +22,7 @@ export function UserDeleteConfirm({
   onCancel,
   onConfirm,
 }: {
-  target: AdminUserRow;
+  target: DeleteUserTarget;
   loading: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -62,104 +55,52 @@ export function UserDeleteConfirm({
     : 0;
 
   return (
-    <AlertDialog
-      open
-      onOpenChange={(next) => {
-        if (!next && !loading) onCancel();
-      }}
+    <DeleteUsersConfirmDialog
+      testId="admin-delete-dialog"
+      title="删除用户"
+      description={
+        <p>
+          将注销账号 <strong className="break-all">{target.email}</strong>
+          {'：账号立即失效，作品（含存储文件）与积分清除，操作不可撤销。'}
+        </p>
+      }
+      confirmText={loading ? '注销中…' : '确认注销'}
+      loading={loading}
+      confirmDisabled={impact === null}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
     >
-      <AlertDialogContent
-        data-testid="admin-delete-dialog"
-        className="admin-portal max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[440px] gap-0 overflow-hidden p-0"
-      >
-        <AlertDialogHeader className="px-5 py-4 text-left">
-          <AlertDialogTitle className="flex items-center gap-2 text-base text-destructive">
-            <AlertTriangle className="size-4 shrink-0" aria-hidden />
-            删除用户
-          </AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="flex flex-col gap-1.5">
-              <p>
-                将注销账号 <strong>{target.email}</strong>。注销后该账号立即失效。
-              </p>
-              <p>作品、任务、素材与积分会被清除；资金记录将按法务要求匿名保留。</p>
-            </div>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <div className="min-h-0 overflow-y-auto border-y border-border bg-muted/30 px-5 py-4">
-          {impactError ? (
-            <div className="flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs">
-              <span className="min-w-0 flex-1 text-destructive">{impactError}</span>
-              <ActionButton
-                variant="ghost"
-                size="sm"
-                onClick={() => setReloadKey((value) => value + 1)}
-              >
-                <RotateCw className="size-3.5" aria-hidden />
-                重试
-              </ActionButton>
-            </div>
-          ) : impact === null ? (
-            <div aria-live="polite">
-              <div className="mb-2 text-xs text-muted-foreground">正在加载影响面…</div>
-              <SkeletonBody rows={2} />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 text-xs">
-              <ImpactGroup
-                label="将清除"
-                detail={`项目 ${impact.projects} · 任务 ${impact.tasks} · 素材 ${impact.assets}`}
-                emphasis
-              />
-              <ImpactGroup
-                label={`将匿名保留（${retainedTotal} 条）`}
-                detail={`订单 ${impact.retained.orders} · 支付 ${impact.retained.payments} · 退款 ${impact.retained.refunds} · 发票 ${impact.retained.invoices} · 生成账单 ${impact.retained.billingOrders} · 积分流水 ${impact.retained.creditLedgerEntries}`}
-              />
-              <p className="text-muted-foreground">
-                对象存储中的作品文件会同步删除，操作不可撤销。
-              </p>
-            </div>
-          )}
-        </div>
-
-        <AlertDialogFooter className="bg-muted/40 px-5 py-3">
-          <AlertDialogCancel size="sm" disabled={loading} onClick={onCancel}>
-            取消
-          </AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
+      {impactError ? (
+        <div className="flex items-center gap-2 text-destructive">
+          <span className="min-w-0 flex-1">{impactError}</span>
+          <ActionButton
+            variant="ghost"
             size="sm"
-            disabled={loading || impact === null}
-            onClick={(event) => {
-              // 请求结束后再由父级关闭，避免加载期间弹框提前消失。
-              event.preventDefault();
-              onConfirm();
-            }}
+            onClick={() => setReloadKey((value) => value + 1)}
           >
-            {loading ? '注销中…' : '确认注销'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function ImpactGroup({
-  label,
-  detail,
-  emphasis = false,
-}: {
-  label: string;
-  detail: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <div className="rounded-md border border-border bg-background/70 px-3 py-2">
-      <div className={emphasis ? 'font-medium text-destructive' : 'font-medium'}>
-        {label}
-      </div>
-      <div className="mt-1 leading-5 text-muted-foreground tabular-nums">{detail}</div>
-    </div>
+            <RotateCw className="size-3.5" aria-hidden />
+            重试
+          </ActionButton>
+        </div>
+      ) : impact === null ? (
+        <div aria-live="polite">
+          <div className="mb-1.5 text-muted-foreground">正在加载影响面…</div>
+          <SkeletonBody rows={2} />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <div>
+            <span className="font-medium text-destructive">将清除</span>
+            <span className="ml-2 text-muted-foreground tabular-nums">
+              {`项目 ${impact.projects} · 任务 ${impact.tasks} · 素材 ${impact.assets}`}
+            </span>
+          </div>
+          <div>
+            <span className="font-medium">将匿名保留（{retainedTotal} 条）</span>
+            <span className="ml-2 text-muted-foreground">资金记录按法务要求留存</span>
+          </div>
+        </div>
+      )}
+    </DeleteUsersConfirmDialog>
   );
 }

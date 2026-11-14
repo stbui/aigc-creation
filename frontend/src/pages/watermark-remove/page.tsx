@@ -153,8 +153,12 @@ export function WatermarkRemovePage() {
       setPreparing(false);
     }
 
+    /*
+     * 不提交 mode：能力定义只声明 auto / region，误传 manual 会被
+     * validateCapabilityParams 在扣费前判 40001。专用页的「手动标注」语义
+     * 已由 detectionMode=MANUAL + maskAssetId 表达，不需要第三个枚举值。
+     */
     await run(inputs, {
-      mode: 'manual',
       detectionMode: 'MANUAL',
       ...(maskAssetId ? { maskAssetId } : {}),
       outputFormat: 'PNG',

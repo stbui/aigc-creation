@@ -1,3 +1,4 @@
+import { Grid3x3, List, Trash2 } from 'lucide-react';
 import {
   ActionButton,
   AdminDataTable,
@@ -7,6 +8,7 @@ import {
   ListError,
   Pagination,
   SelectField,
+  SegmentedGroup,
   SkeletonCards,
   StaleError,
   StatusTag,
@@ -217,7 +219,9 @@ export function UserListSection({
             {/*
              * 排序 / 导出 / 视图同属「列表怎么呈现」，原来排序导出独占一行、
              * 视图再占一行。合并到这一行后，左「选择本页」右「排序·导出·视图」，
-             * 少一层工具栏，首屏能多露出一行卡片。
+             * 少一层工具栏，首屏能多露出一行卡片。视图切换复用素材页同一个
+             * `SegmentedGroup`：自带图标、选中态与读屏语义，不再手写两个
+             * `aria-pressed` 按钮和「视图」文字标签。
              */}
             <div className="flex flex-wrap items-center justify-end gap-1.5">
               <span className="text-xs text-muted-foreground">排序</span>
@@ -238,23 +242,31 @@ export function UserListSection({
                 />
               )}
               <span className="mx-1.5 h-4 w-px bg-border" aria-hidden />
-              <span className="text-xs text-muted-foreground">视图</span>
-              <ActionButton
-                variant={view === 'cards' ? 'default' : 'secondary'}
-                size="sm"
-                onClick={() => onViewChange('cards')}
-                ariaPressed={view === 'cards'}
-              >
-                卡片
-              </ActionButton>
-              <ActionButton
-                variant={view === 'table' ? 'default' : 'secondary'}
-                size="sm"
-                onClick={() => onViewChange('table')}
-                ariaPressed={view === 'table'}
-              >
-                表格
-              </ActionButton>
+              <SegmentedGroup
+                ariaLabel="切换视图"
+                value={view}
+                onChange={(next) => onViewChange(next as UserListView)}
+                options={[
+                  {
+                    value: 'cards',
+                    label: (
+                      <span className="inline-flex items-center gap-1" title="卡片视图">
+                        <Grid3x3 className="size-3.5" aria-hidden />
+                        卡片
+                      </span>
+                    ),
+                  },
+                  {
+                    value: 'table',
+                    label: (
+                      <span className="inline-flex items-center gap-1" title="表格视图">
+                        <List className="size-3.5" aria-hidden />
+                        表格
+                      </span>
+                    ),
+                  },
+                ]}
+              />
             </div>
           </div>
 
@@ -276,7 +288,7 @@ export function UserListSection({
               >
                 {canBatchDelete && deleteOverLimit
                   ? `删除单次最多 ${BATCH_DELETE_LIMIT} 个账号，请分批处理`
-                  : `${batchHint ? `${batchHint}，` : ''}逐条返回结果`}
+                  : batchHint}
               </span>
               <div className="ml-auto flex items-center gap-1.5">
                 {canBatch && (
@@ -293,7 +305,7 @@ export function UserListSection({
                     </ActionButton>
                     <ActionButton
                       size="sm"
-                      variant="destructive"
+                      variant="secondary"
                       disabled={batchBusy}
                       onClick={() =>
                         onBatch('disable', selectedRows.map((row) => row.id))
@@ -307,6 +319,7 @@ export function UserListSection({
                   <ActionButton
                     size="sm"
                     variant="destructive"
+                    icon={Trash2}
                     disabled={batchBusy || deleteOverLimit}
                     onClick={() => onBatchDelete(selectedRows)}
                   >

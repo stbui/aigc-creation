@@ -45,6 +45,11 @@ export interface ModelPickerProps {
    * 上传数量等模型相关约束应从这里读，不能假设前端的页面上限就等于模型上限。
    */
   onModelChange?: (model: PublicModelGroup | null) => void;
+  /**
+   * 是否展示「单次约 X 积分」实时报价行。默认展示；写真模板页不披露这一行，
+   * 但报价回调仍照常工作，提交按钮的价签不受影响。
+   */
+  showQuote?: boolean;
   className?: string;
 }
 
@@ -61,6 +66,7 @@ export function ModelPicker({
   options,
   onQuoteChange,
   onModelChange,
+  showQuote = true,
   className,
 }: ModelPickerProps) {
   const [models, setModels] = useState<PublicModelGroup[]>([]);
@@ -237,7 +243,7 @@ export function ModelPicker({
           );
         })}
       </div>
-      {selected && options && (
+      {selected && options && showQuote && (
         <p
           style={{ fontSize: 12, color: 'var(--text-desc)', margin: '6px 0 0' }}
           data-testid="model-quote"

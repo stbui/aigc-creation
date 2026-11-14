@@ -9,7 +9,12 @@ import {
   MAX_IMAGES,
   MAX_IMAGE_MB,
 } from './constants';
-import { AssetLibraryModal, MobileUploadModal, ResultGalleryPane } from './components';
+import {
+  AssetLibraryModal,
+  MobileUploadModal,
+  ResultGalleryPane,
+  type OutputTab,
+} from './components';
 import { TemplateInputPane } from './TemplateInputPane';
 import { TemplateShowcase } from './TemplateShowcase';
 import {
@@ -33,8 +38,9 @@ import { Modal, useApp } from '../../ui';
  * 婚纱写真模板工作台
  *
  * 页面结构：`.tpl-workspace` 两列网格（432px 左配置栏 + 右模板区），
- * 左栏（上传人像照片 + 已选模板回显 + 提交区）与右栏（分类 tab + 模板网格 +
- * 底部常驻「最近生成」）各自内部滚动，页面本身不滚动。
+ * 左栏（上传人像照片 + 已选模板回显 + 提交区）与右栏（「创作灵感 / 创作结果」
+ * 两个页签；灵感页是分类 tab + 模板网格，结果页是创作结果区）各自内部滚动，
+ * 页面本身不滚动。提交时自动切到「创作结果」。
  *
  * 生成规则：至少上传 1 张人物照片；提交的参数只有模板 id，服务端按模板
  * 查回提示词，与上传照片一起组成模型请求。模板清单由后端下发，前端不存副本；
@@ -86,6 +92,8 @@ export function TemplatePage() {
   const [resolution, setResolution] = useState(DEFAULT_SIZE);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /** 右栏页签：首访落在「创作灵感」（模板是必需输入），提交后切到「创作结果」 */
+  const [rightTab, setRightTab] = useState<OutputTab>('demo');
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
@@ -149,6 +157,8 @@ export function TemplatePage() {
   const submit = async () => {
     if (!formValid || generating || !selectedTemplateId) return;
     setSubmitting(true);
+    // 占位卡在结果区，提交即切页签，避免用户留在灵感页看不到进度
+    setRightTab('results');
 
     try {
       const projectId = await ensureProject();
@@ -224,13 +234,8 @@ export function TemplatePage() {
   );
 
   const guestLabel = blocked ? undefined : '登录后生成婚纱写真';
-  const hint = blocked
-    ? (reason ?? undefined)
-    : images.length === 0
-      ? '请先上传至少 1 张人物照片'
-      : !selectedTemplateId
-        ? '请先在右侧选择一个模板'
-        : undefined;
+  /** 提示行只保留能力不可用的原因；表单未填完由按钮置灰表达，不再给文字提示 */
+  const hint = blocked ? (reason ?? undefined) : undefined;
 
   return (
     <>
@@ -261,8 +266,10 @@ export function TemplatePage() {
           onSubmit={() => void submit()}
         />
 
-        {/* ── 右: 模板展示（常驻）+ 底部历史记录 ── */}
+        {/* ── 右: 创作灵感 / 创作结果 两个页签 ── */}
         <TemplateShowcase
+          activeTab={rightTab}
+          onTabChange={setRightTab}
           catalog={catalog}
           categoryId={categoryId}
           groupId={groupId}

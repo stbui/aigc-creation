@@ -194,6 +194,46 @@ check(
   ).includes('#FF0B22'),
 );
 
+/*
+ * 抠图提示词：模型只出带 Alpha 的透明主体，背景色 / 自定义透明度由
+ * MattingResultEditor 在浏览器合成。旧文案把 token 名与 canvas alpha 当
+ * 画面指令发给模型，这里固化「颜色不进提示词」的分工边界。
+ */
+console.log('\n【抠图提示词：背景色只由前端合成】');
+const mattingBaseline = buildPromptFor('matting', {});
+const mattingColors = matting?.params.find((p) => p.key === 'selectedColor')?.options ?? [];
+check(
+  '抠图提示词不含背景色 token / HEX / alpha 元指令',
+  !['色板', '背景替换为', 'light-blue', '#5546D8', '%'].some((text) => mattingBaseline.includes(text)),
+  mattingBaseline,
+);
+check(
+  '七种色板取值 + 自定义色不改变抠图实发提示词',
+  mattingColors.every(
+    (option) =>
+      buildPromptFor('matting', {
+        selectedColor: option.value,
+        customColor: '#FF0000',
+        customAlpha: 72,
+      }) === mattingBaseline,
+  ),
+);
+check(
+  '旧抠图调用 bgColor 不改变实发提示词',
+  buildPromptFor('matting', { bgColor: '#3988E9' }) === mattingBaseline,
+);
+check(
+  '抠图提示词声明 Alpha 透明主体与发丝级边缘',
+  mattingBaseline.includes('Alpha 通道') &&
+    mattingBaseline.includes('不绘制任何背景') &&
+    mattingBaseline.includes('边缘发丝级保留'),
+);
+check(
+  '抠图提示词的参考图张数只由 refCount 决定',
+  !mattingBaseline.includes('共参考上传的') &&
+    (getCapability('matting')?.buildPrompt({}, 1) ?? '').includes('共参考上传的 1 张商品图。'),
+);
+
 console.log('\n【hidden 字段兼容：未提交不得注入默认值】');
 const oldMatting = sanitizeParams('matting', { bgColor: '#3988E9' });
 check('旧抠图调用不注入 selectedColor', !('selectedColor' in oldMatting), oldMatting);

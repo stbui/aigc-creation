@@ -7,10 +7,10 @@ import type { GalleryItem } from './hooks';
 import { Spin } from '../../ui';
 
 /**
- * 右栏底部「最近生成」历史条。
+ * 右栏「创作结果」页签的结果区。
  *
- * 页面结构对齐 AI 带货图文工作台：模板展示常驻，历史记录固定右栏底部，
- * 不占用模板区。每次提交只产生一张写真，历史卡按单张陈列。
+ * 由原来的底部「最近生成」历史条更名而来：模板灵感与创作结果拆成两个页签，
+ * 结果区独占右栏，不再挤在模板网格下方。每次提交只产生一张写真，历史卡按单张陈列。
  */
 export interface TemplateHistoryProps {
   items: GalleryItem[];
@@ -60,10 +60,10 @@ function TemplateHistoryImpl({
   };
 
   return (
-    <section className="tpl-history" aria-label="最近生成">
+    <section className="tpl-history" aria-label="创作结果">
       <header className="tpl-history-head">
         <strong className="tpl-history-title">
-          最近生成
+          创作结果
           {items.length > 0 && <span className="tpl-history-count">{items.length} 张</span>}
         </strong>
         <div className="tpl-history-actions">

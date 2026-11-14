@@ -3,7 +3,7 @@ import { useAdmin, useToast } from './hooks';
 import { adminUsersApi } from './api';
 import { BATCH_DELETE_CONFIRM } from '~/components/admin/BatchDeleteUsersDialog';
 import type { UserCardAction } from './UserCard';
-import type { AdminUserRole, AdminUserRow } from './types';
+import type { AdminUserRole, AdminUserRow, DeleteUserTarget } from './types';
 import type { AdminPasswordReset } from '../../../types/api';
 
 interface Options {
@@ -24,7 +24,7 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
   const { can, me } = useAdmin();
   const [statusTarget, setStatusTarget] = useState<AdminUserRow | null>(null);
   const [roleTarget, setRoleTarget] = useState<AdminUserRow | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteUserTarget | null>(null);
   const [batchDeleteTarget, setBatchDeleteTarget] = useState<AdminUserRow[] | null>(
     null,
   );
@@ -215,6 +215,8 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
     resetPassword,
     batchStatus,
     openBatchDelete,
+    /** 详情抽屉的删除入口：只有 id/email 也能驱动同一个确认弹框与写锁 */
+    openDelete: (target: DeleteUserTarget) => setDeleteTarget(target),
     confirmBatchDelete,
     closeStatus: () => setStatusTarget(null),
     closeRole: () => setRoleTarget(null),

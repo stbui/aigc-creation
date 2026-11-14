@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import type { TemplateCatalogCategory } from './api';
 import { ALL_CATEGORY, ALL_GROUP } from './constants';
+import { OutputTabsPane, type OutputTab } from './components';
 import type { GalleryItem } from './hooks';
 import { filterCatalog, type TemplateEntry } from './utils';
 import { TemplateCategoryNav } from './TemplateCategoryNav';
@@ -15,13 +16,16 @@ interface TemplateShowcaseProps {
   groupId: string;
   onCategoryChange: (categoryId: string) => void;
   onGroupChange: (groupId: string) => void;
-  /** 展平后的全量模板：历史卡回显模板名用 */
+  /** 展平后的全量模板：结果卡回显模板名用 */
   allTemplates: TemplateEntry[];
   selectedTemplateId: string | null;
   onSelectTemplate: (template: TemplateEntry) => void;
   templatesLoading: boolean;
   templatesError: string | null;
   onRetryTemplates: () => void;
+  /** 右栏页签：demo = 创作灵感，results = 创作结果 */
+  activeTab: OutputTab;
+  onTabChange: (tab: OutputTab) => void;
   galleryItems: GalleryItem[];
   galleryLoading: boolean;
   galleryError: string | null;
@@ -29,7 +33,12 @@ interface TemplateShowcaseProps {
   onOpenAll: () => void;
 }
 
-/** 右栏：一级 / 二级分类导航 + 模板网格（常驻）+ 底部历史条。 */
+/**
+ * 右栏：顶部「创作灵感 / 创作结果」两个页签。
+ *
+ * 灵感页放一级 / 二级分类导航 + 模板网格；结果页放原「最近生成」历史条更名后的
+ * 创作结果区。外壳复用商品主图 / 商品详情的 `OutputTabsPane`，胶囊页签样式不另写一套。
+ */
 export function TemplateShowcase({
   catalog,
   categoryId,
@@ -42,6 +51,8 @@ export function TemplateShowcase({
   templatesLoading,
   templatesError,
   onRetryTemplates,
+  activeTab,
+  onTabChange,
   galleryItems,
   galleryLoading,
   galleryError,
@@ -74,35 +85,45 @@ export function TemplateShowcase({
     : undefined;
 
   return (
-    <section className="tpl-showcase" aria-label="写真模板">
-      <TemplateCategoryNav catalog={catalog} categoryId={categoryId} onSelect={onCategoryChange} />
+    <OutputTabsPane
+      value={activeTab}
+      onChange={onTabChange}
+      generationCount={galleryItems.length}
+      demoLabel="创作灵感"
+      ariaLabel="右栏面板"
+      demo={
+        <section className="tpl-showcase" aria-label="写真模板">
+          <TemplateCategoryNav catalog={catalog} categoryId={categoryId} onSelect={onCategoryChange} />
 
-      {activeCategory && activeCategory.groups.length > 0 && (
-        <TemplateGroupNav groups={activeCategory.groups} groupId={groupId} onChange={onGroupChange} />
-      )}
+          {activeCategory && activeCategory.groups.length > 0 && (
+            <TemplateGroupNav groups={activeCategory.groups} groupId={groupId} onChange={onGroupChange} />
+          )}
 
-      <div className="tpl-template-scroll" ref={scrollRef}>
-        <TemplateGallery
-          /* 换分类 / 分组时重挂载：分页条数、大图状态立即归零，不残留上一组 */
-          key={`${categoryId}|${groupId}`}
-          templates={visibleTemplates}
-          selectedId={selectedTemplateId}
-          onSelect={onSelectTemplate}
-          error={templatesError}
-          loading={templatesLoading}
-          onRetry={onRetryTemplates}
-          onShowAll={showAll}
+          <div className="tpl-template-scroll" ref={scrollRef}>
+            <TemplateGallery
+              /* 换分类 / 分组时重挂载：分页条数、大图状态立即归零，不残留上一组 */
+              key={`${categoryId}|${groupId}`}
+              templates={visibleTemplates}
+              selectedId={selectedTemplateId}
+              onSelect={onSelectTemplate}
+              error={templatesError}
+              loading={templatesLoading}
+              onRetry={onRetryTemplates}
+              onShowAll={showAll}
+            />
+          </div>
+        </section>
+      }
+      results={
+        <TemplateHistory
+          items={galleryItems}
+          templates={allTemplates}
+          loading={galleryLoading}
+          error={galleryError}
+          onRefresh={onRefreshGallery}
+          onOpenAll={onOpenAll}
         />
-      </div>
-
-      <TemplateHistory
-        items={galleryItems}
-        templates={allTemplates}
-        loading={galleryLoading}
-        error={galleryError}
-        onRefresh={onRefreshGallery}
-        onOpenAll={onOpenAll}
-      />
-    </section>
+      }
+    />
   );
 }
