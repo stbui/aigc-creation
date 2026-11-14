@@ -6,6 +6,8 @@ import {
   OssStorageProvider,
   MinioStorageProvider,
   STORAGE_BACKENDS,
+  isSdkInstalled,
+  isStorageBackend,
   maskSecret,
   type StorageBackend,
   type StorageProvider,
@@ -41,49 +43,119 @@ export class StorageService implements OnModuleInit {
   private active: StorageBackend = 'local';
 
   constructor(private readonly config: ConfigService) {
-    this.active = (process.env.STORAGE_BACKEND as StorageBackend) || 'local';
+    /*
+     * 不能把 process.env 直接 as 成 StorageBackend: 拼错一个字母就会得到一个
+     * map 里根本不存在的 active，启动时一切正常、第一次上传才炸。这里显式
+     * 收窄（与 env.validation.ts 的 oneOf 同一份白名单），非法值当场报错。
+     */
+    const raw = process.env.STORAGE_BACKEND;
+    if (raw && !isStorageBackend(raw)) {
+      this.logger.error(`STORAGE_BACKEND 非法: ${raw}（可选 local/oss/minio），已回落 local`);
+      this.active = 'local';
+    } else {
+      this.active = raw ?? 'local';
+    }
 
     // 本地根目录取自 UPLOAD_DIR: 三环境必须各写各的目录, 否则 test 跑一次
     // 「删除任务」就会连带删掉开发环境正在用的素材图, 且不留任何痕迹。
     this.register(new LocalStorageProvider(this.resolveUploadsDir()));
 
-    // 按需构造: 只有配了对应环境变量才实例化, 未配则不进 map。
+    // 按需构造: 凭据**齐全**才实例化, 半配置状态不进 map。
     // 这样 require('ali-oss') / require('minio') 根本不会执行 —— 本地开发零云依赖。
-    if (process.env.OSS_REGION && process.env.OSS_BUCKET && process.env.OSS_ACCESS_KEY_ID) {
+    if (this.requiredEnv('oss').length === 0) {
       try {
         this.register(
           new OssStorageProvider({
-            region: process.env.OSS_REGION,
-            bucket: process.env.OSS_BUCKET,
-            accessKeyId: process.env.OSS_ACCESS_KEY_ID,
-            accessKeySecret: process.env.OSS_ACCESS_KEY_SECRET ?? '',
+            region: process.env.OSS_REGION!,
+            bucket: process.env.OSS_BUCKET!,
+            accessKeyId: process.env.OSS_ACCESS_KEY_ID!,
+            accessKeySecret: process.env.OSS_ACCESS_KEY_SECRET!,
             endpoint: process.env.OSS_ENDPOINT,
           }),
         );
       } catch (e) {
-        this.logger.error(`OSS 初始化失败(将被忽略): ${(e as Error).message}`);
+        this.logger.error(
+          `OSS 初始化失败(将被忽略): ${(e as Error).message}${this.sdkHint('ali-oss')}`,
+        );
       }
     }
 
-    if (process.env.MINIO_ENDPOINT && process.env.MINIO_ACCESS_KEY) {
+    if (this.requiredEnv('minio').length === 0) {
       try {
         this.register(
           new MinioStorageProvider({
-            endPoint: process.env.MINIO_ENDPOINT,
+            endPoint: process.env.MINIO_ENDPOINT!,
             port: Number(process.env.MINIO_PORT ?? 9000),
             useSSL: process.env.MINIO_USE_SSL === 'true',
-            accessKey: process.env.MINIO_ACCESS_KEY,
-            secretKey: process.env.MINIO_SECRET_KEY ?? '',
+            accessKey: process.env.MINIO_ACCESS_KEY!,
+            secretKey: process.env.MINIO_SECRET_KEY!,
             bucket: process.env.MINIO_BUCKET ?? 'huojue',
           }),
         );
       } catch (e) {
-        this.logger.error(`MinIO 初始化失败(将被忽略): ${(e as Error).message}`);
+        this.logger.error(
+          `MinIO 初始化失败(将被忽略): ${(e as Error).message}${this.sdkHint('minio')}`,
+        );
       }
     }
   }
 
+  /**
+   * 启用云端后端的必需变量。有默认值（MINIO_PORT / MINIO_BUCKET / MINIO_USE_SSL）
+   * 或可选（OSS_ENDPOINT）的项不在此列 —— 列进去会让「已经能用了」显示成「还差配置」。
+   */
+  private requiredEnv(backend: 'oss' | 'minio'): string[] {
+    const candidates: Record<string, string | undefined> =
+      backend === 'oss'
+        ? {
+            OSS_REGION: process.env.OSS_REGION,
+            OSS_BUCKET: process.env.OSS_BUCKET,
+            OSS_ACCESS_KEY_ID: process.env.OSS_ACCESS_KEY_ID,
+            OSS_ACCESS_KEY_SECRET: process.env.OSS_ACCESS_KEY_SECRET,
+          }
+        : {
+            MINIO_ENDPOINT: process.env.MINIO_ENDPOINT,
+            MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY,
+            MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY,
+          };
+    return Object.entries(candidates)
+      .filter(([, value]) => !value?.trim())
+      .map(([key]) => key);
+  }
+
+  private sdkHint(name: 'ali-oss' | 'minio'): string {
+    return isSdkInstalled(name)
+      ? ''
+      : `；未安装 SDK ${name}，请先执行 npm --prefix backend install --no-save ${name}`;
+  }
+
+  /**
+   * 逐个点名缺什么，而不是笼统一句「未启用」：少了 SECRET 和少了 SDK
+   * 是两种完全不同的修法，混在一起只会让运维去翻代码。
+   *
+   * 必须在 active 未就绪的提前 return **之前**跑 —— 那恰恰是最需要诊断的场景
+   * （STORAGE_BACKEND 指了一个没配好的云端后端）。只有被选为 active 的后端
+   * 才升到 WARN；本地开发时云端未启用是正常状态，打 INFO 就够，不然每次
+   * 启动都飘两条警告，真出事时反而没人看。
+   */
+  private logDisabledBackends(): void {
+    for (const backend of ['oss', 'minio'] as const) {
+      if (this.providers.has(backend)) continue;
+      const sdk = backend === 'oss' ? 'ali-oss' : 'minio';
+      const absent = this.requiredEnv(backend);
+      const reasons = [
+        absent.length > 0 ? `缺环境变量 ${absent.join(', ')}` : '',
+        isSdkInstalled(sdk) ? '' : `未安装 SDK ${sdk}（npm --prefix backend install --no-save ${sdk}）`,
+      ].filter(Boolean);
+      const line = `后端 ${backend} 未启用：${reasons.length > 0 ? reasons.join('；') : '初始化失败，见上方 error 日志'}`;
+      if (this.active === backend) this.logger.warn(line);
+      else this.logger.log(line);
+    }
+  }
+
   async onModuleInit(): Promise<void> {
+    this.logDisabledBackends();
+
     /*
      * 配置的后端没起来 (例如 STORAGE_BACKEND=oss 但 ali-oss 未安装) 时**不回落本地**:
      * 那会让生产数据静默写进容器本地盘, 重启即丢, 而日志只有一行 WARN。
@@ -103,13 +175,6 @@ export class StorageService implements OnModuleInit {
       );
     } else {
       this.logger.warn(`存储后端 ${this.active} 不可用: ${probe.message}`);
-    }
-
-    const missing = STORAGE_BACKENDS.filter(
-      (backend) => backend !== 'local' && !this.providers.has(backend),
-    );
-    if (missing.length > 0) {
-      this.logger.log(`未启用的后端: ${missing.join(', ')} (补齐对应环境变量即可启用)`);
     }
   }
 

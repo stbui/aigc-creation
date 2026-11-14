@@ -51,6 +51,39 @@ generated/task/<taskId>/output-<n>.<ext>  # 生成产出（确定性，重试复
 - 配置了云端后端但 SDK/凭据缺失时**直接失败，不回落本地**，避免生产数据静默写进容器盘。
 - 读取按素材记录的 `storageBackend` 走原后端；切换默认后端不影响历史素材。
 
+### 3.1 云端后端接入（OSS / MinIO）
+
+`local` 零配置；`oss` / `minio` 走同一套启用流程。凭据仍只从环境变量读（B-63），后台界面不可编辑。
+
+**第 1 步 · 装 SDK**。云端 SDK 刻意不进 `package.json` —— 本地开发不该背两个云 SDK 的体积与启动开销。切哪个装哪个：
+
+```bash
+npm --prefix backend install --no-save ali-oss   # 阿里云 OSS
+npm --prefix backend install --no-save minio     # MinIO / S3 兼容
+```
+
+`--no-save` 保证不改依赖清单；生产请把对应命令写进镜像构建步骤，否则容器重建后 SDK 又没了。
+
+**第 2 步 · 配环境变量**。写进 `backend/.env.{env}.local`（不入库），变量名逐项对齐 `backend/.env.example`：
+
+| 后端 | 必填 | 可选 / 有默认 |
+| --- | --- | --- |
+| OSS | `OSS_REGION`、`OSS_BUCKET`、`OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET` | `OSS_ENDPOINT`（自定义域名） |
+| MinIO | `MINIO_ENDPOINT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY` | `MINIO_PORT=9000`、`MINIO_USE_SSL=false`、`MINIO_BUCKET=huojue` |
+
+`STORAGE_BACKEND` 决定**初始**默认后端（`local` / `oss` / `minio`）；非法值在启动日志报错并回落 `local`，不会静默当作没配。必填项缺任意一个，该后端就不注册 —— 不构造密钥为空的 client 让探测失败得莫名其妙；缺哪些变量、SDK 装没装，启动日志逐项点名。
+
+**第 3 步 · 重启后端并验证**：
+
+1. 重启后端进程（`./start.sh --backend-only` 或 build + restart）。本仓库跑的是 `node dist/main.js`，改 env 不会热生效。
+2. 打开 `/admin/storage`：卡片从「未启用」变为已配置，显示脱敏凭据与地址；容量分布可核对各后端的实际归属。
+3. 点「连通性测试」：除只读探测（OSS `list` / MinIO `bucketExists`）外，还会写 1 字节探针、读回校验并删除，证明 put / get 权限可用。状态轮询与健康检查**只做只读探测**，不会高频写云。
+4. 需要切默认后端时点「设为默认」。切换只影响新上传，历史素材仍按各自的 `storageBackend` 读取。
+
+权限：「连通性测试」需 `channel.test`，「设为默认」需 `setting.write`。预览链接只用于页面即时预览、不入库 —— OSS 签名 1 小时，MinIO 预签名默认 7 天。
+
+**回退**：把 `STORAGE_BACKEND` 改回 `local` 并重启即可。已写到云端的素材**不会自动迁回本地**；仓库内没有云端 → 本地的自动回迁工具，需要人工迁文件并改 `Asset.storageBackend` / `storageKey`。
+
 ## 4. 缩略图
 
 本地 `/uploads/*` 支持按需缩略图：

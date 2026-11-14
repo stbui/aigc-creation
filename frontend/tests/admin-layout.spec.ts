@@ -149,7 +149,7 @@ test.describe('后台布局', () => {
     expect(m.account.right).toBeLessThanOrEqual(m.sider.right + 1);
   });
 
-  test('用户列表使用四列卡片网格且操作平铺', async ({ page }) => {
+  test('用户列表使用四列卡片网格、操作平铺且点击区充足', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/users`);
     await page.waitForSelector('[data-testid="admin-user-card"]', { timeout: 15000 });
@@ -177,6 +177,17 @@ test.describe('后台布局', () => {
         actionColumns: actionGroups.map((group) =>
           group ? getComputedStyle(group).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
         ),
+        buttonSizes: actionGroups.map((group) => {
+          const sizes = group
+            ? Array.from(group.querySelectorAll('button')).map((button) =>
+                button.getBoundingClientRect(),
+              )
+            : [];
+          return {
+            minWidth: sizes.length ? Math.min(...sizes.map((r) => Math.round(r.width))) : 0,
+            minHeight: sizes.length ? Math.min(...sizes.map((r) => Math.round(r.height))) : 0,
+          };
+        }),
       };
     });
 
@@ -187,7 +198,16 @@ test.describe('后台布局', () => {
     expect(Math.min(...m.counts)).toBeGreaterThanOrEqual(1);
     expect(Math.max(...m.counts)).toBeGreaterThanOrEqual(3);
     expect(m.actionDisplays.every((display) => display === 'grid')).toBe(true);
-    expect(m.actionColumns.every((columns) => columns === 4)).toBe(true);
+    /*
+     * 旧断言把操作区写死为 4 列，第五个操作（重置密码）加入后实现已是
+     * 3 列 × 2 行，断言与页面长期不符。这里改为守护真正的契约：操作始终
+     * 平铺在 grid 里、每行 2~3 个，且每个点击区不小于 80×32px —— 避免把
+     * 四字中文按钮再压回 53×28px 的误点风险。
+     */
+    expect(m.actionColumns.every((columns) => columns >= 1 && columns <= 3)).toBe(true);
+    const sizes = m.buttonSizes.filter((size) => size.minWidth > 0);
+    expect(Math.min(...sizes.map((size) => size.minWidth))).toBeGreaterThanOrEqual(80);
+    expect(Math.min(...sizes.map((size) => size.minHeight))).toBeGreaterThanOrEqual(32);
   });
 
   test('顶栏不提供全局搜索入口', async ({ page }) => {

@@ -1,21 +1,14 @@
 import {
   ActionButton,
-  DateRangeField,
-  ExportCsvButton,
   AppliedFilters,
   ClearableField,
+  DateRangeField,
   FilterActions,
   FilterBar,
   SelectField,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
-import {
-  MEMBERSHIP_OPTIONS,
-  ROLE_OPTIONS,
-  SEGMENT_OPTIONS,
-  SORT_OPTIONS,
-  STATUS_OPTIONS,
-} from './constants';
+import { MEMBERSHIP_OPTIONS, ROLE_OPTIONS, SEGMENT_OPTIONS, STATUS_OPTIONS } from './constants';
 import type {
   AdminUserMembershipFilter,
   AdminUserRole,
@@ -40,11 +33,6 @@ interface UserFiltersProps {
   appliedChips: AppliedFilter[];
   onApply: () => void;
   onReset: () => void;
-  sort: string;
-  onSortChange: (value: string) => void;
-  canExport: boolean;
-  exporting: boolean;
-  onExport: () => void;
 }
 
 /** 用户列表的筛选与排序工具栏。只负责展示和转发用户操作。 */
@@ -65,17 +53,18 @@ export function UserFilters({
   appliedChips,
   onApply,
   onReset,
-  sort,
-  onSortChange,
-  canExport,
-  exporting,
-  onExport,
 }: UserFiltersProps) {
   return (
     <>
       <FilterBar>
+        {/*
+         * 六个条件原宽度合计 1160px，比 1440 视口下的内容区还宽 4px，
+         * 于是「查询 / 重置」被挤到第二行、独占一整行。这里只压紧本页的
+         * 两个宽度档位（不动 FilterBar / FilterActions 共用件），把动作收回
+         * 第一行；其余后台页的形态不受影响。
+         */}
         <ClearableField
-          className="w-full sm:w-64"
+          className="w-full sm:w-56"
           ariaLabel="按关键词搜索用户"
           placeholder="邮箱 / 昵称 / 手机号 / 用户 ID"
           value={keyword}
@@ -83,7 +72,7 @@ export function UserFilters({
           onEnter={onApply}
         />
         <SelectField
-          className="min-w-0 flex-1 sm:w-32 sm:flex-none"
+          className="min-w-0 flex-1 sm:w-28 sm:flex-none"
           ariaLabel="按角色筛选"
           allowClear
           clearLabel="全部角色"
@@ -95,7 +84,7 @@ export function UserFilters({
           options={ROLE_OPTIONS}
         />
         <SelectField
-          className="min-w-0 flex-1 sm:w-32 sm:flex-none"
+          className="min-w-0 flex-1 sm:w-28 sm:flex-none"
           ariaLabel="按状态筛选"
           allowClear
           clearLabel="全部状态"
@@ -107,7 +96,7 @@ export function UserFilters({
           options={STATUS_OPTIONS}
         />
         <SelectField
-          className="min-w-0 flex-1 sm:w-32 sm:flex-none"
+          className="min-w-0 flex-1 sm:w-28 sm:flex-none"
           ariaLabel="按运营分群筛选"
           allowClear
           clearLabel="全部分群"
@@ -119,7 +108,7 @@ export function UserFilters({
           options={SEGMENT_OPTIONS}
         />
         <SelectField
-          className="min-w-0 flex-1 sm:w-32 sm:flex-none"
+          className="min-w-0 flex-1 sm:w-28 sm:flex-none"
           ariaLabel="按会员状态筛选"
           allowClear
           clearLabel="全部会员"
@@ -150,26 +139,6 @@ export function UserFilters({
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={onReset} />
       </FilterBar>
-
-      <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2 border-b border-border pb-2">
-        <span className="text-xs text-muted-foreground">排序</span>
-        <SelectField
-          className="w-32"
-          ariaLabel="用户排序"
-          value={sort}
-          onChange={(value) => {
-            if (value) onSortChange(value);
-          }}
-          options={SORT_OPTIONS}
-        />
-        {canExport && (
-          <ExportCsvButton
-            exporting={exporting}
-            onExport={onExport}
-            ariaLabel={exporting ? '正在导出用户 CSV' : '导出用户 CSV'}
-          />
-        )}
-      </div>
     </>
   );
 }

@@ -306,6 +306,21 @@ test.describe('存储配置', () => {
     // 未配置的后端应列出启用所需的环境变量 —— 比「未启用」三个字有用
     const ossCard = cards(page).filter({ hasText: '阿里云 OSS' });
     await expect(ossCard.getByTestId('admin-storage-env')).toContainText('OSS_ACCESS_KEY_ID');
+
+    // 两个云端后端各自给出完整启用链路：SDK 安装命令 + 必填变量 + 可选默认值
+    await expect(ossCard.getByTestId('admin-storage-sdk')).toContainText('ali-oss');
+    await expect(ossCard.getByTestId('admin-storage-env')).toContainText('OSS_ACCESS_KEY_SECRET');
+    const minioCard = cards(page).filter({ hasText: 'MinIO' });
+    await expect(minioCard.getByTestId('admin-storage-sdk')).toContainText('minio');
+    await expect(minioCard.getByTestId('admin-storage-env')).toContainText('MINIO_SECRET_KEY');
+    await expect(minioCard.getByText('MINIO_USE_SSL=false')).toBeVisible();
+
+    // 容量统计：指标卡 + 分布面板（数据来自 /admin/assets/stats，与素材管理页同源）
+    await expect(page.getByTestId('admin-stat-grid')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '容量分布' })).toBeVisible();
+    await expect(
+      page.getByTestId('admin-storage-dist-row').filter({ hasText: '上传原图' }),
+    ).toBeVisible();
   });
 
   test('B-63 凭据只读: 界面无凭据输入框', async ({ page }) => {

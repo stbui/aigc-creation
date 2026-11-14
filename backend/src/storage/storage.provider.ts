@@ -48,8 +48,13 @@ export interface StorageProvider {
   get(key: string): Promise<Buffer>;
   delete(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
-  /** 连通性探测 (B-62); 返回是否可用与诊断信息 */
-  probe(): Promise<{ ok: boolean; message: string; latencyMs?: number }>;
+  /**
+   * 连通性探测 (B-62); 返回是否可用与诊断信息。
+   *
+   * `verifyWrite` 只由运营主动点「连通性测试」时传入：状态轮询与健康检查
+   * 每几秒就跑一次，绝不能每次都在云上写对象（按请求计费、删除失败还会留垃圾）。
+   */
+  probe(opts?: { verifyWrite?: boolean }): Promise<{ ok: boolean; message: string; latencyMs?: number }>;
   /** 凭据状态 (B-63): 只报是否配置与脱敏值, 永不返回明文 */
   credentialStatus(): { configured: boolean; masked?: string; endpoint?: string };
 }
@@ -138,6 +143,44 @@ export function maskSecret(v?: string): string | undefined {
   return v.length <= 4 ? '****' : `****${v.slice(-4)}`;
 }
 
+/**
+ * 只解析模块路径、不加载 SDK。启动自检靠它明确告诉运维「还差一个 npm 包」，
+ * 而不是等第一次上传才抛 Cannot find module。
+ */
+export function isSdkInstalled(name: 'ali-oss' | 'minio'): boolean {
+  try {
+    require.resolve(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 云端写探针：写 1 字节对象、读回校验、尽力删除。
+ *
+ * 只读探测（list / bucketExists）只能证明凭据有效且桶可达，证明不了
+ * put / get 权限 —— 切过去之后才发现传不上去就晚了。local 的 probe 本来就
+ * 实写探针文件，这里把三个后端的「主动测试」语义对齐。
+ */
+async function verifyWriteProbe(io: {
+  put: (key: string, data: Buffer, contentType: string) => Promise<unknown>;
+  get: (key: string) => Promise<Buffer>;
+  remove: (key: string) => Promise<unknown>;
+}): Promise<string> {
+  const key = `.probe-${Date.now()}`;
+  const payload = Buffer.from('ok');
+  try {
+    await io.put(key, payload, 'text/plain');
+    const back = await io.get(key);
+    if (!back.equals(payload)) throw new Error('读回内容与写入不一致');
+    return '读写正常';
+  } finally {
+    // 删除失败不掩盖探测结论，但对象可能残留 —— 交给 bucket 生命周期规则兜底
+    await io.remove(key).catch(() => undefined);
+  }
+}
+
 export class OssStorageProvider implements StorageProvider {
   readonly backend = 'oss' as const;
   private client: any; // ali-oss 实例, 类型随 SDK 版本变化, 用 any 隔离
@@ -150,7 +193,13 @@ export class OssStorageProvider implements StorageProvider {
       accessKeySecret: string;
       endpoint?: string;
     },
+    /** 注入已有 client（单测 / 复用连接池）；不传才按需 require SDK */
+    client?: unknown,
   ) {
+    if (client !== undefined) {
+      this.client = client;
+      return;
+    }
     // 按需 require: 未配置 OSS 时不加载 SDK, 本地开发零依赖
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const OSS = require('ali-oss');
@@ -170,12 +219,10 @@ export class OssStorageProvider implements StorageProvider {
 
   async put(key: string, data: Buffer, contentType: string): Promise<StorageObject> {
     assertSafeKey(key);
-    const res = await this.client.put(key, data, { headers: { 'Content-Type': contentType } });
-    return {
-      key,
-      sizeBytes: Number(res.res?.headers?.['content-length'] ?? data.byteLength),
-      contentType,
-    };
+    await this.client.put(key, data, { headers: { 'Content-Type': contentType } });
+    // ⚠ 不能用上传响应的 content-length: 那是 HTTP 响应体长度, 不是对象大小,
+    // 写进 Asset.sizeBytes 会把容量统计彻底带偏。以实际写入字节数为准。
+    return { key, sizeBytes: data.byteLength, contentType };
   }
 
   async get(key: string): Promise<Buffer> {
@@ -198,16 +245,21 @@ export class OssStorageProvider implements StorageProvider {
     }
   }
 
-  async probe() {
+  async probe(opts?: { verifyWrite?: boolean }) {
     const t0 = Date.now();
     try {
       // list 一次即证明凭据有效且 bucket 可达, 不产生写入
       await this.client.list({ 'max-keys': 1 });
-      return {
-        ok: true,
-        message: `连通正常 · ${this.cfg.bucket} @ ${this.cfg.region}`,
-        latencyMs: Date.now() - t0,
-      };
+      const base = `连通正常 · ${this.cfg.bucket} @ ${this.cfg.region}`;
+      if (!opts?.verifyWrite) {
+        return { ok: true, message: `${base}（只读探测）`, latencyMs: Date.now() - t0 };
+      }
+      const detail = await verifyWriteProbe({
+        put: (k, d, ct) => this.put(k, d, ct),
+        get: (k) => this.get(k),
+        remove: (k) => this.client.delete(k),
+      });
+      return { ok: true, message: `${base} · ${detail}`, latencyMs: Date.now() - t0 };
     } catch (e) {
       return { ok: false, message: `连通失败: ${(e as Error).message}` };
     }
@@ -240,7 +292,14 @@ export class MinioStorageProvider implements StorageProvider {
       secretKey: string;
       bucket: string;
     },
+    /** 注入已有 client（单测 / 复用连接池）；不传才按需 require SDK */
+    client?: unknown,
   ) {
+    this.bucket = cfg.bucket;
+    if (client !== undefined) {
+      this.client = client;
+      return;
+    }
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Client } = require('minio');
     this.client = new Client({
@@ -250,7 +309,6 @@ export class MinioStorageProvider implements StorageProvider {
       accessKey: cfg.accessKey,
       secretKey: cfg.secretKey,
     });
-    this.bucket = cfg.bucket;
   }
 
   private base(): string {
@@ -293,16 +351,21 @@ export class MinioStorageProvider implements StorageProvider {
     }
   }
 
-  async probe() {
+  async probe(opts?: { verifyWrite?: boolean }) {
     const t0 = Date.now();
     try {
       const ok = await this.client.bucketExists(this.bucket);
       if (!ok) return { ok: false, message: `bucket 不存在: ${this.bucket}` };
-      return {
-        ok: true,
-        message: `连通正常 · ${this.base()}`,
-        latencyMs: Date.now() - t0,
-      };
+      const base = `连通正常 · ${this.base()}`;
+      if (!opts?.verifyWrite) {
+        return { ok: true, message: `${base}（只读探测）`, latencyMs: Date.now() - t0 };
+      }
+      const detail = await verifyWriteProbe({
+        put: (k, d, ct) => this.put(k, d, ct),
+        get: (k) => this.get(k),
+        remove: (k) => this.client.removeObject(this.bucket, k),
+      });
+      return { ok: true, message: `${base} · ${detail}`, latencyMs: Date.now() - t0 };
     } catch (e) {
       return { ok: false, message: `连通失败: ${(e as Error).message}` };
     }

@@ -10,10 +10,7 @@ import {
   STATUS_OPTIONS,
 } from './constants';
 import { useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
-import type {
-  AdminUserListResult,
-  AdminUserStats,
-} from '../../../types/api';
+import type { AdminUserListResult } from '../../../types/api';
 import type {
   AdminUserListQuery,
   AdminUserMembershipFilter,
@@ -128,11 +125,8 @@ export function useAdminUserFilters() {
     AdminUserMembershipFilter | undefined
   >(initialMembership);
   const [exporting, setExporting] = useState(false);
-  const [stats, setStats] = useState<AdminUserStats | null>(null);
-  const [statsEpoch, setStatsEpoch] = useState(0);
 
   const exportingRef = useRef(false);
-  const statsSeq = useRef(0);
   const appliedQ = useRef(initialKeyword);
 
   const fetcher = useCallback((raw: Record<string, unknown>) => {
@@ -204,42 +198,6 @@ export function useAdminUserFilters() {
     membership: appliedMembership,
     sort: sort === DEFAULT_SORT ? undefined : sort,
   });
-
-  /** 全局统计与列表共用同一组筛选条件；reload 时同步刷新。 */
-  useEffect(() => {
-    const seq = ++statsSeq.current;
-    adminUsersApi
-      .stats({
-        keyword: appliedKeyword || undefined,
-        role: appliedRole,
-        status: appliedStatus,
-        from: dayStart(appliedFrom),
-        to: dayEnd(appliedTo),
-        segment: appliedSegment,
-        membership: appliedMembership,
-      })
-      .then((next) => {
-        if (seq === statsSeq.current) setStats(next);
-      })
-      .catch(() => {
-        // 统计失败不覆盖列表：顶部退化为「—」，不把整页打成错误态。
-        if (seq === statsSeq.current) setStats(null);
-      });
-  }, [
-    appliedKeyword,
-    appliedRole,
-    appliedStatus,
-    appliedFrom,
-    appliedTo,
-    appliedSegment,
-    appliedMembership,
-    statsEpoch,
-  ]);
-
-  const reloadAll = useCallback(() => {
-    reload();
-    setStatsEpoch((value) => value + 1);
-  }, [reload]);
 
   const applyFilters = () => {
     const nextKeyword = keyword.trim();
@@ -416,7 +374,6 @@ export function useAdminUserFilters() {
     rows,
     params,
     sort,
-    stats,
     appliedChips,
     hasFilter,
     exporting,
@@ -424,7 +381,7 @@ export function useAdminUserFilters() {
     setPage: (page: number, pageSize?: number) => {
       setPage(page, pageSize);
     },
-    reload: reloadAll,
+    reload,
     applyFilters,
     resetFilters,
     exportUsers,

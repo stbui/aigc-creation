@@ -29,7 +29,12 @@ export class AdminStorageController {
     };
   }
 
-  /** 连通性测试 (B-62): 发真实请求, 返回耗时与结果 */
+  /**
+   * 连通性测试 (B-62): 发真实请求, 返回耗时与结果。
+   *
+   * 主动测试带 `verifyWrite`: 云端会写 1 字节探针并读回，证明 put/get 权限也通了，
+   * 而不只是「桶能列出来」。status 的被动轮询与健康检查不传这个参数，避免高频写云。
+   */
   @Post('probe')
   @RequirePermission(PERMISSIONS.channelTest)
   async probe(@Query('backend') backend?: string) {
@@ -40,7 +45,7 @@ export class AdminStorageController {
       ? this.storage.get(backend as StorageBackend)
       : this.storage.getActive();
     if (!p) throw new AppError(40400, `后端未启用: ${backend}`, 404);
-    return { backend: p.backend, ...(await p.probe()) };
+    return { backend: p.backend, ...(await p.probe({ verifyWrite: true })) };
   }
 
   /**

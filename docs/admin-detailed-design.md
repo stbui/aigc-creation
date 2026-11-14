@@ -431,7 +431,9 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ## 15. 存储配置 `/admin/storage`
 
-`GET /admin/storage/status`（当前后端、容量、连通性）、`POST /admin/storage/probe`（探测）、`POST /admin/storage/active?backend=`（切换）。
+`GET /admin/storage/status`（当前后端、各后端凭据脱敏状态与连通性）、`POST /admin/storage/probe`（探测）、`POST /admin/storage/active?backend=`（切换）。
+
+容量统计复用 `GET /admin/assets/stats`（`asset.read`）：`totalBytes` / `total` / `byStatus` / `byBackend` / `byKind`。后台只在这一处做容量聚合，存储域不另写一套 `groupBy` —— 两处统计必然与素材管理页漂移。页面用 4 张指标卡（已占用容量、素材总数、当前默认后端、已下架仍占用）加分布面板（按后端 / 按来源，占比按条数）呈现；无 `asset.read` 时只隐藏容量区，后端状态与连通性测试照常可用。口径按 `Asset` 记录算，不含未入库的孤儿文件；下架不删文件，所以「已下架仍占用」单列。
 
 - 后端：`local`（默认）/ `oss` / `minio`，由 `STORAGE_BACKEND` 决定初始值。
 - 切换**只影响新上传**：`Asset.storageBackend` 记录写入时的后端，老素材仍从原后端读。

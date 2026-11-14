@@ -10,7 +10,6 @@ import {
   StatusTag,
 } from '~/admin-ui/primitives';
 import { cn } from '~/admin-ui/lib/cn';
-import { formatDateTime } from './utils';
 import { UserIdentityCell } from './UserIdentityCell';
 import type { AdminUserRow } from './types';
 
@@ -39,12 +38,17 @@ export function UserCard({
   onToggleSelected?: (next: boolean) => void;
 }) {
   const disabled = user.status === 'disabled';
+  /*
+   * 280px 宽的卡片里平铺 5 个四字操作，每格只剩 53px：文字贴边、相邻按钮
+   * 间距为 0，禁用与删除这类高危操作极易误点。改为每行 2~3 个、两行排布，
+   * 单个点击区不小于 ~85×32px，仍保持「全部操作平铺可见」的既有约定。
+   */
   const actionCols =
-    actions.length >= 5
-      ? 'grid-cols-5'
-      : actions.length === 4
-        ? 'grid-cols-4'
-        : 'grid-cols-3';
+    actions.length >= 5 || actions.length === 3
+      ? 'grid-cols-3'
+      : actions.length === 4 || actions.length === 2
+        ? 'grid-cols-2'
+        : 'grid-cols-1';
 
   return (
     <Card
@@ -84,7 +88,8 @@ export function UserCard({
           <UserIdentityCell user={user} />
         </CardTitle>
         <div className="flex flex-col items-end gap-1">
-          <StatusTag status={user.role} />
+          {/* 普通用户占绝大多数，「用户」标签不携带信息；只保留有区分度的角色 */}
+          {user.role !== 'user' && <StatusTag status={user.role} />}
           <StatusTag status={user.status} showDot />
         </div>
       </CardHeader>
@@ -95,19 +100,6 @@ export function UserCard({
           <UserMetric label="任务" value={user.taskCount} />
           <UserMetric label="素材" value={user.assetCount} />
         </div>
-
-        <dl className="mt-3.5 grid grid-cols-2 gap-x-5 gap-y-2 text-xs">
-          <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">注册时间</dt>
-            <dd className="mt-0.5 truncate leading-4 tabular-nums">{formatDateTime(user.createdAt)}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">最近登录</dt>
-            <dd className="mt-0.5 truncate leading-4 tabular-nums">
-              {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '从未登录'}
-            </dd>
-          </div>
-        </dl>
       </CardContent>
 
       <Separator />
@@ -115,10 +107,7 @@ export function UserCard({
         data-testid="admin-user-card-actions"
         role="group"
         aria-label="用户操作"
-        className={cn(
-          'relative grid items-center gap-0 bg-muted/15 px-1.5 py-1.5',
-          actionCols,
-        )}
+        className={cn('relative grid items-center gap-1 bg-muted/15 px-1.5 py-1.5', actionCols)}
       >
         {actions.map((action) => (
           <ActionButton
@@ -126,12 +115,15 @@ export function UserCard({
             variant="ghost"
             size="xs"
             className={cn(
-              'h-7 w-full px-1 text-xs font-normal',
+              'h-8 w-full rounded-md px-1.5 text-xs font-normal',
               action.danger
-                ? 'text-danger-text hover:text-danger-text'
+                ? 'text-danger-text hover:bg-destructive/10 hover:text-danger-text'
                 : action.emphasis === 'primary'
                   ? 'font-medium text-primary hover:bg-primary/10 hover:text-primary'
-                  : 'text-muted-foreground hover:text-foreground',
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              // 五项齐全时，第二行只剩两项：把高危操作推到行末，中间留一格
+              // 缓冲，避免它与紧邻的常规操作被连点误触。
+              actions.length === 5 && action.danger && 'col-start-3',
             )}
             disabled={action.disabled}
             onClick={action.onSelect}

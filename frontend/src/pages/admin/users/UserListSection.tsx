@@ -3,6 +3,7 @@ import {
   AdminDataTable,
   CheckboxField,
   EmptyState,
+  ExportCsvButton,
   ListError,
   Pagination,
   SelectField,
@@ -13,7 +14,7 @@ import {
 } from '~/admin-ui/primitives';
 import { cn } from '~/admin-ui/lib/cn';
 import { BATCH_DELETE_LIMIT } from '~/components/admin/BatchDeleteUsersDialog';
-import { BATCH_STATUS_LIMIT, PAGE_SIZE_OPTIONS } from './constants';
+import { BATCH_STATUS_LIMIT, PAGE_SIZE_OPTIONS, SORT_OPTIONS } from './constants';
 import { formatDateTime } from './utils';
 import { UserCard, type UserCardAction } from './UserCard';
 import type { AdminUserListResult } from '../../../types/api';
@@ -40,6 +41,9 @@ interface UserListSectionProps {
   selfId?: string | null;
   sort: string;
   onSortChange: (sort: string) => void;
+  canExport: boolean;
+  exporting: boolean;
+  onExport: () => void;
   onRetry: () => void;
   onResetFilters: () => void;
   onOpenUser: (id: string) => void;
@@ -130,6 +134,9 @@ export function UserListSection({
   selfId,
   sort,
   onSortChange,
+  canExport,
+  exporting,
+  onExport,
   onRetry,
   onResetFilters,
   onOpenUser,
@@ -207,7 +214,30 @@ export function UserListSection({
                 />
               )}
             </div>
-            <div className="flex items-center gap-1.5">
+            {/*
+             * 排序 / 导出 / 视图同属「列表怎么呈现」，原来排序导出独占一行、
+             * 视图再占一行。合并到这一行后，左「选择本页」右「排序·导出·视图」，
+             * 少一层工具栏，首屏能多露出一行卡片。
+             */}
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <span className="text-xs text-muted-foreground">排序</span>
+              <SelectField
+                className="w-32"
+                ariaLabel="用户排序"
+                value={sort}
+                onChange={(value) => {
+                  if (value) onSortChange(value);
+                }}
+                options={SORT_OPTIONS}
+              />
+              {canExport && (
+                <ExportCsvButton
+                  exporting={exporting}
+                  onExport={onExport}
+                  ariaLabel={exporting ? '正在导出用户 CSV' : '导出用户 CSV'}
+                />
+              )}
+              <span className="mx-1.5 h-4 w-px bg-border" aria-hidden />
               <span className="text-xs text-muted-foreground">视图</span>
               <ActionButton
                 variant={view === 'cards' ? 'default' : 'secondary'}
