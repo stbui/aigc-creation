@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { RotateCcw, ShieldCheck, WalletCards } from 'lucide-react';
 
@@ -15,7 +16,7 @@ import {
   SkeletonPanel,
   StaleError,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminSettingsApi } from '../../../lib/api';
 import type { AdminSettingValue } from '../../../types/api';
 import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';

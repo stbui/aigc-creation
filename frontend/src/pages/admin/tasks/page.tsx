@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AdminPage, AdminTabs, TabsContent } from '~/admin-ui/primitives';
+import { AdminPage, AdminTabs, TabsContent } from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 import { AiAnalysisMonitor } from './AiAnalysisMonitor';
 import { GenerationTasksTab } from './GenerationTasksTab';
 import { useAdmin } from './hooks';

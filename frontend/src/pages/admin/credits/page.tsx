@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Upload } from 'lucide-react';
 import {
@@ -19,7 +20,7 @@ import {
   StaleError,
   type AdminColumn,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   BATCH_DELETE_CONFIRM,
   BATCH_DELETE_LIMIT,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AdminPage } from '~/admin-ui/primitives';
+import { AdminPage } from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 import { useAdmin, useAdminDetailParam } from './hooks';
 import { useAdminUserActions } from './useAdminUserActions';
 import { useAdminUserFilters } from './useAdminUserFilters';

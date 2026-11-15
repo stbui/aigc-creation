@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -31,7 +32,7 @@ import {
   StaleError,
   TabsContent,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 
 const CONFIG_TAB_META: Record<
   Exclude<SettingsTabKey, 'security'>,

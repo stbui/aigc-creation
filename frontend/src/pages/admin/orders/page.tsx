@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AdminPage,
@@ -9,7 +10,7 @@ import {
   RefreshButton,
   SavedViewBar,
   StaleError,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   readAdminActionContext,
   readAdminDone,

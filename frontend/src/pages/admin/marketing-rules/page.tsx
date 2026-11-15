@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
+import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
 import {
   AdminPage,
   AdminTabs,
   TabsContent,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { CheckinRecordsTab } from './CheckinRecordsTab';
 import { InviteRelationsTab } from './InviteRelationsTab';
 import { MarketingRulesTab } from './MarketingRulesTab';

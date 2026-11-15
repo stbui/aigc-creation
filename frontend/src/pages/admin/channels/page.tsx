@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import '../../../styles/radar-admin.css';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import {
@@ -9,7 +10,7 @@ import {
   Panel,
   SegmentedGroup,
   SkeletonBody,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useChannelWorkspace } from './useChannelWorkspace';
 import { channelConsumptionRefs, consumptionImpactText } from './useProductConsumption';
 import { ChannelDetailPanel } from './ChannelDetailPanel';

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { adminAigcLabelApi } from './api';
 import {
   AdminPage,
@@ -10,7 +11,7 @@ import {
   SaveBar,
   SkeletonPanel,
   StaleError,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';
 import { renderBadgeCanvas } from './utils';
 import { StylePanel } from './StylePanel';

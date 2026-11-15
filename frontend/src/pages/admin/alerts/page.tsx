@@ -1,56 +1,63 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+
 import {
   ALERT_CATEGORY_LABEL,
-  SEVERITY_BADGE,
   SEVERITY_HINT,
-  SEVERITY_SURFACE,
   SEVERITY_TONE,
   SeverityFilter,
 } from './constants';
 import { readSeverity } from './utils';
 import { useAdminAlerts, useAdminUrlFilterSync } from './hooks';
-import { Link, useSearchParams } from 'react-router-dom';
-
-import {
-  AdminPage,
-  ActionButton,
-  EmptyState,
-  ListError,
-  Panel,
-  SegmentedGroup,
-  SkeletonBody,
-  type StatCardItem,
-  StatCards,
-  StaleError,
-  ToneBadge,
-  WorkQueue,
-  WorkQueueSection,
-} from '~/admin-ui/primitives';
 import { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';
-import {
-  ALERT_SEVERITY_META,
-  AlertRefreshButton,
-  alertTime,
-} from '../../../components/admin/AlertCenter';
+import { ALERT_SEVERITY_META, alertTime } from '../../../components/admin/AlertCenter';
 import type { AdminAlertSeverity } from '../../../types/api';
 
 /**
- * 告警中心（/admin/alerts）。
+ * 告警中心（/admin/alerts）—— 中性风格（freebie-radar 设计语言）改造版。
  *
- * 顶栏铃铛只放前 5 条，这里给完整列表与口径说明。数据与铃铛同源：
- * 都来自 `GET /admin/alerts`，且按当前角色权限过滤 —— 财务看不到工单告警，
- * 运营看不到对账差异。没有待处理项时不制造「0 条告警」的噪音。
+ * 本次改造只换「呈现层」：数据 Hook（`useAdminAlerts` / `useAdminUrlFilterSync`
+ * / `useAdminWorkbench`）、severity 元数据、筛选与 URL 同步逻辑**全部保留**，
+ * 仅把 shadcn 原语（`~/admin-ui/primitives` 的 `AdminPage` / `Panel` / `StatCards`
+ * / `SegmentedGroup` / `EmptyState` / `ListError` / `StaleError` / `SkeletonBody`
+ * / `WorkQueue` 与 `AlertCenter` 的 shadcn `Button`）替换为 `admin-ui/radar`
+ * 构建块。视觉语言改为：灰底画布 + 白底细线面板（零阴影）+ 颜色编码语义。
  *
- * ## 版面顺序：态势 → 清单 → 明细 → 口径
- *
- * 旧版把「可处理实体」放在页头下方，一屏 900px 里有 400px 是 5 行对账单据，
- * 真正的告警计数被挤到第二屏 —— 同一个「对账差异 37」还要在分组头、明细行、
- * 清单行各说一遍。现在按「先看全局，再下钻」排：统计卡回答有几种、各几条，
- * 清单回答分别是什么，明细只负责给出可直接点的单据样本，口径降为参考文献。
- *
- * 筛选级别同时写回地址栏（`?severity=`），告警深链从铃铛点进来时直接带着级别。
+ * 版面顺序不变：态势（统计卡）→ 清单（级别筛选 + 待处理列表）→ 明细（可处理
+ * 队列）→ 口径。这是后台从品牌紫逐步迁到中性风格的试点页之一。
  */
+import {
+  Button,
+  RadarBadge,
+  RadarPage,
+  PageHeader,
+  RadarPanel,
+  StatCards,
+  Segmented,
+  EmptyState,
+  ListError,
+  StaleError,
+  SkeletonBody,
+  WorkQueue,
+  WorkQueueSection,
+} from '../../../admin-ui/radar';
+import '../../../styles/radar-admin.css';
+
+/** 严重级别 → 中性风格徽章底色（语义色成对：浅底 + 深字）。 */
+const SEVERITY_BADGE_STYLE: Record<AdminAlertSeverity, string> = {
+  critical: 'bg-radar-alert-subtle text-radar-alert',
+  warning: 'bg-radar-code-subtle text-radar-code',
+  info: 'bg-radar-ink-100 text-radar-ink-600',
+};
+
+/** 严重级别 → 列表行图标色。 */
+const SEVERITY_ICON_STYLE: Record<AdminAlertSeverity, string> = {
+  critical: 'text-radar-alert',
+  warning: 'text-radar-code',
+  info: 'text-radar-ink-500',
+};
+
 export function AdminAlertsPage() {
   const { data, loading, error, reload } = useAdminAlerts();
   const {
@@ -96,7 +103,7 @@ export function AdminAlertsPage() {
    * 统计卡放最前：这一排是整页唯一能回答「今天有几件事、几件要命」的地方。
    * 「待处理告警」单独一张、不染色 —— 它是后三张的和，染色会跟分级抢读。
    */
-  const statItems: StatCardItem[] = useMemo(
+  const statItems = useMemo(
     () => [
       {
         key: 'total',
@@ -120,22 +127,33 @@ export function AdminAlertsPage() {
   );
 
   return (
-    <AdminPage
-      title="告警中心"
-      description="聚合待处理工单、失败任务、对账差异、退款卡单、备份与发票状态。只列需要动作的事项，每 60 秒刷新一次。"
-      actions={<AlertRefreshButton loading={loading} onRefresh={() => void reload()} />}
-    >
+    <RadarPage>
+      <PageHeader
+        title="告警中心"
+        description="聚合待处理工单、失败任务、对账差异、退款卡单、备份与发票状态。只列需要动作的事项，每 60 秒刷新一次。"
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={loading}
+            onClick={() => void reload()}
+          >
+            <RefreshCw className="size-4" aria-hidden />
+            {loading ? '刷新中…' : '刷新'}
+          </Button>
+        }
+      />
 
       {error && data && <StaleError error={error} onRetry={() => void reload()} />}
 
       {/* 四张卡固定一行：数字之间要能横向比较「哪一级在涨」，折行就断了这层对照 */}
       <StatCards items={statItems} columns={4} className="mb-4" />
 
-      <Panel
+      <RadarPanel
         title="待处理清单"
         note="来源按当前角色权限过滤，无权访问的模块不会出现在这里"
         extra={
-          <SegmentedGroup
+          <Segmented
             ariaLabel="按告警级别筛选"
             value={filter}
             onChange={(value) => chooseFilter(value as SeverityFilter)}
@@ -163,9 +181,9 @@ export function AdminAlertsPage() {
             }
             action={
               filter !== 'all' ? (
-                <ActionButton variant="secondary" onClick={() => chooseFilter('all')}>
+                <Button variant="secondary" size="sm" onClick={() => chooseFilter('all')}>
                   查看全部
-                </ActionButton>
+                </Button>
               ) : undefined
             }
           />
@@ -174,43 +192,44 @@ export function AdminAlertsPage() {
             {items.map((item) => {
               const meta = ALERT_SEVERITY_META[item.severity];
               const Icon = meta.icon;
-              const surface = SEVERITY_SURFACE[item.severity];
               return (
                 <li key={item.key}>
                   <Link
                     to={item.link}
-                    className={`group flex items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-colors hover:bg-accent ${surface.card}`}
+                    className="group flex items-center gap-3 rounded-[8px] border border-radar-ink-200 px-3.5 py-2.5 transition-colors hover:bg-radar-surface-hover"
                     data-testid="admin-alert-row"
                   >
-                    <span className={`shrink-0 ${surface.icon}`}>
+                    <span className={`shrink-0 ${SEVERITY_ICON_STYLE[item.severity]}`}>
                       <Icon className="size-[18px]" aria-hidden />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium text-foreground">
+                        <span className="truncate text-[13px] font-medium text-radar-ink-900">
                           {item.title}
                         </span>
-                        <ToneBadge tone={SEVERITY_BADGE[item.severity]}>{meta.label}</ToneBadge>
+                        <RadarBadge className={SEVERITY_BADGE_STYLE[item.severity]}>
+                          {meta.label}
+                        </RadarBadge>
                       </span>
                       <span
-                        className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+                        className="mt-1 flex items-center gap-1.5 text-[12.5px] text-radar-ink-400"
                         title={item.detail}
                       >
                         {/* 来源用小字前缀，代替第二枚 badge —— 标题行已经没地方了 */}
-                        <span className="shrink-0 rounded bg-muted px-1 py-px text-xs leading-4">
+                        <span className="shrink-0 rounded bg-radar-ink-100 px-1 py-px text-[11px] leading-4 text-radar-ink-500">
                           {ALERT_CATEGORY_LABEL[item.category]}
                         </span>
                         <span className="truncate">{item.detail}</span>
                       </span>
                     </span>
                     {item.count !== null && (
-                      <span className="shrink-0 text-lg font-semibold text-foreground tabular-nums">
+                      <span className="shrink-0 text-[18px] font-semibold tabular-nums text-radar-ink-950">
                         {item.count}
                       </span>
                     )}
                     {/* 整行是跳转，右侧给个箭头，别让「37」孤零零挂着像个数字装饰 */}
                     <ChevronRight
-                      className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                      className="size-4 shrink-0 text-radar-ink-300 transition-transform group-hover:translate-x-0.5"
                       aria-hidden
                     />
                   </Link>
@@ -219,21 +238,21 @@ export function AdminAlertsPage() {
             })}
           </ul>
         )}
-      </Panel>
+      </RadarPanel>
 
       <div className="mb-4">
         <WorkQueueSection
           title="可处理明细"
           description="每组列出前几条可直接下钻的单据，完整列表走各模块。"
           actions={
-            <ActionButton
+            <Button
               variant="secondary"
               size="sm"
               disabled={workbenchLoading}
               onClick={() => void reloadWorkbench()}
             >
               刷新待办
-            </ActionButton>
+            </Button>
           }
         >
           <WorkQueue
@@ -247,9 +266,9 @@ export function AdminAlertsPage() {
         </WorkQueueSection>
       </div>
 
-      <Panel title="告警口径" note="计数是「当前待处理数」，被处理后自然消失">
+      <RadarPanel title="告警口径" note="计数是「当前待处理数」，被处理后自然消失">
         {/* 两列：六条口径是参考文献，占满整宽会把页面拉长一屏 */}
-        <ul className="list-disc pl-4 text-xs leading-5 text-muted-foreground lg:columns-2 lg:gap-x-10">
+        <ul className="list-disc pl-4 text-[12.5px] leading-5 text-radar-ink-400 lg:columns-2 lg:gap-x-10">
           <li className="mb-1.5 break-inside-avoid">
             工单：存在尚未受理的「待回复」工单；已受理但仍在处理中的不重复告警；最早一条等待超过
             24 小时升为紧急。
@@ -268,10 +287,10 @@ export function AdminAlertsPage() {
           </li>
           <li className="mb-1.5 break-inside-avoid">发票：存在待开具申请。</li>
         </ul>
-        <p className="mt-3 text-[12px] leading-4 text-muted-foreground">
+        <p className="mt-3 text-[12px] leading-4 text-radar-ink-400">
           不引入「已读」状态：事项被处理后自然消失，避免出现「点过就算解决」的假象。
         </p>
-      </Panel>
-    </AdminPage>
+      </RadarPanel>
+    </RadarPage>
   );
 }

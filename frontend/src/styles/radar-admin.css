@@ -104,3 +104,51 @@
     animation: none !important;
   }
 }
+
+/* ── 中性化作用域 ──
+ * 后台页内容区套上 `.radar-scope` 后，把品牌紫后台的语义令牌整体重映射为
+ * freebie-radar 中性值：灰底 / 近黑品牌 / 零阴影 / 1px 细线 / 颜色编码语义。
+ *
+ * 作用：后台 chunk 里既有的 shadcn 原子件（Input / Select / Switch / Card /
+ * Dialog / 表格等）只要落在页面内容区内，就自动中性化，无需逐件改写；
+ * 同时作为过渡期安全网——页面尚未迁完时，混用的 shadcn 原语也不会露出品牌紫。
+ *
+ * 仅作用于内容区（RadarPage 容器），不污染外壳（侧栏 / 顶栏）的品牌紫令牌，
+ * 与「命名空间隔离」目标一致。
+ */
+.radar-scope {
+  --color-background: #f6f7f9;
+  --color-foreground: #1b1e26;
+  --color-card: #ffffff;
+  --color-card-foreground: #1b1e26;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1b1e26;
+  --color-primary: #111318;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f3f6;
+  --color-secondary-foreground: #1b1e26;
+  --color-muted: #f1f3f6;
+  --color-muted-foreground: #646f80;
+  --color-accent: #f1f3f6;
+  --color-accent-foreground: #111318;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e6e8ec;
+  --color-input: #e6e8ec;
+  --color-ring: #272b36;
+  --color-success-soft: #ecfdf5;
+  --color-success-text: #047857;
+  --color-warn-soft: #fef3c7;
+  --color-warn-text: #92400e;
+  --color-warn-border: #fde68a;
+  --color-danger-soft: #fef2f2;
+  --color-danger-text: #dc2626;
+  --color-brand: #111318;
+  --color-brand-hover: #272b36;
+  --color-brand-bg: #f1f3f6;
+  --color-brand-light: #f1f3f6;
+  --shadow-card: none;
+  --radius-lg: 8px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { BACKEND_ORDER, KIND_LABEL, KIND_ORDER, META } from './constants';
 import { useAdmin, useToast, useAdminResource } from './hooks';
 import { CheckCircle2, Lock, XCircle } from 'lucide-react';
@@ -24,7 +25,7 @@ import {
   ToneBadge,
   formatBytes,
   formatNumber,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '../../../admin-ui/lib/cn';
 import type { StorageBackendId } from '../../../types/api';
 

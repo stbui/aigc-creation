@@ -6,7 +6,8 @@ import { useAdmin, useDiscardConfirm, useUnsavedGuard, useToast, useAdminResourc
 import { adminNotificationsApi } from '../../../lib/api';
 import { deliveryProviderLabel, emailErrorText } from '../email/constants';
 
-import { ActionButton, AdminDataTable, AdminPage, FormDrawer, FormField, MiniStat, Notice, Panel, SelectField, StaleError, StatusTag, SwitchField, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/primitives';
+import { ActionButton, AdminDataTable, AdminPage, FormDrawer, FormField, MiniStat, Notice, Panel, SelectField, StaleError, StatusTag, SwitchField, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 import type { BroadcastResult, DeliveryChannelStatusMap, EmailTestResult, MessageTemplateItem } from '../../../types/api';
 
 /** 业务通知实际读取的模板编码 —— 与通知服务内置兜底文案一一对应 */

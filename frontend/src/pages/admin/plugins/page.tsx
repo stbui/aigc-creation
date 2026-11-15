@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { Link } from 'react-router-dom';
 import { RefreshCw, Upload } from 'lucide-react';
 import { adminPluginsApi, adminProviderCatalogApi } from './api';
@@ -9,7 +10,7 @@ import {
   Notice,
   Panel,
   StaleError,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import { PluginStats } from './PluginStats';
 import { PluginTable } from './PluginTable';

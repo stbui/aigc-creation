@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileText, ListChecks, Send, Settings2 } from 'lucide-react';
 
@@ -17,7 +18,7 @@ import {
   SwitchField,
   TabsContent,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminNotificationsApi, adminSettingsApi } from '../../../lib/api';
 import type {
   AdminSettingValue,

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { STATUS_OPTIONS, KIND_LABELS, STATUS_LABELS } from './constants';
 import { yuan } from './utils';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
@@ -26,7 +27,7 @@ import {
   formatDateTime,
   type AdminColumn,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';
 import type { AdminInvoice, InvoiceStatus } from '../../../types/payment';
 

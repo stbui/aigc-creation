@@ -5,7 +5,8 @@ import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { ShieldAlert } from 'lucide-react';
 import { adminRetentionApi } from '../../../lib/api';
 
-import { AdminPage, ActionButton, AdminDataTable, ConfirmDialog, NumberField, Notice, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/primitives';
+import { AdminPage, ActionButton, AdminDataTable, ConfirmDialog, NumberField, Notice, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 import type { AdminCleanupLog, AdminRetentionTarget } from '../../../types/api';
 
 /**

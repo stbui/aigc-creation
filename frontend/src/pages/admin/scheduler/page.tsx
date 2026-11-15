@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { FRESHNESS_STYLE } from './constants';
 import { since, freshness } from './utils';
 import { useAdmin, useToast, useAdminResource } from './hooks';
@@ -17,7 +18,7 @@ import {
   Panel,
   StaleError,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '../../../admin-ui/lib/cn';
 import type { AdminSchedulerTask } from '../../../types/api';
 

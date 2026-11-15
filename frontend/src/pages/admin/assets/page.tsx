@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
 import {
   AdminPage,
@@ -6,7 +7,7 @@ import {
   SegmentedTabs,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminAssetsApi } from './api';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useSelectionPrune, useToast } from './hooks';
 import {

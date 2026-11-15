@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { Plus } from 'lucide-react';
 import { adminChannelsApi, adminUserGroupsApi } from './api';
 import {
@@ -7,7 +8,7 @@ import {
   ConfirmDialog,
   Panel,
   StaleError,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   useAdmin,
   useAdminResource,

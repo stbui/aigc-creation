@@ -20,7 +20,8 @@ import {
   WorkQueue,
   earliestFailure,
   useAdminResource,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 import { useDuty } from '../../../components/admin/DutyContext';
 import { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';
 import type { AdminOverview, AdminWorkbenchRoleView } from '../../../types/api';

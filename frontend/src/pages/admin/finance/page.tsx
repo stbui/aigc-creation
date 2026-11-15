@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { Link, useSearchParams } from 'react-router-dom';
 import { adminModelCallsHref, defaultRange } from './utils';
 import { useAdminResource, useAdminUrlFilterSync } from './hooks';
@@ -14,7 +15,7 @@ import {
   StatCards,
   TextField,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { toCredits } from '../../../lib/microcredits';
 import type { FinanceAnalyticsView, FinanceBreakdownRow, FinanceDayRow } from '../../../types/model';
 

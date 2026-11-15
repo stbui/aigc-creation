@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
@@ -13,7 +14,7 @@ import {
   RefreshButton,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { EFFECTIVE_META, TYPE_LABEL, type FormState } from './constants';
 import { buildCampaignPayload, emptyForm, toLocalInput } from './utils';

@@ -1,4 +1,5 @@
 import { Search } from 'lucide-react';
+import '../../../styles/radar-admin.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -16,7 +17,7 @@ import {
   SelectField,
   useAdminResource,
   useAdminUrlFilterSync,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { useAdmin } from '../../../context/AdminContext';

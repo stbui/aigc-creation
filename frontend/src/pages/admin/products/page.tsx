@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { adminProductsApi } from './api';
@@ -9,7 +10,7 @@ import {
   RefreshButton,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   useAdmin,
   useAdminResource,

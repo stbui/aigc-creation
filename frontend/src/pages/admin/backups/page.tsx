@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
 import { DatabaseBackup, Trash2 } from 'lucide-react';
 import { adminBackupsApi, adminRetentionApi } from './api';
@@ -13,7 +14,7 @@ import {
   Panel,
   SelectField,
   StaleError,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useAdmin, useAdminResource, useAdminUrlFilterSync, useToast } from './hooks';
 import {
   BACKUP_FILTER_LABELS,

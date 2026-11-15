@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import {
   AdminPage,
   AdminTabs,
   RefreshButton,
   TabsContent,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { PaymentsProvidersTab } from './PaymentsProvidersTab';
 import { PaymentsReconciliationTab } from './PaymentsReconciliationTab';
 import { PaymentsExceptionPanel } from './PaymentsExceptionPanel';

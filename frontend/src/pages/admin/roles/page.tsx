@@ -3,7 +3,8 @@ import { PERMISSION_LABELS, MODULE_LABELS, ROLE_COL } from './constants';
 import { useAdmin, useConfirm, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from '../../../lib/api';
 
-import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, Toggle, ToneBadge } from '~/admin-ui/primitives';
+import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, Toggle, ToneBadge } from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 import { cn } from '../../../admin-ui/lib/cn';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */

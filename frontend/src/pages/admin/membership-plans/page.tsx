@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { Plus } from 'lucide-react';
 import { adminMembershipPlansApi, adminUserGroupsApi } from './api';
 import {
@@ -9,7 +10,7 @@ import {
   PageSkeleton,
   RefreshButton,
   StaleError,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   useAdmin,
   useAdminResource,

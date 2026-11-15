@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminBillingOrdersApi } from './api';
 import {
@@ -9,7 +10,7 @@ import {
   SavedViewBar,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   readAdminActionContext,
   readAdminDone,

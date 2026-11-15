@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import {
   BILLABLE_OPTIONS,
   CAPABILITY_LABELS,
@@ -37,7 +38,7 @@ import {
   formatDuration,
   type AdminColumn,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { ApiLogListResult, ApiLogView } from '../../../types/model';
 
 /**

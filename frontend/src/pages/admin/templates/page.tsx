@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import '../../../styles/radar-admin.css';
 import { Plus } from 'lucide-react';
 
 import {
@@ -9,7 +10,7 @@ import {
   ListError,
   PageSkeleton,
   RefreshButton,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminTemplateCatalogApi } from './api';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import {
