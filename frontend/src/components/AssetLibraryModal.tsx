@@ -11,7 +11,6 @@ import {
   DATE_LABELS,
   filterAssets,
   KIND_LABELS,
-  NO_CAPABILITY,
   type DateFilter,
   type PickerKind,
 } from './assetLibraryFilters';

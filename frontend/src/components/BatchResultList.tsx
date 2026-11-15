@@ -1,6 +1,6 @@
 import './BatchResultList.css';
 import './result-list.css';
-import { memo, useMemo, useState, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { Download, ImagePlus, RotateCcw, Trash2 } from 'lucide-react';
 
 import { ImageLightbox, type LightboxItem } from './ImageLightbox';

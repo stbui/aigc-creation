@@ -3,7 +3,7 @@ import './PromptPolishModal.css';
 import { useUploadLimits } from '../context/UploadLimitsContext';
 import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, X } from 'lucide-react';
-import { assetsApi, promptToolsApi, toAbsoluteUrl } from '../lib/api';
+import { assetsApi, promptToolsApi } from '../lib/api';
 import { promptToolErrorMessage } from '../lib/promptToolMessages';
 import { useProject } from '../hooks/useProject';
 import type { PromptToolResult } from '../types/api';
