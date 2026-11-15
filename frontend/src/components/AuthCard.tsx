@@ -1,5 +1,5 @@
 import '../styles/auth.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Button, Form, FormItem, Input, useApp, useForm, useWatch } from '../ui';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, X } from 'lucide-react';
@@ -9,6 +9,28 @@ import { QrLoginPanel } from './QrLoginPanel';
 import { AuthFormFields } from './AuthFormFields';
 import { LoginGiftArt } from './LoginGiftArt';
 import type { SmsPurpose } from '../types/api';
+
+/**
+ * 无 `href` 的 `<a>` **不可聚焦** —— Tab 遍历直接跳过，焦点环也就永远不显示。
+ *
+ * 登录卡的「忘记密码 / 去登录 / 立即注册」三处都是 `<a onClick>`：鼠标能点，
+ * 键盘用户 Tab 不到、回车也不触发（`docs/accessibility.md` §1 要求焦点可见且顺序一致）。
+ * 这里补 `role` / `tabIndex` 与 Enter / Space 激活，**外观零变化**（不引入 href 以免
+ * 浏览器显示链接地址、也不改 DOM 结构影响 `.login-switch a` 选择器）。
+ */
+function linkActivate(action: () => void) {
+  return {
+    role: 'button' as const,
+    tabIndex: 0,
+    onClick: action,
+    onKeyDown: (event: KeyboardEvent<HTMLAnchorElement>) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        action();
+      }
+    },
+  };
+}
 
 interface AuthForm {
   email: string;
@@ -411,7 +433,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
           {mode === 'login' && (
             <div className="login-links">
               <a
-                onClick={() => {
+                {...linkActivate(() => {
                   /*
                    * 弹窗宿主里必须先关闭弹窗再跳转：LoginModal 渲染在路由之外，
                    * 只 navigate 的话找回页已经在下面加载了，但登录弹窗仍盖着，
@@ -419,7 +441,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                    */
                   onCancel?.();
                   navigate('/forgot-password');
-                }}
+                })}
               >
                 忘记密码？
               </a>
@@ -450,11 +472,11 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
           <div className="login-switch">
             {mode === 'register' ? (
               <span>
-                已有账号？<a onClick={() => switchMode('login')}>去登录</a>
+                已有账号？<a {...linkActivate(() => switchMode('login'))}>去登录</a>
               </span>
             ) : (
               <span>
-                还没有账号？<a onClick={() => switchMode('register')}>立即注册</a>
+                还没有账号？<a {...linkActivate(() => switchMode('register'))}>立即注册</a>
               </span>
             )}
           </div>
