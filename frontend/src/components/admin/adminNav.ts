@@ -23,6 +23,7 @@ import {
   LayoutDashboard,
   ListTree,
   Mail,
+  Palette,
   MessagesSquare,
   MessageSquareText,
   Network,
@@ -288,6 +289,13 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         label: "定时任务",
         icon: Clock,
         permission: "setting.read",
+      },
+      {
+        path: "/admin/radar-style",
+        label: "中性风格示例",
+        icon: Palette,
+        // 设计验证页：不挂业务权限，所有后台角色可见
+        permission: null,
       },
     ],
   },

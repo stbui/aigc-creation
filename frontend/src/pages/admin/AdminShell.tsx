@@ -45,6 +45,7 @@ import {
   AdminTicketsPage,
   AdminUserGroupsPage,
   AdminUsersPage,
+  AdminRadarStylePage,
 } from './routes';
 
 /**
@@ -193,6 +194,8 @@ export function AdminShell() {
               <Route path="templates" element={<AdminTemplatesPage />} />
               {/* AI 标识样式 */}
               <Route path="aigc-label" element={<AdminAigcLabelPage />} />
+              {/* 中性风格（freebie-radar 设计语言）落地验证页 */}
+              <Route path="radar-style" element={<AdminRadarStylePage />} />
               {/* 未实现的模块：显式提示而非静默跳回概览 */}
               <Route path="*" element={<NotImplementedPage />} />
             </Routes>

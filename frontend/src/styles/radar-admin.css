@@ -1,0 +1,106 @@
+@layer theme, base, components, utilities;
+
+/*
+ * freebie-radar 风格后台设计层（命名空间 radar-*）。
+ *
+ * 设计语言：中性灰 + 墨黑品牌 + 零面板阴影 + 1px 细线 + 颜色编码语义。
+ * 与本产品现有品牌紫 / shadcn 后台（styles/admin.css、tokens.css）完全隔离，
+ * 仅由后台 radar 页面 chunk 引入（pages/admin/radar-style/page.tsx），
+ * 不污染全站令牌与现有后台视觉。
+ *
+ * 接入方式参考 admin.css：CSS-first（无 tailwind.config），令牌走 @theme inline，
+ * 自定义面板/抽屉阴影走 @utility。本文件只补充 radar 命名空间的令牌与工具类，
+ * Tailwind 基础/工具层由 admin.css 已在后台 chunk 载入。
+ */
+
+@theme inline {
+  /* 中性灰 ink 阶梯（freebie-radar 实测值） */
+  --color-radar-canvas: #f6f7f9;
+  --color-radar-surface: #ffffff;
+  --color-radar-surface-hover: #f7f8fb;
+  --color-radar-surface-muted: #f1f3f6;
+  --color-radar-ink-950: #111318;
+  --color-radar-ink-900: #1b1e26;
+  --color-radar-ink-700: #374151;
+  --color-radar-ink-600: #4b5563;
+  --color-radar-ink-500: #525c6b;
+  --color-radar-ink-400: #646f80;
+  --color-radar-ink-300: #d1d5de;
+  --color-radar-ink-200: #e6e8ec;
+  --color-radar-ink-100: #f1f3f6;
+
+  /* 品牌（近墨黑，区别于产品品牌紫 #5546d8） */
+  --color-radar-brand: #111318;
+  --color-radar-brand-hover: #272b36;
+  --color-radar-brand-dark: #090a0d;
+  --color-radar-brand-subtle: #eef0ff;
+  --color-radar-brand-border: #c7d0f8;
+  --color-radar-accent: #312e81;
+
+  /* 语义色：实色 + 浅底（成对，参考 freebie-radar） */
+  --color-radar-deal: #047857;
+  --color-radar-deal-subtle: #ecfdf5;
+  --color-radar-deal-border: #a7f3d0;
+  --color-radar-code: #92400e;
+  --color-radar-code-subtle: #fef3c7;
+  --color-radar-code-border: #fde68a;
+  --color-radar-alert: #dc2626;
+  --color-radar-alert-subtle: #fef2f2;
+  --color-radar-alert-border: #fecaca;
+
+  /* 圆角：面板/按钮 8px（freebie-radar 实值，绕过后台 chunk 的 --radius 重映射） */
+  --radius-radar: 8px;
+  /* 阴影：仅抽屉使用，其余面板零阴影 */
+  --shadow-radar-drawer: -8px 0 32px rgba(17, 19, 24, 0.08), -1px 0 0 rgba(17, 19, 24, 0.06);
+}
+
+/* 面板：白底 + 1px 细线 + 8px 圆角（零阴影） */
+@utility panel {
+  background-color: var(--color-radar-surface);
+  border: 1px solid var(--color-radar-ink-200);
+  border-radius: var(--radius-radar);
+}
+
+/* 抽屉阴影（唯一带阴影的元素） */
+@utility radar-drawer-shadow {
+  box-shadow: var(--shadow-radar-drawer);
+}
+
+/* ── 动效关键帧（命名空间 radar-*，避免与全站 .drawer-enter 等冲突） ── */
+@keyframes radar-drawer-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes radar-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes radar-pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes radar-sheet-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes radar-toast-up {
+  from { opacity: 0; transform: translate(-50%, 10px) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+.radar-drawer-enter { animation: radar-drawer-in 210ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.radar-backdrop-enter { animation: radar-backdrop-in 180ms ease-out both; }
+.radar-pop-enter { animation: radar-pop-in 150ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.radar-sheet-enter { animation: radar-sheet-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.radar-toast-enter { animation: radar-toast-up 180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* 无障碍：尊重系统“减少动态效果”设置 */
+@media (prefers-reduced-motion: reduce) {
+  .radar-drawer-enter,
+  .radar-backdrop-enter,
+  .radar-pop-enter,
+  .radar-sheet-enter,
+  .radar-toast-enter {
+    animation: none !important;
+  }
+}
