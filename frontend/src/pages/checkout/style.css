@@ -360,7 +360,7 @@
   flex: none;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--brand-bg);
   color: var(--brand);
   font-size: 14px;

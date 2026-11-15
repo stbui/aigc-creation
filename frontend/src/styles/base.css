@@ -76,6 +76,23 @@ body {
   transform: translateY(0);
 }
 
+/**
+ * 全局键盘焦点环（WCAG 2.2 AA，见 `docs/accessibility.md` §1「焦点必须可见」）。
+ *
+ * 此前焦点样式是 12 处零散覆盖（auth / tool-workspace / redraw / product-detail-kit /
+ * AppSidebar / ui-compat），没被覆盖到的裸 `<button>` 与 `<a onClick>` 在 Tab 遍历时
+ * 完全看不到焦点 —— 键盘用户无法定位。
+ *
+ * 三条约束，改动时勿破坏：
+ *   1. `:where()` 特异性为 0 —— 既有局部规则照常覆盖，不改变任何现有效果；
+ *   2. 只作用于 `:focus-visible` —— 鼠标点击不出现，静止状态零影响；
+ *   3. 不包含 input / select / textarea —— 表单控件自带 focus 边框，叠加会出现双环。
+ */
+:where(a, button, [role='button'], summary):focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
 /* ≤900px 移动态: 顶栏 54px */
 @media (max-width: 900px) {
   :root {

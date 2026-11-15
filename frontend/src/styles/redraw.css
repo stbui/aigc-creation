@@ -66,7 +66,7 @@
   gap: 8px;
   padding: 16px;
   background: var(--tool-surface-12);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .redraw-prompt + .redraw-prompt {
@@ -188,7 +188,7 @@
   align-items: center;
   gap: 4px;
   background: var(--card-bg);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   box-shadow: 0 4px 12px rgba(107, 112, 128, 0.16);
 }
 
@@ -290,7 +290,7 @@
   gap: 4px;
   padding: 4px 8px;
   background: var(--card-bg);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   box-shadow: 0 4px 12px rgba(107, 112, 128, 0.14);
 }
 
@@ -362,7 +362,7 @@
   margin: auto;
   padding: 24px;
   background: transparent;
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
 }
 
 .pk-workspace.local-redraw-page .redraw-intro-copy {
@@ -418,7 +418,7 @@
   gap: 0;
   padding: 0;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
 }
 
 .pk-workspace.local-redraw-page .redraw-stage-topbar {
@@ -534,7 +534,7 @@
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--brand);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   color: var(--brand);
   font-size: 12px;
@@ -658,7 +658,7 @@
   row-gap: 0;
   margin-top: 0;
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--tool-surface-12);
 }
 
@@ -720,7 +720,7 @@
   gap: 3px;
   overflow: hidden;
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-body);
   font-size: 12px;

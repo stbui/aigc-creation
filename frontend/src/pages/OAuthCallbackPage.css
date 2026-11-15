@@ -9,7 +9,7 @@
   width: min(480px, calc(100vw - 32px));
   margin: 12vh auto 0;
   padding: var(--space-40) var(--space-32);
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
   background: var(--card-bg);
   box-shadow: 0 10px 30px rgba(35, 39, 74, 0.12);
   text-align: center;

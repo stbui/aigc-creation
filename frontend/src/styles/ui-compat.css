@@ -71,7 +71,7 @@
     height: 36px;
     padding: 0 16px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-control);
     background: var(--card-bg);
     color: var(--text-1);
     font: inherit;
@@ -175,7 +175,7 @@
   max-height: calc(100vh - 32px);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--card-bg);
   box-shadow: 0 24px 80px rgb(28 22 59 / 0.24);
 }
@@ -247,7 +247,7 @@
 .ui-radio-group.is-button {
   display: inline-flex;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -283,7 +283,7 @@
   height: 4px;
   margin: 0;
   appearance: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-color: var(--border);
   background-image: linear-gradient(var(--brand), var(--brand));
   background-repeat: no-repeat;
@@ -320,7 +320,7 @@
   height: 36px;
   padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   color: var(--text-1);
   font: inherit;
@@ -350,7 +350,7 @@
   height: 104px;
   padding: 0;
   border: 1px dashed var(--border-dot);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-body);
   cursor: pointer;
@@ -412,7 +412,7 @@
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--danger-text);
   color: var(--on-brand);
   font-size: 12px;
@@ -498,7 +498,7 @@
 .ui-alert {
   padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   font-size: 13px;
 }

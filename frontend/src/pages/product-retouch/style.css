@@ -17,7 +17,9 @@
   height: calc(100vh - var(--workspace-topbar-height, 64px));
   min-height: calc(100vh - var(--workspace-topbar-height, 64px));
   max-height: none;
-  padding: 18px;
+  /* 2026-11-15 统一间距: 原为字面值 18px, 是九个工具页里唯一偏离骨架 16px 的一页
+     (其余 8 页顶层 padding 均为 var(--space-16)), 三栏布局本身不构成加宽理由。 */
+  padding: var(--space-16);
   gap: var(--space-16);
   grid-template-columns: 432px minmax(0, 1fr) 192px;
   grid-template-rows: minmax(0, 1fr);
@@ -36,7 +38,7 @@
 
 .pk-workspace.product-retouch-page .pk-config-card {
   padding: var(--space-16);
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
 }
 
 .pk-workspace.product-retouch-page .pk-section {
@@ -134,7 +136,7 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   cursor: zoom-in;
 }
@@ -163,7 +165,7 @@
   height: 40px;
   padding: 0 var(--space-12);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--color-border-soft);
   color: var(--text-body);
   font-size: 14px;
@@ -287,7 +289,7 @@
 
   .pk-workspace.product-retouch-page .pk-config-card {
     padding: 14px;
-    border-radius: 16px;
+    border-radius: var(--radius-panel);
   }
 
   .pk-workspace.product-retouch-page .pk-section {
@@ -468,7 +470,7 @@
   height: 56px;
   padding: 9px;
   border: 1px solid var(--border-1);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   color: var(--wb-text-hero);
   font-size: 12px;

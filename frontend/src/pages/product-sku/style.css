@@ -124,7 +124,7 @@
   position: absolute;
   box-sizing: border-box;
   border: 2px solid var(--brand-active);
-  border-radius: 4px;
+  border-radius: var(--radius-tag);
   background: rgba(85, 70, 216, 0.14);
   pointer-events: none;
   line-height: normal;
@@ -355,7 +355,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-page .pk-form-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--sku-surface-1);
 }
 
@@ -442,7 +442,7 @@ ol.product-sku-steps {
   min-height: 158px;
   padding: var(--space-16);
   border: 1px dashed var(--sku-border-3);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface-4);
   color: var(--text-8);
   cursor: pointer;
@@ -474,7 +474,7 @@ ol.product-sku-steps {
   z-index: 3;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: rgba(255, 255, 255, 0.72);
 }
 
@@ -492,7 +492,7 @@ ol.product-sku-steps {
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--wb-thumb-bg);
   cursor: zoom-in;
 }
@@ -519,7 +519,7 @@ ol.product-sku-steps {
   min-height: 40px;
   padding: 0 var(--space-12);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   color: var(--text-5);
   font-size: 14px;
@@ -579,7 +579,7 @@ ol.product-sku-steps {
   place-items: center;
   width: 24px;
   height: 24px;
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
   background: var(--brand);
   color: var(--card-bg);
   font-size: 12px;
@@ -673,7 +673,7 @@ ol.product-sku-steps {
   min-height: 32px;
   overflow: hidden;
   border: 1px solid var(--brand);
-  border-radius: 4px;
+  border-radius: var(--radius-tag);
   background: var(--card-bg);
 }
 
@@ -728,7 +728,7 @@ ol.product-sku-steps {
   min-height: 84px;
   padding: var(--space-16);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface-6);
 }
 
@@ -827,7 +827,7 @@ ol.product-sku-steps {
   width: 48px;
   height: 48px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
 }
 
@@ -835,7 +835,7 @@ ol.product-sku-steps {
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-tag);
   object-fit: cover;
   cursor: zoom-in;
 }
@@ -902,7 +902,7 @@ ol.product-sku-steps {
   min-height: 40px;
   padding: 0 var(--space-12);
   border: 1px solid var(--sku-border-brand-5);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--mif-surface-back-hover);
   color: var(--brand);
   font-size: 12px;
@@ -928,7 +928,7 @@ ol.product-sku-steps {
   min-height: 40px;
   padding: 0 var(--space-12);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--brand);
   color: var(--card-bg);
   font-size: 14px;
@@ -943,7 +943,7 @@ ol.product-sku-steps {
 .product-sku-result-notice {
   margin: -4px 0 var(--space-10);
   padding: var(--space-8) var(--space-10);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--mif-surface-back-hover);
   color: var(--sku-text-brand-4);
   font-size: 12px;
@@ -1116,7 +1116,7 @@ ol.product-sku-steps {
 .product-sku-generating-pulse {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: linear-gradient(90deg, var(--sku-surface-brand-3) 25%, var(--sku-surface-brand-6) 50%, var(--sku-surface-brand-3) 75%);
   background-size: 200% 100%;
   animation: product-sku-shimmer 1.2s infinite linear;
@@ -1322,7 +1322,7 @@ ol.product-sku-steps {
 .product-sku-history-more {
   min-height: 32px;
   border: 1px dashed var(--sku-border-1);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-8);
   font-size: 12px;
@@ -1442,7 +1442,7 @@ ol.product-sku-steps {
   min-height: 40px;
   padding: 5px var(--space-12);
   overflow-x: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   box-shadow: 0 5px 16px rgba(45, 51, 68, 0.09);
 }
@@ -1521,7 +1521,7 @@ ol.product-sku-steps {
 .product-sku-brush-size b {
   min-width: 20px;
   padding: var(--space-2) 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-tag);
   background: var(--sku-surface-4);
   color: var(--sku-text-10);
   font-size: 12px;
@@ -1566,7 +1566,7 @@ ol.product-sku-steps {
   min-height: 40px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--sku-surface-brand-1);
   color: var(--card-bg);
   font-size: 12px;

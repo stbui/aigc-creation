@@ -455,7 +455,7 @@
   color: var(--alp-text-3);
   background: var(--card-bg);
   border: 1px solid var(--alp-border-6);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   cursor: pointer;
   overflow: hidden;
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;

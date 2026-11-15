@@ -273,7 +273,7 @@
   height: 44px;
   overflow: hidden;
   border: 1px solid var(--tool-border-3);
-  border-radius: 4px;
+  border-radius: var(--radius-tag);
   background: var(--card-bg);
   box-shadow: 0 2px 7px rgba(57, 48, 75, 0.08);
   transition: transform 60ms linear;
@@ -307,7 +307,7 @@
   width: 22px;
   height: 14px;
   border: 1px solid var(--tool-border-2);
-  border-radius: 4px;
+  border-radius: var(--radius-tag);
   background: linear-gradient(var(--tool-surface-10), var(--tool-surface-2));
 }
 
@@ -500,7 +500,7 @@
 .pk-workspace.rotate-angle-page .rotate-angle-range input[type='range'] {
   height: 4px;
   margin: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-tag);
   background: linear-gradient(
     90deg,
     var(--brand) var(--range-progress),

@@ -242,7 +242,7 @@
 .app-topnav-dropdown.ui-dropdown-content {
   min-width: 137px;
   padding: var(--space-10) var(--space-8);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   border: 1px solid var(--border-2);
   background: var(--card-bg);
   box-shadow: 0 18px 42px rgba(31, 41, 55, 0.14);

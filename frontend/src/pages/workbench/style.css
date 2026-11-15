@@ -983,7 +983,7 @@
   height: 212px;
   margin-bottom: var(--space-16);
   padding: 0 100px;
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
   background: var(--hero-grad-1)  50% / cover no-repeat;
 }
 
@@ -1019,7 +1019,7 @@
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
   background: var(--card-bg);
   color: var(--wb-text);
   text-align: left;
@@ -1071,7 +1071,7 @@
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   box-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
 }
@@ -1138,7 +1138,7 @@
 .wb-tool-title em {
   flex: none;
   padding: 1px var(--space-4);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--wb-badge-bg);
   color: var(--card-bg);
   font-size: 12px;
@@ -1179,7 +1179,7 @@
 }
 
 .wb-panel.wb-recent {
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
 }
 
 .wb-panel-title,
@@ -1243,7 +1243,7 @@
 .wb-account-metrics > div {
   min-width: 0;
   padding: var(--space-20) var(--space-24);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -1296,7 +1296,7 @@
 .wb-flow-type {
   display: inline-block;
   padding: var(--space-2) 7px;
-  border-radius: 4px;
+  border-radius: var(--radius-tag);
   font-size: 12px;
   line-height: 15px;
 }
@@ -1354,7 +1354,7 @@
 .wb-dashboard-stats > div {
   min-width: 0;
   padding: var(--space-24);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -1407,7 +1407,7 @@
   width: 80px;
   height: 80px;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--wb-thumb-bg);
   color: var(--wb-thumb-fg);
 }

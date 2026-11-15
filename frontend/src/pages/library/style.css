@@ -560,7 +560,7 @@
   gap: var(--space-8);
   min-height: 180px;
   border: 1px solid var(--alp-border-7);
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
   background: var(--card-bg);
   color: var(--text-desc);
 }

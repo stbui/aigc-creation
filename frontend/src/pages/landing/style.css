@@ -1431,7 +1431,7 @@
   padding: var(--space-10) var(--space-8);
   background: var(--card-bg);
   border: 1px solid var(--border-2);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   box-shadow: 0 18px 42px rgba(31, 41, 55, 0.14);
   display: grid;
   gap: var(--space-2);

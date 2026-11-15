@@ -97,7 +97,7 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--card-bg);
   color: var(--brand);
   box-shadow: 0 2px 10px rgb(85 70 216 / 12%);

@@ -152,7 +152,7 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   cursor: zoom-in;
 }
@@ -163,7 +163,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: rgba(17, 24, 39, 0.35);
   color: var(--card-bg);
   font-size: 12px;
@@ -184,7 +184,7 @@
   height: 40px;
   padding: 0 var(--space-12);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--color-border-soft);
   color: var(--text-body);
   font-size: 14px;
@@ -233,7 +233,7 @@
   height: 32px;
   padding: 0 var(--space-12);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--brand);
   box-shadow: 0 4px 10px rgba(85, 70, 216, 0.2);
   color: var(--card-bg);
@@ -287,7 +287,7 @@
     linear-gradient(-45deg, transparent 75%, var(--tool-surface-8) 75%);
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
   background-size: 16px 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
 }
 .smart-expand-source-preview img {
   position: absolute;

@@ -162,7 +162,7 @@
   height: 64px;
   overflow: hidden;
   border: 1px solid var(--border-brand);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -187,7 +187,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
 }
 
 /* 本页根节点同时带 local-redraw-page（复用画布骨架），且 redraw.css 可能晚于
@@ -204,7 +204,7 @@
   justify-content: center;
   overflow: hidden;
   background: var(--card-bg);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   box-shadow: 0 4px 8px rgba(107, 114, 128, 0.2);
 }
 
@@ -357,7 +357,7 @@
   gap: var(--space-8);
   bottom: 45px;
   background: var(--card-bg);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   box-shadow: 0 4px 16px rgba(107, 114, 128, 0.16);
 }
 
