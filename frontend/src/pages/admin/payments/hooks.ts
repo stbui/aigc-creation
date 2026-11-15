@@ -18,7 +18,7 @@ export {
   useAdminList,
   useAdminResource,
   useAdminUrlFilterSync,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';
 export { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
 
 export { usePaymentExceptionFilters } from './usePaymentExceptionFilters';

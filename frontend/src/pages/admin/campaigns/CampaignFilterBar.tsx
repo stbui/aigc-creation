@@ -6,8 +6,9 @@ import {
   FilterBar,
   SelectField,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { EFFECTIVE_OPTIONS, TYPE_OPTIONS } from './constants';
+import '../../../styles/radar-admin.css';
 
 interface CampaignFilterBarProps {
   keyword: string;

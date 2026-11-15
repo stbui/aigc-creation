@@ -12,11 +12,12 @@ import {
   SwitchField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { AdminSettingValue } from '../../../types/api';
 import type { SettingItem } from './constants';
 import { displayValue } from './utils';
 import { adminSettingsApi } from '../../../lib/api';
+import '../../../styles/radar-admin.css';
 
 const IMAGE_FORMAT_OPTIONS = [
   { value: 'jpg', label: 'JPG' },

@@ -6,7 +6,7 @@ import {
   StaleError,
   StatusTag,
   type TagTone,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   REFUND_REASON_LABELS,
   STATUS_LABELS,
@@ -20,6 +20,7 @@ import {
   formatDateTime,
   toCredits,
 } from './utils';
+import '../../../styles/radar-admin.css';
 
 type ReviewMeta = {
   label: string;

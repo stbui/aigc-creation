@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Notice, Panel, StatCards, StatusTag } from '~/admin-ui/primitives';
+import { Notice, Panel, StatCards, StatusTag } from '~/admin-ui/radar';
 import type { AdminCapabilityControl } from '../../../types/api';
 import type { AdminCapabilityModelListView, CapabilityPricingView } from '../../../types/model';
 import { bindingConfigAvailable, capabilityPriceText } from './utils';
+import '../../../styles/radar-admin.css';
 
 /** 影响面：调整商品、改价、下线前，先明确用户与已创建任务会受什么影响。 */
 export function ImpactPanel({

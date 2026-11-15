@@ -8,10 +8,11 @@ import {
   ModalDialog,
   NumberField,
   SelectField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useToast } from './hooks';
 import { moveOrderItem, orderChanged, type OrderItem } from './utils';
 import type { ChannelOrderItemView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 /**
  * 排序弹窗（渠道之间 / 渠道内模型之间）。

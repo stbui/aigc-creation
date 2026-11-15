@@ -7,9 +7,10 @@ import {
   Notice,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { contributionText } from './constants';
 import type { PluginView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 type PluginProvider = PluginView['providers'][number];
 

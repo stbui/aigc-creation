@@ -1,10 +1,11 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
-import { ActionButton, Panel } from '~/admin-ui/primitives';
+import { ActionButton, Panel } from '~/admin-ui/radar';
 import type {
   AdminTemplateCategory,
   AdminTemplateGroup,
 } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 export interface CategorySidebarProps {
   categories: AdminTemplateCategory[];

@@ -6,7 +6,7 @@ import {
   StaleError,
   ActionButton,
   useSelectionPrune,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useAllChannelModelsColumns } from './AllChannelModelsColumns';
 import { AllChannelModelsFilters } from './AllChannelModelsFilters';
 import { ModelCommerceOverview } from './ModelCommerceOverview';
@@ -29,6 +29,7 @@ import type {
   ChannelModelHealthRowView,
   ChannelOrderItemView,
 } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 /** 「不健康」的阈值：24h 成功率低于 80% */
 const UNHEALTHY_RATE = 0.8;

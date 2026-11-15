@@ -11,7 +11,7 @@ import {
   SelectField,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
 import { ChannelModelTestResultPanel } from './ChannelModelTestResultPanel';
@@ -20,6 +20,7 @@ import { PRODUCT_STATE_META, productStateOf } from './utils';
 import { CAPABILITY_OPTIONS, PAGE_SIZE, STATUS_FILTER_OPTIONS } from './constants';
 import type { ProductConsumptionState } from './useProductConsumption';
 import type { AdminChannelModelView, ChannelModelHealthRowView, ProtocolTestResultView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 interface ChannelModelTableProps {
   models: AdminChannelModelView[] | null;

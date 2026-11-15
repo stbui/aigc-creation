@@ -8,10 +8,11 @@ import {
   CheckboxField,
   Separator,
   StatusTag,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '~/admin-ui/lib/cn';
 import { UserIdentityCell } from './UserIdentityCell';
 import type { AdminUserRow } from './types';
+import '../../../styles/radar-admin.css';
 
 export interface UserCardAction {
   key: string;

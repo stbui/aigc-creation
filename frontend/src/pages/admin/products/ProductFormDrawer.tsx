@@ -4,7 +4,7 @@ import {
   SelectField,
   TextAreaField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   CURRENCY_OPTIONS,
   GRANT_TYPE_OPTIONS,
@@ -16,6 +16,7 @@ import {
 } from './constants';
 import { currencySymbol } from './utils';
 import type { AdminProduct } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 interface ProductFormDrawerProps {
   open: boolean;

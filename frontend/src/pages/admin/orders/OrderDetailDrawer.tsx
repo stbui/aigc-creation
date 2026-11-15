@@ -6,7 +6,7 @@ import {
   Descriptions,
   DetailSection,
   StatusTag,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminOrdersApi } from './api';
 import {
   aggregateRefundState,
@@ -24,6 +24,7 @@ import {
   yuan,
 } from './utils';
 import type { AdminOrderDetail, AdminOrderRefund, AdminOrderRow } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /** 详情抽屉里的一条时间线记录：状态点 + 主行 + 灰色补充行 */
 function RecordRow({

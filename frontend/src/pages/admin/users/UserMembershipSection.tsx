@@ -10,12 +10,13 @@ import {
   Separator,
   StatusTag,
   formatYuan,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type {
   AdminUserMembership,
   AdminUserMembershipHistoryItem,
 } from '../../../types/admin-users';
 import { formatDateTime } from './utils';
+import '../../../styles/radar-admin.css';
 
 const MEMBERSHIP_STATUS_META = {
   active: { label: '生效中', tone: 'success' },

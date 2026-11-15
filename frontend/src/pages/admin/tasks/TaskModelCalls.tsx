@@ -7,11 +7,12 @@ import {
   StatusTag,
   type AdminColumn,
   type TagTone,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { ApiLogListResult, ApiLogView } from '../../../types/model';
 import { adminApiLogsApi } from './api';
 import { useAdminResource } from './hooks';
 import { adminModelCallsHref, formatDateTime, formatDuration } from './utils';
+import '../../../styles/radar-admin.css';
 
 const REQUEST_KIND_LABELS: Record<string, string> = {
   create: '创建',

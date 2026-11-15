@@ -8,9 +8,10 @@ import {
   StatusTag,
   type AdminColumn,
   type RowMenuItem,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { backupStatusLabel, formatBytes, formatRelative, triggerLabel } from './utils';
 import type { AdminBackup } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 interface BackupTableProps {
   rows: AdminBackup[];

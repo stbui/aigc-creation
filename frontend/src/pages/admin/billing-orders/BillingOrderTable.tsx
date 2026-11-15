@@ -5,10 +5,11 @@ import {
   AdminDataTable,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { BILLING_MODE_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import { toCredits } from './utils';
 import type { BillingOrderView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 interface BillingOrderTableProps {
   rows: BillingOrderView[];

@@ -1,5 +1,6 @@
-import { ConfirmDialog } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/radar';
 import type { PluginView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 /**
  * 插件的三个写操作确认：启停、上传安装、卸载。

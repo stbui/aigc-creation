@@ -3,7 +3,7 @@ import {
   useAdminList,
   useAdminUrlFilterSync,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 
 /**
  * 「草稿 → 应用」两段式列表的共用内核。

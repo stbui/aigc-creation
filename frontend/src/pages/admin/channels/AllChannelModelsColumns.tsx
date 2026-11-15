@@ -6,7 +6,7 @@ import {
   RowMenu,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
 import { ProductConsumptionCell } from './ProductConsumptionCell';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
@@ -18,6 +18,7 @@ import type {
   ChannelModelHealthRowView,
   ModelCommerceProductView,
 } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 export interface AllChannelModelsColumnOptions {
   channelNameById: Map<string, string>;

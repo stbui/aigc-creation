@@ -1,5 +1,6 @@
-import { ConfirmDialog } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/radar';
 import type { AdminBackupStats } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 interface BackupRunConfirmProps {
   open: boolean;

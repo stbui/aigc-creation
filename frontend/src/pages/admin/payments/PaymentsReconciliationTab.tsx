@@ -14,7 +14,7 @@ import {
   StatusTag,
   formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -39,6 +39,7 @@ import {
 } from './utils';
 import { ReconciliationDetailDrawer } from './ReconciliationDetailDrawer';
 import { ReconciliationToolbar } from './ReconciliationToolbar';
+import '../../../styles/radar-admin.css';
 
 /**
  * 交易核对标签。

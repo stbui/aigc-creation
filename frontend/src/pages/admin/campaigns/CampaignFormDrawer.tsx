@@ -5,10 +5,11 @@ import {
   SwitchField,
   TextAreaField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { EFFECTIVE_META, STATUS_OPTIONS, TYPE_OPTIONS, type FormState } from './constants';
 import { inWindow } from './utils';
 import type { AdminCampaign, CampaignStatus, CampaignType } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 interface CampaignFormDrawerProps {
   open: boolean;

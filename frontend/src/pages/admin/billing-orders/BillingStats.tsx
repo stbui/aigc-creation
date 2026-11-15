@@ -1,5 +1,6 @@
-import { StatCards } from '~/admin-ui/primitives';
+import { StatCards } from '~/admin-ui/radar';
 import { STATUS_LABELS } from './constants';
+import '../../../styles/radar-admin.css';
 
 /**
  * 五个账单状态的计数条。

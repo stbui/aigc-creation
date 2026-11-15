@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Panel } from '~/admin-ui/primitives';
+import { Panel } from '~/admin-ui/radar';
 import { drawPreview, renderBadgeCanvas } from './utils';
 import type { AigcLabelSpec } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 示例底图 + 实时合成预览。

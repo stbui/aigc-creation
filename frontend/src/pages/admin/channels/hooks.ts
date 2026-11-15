@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
-import { useAdminDetailParam, useAdminResource, useAdminUrlFilterSync } from '../../../admin-ui/primitives';
+import { useAdminDetailParam, useAdminResource, useAdminUrlFilterSync } from '~/admin-ui/radar';
 import { useAdmin } from '../../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
 import type { AdminChannelView } from '../../../types/model';

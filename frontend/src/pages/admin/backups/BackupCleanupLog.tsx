@@ -1,6 +1,7 @@
-import { formatDateTime, EmptyState, Panel, StatusTag } from '~/admin-ui/primitives';
+import { formatDateTime, EmptyState, Panel, StatusTag } from '~/admin-ui/radar';
 import { triggerLabel } from './utils';
 import type { AdminCleanupLog } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /** 清理留痕：到期数据清理不可逆，逐条记录删了多少、保留多少天 */
 export function BackupCleanupLog({ logs }: { logs: AdminCleanupLog[] }) {

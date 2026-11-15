@@ -1,5 +1,6 @@
-import { StatCard } from '~/admin-ui/primitives';
+import { StatCard } from '~/admin-ui/radar';
 import type { TicketStats } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 工单概览统计卡。

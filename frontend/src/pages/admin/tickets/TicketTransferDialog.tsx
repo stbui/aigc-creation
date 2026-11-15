@@ -3,8 +3,9 @@ import {
   ConfirmDialog,
   SelectField,
   TextAreaField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { AdminTicketAssignee } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 转交工单。

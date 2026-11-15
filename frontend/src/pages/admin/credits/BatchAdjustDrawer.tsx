@@ -10,11 +10,12 @@ import {
   TextAreaField,
   TextField,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminCreditsApi } from './api';
 import { useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { useStableIdempotencyKey } from './useStableIdempotencyKey';
 import type { BatchAdjustItem, BatchAdjustResult, BatchAdjustRow } from './constants';
+import '../../../styles/radar-admin.css';
 
 /**
  * 批量调整。

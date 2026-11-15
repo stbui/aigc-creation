@@ -1,6 +1,7 @@
-import { ConfirmDialog } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/radar';
 import { POSITION_LABELS } from './constants';
 import type { AigcLabelSpec } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 保存确认。

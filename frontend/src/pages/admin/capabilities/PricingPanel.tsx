@@ -10,7 +10,7 @@ import {
   SkeletonBody,
   StaleError,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { adminCapabilityModelsApi } from '../../../lib/api';
@@ -18,6 +18,7 @@ import { BILLING_MODE_OPTIONS } from '../../../lib/billing-mode';
 import { parseCredits, toCredits, toCreditsInput } from '../../../lib/microcredits';
 import type { CapabilityPricingView } from '../../../types/model';
 import { capabilityPriceText, formatUpdatedAt } from './utils';
+import '../../../styles/radar-admin.css';
 
 interface PricingDraft {
   billingMode: string;

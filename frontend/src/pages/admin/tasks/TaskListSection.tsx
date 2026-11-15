@@ -7,9 +7,10 @@ import {
   Panel,
   StaleError,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { AdminTaskListResult } from '../../../types/api';
 import type { AdminTaskRow, TaskActionKind } from './types';
+import '../../../styles/radar-admin.css';
 
 interface TaskListSectionProps {
   data: AdminTaskListResult | null;

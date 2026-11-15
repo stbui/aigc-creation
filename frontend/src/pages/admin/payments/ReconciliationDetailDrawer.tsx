@@ -11,11 +11,12 @@ import {
   StaleError,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminPaymentReconciliationApi } from './api';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import { adminOrderDetailHref, moneyText } from './utils';
 import { RECONCILIATION_RESULT_LABELS, type AdminReconciliationItem } from '../../../types/payment';
+import '../../../styles/radar-admin.css';
 
 /** 交易核对明细抽屉。 */
 export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; onClose: () => void }) {

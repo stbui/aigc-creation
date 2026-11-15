@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/radar';
 import { BADGE_STYLE_LABELS } from './constants';
 import { toCreditsInput } from './utils';
 import type { ChannelOrderItemView, UserGroupView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 interface UserGroupTableProps {
   rows: UserGroupView[];

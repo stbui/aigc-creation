@@ -1,5 +1,6 @@
-import { StatCards } from '~/admin-ui/primitives';
+import { StatCards } from '~/admin-ui/radar';
 import type { PluginListResult } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 /**
  * 插件概览统计。

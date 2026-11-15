@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { formatNumber, formatDateTime, Meter, formatDuration } from '../../../admin-ui/primitives';
+import { formatNumber, formatDateTime, Meter, formatDuration } from '~/admin-ui/radar';
 import { taskErrorLabel } from '../../../lib/admin-error-codes';
 import { adminOrderDetailHref, adminTaskHref } from '../../../lib/admin-links';
 import type { DutyTask } from '../../../components/admin/DutyContext';
 import type { AdminOrderRow, AdminOverview } from '../../../types/api';
 import { QUEUE_LIMIT, hhmm, queueTime, yuan } from './utils';
+import '../../../styles/radar-admin.css';
 
 /**
  * 概览页首屏构件与展示小节。

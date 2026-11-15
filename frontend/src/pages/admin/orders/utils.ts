@@ -11,10 +11,10 @@ export {
 } from '../../../lib/admin-links';
 
 /** 分 → 元文本（统一实现在 admin-ui/lib/format.ts） */
-export { formatYuanPlain as yuan } from '../../../admin-ui/primitives';
+export { formatYuanPlain as yuan } from '~/admin-ui/radar';
 
 /** 后台统一的时间展示；空值显示破折号，不用空白单元格 */
-export { formatDateTime as fmtTime } from '../../../admin-ui/primitives';
+export { formatDateTime as fmtTime } from '~/admin-ui/radar';
 
 /** 元输入 → 分。非法返回 null, 不做静默兜底 */
 export function yuanToCents(text: string): number | null {

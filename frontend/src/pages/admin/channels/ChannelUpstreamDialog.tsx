@@ -9,7 +9,7 @@ import {
   StatusTag,
   SwitchField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useProtocolCatalog } from './useChannelModels';
 import { useCapabilities } from './hooks';
 import { parseCredits, toCreditsInput } from './utils';
@@ -19,6 +19,7 @@ import {
   type BatchImportConfig,
 } from './constants';
 import type { AdminChannelDefaultModelView, UpstreamModelPreview } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 interface ChannelUpstreamDialogProps {
   open: boolean;

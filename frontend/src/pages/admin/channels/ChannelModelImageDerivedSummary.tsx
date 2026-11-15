@@ -1,5 +1,6 @@
-import { Descriptions, FieldDescription, FieldLegend, FieldSet } from '~/admin-ui/primitives';
+import { Descriptions, FieldDescription, FieldLegend, FieldSet } from '~/admin-ui/radar';
 import type { ImageCapabilityConfigView } from './imageCapability';
+import '../../../styles/radar-admin.css';
 
 /** 参数编辑后的派生合同快照，帮助运营确认最终会保存成什么。 */
 export function ChannelModelImageDerivedSummary({

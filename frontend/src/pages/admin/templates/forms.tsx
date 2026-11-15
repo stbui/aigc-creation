@@ -11,7 +11,7 @@ import {
   TextAreaField,
   TextField,
   type SelectFieldOption,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminTemplateCatalogApi } from './api';
 import { useToast } from './hooks';
 import type { CategoryDraft, GroupDraft, ItemDraft } from './constants';
@@ -21,6 +21,7 @@ import {
   buildItemPayload,
   parseSortOrder,
 } from './utils';
+import '../../../styles/radar-admin.css';
 
 interface DrawerShellProps {
   title: string;

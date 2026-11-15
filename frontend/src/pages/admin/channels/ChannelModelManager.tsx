@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminChannelsApi } from './api';
-import { ConfirmDialog, Notice } from '~/admin-ui/primitives';
+import { ConfirmDialog, Notice } from '~/admin-ui/radar';
 import { useToast } from './hooks';
 import { ChannelModelDialogs } from './ChannelModelDialogs';
 import { ChannelModelTable } from './ChannelModelTable';
@@ -20,6 +20,7 @@ import type {
   ProtocolTestResultView,
   UpstreamModelPreview,
 } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 /**
  * 商品工作台（供应商视图右侧详情区，跟随选中供应商内联渲染）。

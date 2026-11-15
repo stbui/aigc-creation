@@ -1,6 +1,7 @@
 import { Zap } from 'lucide-react';
-import { ActionButton, Descriptions, Notice } from '~/admin-ui/primitives';
+import { ActionButton, Descriptions, Notice } from '~/admin-ui/radar';
 import type { ProtocolTestResultView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 export function ChannelModelTestPanel({
   testResult,

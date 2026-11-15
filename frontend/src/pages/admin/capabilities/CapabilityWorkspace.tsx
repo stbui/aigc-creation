@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AdminTabs, Notice, StatusTag, TabsContent, useAdminResource } from '~/admin-ui/primitives';
+import { AdminTabs, Notice, StatusTag, TabsContent, useAdminResource } from '~/admin-ui/radar';
 import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { adminCapabilitiesApi, adminCapabilityModelsApi } from '../../../lib/api';
@@ -17,6 +17,7 @@ import { ImpactPanel } from './ImpactPanel';
 import { PricingPanel } from './PricingPanel';
 import type { CapabilityTab } from './types';
 import { formatUpdatedAt, runtimeTone } from './utils';
+import '../../../styles/radar-admin.css';
 
 /**
  * 当前能力上下文。

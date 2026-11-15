@@ -1,4 +1,5 @@
-import { ConfirmDialog, FormField, NumberField } from '~/admin-ui/primitives';
+import { ConfirmDialog, FormField, NumberField } from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 
 interface BackupPruneConfirmProps {
   open: boolean;

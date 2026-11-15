@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '~/admin-ui/lib/cn';
-import { Toggle } from '~/admin-ui/primitives';
+import { Toggle } from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 
 /**
  * 单选按钮组的一枚。

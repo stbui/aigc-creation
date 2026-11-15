@@ -9,13 +9,14 @@ import {
   IconButton,
   SelectField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   MAX_MODEL_TAGS,
   MAX_TAG_TEXT_LENGTH,
   TAG_COLOR_LABELS,
   validateModelTags,
 } from './utils';
+import '../../../styles/radar-admin.css';
 
 /**
  * 模型展示标签编辑器。

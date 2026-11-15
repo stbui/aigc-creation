@@ -11,9 +11,10 @@ import {
   FormField,
   SelectField,
   StatusTag,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { ROLE_OPTIONS } from './constants';
 import type { AdminUserRole, AdminUserRow } from './types';
+import '../../../styles/radar-admin.css';
 
 /**
  * 变更角色确认。

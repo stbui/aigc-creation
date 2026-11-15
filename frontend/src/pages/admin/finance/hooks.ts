@@ -5,4 +5,4 @@
 export {
   useAdminResource,
   useAdminUrlFilterSync,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';

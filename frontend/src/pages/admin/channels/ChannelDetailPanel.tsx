@@ -1,9 +1,10 @@
 import { Pencil, Plus } from 'lucide-react';
-import { ActionButton, EmptyState, Panel, RowMenu, StatusTag } from '~/admin-ui/primitives';
+import { ActionButton, EmptyState, Panel, RowMenu, StatusTag } from '~/admin-ui/radar';
 import { ChannelModelManager } from './ChannelModelManager';
 import { CAPABILITY_OPTIONS } from './constants';
 import type { ProductConsumptionState } from './useProductConsumption';
 import type { AdminChannelView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 interface ChannelDetailPanelProps {
   selected: AdminChannelView | null;

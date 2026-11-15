@@ -6,7 +6,7 @@ import {
   SegmentedGroup,
   SkeletonCards,
   StaleError,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   useAdmin,
   useAdminResource,
@@ -22,6 +22,7 @@ import { PaymentsProviderCard } from './PaymentsProviderCard';
 import { PaymentsProviderInstancesDrawer } from './PaymentsProviderInstancesDrawer';
 import { PaymentsProviderSummary } from './PaymentsProviderSummary';
 import { PaymentsVisibleMethodsCard } from './PaymentsVisibleMethodsCard';
+import '../../../styles/radar-admin.css';
 
 /**
  * 收款设置标签。

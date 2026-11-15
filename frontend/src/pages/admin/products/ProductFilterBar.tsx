@@ -7,8 +7,9 @@ import {
   FilterBar,
   SelectField,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { GRANT_TYPE_FILTER_OPTIONS, STATUS_OPTIONS } from './constants';
+import '../../../styles/radar-admin.css';
 
 interface ProductFilterBarProps {
   q: string;

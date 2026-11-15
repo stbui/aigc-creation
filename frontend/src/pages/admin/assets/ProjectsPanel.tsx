@@ -10,12 +10,13 @@ import {
   Panel,
   StaleError,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminAssetsApi } from './api';
 import { useAdmin, useToast } from './hooks';
 import { ProjectDeleteConfirm, type ProjectDeleteResult } from './ProjectDeleteConfirm';
 import { ProjectFormDrawer } from './ProjectFormDrawer';
 import type { AdminProject, AdminProjectListResult, Project } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 const DEFAULT_PAGE_SIZE = 20;
 

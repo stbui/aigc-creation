@@ -5,12 +5,13 @@ import {
   MiniStat,
   StatusTag,
   formatYuan,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type {
   AdminUserRecentOrder,
   AdminUserSpending,
 } from '../../../types/admin-users';
 import { adminOrderDetailHref, adminOrderHref, formatDateTime } from './utils';
+import '../../../styles/radar-admin.css';
 
 /** 订单状态 → 用户详情里的文案。色调用 STATUS_META 的统一映射。 */
 const ORDER_STATUS_LABEL: Record<string, string> = {

@@ -18,7 +18,7 @@ import {
   TextAreaField,
   formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   useAdmin,
   usePaymentExceptionFilters,
@@ -35,6 +35,7 @@ import {
   PAYMENT_EXCEPTION_STATUS_OPTIONS,
 } from './constants';
 import { adminOrderDetailHref, moneyText, providerLabel } from './utils';
+import '../../../styles/radar-admin.css';
 
 /**
  * 资金异常待办标签。

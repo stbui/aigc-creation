@@ -20,7 +20,7 @@ import {
   TextAreaField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminSettingsApi } from '../../../lib/api';
 import type { AdminSettingValue } from '../../../types/api';
 import {
@@ -28,6 +28,7 @@ import {
   PAYMENT_RULES_KEYS,
   type PaymentRuleItem,
 } from './constants';
+import '../../../styles/radar-admin.css';
 
 function ruleValue(value: unknown): string {
   return value === null || value === undefined ? '' : String(value);

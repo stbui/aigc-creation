@@ -4,7 +4,7 @@ import {
   useAdminList,
   useAdminResource,
   useAdminUrlFilterSync,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useAdmin } from '../../../context/AdminContext';
 import { useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
 import type { CheckinRule, InviteRule } from '../../../types/api';

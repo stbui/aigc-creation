@@ -20,11 +20,12 @@ import {
   type AdminColumn,
   type AppliedFilter,
   type TagTone,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { ApiLogListResult, ApiLogView } from '../../../types/model';
 import { adminApiLogsApi } from './api';
 import { useAdminList, useAdminUrlFilterSync } from './hooks';
 import { adminModelCallsHref, adminUserDetailHref } from './utils';
+import '../../../styles/radar-admin.css';
 
 const SOURCE = 'tool';
 const OPERATION = 'image_to_prompt';

@@ -5,10 +5,11 @@ import {
   Pagination,
   SelectField,
   SkeletonCards,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '~/admin-ui/lib/cn';
 import { ProductCard } from './ProductCard';
 import type { AdminProduct } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 interface ProductCardGridProps {
   rows: AdminProduct[];

@@ -13,10 +13,11 @@ import {
   SkeletonCards,
   StatusTag,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '~/admin-ui/lib/cn';
 import { centsToYuan } from './utils';
 import type { AdminMembershipPlan } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 interface PlanCardGridProps {
   rows: AdminMembershipPlan[];

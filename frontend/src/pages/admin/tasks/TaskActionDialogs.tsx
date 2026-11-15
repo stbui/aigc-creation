@@ -1,7 +1,8 @@
-import { ConfirmDialog } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/radar';
 import { TaskDeleteDialog } from './TaskDeleteDialog';
 import type { AdminTaskRow, TaskActionKind } from './types';
 import { shortId } from './utils';
+import '../../../styles/radar-admin.css';
 
 interface TaskActionDialogsProps {
   confirm: { kind: TaskActionKind; task: AdminTaskRow } | null;

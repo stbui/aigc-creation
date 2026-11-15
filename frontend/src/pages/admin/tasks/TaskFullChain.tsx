@@ -1,6 +1,6 @@
 import { ExternalLink, GitBranch, ImageOff, Image as ImageIcon, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { DetailSection, StatusTag, type TagTone } from '~/admin-ui/primitives';
+import { DetailSection, StatusTag, type TagTone } from '~/admin-ui/radar';
 import type { AdminTaskDetail } from '../../../types/api';
 import type { AdminTaskRouteAttempt } from '../../../types/task-route';
 import { TaskBillingOrders } from './TaskBillingOrders';
@@ -11,6 +11,7 @@ import {
   formatDateTime,
   formatDuration,
 } from './utils';
+import '../../../styles/radar-admin.css';
 
 const PRE_CONNECTION_FAILURES = new Set([
   'outbound_invalid_url',

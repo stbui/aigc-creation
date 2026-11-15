@@ -5,12 +5,13 @@ import {
   SelectField,
   SwitchField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { ChannelHeadersEditor } from './ChannelHeadersEditor';
 import { Field } from './ChannelField';
 import { useProtocolCatalog } from './useChannelModels';
 import { BILLING_MODE_OPTIONS, type ChannelDraft, type DefaultModelDraft } from './constants';
 import type { AdminChannelView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 interface ChannelFormDrawerProps {
   open: boolean;

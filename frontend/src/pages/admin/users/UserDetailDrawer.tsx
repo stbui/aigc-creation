@@ -15,7 +15,7 @@ import {
   MiniStat,
   SkeletonBody,
   StatusTag,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '~/admin-ui/lib/cn';
 import { adminUsersApi, assetThumbUrl } from './api';
 import { LOGIN_REASON_LABEL } from './constants';
@@ -32,6 +32,7 @@ import {
 } from './utils';
 import type { AdminLoginLogResult, AdminUserDetail } from '../../../types/api';
 import type { DeleteUserTarget } from './types';
+import '../../../styles/radar-admin.css';
 
 /**
  * 描述列表的一项：标签在左、内容在右，同一行。

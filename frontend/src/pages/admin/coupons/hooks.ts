@@ -5,7 +5,7 @@
 export {
   useAdminList,
   useAdminUrlFilterSync,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';
 export { useAdmin } from '../../../context/AdminContext';
 export { useToast } from '../../../admin-ui/providers/ToastProvider';
 export { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';

@@ -7,9 +7,10 @@ import {
   formatDate,
   type AdminColumn,
   type RowMenuItem,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { contributionText } from './constants';
 import type { PluginView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 /**
  * 插件清单。

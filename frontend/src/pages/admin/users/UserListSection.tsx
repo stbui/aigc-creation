@@ -13,7 +13,7 @@ import {
   StaleError,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '~/admin-ui/lib/cn';
 import { BATCH_DELETE_LIMIT } from '~/components/admin/BatchDeleteUsersDialog';
 import { BATCH_STATUS_LIMIT, PAGE_SIZE_OPTIONS, SORT_OPTIONS } from './constants';
@@ -21,6 +21,7 @@ import { formatDateTime } from './utils';
 import { UserCard, type UserCardAction } from './UserCard';
 import type { AdminUserListResult } from '../../../types/api';
 import type { AdminUserRow } from './types';
+import '../../../styles/radar-admin.css';
 
 export type UserListView = 'cards' | 'table';
 

@@ -6,7 +6,7 @@ import {
   SelectField,
   SwitchField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 
 import {
   ALIYUN_ADDRESS_TYPE_LABELS,
@@ -16,6 +16,7 @@ import {
   type EmailProvider,
   type EmailSettingItem,
 } from './constants';
+import '../../../styles/radar-admin.css';
 
 export type SettingValue = string | number | boolean | null;
 

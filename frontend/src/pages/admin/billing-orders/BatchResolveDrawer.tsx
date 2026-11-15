@@ -1,4 +1,5 @@
-import { ActionButton, Drawer, Notice, TextAreaField } from '~/admin-ui/primitives';
+import { ActionButton, Drawer, Notice, TextAreaField } from '~/admin-ui/radar';
+import '../../../styles/radar-admin.css';
 
 interface BatchResolveDrawerProps {
   open: boolean;

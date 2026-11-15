@@ -20,7 +20,7 @@ import {
   SwitchField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { DeliveryChannelStatus, EmailTestResult } from '../../../types/api';
 import {
   EVENT_GROUPS,
@@ -32,6 +32,7 @@ import {
   type EmailProvider,
   type EmailSettingItem,
 } from './constants';
+import '../../../styles/radar-admin.css';
 
 type SettingValue = string | number | boolean | null;
 

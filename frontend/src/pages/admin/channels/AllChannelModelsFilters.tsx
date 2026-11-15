@@ -4,7 +4,7 @@ import {
   FilterActions,
   FilterBar,
   SelectField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { ProductStatusStrip, type ProductStatusCounts } from './ProductStatusStrip';
 import {
   ALL_MODELS_COMMERCE_OPTIONS,
@@ -13,6 +13,7 @@ import {
   type AllModelsCommerceFilter,
   type AllModelsStatusFilter,
 } from './constants';
+import '../../../styles/radar-admin.css';
 
 interface Props {
   counts: ProductStatusCounts;

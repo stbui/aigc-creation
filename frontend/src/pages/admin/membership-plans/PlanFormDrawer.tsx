@@ -5,9 +5,10 @@ import {
   SelectField,
   SwitchField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { PlanDraft } from './constants';
 import type { AdminMembershipPlan } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 interface PlanFormDrawerProps {
   open: boolean;

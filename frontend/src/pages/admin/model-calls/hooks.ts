@@ -14,4 +14,4 @@ export {
   useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';

@@ -8,7 +8,7 @@ import {
   IconButton,
   Notice,
   StatusTag,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { moveOrderItem, orderChanged, type OrderItem } from '~/lib/channelOrder';
 import type {
   AdminPaymentProviderInstanceView,
@@ -33,6 +33,7 @@ import {
   instanceState,
   providerWithInstances,
 } from './utils';
+import '../../../styles/radar-admin.css';
 
 function sortedInstances(
   instances: AdminPaymentProviderInstanceView[],

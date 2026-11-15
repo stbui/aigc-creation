@@ -9,9 +9,10 @@ import {
   SegmentedGroup,
   TextField,
   Toggle,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '../../../admin-ui/lib/cn';
 import type { AdminTemplateItem } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 export type StatusFilter = 'all' | 'enabled' | 'disabled';
 

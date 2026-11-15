@@ -5,9 +5,10 @@ import {
   FormField,
   SelectField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminAssetsApi, adminUsersApi } from './api';
 import type { AdminProject, AdminUserListResult, Project } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 type UserRow = AdminUserListResult['items'][number];
 

@@ -10,7 +10,7 @@
  */
 
 import { useCallback } from 'react';
-import { useAdminList, useAdminResource } from '../../../admin-ui/primitives';
+import { useAdminList, useAdminResource } from '~/admin-ui/radar';
 import { adminCreditsApi } from './api';
 import type {
   AdminCreditLedgerRow,
@@ -21,7 +21,7 @@ import type {
 export {
   useAdminDetailParam,
   useAdminUrlFilterSync,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';
 export { useAdminList, useAdminResource };
 export { useToast } from '../../../admin-ui/providers/ToastProvider';
 export { useAdmin } from '../../../context/AdminContext';

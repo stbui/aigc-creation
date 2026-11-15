@@ -19,7 +19,7 @@ import {
   TextAreaField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '~/admin-ui/lib/cn';
 import { adminNotificationsApi } from '../../../lib/api';
 import type { MessageTemplateItem } from '../../../types/api';
@@ -32,6 +32,7 @@ import {
   templatePlaceholder,
   type EmailTemplateMeta,
 } from './template-constants';
+import '../../../styles/radar-admin.css';
 
 interface TemplateDraft {
   subject: string;

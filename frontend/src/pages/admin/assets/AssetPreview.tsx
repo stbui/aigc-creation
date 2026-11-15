@@ -15,11 +15,12 @@ import {
   Button,
   StatusTag,
   formatDateTime,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useBodyScrollLock } from '~/hooks';
 import { BACKEND_LABEL, type AssetRow } from './constants';
 import { assetLabel, fmtBytes, fmtFormat, thumbOf } from './utils';
 import type { AssetStatus } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 素材预览：左侧看图，右侧看提示词与信息。

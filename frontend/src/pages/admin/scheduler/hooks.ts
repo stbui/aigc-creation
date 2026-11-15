@@ -12,4 +12,4 @@ export {
 
 export {
   useAdminResource,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';

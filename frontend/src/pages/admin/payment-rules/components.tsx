@@ -15,13 +15,14 @@ import {
   Panel,
   StatCards,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { AdminSettingValue } from '../../../types/api';
 import {
   PAYMENT_CONFIG_HREF,
   PAYMENT_RULES_KEYS,
   refundRatioPercent,
 } from './constants';
+import '../../../styles/radar-admin.css';
 
 export interface RuleChange {
   key: string;

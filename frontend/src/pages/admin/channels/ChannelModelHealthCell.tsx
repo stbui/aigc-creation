@@ -1,4 +1,4 @@
-import { HelpTip, StatusTag } from '~/admin-ui/primitives';
+import { HelpTip, StatusTag } from '~/admin-ui/radar';
 import {
   formatAmount,
   formatMarkupPercent,
@@ -12,6 +12,7 @@ import type {
   ChannelModelHealthRowView,
   ChannelModelPriceTierView,
 } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 /**
  * 线路稳定性单元格：24h 成功率 + 最近 10 次结果色块。

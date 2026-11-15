@@ -4,6 +4,6 @@
 
 export {
   useAdminUrlFilterSync,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';
 
 export { useAdminAlerts } from '../../../hooks';

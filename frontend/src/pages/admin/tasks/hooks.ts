@@ -13,4 +13,4 @@ export {
   useAdminResource,
   useAdminUrlFilterSync,
   useSelectionPrune,
-} from '../../../admin-ui/primitives';
+} from '~/admin-ui/radar';

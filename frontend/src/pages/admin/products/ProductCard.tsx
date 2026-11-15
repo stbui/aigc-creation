@@ -7,7 +7,7 @@ import {
   CardFooter,
   Separator,
   StatusTag,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { cn } from '~/admin-ui/lib/cn';
 import { adminProductOrdersHref } from '../../../lib/admin-links';
 import {
@@ -23,6 +23,7 @@ import {
   validDaysText,
 } from './utils';
 import type { AdminProduct } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 商品售卖卡。

@@ -14,7 +14,7 @@ import {
   StatusTag,
   SwitchField,
   TextAreaField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   PRIORITY_OPTIONS,
   STATUS_LABELS,
@@ -35,6 +35,7 @@ import {
 import { TICKET_REPLY_TEMPLATES, fillTicketTemplate } from './reply-templates';
 import { buildAdminContextLink } from '../../../lib/admin-context-link';
 import type { AdminTicketAssignee, AdminTicketDetail, TicketStatus } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /** 对话气泡：客户在左、客服在右，避免一长串同色消息分不清谁说的 */
 function Message({

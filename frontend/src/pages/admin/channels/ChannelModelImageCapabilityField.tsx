@@ -21,7 +21,7 @@ import {
   SwitchField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type { ModelDraft } from './constants';
 import { ChannelModelImageDerivedSummary } from './ChannelModelImageDerivedSummary';
 import {
@@ -37,6 +37,7 @@ import {
   type ImageParameterDefinitionView,
   type ImageParameterSettingView,
 } from './imageCapability';
+import '../../../styles/radar-admin.css';
 
 const MEGABYTE = 1024 * 1024;
 

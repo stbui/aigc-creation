@@ -6,7 +6,7 @@ import {
   Button,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   PRIORITY_LABELS,
   PRIORITY_TONE,
@@ -16,6 +16,7 @@ import {
 } from './constants';
 import { adminUserDetailHref } from './utils';
 import type { AdminTicketRow } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 工单列表。

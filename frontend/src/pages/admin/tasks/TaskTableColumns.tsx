@@ -7,7 +7,7 @@ import {
   StatusTag,
   type AdminColumn,
   type RowMenuItem,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { assetThumbUrl } from './api';
 import {
   adminTasksHref,
@@ -17,6 +17,7 @@ import {
   taskErrorLabel,
 } from './utils';
 import type { AdminTaskRow, TaskActionKind } from './types';
+import '../../../styles/radar-admin.css';
 
 interface UseTaskTableColumnsOptions {
   can: (permission: string) => boolean;

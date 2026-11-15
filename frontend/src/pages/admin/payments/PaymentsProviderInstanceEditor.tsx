@@ -11,7 +11,7 @@ import {
   SwitchField,
   TextAreaField,
   TextField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import type {
   AdminPaymentProviderInstanceView,
   AdminPaymentProviderView,
@@ -29,6 +29,7 @@ import {
   paymentWarningText,
   togglePaymentMethod,
 } from './utils';
+import '../../../styles/radar-admin.css';
 
 /** 实例编辑草稿。金额在 UI 中使用「元」，提交时再转回整数分。 */
 export interface InstanceDraft {

@@ -11,7 +11,7 @@ import {
   StaleError,
   StatusTag,
   SwitchField,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { adminCapabilityModelsApi } from '../../../lib/api';
@@ -21,6 +21,7 @@ import type {
 } from '../../../types/model';
 import type { BindingDraft } from './types';
 import { bindingCostHint, bindingIssue } from './utils';
+import '../../../styles/radar-admin.css';
 
 function toDraft(row: AdminCapabilityModelListView['bindings'][number]): BindingDraft {
   return {

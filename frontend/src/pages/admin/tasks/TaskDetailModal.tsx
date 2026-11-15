@@ -9,7 +9,7 @@ import {
   DetailSection,
   Notice,
   StatusTag,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from './api';
 import { useToast } from './hooks';
 import { TaskFullChain } from './TaskFullChain';
@@ -27,6 +27,7 @@ import {
   taskErrorLabel,
 } from './utils';
 import type { AdminTask, AdminTaskDetail } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 type Row = AdminTask;
 

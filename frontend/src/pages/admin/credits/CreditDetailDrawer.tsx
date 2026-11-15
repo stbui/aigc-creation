@@ -17,7 +17,7 @@ import {
   StaleError,
   TextField,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { LEDGER_LABELS, LEDGER_OPTIONS, SOURCE_LABELS } from './constants';
 import { useCreditDetail, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { adminCreditsApi } from './api';
@@ -34,6 +34,7 @@ import {
   signed,
 } from './utils';
 import type { AdminCreditLedgerRow, AdminCreditLotRow, AdminCreditRow } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 单用户明细: 批次 + 流水 + 单条调整。

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { AppliedFilter, SelectFieldOption } from '~/admin-ui/primitives';
+import type { AppliedFilter, SelectFieldOption } from '~/admin-ui/radar';
 import { adminTasksApi } from './api';
 import { STATUS_OPTIONS } from './constants';
 import { useAdminList, useAdminUrlFilterSync, useToast } from './hooks';

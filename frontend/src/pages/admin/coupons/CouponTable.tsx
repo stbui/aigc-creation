@@ -8,7 +8,7 @@ import {
   StatusTag,
   formatDate,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import {
   EFFECTIVE_META,
   SCOPE_LABEL,
@@ -17,6 +17,7 @@ import {
 } from './constants';
 import { faceValue, yuan } from './utils';
 import type { AdminCoupon } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 券列表。

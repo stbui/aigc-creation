@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { type AppliedFilter } from '~/admin-ui/primitives';
+import { type AppliedFilter } from '~/admin-ui/radar';
 import { adminUsersApi } from './api';
 import {
   DEFAULT_SORT,

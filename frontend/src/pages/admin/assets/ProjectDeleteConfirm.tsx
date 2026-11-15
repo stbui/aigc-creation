@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ConfirmDialog, Notice, SelectField, TextField } from '~/admin-ui/primitives';
+import { ConfirmDialog, Notice, SelectField, TextField } from '~/admin-ui/radar';
 import { adminAssetsApi } from './api';
 import type { AdminProject } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 export interface ProjectDeleteResult {
   id: string;

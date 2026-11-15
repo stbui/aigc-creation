@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { DetailSection, EmptyState, MiniStat } from '~/admin-ui/primitives';
+import { DetailSection, EmptyState, MiniStat } from '~/admin-ui/radar';
 import { cn } from '~/admin-ui/lib/cn';
 import type { AdminUserGeneration } from '../../../types/admin-users';
 import { adminTasksHref } from './utils';
+import '../../../styles/radar-admin.css';
 
 const MODALITY_LABEL: Record<string, string> = {
   image: '图像',

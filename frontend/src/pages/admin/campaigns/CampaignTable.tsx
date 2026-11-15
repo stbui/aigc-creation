@@ -7,10 +7,11 @@ import {
   ToneBadge,
   formatDate,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { EFFECTIVE_META, TYPE_LABEL, type TagTone } from './constants';
 import { inWindow, payloadSummary } from './utils';
 import type { AdminCampaign } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 interface CampaignTableProps {
   rows: AdminCampaign[];

@@ -11,13 +11,14 @@ import {
   StaleError,
   formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { UserCell } from './UserCell';
 import { marketingApi } from './api';
 import { useAdminList, useAdminUrlFilterSync } from './hooks';
 import { checkinSummaryNote } from './utils';
 import type { CheckinRow } from './constants';
 import type { AdminCheckinListResult } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 签到记录流水（`?tab=checkins`）。

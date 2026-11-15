@@ -14,7 +14,7 @@ import {
   StatusTag,
   formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { marketingApi } from './api';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
 import {
@@ -26,6 +26,7 @@ import {
 import { UserCell } from './UserCell';
 import { inviteSummaryNote, userLabel } from './utils';
 import type { AdminInviteListResult } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 邀请关系流水（`?tab=invites`）。

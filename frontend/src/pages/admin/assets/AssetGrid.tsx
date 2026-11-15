@@ -5,10 +5,11 @@ import {
   EmptyState,
   ListError,
   Pagination,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { AssetThumb } from './AssetThumb';
 import { assetLabel, cn, fmtBytes, generationLine, thumbSrc } from './utils';
 import type { AssetRow } from './constants';
+import '../../../styles/radar-admin.css';
 
 /**
  * 缩略图网格视图。

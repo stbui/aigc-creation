@@ -3,4 +3,4 @@
  */
 
 /** 分 → 元（统一实现在 admin-ui/lib/format.ts） */
-export { formatYuanPlain as yuan } from '../../../admin-ui/primitives';
+export { formatYuanPlain as yuan } from '~/admin-ui/radar';

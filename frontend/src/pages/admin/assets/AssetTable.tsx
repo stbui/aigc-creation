@@ -5,11 +5,12 @@ import {
   StatusTag,
   formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { AssetThumb } from './AssetThumb';
 import { BACKEND_LABEL, type AssetRow } from './constants';
 import { assetLabel, fmtBytes, fmtFormat, generationLine, thumbSrc } from './utils';
 import type { AssetStatus } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 表格视图。

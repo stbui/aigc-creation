@@ -2,7 +2,7 @@
  * 数据备份的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
  */
 
-import { formatBytes, formatRelative } from '../../../admin-ui/primitives';
+import { formatBytes, formatRelative } from '~/admin-ui/radar';
 import { BACKUP_STATUS_LABELS } from './constants';
 
 export { formatBytes, formatRelative };

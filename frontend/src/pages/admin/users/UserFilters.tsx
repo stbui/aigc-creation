@@ -7,7 +7,7 @@ import {
   FilterBar,
   SelectField,
   type AppliedFilter,
-} from '~/admin-ui/primitives';
+} from '~/admin-ui/radar';
 import { MEMBERSHIP_OPTIONS, ROLE_OPTIONS, SEGMENT_OPTIONS, STATUS_OPTIONS } from './constants';
 import type {
   AdminUserMembershipFilter,
@@ -15,6 +15,7 @@ import type {
   AdminUserSegment,
   AdminUserStatus,
 } from './types';
+import '../../../styles/radar-admin.css';
 
 interface UserFiltersProps {
   keyword: string;

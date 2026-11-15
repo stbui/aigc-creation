@@ -1,4 +1,4 @@
-import { ActionButton, Descriptions, Drawer, Notice, formatDateTime, formatDuration } from '~/admin-ui/primitives';
+import { ActionButton, Descriptions, Drawer, Notice, formatDateTime, formatDuration } from '~/admin-ui/radar';
 import type { ApiLogView } from '../../../types/model';
 import {
   CAPABILITY_LABELS,
@@ -7,6 +7,7 @@ import {
   SOURCE_LABELS,
   STATUS_LABELS,
 } from './constants';
+import '../../../styles/radar-admin.css';
 
 export function ModelCallDetailDrawer({
   detailId,

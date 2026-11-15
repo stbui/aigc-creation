@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ActionButton, Notice, Panel } from '~/admin-ui/primitives';
+import { ActionButton, Notice, Panel } from '~/admin-ui/radar';
 import { ChannelModelBasicFields } from './ChannelModelFormFields';
 import { ChannelModelContractField } from './ChannelModelContractField';
 import { createDefaultTextCapabilityConfigJson } from './textCapability';
@@ -15,6 +15,7 @@ import { useProtocolCatalog } from './useChannelModels';
 import type { ModelDraft } from './constants';
 import type { ImageParameterDefinitionView } from './imageCapability';
 import type { ProtocolTestResultView } from '../../../types/model';
+import '../../../styles/radar-admin.css';
 
 export const CHANNEL_MODEL_FORM_ID = 'channel-model-form';
 

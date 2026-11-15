@@ -1,5 +1,6 @@
-import { ActionButton, ModalDialog } from '~/admin-ui/primitives';
+import { ActionButton, ModalDialog } from '~/admin-ui/radar';
 import type { AdminTemplateItem } from '../../../types/api';
+import '../../../styles/radar-admin.css';
 
 /**
  * 模板预览：大图 + 全部标签 + 完整提示词。
