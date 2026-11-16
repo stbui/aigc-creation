@@ -1,5 +1,4 @@
-import type { CapabilityRuntime } from '../../../types/api';
-import type { CapabilityRuntimeFilter, CapabilityTab } from './types';
+import type { CapabilityRuntime, CapabilityRuntimeFilter, CapabilityTab } from './types';
 
 export const CAPABILITY_TABS: ReadonlyArray<{ value: CapabilityTab; label: string }> = [
   { value: 'overview', label: '概览' },

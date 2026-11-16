@@ -8,6 +8,7 @@ import type { AssetRow } from './constants';
 export { cn } from '../../../admin-ui/lib/cn';
 
 /** 字节 → 人类可读 */
+export { formatDateTime } from '../../../admin-ui/lib/format';
 export function fmtBytes(b: number): string {
   if (b < 1024) return `${b} B`;
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;

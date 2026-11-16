@@ -1,5 +1,5 @@
 import { ApiError } from './api';
-import type { ProtocolTestResultView } from '../../../types/model';
+import type { ProtocolTestResultView } from './types';
 
 /**
  * 连通测试失败详情。

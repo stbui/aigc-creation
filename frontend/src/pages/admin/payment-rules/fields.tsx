@@ -21,7 +21,7 @@ import {
   TextField,
   ToneBadge,
 } from '~/admin-ui/radar';
-import { adminSettingsApi } from '../../../lib/api';
+import { adminSettingsApi } from './api';
 import type { AdminSettingValue } from '../../../types/api';
 import {
   PAYMENT_RULE_COPY,

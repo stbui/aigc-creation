@@ -19,28 +19,14 @@ import {
   TextAreaField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/radar';
-import { cn } from '~/admin-ui/lib/cn';
-import { adminNotificationsApi } from '../../../lib/api';
-import type { MessageTemplateItem } from '../../../types/api';
+} from './components';
+import { adminNotificationsApi } from './api';
+import { EMAIL_TEMPLATE_BY_CODE, EMAIL_TEMPLATE_GROUPS, EMAIL_TEMPLATES } from './constants';
 import { useAdminResource, useToast, useUnsavedGuard } from './hooks';
-import {
-  EMAIL_TEMPLATE_BY_CODE,
-  EMAIL_TEMPLATE_GROUPS,
-  EMAIL_TEMPLATES,
-  renderEmailTemplatePreview,
-  templatePlaceholder,
-  type EmailTemplateMeta,
-} from './template-constants';
-import '../../../styles/radar-admin.css';
+import type { EmailTemplateDraft, EmailTemplateMeta, MessageTemplateItem } from './types';
+import { cn, renderEmailTemplatePreview, templatePlaceholder } from './utils';
 
-interface TemplateDraft {
-  subject: string;
-  body: string;
-  enabled: boolean;
-}
-
-function draftFrom(meta: EmailTemplateMeta, item?: MessageTemplateItem): TemplateDraft {
+function draftFrom(meta: EmailTemplateMeta, item?: MessageTemplateItem): EmailTemplateDraft {
   return {
     subject: item?.subject || meta.defaultSubject,
     body: item?.body || meta.defaultBody,
@@ -48,7 +34,7 @@ function draftFrom(meta: EmailTemplateMeta, item?: MessageTemplateItem): Templat
   };
 }
 
-function sameDraft(a: TemplateDraft | null, b: TemplateDraft | null): boolean {
+function sameDraft(a: EmailTemplateDraft | null, b: EmailTemplateDraft | null): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -78,8 +64,8 @@ export function EmailTemplatesPanel({ canManage }: { canManage: boolean }) {
   );
 
   const [openCode, setOpenCode] = useState<string | null>(null);
-  const [form, setForm] = useState<TemplateDraft | null>(null);
-  const [formBase, setFormBase] = useState<TemplateDraft | null>(null);
+  const [form, setForm] = useState<EmailTemplateDraft | null>(null);
+  const [formBase, setFormBase] = useState<EmailTemplateDraft | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [togglingCode, setTogglingCode] = useState<string | null>(null);

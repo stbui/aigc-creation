@@ -1,7 +1,11 @@
 import { toCredits } from '../../../lib/microcredits';
-import type { AdminCapabilityControl } from '../../../types/api';
-import type { CapabilityPricingView } from '../../../types/model';
-import type { CapabilityRuntimeFilter } from './types';
+export { parseCredits, toCredits, toCreditsInput } from '../../../lib/microcredits';
+export { BILLING_MODE_OPTIONS } from '../../../lib/billing-mode';
+import type {
+  AdminCapabilityControl,
+  CapabilityPricingView,
+  CapabilityRuntimeFilter,
+} from './types';
 
 export function matchesCapabilityFilters(
   row: AdminCapabilityControl,

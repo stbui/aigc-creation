@@ -1,5 +1,4 @@
 import {
-  formatDateTime,
   ActionButton,
   AdminDataTable,
   Descriptions,
@@ -7,10 +6,10 @@ import {
   Notice,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/radar';
+} from './components';
+import { formatDateTime } from './utils';
 import { contributionText } from './constants';
-import type { PluginView } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import type { PluginView } from './types';
 
 type PluginProvider = PluginView['providers'][number];
 

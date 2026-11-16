@@ -3,7 +3,7 @@ import '../../../styles/radar-admin.css';
 import { Link, useSearchParams } from 'react-router-dom';
 import { adminModelCallsHref, defaultRange } from './utils';
 import { useAdminResource, useAdminUrlFilterSync } from './hooks';
-import { adminAnalyticsApi } from '../../../lib/api';
+import { adminAnalyticsApi } from './api';
 import {
   AdminPage,
   ActionButton,
@@ -16,7 +16,7 @@ import {
   TextField,
   type AdminColumn,
 } from '~/admin-ui/radar';
-import { toCredits } from '../../../lib/microcredits';
+import { toCredits } from './utils';
 import type { FinanceAnalyticsView, FinanceBreakdownRow, FinanceDayRow } from '../../../types/model';
 
 /** null 表示成本快照不可计算；这里必须显示「—」，不能把未知写成 0。 */

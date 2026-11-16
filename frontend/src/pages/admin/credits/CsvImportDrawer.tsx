@@ -11,13 +11,12 @@ import {
   StatusTag,
   TextField,
   type AdminColumn,
-} from '~/admin-ui/radar';
+} from './components';
 import { IMPORT_PAGE_SIZE } from './constants';
 import { adminCreditsApi } from './api';
 import { useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { signed } from './utils';
-import type { CreditImportResult } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { CreditImportResult } from './types';
 
 /**
  * CSV 导入积分。

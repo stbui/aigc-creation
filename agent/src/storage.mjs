@@ -22,7 +22,7 @@ export class SessionStorage {
       raw = readFileSync(this.filePath, 'utf8');
     } catch (error) {
       if (error.code !== 'ENOENT') {
-        console.error('[codex-web] failed to read saved sessions:', error.message);
+        console.error('[HuojueAgent] failed to read saved sessions:', error.message);
       }
       return [];
     }
@@ -32,7 +32,7 @@ export class SessionStorage {
       if (parsed?.version !== STORAGE_VERSION || !Array.isArray(parsed.sessions)) return [];
       return parsed.sessions;
     } catch (error) {
-      console.error('[codex-web] ignoring invalid saved sessions:', error.message);
+      console.error('[HuojueAgent] ignoring invalid saved sessions:', error.message);
       return [];
     }
   }
@@ -61,7 +61,7 @@ export class SessionStorage {
     try {
       sessions = typeof source === 'function' ? source() : source;
     } catch (error) {
-      console.error('[codex-web] failed to snapshot sessions:', error.message);
+      console.error('[HuojueAgent] failed to snapshot sessions:', error.message);
       return this.writing;
     }
 
@@ -77,7 +77,7 @@ export class SessionStorage {
         await rename(this.tempPath, this.filePath);
       })
       .catch((error) => {
-        console.error('[codex-web] failed to save sessions:', error.message);
+        console.error('[HuojueAgent] failed to save sessions:', error.message);
       });
     await this.writing;
 

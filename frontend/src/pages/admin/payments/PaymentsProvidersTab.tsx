@@ -6,13 +6,13 @@ import {
   SegmentedGroup,
   SkeletonCards,
   StaleError,
-} from '~/admin-ui/radar';
+} from './components';
 import {
   useAdmin,
   useAdminResource,
   useRefreshOnNonce,
 } from './hooks';
-import type { AdminPaymentProviderView } from '../../../types/payment';
+import type { AdminPaymentProviderView } from './types';
 import { providerState } from './utils';
 import {
   PAYMENT_PROVIDER_STATE_META,
@@ -22,7 +22,6 @@ import { PaymentsProviderCard } from './PaymentsProviderCard';
 import { PaymentsProviderInstancesDrawer } from './PaymentsProviderInstancesDrawer';
 import { PaymentsProviderSummary } from './PaymentsProviderSummary';
 import { PaymentsVisibleMethodsCard } from './PaymentsVisibleMethodsCard';
-import '../../../styles/radar-admin.css';
 
 /**
  * 收款设置标签。

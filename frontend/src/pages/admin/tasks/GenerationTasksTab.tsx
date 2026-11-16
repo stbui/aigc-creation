@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ContextBanner, Notice, SavedViewBar } from '~/admin-ui/radar';
-import { readAdminDone } from '../../../lib/admin-context-link';
+import { ContextBanner, Notice, SavedViewBar } from './components';
+import { readAdminDone } from './utils';
 import { useAdmin, useAdminDetailParam, useDuty, useSelectionPrune } from './hooks';
 import { TaskActionDialogs } from './TaskActionDialogs';
 import { TaskDetailModal } from './TaskDetailModal';
@@ -12,7 +12,6 @@ import { TaskStats } from './TaskStats';
 import { useTaskActions } from './useTaskActions';
 import { useTaskFilters } from './useTaskFilters';
 import { useTaskTableColumns } from './TaskTableColumns';
-import '../../../styles/radar-admin.css';
 
 /**
  * 生成任务标签页：生命周期、筛选、表格工具栏与写操作分别由独立模块承载。

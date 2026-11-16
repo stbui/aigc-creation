@@ -1,8 +1,8 @@
 const STORAGE_KEYS = {
-  sessions: 'codex-web.sessions.v1',
-  settings: 'codex-web.settings.v1',
-  theme: 'codex-web.theme',
-  token: 'codex-web.access-token',
+  sessions: 'huojue.sessions.v1',
+  settings: 'huojue.settings.v1',
+  theme: 'huojue.theme',
+  token: 'huojue.access-token',
 };
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -174,8 +174,8 @@ function loadSessions() {
       sessions.push({
         id: raw.id,
         title: typeof raw.title === 'string' && raw.title ? raw.title.slice(0, 80) : '会话',
-        codexThreadId:
-          typeof raw.codexThreadId === 'string' && raw.codexThreadId ? raw.codexThreadId : null,
+        agentThreadId:
+          typeof raw.agentThreadId === 'string' && raw.agentThreadId ? raw.agentThreadId : null,
         createdAt: validDate(raw.createdAt),
         updatedAt: validDate(raw.updatedAt),
         status: 'idle',
@@ -206,7 +206,7 @@ function makeDraft(settings) {
   return {
     id: null,
     title: '新会话',
-    codexThreadId: null,
+    agentThreadId: null,
     createdAt: now,
     updatedAt: now,
     status: 'idle',
@@ -895,9 +895,9 @@ function renderHeader() {
     ui.sessionMeta.append(h('span', `meta-${part.kind}`, part.text));
   });
 
-  ui.copyThreadButton.hidden = !session.codexThreadId;
-  ui.copyThreadButton.title = session.codexThreadId
-    ? `复制线程 ID：${session.codexThreadId}`
+  ui.copyThreadButton.hidden = !session.agentThreadId;
+  ui.copyThreadButton.title = session.agentThreadId
+    ? `复制线程 ID：${session.agentThreadId}`
     : '复制线程 ID';
 }
 
@@ -1089,7 +1089,7 @@ async function readSse(response, onMessage) {
     try {
       payload = JSON.parse(data);
     } catch (error) {
-      console.warn('[codex-web] invalid SSE payload', error);
+      console.warn('[HuojueAgent] invalid SSE payload', error);
       return;
     }
     onMessage(payload);
@@ -1115,7 +1115,7 @@ async function readSse(response, onMessage) {
 function applyServerSession(session, serverSession) {
   if (!serverSession || typeof serverSession !== 'object') return;
   if (serverSession.title && serverSession.title !== '新会话') session.title = serverSession.title;
-  if (serverSession.codexThreadId) session.codexThreadId = serverSession.codexThreadId;
+  if (serverSession.agentThreadId) session.agentThreadId = serverSession.agentThreadId;
   if (serverSession.status) session.status = serverSession.status;
   if (serverSession.settings) session.settings = sanitizeSettings(serverSession.settings);
   if ('usage' in serverSession) {
@@ -1174,7 +1174,7 @@ function handleCodexEvent(session, event) {
   if (!event || typeof event.type !== 'string') return;
   switch (event.type) {
     case 'thread.started':
-      if (event.thread_id) session.codexThreadId = event.thread_id;
+      if (event.thread_id) session.agentThreadId = event.thread_id;
       break;
     case 'item.started':
     case 'item.updated':
@@ -1252,7 +1252,7 @@ async function ensureServerSession(session) {
   if (session.id && !session.serverMissing) return;
 
   const payload = { settings: session.settings };
-  if (session.codexThreadId) payload.resumeThreadId = session.codexThreadId;
+  if (session.agentThreadId) payload.resumeThreadId = session.agentThreadId;
 
   const data = await api('/api/sessions', {
     method: 'POST',
@@ -1261,7 +1261,7 @@ async function ensureServerSession(session) {
 
   session.id = data.session.id;
   session.serverMissing = false;
-  session.codexThreadId = data.session.codexThreadId || session.codexThreadId;
+  session.agentThreadId = data.session.agentThreadId || session.agentThreadId;
   applyServerSession(session, data.session);
   if (!state.sessions.includes(session)) rememberSession(session);
   persistSoon();
@@ -1438,7 +1438,7 @@ async function deleteSession(session) {
       await api(`/api/sessions/${encodeURIComponent(session.id)}`, { method: 'DELETE' });
     } catch (error) {
       if (!(error instanceof ApiError && error.status === 404)) {
-        console.warn('[codex-web] failed to delete server session', error);
+        console.warn('[HuojueAgent] failed to delete server session', error);
       }
     }
   }
@@ -1463,7 +1463,7 @@ function persistSessions() {
     .map((session) => ({
       id: session.id,
       title: session.title,
-      codexThreadId: session.codexThreadId,
+      agentThreadId: session.agentThreadId,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       status: 'idle',
@@ -1478,7 +1478,7 @@ function persistSessions() {
   try {
     localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(serialized));
   } catch (error) {
-    console.warn('[codex-web] failed to persist sessions', error);
+    console.warn('[HuojueAgent] failed to persist sessions', error);
   }
 }
 
@@ -1592,7 +1592,7 @@ async function resumeThread() {
       ...makeDraft(data.session.settings || state.settings),
       id: data.session.id,
       title: data.session.title || '恢复的会话',
-      codexThreadId: data.session.codexThreadId || threadId,
+      agentThreadId: data.session.agentThreadId || threadId,
       createdAt: validDate(data.session.createdAt),
       updatedAt: validDate(data.session.updatedAt),
       usage: data.session.usage || null,
@@ -1697,7 +1697,7 @@ async function pingServer() {
     ui.serverPill.classList.add('offline');
     ui.serverState.textContent = '本地服务未连接';
     showError('无法连接本地服务', '请确认 npm start 正在运行。', '如果设置在非本机地址，请检查 HOST 与访问令牌。');
-    console.warn('[codex-web] health check failed', error);
+    console.warn('[HuojueAgent] health check failed', error);
     return false;
   }
 }
@@ -1817,7 +1817,7 @@ function bindEvents() {
   });
 
   ui.copyThreadButton.addEventListener('click', () => {
-    copyText(state.current?.codexThreadId || '');
+    copyText(state.current?.agentThreadId || '');
   });
 
   ui.saveSettingsButton.addEventListener('click', saveSettingsFromDialog);

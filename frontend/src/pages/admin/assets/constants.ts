@@ -5,7 +5,7 @@
  * 即忽略，避免手工改地址栏把列表打到后端不认识的筛选值。
  */
 
-import type { AdminAssetListResult } from '../../../types/api';
+import type { AdminAssetListResult } from './types';
 
 export type AssetRow = AdminAssetListResult['items'][number];
 

@@ -7,11 +7,15 @@ import {
   StatusTag,
   type AdminColumn,
   type RowMenuItem,
-} from '~/admin-ui/radar';
-import { CHANNEL_LABELS, REFUND_STATE_TONES, REFUND_STATUS_LABELS, STATUS_LABEL_OVERRIDE } from './constants';
+} from './components';
+import {
+  CHANNEL_LABELS,
+  REFUND_STATE_TONES,
+  REFUND_STATUS_LABELS,
+  STATUS_LABEL_OVERRIDE,
+} from './constants';
 import { adminOrderDetailHref, adminUserDetailHref, fmtTime, yuan } from './utils';
-import type { AdminOrderRow } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminOrderRow } from './types';
 
 /**
  * 订单列表：列定义、批量核销入口与表格状态。

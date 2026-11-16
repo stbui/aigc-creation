@@ -10,17 +10,12 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import {
-  ActionButton,
-  Button,
-  StatusTag,
-  formatDateTime,
-} from '~/admin-ui/radar';
-import { useBodyScrollLock } from '~/hooks';
+import { ActionButton, Button, StatusTag } from './components';
+import { formatDateTime } from './utils';
+import { useBodyScrollLock } from './hooks';
 import { BACKEND_LABEL, type AssetRow } from './constants';
 import { assetLabel, fmtBytes, fmtFormat, thumbOf } from './utils';
-import type { AssetStatus } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AssetStatus } from './types';
 
 /**
  * 素材预览：左侧看图，右侧看提示词与信息。

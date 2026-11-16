@@ -2,11 +2,12 @@
  * 优惠券的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
  */
 
-import type { AdminCoupon, CouponType, UpsertCouponPayload } from '../../../types/api';
+import type { AdminCoupon, CouponType, UpsertCouponPayload } from './types';
 import { formatYuanPlain } from '../../../admin-ui/lib/format';
 import type { FormState } from './constants';
 
 /** 分 → 元（统一实现在 admin-ui/lib/format.ts） */
+export { formatDate } from '../../../admin-ui/lib/format';
 export const yuan = formatYuanPlain;
 
 /** 面额展示：语义随类型而变，不统一按元显示 */

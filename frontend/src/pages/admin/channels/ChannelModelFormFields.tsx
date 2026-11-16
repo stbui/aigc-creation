@@ -12,10 +12,9 @@ import {
   TextAreaField,
   TextField,
   type SelectFieldOption,
-} from '~/admin-ui/radar';
+} from './components';
 import { ChannelModelTagsEditor } from './ChannelModelTagsEditor';
 import { CAPABILITY_OPTIONS, CURRENCY_OPTIONS, type ModelDraft } from './constants';
-import '../../../styles/radar-admin.css';
 
 type BasicTextFieldName =
   | 'modelKey'

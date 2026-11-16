@@ -1,12 +1,8 @@
 import { useCallback, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import {
-  AdminPage,
-  AdminTabs,
-  RefreshButton,
-  TabsContent,
-} from '~/admin-ui/radar';
+import { AdminPage, AdminTabs, RefreshButton, TabsContent } from './components';
+import { PAYMENTS_TAB_COPY, PAYMENTS_TABS, type PaymentsTabValue } from './constants';
+import { isPaymentsTab } from './utils';
 import { PaymentsProvidersTab } from './PaymentsProvidersTab';
 import { PaymentsReconciliationTab } from './PaymentsReconciliationTab';
 import { PaymentsExceptionPanel } from './PaymentsExceptionPanel';
@@ -31,46 +27,20 @@ import { PaymentsExceptionPanel } from './PaymentsExceptionPanel';
  *
  * **URL 是标签的事实源**：`?tab=` 决定显示哪个标签，浏览器前进后退能正确
  * 回到上一个标签；核对的深链参数（`runId`）也写在同一个 URL 上，刷新可复原。
+ *
+ * 页面只做标签切换与 URL 同步：页签清单与页头文案在 `constants.ts`，
+ * 合法性判定在 `utils.ts`，三个标签各自一个业务组件。
  */
-
-/** 合法标签白名单；非法值一律回落到第一个。`products` / `orders` 旧链接回落到收款设置。 */
-const TABS = [
-  { value: 'providers', label: '收款设置' },
-  { value: 'reconciliation', label: '交易核对' },
-  { value: 'exceptions', label: '异常处理' },
-] as const;
-
-type TabValue = (typeof TABS)[number]['value'];
-
-const TAB_COPY: Record<TabValue, { title: string; description: string }> = {
-  providers: {
-    title: '收款设置',
-    description: '配置客户可用的收款渠道与支付方式',
-  },
-  reconciliation: {
-    title: '交易核对',
-    description: '核对渠道流水与系统订单，跟进对账差异',
-  },
-  exceptions: {
-    title: '异常处理',
-    description: '处理支付异常与退款兜底，闭环资金问题',
-  },
-};
-
-function isTab(value: string | null): value is TabValue {
-  return TABS.some((tab) => tab.value === value);
-}
-
 export function AdminPaymentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab');
-  const tab: TabValue = isTab(rawTab) ? rawTab : 'providers';
+  const tab: PaymentsTabValue = isPaymentsTab(rawTab) ? rawTab : 'providers';
 
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const switchTab = useCallback(
     (next: string) => {
-      if (!isTab(next)) return;
+      if (!isPaymentsTab(next)) return;
       setSearchParams(
         (prev) => {
           const params = new URLSearchParams(prev);
@@ -85,13 +55,13 @@ export function AdminPaymentsPage() {
 
   // 侧栏菜单以 `tab=providers` 作为收款设置的规范地址。旧书签或不带
   // 标签参数的入口先补齐参数，避免页面已渲染但侧栏没有选中项。
-  if (!isTab(rawTab)) {
+  if (!isPaymentsTab(rawTab)) {
     const params = new URLSearchParams(searchParams);
     params.set('tab', 'providers');
     return <Navigate to={`/admin/payments?${params.toString()}`} replace />;
   }
 
-  const pageCopy = TAB_COPY[tab];
+  const pageCopy = PAYMENTS_TAB_COPY[tab];
 
   return (
     <AdminPage
@@ -106,7 +76,7 @@ export function AdminPaymentsPage() {
         />
       }
     >
-      <AdminTabs value={tab} onValueChange={switchTab} items={TABS} ariaLabel="支付配置视图">
+      <AdminTabs value={tab} onValueChange={switchTab} items={PAYMENTS_TABS} ariaLabel="支付配置视图">
         {/*
          * 筛选条件与详情深链都在地址栏，切回标签时能恢复；标签未激活时不挂载
          * （Radix 默认），离开标签即释放各自的数据与分页状态，避免进页就并发

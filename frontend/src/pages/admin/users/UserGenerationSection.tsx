@@ -1,16 +1,8 @@
 import { Link } from 'react-router-dom';
-import { DetailSection, EmptyState, MiniStat } from '~/admin-ui/radar';
-import { cn } from '~/admin-ui/lib/cn';
-import type { AdminUserGeneration } from '../../../types/admin-users';
-import { adminTasksHref } from './utils';
-import '../../../styles/radar-admin.css';
-
-const MODALITY_LABEL: Record<string, string> = {
-  image: '图像',
-  video: '视频',
-  text: '文本',
-  audio: '音频',
-};
+import { DetailSection, EmptyState, MiniStat } from './components';
+import type { AdminUserGeneration } from './types';
+import { MODALITY_LABEL } from './constants';
+import { adminTasksHref, cn } from './utils';
 
 function successRateClass(rate: number | null): string {
   if (rate === null) return 'text-muted-foreground';

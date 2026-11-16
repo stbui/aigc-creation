@@ -12,11 +12,7 @@
 import { useCallback } from 'react';
 import { useAdminList, useAdminResource } from '~/admin-ui/radar';
 import { adminCreditsApi } from './api';
-import type {
-  AdminCreditLedgerRow,
-  AdminCreditListResult,
-  AdminCreditLotRow,
-} from '../../../types/api';
+import type { AdminCreditLedgerRow, AdminCreditListResult, AdminCreditLotRow } from './types';
 
 export {
   useAdminDetailParam,
@@ -33,6 +29,7 @@ export { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGua
  * 初始化参数来自 URL，首次请求即带筛选；筛选变更由页面通过 `setQuery`
  * 触发，`useAdminList` 负责竞态、失败保留与页码重置。
  */
+export { useAdminExport } from '~/admin-ui/radar';
 export function useCreditDirectory(initialEmail: string, initialUserId: string) {
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>

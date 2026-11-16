@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
 import {
   AdminPage,
@@ -10,11 +9,7 @@ import {
   SavedViewBar,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/radar';
-import {
-  readAdminActionContext,
-  readAdminDone,
-} from '../../../lib/admin-context-link';
+} from './components';
 import { adminTicketsApi } from './api';
 import {
   useAdmin,
@@ -34,7 +29,7 @@ import {
   TYPE_LABELS,
   TYPE_OPTIONS,
 } from './constants';
-import { transitionLabel } from './utils';
+import { transitionLabel, readAdminActionContext, readAdminDone } from './utils';
 import { TicketFilterBar, type TicketFilterDraft } from './TicketFilterBar';
 import { TicketStatsCards } from './TicketStatsCards';
 import { TicketTable } from './TicketTable';
@@ -47,7 +42,7 @@ import type {
   TicketStats,
   TicketStatus,
   TicketType,
-} from '../../../types/api';
+} from './types';
 
 /**
  * 工单处理中心。

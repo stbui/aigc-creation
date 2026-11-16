@@ -7,11 +7,10 @@ import {
   SuggestField,
   SwitchField,
   TextField,
-} from '~/admin-ui/radar';
+} from './components';
 import { FONT_PRESETS } from './constants';
 import { ChoiceButton } from './ChoiceButton';
-import type { AigcLabelSpec } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AigcLabelSpec } from './types';
 
 /**
  * 角标样式面板。

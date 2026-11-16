@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PluginView } from '~/types/model';
+import type { PluginView } from '../types';
 import { PluginTable } from '../PluginTable';
 
 const BASE: PluginView = {

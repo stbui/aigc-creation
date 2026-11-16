@@ -1,16 +1,10 @@
 import { useMemo } from 'react';
-import {
-  ActionButton,
-  AdminDataTable,
-  StatusTag,
-  formatDateTime,
-  type AdminColumn,
-} from '~/admin-ui/radar';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import { formatDateTime } from './utils';
 import { AssetThumb } from './AssetThumb';
 import { BACKEND_LABEL, type AssetRow } from './constants';
 import { assetLabel, fmtBytes, fmtFormat, generationLine, thumbSrc } from './utils';
-import type { AssetStatus } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AssetStatus } from './types';
 
 /**
  * 表格视图。

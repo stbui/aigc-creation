@@ -7,7 +7,7 @@ import {
   FilterBar,
   SelectField,
   type AppliedFilter,
-} from '~/admin-ui/radar';
+} from './components';
 import { MEMBERSHIP_OPTIONS, ROLE_OPTIONS, SEGMENT_OPTIONS, STATUS_OPTIONS } from './constants';
 import type {
   AdminUserMembershipFilter,
@@ -15,7 +15,6 @@ import type {
   AdminUserSegment,
   AdminUserStatus,
 } from './types';
-import '../../../styles/radar-admin.css';
 
 interface UserFiltersProps {
   keyword: string;
@@ -104,7 +103,7 @@ export function UserFilters({
           value={segment}
           onChange={(value) => {
             const next = SEGMENT_OPTIONS.find((option) => option.value === value)?.value;
-            onSegmentChange(next as AdminUserSegment | undefined);
+            onSegmentChange(next);
           }}
           options={SEGMENT_OPTIONS}
         />
@@ -118,7 +117,7 @@ export function UserFilters({
             const next = MEMBERSHIP_OPTIONS.find(
               (option) => option.value === value,
             )?.value;
-            onMembershipChange(next as AdminUserMembershipFilter | undefined);
+            onMembershipChange(next);
           }}
           options={MEMBERSHIP_OPTIONS}
         />

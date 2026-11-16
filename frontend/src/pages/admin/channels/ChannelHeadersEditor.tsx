@@ -11,10 +11,9 @@
  */
 
 import { Plus, Trash2 } from 'lucide-react';
-import { ActionButton, IconButton, TextField } from '~/admin-ui/radar';
+import { ActionButton, IconButton, TextField } from './components';
 import type { ChannelHeader } from './constants';
 import { DEFAULT_USER_AGENT, MAX_HEADER_COUNT, validateChannelHeaders } from './utils';
-import '../../../styles/radar-admin.css';
 
 export function ChannelHeadersEditor({
   value,

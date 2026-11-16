@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
 import { DatabaseBackup, Trash2 } from 'lucide-react';
 import { adminBackupsApi, adminRetentionApi } from './api';
@@ -14,7 +13,7 @@ import {
   Panel,
   SelectField,
   StaleError,
-} from '~/admin-ui/radar';
+} from './components';
 import { useAdmin, useAdminResource, useAdminUrlFilterSync, useToast } from './hooks';
 import {
   BACKUP_FILTER_LABELS,
@@ -28,7 +27,7 @@ import { BackupTable } from './BackupTable';
 import { BackupCleanupLog } from './BackupCleanupLog';
 import { BackupRunConfirm } from './BackupRunConfirm';
 import { BackupPruneConfirm } from './BackupPruneConfirm';
-import type { AdminBackup } from '../../../types/api';
+import type { AdminBackup } from './types';
 
 /**
  * 数据备份（`/admin/backups`）。

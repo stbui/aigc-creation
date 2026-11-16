@@ -6,4 +6,5 @@
  * `utils.ts` / `constants.ts` 取用。分层约定见
  * `docs/frontend-module-conventions.md`。
  */
+import '../../../styles/radar-admin.css';
 export { AdminCreditsPage } from './page';

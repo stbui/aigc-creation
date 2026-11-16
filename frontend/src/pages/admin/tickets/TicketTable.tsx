@@ -1,12 +1,6 @@
 import { Link } from 'react-router-dom';
-import {
-  formatDateTime,
-  ActionButton,
-  AdminDataTable,
-  Button,
-  StatusTag,
-  type AdminColumn,
-} from '~/admin-ui/radar';
+import { ActionButton, AdminDataTable, Button, StatusTag, type AdminColumn } from './components';
+import { formatDateTime } from './utils';
 import {
   PRIORITY_LABELS,
   PRIORITY_TONE,
@@ -15,8 +9,7 @@ import {
   TYPE_LABELS,
 } from './constants';
 import { adminUserDetailHref } from './utils';
-import type { AdminTicketRow } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminTicketRow } from './types';
 
 /**
  * 工单列表。

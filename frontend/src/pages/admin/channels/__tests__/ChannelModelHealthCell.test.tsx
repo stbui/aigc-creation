@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ChannelModelHealthCell } from '../ChannelModelHealthCell';
 import { formatRate, healthTone } from '../utils';
-import type { ChannelModelHealthRowView } from '../../../../types/model';
+import type { ChannelModelHealthRowView } from '../types';
 
 /**
  * 稳定性单元格的展示口径。

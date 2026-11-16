@@ -5,8 +5,8 @@
  * 提交时只取当前类型需要的字段（见 `buildCampaignPayload`）。
  */
 
-import type { AdminCampaign, CampaignStatus, CampaignType } from '../../../types/api';
-import type { TagTone } from '../../../components/admin/statusMeta';
+import type { AdminCampaign, CampaignStatus, CampaignType } from './types';
+import type { TagTone } from './components';
 
 export const TYPE_LABEL: Record<CampaignType, string> = {
   limited_price: '限时价',

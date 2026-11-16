@@ -5,3 +5,4 @@
 export { useToast } from '../../../admin-ui/providers/ToastProvider';
 export { useAdmin } from '../../../context/AdminContext';
 export { useAdminList, useAdminUrlFilterSync, useSelectionPrune } from '~/admin-ui/radar';
+export { useBodyScrollLock } from '~/hooks';

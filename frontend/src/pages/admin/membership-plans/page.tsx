@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { Plus } from 'lucide-react';
 import { adminMembershipPlansApi, adminUserGroupsApi } from './api';
 import {
@@ -10,21 +9,15 @@ import {
   PageSkeleton,
   RefreshButton,
   StaleError,
-} from '~/admin-ui/radar';
-import {
-  useAdmin,
-  useAdminResource,
-  useDiscardConfirm,
-  useToast,
-  useUnsavedGuard,
-} from './hooks';
+} from './components';
+import { useAdmin, useAdminResource, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { EMPTY_DRAFT, type PlanDraft } from './constants';
 import { buildPlanPayload, groupOptions, toDraft } from './utils';
 import { PlanCardGrid } from './PlanCardGrid';
 import { PlanDeleteConfirm } from './PlanDeleteConfirm';
 import { PlanFormDrawer } from './PlanFormDrawer';
 import { PlanStatusConfirm } from './PlanStatusConfirm';
-import type { AdminMembershipPlan } from '../../../types/api';
+import type { AdminMembershipPlan } from './types';
 
 /**
  * 会员套餐管理（`/admin/membership-plans`）。

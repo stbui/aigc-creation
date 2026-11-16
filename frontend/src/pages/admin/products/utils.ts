@@ -6,19 +6,14 @@
  * 非法输入返回 `null` 而不是兜底成 0：静默变免费是灾难。
  */
 
-import type {
-  AdminProduct,
-  CreateProductPayload,
-  UpdateProductPayload,
-} from '../../../types/api';
+import type { AdminProduct, CreateProductPayload, UpdateProductPayload } from './types';
 import { formatMonthDayTime, formatYuanPlain } from '../../../admin-ui/lib/format';
-import {
-  DEFAULT_SORT_ORDER,
-  type ProductCurrency,
-  type ProductDraft,
-} from './constants';
+export { adminProductOrdersHref } from '../../../lib/admin-links';
+import { DEFAULT_SORT_ORDER, type ProductCurrency, type ProductDraft } from './constants';
 
 /** 币种符号。商品只有 CNY / USD 两种，不做通用货币库 */
+export { formatNumber } from '../../../admin-ui/lib/format';
+export { cn } from '~/admin-ui/lib/cn';
 export function currencySymbol(currency: ProductCurrency | string): string {
   return currency === 'USD' ? '$' : '¥';
 }

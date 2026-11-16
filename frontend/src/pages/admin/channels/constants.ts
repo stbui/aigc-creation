@@ -1,4 +1,4 @@
-import type { SelectFieldOption } from '~/admin-ui/radar';
+import type { SelectFieldOption } from './components';
 import { BILLING_MODE_LABELS } from '../../../lib/billing-mode';
 
 /* ------------------------------------------------------------------------- */

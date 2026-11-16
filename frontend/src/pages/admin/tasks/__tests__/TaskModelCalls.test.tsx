@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ApiLogListResult, ApiLogView } from '../../../../types/model';
+import type { ApiLogListResult, ApiLogView } from '../types';
 
 const { listMock } = vi.hoisted(() => ({ listMock: vi.fn() }));
 

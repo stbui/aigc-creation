@@ -1,4 +1,9 @@
-import type { AdminUserRole, AdminUserStatus } from './types';
+import type {
+  AdminUserMembershipFilter,
+  AdminUserRole,
+  AdminUserSegment,
+  AdminUserStatus,
+} from './types';
 
 /**
  * 用户管理的角色、状态与登录原因映射。
@@ -20,13 +25,13 @@ export const STATUS_OPTIONS: Array<{ value: AdminUserStatus; label: string }> = 
   { value: 'deleted', label: '已注销' },
 ];
 
-export const SEGMENT_OPTIONS = [
+export const SEGMENT_OPTIONS: Array<{ value: AdminUserSegment; label: string }> = [
   { value: 'never_login', label: '从未登录' },
   { value: 'inactive_30d', label: '30 天未登录' },
   { value: 'no_tasks', label: '无可见任务' },
 ];
 
-export const MEMBERSHIP_OPTIONS = [
+export const MEMBERSHIP_OPTIONS: Array<{ value: AdminUserMembershipFilter; label: string }> = [
   { value: 'member', label: '生效中的会员' },
   { value: 'non_member', label: '非会员' },
 ];
@@ -66,4 +71,31 @@ export const LOGIN_REASON_LABEL: Record<string, string> = {
   disabled: '账号已禁用',
   deleted: '账号已注销',
   temp_password_expired: '临时密码已过期',
+};
+
+/** 会员状态 → 展示文案与色调（会员信息区 / 历史列表共用）。 */
+export const MEMBERSHIP_STATUS_META = {
+  active: { label: '生效中', tone: 'success' },
+  scheduled: { label: '待生效', tone: 'brand' },
+  grace: { label: '宽限期', tone: 'warn' },
+  cancelled: { label: '已取消续费', tone: 'warn' },
+  expired: { label: '已过期', tone: 'muted' },
+  refunded: { label: '已退款', tone: 'muted' },
+} as const;
+
+/** 订单状态 → 用户详情里的文案。色调用 StatusTag 的统一映射。 */
+export const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: '待支付',
+  paid: '已支付',
+  cancelled: '已取消',
+  refunded: '已退款',
+  partial_refunded: '部分退款',
+};
+
+/** 生成任务模态 → 中文（用户详情的生成概览）。 */
+export const MODALITY_LABEL: Record<string, string> = {
+  image: '图像',
+  video: '视频',
+  text: '文本',
+  audio: '音频',
 };

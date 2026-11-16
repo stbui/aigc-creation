@@ -5,114 +5,19 @@ import {
   NumberField,
   SelectField,
   SwitchField,
-  TextField,
-} from '~/admin-ui/radar';
+} from './components';
+import { ALIYUN_ADDRESS_TYPE_LABELS, EMAIL_KEYS } from './constants';
+import type { AdminSettingValue, EmailProvider, EmailSettingItem } from './types';
+import { emailFieldCopy, providerMeta, settingValueText } from './utils';
+import { SettingTextField } from './SettingTextField';
 
-import {
-  ALIYUN_ADDRESS_TYPE_LABELS,
-  EMAIL_KEYS,
-  emailFieldCopy,
-  providerMeta,
-  type EmailProvider,
-  type EmailSettingItem,
-} from './constants';
-import '../../../styles/radar-admin.css';
-
-export type SettingValue = string | number | boolean | null;
-
-function valueText(value: unknown): string {
-  return value === null || value === undefined ? '' : String(value);
-}
-
-/* ────────────────────────── 设置字段 ────────────────────────── */
-
-export function SettingTextField({
-  item,
-  value,
-  disabled,
-  clearPending = false,
-  onChange,
-  onClear,
-  onUndoClear,
-}: {
-  item: EmailSettingItem;
-  value: unknown;
-  disabled: boolean;
-  clearPending?: boolean;
-  onChange: (value: SettingValue) => void;
-  onClear?: () => void;
-  onUndoClear?: () => void;
-}) {
-  const configured = Boolean(item.hasSecret || item.overridden);
-  const showClear = item.sensitive && configured && !clearPending && Boolean(onClear);
-  const copy = emailFieldCopy(item.key, item);
-
-  return (
-    <FormField
-      label={copy.label}
-      hint={copy.hint}
-      className="min-w-0"
-    >
-      <div className="flex items-start gap-2">
-        <TextField
-          key="input"
-          value={clearPending ? '' : valueText(value)}
-          onChange={(next) => {
-            if (item.sensitive && next === '') {
-              onChange('');
-              return;
-            }
-            onChange(next);
-          }}
-          disabled={disabled || clearPending}
-          ariaLabel={copy.label}
-          type={item.control === 'password' ? 'password' : 'text'}
-          maxLength={item.maxLength}
-          placeholder={
-            item.sensitive && configured && !clearPending
-              ? '留空保持当前密钥'
-              : copy.placeholder ?? '请输入'
-          }
-          className="min-w-0 flex-1"
-        />
-        {showClear && (
-          <ActionButton
-            key="clear"
-            variant="ghost"
-            size="xs"
-            className="mt-0.5 shrink-0 text-danger-text"
-            onClick={onClear}
-            ariaLabel={`移除${copy.label}`}
-          >
-            移除
-          </ActionButton>
-        )}
-        {clearPending && onUndoClear && (
-          <ActionButton
-            key="restore"
-            variant="ghost"
-            size="xs"
-            className="mt-0.5 shrink-0"
-            onClick={onUndoClear}
-            ariaLabel={`恢复${copy.label}`}
-          >
-            恢复
-          </ActionButton>
-        )}
-      </div>
-      {item.sensitive ? (
-        <p className="text-[12px] leading-4 text-muted-foreground">
-          {clearPending
-            ? '保存后将移除当前密钥。依赖该密钥的邮件通道可能无法正常发送。'
-            : configured
-              ? `已保存${item.secretMask ? ` ${item.secretMask}` : ''}；留空不会覆盖现有密钥。`
-              : '尚未配置。密钥加密保存，页面不会显示明文。'}
-        </p>
-      ) : null}
-    </FormField>
-  );
-}
-
+/**
+ * 按通道渲染各自的凭据字段。
+ *
+ * `env` / `console` 没有可填字段，只给一段说明 —— 渲染空表单会让人以为「这里
+ * 应该填但没加载出来」。SMTP 段额外提供 163 推荐参数一键填充，那是国内运营
+ * 最常踩的坑（端口与加密方式不匹配）。
+ */
 export function ProviderFields({
   provider,
   itemFor,
@@ -128,7 +33,7 @@ export function ProviderFields({
   valueFor: (key: string) => unknown;
   disabled: boolean;
   clearPending: (key: string) => boolean;
-  onChange: (key: string, value: SettingValue) => void;
+  onChange: (key: string, value: AdminSettingValue) => void;
   onClear: (key: string) => void;
   onUndoClear: (key: string) => void;
 }) {
@@ -257,7 +162,7 @@ export function ProviderFields({
       <FormField label={copy.label} hint={copy.hint}>
         <SelectField
           ariaLabel={copy.label}
-          value={valueText(valueFor(EMAIL_KEYS.aliyunDmAddressType))}
+          value={settingValueText(valueFor(EMAIL_KEYS.aliyunDmAddressType))}
           disabled={disabled}
           onChange={(next) => {
             if (next !== undefined) onChange(EMAIL_KEYS.aliyunDmAddressType, next);

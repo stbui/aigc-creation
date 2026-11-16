@@ -10,12 +10,10 @@ import {
   Panel,
   SelectField,
   SkeletonBody,
-} from '~/admin-ui/radar';
-import { cn } from '../../../admin-ui/lib/cn';
-import { formatRate, healthTone } from './utils';
+} from './components';
+import { cn, formatRate, healthTone } from './utils';
 import { CHANNEL_STATUS_OPTIONS, type ChannelHealthSummary } from './constants';
-import type { AdminChannelView } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import type { AdminChannelView } from './types';
 
 interface ChannelListPanelProps {
   rows: AdminChannelView[];

@@ -3,16 +3,13 @@
  */
 
 import { DEFAULT_TAB, TAB_OPTIONS, type TabValue } from './constants';
-import type {
-  AdminCheckinListResult,
-  AdminInviteListResult,
-  CheckinRule,
-} from '../../../types/api';
+import type { AdminCheckinListResult, AdminInviteListResult, CheckinRule } from './types';
 
 /* 跨模块深链：列表里的邮箱跳用户页，口径与后台其它页面一致 */
 export { adminUserHref } from '../../../lib/admin-links';
 
 /** 地址栏 `?tab=` → 页签。非法值回落规则页，不让页面停在一片空白上 */
+export { formatDateTime } from '../../../admin-ui/lib/format';
 export function resolveTab(value: string | null): TabValue {
   return TAB_OPTIONS.some((tab) => tab.value === value) ? (value as TabValue) : DEFAULT_TAB;
 }

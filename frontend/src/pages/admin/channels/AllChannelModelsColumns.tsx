@@ -1,24 +1,17 @@
 import { useMemo } from 'react';
 import { Pencil, Power } from 'lucide-react';
-import {
-  ActionButton,
-  Button,
-  RowMenu,
-  StatusTag,
-  type AdminColumn,
-} from '~/admin-ui/radar';
+import { ActionButton, Button, RowMenu, StatusTag, type AdminColumn } from './components';
 import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
 import { ProductConsumptionCell } from './ProductConsumptionCell';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
 import { ModelCommerceMetricsCell } from './ModelCommerceMetricsCell';
 import { PRODUCT_STATE_META, productStateOf } from './utils';
 import type { ProductConsumptionState } from './useProductConsumption';
-import type {
-  AdminChannelModelListItem,
-  ChannelModelHealthRowView,
-  ModelCommerceProductView,
-} from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import {
+  type AdminChannelModelListItem,
+  type ChannelModelHealthRowView,
+  type ModelCommerceProductView,
+} from './types';
 
 export interface AllChannelModelsColumnOptions {
   channelNameById: Map<string, string>;

@@ -8,20 +8,19 @@ import {
   CardHeader,
   CardTitle,
   StatusTag,
-} from '~/admin-ui/radar';
-import { cn } from '~/admin-ui/lib/cn';
-import type { AdminPaymentProviderView } from '../../../types/payment';
+} from './components';
+import type { AdminPaymentProviderView } from './types';
 import {
   PAYMENT_PROVIDER_STATE_META,
   type PaymentProviderState,
 } from './constants';
 import {
+  cn,
   instanceState,
   providerBlockingIssues,
   providerState,
   usableInstanceCount,
 } from './utils';
-import '../../../styles/radar-admin.css';
 
 /** 来源图标：内联小方块，避免拉外链图片（后台不该有第三方资源依赖） */
 const PROVIDER_ACCENTS: Record<string, string> = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AdminChannelView } from '../../../../types/model';
+import type { AdminChannelView } from '../types';
 import {
   buildConsumptionIndex,
   buildConsumptionKeyIndex,

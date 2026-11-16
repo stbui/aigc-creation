@@ -1,6 +1,5 @@
 import { CalendarDays, Coins, Crown } from 'lucide-react';
 import {
-  formatNumber,
   ActionButton,
   Card,
   CardContent,
@@ -13,11 +12,9 @@ import {
   SkeletonCards,
   StatusTag,
   ToneBadge,
-} from '~/admin-ui/radar';
-import { cn } from '~/admin-ui/lib/cn';
-import { centsToYuan } from './utils';
-import type { AdminMembershipPlan } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+} from './components';
+import { formatNumber, cn, centsToYuan } from './utils';
+import type { AdminMembershipPlan } from './types';
 
 interface PlanCardGridProps {
   rows: AdminMembershipPlan[];

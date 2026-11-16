@@ -50,7 +50,7 @@ export const STATUS_TONES: Record<string, 'success' | 'danger' | 'warn' | 'brand
  * 筛选下拉选项。提到模块级：内联字面量会让页面任一 state 变化（筛选、分页、
  * 轮询刷新）都重建数组，带着 5 个 SelectField 一起重渲染。
  */
-type SelectOption = { value: string; label: string };
+export type SelectOption = { value: string; label: string };
 
 export const STATUS_OPTIONS: SelectOption[] = [
   { value: 'success', label: '成功' },

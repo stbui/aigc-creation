@@ -2,7 +2,7 @@
  * 插件的静态文案与派生展示。
  */
 
-import type { PluginView } from '../../../types/model';
+import type { PluginView } from './types';
 
 /** 贡献项 → 非零条目文本 */
 export function contributionText(plugin: PluginView): string {

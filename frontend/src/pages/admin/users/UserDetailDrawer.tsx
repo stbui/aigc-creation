@@ -15,9 +15,8 @@ import {
   MiniStat,
   SkeletonBody,
   StatusTag,
-} from '~/admin-ui/radar';
-import { cn } from '~/admin-ui/lib/cn';
-import { adminUsersApi, assetThumbUrl } from './api';
+} from './components';
+import { adminUsersApi } from './api';
 import { LOGIN_REASON_LABEL } from './constants';
 import { UserGenerationSection } from './UserGenerationSection';
 import { UserMembershipSection } from './UserMembershipSection';
@@ -28,11 +27,16 @@ import {
   adminOrderHref,
   adminTaskHref,
   adminTasksHref,
+  assetThumbUrl,
+  cn,
   formatDateTime,
 } from './utils';
-import type { AdminLoginLogResult, AdminUserDetail } from '../../../types/api';
-import type { DeleteUserTarget } from './types';
-import '../../../styles/radar-admin.css';
+import type {
+  AdminLoginLogResult,
+  AdminUserDetail,
+  DeleteUserTarget,
+} from './types';
+
 
 /**
  * 描述列表的一项：标签在左、内容在右，同一行。
@@ -57,7 +61,6 @@ function InfoItem({
   );
 }
 
-/** 抽屉里的资源计数。统一放在一条统计带里，避免三张独立小卡重复描边。 */
 /**
  * 详情抽屉里的「最近登录」区块。
  *

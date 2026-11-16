@@ -1,7 +1,6 @@
-import { FormDrawer, FormField, SelectField, TextField } from '~/admin-ui/radar';
+import { FormDrawer, FormField, SelectField, TextField } from './components';
 import { SCOPE_OPTIONS, STATUS_OPTIONS, TYPE_OPTIONS, type FormState } from './constants';
-import type { AdminCoupon, CouponScope, CouponStatus, CouponType } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminCoupon, CouponScope, CouponStatus, CouponType } from './types';
 
 /**
  * 新建 / 编辑优惠券。

@@ -5,7 +5,7 @@ import { since, freshness } from './utils';
 import { useAdmin, useToast, useAdminResource } from './hooks';
 import { AlertTriangle, Play } from 'lucide-react';
 
-import { adminSchedulerApi } from '../../../lib/api';
+import { adminSchedulerApi } from './api';
 
 import {
   AdminPage,

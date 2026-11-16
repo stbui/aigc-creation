@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FolderPlus, Save } from 'lucide-react';
-import {
-  FormDrawer,
-  FormField,
-  SelectField,
-  TextField,
-} from '~/admin-ui/radar';
+import { FormDrawer, FormField, SelectField, TextField } from './components';
 import { adminAssetsApi, adminUsersApi } from './api';
-import type { AdminProject, AdminUserListResult, Project } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminProject, AdminUserListResult, Project } from './types';
 
 type UserRow = AdminUserListResult['items'][number];
 

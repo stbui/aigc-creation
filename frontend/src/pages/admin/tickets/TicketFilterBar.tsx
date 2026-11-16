@@ -6,9 +6,8 @@ import {
   FilterBar,
   SelectField,
   type AppliedFilter,
-} from '~/admin-ui/radar';
+} from './components';
 import { STATUS_OPTIONS, TYPE_OPTIONS } from './constants';
-import '../../../styles/radar-admin.css';
 
 /** 筛选条上的四个下拉草稿。均未提交，点「查询」或回车才写进查询条件。 */
 export interface TicketFilterDraft {

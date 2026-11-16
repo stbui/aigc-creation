@@ -3,6 +3,9 @@
  */
 
 export { cn } from '../../../admin-ui/lib/cn';
+
+/** 跨模块上下文链接（回跳带 context / done 标记） */
+export { readAdminActionContext, readAdminDone, withAdminDone } from '../../../lib/admin-context-link';
 export {
   adminCreditHref,
   adminOrderDetailHref,
@@ -17,6 +20,7 @@ export { formatYuanPlain as yuan } from '~/admin-ui/radar';
 export { formatDateTime as fmtTime } from '~/admin-ui/radar';
 
 /** 元输入 → 分。非法返回 null, 不做静默兜底 */
+export { ApiError } from '../../../lib/api';
 export function yuanToCents(text: string): number | null {
   const trimmed = text.trim();
   if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;

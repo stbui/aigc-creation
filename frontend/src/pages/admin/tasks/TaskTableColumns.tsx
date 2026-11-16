@@ -1,23 +1,22 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  formatDateTime,
   ActionButton,
   RowMenu,
   StatusTag,
   type AdminColumn,
   type RowMenuItem,
-} from '~/admin-ui/radar';
+} from './components';
 import { assetThumbUrl } from './api';
 import {
   adminTasksHref,
   adminUserDetailHref,
+  formatDateTime,
   formatDuration,
   shortId,
   taskErrorLabel,
 } from './utils';
 import type { AdminTaskRow, TaskActionKind } from './types';
-import '../../../styles/radar-admin.css';
 
 interface UseTaskTableColumnsOptions {
   can: (permission: string) => boolean;

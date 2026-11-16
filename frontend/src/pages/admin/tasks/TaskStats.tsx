@@ -1,6 +1,5 @@
-import { StatCard } from '~/admin-ui/radar';
-import type { AdminTaskCongestion } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import { StatCard } from './components';
+import type { AdminTaskCongestion } from './types';
 
 /**
  * 任务监控顶部的运行水位。

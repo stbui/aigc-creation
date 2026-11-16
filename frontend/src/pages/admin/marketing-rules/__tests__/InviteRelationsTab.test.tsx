@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AdminInviteListResult } from '../../../../types/api';
+import type { AdminInviteListResult } from '../types';
 import type { InviteRow } from '../constants';
 
 const { invitesMock, grantMock, toastMock, canDo } = vi.hoisted(() => ({

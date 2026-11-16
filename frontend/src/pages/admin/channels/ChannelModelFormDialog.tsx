@@ -1,12 +1,11 @@
 import { useRef } from 'react';
-import { ActionButton, ModalDialog } from '~/admin-ui/radar';
+import { ActionButton, ModalDialog } from './components';
 import {
   CHANNEL_MODEL_FORM_ID,
   ChannelModelForm,
 } from './ChannelModelForm';
 import type { ModelDraft } from './constants';
-import type { AdminChannelModelView, ProtocolTestResultView } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import type { AdminChannelModelView, ProtocolTestResultView } from './types';
 
 interface ChannelModelFormDialogProps {
   open: boolean;

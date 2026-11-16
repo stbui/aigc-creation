@@ -1,9 +1,9 @@
 {
-  "name": "codex-web",
+  "name": "huojue-agent",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A local web workspace for the OpenAI Codex SDK",
+  "description": "货觉AI 智能体（Agent）本地 Web 工作台",
   "engines": {
     "node": ">=18"
   },

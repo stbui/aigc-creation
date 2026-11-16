@@ -1,4 +1,6 @@
 /** 能力绑定草稿：提交前允许运营调整启停、优先级与权重。 */
+export type { AdminCapabilityControl, CapabilityRuntime } from '../../../types/api';
+export type { AdminCapabilityModelCandidateView, AdminCapabilityModelListView, CapabilityPricingView } from '../../../types/model';
 export interface BindingDraft {
   channelModelId: string;
   enabled: boolean;

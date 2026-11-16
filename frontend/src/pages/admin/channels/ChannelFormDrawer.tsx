@@ -1,17 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  FormDrawer,
-  NumberField,
-  SelectField,
-  SwitchField,
-  TextField,
-} from '~/admin-ui/radar';
+import { FormDrawer, NumberField, SelectField, SwitchField, TextField } from './components';
 import { ChannelHeadersEditor } from './ChannelHeadersEditor';
 import { Field } from './ChannelField';
 import { useProtocolCatalog } from './useChannelModels';
 import { BILLING_MODE_OPTIONS, type ChannelDraft, type DefaultModelDraft } from './constants';
-import type { AdminChannelView } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import type { AdminChannelView } from './types';
 
 interface ChannelFormDrawerProps {
   open: boolean;

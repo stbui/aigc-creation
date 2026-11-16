@@ -8,9 +8,8 @@ import {
   TextField,
   type AppliedFilter,
   type SelectFieldOption,
-} from '~/admin-ui/radar';
+} from './components';
 import { STATUS_OPTIONS } from './constants';
-import '../../../styles/radar-admin.css';
 
 interface TaskFiltersProps {
   status?: string;

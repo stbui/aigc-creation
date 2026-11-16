@@ -7,9 +7,8 @@ import {
   FilterBar,
   SelectField,
   type AppliedFilter,
-} from '~/admin-ui/radar';
+} from './components';
 import { CHANNEL_OPTIONS, REFUND_STATE_OPTIONS, STATUS_OPTIONS } from './constants';
-import '../../../styles/radar-admin.css';
 
 export interface OrderFilterValues {
   status?: string;

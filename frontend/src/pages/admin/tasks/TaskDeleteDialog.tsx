@@ -1,5 +1,4 @@
-import { ConfirmDialog } from '~/admin-ui/radar';
-import '../../../styles/radar-admin.css';
+import { ConfirmDialog } from './components';
 
 /**
  * 任务删除确认。

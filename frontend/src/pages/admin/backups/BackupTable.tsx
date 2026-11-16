@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import {
-  formatDateTime,
   ActionButton,
   AdminDataTable,
   Descriptions,
@@ -8,10 +7,15 @@ import {
   StatusTag,
   type AdminColumn,
   type RowMenuItem,
-} from '~/admin-ui/radar';
-import { backupStatusLabel, formatBytes, formatRelative, triggerLabel } from './utils';
-import type { AdminBackup } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+} from './components';
+import {
+  formatDateTime,
+  backupStatusLabel,
+  formatBytes,
+  formatRelative,
+  triggerLabel,
+} from './utils';
+import type { AdminBackup } from './types';
 
 interface BackupTableProps {
   rows: AdminBackup[];

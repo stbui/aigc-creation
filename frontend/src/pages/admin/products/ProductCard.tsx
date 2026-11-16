@@ -1,20 +1,8 @@
 import { CalendarDays } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import {
-  formatNumber,
-  ActionButton,
-  Card,
-  CardFooter,
-  Separator,
-  StatusTag,
-} from '~/admin-ui/radar';
-import { cn } from '~/admin-ui/lib/cn';
-import { adminProductOrdersHref } from '../../../lib/admin-links';
-import {
-  SALE_STATUS_LABELS,
-  SALE_STRATEGY_LABELS,
-  STATUS_LABELS,
-} from './constants';
+import { ActionButton, Card, CardFooter, Separator, StatusTag } from './components';
+import { formatNumber, cn, adminProductOrdersHref } from './utils';
+import { SALE_STATUS_LABELS, SALE_STRATEGY_LABELS, STATUS_LABELS } from './constants';
 import {
   currencySymbol,
   moneyText,
@@ -22,8 +10,7 @@ import {
   saleWindowEnd,
   validDaysText,
 } from './utils';
-import type { AdminProduct } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminProduct } from './types';
 
 /**
  * 商品售卖卡。

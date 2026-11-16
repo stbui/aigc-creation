@@ -4,11 +4,12 @@
  * 金额只在提交边界换算一次（元 → 分）；编辑回填后不再乘 100。
  */
 
-import type { AdminCampaign, UpsertCampaignPayload } from '../../../types/api';
+import type { AdminCampaign, UpsertCampaignPayload } from './types';
 import { formatYuanPlain } from '../../../admin-ui/lib/format';
 import type { FormState } from './constants';
 
 /** 分 → 元（统一实现在 admin-ui/lib/format.ts） */
+export { formatDate } from '../../../admin-ui/lib/format';
 export const yuan = formatYuanPlain;
 
 export function toLocalInput(iso: string): string {

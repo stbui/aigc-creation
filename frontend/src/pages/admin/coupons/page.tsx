@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
@@ -8,7 +7,6 @@ import {
   AdminPage,
   ConfirmDialog,
   ExportCsvButton,
-  useAdminExport,
   AppliedFilters,
   ClearableField,
   FilterActions,
@@ -18,13 +16,21 @@ import {
   SelectField,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/radar';
-import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
+} from './components';
+import {
+  useAdminExport,
+  useAdmin,
+  useAdminList,
+  useAdminUrlFilterSync,
+  useDiscardConfirm,
+  useToast,
+  useUnsavedGuard,
+} from './hooks';
 import { STATUS_OPTIONS, TYPE_LABEL, TYPE_OPTIONS, type FormState } from './constants';
 import { buildCouponPayload, emptyForm, toLocalInput } from './utils';
 import { CouponTable } from './CouponTable';
 import { CouponFormDrawer } from './CouponFormDrawer';
-import type { AdminCoupon, CouponType } from '../../../types/api';
+import type { AdminCoupon, CouponType } from './types';
 
 /**
  * 优惠券（`/admin/coupons`）。

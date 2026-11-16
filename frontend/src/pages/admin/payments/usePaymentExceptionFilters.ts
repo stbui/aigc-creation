@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { AppliedFilter } from '~/admin-ui/radar';
-import type { AdminPageResult, AdminPaymentException } from '../../../types/payment';
+import type { AppliedFilter } from './components';
+import type { AdminPageResult, AdminPaymentException } from './types';
 import { adminPaymentExceptionsApi } from './api';
 import {
   EMPTY_PAYMENT_EXCEPTION_FILTERS,

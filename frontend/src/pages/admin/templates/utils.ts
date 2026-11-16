@@ -3,6 +3,7 @@
  */
 import type { CategoryDraft, GroupDraft, ItemDraft } from './constants';
 
+export { cn } from '../../../admin-ui/lib/cn';
 export function parseTagInput(raw: string): string[] {
   return [
     ...new Set(

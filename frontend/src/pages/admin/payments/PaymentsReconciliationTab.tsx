@@ -12,9 +12,8 @@ import {
   SelectField,
   StaleError,
   StatusTag,
-  formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/radar';
+} from './components';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -26,12 +25,13 @@ import {
 import type {
   AdminPaymentProviderView,
   AdminReconciliationRun,
-} from '../../../types/payment';
+} from './types';
 import {
   RECONCILIATION_RUN_STATUS_META,
   RECONCILIATION_RUN_STATUS_OPTIONS,
 } from './constants';
 import {
+  formatDateTime,
   instanceLabel,
   ninetyDaysAgo,
   providerLabel,
@@ -39,7 +39,6 @@ import {
 } from './utils';
 import { ReconciliationDetailDrawer } from './ReconciliationDetailDrawer';
 import { ReconciliationToolbar } from './ReconciliationToolbar';
-import '../../../styles/radar-admin.css';
 
 /**
  * 交易核对标签。

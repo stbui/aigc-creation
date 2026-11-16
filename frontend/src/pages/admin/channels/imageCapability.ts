@@ -6,9 +6,7 @@
  * `capabilityConfig` JSON，不改变保存接口。
  */
 
-import type { ImageParameterDefinitionView } from '../../../types/imageCapability';
-
-export type { ImageParameterDefinitionView } from '../../../types/imageCapability';
+import type { ImageParameterDefinitionView } from './types';
 
 export interface ImageParameterSettingView {
   name: string;

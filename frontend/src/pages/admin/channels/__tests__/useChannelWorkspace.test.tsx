@@ -3,10 +3,10 @@ import type { PropsWithChildren } from 'react';
 import { BrowserRouter, MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { AdminChannelView } from '../../../../types/model';
-import { useAdminDetailParam } from '../../../../admin-ui/primitives';
+import type { AdminChannelView } from '../types';
 import {
   useActionLock,
+  useAdminDetailParam,
   useChannelList,
   useChannelSelection,
   useChannelView,

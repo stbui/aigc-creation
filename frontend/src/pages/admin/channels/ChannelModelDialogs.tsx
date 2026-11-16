@@ -1,11 +1,11 @@
 import { lazy, Suspense } from 'react';
 import type { BatchImportConfig, ModelDraft } from './constants';
-import type {
-  AdminChannelDefaultModelView,
-  AdminChannelModelView,
-  ProtocolTestResultView,
-  UpstreamModelPreview,
-} from '../../../types/model';
+import {
+  type AdminChannelDefaultModelView,
+  type AdminChannelModelView,
+  type ProtocolTestResultView,
+  type UpstreamModelPreview,
+} from './types';
 
 /*
  * 编辑器、上游导入与调价只在用户主动打开时出现。把它们留在初始 chunk 会

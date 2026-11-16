@@ -1,6 +1,6 @@
-import { formatDateTime, Panel } from '~/admin-ui/radar';
-import type { AdminAigcLabel } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import { Panel } from './components';
+import { formatDateTime } from './utils';
+import type { AdminAigcLabel } from './types';
 
 /**
  * 当前生效位图 —— 服务端实际使用的那一张。

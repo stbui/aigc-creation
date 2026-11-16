@@ -5,11 +5,11 @@ import { lazy, type ComponentType } from 'react';
  *
  * `/admin` 外壳本身已经是懒加载，但此前外壳一次性静态导入全部页面，进入概览
  * 时仍要下载整包后台代码。这里保留外壳与概览同步加载，其余页面在首次导航到
- * 对应路由时再请求各自 chunk；Suspense 放在 AdminShell 内，加载期间侧栏不
+ * 对应路由时再请求各自 chunk；Suspense 放在 AdminLayout 内，加载期间侧栏不
  * 消失，避免整屏闪白。
  *
  * 本文件只做「路由路径 → 懒加载组件」的声明，不含任何渲染逻辑；路由挂载见
- * `AdminShell.tsx`，侧栏菜单的事实源是 `components/admin/adminNav.ts`。
+ * `layout.tsx`，侧栏菜单的事实源是 `components/admin/adminNav.ts`。
  */
 function lazyAdminPage<T extends Record<string, ComponentType<any>>>(
   loader: () => Promise<T>,

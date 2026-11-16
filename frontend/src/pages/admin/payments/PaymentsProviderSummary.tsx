@@ -7,12 +7,10 @@ import {
   CardHeader,
   Meter,
   StatusTag,
-} from '~/admin-ui/radar';
-import { cn } from '~/admin-ui/lib/cn';
+} from './components';
 import { PAYMENT_PROVIDER_STATE_META, type PaymentProviderState } from './constants';
-import type { AdminPaymentProviderView } from '../../../types/payment';
-import { providerState } from './utils';
-import '../../../styles/radar-admin.css';
+import type { AdminPaymentProviderView } from './types';
+import { cn, providerState } from './utils';
 
 const STATE_ORDER: readonly PaymentProviderState[] = [
   'usable',

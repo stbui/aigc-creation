@@ -11,10 +11,9 @@ import {
   FormField,
   SelectField,
   StatusTag,
-} from '~/admin-ui/radar';
+} from './components';
 import { ROLE_OPTIONS } from './constants';
 import type { AdminUserRole, AdminUserRow } from './types';
-import '../../../styles/radar-admin.css';
 
 /**
  * 变更角色确认。
@@ -63,7 +62,9 @@ export function UserRoleConfirm({
               ariaLabel="目标角色"
               value={next}
               onChange={(value) => {
-                if (value) setNext(value as AdminUserRole);
+                // 白名单收窄：SelectField 的 value 是宽 string，反查选项表既校验又定型
+                const next = ROLE_OPTIONS.find((option) => option.value === value)?.value;
+                if (next) setNext(next);
               }}
               options={ROLE_OPTIONS}
             />

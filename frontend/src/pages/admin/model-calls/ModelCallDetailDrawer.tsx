@@ -1,5 +1,4 @@
-import { ActionButton, Descriptions, Drawer, Notice, formatDateTime, formatDuration } from '~/admin-ui/radar';
-import type { ApiLogView } from '../../../types/model';
+import { ActionButton, Descriptions, Drawer, Notice } from './components';
 import {
   CAPABILITY_LABELS,
   OPERATION_LABELS,
@@ -7,8 +6,15 @@ import {
   SOURCE_LABELS,
   STATUS_LABELS,
 } from './constants';
-import '../../../styles/radar-admin.css';
+import type { ApiLogView } from './types';
+import { formatDateTime, formatDuration } from './utils';
 
+/**
+ * 单条调用记录的详情抽屉。
+ *
+ * 数据来自列表当前页（`rows`），不再单独取一次详情接口：一次调用记录的所有
+ * 字段列表里已经全部下发，再请求一次只会让「点开瞬间闪一下」。
+ */
 export function ModelCallDetailDrawer({
   detailId,
   detail,

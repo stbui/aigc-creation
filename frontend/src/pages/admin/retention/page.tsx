@@ -3,7 +3,7 @@ import { TARGET_LABELS } from './constants';
 import { fmtTime } from './utils';
 import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { ShieldAlert } from 'lucide-react';
-import { adminRetentionApi } from '../../../lib/api';
+import { adminRetentionApi } from './api';
 
 import { AdminPage, ActionButton, AdminDataTable, ConfirmDialog, NumberField, Notice, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/radar';
 import '../../../styles/radar-admin.css';

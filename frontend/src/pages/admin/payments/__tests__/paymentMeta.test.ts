@@ -32,7 +32,7 @@ import type {
   AdminPaymentProviderInstanceView,
   AdminPaymentProviderView,
   PaymentConfigField,
-} from '../../../../types/payment';
+} from '../types';
 
 /**
  * 支付域（渠道 / 对账 / 异常）的展示口径。

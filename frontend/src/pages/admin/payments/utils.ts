@@ -1,3 +1,10 @@
+import { formatYuanPlain } from '../../../admin-ui/lib/format';
+import {
+  PAYMENTS_TABS,
+  PROVIDER_LABELS,
+  type PaymentProviderState,
+  type PaymentsTabValue,
+} from './constants';
 import type {
   AdminPaymentProviderInstanceView,
   AdminPaymentProviderView,
@@ -5,12 +12,11 @@ import type {
   PaymentCurrency,
   PaymentSource,
   VisiblePaymentMethod,
-} from '../../../types/payment';
-import { formatYuanPlain } from '../../../admin-ui/lib/format';
-import {
-  PROVIDER_LABELS,
-  type PaymentProviderState,
-} from './constants';
+} from './types';
+
+export { cn } from '~/admin-ui/lib/cn';
+export { formatDateTime } from '../../../admin-ui/lib/format';
+export { formatYuanPlain };
 
 /**
  * 支付域的纯函数：账单日期（上海时区）、金额格式化、渠道短名与配置草稿校验。
@@ -18,6 +24,11 @@ import {
  * 充值商品的展示与表单派生不在这里 —— 商品统一由「商品管理」（`/admin/products`）
  * 维护，`payments/` 只处理渠道、订单、对账、异常四件事。
  */
+
+/** 合法页签白名单；非法值一律回落到第一个（`providers`）。 */
+export function isPaymentsTab(value: string | null): value is PaymentsTabValue {
+  return PAYMENTS_TABS.some((tab) => tab.value === value);
+}
 
 /**
  * 昨天（`YYYY-MM-DD`，上海时区）。对账只能选昨天及更早的账单日。
@@ -70,6 +81,9 @@ export {
   adminProductOrdersHref,
   adminUserDetailHref,
 } from '../../../lib/admin-links';
+
+/** 渠道订单项搬运：列表内拖拽重排 / 状态变更，纯函数无 React 依赖。 */
+export { moveOrderItem, orderChanged, type OrderItem } from '~/lib/channelOrder';
 
 /**
  * 渠道配置的**草稿态**必填项校验。

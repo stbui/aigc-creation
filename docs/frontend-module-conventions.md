@@ -3,8 +3,10 @@
 状态：现行（与 `frontend/src/pages/admin/channels/`、`frontend/src/pages/admin/payments/`、
 `frontend/src/pages/admin/credits/`、`frontend/src/pages/admin/tasks/`、
 `frontend/src/pages/admin/orders/`、`frontend/src/pages/admin/users/`、
+`frontend/src/pages/admin/storage/`、`frontend/src/pages/admin/settings/`、`frontend/src/pages/admin/model-calls/`、
+`frontend/src/pages/admin/email/`、
 `frontend/src/pages/admin/assets/`、`frontend/src/pages/admin/tickets/`、
-`frontend/src/pages/admin/logical-models/`、`frontend/src/pages/admin/plugins/`、
+`frontend/src/pages/admin/capabilities/`、`frontend/src/pages/admin/plugins/`、
 `frontend/src/pages/admin/coupons/`、`frontend/src/pages/admin/aigc-label/`、
 `frontend/src/pages/admin/billing-orders/`、`frontend/src/pages/admin/campaigns/`、
 `frontend/src/pages/admin/user-groups/`、`frontend/src/pages/admin/membership-plans/`、
@@ -18,6 +20,21 @@
 `frontend/src/pages/sitemap/`、`frontend/src/pages/qr-login/`、
 `frontend/src/pages/checkout/`、`frontend/src/pages/orders/`、
 `frontend/src/pages/tickets/`、`frontend/src/pages/workbench/` 同步维护）。
+
+清单表示**该目录适用本约定**，不代表已达到收敛标准：8 入口是否齐备、
+`radar-admin.css` 是否只被引入一次、非入口文件是否零外部直连，以目录实际为准。
+后台侧已逐目录校正至达标的（24 个，均满足 8 入口齐备、`radar-admin.css` 只引入 1 次、
+非入口文件零外部直连）：
+
+- 首批：`users/`、`storage/`、`settings/`、`payments/`、`model-calls/`、`email/`、
+  `channels/`、`tasks/`
+- 第二批：`aigc-label/`、`assets/`、`capabilities/`、`orders/`、`plugins/`、
+  `billing-orders/`、`tickets/`、`products/`、`backups/`、`membership-plans/`、
+  `templates/`、`credits/`、`campaigns/`、`coupons/`、`user-groups/`、`marketing-rules/`
+
+后台侧尚未达标、仍待收敛的：`dashboard/`、`payment-rules/`、`layout-parts/`、
+`alerts/`、`invoices/`、`notifications/`、`retention/`、`scheduler/`、`finance/`、
+`roles/`、`radar-style/`。
 
 适用于 `frontend/src/pages/**` 下**多文件**的功能目录。单文件页面不强制套用；
 当页面长到需要拆分时，按本约定落位。参考实现见
@@ -58,13 +75,16 @@ pages/admin/channels/
 ├── hooks.ts          # 外部 hook 入口（唯一）+ 本目录 hooks
 ├── utils.ts          # 外部工具入口（唯一）+ 本目录纯函数
 ├── constants.ts      # 常量、类型、默认值
+├── types.ts          # 外部类型入口（可选；目录内有跨模块类型时才有）
 ├── style.css         # 页面专属样式（仅本页加载）
 ├── <业务组件>.tsx     # 本目录自己的板块组件
 └── __tests__/        # 与实现同目录的 Vitest 用例
 ```
 
 文件名固定小写的有 8 个：`index.ts` / `page.tsx` / `components.ts` / `api.ts` /
-`hooks.ts` / `utils.ts` / `constants.ts` / `style.css`。业务组件用 `PascalCase.tsx`，文件名即组件名。
+`hooks.ts` / `utils.ts` / `constants.ts` / `style.css`。另有一个**可选**入口
+`types.ts`：目录里有跨模块类型（`src/types/*`）引用时建它，作为本目录的唯一类型来源，
+见 §2、§3。业务组件用 `PascalCase.tsx`，文件名即组件名。
 
 ### 页面 CSS 归属
 
@@ -103,6 +123,7 @@ pages/admin/channels/
 | `hooks.ts` | 从 `src/admin-ui/providers` / `src/context` / `src/hooks` / `src/components` 转出的 hook；本目录自有的数据 hook | 组件、接口实现 |
 | `utils.ts` | 从 `src/lib/*` 转出的工具；本目录纯函数（不依赖 React） | 组件、hook、状态 |
 | `constants.ts` | 选项表、默认值、草稿类型、健康汇总等结构类型 | 函数、请求、组件 |
+| `types.ts`（可选） | 从 `src/types/*` 转出的跨模块类型；引用方在 3 个以上时才建 | 本目录自有的草稿 / 结构类型（留 `constants.ts`）；运行期值 |
 | `<业务组件>.tsx` | 本目录独占的展示与交互 | 外部依赖直连（走入口） |
 
 各入口文件顶部写清职责与「新增引用时在这里补一行 re-export」。
@@ -117,17 +138,20 @@ import { adminChannelsApi } from './api';                  // 后端接口
 import { useToast, useChannelList } from './hooks';        // hook
 import { priceOf, formatRate } from './utils';             // 纯函数 / src/lib 工具
 import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量与类型
+import type { AdminChannelView } from './types';           // 跨模块类型（已建 types.ts 时）
 ```
 
 - 不直接引 `src/admin-ui` / `src/components` / `src/vendor` / `src/context` /
   `src/hooks` / `src/lib`（只有入口文件可以）。
 - `src/types/model` 是例外：纯类型模块，不产生运行期依赖，各文件直接
-  `import type`，不必再包一层。
+  `import type`，不必再包一层。**但目录一旦建了 `types.ts`，目录内文件就统一从
+  `./types` 取**，不再直连 `src/types/*` —— 两套写法混用会出现同一类型两个来源。
 - **第三方库（lucide-react / react-router-dom）不经入口转出** —— 它们不是本项目的
   共享控件，直接引即可（`channels/` 与 `product-detail/` 一致）。项目 UI 控件统一从
   `src/admin-ui/primitives` 取件，不从模块入口再包一层。
 - 入口之间是单向的：`utils` → `constants`；`hooks` → `api` / `constants`；
-  `constants` → `components`（只取选项类型）。业务组件与 `page` 可以依赖全部入口；
+  `constants` → `components`（只取选项类型）。`types` 只转出外部类型、不依赖任何
+  入口，可被所有入口与业务文件引用。业务组件与 `page` 可以依赖全部入口；
   `index` 只依赖 `page`。
 - 目录内相对导入一律 `./X`；不使用 `../` 跳出目录（入口文件引外部时除外）。
 
@@ -141,6 +165,7 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
 | 需要新的外部 hook / provider | 先在 `hooks.ts` 补 re-export |
 | 需要新的 `src/lib/*` 工具 | 先在 `utils.ts` 补 re-export |
 | 新的常量、选项表、默认值、结构类型 | `constants.ts` |
+| 新的 `src/types/*` 引用 | 先在 `types.ts` 补 re-export（没建就先建） |
 | 新的纯函数（无 React） | `utils.ts` |
 | 多组件共用的取数逻辑 | `hooks.ts`，或独立 `useXxx.ts` 只在本目录引用 |
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AdminPaymentException } from '../../../../types/payment';
+import type { AdminPaymentException } from '../types';
 
 const mocks = vi.hoisted(() => ({
   can: vi.fn(),

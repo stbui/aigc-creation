@@ -16,14 +16,13 @@ import {
   SwitchField,
   TextField,
   type SelectFieldOption,
-} from '~/admin-ui/radar';
+} from './components';
 import {
   BILLING_MODE_OPTIONS,
   EMPTY_TIER,
   type ModelDraft,
   type TierDraft,
 } from './constants';
-import '../../../styles/radar-admin.css';
 
 type TierTextFieldName =
   | 'selector'

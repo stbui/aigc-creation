@@ -2,7 +2,7 @@
  * 工单处理的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
  */
 
-import type { TicketStatus } from '../../../types/api';
+import type { TicketStatus } from './types';
 
 export { formatDateTime, formatYuanPlain } from '../../../admin-ui/lib/format';
 export { cn } from '../../../admin-ui/lib/cn';
@@ -13,6 +13,11 @@ export {
   adminOrderHref,
   adminUserDetailHref,
 } from '../../../lib/admin-links';
+export {
+  buildAdminContextLink,
+  readAdminActionContext,
+  readAdminDone,
+} from '../../../lib/admin-context-link';
 
 /** 状态流转动作的界面文案（与目标状态一一对应） */
 export function transitionLabel(to: TicketStatus): string {

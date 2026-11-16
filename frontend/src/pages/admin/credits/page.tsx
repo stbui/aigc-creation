@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Upload } from 'lucide-react';
 import {
@@ -7,7 +6,6 @@ import {
   ActionButton,
   BatchBar,
   ExportCsvButton,
-  useAdminExport,
   AdminDataTable,
   AppliedFilters,
   ClearableField,
@@ -20,19 +18,16 @@ import {
   StaleError,
   type AdminColumn,
   type AppliedFilter,
-} from '~/admin-ui/radar';
-import {
-  BATCH_DELETE_CONFIRM,
-  BATCH_DELETE_LIMIT,
-  BatchDeleteUsersDialog,
-} from '~/components/admin/BatchDeleteUsersDialog';
+} from './components';
+import { useAdminExport } from './hooks';
+import { BATCH_DELETE_CONFIRM, BATCH_DELETE_LIMIT, BatchDeleteUsersDialog } from './components';
 import { adminCreditsApi, adminUsersApi } from './api';
 import { useAdmin, useAdminUrlFilterSync, useCreditDirectory, useToast } from './hooks';
 import { adminUserDetailHref, fmtTime } from './utils';
 import { CreditDetailDrawer } from './CreditDetailDrawer';
 import { BatchAdjustDrawer } from './BatchAdjustDrawer';
 import { CsvImportDrawer } from './CsvImportDrawer';
-import type { AdminCreditRow } from '../../../types/api';
+import type { AdminCreditRow } from './types';
 
 /**
  * 积分账本 (B-49~B-52)。

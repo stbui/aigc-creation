@@ -1,6 +1,5 @@
-import { StatusTag } from '~/admin-ui/radar';
+import { StatusTag } from './components';
 import { CAPABILITY_OPTIONS } from './constants';
-import '../../../styles/radar-admin.css';
 
 /**
  * 渠道模型能力标签。

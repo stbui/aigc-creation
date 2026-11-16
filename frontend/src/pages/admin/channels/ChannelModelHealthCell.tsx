@@ -1,4 +1,4 @@
-import { HelpTip, StatusTag } from '~/admin-ui/radar';
+import { HelpTip, StatusTag } from './components';
 import {
   formatAmount,
   formatMarkupPercent,
@@ -7,12 +7,11 @@ import {
   markupPercent,
   tierPriceLines,
 } from './utils';
-import type {
-  AdminChannelModelListItem,
-  ChannelModelHealthRowView,
-  ChannelModelPriceTierView,
-} from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import {
+  type AdminChannelModelListItem,
+  type ChannelModelHealthRowView,
+  type ChannelModelPriceTierView,
+} from './types';
 
 /**
  * 线路稳定性单元格：24h 成功率 + 最近 10 次结果色块。

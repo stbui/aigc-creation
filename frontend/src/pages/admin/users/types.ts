@@ -1,4 +1,27 @@
+/**
+ * 用户管理的类型出口 —— 目录内文件的唯一类型来源。
+ *
+ * 外部类型（`types/api`、`types/admin-users`）在此统一 re-export，业务文件
+ * 一律从 `./types` 取；本目录派生的结构与查询类型也定义于此。
+ */
+
 import type { AdminUserListResult } from '../../../types/api';
+
+/* 外部类型统一转出 */
+export type {
+  AdminUserListResult,
+  AdminLoginLogResult,
+  AdminUserDetail,
+  AdminPasswordReset,
+} from '../../../types/api';
+export type {
+  AdminUserMembership,
+  AdminUserMembershipHistoryItem,
+  AdminUserImpact,
+  AdminUserRecentOrder,
+  AdminUserSpending,
+  AdminUserGeneration,
+} from '../../../types/admin-users';
 
 /** 用户列表与详情共用的一行数据结构。 */
 export type AdminUserRow = AdminUserListResult['items'][number];

@@ -5,8 +5,8 @@
  * 否则同一状态在表里叫「待发放」、在筛选里叫「未发放」。
  */
 
-import type { AdminCheckinListResult, AdminInviteListResult } from '../../../types/api';
-import type { TagTone } from '../../../components/admin/statusMeta';
+import type { AdminCheckinListResult, AdminInviteListResult } from './types';
+import type { TagTone } from './components';
 
 /** 状态标签色调，与 `StatusTag` 的 `tone` 同形 */
 export type { TagTone };

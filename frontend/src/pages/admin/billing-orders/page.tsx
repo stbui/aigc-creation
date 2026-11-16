@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminBillingOrdersApi } from './api';
 import {
@@ -10,12 +9,7 @@ import {
   SavedViewBar,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/radar';
-import {
-  readAdminActionContext,
-  readAdminDone,
-  withAdminDone,
-} from '../../../lib/admin-context-link';
+} from './components';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -26,13 +20,13 @@ import {
   useToast,
 } from './hooks';
 import { STATUS_LABELS, REVIEW_OPTION } from './constants';
-import { toCredits } from './utils';
+import { readAdminActionContext, readAdminDone, toCredits, withAdminDone } from './utils';
 import { BillingStats } from './BillingStats';
 import { BillingFilterBar } from './BillingFilterBar';
 import { BillingOrderTable } from './BillingOrderTable';
 import { BillingDetailDrawer } from './BillingDetailDrawer';
 import { BatchResolveDrawer } from './BatchResolveDrawer';
-import type { BillingOrderListResult, BillingOrderView } from '../../../types/model';
+import type { BillingOrderListResult, BillingOrderView } from './types';
 
 /**
  * 生成账单（`/admin/billing-orders`）。

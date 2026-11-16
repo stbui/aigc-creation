@@ -6,9 +6,8 @@ import {
   FilterBar,
   SelectField,
   type AppliedFilter,
-} from '~/admin-ui/radar';
+} from './components';
 import { BACKEND_OPTIONS, KIND_OPTIONS, STATUS_OPTIONS } from './constants';
-import '../../../styles/radar-admin.css';
 
 interface AssetFilterBarProps {
   keyword: string;

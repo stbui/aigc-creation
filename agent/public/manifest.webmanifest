@@ -1,7 +1,7 @@
 {
-  "name": "Codex Web",
-  "short_name": "Codex Web",
-  "description": "A local web workspace for the Codex SDK",
+  "name": "货觉AI 智能体",
+  "short_name": "货觉AI",
+  "description": "货觉AI 智能体的本地 Web 工作台",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b0d10",

@@ -1,4 +1,4 @@
-import type { AdminBackup } from '../../../types/api';
+import type { AdminBackup } from './types';
 
 /**
  * 数据备份的默认值与状态文案。

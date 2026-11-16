@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { adminModelCommerceApi } from './api';
-import type { ModelCommerceOverviewView, ModelCommerceProductView } from '../../../types/model';
+import type { ModelCommerceOverviewView, ModelCommerceProductView } from './types';
 
 /**
  * 商品台账的经营数据（近 N 天调用、净收入、毛利、退款与运营待办）。

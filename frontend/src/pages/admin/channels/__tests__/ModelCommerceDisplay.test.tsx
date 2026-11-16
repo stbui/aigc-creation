@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ModelCommerceMetricsCell } from '../ModelCommerceMetricsCell';
 import { ModelCommerceOverview } from '../ModelCommerceOverview';
-import type { ModelCommerceOverviewView, ModelCommerceProductView } from '../../../../types/model';
+import type { ModelCommerceOverviewView, ModelCommerceProductView } from '../types';
 
 const product: ModelCommerceProductView = {
   channelModelId: 'cm-1',

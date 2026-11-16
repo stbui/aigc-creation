@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PERMISSION_LABELS, MODULE_LABELS, ROLE_COL } from './constants';
 import { useAdmin, useConfirm, useToast, useUnsavedGuard, useAdminResource } from './hooks';
-import { adminApi, adminRolesApi } from '../../../lib/api';
+import { adminApi, adminRolesApi } from './api';
 
 import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, Toggle, ToneBadge } from '~/admin-ui/radar';
 import '../../../styles/radar-admin.css';

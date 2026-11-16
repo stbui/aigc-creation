@@ -9,26 +9,23 @@ import {
   EmptyState,
   Separator,
   StatusTag,
-  formatYuan,
-} from '~/admin-ui/radar';
+} from './components';
 import type {
   AdminUserMembership,
   AdminUserMembershipHistoryItem,
-} from '../../../types/admin-users';
-import { formatDateTime } from './utils';
-import '../../../styles/radar-admin.css';
+} from './types';
+import { MEMBERSHIP_STATUS_META } from './constants';
+import { formatDateTime, formatYuan } from './utils';
 
-const MEMBERSHIP_STATUS_META = {
-  active: { label: '生效中', tone: 'success' },
-  scheduled: { label: '待生效', tone: 'brand' },
-  grace: { label: '宽限期', tone: 'warn' },
-  cancelled: { label: '已取消续费', tone: 'warn' },
-  expired: { label: '已过期', tone: 'muted' },
-  refunded: { label: '已退款', tone: 'muted' },
-} as const;
+/** 后端可能返回未登记状态；用守卫收窄，未知值由下方兜底原样显示。 */
+function isKnownMembershipStatus(
+  status: string,
+): status is keyof typeof MEMBERSHIP_STATUS_META {
+  return Object.prototype.hasOwnProperty.call(MEMBERSHIP_STATUS_META, status);
+}
 
 function MembershipStatus({ status }: { status: string | null }) {
-  const meta = status ? MEMBERSHIP_STATUS_META[status as keyof typeof MEMBERSHIP_STATUS_META] : null;
+  const meta = status && isKnownMembershipStatus(status) ? MEMBERSHIP_STATUS_META[status] : null;
   return (
     <StatusTag
       status={status ?? 'unknown'}

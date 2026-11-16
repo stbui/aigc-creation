@@ -15,3 +15,8 @@ export { formatDateTime as fmtTime } from '~/admin-ui/radar';
 
 /** 跨模块深链（用户 / 任务 / 渠道调用记录） */
 export { adminModelCallsHref, adminTaskHref, adminUserDetailHref } from '../../../lib/admin-links';
+
+/** 跨模块上下文链接（回跳带 context / done 标记） */
+export { readAdminActionContext, readAdminDone, withAdminDone } from '../../../lib/admin-context-link';
+
+export { formatDateTime } from '../../../admin-ui/lib/format';

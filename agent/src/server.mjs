@@ -34,7 +34,7 @@ let config;
 try {
   config = loadConfig();
 } catch (error) {
-  console.error(`[codex-web] ${error.message}`);
+  console.error(`[HuojueAgent] ${error.message}`);
   process.exit(1);
 }
 
@@ -60,22 +60,22 @@ server.listen(config.port, config.host, () => {
   const address = server.address();
   const port = typeof address === 'object' && address ? address.port : config.port;
   for (const url of accessUrls(config.host, port)) {
-    console.log(`[codex-web] ${url}`);
+    console.log(`[HuojueAgent] ${url}`);
   }
-  console.log(`[codex-web] workspace: ${config.workspaceRoot}`);
-  console.log(`[codex-web] history: ${storage ? config.dataDir : 'memory only'}`);
-  console.log('[codex-web] sdk: @openai/codex-sdk@0.164.0');
+  console.log(`[HuojueAgent] workspace: ${config.workspaceRoot}`);
+  console.log(`[HuojueAgent] history: ${storage ? config.dataDir : 'memory only'}`);
+  console.log('[HuojueAgent] sdk: @openai/codex-sdk@0.164.0');
   if (
     !config.accessToken &&
     (['0.0.0.0', '::'].includes(config.host) ||
       !['127.0.0.1', 'localhost', '::1'].includes(config.host))
   ) {
     console.warn(
-      '[codex-web] warning: accessible from the network without AGENT_ACCESS_TOKEN',
+      '[HuojueAgent] warning: accessible from the network without AGENT_ACCESS_TOKEN',
     );
   }
   if (config.allowDangerFullAccess) {
-    console.warn('[codex-web] warning: danger-full-access is enabled');
+    console.warn('[HuojueAgent] warning: danger-full-access is enabled');
   }
 });
 
@@ -84,7 +84,7 @@ let shuttingDown = false;
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`\n[codex-web] ${signal}, shutting down`);
+  console.log(`\n[HuojueAgent] ${signal}, shutting down`);
   sessions.abortAll();
   const forceExit = setTimeout(() => process.exit(0), 3_000);
   forceExit.unref();

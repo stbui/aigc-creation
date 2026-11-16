@@ -9,16 +9,15 @@ import {
   Panel,
   RefreshButton,
   StaleError,
-  formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/radar';
+} from './components';
+import { formatDateTime } from './utils';
 import { UserCell } from './UserCell';
 import { marketingApi } from './api';
 import { useAdminList, useAdminUrlFilterSync } from './hooks';
 import { checkinSummaryNote } from './utils';
 import type { CheckinRow } from './constants';
-import type { AdminCheckinListResult } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminCheckinListResult } from './types';
 
 /**
  * 签到记录流水（`?tab=checkins`）。

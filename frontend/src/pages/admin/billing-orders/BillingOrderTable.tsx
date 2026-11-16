@@ -1,15 +1,9 @@
 import { useMemo } from 'react';
-import {
-  formatDateTime,
-  ActionButton,
-  AdminDataTable,
-  StatusTag,
-  type AdminColumn,
-} from '~/admin-ui/radar';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import { formatDateTime } from './utils';
 import { BILLING_MODE_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import { toCredits } from './utils';
-import type { BillingOrderView } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import type { BillingOrderView } from './types';
 
 interface BillingOrderTableProps {
   rows: BillingOrderView[];

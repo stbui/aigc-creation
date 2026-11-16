@@ -10,7 +10,7 @@
  */
 
 import { ApiError, adminChannelModelsApi, adminChannelsApi, adminCapabilityModelsApi, adminModelCommerceApi } from '../../../lib/api';
-import type { AdminChannelView } from '../../../types/model';
+import type { AdminChannelView } from './types';
 
 // 本文件既要用这些接口对象，也要把它们转给目录内其它文件
 export { ApiError, adminChannelModelsApi, adminChannelsApi, adminCapabilityModelsApi, adminModelCommerceApi };

@@ -1,11 +1,7 @@
 /**
  * 写真模板后台管理的本地常量与表单草稿。
  */
-import type {
-  AdminTemplateCategory,
-  AdminTemplateGroup,
-  AdminTemplateItem,
-} from '../../../types/api';
+import type { AdminTemplateCategory, AdminTemplateGroup, AdminTemplateItem } from './types';
 
 export interface CategoryDraft {
   slug: string;

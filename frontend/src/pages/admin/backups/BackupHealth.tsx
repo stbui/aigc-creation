@@ -1,8 +1,7 @@
 import { ShieldAlert } from 'lucide-react';
-import { formatDateTime, Notice, StatCard } from '~/admin-ui/radar';
-import { formatRelative } from './utils';
-import type { AdminBackupStats } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import { Notice, StatCard } from './components';
+import { formatDateTime, formatRelative } from './utils';
+import type { AdminBackupStats } from './types';
 
 /**
  * 备份健康度：过期、未验证、失败三类问题直接对应「出事时能不能用」。

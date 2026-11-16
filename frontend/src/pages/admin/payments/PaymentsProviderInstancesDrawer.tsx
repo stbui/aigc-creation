@@ -8,12 +8,12 @@ import {
   IconButton,
   Notice,
   StatusTag,
-} from '~/admin-ui/radar';
-import { moveOrderItem, orderChanged, type OrderItem } from '~/lib/channelOrder';
+} from './components';
+import { moveOrderItem, orderChanged, type OrderItem } from './utils';
 import type {
   AdminPaymentProviderInstanceView,
   AdminPaymentProviderView,
-} from '../../../types/payment';
+} from './types';
 import { adminPaymentProvidersApi } from './api';
 import {
   useDiscardConfirm,
@@ -33,7 +33,6 @@ import {
   instanceState,
   providerWithInstances,
 } from './utils';
-import '../../../styles/radar-admin.css';
 
 function sortedInstances(
   instances: AdminPaymentProviderInstanceView[],

@@ -7,6 +7,9 @@
 
 import { formatDate, formatHm, formatMonthDayTime } from '../../../admin-ui/lib/format';
 
+export { taskErrorLabel } from '../../../lib/admin-error-codes';
+export { adminOrderDetailHref, adminTaskHref } from '../../../lib/admin-links';
+
 /** 队列最多列几条：再多就不叫队列，剩下的去任务页筛 */
 export const QUEUE_LIMIT = 6;
 

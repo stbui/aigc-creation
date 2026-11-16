@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ActionButton, ConfirmDialog, SkeletonBody } from '~/admin-ui/radar';
+import { ActionButton, ConfirmDialog, SkeletonBody } from './components';
 import { adminAssetsApi } from './api';
 import { BACKEND_LABEL, type AssetDeleteTarget } from './constants';
 import { assetLabel, fmtBytes } from './utils';
-import '../../../styles/radar-admin.css';
 
 interface Impact {
   sizeBytes: number;

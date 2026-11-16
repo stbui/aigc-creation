@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
-import {
-  AdminPage,
-  Panel,
-  SegmentedTabs,
-  StaleError,
-  type AppliedFilter,
-} from '~/admin-ui/radar';
+import { AdminPage, Panel, SegmentedTabs, StaleError, type AppliedFilter } from './components';
 import { adminAssetsApi } from './api';
-import { useAdmin, useAdminList, useAdminUrlFilterSync, useSelectionPrune, useToast } from './hooks';
+import {
+  useAdmin,
+  useAdminList,
+  useAdminUrlFilterSync,
+  useSelectionPrune,
+  useToast,
+} from './hooks';
 import {
   BACKEND_LABEL,
   GRID_PAGE_SIZE,
@@ -24,7 +23,7 @@ import { AssetPreview } from './AssetPreview';
 import { AssetDeleteConfirm } from './AssetDeleteConfirm';
 import { AssetViewToolbar } from './AssetViewToolbar';
 import { ProjectsPanel } from './ProjectsPanel';
-import type { AdminAssetListResult, AssetStatus } from '../../../types/api';
+import type { AdminAssetListResult, AssetStatus } from './types';
 
 /**
  * 素材管理 (B-22~B-26)。

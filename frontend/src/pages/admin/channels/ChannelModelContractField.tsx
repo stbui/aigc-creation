@@ -6,9 +6,8 @@ import {
   FieldLabel,
   Panel,
   TextAreaField,
-} from '~/admin-ui/radar';
+} from './components';
 import type { ModelDraft } from './constants';
-import '../../../styles/radar-admin.css';
 
 export function ChannelModelContractField({
   control,

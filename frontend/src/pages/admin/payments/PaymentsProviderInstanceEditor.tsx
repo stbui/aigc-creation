@@ -11,14 +11,14 @@ import {
   SwitchField,
   TextAreaField,
   TextField,
-} from '~/admin-ui/radar';
+} from './components';
 import type {
   AdminPaymentProviderInstanceView,
   AdminPaymentProviderView,
   PaymentConfigField,
   PaymentProviderConfigUpdate,
   VisiblePaymentMethod,
-} from '../../../types/payment';
+} from './types';
 import { PAYMENT_METHOD_LABELS, PAYMENT_PROVIDER_STATE_META } from './constants';
 import {
   allowedPaymentMethods,
@@ -29,7 +29,6 @@ import {
   paymentWarningText,
   togglePaymentMethod,
 } from './utils';
-import '../../../styles/radar-admin.css';
 
 /** 实例编辑草稿。金额在 UI 中使用「元」，提交时再转回整数分。 */
 export interface InstanceDraft {

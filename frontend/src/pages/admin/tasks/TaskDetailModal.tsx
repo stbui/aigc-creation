@@ -2,14 +2,13 @@ import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Copy, ExternalLink, ImageOff } from 'lucide-react';
 import {
-  formatDateTime,
   ActionButton,
   AdminModal,
   Descriptions,
   DetailSection,
   Notice,
   StatusTag,
-} from '~/admin-ui/radar';
+} from './components';
 import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from './api';
 import { useToast } from './hooks';
 import { TaskFullChain } from './TaskFullChain';
@@ -23,11 +22,11 @@ import {
   adminTasksHref,
   adminUserDetailHref,
   fmtBytes,
+  formatDateTime,
   formatDuration,
   taskErrorLabel,
 } from './utils';
-import type { AdminTask, AdminTaskDetail } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminTask, AdminTaskDetail } from './types';
 
 type Row = AdminTask;
 

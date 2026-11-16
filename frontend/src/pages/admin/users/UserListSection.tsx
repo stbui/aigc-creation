@@ -13,15 +13,12 @@ import {
   StaleError,
   StatusTag,
   type AdminColumn,
-} from '~/admin-ui/radar';
-import { cn } from '~/admin-ui/lib/cn';
-import { BATCH_DELETE_LIMIT } from '~/components/admin/BatchDeleteUsersDialog';
+  BATCH_DELETE_LIMIT,
+} from './components';
 import { BATCH_STATUS_LIMIT, PAGE_SIZE_OPTIONS, SORT_OPTIONS } from './constants';
-import { formatDateTime } from './utils';
+import { cn, formatDateTime } from './utils';
 import { UserCard, type UserCardAction } from './UserCard';
-import type { AdminUserListResult } from '../../../types/api';
-import type { AdminUserRow } from './types';
-import '../../../styles/radar-admin.css';
+import type { AdminUserListResult, AdminUserRow } from './types';
 
 export type UserListView = 'cards' | 'table';
 
@@ -218,11 +215,9 @@ export function UserListSection({
               )}
             </div>
             {/*
-             * 排序 / 导出 / 视图同属「列表怎么呈现」，原来排序导出独占一行、
-             * 视图再占一行。合并到这一行后，左「选择本页」右「排序·导出·视图」，
-             * 少一层工具栏，首屏能多露出一行卡片。视图切换复用素材页同一个
-             * `SegmentedGroup`：自带图标、选中态与读屏语义，不再手写两个
-             * `aria-pressed` 按钮和「视图」文字标签。
+             * 排序 / 导出 / 视图同属「列表怎么呈现」，合并到这一行省一层工具栏，
+             * 首屏能多露出一行卡片。视图切换复用素材页的 `SegmentedGroup`，
+             * 自带图标、选中态与读屏语义。
              */}
             <div className="flex flex-wrap items-center justify-end gap-1.5">
               <span className="text-xs text-muted-foreground">排序</span>
@@ -246,7 +241,7 @@ export function UserListSection({
               <SegmentedGroup
                 ariaLabel="切换视图"
                 value={view}
-                onChange={(next) => onViewChange(next as UserListView)}
+                onChange={(next) => onViewChange(next === 'table' ? 'table' : 'cards')}
                 options={[
                   {
                     value: 'cards',

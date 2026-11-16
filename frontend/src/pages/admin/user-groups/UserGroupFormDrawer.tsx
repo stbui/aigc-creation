@@ -11,10 +11,9 @@ import {
   SwitchField,
   TextAreaField,
   TextField,
-} from '~/admin-ui/radar';
+} from './components';
 import { BADGE_STYLE_OPTIONS, type GroupDraft, type OverrideDraft } from './constants';
-import type { ChannelOrderItemView, UserGroupView } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import type { ChannelOrderItemView, UserGroupView } from './types';
 
 interface UserGroupFormDrawerProps {
   open: boolean;

@@ -1,9 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AdminTaskDetail } from '../../../../types/api';
-import type { AdminTaskRouteAttempt } from '../../../../types/task-route';
-import type { BillingOrderListResult, BillingOrderView } from '../../../../types/model';
+import type {
+  AdminTaskDetail,
+  AdminTaskRouteAttempt,
+  BillingOrderListResult,
+  BillingOrderView,
+} from '../types';
 
 const { billingListMock, apiLogListMock } = vi.hoisted(() => ({
   billingListMock: vi.fn(),

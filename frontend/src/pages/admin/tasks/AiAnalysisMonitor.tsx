@@ -15,17 +15,19 @@ import {
   StaleError,
   StatCards,
   StatusTag,
-  formatDateTime,
-  formatDuration,
   type AdminColumn,
   type AppliedFilter,
   type TagTone,
-} from '~/admin-ui/radar';
-import type { ApiLogListResult, ApiLogView } from '../../../types/model';
+} from './components';
+import type { ApiLogListResult, ApiLogView } from './types';
 import { adminApiLogsApi } from './api';
 import { useAdminList, useAdminUrlFilterSync } from './hooks';
-import { adminModelCallsHref, adminUserDetailHref } from './utils';
-import '../../../styles/radar-admin.css';
+import {
+  adminModelCallsHref,
+  adminUserDetailHref,
+  formatDateTime,
+  formatDuration,
+} from './utils';
 
 const SOURCE = 'tool';
 const OPERATION = 'image_to_prompt';

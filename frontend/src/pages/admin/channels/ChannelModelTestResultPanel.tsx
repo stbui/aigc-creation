@@ -1,6 +1,5 @@
-import { Descriptions, Panel, StatusTag } from '~/admin-ui/radar';
-import type { ProtocolTestResultView } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import { Descriptions, Panel, StatusTag } from './components';
+import type { ProtocolTestResultView } from './types';
 
 export function ChannelModelTestResultPanel({ testResult }: { testResult: ProtocolTestResultView }) {
   return (

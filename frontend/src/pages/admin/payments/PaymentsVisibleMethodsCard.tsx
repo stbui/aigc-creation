@@ -13,18 +13,17 @@ import {
   Notice,
   SelectField,
   StatusTag,
-} from '~/admin-ui/radar';
+} from './components';
 import type {
   AdminPaymentProviderView,
   AdminPaymentSettings,
   PaymentSource,
   VisiblePaymentMethod,
-} from '../../../types/payment';
+} from './types';
 import { adminPaymentProvidersApi } from './api';
 import { PAYMENT_METHOD_LABELS } from './constants';
 import { useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { sourceAvailability, sourceAvailableInstances } from './utils';
-import '../../../styles/radar-admin.css';
 
 const SOURCE_LABELS: Record<PaymentSource, string> = {
   unset: '尚未选择来源',

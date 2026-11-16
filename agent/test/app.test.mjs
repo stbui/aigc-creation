@@ -211,7 +211,7 @@ function makeRecoveringThread(options) {
 }
 
 async function startServer(t, { config, codex = makeFakeCodex(), root } = {}) {
-  const testRoot = root || mkdtempSync(path.join(tmpdir(), 'codex-web-test-'));
+  const testRoot = root || mkdtempSync(path.join(tmpdir(), 'huojue-agent-test-'));
   mkdirSync(path.join(testRoot, 'project'), { recursive: true });
   const serverConfig = config || makeConfig(testRoot);
   const { server, sessions } = createAgentServer({ config: serverConfig, codex });
@@ -292,7 +292,7 @@ test('serves the UI and an unauthenticated health check', async (t) => {
   const page = await fetch(`${baseUrl}/`);
   assert.equal(page.status, 200);
   assert.match(page.headers.get('content-type'), /text\/html/);
-  assert.match(await page.text(), /Codex Web/);
+  assert.match(await page.text(), /货觉AI 智能体/);
   assert.match(page.headers.get('content-security-policy'), /default-src 'self'/);
 
   const health = await fetch(`${baseUrl}/api/health`);
@@ -314,7 +314,7 @@ test('creates a session, streams Codex events, and stores the timeline', async (
 
   assert.equal(response.status, 201);
   assert.ok(payload.session.id);
-  assert.equal(payload.session.codexThreadId, null);
+  assert.equal(payload.session.agentThreadId, null);
   assert.equal(payload.session.settings.workingDirectory, 'project');
   assert.equal(codex.threads.length, 1);
   assert.equal(codex.threads[0].options.workingDirectory, path.join(config.workspaceRoot, 'project'));
@@ -344,7 +344,7 @@ test('creates a session, streams Codex events, and stores the timeline', async (
   );
   const done = messages.find((message) => message.type === 'done');
   assert.ok(done);
-  assert.equal(done.session.codexThreadId, 'thread-fake-123456');
+  assert.equal(done.session.agentThreadId, 'thread-fake-123456');
   assert.equal(done.session.status, 'idle');
   assert.equal(done.session.usage.output_tokens, 5);
 
@@ -485,7 +485,7 @@ test('danger-full-access is denied unless explicitly enabled', async (t) => {
 });
 
 test('protects APIs with an optional bearer token', async (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-auth-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-auth-'));
   const config = makeConfig(root, { accessToken: 'test-secret' });
   const serverCtx = await startServer(t, { config, root });
 
@@ -516,13 +516,13 @@ test('resumes an existing Codex thread', async (t) => {
   });
   assert.equal(response.status, 201);
   const payload = await response.json();
-  assert.equal(payload.session.codexThreadId, 'thread-existing-123');
+  assert.equal(payload.session.agentThreadId, 'thread-existing-123');
   assert.equal(codex.resumed.length, 1);
   assert.equal(codex.resumed[0].id, 'thread-existing-123');
 });
 
 test('turns failures into an error event and a persisted notice', async (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-error-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-error-'));
   const config = makeConfig(root);
   const codex = {
     startThread(options) {
@@ -552,7 +552,7 @@ test('turns failures into an error event and a persisted notice', async (t) => {
 });
 
 test('does not surface benign Codex configuration diagnostics as errors', async (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-diagnostics-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-diagnostics-'));
   const config = makeConfig(root);
   const codex = {
     startThread() {
@@ -621,7 +621,7 @@ test('does not surface benign Codex configuration diagnostics as errors', async 
 });
 
 test('aborts a stalled turn with a readable idle-timeout error', { timeout: 5_000 }, async (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-idle-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-idle-'));
   const config = makeConfig(root, { turnIdleTimeoutMs: 120 });
   const codex = {
     startThread(options) {
@@ -661,7 +661,7 @@ test('aborts a stalled turn with a readable idle-timeout error', { timeout: 5_00
 });
 
 test('resets the idle timeout whenever events keep arriving', { timeout: 5_000 }, async (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-idle-active-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-idle-active-'));
   const config = makeConfig(root, { turnIdleTimeoutMs: 400 });
   const codex = {
     startThread(options) {
@@ -695,7 +695,7 @@ test('resets the idle timeout whenever events keep arriving', { timeout: 5_000 }
 });
 
 test('treats a top-level error event as a failed turn', { timeout: 5_000 }, async (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-stream-error-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-stream-error-'));
   const config = makeConfig(root);
   const codex = {
     startThread(options) {
@@ -729,7 +729,7 @@ test('treats a top-level error event as a failed turn', { timeout: 5_000 }, asyn
 });
 
 test('fails a turn when the event stream ends without turn.completed', async (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-stream-truncated-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-stream-truncated-'));
   const config = makeConfig(root);
   const codex = {
     startThread(options) {
@@ -766,7 +766,7 @@ test('fails a turn when the event stream ends without turn.completed', async (t)
 });
 
 test('turns a turn.failed event into a persisted failure', async (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-turn-failed-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-turn-failed-'));
   const config = makeConfig(root);
   const codex = {
     startThread(options) {
@@ -803,7 +803,7 @@ test(
   'keeps the turn successful when a recoverable error is followed by turn.completed',
   { timeout: 5_000 },
   async (t) => {
-    const root = mkdtempSync(path.join(tmpdir(), 'codex-web-stream-recover-'));
+    const root = mkdtempSync(path.join(tmpdir(), 'huojue-agent-stream-recover-'));
     const config = makeConfig(root);
     const codex = {
       startThread(options) {

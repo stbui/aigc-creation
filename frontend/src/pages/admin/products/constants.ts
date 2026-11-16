@@ -5,7 +5,7 @@
  * 转换只在 `toDraft`（回填）与 `buildProductPayload`（提交）两处发生。
  */
 
-import type { AdminProduct } from '../../../types/api';
+import type { AdminProduct } from './types';
 
 export type ProductCurrency = 'CNY' | 'USD';
 export type ProductSaleStrategy = 'unlimited' | 'periodic' | 'inventory' | 'timed';

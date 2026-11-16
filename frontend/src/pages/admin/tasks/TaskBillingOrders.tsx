@@ -1,18 +1,18 @@
 import { AlertTriangle, ExternalLink, ShieldCheck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { buildAdminContextLink } from '../../../lib/admin-context-link';
+import { buildAdminContextLink } from './utils';
 import {
   Notice,
   StaleError,
   StatusTag,
   type TagTone,
-} from '~/admin-ui/radar';
+} from './components';
 import {
   REFUND_REASON_LABELS,
   STATUS_LABELS,
   STATUS_TONES,
-} from '../billing-orders/constants';
-import type { BillingOrderListResult, BillingOrderView } from '../../../types/model';
+} from '../billing-orders/shared';
+import type { BillingOrderListResult, BillingOrderView } from './types';
 import { adminBillingOrdersApi } from './api';
 import { useAdminResource } from './hooks';
 import {
@@ -20,7 +20,6 @@ import {
   formatDateTime,
   toCredits,
 } from './utils';
-import '../../../styles/radar-admin.css';
 
 type ReviewMeta = {
   label: string;

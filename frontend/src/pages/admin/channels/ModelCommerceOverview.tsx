@@ -1,8 +1,6 @@
-import { Button, StatCards, StaleError, type StatCardItem } from '~/admin-ui/radar';
-import { toCredits } from '../../../lib/microcredits';
-import { formatRate } from './utils';
-import type { ModelCommerceOverviewView } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import { Button, StatCards, StaleError, type StatCardItem } from './components';
+import { formatRate, toCredits } from './utils';
+import type { ModelCommerceOverviewView } from './types';
 
 const counts = new Intl.NumberFormat('zh-CN');
 

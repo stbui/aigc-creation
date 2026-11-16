@@ -5,13 +5,12 @@ import {
   RowMenu,
   StatusTag,
   ToneBadge,
-  formatDate,
   type AdminColumn,
-} from '~/admin-ui/radar';
+} from './components';
+import { formatDate } from './utils';
 import { EFFECTIVE_META, TYPE_LABEL, type TagTone } from './constants';
 import { inWindow, payloadSummary } from './utils';
-import type { AdminCampaign } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminCampaign } from './types';
 
 interface CampaignTableProps {
   rows: AdminCampaign[];

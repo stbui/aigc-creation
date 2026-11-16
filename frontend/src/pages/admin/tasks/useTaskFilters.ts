@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { AppliedFilter, SelectFieldOption } from '~/admin-ui/radar';
+import type { AppliedFilter, SelectFieldOption } from './components';
 import { adminTasksApi } from './api';
 import { STATUS_OPTIONS } from './constants';
 import { useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
-import type { AdminTaskListResult } from '../../../types/api';
+import type { AdminTaskListResult } from './types';
 
 const STATUS_VALUES = new Set(STATUS_OPTIONS.map((option) => option.value));
 

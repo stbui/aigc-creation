@@ -6,7 +6,7 @@
  */
 
 import { parseCredits, toCreditsInput } from '../../../lib/microcredits';
-import type { UserGroupView } from '../../../types/model';
+import type { UserGroupView } from './types';
 import type { GroupDraft } from './constants';
 
 export { parseCredits, toCreditsInput };

@@ -6,18 +6,12 @@ import {
   Meter,
   RowMenu,
   StatusTag,
-  formatDate,
   type AdminColumn,
-} from '~/admin-ui/radar';
-import {
-  EFFECTIVE_META,
-  SCOPE_LABEL,
-  TYPE_LABEL,
-  type TagTone,
-} from './constants';
+} from './components';
+import { formatDate } from './utils';
+import { EFFECTIVE_META, SCOPE_LABEL, TYPE_LABEL, type TagTone } from './constants';
 import { faceValue, yuan } from './utils';
-import type { AdminCoupon } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminCoupon } from './types';
 
 /**
  * 券列表。

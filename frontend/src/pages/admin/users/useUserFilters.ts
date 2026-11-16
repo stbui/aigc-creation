@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { type AppliedFilter } from '~/admin-ui/radar';
+import { type AppliedFilter } from './components';
 import { adminUsersApi } from './api';
 import {
   DEFAULT_SORT,
@@ -10,9 +10,9 @@ import {
   STATUS_OPTIONS,
 } from './constants';
 import { useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
-import type { AdminUserListResult } from '../../../types/api';
 import type {
   AdminUserListQuery,
+  AdminUserListResult,
   AdminUserMembershipFilter,
   AdminUserRole,
   AdminUserSegment,
@@ -88,7 +88,7 @@ function dayEnd(value: string): string | undefined {
  * 输入草稿和已生效查询分开：输入框只在「查询」或回车时提交，避免每键请求。
  * URL 只同步筛选与排序，不同步页码 —— 分享链接不应该把对方带到第 7 页。
  */
-export function useAdminUserFilters() {
+export function useUserFilters() {
   const toast = useToast();
   const [searchParams] = useSearchParams();
 

@@ -21,6 +21,9 @@ export {
   adminUserDetailHref,
 } from '../../../lib/admin-links';
 
+/* 跨模块上下文链接 helper */
+export { buildAdminContextLink, readAdminDone } from '../../../lib/admin-context-link';
+
 /** 任务短 id: cuid 尾部 8 位。后台表格宽度有限, 全 id 会把列挤到换行 */
 export function shortId(id: string): string {
   return id.slice(-8);

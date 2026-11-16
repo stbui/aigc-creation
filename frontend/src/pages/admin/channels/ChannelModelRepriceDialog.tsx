@@ -9,7 +9,7 @@ import {
   NumberField,
   SelectField,
   TextField,
-} from '~/admin-ui/radar';
+} from './components';
 import { useToast } from './hooks';
 import {
   buildRepriceRows,
@@ -23,8 +23,7 @@ import {
   saleInputValue,
   type RepriceRow,
 } from './utils';
-import type { AdminChannelModelView, ChannelModelRepriceInput } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import type { AdminChannelModelView, ChannelModelRepriceInput } from './types';
 
 /**
  * 渠道模型「统一调价」弹窗。

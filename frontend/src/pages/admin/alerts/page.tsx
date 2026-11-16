@@ -9,9 +9,8 @@ import {
   SeverityFilter,
 } from './constants';
 import { readSeverity } from './utils';
-import { useAdminAlerts, useAdminUrlFilterSync } from './hooks';
-import { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';
-import { ALERT_SEVERITY_META, alertTime } from '../../../components/admin/AlertCenter';
+import { useAdminAlerts, useAdminUrlFilterSync, useAdminWorkbench } from './hooks';
+import { ALERT_SEVERITY_META, alertTime } from './components';
 import type { AdminAlertSeverity } from '../../../types/api';
 
 /**

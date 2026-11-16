@@ -1,13 +1,19 @@
 import { useRef, useState } from 'react';
 import { useAdmin, useToast } from './hooks';
 import { adminUsersApi } from './api';
-import { BATCH_DELETE_CONFIRM } from '~/components/admin/BatchDeleteUsersDialog';
+import { BATCH_DELETE_CONFIRM } from './components';
 import type { UserCardAction } from './UserCard';
-import type { AdminUserRole, AdminUserRow, DeleteUserTarget } from './types';
-import type { AdminPasswordReset } from '../../../types/api';
+import type {
+  AdminPasswordReset,
+  AdminUserRole,
+  AdminUserRow,
+  DeleteUserTarget,
+} from './types';
 
 interface Options {
   reload: () => void;
+  /** 任何写操作成功后触发：刷新列表的同时让打开的详情抽屉重取快照 */
+  onChanged: () => void;
   onDeleted: () => void;
   /** 批量注销成功后：清空勾选并关掉可能正打开的详情抽屉 */
   onBatchDeleted: () => void;
@@ -19,7 +25,7 @@ interface Options {
  * 所有写请求共用一把互斥锁，防止双击或快捷键在第一次请求完成前重复提交。
  * 确认框目标单独保存，关闭时不会误清空其它业务状态。
  */
-export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Options) {
+export function useUserActions({ reload, onChanged, onDeleted, onBatchDeleted }: Options) {
   const toast = useToast();
   const { can, me } = useAdmin();
   const [statusTarget, setStatusTarget] = useState<AdminUserRow | null>(null);
@@ -34,6 +40,12 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
   );
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+
+  /** 写成功后刷新列表，并让打开的详情抽屉重取快照（状态/角色/密码可能已变）。 */
+  const refresh = () => {
+    reload();
+    onChanged();
+  };
 
   const run = async (task: () => Promise<void>, fallbackMessage: string) => {
     if (busyRef.current) return;
@@ -54,7 +66,7 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
     await run(async () => {
       await adminUsersApi.changeStatus(statusTarget.id, next);
       setStatusTarget(null);
-      reload();
+      refresh();
       toast.success(next === 'disabled' ? '账号已禁用，登录凭证立即失效' : '账号已启用');
     }, '操作失败');
   };
@@ -64,7 +76,7 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
     await run(async () => {
       await adminUsersApi.changeRole(roleTarget.id, next);
       setRoleTarget(null);
-      reload();
+      refresh();
       toast.success('角色已变更');
     }, '操作失败');
   };
@@ -74,7 +86,7 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
     await run(async () => {
       await adminUsersApi.logoutAll(logoutTarget.id);
       setLogoutTarget(null);
-      reload();
+      refresh();
       toast.success('已强制下线，所有旧登录凭证立即失效');
     }, '强制下线失败');
   };
@@ -86,7 +98,7 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
   ) => {
     await run(async () => {
       const summary = await adminUsersApi.batch(ids, action);
-      reload();
+      refresh();
       if (summary.failed > 0) {
         const first = summary.results.find((item) => !item.ok)?.message;
         toast.error(
@@ -106,7 +118,7 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
       await adminUsersApi.remove(deleteTarget.id, false);
       setDeleteTarget(null);
       onDeleted();
-      reload();
+      refresh();
       toast.success('用户已注销，资金记录已匿名保留');
     }, '删除失败');
   };
@@ -127,7 +139,7 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
       const summary = await adminUsersApi.batch(ids, 'delete', BATCH_DELETE_CONFIRM);
       setBatchDeleteTarget(null);
       onBatchDeleted();
-      reload();
+      refresh();
       if (summary.failed > 0) {
         const first = summary.results.find((item) => !item.ok)?.message;
         toast.error(
@@ -145,7 +157,7 @@ export function useAdminUserActions({ reload, onDeleted, onBatchDeleted }: Optio
     await run(async () => {
       const result = await adminUsersApi.resetPassword(target.id);
       setTempPassword(result);
-      reload();
+      refresh();
     }, '重置密码失败');
   };
 

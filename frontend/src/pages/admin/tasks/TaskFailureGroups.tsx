@@ -1,7 +1,6 @@
 import { AlertTriangle, X } from 'lucide-react';
-import { Button, Toggle } from '~/admin-ui/radar';
+import { Button, Toggle } from './components';
 import { cn, taskErrorLabel } from './utils';
-import '../../../styles/radar-admin.css';
 
 /**
  * 近 24 小时失败任务的错误码聚合。

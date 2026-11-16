@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { adminChannelsApi } from './api';
-import { downloadJson } from '../../../lib/download';
+import {
+  buildDefaultModelPayload,
+  downloadJson,
+  normalizeChannelHeaders,
+  toChannelDraft,
+  validateChannelHeaders,
+} from './utils';
 import {
   useActionLock,
   useAdmin,
@@ -16,14 +22,8 @@ import {
   useUnsavedGuard,
 } from './hooks';
 import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants';
-import {
-  buildDefaultModelPayload,
-  normalizeChannelHeaders,
-  toChannelDraft,
-  validateChannelHeaders,
-} from './utils';
 import { useProductConsumption } from './useProductConsumption';
-import type { AdminChannelView, SystemChannelExportView } from '../../../types/model';
+import type { AdminChannelView, SystemChannelExportView } from './types';
 
 /**
  * 渠道工作台的状态与写操作。

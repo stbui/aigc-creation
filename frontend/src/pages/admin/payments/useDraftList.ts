@@ -1,9 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  useAdminList,
-  useAdminUrlFilterSync,
-  type AppliedFilter,
-} from '~/admin-ui/radar';
+import type { AppliedFilter } from './components';
+import { useAdminList, useAdminUrlFilterSync } from './hooks';
 
 /**
  * 「草稿 → 应用」两段式列表的共用内核。

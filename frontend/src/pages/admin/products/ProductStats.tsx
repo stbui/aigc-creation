@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
-import { StatCard } from '~/admin-ui/radar';
-import type { AdminProduct } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import { StatCard } from './components';
+import type { AdminProduct } from './types';
 
 /** 商品统计条：总数 / 在售 / 已下架 / 促销中 / 有历史订单 */
 export function ProductStats({ rows }: { rows: AdminProduct[] }) {

@@ -1,7 +1,6 @@
-import { ConfirmDialog } from '~/admin-ui/radar';
+import { ConfirmDialog } from './components';
 import { yuan } from './utils';
-import type { AdminOrderRow } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminOrderRow } from './types';
 
 /** 删除确认：仅允许从未产生业务记录的待支付/已取消订单。 */
 export function OrderDeleteConfirm({

@@ -1,7 +1,6 @@
-import { ConfirmDialog } from '~/admin-ui/radar';
+import { ConfirmDialog } from './components';
 import { centsToYuan } from './utils';
-import type { AdminMembershipPlan } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminMembershipPlan } from './types';
 
 interface PlanStatusConfirmProps {
   target: AdminMembershipPlan | null;

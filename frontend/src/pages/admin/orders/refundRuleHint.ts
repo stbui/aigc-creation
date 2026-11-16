@@ -1,4 +1,4 @@
-import { ApiError } from '../../../lib/api';
+import { ApiError } from './api';
 
 /**
  * 退款被拒时的错误码 → 运营该做什么。

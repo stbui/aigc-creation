@@ -1,10 +1,4 @@
-import {
-  FormDrawer,
-  FormField,
-  SelectField,
-  TextAreaField,
-  TextField,
-} from '~/admin-ui/radar';
+import { FormDrawer, FormField, SelectField, TextAreaField, TextField } from './components';
 import {
   CURRENCY_OPTIONS,
   GRANT_TYPE_OPTIONS,
@@ -15,8 +9,7 @@ import {
   type ProductSaleStrategy,
 } from './constants';
 import { currencySymbol } from './utils';
-import type { AdminProduct } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminProduct } from './types';
 
 interface ProductFormDrawerProps {
   open: boolean;

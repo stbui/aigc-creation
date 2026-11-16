@@ -1,8 +1,7 @@
-import { FormField, NumberField, Panel, RangeField } from '~/admin-ui/radar';
+import { FormField, NumberField, Panel, RangeField } from './components';
 import { POSITION_LABELS, POSITION_OPTIONS } from './constants';
 import { ChoiceButton } from './ChoiceButton';
-import type { AigcLabelSpec } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AigcLabelSpec } from './types';
 
 /**
  * 位置与缩放。

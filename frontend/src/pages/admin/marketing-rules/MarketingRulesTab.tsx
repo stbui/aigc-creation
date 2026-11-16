@@ -12,10 +12,9 @@ import {
   SelectField,
   StaleError,
   SwitchField,
-} from '~/admin-ui/radar';
+} from './components';
 import type { RuleDrafts } from './hooks';
 import { checkinRuleError } from './utils';
-import '../../../styles/radar-admin.css';
 
 /**
  * 单条全局规则的保存条。

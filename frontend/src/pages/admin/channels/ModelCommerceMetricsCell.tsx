@@ -1,7 +1,5 @@
-import { cn } from '../../../admin-ui/lib/cn';
-import { toCredits } from '../../../lib/microcredits';
-import { formatRate } from './utils';
-import type { ModelCommerceProductView } from '../../../types/model';
+import { cn, formatRate, toCredits } from './utils';
+import type { ModelCommerceProductView } from './types';
 
 const counts = new Intl.NumberFormat('zh-CN');
 

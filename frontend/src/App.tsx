@@ -109,10 +109,10 @@ const AccountPage = lazyRoute('/account', () => import('./pages/account'), 'Acco
 const TicketsPage = lazyRoute('/tickets', () => import('./pages/tickets'), 'TicketsPage');
 
 // 后台管理端: 独立外壳与鉴权, 不走 C 端 Shell (侧栏/顶导/促销条均为 C 端语义)
-const AdminShell = lazyRoute(
+const AdminLayout = lazyRoute(
   ['/admin', '/admin/*'],
   () => import('./pages/admin/AdminDashboardPage'),
-  'AdminShell',
+  'AdminLayout',
 );
 
 /** 懒加载页面的统一兜底：保留页面节奏的骨架，而不是一整块空白转圈。 */
@@ -397,7 +397,7 @@ function Shell() {
             />
             {/* 2026-10-20: 此前是 <Navigate to="/workbench" replace />, 未知 URL 被静默
                 弹回工作台 —— 用户输错路径时分不清是「页面不存在」还是「页面坏了」。
-                这与 AdminShell.tsx 里「不用 Navigate 静默弹回」的决策原则相悖, 现改为显式 404。
+                这与 layout.tsx 里「不用 Navigate 静默弹回」的决策原则相悖, 现改为显式 404。
                 已核对 tests/ 与 e2e/: 无任何用例依赖 catch-all 跳工作台。 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
@@ -446,7 +446,7 @@ export default function App() {
                 <Route path="/mobile-upload" element={<MobileUploadPage />} />
                 {/* ⚠ /admin/* 必须注册在下面那条 catch-all 之前,
                     否则会被 `path="*"` 吞进 C 端 Shell */}
-                <Route path="/admin/*" element={<AdminShell />} />
+                <Route path="/admin/*" element={<AdminLayout />} />
                 <Route path="*" element={<Shell />} />
               </Routes>
             </Suspense>

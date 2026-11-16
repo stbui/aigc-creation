@@ -1,8 +1,7 @@
-import { StaleError, StatusTag } from '~/admin-ui/radar';
-import type { AdminCapabilityControl } from '../../../types/api';
+import { StaleError, StatusTag } from './components';
+import type { AdminCapabilityControl } from './types';
 import { runtimeStatusLabel } from './constants';
 import { runtimeTone } from './utils';
-import '../../../styles/radar-admin.css';
 
 /** 左侧能力清单；筛选由页面完成，这里只负责选择与运行结论。 */
 export function CapabilityList({

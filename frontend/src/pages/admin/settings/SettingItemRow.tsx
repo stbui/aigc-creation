@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Image as ImageIcon } from 'lucide-react';
 import {
-  formatDateTime,
   ActionButton,
   CheckboxField,
   FilePicker,
@@ -12,18 +11,11 @@ import {
   SwitchField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/radar';
-import type { AdminSettingValue } from '../../../types/api';
-import type { SettingItem } from './constants';
-import { displayValue } from './utils';
-import { adminSettingsApi } from '../../../lib/api';
-import '../../../styles/radar-admin.css';
-
-const IMAGE_FORMAT_OPTIONS = [
-  { value: 'jpg', label: 'JPG' },
-  { value: 'png', label: 'PNG' },
-  { value: 'webp', label: 'WebP' },
-] as const;
+} from './components';
+import { IMAGE_FORMAT_OPTIONS } from './constants';
+import { adminSettingsApi } from './api';
+import type { AdminSettingValue, SettingItem } from './types';
+import { displayValue, formatDateTime } from './utils';
 
 function ImageFormatsControl({
   item,

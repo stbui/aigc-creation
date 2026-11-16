@@ -1,6 +1,5 @@
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/radar';
-import type { ProviderCatalogEntry } from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import type { ProviderCatalogEntry } from './types';
 
 /**
  * 服务商目录清单。

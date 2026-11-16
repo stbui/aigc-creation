@@ -5,7 +5,7 @@
  * `BILLING_STATUSES`；这里只做展示映射，不新增或改变状态语义。
  */
 
-import { STATUS_META } from '../../../components/admin/statusMeta';
+import { STATUS_META } from './components';
 
 export const STATUS_LABELS: Record<string, string> = {
   reserved: '已预留',

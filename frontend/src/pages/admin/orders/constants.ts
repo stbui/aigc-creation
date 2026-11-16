@@ -1,4 +1,4 @@
-import type { TagTone } from '../../../components/admin/statusMeta';
+import type { TagTone } from './components';
 
 /**
  * 订单管理的状态、渠道与退款选项表。

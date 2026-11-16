@@ -1,5 +1,4 @@
 import { Search } from 'lucide-react';
-import '../../../styles/radar-admin.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -15,14 +14,10 @@ import {
   ListError,
   Panel,
   SelectField,
-  useAdminResource,
-  useAdminUrlFilterSync,
-} from '~/admin-ui/radar';
-import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
-import { useToast } from '../../../admin-ui/providers/ToastProvider';
-import { useAdmin } from '../../../context/AdminContext';
-import { adminCapabilitiesApi, adminCapabilityModelsApi } from '../../../lib/api';
-import type { AdminCapabilityControl } from '../../../types/api';
+} from './components';
+import { useAdminResource, useAdminUrlFilterSync, useAdmin, useConfirm, useToast } from './hooks';
+import { adminCapabilitiesApi, adminCapabilityModelsApi } from './api';
+import type { AdminCapabilityControl } from './types';
 import { CapabilityList } from './CapabilityList';
 import { CapabilityWorkspace } from './CapabilityWorkspace';
 import { isCapabilityTab, isRuntimeFilter, RUNTIME_FILTER_OPTIONS } from './constants';

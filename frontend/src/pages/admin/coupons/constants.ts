@@ -5,8 +5,8 @@
  * `type`，不能统一按元处理。
  */
 
-import type { AdminCoupon, CouponScope, CouponStatus, CouponType } from '../../../types/api';
-import type { TagTone } from '../../../components/admin/statusMeta';
+import type { AdminCoupon, CouponScope, CouponStatus, CouponType } from './types';
+import type { TagTone } from './components';
 
 export const TYPE_LABEL: Record<CouponType, string> = {
   full_cut: '满减',

@@ -21,8 +21,9 @@ import {
   SwitchField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/radar';
+} from './components';
 import type { ModelDraft } from './constants';
+import type { ImageParameterDefinitionView } from './types';
 import { ChannelModelImageDerivedSummary } from './ChannelModelImageDerivedSummary';
 import {
   createDefaultImageCapabilityConfigJson,
@@ -34,10 +35,8 @@ import {
   setImageParameterEnabled,
   setImageParameterValues,
   type ImageCapabilityConfigView,
-  type ImageParameterDefinitionView,
   type ImageParameterSettingView,
 } from './imageCapability';
-import '../../../styles/radar-admin.css';
 
 const MEGABYTE = 1024 * 1024;
 

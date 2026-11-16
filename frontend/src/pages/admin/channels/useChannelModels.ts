@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type {
-  AdminChannelModelView,
-  ChannelModelHealthRowView,
-  ProtocolCatalogEntryView,
-} from '../../../types/model';
+import {
+  type AdminChannelModelView,
+  type ChannelModelHealthRowView,
+  type ProtocolCatalogEntryView,
+} from './types';
 
 import { adminChannelsApi, fetchChannelHealth } from './api';
 

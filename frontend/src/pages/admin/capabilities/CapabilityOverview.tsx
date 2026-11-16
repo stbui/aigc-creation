@@ -1,7 +1,10 @@
 import { Power } from 'lucide-react';
-import { ActionButton, Notice, StatCards } from '~/admin-ui/radar';
-import type { AdminCapabilityControl } from '../../../types/api';
-import type { AdminCapabilityModelListView, CapabilityPricingView } from '../../../types/model';
+import { ActionButton, Notice, StatCards } from './components';
+import type {
+  AdminCapabilityControl,
+  AdminCapabilityModelListView,
+  CapabilityPricingView,
+} from './types';
 import { DEFAULT_OFFLINE_REASON } from './constants';
 import {
   bindingConfigAvailable,
@@ -9,7 +12,6 @@ import {
   capabilityPriceText,
   formatUpdatedAt,
 } from './utils';
-import '../../../styles/radar-admin.css';
 
 /** 能力概览：先回答“现在能不能卖”，再给出下一步该做什么。 */
 export function CapabilityOverview({

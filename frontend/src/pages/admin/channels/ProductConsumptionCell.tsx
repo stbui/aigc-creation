@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
-import { HelpTip, ToneBadge } from '~/admin-ui/radar';
+import { HelpTip, ToneBadge } from './components';
 import type { ProductConsumptionRef } from './useProductConsumption';
-import '../../../styles/radar-admin.css';
 
 function dedupeByCapability(refs: ProductConsumptionRef[]): ProductConsumptionRef[] {
   const byCapability = new Map<string, ProductConsumptionRef>();

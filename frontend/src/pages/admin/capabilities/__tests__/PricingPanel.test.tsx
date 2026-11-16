@@ -1,8 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ConfirmProvider } from '~/admin-ui/providers/ConfirmProvider';
-import { ToastProvider } from '~/admin-ui/providers/ToastProvider';
-import type { CapabilityPricingView } from '../../../../types/model';
+import { ConfirmProvider, ToastProvider } from '../hooks';
+import type { CapabilityPricingView } from '../types';
 import { PricingPanel } from '../PricingPanel';
 
 function renderPanel({

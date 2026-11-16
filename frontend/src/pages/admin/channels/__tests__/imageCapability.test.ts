@@ -7,8 +7,8 @@ import {
   setImageParameterEnabled,
   setImageParameterValues,
   validateImageCapabilityConfigJson,
-  type ImageParameterDefinitionView,
 } from '../imageCapability';
+import type { ImageParameterDefinitionView } from '../types';
 
 const definitions: ImageParameterDefinitionView[] = [
   {

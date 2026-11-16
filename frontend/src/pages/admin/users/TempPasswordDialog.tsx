@@ -6,10 +6,9 @@ import {
   InputGroupButton,
   InputGroupInput,
   ModalDialog,
-} from '~/admin-ui/radar';
+} from './components';
 import { useToast } from './hooks';
 import { formatDateTime } from './utils';
-import '../../../styles/radar-admin.css';
 
 /**
  * 临时密码只展示一次。

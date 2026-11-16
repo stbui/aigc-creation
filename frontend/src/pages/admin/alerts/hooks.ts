@@ -7,3 +7,5 @@ export {
 } from '~/admin-ui/radar';
 
 export { useAdminAlerts } from '../../../hooks';
+
+export { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';

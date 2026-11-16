@@ -1,5 +1,5 @@
 /**
- * AdminModelCallsPage 的 hook 入口 —— 目录内文件的唯一外部 hook 来源。
+ * 调用记录的 hook 入口 —— 目录内文件的唯一外部 hook 来源。
  */
 
 export {
@@ -12,6 +12,7 @@ export {
 
 export {
   useAdminDetailParam,
+  useAdminExport,
   useAdminList,
   useAdminUrlFilterSync,
 } from '~/admin-ui/radar';

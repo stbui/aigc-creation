@@ -1,9 +1,11 @@
 /**
- * AdminStoragePage 的本地常量与类型。
+ * 存储配置的选项表与后端元信息。
+ *
+ * 本目录派生的类型统一从 `./types` 取；此处只放常量与选项表，不放函数 / 请求 / 组件。
  */
 
 import { Cloud, HardDrive, Server } from 'lucide-react';
-import type { StorageBackendId } from '../../../types/api';
+import type { StorageBackendId } from './types';
 
 /** 固定展示顺序：与 STORAGE_BACKENDS 一致，避免接口返回顺序决定版面 */
 export const BACKEND_ORDER: StorageBackendId[] = ['local', 'oss', 'minio'];

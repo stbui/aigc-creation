@@ -2,7 +2,7 @@ import type {
   PaymentExceptionStatus,
   PaymentProviderId,
   VisiblePaymentMethod,
-} from '../../../types/payment';
+} from './types';
 
 /**
  * 支付域（渠道 / 对账 / 异常）的展示文案与筛选白名单。
@@ -200,5 +200,46 @@ export const EMPTY_PAYMENT_EXCEPTION_FILTERS: PaymentExceptionFilterValues = {
   priority: undefined,
   overdue: undefined,
 };
+
+/**
+ * 支付工作台的三个标签。
+ *
+ * `?tab=` 的合法值只有这三个；`products` / `orders` 旧链接回落到收款设置
+ * （订单与商品各有独立工作台，本页只保留收款、核对、异常三件事）。
+ */
+export const PAYMENTS_TABS = [
+  { value: 'providers', label: '收款设置' },
+  { value: 'reconciliation', label: '交易核对' },
+  { value: 'exceptions', label: '异常处理' },
+] as const;
+
+export type PaymentsTabValue = (typeof PAYMENTS_TABS)[number]['value'];
+
+/** 页头标题与副标题；与页签文案同源维护，避免两处漂移。 */
+export const PAYMENTS_TAB_COPY: Record<
+  PaymentsTabValue,
+  { title: string; description: string }
+> = {
+  providers: {
+    title: '收款设置',
+    description: '配置客户可用的收款渠道与支付方式',
+  },
+  reconciliation: {
+    title: '交易核对',
+    description: '核对渠道流水与系统订单，跟进对账差异',
+  },
+  exceptions: {
+    title: '异常处理',
+    description: '处理支付异常与退款兜底，闭环资金问题',
+  },
+};
+
+/**
+ * 对账结果 → 中文。
+ *
+ * 它来自类型模块 `types/payment`，但本身是运行期常量：按约定落这里，
+ * 不经 `./types` 转出（`./types` 只转类型，`export type` 带不走值）。
+ */
+export { RECONCILIATION_RESULT_LABELS } from '../../../types/payment';
 
 

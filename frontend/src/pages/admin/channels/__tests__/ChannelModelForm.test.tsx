@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, type Mock } from 'vitest';
-import { ToastProvider } from '../../../../admin-ui/providers/ToastProvider';
+import { ToastProvider } from '../components';
 import { ChannelModelForm } from '../ChannelModelForm';
 import { EMPTY_MODEL_DRAFT, type ModelDraft } from '../constants';
 

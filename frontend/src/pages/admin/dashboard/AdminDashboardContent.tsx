@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { adminApi } from '../../../lib/api';
-import { useAdmin } from '../../../context/AdminContext';
-import { ExceptionPage } from '../../../components/ExceptionPage';
+import { adminApi } from './api';
+import { useAdmin, useDuty, useAdminWorkbench } from './hooks';
+import { ExceptionPage } from './components';
 import {
   ActionButton,
   AdminPage,
@@ -22,8 +22,6 @@ import {
   useAdminResource,
 } from '~/admin-ui/radar';
 import '../../../styles/radar-admin.css';
-import { useDuty } from '../../../components/admin/DutyContext';
-import { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';
 import type { AdminOverview, AdminWorkbenchRoleView } from '../../../types/api';
 import {
   EmptyInline,
@@ -35,8 +33,7 @@ import {
   Subhead,
 } from './DashboardWidgets';
 import { WindowStrip, TotalsStrip } from './DashboardMetricStrips';
-import { CHANNEL_LABELS, queueTime, yuan } from './utils';
-import { taskErrorLabel } from '../../../lib/admin-error-codes';
+import { CHANNEL_LABELS, queueTime, yuan, taskErrorLabel } from './utils';
 
 function DashboardControls({
   days,
@@ -90,7 +87,7 @@ function DashboardControls({
  * 平台概览（值班台）页面内容。
  *
  * 从 `AdminDashboardPage.tsx` 抽出：该文件此前同时承载路由表、后台外壳与本节
- * 内容三件事，本文件只负责「概览页怎么画」。外壳与路由挂载见 `AdminShell.tsx`，
+ * 内容三件事，本文件只负责「概览页怎么画」。外壳与路由挂载见 `layout.tsx`，
  * 子页懒加载表见 `routes.ts`。值班数据（DutyContext）由外壳在 `/admin` index
  * 路由上挂载，切走即卸载，30 秒轮询随之停止。
  */

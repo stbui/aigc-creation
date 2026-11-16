@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { adminAigcLabelApi } from './api';
 import {
   AdminPage,
@@ -11,7 +10,7 @@ import {
   SaveBar,
   SkeletonPanel,
   StaleError,
-} from '~/admin-ui/radar';
+} from './components';
 import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';
 import { renderBadgeCanvas } from './utils';
 import { StylePanel } from './StylePanel';
@@ -19,7 +18,7 @@ import { PreviewPanel } from './PreviewPanel';
 import { PositionPanel } from './PositionPanel';
 import { CurrentBadgePanel } from './CurrentBadgePanel';
 import { SaveLabelConfirm } from './SaveLabelConfirm';
-import type { AigcLabelSpec } from '../../../types/api';
+import type { AigcLabelSpec } from './types';
 
 /**
  * AI 生成标识样式（2026-10-21）。

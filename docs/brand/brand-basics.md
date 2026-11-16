@@ -17,7 +17,7 @@
 
 | 对象 | 规范 |
 | --- | --- |
-| npm 包 | `huojue`（根 monorepo）/ `huojue-backend` / `huojue-frontend` |
+| npm 包 | `huojue`（根 monorepo）/ `huojue-backend` / `huojue-frontend` / `huojue-agent`（agent 智能体子包） |
 | Docker 镜像 / 容器 / 卷 | `huojue-*` 前缀；变量 `HUOJUE_*` |
 | localStorage | `huojue_token` / `huojue_email` / `huojue_role` |
 | 上游请求 User-Agent | `huojue/1.0` |

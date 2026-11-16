@@ -5,13 +5,15 @@
  * ASCII），服务端合成时只做缩放、定位与透明度。
  */
 
-import type { AigcLabelSpec } from '../../../types/api';
+import type { AigcLabelSpec } from './types';
 import { hexToRgba } from '../../../lib/aigc-label';
 import { PREVIEW_PALETTE, RENDER_SCALE } from './constants';
 
 export { hexToRgba };
 
 /** 按样式把角标画成一张 PNG（透明底） */
+export { formatDateTime } from '../../../admin-ui/lib/format';
+export { cn } from '~/admin-ui/lib/cn';
 export function renderBadgeCanvas(spec: AigcLabelSpec): HTMLCanvasElement {
   const S = RENDER_SCALE;
   const fontSize = spec.fontSize * S;

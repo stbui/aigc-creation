@@ -16,16 +16,15 @@ import {
   StatusTag,
   TextField,
   TextAreaField,
-  formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/radar';
+} from './components';
 import {
   useAdmin,
   usePaymentExceptionFilters,
   useRefreshOnNonce,
   useToast,
 } from './hooks';
-import type { AdminPaymentException, PaymentExceptionStatus } from '../../../types/payment';
+import type { AdminPaymentException, PaymentExceptionStatus } from './types';
 import {
   ORDER_PROVIDERS,
   PAYMENT_EXCEPTION_KIND_LABELS,
@@ -34,8 +33,7 @@ import {
   PAYMENT_EXCEPTION_STATUS_META,
   PAYMENT_EXCEPTION_STATUS_OPTIONS,
 } from './constants';
-import { adminOrderDetailHref, moneyText, providerLabel } from './utils';
-import '../../../styles/radar-admin.css';
+import { adminOrderDetailHref, formatDateTime, moneyText, providerLabel } from './utils';
 
 /**
  * 资金异常待办标签。

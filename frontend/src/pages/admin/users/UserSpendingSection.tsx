@@ -4,23 +4,13 @@ import {
   EmptyState,
   MiniStat,
   StatusTag,
-  formatYuan,
-} from '~/admin-ui/radar';
+} from './components';
 import type {
   AdminUserRecentOrder,
   AdminUserSpending,
-} from '../../../types/admin-users';
-import { adminOrderDetailHref, adminOrderHref, formatDateTime } from './utils';
-import '../../../styles/radar-admin.css';
-
-/** 订单状态 → 用户详情里的文案。色调用 STATUS_META 的统一映射。 */
-const ORDER_STATUS_LABEL: Record<string, string> = {
-  pending: '待支付',
-  paid: '已支付',
-  cancelled: '已取消',
-  refunded: '已退款',
-  partial_refunded: '部分退款',
-};
+} from './types';
+import { ORDER_STATUS_LABEL } from './constants';
+import { adminOrderDetailHref, adminOrderHref, formatDateTime, formatYuan } from './utils';
 
 /**
  * 用户详情中的消费概览。
@@ -114,22 +104,26 @@ export function UserSpendingSection({
           </div>
         </div>
 
-        {spending.firstPaidAt || spending.lastPaidAt ? (
+        {(spending.firstPaidAt || spending.lastPaidAt) && (
           <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              首次消费{' '}
-              <strong className="font-medium text-foreground">
-                {formatDateTime(spending.firstPaidAt)}
-              </strong>
-            </span>
-            <span>
-              最近消费{' '}
-              <strong className="font-medium text-foreground">
-                {formatDateTime(spending.lastPaidAt)}
-              </strong>
-            </span>
+            {spending.firstPaidAt ? (
+              <span>
+                首次消费{' '}
+                <strong className="font-medium text-foreground">
+                  {formatDateTime(spending.firstPaidAt)}
+                </strong>
+              </span>
+            ) : null}
+            {spending.lastPaidAt ? (
+              <span>
+                最近消费{' '}
+                <strong className="font-medium text-foreground">
+                  {formatDateTime(spending.lastPaidAt)}
+                </strong>
+              </span>
+            ) : null}
           </p>
-        ) : null}
+        )}
 
         {orders.length === 0 ? (
           <EmptyState

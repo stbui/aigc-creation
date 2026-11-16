@@ -1,16 +1,8 @@
 import { useRef, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { Link } from 'react-router-dom';
 import { RefreshCw, Upload } from 'lucide-react';
 import { adminPluginsApi, adminProviderCatalogApi } from './api';
-import {
-  AdminPage,
-  ActionButton,
-  Button,
-  Notice,
-  Panel,
-  StaleError,
-} from '~/admin-ui/radar';
+import { AdminPage, ActionButton, Button, Notice, Panel, StaleError } from './components';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import { PluginStats } from './PluginStats';
 import { PluginTable } from './PluginTable';
@@ -21,7 +13,7 @@ import {
   TogglePluginConfirm,
   UninstallPluginConfirm,
 } from './PluginActionDialogs';
-import type { PluginView, ProviderCatalogEntry, ProviderCatalogView } from '../../../types/model';
+import type { PluginView, ProviderCatalogEntry, ProviderCatalogView } from './types';
 
 /**
  * 插件（`/admin/plugins`）。

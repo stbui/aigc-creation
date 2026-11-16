@@ -3,8 +3,8 @@ import { MemoryRouter } from 'react-router-dom';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AdminTaskListResult } from '../../../../types/api';
-import { ToastProvider } from '../../../../admin-ui/providers/ToastProvider';
+import type { AdminTaskListResult } from '../types';
+import { ToastProvider } from '../components';
 
 const { listMock, exportCsvMock } = vi.hoisted(() => ({
   listMock: vi.fn(),

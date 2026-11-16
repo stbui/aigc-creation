@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AdminCapabilityControl } from '../../../../types/api';
-import type { AdminCapabilityModelListView, CapabilityPricingView } from '../../../../types/model';
+import type {
+  AdminCapabilityControl,
+  AdminCapabilityModelListView,
+  CapabilityPricingView,
+} from '../types';
 import { CapabilityOverview } from '../CapabilityOverview';
 
 const capability: AdminCapabilityControl = {

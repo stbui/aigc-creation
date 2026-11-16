@@ -23,12 +23,12 @@ import {
   saleInputValue,
   type RepriceRow,
 } from '../../../lib/channelReprice';
-import { parseCredits, toCreditsInput } from '../../../lib/microcredits';
+import { parseCredits, toCredits, toCreditsInput } from '../../../lib/microcredits';
 import type {
   AdminChannelModelView,
   AdminChannelView,
   ChannelModelPriceTierView,
-} from '../../../types/model';
+} from './types';
 import {
   EMPTY_DEFAULT_MODEL_DRAFT,
   EMPTY_TIER,
@@ -40,7 +40,8 @@ import {
 } from './constants';
 import { createDefaultTextCapabilityConfigJson } from './textCapability';
 
-/* 外部工具转出：目录内文件不直接引 `src/lib/*` */
+/* 外部工具转出：目录内文件不直接引 `src/lib/*`，也不直接引 `~/admin-ui/lib/*` */
+export { cn } from '~/admin-ui/lib/cn';
 export {
   MAX_REPRICE_MARKUP_PERCENT,
   MAX_REPRICE_MODELS,
@@ -58,10 +59,12 @@ export {
   repriceBlockingModels,
   saleInputValue,
   tierPriceLines,
+  toCredits,
   toCreditsInput,
   type OrderItem,
   type RepriceRow,
 };
+export { downloadJson } from '../../../lib/download';
 
 /* ------------------------------------------------------------------------- */
 /* 商品状态                                                                  */

@@ -1,8 +1,6 @@
-import { cn } from '../../../admin-ui/lib/cn';
-import { Toggle } from '~/admin-ui/radar';
+import { cn, PRODUCT_STATE_META, type ProductState } from './utils';
+import { Toggle } from './components';
 import type { AllModelsStatusFilter } from './constants';
-import { PRODUCT_STATE_META, type ProductState } from './utils';
-import '../../../styles/radar-admin.css';
 
 export interface ProductStatusCounts {
   available: number;

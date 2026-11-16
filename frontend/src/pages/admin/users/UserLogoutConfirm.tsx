@@ -8,9 +8,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '~/admin-ui/radar';
+} from './components';
 import type { AdminUserRow } from './types';
-import '../../../styles/radar-admin.css';
 
 /**
  * 强制下线确认。

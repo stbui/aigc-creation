@@ -17,7 +17,7 @@ import {
   StaleError,
   ToneBadge,
 } from '~/admin-ui/radar';
-import { adminSettingsApi } from '../../../lib/api';
+import { adminSettingsApi } from './api';
 import type { AdminSettingValue } from '../../../types/api';
 import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';
 import {

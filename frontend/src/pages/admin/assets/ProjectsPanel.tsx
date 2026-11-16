@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FolderPlus, Pencil, Trash2 } from 'lucide-react';
 import {
-  formatDateTime,
   ActionButton,
   AdminDataTable,
   ClearableField,
@@ -10,13 +9,13 @@ import {
   Panel,
   StaleError,
   type AdminColumn,
-} from '~/admin-ui/radar';
+} from './components';
+import { formatDateTime } from './utils';
 import { adminAssetsApi } from './api';
 import { useAdmin, useToast } from './hooks';
 import { ProjectDeleteConfirm, type ProjectDeleteResult } from './ProjectDeleteConfirm';
 import { ProjectFormDrawer } from './ProjectFormDrawer';
-import type { AdminProject, AdminProjectListResult, Project } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminProject, AdminProjectListResult, Project } from './types';
 
 const DEFAULT_PAGE_SIZE = 20;
 

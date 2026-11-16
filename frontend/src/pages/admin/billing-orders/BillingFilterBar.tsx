@@ -6,9 +6,8 @@ import {
   SelectField,
   TextField,
   type AppliedFilter,
-} from '~/admin-ui/radar';
+} from './components';
 import { BILLING_MODE_OPTIONS, REVIEW_OPTION, STATUS_OPTIONS } from './constants';
-import '../../../styles/radar-admin.css';
 
 interface BillingFilterBarProps {
   status: string | undefined;

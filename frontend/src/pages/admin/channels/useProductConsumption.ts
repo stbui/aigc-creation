@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { adminCapabilityModelsApi } from './api';
 import { useAdmin, useAdminResource, useCapabilities } from './hooks';
-import type { AdminChannelView } from '../../../types/model';
+import type { AdminChannelView } from './types';
 
 /**
  * 商品被哪些能力消费。

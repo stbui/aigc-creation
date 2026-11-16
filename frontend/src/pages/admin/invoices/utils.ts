@@ -4,3 +4,4 @@
 
 /** 分 → 元（统一实现在 admin-ui/lib/format.ts） */
 export { formatYuanPlain as yuan } from '~/admin-ui/radar';
+export { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';

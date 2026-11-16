@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Send, Share2, UserCheck } from 'lucide-react';
 import {
-  formatDateTime,
   ActionButton,
   Descriptions,
   DetailSection,
@@ -14,7 +13,8 @@ import {
   StatusTag,
   SwitchField,
   TextAreaField,
-} from '~/admin-ui/radar';
+} from './components';
+import { formatDateTime } from './utils';
 import {
   PRIORITY_OPTIONS,
   STATUS_LABELS,
@@ -31,11 +31,10 @@ import {
   cn,
   formatYuanPlain,
   transitionLabel,
+  buildAdminContextLink,
 } from './utils';
 import { TICKET_REPLY_TEMPLATES, fillTicketTemplate } from './reply-templates';
-import { buildAdminContextLink } from '../../../lib/admin-context-link';
-import type { AdminTicketAssignee, AdminTicketDetail, TicketStatus } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminTicketAssignee, AdminTicketDetail, TicketStatus } from './types';
 
 /** 对话气泡：客户在左、客服在右，避免一长串同色消息分不清谁说的 */
 function Message({

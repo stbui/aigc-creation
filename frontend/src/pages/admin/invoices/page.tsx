@@ -28,7 +28,7 @@ import {
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/radar';
-import { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';
+import { adminOrderDetailHref, adminUserHref } from './utils';
 import type { AdminInvoice, InvoiceStatus } from '../../../types/payment';
 
 /**

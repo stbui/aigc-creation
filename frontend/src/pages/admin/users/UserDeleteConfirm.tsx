@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { RotateCw } from 'lucide-react';
-import { ActionButton, SkeletonBody } from '~/admin-ui/radar';
-import { DeleteUsersConfirmDialog } from '~/components/admin/DeleteUsersConfirmDialog';
+import { ActionButton, DeleteUsersConfirmDialog, SkeletonBody } from './components';
 import { adminUsersApi } from './api';
-import type { AdminUserImpact } from '../../../types/admin-users';
-import type { DeleteUserTarget } from './types';
-import '../../../styles/radar-admin.css';
+import type { AdminUserImpact, DeleteUserTarget } from './types';
+
 
 /**
  * 删除（注销）用户的二次确认。

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
@@ -8,20 +7,27 @@ import {
   AdminPage,
   ConfirmDialog,
   ExportCsvButton,
-  useAdminExport,
   Notice,
   Panel,
   RefreshButton,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/radar';
-import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
+} from './components';
+import {
+  useAdminExport,
+  useAdmin,
+  useAdminList,
+  useAdminUrlFilterSync,
+  useDiscardConfirm,
+  useToast,
+  useUnsavedGuard,
+} from './hooks';
 import { EFFECTIVE_META, TYPE_LABEL, type FormState } from './constants';
 import { buildCampaignPayload, emptyForm, toLocalInput } from './utils';
 import { CampaignFilterBar } from './CampaignFilterBar';
 import { CampaignTable } from './CampaignTable';
 import { CampaignFormDrawer } from './CampaignFormDrawer';
-import type { AdminCampaign } from '../../../types/api';
+import type { AdminCampaign } from './types';
 
 /**
  * 限时活动（`/admin/campaigns`）。

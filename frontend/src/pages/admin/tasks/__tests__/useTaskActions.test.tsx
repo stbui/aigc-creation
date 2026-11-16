@@ -2,9 +2,8 @@ import { act, renderHook } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BatchSummary } from '../../../../types/api';
-import { ToastProvider } from '../../../../admin-ui/providers/ToastProvider';
-import type { AdminTaskRow } from '../types';
+import type { AdminTaskRow, BatchSummary } from '../types';
+import { ToastProvider } from '../components';
 
 const { batchMock, removeMock, reloadMock } = vi.hoisted(() => ({
   batchMock: vi.fn(),

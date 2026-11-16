@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { adminProductsApi } from './api';
@@ -10,7 +9,7 @@ import {
   RefreshButton,
   StaleError,
   type AppliedFilter,
-} from '~/admin-ui/radar';
+} from './components';
 import {
   useAdmin,
   useAdminResource,
@@ -25,7 +24,7 @@ import { ProductStats } from './ProductStats';
 import { ProductFilterBar } from './ProductFilterBar';
 import { ProductCardGrid } from './ProductCardGrid';
 import { ProductFormDrawer } from './ProductFormDrawer';
-import type { AdminProduct } from '../../../types/api';
+import type { AdminProduct } from './types';
 
 /**
  * 商品管理（`/admin/products`，B-34~B-36）。

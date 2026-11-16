@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AdminPage } from '~/admin-ui/radar';
-import '../../../styles/radar-admin.css';
+import { AdminPage, BatchDeleteUsersDialog } from './components';
+
 import { useAdmin, useAdminDetailParam } from './hooks';
-import { useAdminUserActions } from './useAdminUserActions';
-import { useAdminUserFilters } from './useAdminUserFilters';
+import { useUserActions } from './useUserActions';
+import { useUserFilters } from './useUserFilters';
 import { UserDetailDrawer } from './UserDetailDrawer';
 import { UserDeleteConfirm } from './UserDeleteConfirm';
-import { BatchDeleteUsersDialog } from '~/components/admin/BatchDeleteUsersDialog';
 import { UserFilters } from './UserFilters';
 import { UserListSection, type UserListView } from './UserListSection';
 import { UserLogoutConfirm } from './UserLogoutConfirm';
@@ -25,14 +24,17 @@ import { TempPasswordDialog } from './TempPasswordDialog';
 export function AdminUsersPage() {
   const { can, me } = useAdmin();
   const [detailId, setDetailId] = useAdminDetailParam();
+  /** 写操作成功后自增，强制详情抽屉重挂载以重取快照（状态/角色/密码可能已变）。 */
+  const [detailVersion, setDetailVersion] = useState(0);
   const [view, setView] = useState<UserListView>('cards');
   const [selected, setSelected] = useState<string[]>([]);
-  const filters = useAdminUserFilters();
+  const filters = useUserFilters();
 
   const openUser = useCallback((id: string) => setDetailId(id), [setDetailId]);
   const closeUser = useCallback(() => setDetailId(null), [setDetailId]);
-  const actions = useAdminUserActions({
+  const actions = useUserActions({
     reload: filters.reload,
+    onChanged: () => setDetailVersion((value) => value + 1),
     onDeleted: closeUser,
     // 批量注销后列表里已经没有这些人，勾选与可能打开的抽屉都要一起清掉
     onBatchDeleted: () => {
@@ -101,6 +103,7 @@ export function AdminUsersPage() {
       />
 
       <UserDetailDrawer
+        key={`${detailId ?? 'closed'}-${detailVersion}`}
         detailId={detailId}
         onClose={closeUser}
         // 删除确认仍由页面统一承载：抽屉只发意图，不另起一套弹框与写锁
@@ -121,6 +124,7 @@ export function AdminUsersPage() {
 
       {actions.roleTarget && (
         <UserRoleConfirm
+          key={actions.roleTarget.id}
           target={actions.roleTarget}
           loading={actions.busy}
           onCancel={actions.closeRole}

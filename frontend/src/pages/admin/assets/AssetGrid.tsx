@@ -1,15 +1,8 @@
 import { useRef, useState } from 'react';
-import {
-  ActionButton,
-  CheckboxField,
-  EmptyState,
-  ListError,
-  Pagination,
-} from '~/admin-ui/radar';
+import { ActionButton, CheckboxField, EmptyState, ListError, Pagination } from './components';
 import { AssetThumb } from './AssetThumb';
 import { assetLabel, cn, fmtBytes, generationLine, thumbSrc } from './utils';
 import type { AssetRow } from './constants';
-import '../../../styles/radar-admin.css';
 
 /**
  * 缩略图网格视图。

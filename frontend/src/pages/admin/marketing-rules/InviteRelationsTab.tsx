@@ -12,9 +12,9 @@ import {
   SelectField,
   StaleError,
   StatusTag,
-  formatDateTime,
   type AdminColumn,
-} from '~/admin-ui/radar';
+} from './components';
+import { formatDateTime } from './utils';
 import { marketingApi } from './api';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
 import {
@@ -25,8 +25,7 @@ import {
 } from './constants';
 import { UserCell } from './UserCell';
 import { inviteSummaryNote, userLabel } from './utils';
-import type { AdminInviteListResult } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import type { AdminInviteListResult } from './types';
 
 /**
  * 邀请关系流水（`?tab=invites`）。

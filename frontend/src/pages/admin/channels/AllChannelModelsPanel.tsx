@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminChannelModelsApi, adminChannelsApi, fetchChannelHealth } from './api';
+import { AdminDataTable, StaleError, ActionButton } from './components';
 import {
-  AdminDataTable,
-  StaleError,
-  ActionButton,
+  useAdmin,
+  useAdminUrlFilterSync,
+  useConfirm,
   useSelectionPrune,
-} from '~/admin-ui/radar';
+  useToast,
+} from './hooks';
 import { useAllChannelModelsColumns } from './AllChannelModelsColumns';
 import { AllChannelModelsFilters } from './AllChannelModelsFilters';
 import { ModelCommerceOverview } from './ModelCommerceOverview';
-import { consumptionImpactText } from './useProductConsumption';
-import { useAdmin, useConfirm, useToast, useAdminUrlFilterSync } from './hooks';
+import { consumptionImpactText, type ProductConsumptionState } from './useProductConsumption';
 import { productStateOf } from './utils';
 import {
   ALL_MODELS_COMMERCE_OPTIONS,
@@ -22,14 +23,12 @@ import {
 } from './constants';
 import { testErrorText, testFailureText } from './modelTest';
 import { useModelCommerce } from './useModelCommerce';
-import type { ProductConsumptionState } from './useProductConsumption';
 import type { ProductStatusCounts } from './ProductStatusStrip';
-import type {
-  AdminChannelModelListItem,
-  ChannelModelHealthRowView,
-  ChannelOrderItemView,
-} from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import {
+  type AdminChannelModelListItem,
+  type ChannelModelHealthRowView,
+  type ChannelOrderItemView,
+} from './types';
 
 /** 「不健康」的阈值：24h 成功率低于 80% */
 const UNHEALTHY_RATE = 0.8;

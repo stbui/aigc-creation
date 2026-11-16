@@ -2,7 +2,7 @@
  * AI 标识的静态文案与渲染常量。
  */
 
-import type { AigcLabelPosition } from '../../../types/api';
+import type { AigcLabelPosition } from './types';
 
 export const POSITION_LABELS: Record<AigcLabelPosition, string> = {
   'bottom-right': '右下',

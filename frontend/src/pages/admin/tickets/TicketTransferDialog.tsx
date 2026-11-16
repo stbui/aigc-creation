@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
-import {
-  ConfirmDialog,
-  SelectField,
-  TextAreaField,
-} from '~/admin-ui/radar';
-import type { AdminTicketAssignee } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import { ConfirmDialog, SelectField, TextAreaField } from './components';
+import type { AdminTicketAssignee } from './types';
 
 /**
  * 转交工单。

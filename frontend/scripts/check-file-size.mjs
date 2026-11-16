@@ -41,29 +41,30 @@ const BASELINE = {
   // 以下是待分批拆分的债务清单，不是许可证；新增文件仍走通用守卫。
   // 注：`lib/api.ts`、`types/api.d.ts`、`types/model.ts` 已按域拆分回落到 800 行内，
   // 但仍在 500+ 清单里，一并登记棘轮，防止再次长回去。
+  // 2026-11-16 全表对账：17 条与代码漂移。>500 行的 12 条按下调数字（棘轮只许变短）；
+  // ≤500 行的 5 条（`admin/assets/page`、`admin/model-calls/page`、`creative-image/page`、
+  // `invitations/page`、`types/admin-ops`）按本文件规则「拆分完成后把该行删掉」清除，
+  // 回落通用守卫（>500 告警、>800 报错）；另删 2 条失效引用 ——
+  // `pages/CreditsPage.tsx`、`pages/ToolPage.tsx` 已在 54b6a58 改为 `pages/credits/`、
+  // `pages/tool/` 目录，旧单文件不存在。
   'src/admin-ui/components/ui/sidebar.tsx': 726,
   'src/admin-ui/primitives/fields.tsx': 547,
-  'src/admin-ui/primitives/form.tsx': 779,
+  'src/admin-ui/primitives/form.tsx': 777,
   'src/admin-ui/primitives/table.tsx': 643,
-  'src/lib/api.ts': 746,
-  'src/pages/CreditsPage.tsx': 557,
-  'src/pages/ToolPage.tsx': 542,
-  'src/pages/admin/assets/page.tsx': 512,
-  'src/pages/admin/channels/AllChannelModelsPanel.tsx': 623,
-  'src/pages/admin/channels/ChannelModelManager.tsx': 674,
-  'src/pages/admin/model-calls/page.tsx': 597,
-  'src/pages/admin/orders/OrderDetailDrawer.tsx': 524,
-  'src/pages/admin/payments/PaymentsExceptionPanel.tsx': 523,
-  'src/pages/admin/templates/page.tsx': 566,
-  'src/pages/admin/tickets/page.tsx': 609,
-  'src/pages/checkout/hooks.ts': 551,
-  'src/pages/creative-image/page.tsx': 768,
-  'src/pages/invitations/page.tsx': 591,
-  'src/types/admin-console.ts': 644,
-  'src/types/admin-ops.ts': 544,
-  'src/types/admin-support.ts': 570,
-  'src/types/api.d.ts': 619,
-  'src/types/model.ts': 580,
+  'src/lib/api.ts': 720,
+  'src/pages/admin/channels/AllChannelModelsPanel.tsx': 508,
+  'src/pages/admin/channels/ChannelModelManager.tsx': 625,
+  'src/pages/admin/orders/OrderDetailDrawer.tsx': 511,
+  'src/pages/admin/payments/PaymentsExceptionPanel.tsx': 518,
+  'src/pages/admin/templates/page.tsx': 554,
+  'src/pages/admin/tickets/page.tsx': 567,
+  'src/pages/checkout/hooks.ts': 550,
+  // 2026-11-16 积分账本三类型（CreditBusinessType / CreditLedgerEntry / CreditLedgerPage）
+  // 拆到 `types/admin-credits.ts`，本文件回落到 611 行，基线随之下调。
+  'src/types/admin-console.ts': 611,
+  'src/types/admin-support.ts': 567,
+  'src/types/api.d.ts': 615,
+  'src/types/model.ts': 577,
 };
 
 function countLines(path) {

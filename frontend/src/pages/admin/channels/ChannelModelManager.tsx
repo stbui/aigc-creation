@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminChannelsApi } from './api';
-import { ConfirmDialog, Notice } from '~/admin-ui/radar';
+import { ConfirmDialog, Notice } from './components';
 import { useToast } from './hooks';
 import { ChannelModelDialogs } from './ChannelModelDialogs';
 import { ChannelModelTable } from './ChannelModelTable';
@@ -14,13 +14,12 @@ import {
 import { buildPriceTiers, toCreditsInput, toModelDraft } from './utils';
 import { useChannelModelHealth, useChannelModels } from './useChannelModels';
 import { consumptionImpactText, type ProductConsumptionState } from './useProductConsumption';
-import type {
-  AdminChannelModelView,
-  AdminChannelView,
-  ProtocolTestResultView,
-  UpstreamModelPreview,
-} from '../../../types/model';
-import '../../../styles/radar-admin.css';
+import {
+  type AdminChannelModelView,
+  type AdminChannelView,
+  type ProtocolTestResultView,
+  type UpstreamModelPreview,
+} from './types';
 
 /**
  * 商品工作台（供应商视图右侧详情区，跟随选中供应商内联渲染）。

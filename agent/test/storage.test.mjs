@@ -6,7 +6,7 @@ import test from 'node:test';
 import { SessionStorage } from '../src/storage.mjs';
 
 function makeStorage(t) {
-  const directory = mkdtempSync(path.join(tmpdir(), 'codex-web-storage-'));
+  const directory = mkdtempSync(path.join(tmpdir(), 'huojue-agent-storage-'));
   const storage = new SessionStorage(directory);
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   return storage;

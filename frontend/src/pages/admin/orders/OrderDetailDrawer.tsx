@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  ActionButton,
-  AdminDrawer,
-  Descriptions,
-  DetailSection,
-  StatusTag,
-} from '~/admin-ui/radar';
+import { ActionButton, AdminDrawer, Descriptions, DetailSection, StatusTag } from './components';
 import { adminOrdersApi } from './api';
 import {
   aggregateRefundState,
@@ -15,16 +9,8 @@ import {
   REFUND_STATUS_LABELS,
   STATUS_LABEL_OVERRIDE,
 } from './constants';
-import {
-  adminCreditHref,
-  adminTasksHref,
-  adminUserDetailHref,
-  cn,
-  fmtTime,
-  yuan,
-} from './utils';
-import type { AdminOrderDetail, AdminOrderRefund, AdminOrderRow } from '../../../types/api';
-import '../../../styles/radar-admin.css';
+import { adminCreditHref, adminTasksHref, adminUserDetailHref, cn, fmtTime, yuan } from './utils';
+import type { AdminOrderDetail, AdminOrderRefund, AdminOrderRow } from './types';
 
 /** 详情抽屉里的一条时间线记录：状态点 + 主行 + 灰色补充行 */
 function RecordRow({

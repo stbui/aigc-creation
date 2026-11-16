@@ -126,7 +126,7 @@ export function createAgentServer({ config, codex = createCodex(config) }) {
         detail: error instanceof HttpError ? error.detail : undefined,
       });
       if (!(error instanceof HttpError)) {
-        console.error('[codex-web] request failed:', error);
+        console.error('[HuojueAgent] request failed:', error);
       }
     });
   });
@@ -139,7 +139,7 @@ function createSessionStorage(config) {
   try {
     return new SessionStorage(config.dataDir);
   } catch (error) {
-    console.error('[codex-web] persistent history disabled:', error.message);
+    console.error('[HuojueAgent] persistent history disabled:', error.message);
     return null;
   }
 }
@@ -232,7 +232,7 @@ async function routeApi(req, res, url, pathname, deps) {
     const session = sessions.create({
       id: randomUUID(),
       title: typeof body.title === 'string' ? cleanTitle(body.title) : '新会话',
-      codexThreadId: resumeThreadId,
+      agentThreadId: resumeThreadId,
       settings,
       resolvedWorkingDirectory,
       thread,
@@ -346,7 +346,7 @@ function publicSession(session, config) {
     id: session.id,
     title: session.title,
     status: session.status,
-    codexThreadId: session.codexThreadId,
+    agentThreadId: session.agentThreadId,
     createdAt: new Date(session.createdAt).toISOString(),
     updatedAt: new Date(session.updatedAt).toISOString(),
     settings: session.settings,
@@ -480,7 +480,7 @@ async function runTurn(req, res, session, { config, codex }) {
       let outboundEvent = event;
 
       if (event.type === 'thread.started') {
-        session.codexThreadId = event.thread_id;
+        session.agentThreadId = event.thread_id;
       } else if (
         event.type === 'item.started' ||
         event.type === 'item.updated' ||
@@ -599,8 +599,8 @@ function ensureSessionThread(session, codex, config) {
   const settings = { ...session.settings };
   const options = buildThreadOptions(settings, resolvedWorkingDirectory, config);
   session.resolvedWorkingDirectory = resolvedWorkingDirectory;
-  session.thread = session.codexThreadId
-    ? codex.resumeThread(session.codexThreadId, options)
+  session.thread = session.agentThreadId
+    ? codex.resumeThread(session.agentThreadId, options)
     : codex.startThread(options);
   return session.thread;
 }

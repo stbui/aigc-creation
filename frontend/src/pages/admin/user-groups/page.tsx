@@ -1,26 +1,13 @@
 import { useEffect, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { Plus } from 'lucide-react';
 import { adminChannelsApi, adminUserGroupsApi } from './api';
-import {
-  AdminPage,
-  ActionButton,
-  ConfirmDialog,
-  Panel,
-  StaleError,
-} from '~/admin-ui/radar';
-import {
-  useAdmin,
-  useAdminResource,
-  useDiscardConfirm,
-  useToast,
-  useUnsavedGuard,
-} from './hooks';
+import { AdminPage, ActionButton, ConfirmDialog, Panel, StaleError } from './components';
+import { useAdmin, useAdminResource, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { EMPTY_DRAFT, type GroupDraft, type OverrideDraft } from './constants';
 import { buildGroupPayload, toDraft } from './utils';
 import { UserGroupTable } from './UserGroupTable';
 import { UserGroupFormDrawer } from './UserGroupFormDrawer';
-import type { ChannelOrderItemView, UserGroupView } from '../../../types/model';
+import type { ChannelOrderItemView, UserGroupView } from './types';
 
 /**
  * 用户分组（`/admin/user-groups`）。

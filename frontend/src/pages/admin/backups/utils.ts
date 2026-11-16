@@ -8,6 +8,7 @@ import { BACKUP_STATUS_LABELS } from './constants';
 export { formatBytes, formatRelative };
 
 /** 备份状态文案；未终结的（running 等）统一读作「进行中」 */
+export { formatDateTime } from '../../../admin-ui/lib/format';
 export function backupStatusLabel(status: string): string {
   return BACKUP_STATUS_LABELS[status] ?? '进行中';
 }

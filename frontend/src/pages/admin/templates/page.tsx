@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import '../../../styles/radar-admin.css';
 import { Plus } from 'lucide-react';
 
 import {
@@ -10,7 +9,7 @@ import {
   ListError,
   PageSkeleton,
   RefreshButton,
-} from '~/admin-ui/radar';
+} from './components';
 import { adminTemplateCatalogApi } from './api';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import {
@@ -26,11 +25,7 @@ import { CategoryFormDrawer, GroupFormDrawer, ItemFormDrawer } from './forms';
 import { CategorySidebar } from './CategorySidebar';
 import { TemplateWorkspace, type StatusFilter } from './TemplateWorkspace';
 import { TemplatePreviewDialog } from './TemplatePreviewDialog';
-import type {
-  AdminTemplateCategory,
-  AdminTemplateGroup,
-  AdminTemplateItem,
-} from '../../../types/api';
+import type { AdminTemplateCategory, AdminTemplateGroup, AdminTemplateItem } from './types';
 
 type DeleteTarget =
   | { kind: 'category'; id: string; name: string; impact: string[] }

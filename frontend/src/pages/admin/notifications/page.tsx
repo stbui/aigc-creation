@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { CHANNEL_LABEL, CHANNEL_OPTIONS, BUILTIN_CODES } from './constants';
 import { fmtTime } from './utils';
 import { useAdmin, useDiscardConfirm, useUnsavedGuard, useToast, useAdminResource } from './hooks';
-import { adminNotificationsApi } from '../../../lib/api';
-import { deliveryProviderLabel, emailErrorText } from '../email/constants';
+import { adminNotificationsApi } from './api';
+import { deliveryProviderLabel, emailErrorText } from '../email';
 
 import { ActionButton, AdminDataTable, AdminPage, FormDrawer, FormField, MiniStat, Notice, Panel, SelectField, StaleError, StatusTag, SwitchField, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/radar';
 import '../../../styles/radar-admin.css';

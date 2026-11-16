@@ -1,8 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ConfirmProvider } from '~/admin-ui/providers/ConfirmProvider';
-import { ToastProvider } from '~/admin-ui/providers/ToastProvider';
-import type { AdminCapabilityModelListView } from '../../../../types/model';
+import { ConfirmProvider, ToastProvider } from '../hooks';
+import type { AdminCapabilityModelListView } from '../types';
 import { BindingPanel, candidateToDraft } from '../BindingPanel';
 
 const data: AdminCapabilityModelListView = {

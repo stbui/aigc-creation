@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import type { AdminCapabilityControl } from '../../../../types/api';
+import type { AdminCapabilityControl } from '../types';
 import { ImpactPanel } from '../ImpactPanel';
 
 const capability: AdminCapabilityControl = {
