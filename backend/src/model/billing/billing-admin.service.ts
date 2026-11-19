@@ -627,9 +627,11 @@ export interface ApiLogView {
 /**
  * 单条调用记录的详情视图：在列表视图上补「这次到底发了什么、上游回了什么」。
  *
- * 报文是入库前已经过脱敏 / 截断的预览文本（见 `task-executor.safeJson`、
- * `proxy.payload.sanitizeCallPayload`、`text-tool.previewJson`），后台这里
- * 不再做二次处理 —— 再裁一次会让「界面看到的」和「库里存的」出现两套口径。
+ * 报文是**明文**入库的（为了能直接看到提示词与上游正文），写入侧只折叠内嵌
+ * 媒体并截断超长内容（见 `model/protocol/call-payload.ts` 与
+ * `proxy.payload.formatCallPayload`），后台这里不再做二次处理 —— 再裁一次
+ * 会让「界面看到的」和「库里存的」出现两套口径。报文只经本接口下发，列表与
+ * CSV 导出都不含。
  */
 export interface ApiLogDetailView extends ApiLogView {
   /** 实际发往上游的完整 URL（含查询串，密钥类查询参数已在写库前剥离） */

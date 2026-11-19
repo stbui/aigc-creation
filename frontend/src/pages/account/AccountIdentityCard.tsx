@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 import type { MyProfile } from '../../types/api';
 import { fmtDate, fmtDateTime } from './utils';
-import { Avatar, Button, Input } from '../../ui';
+import { Avatar, AvatarFallback, Button, Input } from '../../ui';
 
 /**
  * 身份与资料卡。
@@ -36,8 +36,8 @@ export function AccountIdentityCard({
   return (
     <section className="account-card account-identity">
       <div className="account-identity-head">
-        <Avatar size={64} className="account-avatar">
-          {avatarChar}
+        <Avatar className="account-avatar size-16">
+          <AvatarFallback className="account-avatar">{avatarChar}</AvatarFallback>
         </Avatar>
         <div className="account-identity-info">
           <div className="account-identity-name">

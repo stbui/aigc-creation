@@ -5,13 +5,14 @@
  * 一律经由本文件。第三方 UI 库 (lucide-react) 不经本文件。
  */
 
-/** shadcn / 兼容层表单与展示件 */
+/** shadcn 表单与展示件 */
 export {
   Button,
   Form,
+  FormItem,
   Input,
-  InputNumber,
-  Radio,
+  RadioGroup,
+  RadioGroupItem,
   Select,
   Slider,
   StatusBadge,
@@ -21,9 +22,9 @@ export {
   SurfaceTitle,
   Switch,
   Textarea,
-  Typography,
   Upload,
   useWatch,
+  useForm,
   type FormInstance,
   type UploadFile,
 } from '../../ui';

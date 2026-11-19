@@ -1,13 +1,22 @@
 import type { ChangeEventHandler } from 'react';
 import type { CapabilityParam } from '../../types/api';
-import { Form, Input, InputNumber, Radio, Slider, Switch, Textarea, useWatch } from './components';
+import {
+  FormItem,
+  Input,
+  RadioGroup,
+  RadioGroupItem,
+  Slider,
+  Switch,
+  Textarea,
+  useWatch,
+} from './components';
 import { PARAM_TEXT_MAX_LENGTH, PARAM_TEXT_ROWS } from './constants';
 
 interface ToolParamFieldProps {
   param: CapabilityParam;
 }
 
-/** 文本参数：value/onChange 由 Form.Item 注入，计数用 useWatch 订阅同一字段。 */
+/** 文本参数：value/onChange 由 FormItem 的 field 提供，计数用 useWatch 订阅同一字段。 */
 function ParamTextArea({
   paramKey,
   maxLength,
@@ -43,75 +52,90 @@ export function ToolParamField({ param }: ToolParamFieldProps) {
   switch (param.type) {
     case 'enum':
       return (
-        <Form.Item name={param.key} label={param.label} tooltip={param.help}>
-          <Radio.Group optionType="button" buttonStyle="solid">
-            {(param.options ?? []).map((option) => (
-              <Radio.Button key={String(option.value)} value={option.value}>
-                {option.label}
-              </Radio.Button>
-            ))}
-          </Radio.Group>
-        </Form.Item>
+        <FormItem name={param.key} label={param.label} description={param.help}>
+          {({ field }) => (
+            <RadioGroup
+              value={String(field.value ?? '')}
+              onValueChange={(value) => field.onChange(value)}
+              aria-label={param.label}
+              className="flex flex-wrap gap-2"
+            >
+              {(param.options ?? []).map((option) => {
+                const value = String(option.value);
+                return (
+                  <label
+                    key={value}
+                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm"
+                  >
+                    <RadioGroupItem value={value} id={`${param.key}-${value}`} />
+                    {option.label}
+                  </label>
+                );
+              })}
+            </RadioGroup>
+          )}
+        </FormItem>
       );
     case 'number':
-      // Slider 与 InputNumber 共享同一个字段: 不能都塞进带 name 的 Form.Item
-      // (兼容层只会把值注入其中一个), 改为受控读写表单状态, 保证两边同步。
       return (
-        <Form.Item
-          label={param.label}
-          tooltip={param.help}
-          shouldUpdate={(prev, next) => prev[param.key] !== next[param.key]}
-          noStyle
-        >
-          {({ getFieldValue, setFieldsValue }) => (
-            <div className="tool-param-field">
-              <span className="tool-param-label">{param.label}</span>
-              <div className="tool-param-number">
-                <Slider
-                  min={param.min}
-                  max={param.max}
-                  step={param.step}
-                  value={getFieldValue(param.key) as number}
-                  onChange={(value) => setFieldsValue({ [param.key]: value })}
-                  tooltip={{ formatter: (value) => String(value) }}
-                />
-                <InputNumber
-                  min={param.min}
-                  max={param.max}
-                  step={param.step}
-                  value={getFieldValue(param.key) as number}
-                  onChange={(value) => setFieldsValue({ [param.key]: value })}
-                />
-              </div>
+        <FormItem name={param.key} label={param.label} description={param.help}>
+          {({ field }) => (
+            <div className="tool-param-number">
+              <Slider
+                min={param.min}
+                max={param.max}
+                step={param.step}
+                value={[Number(field.value ?? param.min ?? 0)]}
+                onValueChange={(next) => field.onChange(Array.isArray(next) ? next[0] : next)}
+                thumbAriaLabel={param.label}
+              />
+              <Input
+                type="number"
+                min={param.min}
+                max={param.max}
+                step={param.step}
+                value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  field.onChange(raw === '' ? null : Number(raw));
+                }}
+                aria-label={param.label}
+              />
             </div>
           )}
-        </Form.Item>
+        </FormItem>
       );
     case 'boolean':
       return (
-        <Form.Item name={param.key} label={param.label} valuePropName="checked" tooltip={param.help}>
-          <Switch />
-        </Form.Item>
+        <FormItem name={param.key} label={param.label} description={param.help}>
+          {({ field }) => (
+            <Switch checked={Boolean(field.value)} onCheckedChange={(next) => field.onChange(next)} />
+          )}
+        </FormItem>
       );
     case 'text':
     default:
       return (
-        <Form.Item
+        <FormItem
           name={param.key}
           label={param.label}
-          tooltip={param.help}
+          description={param.help}
           rules={
             param.pattern
               ? [{ pattern: new RegExp(param.pattern), message: `${param.label}格式不正确` }]
               : undefined
           }
         >
-          <ParamTextArea
-            paramKey={param.key}
-            maxLength={param.maxLength ?? PARAM_TEXT_MAX_LENGTH}
-            placeholder={param.placeholder}
-          />
-        </Form.Item>
+          {({ field }) => (
+            <ParamTextArea
+              paramKey={param.key}
+              maxLength={param.maxLength ?? PARAM_TEXT_MAX_LENGTH}
+              placeholder={param.placeholder}
+              value={field.value as string | undefined}
+              onChange={field.onChange}
+            />
+          )}
+        </FormItem>
       );
   }
 }

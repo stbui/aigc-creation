@@ -548,7 +548,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 `GET /admin/api-logs`（`model.call_read`）记录每次上游调用：`requestKind`（task / tool / test / proxy）、渠道、模型、协议、耗时、结果、`RouteAttempt.failureCode` 与错误摘要，可按状态 / 类型 / 渠道 / 任务 / 用户 / 模型筛选。用于回答「这次扣的是谁、走的是哪条线路、为什么失败」。列表不下发请求 / 响应报文。
 
-`GET /admin/api-logs/:id`（`model.call_read`）返回单条调用详情，在列表字段上补 `upstreamUrl`、`requestContentType`、`requestBody`、`responseBody`。报文是写库前已脱敏与截断的预览文本（密钥字段、内联 base64、超长响应都在写入侧处理），后台详情抽屉原样展示，不做二次裁剪。`:id` 路由必须声明在 `GET /export` 之后 —— 两者都是单段路径，反过来会让导出请求先命中详情、把 `export` 当成 id 去查。
+`GET /admin/api-logs/:id`（`model.call_read`）返回单条调用详情，在列表字段上补 `upstreamUrl`、`requestContentType`、`requestBody`、`responseBody`。报文**明文入库**，保留提示词与上游正文；写入侧只折叠内嵌媒体（data URL / base64 字段 / multipart 文件）并截断超长报文（`model/protocol/call-payload.ts`，256 K 字符上限；中转路径同一套规则）。后台详情抽屉原样展示，不做二次裁剪。报文只经这条接口下发（列表与 CSV 导出都不含），安全边界是 `model.call_read` 权限与 90 天保留期，而不是写入侧过滤。`:id` 路由必须声明在 `GET /export` 之后 —— 两者都是单段路径，反过来会让导出请求先命中详情、把 `export` 当成 id 去查。
 
 `GET /admin/api-logs/export`（`model.call_read + data.export`）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。后台页面不摆放导出按钮：该页用于逐条排障，导出能力保留在接口层，需要时按同一筛选直接调用。
 

@@ -92,7 +92,7 @@
        此前全站有 44 处裸 hex, 其中的 #fff / #fafbfd 各重复十几次, 想调一次底色
        就得全文搜 hex。下面两个是这几处裸 hex 的语义归属。
        （同批的 --brand-bg-tint / --brand-border-soft / --info-text / --info-border
-        只服务 旧版 UI 库后台，2026-10-30 后台改版后已无消费者，一并删除。） */
+        只服务旧版后台，2026-10-30 后台改版后已无消费者，一并删除。） */
   --on-brand: #ffffff; /* 实心色块 (品牌紫/危险红) 上的文字与图标 */
   --brand-gradient-end: #7b5df1;
   --brand-chip-bg: #e9e5ff;

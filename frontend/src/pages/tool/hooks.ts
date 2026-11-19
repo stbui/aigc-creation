@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Asset, CapabilityDef, Task } from '../../types/api';
-import { Upload, type FormInstance, type UploadFile } from '../../ui';
+import { type FormInstance, type UploadFile } from '../../ui';
 import { useAssetLibrary } from '../../hooks/useAssetLibrary';
 import { useCreditLabel } from '../../hooks/useCreditLabel';
 import { useGenerateError } from '../../hooks/useGenerateError';
@@ -62,7 +62,7 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
   const pollSignal = usePollAbort();
   const { allowedLabel, isSupportedImageFile, validateImageFile } = useUploadLimits();
 
-  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [files, setFiles] = useState<UploadFile[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [generating, setGenerating] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
@@ -97,7 +97,7 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
     // 同步更新镜像，保证同一批多选时第二张看到第一张已占用额度
     assetsRef.current = [...current, asset];
     setAssets((prev) => (prev.some((item) => item.id === asset.id) ? prev : [...prev, asset]));
-    setFileList((prev) => [
+    setFiles((prev) => [
       ...prev,
       {
         uid: asset.id,
@@ -113,8 +113,8 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
 
   // 切换能力时重置表单与状态 (默认值来自后端声明)
   useEffect(() => {
-    form.setFieldsValue(def.defaultParams as Record<string, unknown>);
-    setFileList([]);
+    form.reset(def.defaultParams as Record<string, unknown>);
+    setFiles([]);
     setAssets([]);
     assetsRef.current = [];
     setTask(null);
@@ -132,17 +132,17 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
     return outcome.task;
   }
 
-  /** 旧版 UI 库兼容 Upload 的 beforeUpload：校验后走自身上传逻辑 */
-  const beforeUpload = async (file: File): Promise<boolean | string> => {
-    if (generating) return Upload.LIST_IGNORE;
+  /** onSelect 只做校验；上传由本 hook 自己发起。 */
+  const onSelect = async (file: File): Promise<boolean> => {
+    if (generating) return false;
     if (!isSupportedImageFile(file)) {
       message.warning(`请选择图片文件（${allowedLabel}）`);
-      return Upload.LIST_IGNORE;
+      return false;
     }
     const validationError = await validateImageFile(file);
     if (validationError) {
       message.error(`${file.name}：${validationError}`);
-      return Upload.LIST_IGNORE;
+      return false;
     }
     setUploadingCount((count) => count + 1);
     doUpload(file)
@@ -150,8 +150,8 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
         assetsRef.current = [...assetsRef.current, asset];
         setAssets((prev) => [...prev, asset]);
         // 必须落成 UploadFile：直接塞原生 File 时没有 uid / 预览地址，
-        // 缩略图与「移除」都会错位（兼容层会按 uid 定位）。
-        setFileList((prev) => [
+        // 缩略图与「移除」都会错位（列表按 uid 定位）。
+        setFiles((prev) => [
           ...prev,
           {
             uid: asset.id,
@@ -166,29 +166,29 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
       })
       .catch((cause: Error) => message.error(cause.message || '上传失败'))
       .finally(() => setUploadingCount((count) => Math.max(0, count - 1)));
-    return false; // 阻止兼容层自动请求, 走自己的上传逻辑
+    return false; // 不进入 files；上传成功后由 doUpload 写回
   };
 
   const removeFile = (file: UploadFile) => {
     if (generating) return;
-    const index = fileList.findIndex((item) => item.uid === file.uid);
+    const index = files.findIndex((item) => item.uid === file.uid);
     if (index >= 0) {
       assetsRef.current = assetsRef.current.filter((_, current) => current !== index);
       setAssets((prev) => prev.filter((_, current) => current !== index));
     }
-    setFileList((prev) => prev.filter((item) => item.uid !== file.uid));
+    setFiles((prev) => prev.filter((item) => item.uid !== file.uid));
   };
 
   const onSubmit = async () => {
     if (generating || uploadingCount > 0) return;
-    if (fileList.length < inputs) {
+    if (files.length < inputs) {
       message.warning(`请先上传 ${inputs} 张图片`);
       return;
     }
     setGenerating(true);
     setTask(null);
     try {
-      const params = form.getFieldsValue();
+      const params = form.getValues();
       const projectId = await ensureProject();
       const modelKey = await resolveModelKey(def.id);
       const inputAssetIds = assetsRef.current.map((asset) => asset.id);
@@ -239,14 +239,14 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
   return {
     inputs,
     creditLabel,
-    fileList,
+    files,
     assets,
     generating,
     uploadingCount,
     task,
     resultUrl: task?.outputAsset ? assetSrc(task.outputAsset) : undefined,
     library,
-    beforeUpload,
+    onSelect,
     removeFile,
     onSubmit,
     clearResult,

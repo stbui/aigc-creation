@@ -1,8 +1,7 @@
 /**
- * C 端 ui 兼容层（ui-* 类）。
+ * C 端 UI 基线（ui-* 类）。
  *
- * 从 global.css 迁出；由 global.css 在 ui/styles.css 之前 @import，
- * 保证页面皮肤仍能压过基线。
+ * 由 global.css 在 ui/styles.css 之前 @import，保证页面皮肤仍能压过基线。
  */
 
 /* * 生成设置的紧凑控件：参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
@@ -35,20 +34,11 @@
   flex-direction: column;
 }
 
-.ui-form-item {
-  margin-bottom: 18px;
-}
-
-.ui-form.is-vertical .ui-form-label {
+.ui-form-label {
   display: block;
   margin-bottom: 6px;
   font-size: 13px;
   color: var(--text-body);
-}
-
-.ui-form-control {
-  display: flex;
-  flex-direction: column;
 }
 
 .ui-form-error {
@@ -58,12 +48,12 @@
   color: var(--danger-text);
 }
 
-/* ui 兼容层的按钮基线放在 components 层：页面自己的按钮皮肤（.login-submit /
+/* C 端按钮基线放在 components 层：页面自己的按钮皮肤（.login-submit /
    .pk-primary-btn …）是未分层样式，必须能压过基线；若基线留在未分层区且靠后，
    会按源码顺序反向覆盖所有页面按钮。 */
 
 @layer components {
-  .ui-btn {
+  .ui-action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -81,50 +71,50 @@
     transition: background 0.15s, border-color 0.15s, color 0.15s;
   }
 
-  .ui-btn:hover:not(:disabled) {
+  .ui-action:hover:not(:disabled) {
     border-color: var(--brand);
     color: var(--brand);
   }
 
-  .ui-btn.is-primary {
+  .ui-action.is-primary {
     border-color: var(--brand);
     background: var(--brand);
     color: var(--on-brand);
   }
 
-  .ui-btn.is-primary:hover:not(:disabled) {
+  .ui-action.is-primary:hover:not(:disabled) {
     border-color: var(--brand-hover);
     background: var(--brand-hover);
     color: var(--on-brand);
   }
 
-  .ui-btn.is-ghost {
+  .ui-action.is-ghost {
     border-color: transparent;
     background: transparent;
     color: var(--text-body);
   }
 
-  .ui-btn.is-ghost:hover:not(:disabled) {
+  .ui-action.is-ghost:hover:not(:disabled) {
     background: var(--brand-bg);
     color: var(--brand);
   }
 
-  .ui-btn.is-danger {
+  .ui-action.is-danger {
     border-color: var(--danger-text);
     background: var(--danger-text);
     color: var(--on-brand);
   }
 
-  /* 危险态必须显式覆盖通用 hover：`.ui-btn:hover:not(:disabled)` 的特异性
-     3 > `.ui-btn.is-danger` 的 2，不写这条会让危险按钮 hover 时文字变品牌紫、
+  /* 危险态必须显式覆盖通用 hover：`.ui-action:hover:not(:disabled)` 的特异性
+     3 > `.ui-action.is-danger` 的 2，不写这条会让危险按钮 hover 时文字变品牌紫、
      压在红底上（删除确认里最容易被看到的一处）。 */
-  .ui-btn.is-danger:hover:not(:disabled) {
+  .ui-action.is-danger:hover:not(:disabled) {
     border-color: color-mix(in srgb, var(--danger-text) 86%, var(--mask-opaque));
     background: color-mix(in srgb, var(--danger-text) 86%, var(--mask-opaque));
     color: var(--on-brand);
   }
 
-  .ui-btn:disabled {
+  .ui-action:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
@@ -204,133 +194,6 @@
 
 .ui-modal-body {
   min-height: 0;
-}
-
-.ui-radio-group {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.ui-radio,
-  .ui-radio-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-body);
-}
-
-.ui-radio input,
-  .ui-radio-button input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.ui-radio::before {
-  content: '';
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--card-bg);
-}
-
-.ui-radio.is-checked::before,
-  .ui-radio input:checked + span::before {
-  border-color: var(--brand);
-  background: radial-gradient(circle, var(--brand) 0 3px, var(--card-bg) 3.5px);
-}
-
-.ui-radio-group.is-button {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: var(--radius-control);
-  background: var(--surface);
-}
-
-.ui-radio-group.is-button .ui-radio-button {
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 6px;
-  color: var(--text-body);
-}
-
-.ui-radio-group.is-button .ui-radio-button:has(input:checked) {
-  background: var(--card-bg);
-  color: var(--brand);
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
-}
-
-.ui-radio-group.is-solid .ui-radio-button:has(input:checked) {
-  background: var(--brand);
-  color: var(--on-brand);
-}
-
-.ui-radio-group.is-disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.ui-switch {
-  flex: none;
-}
-
-.ui-slider {
-  width: 100%;
-  height: 4px;
-  margin: 0;
-  appearance: none;
-  border-radius: var(--radius-pill);
-  background-color: var(--border);
-  background-image: linear-gradient(var(--brand), var(--brand));
-  background-repeat: no-repeat;
-  outline: none;
-  cursor: pointer;
-}
-
-.ui-slider::-webkit-slider-thumb {
-  width: 16px;
-  height: 16px;
-  appearance: none;
-  border: 2px solid var(--brand);
-  border-radius: 50%;
-  background: var(--card-bg);
-  box-shadow: 0 1px 3px rgb(15 23 42 / 0.18);
-}
-
-.ui-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--brand);
-  border-radius: 50%;
-  background: var(--card-bg);
-}
-
-.ui-slider:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ui-input-number {
-  box-sizing: border-box;
-  width: 100%;
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--card-bg);
-  color: var(--text-1);
-  font: inherit;
-  font-size: 13px;
-}
-
-.ui-input-number:focus-visible {
-  outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgb(98 93 245 / 0.1);
 }
 
 .ui-upload {
@@ -419,141 +282,6 @@
   line-height: 16px;
   text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-.ui-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 32px 16px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.ui-alert {
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  font-size: 13px;
-}
-
-.ui-alert p {
-  margin: 4px 0 0;
-  color: var(--text-body);
-}
-
-.ui-alert.is-error {
-  border-color: var(--danger-text);
-  background: var(--danger-soft-bg);
-  color: var(--danger-text);
-}
-
-.ui-alert.is-warning {
-  border-color: var(--warn-border);
-  background: var(--warn-bg);
-  color: var(--warn-text);
-}
-
-.ui-alert.is-success {
-  border-color: var(--success-border);
-  background: var(--success-soft-bg);
-  color: var(--success-text);
-}
-
-.ui-pagination {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ui-pagination-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--card-bg);
-  color: var(--text-body);
-  cursor: pointer;
-}
-
-.ui-pagination-btn:hover:not(:disabled) {
-  border-color: var(--brand);
-  color: var(--brand);
-}
-
-.ui-pagination-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.ui-pagination-status {
-  font-size: 13px;
-  color: var(--text-body);
-}
-
-.ui-table-wrap {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.ui-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.ui-table th,
-  .ui-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: middle;
-}
-
-.ui-table th {
-  color: var(--text-body);
-  font-weight: 600;
-  background: var(--surface);
-  white-space: nowrap;
-}
-
-.ui-table.is-small th,
-  .ui-table.is-small td {
-  padding: 8px 10px;
-}
-
-.ui-popconfirm {
-  min-width: 200px;
-  padding: 12px;
-}
-
-.ui-popconfirm-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.ui-popconfirm-desc {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--text-desc);
-}
-
-.ui-popconfirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.ui-text-secondary {
-  color: var(--text-body);
 }
 
 /* 表单控件：Select 触发器和 Input 仍沿用业务字段的 32px 小尺寸 */

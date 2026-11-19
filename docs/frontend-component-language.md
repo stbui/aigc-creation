@@ -79,10 +79,10 @@
 | 展示完整数据状态 | `StateSkeleton` / `StateEmpty` / `StateError` 或后台对应组件 | 用一行“加载中”“暂无数据”代替 | 状态判定顺序遵循反馈规范 |
 | 瞬时操作反馈 | Toast | 用 Toast 承载必须持续阅读的结果 | 成功、警示、失败时长由 Provider 统一 |
 | 页面内持续提示 | `Notice` / `InlineAlert` | 用 Toast 代替字段错误或不可恢复风险 | `danger` 使用警告语义，不只换颜色 |
-| 确认不可逆动作 | `ConfirmDialog` / `ConfirmAlert` / `Popconfirm` | 点击即删除或退款 | 写明对象、后果、可否撤销与影响数量 |
+| 确认不可逆动作 | `ConfirmDialog` / `ConfirmAlert` / `modal.confirm` | 点击即删除或退款 | 写明对象、后果、可否撤销与影响数量 |
 | 查看详情 | `Drawer` / `AdminDrawer` | 所有详情无条件跳新页面 | 保留列表筛选和返回上下文 |
 | 聚焦完成一个短表单或并排详情 | `ModalDialog` / `Modal` | 用多个弹层串联流程 | 每个弹层只承担一个决策 |
-| 短暂附加操作 | `Dropdown` / `RowMenu` / `Popover` | 把关键操作只藏在 hover 中 | 触发器必须有可读名称与键盘入口 |
+| 短暂附加操作 | `DropdownMenu` / `RowMenu` / `Popover` | 把关键操作只藏在 hover 中 | 触发器必须有可读名称与键盘入口 |
 
 ### 4.1 按钮语言
 
@@ -417,8 +417,8 @@ C 端日期按展示密度选择 `frontend/src/lib/format.ts`：`formatDate` 只
 
 ## 15. 已知缺口
 
-- C 端 `Button` 仍保留 旧版 UI 库风格兼容参数，存在 `type` / `variant` 两套外观入口；新组件不应继续复制这种双轨 API，存量收敛需单独评估。
-- C 端 `Badge` 表示数字角标，后台 `Badge` / `RadarBadge` 表示标签；同名词的职责需要根据公开入口理解，跨端新增组件必须使用更明确的名称。
+- 旧版组件库的兼容层已清除：C 端 `Button` 只剩 `variant` / `size` 一套外观入口，表单、表格、分页、页签与浮层都直接组合 shadcn 原子件。
+- 图标角标使用 `CountBadge`，与表示标签的 `Badge` / `RadarBadge` 区分；跨端新增组件必须使用更明确的名称。
 - `className` 与 `style` 仍可在调用点覆盖部分视觉，`verify:conventions` 目前只强制最小字号等少数规则，组件 API 约束主要依赖评审。
 - 公开入口尚无统一的 API 契约快照或禁止直连检查；新增组件仍需测试与人工核对。
 - 状态映射只覆盖已登记跨域状态，领域内状态仍应在所属目录集中维护，不能在各页面重复写文案。

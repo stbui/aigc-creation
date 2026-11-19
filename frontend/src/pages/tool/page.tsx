@@ -2,7 +2,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 import type { CapabilityDef } from '../../types/api';
-import { AssetLibraryModal, Button, ExceptionPage, Form } from './components';
+import { AssetLibraryModal, Button, ExceptionPage, useForm } from './components';
 import { useDocumentMeta, useToolPageTask } from './hooks';
 import { IS_PROD, capabilityById, runtimeOf, toolPath } from './utils';
 import { ToolPageHeader } from './ToolPageHeader';
@@ -64,8 +64,8 @@ export function ToolPage() {
    * 下线与「模型通道没配」两种情况 —— 两者的共同点是
    * **按下去必然失败**，所以直接换成说明页，而不是让用户上传完图才收到报错。
    *
-   * 可用性判断放在表单组件之外：`Form.useForm` 一旦创建就必须挂上 <Form>，
-   * 在全量不可用/能力不存在时提前 return 会触发未连接警告。
+   * 可用性判断放在表单组件之外：表单实例一旦创建就要挂上 <Form>；
+   * 在全量不可用/能力不存在时提前 return 可以少做一次无意义的初始化。
    */
   const runtime = runtimeOf(def);
   const blocked = runtime.effective === 'disabled' || runtime.effective === 'unavailable';
@@ -90,7 +90,7 @@ export function ToolPage() {
 
 function ToolPageContent({ def }: { def: CapabilityDef }) {
   useDocumentMeta(`${def.name} · 货觉AI`, def.summary);
-  const [form] = Form.useForm();
+  const form = useForm<Record<string, unknown>>();
   const state = useToolPageTask(def, form);
 
   return (
@@ -110,11 +110,11 @@ function ToolPageContent({ def }: { def: CapabilityDef }) {
           form={form}
           inputs={state.inputs}
           creditLabel={state.creditLabel}
-          fileList={state.fileList}
+          files={state.files}
           assets={state.assets}
           generating={state.generating}
           uploadingCount={state.uploadingCount}
-          beforeUpload={state.beforeUpload}
+          onSelect={state.onSelect}
           onRemoveFile={state.removeFile}
           onOpenLibrary={state.library.openLibrary}
           onSubmit={() => void state.onSubmit()}

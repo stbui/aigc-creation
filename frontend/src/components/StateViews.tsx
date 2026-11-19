@@ -10,17 +10,17 @@ import { Button } from '../ui';
  * 2026-10-20 抽取。此前「加载中 / 空 / 失败」三种态在 20+ 个页面各写一遍,
  * 且实现分裂成四套互不相容的写法:
  *
- *   ① 旧版 UI 库 `<Empty>`  —— WorkbenchPage / StatsPage / ToolPage / AdminWidgets,
- *      用的是 旧版 UI 库默认灰蓝插画, 与站内自绘的品牌紫插画不是同一套设计语言
+ *   ① 旧的 `<Empty>`  —— WorkbenchPage / StatsPage / ToolPage / AdminWidgets,
+ *      用的是默认灰蓝插画, 与站内自绘的品牌紫插画不是同一套设计语言
  *      (ExceptionPage 抽取时已认定该问题, 但只修了异常页, 普通空态没修)。
- *   ② 旧版 UI 库 `<Spin>`   —— App.tsx / StatsPage / ToolPage / AdminWidgets。
+ *   ② 旧的 `<Spin>`   —— App.tsx / StatsPage / ToolPage / AdminWidgets。
  *   ③ lucide `Loader2` + 自定义 CSS 动画 —— WorksPage / LibraryPage / PackagesPage。
  *   ④ 纯文本          —— CreditsPage「正在加载…」、InvitationsPage「加载中…」
  *      直接拿 h2/p 充当加载指示器。
  *
  * 四套并行的代价不是"不好看", 而是**行为不一致**:
- *   - 只有 旧版 UI 库 Empty 一套能撑住"失败"语义, 于是「加载失败」被大量页面
- *     直接渲染成 旧版 UI 库 Empty 或纯文本, 用户分不清"没数据"还是"没连上";
+ *   - 只有旧的 Empty 一套能撑住"失败"语义, 于是「加载失败」被大量页面
+ *     直接渲染成 Empty 或纯文本, 用户分不清"没数据"还是"没连上";
  *   - 加载态只有 §④ 那两处是纯文本, 慢网下用户以为页面是空的。
  *
  * 本组件收敛为一套: 骨架屏(占位防跳动) + 空态 + 失败态 + 行内加载,

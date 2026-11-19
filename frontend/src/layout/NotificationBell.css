@@ -6,14 +6,14 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    顶导消息铃铛 (B4, 2026-10-21)
    与 .app-quota 同一视觉尺度: 32px 高、12px 字号、中性色, 避免在 64px 顶栏里
-   抢过品牌与导航。未读角标由 旧版 UI 库 Badge 托管, 不自定义。
+   抢过品牌与导航。未读角标由 CountBadge 托管, 不自定义。
    ───────────────────────────────────────────────────────────────────────────── */
 .app-notif-trigger {
   width: 32px;
 }
 
 /* 未读角标压到 12px 并加 2px 白描边: 18px 铃铛上的默认角标会糊成一团红点。
-   角标的实际 DOM 是 .ui-badge-count，
+   角标的实际 DOM 是 [data-slot='badge-count']，
    覆盖规则见文件末尾「消息角标」适配层。 */
 .app-notif-panel {
   width: 320px;
@@ -94,7 +94,7 @@
   color: var(--text-desc);
 }
 
-.app-notif-trigger .ui-badge-count {
+.app-notif-trigger [data-slot='badge-count'] {
   min-width: 16px;
   height: 16px;
   padding: 0 4px;

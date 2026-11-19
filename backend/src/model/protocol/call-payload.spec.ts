@@ -38,9 +38,11 @@ describe('调用记录报文预览', () => {
   });
 
   it('不会把代理对切成半个字符', () => {
-    const text = `${'a'.repeat(9)}😀tail`;
-    const cut = truncateCallPayload(text, 10);
-    expect(cut.startsWith(`${'a'.repeat(9)}…`)).toBe(true);
+    const text = '😀'.repeat(200);
+    const cut = truncateCallPayload(text, 100);
+    expect(cut.length).toBeLessThanOrEqual(100);
+    // 末尾若留下孤立的高位代理，前端会出现替换符
+    expect(cut).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
   });
 
   it('非 JSON 响应原样保留，二进制只报体积', () => {

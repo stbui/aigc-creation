@@ -80,7 +80,7 @@ body {
  * 全局键盘焦点环（WCAG 2.2 AA，见 `docs/accessibility.md` §1「焦点必须可见」）。
  *
  * 此前焦点样式是 12 处零散覆盖（auth / tool-workspace / redraw / product-detail-kit /
- * AppSidebar / ui-compat），没被覆盖到的裸 `<button>` 与 `<a onClick>` 在 Tab 遍历时
+ * AppSidebar / ui.css），没被覆盖到的裸 `<button>` 与 `<a onClick>` 在 Tab 遍历时
  * 完全看不到焦点 —— 键盘用户无法定位。
  *
  * 三条约束，改动时勿破坏：

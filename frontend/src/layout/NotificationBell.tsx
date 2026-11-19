@@ -1,6 +1,6 @@
 import './NotificationBell.css';
 import { useState } from 'react';
-import { Badge, Button, Empty, Popover, Spin } from '../ui';
+import { Button, CountBadge, Popover, Spin } from '../ui';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatRelativeTime } from '../lib/format';
@@ -46,7 +46,7 @@ export function NotificationBell() {
             <Spin className="size-4" />
           </div>
         ) : items.length === 0 ? (
-          <Empty description="暂无消息" />
+          <p className="app-notif-empty">暂无消息</p>
         ) : (
           items.map((n) => (
             <button
@@ -78,9 +78,9 @@ export function NotificationBell() {
       className="app-notif-popover"
     >
       <button type="button" className="app-header-action app-notif-trigger" aria-label={unread ? `消息通知，${unread} 条未读` : '消息通知'}>
-        <Badge count={unread}>
+        <CountBadge count={unread}>
           <Bell size={18} />
-        </Badge>
+        </CountBadge>
       </button>
     </Popover>
   );

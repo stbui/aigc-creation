@@ -94,22 +94,23 @@
   }
 }
 
-/* ───────── C 端 shadcn 适配层（替代 旧版 UI 库的兼容外观） ─────────
-   只新增 ui-* / login-input-* 选择器，不改原有页面类。
+/* ───────── C 端 shadcn 适配层 ─────────
+   只新增 ui-* / login-input-* 选择器与 data-slot，不改原有页面类。
    颜色、圆角、字号全部消费 :root 令牌，保持与迁移前一致。
 
    【选择器与 DOM 的对应关系】页面样式只能命中真实存在的节点。当前
-   `frontend/src/ui/primitives/**` 实际输出的兼容类只有这些：
-     .ui-btn / .ui-alert / .ui-input
-     .ui-form-item / .ui-form-label / .ui-form-control / .ui-form-error
+   `frontend/src/ui/primitives/**` 实际输出的类只有这些：
+     .ui-action / .ui-input
+     .ui-form-label / .ui-form-error
      .ui-select-trigger / .ui-dropdown-content / .ui-dropdown-item
-     .ui-tabs-list / .ui-badge-count / .ui-text-secondary
+     .ui-badge-count / [data-slot="badge-count"]
      .login-input-wrap / .login-input-inner / .login-input-prefix
      .login-textarea-count
      .ui-modal-head / .ui-modal-body / [data-slot="c-modal-container"]
      （弹窗外壳，见 ui/primitives/modal.tsx）
-   写页面样式时按这份清单取类名，不要照抄历史文档里的旧 UI 库类名 ——
-   它们已不存在，写了也不命中。
+   写页面样式时按这份清单取类名；Tabs / 表格 / 分页直接用 shadcn 的
+   `[data-slot="tabs-list"]` / `[data-slot="table-head"]` 等槽位，
+   次要文字用 shadcn 的 `text-muted-foreground`。
    Tag / Card / Row / Col 已直连 shadcn（.credits-status / Surface 等走
    `[data-slot]` 选择器），不再输出 .ui-tag / .ui-card / .ui-row / .ui-col。 */
 

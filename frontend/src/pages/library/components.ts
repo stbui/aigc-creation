@@ -35,7 +35,6 @@ export {
   InlineAlertDescription,
   Input,
   Modal,
-  Popconfirm,
   Select,
   SelectContent,
   SelectGroup,

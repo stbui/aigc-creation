@@ -12,50 +12,52 @@ export interface UploadFile {
 }
 
 export interface UploadProps {
+  /** 触发按钮内容 */
   children?: ReactNode;
-  /** 目前 C 端只使用 picture-card，但保留属性避免页面改动。 */
-  listType?: 'text' | 'picture' | 'picture-card';
-  fileList?: UploadFile[];
+  /** 已选文件；由调用方持有，组件只负责渲染与转交选择结果 */
+  files?: UploadFile[];
   accept?: string;
   multiple?: boolean;
+  /** 位子上限；达到后不再显示触发按钮 */
   maxCount?: number;
   disabled?: boolean;
   className?: string;
-  beforeUpload?: (file: File, fileList: File[]) => boolean | Promise<boolean | string> | string;
+  /** 返回 false 表示拒收该文件；不会替调用方发起上传 */
+  onSelect?: (file: File, files: File[]) => boolean | Promise<boolean>;
   onRemove?: (file: UploadFile) => boolean | void | Promise<boolean | void>;
-  onChange?: (info: { fileList: UploadFile[] }) => void;
+  onFilesChange?: (files: UploadFile[]) => void;
   onPreview?: (file: UploadFile) => void;
-  showUploadList?: boolean;
+  /** 是否在缩略图上显示移除按钮 */
+  showRemove?: boolean;
 }
 
-const LIST_IGNORE = 'LIST_IGNORE';
-
-function UploadInner({
+export function Upload({
   children,
-  fileList = [],
+  files = [],
   accept,
   multiple,
   maxCount,
   disabled,
   className,
-  beforeUpload,
-  onChange,
+  onSelect,
+  onFilesChange,
   onRemove,
   onPreview,
-  showUploadList = true,
+  showRemove = true,
 }: UploadProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const keyOf = (file: UploadFile, index: number) =>
     String(file.uid ?? (file.originFileObj as File & { uid?: string | number })?.uid ?? `${file.name}-${index}`);
 
-  const pick = async (files: FileList | null) => {
-    if (!files || disabled) return;
-    const remaining = maxCount === undefined ? files.length : Math.max(0, maxCount - fileList.length);
-    const picked = Array.from(files).slice(0, remaining);
+  const pick = async (pickedFiles: FileList | null) => {
+    if (!pickedFiles || disabled) return;
+    const remaining =
+      maxCount === undefined ? pickedFiles.length : Math.max(0, maxCount - files.length);
+    const picked = Array.from(pickedFiles).slice(0, remaining);
     const accepted: UploadFile[] = [];
     for (const [index, file] of picked.entries()) {
-      const result = await beforeUpload?.(file, picked);
-      if (result === false || result === LIST_IGNORE) continue;
+      const result = await onSelect?.(file, picked);
+      if (result === false) continue;
       accepted.push({
         uid: `${Date.now()}-${index}-${file.name}`,
         name: file.name,
@@ -63,7 +65,7 @@ function UploadInner({
         originFileObj: file,
       });
     }
-    if (accepted.length > 0) onChange?.({ fileList: [...fileList, ...accepted] });
+    if (accepted.length > 0) onFilesChange?.([...files, ...accepted]);
   };
 
   return (
@@ -91,7 +93,7 @@ function UploadInner({
         }}
       />
       <div className="ui-upload-list">
-        {fileList.map((file, index) => (
+        {files.map((file, index) => (
           <div key={keyOf(file, index)} className="ui-upload-item">
             {(file.thumbUrl || file.url) && (
               <button
@@ -103,7 +105,7 @@ function UploadInner({
                 <img src={file.thumbUrl ?? file.url} alt={file.name} />
               </button>
             )}
-            {showUploadList && (
+            {showRemove && (
               <button
                 type="button"
                 className="ui-upload-remove"
@@ -116,7 +118,7 @@ function UploadInner({
             )}
           </div>
         ))}
-        {(!maxCount || fileList.length < maxCount) && (
+        {(!maxCount || files.length < maxCount) && (
           <button
             type="button"
             className="ui-upload-trigger"
@@ -130,6 +132,3 @@ function UploadInner({
     </div>
   );
 }
-
-/** 旧版 UI 库 Upload 的兼容壳：C 端只用 picture-card + 自定义上传逻辑。 */
-export const Upload = Object.assign(UploadInner, { LIST_IGNORE });

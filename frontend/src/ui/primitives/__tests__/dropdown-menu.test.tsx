@@ -3,19 +3,24 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
-import { Dropdown } from '../dropdown';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../index';
 
-describe('Dropdown 链接项', () => {
+describe('DropdownMenu 链接项', () => {
   it('to 把整行渲染为链接，而不是按钮伪装的路由跳转', async () => {
     render(
       <MemoryRouter>
-        <Dropdown
-          menu={{
-            items: [{ key: 'works', label: '我的作品', to: '/works' }],
-          }}
-        >
-          <button type="button">打开菜单</button>
-        </Dropdown>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button">打开菜单</button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <a href="/works">我的作品</a>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </MemoryRouter>,
     );
 

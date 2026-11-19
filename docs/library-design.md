@@ -147,7 +147,7 @@
 | Primary | `Button type="primary"` → `default` | 品牌紫底、白字、42px 高、8px 圆角 | 上传素材、空态主动作 |
 | Outline | `Button` / `type="default"` → `outline` | 白底、常规边框、次要文字 | 刷新、筛选触发器 |
 | Ghost | `Button type="text"` → `ghost` | 透明底、按上下文着色 | 批量下载、取消选择、卡片操作 |
-| Danger | `danger` / `Popconfirm okButtonProps.danger` | 危险色文字与确认态 | 删除素材及其产出记录 |
+| Danger | `Button variant="destructive"` | 危险色文字与确认态 | 删除素材及其产出记录 |
 | Pill | `ToggleGroup` + `outline` | 32px 高、胶囊圆角 | 分组方式、分组结果 |
 
 ### 6.2 尺寸
@@ -178,7 +178,7 @@
 | 分组方式 | `ToggleGroup` | 单选，2–7 项；不使用循环 Button 手写选中态 |
 | 分组结果 | `ToggleGroup` | “全部素材” + 当前聚合组，显示计数 |
 | 多选素材 | `Checkbox` | 22 × 22，绝对定位封面左上角 |
-| 删除确认 | `Popconfirm` | 说明影响范围，确认按钮使用危险态 |
+| 删除确认 | `modal.confirm({ danger: true })` | 说明影响范围，确认按钮使用危险态 |
 
 筛选规则：
 
@@ -311,7 +311,7 @@
 | 素材多选 | `Checkbox` |
 | 来源标记 | `StatusBadge` |
 | 空态 | `EmptyState` + `EmptyStateMedia` + `EmptyStateHeader` + `EmptyStateTitle` + `EmptyStateDescription` + `EmptyStateContent` |
-| 删除确认 | `Popconfirm` |
+| 删除确认 | `modal.confirm({ danger: true })` |
 
 实现规则：
 

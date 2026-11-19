@@ -39,31 +39,38 @@ import { Input as ShadcnInput } from '~/admin-ui/components/ui/input';
 export { ShadcnInput as Input };
 export type InputProps = ComponentProps<typeof ShadcnInput>;
 
-export { Radio } from './primitives/radio';
-export { Slider } from './primitives/slider';
-export { InputNumber } from './primitives/input-number';
+export { RadioGroup, RadioGroupItem } from '~/admin-ui/components/ui/radio-group';
+export { Slider } from '~/admin-ui/components/ui/slider';
 export { NumberStepper, type NumberStepperProps } from './primitives/number-stepper';
 export { Upload, type UploadFile, type UploadProps } from './primitives/upload';
 export { Modal, type ModalProps } from './primitives/modal';
 export { Drawer, type DrawerProps } from './primitives/drawer';
 export { Popover, type PopoverProps } from './primitives/popover';
-export { Dropdown, type DropdownProps, type DropdownItem } from './primitives/dropdown';
-export { Avatar, type AvatarProps } from './primitives/avatar';
-export { Badge, type BadgeProps } from './primitives/badge';
-export { Empty, type EmptyProps } from './primitives/empty';
-export { Popconfirm, type PopconfirmProps } from './primitives/popconfirm';
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '~/admin-ui/components/ui/dropdown-menu';
+export { CountBadge, type CountBadgeProps } from './primitives/count-badge';
 import { Spinner } from '~/admin-ui/components/ui/spinner';
 
 export { Spinner as Spin };
-export { Tabs, type TabsProps, type TabItem } from './primitives/tabs';
-export { Pagination, type PaginationProps } from './primitives/pagination';
-export { Table, type TableProps, type TableColumn } from './primitives/table';
-export { Typography } from './primitives/misc';
 export { UiDialog } from './primitives/dialog';
 export { ToggleGroup, type ToggleGroupOption, type ToggleGroupProps } from './primitives/toggle-group';
-export { Form, FormItem, useForm, useWatch, type FormInstance } from './primitives/form';
+export {
+  Form,
+  FormItem,
+  useForm,
+  useWatch,
+  type FormInstance,
+  type FormItemProps,
+  type FormItemRule,
+} from './primitives/form';
 
-/* shadcn 组合式原子件的 C 端别名：避免与 旧版 UI 库兼容壳 Card 同名冲突。 */
+/* shadcn 组合式原子件的 C 端别名。 */
 export {
   Card as Surface,
   CardHeader as SurfaceHeader,
@@ -91,9 +98,35 @@ export {
   Tabs as NavigationTabs,
   TabsList as NavigationTabsList,
   TabsTrigger as NavigationTabsTrigger,
+  TabsContent as NavigationTabsContent,
 } from '~/admin-ui/components/ui/tabs';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from '~/admin-ui/components/ui/tabs';
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableCaption,
+} from '~/admin-ui/components/ui/table';
+export {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationEllipsis,
+} from '~/admin-ui/components/ui/pagination';
 export { Separator } from '~/admin-ui/components/ui/separator';
 export { Skeleton } from '~/admin-ui/components/ui/skeleton';
+export {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+} from '~/admin-ui/components/ui/avatar';
 export {
   Field,
   FieldContent,

@@ -8,7 +8,8 @@
  *   1. **写日志永不抛错**（返回布尔）：调用已经发生，日志写失败不能把成功请求
  *      变成失败响应；但计费侧必须知道结果 —— 日志缺失时 Token 账单无法结算，
  *      调用方据此转 `uncertain` 而不是按预授权金额结清；
- *   2. 请求 / 响应报文先过 `sanitizeCallPayload`：密钥与内嵌媒体不进库。
+ *   2. 请求 / 响应报文按 `formatCallPayload` 入库：明文保留提示词与上游正文，
+ *      只折叠内嵌媒体并截断超长报文。报文只经后台详情接口（`model.call_read`）下发。
  */
 
 import { Injectable, Logger } from '@nestjs/common';

@@ -50,7 +50,7 @@
   font-weight: 600;
 }
 
-/* 批次状态: 深色前景 + 淡底胶囊, 不再用 旧版 UI 库预设 success / error 的 2.41:1 绿字
+/* 批次状态: 深色前景 + 淡底胶囊, 不再用预设 success / error 的 2.41:1 绿字
    （Tag 的 DOM 形见文件末尾「状态标签」适配层 .credits-status[data-slot="badge"]） */
 .credits-status.is-active {
   color: var(--credits-plus);
@@ -157,11 +157,12 @@
 }
 
 /*
- * 加列后不再靠压缩列宽把整表塞进卡片：兼容层的 scroll.x 只开横向滚动开关，
- * 不设最小宽度，桌面窄窗口里单据短 ID 会被挤断。这里按两表列宽之和兜底。
+ * 加列后不再靠压缩列宽把整表塞进卡片：shadcn Table 自带横向滚动容器，
+ * 最小宽度由面板上的 `min-w-[850px]` 兜底。这里补充卡片内的表格视觉。
  */
-.credits-list-card .ui-table {
-  min-width: 850px;
+.credits-list-card [data-slot='table-head'] {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /*
@@ -268,7 +269,7 @@
 }
 
 /* 积分 Tabs：与「我的作品」同款线形页签（品牌色下划线），不用 shadcn 默认灰底胶囊 */
-.credits-list-card .ui-tabs-list {
+.credits-list-card [data-slot='tabs-list'] {
   gap: var(--space-24);
   margin-bottom: var(--space-12);
   padding: 0;
@@ -277,7 +278,7 @@
   background: transparent;
 }
 
-.credits-list-card .ui-tabs-list [data-slot='tabs-trigger'] {
+.credits-list-card [data-slot='tabs-list'] [data-slot='tabs-trigger'] {
   flex: none;
   height: auto;
   padding: 0 0 var(--space-12);
@@ -288,17 +289,17 @@
   box-shadow: none;
 }
 
-.credits-list-card .ui-tabs-list [data-slot='tabs-trigger']:hover {
+.credits-list-card [data-slot='tabs-list'] [data-slot='tabs-trigger']:hover {
   color: var(--text-body);
 }
 
-.credits-list-card .ui-tabs-list [data-slot='tabs-trigger'][data-state='active'] {
+.credits-list-card [data-slot='tabs-list'] [data-slot='tabs-trigger'][data-state='active'] {
   background: transparent;
   color: var(--brand);
   box-shadow: none;
 }
 
-.credits-list-card .ui-tabs-list [data-slot='tabs-trigger']::after {
+.credits-list-card [data-slot='tabs-list'] [data-slot='tabs-trigger']::after {
   bottom: -1px;
   height: 2px;
   background: var(--brand);

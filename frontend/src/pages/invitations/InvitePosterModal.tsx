@@ -17,9 +17,7 @@ export function InvitePosterModal({ open, posterUrl, onClose, onDownload }: Invi
       onCancel={onClose}
       footer={null}
       width={420}
-      centered
       title="邀请海报"
-      destroyOnHidden
     >
       {posterUrl && <img src={posterUrl} alt="邀请海报" className="invite-poster-image" />}
       <Button

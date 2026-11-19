@@ -9,7 +9,7 @@
  *
  * 安全边界在访问控制层，不在写入层：报文只经 `GET /admin/api-logs/:id`
  * （`model.call_read`）下发，列表与 CSV 导出都不含报文；上游凭证由服务端注入
- * 请求头，不进入 `spec.body`。中转路径另见 `proxy.payload.sanitizeCallPayload`。
+ * 请求头，不进入 `spec.body`。中转路径另见 `proxy.payload.formatCallPayload`。
  *
  * 三条写入路径（生成任务、后台连通性测试、文本工具）共用这里的上限，避免
  * 「任务页能看到完整响应、调用记录页只剩 4 KB」这种口径分裂。
@@ -21,10 +21,7 @@ export const CALL_PAYLOAD_PREVIEW_CHARS = 256 << 10;
 const INLINE_MEDIA = /(data:[^;"]+;base64,)[A-Za-z0-9+/=]{64,}/g;
 
 /** 截断到报文上限：不从代理对中间切开，否则前端会出现半个字符 */
-export function truncateCallPayload(
-  value: string,
-  limit = CALL_PAYLOAD_PREVIEW_CHARS,
-): string {
+export function truncateCallPayload(value: string, limit = CALL_PAYLOAD_PREVIEW_CHARS): string {
   const text = String(value ?? '');
   if (text.length <= limit) return text;
   const marker = `… [报文已截断，原始长度 ${text.length} 字符]`;

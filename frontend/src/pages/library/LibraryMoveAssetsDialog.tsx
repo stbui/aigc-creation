@@ -42,7 +42,6 @@ export function LibraryMoveAssetsDialog({ open, count, projects, onCancel, onCon
       open={open}
       title="移动素材"
       width="min(460px, calc(100vw - 32px))"
-      centered
       onCancel={onCancel}
       footer={null}
     >

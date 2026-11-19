@@ -7,11 +7,11 @@ import { StateIllustration } from './illustrations';
 /**
  * 全站统一异常页。
  *
- * 2026-10-20 抽取。此前异常态散落 7 处各写一遍 旧版 UI 库 `<Result>`:
+ * 2026-10-20 抽取。此前异常态散落 7 处各写一遍旧的 `<Result>`:
  *   ErrorBoundary.tsx / App.tsx 能力清单 / ToolPage ×2 / AdminDashboard ×2 / AdminWidgets。
  * 问题是三重的:
- *   1. **视觉脱节** —— 项目配了品牌紫 旧版 UI 库 token、77 个语义 token、自绘了
- *      `ToolEmptyIllustration`, 但异常页用的是 旧版 UI 库 Result 默认插画 (灰蓝图标),
+ *   1. **视觉脱节** —— 项目配了品牌紫 token、77 个语义 token、自绘了
+ *      `ToolEmptyIllustration`, 但异常页用的是旧 Result 默认插画 (灰蓝图标),
  *      与站内自绘插画不是一个设计语言。
  *   2. **技术信息直给用户** —— ErrorBoundary 直接把 `error.message` 当 subTitle 展示,
  *      用户看到的是 "Objects are not valid as a React child" 这类内部文案, 无从处置。

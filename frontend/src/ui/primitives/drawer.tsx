@@ -11,37 +11,39 @@ export interface DrawerProps {
   title?: ReactNode;
   children?: ReactNode;
   onClose?: () => void;
-  placement?: 'left' | 'right' | 'top' | 'bottom';
+  side?: 'left' | 'right' | 'top' | 'bottom';
   width?: number | string;
-  size?: number | string;
   className?: string;
-  styles?: { body?: React.CSSProperties };
+  bodyPadding?: number | string;
 }
 
-/** 旧版 UI 库 Drawer 的兼容壳，侧边方向映射到 shadcn Sheet。 */
+/** C 端抽屉：侧边方向映射到 shadcn Sheet。 */
 export function Drawer({
   open,
   title,
   children,
   onClose,
-  placement = 'right',
+  side = 'right',
   width,
-  size,
   className,
-  styles,
+  bodyPadding,
 }: DrawerProps) {
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose?.()}>
       <SheetContent
         data-testid="ui-drawer"
-        side={placement}
+        side={side}
         className={className}
-        style={{ width: width ?? size }}
+        style={width !== undefined ? { width } : undefined}
       >
         <SheetHeader>
           <SheetTitle className={!title ? 'sr-only' : undefined}>{title ?? '抽屉'}</SheetTitle>
         </SheetHeader>
-        <div className="ui-drawer-body" style={styles?.body}>
+        <div
+          className="ui-drawer-body"
+          data-slot="drawer-body"
+          style={bodyPadding !== undefined ? { padding: bodyPadding } : undefined}
+        >
           {children}
         </div>
       </SheetContent>

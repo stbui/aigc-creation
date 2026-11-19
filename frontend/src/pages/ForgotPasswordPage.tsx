@@ -1,6 +1,15 @@
 import '../styles/auth.css';
 import { useState } from 'react';
-import { Button, Form, FormItem, Input, InputGroup, InputGroupAddon, InputGroupInput, useApp } from '../ui';
+import {
+  Button,
+  Form,
+  FormItem,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  useApp,
+  useForm,
+} from '../ui';
 import { Link } from 'react-router-dom';
 import { Mail, ShieldCheck } from 'lucide-react';
 import { authApi } from '../lib/api';
@@ -21,8 +30,9 @@ export function ForgotPasswordPage() {
   const { message } = useApp();
   const [submitting, setSubmitting] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const form = useForm<{ email: string }>();
 
-  const onFinish = async (values: { email: string }) => {
+  const onSubmit = async (values: { email: string }) => {
     setSubmitting(true);
     try {
       await authApi.forgotPassword(values.email.trim());
@@ -62,7 +72,7 @@ export function ForgotPasswordPage() {
             <p className="auth-plain-desc">
               输入注册时使用的邮箱，我们会发送一封包含重置链接的邮件。
             </p>
-            <Form layout="vertical" onFinish={onFinish} requiredMark={false} className="login-form">
+            <Form form={form} onSubmit={onSubmit} aria-label="找回密码" className="login-form">
               <FormItem
                 name="email"
                 label="邮箱"
@@ -72,16 +82,17 @@ export function ForgotPasswordPage() {
                   { type: 'email', message: '邮箱格式不正确' },
                 ]}
               >
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<Mail size={15} />}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="账号（邮箱）"
-                    autoComplete="username"
-                    autoFocus
-                  />
-                </InputGroup>
+                {({ field }) => (
+                  <InputGroup>
+                    <InputGroupAddon>{<Mail size={15} />}</InputGroupAddon>
+                    <InputGroupInput
+                      {...field}
+                      placeholder="账号（邮箱）"
+                      autoComplete="username"
+                      autoFocus
+                    />
+                  </InputGroup>
+                )}
               </FormItem>
               <Button disabled={submitting}
                 variant="default"

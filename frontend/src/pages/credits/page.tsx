@@ -2,7 +2,18 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
 
 import { CREDITS_PAGE_META, type Tab } from './constants';
-import { Button, PersonalPage, StateButton, StateEmpty, Surface, SurfaceContent, Tabs } from './components';
+import {
+  Button,
+  PersonalPage,
+  StateButton,
+  StateEmpty,
+  Surface,
+  SurfaceContent,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from './components';
 import { useAuth, useCreditsData, useDocumentMeta, useMediaQuery } from './hooks';
 import { CreditsHero } from './CreditsHero';
 import { CreditsLedgerPanel } from './CreditsLedgerPanel';
@@ -28,7 +39,7 @@ export function CreditsPage() {
   const { token, openLogin } = useAuth();
   /*
    * 表格在窄屏会被卡片右缘切断, 换成列表渲染 (见 CreditsLedgerList / CreditsLotList)。
-   * 767 是兼容层的 md 边界；表格加列后桌面段靠 Table 的横向滚动兜住，
+   * 767 是站内 md 断点；表格加列后桌面段靠 Table 的横向滚动兜住，
    * 不再要求整表塞进 767px。
    */
   const narrow = useMediaQuery('(max-width: 767px)');
@@ -91,46 +102,42 @@ export function CreditsPage() {
 
       <Surface className="credits-list-card">
         <SurfaceContent>
-        <Tabs
-          activeKey={tab}
-          onChange={(key) => setTab(key as Tab)}
-          items={[
-            {
-              key: 'ledger',
-              label: '积分流水',
-              children: (
-                <CreditsLedgerPanel
-                  rows={ledger}
-                  total={ledgerTotal}
-                  initialLoading={loading}
-                  tableLoading={ledgerLoading}
-                  error={ledgerError}
-                  filter={ledgerFilter}
-                  narrow={narrow}
-                  page={ledgerPage}
-                  onFilterChange={handleLedgerFilterChange}
-                  onPageChange={(page) => void loadLedgerPage(page, ledgerFilter)}
-                  onRetry={retryLedger}
-                />
-              ),
-            },
-            {
-              key: 'lots',
-              label: '批次明细',
-              children: (
-                <CreditsLotPanel
-                  lots={lots}
-                  initialLoading={loading}
-                  error={error}
-                  narrow={narrow}
-                  page={lotsPage}
-                  onPageChange={setLotsPage}
-                  onRetry={retryAll}
-                />
-              ),
-            },
-          ]}
-        />
+        <Tabs value={tab} onValueChange={(key) => setTab(key as Tab)}>
+          <TabsList
+            variant="line"
+            aria-label="积分明细"
+            className="h-auto justify-start gap-6"
+          >
+            <TabsTrigger value="ledger">积分流水</TabsTrigger>
+            <TabsTrigger value="lots">批次明细</TabsTrigger>
+          </TabsList>
+          <TabsContent value="ledger">
+            <CreditsLedgerPanel
+              rows={ledger}
+              total={ledgerTotal}
+              initialLoading={loading}
+              tableLoading={ledgerLoading}
+              error={ledgerError}
+              filter={ledgerFilter}
+              narrow={narrow}
+              page={ledgerPage}
+              onFilterChange={handleLedgerFilterChange}
+              onPageChange={(page) => void loadLedgerPage(page, ledgerFilter)}
+              onRetry={retryLedger}
+            />
+          </TabsContent>
+          <TabsContent value="lots">
+            <CreditsLotPanel
+              lots={lots}
+              initialLoading={loading}
+              error={error}
+              narrow={narrow}
+              page={lotsPage}
+              onPageChange={setLotsPage}
+              onRetry={retryAll}
+            />
+          </TabsContent>
+        </Tabs>
         </SurfaceContent>
       </Surface>
     </PersonalPage>

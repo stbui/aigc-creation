@@ -30,7 +30,7 @@
 .alp-modal [data-slot="c-modal-body"] {
   flex: 1 1 auto;
   min-height: 0;
-  /* 旧版 UI 库的 body 默认是 block。只给外层 max-height 时，block 子级会按
+  /* 弹窗 body 默认是 block。只给外层 max-height 时，block 子级会按
      内容自然高度排版，内部 .alp-body 的 100% 高度因此失效，footer 被撑到
      可视区之外（实拍 900px 视口里 footer 的 y=1818）。这里让 body 成为
      纵向 flex 容器，中间素材区才能收缩并滚动。 */
@@ -430,7 +430,7 @@
   /*
    * ⚠️ 必须显式 `height: auto`。
    *
-   * 卡片是 shadcn `Button`（类名里带 `h-9` = 36px），而 `ui-compat.css` 的
+   * 卡片是 shadcn `Button`（类名里带 `h-9` = 36px），而 `ui.css` 的
    * `[data-slot="button"]` 基线也是 `height: 36px`。本卡片的高度应当由内部
    * `.alp-cover { aspect-ratio: 1 }` 决定，自身不写 height —— 于是高度被基线
    * 钉在 36px，封面盒只能压成「宽 128 × 高 36」的横条，图片随之被压扁。

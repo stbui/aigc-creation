@@ -18,23 +18,18 @@ export interface ModalProps {
   okText?: string;
   cancelText?: string;
   width?: number | string;
-  /** 旧版 UI 库兼容：false 时按顶部定位，true（本项目既有默认）时垂直居中。 */
-  centered?: boolean;
-  /** Radix 默认在关闭时卸载内容；显式传 false 可保留 DOM 状态。 */
-  destroyOnHidden?: boolean;
+  /** 弹窗定位：居中（默认）或距顶部固定偏移。 */
+  position?: 'center' | 'top';
+  /** 关闭后保留 DOM 状态；默认卸载。 */
+  keepMounted?: boolean;
   closable?: boolean;
-  maskClosable?: boolean;
-  confirmLoading?: boolean;
-  okButtonProps?: {
-    danger?: boolean;
-    disabled?: boolean;
-    loading?: boolean;
-  };
-  cancelButtonProps?: { disabled?: boolean };
+  /** 点击遮罩是否关闭；默认 true。 */
+  closeOnMaskClick?: boolean;
+  /** 确认按钮状态。 */
+  confirmState?: { danger?: boolean; disabled?: boolean; loading?: boolean };
+  cancelDisabled?: boolean;
   className?: string;
   styles?: { body?: CSSProperties; mask?: CSSProperties; container?: CSSProperties };
-  /** 旧版 UI 库兼容：`mask={{ closable }}` */
-  mask?: { closable?: boolean };
   keyboard?: boolean;
   closeIcon?: ReactNode;
 }
@@ -56,22 +51,18 @@ export function Modal({
   okText = '确定',
   cancelText = '取消',
   width = 520,
-  centered = true,
-  destroyOnHidden,
+  position = 'center',
+  keepMounted,
   closable = true,
-  mask,
-  maskClosable,
+  closeOnMaskClick = true,
   className,
   styles,
   keyboard = true,
   closeIcon,
-  confirmLoading,
-  okButtonProps,
-  cancelButtonProps,
+  confirmState,
+  cancelDisabled,
 }: ModalProps) {
-  const canMaskClose = maskClosable ?? mask?.closable ?? true;
-  const okDisabled = Boolean(confirmLoading || okButtonProps?.loading || okButtonProps?.disabled);
-  const keepMounted = destroyOnHidden === false;
+  const okDisabled = Boolean(confirmState?.loading || confirmState?.disabled);
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onCancel?.()}>
       <DialogPrimitive.Portal forceMount={keepMounted || undefined}>
@@ -83,14 +74,13 @@ export function Modal({
         <DialogPrimitive.Content
           forceMount={keepMounted || undefined}
           hidden={keepMounted && !open}
-          className={cn('ui-modal-content', centered ? 'is-centered' : 'is-top')}
+          className={cn('ui-modal-content', position === 'center' ? 'is-centered' : 'is-top')}
           style={{
             maxWidth: width,
-            ...(!centered ? { top: 100, transform: 'translateX(-50%)' } : {}),
+            ...(position === 'top' ? { top: 100, transform: 'translateX(-50%)' } : {}),
           }}
-          data-destroy-on-hidden={destroyOnHidden ?? true}
           onEscapeKeyDown={keyboard ? undefined : (event) => event.preventDefault()}
-          onPointerDownOutside={canMaskClose ? undefined : (event) => event.preventDefault()}
+          onPointerDownOutside={closeOnMaskClick ? undefined : (event) => event.preventDefault()}
           onOpenAutoFocus={
             title ? (event) => event.preventDefault() : undefined
           }
@@ -116,15 +106,15 @@ export function Modal({
                   <>
                     <button
                       type="button"
-                      className="ui-btn is-ghost"
+                      className="ui-action is-ghost"
                       onClick={onCancel}
-                      disabled={cancelButtonProps?.disabled}
+                      disabled={cancelDisabled}
                     >
                       {cancelText}
                     </button>
                     <button
                       type="button"
-                      className={cn('ui-btn', okButtonProps?.danger ? 'is-danger' : 'is-primary')}
+                      className={cn('ui-action', confirmState?.danger ? 'is-danger' : 'is-primary')}
                       onClick={onOk}
                       disabled={okDisabled}
                     >

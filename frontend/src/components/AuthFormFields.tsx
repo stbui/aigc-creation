@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { Lock, Mail, Smartphone, User } from 'lucide-react';
-import { Button, FormItem, Input, InputGroup, InputGroupAddon, InputGroupInput } from '../ui';
+import { Button, FormItem, InputGroup, InputGroupAddon, InputGroupInput } from '../ui';
 import type { SmsPurpose } from '../types/api';
 
 /**
@@ -57,15 +57,14 @@ export function AuthFormFields({
             { max: 20, message: '昵称最多 20 个字符' },
           ]}
         >
-          <InputGroup>
-            <InputGroupAddon>
-              {<User size={15} />}
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="展示名称"
-              maxLength={20}
-            />
-          </InputGroup>
+          {({ field }) => (
+            <InputGroup>
+              <InputGroupAddon>
+                {<User size={15} />}
+              </InputGroupAddon>
+              <InputGroupInput {...field} placeholder="展示名称" maxLength={20} />
+            </InputGroup>
+          )}
         </FormItem>
       )}
 
@@ -79,16 +78,19 @@ export function AuthFormFields({
             { type: 'email', message: '邮箱格式不正确' },
           ]}
         >
-          <InputGroup>
-            <InputGroupAddon>
-              {<Mail size={15} />}
-            </InputGroupAddon>
-            <InputGroupInput
-              ref={emailRef}
-              placeholder="账号（邮箱）"
-              autoComplete="username"
-            />
-          </InputGroup>
+          {({ field }) => (
+            <InputGroup>
+              <InputGroupAddon>
+                {<Mail size={15} />}
+              </InputGroupAddon>
+              <InputGroupInput
+                {...field}
+                ref={emailRef}
+                placeholder="账号（邮箱）"
+                autoComplete="username"
+              />
+            </InputGroup>
+          )}
         </FormItem>
       )}
 
@@ -104,17 +106,20 @@ export function AuthFormFields({
             { pattern: /^(\+?86[\s-]?)?1[3-9]\d{9}$/, message: '手机号格式不正确' },
           ]}
         >
-          <InputGroup>
-            <InputGroupAddon>
-              {<Smartphone size={15} />}
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="已绑定的手机号"
-              maxLength={14}
-              inputMode="tel"
-              autoComplete="tel"
-            />
-          </InputGroup>
+          {({ field }) => (
+            <InputGroup>
+              <InputGroupAddon>
+                {<Smartphone size={15} />}
+              </InputGroupAddon>
+              <InputGroupInput
+                {...field}
+                placeholder="已绑定的手机号"
+                maxLength={14}
+                inputMode="tel"
+                autoComplete="tel"
+              />
+            </InputGroup>
+          )}
         </FormItem>
       )}
 
@@ -128,16 +133,19 @@ export function AuthFormFields({
             { min: 6, message: '密码至少 6 位' },
           ]}
         >
-          <InputGroup>
-            <InputGroupAddon>
-              {<Lock size={15} />}
-            </InputGroupAddon>
-            <InputGroupInput
-              type="password"
-              placeholder="请输入密码"
-              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-            />
-          </InputGroup>
+          {({ field }) => (
+            <InputGroup>
+              <InputGroupAddon>
+                {<Lock size={15} />}
+              </InputGroupAddon>
+              <InputGroupInput
+                {...field}
+                type="password"
+                placeholder="请输入密码"
+                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+              />
+            </InputGroup>
+          )}
         </FormItem>
       )}
 
@@ -149,17 +157,20 @@ export function AuthFormFields({
           className="login-field"
           rules={[{ pattern: /^(\+?86[\s-]?)?1[3-9]\d{9}$/, message: '手机号格式不正确' }]}
         >
-          <InputGroup>
-            <InputGroupAddon>
-              {<Smartphone size={15} />}
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="选填，用于短信登录"
-              maxLength={14}
-              inputMode="tel"
-              autoComplete="tel"
-            />
-          </InputGroup>
+          {({ field }) => (
+            <InputGroup>
+              <InputGroupAddon>
+                {<Smartphone size={15} />}
+              </InputGroupAddon>
+              <InputGroupInput
+                {...field}
+                placeholder="选填，用于短信登录"
+                maxLength={14}
+                inputMode="tel"
+                autoComplete="tel"
+              />
+            </InputGroup>
+          )}
         </FormItem>
       )}
 

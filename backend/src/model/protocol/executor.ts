@@ -286,6 +286,7 @@ export class ProtocolExecutor {
     for (const header of channel.headers ?? []) setHeader(headers, header.name, header.value);
 
     const target = new URL(url);
+    const originalQuery = new URLSearchParams(target.searchParams);
     applyProtocolAuth({ method: spec.method, url: target, headers, body }, spec.auth, channel.credentials);
 
     const startedAt = Date.now();
@@ -303,7 +304,11 @@ export class ProtocolExecutor {
       headers: response.headers,
       body: response.body,
       text: response.text,
-      url: target.toString(),
+      /*
+       * `url` 会写进调用记录的 `upstreamUrl` 并在后台详情展示：鉴权注入阶段新加的
+       * 查询参数（`?key=` 这类）必须去掉，否则等于把上游密钥摆到页面上。
+       */
+      url: stripAuthQuery(originalQuery, target),
       durationMs: Date.now() - startedAt,
     };
   }
@@ -312,4 +317,20 @@ export class ProtocolExecutor {
   async download(reference: MediaReference, channel: ProtocolChannelRuntime): Promise<{ data: Buffer; mimeType: string }> {
     return resolveMediaBytes(reference, channel);
   }
+}
+
+/**
+ * 去掉鉴权注入阶段新增的查询参数，保留调用方原有的查询串。
+ *
+ * `query` 型鉴权（`?key=` / `?api_key=`）会把凭证拼进最终 URL；这个 URL 会写进
+ * `ApiCallLog.upstreamUrl` 并在后台详情展示，因此只回传注入前的形状。同名键
+ * 原本就存在时保留调用方的值 —— 那是业务参数（如 `alt=sse`），不是密钥。
+ */
+function stripAuthQuery(original: URLSearchParams, target: URL): string {
+  const url = new URL(target.toString());
+  const before = new Set([...original.keys()]);
+  for (const key of [...url.searchParams.keys()]) {
+    if (!before.has(key)) url.searchParams.delete(key);
+  }
+  return url.toString();
 }

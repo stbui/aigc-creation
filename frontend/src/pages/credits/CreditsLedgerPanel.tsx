@@ -2,12 +2,21 @@ import { Link } from 'react-router-dom';
 import type { CreditLedgerEntry } from '../../types/api';
 import {
   Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
   Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem,
   StateButton,
   StateEmpty,
   StateError,
   StateSkeleton,
   Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from './components';
 import { LEDGER_FILTER_OPTIONS, PAGE_SIZE, type LedgerFilter } from './constants';
 import {
@@ -50,71 +59,6 @@ export function CreditsLedgerPanel({
   onPageChange,
   onRetry,
 }: CreditsLedgerPanelProps) {
-  const columns = [
-    {
-      title: '时间',
-      dataIndex: 'createdAt',
-      width: 170,
-      render: (value: string | null) => formatDateTime(value),
-    },
-    {
-      /*
-       * 「业务类型」优先（连续签到奖励 / 创意生图扣费 …）, 只有 `other` 才回退到
-       * 账本动作文案。不新增物理列: 现表已 6 列、scroll.x=850 接近窄屏截断阈值,
-       * 业务口径塞进同一格比多一列更稳。
-       */
-      title: '类型',
-      key: 'businessType',
-      width: 120,
-      render: (_value: unknown, row: CreditLedgerEntry) => ledgerTypeLabel(row),
-    },
-    {
-      // 关联单据三选一（账单 / 支付订单 / 生成任务）；短 ID 可读，完整 id 放 title
-      title: '关联单据',
-      key: 'reference',
-      width: 170,
-      ellipsis: true,
-      render: (_value: unknown, row: CreditLedgerEntry) => {
-        const reference = ledgerReference(row);
-        if (!reference) return '—';
-        return (
-          <span title={reference.id}>
-            {reference.label} {shortId(reference.id)}
-          </span>
-        );
-      },
-    },
-    {
-      title: '变动',
-      dataIndex: 'amount',
-      width: 110,
-      align: 'right' as const,
-      render: (value: number) => (
-        <span className={`credits-amount ${value >= 0 ? 'is-plus' : 'is-minus'}`}>
-          {value >= 0 ? `+${value}` : value}
-        </span>
-      ),
-    },
-    {
-      // 这是该笔变动**发生当时**的快照, 不等于当前余额；
-      // 列名叫「余额」会让用户拿它和顶部的余额对照, 误以为账错了。
-      title: '变动后余额',
-      dataIndex: 'balanceAfter',
-      width: 110,
-      align: 'right' as const,
-    },
-    {
-      title: '备注',
-      dataIndex: 'reason',
-      ellipsis: true,
-      /*
-       * 后台人工调整的 reason 是运营填写的内部备注，可能含工单号、客服姓名。
-       * C 端只展示枚举文案，不把内部原文透出给用户。
-       */
-      render: (_value: string | null, row: CreditLedgerEntry) => ledgerRemark(row) ?? '—',
-    },
-  ];
-
   return (
     <>
       <div className="credits-ledger-toolbar">
@@ -169,33 +113,77 @@ export function CreditsLedgerPanel({
           <CreditsLedgerList rows={rows} />
           {total > PAGE_SIZE && (
             <div className="credits-mobile-pager">
-              <Pagination
-                simple
-                size="small"
-                current={page}
-                pageSize={PAGE_SIZE}
-                total={total}
-                onChange={onPageChange}
-              />
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => onPageChange(Math.max(1, page - 1))}
+                      aria-disabled={page <= 1}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <span className="px-2 text-xs text-muted-foreground">
+                      第 {page} / {Math.max(1, Math.ceil(total / PAGE_SIZE))} 页
+                    </span>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => onPageChange(page + 1)}
+                      aria-disabled={page >= Math.ceil(total / PAGE_SIZE)}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           )}
         </>
       ) : (
         <Table
-          rowKey="id"
-          size="small"
-          loading={tableLoading}
-          columns={columns}
-          dataSource={rows}
-          pagination={{
-            current: page,
-            pageSize: PAGE_SIZE,
-            total,
-            hideOnSinglePage: true,
-            onChange: onPageChange,
-          }}
-          scroll={{ x: 850 }}
-        />
+          className={`min-w-[850px]${tableLoading ? ' pointer-events-none opacity-60' : ''}`}
+          aria-busy={tableLoading || undefined}
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead>时间</TableHead>
+              <TableHead>类型</TableHead>
+              <TableHead>关联单据</TableHead>
+              <TableHead className="text-right">变动</TableHead>
+              <TableHead className="text-right">变动后余额</TableHead>
+              <TableHead>备注</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => {
+              const reference = ledgerReference(row);
+              return (
+                <TableRow key={row.id}>
+                  <TableCell>{formatDateTime(row.createdAt)}</TableCell>
+                  <TableCell>{ledgerTypeLabel(row)}</TableCell>
+                  <TableCell className="max-w-[170px] truncate">
+                    {reference ? (
+                      <span title={reference.id}>
+                        {reference.label} {shortId(reference.id)}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span
+                      className={`credits-amount ${row.amount >= 0 ? 'is-plus' : 'is-minus'}`}
+                    >
+                      {row.amount >= 0 ? `+${row.amount}` : row.amount}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">{row.balanceAfter}</TableCell>
+                  <TableCell className="max-w-[220px] truncate">
+                    {ledgerRemark(row) ?? '—'}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       )}
     </>
   );

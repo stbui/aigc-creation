@@ -10,21 +10,34 @@ export { PersonalPage } from '../../components/PersonalPage';
 /** 空态 / 失败态 / 骨架屏与空态按钮 */
 export { StateButton, StateEmpty, StateError, StateSkeleton } from '../../components/StateViews';
 
-/** shadcn / 兼容层组合件 */
+/** shadcn 组合件 */
 export {
   Button,
   Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spin,
   StatusBadge,
   Surface,
   SurfaceContent,
   SurfaceHeader,
   SurfaceTitle,
   Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '../../ui';

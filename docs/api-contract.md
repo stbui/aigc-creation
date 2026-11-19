@@ -160,7 +160,7 @@
 | GET | `/api/v1/admin/analytics/finance?from&to` | 财务汇总：实收 = 已结算 `actualAmountMicrocredits`，已退 = `refundedAmountMicrocredits`，净收入 = 实收 − 已退；预留 / 运行 / 待核对单列挂账**不计入实收**；区间默认 30 天、上限 366 天，`model.analytics_read`。**单位是积分**，与概览页的「订单收入（元）」（订单实付）不是同一笔账 |
 | GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve`、`/billing-orders/batch-resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`）。单条与批量请求均必须带 `reason`（≤ 500 字），批量同一次操作共享 `reviewBatchId`；`billing_order.read` / `billing_order.resolve`；列表支持 `?status=review`「待核对」队列口径；批量核对逐条独立处置并回显失败原因 |
 | GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 来源 / 操作 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read`（**不含**请求体 / 响应体） |
-| GET | `/api/v1/admin/api-logs/:id` | 单条调用详情：列表字段 + `upstreamUrl` / `requestContentType` / `requestBody` / `responseBody`（写库前已脱敏与截断的预览文本），`model.call_read`；路由声明在 `export` 之后 |
+| GET | `/api/v1/admin/api-logs/:id` | 单条调用详情：列表字段 + `upstreamUrl` / `requestContentType` / `requestBody` / `responseBody`（明文报文，仅折叠内嵌媒体并截断超长内容），`model.call_read`；路由声明在 `export` 之后 |
 | GET | `/api/v1/admin/api-logs/export` | 调用记录 CSV（与列表同筛选口径，上限 5000 行；**不含请求体 / 响应体**），`model.call_read + data.export` |
 | GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架请求必须带原因（后台页面统一生成并下发 C 端），写需 `capability.write`（高危，下架需填写业务原因） |
 | GET/PUT | `/api/v1/admin/aigc-label` | 读 / 改角标样式（`setting.read` / `setting.write`） |

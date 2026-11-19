@@ -3,18 +3,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { Upload } from '../upload';
 
-describe('Upload 兼容层', () => {
-  it('接受文件后调用 onChange 并回传 UploadFile 列表', async () => {
-    const onChange = vi.fn();
-    const { container } = render(<Upload onChange={onChange}>上传</Upload>);
+describe('Upload', () => {
+  it('选中文件后回传新的文件列表', async () => {
+    const onFilesChange = vi.fn();
+    const { container } = render(<Upload onFilesChange={onFilesChange}>上传</Upload>);
     const input = container.querySelector<HTMLInputElement>('input[type="file"]');
     expect(input).not.toBeNull();
 
     const file = new File(['image'], 'sample.png', { type: 'image/png' });
     fireEvent.change(input!, { target: { files: [file] } });
 
-    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
-    expect(onChange.mock.calls[0][0].fileList).toEqual([
+    await waitFor(() => expect(onFilesChange).toHaveBeenCalledTimes(1));
+    expect(onFilesChange.mock.calls[0][0]).toEqual([
       expect.objectContaining({
         name: 'sample.png',
         status: 'uploading',
@@ -23,10 +23,10 @@ describe('Upload 兼容层', () => {
     ]);
   });
 
-  it('beforeUpload 拒绝时不触发 onChange', async () => {
-    const onChange = vi.fn();
+  it('onSelect 拒绝时不回传文件列表', async () => {
+    const onFilesChange = vi.fn();
     const { container } = render(
-      <Upload beforeUpload={() => Upload.LIST_IGNORE} onChange={onChange}>
+      <Upload onSelect={() => false} onFilesChange={onFilesChange}>
         上传
       </Upload>,
     );
@@ -36,6 +36,19 @@ describe('Upload 兼容层', () => {
     fireEvent.change(input!, { target: { files: [file] } });
 
     await waitFor(() => expect(input!.value).toBe(''));
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onFilesChange).not.toHaveBeenCalled();
+  });
+
+  it('达到 maxCount 后不再渲染触发按钮', () => {
+    const { queryByRole } = render(
+      <Upload
+        maxCount={1}
+        files={[{ uid: 'a', name: 'a.png', status: 'done' }]}
+        onFilesChange={() => undefined}
+      >
+        上传
+      </Upload>,
+    );
+    expect(queryByRole('button', { name: '上传' })).toBeNull();
   });
 });

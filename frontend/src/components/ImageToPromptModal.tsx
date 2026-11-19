@@ -121,7 +121,6 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
       onCancel={onCancel}
       footer={null}
       width={600}
-      centered
       className="pt-i2p-modal"
       closeIcon={<X size={18} />}
       title={

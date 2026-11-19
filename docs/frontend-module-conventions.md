@@ -90,7 +90,7 @@ pages/admin/channels/
 
 - **只放本页独占的选择器**（如 `product-sku-*`、`smart-expand-*`、页面根类
   `.my-works-page`）。共享骨架（`.pk-workspace` / `.tool-*` 在
-  `styles/tool-workspace.css`，`.ui-*` 兼容层在 `styles/ui-compat.css`）与全局
+  `styles/tool-workspace.css`，C 端 UI 基线在 `styles/ui.css`）与全局
   设计令牌（`styles/tokens.css`）不搬进页面文件。
 - 多文件目录用 `style.css`，由 `index.ts` 以 `import './style.css';` 引入；
   单文件页面用同名 `<PageName>.css`（如 `CreditsPage.tsx` + `CreditsPage.css`），
@@ -99,7 +99,7 @@ pages/admin/channels/
   把需要被全局规则兜底的选择器搬进来。
 - `styles/global.css` 只是分层入口（`@layer` 顺序 + `@import`），不写具体规则：
   令牌进 `tokens.css`，基础元素、chrome 高度与通用工具类进 `base.css`，跨页工具皮肤进
-  `tool-workspace.css`，`ui-*` 兼容层进 `ui-compat.css`。新增页面专属规则直接写进
+  `tool-workspace.css`，`ui-*` 基线进 `ui.css`。新增页面专属规则直接写进
   对应目录的 `style.css` 或同名页面 CSS。
 - 通用工具类只放 `base.css`，**类名必须带 `u-` 前缀**（`u-font-12` / `u-px-8` /
   `u-p-4`）。`base.css` 是未分层样式，会压过 Tailwind 的 `@layer utilities`；不带前缀

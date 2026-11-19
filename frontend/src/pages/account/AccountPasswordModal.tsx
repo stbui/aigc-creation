@@ -42,11 +42,12 @@ export function AccountPasswordModal({
       title={hasPassword ? '修改密码' : '设置登录密码'}
       okText={hasPassword ? '确认修改' : '设置密码'}
       cancelText="取消"
-      confirmLoading={changing}
-      okButtonProps={{ disabled: (hasPassword && !oldPassword) || !newPassword || !confirmPassword }}
+      confirmState={{
+        loading: changing,
+        disabled: (hasPassword && !oldPassword) || !newPassword || !confirmPassword,
+      }}
       onOk={onOk}
       onCancel={onCancel}
-      destroyOnHidden
     >
       <p className="account-desc">
         {hasPassword

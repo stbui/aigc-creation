@@ -20,7 +20,16 @@ import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
 import { useAccountMembership } from './hooks';
 import { formatLongDate, formatNumber } from '../lib/format';
-import { Avatar, Dropdown } from '../ui';
+import {
+  Avatar,
+  AvatarFallback,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui';
 
 function formatExpiry(iso: string | null | undefined): string {
   if (!iso) return '长期有效';
@@ -91,18 +100,38 @@ export function UserAccountMenu() {
   const accountName = email?.split('@')[0] || '用户';
 
   return (
-    <Dropdown
+    <DropdownMenu
       open={open}
       onOpenChange={handleOpenChange}
-      placement="bottomRight"
       modal={false}
-      classNames={{ root: 'app-user-dropdown' }}
-      menu={{
-        header: (
+    >
+      <DropdownMenuTrigger asChild>
+        <button
+          className={`app-header-action app-user${open ? ' is-open' : ''}`}
+          type="button"
+          aria-label="打开账户菜单"
+          aria-haspopup="menu"
+          aria-expanded={open}
+        >
+          <Avatar className="app-user-avatar size-7">
+            <AvatarFallback className="app-user-avatar">
+              {(email ?? 'U').charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <span className="app-user-email" title={email ?? ''}>
+            {email}
+          </span>
+          <ChevronDown size={14} className="app-user-chevron" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="app-user-dropdown ui-dropdown-content">
+        <DropdownMenuGroup>
           <div className="app-user-menu-head">
             <div className="app-user-menu-identity">
-              <Avatar size={42} className="app-user-menu-avatar">
-                {(email ?? 'U').charAt(0).toUpperCase()}
+              <Avatar className="app-user-menu-avatar size-[42px]">
+                <AvatarFallback className="app-user-menu-avatar">
+                  {(email ?? 'U').charAt(0).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               <div className="app-user-menu-user-copy">
                 <strong>你好，{accountName}</strong>
@@ -151,79 +180,60 @@ export function UserAccountMenu() {
               </Link>
             </div>
           </div>
-        ),
-        items: [
-          {
-            key: 'account',
-            icon: linkIcon(<Settings size={16} />),
-            label: menuLabel('账户设置', '资料、安全与通知偏好'),
-            to: '/account',
-          },
-          {
-            key: 'works',
-            icon: linkIcon(<Images size={16} />),
-            label: menuLabel('我的作品', '查看全部创作结果'),
-            to: '/works',
-          },
-          {
-            key: 'orders',
-            icon: linkIcon(<Receipt size={16} />),
-            label: menuLabel('我的订单', '订单、支付与发票'),
-            to: '/orders',
-          },
-          {
-            key: 'credits',
-            icon: linkIcon(<Wallet size={16} />),
-            label: menuLabel('积分明细', '余额、充值与消费记录'),
-            to: '/credits',
-          },
-          {
-            key: 'tickets',
-            icon: linkIcon(<LifeBuoy size={16} />),
-            label: menuLabel('我的工单', '问题反馈与客服回复'),
-            to: '/tickets',
-          },
-          ...(isAdminRole
-            ? [
-                { key: 'divider-admin', type: 'divider' as const },
-                {
-                  key: 'admin',
-                  icon: linkIcon(<ShieldCheck size={16} />),
-                  label: menuLabel('进入运营后台', '管理与运营工作台'),
-                  to: '/admin',
-                },
-              ]
-            : []),
-          { key: 'divider-logout', type: 'divider' as const },
-          {
-            key: 'logout',
-            danger: true,
-            icon: linkIcon(<LogOut size={16} />),
-            label: menuLabel('退出登录', '安全退出当前账户'),
-            onClick: () => {
-              setOpen(false);
+          <DropdownMenuItem asChild>
+            <Link to="/account">
+              {linkIcon(<Settings size={16} />)}
+              {menuLabel('账户设置', '资料、安全与通知偏好')}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/works">
+              {linkIcon(<Images size={16} />)}
+              {menuLabel('我的作品', '查看全部创作结果')}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/orders">
+              {linkIcon(<Receipt size={16} />)}
+              {menuLabel('我的订单', '订单、支付与发票')}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/credits">
+              {linkIcon(<Wallet size={16} />)}
+              {menuLabel('积分明细', '余额、充值与消费记录')}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/tickets">
+              {linkIcon(<LifeBuoy size={16} />)}
+              {menuLabel('我的工单', '问题反馈与客服回复')}
+            </Link>
+          </DropdownMenuItem>
+          {isAdminRole && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/admin">
+                  {linkIcon(<ShieldCheck size={16} />)}
+                  {menuLabel('进入运营后台', '管理与运营工作台')}
+                </Link>
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => {
               logout();
               navigate('/login');
-            },
-          },
-        ],
-      }}
-    >
-      <button
-        className={`app-header-action app-user${open ? ' is-open' : ''}`}
-        type="button"
-        aria-label="打开账户菜单"
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        <Avatar size={28} className="app-user-avatar">
-          {(email ?? 'U').charAt(0).toUpperCase()}
-        </Avatar>
-        <span className="app-user-email" title={email ?? ''}>
-          {email}
-        </span>
-        <ChevronDown size={14} className="app-user-chevron" aria-hidden="true" />
-      </button>
-    </Dropdown>
+            }}
+          >
+            {linkIcon(<LogOut size={16} />)}
+            {menuLabel('退出登录', '安全退出当前账户')}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

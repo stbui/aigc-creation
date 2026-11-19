@@ -1,6 +1,13 @@
 import './AppHeader.css';
 import { useMemo, useState } from 'react';
-import { Button, Dropdown } from '../ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui';
 import { ChevronDown, Menu, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
@@ -55,34 +62,35 @@ export function AppHeader({ groups, items, mobileNavOpen, onOpenMobileNav }: Pro
           首页
         </Link>
         {topGroups.map((g) => (
-          <Dropdown
+          <DropdownMenu
             key={g.id}
             open={navOpen === g.id}
             onOpenChange={(v) => setNavOpen(v ? g.id : null)}
-            classNames={{ root: 'app-topnav-dropdown' }}
-            menu={{
-              items: visibleItems
-                .filter((c) => c.group === g.id)
-                .map((c) => ({
-                  key: c.id,
-                  label: (
-                    <span className="app-topnav-item-row">
-                      <CapabilityIcon id={c.id} size={20} />
-                      {c.name}
-                      {c.mode === 'planned' && <span className="app-mode-tag">{MODE_LABELS.planned}</span>}
-                    </span>
-                  ),
-                  disabled: c.mode === 'planned',
-                  to: toolPath(c.id),
-                })),
-            }}
-            placement="bottomLeft"
           >
-            <Button variant="ghost" className="app-topnav-item" >
-              {<ChevronDown size={14} />}
-              {g.name}
-            </Button>
-          </Dropdown>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="app-topnav-item">
+                {<ChevronDown size={14} />}
+                {g.name}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="app-topnav-dropdown">
+              <DropdownMenuGroup>
+                {visibleItems
+                  .filter((c) => c.group === g.id)
+                  .map((c) => (
+                    <DropdownMenuItem key={c.id} disabled={c.mode === 'planned'} asChild>
+                      <Link to={toolPath(c.id)} className="app-topnav-item-row">
+                        <CapabilityIcon id={c.id} size={20} />
+                        {c.name}
+                        {c.mode === 'planned' && (
+                          <span className="app-mode-tag">{MODE_LABELS.planned}</span>
+                        )}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ))}
         <Link to="/works" className="app-topnav-item">
           我的作品

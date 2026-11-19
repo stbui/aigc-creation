@@ -1,15 +1,15 @@
-/* 级联层次先在这里定序：global.css 比 ui/styles.css 先载入。ui 兼容层里的
+/* 级联层次先在这里定序：global.css 比 ui/styles.css 先载入。C 端 UI 基线里的
    `@layer components` 会抢先把 components 注册成第一层，后声明的 theme / base
-   反而压在它之上（`.ui-btn` 的边框会被 base 的 `border: 0 solid` 兜底吃掉）。
+   反而压在它之上（`.ui-action` 的边框会被 base 的 `border: 0 solid` 兜底吃掉）。
    顺序与 ui/styles.css 一致：主题 < 基础 < 组件 < 工具类。 */
 @layer theme, base, components, utilities;
 
-/* 分层装载顺序：令牌 → 基础 → 共享组件 → ui 兼容层。
+/* 分层装载顺序：令牌 → 基础 → 共享组件 → C 端 UI 基线。
    页面与组件样式各自就近 import，不再回流本文件。 */
 @import './tokens.css';
 @import './base.css';
 @import './tool-workspace.css';
-@import './ui-compat.css';
+@import './ui.css';
 
 .status-succeeded {
   color: var(--wb-status-completed);

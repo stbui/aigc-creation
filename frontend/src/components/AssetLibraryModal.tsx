@@ -167,7 +167,6 @@ export function AssetLibraryModal({
       onCancel={onCancel}
       footer={null}
       width="min(1180px, calc(100vw - 40px))"
-      centered
       className="alp-modal"
       closeIcon={null}
       styles={{

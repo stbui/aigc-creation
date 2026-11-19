@@ -26,7 +26,7 @@ import { UserGroupService } from '../user-groups/user-group.service';
 import { ChannelSlotService } from '../tasks/channel-slot.service';
 import { ChannelUnavailableError } from '../channels/channel-runtime.service';
 import { OutboundError, outboundRequest, validateOutboundUrl } from '../infra/outbound';
-import { ensureChatCompletionStreamUsage, sanitizeCallPayload } from './proxy.payload';
+import { ensureChatCompletionStreamUsage, formatCallPayload } from './proxy.payload';
 import {
   ProxyPathError,
   authorizeSystemProxy,
@@ -490,8 +490,8 @@ export class SystemProxyService {
         concurrencyLimit: channel.concurrencyLimit,
         upstreamUrl: entry.target,
         requestContentType: input.contentType,
-        requestBody: sanitizeCallPayload(input.body, input.contentType),
-        responseBody: sanitizeCallPayload(entry.responseBody ?? Buffer.alloc(0), ''),
+        requestBody: formatCallPayload(input.body, input.contentType),
+        responseBody: formatCallPayload(entry.responseBody ?? Buffer.alloc(0), ''),
         responseBodyBuffer: entry.responseBody,
         streamed: entry.streamed,
         errorCode: entry.errorCode,

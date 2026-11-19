@@ -56,18 +56,17 @@ export function ForcePasswordChangeModal() {
       open
       title="请先修改登录密码"
       closable={false}
-      maskClosable={false}
+      closeOnMaskClick={false}
       keyboard={false}
-      confirmLoading={submitting}
       okText="确认修改"
-      okButtonProps={{ disabled: !canSubmit }}
+      confirmState={{ loading: submitting, disabled: !canSubmit }}
       onOk={() => void submit()}
       onCancel={() => undefined}
       footer={
         <div className="ui-modal-foot">
           <button
             type="button"
-            className="ui-btn is-primary"
+            className="ui-action is-primary"
             disabled={!canSubmit}
             onClick={() => void submit()}
           >

@@ -148,7 +148,7 @@
 
 /* 通用工具页结果卡「生成中」骨架 (2026-10-20) */
 .tool-result-loading {
-  /* 2026-10-20: 原为 `padding: 48px 0; justify-content: center` 配 旧版 UI 库 Spin。
+  /* 2026-10-20: 原为 `padding: 48px 0; justify-content: center` 配旧 Spinner。
      改用骨架屏占位后, 块内是骨架 + 提示文字的竖排, 需 flex-column。 */
   display: flex;
   flex-direction: column;
@@ -180,7 +180,7 @@
 }
 
 /* ───────── shadcn 适配层：旧页面选择器映射 ─────────
-   下面只新增选择器，把仍按 旧版 UI 库 DOM 命中的页面规则映射到当前适配层。
+   下面只新增选择器，把仍按旧浮层 DOM 命中的页面规则映射到当前适配层。
    所有数值延续上方原有规则，避免迁移 shadcn 后布局/间距发生变化。 */
 
 /* 按钮：业务类名仍写在 Button 上，DOM 带 data-slot="button" */

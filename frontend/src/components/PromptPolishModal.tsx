@@ -91,7 +91,6 @@ export function PromptPolishModal({ open, value, onApply, onCancel }: PromptPoli
       onCancel={onCancel}
       footer={null}
       width={600}
-      centered
       className="pt-polish-modal"
       closeIcon={<X size={18} />}
       title={

@@ -26,8 +26,6 @@ export interface ProxyUsage {
   cachedTokens: bigint;
 }
 
-const MAX_DETAIL_CHARS = 1000;
-
 /**
  * 生成可入库的报文文本。
  *
@@ -37,7 +35,7 @@ const MAX_DETAIL_CHARS = 1000;
  * @param data        原始报文
  * @param contentType 请求头里的类型；响应可传空串，由内容嗅探
  */
-export function sanitizeCallPayload(data: Buffer, contentType = ''): string {
+export function formatCallPayload(data: Buffer, contentType = ''): string {
   if (!data || data.length === 0) return '';
   const mediaType = mediaTypeOf(contentType) || sniffMediaType(data);
   if (mediaType === 'multipart/form-data') {
@@ -78,10 +76,17 @@ export function ensureChatCompletionStreamUsage(body: Buffer): Buffer {
   }
   if (payload.stream !== true) return body;
   const current = payload.stream_options;
-  if (current !== undefined && current !== null && (typeof current !== 'object' || Array.isArray(current))) {
+  if (
+    current !== undefined &&
+    current !== null &&
+    (typeof current !== 'object' || Array.isArray(current))
+  ) {
     throw new Error('stream_options 必须是 JSON 对象');
   }
-  payload.stream_options = { ...(current as Record<string, unknown> | undefined), include_usage: true };
+  payload.stream_options = {
+    ...(current as Record<string, unknown> | undefined),
+    include_usage: true,
+  };
   return Buffer.from(JSON.stringify(payload));
 }
 
@@ -123,8 +128,20 @@ function usageFromJson(text: string): ProxyUsage | null {
     return -1;
   };
 
-  const input = pick('prompt_tokens', 'input_tokens', 'promptTokenCount', 'promptTokens', 'inputTokens');
-  const output = pick('completion_tokens', 'output_tokens', 'candidatesTokenCount', 'completionTokens', 'outputTokens');
+  const input = pick(
+    'prompt_tokens',
+    'input_tokens',
+    'promptTokenCount',
+    'promptTokens',
+    'inputTokens',
+  );
+  const output = pick(
+    'completion_tokens',
+    'output_tokens',
+    'candidatesTokenCount',
+    'completionTokens',
+    'outputTokens',
+  );
   const cachedRaw = usage.cached_tokens ?? usage.prompt_tokens_details?.cached_tokens;
   const cached =
     cachedRaw !== undefined && cachedRaw !== null && cachedRaw !== ''
@@ -157,7 +174,14 @@ export function extractMediaCount(body: Buffer): number {
   const parsed = tryJson(body.toString('utf8'));
   if (parsed === undefined || parsed === null || typeof parsed !== 'object') return 0;
   const payload = parsed as Record<string, any>;
-  const arrays = [payload.data, payload.images, payload.videos, payload.audios, payload.image_urls, payload.output];
+  const arrays = [
+    payload.data,
+    payload.images,
+    payload.videos,
+    payload.audios,
+    payload.image_urls,
+    payload.output,
+  ];
   return arrays.reduce<number>((total, item) => total + (Array.isArray(item) ? item.length : 0), 0);
 }
 
@@ -170,7 +194,9 @@ export function extractMediaCount(body: Buffer): number {
  * 提示词、模型输出、上下游正文一律保留，后台详情直接展示。
  */
 function foldInlineMedia(value: any, key = ''): any {
-  const normalizedKey = String(key ?? '').toLowerCase().replace(/[_-]/g, '');
+  const normalizedKey = String(key ?? '')
+    .toLowerCase()
+    .replace(/[_-]/g, '');
   if (Array.isArray(value)) return value.map((item) => foldInlineMedia(item, key));
   if (value && typeof value === 'object') {
     const result: Record<string, any> = {};
@@ -211,7 +237,11 @@ function sanitizeMultipart(data: Buffer, contentType: string): string {
     const fileName = /filename="([^"]*)"/i.exec(headers)?.[1] ?? '';
     const content = data.slice(headerEnd + 4, next);
     fields[name] = fileName
-      ? { fileName, contentType: /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1] ?? '', size: content.length }
+      ? {
+          fileName,
+          contentType: /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1] ?? '',
+          size: content.length,
+        }
       : foldInlineMedia(content.toString('utf8').slice(0, MAX_PAYLOAD_BYTES + 1), name);
     offset = next;
   }
@@ -265,9 +295,19 @@ function mediaTypeOf(contentType: string): string {
 
 /** 按魔数粗略判断：代理响应常常缺 Content-Type */
 function sniffMediaType(data: Buffer): string {
-  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return 'image/jpeg';
-  if (data.length >= 8 && data.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
-  if (data.length >= 12 && data.slice(0, 4).toString() === 'RIFF' && data.slice(8, 12).toString() === 'WEBP') return 'image/webp';
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff)
+    return 'image/jpeg';
+  if (
+    data.length >= 8 &&
+    data.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  )
+    return 'image/png';
+  if (
+    data.length >= 12 &&
+    data.slice(0, 4).toString() === 'RIFF' &&
+    data.slice(8, 12).toString() === 'WEBP'
+  )
+    return 'image/webp';
   if (data.length >= 5 && data.slice(0, 5).toString() === '%PDF-') return 'application/pdf';
   return '';
 }

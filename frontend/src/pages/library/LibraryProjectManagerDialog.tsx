@@ -101,7 +101,6 @@ export function LibraryProjectManagerDialog({
       title="项目管理"
       footer={null}
       width="min(680px, calc(100vw - 32px))"
-      centered
       onCancel={onClose}
       className="asset-library-project-modal"
     >

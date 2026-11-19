@@ -1,10 +1,8 @@
 import { RefreshCw, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../types/api';
-import { Button, ResultMedia, StateEmpty, StateSkeleton, Surface, SurfaceContent, SurfaceHeader, SurfaceTitle, Typography, formatDuration } from './components';
+import { Button, ResultMedia, StateEmpty, StateSkeleton, Surface, SurfaceContent, SurfaceHeader, SurfaceTitle, formatDuration } from './components';
 import { useApp } from './hooks';
-
-const { Text } = Typography;
 
 interface ToolResultCardProps {
   name: string;
@@ -50,13 +48,13 @@ export function ToolResultCard({
           />
           <div className="tool-result-meta">
             <div>
-              <Text type="secondary">
+              <span className="text-muted-foreground">
                 {task?.outputAsset?.width}×{task?.outputAsset?.height} · {task?.outputAsset?.format}
                 {/* 视频没有宽高 (Jimp 不解视频), 补一个时长 */}
                 {formatDuration(task?.outputAsset?.durationMs)
                   ? ` · ${formatDuration(task?.outputAsset?.durationMs)}`
                   : ''}
-              </Text>
+              </span>
             </div>
             <div className="tool-result-actions">
               <Button disabled={generating} size="sm" onClick={onRegenerate} >

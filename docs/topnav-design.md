@@ -96,7 +96,7 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 
 条目内容：能力图标 + 能力名（+ 规划中标签）。点击导航到 `toolPath(id)`。
 
-**覆写边界**：下拉由 `ui` 的 `Dropdown`（radix）承载，条目样式在组件内统一定义。外壳只通过 `.app-topnav-dropdown` 调整容器层级，**不要写旧 UI 库的私有类覆写**，也不要改 `ui` 私有类来迁就单个入口。
+**覆写边界**：下拉由 shadcn `DropdownMenu`（radix）承载，条目样式在组件内统一定义。外壳只通过 `.app-topnav-dropdown` 调整容器层级，**不要写第三方库的私有类覆写**，也不要改 `ui` 私有类来迁就单个入口。
 
 ### 2.6 用户动作区
 

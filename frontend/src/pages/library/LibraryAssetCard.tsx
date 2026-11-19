@@ -86,7 +86,7 @@ export function LibraryAssetCard({
       title: '确定删除该素材？',
       okText: '删除',
       cancelText: '取消',
-      okButtonProps: { danger: true },
+      danger: true,
       onOk: () => onRemove(asset.id),
     });
   }, [asset.id, modal, onRemove]);

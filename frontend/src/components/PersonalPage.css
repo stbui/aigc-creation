@@ -47,7 +47,7 @@
   color: var(--text-strong);
 }
 
-.personal-page-heading .ui-text-secondary {
+.personal-page-heading .text-muted-foreground {
   font-size: 13px;
   line-height: 20px;
   color: var(--text-muted);

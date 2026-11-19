@@ -2,7 +2,7 @@ import '../styles/product-detail-kit.css';
 
 import type { ReactNode } from 'react';
 
-import { Tabs } from '../ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui';
 
 /**
  * 工具页右侧「功能示例 / 创作结果」页签外壳。
@@ -48,29 +48,24 @@ export function OutputTabsPane({
   return (
     <section className="pd-right-pane">
       <Tabs
-        activeKey={value}
-        onChange={(key) => onChange(key as OutputTab)}
+        value={value}
+        onValueChange={(next) => onChange(next as OutputTab)}
         className="pd-right-tabs"
-        tabBarClassName="pd-tabs u-p-4"
-        tabBarAriaLabel={ariaLabel}
-        items={[
-          {
-            key: 'demo',
-            label: demoLabel,
-            children: <div className="pd-right-panel">{demo}</div>,
-          },
-          {
-            key: 'results',
-            label: (
-              <>
-                创作结果
-                {generationCount > 0 && <span className="pd-tab-count u-font-12">{generationCount}</span>}
-              </>
-            ),
-            children: <div className="pd-right-panel">{results}</div>,
-          },
-        ]}
-      />
+      >
+        <TabsList variant="line" aria-label={ariaLabel} className="pd-tabs u-p-4">
+          <TabsTrigger value="demo">{demoLabel}</TabsTrigger>
+          <TabsTrigger value="results">
+            创作结果
+            {generationCount > 0 && <span className="pd-tab-count u-font-12">{generationCount}</span>}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="demo">
+          <div className="pd-right-panel">{demo}</div>
+        </TabsContent>
+        <TabsContent value="results">
+          <div className="pd-right-panel">{results}</div>
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }

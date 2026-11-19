@@ -2,12 +2,21 @@ import { Link } from 'react-router-dom';
 import type { CreditLot } from '../../types/api';
 import {
   Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
   StateButton,
   StateEmpty,
   StateError,
   StateSkeleton,
   StatusBadge,
   Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from './components';
 import { LOT_STATUS, PAGE_SIZE, SOURCE_LABEL } from './constants';
 import { formatDate, shortId } from './utils';
@@ -33,49 +42,6 @@ export function CreditsLotPanel({
   onPageChange,
   onRetry,
 }: CreditsLotPanelProps) {
-  const columns = [
-    {
-      title: '来源',
-      dataIndex: 'source',
-      width: 130,
-      render: (value: string) => SOURCE_LABEL[value] ?? value,
-    },
-    {
-      title: '发放时间',
-      dataIndex: 'createdAt',
-      width: 130,
-      render: (value: string) => formatDate(value),
-    },
-    {
-      // 购买批次指向购买单；短 ID 可读，完整 id 放 title
-      title: '关联订单',
-      dataIndex: 'orderId',
-      width: 130,
-      ellipsis: true,
-      render: (value: string | null) =>
-        value ? <span title={value}>{shortId(value)}</span> : '—',
-    },
-    { title: '总额', dataIndex: 'totalCredits', width: 100, align: 'right' as const },
-    { title: '剩余', dataIndex: 'remainingCredits', width: 100, align: 'right' as const },
-    {
-      title: '到期日',
-      dataIndex: 'expireAt',
-      width: 140,
-      render: (value: string | null) => (value ? formatDate(value) : '永久'),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 100,
-      render: (value: CreditLot['status']) => (
-        // 不用预设色: 默认绿字在淡绿底上对比度不足, 状态色统一走 .credits-status
-        <StatusBadge variant="secondary" className={`credits-status is-${value}`}>
-          {LOT_STATUS[value] ?? LOT_STATUS.active}
-        </StatusBadge>
-      ),
-    },
-  ];
-
   const view = lots.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return initialLoading ? (
@@ -102,31 +68,66 @@ export function CreditsLotPanel({
       <CreditsLotList rows={view} />
       {lots.length > PAGE_SIZE && (
         <div className="credits-mobile-pager">
-          <Pagination
-            simple
-            size="small"
-            current={page}
-            pageSize={PAGE_SIZE}
-            total={lots.length}
-            onChange={onPageChange}
-          />
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => onPageChange(Math.max(1, page - 1))}
+                  aria-disabled={page <= 1}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="px-2 text-xs text-muted-foreground">
+                  第 {page} / {Math.max(1, Math.ceil(lots.length / PAGE_SIZE))} 页
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => onPageChange(page + 1)}
+                  aria-disabled={page >= Math.ceil(lots.length / PAGE_SIZE)}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
     </>
   ) : (
-    <Table
-      rowKey="id"
-      size="small"
-      columns={columns}
-      dataSource={lots}
-      pagination={{
-        current: page,
-        pageSize: PAGE_SIZE,
-        total: lots.length,
-        hideOnSinglePage: true,
-        onChange: onPageChange,
-      }}
-      scroll={{ x: 850 }}
-    />
+    <Table className="min-w-[850px]">
+      <TableHeader>
+        <TableRow>
+          <TableHead>来源</TableHead>
+          <TableHead>发放时间</TableHead>
+          <TableHead>关联订单</TableHead>
+          <TableHead className="text-right">总额</TableHead>
+          <TableHead className="text-right">剩余</TableHead>
+          <TableHead>到期日</TableHead>
+          <TableHead>状态</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {lots.map((lot) => (
+          <TableRow key={lot.id}>
+            <TableCell>{SOURCE_LABEL[lot.source] ?? lot.source}</TableCell>
+            <TableCell>{formatDate(lot.createdAt)}</TableCell>
+            <TableCell className="max-w-[130px] truncate">
+              {lot.orderId ? <span title={lot.orderId}>{shortId(lot.orderId)}</span> : '—'}
+            </TableCell>
+            <TableCell className="text-right">{lot.totalCredits}</TableCell>
+            <TableCell className="text-right">{lot.remainingCredits}</TableCell>
+            <TableCell>{lot.expireAt ? formatDate(lot.expireAt) : '永久'}</TableCell>
+            <TableCell>
+              {/* 不用预设色: 默认绿字在淡绿底上对比度不足, 状态色统一走 .credits-status */}
+              <StatusBadge
+                variant="secondary"
+                className={`credits-status is-${lot.status}`}
+              >
+                {LOT_STATUS[lot.status] ?? LOT_STATUS.active}
+              </StatusBadge>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

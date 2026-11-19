@@ -23,7 +23,7 @@ interface State {
  * React 只能捕获渲染/生命周期/构造中的错误, 事件回调与异步错误不在此列
  * (那类错误由各处的 try/catch 与 message 提示处理)。
  *
- * 2026-10-20: 兜底 UI 从 旧版 UI 库 <Result> 换成 ExceptionPage。此前把 error.message
+ * 2026-10-20: 兜底 UI 从旧的 <Result> 换成 ExceptionPage。此前把 error.message
  * 直接当副标题展示, 用户看到的是 "Objects are not valid as a React child"
  * 这类内部文案 —— 既看不懂也无处可去。现在主文案说人话, 原始 message +
  * componentStack 收进默认收起的「技术详情」, 可一键复制。

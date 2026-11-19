@@ -1,24 +1,34 @@
 import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { Form, FormItem, type FormInstance } from '../form';
+import { Form, FormItem, useForm, type FormInstance } from '../form';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from '~/admin-ui/components/ui/input-group';
 
-describe('FormItem 兼容层', () => {
-  it('label 指向真实输入框，错误信息通过 aria-describedby 关联', () => {
-    let form!: FormInstance;
+describe('Form / FormItem', () => {
+  it('label 指向真实输入框，错误信息通过 aria-describedby 关联', async () => {
+    let form!: FormInstance<{ email: string }>;
 
     function Harness() {
-      [form] = Form.useForm();
+      form = useForm<{ email: string }>({ defaultValues: { email: '' } });
       return (
-        <Form form={form}>
-          <FormItem name="email" label="邮箱">
-            <input />
+        <Form
+          form={form}
+          onSubmit={async () => {
+            await form.trigger();
+          }}
+        >
+          <FormItem
+            name="email"
+            label="邮箱"
+            rules={[{ required: true, message: '请输入邮箱' }]}
+          >
+            {({ field }) => <input {...field} />}
           </FormItem>
+          <button type="submit">提交</button>
         </Form>
       );
     }
@@ -27,51 +37,47 @@ describe('FormItem 兼容层', () => {
     const input = screen.getByLabelText('邮箱');
     expect(input).toHaveAttribute('id');
 
-    act(() => form.setFields([{ name: 'email', errors: ['请输入邮箱'] }]));
+    await act(async () => {
+      screen.getByRole('button', { name: '提交' }).click();
+    });
 
-    const error = screen.getByText('请输入邮箱');
+    const error = await screen.findByText('请输入邮箱');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAttribute('aria-describedby', error.id);
   });
 
-  it('shouldUpdate 只在比较函数返回 true 时渲染内容', () => {
-    let form!: FormInstance;
-
+  it('description 在无错误时作为帮助文案关联到控件', () => {
     function Harness() {
-      [form] = Form.useForm();
+      const form = useForm({ defaultValues: { email: '' } });
       return (
         <Form form={form}>
-          <FormItem
-            shouldUpdate={(previous, next) => previous.watched !== next.watched}
-          >
-            <span>联动内容</span>
+          <FormItem name="email" label="邮箱" description="用于接收通知">
+            {({ field }) => <input {...field} />}
           </FormItem>
         </Form>
       );
     }
 
     render(<Harness />);
-    expect(screen.getByText('联动内容')).toBeInTheDocument();
-
-    act(() => form.setFieldsValue({ watched: 1 }));
-    expect(screen.getByText('联动内容')).toBeInTheDocument();
-
-    act(() => form.setFieldsValue({ unrelated: 1 }));
-    expect(screen.queryByText('联动内容')).not.toBeInTheDocument();
+    const input = screen.getByLabelText('邮箱');
+    const hint = screen.getByText('用于接收通知');
+    expect(input).toHaveAttribute('aria-describedby', hint.id);
   });
 
-  it('value/onChange 穿透 InputGroup，落到内部 input 而非 addon', () => {
-    let form!: FormInstance;
+  it('value/onChange 穿透 InputGroup，落到内部 input 而非 addon', async () => {
+    let form!: FormInstance<{ email: string }>;
 
     function Harness() {
-      [form] = Form.useForm();
+      form = useForm<{ email: string }>({ defaultValues: { email: '' } });
       return (
         <Form form={form}>
           <FormItem name="email" label="邮箱">
-            <InputGroup>
-              <InputGroupAddon>@</InputGroupAddon>
-              <InputGroupInput />
-            </InputGroup>
+            {({ field }) => (
+              <InputGroup>
+                <InputGroupAddon>@</InputGroupAddon>
+                <InputGroupInput {...field} />
+              </InputGroup>
+            )}
           </FormItem>
         </Form>
       );
@@ -81,7 +87,9 @@ describe('FormItem 兼容层', () => {
     const input = screen.getByLabelText('邮箱');
     expect(input.tagName).toBe('INPUT');
 
-    act(() => form.setFieldsValue({ email: 'a@b.com' }));
+    await act(async () => {
+      form.setValue('email', 'a@b.com');
+    });
     expect(input).toHaveValue('a@b.com');
   });
 });

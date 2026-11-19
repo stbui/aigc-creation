@@ -12,7 +12,7 @@
   border-bottom: 1px solid var(--color-border-soft);
   padding: 0 var(--space-24); /* 参考站 padding 0 24 (原 0 20, 品牌块 x 差 4px) */
   height: 64px;
-  /* 旧版 UI 库 <Header> 默认 line-height:64px 会被子元素继承, 使 .app-quota / .app-user 的
+  /* 历史 Header 组件默认 line-height:64px 会被子元素继承, 使 .app-quota / .app-user 的
      行盒撑到 64px (再加 padding 即 72px), 溢出 64px 顶栏上下各 4px —— 2026-10-19 实测复现, 此处归零 */
   line-height: normal;
   position: sticky;

@@ -178,9 +178,9 @@
   padding: var(--space-8) var(--space-12);
   border-radius: var(--radius-card);
   text-decoration: none;
-  /* 2026-10-19 修 旧版 UI 库蓝泄漏: 本选择器作用于 react-router <Link>, 原先只设了
-     text-decoration 却漏了 color, 导致 46 个链接继承 旧版 UI 库默认主题链接色 #1677ff
-     (CSS 全文无 1677ff 字面值 = 旧版 UI 库运行时注入), 在紫系全站里是刺眼的蓝。
+  /* 2026-10-19 修默认链接蓝泄漏: 本选择器作用于 react-router <Link>, 原先只设了
+     text-decoration 却漏了 color, 导致 46 个链接继承默认主题链接色 #1677ff
+     (CSS 全文无 1677ff 字面值 = 由旧组件运行时注入), 在紫系全站里是刺眼的蓝。
      颜色语义由子元素 .sitemap-item-name / -path 各自定义, 此处只需不让 <a> 兜底蓝。*/
   color: var(--text-strong);
   transition: background 0.15s;

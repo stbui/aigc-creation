@@ -40,7 +40,7 @@ export function AccountDeleteModal({
       open={open}
       title="确认注销账号"
       okText="确认注销"
-      okButtonProps={{
+      confirmState={{
         danger: true,
         loading: deleting,
         disabled: deleteConfirm !== DELETE_CONFIRM_WORD || (hasPassword && !deletePassword),
@@ -48,10 +48,9 @@ export function AccountDeleteModal({
       cancelText="取消"
       onOk={onOk}
       onCancel={onCancel}
-      destroyOnHidden
     >
       <div className="account-delete-body">
-        <InlineAlert className="ui-alert is-warning">
+        <InlineAlert className="border-warn-border bg-warn-soft text-warn-text">
           <InlineAlertTitle>此操作不可撤销</InlineAlertTitle>
           <InlineAlertDescription>
             {previewLoading

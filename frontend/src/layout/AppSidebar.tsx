@@ -29,12 +29,12 @@ export function AppSidebar({ groups, items, mobileOpen, onCloseMobile }: Props) 
 
       <Drawer
         title="导航菜单"
-        placement="left"
-        size={280}
+        side="left"
+        width={280}
         open={mobileOpen}
         onClose={onCloseMobile}
         className="app-mobile-drawer"
-        styles={{ body: { padding: 0 } }}
+        bodyPadding={0}
       >
         {/* 移动端补齐顶导隐藏后的高频入口 */}
         <nav className="app-mobile-links" aria-label="快捷导航">

@@ -108,7 +108,7 @@
   overflow-wrap: anywhere;
 }
 
-/* 状态 / 未读: 自绘胶囊而不是 旧版 UI 库 Tag —— Tag 的蓝绿是 旧版 UI 库色板, 与品牌紫并排发灰 */
+/* 状态 / 未读: 自绘胶囊而不是通用标签组件 —— 通用标签色板与品牌紫并排发灰 */
 .account-pill {
   display: inline-flex;
   align-items: center;

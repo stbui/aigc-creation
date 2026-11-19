@@ -616,20 +616,19 @@
   line-height: 20px;
 }
 
-.login-field .ui-form-item {
+.login-field {
   margin-bottom: 18px;
 }
 
+/* 登录卡片只有 placeholder，不显示 label 行；找回/重置页是独立卡片，需要 label */
 .login-field .ui-form-label {
   display: none;
 }
 
 .auth-plain-card .login-field .ui-form-label {
   display: block;
-}
-
-.auth-plain-card .login-field .ui-form-label > span {
   font-size: 13px;
+  font-weight: 400;
   color: var(--text-body);
 }
 

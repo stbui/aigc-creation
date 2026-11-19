@@ -1,6 +1,6 @@
 import '../styles/auth.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Form, FormItem, Input, InputGroup, InputGroupAddon, InputGroupInput, useApp, useForm, useWatch } from '../ui';
+import { Button, Form, FormItem, InputGroup, InputGroupAddon, InputGroupInput, useApp, useForm, useWatch } from '../ui';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, X } from 'lucide-react';
 import { authApi, oauthAuthorizeUrl, type OAuthProviderInfo } from '../lib/api';
@@ -95,7 +95,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
   const { login } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [submitting, setSubmitting] = useState(false);
-  const [form] = useForm<AuthForm>();
+  const form = useForm<AuthForm>();
   const emailRef = useRef<HTMLInputElement>(null);
 
   // 短信与邮箱验证码各自使用独立状态，避免两个倒计时/loading 互相串台
@@ -106,8 +106,8 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
 
   // 注册模式下手机号是选填的；只有填了才显示验证码输入框
-  const phoneValue = useWatch('phone', form);
-  const emailValue = useWatch('email', form);
+  const phoneValue = useWatch<AuthForm>('phone', form);
+  const emailValue = useWatch<AuthForm>('email', form);
   const needPhoneCode = mode === 'register' && Boolean(phoneValue);
 
   useEffect(() => {
@@ -125,7 +125,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
     };
   }, []);
 
-  // 弹窗打开时把焦点落到账号输入框 (旧版 UI 库 Modal 默认会聚焦第一个可聚焦元素 = 激活 tab),
+  // 弹窗打开时把焦点落到账号输入框 (否则落在激活的页签上),
   // 用户可直接敲键盘; 关闭时归还焦点由 Modal 处理。
   useEffect(() => {
     const t = window.setTimeout(() => emailRef.current?.focus(), 60);
@@ -154,7 +154,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
    */
   const handleSendSms = useCallback(
     async (purpose: SmsPurpose) => {
-      const phone = String(form.getFieldValue('phone') ?? '');
+      const phone = String(form.getValues('phone') ?? '');
       if (!phone) {
         message.error('请先填写手机号');
         return;
@@ -182,7 +182,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
    * 因此不能文案承诺「已发送」；`delivered=false` 只提示去控制台通道排查。
    */
   const handleSendEmail = useCallback(async () => {
-    const email = String(form.getFieldValue('email') ?? '').trim();
+    const email = String(form.getValues('email') ?? '').trim();
     if (!email) {
       message.error('请先填写邮箱');
       return;
@@ -207,7 +207,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
     }
   }, [form, message]);
 
-  const onFinish = async (values: AuthForm) => {
+  const onFinish = async (values: AuthForm): Promise<void> => {
     setSubmitting(true);
     try {
       if (mode === 'sms') {
@@ -259,7 +259,14 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
     setMode(next);
     setSmsCountdown(0);
     setEmailCountdown(0);
-    form.resetFields(['password', 'emailCode', 'name', 'phone', 'smsCode', 'agreed']);
+    form.reset({
+      password: '',
+      emailCode: '',
+      name: '',
+      phone: '',
+      smsCode: '',
+      agreed: false,
+    });
   };
 
   const activeTab = mode === 'qr' ? 'qr' : mode === 'sms' ? 'sms' : 'account';
@@ -272,27 +279,30 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
       className="login-field"
       rules={[{ required: true, message: '请输入验证码' }]}
     >
-      <div className="login-code-row">
-        <InputGroup>
-          <InputGroupAddon>
-            {<ShieldCheck size={15} />}
-          </InputGroupAddon>
-          <InputGroupInput
-            placeholder="6 位验证码"
-            maxLength={6}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-          />
-        </InputGroup>
-        <Button
-          className="login-code-btn"
-          onClick={() => handleSendSms(purpose)}
-          disabled={smsCountdown > 0 || sendingSms}
-        >
-          <span className="state-spinner is-small" aria-hidden />
-          {smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码'}
-        </Button>
-      </div>
+      {({ field }) => (
+        <div className="login-code-row">
+          <InputGroup>
+            <InputGroupAddon>
+              {<ShieldCheck size={15} />}
+            </InputGroupAddon>
+            <InputGroupInput
+              {...field}
+              placeholder="6 位验证码"
+              maxLength={6}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            />
+          </InputGroup>
+          <Button
+            className="login-code-btn"
+            onClick={() => handleSendSms(purpose)}
+            disabled={smsCountdown > 0 || sendingSms}
+          >
+            <span className="state-spinner is-small" aria-hidden />
+            {smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码'}
+          </Button>
+        </div>
+      )}
     </FormItem>
   );
 
@@ -304,27 +314,30 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
       className="login-field"
       rules={[{ required: true, message: '请输入邮箱验证码' }]}
     >
-      <div className="login-code-row">
-        <InputGroup>
-          <InputGroupAddon>
-            {<ShieldCheck size={15} />}
-          </InputGroupAddon>
-          <InputGroupInput
-            placeholder="6 位验证码"
-            maxLength={6}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-          />
-        </InputGroup>
-        <Button
-          className="login-code-btn"
-          onClick={() => void handleSendEmail()}
-          disabled={emailCountdown > 0 || !emailValue || sendingEmail}
-        >
-          <span className="state-spinner is-small" aria-hidden />
-          {emailCountdown > 0 ? `${emailCountdown}s` : '获取验证码'}
-        </Button>
-      </div>
+      {({ field }) => (
+        <div className="login-code-row">
+          <InputGroup>
+            <InputGroupAddon>
+              {<ShieldCheck size={15} />}
+            </InputGroupAddon>
+            <InputGroupInput
+              {...field}
+              placeholder="6 位验证码"
+              maxLength={6}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            />
+          </InputGroup>
+          <Button
+            className="login-code-btn"
+            onClick={() => void handleSendEmail()}
+            disabled={emailCountdown > 0 || !emailValue || sendingEmail}
+          >
+            <span className="state-spinner is-small" aria-hidden />
+            {emailCountdown > 0 ? `${emailCountdown}s` : '获取验证码'}
+          </Button>
+        </div>
+      )}
     </FormItem>
   );
 
@@ -399,9 +412,8 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
           {mode !== 'qr' && (
           <Form
             form={form}
-            layout="vertical"
-            onFinish={onFinish}
-            requiredMark={false}
+            onSubmit={onFinish}
+            aria-label="账号表单"
             className="login-form"
           >
             <AuthFormFields

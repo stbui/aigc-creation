@@ -144,7 +144,7 @@ aigc-creation/
         ├── lib/                # api.ts（拆信封）/ http.ts / auth.ts / capabilities.ts / constants.ts
         ├── context/ hooks/     # AuthContext / AdminContext（权限点）/ CreditsContext；共享 hook（index.ts 统一出口）
         └── styles/             # global.css（分层入口）+ tokens.css（★ 设计令牌）+ base.css
-                                # + tool-workspace.css / ui-compat.css + admin.css（后台 Tailwind 入口，无 preflight）
+                                # + tool-workspace.css / ui.css + admin.css（后台 Tailwind 入口，无 preflight）
 ```
 
 逐模块注释的完整目录树见 `CLAUDE.md`「目录结构」。

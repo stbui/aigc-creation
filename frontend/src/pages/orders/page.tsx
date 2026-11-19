@@ -252,7 +252,7 @@ export function OrdersPage() {
       content: '取消后订单不可恢复；优惠券只在支付成功后核销，本单不会占用券。',
       okText: '取消订单',
       cancelText: '保留订单',
-      okButtonProps: { danger: true },
+      danger: true,
       onOk: async () => {
         setCancelling(o.id);
         try {

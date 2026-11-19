@@ -3,7 +3,7 @@
  *
  * ## 与前台的关系
  *
- * 前台（C 端）样式由 `styles/global.css` 入口分层装载（tokens / base / tool-workspace / ui-compat），**本文件不碰它们**。
+ * 前台（C 端）样式由 `styles/global.css` 入口分层装载（tokens / base / tool-workspace / ui），**本文件不碰它们**。
  * 本文件只被后台 chunk 导入（`pages/admin/AdminDashboardPage.tsx`），C 端不下载。
  * 两者共享的只有 `tokens.css` 的 `:root` 设计令牌（品牌紫、中性色、圆角档、状态色）。
  *

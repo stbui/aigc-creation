@@ -3,19 +3,18 @@ import { useToast, type ToastApi } from '~/admin-ui/providers/ToastProvider';
 import { UiDialog } from '../primitives/dialog';
 
 /**
- * 旧版 UI 库 `App.useApp()` 的兼容层。
+ * C 端反馈 API：toast 与确认弹窗。
  *
- * 迁移期页面只改 import：`const { message, modal } = useApp()`。
  * - `message.*` 走项目 toast；
  * - `modal.confirm` 走项目确认弹窗，返回 Promise<boolean>；
- * - 不提供 旧版 UI 库的 notification / contextHolder 等 C 端未使用的能力。
+ * - 只暴露 C 端实际使用的能力，不保留旧库的 notification / contextHolder。
  */
 export interface ConfirmOptions {
   title: ReactNode;
   content?: ReactNode;
   okText?: string;
   cancelText?: string;
-  okButtonProps?: { danger?: boolean };
+  danger?: boolean;
   onOk?: () => void | Promise<void>;
 }
 
@@ -25,7 +24,7 @@ export interface InfoOptions {
   okText?: string;
   cancelText?: string;
   width?: number;
-  okButtonProps?: { danger?: boolean };
+  danger?: boolean;
   onOk?: () => void | Promise<void>;
 }
 
@@ -43,7 +42,7 @@ export interface AppApi {
 interface PendingConfirm {
   options: ConfirmOptions | InfoOptions;
   resolve: (value: boolean) => void;
-  /** confirm 有取消/确认两个按钮；info 类只有确认（旧版 UI 库同此语义） */
+  /** confirm 有取消/确认两个按钮；info 类只有确认 */
   kind: 'confirm' | 'info';
 }
 
@@ -91,7 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         confirmText={pending?.options.okText ?? '确定'}
         cancelText={pending?.options.cancelText}
         hideCancel={pending?.kind === 'info'}
-        danger={Boolean(pending?.options.okButtonProps?.danger)}
+        danger={pending?.options.danger}
         onCancel={() => close(false)}
         onConfirm={() => {
           const options = pending?.options;

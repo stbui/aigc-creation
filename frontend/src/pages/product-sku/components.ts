@@ -5,7 +5,7 @@
  * 页面用到的共享控件集中可见, 替换或加埋点只改一处。
  * 目录内新增共享组件引用时在这里补一行 re-export。
  *
- * 第三方 UI 库 (旧版 UI 库 / lucide-react) 不经本文件 —— 它们不是本项目的共享控件,
+ * 第三方库 (lucide-react) 不经本文件 —— 它们不是本项目的共享控件,
  * 与 `channels/` / `product-detail/` / `product-kit/` / `viral-clone/` 的做法一致。
  * `useAssetLibrary` 属于 hook, 统一从 `./hooks` 取。
  */

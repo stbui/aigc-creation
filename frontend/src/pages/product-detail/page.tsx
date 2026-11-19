@@ -291,7 +291,7 @@ export function ProductDetailPage() {
         title: '删除这次生成的全部图片？',
         content: '生成图与本地文件会一并删除，不可恢复。',
         okText: '删除',
-        okButtonProps: { danger: true },
+        danger: true,
         cancelText: '取消',
         onOk: async () => {
           try {

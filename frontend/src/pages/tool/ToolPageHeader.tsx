@@ -1,8 +1,6 @@
 import type { CapabilityDef } from '../../types/api';
-import { CapabilityIcon, StatusBadge, Typography } from './components';
+import { CapabilityIcon, StatusBadge } from './components';
 import { MODE_LABELS, RUNTIME_LABELS, runtimeOf } from './utils';
-
-const { Title, Paragraph, Text } = Typography;
 
 interface ToolPageHeaderProps {
   def: CapabilityDef;
@@ -19,7 +17,7 @@ export function ToolPageHeader({ def }: ToolPageHeaderProps) {
           <CapabilityIcon id={def.id} size={22} />
         </span>
         <div>
-          <Title level={3} className="tool-header-title">
+          <h3 className="tool-header-title">
             {def.name}
             {def.badge && <StatusBadge variant="secondary" className="tool-tag-free">{def.badge}</StatusBadge>}
             {/*
@@ -33,14 +31,14 @@ export function ToolPageHeader({ def }: ToolPageHeaderProps) {
             >
               {RUNTIME_LABELS[runtime.effective] ?? MODE_LABELS[def.mode]}
             </StatusBadge>
-          </Title>
-          <Paragraph className="tool-header-sub">{def.summary}</Paragraph>
+          </h3>
+          <p className="tool-header-sub">{def.summary}</p>
         </div>
       </div>
 
       {def.help && (
         <div className="tool-notice tool-notice-help">
-          <Text type="secondary">{def.help}</Text>
+          <span className="text-muted-foreground">{def.help}</span>
         </div>
       )}
     </>

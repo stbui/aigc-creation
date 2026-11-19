@@ -237,10 +237,10 @@ export function ToolHistoryPane({
       <Drawer
         title={title}
         open={drawerOpen}
-        placement="right"
-        size={320}
+        side="right"
+        width={320}
         onClose={() => setDrawerOpen(false)}
-        styles={{ body: { padding: 12 } }}
+        bodyPadding={12}
       >
         {content}
       </Drawer>

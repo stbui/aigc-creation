@@ -19,10 +19,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { ChannelExecution } from '../channels/channel-runtime.service';
 import { OutboundError } from '../infra/outbound';
-import {
-  previewCallPayload,
-  previewCallText,
-} from '../protocol/call-payload';
+import { previewCallPayload, previewCallText } from '../protocol/call-payload';
 import { ProtocolExecutor, type ProtocolHttpResponse } from '../protocol/executor';
 import type {
   GenerationRequest,

@@ -199,8 +199,9 @@ export function Detail({ detailId, onClose }: { detailId: string | null; onClose
 /**
  * 报文预览块。
  *
- * 内容已在写库前脱敏并截断（密钥字段、内联 base64、超长响应），这里原样展示
- * 不再二次处理 —— 后台再裁一次会让「界面看到的」和「库里存的」出现两套口径。
+ * 报文是明文入库，只在内嵌媒体（data URL / base64）与超长内容上做过折叠与截断。
+ * 这里原样展示、不做二次处理 —— 后台再裁一次会让「界面看到的」和「库里存的」
+ * 出现两套口径；`max-h` 只负责滚动视口。
  */
 function PayloadBlock({ text, emptyText }: { text: string; emptyText: string }) {
   if (!text.trim()) {

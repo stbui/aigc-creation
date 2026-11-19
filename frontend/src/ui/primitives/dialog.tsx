@@ -22,8 +22,8 @@ interface UiDialogProps {
 /**
  * 通用确认/表单弹窗。
  *
- * 替代 旧版 UI 库 Modal 的常用形态。`children` 为空时是确认框；有内容时是普通弹窗，
- * 内容区宽度由 `width` 控制，视觉仍由 C 端现有 CSS 变量接管。
+ * `children` 为空时是确认框；有内容时是普通弹窗，内容区宽度由 `width` 控制，
+ * 视觉由 C 端现有 CSS 变量接管。
  */
 export function UiDialog({
   open,

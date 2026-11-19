@@ -8,7 +8,6 @@ import {
   SurfaceContent,
   SurfaceHeader,
   SurfaceTitle,
-  Typography,
   Upload,
   type FormInstance,
   type UploadFile,
@@ -16,18 +15,17 @@ import {
 import { ToolParamField } from './ToolParamField';
 import { useUploadLimits } from '../../context/UploadLimitsContext';
 
-const { Text } = Typography;
 
 interface ToolUploadCardProps {
   def: CapabilityDef;
   form: FormInstance;
   inputs: number;
   creditLabel: string | null;
-  fileList: UploadFile[];
+  files: UploadFile[];
   assets: Asset[];
   generating: boolean;
   uploadingCount: number;
-  beforeUpload: (file: File) => boolean | string | Promise<boolean | string>;
+  onSelect: (file: File) => boolean | Promise<boolean>;
   onRemoveFile: (file: UploadFile) => void;
   onOpenLibrary: () => void;
   onSubmit: () => void;
@@ -39,11 +37,11 @@ export function ToolUploadCard({
   form,
   inputs,
   creditLabel,
-  fileList,
+  files,
   assets,
   generating,
   uploadingCount,
-  beforeUpload,
+  onSelect,
   onRemoveFile,
   onOpenLibrary,
   onSubmit,
@@ -58,21 +56,20 @@ export function ToolUploadCard({
       </SurfaceHeader>
       <SurfaceContent>
       <Upload
-        listType="picture-card"
-        fileList={fileList}
+        files={files}
         accept={accept}
         multiple={inputs > 1}
         maxCount={inputs}
         disabled={generating}
-        beforeUpload={beforeUpload}
+        onSelect={onSelect}
         onRemove={onRemoveFile}
       >
         <div className="tool-upload-trigger">
           <UploadIcon size={20} />
           <span>上传图片</span>
-          <Text type="secondary" className="tool-upload-hint">
+          <span className="tool-upload-hint text-muted-foreground">
             ≤ {maxMb}MB
-          </Text>
+          </span>
         </div>
       </Upload>
 
@@ -80,7 +77,7 @@ export function ToolUploadCard({
         从素材库导入
       </Button>
 
-      <Form form={form} layout="vertical" className="tool-form">
+      <Form form={form} className="tool-form">
         {/* hidden 的参数由具体页面代填（如遮罩素材 id），通用表单不渲染 */}
         {def.params
           .filter((param) => !param.hidden)
@@ -100,9 +97,9 @@ export function ToolUploadCard({
         {generating ? '生成中…' : uploadingCount > 0 ? '上传中…' : '立即生成'}
       </Button>
       {creditLabel && (
-        <Text type="secondary" className="tool-credit-hint">
+        <span className="tool-credit-hint text-muted-foreground">
           {creditLabel}
-        </Text>
+        </span>
       )}
     </SurfaceContent>
     </Surface>

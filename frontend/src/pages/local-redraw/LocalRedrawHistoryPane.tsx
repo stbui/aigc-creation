@@ -87,8 +87,8 @@ export const LocalRedrawHistoryPane = memo(function LocalRedrawHistoryPane({
         title="历史记录"
         open={drawerOpen}
         onClose={onCloseDrawer}
-        size={320}
-        styles={{ body: { padding: 12 } }}
+        width={320}
+        bodyPadding={12}
       >
         <ToolHistoryGrid
           tasks={tasks}

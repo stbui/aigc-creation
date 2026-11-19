@@ -181,12 +181,11 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
       footer={null}
       /* 宽度写成 min() 而不是 440: 窄屏下容器要按 `100vw - 40px` 收窄。 */
       width="min(440px, calc(100vw - 40px))"
-      centered
       className="mum-modal"
       closeIcon={null}
       styles={{
         body: { padding: 0 },
-        // 参考站 backdrop: #14122180 (不带模糊)。旧版 UI 库默认是 45% 纯黑, 比参考站更重。
+        // 参考站 backdrop: #14122180 (不带模糊), 比通用遮罩更轻。
         mask: { background: 'var(--overlay-mask-soft)' },
       }}
       title={null}

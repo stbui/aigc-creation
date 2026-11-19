@@ -102,6 +102,7 @@
 - 日志落盘前统一脱敏：`Authorization: Bearer/Basic` 与 `token/secret/password/api_key/authorization/credential` 键值对替换为 `***`。
 - 脱敏规则顺序不可交换：Bearer 必须先于键值规则匹配。
 - 不得记录请求体原文、完整凭证、支付回调密文、用户密码与验证码。
+- **例外：模型调用记录（`ApiCallLog.requestBody` / `responseBody`）明文入库**，供后台逐条排障查看提示词与上游正文。边界靠访问控制与保留期：报文只经 `GET /admin/api-logs/:id`（`model.call_read`）下发，列表与 CSV 导出均不含；按「数据保留」默认 90 天清理；写入侧只折叠内嵌媒体与截断超长报文，不做字段名脱敏。上游凭证由服务端注入请求头，不进报文；客户端 `?key=` 在出站前由 `stripSecretQuery` 剥离。
 - 请求追踪 id 写入响应头与日志，用于关联排障；错误文案只对 5xx 暴露请求号。
 - 新增敏感字段名必须同步扩展脱敏规则，并补一条脱敏测试。
 

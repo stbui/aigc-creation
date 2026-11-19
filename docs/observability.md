@@ -62,7 +62,7 @@
 
 - 一次尝试一条记录；重试与切线分别记录，不合并。
 - `billable` 必须准确：文本工具为 `false`，生成任务为 `true`。
-- 请求 / 响应报文只存**脱敏截断后的预览**：任务路径经 `safeJson` 折叠内联 base64 并截断 4000 字符，中转路径经 `sanitizeCallPayload` 剥离密钥字段（上限 128 KB），文本工具存 `previewJson` 与响应文本切片。列表与 CSV 导出都不含报文，只有 `GET /admin/api-logs/:id` 详情接口下发，用于逐条排障。
+- 请求 / 响应报文**明文入库**（为了在后台看到真实提示词与上游正文），只做两件事：折叠内嵌媒体（`data:` URL / base64 字段 / multipart 文件）与截断超长报文。三条写入路径共用 `backend/src/model/protocol/call-payload.ts` 的上限（256 K 字符，超源报文 4 MB 不入库），中转路径的请求 / 响应走 `sanitizeCallPayload` 的同一套规则。
 - 状态映射与任务 / 账单状态保持一致，不出现「任务失败但调用记录成功」这类矛盾。
 - 默认保留 90 天，经后台「数据保留」手动清理。
 

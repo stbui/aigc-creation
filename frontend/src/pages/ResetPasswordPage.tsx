@@ -1,6 +1,15 @@
 import '../styles/auth.css';
 import { useState } from 'react';
-import { Button, Form, FormItem, Input, InputGroup, InputGroupAddon, InputGroupInput, useApp } from '../ui';
+import {
+  Button,
+  Form,
+  FormItem,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  useApp,
+  useForm,
+} from '../ui';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Lock, ShieldCheck } from 'lucide-react';
 import { authApi } from '../lib/api';
@@ -20,8 +29,9 @@ export function ResetPasswordPage() {
   const token = (params.get('token') || '').trim();
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const form = useForm<{ password: string; confirm: string }>();
 
-  const onFinish = async (values: { password: string }) => {
+  const onSubmit = async (values: { password: string; confirm: string }) => {
     setSubmitting(true);
     try {
       await authApi.resetPassword(token, values.password);
@@ -70,7 +80,7 @@ export function ResetPasswordPage() {
           <>
             <h1>设置新密码</h1>
             <p className="auth-plain-desc">请设置至少 6 位的新密码。提交后旧密码立即失效。</p>
-            <Form layout="vertical" onFinish={onFinish} requiredMark={false} className="login-form">
+            <Form form={form} onSubmit={onSubmit} aria-label="重置密码" className="login-form">
               <FormItem
                 name="password"
                 label="新密码"
@@ -80,17 +90,18 @@ export function ResetPasswordPage() {
                   { min: 6, message: '密码至少 6 位' },
                 ]}
               >
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<Lock size={15} />}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    type="password"
-                    placeholder="至少 6 位"
-                    autoComplete="new-password"
-                    autoFocus
-                  />
-                </InputGroup>
+                {({ field }) => (
+                  <InputGroup>
+                    <InputGroupAddon>{<Lock size={15} />}</InputGroupAddon>
+                    <InputGroupInput
+                      {...field}
+                      type="password"
+                      placeholder="至少 6 位"
+                      autoComplete="new-password"
+                      autoFocus
+                    />
+                  </InputGroup>
+                )}
               </FormItem>
               <FormItem
                 name="confirm"
@@ -99,23 +110,24 @@ export function ResetPasswordPage() {
                 rules={[
                   { required: true, message: '请再次输入新密码' },
                   {
-                    validator: (_rule, value, form) => {
-                      if (!value || form.getFieldValue('password') === value) return;
-                      throw new Error('两次输入的密码不一致');
-                    },
+                    validate: (value, instance) =>
+                      !value || instance.getValues('password') === value
+                        ? undefined
+                        : '两次输入的密码不一致',
                   },
                 ]}
               >
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<Lock size={15} />}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    type="password"
-                    placeholder="再次输入"
-                    autoComplete="new-password"
-                  />
-                </InputGroup>
+                {({ field }) => (
+                  <InputGroup>
+                    <InputGroupAddon>{<Lock size={15} />}</InputGroupAddon>
+                    <InputGroupInput
+                      {...field}
+                      type="password"
+                      placeholder="再次输入"
+                      autoComplete="new-password"
+                    />
+                  </InputGroup>
+                )}
               </FormItem>
               <Button disabled={submitting}
                 variant="default"

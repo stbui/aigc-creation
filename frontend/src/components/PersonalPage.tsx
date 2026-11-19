@@ -2,9 +2,7 @@ import './PersonalPage.css';
 import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Typography } from '../ui';
-
-const { Title, Text } = Typography;
+import { Button } from '../ui';
 
 /**
  * 个人域页面统一骨架（账户 / 积分 / 订单 / 工单 / 邀请 / 数据中心）。
@@ -56,8 +54,8 @@ export function PersonalPage({
       {(title || description || extra) && (
         <header className="personal-page-head">
           <div className="personal-page-heading">
-            {title && <Title level={3}>{title}</Title>}
-            {description && <Text type="secondary">{description}</Text>}
+            {title && <h3 className="personal-page-title">{title}</h3>}
+            {description && <p className="text-muted-foreground">{description}</p>}
           </div>
           {extra && <div className="personal-page-extra">{extra}</div>}
         </header>

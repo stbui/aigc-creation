@@ -216,7 +216,7 @@ export function TemplatePage() {
         title: '删除这张写真？',
         content: '生成图与本地文件会一并删除，不可恢复。',
         okText: '删除',
-        okButtonProps: { danger: true },
+        danger: true,
         cancelText: '取消',
         onOk: async () => {
           try {
@@ -310,7 +310,6 @@ export function TemplatePage() {
         width={960}
         onCancel={() => setHistoryOpen(false)}
         footer={null}
-        destroyOnHidden
       >
         <ResultGalleryPane
           title="生成记录"

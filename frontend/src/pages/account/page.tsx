@@ -153,7 +153,7 @@ export function AccountPage() {
       }，期间仍可正常使用会员权益；需要时可随时续费。`,
       okText: '取消自动续费',
       cancelText: '继续续费',
-      okButtonProps: { danger: true },
+      danger: true,
       onOk: async () => {
         setCancelling(true);
         try {
