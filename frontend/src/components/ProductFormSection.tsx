@@ -5,7 +5,7 @@ import { ToolImageDropzone } from './ToolImageDropzone';
 import { MAX_PRODUCT_NAME_LEN } from '../lib/constants';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 import type { UploadedImage } from '../hooks/useImageUpload';
-import { Input, Select, Textarea } from '../ui';
+import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, Textarea } from '../ui';
 
 export interface ProductFieldsGridProps {
   productName: string;
@@ -85,12 +85,25 @@ export function SelectField({
   return (
     <div className="pk-field">
       <span className="pk-field-label">{label}</span>
-      <Select
-        value={value}
-        onChange={(next) => onChange(String(next))}
-        options={options}
-        aria-label={label}
-      />
+        <Select
+          value={value}
+          onValueChange={(next) => onChange(String(next))}
+        >
+          <SelectTrigger
+            aria-label={label}
+          >
+            <SelectValue placeholder={'请选择'} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {options.map((option) => (
+                <SelectItem key={String(option.value)} value={String(option.value)}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
     </div>
   );
 }
@@ -130,6 +143,7 @@ export function ProductDescriptionField({
       </div>
       <div className={`pk-desc-editor${rows >= 5 ? ' pk-desc-editor-tall' : ''}`}>
         <Textarea
+          className="field-sizing-fixed"
           rows={rows}
           maxLength={maxLength}
           value={value}

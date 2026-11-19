@@ -43,7 +43,8 @@ export function InviteRelationsBlock({
       </ul>
       {relations.length < totalInvited && (
         <div className="invite-load-more">
-          <Button loading={loadingMore} onClick={onLoadMore}>
+          <Button disabled={loadingMore} onClick={onLoadMore}>
+            <span className="state-spinner is-small" aria-hidden />
             加载更多记录（已显示 {relations.length} / {totalInvited}）
           </Button>
         </div>

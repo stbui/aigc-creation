@@ -44,12 +44,12 @@ export function PersonalPage({
     <div className={`personal-page is-${width}${className ? ` ${className}` : ''}`}>
       {showBack && (
         <Button
-          type="text"
-          size="small"
+          variant="ghost"
+          size="sm"
           className="personal-page-back"
-          icon={<ArrowLeft size={15} />}
           onClick={() => (onBack ? onBack() : navigate(-1))}
         >
+          {<ArrowLeft size={15} />}
           返回
         </Button>
       )}

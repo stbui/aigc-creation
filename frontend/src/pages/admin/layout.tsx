@@ -126,6 +126,7 @@ export function AdminLayout() {
               <Route path="settings/generate" element={<AdminSettingsPage group="generate" />} />
               <Route path="settings/upload" element={<AdminSettingsPage group="upload" />} />
               <Route path="settings/backup" element={<AdminSettingsPage group="backup" />} />
+              <Route path="settings/performance" element={<AdminSettingsPage group="performance" />} />
               <Route path="settings/security" element={<AdminSettingsPage group="security" />} />
               <Route path="backups" element={<AdminBackupPage />} />
               <Route path="assets" element={<AdminAssetsPage />} />

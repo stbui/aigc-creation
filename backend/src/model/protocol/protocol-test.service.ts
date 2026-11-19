@@ -18,6 +18,7 @@ import { OutboundError, parseOutboundHeaders } from '../infra/outbound';
 import { decodeCapabilityConfig, type ModelCapabilityConfig } from '../domain/capability-config';
 import { imageParameterAppliesTo, isImageParameterEnabled, resolveImageParameters, type ImageParameter } from '../domain/image-parameters';
 import { ProtocolCatalogService } from './protocol-catalog.service';
+import { previewCallPayload, previewCallText, truncateCallPayload } from './call-payload';
 import { ProtocolRegistry } from './registry';
 import { ProtocolExecutor, type ProtocolChannelRuntime } from './executor';
 import type {
@@ -73,7 +74,6 @@ const TEST_PROMPTS: Record<string, string> = {
 
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_POLL_TIMEOUT_MS = 5 * 60 * 1000;
-const BODY_PREVIEW_CHARS = 4000;
 
 @Injectable()
 export class ProtocolTestService {
@@ -149,11 +149,11 @@ export class ProtocolTestService {
     try {
       const createSpec = await adapter.buildCreate({ baseUrl: runtime.baseUrl, request });
       spec = { method: createSpec.method, path: createSpec.path, contentType: createSpec.contentType };
-      requestPreview = truncate(safeJson(createSpec.body));
+      requestPreview = previewCallPayload(createSpec.body);
       const response = await this.executor.send(createSpec, runtime);
       statusCode = response.status;
       upstreamUrl = response.url;
-      responsePreview = truncate(response.text);
+      responsePreview = previewCallText(response.text);
       if (response.status < 200 || response.status >= 300) {
         errorCode = 'upstream_http_error';
         throw new Error(`上游返回 HTTP ${response.status}：${upstreamErrorText(response.text)}`);
@@ -183,7 +183,7 @@ export class ProtocolTestService {
           const pollResponse = await this.executor.send(pollSpec, runtime);
           statusCode = pollResponse.status;
           upstreamUrl = pollResponse.url;
-          responsePreview = truncate(pollResponse.text);
+          responsePreview = previewCallText(pollResponse.text);
           if (pollResponse.status < 200 || pollResponse.status >= 300) {
             errorCode = 'upstream_http_error';
             throw new Error(`轮询返回 HTTP ${pollResponse.status}：${upstreamErrorText(pollResponse.text)}`);
@@ -239,7 +239,7 @@ export class ProtocolTestService {
         mediaCount,
         providerRequestId: taskId,
         errorCode,
-        error: truncate(error, 1000),
+        error: truncateCallPayload(error, 1000),
         concurrencyLimit: channel.concurrencyLimit,
         upstreamUrl,
         requestContentType: spec.contentType,
@@ -339,18 +339,8 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 请求体预览：Buffer 只报体积，data URL 的内联字节折叠掉，避免把整段二进制写进调用记录 */
-function safeJson(value: any): string {
-  if (value === undefined || value === null) return '';
-  if (Buffer.isBuffer(value)) return `<binary ${value.length} bytes>`;
-  try {
-    return JSON.stringify(value).replace(/(data:[^;"]+;base64,)[A-Za-z0-9+/=]{64,}/g, '$1…');
-  } catch {
-    return String(value);
-  }
-}
-
-function truncate(value: string, limit = BODY_PREVIEW_CHARS): string {
+/** 短文本截断：仅用于返回给页面的摘要，调用记录走 `call-payload` 的上限 */
+function truncate(value: string, limit: number): string {
   const text = String(value ?? '');
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }

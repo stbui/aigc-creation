@@ -26,7 +26,7 @@ export function ProductSkuReferenceThumb({
   return (
     <div className="product-sku-reference-thumb">
       <Button
-        htmlType="button"
+        type="button"
         variant="ghost"
         size="icon-xs"
         aria-label="移除参考图"

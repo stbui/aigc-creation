@@ -13,7 +13,7 @@
 }
 
 /* 未读角标压到 12px 并加 2px 白描边: 18px 铃铛上的默认角标会糊成一团红点。
-   角标的实际 DOM 是 .ui-badge-count（Badge 兼容壳不再输出 .ant-badge），
+   角标的实际 DOM 是 .ui-badge-count，
    覆盖规则见文件末尾「消息角标」适配层。 */
 .app-notif-panel {
   width: 320px;

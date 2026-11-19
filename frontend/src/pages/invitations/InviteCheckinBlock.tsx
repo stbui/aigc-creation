@@ -37,7 +37,8 @@ export function InviteCheckinBlock({ checkin, submitting, onCheckin }: InviteChe
           {/* 签到关闭时不能写「今日可得 N 积分」—— 那是一个拿不到的数字 */}
           <div className="invite-checkin-stat">
             <span className="invite-metric-label">
-              <Gift size={13} aria-hidden />{' '}
+              <Gift size={13} aria-hidden />
+                {' '}
               {!rule.enabled ? '签到状态' : checkin.checkedIn ? '今日已得' : '今日可得'}
             </span>
             <span className={`invite-checkin-value${rule.enabled ? '' : ' is-text'}`}>
@@ -47,13 +48,13 @@ export function InviteCheckinBlock({ checkin, submitting, onCheckin }: InviteChe
           </div>
         </div>
         <Button
-          type="primary"
-          size="large"
+          variant="default"
+          size="lg"
           className="invite-checkin-btn"
           onClick={onCheckin}
-          loading={submitting}
-          disabled={checkin.checkedIn || !rule.enabled}
+          disabled={checkin.checkedIn || !rule.enabled || submitting}
         >
+          <span className="state-spinner is-small" aria-hidden />
           {checkin.checkedIn
             ? `今日已签到 +${checkin.todayCredits}`
             : rule.enabled

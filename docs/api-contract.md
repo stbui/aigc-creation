@@ -121,6 +121,7 @@
 | POST | `/api/v1/admin/payments/providers/:providerId/instances` | 新建服务商实例；可选名称、凭据、关单分钟、实例限额、退款开关与支付方式子集，`payment.write` |
 | PUT | `/api/v1/admin/payments/providers/:providerId/instances/:instanceId/config` | 保存指定实例的新版本配置；字段同旧版配置保存接口，`payment.write` |
 | PATCH | `/api/v1/admin/payments/providers/:providerId/instances/order` | 按 `{ instanceIds }` 调整实例排序，`payment.write` |
+| GET | `/api/v1/admin/system-performance` | 系统性能只读快照：运行时（内存 / CPU 累计时间 / 事件循环延迟）、数据库探活与库文件大小、存储探活（30 秒缓存）、近 24 小时任务与上游调用 P95、线路冷却与调度器状态；`setting.read` |
 | POST | `/api/v1/admin/settings/upload` | 上传设置图片（multipart 字段 `file`），返回 `{ value, previewUrl, width, height, sizeBytes }`；`setting.write` |
 | GET/PUT | `/api/v1/admin/payments/settings` | 支付设置：`defaultCurrency` / `alipaySource` / `wechatSource`，字段均可选，PUT 只更新实际提交项；读 `payment.read` / 写 `payment.write` |
 | GET | `/api/v1/admin/payments/orders` | 支付订单列表（服务端分页，默认 30）：筛选 `status` / `providerId` / `keyword` / `timeField` / `from` / `to` / `sort`，`payment.read` |
@@ -158,7 +159,8 @@
 | GET/POST | `/api/v1/admin/provider-catalog`、`/refresh`、`/:id/{verify,install}` | 服务商目录（插件包上游清单）：未配置 `MODEL_PROVIDER_CATALOG_URL` 时返回空态与原因；安装走与上传安装同一套校验；`plugin.read` / `plugin.write` |
 | GET | `/api/v1/admin/analytics/finance?from&to` | 财务汇总：实收 = 已结算 `actualAmountMicrocredits`，已退 = `refundedAmountMicrocredits`，净收入 = 实收 − 已退；预留 / 运行 / 待核对单列挂账**不计入实收**；区间默认 30 天、上限 366 天，`model.analytics_read`。**单位是积分**，与概览页的「订单收入（元）」（订单实付）不是同一笔账 |
 | GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve`、`/billing-orders/batch-resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`）。单条与批量请求均必须带 `reason`（≤ 500 字），批量同一次操作共享 `reviewBatchId`；`billing_order.read` / `billing_order.resolve`；列表支持 `?status=review`「待核对」队列口径；批量核对逐条独立处置并回显失败原因 |
-| GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 来源 / 操作 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read` |
+| GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 来源 / 操作 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read`（**不含**请求体 / 响应体） |
+| GET | `/api/v1/admin/api-logs/:id` | 单条调用详情：列表字段 + `upstreamUrl` / `requestContentType` / `requestBody` / `responseBody`（写库前已脱敏与截断的预览文本），`model.call_read`；路由声明在 `export` 之后 |
 | GET | `/api/v1/admin/api-logs/export` | 调用记录 CSV（与列表同筛选口径，上限 5000 行；**不含请求体 / 响应体**），`model.call_read + data.export` |
 | GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架请求必须带原因（后台页面统一生成并下发 C 端），写需 `capability.write`（高危，下架需填写业务原因） |
 | GET/PUT | `/api/v1/admin/aigc-label` | 读 / 改角标样式（`setting.read` / `setting.write`） |

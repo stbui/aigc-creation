@@ -36,12 +36,12 @@ export function LibraryGroupPanel({
         <SurfaceTitle className="asset-library-group-title">素材分组</SurfaceTitle>
         <LibraryGroupByToggle value={groupBy} onChange={onGroupByChange} />
         <Button
-          type="text"
-          size="small"
-          icon={<FolderKanban className="size-3.5" />}
+          variant="ghost"
+          size="sm"
           className="ml-auto shrink-0"
           onClick={onOpenProjectManager}
         >
+          {<FolderKanban className="size-3.5" />}
           项目管理
         </Button>
       </div>

@@ -16,7 +16,7 @@ export function QrLoginRequiredState({ onLogin }: QrLoginRequiredStateProps) {
       <p className="qr-confirm-desc">
         扫码登录需要你在手机上有一个已登录的账号。登录后会自动回到本页，二维码在 2 分钟内有效。
       </p>
-      <Button type="primary" size="large" block className="login-submit" onClick={onLogin}>
+      <Button variant="default" size="lg" className="w-full login-submit" onClick={onLogin}>
         去登录
       </Button>
     </QrConfirmCard>

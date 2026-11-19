@@ -18,14 +18,14 @@ export function AccountOrdersCard({ orders }: { orders: Order[] }) {
       <header className="account-card-head">
         <Receipt size={15} aria-hidden />
         <h2>最近订单</h2>
-        <Button asChild type="link" size="small" className="account-card-more">
+        <Button asChild variant="link" size="sm" className="account-card-more">
           <Link to="/orders">全部订单</Link>
         </Button>
       </header>
       {orders.length === 0 ? (
         <p className="account-empty">
           暂无订单。
-          <Button asChild type="link" size="small">
+          <Button asChild variant="link" size="sm">
             <Link to="/packages">去购买积分或会员</Link>
           </Button>
         </p>

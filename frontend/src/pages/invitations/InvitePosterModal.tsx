@@ -23,12 +23,11 @@ export function InvitePosterModal({ open, posterUrl, onClose, onDownload }: Invi
     >
       {posterUrl && <img src={posterUrl} alt="邀请海报" className="invite-poster-image" />}
       <Button
-        type="primary"
-        block
-        icon={<Download size={15} />}
-        className="invite-poster-download"
+        variant="default"
+        className="w-full invite-poster-download"
         onClick={onDownload}
       >
+        {<Download size={15} />}
         下载海报
       </Button>
       <p className="invite-poster-note">海报含你的专属邀请码，好友扫码注册后自动绑定邀请关系。</p>

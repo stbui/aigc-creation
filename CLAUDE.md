@@ -37,7 +37,7 @@
 | 107 个插件包 / 115 个 provider | `backend/plugins/*/manifest.json` | 3 个 `src-*` 镜像目录（`src-a6api` / `src-antigravity-proxy` / `src-metaso-h3`）不参与运行 |
 | 18 项能力 / 17 image + 1 video / 14 项进工作台 | `definitions/index.ts` 的 `CAPABILITY_PLUGINS` | `*.spec.ts`、`*-options.ts`、`*.templates.ts` 不是能力定义 |
 | 36 个后台菜单入口 / 7 个分组 | `adminNav.ts` 的 `ADMIN_MENU` | 外壳、概览内容组件与测试目录不是菜单页 |
-| 34 条壳内路由 | `frontend/src/App.tsx` 的 `Shell()` 内路由 | catch-all、3 条裸外壳页、6 条独立页不计入 |
+| 35 条壳内路由 | `frontend/src/App.tsx` 的 `Shell()` 内路由 | catch-all、3 条裸外壳页、6 条独立页不计入 |
 
 本地账号：development / test 的后台预设为 `admin@admin.com` / `123456789`；普通账号由 `seed` 创建，不能获得 admin 角色。production 不设默认密码，必须显式提供 `ADMIN_PASSWORD` 或使用一次性随机密码。
 

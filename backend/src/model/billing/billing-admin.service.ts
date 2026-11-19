@@ -70,6 +70,20 @@ const API_LOG_VIEW_SELECT = {
   createdAt: true,
 } as const;
 
+/**
+ * 详情多读四列：原始上游地址、请求类型与两份报文。
+ *
+ * 列表与导出都不需要它们（报文可能含用户提示词与整段上游响应），只有打开单条
+ * 记录排障时才读，避免 50 行 × 数 MB 的报文进一次列表请求。
+ */
+const API_LOG_DETAIL_SELECT = {
+  ...API_LOG_VIEW_SELECT,
+  upstreamUrl: true,
+  requestContentType: true,
+  requestBody: true,
+  responseBody: true,
+} as const;
+
 export interface BillingOrderQuery {
   status?: string;
   userId?: string;
@@ -413,6 +427,31 @@ export class BillingAdminService {
   }
 
   /**
+   * 单条调用记录（含请求 / 响应报文）。
+   *
+   * 报文不随列表下发：一页 50 条各自可能带上百 KB 的上游响应，列表为了展示
+   * 「状态与耗时」没必要背这个体积。详情是逐条排障的入口，这里才读。
+   */
+  async getApiLog(id: string): Promise<ApiLogDetailView> {
+    const key = String(id ?? '').trim();
+    if (key === '') throw new AppError(40400, '调用记录不存在', 404);
+    const row = await this.prisma.apiCallLog.findUnique({
+      where: { id: key },
+      select: API_LOG_DETAIL_SELECT,
+    });
+    if (!row) throw new AppError(40400, '调用记录不存在', 404);
+    const related = await this.apiLogRelations([row]);
+    return {
+      ...toApiLogView(row),
+      ...related.get(row.id),
+      upstreamUrl: row.upstreamUrl,
+      requestContentType: row.requestContentType,
+      requestBody: row.requestBody,
+      responseBody: row.responseBody,
+    };
+  }
+
+  /**
    * 调用记录的关联投影（用户昵称 / 任务状态 / 账单状态与金额）。
    *
    * 只查当前页涉及的 id，不做全表扫描。
@@ -583,6 +622,24 @@ export interface ApiLogView {
   billingStatus?: string;
   billingReservedMicrocredits?: number | null;
   billingSettledMicrocredits?: number | null;
+}
+
+/**
+ * 单条调用记录的详情视图：在列表视图上补「这次到底发了什么、上游回了什么」。
+ *
+ * 报文是入库前已经过脱敏 / 截断的预览文本（见 `task-executor.safeJson`、
+ * `proxy.payload.sanitizeCallPayload`、`text-tool.previewJson`），后台这里
+ * 不再做二次处理 —— 再裁一次会让「界面看到的」和「库里存的」出现两套口径。
+ */
+export interface ApiLogDetailView extends ApiLogView {
+  /** 实际发往上游的完整 URL（含查询串，密钥类查询参数已在写库前剥离） */
+  upstreamUrl: string;
+  /** 请求的 Content-Type */
+  requestContentType: string;
+  /** 请求报文预览；GET 轮询等无请求体时为空串 */
+  requestBody: string;
+  /** 上游响应报文预览；流式响应记录的是首个数据块或整段文本 */
+  responseBody: string;
 }
 
 /** 调用记录的关联投影（只读展示字段，不落库） */

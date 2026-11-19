@@ -9,7 +9,7 @@ export interface LibraryLoadMoreProps {
 export function LibraryLoadMore({ remaining, onClick }: LibraryLoadMoreProps) {
   if (remaining <= 0) return null;
   return (
-    <Button type="text" className="asset-library-load-more" onClick={onClick}>
+    <Button variant="ghost" className="asset-library-load-more" onClick={onClick}>
       加载更多（剩余 {remaining} 个）
     </Button>
   );

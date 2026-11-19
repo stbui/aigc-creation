@@ -25,7 +25,7 @@ export function ProductSkuReferenceUploadButton({
   return (
     <>
       <Button
-        htmlType="button"
+        type="button"
         variant="link"
         size="xs"
         disabled={busy}

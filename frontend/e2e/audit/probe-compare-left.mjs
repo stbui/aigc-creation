@@ -17,7 +17,7 @@ async function ref(){
     return {
       sections: secs.map(el=>({y:r(el).y,h:r(el).h,gapBefore:getComputedStyle(el).marginTop,title:el.querySelector('h2')?.textContent?.trim()})),
       uploadDrop: r(document.querySelector('[class^="social-media-uploadDropzone-"]')),
-      selectBox: r(document.querySelector('.ant-select-selector')),
+      selectBox: r(document.querySelector('[class*="select-selector"], [class*="select"]')),
       noText: r(document.querySelector('[class^="social-media-noTextField-"]')),
       textarea: r(document.querySelector('[class^="social-media-copyTextarea-"]')),
       modeCard: r(document.querySelector('[class^="social-media-option-"]')),
@@ -45,7 +45,7 @@ async function local(){
     return {
       sections: secs.map(el=>({y:r(el).y,h:r(el).h,title:el.querySelector('.pk-section-title,.pk-field-label-row .pk-section-title')?.textContent?.trim()})),
       uploadDrop: r(document.querySelector('.sc-sections .pk-dropzone')),
-      selectBox: r(document.querySelector('.sc-sections .ant-select-selector, .sc-sections [class*=select]')),
+      selectBox: r(document.querySelector('.sc-sections [data-slot="select-trigger"], .sc-sections [class*=select]')),
       noText: r(document.querySelector('.sc-toggle-row')),
       textarea: r(document.querySelector('.sc-copy-editor textarea')),
       modeCard: r(document.querySelector('.sc-mode-option')),

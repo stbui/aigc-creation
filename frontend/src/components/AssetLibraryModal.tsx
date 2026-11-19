@@ -15,7 +15,7 @@ import {
   type PickerKind,
 } from './assetLibraryFilters';
 import type { Asset } from '../types/api';
-import { useApp, Button, Input, Modal } from '../ui';
+import { useApp, Button, Input, InputGroup, InputGroupAddon, InputGroupInput, Modal } from '../ui';
 
 /**
  * 素材库导入选择器
@@ -174,19 +174,13 @@ export function AssetLibraryModal({
         body: { padding: 0 },
         mask: { background: 'var(--overlay-mask-strong)', backdropFilter: 'blur(3px)' },
       }}
-      /*
-       * ⚠️ `className` 是给**容器几何**用的, 不是给内容用的:
-       * 兼容壳把它与 `ui-modal-surface` / `ant-modal-container` 挂在同一个 div 上,
-       * global.css 里的容器规则因此必须写紧邻合并选择器 `.alp-modal.ant-modal-container`。
-       * 改成后代形式 (` .alp-modal .ant-modal-container`) 会静默失效 ——
-       * 表现为整个弹窗退回默认几何、底部操作条被撑到屏外。@2026-11-03
-       */
+      /* `className` 作用于容器几何：它与 `ui-modal-surface` 在同一个元素上。 */
       title={
         <div className="alp-header">
           <div className="alp-header-main">
             <h2 className="alp-title">从素材库导入</h2>
           </div>
-          <Button type="text" className="alp-close" aria-label="关闭素材库" onClick={onCancel}>
+          <Button variant="ghost" className="alp-close" aria-label="关闭素材库" onClick={onCancel}>
             <X size={19} className="size-[19px]" />
           </Button>
         </div>
@@ -199,7 +193,7 @@ export function AssetLibraryModal({
             {KIND_LABELS.map((k) => (
               <Button
                 key={k.id}
-                type="text"
+                variant="ghost"
                 aria-pressed={kind === k.id}
                 className={`alp-chip${kind === k.id ? ' is-active' : ''}`}
                 onClick={() => setKind(k.id)}
@@ -215,7 +209,7 @@ export function AssetLibraryModal({
               {DATE_LABELS.map((d) => (
                 <Button
                   key={d.id}
-                  type="text"
+                  variant="ghost"
                   className={`alp-date-option${dateFilter === d.id ? ' is-active' : ''}`}
                   aria-pressed={dateFilter === d.id}
                   onClick={() => setDateFilter(d.id)}
@@ -226,30 +220,33 @@ export function AssetLibraryModal({
             </div>
 
             {/*
-              搜索框走 `Input` 兼容壳的 prefix / suffix, 不再手写
-              「div 包图标 + 裸 input + 条件清除键」—— 后者与 Input 的
-              `.ant-input-affix-wrapper` 是同一套结构的两份实现。
+              搜索框走 shadcn `InputGroup`, 不再手写
+              「div 包图标 + 裸 input + 条件清除键」。
               清除键用共享 `Button` (variant=ghost) 而不是裸 button。
             */}
-            <Input
-              className="alp-search"
-              prefix={<Search size={14} />}
-              suffix={
-                keyword ? (
+              <InputGroup>
+                <InputGroupAddon>
+                  {<Search size={14} />}
+                </InputGroupAddon>
+                <InputGroupInput
+                  className="alp-search"
+                  value={keyword}
+                  placeholder="搜索素材名称 / 地址"
+                  onChange={(e) => setKeyword(e.target.value)}
+                />
+                <InputGroupAddon align="inline-end">
+                  {keyword ? (
                   <Button
-                    type="text"
+                    variant="ghost"
                     className="alp-search-clear"
                     aria-label="清除搜索"
                     onClick={() => setKeyword('')}
                   >
                     <X size={12} className="size-[12px]" />
                   </Button>
-                ) : null
-              }
-              value={keyword}
-              placeholder="搜索素材名称 / 地址"
-              onChange={(e) => setKeyword(e.target.value)}
-            />
+                ) : null}
+                </InputGroupAddon>
+              </InputGroup>
           </div>
         </div>
 
@@ -261,7 +258,7 @@ export function AssetLibraryModal({
               {KIND_LABELS.map((k) => (
                 <Button
                   key={k.id}
-                  type="text"
+                  variant="ghost"
                   className={kind === k.id ? 'is-active' : ''}
                   aria-current={kind === k.id}
                   onClick={() => setKind(k.id)}
@@ -276,7 +273,7 @@ export function AssetLibraryModal({
                 <strong>用途分类</strong>
                 <nav aria-label="用途分类">
                   <Button
-                    type="text"
+                    variant="ghost"
                     className={capabilityFilter === 'all' ? 'is-active' : ''}
                     aria-current={capabilityFilter === 'all'}
                     onClick={() => setCapabilityFilter('all')}
@@ -287,7 +284,7 @@ export function AssetLibraryModal({
                   {capabilityOptions.map((option) => (
                     <Button
                       key={option.id}
-                      type="text"
+                      variant="ghost"
                       className={capabilityFilter === option.id ? 'is-active' : ''}
                       aria-current={capabilityFilter === option.id}
                       title={`${option.label}（${option.count}）`}
@@ -380,17 +377,17 @@ export function AssetLibraryModal({
               {maxSelectable !== undefined ? ` / 最多选择 ${maxSelectable} 张` : ' 张'}
             </span>
             {selected.length > 0 && (
-              <Button type="text" className="alp-clear" onClick={() => setSelected([])}>
+              <Button variant="ghost" className="alp-clear" onClick={() => setSelected([])}>
                 清除选择
               </Button>
             )}
           </div>
           <div className="alp-footer-actions">
-            <Button type="text" className="alp-btn alp-btn-cancel" onClick={onCancel}>
+            <Button variant="ghost" className="alp-btn alp-btn-cancel" onClick={onCancel}>
               取消
             </Button>
             <Button
-              type="text"
+              variant="ghost"
               className="alp-btn alp-btn-confirm"
               disabled={selected.length === 0}
               onClick={confirm}

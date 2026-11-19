@@ -39,7 +39,7 @@ export function StatsPage() {
           title="登录后查看你的创作数据"
           desc="作品、创作趋势和常用能力会与你的账号关联，登录后即可查看。"
           action={
-            <Button type="primary" onClick={openLogin}>
+            <Button variant="default" onClick={openLogin}>
               登录/注册
             </Button>
           }
@@ -117,10 +117,11 @@ export function StatsPage() {
               刷新失败，显示上次数据
             </span>
           )}
-          <Button icon={<RefreshCw size={14} />} loading={refreshing} onClick={refresh}>
+          <Button disabled={refreshing} onClick={refresh}>
+            <span className="state-spinner is-small" aria-hidden />
             刷新数据
           </Button>
-          <Button asChild type="primary">
+          <Button asChild variant="default">
             <Link to="/workbench">去创作</Link>
           </Button>
         </div>

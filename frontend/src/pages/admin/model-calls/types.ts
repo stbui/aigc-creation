@@ -6,7 +6,7 @@
  */
 
 /* 外部类型统一转出 */
-export type { ApiLogListResult, ApiLogView } from '../../../types/model';
+export type { ApiLogDetailView, ApiLogListResult, ApiLogView } from '../../../types/model';
 
 /**
  * 筛选条上的 11 个条件值，同时充当「已生效条件 → 请求参数」的载体。

@@ -6,8 +6,8 @@ import {
   StateEmpty,
   StateError,
   StateSkeleton,
+  StatusBadge,
   Table,
-  Tag,
 } from './components';
 import { LOT_STATUS, PAGE_SIZE, SOURCE_LABEL } from './constants';
 import { formatDate, shortId } from './utils';
@@ -69,9 +69,9 @@ export function CreditsLotPanel({
       width: 100,
       render: (value: CreditLot['status']) => (
         // 不用预设色: 默认绿字在淡绿底上对比度不足, 状态色统一走 .credits-status
-        <Tag className={`credits-status is-${value}`}>
+        <StatusBadge variant="secondary" className={`credits-status is-${value}`}>
           {LOT_STATUS[value] ?? LOT_STATUS.active}
-        </Tag>
+        </StatusBadge>
       ),
     },
   ];

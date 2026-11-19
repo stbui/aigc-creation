@@ -53,7 +53,7 @@ export function AccountIdentityCard({
           </div>
         </div>
         <div className="account-quick">
-          <Button asChild type="primary">
+          <Button asChild variant="default">
             <Link to="/credits">
               <Wallet size={14} aria-hidden />
               积分明细
@@ -100,15 +100,15 @@ export function AccountIdentityCard({
               value={name}
               maxLength={20}
               onChange={(e) => onNameChange(e.target.value)}
-              onPressEnter={() => nameDirty && onSaveName()}
+              onKeyDown={(e) => { if (e.key === 'Enter' && nameDirty) onSaveName(); }}
             />
             <Button
-              size="small"
-              type={nameDirty ? 'primary' : 'default'}
-              disabled={!nameDirty}
-              loading={savingName}
+              size="sm"
+              variant={nameDirty ? 'default' : 'outline'}
+              disabled={!nameDirty || savingName}
               onClick={onSaveName}
             >
+              <span className="state-spinner is-small" aria-hidden />
               保存
             </Button>
           </div>

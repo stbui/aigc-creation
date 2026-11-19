@@ -51,7 +51,7 @@
 }
 
 /* 批次状态: 深色前景 + 淡底胶囊, 不再用 旧版 UI 库预设 success / error 的 2.41:1 绿字
-   （Tag 的 DOM 形见文件末尾「状态标签」适配层 .credits-status.ui-tag） */
+   （Tag 的 DOM 形见文件末尾「状态标签」适配层 .credits-status[data-slot="badge"]） */
 .credits-status.is-active {
   color: var(--credits-plus);
   background: var(--success-soft-bg);
@@ -228,7 +228,7 @@
   padding-top: var(--space-12);
 }
 
-.credits-hero .ui-card-body {
+.credits-hero [data-slot="card-content"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -236,27 +236,27 @@
   padding: var(--space-20) var(--space-24);
 }
 
-.credits-stat-card .ui-card-body {
+.credits-stat-card [data-slot="card-content"] {
   padding: 14px var(--space-16);
 }
 
-.credits-list-card .ui-card-body {
+.credits-list-card [data-slot="card-content"] {
   padding: var(--space-16) var(--space-20) var(--space-20);
 }
 
 @media (max-width: 900px) {
-  .credits-hero .ui-card-body {
+  .credits-hero [data-slot="card-content"] {
     flex-direction: column;
     align-items: flex-start;
     padding: 18px;
   }
-  .credits-list-card .ui-card-body {
+  .credits-list-card [data-slot="card-content"] {
     padding: var(--space-12) 14px var(--space-16);
   }
 }
 
-/* 状态标签：Tag 不再带 .ant-tag，保留同一套深色前景 / 淡底胶囊 */
-.credits-status.ui-tag {
+/* 状态标签：保留同一套深色前景 / 淡底胶囊 */
+.credits-status[data-slot="badge"] {
   margin-inline-end: 0;
   height: 22px;
   padding: 0 var(--space-8);

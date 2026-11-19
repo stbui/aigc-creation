@@ -1,7 +1,7 @@
 import { CheckCircle2, MessageSquare, Send, User } from 'lucide-react';
 import type { Ticket } from '../../types/api';
 import { formatDateTime } from './utils';
-import { Button, Input } from './components';
+import { Button, Input, Textarea } from './components';
 
 /**
  * 工单详情的对话线 + 回复区。
@@ -73,26 +73,28 @@ export function TicketThread({
             </h3>
             <span>客服回复会同时推送站内消息</span>
           </div>
-          <Input.TextArea
-            rows={4}
-            maxLength={2000}
-            value={reply}
-            disabled={busy}
-            onChange={(e) => onReplyChange(e.target.value)}
-            placeholder="补充说明或继续追问…"
-            showCount
-          />
+          <div className="login-textarea-wrap">
+            <Textarea
+              className="login-textarea field-sizing-fixed"
+              rows={4}
+              maxLength={2000}
+              value={reply}
+              disabled={busy}
+              onChange={(e) => onReplyChange(e.target.value)}
+              placeholder="补充说明或继续追问…"
+            />
+            <span className="login-textarea-count">{reply.length}/2000</span>
+          </div>
           <div className="ticket-reply-actions">
             <Button disabled={busy} onClick={onCloseTicket}>
               问题已解决，关闭工单
             </Button>
             <Button
-              type="primary"
-              icon={<Send size={14} />}
-              disabled={busy || !reply.trim()}
-              loading={busy}
+              variant="default"
+              disabled={busy || !reply.trim() || busy}
               onClick={onSendReply}
             >
+              <span className="state-spinner is-small" aria-hidden />
               发送
             </Button>
           </div>

@@ -93,7 +93,7 @@ export function CreativeImageUploadSection({
         />
         {uploading && (
           <div className="pk-dropzone-loading">
-            <Spin size="small" />
+            <Spin className="size-4" />
           </div>
         )}
         {images.length === 0 ? (

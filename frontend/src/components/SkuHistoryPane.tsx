@@ -40,7 +40,7 @@ function HistoryList({
   if (loading && items.length === 0) {
     return (
       <div className="redraw-history-loading" aria-live="polite">
-        <Spin size="small" />
+        <Spin className="size-4" />
         <span>加载中…</span>
       </div>
     );

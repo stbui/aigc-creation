@@ -27,7 +27,7 @@ export function AccountAssetsCard({
       <header className="account-card-head">
         <Wallet size={15} aria-hidden />
         <h2>积分与会员</h2>
-        <Button asChild type="link" size="small" className="account-card-more">
+        <Button asChild variant="link" size="sm" className="account-card-more">
           <Link to="/credits">查看积分明细</Link>
         </Button>
       </header>
@@ -43,7 +43,7 @@ export function AccountAssetsCard({
               : '积分余额加载失败，可前往积分明细页查看'}
           </small>
           <div className="account-asset-actions">
-            <Button asChild size="small">
+            <Button asChild size="sm">
               <Link to="/packages">购买积分</Link>
             </Button>
           </div>
@@ -57,11 +57,12 @@ export function AccountAssetsCard({
               : '开通会员享专属折扣与每月赠送积分'}
           </small>
           <div className="account-asset-actions">
-            <Button asChild size="small" type={membership?.isMember ? 'default' : 'primary'}>
+            <Button asChild size="sm" variant={membership?.isMember ? 'outline' : 'default'}>
               <Link to="/packages">{membership?.isMember ? '续费会员' : '开通会员'}</Link>
             </Button>
             {membership?.isMember && !membership.cancelAtPeriodEnd && (
-              <Button size="small" type="text" danger loading={cancelling} onClick={onCancelMembership}>
+              <Button disabled={cancelling} size="sm" variant="ghost" onClick={onCancelMembership}>
+                <span className="state-spinner is-small" aria-hidden />
                 取消自动续费
               </Button>
             )}

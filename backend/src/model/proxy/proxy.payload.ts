@@ -1,19 +1,23 @@
 /**
- * 中转报文入库前的脱敏与用量提取。
+ * 中转报文入库格式与用量提取。
  *
- * 移植自 open-ai-canvas `internal/platform/api_call_payload.go`：
- * 调用记录要能排障（看到请求长什么样、上游报了什么），但**不能**把
- * 密钥、内嵌图片和用户上传的 base64 原样写进日志库 —— 那既是数据泄漏，
- * 也会把一张表撑到几个 GB。
+ * 调用记录要能排障：管理员在后台能直接看到**请求里的提示词**与**上游返回的正文**。
+ * 因此这里不再按字段名抹掉密钥类字段 —— 脱敏只保留「内嵌媒体折叠」，那一步是
+ * 为了可读性与表体积（一张 1MB 的 base64 图既看不了也存不起），不是安全过滤。
+ *
+ * 安全边界改为访问控制：报文只经 `GET /admin/api-logs/:id`（`model.call_read`）
+ * 下发，列表与 CSV 导出都不含报文；调用记录按保留期清理（默认 90 天）。
+ * 上游凭证由服务端注入请求头，不会出现在报文里；客户端自带的 `?key=` 查询参数
+ * 在出站前就被 `stripSecretQuery` 剥离，也不进 `upstreamUrl`。
  *
  * 用量提取与任务路径共用同一套语义：OpenAI / Anthropic / Gemini 三种
  * 字段命名都要认，缺一个就会让 Token 账单结算失败（停在 uncertain）。
  */
 
 /** 入库报文上限：超过即截断并写明原始长度 */
-const MAX_PAYLOAD_BYTES = 128 << 10;
+const MAX_PAYLOAD_BYTES = 256 << 10;
 /** 源报文上限：超过直接记一行说明，不做解析 */
-const MAX_SOURCE_BYTES = 1 << 20;
+const MAX_SOURCE_BYTES = 4 << 20;
 
 /** 一次中转请求 / 响应的用量（与 `BillingUsage` 同形） */
 export interface ProxyUsage {
@@ -22,10 +26,13 @@ export interface ProxyUsage {
   cachedTokens: bigint;
 }
 
-const SECRET_FIELD_MARKERS = ['apikey', 'accesstoken', 'authorization', 'password', 'secret'];
+const MAX_DETAIL_CHARS = 1000;
 
 /**
  * 生成可入库的报文文本。
+ *
+ * 不按字段名脱敏：后台详情要看提示词与上游正文。唯一保留的折叠是内嵌媒体
+ * （data URL / base64 字段 / multipart 文件），它们既不适合展示也会把表撑大。
  *
  * @param data        原始报文
  * @param contentType 请求头里的类型；响应可传空串，由内容嗅探
@@ -37,12 +44,12 @@ export function sanitizeCallPayload(data: Buffer, contentType = ''): string {
     return sanitizeMultipart(data, contentType);
   }
   if (data.length > MAX_SOURCE_BYTES) {
-    return `[报文过大，已省略，共 ${data.length} 字节]`;
+    return `[报文过大，未入库，共 ${data.length} 字节]`;
   }
   const text = data.toString('utf8');
   const json = tryJson(text);
   if (json !== undefined) {
-    return truncate(toPrettyJson(sanitizeValue(json, '')));
+    return truncate(toPrettyJson(foldInlineMedia(json)));
   }
   if (isBinaryMedia(mediaType)) {
     return `[${mediaType || '未知类型'} 二进制报文，共 ${data.length} 字节]`;
@@ -156,16 +163,19 @@ export function extractMediaCount(body: Buffer): number {
 
 // ── 内部 ──────────────────────────────────────────────────────────
 
-function sanitizeValue(value: any, key: string): any {
+/**
+ * 折叠内嵌媒体，其余字段原样保留。
+ *
+ * 只看值形态与字段名，不看 `authorization` / `secret` 这类词 —— 报文里出现的
+ * 提示词、模型输出、上下游正文一律保留，后台详情直接展示。
+ */
+function foldInlineMedia(value: any, key = ''): any {
   const normalizedKey = String(key ?? '').toLowerCase().replace(/[_-]/g, '');
-  for (const marker of SECRET_FIELD_MARKERS) {
-    if (normalizedKey.includes(marker)) return '[REDACTED]';
-  }
-  if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, key));
+  if (Array.isArray(value)) return value.map((item) => foldInlineMedia(item, key));
   if (value && typeof value === 'object') {
     const result: Record<string, any> = {};
     for (const [childKey, childValue] of Object.entries(value)) {
-      result[childKey] = sanitizeValue(childValue, childKey);
+      result[childKey] = foldInlineMedia(childValue, childKey);
     }
     return result;
   }
@@ -177,28 +187,8 @@ function sanitizeValue(value: any, key: string): any {
     if (normalizedKey.includes('base64') || normalizedKey.includes('b64')) {
       return `[内嵌编码数据，共 ${value.length} 字符]`;
     }
-    return sanitizeUrlString(value);
   }
   return value;
-}
-
-function sanitizeUrlString(value: string): string {
-  if (!/^https?:\/\//i.test(value)) return value;
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return value;
-  }
-  let changed = false;
-  for (const key of [...parsed.searchParams.keys()]) {
-    const normalized = key.toLowerCase().replace(/[_-]/g, '');
-    if (normalized.includes('token') || normalized.includes('signature') || normalized.includes('apikey') || normalized === 'key') {
-      parsed.searchParams.set(key, '[REDACTED]');
-      changed = true;
-    }
-  }
-  return changed ? parsed.toString() : value;
 }
 
 function sanitizeMultipart(data: Buffer, contentType: string): string {
@@ -222,7 +212,7 @@ function sanitizeMultipart(data: Buffer, contentType: string): string {
     const content = data.slice(headerEnd + 4, next);
     fields[name] = fileName
       ? { fileName, contentType: /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1] ?? '', size: content.length }
-      : sanitizeValue(content.toString('utf8').slice(0, MAX_PAYLOAD_BYTES + 1), name);
+      : foldInlineMedia(content.toString('utf8').slice(0, MAX_PAYLOAD_BYTES + 1), name);
     offset = next;
   }
   return truncate(toPrettyJson(fields));

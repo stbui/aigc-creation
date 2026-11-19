@@ -1,5 +1,5 @@
 import type { CapabilityDef } from '../../types/api';
-import { CapabilityIcon, Tag, Typography } from './components';
+import { CapabilityIcon, StatusBadge, Typography } from './components';
 import { MODE_LABELS, RUNTIME_LABELS, runtimeOf } from './utils';
 
 const { Title, Paragraph, Text } = Typography;
@@ -21,17 +21,18 @@ export function ToolPageHeader({ def }: ToolPageHeaderProps) {
         <div>
           <Title level={3} className="tool-header-title">
             {def.name}
-            {def.badge && <Tag className="tool-tag-free">{def.badge}</Tag>}
+            {def.badge && <StatusBadge variant="secondary" className="tool-tag-free">{def.badge}</StatusBadge>}
             {/*
               标注以**运行时结论**为准（云端模型 / 不可用），
               mode 只在后端未下发 runtime 时兜底 —— 同一项能力在不同部署下
               按下去走的路不同，标 mode 会把「没配通道的 real」说成「已接入」。
             */}
-            <Tag
+            <StatusBadge
+              variant="secondary"
               className={`tool-tag-mode tool-tag-${runtime.effective === 'remote' ? 'real' : runtime.effective}`}
             >
               {RUNTIME_LABELS[runtime.effective] ?? MODE_LABELS[def.mode]}
-            </Tag>
+            </StatusBadge>
           </Title>
           <Paragraph className="tool-header-sub">{def.summary}</Paragraph>
         </div>

@@ -45,11 +45,11 @@ function DetailSectionPickerBase({ selected, onToggle }: DetailSectionPickerProp
                 title={locked ? `最多选择 ${MAX_SECTIONS} 个模块` : undefined}
               >
                 <Checkbox
-                  className="pk-section-check"
+                  className="pk-section-check align-middle"
                   checked={checked}
                   disabled={locked}
                   aria-label={m.label}
-                  onChange={() => onToggle(m.value)}
+                  onCheckedChange={() => onToggle(m.value)}
                 />
                 <span>
                   <strong>{m.label}</strong>

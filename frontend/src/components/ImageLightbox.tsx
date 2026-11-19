@@ -117,7 +117,7 @@ export function ImageLightbox({
     >
       <Button
         ref={closeRef}
-        type="text"
+        variant="ghost"
         className="img-viewer-close"
         aria-label="关闭预览"
         title="关闭（Esc）"
@@ -129,7 +129,7 @@ export function ImageLightbox({
       {items.length > 1 && (
         <>
           <Button
-            type="text"
+            variant="ghost"
             className="img-viewer-nav is-prev"
             aria-label="上一张"
             title="上一张（←）"
@@ -138,7 +138,7 @@ export function ImageLightbox({
             <ChevronLeft size={22} className="size-[22px]" />
           </Button>
           <Button
-            type="text"
+            variant="ghost"
             className="img-viewer-nav is-next"
             aria-label="下一张"
             title="下一张（→）"
@@ -185,7 +185,7 @@ export function ImageLightbox({
           <div className="img-viewer-failed" role="alert" onClick={(e) => e.stopPropagation()}>
             <strong>原图加载失败</strong>
             <span>链接可能已过期或文件已被清理，可先重新加载一次。</span>
-            <Button type="text" onClick={retry}>
+            <Button variant="ghost" onClick={retry}>
               重新加载
             </Button>
           </div>
@@ -195,11 +195,11 @@ export function ImageLightbox({
       <div className="img-viewer-bar" onClick={(e) => e.stopPropagation()}>
         <span className="img-viewer-meta" aria-live="polite">{meta.join(' · ')}</span>
         <div className="img-viewer-zoom">
-          <Button type="text" aria-label="缩小" title="缩小（-）" disabled={zoom <= MIN_ZOOM} onClick={() => zoomBy(-ZOOM_STEP)}>
+          <Button variant="ghost" aria-label="缩小" title="缩小（-）" disabled={zoom <= MIN_ZOOM} onClick={() => zoomBy(-ZOOM_STEP)}>
             <Minus size={16} />
           </Button>
           <Button
-            type="text"
+            variant="ghost"
             className="img-viewer-zoom-value"
             aria-label={zoom === 1 ? '适应窗口' : `当前缩放 ${Math.round(zoom * 100)}%，点击适应窗口`}
             title="适应窗口（0）"
@@ -207,12 +207,12 @@ export function ImageLightbox({
           >
             {zoom === 1 ? '适应' : `${Math.round(zoom * 100)}%`}
           </Button>
-          <Button type="text" aria-label="放大" title="放大（+）" disabled={zoom >= MAX_ZOOM} onClick={() => zoomBy(ZOOM_STEP)}>
+          <Button variant="ghost" aria-label="放大" title="放大（+）" disabled={zoom >= MAX_ZOOM} onClick={() => zoomBy(ZOOM_STEP)}>
             <Plus size={16} />
           </Button>
         </div>
         <Button
-          type="text"
+          variant="ghost"
           className="img-viewer-rotate"
           aria-label={`顺时针旋转图片${rotation ? `，当前 ${rotation}°` : ''}`}
           aria-keyshortcuts="R"
@@ -227,7 +227,7 @@ export function ImageLightbox({
         </a>
         {item.prompt && (
           <Button
-            type="text"
+            variant="ghost"
             className="img-viewer-action"
             aria-label={promptOpen ? '收起提示词' : '查看提示词'}
             aria-expanded={promptOpen}
@@ -244,7 +244,7 @@ export function ImageLightbox({
         <div className="img-viewer-prompt" role="region" aria-label="生成提示词" onClick={(e) => e.stopPropagation()}>
           <div className="img-viewer-prompt-head">
             <strong>生成提示词</strong>
-            <Button type="text" onClick={() => void copyPrompt()}>
+            <Button variant="ghost" onClick={() => void copyPrompt()}>
               {promptCopied ? <Check size={14} className="size-[14px]" /> : <Copy size={14} className="size-[14px]" />}
               {promptCopied ? '已复制' : '复制'}
             </Button>

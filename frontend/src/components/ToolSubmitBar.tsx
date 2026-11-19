@@ -63,7 +63,7 @@ export function ToolSubmitBar({
       <div className="pk-submit-row">
         {extra}
         <Button
-          type="primary"
+          variant="default"
           className="pk-primary-btn"
           disabled={btnDisabled}
           onClick={() => {
@@ -73,7 +73,7 @@ export function ToolSubmitBar({
         >
           {submitting ? (
             <>
-              <Spin size="small" />
+              <Spin className="size-4" />
               <strong className="u-font-14">生成中…</strong>
             </>
           ) : (

@@ -55,20 +55,23 @@ export function AccountPasswordModal({
       </p>
       <div className="account-form">
         {hasPassword && (
-          <Input.Password
+          <Input
+            type="password"
             placeholder="当前密码"
             value={oldPassword}
             onChange={(e) => onOldPasswordChange(e.target.value)}
             autoComplete="current-password"
           />
         )}
-        <Input.Password
+        <Input
+          type="password"
           placeholder={`新密码（至少 ${MIN_PASSWORD_LENGTH} 位）`}
           value={newPassword}
           onChange={(e) => onNewPasswordChange(e.target.value)}
           autoComplete="new-password"
         />
-        <Input.Password
+        <Input
+          type="password"
           placeholder="再次输入新密码"
           value={confirmPassword}
           onChange={(e) => onConfirmPasswordChange(e.target.value)}

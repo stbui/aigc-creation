@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FolderInput } from 'lucide-react';
-import { Button, Modal, Select } from './components';
+import { Button, Modal, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from './components';
 import type { ProjectListItem } from '../../types/api';
 
 export interface LibraryMoveAssetsDialogProps {
@@ -59,17 +59,29 @@ export function LibraryMoveAssetsDialog({ open, count, projects, onCancel, onCon
             <label className="text-xs font-medium text-foreground">
               目标项目
             </label>
-            <Select
-              value={projectId || undefined}
-              onChange={(value) => setProjectId(value === undefined ? '' : String(value))}
-              options={projects.map((project) => ({
-                value: project.id,
-                label: `${project.name}（${project.assetCount} 个素材）`,
-              }))}
-              placeholder="选择目标项目"
-              aria-label="目标项目"
-              className="w-full"
-            />
+              <Select
+                value={projectId || undefined}
+                onValueChange={(value) => setProjectId(value === undefined ? '' : String(value))}
+              >
+                <SelectTrigger
+                  aria-label={'目标项目'}
+                  className={'w-full'}
+                >
+                  <SelectValue placeholder={'选择目标项目'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {projects.map((project) => ({
+                      value: project.id,
+                      label: `${project.name}（${project.assetCount} 个素材）`,
+                    })).map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
           </div>
         )}
         {error && (
@@ -78,14 +90,13 @@ export function LibraryMoveAssetsDialog({ open, count, projects, onCancel, onCon
           </div>
         )}
         <div className="flex justify-end gap-2">
-          <Button type="text" onClick={onCancel} disabled={busy}>取消</Button>
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>取消</Button>
           <Button
-            type="primary"
-            icon={<FolderInput className="size-4" />}
-            loading={busy}
-            disabled={!projectId}
+            variant="default"
+            disabled={!projectId || busy}
             onClick={() => void confirm()}
           >
+            <span className="state-spinner is-small" aria-hidden />
             移动
           </Button>
         </div>

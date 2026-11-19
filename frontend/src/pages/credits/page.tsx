@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
 
 import { CREDITS_PAGE_META, type Tab } from './constants';
-import { Button, Card, PersonalPage, StateButton, StateEmpty, Tabs } from './components';
+import { Button, PersonalPage, StateButton, StateEmpty, Surface, SurfaceContent, Tabs } from './components';
 import { useAuth, useCreditsData, useDocumentMeta, useMediaQuery } from './hooks';
 import { CreditsHero } from './CreditsHero';
 import { CreditsLedgerPanel } from './CreditsLedgerPanel';
@@ -78,7 +78,7 @@ export function CreditsPage() {
       title={CREDITS_PAGE_META.title}
       description={CREDITS_PAGE_META.description}
       extra={
-        <Button asChild type="primary">
+        <Button asChild variant="default">
           <Link to="/packages">
             <ShoppingBag size={15} aria-hidden />
             购买积分 / 会员
@@ -89,7 +89,8 @@ export function CreditsPage() {
       <CreditsHero balance={balance} />
       <CreditsStatsGrid balance={balance} />
 
-      <Card className="credits-list-card">
+      <Surface className="credits-list-card">
+        <SurfaceContent>
         <Tabs
           activeKey={tab}
           onChange={(key) => setTab(key as Tab)}
@@ -130,7 +131,8 @@ export function CreditsPage() {
             },
           ]}
         />
-      </Card>
+        </SurfaceContent>
+      </Surface>
     </PersonalPage>
   );
 }

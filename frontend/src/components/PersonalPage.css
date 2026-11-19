@@ -24,7 +24,7 @@
   min-width: 0;
 }
 
-/* 标题排版（Typography 不再输出 .ant-typography-*）见文件末尾「标题排版」适配层 */
+/* 标题排版见文件末尾「标题排版」适配层 */
 .personal-page-extra {
   flex: none;
   display: flex;
@@ -39,7 +39,7 @@
   min-width: 0;
 }
 
-/* 标题排版：Typography 不再输出 .ant-typography-* */
+/* 标题排版 */
 .personal-page-heading h3 {
   margin: 0;
   font-size: 24px;
@@ -106,7 +106,7 @@
     flex-wrap: wrap;
   }
 
-  .personal-page-extra .ui-btn:first-child {
+  .personal-page-extra [data-slot="button"]:first-child {
      
     flex: 1 1 auto;
     min-width: 0;

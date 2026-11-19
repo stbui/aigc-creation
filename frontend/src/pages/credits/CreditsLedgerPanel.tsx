@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import type { CreditLedgerEntry } from '../../types/api';
 import {
   Pagination,
-  Select,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem,
   StateButton,
   StateEmpty,
   StateError,
@@ -120,11 +120,24 @@ export function CreditsLedgerPanel({
       <div className="credits-ledger-toolbar">
         <Select
           value={filter}
-          onChange={(value) => onFilterChange(value as LedgerFilter)}
-          options={LEDGER_FILTER_OPTIONS}
+          onValueChange={(value) => onFilterChange(value as LedgerFilter)}
           disabled={initialLoading || tableLoading}
-          aria-label="筛选积分流水"
-        />
+        >
+          <SelectTrigger
+            aria-label={'筛选积分流水'}
+          >
+            <SelectValue placeholder={'请选择'} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {LEDGER_FILTER_OPTIONS.map((option) => (
+                <SelectItem key={String(option.value)} value={String(option.value)}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
       {initialLoading ? (
         <StateSkeleton variant="row" count={5} />

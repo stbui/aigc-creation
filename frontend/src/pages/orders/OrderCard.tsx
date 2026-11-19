@@ -161,7 +161,7 @@ export function OrderCard({
               <Button disabled={cancelling} onClick={onCancel}>
                 {cancelling ? '取消中…' : '取消订单'}
               </Button>
-              <Button type="primary" onClick={onPay}>
+              <Button variant="default" onClick={onPay}>
                 继续支付
               </Button>
             </div>

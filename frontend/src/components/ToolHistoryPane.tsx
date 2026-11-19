@@ -79,7 +79,7 @@ export function ToolHistoryGrid({
       <div className="redraw-history-scroll">
         {loading ? (
           <div className="redraw-history-loading" aria-live="polite">
-            <Spin size="small" />
+            <Spin className="size-4" />
             <span>加载中…</span>
           </div>
         ) : error ? (

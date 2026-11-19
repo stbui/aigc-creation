@@ -81,19 +81,22 @@ export function ForcePasswordChangeModal() {
         完成前无法使用其他功能。临时密码 24 小时内有效。
       </p>
       <div className="account-form">
-        <Input.Password
+        <Input
+          type="password"
           placeholder="当前密码（管理员提供的临时密码）"
           value={oldPassword}
           onChange={(e) => setOldPassword(e.target.value)}
           autoComplete="current-password"
         />
-        <Input.Password
+        <Input
+          type="password"
           placeholder={`新密码（至少 ${MIN_PASSWORD_LENGTH} 位）`}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           autoComplete="new-password"
         />
-        <Input.Password
+        <Input
+          type="password"
           placeholder="再次输入新密码"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}

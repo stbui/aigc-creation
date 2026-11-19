@@ -22,24 +22,24 @@ export function LibraryBatchBar({ count, onDownload, onMove, onClear }: LibraryB
         {/* 只播报选中个数；整条容器挂 role=status 会让内部按钮失去按钮语义 */}
         <span aria-live="polite">已选 {count} 个素材</span>
         <Button
-          type="text"
-          size="small"
-          icon={<Download className="size-3" />}
+          variant="ghost"
+          size="sm"
           onClick={onDownload}
         >
+          {<Download className="size-3" />}
           下载所选
         </Button>
         <Button
-          type="text"
-          size="small"
-          icon={<FolderInput className="size-3" />}
+          variant="ghost"
+          size="sm"
           onClick={onMove}
         >
+          {<FolderInput className="size-3" />}
           移动到项目
         </Button>
         <Button
-          type="text"
-          size="small"
+          variant="ghost"
+          size="sm"
           className="asset-library-batch-cancel"
           onClick={onClear}
         >

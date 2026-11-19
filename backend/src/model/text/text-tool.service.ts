@@ -29,6 +29,7 @@ import {
   type ChannelExecution,
 } from '../channels/channel-runtime.service';
 import { ProtocolExecutor, type ProtocolHttpResponse } from '../protocol/executor';
+import { previewCallPayload, previewCallText } from '../protocol/call-payload';
 import { extractUsage } from '../protocol/usage';
 import type { GenerationMessage, GenerationRequest, MediaReference } from '../protocol/runtime';
 
@@ -58,7 +59,6 @@ export interface TextToolResult {
 }
 
 const MAX_TOKENS_DEFAULT = 1024;
-const BODY_PREVIEW_CHARS = 4000;
 const ERROR_PREVIEW_CHARS = 1000;
 const TEXT_TOOL_UNAVAILABLE_MESSAGE = '文字处理暂时不可用，请稍后再试';
 
@@ -110,10 +110,13 @@ export class TextToolService {
       let response: ProtocolHttpResponse | null = null;
       let path = '';
       let method = 'POST';
+      /* 真实发出的报文：buildCreate 之后才确定（声明式协议会把 system 指令并进 messages） */
+      let requestBody = '';
       try {
         const spec = await channel.adapter.buildCreate({ baseUrl: channel.runtime.baseUrl, request });
         path = spec.path;
         method = spec.method;
+        requestBody = previewCallPayload(spec.body);
         response = await this.executor.send(spec, channel.runtime);
         const parsed = await this.readText(channel, request, response);
         await this.logCall({
@@ -123,6 +126,7 @@ export class TextToolService {
           response,
           method,
           path,
+          requestBody,
           status: 'success',
           errorCode: '',
           error: '',
@@ -143,6 +147,7 @@ export class TextToolService {
           response,
           method,
           path,
+          requestBody,
           status: 'failed',
           errorCode: error instanceof TextUpstreamError ? error.code : failureCodeOf(error),
           error: lastError,
@@ -245,6 +250,8 @@ export class TextToolService {
     response: ProtocolHttpResponse | null;
     method: string;
     path: string;
+    /** 实际发出的请求报文预览；协议构建失败时为空串 */
+    requestBody: string;
     status: 'success' | 'failed';
     errorCode: string;
     error: string;
@@ -280,8 +287,8 @@ export class TextToolService {
           concurrencyLimit: input.channel.concurrencyLimit,
           upstreamUrl: input.response?.url ?? '',
           requestContentType: 'application/json',
-          requestBody: previewJson(input.request),
-          responseBody: String(input.response?.text ?? '').slice(0, BODY_PREVIEW_CHARS),
+          requestBody: input.requestBody,
+          responseBody: previewCallText(input.response?.text),
           startedAt: new Date(input.startedAt),
         },
       });
@@ -330,16 +337,4 @@ function snippet(text: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 200);
-}
-
-/** 请求体预览：内联 base64 折叠，避免把整张图写进调用记录 */
-function previewJson(value: unknown): string {
-  try {
-    return String(JSON.stringify(value) ?? '').replace(
-      /(data:[^;"]+;base64,)[A-Za-z0-9+/=]{64,}/g,
-      '$1…',
-    );
-  } catch {
-    return '';
-  }
 }

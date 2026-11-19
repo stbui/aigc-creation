@@ -49,7 +49,7 @@ export function AssetLibraryPickerCard({
 
   return (
     <Button
-      type="text"
+      variant="ghost"
       className={`alp-card${selected ? ' is-selected' : ''}`}
       aria-pressed={selected}
       disabled={!selected && atLimit}

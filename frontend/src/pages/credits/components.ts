@@ -11,4 +11,20 @@ export { PersonalPage } from '../../components/PersonalPage';
 export { StateButton, StateEmpty, StateError, StateSkeleton } from '../../components/StateViews';
 
 /** shadcn / 兼容层组合件 */
-export { Button, Card, Col, Pagination, Row, Select, Table, Tabs, Tag } from '../../ui';
+export {
+  Button,
+  Pagination,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusBadge,
+  Surface,
+  SurfaceContent,
+  SurfaceHeader,
+  SurfaceTitle,
+  Table,
+  Tabs,
+} from '../../ui';

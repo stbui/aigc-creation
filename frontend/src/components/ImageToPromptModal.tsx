@@ -173,7 +173,7 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
         />
         {loading && (
           <div className="pt-polish-loading">
-            <Spin size="small" />
+            <Spin className="size-4" />
           </div>
         )}
       </div>

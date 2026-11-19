@@ -89,7 +89,7 @@ div.social-media-page-J-DPOa            1440×900  @0,0     ← 页面根，不�
 
 > **本站主动偏离（默认值）**：投放平台 / 目标市场 / 输出语言默认改为 **抖音 / 中国 / 中文**——面向国内电商团队。选项清单与顺序不变，只换初值。前端 `constants.ts` 的 `DEFAULT_PLATFORM` / `DEFAULT_MARKET` / `DEFAULT_LANGUAGE` 与后端 `definitions/shoppable_carousel.ts` 的 `default` 必须同值。
 
-第五块 **「图片不加文字」开关**：`padding 12px`，底 `rgba(0,30,89,.04)`，`border-radius 10`；标题 14px `#1c1d1f`；描述 12px `#8d919b`「图片突出产品使用场景，不添加文字。」；开关 `ant-switch small` 28×16，**默认关**（未勾选态 `bg #ebedf2`）。
+第五块 **「图片不加文字」开关**：`padding 12px`，底 `rgba(0,30,89,.04)`，`border-radius 10`；标题 14px `#1c1d1f`；描述 12px `#8d919b`「图片突出产品使用场景，不添加文字。」；开关 `shadcn Switch` 28×16，**默认关**（未勾选态 `bg #ebedf2`）。
 
 ### 3.3 商品卖点 & 生成要求
 | 节点 | 实测 |
@@ -116,7 +116,7 @@ div.social-media-page-J-DPOa            1440×900  @0,0     ← 页面根，不�
 | --- | --- |
 | 标题 | 「附加功能」15px `#1c1d1f` |
 | 行 | 高 36，`gap 12`，左文字 14px `#616366`「社媒帖子发布文案」，右侧开关 28×16 |
-| 默认 | **开**（`ant-switch-checked`，底 `#5c6066`） |
+| 默认 | **开**（Switch checked，底 `#5c6066`） |
 
 ## 4. 底部数量步进器与主按钮
 

@@ -78,7 +78,8 @@ export function AppHeader({ groups, items, mobileNavOpen, onOpenMobileNav }: Pro
             }}
             placement="bottomLeft"
           >
-            <Button type="text" className="app-topnav-item" icon={<ChevronDown size={14} />}>
+            <Button variant="ghost" className="app-topnav-item" >
+              {<ChevronDown size={14} />}
               {g.name}
             </Button>
           </Dropdown>

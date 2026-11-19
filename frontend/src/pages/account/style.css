@@ -15,17 +15,17 @@
 /* 输入框已占满一行, 保存按钮跟着通栏, 否则半截按钮孤零零挂在左边 */
 
 @media (max-width: 640px) {
-  .account-field-value > .ui-btn {
+  .account-field-value > [data-slot="button"] {
     flex: 1 1 100%;
   }
 
-  .account-actions > li .ui-btn {
+  .account-actions > li [data-slot="button"] {
     width: 100%;
   }
 }
 
 @media (max-width: 900px) {
-  .account-quick .ui-btn {
+  .account-quick [data-slot="button"] {
     flex: 1 1 calc(50% - 4px);
   }
 }
@@ -634,7 +634,7 @@
   }
 }
 
-.account-actions .ui-btn {
+.account-actions [data-slot="button"] {
   flex: none;
 }
 

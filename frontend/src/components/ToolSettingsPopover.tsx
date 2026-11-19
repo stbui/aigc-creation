@@ -106,7 +106,7 @@ export function ToolSettingsPopover({
   return (
     <div className="pk-settings-shell" ref={shellRef}>
       <Button
-        type="text"
+        variant="ghost"
         className={`pk-settings-summary u-font-12${open ? ' pk-settings-summary-open' : ''}`}
         aria-expanded={open}
         onClick={onToggle}
@@ -133,7 +133,7 @@ export function ToolSettingsPopover({
             <div className="pk-settings-popover-head">
               <h2 className="u-font-16">高级设置</h2>
               <Button
-                type="text"
+                variant="ghost"
                 className="pk-settings-close"
                 aria-label="关闭高级设置"
                 title="关闭"
@@ -153,7 +153,7 @@ export function ToolSettingsPopover({
                   return (
                     <Button
                       key={v}
-                      type="text"
+                      variant="ghost"
                       className={`pk-ratio-option${v === ratio ? ' pk-option-active' : ''}`}
                       aria-pressed={v === ratio}
                       onClick={() => onRatioChange?.(v)}
@@ -172,7 +172,7 @@ export function ToolSettingsPopover({
                 {resolutionOptions(capabilityId, resolutionValues).map((o) => (
                   <Button
                     key={String(o.value)}
-                    type="text"
+                    variant="ghost"
                     className={`pk-resolution-option u-p-8${o.value === resolution ? ' pk-option-active' : ''}`}
                     aria-pressed={o.value === resolution}
                     disabled={o.disabled}

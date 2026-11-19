@@ -62,13 +62,13 @@
 
 - 一次尝试一条记录；重试与切线分别记录，不合并。
 - `billable` 必须准确：文本工具为 `false`，生成任务为 `true`。
-- 不记录提示词与响应正文；需要复现时靠参数快照与模型版本。
+- 请求 / 响应报文只存**脱敏截断后的预览**：任务路径经 `safeJson` 折叠内联 base64 并截断 4000 字符，中转路径经 `sanitizeCallPayload` 剥离密钥字段（上限 128 KB），文本工具存 `previewJson` 与响应文本切片。列表与 CSV 导出都不含报文，只有 `GET /admin/api-logs/:id` 详情接口下发，用于逐条排障。
 - 状态映射与任务 / 账单状态保持一致，不出现「任务失败但调用记录成功」这类矛盾。
 - 默认保留 90 天，经后台「数据保留」手动清理。
 
 ## 5. 指标
 
-当前**没有** Prometheus / OpenTelemetry / APM 端点；指标全部从数据库聚合：
+当前**没有** Prometheus / OpenTelemetry / APM 端点；指标全部从数据库聚合。系统设置页的「系统性能」页签（`GET /admin/system-performance`）是运行时快照：进程内存 / CPU 累计时间 / 事件循环延迟、数据库 `SELECT 1`、存储探活、近 24 小时任务与调用 P95、线路冷却与调度器失败。它只展示不落库，不替代下列业务指标：
 
 - `ChannelModelMetricsService`：近 24 小时成功率、P95、样本数。
 - `RouteScoreService`：按成功率划分健康层，供选路使用。

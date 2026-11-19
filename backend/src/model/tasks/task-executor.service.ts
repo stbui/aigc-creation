@@ -19,6 +19,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { ChannelExecution } from '../channels/channel-runtime.service';
 import { OutboundError } from '../infra/outbound';
+import {
+  previewCallPayload,
+  previewCallText,
+} from '../protocol/call-payload';
 import { ProtocolExecutor, type ProtocolHttpResponse } from '../protocol/executor';
 import type {
   GenerationRequest,
@@ -69,13 +73,7 @@ export function truncate(value: string, limit: number): string {
 
 /** 请求体预览：Buffer 只报体积，内联 base64 折叠，避免把整段二进制写进日志 */
 export function safeJson(value: any): string {
-  if (value === undefined || value === null) return '';
-  if (Buffer.isBuffer(value)) return `<binary ${value.length} bytes>`;
-  try {
-    return JSON.stringify(value).replace(/(data:[^;"]+;base64,)[A-Za-z0-9+/=]{64,}/g, '$1…');
-  } catch {
-    return String(value);
-  }
+  return previewCallPayload(value);
 }
 
 /** 一次上游调用的结果 */
@@ -153,11 +151,11 @@ export class TaskExecutorService {
 
     try {
       spec = await adapter.buildCreate({ baseUrl: channel.runtime.baseUrl, request });
-      requestBody = truncate(safeJson(spec.body), 4000);
+      requestBody = safeJson(spec.body);
       sent = true;
       response = await this.executor.send(spec, channel.runtime);
       statusCode = response.status;
-      responseBody = truncate(response.text, 4000);
+      responseBody = previewCallText(response.text);
       if (response.status < 200 || response.status >= 300) {
         failureCode = upstreamFailureCode(response.status);
         failureMessage = `上游返回 HTTP ${response.status}：${upstreamErrorText(response.text)}`;
@@ -255,10 +253,10 @@ export class TaskExecutorService {
         request,
         taskId,
       });
-      requestBody = truncate(safeJson(spec.body), 4000);
+      requestBody = safeJson(spec.body);
       response = await this.executor.send(spec, channel.runtime);
       statusCode = response.status;
-      responseBody = truncate(response.text, 4000);
+      responseBody = previewCallText(response.text);
       if (response.status < 200 || response.status >= 300) {
         failureCode = upstreamFailureCode(response.status);
         failureMessage = `轮询返回 HTTP ${response.status}：${upstreamErrorText(response.text)}`;

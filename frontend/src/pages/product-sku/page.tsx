@@ -299,7 +299,7 @@ export function ProductSkuPage() {
 
       {restoringId && (
         <Surface className="product-sku-restoring flex-row border-0" role="status">
-          <Spin size="small" /> 正在恢复历史提交…
+          <Spin className="size-4" /> 正在恢复历史提交…
         </Surface>
       )}
 

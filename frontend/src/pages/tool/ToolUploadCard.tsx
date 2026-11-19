@@ -3,8 +3,11 @@ import { Upload as UploadIcon } from 'lucide-react';
 import type { Asset, CapabilityDef } from '../../types/api';
 import {
   Button,
-  Card,
   Form,
+  Surface,
+  SurfaceContent,
+  SurfaceHeader,
+  SurfaceTitle,
   Typography,
   Upload,
   type FormInstance,
@@ -49,7 +52,11 @@ export function ToolUploadCard({
   const { accept, maxMb } = useUploadLimits();
 
   return (
-    <Card className="tool-form-card" title={inputs > 1 ? '输入素材' : '上传商品图'}>
+    <Surface className="tool-form-card">
+      <SurfaceHeader>
+        <SurfaceTitle>{inputs > 1 ? '输入素材' : '上传商品图'}</SurfaceTitle>
+      </SurfaceHeader>
+      <SurfaceContent>
       <Upload
         listType="picture-card"
         fileList={fileList}
@@ -69,7 +76,7 @@ export function ToolUploadCard({
         </div>
       </Upload>
 
-      <Button type="link" size="small" onClick={onOpenLibrary} disabled={busy}>
+      <Button variant="link" size="sm" onClick={onOpenLibrary} disabled={busy}>
         从素材库导入
       </Button>
 
@@ -83,14 +90,13 @@ export function ToolUploadCard({
       </Form>
 
       <Button
-        type="primary"
-        size="large"
-        block
-        loading={generating}
-        disabled={busy || assets.length < inputs}
+        variant="default"
+        size="lg"
+        className="w-full tool-submit"
+        disabled={busy || assets.length < inputs || generating}
         onClick={onSubmit}
-        className="tool-submit"
       >
+        <span className="state-spinner is-small" aria-hidden />
         {generating ? '生成中…' : uploadingCount > 0 ? '上传中…' : '立即生成'}
       </Button>
       {creditLabel && (
@@ -98,6 +104,7 @@ export function ToolUploadCard({
           {creditLabel}
         </Text>
       )}
-    </Card>
+    </SurfaceContent>
+    </Surface>
   );
 }

@@ -1,6 +1,6 @@
 import '../styles/auth.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Form, FormItem, Input, useApp, useForm, useWatch } from '../ui';
+import { Button, Form, FormItem, Input, InputGroup, InputGroupAddon, InputGroupInput, useApp, useForm, useWatch } from '../ui';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, X } from 'lucide-react';
 import { authApi, oauthAuthorizeUrl, type OAuthProviderInfo } from '../lib/api';
@@ -273,19 +273,23 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
       rules={[{ required: true, message: '请输入验证码' }]}
     >
       <div className="login-code-row">
-        <Input
-          prefix={<ShieldCheck size={15} />}
-          placeholder="6 位验证码"
-          maxLength={6}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-        />
+        <InputGroup>
+          <InputGroupAddon>
+            {<ShieldCheck size={15} />}
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="6 位验证码"
+            maxLength={6}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+          />
+        </InputGroup>
         <Button
           className="login-code-btn"
           onClick={() => handleSendSms(purpose)}
-          loading={sendingSms}
-          disabled={smsCountdown > 0}
+          disabled={smsCountdown > 0 || sendingSms}
         >
+          <span className="state-spinner is-small" aria-hidden />
           {smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码'}
         </Button>
       </div>
@@ -301,19 +305,23 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
       rules={[{ required: true, message: '请输入邮箱验证码' }]}
     >
       <div className="login-code-row">
-        <Input
-          prefix={<ShieldCheck size={15} />}
-          placeholder="6 位验证码"
-          maxLength={6}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-        />
+        <InputGroup>
+          <InputGroupAddon>
+            {<ShieldCheck size={15} />}
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="6 位验证码"
+            maxLength={6}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+          />
+        </InputGroup>
         <Button
           className="login-code-btn"
           onClick={() => void handleSendEmail()}
-          loading={sendingEmail}
-          disabled={emailCountdown > 0 || !emailValue}
+          disabled={emailCountdown > 0 || !emailValue || sendingEmail}
         >
+          <span className="state-spinner is-small" aria-hidden />
           {emailCountdown > 0 ? `${emailCountdown}s` : '获取验证码'}
         </Button>
       </div>

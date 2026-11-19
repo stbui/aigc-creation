@@ -3,13 +3,43 @@ export { AppProvider, useApp, type AppApi, type ConfirmOptions } from './provide
 export { UiProvider } from './providers/UiProvider';
 export { cn } from './lib/cn';
 
-export { Button, type ButtonProps } from './primitives/button';
-export { Input, type InputProps } from './primitives/input';
-export { Textarea, type TextareaProps } from './primitives/textarea';
-export { Select, type SelectProps, type SelectOption } from './primitives/select';
-export { Checkbox, type CheckboxProps } from './primitives/checkbox';
+import type { ComponentProps, ReactNode } from 'react';
+import { Button } from '~/admin-ui/components/ui/button';
+import { Textarea as ShadcnTextarea } from '~/admin-ui/components/ui/textarea';
+import { Checkbox as ShadcnCheckbox } from '~/admin-ui/components/ui/checkbox';
+import { Switch as ShadcnSwitch } from '~/admin-ui/components/ui/switch';
+
+export { Button };
+export type ButtonProps = ComponentProps<typeof Button>;
+
+export { ShadcnTextarea as Textarea };
+export type TextareaProps = ComponentProps<typeof ShadcnTextarea>;
+
+export { ShadcnCheckbox as Checkbox };
+export type CheckboxProps = ComponentProps<typeof ShadcnCheckbox>;
+
+export { ShadcnSwitch as Switch };
+export type SwitchProps = ComponentProps<typeof ShadcnSwitch>;
+
+/* Select 直连 shadcn 组合件：调用点自行组合 Trigger/Content/Item。 */
+export {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+} from '~/admin-ui/components/ui/select';
+export interface SelectOption {
+  value: string | number;
+  label: ReactNode;
+}
+import { Input as ShadcnInput } from '~/admin-ui/components/ui/input';
+
+export { ShadcnInput as Input };
+export type InputProps = ComponentProps<typeof ShadcnInput>;
+
 export { Radio } from './primitives/radio';
-export { Switch } from './primitives/switch';
 export { Slider } from './primitives/slider';
 export { InputNumber } from './primitives/input-number';
 export { NumberStepper, type NumberStepperProps } from './primitives/number-stepper';
@@ -22,11 +52,13 @@ export { Avatar, type AvatarProps } from './primitives/avatar';
 export { Badge, type BadgeProps } from './primitives/badge';
 export { Empty, type EmptyProps } from './primitives/empty';
 export { Popconfirm, type PopconfirmProps } from './primitives/popconfirm';
-export { Spin } from './primitives/spin';
+import { Spinner } from '~/admin-ui/components/ui/spinner';
+
+export { Spinner as Spin };
 export { Tabs, type TabsProps, type TabItem } from './primitives/tabs';
 export { Pagination, type PaginationProps } from './primitives/pagination';
 export { Table, type TableProps, type TableColumn } from './primitives/table';
-export { Tag, Card, Row, Col, Alert, Typography } from './primitives/misc';
+export { Typography } from './primitives/misc';
 export { UiDialog } from './primitives/dialog';
 export { ToggleGroup, type ToggleGroupOption, type ToggleGroupProps } from './primitives/toggle-group';
 export { Form, FormItem, useForm, useWatch, type FormInstance } from './primitives/form';

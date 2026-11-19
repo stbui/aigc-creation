@@ -1,7 +1,7 @@
 
 import type { DeletionPreview } from '../../types/api';
 import { DELETE_CONFIRM_WORD } from './constants';
-import { Alert, Input, Modal } from '../../ui';
+import { InlineAlert, InlineAlertDescription, InlineAlertTitle, Input, Modal } from '../../ui';
 
 /**
  * 注销账号弹窗。
@@ -51,19 +51,19 @@ export function AccountDeleteModal({
       destroyOnHidden
     >
       <div className="account-delete-body">
-        <Alert
-          type="warning"
-          title="此操作不可撤销"
-          description={
-            previewLoading
+        <InlineAlert className="ui-alert is-warning">
+          <InlineAlertTitle>此操作不可撤销</InlineAlertTitle>
+          <InlineAlertDescription>
+            {previewLoading
               ? '正在统计影响面…'
               : preview
                 ? `将清除 ${preview.projects} 个项目、${preview.tasks} 个作品、${preview.assets} 个素材、${preview.notifications} 条消息；${preview.orders} 笔订单将匿名化保留。`
-                : '未能获取影响面预览，但不影响注销流程。'
-          }
-        />
+                : '未能获取影响面预览，但不影响注销流程。'}
+          </InlineAlertDescription>
+        </InlineAlert>
         {hasPassword ? (
-          <Input.Password
+          <Input
+            type="password"
             placeholder="当前密码"
             value={deletePassword}
             onChange={(e) => onPasswordChange(e.target.value)}

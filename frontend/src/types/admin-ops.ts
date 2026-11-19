@@ -495,3 +495,5 @@ export interface AdminSchedulerStatus {
   failing: string[];
 }
 
+/** 系统性能快照；拆到独立文件后在这里统一再导出，调用方路径不变。 */
+export type { AdminSystemPerformance } from "./admin-performance";

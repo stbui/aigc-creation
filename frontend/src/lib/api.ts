@@ -125,6 +125,7 @@ import type {
   AdminChannelModelListItem,
   AdminChannelModelView,
   AdminChannelView,
+  ApiLogDetailView,
   ApiLogListResult,
   BillingBatchResolveResult,
   BillingOrderListResult,
@@ -694,6 +695,15 @@ export const adminApiLogsApi = {
   ) => request<ApiLogListResult>(`/admin/api-logs${toQuery(params)}`),
 
   /**
+   * 单条调用详情（含请求 / 响应报文）。
+   *
+   * 报文只在详情里下发：列表一次几十行，每条都可能带上百 KB 的上游响应，
+   * 为了展示「状态与耗时」不值得整页读一遍大字段。
+   */
+  detail: (id: string) =>
+    request<ApiLogDetailView>(`/admin/api-logs/${encodeURIComponent(id)}`),
+
+  /**
    * 导出当前筛选结果（CSV，上限 5000 行）。
    *
    * 刻意不含请求体 / 响应体：那是排查用的明细，落成可转发的文件就等于把上游密钥
@@ -714,7 +724,7 @@ export { modelCatalogApi, modelsApi, publicChannelsApi } from "./model-catalog-a
 // 按域拆分后的聚合出口（沿用 api-payments / model-catalog-api 模式）
 export { authApi, oauthAuthorizeUrl, projectsApi, assetsApi, generateApi, newIdempotencyKey, statsApi, shoppableCarouselApi, templateApi, promptToolsApi, mobileUploadApi } from "./api-tools";
 export type { OAuthProviderInfo, AssetSourceFields } from "./api-tools";
-export { adminUsersApi, adminRolesApi, adminSettingsApi, adminAigcLabelApi, adminTasksApi, adminBackupsApi, adminAssetsApi, adminStorageApi, adminTemplateCatalogApi, adminPromptsApi } from "./api-admin-system";
+export { adminUsersApi, adminRolesApi, adminSettingsApi, adminSystemPerformanceApi, adminAigcLabelApi, adminTasksApi, adminBackupsApi, adminAssetsApi, adminStorageApi, adminTemplateCatalogApi, adminPromptsApi } from "./api-admin-system";
 export { marketingApi, myMarketingApi, adminSchedulerApi, adminProductsApi, adminMembershipPlansApi, adminOrdersApi, adminCreditsApi, adminRetentionApi, adminInvoicesApi } from "./api-admin-commerce";
 export { meApi, notificationsApi, adminNotificationsApi, ticketsApi, adminTicketsApi } from "./api-account";
 export { adminChannelsApi, adminChannelModelsApi, adminCapabilityModelsApi, adminModelCommerceApi, adminUserGroupsApi, adminPluginsApi, adminProviderCatalogApi, adminBillingOrdersApi } from "./api-admin-channels";

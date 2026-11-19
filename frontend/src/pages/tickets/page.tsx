@@ -284,10 +284,10 @@ export function TicketsPage() {
       description="提交问题、投诉或咨询，客服回复会出现在这里，也会推送站内消息。"
       extra={
         <Button
-          type="primary"
-          icon={composing ? <X size={15} /> : <MessageSquarePlus size={15} />}
+          variant="default"
           onClick={() => setComposing((v) => !v)}
         >
+          {composing ? <X size={15} /> : <MessageSquarePlus size={15} />}
           {composing ? '收起表单' : '提交新工单'}
         </Button>
       }
@@ -344,7 +344,8 @@ export function TicketsPage() {
           )}
           {!loading && items.length > 0 && items.length < total && (
             <div className="ticket-load-more">
-              <Button loading={loadingMore} onClick={() => void load({ append: true })}>
+              <Button disabled={loadingMore} onClick={() => void load({ append: true })}>
+                <span className="state-spinner is-small" aria-hidden />
                 加载更多工单（已加载 {items.length} / {total}）
               </Button>
             </div>

@@ -1,5 +1,6 @@
 import { PRIORITY_LABELS, PRIORITY_VALUES, TYPE_OPTIONS, type TicketFormState } from './constants';
-import { Button, Input, Select } from './components';
+import type { TicketPriority, TicketType } from '../../types/api';
+import { Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, Textarea } from './components';
 
 /**
  * 新建工单表单。
@@ -33,21 +34,47 @@ export function TicketComposeForm({
       {/* Select 不用 <label> 包裹：label 会把点击二次转发给触发按钮（打开即关闭） */}
       <div>
         问题类型
-        <Select
-          value={form.type}
-          onChange={(value) => onChange({ type: value })}
-          options={TYPE_OPTIONS}
-          aria-label="问题类型"
-        />
+          <Select
+            value={form.type}
+            onValueChange={(value) => onChange({ type: value as TicketType })}
+          >
+            <SelectTrigger
+              aria-label={'问题类型'}
+            >
+              <SelectValue placeholder={'请选择'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={String(option.value)} value={String(option.value)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
       </div>
       <div>
         优先级
-        <Select
-          value={form.priority}
-          onChange={(value) => onChange({ priority: value })}
-          options={PRIORITY_VALUES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
-          aria-label="优先级"
-        />
+          <Select
+            value={form.priority}
+            onValueChange={(value) => onChange({ priority: value as TicketPriority })}
+          >
+            <SelectTrigger
+              aria-label={'优先级'}
+            >
+              <SelectValue placeholder={'请选择'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {PRIORITY_VALUES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] })).map((option) => (
+                  <SelectItem key={String(option.value)} value={String(option.value)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
       </div>
       <label className="is-full">
         标题
@@ -60,19 +87,23 @@ export function TicketComposeForm({
       </label>
       <label className="is-full">
         详细描述
-        <Input.TextArea
-          rows={5}
-          maxLength={2000}
-          showCount
-          value={form.content}
-          onChange={(e) => onChange({ content: e.target.value })}
-          placeholder="复现步骤、涉及的能力名称或订单号；有报错截图可一并描述。"
-        />
+        <div className="login-textarea-wrap">
+          <Textarea
+            className="login-textarea field-sizing-fixed"
+            rows={5}
+            maxLength={2000}
+            value={form.content}
+            onChange={(e) => onChange({ content: e.target.value })}
+            placeholder="复现步骤、涉及的能力名称或订单号；有报错截图可一并描述。"
+          />
+          <span className="login-textarea-count">{form.content.length}/2000</span>
+        </div>
       </label>
       {formError && <p className="ticket-error is-full">{formError}</p>}
       <div className="ticket-compose-actions">
         <Button onClick={onCancel}>取消</Button>
-        <Button type="primary" loading={submitting} onClick={onSubmit}>
+        <Button disabled={submitting} variant="default" onClick={onSubmit}>
+          <span className="state-spinner is-small" aria-hidden />
           提交工单
         </Button>
       </div>

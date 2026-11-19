@@ -58,7 +58,7 @@ export function ProductSkuVariantRow({
           onPick={(file, input) => onUploadReference(file, itemKey, region.id, input)}
         />
         <Button
-          htmlType="button"
+          type="button"
           variant="link"
           size="xs"
           className="h-auto border-0 bg-transparent p-0 text-xs font-normal text-muted-foreground underline underline-offset-4 hover:text-brand"
@@ -67,7 +67,7 @@ export function ProductSkuVariantRow({
           素材库
         </Button>
         <Button
-          htmlType="button"
+          type="button"
           variant="link"
           size="xs"
           className="h-auto border-0 bg-transparent p-0 text-xs font-normal text-muted-foreground underline underline-offset-4 hover:text-brand"

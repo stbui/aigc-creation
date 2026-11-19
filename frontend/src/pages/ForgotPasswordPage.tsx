@@ -1,6 +1,6 @@
 import '../styles/auth.css';
 import { useState } from 'react';
-import { Button, Form, FormItem, Input, useApp } from '../ui';
+import { Button, Form, FormItem, Input, InputGroup, InputGroupAddon, InputGroupInput, useApp } from '../ui';
 import { Link } from 'react-router-dom';
 import { Mail, ShieldCheck } from 'lucide-react';
 import { authApi } from '../lib/api';
@@ -72,20 +72,23 @@ export function ForgotPasswordPage() {
                   { type: 'email', message: '邮箱格式不正确' },
                 ]}
               >
-                <Input
-                  prefix={<Mail size={15} />}
-                  placeholder="账号（邮箱）"
-                  autoComplete="username"
-                  autoFocus
-                />
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<Mail size={15} />}
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="账号（邮箱）"
+                    autoComplete="username"
+                    autoFocus
+                  />
+                </InputGroup>
               </FormItem>
-              <Button
-                type="primary"
-                htmlType="submit"
-                block
-                className="login-submit"
-                loading={submitting}
+              <Button disabled={submitting}
+                variant="default"
+                type="submit"
+                className="w-full login-submit"
               >
+                <span className="state-spinner is-small" aria-hidden />
                 发送重置链接
               </Button>
             </Form>

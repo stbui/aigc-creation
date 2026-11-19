@@ -14,7 +14,7 @@ export function StatsEmptyPanel() {
         <h3>从第一次创作开始积累作品</h3>
         <p>去工作台选择一个能力，提交创作后这里会展示你的作品趋势和常用能力。</p>
       </div>
-      <Button asChild type="primary">
+      <Button asChild variant="default">
         <Link to="/workbench">开始创作</Link>
       </Button>
     </article>

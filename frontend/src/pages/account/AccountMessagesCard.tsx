@@ -27,13 +27,13 @@ export function AccountMessagesCard({
         <Bell size={15} aria-hidden />
         <h2>最近消息</h2>
         <Button
-          type="link"
-          size="small"
+          variant="link"
+          size="sm"
           className="account-card-more"
-          icon={<CheckCheck size={13} />}
           disabled={unread === 0}
           onClick={onMarkAllRead}
         >
+          {<CheckCheck size={13} />}
           全部已读
         </Button>
       </header>

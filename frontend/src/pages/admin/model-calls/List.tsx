@@ -2,21 +2,13 @@ import { useMemo } from 'react';
 import {
   ActionButton,
   AdminDataTable,
-  ExportCsvButton,
   Panel,
   RefreshButton,
   StatusTag,
   StaleError,
   type AdminColumn,
 } from './components';
-import {
-  CAPABILITY_LABELS,
-  OPERATION_LABELS,
-  REQUEST_KIND_LABELS,
-  SOURCE_LABELS,
-  STATUS_LABELS,
-  STATUS_TONES,
-} from './constants';
+import { SOURCE_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import type { ApiLogView } from './types';
 import { formatDateTime, formatDuration } from './utils';
 
@@ -26,16 +18,16 @@ import { formatDateTime, formatDuration } from './utils';
  * 列定义留在这里而不是页面里：列的内容、宽度、空态文案属于列表自身的展示
  * 契约，页面只需要回答「谁打开详情、谁触发刷新」。同名的一列若两处维护，
  * 迟早出现表格里和信息卡里对不上。
+ *
+ * 本页不提供导出按钮：该列表用于逐条排障，导出能力保留在
+ * `/admin/api-logs/export` 接口层，不在这里重复摆放。
  */
-export function ModelCallListSection({
+export function List({
   rows,
   loading,
   error,
   hasFilter,
   pagination,
-  exporting,
-  canExport,
-  onExport,
   onRefresh,
   onOpenDetail,
   onResetFilters,
@@ -50,9 +42,6 @@ export function ModelCallListSection({
     total: number;
     onChange: (page: number, pageSize?: number) => void;
   };
-  exporting: boolean;
-  canExport: boolean;
-  onExport: () => void;
   onRefresh: () => void;
   onOpenDetail: (id: string) => void;
   onResetFilters: () => void;
@@ -70,81 +59,78 @@ export function ModelCallListSection({
         title: '状态',
         width: 100,
         render: (row) => (
-          <div className="flex flex-col">
-            <StatusTag
-              status={row.status}
-              tone={STATUS_TONES[row.status] ?? 'muted'}
-              label={STATUS_LABELS[row.status] ?? row.status}
-            />
-            <span className={row.statusCode >= 400 ? 'text-danger-text' : undefined}>
-              HTTP {row.statusCode || '—'}
-            </span>
-          </div>
-        ),
-      },
-      {
-        key: 'kind',
-        title: '类型',
-        width: 100,
-        render: (row) => (
-          <div className="flex flex-col">
-            <span>{REQUEST_KIND_LABELS[row.requestKind] ?? row.requestKind}</span>
-            <span className={row.billable ? undefined : 'text-warn-text'}>
-              {row.billable ? '计费' : '不计费'}
-            </span>
-          </div>
+          <StatusTag
+            status={row.status}
+            tone={STATUS_TONES[row.status] ?? 'muted'}
+            label={STATUS_LABELS[row.status] ?? row.status}
+            showDot
+          />
         ),
       },
       {
         key: 'source',
-        title: '来源 / 操作',
-        width: 190,
+        title: '来源',
+        width: 130,
+        render: (row) => <div>{(SOURCE_LABELS[row.source] ?? row.source) || '—'}</div>,
+      },
+      {
+        key: 'channel',
+        title: '渠道',
+        width: 160,
         render: (row) => (
-          <div className="min-w-0">
-            <div>{(SOURCE_LABELS[row.source] ?? row.source) || '—'}</div>
-            <div className="truncate" title={row.operation || undefined}>
-              {(OPERATION_LABELS[row.operation] ?? row.operation) || '—'}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {(CAPABILITY_LABELS[row.capability] ?? row.capability) || '—'}
-            </div>
+          <div className="truncate" title={row.channelName || row.channelId || undefined}>
+            {row.channelName || row.channelId || '—'}
           </div>
         ),
       },
       {
-        key: 'channel',
-        title: '渠道 / 模型',
-        width: 220,
+        key: 'model',
+        title: '模型',
+        width: 180,
         render: (row) => (
-          <div className="min-w-0">
-            <div title={row.channelName || row.channelId || undefined}>
-              {row.channelName || row.channelId || '—'}
-            </div>
-            <div className="truncate" title={row.model || undefined}>
-              {row.model || '—'}
-            </div>
+          <div
+            className="truncate font-mono text-[12px] text-muted-foreground"
+            title={row.model || undefined}
+          >
+            {row.model || '—'}
+          </div>
+        ),
+      },
+      {
+        key: 'duration',
+        title: '耗时',
+        width: 110,
+        render: (row) => (
+          <div className="flex flex-col">
+            <span className="tabular-nums">{formatDuration(row.durationMs)}</span>
+            {row.pollCount > 1 && (
+              <span className="text-muted-foreground">轮询 {row.pollCount} 次</span>
+            )}
           </div>
         ),
       },
       {
         key: 'usage',
         title: '用量',
-        width: 160,
-        render: (row) => (
-          <div className="flex flex-col">
-            <span>
-              {formatDuration(row.durationMs)}
-              {row.pollCount > 1 ? ` · 轮询 ${row.pollCount}` : ''}
-            </span>
-            {row.usageAvailable && (
-              <span>
-                输入 {row.inputTokens} / 输出 {row.outputTokens}
-              </span>
-            )}
-            {row.mediaCount > 0 && <span>产出 {row.mediaCount} 个</span>}
-            {row.videoSeconds > 0 && <span>{row.videoSeconds}s 视频</span>}
-          </div>
-        ),
+        width: 170,
+        render: (row) => {
+          const lines: string[] = [];
+          if (row.usageAvailable) {
+            lines.push(`输入 ${row.inputTokens} / 输出 ${row.outputTokens}`);
+          }
+          if (row.mediaCount > 0) lines.push(`产出 ${row.mediaCount} 个`);
+          if (row.videoSeconds > 0) lines.push(`${row.videoSeconds}s 视频`);
+          if (lines.length === 0) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <div className="flex flex-col tabular-nums">
+              {lines.map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </div>
+          );
+        },
       },
       {
         key: 'error',
@@ -178,15 +164,7 @@ export function ModelCallListSection({
   );
 
   return (
-    <Panel
-      title="调用明细"
-      extra={
-        <>
-          {canExport && <ExportCsvButton exporting={exporting} onExport={onExport} />}
-          <RefreshButton loading={loading} onRefresh={onRefresh} />
-        </>
-      }
-    >
+    <Panel title="调用明细" extra={<RefreshButton loading={loading} onRefresh={onRefresh} />}>
       {error && rows.length > 0 && <StaleError error={error} onRetry={onRefresh} />}
       <AdminDataTable<ApiLogView>
         rows={rows}
@@ -209,7 +187,7 @@ export function ModelCallListSection({
             </ActionButton>
           ) : undefined
         }
-        minWidth={1380}
+        minWidth={1300}
         pagination={pagination}
       />
     </Panel>

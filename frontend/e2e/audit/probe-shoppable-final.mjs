@@ -17,13 +17,13 @@ const out = {};
 /** 打开第 idx 个 posterSelect，读取其可见下拉里的选项 */
 async function readSelect(page, idx) {
   const fields = await page.$$('[class^="social-media-posterSelectField-"]');
-  const trigger = await fields[idx].$('.ant-select');
+  const trigger = await fields[idx].$('[class*="select"]');
   await trigger.click();
   await page.waitForTimeout(500);
   const options = await page.evaluate(() => {
-    const dds = Array.from(document.querySelectorAll('.ant-select-dropdown')).filter((d) => !d.className.includes('hidden') && d.getBoundingClientRect().height > 0);
+    const dds = Array.from(document.querySelectorAll('[class*="select-dropdown"]')).filter((d) => !d.className.includes('hidden') && d.getBoundingClientRect().height > 0);
     const dd = dds[dds.length - 1];
-    return dd ? Array.from(dd.querySelectorAll('.ant-select-item-option')).map((o) => o.innerText.trim()) : [];
+    return dd ? Array.from(dd.querySelectorAll('[class*="item-option"]')).map((o) => o.innerText.trim()) : [];
   });
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
@@ -53,7 +53,7 @@ async function readSelect(page, idx) {
   await gen.click({ timeout: 3000 }).catch(() => {});
   await page.waitForTimeout(1500);
   out.emptySubmit = await page.evaluate(() => {
-    const notices = Array.from(document.querySelectorAll('.ant-message-notice, .ant-message span, [class*="message"]')).map((e) => e.innerText.trim()).filter(Boolean);
+    const notices = Array.from(document.querySelectorAll('[class*="message-notice"], [class*="message"] span, [class*="message"]')).map((e) => e.innerText.trim()).filter(Boolean);
     // 上传区是否出现错误提示
     const upload = document.querySelector('[class^="social-media-uploadDropzone-"]');
     return { notices: [...new Set(notices)].slice(0, 6), uploadClass: String(upload?.className), uploadBorder: upload ? getComputedStyle(upload).border : null, url: location.href };

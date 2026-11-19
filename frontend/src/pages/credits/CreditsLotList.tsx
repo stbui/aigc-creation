@@ -1,5 +1,5 @@
 import type { CreditLot } from '../../types/api';
-import { Tag } from './components';
+import { StatusBadge } from './components';
 import { LOT_STATUS, SOURCE_LABEL } from './constants';
 import { formatDate } from './utils';
 
@@ -15,9 +15,9 @@ export function CreditsLotList({ rows }: CreditsLotListProps) {
         <li key={lot.id} className="credits-mobile-item">
           <div className="credits-mobile-line">
             <span className="credits-mobile-title">{SOURCE_LABEL[lot.source] ?? lot.source}</span>
-            <Tag className={`credits-status is-${lot.status}`}>
+            <StatusBadge variant="secondary" className={`credits-status is-${lot.status}`}>
               {LOT_STATUS[lot.status] ?? LOT_STATUS.active}
-            </Tag>
+            </StatusBadge>
           </div>
           <div className="credits-mobile-meta">
             <span>

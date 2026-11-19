@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '../lib/cn';
 import { Pagination } from './pagination';
-import { Spin } from './spin';
+import { Spinner } from '~/admin-ui/components/ui/spinner';
 
 export interface TableColumn<T> {
   key?: string;
@@ -112,7 +112,7 @@ export function Table<T>({
         </table>
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/70">
-            <Spin size="small" />
+            <Spinner className="size-4" />
           </div>
         )}
       </div>

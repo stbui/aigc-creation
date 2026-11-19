@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { Lock, Mail, Smartphone, User } from 'lucide-react';
-import { Button, FormItem, Input } from '../ui';
+import { Button, FormItem, Input, InputGroup, InputGroupAddon, InputGroupInput } from '../ui';
 import type { SmsPurpose } from '../types/api';
 
 /**
@@ -57,7 +57,15 @@ export function AuthFormFields({
             { max: 20, message: '昵称最多 20 个字符' },
           ]}
         >
-          <Input prefix={<User size={15} />} placeholder="展示名称" maxLength={20} />
+          <InputGroup>
+            <InputGroupAddon>
+              {<User size={15} />}
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="展示名称"
+              maxLength={20}
+            />
+          </InputGroup>
         </FormItem>
       )}
 
@@ -71,7 +79,16 @@ export function AuthFormFields({
             { type: 'email', message: '邮箱格式不正确' },
           ]}
         >
-          <Input ref={emailRef} prefix={<Mail size={15} />} placeholder="账号（邮箱）" autoComplete="username" />
+          <InputGroup>
+            <InputGroupAddon>
+              {<Mail size={15} />}
+            </InputGroupAddon>
+            <InputGroupInput
+              ref={emailRef}
+              placeholder="账号（邮箱）"
+              autoComplete="username"
+            />
+          </InputGroup>
         </FormItem>
       )}
 
@@ -87,13 +104,17 @@ export function AuthFormFields({
             { pattern: /^(\+?86[\s-]?)?1[3-9]\d{9}$/, message: '手机号格式不正确' },
           ]}
         >
-          <Input
-            prefix={<Smartphone size={15} />}
-            placeholder="已绑定的手机号"
-            maxLength={14}
-            inputMode="tel"
-            autoComplete="tel"
-          />
+          <InputGroup>
+            <InputGroupAddon>
+              {<Smartphone size={15} />}
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="已绑定的手机号"
+              maxLength={14}
+              inputMode="tel"
+              autoComplete="tel"
+            />
+          </InputGroup>
         </FormItem>
       )}
 
@@ -107,11 +128,16 @@ export function AuthFormFields({
             { min: 6, message: '密码至少 6 位' },
           ]}
         >
-          <Input.Password
-            prefix={<Lock size={15} />}
-            placeholder="请输入密码"
-            autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-          />
+          <InputGroup>
+            <InputGroupAddon>
+              {<Lock size={15} />}
+            </InputGroupAddon>
+            <InputGroupInput
+              type="password"
+              placeholder="请输入密码"
+              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+            />
+          </InputGroup>
         </FormItem>
       )}
 
@@ -123,13 +149,17 @@ export function AuthFormFields({
           className="login-field"
           rules={[{ pattern: /^(\+?86[\s-]?)?1[3-9]\d{9}$/, message: '手机号格式不正确' }]}
         >
-          <Input
-            prefix={<Smartphone size={15} />}
-            placeholder="选填，用于短信登录"
-            maxLength={14}
-            inputMode="tel"
-            autoComplete="tel"
-          />
+          <InputGroup>
+            <InputGroupAddon>
+              {<Smartphone size={15} />}
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="选填，用于短信登录"
+              maxLength={14}
+              inputMode="tel"
+              autoComplete="tel"
+            />
+          </InputGroup>
         </FormItem>
       )}
 
@@ -137,7 +167,8 @@ export function AuthFormFields({
       {needPhoneCode && codeField('verify')}
 
       {/* 参考站 .auth-submit: 340x48 / linear-gradient(90deg,#8064f6,#5546d8) / 14px 600 / radius 8 */}
-      <Button type="primary" htmlType="submit" block className="login-submit" loading={submitting}>
+      <Button disabled={submitting} variant="default" type="submit" className="w-full login-submit" >
+        <span className="state-spinner is-small" aria-hidden />
         {mode === 'login' ? '登录' : mode === 'sms' ? '登录' : '注册并登录'}
       </Button>
     </>

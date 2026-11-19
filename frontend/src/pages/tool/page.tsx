@@ -95,7 +95,7 @@ function ToolPageContent({ def }: { def: CapabilityDef }) {
 
   return (
     <div className="tool-page">
-      <Button asChild type="text" className="tool-back">
+      <Button asChild variant="ghost" className="tool-back">
         <Link to="/workbench">
           <ArrowLeft size={15} aria-hidden />
           返回工作台

@@ -22,8 +22,8 @@
 }
 
 @media (max-width: 640px) {
-  .order-action-btns .ui-btn,
-  .order-invoice-actions .ui-btn {
+  .order-action-btns [data-slot="button"],
+  .order-invoice-actions [data-slot="button"] {
     flex: 1;
   }
 }

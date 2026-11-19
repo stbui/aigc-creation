@@ -1,5 +1,5 @@
 /**
- * C 端 ui 兼容层（ui-* / ant-* 类）。
+ * C 端 ui 兼容层（ui-* 类）。
  *
  * 从 global.css 迁出；由 global.css 在 ui/styles.css 之前 @import，
  * 保证页面皮肤仍能压过基线。
@@ -7,8 +7,8 @@
 
 /* * 生成设置的紧凑控件：参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
  *
- * 兼容壳 Input 的 DOM 是 <input class="ant-input ui-input">，Select 的触发器是
- * <button class="ui-select-trigger">（尺寸见文件末尾「表单控件」适配层）；
+ * shadcn Input 的 DOM 带 `data-slot="input"`，Select 的触发器带
+ * `data-slot="select-trigger"`（尺寸见文件末尾「表单控件」适配层）；
  * 此处只覆盖 Input，原生控件（若再引入）走下面的通用规则。 */
 
 .pk-field .ui-input {
@@ -152,7 +152,7 @@
   padding: 0 24px 18px;
 }
 
-/* Radix 弹窗的定点定位 + 旧版 UI 库类名映射。
+/* Radix 弹窗的定点定位 + C 端弹窗槽位。
    页面级 CSS 仍以 .login-modal / .alp-modal / .mum-modal 等选择器命中，
    这里只补容器定位与关闭按钮，不改这些页面的视觉数值。 */
 
@@ -432,69 +432,6 @@
   font-size: 13px;
 }
 
-.ui-tag {
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text-body);
-  font-size: 12px;
-  line-height: 1;
-}
-
-.ui-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--card-bg);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-
-.ui-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px 0;
-}
-
-.ui-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.ui-card-body {
-  padding: 16px 20px 20px;
-}
-
-.ui-card.is-small .ui-card-body {
-  padding: 14px 16px;
-}
-
-.ui-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.ui-col {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.ui-col[data-sm='6'] {
-  flex-basis: calc(50% - 6px);
-}
-
-@media (min-width: 640px) {
-  .ui-col[data-sm='6'] {
-    flex-basis: calc(25% - 9px);
-  }
-}
-
 .ui-alert {
   padding: 10px 14px;
   border: 1px solid var(--border);
@@ -637,10 +574,10 @@
  * 表现为图片型按钮被压成 36px 高的横条（结果缩略图、素材卡整张被裁掉）。
  * 这些类只加显式高度，其余尺寸仍由各自皮肤决定。 */
 
-.pk-text-link.ui-btn,
-  .pk-ai-btn.ui-btn,
-  .pk-thumb-add.ui-btn,
-  .pd-result-thumb.ui-btn,
-  .pd-result-source-thumb.ui-btn {
+.pk-text-link[data-slot="button"],
+  .pk-ai-btn[data-slot="button"],
+  .pk-thumb-add[data-slot="button"],
+  .pd-result-thumb[data-slot="button"],
+  .pd-result-source-thumb[data-slot="button"] {
   height: auto;
 }

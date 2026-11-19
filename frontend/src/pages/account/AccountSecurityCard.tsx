@@ -67,10 +67,10 @@ export function AccountSecurityCard({
                 </span>
               </div>
               <Button
-                disabled={linked}
-                loading={linkingProvider === provider.id}
+                disabled={linked || (linkingProvider === provider.id)}
                 onClick={() => onLinkOAuth(provider)}
               >
+                <span className="state-spinner is-small" aria-hidden />
                 {linked ? '已绑定' : '绑定账号'}
               </Button>
             </li>
@@ -86,7 +86,8 @@ export function AccountSecurityCard({
               导出账号资料、项目、素材元信息、生成记录、订单、积分流水与消息（JSON）。导出不含密码哈希等内部字段；素材文件本体请到素材库单独下载。
             </span>
           </div>
-          <Button loading={exporting} onClick={onExportData}>
+          <Button disabled={exporting} onClick={onExportData}>
+            <span className="state-spinner is-small" aria-hidden />
             导出我的数据
           </Button>
         </li>
@@ -100,7 +101,7 @@ export function AccountSecurityCard({
               注销后账号不可恢复：作品、素材与积分将被清除，生效中的会员权益同时终止且不退款。依据会计与消费者权益相关法规，订单、支付与积分流水会以匿名化形式保留。
             </span>
           </div>
-          <Button danger onClick={onDeleteAccount}>
+          <Button variant="destructive" onClick={onDeleteAccount}>
             注销账号
           </Button>
         </li>

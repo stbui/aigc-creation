@@ -18,7 +18,7 @@ export function StatsRecentPanel({ tasks }: StatsRecentPanelProps) {
       <header className="stats-panel-head">
         <h4 className="stats-panel-title">最近创作</h4>
         {tasks.length > 0 && (
-          <Button asChild type="link" size="small">
+          <Button asChild variant="link" size="sm">
             <Link to="/works">查看作品</Link>
           </Button>
         )}
@@ -29,7 +29,7 @@ export function StatsRecentPanel({ tasks }: StatsRecentPanelProps) {
           title="暂无创作"
           desc="完成一次创作后，最近作品会出现在这里。"
           action={
-            <Button asChild type="text">
+            <Button asChild variant="ghost">
               <Link to="/workbench">去创作</Link>
             </Button>
           }

@@ -52,7 +52,7 @@ export function ProductSkuListSection({
       <div className="product-sku-list-heading">
         <strong>SKU 清单</strong>
         <Button
-          htmlType="button"
+          type="button"
           variant="ghost"
           size="xs"
           disabled={items.length >= MAX_SKUS}

@@ -21,7 +21,7 @@
  * 表现为图片型按钮被压成 36px 高的横条（结果缩略图、素材卡整张被裁掉）。
  * 这些类只加显式高度，其余尺寸仍由各自皮肤决定。 */
 
-.alp-card.ui-btn {
+.alp-card[data-slot="button"] {
   height: auto;
 }
 

@@ -8,17 +8,8 @@
    素材库导入选择器 (asset-library-picker)
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ⚠️ **必须是紧邻合并选择器 `.alp-modal.ant-modal-container`, 不能写成后代形式。**
-   兼容壳 (`ui/primitives/modal.tsx`) 把页面级类与容器类挂在**同一个元素**上:
-     <div class="ui-modal-surface ant-modal-container ant-modal-content alp-modal">
-   故 `.alp-modal .ant-modal-container` (后代) 恒不命中 —— @2026-11-03 实测命中数 0,
-   参考站实测的 padding 0 / radius 20 / 1px #e5e8f0 边框 / 阴影 / max-height 760 /
-   纵向 flex **全部失效**, 弹窗退回 `.ui-modal-surface` 的默认
-   (radius 12 / display block / overflow auto / max-height calc(100vh - 32px))。
-   症状: 内部三段高度不受约束, 底部操作条被撑到文档流末端 —— 900px 视口实测
-   `.alp-footer` 的 bottom = 2615 (屏外 1700px 余), 「已选 N / 取消 / 确定」要点进去
-   再滚动整页才看得到。@2026-11-03 对拍修复 */
-.alp-modal.ant-modal-container {
+/* `className` 与 `ui-modal-surface` 挂在同一个容器上，直接命中 `.alp-modal`。 */
+.alp-modal {
   padding: 0 !important;
   border-radius: 20px;
   overflow: hidden;
@@ -31,12 +22,12 @@
   max-height: min(760px, calc(100vh - 40px));
 }
 
-/* header / body 是容器的**子元素**, 后代选择器在这里是对的 (与上面不同) */
-.alp-modal .ant-modal-header {
+/* header / body 是容器的**子元素** */
+.alp-modal [data-slot="c-modal-header"] {
   flex: none;
 }
 
-.alp-modal .ant-modal-body {
+.alp-modal [data-slot="c-modal-body"] {
   flex: 1 1 auto;
   min-height: 0;
   /* 旧版 UI 库的 body 默认是 block。只给外层 max-height 时，block 子级会按
@@ -56,13 +47,13 @@
   min-height: 0;
 }
 
-.alp-modal .ant-modal-header {
+.alp-modal [data-slot="c-modal-header"] {
   padding: 0;
   margin: 0;
   border-bottom: 1px solid var(--alp-border-8);
 }
 
-.alp-modal .ant-modal-body {
+.alp-modal [data-slot="c-modal-body"] {
   padding: 0;
 }
 
@@ -267,7 +258,7 @@
   margin-left: 0;
 }
 
-.alp-search-clear.ui-btn {
+.alp-search-clear[data-slot="button"] {
   flex: none;
   width: 20px;
   height: 20px;
@@ -282,7 +273,7 @@
   cursor: pointer;
 }
 
-.alp-search-clear.ui-btn:hover {
+.alp-search-clear[data-slot="button"]:hover {
   background: none;
   color: var(--alp-text-3);
 }
@@ -440,15 +431,15 @@
    * ⚠️ 必须显式 `height: auto`。
    *
    * 卡片是 shadcn `Button`（类名里带 `h-9` = 36px），而 `ui-compat.css` 的
-   * `.ui-btn` 基线也是 `height: 36px`。本卡片的高度应当由内部
+   * `[data-slot="button"]` 基线也是 `height: 36px`。本卡片的高度应当由内部
    * `.alp-cover { aspect-ratio: 1 }` 决定，自身不写 height —— 于是高度被基线
    * 钉在 36px，封面盒只能压成「宽 128 × 高 36」的横条，图片随之被压扁。
    *
-   * 这条规则原只写在 `pages/library/style.css` 的 `.alp-card.ui-btn` 里，
+   * 这条规则原只写在 `pages/library/style.css` 的 `.alp-card[data-slot="button"]` 里，
    * 而那是 `/library` 路由的懒加载样式 —— 从**工具页**（商品 SKU 等）打开
    * 同一个弹窗时该文件未加载，压扁照旧。故就近收进组件样式，对所有调用方生效。
    * 未分层规则优先于 `@layer utilities` 的 `h-9` 与 `@layer components` 的
-   * `.ui-btn`，不依赖源码顺序。@2026-11-11
+   * `[data-slot="button"]`，不依赖源码顺序。@2026-11-11
    */
   height: auto;
   text-align: left;

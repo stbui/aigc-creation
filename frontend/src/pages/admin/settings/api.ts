@@ -6,4 +6,4 @@
  * 调用形式保持 `adminSettingsApi.xxx()`。需要新的后端接口时先在这里补齐转出或封装。
  */
 
-export { adminSettingsApi } from '../../../lib/api';
+export { adminSettingsApi, adminSystemPerformanceApi } from '../../../lib/api';

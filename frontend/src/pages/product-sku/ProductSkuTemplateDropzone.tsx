@@ -11,7 +11,7 @@ interface ProductSkuTemplateDropzoneProps {
 export function ProductSkuTemplateDropzone({ onPick }: ProductSkuTemplateDropzoneProps) {
   return (
     <Button
-      htmlType="button"
+      type="button"
       variant="outline"
       className="h-auto min-h-40 w-full flex-col gap-1.5 rounded-md border-dashed bg-muted px-4 py-4 whitespace-normal text-muted-foreground hover:border-brand max-[560px]:min-h-32.5"
       onClick={onPick}

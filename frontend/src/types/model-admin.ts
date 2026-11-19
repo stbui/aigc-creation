@@ -241,6 +241,22 @@ export interface ApiLogView {
   billingSettledMicrocredits?: number | null;
 }
 
+/**
+ * 单条调用详情：在列表行上补「这次到底发了什么、上游回了什么」。
+ *
+ * 列表接口不下发这几个字段（一页几十条、每条可能上百 KB 的上游响应）。
+ */
+export interface ApiLogDetailView extends ApiLogView {
+  /** 实际发往上游的 URL；密钥类查询参数已在写库前剥离 */
+  upstreamUrl: string;
+  /** 请求 Content-Type；无请求体时为空串 */
+  requestContentType: string;
+  /** 请求报文预览；GET 轮询等无请求体时为空串 */
+  requestBody: string;
+  /** 上游响应报文预览 */
+  responseBody: string;
+}
+
 export interface ApiLogSummaryView {
   total: number;
   success: number;

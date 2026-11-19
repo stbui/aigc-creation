@@ -40,10 +40,12 @@ export function InviteHero({
           )}
         </p>
         <div className="invite-hero-actions">
-          <Button type="primary" icon={<Link2 size={15} />} onClick={onCopyLink}>
+          <Button variant="default" onClick={onCopyLink}>
+            {<Link2 size={15} />}
             复制邀请链接
           </Button>
-          <Button icon={<ImageIcon size={15} />} loading={posterBusy} onClick={onOpenPoster}>
+          <Button disabled={posterBusy} onClick={onOpenPoster}>
+            <span className="state-spinner is-small" aria-hidden />
             查看邀请海报
           </Button>
         </div>

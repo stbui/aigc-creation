@@ -35,14 +35,15 @@ export function NotificationBell() {
     <div className="app-notif-panel">
       <div className="app-notif-head">
         <span>消息通知</span>
-        <Button type="link" size="small" disabled={unread === 0} onClick={markAllRead} icon={<CheckCheck size={13} />}>
+        <Button variant="link" size="sm" disabled={unread === 0} onClick={markAllRead} >
+          {<CheckCheck size={13} />}
           全部已读
         </Button>
       </div>
       <div className="app-notif-body">
         {loading ? (
           <div className="app-notif-empty">
-            <Spin size="small" />
+            <Spin className="size-4" />
           </div>
         ) : items.length === 0 ? (
           <Empty description="暂无消息" />

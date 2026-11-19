@@ -1,6 +1,6 @@
 import { RefreshCw, Smartphone, Upload } from 'lucide-react';
 
-import { Button, Select } from './components';
+import { Button, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from './components';
 import { ASSET_KIND_OPTIONS, type AssetKind } from './constants';
 
 /**
@@ -49,38 +49,63 @@ export function LibraryToolbar({
         <div className="asset-library-header-actions">
           <Select
             value={assetKind}
-            onChange={(next) => onAssetKindChange(next as AssetKind)}
-            options={ASSET_KIND_OPTIONS}
-            aria-label="来源筛选"
-            className="asset-library-date-filter"
-          />
+            onValueChange={(next) => onAssetKindChange(next as AssetKind)}
+          >
+            <SelectTrigger
+              aria-label={'来源筛选'}
+              className={'asset-library-date-filter'}
+            >
+              <SelectValue placeholder={'请选择'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {ASSET_KIND_OPTIONS.map((option) => (
+                  <SelectItem key={String(option.value)} value={String(option.value)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           <Select
             value={capability}
-            onChange={(next) => onCapabilityChange(String(next))}
-            options={[
-              { value: 'all', label: '全部能力' },
-              ...capabilityOptions.map((item) => ({ value: item.id, label: item.name })),
-            ]}
-            aria-label="能力筛选"
-          />
+            onValueChange={(next) => onCapabilityChange(String(next))}
+          >
+            <SelectTrigger
+              aria-label={'能力筛选'}
+            >
+              <SelectValue placeholder={'请选择'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {[
+                  { value: 'all', label: '全部能力' },
+                  ...capabilityOptions.map((item) => ({ value: item.id, label: item.name })),
+                ].map((option) => (
+                  <SelectItem key={String(option.value)} value={String(option.value)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           <Button
-            icon={<RefreshCw className="size-3.5" />}
             onClick={onRefresh}
           >
+            {<RefreshCw className="size-3.5" />}
             刷新
           </Button>
           <Button
-            icon={<Smartphone className="size-3.5" />}
             onClick={onMobileUpload}
           >
+            {<Smartphone className="size-3.5" />}
             手机上传
           </Button>
-          <Button
-            type="primary"
-            icon={<Upload className="size-3.5" />}
-            loading={uploading}
+          <Button disabled={uploading}
+            variant="default"
             onClick={onUpload}
           >
+            <span className="state-spinner is-small" aria-hidden />
             上传素材
           </Button>
         </div>

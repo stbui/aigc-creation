@@ -5,6 +5,8 @@
  *   · `GET  /admin/billing-orders/:id`          账单详情
  *   · `POST /admin/billing-orders/:id/resolve`  人工核对（settle | refund，高危）
  *   · `GET  /admin/api-logs`                    上游调用记录（`ApiCallLog`）
+ *   · `GET  /admin/api-logs/:id`                单条调用详情（含请求 / 响应报文）
+ *   · `GET  /admin/api-logs/export`             调用记录 CSV（不含报文）
  *
  * 页面在 `/admin/model-calls`，走 `/admin/api-logs` —— 不能复用旧
  * `AdminModelCallsController` 的 `admin/model-calls` 路径：那套读的是旧
@@ -153,6 +155,18 @@ export class AdminApiLogsController {
   ) {
     const csv = await this.billing.exportApiLogsCsv(apiLogQueryOf(raw));
     sendCsv(res, "api-logs", csv);
+  }
+
+  /**
+   * 单条调用详情（含请求 / 响应报文）。
+   *
+   * 必须声明在 `export` 之后：`export` 也是单个路径段，若 `:id` 在前，
+   * 导出请求会先命中这里、把 "export" 当作 id 去查。
+   */
+  @Get(":id")
+  @RequirePermission(PERMISSIONS.modelCallRead)
+  detail(@Param("id") id: string) {
+    return this.billing.getApiLog(id);
   }
 }
 

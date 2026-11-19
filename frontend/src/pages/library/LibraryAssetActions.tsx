@@ -31,27 +31,27 @@ export function LibraryAssetActions({
   return (
     <div className="asset-library-hover-actions">
       <Button
-        type="text"
-        size="small"
-        icon={<Eye className="size-3" />}
+        variant="ghost"
+        size="sm"
         aria-label="查看原图地址"
         title="查看原图（新标签页打开原图）"
         onClick={onOpenOriginal}
       >
+        {<Eye className="size-3" />}
         查看
       </Button>
       <Button
-        type="text"
-        size="small"
-        icon={<Download className="size-3" />}
+        variant="ghost"
+        size="sm"
         aria-label="下载素材"
         title="下载素材"
         onClick={onDownload}
       >
+        {<Download className="size-3" />}
         下载
       </Button>
       {canReuse && reuseTo && (
-        <Button asChild type="text" size="small">
+        <Button asChild variant="ghost" size="sm">
           <Link to={reuseTo}>
             <Sparkles className="size-3" aria-hidden />
             再来一张
@@ -59,14 +59,13 @@ export function LibraryAssetActions({
         </Button>
       )}
       <Button
-        type="text"
-        size="small"
-        icon={<Trash2 className="size-3" />}
+        variant="ghost"
+        size="sm"
         className="asset-library-hover-delete"
         aria-label={deleteLabel}
         title="删除素材"
-        onClick={onRemove}
-      />
+        onClick={onRemove}>
+          {<Trash2 className="size-3" />}</Button>
     </div>
   );
 }

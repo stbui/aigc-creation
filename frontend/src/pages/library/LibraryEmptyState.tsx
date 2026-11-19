@@ -36,8 +36,7 @@ export function LibraryEmptyState({ copy, primary, onAction }: LibraryEmptyState
       </EmptyStateHeader>
       <EmptyStateContent>
         <Button
-          type={primary ? 'primary' : 'default'}
-          icon={primary ? <Upload className="size-3.5" /> : undefined}
+          variant={primary ? 'default' : 'outline'}
           className={cn(
             'asset-library-button',
             'asset-library-empty-action',
@@ -45,6 +44,7 @@ export function LibraryEmptyState({ copy, primary, onAction }: LibraryEmptyState
           )}
           onClick={onAction}
         >
+          {primary ? <Upload className="size-3.5" /> : undefined}
           {copy.action}
         </Button>
       </EmptyStateContent>

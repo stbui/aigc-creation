@@ -74,8 +74,8 @@ console.log(
       return `${s} ${Math.round(r.width)}x${Math.round(r.height)} @${Math.round(r.x)},${Math.round(r.y)} p=${c.padding} gap=${c.gap} bd=${c.borderWidth} ${c.borderColor} r=${c.borderRadius} bg=${c.backgroundColor}`;
     };
     return [
-      '.ant-modal',
-      '.alp-modal .ant-modal-content',
+      '[data-slot="c-modal-container"]',
+      '.alp-modal [data-slot="c-modal-body"]',
       '.alp-header',
       '.alp-toolbar',
       '.alp-layout',

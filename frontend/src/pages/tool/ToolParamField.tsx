@@ -1,9 +1,41 @@
+import type { ChangeEventHandler } from 'react';
 import type { CapabilityParam } from '../../types/api';
-import { Form, Input, InputNumber, Radio, Slider, Switch } from './components';
+import { Form, Input, InputNumber, Radio, Slider, Switch, Textarea, useWatch } from './components';
 import { PARAM_TEXT_MAX_LENGTH, PARAM_TEXT_ROWS } from './constants';
 
 interface ToolParamFieldProps {
   param: CapabilityParam;
+}
+
+/** 文本参数：value/onChange 由 Form.Item 注入，计数用 useWatch 订阅同一字段。 */
+function ParamTextArea({
+  paramKey,
+  maxLength,
+  placeholder,
+  value,
+  onChange,
+}: {
+  paramKey: string;
+  maxLength: number;
+  placeholder?: string;
+  value?: string;
+  onChange?: ChangeEventHandler<HTMLTextAreaElement>;
+}) {
+  const watched = useWatch(paramKey);
+  const length = typeof watched === 'string' ? watched.length : (value?.length ?? 0);
+  return (
+    <div className="login-textarea-wrap">
+      <Textarea
+        className="login-textarea field-sizing-fixed"
+        rows={PARAM_TEXT_ROWS}
+        maxLength={maxLength}
+        value={value ?? ''}
+        onChange={onChange}
+        placeholder={placeholder}
+      />
+      <span className="login-textarea-count">{length}/{maxLength}</span>
+    </div>
+  );
 }
 
 /** 按后端参数声明渲染单个表单项（enum / number / boolean / text）。 */
@@ -74,11 +106,10 @@ export function ToolParamField({ param }: ToolParamFieldProps) {
               : undefined
           }
         >
-          <Input.TextArea
-            rows={PARAM_TEXT_ROWS}
-            placeholder={param.placeholder}
+          <ParamTextArea
+            paramKey={param.key}
             maxLength={param.maxLength ?? PARAM_TEXT_MAX_LENGTH}
-            showCount
+            placeholder={param.placeholder}
           />
         </Form.Item>
       );

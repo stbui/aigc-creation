@@ -73,7 +73,7 @@ export function ProductSkuListItem({
           </InputGroupText>
         </InputGroup>
         <Button
-          htmlType="button"
+          type="button"
           variant="ghost"
           size="icon-xs"
           aria-label={`移除 SKU ${itemIndex + 1}`}

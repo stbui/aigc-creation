@@ -179,13 +179,7 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
       open={open}
       onCancel={close}
       footer={null}
-      /*
-       * 宽度写成 min() 而不是 440: 窄屏下容器要按 `100vw - 40px` 收窄。
-       * 旧写法靠 `.ant-modal.mum-modal { max-width: calc(100vw - 40px) }` 兜底,
-       * 但兼容壳的 DOM 里没有 `.ant-modal` 节点 (容器是 `.ui-modal-content`),
-       * 那条规则恒不命中 —— 窄屏时 `.mum` 按 440 排版而容器按 calc(100vw - 16px)
-       * 收窄, 右侧露出一条白色空带。这里直接由调用方给出宽度, 不依赖类名协商。
-       */
+      /* 宽度写成 min() 而不是 440: 窄屏下容器要按 `100vw - 40px` 收窄。 */
       width="min(440px, calc(100vw - 40px))"
       centered
       className="mum-modal"
@@ -198,7 +192,7 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
       title={null}
     >
       <div className="mum">
-        <Button type="text" className="mum-close" aria-label="取消手机上传" onClick={close}>
+        <Button variant="ghost" className="mum-close" aria-label="取消手机上传" onClick={close}>
           <X size={16} />
         </Button>
 
@@ -208,7 +202,7 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
         {loading && !qrDataUrl ? (
           <div className="mum-qr-box">
             <div className="mum-qr-state">
-              <Spin size="small" />
+              <Spin className="size-4" />
               <span>正在生成二维码…</span>
             </div>
           </div>
@@ -217,7 +211,7 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
             <div className="mum-qr-box">
               <div className="mum-qr-state is-error">二维码已失效，请重新生成二维码</div>
             </div>
-            <Button type="text" className="mum-refresh" onClick={() => void start()}>
+            <Button variant="ghost" className="mum-refresh" onClick={() => void start()}>
               <RefreshCw size={13} className="size-[13px]" />
               刷新二维码
             </Button>
@@ -228,7 +222,7 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
               {qrDataUrl && <img src={qrDataUrl} alt="手机上传二维码" />}
             </div>
             <div className="mum-waiting">
-              <Spin size="small" />
+              <Spin className="size-4" />
               <span>手机扫码上传 · 等待扫码完成</span>
             </div>
             {remainSec > 0 && <small className="mum-expiry">{remainSec} 秒后失效</small>}

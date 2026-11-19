@@ -2,25 +2,10 @@ import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminApiLogsApi } from './api';
 import type { AppliedFilter } from './components';
-import {
-  OPERATION_LABELS,
-  REQUEST_KIND_LABELS,
-  SOURCE_LABELS,
-  STATUS_LABELS,
-} from './constants';
-import {
-  useAdminExport,
-  useAdminList,
-  useAdminUrlFilterSync,
-  useToast,
-} from './hooks';
+import { OPERATION_LABELS, REQUEST_KIND_LABELS, SOURCE_LABELS, STATUS_LABELS } from './constants';
+import { useAdminList, useAdminUrlFilterSync } from './hooks';
 import type { ApiLogListResult, ModelCallFilterValues } from './types';
-import {
-  dateChipLabel,
-  hasAnyFilter,
-  readAppliedFilters,
-  readInitialFilters,
-} from './utils';
+import { dateChipLabel, hasAnyFilter, readAppliedFilters, readInitialFilters } from './utils';
 
 /** 重置后的空筛选：下拉项 `undefined`、文本项空串，与地址栏初值同形。 */
 const EMPTY_FILTERS: ModelCallFilterValues = {
@@ -62,7 +47,7 @@ function passThrough(params: Record<string, unknown>): ModelCallFilterValues {
 }
 
 /**
- * 调用记录的筛选草稿、已生效条件、URL 同步与导出。
+ * 调用记录的筛选草稿、已生效条件与 URL 同步。
  *
  * 草稿（`draft`）与已生效（`params`）分开：只在「查询」或回车时提交，避免每键
  * 一次请求。详情 id 不在这里 —— 它与筛选共用同一份地址栏，塞进同一个 hook
@@ -70,9 +55,7 @@ function passThrough(params: Record<string, unknown>): ModelCallFilterValues {
  */
 export function useModelCallFilters() {
   const [searchParams] = useSearchParams();
-  const [draft, setDraft] = useState<ModelCallFilterValues>(() =>
-    readInitialFilters(searchParams),
-  );
+  const [draft, setDraft] = useState<ModelCallFilterValues>(() => readInitialFilters(searchParams));
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -93,16 +76,6 @@ export function useModelCallFilters() {
   const applied = readAppliedFilters(params);
   const rows = data?.items ?? [];
   const hasFilter = hasAnyFilter(applied);
-
-  const toast = useToast();
-  const { exporting, runExport } = useAdminExport(toast);
-
-  /** 导出走当前筛选条件 —— 文件的筛选口径必须与屏幕上看到的一致 */
-  const exportCsv = () =>
-    runExport(
-      () => adminApiLogsApi.exportCsv(passThrough(params)),
-      '导出已开始下载',
-    );
 
   const patchDraft = useCallback((patch: Partial<ModelCallFilterValues>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -229,9 +202,7 @@ export function useModelCallFilters() {
           onClear: clearBillable,
         }
       : null,
-    applied.model
-      ? { key: 'model', label: `模型：${applied.model}`, onClear: clearModel }
-      : null,
+    applied.model ? { key: 'model', label: `模型：${applied.model}`, onClear: clearModel } : null,
     applied.channelId
       ? {
           key: 'channelId',
@@ -245,13 +216,9 @@ export function useModelCallFilters() {
     applied.userId
       ? { key: 'userId', label: `用户：${applied.userId}`, onClear: clearUserId }
       : null,
-    dateChip
-      ? { key: 'date', label: dateChip, onClear: clearDateRange }
-      : null,
+    dateChip ? { key: 'date', label: dateChip, onClear: clearDateRange } : null,
   ];
-  const appliedChips = chipCandidates.filter(
-    (item): item is AppliedFilter => item !== null,
-  );
+  const appliedChips = chipCandidates.filter((item): item is AppliedFilter => item !== null);
 
   return {
     draft,
@@ -263,8 +230,6 @@ export function useModelCallFilters() {
     params,
     hasFilter,
     appliedChips,
-    exporting,
-    exportCsv,
     applyFilters,
     resetFilters,
     reload,

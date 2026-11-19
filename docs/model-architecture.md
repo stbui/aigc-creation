@@ -226,7 +226,7 @@ running ──nextPollAt 到期──► 回查上游
 | 能力与模型 | `/admin/capabilities` | 能力上下线 + 候选池 + 能力售价 + 路由模拟；候选池可添加 / 移除商品、调优先级 / 权重；定价支持按次 / 按秒 / Token |
 | 用户分组 | `/admin/user-groups` | 可见渠道集合、倍率、货币换算、按模型覆盖 |
 | 插件 | `/admin/plugins` | 内置包只读；上传包可校验 / 安装 / 卸载；每项带当前环境可用性 |
-| 调用记录 | `/admin/model-calls` | 逐次上游 HTTP；`GET /admin/api-logs/export` 导出 CSV |
+| 调用记录 | `/admin/model-calls` | 逐次上游 HTTP；`GET /admin/api-logs/:id` 取单条报文预览，`GET /admin/api-logs/export` 导出 CSV |
 | 生成账单 | `/admin/billing-orders` | `uncertain` 只能人工 `settle` / `refund`，必须填原因；支持批量核对 |
 | 财务分析 | `/admin/finance` | `GET /admin/analytics/finance`：实收只算已结算，挂账单单列 |
 

@@ -14,8 +14,23 @@ type ControlProps = Record<string, unknown> & {
 
 const DOM_CONTROL_TAGS = new Set(['input', 'select', 'textarea']);
 
+/**
+ * 纯包装容器：它们自己不消费 value/onChange，注入应继续向下找到真正的控件。
+ * InputGroup 用图标 addon 包住 InputGroupInput，addon 排在 input 前面；
+ * 不穿透会把表单值误注入到 addon 的 <div> 上。
+ */
+const TRANSPARENT_COMPONENTS = new Set([
+  'InputGroup',
+  'InputGroupAddon',
+  'InputGroupButton',
+  'InputGroupText',
+]);
+
 function isControlElement(element: ReactElement<ControlProps>) {
   if (typeof element.type === 'string') return DOM_CONTROL_TAGS.has(element.type);
+  const componentName =
+    typeof element.type === 'function' ? (element.type as { name?: string }).name : undefined;
+  if (componentName && TRANSPARENT_COMPONENTS.has(componentName)) return false;
   return element.type !== Fragment;
 }
 

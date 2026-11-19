@@ -1,7 +1,7 @@
 import { Wallet } from 'lucide-react';
 
 import type { CreditBalance } from '../../types/api';
-import { Card } from './components';
+import { Surface, SurfaceContent } from './components';
 import { formatDate } from './utils';
 
 interface CreditsHeroProps {
@@ -11,7 +11,8 @@ interface CreditsHeroProps {
 /** 顶部余额卡：可用积分、最近到期日与扣减口径。 */
 export function CreditsHero({ balance }: CreditsHeroProps) {
   return (
-    <Card className="credits-hero">
+    <Surface className="credits-hero">
+      <SurfaceContent>
       <div className="credits-hero-main">
         <span className="credits-hero-icon" aria-hidden>
           <Wallet size={22} />
@@ -45,6 +46,7 @@ export function CreditsHero({ balance }: CreditsHeroProps) {
           </span>
         </div>
       )}
-    </Card>
+      </SurfaceContent>
+    </Surface>
   );
 }

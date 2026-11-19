@@ -30,6 +30,7 @@ export function ViralCloneRequirementCard({
         <div className="pk-desc-editor">
           <Textarea
             id="vc-requirement"
+            className="field-sizing-fixed"
             rows={3}
             maxLength={MAX_REQUIREMENT_LEN}
             value={requirement}

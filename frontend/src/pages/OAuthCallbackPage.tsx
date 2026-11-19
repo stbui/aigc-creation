@@ -60,7 +60,7 @@ export function OAuthCallbackPage() {
           <>
             <h1>第三方登录失败</h1>
             <p>{error}</p>
-            <Button asChild type="primary" size="large">
+            <Button asChild variant="default" size="lg">
               <Link replace to="/login">
                 返回登录
               </Link>
@@ -68,7 +68,7 @@ export function OAuthCallbackPage() {
           </>
         ) : (
           <>
-            <Spin size="large" />
+            <Spin className="size-7" />
             <p>正在完成登录…</p>
           </>
         )}

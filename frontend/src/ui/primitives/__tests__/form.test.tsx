@@ -2,6 +2,11 @@ import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { Form, FormItem, type FormInstance } from '../form';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '~/admin-ui/components/ui/input-group';
 
 describe('FormItem 兼容层', () => {
   it('label 指向真实输入框，错误信息通过 aria-describedby 关联', () => {
@@ -53,5 +58,30 @@ describe('FormItem 兼容层', () => {
 
     act(() => form.setFieldsValue({ unrelated: 1 }));
     expect(screen.queryByText('联动内容')).not.toBeInTheDocument();
+  });
+
+  it('value/onChange 穿透 InputGroup，落到内部 input 而非 addon', () => {
+    let form!: FormInstance;
+
+    function Harness() {
+      [form] = Form.useForm();
+      return (
+        <Form form={form}>
+          <FormItem name="email" label="邮箱">
+            <InputGroup>
+              <InputGroupAddon>@</InputGroupAddon>
+              <InputGroupInput />
+            </InputGroup>
+          </FormItem>
+        </Form>
+      );
+    }
+
+    render(<Harness />);
+    const input = screen.getByLabelText('邮箱');
+    expect(input.tagName).toBe('INPUT');
+
+    act(() => form.setFieldsValue({ email: 'a@b.com' }));
+    expect(input).toHaveValue('a@b.com');
   });
 });

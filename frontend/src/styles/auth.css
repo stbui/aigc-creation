@@ -13,8 +13,8 @@
 
 /* * 生成设置的紧凑控件：参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
  *
- * 兼容壳 Input 的 DOM 是 <input class="ant-input ui-input">，Select 的触发器是
- * <button class="ui-select-trigger">（尺寸见文件末尾「表单控件」适配层）；
+ * shadcn Input 的 DOM 带 `data-slot="input"`，Select 的触发器带
+ * `data-slot="select-trigger"`（尺寸见文件末尾「表单控件」适配层）；
  * 此处只覆盖 Input，原生控件（若再引入）走下面的通用规则。 */
 
 .pk-field .login-input-inner {
@@ -504,16 +504,14 @@
 /* 登录弹窗遮罩容器: 兼容壳只负责遮罩与居中, 内容区完全透明,
    卡片本体 (840x478 / radius 32 / 阴影) 由 .login-split 承担, 与独立页同一套样式。
 
-   ⚠️ 同 `.alp-modal`: 页面级类与容器类在**同一个元素**上, 必须写紧邻合并选择器。
-   原先三处 (子孙) 与 `.ant-modal-close` (该节点在这套壳里不存在, 关闭键是
-   `.ui-modal-close`) 全为死规则 —— @2026-11-03 实测命中数均为 0。
+   页面级类与容器类在**同一个元素**上, 直接命中 `.login-modal`。
    因为 LoginModal 另外用 `styles.container` 内联了同一组值, 视觉未暴露差异;
    内联值拿掉后这里才真正生效, 故两条都要保留。
 
    不要在这里写 `max-height: none`: 卡片本体 515px 高, 矮视口下
    `.ui-modal-surface` 的 `calc(100vh - 32px)` 与 `overflow: auto` 是唯一的
    兜底滚动 —— 去掉后卡片底部（含登录按钮）会被裁到视口外。 */
-.login-modal.ant-modal-container {
+.login-modal {
   padding: 0;
   background: transparent;
   box-shadow: none;
@@ -647,7 +645,7 @@
   align-items: center;
 }
 
-/* 弹层关闭按钮：保留旧 .ant-modal-close 的隐藏语义
+/* 弹层关闭按钮：保留隐藏语义
    (登录弹窗按设计不显示右上角关闭键, `closable={false}` 已不渲染;
     这条是兜底, 防止日后误开 closable 时冒出一个关闭键) */
 .login-modal .ui-modal-close {

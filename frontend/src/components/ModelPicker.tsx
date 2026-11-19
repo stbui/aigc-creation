@@ -202,7 +202,7 @@ export function ModelPicker({
           return (
             <Button
               key={model.id}
-              type="text"
+              variant="ghost"
               data-testid="model-option"
               data-model-id={model.id}
               data-available={model.available ? 'true' : 'false'}

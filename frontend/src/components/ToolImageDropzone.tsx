@@ -92,11 +92,11 @@ export function ToolImageDropzone({
           {title}
         </strong>
         <div className="pk-upload-title-actions">
-          <Button type="text" className="pk-text-link u-font-12" onClick={onOpenLibrary}>
+          <Button variant="ghost" className="pk-text-link u-font-12" onClick={onOpenLibrary}>
             从素材库导入
           </Button>
           <Button
-            type="text"
+            variant="ghost"
             className="pk-text-link u-font-12"
             title="用手机扫码上传，图片回填到上方"
             onClick={onOpenMobile}
@@ -138,7 +138,7 @@ export function ToolImageDropzone({
         />
         {uploading && (
           <div className="pk-dropzone-loading">
-            <Spin size="small" />
+            <Spin className="size-4" />
           </div>
         )}
         {images.length === 0 ? (
@@ -158,7 +158,7 @@ export function ToolImageDropzone({
                   decoding="async"
                 />
                 <Button
-                  type="text"
+                  variant="ghost"
                   className="pk-thumb-remove"
                   aria-label={`移除 ${img.name}`}
                   onClick={(e) => {
@@ -172,7 +172,7 @@ export function ToolImageDropzone({
             ))}
             {!single && images.length < max && (
               <Button
-                type="text"
+                variant="ghost"
                 className="pk-thumb-add"
                 onClick={(e) => {
                   e.stopPropagation();

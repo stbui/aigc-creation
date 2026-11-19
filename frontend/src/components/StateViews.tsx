@@ -171,7 +171,7 @@ export function StateError({
       {(onRetry || action) && (
         <div className="state-error-action">
           {onRetry && (
-            <Button type="text" className="state-btn is-primary" onClick={onRetry}>
+            <Button variant="ghost" className="state-btn is-primary" onClick={onRetry}>
               <RotateCcw size={14} className="size-[14px]" />
               重试
             </Button>
@@ -201,7 +201,7 @@ export function StateButton({
   return (
     <Button
       asChild={asChild}
-      type="text"
+      variant="ghost"
       className={`state-btn${variant === 'primary' ? ' is-primary' : ' is-ghost'}`}
       onClick={onClick}
       disabled={disabled}

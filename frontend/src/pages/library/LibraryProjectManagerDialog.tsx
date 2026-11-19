@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FolderOpen, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Button, InlineAlert, InlineAlertDescription, Input, Modal, Select, StatusBadge } from './components';
+import { Button, InlineAlert, InlineAlertDescription, Input, Modal, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, StatusBadge } from './components';
 import type { ProjectListItem } from '../../types/api';
 
 export interface LibraryProjectManagerDialogProps {
@@ -117,16 +117,15 @@ export function LibraryProjectManagerDialog({
               maxLength={80}
               placeholder="输入项目名称"
               onChange={(event) => setNewName(event.target.value)}
-              onPressEnter={create}
+              onKeyDown={(e) => { if (e.key === 'Enter') create(); }}
               disabled={busy}
             />
             <Button
-              type="primary"
-              icon={<Plus className="size-4" />}
+              variant="default"
               onClick={create}
-              loading={busy}
-              disabled={!newName.trim()}
+              disabled={!newName.trim() || busy}
             >
+              <span className="state-spinner is-small" aria-hidden />
               新建
             </Button>
           </div>
@@ -163,11 +162,12 @@ export function LibraryProjectManagerDialog({
                               value={editingName}
                               maxLength={80}
                               onChange={(event) => setEditingName(event.target.value)}
-                              onPressEnter={rename}
+                              onKeyDown={(e) => { if (e.key === 'Enter') rename(); }}
                               disabled={busy}
                             />
-                            <Button type="primary" size="small" loading={busy} onClick={rename}>保存</Button>
-                            <Button type="text" size="small" onClick={() => setEditingId(null)}>取消</Button>
+                            <Button disabled={busy} variant="default" size="sm" onClick={rename}>
+                              <span className="state-spinner is-small" aria-hidden />保存</Button>
+                            <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>取消</Button>
                           </div>
                         ) : (
                           <>
@@ -186,33 +186,31 @@ export function LibraryProjectManagerDialog({
                       {!editing && (
                         <div className="flex shrink-0 items-center gap-1">
                           <Button
-                            type="text"
-                            size="small"
-                            icon={<FolderOpen className="size-3.5" />}
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
                               onSelect(project.id);
                               onClose();
                             }}
                           >
+                            {<FolderOpen className="size-3.5" />}
                             查看
                           </Button>
                           <Button
-                            type="text"
-                            size="small"
-                            icon={<Pencil className="size-3.5" />}
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
                               setDeleteTarget(null);
                               setEditingId(project.id);
                               setEditingName(project.name);
                             }}
                           >
+                            {<Pencil className="size-3.5" />}
                             重命名
                           </Button>
                           <Button
-                            type="text"
-                            danger
-                            size="small"
-                            icon={<Trash2 className="size-3.5" />}
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
                               setEditingId(null);
                               setDeleteTarget(project);
@@ -221,6 +219,7 @@ export function LibraryProjectManagerDialog({
                               );
                             }}
                           >
+                            {<Trash2 className="size-3.5" />}
                             删除
                           </Button>
                         </div>
@@ -238,28 +237,40 @@ export function LibraryProjectManagerDialog({
                             <label className="text-xs font-medium text-foreground">
                               将 {project.assetCount} 个素材迁移到
                             </label>
-                            <Select
-                              value={moveTarget ?? undefined}
-                              onChange={(value) => setMoveTarget(String(value))}
-                              options={targetOptions}
-                              placeholder={targetOptions.length > 0 ? '选择迁移目标项目' : '没有可用的迁移目标项目'}
-                              disabled={busy || targetOptions.length === 0}
-                              aria-label="素材迁移目标项目"
-                              className="w-full"
-                            />
+                              <Select
+                                value={moveTarget ?? undefined}
+                                onValueChange={(value) => setMoveTarget(String(value))}
+                                disabled={busy || targetOptions.length === 0}
+                              >
+                                <SelectTrigger
+                                  aria-label={'素材迁移目标项目'}
+                                  className={'w-full'}
+                                >
+                                  <SelectValue placeholder={targetOptions.length > 0 ? '选择迁移目标项目' : '没有可用的迁移目标项目'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectGroup>
+                                    {targetOptions.map((option) => (
+                                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+                                </SelectContent>
+                              </Select>
                           </div>
                         )}
                         <div className="mt-3 flex justify-end gap-2">
-                          <Button type="text" size="small" onClick={() => setDeleteTarget(null)} disabled={busy}>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(null)} disabled={busy}>
                             取消
                           </Button>
                           <Button
-                            danger
-                            size="small"
-                            loading={busy}
-                            disabled={project.assetCount > 0 && !moveTarget}
+                            variant="destructive"
+                            size="sm"
+                            disabled={project.assetCount > 0 && !moveTarget || busy}
                             onClick={remove}
                           >
+                            <span className="state-spinner is-small" aria-hidden />
                             确认删除
                           </Button>
                         </div>

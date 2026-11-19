@@ -111,7 +111,7 @@ export function LibraryAssetCard({
                 />
               ) : (
                 <Button
-                  type="text"
+                  variant="ghost"
                   className="asset-library-cover-button"
                   aria-label={`查看${capabilityName(asset.capability)}素材大图`}
                   title="点击查看大图"
@@ -128,7 +128,7 @@ export function LibraryAssetCard({
               {!shouldLoad && <div className="asset-library-cover-placeholder" aria-hidden="true" />}
               <Checkbox
                 checked={selected}
-                onChange={() => onToggle(asset.id)}
+                onCheckedChange={() => onToggle(asset.id)}
                 className={cn('asset-library-check', selected && 'on')}
                 aria-label={selected ? '取消选择' : '选择该素材'}
               />

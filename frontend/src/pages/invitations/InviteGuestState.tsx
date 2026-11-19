@@ -12,7 +12,7 @@ export function InviteGuestState({ onLogin }: InviteGuestStateProps) {
         title="登录后查看邀请与签到"
         desc="邀请链接、邀请人数与每日签到都与账号绑定；带邀请码进入的新用户注册后会自动绑定。"
         action={
-          <Button type="primary" onClick={onLogin}>
+          <Button variant="default" onClick={onLogin}>
             登录/注册
           </Button>
         }

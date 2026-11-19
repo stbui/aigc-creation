@@ -15,7 +15,7 @@ import { ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
 import type { ShoppableCarouselTemplate } from './api';
 import { templateBeatsText } from './utils';
-import { Input, Select, Switch } from '../../ui';
+import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, Switch } from '../../ui';
 
 /**
  * 左栏配置区。
@@ -123,39 +123,91 @@ export function ShoppableCarouselConfig({
                 已知会让下拉「打开即关闭」; 无障碍名走 aria-label */}
             <div className="pk-field">
               <span className="pk-field-label">投放平台</span>
-              <Select
-                value={platform}
-                onChange={onPlatformChange}
-                options={PLATFORM_OPTIONS}
-                aria-label="投放平台"
-              />
+                <Select
+                  value={platform}
+                  onValueChange={onPlatformChange}
+                >
+                  <SelectTrigger
+                    aria-label={'投放平台'}
+                  >
+                    <SelectValue placeholder={'请选择'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {PLATFORM_OPTIONS.map((option) => (
+                        <SelectItem key={String(option.value)} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
             </div>
             <div className="pk-field">
               <span className="pk-field-label">目标市场</span>
-              <Select
-                value={market}
-                onChange={onMarketChange}
-                options={MARKET_OPTIONS}
-                aria-label="目标市场"
-              />
+                <Select
+                  value={market}
+                  onValueChange={onMarketChange}
+                >
+                  <SelectTrigger
+                    aria-label={'目标市场'}
+                  >
+                    <SelectValue placeholder={'请选择'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {MARKET_OPTIONS.map((option) => (
+                        <SelectItem key={String(option.value)} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
             </div>
             <div className="pk-field">
               <span className="pk-field-label">输出语言</span>
-              <Select
-                value={language}
-                onChange={onLanguageChange}
-                options={LANGUAGE_OPTIONS}
-                aria-label="输出语言"
-              />
+                <Select
+                  value={language}
+                  onValueChange={onLanguageChange}
+                >
+                  <SelectTrigger
+                    aria-label={'输出语言'}
+                  >
+                    <SelectValue placeholder={'请选择'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {LANGUAGE_OPTIONS.map((option) => (
+                        <SelectItem key={String(option.value)} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
             </div>
             <div className="pk-field">
               <span className="pk-field-label">画面比例</span>
-              <Select
-                value={ratio}
-                onChange={onRatioChange}
-                options={RATIO_OPTIONS}
-                aria-label="画面比例"
-              />
+                <Select
+                  value={ratio}
+                  onValueChange={onRatioChange}
+                >
+                  <SelectTrigger
+                    aria-label={'画面比例'}
+                  >
+                    <SelectValue placeholder={'请选择'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {RATIO_OPTIONS.map((option) => (
+                        <SelectItem key={String(option.value)} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
             </div>
           </div>
 
@@ -165,7 +217,7 @@ export function ShoppableCarouselConfig({
               <strong>图片不加文字</strong>
               <small>图片突出产品使用场景，不添加文字。</small>
             </div>
-            <Switch checked={noText} onChange={onNoTextChange} aria-label="图片不加文字" />
+            <Switch checked={noText} onCheckedChange={onNoTextChange} aria-label="图片不加文字" />
           </div>
         </div>
 
@@ -263,7 +315,7 @@ export function ShoppableCarouselConfig({
           {/* 参考站「附加功能」是**普通行**（无灰底块），只有「图片不加文字」带灰底 */}
           <div className="sc-toggle-row sc-toggle-row-plain">
             <span className="sc-toggle-label">社媒帖子发布文案</span>
-            <Switch checked={socialCaption} onChange={onSocialCaptionChange} aria-label="社媒帖子发布文案" />
+            <Switch checked={socialCaption} onCheckedChange={onSocialCaptionChange} aria-label="社媒帖子发布文案" />
           </div>
         </div>
       </div>

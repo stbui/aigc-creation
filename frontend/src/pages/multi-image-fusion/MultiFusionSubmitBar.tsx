@@ -53,7 +53,7 @@ export function MultiFusionSubmitBar({
       >
         {submitting ? (
           <>
-            <Spin size="small" />
+            <Spin className="size-4" />
             <span>生成中…</span>
           </>
         ) : (

@@ -2,6 +2,7 @@ import { request, toQuery, downloadCsv } from "./api";
 import { API_ROOT, formDataWithFile, extractErrorMessage } from "./http";
 import { getToken } from "./auth";
 import type { AdminPrompt, AdminPromptListResult, CreatePromptPayload, PromptUploadedImage, UpdatePromptPayload } from "../types/admin-prompts";
+import type { AdminSystemPerformance } from "../types/admin-performance";
 import type { AdminAigcLabel, AdminAssetListResult, AdminAssetStats, AdminBackup, AdminBackupStats, AdminLoginLogResult, AdminPasswordReset, AdminProjectListResult, AdminRoleItem, AdminSettingImageUpload, AdminSettings, AdminSettingsUpdatePayload, AdminSettingsUpdateResult, AdminStorageStatus, AdminTaskCongestion, AdminTaskDetail, AdminTaskListResult, AdminTemplateCatalog, AdminTemplateCategory, AdminTemplateGroup, AdminTemplateItem, AdminUserDetail, AdminUserListResult, AdminUserStats, AigcLabelSpec, AssetStatus, BatchSummary, Project, StorageBackendId } from "../types/api";
 import type { AdminUserImpact } from "../types/admin-users";
 
@@ -140,6 +141,16 @@ export const adminSettingsApi = {
   uploadImage: (file: File) => request<AdminSettingImageUpload>("/admin/settings/upload", { method: "POST", body: formDataWithFile("file", file) }),
   update: (payload: AdminSettingsUpdatePayload) =>
     request<AdminSettingsUpdateResult>("/admin/settings", { method: "PATCH", body: payload }),
+};
+
+/**
+ * 系统性能快照（只读）。
+ *
+ * 与系统设置同页展示，但走独立端点：设置接口的职责是读写运行时配置，
+ * 把进程 / 数据库 / 调用耗时塞进去会让「保存设置」与「采集指标」互相拖累。
+ */
+export const adminSystemPerformanceApi = {
+  read: () => request<AdminSystemPerformance>("/admin/system-performance"),
 };
 
 /**

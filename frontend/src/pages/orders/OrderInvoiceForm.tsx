@@ -1,7 +1,7 @@
 import type { Order } from '../../types/api';
 import { formatYuan } from './utils';
 import type { InvoiceFormState } from './constants';
-import { Button, Input, Select } from './components';
+import { Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from './components';
 
 /**
  * 开票信息表单。
@@ -41,15 +41,28 @@ export function OrderInvoiceForm({
             表现为「点开立刻关闭」。无障碍名走 aria-label。 */}
         <div className="order-field">
           <span>抬头类型</span>
-          <Select
-            value={form.kind}
-            onChange={(value) => onChange({ kind: value })}
-            options={[
-              { value: 'personal', label: '个人' },
-              { value: 'company', label: '企业' },
-            ]}
-            aria-label="抬头类型"
-          />
+            <Select
+              value={form.kind}
+              onValueChange={(value) => onChange({ kind: value as 'personal' | 'company' })}
+            >
+              <SelectTrigger
+                aria-label={'抬头类型'}
+              >
+                <SelectValue placeholder={'请选择'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {[
+                    { value: 'personal', label: '个人' },
+                    { value: 'company', label: '企业' },
+                  ].map((option) => (
+                    <SelectItem key={String(option.value)} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
         </div>
         <label className="order-field">
           <span>发票抬头</span>
@@ -89,11 +102,11 @@ export function OrderInvoiceForm({
       <div className="order-invoice-actions">
         <Button onClick={onCancel}>取消</Button>
         <Button
-          type="primary"
-          loading={submitting}
-          disabled={!form.title.trim()}
+          variant="default"
+          disabled={!form.title.trim() || submitting}
           onClick={onSubmit}
         >
+          <span className="state-spinner is-small" aria-hidden />
           提交开票申请
         </Button>
       </div>

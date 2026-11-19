@@ -391,13 +391,14 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ## 14. 系统设置 `/admin/settings`
 
-`GET|PATCH /admin/settings`（`setting.read` / `setting.write`）。默认值与键名只在 `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` 定义。页面按独立路由分为四个页签：
+`GET|PATCH /admin/settings`（`setting.read` / `setting.write`）。默认值与键名只在 `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` 定义。页面按独立路由分为五个页签：
 
 | 页签 | 路由 | 运行时配置 |
 | --- | --- | --- |
 | 运行与生成 | `/admin/settings/generate` | `generate.billingAutoRefund`：账单清扫任务每 5 分钟读取一次；关闭时任务账单保留在待核对队列 |
 | 上传限制 | `/admin/settings/upload` | `upload.maxSizeMb` / `upload.maxPixels` / `upload.allowedTypes`：下一次上传请求起生效，后端与网页端使用同一份快照 |
 | 备份 | `/admin/settings/backup` | `backup.frequencyDays`：调度器每 10 分钟检查一次，按最近一次成功备份判断是否到期 |
+| 系统性能 | `/admin/settings/performance` | 只读运行时快照（`GET /admin/system-performance`，`setting.read`）：进程内存 / CPU 累计时间 / 事件循环延迟、数据库 `SELECT 1` 与库文件大小、存储探活、近 24 小时任务与调用 P95、线路冷却、调度器连续失败；无写接口 |
 | 安全 | `/admin/settings/security` | 只读策略说明：令牌有效期由 `JWT_TTL` 控制，密码最小长度由发布版本中的后端 DTO 校验；本页不提供运行时编辑 |
 
 上传限制的部署硬上限为 100 MB、200,000,000 像素，后台配置只能在此范围内收紧；大小与像素总量必须填写整数。格式白名单只接受 JPG / PNG / WebP，`jpeg` 归一为 `jpg`，不允许保存空白名单或后端无法识别的格式。
@@ -413,7 +414,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 - 只读项（`readOnly`）不渲染可编辑控件，只展示当前值并给出 `linkTo` 入口；安全页签没有运行时配置项，不伪造保存入口。
 - 退款规则的读取方是 `order.service.refund`，规则对象由后台控制器取好后传入，订单域不依赖 admin 层。
 - 保存不要求填写变更原因。
-- **固定页签路由**：仅 `/admin/settings` 与 `/admin/settings/generate|upload|backup|security` 有效；访问 `/admin/settings` 时以 `replace` 进入 `/admin/settings/generate`。切换页签同样使用 `replace` 更新地址，不堆叠历史。页面不读取 `?group=`，旧设置路径与未知分组均不兼容，由后台路由显示 404。
+- **固定页签路由**：仅 `/admin/settings` 与 `/admin/settings/generate|upload|backup|performance|security` 有效；访问 `/admin/settings` 时以 `replace` 进入 `/admin/settings/generate`。切换页签同样使用 `replace` 更新地址，不堆叠历史。页面不读取 `?group=`，旧设置路径与未知分组均不兼容，由后台路由显示 404。
 
 ### 14.1 角色权限 `/admin/roles`
 
@@ -545,9 +546,11 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ### 17.5 调用记录 `/admin/api-logs`
 
-`GET /admin/api-logs`（`model.call_read`）记录每次上游调用：`requestKind`（task / tool / test / proxy）、渠道、模型、协议、耗时、结果、`RouteAttempt.failureCode` 与错误摘要，可按状态 / 类型 / 渠道 / 任务 / 用户 / 模型筛选。用于回答「这次扣的是谁、走的是哪条线路、为什么失败」。
+`GET /admin/api-logs`（`model.call_read`）记录每次上游调用：`requestKind`（task / tool / test / proxy）、渠道、模型、协议、耗时、结果、`RouteAttempt.failureCode` 与错误摘要，可按状态 / 类型 / 渠道 / 任务 / 用户 / 模型筛选。用于回答「这次扣的是谁、走的是哪条线路、为什么失败」。列表不下发请求 / 响应报文。
 
-`GET /admin/api-logs/export`（`model.call_read + data.export`）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。
+`GET /admin/api-logs/:id`（`model.call_read`）返回单条调用详情，在列表字段上补 `upstreamUrl`、`requestContentType`、`requestBody`、`responseBody`。报文是写库前已脱敏与截断的预览文本（密钥字段、内联 base64、超长响应都在写入侧处理），后台详情抽屉原样展示，不做二次裁剪。`:id` 路由必须声明在 `GET /export` 之后 —— 两者都是单段路径，反过来会让导出请求先命中详情、把 `export` 当成 id 去查。
+
+`GET /admin/api-logs/export`（`model.call_read + data.export`）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。后台页面不摆放导出按钮：该页用于逐条排障，导出能力保留在接口层，需要时按同一筛选直接调用。
 
 ### 17.6 生成账单 `/admin/billing-orders` 与财务分析 `/admin/finance`
 

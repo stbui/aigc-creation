@@ -1,6 +1,6 @@
 import '../styles/auth.css';
 import { useState } from 'react';
-import { Button, Form, FormItem, Input, useApp } from '../ui';
+import { Button, Form, FormItem, Input, InputGroup, InputGroupAddon, InputGroupInput, useApp } from '../ui';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Lock, ShieldCheck } from 'lucide-react';
 import { authApi } from '../lib/api';
@@ -80,12 +80,17 @@ export function ResetPasswordPage() {
                   { min: 6, message: '密码至少 6 位' },
                 ]}
               >
-                <Input.Password
-                  prefix={<Lock size={15} />}
-                  placeholder="至少 6 位"
-                  autoComplete="new-password"
-                  autoFocus
-                />
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<Lock size={15} />}
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    type="password"
+                    placeholder="至少 6 位"
+                    autoComplete="new-password"
+                    autoFocus
+                  />
+                </InputGroup>
               </FormItem>
               <FormItem
                 name="confirm"
@@ -101,19 +106,23 @@ export function ResetPasswordPage() {
                   },
                 ]}
               >
-                <Input.Password
-                  prefix={<Lock size={15} />}
-                  placeholder="再次输入"
-                  autoComplete="new-password"
-                />
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<Lock size={15} />}
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    type="password"
+                    placeholder="再次输入"
+                    autoComplete="new-password"
+                  />
+                </InputGroup>
               </FormItem>
-              <Button
-                type="primary"
-                htmlType="submit"
-                block
-                className="login-submit"
-                loading={submitting}
+              <Button disabled={submitting}
+                variant="default"
+                type="submit"
+                className="w-full login-submit"
               >
+                <span className="state-spinner is-small" aria-hidden />
                 重置密码
               </Button>
             </Form>

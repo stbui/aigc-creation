@@ -51,7 +51,7 @@ export function ProductSkuTemplateCard({
         <SurfaceTitle className="text-sm leading-5 font-bold">SKU模板图</SurfaceTitle>
         <SurfaceAction className="product-sku-card-heading-actions">
           <Button
-            htmlType="button"
+            type="button"
             variant="ghost"
             className="workspace-material-library-trigger h-auto hover:bg-transparent"
             onClick={onOpenLibrary}
@@ -59,7 +59,7 @@ export function ProductSkuTemplateCard({
             从素材库导入
           </Button>
           <Button
-            htmlType="button"
+            type="button"
             variant="ghost"
             className="mobile-upload-trigger mobile-upload-qr-trigger h-auto hover:bg-transparent"
             onClick={onOpenMobile}
@@ -97,7 +97,7 @@ export function ProductSkuTemplateCard({
               className="absolute inset-0 z-10 grid place-items-center rounded-md bg-background/70"
               aria-live="polite"
             >
-              <Spin size="small" />
+              <Spin className="size-4" />
             </span>
           )}
 

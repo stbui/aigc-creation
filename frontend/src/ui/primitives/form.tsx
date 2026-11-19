@@ -367,7 +367,7 @@ export function FormItem({
   return (
     <div className={cn('ui-form-item', className)}>
       {label && (
-        <label htmlFor={controlId} className="ui-form-label ant-form-item-label">
+        <label htmlFor={controlId} className="ui-form-label">
           <span>{label}</span>
         </label>
       )}
@@ -375,7 +375,7 @@ export function FormItem({
       <div className="ui-form-control">
         {injected}
         {error && (
-          <span id={errorId} className="ui-form-error ant-form-item-explain-error">
+          <span id={errorId} className="ui-form-error">
             {error}
           </span>
         )}
@@ -400,9 +400,12 @@ function injectControl(
   controlId: string,
   stateProps?: Record<string, unknown>,
 ): ReactNode {
+  // value 初始 undefined 会让原生 input 先以非受控挂载、再切受控（React 警告 + 光标跳动）。
+  // 旧 Input 壳曾逐个收敛成空串，直连 shadcn 后统一在注入处归一化。
+  const normalizedValue = propName === 'value' && value === undefined ? '' : value;
   const props: Record<string, unknown> = {
     ...stateProps,
-    [propName]: value,
+    [propName]: normalizedValue,
     onChange: (eventOrValue: unknown) => {
       if (eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue) {
         const target = (eventOrValue as { target: { value?: unknown; checked?: boolean } }).target;
@@ -412,6 +415,12 @@ function injectControl(
       onChange(eventOrValue);
     },
   };
+  // valuePropName="checked" 的控件可能是 shadcn Switch/Checkbox：它们只认
+  // onCheckedChange(boolean)，不会触发上面的 onChange。两者同时注入，原生
+  // 控件走 onChange、Radix 控件走 onCheckedChange，互不冲突。
+  if (propName === 'checked') {
+    props.onCheckedChange = (checked: boolean) => onChange(checked);
+  }
   return injectPropsIntoFirstControl(children, props, controlId);
 }
 

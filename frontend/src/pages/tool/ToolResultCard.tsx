@@ -1,7 +1,7 @@
 import { RefreshCw, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../types/api';
-import { Button, Card, ResultMedia, StateEmpty, StateSkeleton, Typography, formatDuration } from './components';
+import { Button, ResultMedia, StateEmpty, StateSkeleton, Surface, SurfaceContent, SurfaceHeader, SurfaceTitle, Typography, formatDuration } from './components';
 import { useApp } from './hooks';
 
 const { Text } = Typography;
@@ -27,7 +27,11 @@ export function ToolResultCard({
   const { message } = useApp();
 
   return (
-    <Card className="tool-result-card" title="生成结果">
+    <Surface className="tool-result-card">
+      <SurfaceHeader>
+        <SurfaceTitle>生成结果</SurfaceTitle>
+      </SurfaceHeader>
+      <SurfaceContent>
       {generating && !resultUrl ? (
         /* 生成中 → 骨架占位 (与工具页结果栏同构), 不退回空态 */
         <div className="tool-result-loading">
@@ -55,17 +59,18 @@ export function ToolResultCard({
               </Text>
             </div>
             <div className="tool-result-actions">
-              <Button size="small" icon={<RefreshCw size={13} />} onClick={onRegenerate} loading={generating}>
+              <Button disabled={generating} size="sm" onClick={onRegenerate} >
+                <span className="state-spinner is-small" aria-hidden />
                 重新生成
               </Button>
               <Button
-                size="small"
-                icon={<Trash2 size={13} />}
+                size="sm"
                 onClick={() => {
                   onClear();
                   message.info('已清空当前结果，素材仍保留在素材库');
                 }}
               >
+                {<Trash2 size={13} />}
                 清空
               </Button>
             </div>
@@ -78,6 +83,7 @@ export function ToolResultCard({
           desc="上传素材并点击生成后，结果会显示在这里。"
         />
       )}
-    </Card>
+      </SurfaceContent>
+    </Surface>
   );
 }

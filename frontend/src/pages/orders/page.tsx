@@ -301,7 +301,7 @@ export function OrdersPage() {
           : '订单与支付记录，未支付订单可在有效期内继续支付。'
       }
       extra={
-        <Button asChild type="primary">
+        <Button asChild variant="default">
           <Link to="/packages">
             <ShoppingBag size={15} aria-hidden />
             购买积分 / 会员
@@ -359,7 +359,8 @@ export function OrdersPage() {
 
       {!loading && !error && orders.length > 0 && orders.length < total && (
         <div className="order-load-more">
-          <Button loading={loadingMore} onClick={() => void load({ append: true })}>
+          <Button disabled={loadingMore} onClick={() => void load({ append: true })}>
+            <span className="state-spinner is-small" aria-hidden />
             加载更多订单（已加载 {orders.length} / {total}）
           </Button>
         </div>

@@ -31,7 +31,7 @@ export function OrderInvoiceStatus({
 }: OrderInvoiceStatusProps) {
   if (!invoice) {
     return (
-      <Button size="small" onClick={onToggle}>
+      <Button size="sm" onClick={onToggle}>
         {formOpen ? '收起开票信息' : '申请开票'}
       </Button>
     );
@@ -40,7 +40,7 @@ export function OrderInvoiceStatus({
     return (
       <span className="order-invoice-state is-issued">
         发票 {invoice.invoiceNo} 已开具
-        <Button size="small" type="link" onClick={() => previewInvoice(invoice.id)}>
+        <Button size="sm" variant="link" onClick={() => previewInvoice(invoice.id)}>
           查看
         </Button>
       </span>
@@ -54,7 +54,7 @@ export function OrderInvoiceStatus({
       <span className="order-invoice-state is-rejected">
         发票 {invoice.invoiceNo} 已冲红
         {invoice.redFlushReason ? `：${invoice.redFlushReason}` : ''}
-        <Button size="small" type="link" onClick={() => previewInvoice(invoice.id)}>
+        <Button size="sm" variant="link" onClick={() => previewInvoice(invoice.id)}>
           查看原件
         </Button>
       </span>
@@ -63,7 +63,7 @@ export function OrderInvoiceStatus({
   return (
     <span className="order-invoice-state is-rejected">
       发票被驳回：{invoice.rejectReason ?? '未说明原因'}
-      <Button size="small" onClick={onReapply}>
+      <Button size="sm" onClick={onReapply}>
         重新申请
       </Button>
     </span>

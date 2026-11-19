@@ -22,6 +22,7 @@ export const SETTINGS_TABS: ReadonlyArray<{ value: SettingsTabKey; label: string
   { value: 'generate', label: '运行与生成' },
   { value: 'upload', label: '上传限制' },
   { value: 'backup', label: '备份' },
+  { value: 'performance', label: '系统性能' },
   { value: 'security', label: '安全' },
 ];
 

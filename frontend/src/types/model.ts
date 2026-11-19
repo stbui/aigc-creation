@@ -574,4 +574,4 @@ export interface ModelIntentPayload {
 export * from "./model-catalog";
 
 // 按域拆分后的聚合出口
-export type { UserGroupModelOverrideView, UserGroupView, PluginManifestFieldView, PluginProviderView, PluginVerifyResultView, PluginView, PluginProtocolStatusView, PluginListResult, BillingOrderView, BillingBatchResolveResult, BillingOrderListResult, ApiLogView, ApiLogSummaryView, ApiLogListResult } from "./model-admin";
+export type { UserGroupModelOverrideView, UserGroupView, PluginManifestFieldView, PluginProviderView, PluginVerifyResultView, PluginView, PluginProtocolStatusView, PluginListResult, BillingOrderView, BillingBatchResolveResult, BillingOrderListResult, ApiLogView, ApiLogDetailView, ApiLogSummaryView, ApiLogListResult } from "./model-admin";

@@ -141,7 +141,7 @@
 | 能力与模型 `/admin/capabilities` | 以能力为主实体：卡片展示 18 项能力的运行状态与上下线动作，并内联消费的模型商品、用户实付与售卖状态。底层维护 `LogicalModel` + 发布快照（revision）+ 线路（route），可用「消费测试」只读验证落点；旧地址 `/admin/logical-models` 重定向到本页并保留 query/hash |
 | 用户分组 `/admin/user-groups` | 分组决定倍率、可见渠道与按模型的覆盖价格；没有有效会员的用户落在 `default` 分组，默认分组不可删除 |
 | 插件 `/admin/plugins` | 协议来源：启停即重注册协议，渠道模型可选的协议列表随之变化；支持安装、校验与查看服务商目录 |
-| 调用记录 `/admin/model-calls` | `ApiCallLog` 列表与详情：能力、协议、渠道、耗时、结果、`RouteAttempt.failureCode` 与错误摘要；CSV 导出与列表同口径（`model.call_read + data.export`），不含请求体 / 响应体 |
+| 调用记录 `/admin/model-calls` | `ApiCallLog` 列表与详情：能力、协议、渠道、耗时、结果、`RouteAttempt.failureCode` 与错误摘要；详情抽屉另显请求 / 响应报文（`GET /admin/api-logs/:id`）；页面不提供导出入口（列表与详情逐条排障用），接口 `GET /admin/api-logs/export` 仍按列表同口径输出 CSV（`model.call_read + data.export`），不含请求体 / 响应体 |
 | 生成账单 `/admin/billing-orders` | `BillingOrder` 列表与详情；`uncertain` 账单只能人工结算或退款 |
 | 财务分析 `/admin/finance` | 实收 = 已结算账单、已退 = 订单退款、净收入 = 实收 − 已退；预留 / 运行 / 待核对单列为「挂账」，不计入实收 |
 | 能力与模型的上下线 | 下架原因由页面统一生成；下线后 C 端 `runtime.effective=disabled`，任务在扣费前被拦截并返回 `40005`。能力开关与售卖配置分别校验 `capability.write` / `logical_model.write`，不做混合保存 |

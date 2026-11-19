@@ -53,6 +53,8 @@ import { AdminGuard } from './admin.guard';
 import { PermissionGuard } from './permission.guard';
 import { AdminRoleService } from './admin-role.service';
 import { AdminOverviewService } from './overview.service';
+import { SystemPerformanceController } from './system-performance.controller';
+import { SystemPerformanceService } from './system-performance.service';
 import { AdminUsersService } from './users.service';
 import { AdminSettingsService } from './settings.service';
 import { BackupService } from './backup.service';
@@ -112,6 +114,8 @@ import { SchedulerService } from './scheduler.service';
     AdminUsersController,
     AdminRolesController,
     AdminSettingsController,
+    // 系统性能：只读运行时 / 数据面快照（settings 页的性能页签）
+    SystemPerformanceController,
     AdminBackupController,
     AdminAssetsController,
     AdminStorageController,
@@ -155,6 +159,7 @@ import { SchedulerService } from './scheduler.service';
     AdminOverviewService,
     AdminUsersService,
     AdminSettingsService,
+    SystemPerformanceService,
     BackupService,
     AdminAssetsService,
     AdminCommerceService,

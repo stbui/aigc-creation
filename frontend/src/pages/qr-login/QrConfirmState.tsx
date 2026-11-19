@@ -45,18 +45,17 @@ export function QrConfirmState({ scan, scanError, busy, onDecide }: QrConfirmSta
       )}
 
       <div className="qr-confirm-actions">
-        <Button block size="large" disabled={busy} onClick={() => onDecide(false)}>
+        <Button className="w-full" size="lg" disabled={busy} onClick={() => onDecide(false)}>
           不是我，取消
         </Button>
         <Button
-          type="primary"
-          block
-          size="large"
-          className="login-submit"
-          loading={busy}
-          disabled={Boolean(scanError) || !scan}
+          variant="default"
+          className="w-full login-submit"
+          size="lg"
+          disabled={Boolean(scanError) || !scan || busy}
           onClick={() => onDecide(true)}
         >
+          <span className="state-spinner is-small" aria-hidden />
           确认登录
         </Button>
       </div>
