@@ -90,7 +90,7 @@ export function ProductStatusStrip({
             className={cn(
               'h-auto min-w-0 gap-1.5 rounded-lg border-border bg-card px-2.5 py-1 text-[12px] leading-4 font-normal',
               'text-muted-foreground hover:bg-muted hover:text-muted-foreground',
-              'data-[state=on]:border-brand/30 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground',
+              'data-[state=on]:border-radar-ink-300 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground',
               item.count === 0 && !selected && 'opacity-60',
             )}
           >

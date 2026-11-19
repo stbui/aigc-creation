@@ -6,8 +6,8 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '../../admin-ui/components/ui/dropdown-menu';
-import { cn } from '../../admin-ui/lib/cn';
+  cn,
+} from '../../admin-ui/radar';
 import { ALERT_SEVERITY_META } from './AlertCenter';
 import { useAdminAlerts } from '../../hooks';
 

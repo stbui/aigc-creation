@@ -17,7 +17,6 @@ import {
   useChannelSelection,
   useChannelView,
   useConfirm,
-  useDiscardConfirm,
   useToast,
   useUnsavedGuard,
 } from './hooks';
@@ -104,7 +103,6 @@ export function useChannelWorkspace() {
     setCreating(false);
     setEditing(null);
   };
-  const requestCloseForm = useDiscardConfirm(formDirty, resetForm);
 
   const updateDraft = (patch: Partial<ChannelDraft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -346,7 +344,7 @@ export function useChannelWorkspace() {
     updateDraft,
     openCreate,
     openEdit,
-    requestCloseForm,
+    resetForm,
     submit,
     duplicate,
     deleteTarget,

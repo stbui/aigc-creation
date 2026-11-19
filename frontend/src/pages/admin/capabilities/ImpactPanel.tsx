@@ -163,7 +163,7 @@ export function ImpactPanel({
                   </div>
                   <Link
                     to={`/admin/channels?view=channels&id=${encodeURIComponent(row.channelId)}`}
-                    className="truncate text-xs text-brand hover:underline"
+                    className="truncate text-xs text-radar-ink-950 hover:underline"
                     title="查看供应商"
                   >
                     {row.channelName || row.channelId}

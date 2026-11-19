@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 
 import { STATS_PAGE_META } from './constants';
@@ -25,7 +25,6 @@ import { StatsTrendPanel } from './StatsTrendPanel';
  */
 export function StatsPage() {
   useDocumentMeta('数据中心 · 货觉AI', '查看作品积累、创作趋势与常用能力。');
-  const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const { stats, loading, refreshing, lastUpdated, error, refresh, reload } = useStatsOverview(token);
 
@@ -121,8 +120,8 @@ export function StatsPage() {
           <Button icon={<RefreshCw size={14} />} loading={refreshing} onClick={refresh}>
             刷新数据
           </Button>
-          <Button type="primary" onClick={() => navigate('/workbench')}>
-            去创作
+          <Button asChild type="primary">
+            <Link to="/workbench">去创作</Link>
           </Button>
         </div>
       }

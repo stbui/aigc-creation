@@ -99,7 +99,7 @@ export function PlanCardGrid({
  * 会员卡。
  *
  * 层级按运营视角排：**价格最强**，积分与有效期次之，权益与用量最弱。
- * 在售卡用品牌色 + 卡面渐变与同心圆水印；下架卡整体转灰但保留可读性。
+ * 在售卡用近墨黑 + 卡面灰渐变与同心圆水印；下架卡整体转灰但保留可读性。
  */
 function PlanCard({
   row,
@@ -128,22 +128,22 @@ function PlanCard({
       className={cn(
         'group relative flex h-full flex-col gap-0 overflow-hidden rounded-xl border py-0 transition-all duration-200',
         active
-          ? 'border-border bg-card shadow-card hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg'
+          ? 'border-border bg-card hover:-translate-y-0.5 hover:border-primary/30'
           : 'border-border/80 bg-muted/25 shadow-none hover:border-border',
       )}
     >
-      {/* 卡面顶边：在售卡走品牌渐变，下架卡走中性细线 */}
+      {/* 卡面顶边：在售卡走近墨黑渐变，下架卡走中性细线 */}
       <div
         aria-hidden
         className={cn(
           'h-1 w-full shrink-0',
           active
-            ? 'bg-gradient-to-r from-brand via-brand-light to-brand/40'
+            ? 'bg-gradient-to-r from-radar-ink-950 via-radar-ink-400 to-radar-ink-950/40'
             : 'bg-border',
         )}
       />
 
-      {/* 卡面装饰：淡品牌渐变 + 同心圆水印，替代整块彩色区块，保留会员卡质感 */}
+      {/* 卡面装饰：淡中性灰渐变 + 同心圆水印，替代整块彩色区块，保留会员卡质感 */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-1 h-32 overflow-hidden"
@@ -152,7 +152,7 @@ function PlanCard({
           className={cn(
             'absolute inset-0',
             active
-              ? 'bg-gradient-to-b from-brand-bg/80 via-brand-bg/25 to-transparent'
+              ? 'bg-gradient-to-b from-radar-ink-100/80 via-radar-ink-100/25 to-transparent'
               : 'bg-gradient-to-b from-muted/60 to-transparent',
           )}
         />
@@ -224,7 +224,7 @@ function PlanCard({
         <div
           className={cn(
             'flex items-baseline gap-1',
-            active ? 'text-brand' : 'text-muted-foreground',
+            active ? 'text-radar-ink-950' : 'text-muted-foreground',
           )}
         >
           <span className="text-[15px] font-semibold">¥</span>
@@ -243,7 +243,7 @@ function PlanCard({
               className={cn(
                 'flex size-7 shrink-0 items-center justify-center rounded-md',
                 active
-                  ? 'bg-brand-bg text-brand'
+                  ? 'bg-radar-ink-100 text-radar-ink-950'
                   : 'bg-card text-muted-foreground',
               )}
             >
@@ -268,7 +268,7 @@ function PlanCard({
               className={cn(
                 'flex size-7 shrink-0 items-center justify-center rounded-md',
                 active
-                  ? 'bg-brand-bg text-brand'
+                  ? 'bg-radar-ink-100 text-radar-ink-950'
                   : 'bg-card text-muted-foreground',
               )}
             >

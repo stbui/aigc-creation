@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 import { A } from './constants';
@@ -10,8 +10,6 @@ interface LandingFeaturesProps {
 
 /** 产品特性：宽卡 + 两张补充卡，CTA 跟随能力可见性。 */
 export function LandingFeatures({ canUse }: LandingFeaturesProps) {
-  const navigate = useNavigate();
-
   return (
     <section className="lp-section">
       <header className="lp-section-head is-center">
@@ -28,14 +26,10 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
             <li>风格统一，适合店铺、广告、详情页同步使用</li>
           </ul>
           {canUse('main_image') && (
-            <button
-              type="button"
-              className="lp-btn lp-btn-primary"
-              onClick={() => navigate('/product-kit')}
-            >
+            <Link className="lp-btn lp-btn-primary" to="/product-kit">
               去试试
               <ArrowRight size={15} aria-hidden />
-            </button>
+            </Link>
           )}
         </div>
         <div className="lp-feature-media">
@@ -64,14 +58,10 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
             <li>提升页面完整度，减少设计制作时间</li>
           </ul>
           {canUse('detail_image') && (
-            <button
-              type="button"
-              className="lp-text-link"
-              onClick={() => navigate('/product-detail')}
-            >
+            <Link className="lp-text-link" to="/product-detail">
               去试试
               <ArrowRight size={14} aria-hidden />
-            </button>
+            </Link>
           )}
         </article>
         <article className="lp-feature-card">
@@ -82,14 +72,10 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
             <li>保留原图氛围，替换主体不违和</li>
           </ul>
           {canUse('hot_remake') && (
-            <button
-              type="button"
-              className="lp-text-link"
-              onClick={() => navigate('/viral-clone')}
-            >
+            <Link className="lp-text-link" to="/viral-clone">
               去试试
               <ArrowRight size={14} aria-hidden />
-            </button>
+            </Link>
           )}
         </article>
       </div>

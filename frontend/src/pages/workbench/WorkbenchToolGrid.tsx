@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { CapabilityDef } from '../../types/api';
 import { WORKBENCH_ART } from './constants';
 import { runtimeOf, toolPath } from './utils';
@@ -16,8 +16,6 @@ export interface WorkbenchToolGridProps {
 }
 
 export function WorkbenchToolGrid({ cards }: WorkbenchToolGridProps) {
-  const navigate = useNavigate();
-
   return (
     <section className="wb-tool-section" aria-label="创作工具">
       <div className="wb-tool-grid">
@@ -27,21 +25,15 @@ export function WorkbenchToolGrid({ cards }: WorkbenchToolGridProps) {
           const rt = runtimeOf(c);
           const closed = c.mode === 'planned' || rt.effective === 'disabled';
           const unavailable = rt.effective === 'unavailable';
-          return (
-            <button
-              key={c.id}
-              type="button"
-              className={`wb-tool-card wb-card-${c.mode}`}
-              onClick={() => (closed ? undefined : navigate(toolPath(c.id)))}
-              disabled={closed}
-              title={
-                rt.effective === 'disabled'
-                  ? rt.reason || '该能力已下线'
-                  : unavailable
-                    ? rt.reason || '该能力暂无可用模型通道'
-                    : undefined
-              }
-            >
+          const title =
+            rt.effective === 'disabled'
+              ? rt.reason || '该能力已下线'
+              : unavailable
+                ? rt.reason || '该能力暂无可用模型通道'
+                : undefined;
+          const className = `wb-tool-card wb-card-${c.mode}`;
+          const body = (
+            <>
               <div className={`wb-tool-visual${art ? '' : ' wb-tool-visual--empty'}`}>
                 {art ? (
                   <img src={art.image} alt={`${c.name}示例`} loading="lazy" />
@@ -66,7 +58,17 @@ export function WorkbenchToolGrid({ cards }: WorkbenchToolGridProps) {
                 {/* 卡片固定高 108px, 描述单行省略; 原句走原生 tooltip 兜底 */}
                 <span title={c.summary}>{c.summary}</span>
               </div>
+            </>
+          );
+          // 不可用的能力没有目标路由, 保留原生按钮的 disabled 语义。
+          return closed ? (
+            <button key={c.id} type="button" className={className} disabled title={title}>
+              {body}
             </button>
+          ) : (
+            <Link key={c.id} className={className} to={toolPath(c.id)} title={title}>
+              {body}
+            </Link>
           );
         })}
       </div>

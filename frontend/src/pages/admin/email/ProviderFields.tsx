@@ -57,7 +57,7 @@ export function ProviderFields({
     <div className="mt-4 border-t border-border pt-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-2">
-          <ProviderIcon className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+          <ProviderIcon className="mt-0.5 size-4 shrink-0 text-radar-ink-950" aria-hidden />
           <p className="m-0 text-[12px] leading-5 text-muted-foreground">{meta.detail}</p>
         </div>
         {provider === 'smtp' ? (

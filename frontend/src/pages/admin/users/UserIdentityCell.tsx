@@ -9,7 +9,7 @@ export function UserIdentityCell({ user }: { user: AdminUserRow }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
       <span
-        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-[13px] font-semibold text-brand"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-[13px] font-semibold text-radar-ink-950"
         aria-hidden
       >
         {initial}

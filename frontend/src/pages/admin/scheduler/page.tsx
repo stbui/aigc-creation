@@ -18,8 +18,8 @@ import {
   Panel,
   StaleError,
   ToneBadge,
+  cn,
 } from '~/admin-ui/radar';
-import { cn } from '../../../admin-ui/lib/cn';
 import type { AdminSchedulerTask } from '../../../types/api';
 
 /** 相对时间 —— 运维看的是「多久没跑了」，不是绝对时间 */

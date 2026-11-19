@@ -101,7 +101,7 @@ export function ChannelModelTagsEditor({
                   key={`${tag.text}-${index}`}
                   className="rounded-full border border-border px-2 py-0.5 text-[12px]"
                   style={{
-                    color: `var(--tag-${tag.color}, var(--brand))`,
+                    color: `var(--tag-${tag.color}, var(--text-strong))`,
                     borderColor: `var(--tag-${tag.color}-border, var(--border))`,
                   }}
                 >

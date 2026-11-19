@@ -112,7 +112,7 @@ export function ProjectDeleteConfirm({ target, onCancel, onDeleted }: ProjectDel
       onConfirm={() => void remove()}
       extra={
         needsMove ? (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             <div className="rounded-lg border border-warn-soft bg-warn-soft/60 px-3 py-2 text-xs leading-5 text-warn-text">
               有素材的项目不能直接删除，请选择一个同用户的未删除项目接收素材。
             </div>

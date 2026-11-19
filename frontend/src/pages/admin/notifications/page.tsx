@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { CHANNEL_LABEL, CHANNEL_OPTIONS, BUILTIN_CODES } from './constants';
 import { fmtTime } from './utils';
-import { useAdmin, useDiscardConfirm, useUnsavedGuard, useToast, useAdminResource } from './hooks';
+import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { adminNotificationsApi } from './api';
 import { deliveryProviderLabel, emailErrorText } from '../email';
 
@@ -28,7 +28,6 @@ import type { BroadcastResult, DeliveryChannelStatusMap, EmailTestResult, Messag
 export function AdminNotificationsPage() {
   const toast = useToast();
   const { can } = useAdmin();
-  const navigate = useNavigate();
   const writable = can('message.write');
 
   /* ── 广播 ── */
@@ -70,7 +69,6 @@ export function AdminNotificationsPage() {
     formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
   );
   useUnsavedGuard(formDirty);
-  const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
   /*
    * 通道状态单独拉: 它失败不该把模板列表也拖成错误态（反之亦然）。
@@ -251,8 +249,8 @@ export function AdminNotificationsPage() {
       description="发送全站活动消息，并维护注册、支付、积分、工单等业务通知模板。"
       actions={
         <div className="flex items-center gap-2">
-          <ActionButton variant="outline" size="sm" onClick={() => navigate('/admin/email')}>
-            邮箱配置
+          <ActionButton asChild variant="outline" size="sm">
+            <Link to="/admin/email">邮箱配置</Link>
           </ActionButton>
           {writable ? (
             <ActionButton variant="default" size="sm" onClick={() => openCreate()}>
@@ -275,8 +273,8 @@ export function AdminNotificationsPage() {
       <Panel title="投递通道" note="无法确认当前是否真实投递">
         <Notice tone="danger" title="通道状态读取失败" className="mb-0">
           请刷新重试；在状态恢复前，请勿将“发送成功”视为用户已收到。
-          <ActionButton variant="ghost" size="xs" className="ml-2" onClick={() => navigate('/admin/email')}>
-            打开邮箱配置
+          <ActionButton asChild variant="ghost" size="xs" className="ml-2">
+            <Link to="/admin/email">打开邮箱配置</Link>
           </ActionButton>
         </Notice>
       </Panel>
@@ -529,7 +527,7 @@ export function AdminNotificationsPage() {
 
     <FormDrawer
       open={formOpen}
-      onClose={requestCloseForm}
+      onClose={() => setFormOpen(false)}
       size="md"
       title={editing ? `编辑模板 ${editing.code}` : '新建消息模板'}
       busy={saving}

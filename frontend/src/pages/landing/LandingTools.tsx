@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 import { A, type ToolEntry } from './constants';
@@ -9,8 +9,6 @@ interface LandingToolsProps {
 
 /** 修图工具：一屏内完成工具选择。 */
 export function LandingTools({ entries }: LandingToolsProps) {
-  const navigate = useNavigate();
-
   return (
     <section className="lp-section lp-section-tight">
       <div className="lp-tools-head">
@@ -25,12 +23,7 @@ export function LandingTools({ entries }: LandingToolsProps) {
       </div>
       <div className="lp-tool-grid">
         {entries.map((entry) => (
-          <button
-            key={entry.label}
-            type="button"
-            className="lp-tool"
-            onClick={() => navigate(entry.to)}
-          >
+          <Link key={entry.label} className="lp-tool" to={entry.to}>
             <img
               src={`${A}/icons/${entry.icon}.svg`}
               alt=""
@@ -39,7 +32,7 @@ export function LandingTools({ entries }: LandingToolsProps) {
               decoding="async"
             />
             <span>{entry.label}</span>
-          </button>
+          </Link>
         ))}
       </div>
     </section>

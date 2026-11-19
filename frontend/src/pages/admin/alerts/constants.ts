@@ -4,17 +4,19 @@
 
 import type { AdminAlertItem, AdminAlertSeverity } from '../../../types/api';
 
-export const SEVERITY_SURFACE: Record<AdminAlertSeverity, { card: string; icon: string }> = {
-  critical: { card: 'border-danger-soft bg-danger-soft/40', icon: 'text-danger-text' },
-  warning: { card: 'border-warn-soft bg-warn-soft/40', icon: 'text-warn-text' },
-  info: { card: 'border-border bg-card', icon: 'text-brand' },
+/** 严重级别 → 中性风格徽章底色（语义色成对：浅底 + 深字）。 */
+export const SEVERITY_BADGE_STYLE: Record<AdminAlertSeverity, string> = {
+  critical: 'bg-radar-alert-subtle text-radar-alert',
+  warning: 'bg-radar-code-subtle text-radar-code',
+  info: 'bg-radar-ink-100 text-radar-ink-600',
 };
 
-export const SEVERITY_BADGE = {
-  critical: 'danger',
-  warning: 'warn',
-  info: 'brand',
-} as const;
+/** 严重级别 → 列表行图标色。 */
+export const SEVERITY_ICON_STYLE: Record<AdminAlertSeverity, string> = {
+  critical: 'text-radar-alert',
+  warning: 'text-radar-code',
+  info: 'text-radar-ink-500',
+};
 
 export const SEVERITY_TONE: Record<AdminAlertSeverity, 'danger' | 'warn' | undefined> = {
   critical: 'danger',

@@ -12,8 +12,8 @@ import { PREVIEW_PALETTE, RENDER_SCALE } from './constants';
 export { hexToRgba };
 
 /** 按样式把角标画成一张 PNG（透明底） */
-export { formatDateTime } from '../../../admin-ui/lib/format';
-export { cn } from '~/admin-ui/lib/cn';
+export { formatDateTime } from '~/admin-ui/radar';
+export { cn } from '~/admin-ui/radar';
 export function renderBadgeCanvas(spec: AigcLabelSpec): HTMLCanvasElement {
   const S = RENDER_SCALE;
   const fontSize = spec.fontSize * S;

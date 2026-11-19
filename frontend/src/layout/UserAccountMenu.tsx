@@ -14,18 +14,17 @@ import {
   ShieldCheck,
   Wallet,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../context/AdminContext';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
 import { useAccountMembership } from './hooks';
+import { formatLongDate, formatNumber } from '../lib/format';
 import { Avatar, Dropdown } from '../ui';
 
 function formatExpiry(iso: string | null | undefined): string {
   if (!iso) return '长期有效';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '待确认';
-  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  return formatLongDate(iso, '待确认');
 }
 
 function menuLabel(title: string, hint: string): ReactNode {
@@ -59,11 +58,6 @@ export function UserAccountMenu() {
     if (next) void reloadMembership();
   };
 
-  const go = (path: string) => {
-    setOpen(false);
-    navigate(path);
-  };
-
   const isAdminRole = !adminLoading && me !== null;
   const isMember = membership?.isMember === true;
   const planName = membershipLoading && !membership
@@ -90,7 +84,7 @@ export function UserAccountMenu() {
     : membershipFailed && !membership
       ? '暂未获取'
       : isMember && membership?.monthlyCredits
-        ? `${membership.monthlyCredits.toLocaleString('zh-CN')} 积分`
+        ? `${formatNumber(membership.monthlyCredits)} 积分`
         : isMember
           ? '暂无月度赠送'
           : '未开通';
@@ -116,7 +110,7 @@ export function UserAccountMenu() {
               </div>
               <div className="app-user-menu-balance">
                 <span>积分余额</span>
-                <strong>{balance ? balance.balance.toLocaleString('zh-CN') : '—'}</strong>
+                <strong>{formatNumber(balance?.balance)}</strong>
               </div>
             </div>
 
@@ -151,14 +145,10 @@ export function UserAccountMenu() {
                 <p className="app-user-menu-package-note">已取消自动续费，当前权益可使用至到期日</p>
               )}
 
-              <button
-                type="button"
-                className="app-user-menu-package-action"
-                onClick={() => go('/packages')}
-              >
+              <Link className="app-user-menu-package-action" to="/packages">
                 {isMember ? '续费或升级套餐' : '选购套餐'}
                 <ArrowUpRight size={14} aria-hidden="true" />
-              </button>
+              </Link>
             </div>
           </div>
         ),
@@ -167,31 +157,31 @@ export function UserAccountMenu() {
             key: 'account',
             icon: linkIcon(<Settings size={16} />),
             label: menuLabel('账户设置', '资料、安全与通知偏好'),
-            onClick: () => go('/account'),
+            to: '/account',
           },
           {
             key: 'works',
             icon: linkIcon(<Images size={16} />),
             label: menuLabel('我的作品', '查看全部创作结果'),
-            onClick: () => go('/works'),
+            to: '/works',
           },
           {
             key: 'orders',
             icon: linkIcon(<Receipt size={16} />),
             label: menuLabel('我的订单', '订单、支付与发票'),
-            onClick: () => go('/orders'),
+            to: '/orders',
           },
           {
             key: 'credits',
             icon: linkIcon(<Wallet size={16} />),
             label: menuLabel('积分明细', '余额、充值与消费记录'),
-            onClick: () => go('/credits'),
+            to: '/credits',
           },
           {
             key: 'tickets',
             icon: linkIcon(<LifeBuoy size={16} />),
             label: menuLabel('我的工单', '问题反馈与客服回复'),
-            onClick: () => go('/tickets'),
+            to: '/tickets',
           },
           ...(isAdminRole
             ? [
@@ -200,7 +190,7 @@ export function UserAccountMenu() {
                   key: 'admin',
                   icon: linkIcon(<ShieldCheck size={16} />),
                   label: menuLabel('进入运营后台', '管理与运营工作台'),
-                  onClick: () => go('/admin'),
+                  to: '/admin',
                 },
               ]
             : []),

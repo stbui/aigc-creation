@@ -1023,6 +1023,7 @@
   background: var(--card-bg);
   color: var(--wb-text);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   font: inherit;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
@@ -1200,7 +1201,9 @@
 }
 
 .wb-panel-title button,
-  .wb-flow-head button {
+  .wb-panel-title a,
+  .wb-flow-head button,
+  .wb-flow-head a {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -1209,6 +1212,7 @@
   background: none;
   color: var(--text-muted);
   font-size: 12px;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -1393,6 +1397,7 @@
   background: none;
   color: var(--wb-text);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 

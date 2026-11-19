@@ -1,13 +1,6 @@
 import { useState } from 'react';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  ConfirmAlert,
   FormField,
   SelectField,
   StatusTag,
@@ -35,26 +28,20 @@ export function UserRoleConfirm({
   const [next, setNext] = useState<AdminUserRole>(target.role);
 
   return (
-    <AlertDialog
-      open
-      onOpenChange={(open) => {
-        if (!open && !loading) onCancel();
-      }}
-    >
-      <AlertDialogContent
-        data-testid="admin-role-dialog"
-        className="admin-portal w-[calc(100%-2rem)] max-w-[400px] gap-0 overflow-hidden p-0"
-      >
-        <AlertDialogHeader className="px-5 py-4 text-left">
-          <AlertDialogTitle className="text-base">变更角色</AlertDialogTitle>
-          <AlertDialogDescription>
-            确定要变更 <strong>{target.email}</strong> 的角色吗？变更后立即生效。
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <div className="flex flex-col gap-4 border-y border-border bg-muted/30 px-5 py-4">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">当前角色</span>
+    <ConfirmAlert
+      testId="admin-role-dialog"
+      title="变更角色"
+      icon={null}
+      danger={false}
+      description={
+        <p>
+          确定要变更 <strong>{target.email}</strong> 的角色吗？变更后立即生效。
+        </p>
+      }
+      body={
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2 text-[13px]">
+            <span className="text-radar-ink-500">当前角色</span>
             <StatusTag status={target.role} />
           </div>
           <FormField label="目标角色">
@@ -70,24 +57,12 @@ export function UserRoleConfirm({
             />
           </FormField>
         </div>
-
-        <AlertDialogFooter className="bg-muted/40 px-5 py-3">
-          <AlertDialogCancel size="sm" disabled={loading} onClick={onCancel}>
-            取消
-          </AlertDialogCancel>
-          <AlertDialogAction
-            size="sm"
-            disabled={loading || next === target.role}
-            onClick={(event) => {
-              // 请求结束后再由父级关闭，避免加载期间弹框提前消失。
-              event.preventDefault();
-              onConfirm(next);
-            }}
-          >
-            {loading ? '变更中…' : '确认变更'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      }
+      confirmText={loading ? '变更中…' : '确认变更'}
+      loading={loading}
+      confirmDisabled={next === target.role}
+      onCancel={onCancel}
+      onConfirm={() => onConfirm(next)}
+    />
   );
 }

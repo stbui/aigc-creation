@@ -56,7 +56,7 @@ export function TicketTable({
           <Button
             variant="link"
             size="sm"
-            className="h-auto max-w-[260px] justify-start overflow-hidden p-0 text-brand"
+            className="h-auto max-w-[260px] justify-start overflow-hidden p-0 text-radar-ink-950"
             title={row.subject}
             onClick={() => onOpen(row.id)}
           >
@@ -77,7 +77,7 @@ export function TicketTable({
         <div className="flex flex-col gap-0.5">
           <span>{row.userName || '—'}</span>
           <Link
-            className="block max-w-[170px] truncate text-[12px] text-brand hover:underline"
+            className="block max-w-[170px] truncate text-[12px] text-radar-ink-950 hover:underline"
             title={row.userEmail}
             to={adminUserDetailHref(row.userId)}
           >

@@ -1,4 +1,5 @@
 import { Images } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import type { WorksTab } from './useWorksFilters';
 
@@ -11,10 +12,9 @@ import type { WorksTab } from './useWorksFilters';
 export interface WorksEmptyStateProps {
   tab: WorksTab;
   activeFilterCount: number;
-  onGoCreate: () => void;
 }
 
-export function WorksEmptyState({ tab, activeFilterCount, onGoCreate }: WorksEmptyStateProps) {
+export function WorksEmptyState({ tab, activeFilterCount }: WorksEmptyStateProps) {
   const filtered = activeFilterCount > 0;
   const isVideo = tab === 'video';
   return (
@@ -37,9 +37,9 @@ export function WorksEmptyState({ tab, activeFilterCount, onGoCreate }: WorksEmp
             : '完成一次创作后，作品会出现在这里。'}
       </p>
       {!filtered && (
-        <button type="button" className="my-works-empty-action" onClick={onGoCreate}>
+        <Link className="my-works-empty-action" to="/workbench">
           去创作
-        </button>
+        </Link>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { BarChart3, ChevronRight, FolderOpen, Image as ImageIcon, Images, MessageSquare, Receipt } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
 import type { MyProfile } from '../../types/api';
 
@@ -12,11 +13,9 @@ import type { MyProfile } from '../../types/api';
 export function AccountStatsCard({
   counts,
   ticketTotal,
-  onNavigate,
 }: {
   counts: MyProfile['counts'] | undefined;
   ticketTotal: number | null;
-  onNavigate: (to: string) => void;
 }) {
   const stats: Array<{ label: string; value: number | null; to: string; icon: ReactNode }> = [
     { label: '项目', value: counts?.projects ?? null, to: '/library', icon: <FolderOpen size={13} aria-hidden /> },
@@ -34,19 +33,14 @@ export function AccountStatsCard({
       </header>
       <div className="account-stats">
         {stats.map((stat) => (
-          <button
-            key={stat.label}
-            type="button"
-            className="account-stat"
-            onClick={() => onNavigate(stat.to)}
-          >
+          <Link key={stat.label} className="account-stat" to={stat.to}>
             <span className="account-stat-label">
               {stat.icon}
               {stat.label}
               <ChevronRight size={13} className="account-stat-arrow" aria-hidden />
             </span>
             <b>{stat.value ?? '—'}</b>
-          </button>
+          </Link>
         ))}
       </div>
     </section>

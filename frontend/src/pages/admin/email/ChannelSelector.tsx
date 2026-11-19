@@ -36,23 +36,23 @@ export function ChannelSelector({
             onClick={() => onChange(provider.value)}
             className={[
               'group relative flex min-h-[112px] flex-col items-start rounded-lg border p-3 text-left transition-colors',
-              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-radar-ink-950 disabled:cursor-not-allowed disabled:opacity-60',
               selected
-                ? 'border-brand bg-accent/60 shadow-sm'
-                : 'border-border bg-background hover:border-brand/40 hover:bg-muted/30',
+                ? 'border-radar-ink-300 bg-accent/60'
+                : 'border-border bg-background hover:border-radar-ink-300 hover:bg-muted/30',
             ].join(' ')}
           >
             <span className="flex w-full items-center justify-between gap-2">
               <span
                 className={[
                   'flex size-8 items-center justify-center rounded-lg',
-                  selected ? 'bg-brand text-white' : 'bg-muted text-muted-foreground',
+                  selected ? 'bg-radar-ink-950 text-white' : 'bg-muted text-muted-foreground',
                 ].join(' ')}
               >
                 <Icon className="size-4" aria-hidden />
               </span>
               {selected ? (
-                <span className="flex size-5 items-center justify-center rounded-full bg-brand text-white">
+                <span className="flex size-5 items-center justify-center rounded-full bg-radar-ink-950 text-white">
                   <Check className="size-3" aria-hidden />
                 </span>
               ) : (

@@ -25,6 +25,8 @@ export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   cancelled: { label: '已取消', tone: 'muted' },
   // 账号状态 (后端 Prisma User.status)
   active: { label: '正常', tone: 'success' },
+  /** 内容 / 配置类开关的打开态；账号状态没有这个值。 */
+  enabled: { label: '已启用', tone: 'success' },
   disabled: { label: '已禁用', tone: 'warn' },
   deleted: { label: '已注销', tone: 'muted' },
   // 角色。四种角色使用不同色调快速区分；角色文字仍是无障碍识别的主要依据。

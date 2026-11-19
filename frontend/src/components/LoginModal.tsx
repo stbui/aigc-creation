@@ -45,8 +45,8 @@ export function LoginModal({ open, onClose, authEpoch }: Props) {
 /**
  * 弹窗宿主 —— 必须渲染在 `<BrowserRouter>` 之内 (见 App.tsx)。
  *
- * AuthCard 内部用 `useNavigate()` 跳「忘记密码」; 若宿主放在 AuthProvider 里
- * (Router 之外) 会抛 "useNavigate() may be used only in the context of a
+ * AuthCard 内部用 `<Link>` 跳「忘记密码」; 若宿主放在 AuthProvider 里
+ * (Router 之外) 会抛 "useHref() may be used only in the context of a
  * <Router> component", 弹窗压根挂不上 —— 用户看到的是「点按钮没反应」。
  */
 export function LoginModalHost() {

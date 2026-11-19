@@ -6,8 +6,8 @@
 import { BACKEND_ORDER, KIND_LABEL, KIND_ORDER, META } from './constants';
 import type { AdminAssetStats, DistributionRow } from './types';
 
-export { cn } from '~/admin-ui/lib/cn';
-export { formatBytes, formatNumber } from '../../../admin-ui/lib/format';
+export { cn } from '~/admin-ui/radar';
+export { formatBytes, formatNumber } from '~/admin-ui/radar';
 
 /**
  * 容量分布的两组行：后端按固定顺序，素材来源先按已知顺序、再补未知值（原样显示，

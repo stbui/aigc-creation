@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { AdminOverview } from '../../../types/api';
-import { formatNumber } from '../../../admin-ui/lib/format';
+import { formatNumber } from '~/admin-ui/radar';
 import { yuan } from './utils';
 
 /**
@@ -9,7 +9,7 @@ import { yuan } from './utils';
  * 一行读数 + 环比，替代六张同权重指标卡：数值与「比上一窗口好还是坏」
  * 挨在一起，扫一眼就有判断。
  */
-export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinance: boolean }) {
+export function WindowStrip({ data, finance }: { data: AdminOverview; finance: boolean }) {
   const w = data.window;
   const cmp = data.comparison;
 
@@ -21,7 +21,7 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
     hint: string;
     danger?: boolean;
   }> = [
-    ...(isFinance
+    ...(finance
       ? []
       : [
           {
@@ -112,7 +112,7 @@ export function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinanc
  * 多少用户 / 项目 / 素材」这类存量问题。任务状态与累计成功率只给有任务读权
  * 的运营视角；财务视角用累计实收补位，避免与上方窗口营收混淆。
  */
-export function TotalsStrip({ data, isFinance }: { data: AdminOverview; isFinance: boolean }) {
+export function TotalsStrip({ data, finance }: { data: AdminOverview; finance: boolean }) {
   const t = data.totals;
   const items: Array<{
     key: string;
@@ -133,7 +133,7 @@ export function TotalsStrip({ data, isFinance }: { data: AdminOverview; isFinanc
       value: formatNumber(t.projects),
       hint: '平台全部项目',
     },
-    ...(isFinance
+    ...(finance
       ? [
           {
             key: 'gmv',

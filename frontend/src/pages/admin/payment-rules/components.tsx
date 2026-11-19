@@ -15,6 +15,7 @@ import {
   Panel,
   StatCards,
   ToneBadge,
+  formatDecimal,
 } from '~/admin-ui/radar';
 import type { AdminSettingValue } from '../../../types/api';
 import {
@@ -38,9 +39,7 @@ const AMOUNT_KEYS = new Set<string>([
 ]);
 
 function numberText(value: unknown): string {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return '—';
-  return numeric.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  return formatDecimal(value);
 }
 
 export function formatRuleValue(key: string, value: AdminSettingValue): string {
@@ -164,7 +163,7 @@ export function OperationGuidePanel({
       >
         <dl className="flex flex-col gap-4">
           <div className="flex items-start gap-3">
-            <CircleDollarSign className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+            <CircleDollarSign className="mt-0.5 size-4 shrink-0 text-radar-ink-950" aria-hidden />
             <div>
               <dt className="text-[13px] font-medium text-foreground">客户付款</dt>
               <dd className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
@@ -175,7 +174,7 @@ export function OperationGuidePanel({
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <RotateCcw className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+            <RotateCcw className="mt-0.5 size-4 shrink-0 text-radar-ink-950" aria-hidden />
             <div>
               <dt className="text-[13px] font-medium text-foreground">退款处理</dt>
               <dd className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
@@ -187,7 +186,7 @@ export function OperationGuidePanel({
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <Clock3 className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+            <Clock3 className="mt-0.5 size-4 shrink-0 text-radar-ink-950" aria-hidden />
             <div>
               <dt className="text-[13px] font-medium text-foreground">下单边界</dt>
               <dd className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
@@ -238,11 +237,11 @@ function RelatedLink({
   return (
     <Link
       to={to}
-      className="group -mx-2 flex items-start gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      className="group -mx-2 flex items-start gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-radar-ink-950"
     >
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground group-hover:text-brand" aria-hidden />
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground group-hover:text-radar-ink-950" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1 text-[13px] font-medium text-foreground group-hover:text-brand">
+        <span className="flex items-center gap-1 text-[13px] font-medium text-foreground group-hover:text-radar-ink-950">
           {label}
           <ArrowUpRight className="size-3.5" aria-hidden />
         </span>

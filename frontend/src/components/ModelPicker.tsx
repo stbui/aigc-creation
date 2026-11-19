@@ -181,10 +181,7 @@ export function ModelPicker({
         data-testid="model-picker"
       >
         <strong className="pk-settings-group-label">模型</strong>
-        <p
-          style={{ fontSize: 12, color: 'var(--text-desc)', margin: 0 }}
-          data-testid="model-picker-empty"
-        >
+        <p className="pk-settings-note" data-testid="model-picker-empty">
           {requiredInputs.includes('mask')
             ? '当前没有支持遮罩重绘的模型，稍后再试。'
             : '该能力当前没有可用模型，稍后再试。'}

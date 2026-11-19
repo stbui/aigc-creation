@@ -5,35 +5,27 @@
  * `hooks.ts`; 这里只放不依赖 React 的金额、日期与导出文件名换算。
  */
 
+import { formatCompactDateTime, formatDateTime } from '../../lib/format';
+
 /**
- * 分 → 「¥39.00」。
- *
  * 金额一律由后端下发整数分，前端只做展示格式化 —— 不在这一层做任何汇率或折扣计算。
+ * 分 → 「¥39.00」；实现统一走 `lib/format`。
  */
-export function fmtYuan(cents: number): string {
-  return `¥${(cents / 100).toFixed(2)}`;
-}
+export { formatYuan as fmtYuan } from '../../lib/format';
 
-/** 日期（不含时分） */
-export function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
-}
+/** 日期（不含时分）；与全站日期口径共用 `lib/format`。 */
+export { formatDate as fmtDate } from '../../lib/format';
+/** 积分与数量千分位 */
+export { formatNumber } from '../../lib/format';
 
-/** 日期 + 时分；消息列表用短格式 (省略年份) */
+/**
+ * 日期 + 时分；消息列表用短格式 (省略年份)。
+ * 页面保留 `short` 开关，具体格式由 `lib/format` 决定。
+ */
+export { formatCompactDateTime, formatDateTime };
+
 export function fmtDateTime(iso: string | null | undefined, short = false): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('zh-CN', {
-    ...(short ? {} : { year: 'numeric' }),
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return short ? formatCompactDateTime(iso) : formatDateTime(iso);
 }
 
 /** 个人数据导出的文件名: 账号 + 导出日期 */

@@ -166,7 +166,7 @@ export function UserSpendingSection({
 
         <div className="mt-2 text-right">
           <Link
-            className="text-xs font-medium text-brand hover:underline"
+            className="text-xs font-medium text-radar-ink-950 hover:underline"
             to={adminOrderHref({ email })}
           >
             查看全部订单

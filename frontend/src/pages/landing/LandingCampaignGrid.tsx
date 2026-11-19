@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import type { PromoCampaign } from '../../types/api';
 import { capabilityName, formatCampaignEnd, toolPath } from './utils';
@@ -14,14 +14,14 @@ interface LandingCampaignGridProps {
  * 展示层再算一遍价格就会出现「页面写 9.9、结算收 19.9」。
  */
 export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
-  const navigate = useNavigate();
-
   return (
     <div className="lp-addon-grid">
-      {campaigns.map((campaign) =>
-        campaign.type === 'limited_price' &&
-        campaign.product &&
-        typeof campaign.priceCents === 'number' ? (
+      {campaigns.map((campaign) => {
+        const firstCapability = campaign.capabilityIds?.[0];
+        const freeTarget = firstCapability ? toolPath(firstCapability) : '/workbench';
+        return campaign.type === 'limited_price' &&
+          campaign.product &&
+          typeof campaign.priceCents === 'number' ? (
           <article key={campaign.id} className="lp-addon-card is-campaign">
             <span className="lp-campaign-tag">限时价</span>
             <h3>{campaign.product.name}</h3>
@@ -33,13 +33,12 @@ export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
             <p className="lp-addon-meta">
               {campaign.name} · {formatCampaignEnd(campaign.endAt)}结束
             </p>
-            <button
-              type="button"
+            <Link
               className="lp-plan-buy"
-              onClick={() => navigate(`/checkout/${encodeURIComponent(campaign.product!.sku)}`)}
+              to={`/checkout/${encodeURIComponent(campaign.product!.sku)}`}
             >
               立即抢购
-            </button>
+            </Link>
           </article>
         ) : (
           <article key={campaign.id} className="lp-addon-card is-campaign">
@@ -55,19 +54,12 @@ export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
               {campaign.onlyNewUsers ? '仅限新用户，登录后按资格生效 · ' : ''}
               {formatCampaignEnd(campaign.endAt)}结束
             </p>
-            <button
-              type="button"
-              className="lp-plan-buy"
-              onClick={() => {
-                const first = campaign.capabilityIds?.[0];
-                navigate(first ? toolPath(first) : '/workbench');
-              }}
-            >
+            <Link className="lp-plan-buy" to={freeTarget}>
               去使用
-            </button>
+            </Link>
           </article>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }

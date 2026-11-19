@@ -19,4 +19,4 @@ export { adminModelCallsHref, adminTaskHref, adminUserDetailHref } from '../../.
 /** 跨模块上下文链接（回跳带 context / done 标记） */
 export { readAdminActionContext, readAdminDone, withAdminDone } from '../../../lib/admin-context-link';
 
-export { formatDateTime } from '../../../admin-ui/lib/format';
+export { formatDateTime } from '~/admin-ui/radar';

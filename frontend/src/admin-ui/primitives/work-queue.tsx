@@ -22,8 +22,8 @@ const SEVERITY_STYLE: Record<
     label: '需处理',
   },
   info: {
-    badge: 'bg-accent text-brand',
-    dot: 'bg-brand',
+    badge: 'bg-accent text-accent-foreground',
+    dot: 'bg-foreground',
     label: '提示',
   },
 };
@@ -138,7 +138,7 @@ export function WorkQueue({
               {amount && <span className="text-xs tabular-nums text-muted-foreground">涉及 {amount}</span>}
               <Link
                 to={group.link}
-                className="ml-auto inline-flex items-center gap-1 text-[13px] text-brand hover:underline"
+                className="ml-auto inline-flex items-center gap-1 text-[13px] text-foreground hover:underline"
               >
                 查看全部
                 <ArrowRight className="size-3.5" aria-hidden />
@@ -188,7 +188,7 @@ export function WorkQueue({
                           </span>
                         )}
                         {/* 分组头是「查看全部 →」，行内动作也该带方向，否则蓝色「处理」读起来像状态词 */}
-                        <span className="inline-flex shrink-0 items-center gap-0.5 text-[13px] text-brand">
+                        <span className="inline-flex shrink-0 items-center gap-0.5 text-[13px] text-foreground">
                           处理
                           <ArrowRight className="size-3" aria-hidden />
                         </span>

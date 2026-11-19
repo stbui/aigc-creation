@@ -173,6 +173,8 @@
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`）。广播请求可带 `sendEmail: true`，返回 `sent/users/emailSent/emailFailed/emailSkipped`；模板按 `code + channel` 独立维护 |
 | POST | `/api/v1/admin/notifications/email/test` | 用当前运行时邮件配置发送测试邮件（`{ to }`，`message.write`），返回 `ok/provider/delivered/messageId/error`；`delivered=false` 表示仅落 console outbox 或配置失败 |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/templates/*` | 写真模板目录：`catalog` 读取；`categories` / `groups` / `items` 三层 CRUD；`upload` 上传预览图。读需 `template.read`，写需 `template.write` |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/prompts`、`/api/v1/admin/prompts/:id` | 提示词库 CRUD；标题可空、正文必填；列表支持 `keyword` / `category` / `modality` / `enabled` 筛选与分页，响应附带全量已有分类。读需 `prompt.read`，写需 `prompt.write` |
+| POST | `/api/v1/admin/prompts/upload` | 提示词配图批量上传（multipart 字段 `files`，最多 9 张），返回稳定引用 `storage://<backend>/<key>` 与预览地址；`prompt.write`。配图亦可从素材库多选后提交 `images: [{ ref, assetId?, name? }]` |
 | GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`enabled` / `provider` / `delivers` / `configured` / `message`，不含凭据；`message.write`） |
 | GET/POST | `/api/v1/admin/{storage,scheduler,backups,roles,settings}*` | 系统管理 |
 

@@ -57,7 +57,7 @@ function Message({
         internal
           ? 'ml-10 border-warn-soft bg-warn-soft/30'
           : fromAdmin
-            ? 'ml-10 border-brand/20 bg-accent'
+            ? 'ml-10 border-radar-ink-200 bg-accent'
             : 'border-border bg-card',
       )}
     >
@@ -263,7 +263,7 @@ export function TicketDetailDrawer({
                     <span className="flex flex-wrap items-center gap-1.5">
                       {detail.user.name || '—'} ·{' '}
                       <Link
-                        className="text-brand hover:underline"
+                        className="text-radar-ink-950 hover:underline"
                         to={adminUserDetailHref(detail.user.id)}
                       >
                         {detail.user.email}
@@ -271,7 +271,7 @@ export function TicketDetailDrawer({
                     </span>
                     <span className="flex gap-3 text-[12px]">
                       <Link
-                        className="text-brand hover:underline"
+                        className="text-radar-ink-950 hover:underline"
                         to={adminCreditHref({
                           userId: detail.user.id,
                           email: detail.user.email,
@@ -280,7 +280,7 @@ export function TicketDetailDrawer({
                         积分账本
                       </Link>
                       <Link
-                        className="text-brand hover:underline"
+                        className="text-radar-ink-950 hover:underline"
                         to={adminOrderHref({ email: detail.user.email })}
                       >
                         全部订单
@@ -320,7 +320,7 @@ export function TicketDetailDrawer({
                       value: (
                         <span className="flex flex-wrap items-baseline gap-1.5">
                           <Link
-                            className="text-brand hover:underline"
+                            className="text-radar-ink-950 hover:underline"
                             to={adminOrderDetailHref(detail.related.order.id)}
                           >
                             {detail.related.order.orderNo}
@@ -349,7 +349,7 @@ export function TicketDetailDrawer({
                       value: (
                         <span className="flex flex-wrap items-baseline gap-1.5">
                           <Link
-                            className="text-brand hover:underline"
+                            className="text-radar-ink-950 hover:underline"
                             to={adminAssetHref(detail.related.asset.id)}
                           >
                             <code className="font-mono text-xs">

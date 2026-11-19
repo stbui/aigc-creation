@@ -1,473 +1,420 @@
-# 后台界面规格
+# 后台前端设计语言规范
 
-后台管理端 `/admin` 的视觉与布局规格：令牌、外壳几何、通用结构与页面原型。功能与接口见 `docs/admin-console-design.md` 与 `docs/admin-detailed-design.md`。
+后台管理端 `/admin` 的统一视觉语言、组件契约与交互规则。功能口径见 `docs/admin-console-design.md`，信息架构与权限见 `docs/admin-suite-design.md`，字段与接口见 `docs/admin-detailed-design.md`。
 
-> **当前实现：shadcn/ui（`new-york` 风格，radix 底座）**，2026-11-02 推倒重建。
-> 后台曾先后经历 antd、自建组件套件、shadcn 三轮换装，**前两轮的组件与样式已全部删除**，
-> 仓库内不再有残留引用。历史决策过程见 `docs/README.md`；本文只写现状。
+> **一句话结论：品牌紫定义“这是货觉AI”；中性灰定义“这是运营工具”。**
 >
-> 后台 31 个页面全部走 shadcn 原子件（`admin-ui/components/ui/*`），经 `admin-ui/primitives/*`
-> 这一层组合件供给页面。C 端（前台）不复用这套组合件，页面只从 `frontend/src/ui` 兼容层取件；
-> 该层底层同样复用 `admin-ui/components/ui` 的 shadcn/radix 原子件，**antd 已从依赖与源码中移除**。
+> 后台采用双层视觉体系，而不是两套可任选的主题：
+>
+> | 层 | 视觉语言 | 覆盖范围 | 事实源 |
+> | --- | --- | --- | --- |
+> | 外壳层 | 产品品牌紫 + shadcn | 侧栏、顶栏、跳链、外壳焦点 | `frontend/src/admin-ui/shell/AdminBoardLayout.tsx` |
+> | 内容层 | freebie-radar 中性灰 | 页头、页签、筛选、表格、面板、表单、浮层、反馈 | `frontend/src/styles/radar-admin.css` + `frontend/src/admin-ui/radar/*` |
+>
+> 边界只有一个：**品牌紫不得进入业务内容，Radar 中性值不得重绘外壳。** 这不是过渡期兼容策略，而是 2026-11 全量迁移后的稳定规范。
 
 | 项 | 事实源 |
 | --- | --- |
-| 外壳组件 | `frontend/src/admin-ui/shell/AdminBoardLayout.tsx` |
+| 外壳组件 | `frontend/src/admin-ui/shell/AdminBoardLayout.tsx:59` |
 | 菜单数据 | `frontend/src/components/admin/adminNav.ts`（7 组 / 35 条） |
-| 页面取用层 | `frontend/src/admin-ui/primitives/index.ts`（页面**只从这里**取件） |
-| 基础件 | `frontend/src/admin-ui/components/ui/`（shadcn CLI 生成，`scripts/post-shadcn.mjs` 后处理） |
-| 类名合并 | `frontend/src/admin-ui/lib/cn.ts`（官方 `cn` 包的 `createCn` + 项目 token 补登） |
-| 状态色 | `frontend/src/components/admin/statusMeta.ts`（`STATUS_META`） |
-| 样式 | `tokens.css` 的 `:root` 令牌 + `frontend/src/styles/admin.css`（后台 Tailwind 入口 + `@theme inline` 桥接） |
-| 跨页微规格 | `docs/typography.md` |
+| 页面组件入口 | `frontend/src/admin-ui/radar/index.ts:1` |
+| Radar 令牌与动效 | `frontend/src/styles/radar-admin.css:16` |
+| 页面骨架 | `frontend/src/admin-ui/radar/page.tsx:8` |
+| 表格 | `frontend/src/admin-ui/primitives/table.tsx:154` |
+| 状态语义 | `frontend/src/components/admin/statusMeta.ts:19` |
+| 格式化 | `frontend/src/admin-ui/lib/format.ts:54` |
+| 全站字号下限 | `docs/typography.md` |
 
 ---
 
-## 0. 设计原则
+## 1. 设计原则
 
-| 原则 | 说明 |
+| 原则 | 规则 |
 | --- | --- |
-| 令牌复用 | 只用 `tokens.css` 的 token，不写裸 hex；shadcn 语义类经 `admin.css` 的 `@theme inline` 桥接过来 |
-| 密度优先 | 后台是长时间使用的工具，信息密度高于 C 端营销页；表格行高与间距取紧凑档 |
-| 少装饰 | 无渐变、无插画，阴影仅用于浮层与卡片 |
-| 操作可见 | 关键操作紧邻数据行，不藏进菜单深处 |
-| 状态双编码 | 状态用色块 + 文字，不只靠颜色（色觉障碍可达性） |
-| 反馈三态 | 任何拉取有加载 / 成功 / 失败三态，失败给可读原因与重试 |
-| 一套组件 | 页面只从 `primitives` 取件；同一形态（如筛选条、表格）只有一份实现 |
+| 工具优先 | 后台服务长时间、高密度运营工作。信息密度、扫读效率和误操作成本优先于装饰性。 |
+| 双层一致 | 所有页面共享同一外壳；所有业务内容共享同一 Radar 语言。禁止页面自造“第三套主题”。 |
+| 面与线分层 | 灰画布承载白面板，白面板用 1px 描边和 8px 圆角建立层级；面板默认零阴影。 |
+| 操作就近 | 主操作在页头，行操作在数据行，批量操作在表格上方，危险操作在详情底部。 |
+| 状态双编码 | 状态必须同时有颜色和中文文字。颜色只帮助扫读，不能独自承担语义。 |
+| 状态可区分 | 首次加载、无数据失败、空数据、有数据但刷新失败是四种状态，不得合并。 |
+| 一套组件 | 业务页面只从 `~/admin-ui/radar` 取件；同类交互只保留一份实现。 |
+| 键盘可达 | 所有操作可键盘完成；浮层焦点锁定，关闭后焦点归位。 |
 
-## 1. 令牌
+## 2. 视觉边界
 
-### 1.1 语义映射
+### 2.1 外壳层：品牌紫
 
-后台页面写的是 shadcn 语义类，底层由 `admin.css` 的 `@theme inline` 映射到 `tokens.css` 的令牌：
+外壳表达产品身份，固定使用品牌紫。配置来自 `tokens.css`、`styles/admin.css` 与 shadcn `Sidebar` 组合，不跟随内容页的 `.radar-scope` 重映射。
 
-| 用途 | shadcn 类 | 项目 token |
+| 部位 | 规格 |
+| --- | --- |
+| 侧栏 | 展开 232px，折叠 60px；`h-svh` 全高 |
+| 品牌头 | 56px；标记 +「货觉AI 运营后台」 |
+| 导航 | 7 个分组，分组可折叠，按权限过滤；导航区自身滚动 |
+| 顶栏 | 56px：折叠开关、面包屑、告警铃铛、非生产环境标识 |
+| 内容区 | padding `18px 26px 56px`；横向与纵向滚动都限制在内容区内 |
+| 主色 | 品牌紫 `#5546d8`；用于外壳选中态、焦点与品牌识别 |
+| 账号菜单 | 固定在侧栏底部；折叠态只留头像 |
+
+`.adm-*` 只允许外壳三个类：`adm-layout`、`adm-content`、`adm-skip-link`。它们是几何与可访问性契约，不是页面样式工具。
+
+### 2.2 内容层：Radar 中性灰
+
+页面内容必须被 `RadarPage`（或自动使用它的 `AdminPage`）包裹。`.radar-scope` 把 shadcn 语义变量重映射为 Radar 中性值，避免门户组件泄漏品牌紫。
+
+| 规则 | 要求 |
+| --- | --- |
+| 页面入口 | 只从 `~/admin-ui/radar` 导入业务组件、格式化函数与数据 Hook |
+| 页面容器 | `AdminPage` 自动包裹 `RadarPage`；自定义页面直接用 `RadarPage` |
+| 品牌色 | 内容层品牌动作使用近黑 `#111318`，不是产品紫 `#5546d8` |
+| 禁止直连 | 不得从 `admin-ui/components/ui/*` 或 `admin-ui/primitives/*` 直接取品牌可见组件 |
+| 禁止新模式 | 不新增 `adm-*` 类，不在页面内重定义 Radar 令牌 |
+
+允许的例外只有外壳级故障页：`AdminLoadError`、`NoAdminAccess` 与路由加载骨架。它们发生在外壳内容尚不可用时，可由外壳层承载。业务成功页不属于例外。
+
+## 3. 色彩与令牌
+
+### 3.1 Radar 色板
+
+令牌定义见 `frontend/src/styles/radar-admin.css:16`。页面使用 `radar-*` 语义类，不写裸 hex。
+
+| 用途 | 令牌 | 值 |
 | --- | --- | --- |
-| 页面底 | `bg-page` | `--page-bg` `#f6f7fb` |
-| 卡片与面板 | `bg-card` | `--card-bg` `#ffffff` |
-| 主色 | `bg-primary` / `text-brand` | `--brand` `#5546d8` |
-| 悬停淡底 | `bg-accent` | `--brand-bg` `#f1efff` |
-| 链接 | `text-brand` / 500 | `--brand` `#5546d8` |
-| 正文 | `text-foreground` | `--text-strong` `#171a2b` |
-| 次要文字 | `text-muted-foreground` | `--text-body` `#4e5969` |
-| 描边 | `border-border` / `border-input` | `--border` `#e5e7ef` |
-| 灰底块 | `bg-muted` / `bg-secondary` | `--surface` `#f2f4f7` |
-| 成功 | `bg-success-soft` / `text-success-text` | `--success-soft-bg` / `--success-text` |
-| 警告 | `bg-warn-soft` / `text-warn-text` | `--warn-bg` / `--warn-text` |
-| 危险 | `bg-danger-soft` / `text-danger-text` | `--danger-soft-bg` / `--danger-text` |
-| 卡片投影 | `shadow-card` | `--shadow-card`（`tokens.css` 定义，`cn.ts` 补登） |
+| 页面画布 | `radar-canvas` | `#f6f7f9` |
+| 卡片 / 面板 | `radar-surface` | `#ffffff` |
+| 悬停底 | `radar-surface-hover` | `#f7f8fb` |
+| 静默底 | `radar-surface-muted` / `radar-ink-100` | `#f1f3f6` |
+| 主文字 | `radar-ink-950` | `#111318` |
+| 标题文字 | `radar-ink-900` | `#1b1e26` |
+| 标签 / 强调文字 | `radar-ink-700` | `#374151` |
+| 次文字 | `radar-ink-500` | `#525c6b` |
+| 辅助文字 | `radar-ink-400` | `#646f80` |
+| 描边 | `radar-ink-200` | `#e6e8ec` |
+| 品牌动作 | `radar-brand` | `#111318` |
+| 品牌悬停 | `radar-brand-hover` | `#272b36` |
+| 焦点强调 | `radar-accent` | `#312e81` |
+| 成功文字 / 浅底 | `radar-deal` / `radar-deal-subtle` | `#047857` / `#ecfdf5` |
+| 警告文字 / 浅底 | `radar-code` / `radar-code-subtle` | `#92400e` / `#fef3c7` |
+| 危险文字 / 浅底 | `radar-alert` / `radar-alert-subtle` | `#dc2626` / `#fef2f2` |
 
-### 1.2 圆角
+文字层级：主值用 `ink-950/900`，字段标签用 `ink-700`，说明与 meta 用 `ink-400/500`。不要用低对比灰承载必须阅读的业务信息。
 
-Tailwind v4 的默认阶梯与项目规定对不齐，`admin.css` 的 `@theme inline` 重映射到全站五档：
+### 3.2 圆角、阴影与描边
 
-| Tailwind 类 | 值 | 项目档 |
-| --- | --- | --- |
-| `rounded-sm` | 4px | `--radius-tag` |
-| `rounded-md` | 8px | `--radius-control`（按钮 / 输入框） |
-| `rounded-lg` | 12px | `--radius-card`（卡片 / 面板） |
-| `rounded-xl` | 16px | `--radius-panel` |
-| `rounded-2xl` | 24px | `--radius-hero` |
+| 元素 | 规格 |
+| --- | --- |
+| 面板 | 8px 圆角，1px `radar-ink-200` 描边，零阴影 |
+| 输入、按钮、菜单项 | 8px 圆角 |
+| 页签内部触发器 | 6px 圆角 |
+| 弹窗 | 12px 圆角，零阴影 |
+| 下拉菜单 | 零阴影，1px 细线 |
+| 抽屉 | 唯一允许带阴影的浮层 |
+| 分隔线 | 1px；优先 `radar-ink-100`，外框用 `radar-ink-200` |
 
-另加胶囊档 `rounded-full`（状态标签、比例条）。用 `var()` 引用而非抄字面值：圆角档位只定义一处。
+禁止用阴影模拟卡片层级。面板与画布之间靠灰白对比和细线区分，不靠“浮起来”。
 
-### 1.3 禁令
+### 3.3 令牌禁令
 
-- 不新增裸 hex；状态色一律走上表语义 token。
-- 不与 C 端共用外壳样式：`app-*` / `wb-*` / `asset-library-*` 不进后台。
-- 页面内不写 `adm-*` 类。`.adm-*` 只剩外壳骨架三个（见 §2.1），是几何契约不是样式装饰。
-- 页面不直连 `admin-ui/components/ui/*`（原子件），只从 `primitives` 取。
+- 业务页面不写裸 hex、`rgb()`、`hsl()`；新增颜色必须先进入 Radar 令牌。
+- 不把 `--brand`、`bg-brand`、`text-brand` 等品牌紫外壳语义用于页面内容。
+- 不新增与现有色阶近似的灰色、蓝色或紫色。
+- 状态色必须成对使用“深色文字 + 浅色底”；不得只换文字色而没有文字标签。
 
-## 2. 外壳
+## 4. 字体与排版
 
-### 2.1 骨架
+字体栈与加载方式遵循 `docs/typography.md`：Noto Sans SC 优先，最小字号 12px。
 
-外壳由 `admin-ui/shell/AdminBoardLayout` 实现，基于 shadcn `Sidebar` 组合，无值班带：
+### 4.1 后台字号阶梯
+
+| 场景 | 字号 / 字重 / 行高 |
+| --- | --- |
+| 页面标题 | 22px / 600 / 紧凑行高 |
+| 页面说明 | 13px / 400 / 20px |
+| 面板标题 | 13px / 600 |
+| 面板说明 | 12.5px / 400 / 20px |
+| 正文、字段标签、输入值 | 13px / 400；标签 500 |
+| 表格表头 | 13px / 600 |
+| 表格正文 | 13px / 400 |
+| 抽屉 / 弹窗标题 | 15px / 600 |
+| 浮层描述 | 12.5px / 400 / 20px |
+| 统计数值 | 22px / 600；紧凑态 18px |
+| 按钮 | 12–13px；按 sm / md 档 |
+| 辅助说明、键值标签 | 12–12.5px / 400 |
+
+全站最小字号为 **12px**。徽标、状态标签、辅助说明与代码片段一律不低于 12px；不得为了迁就现状把规范下调为 11px。
+
+### 4.2 对齐规则
+
+- 页面只保留一个 `h1`；面板标题用 `h2`，详情小节用 `h3`。
+- 金额、积分、条数、耗时等单值列右对齐并使用 `tabular-nums`。
+- 复合单元格保持左对齐；不要把中文说明右对齐。
+- 名称与徽标同行时，名称 `min-w-0 truncate`，徽标 `shrink-0`。
+- 正文和说明允许自然换行；meta、时间、状态标签不换行。
+
+## 5. 布局与几何
+
+### 5.1 页面骨架
+
+`AdminPage` 的标准顺序：
 
 ```
-Sidebar 232px（折叠 60px，≤1280px 自动折叠；h-svh 全高）
-├── 品牌头：56px，标记 + 「货觉AI 运营后台」
-├── 导航：7 个分组（总览 / 运营与内容 / 模型与能力 / 商品与交易 / 资金与财务 / 系统 / 数据与安全），可折叠，按权限点过滤；导航区自身滚动
-└── 底：账号菜单（品牌紫头像 + 邮箱 / 角色，菜单含返回前台 / 退出登录）
-
-SidebarInset（内容区）
-├── Topbar 56px：折叠开关 + 分隔线 + 面包屑（分组 / 页面），右侧告警铃铛 + 环境标识
-└── Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不设统一限宽），横向滚动限在该区内
+RadarPage
+└── PageHeader（标题 + 说明 + 主操作）
+    ├── AdminTabs / SegmentedTabs（可选）
+    ├── FilterBar（列表页）
+    ├── BatchBar（有选中项时）
+    ├── Panel / 表格 / 卡片网格
+    └── Pagination
 ```
 
-`.adm-*` 在仓库里只剩三个类，规则在 `styles/admin.css` 的 `@layer base`：
+`RadarPage` 用负外边距抵消外壳的 `26px / 18px` padding，再铺满灰画布。外壳几何变更时，`RadarPage` 与外壳必须同步，见 `frontend/src/admin-ui/radar/blocks.tsx:42` 与 `frontend/src/admin-ui/shell/AdminBoardLayout.tsx:293`。
 
-| 类 | 用途 |
+### 5.2 间距
+
+| 场景 | 规格 |
 | --- | --- |
-| `.adm-layout` | 外壳根，e2e 用它确认后台外壳已挂载 |
-| `.adm-content` | 内容区，e2e 量它的宽度与左边缘，验证「内容区 = 视口 − 侧栏」且无横向溢出 |
-| `.adm-skip-link` | 键盘用户的跳转入口（`#adm-main`） |
+| 页头底距 | 12–16px |
+| 页签与正文 | 12px |
+| 面板间距 | 16px |
+| 面板内边距 | 20px |
+| 面板标题栏 | `12px 20px` |
+| 筛选条与表格 | 12px |
+| 表单字段纵向间距 | 12–16px |
+| 页面底部操作条 | sticky，距底部 0，上距 12px |
 
-页面内新增 `adm-*` 类是错的。
+不设统一最大宽度。表格与双栏详情铺满内容区；表单型面板可用 `narrow` 限制为 760px。
 
-### 2.2 侧栏细节
-
-| 项 | 规格 |
-| --- | --- |
-| 顶栏 | 高 56px（`data-testid="admin-header"`），内容区顶部：折叠开关 + 面包屑（分组 / 页面），右侧告警铃铛与环境标识 |
-| 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），品牌头与底部账号菜单不参与 |
-| 底部区 | 侧栏底、上边框分隔；账号菜单固定在底部，折叠态只留头像 |
-| 分组标题 | 14px / 600 / `tracking-[0.08em]`，当前分组带品牌色圆点；分组容器内边距 2px、组间不额外留白；可点击折叠/展开；首次进入只展开当前页所在分组，之后沿用写入 `localStorage` 的用户偏好；侧栏折叠态隐藏标题并改用分隔线 |
-| 菜单项 | 高 36px，圆角 8px，14px / 500 文字，padding `0 10px`；子菜单相对父级缩进 20px 并带左侧引导线，形成清晰的树状层级 |
-| 悬停 | 底 `bg-sidebar-accent`，字 `text-sidebar-accent-foreground` |
-| 选中 | 底 `bg-sidebar-accent`、字 `text-sidebar-accent-foreground` / 600，左侧 3px 品牌色竖条 |
-| 折叠态 | 只留图标并居中，`tooltip` 给全称；分组之间用分隔线代替标题；`Ctrl/Cmd + B` 与顶栏开关均可切换 |
-| 规划项 | 标「待建」小胶囊（`planned` 字段） |
-
-菜单按权限过滤：无权项不渲染，整组为空时整组隐藏。
-
-### 2.3 顶栏右侧与账号菜单
-
-| 项 | 规格 |
-| --- | --- |
-| 告警铃铛 | `AdminAlertBell`，角标是待处理事项数；点击展开最近告警，可跳对应页面 |
-| 环境标识 | 灰底胶囊 + 橙点，**仅非生产显示**，避免误在生产执行测试操作 |
-| 用户菜单 | 位于侧栏底部：品牌紫头像 + 邮箱 / 角色两行；展开后头部复显身份，菜单含返回前台、退出登录（危险色）；折叠态只留头像 |
-
-### 2.4 内容区
-
-背景 `bg-page`；直接子块（页头 / 筛选条 / 面板 / 指标卡 / 批量条 / 提示条）铺满内容区，不做统一限宽 —— 后台以宽表与「列表 + 详情」双栏为主，限宽只会挤压表格。需要窄版的地方由页面自己约束（`Panel` 的 `narrow`、`SaveBar` 的 `narrow`，宽 760px 左对齐）。`id="adm-main"`、`tabIndex={-1}`，配合顶部「跳到主要内容」跳链。
-
-### 2.5 断点
+### 5.3 断点与滚动
 
 | 视口 | 行为 |
 | --- | --- |
-| > 1280 | 侧栏展开 232px |
-| ≤ 1280 | 自动折叠为 60px 图标栏（可手动展开） |
+| > 1280px | 侧栏展开 232px |
+| ≤ 1280px | 侧栏自动折叠为 60px，可手动展开 |
+| 任意窄视口 | 表格在内容区内横向滚动，不做移动端重排 |
+| 长页面 | 内容区内部纵向滚动，顶栏保持固定 |
 
-后台不做更窄的适配：< 1280 时表格横向滚动，不做移动端重排（运营用桌面）。
+后台面向桌面运营，不新增移动端专属布局。任何宽度下都不得出现整页级横向滚动。
 
-离开页面前若有未保存变更，弹确认框，Esc 可关；编辑抽屉关闭时使用同一套确认逻辑（`useUnsavedGuard` / `useDiscardConfirm`）。
+## 6. 组件模式
 
-## 3. 通用结构
+### 6.1 页头
 
-### 3.1 PageHeader
+`PageHeader` 是扁平标题区，不是卡片：标题和说明在左，操作在右，无品牌色左边线。
 
-`primitives/layout.PageHeader`：轻量标题卡，品牌色左边线定位；标题 + 副标题在左，操作在右。标题 `h1` / 20px / 600，副标题 13px `text-muted-foreground`（不截断 —— 它通常是一句话说明「这一页在管什么」）。操作区右对齐、可换行。
+- 标题 22px / 600。
+- 说明 13px / 20px，不截断；一句话说清“这一页在管什么”。
+- 主操作右对齐；最多一个主按钮，其余用次按钮或菜单。
+- 页面级动作不得沉到表格底部或筛选条内。
 
-正文与表格链接默认使用品牌紫、500 字重；悬停显示下划线并转到 `--brand-hover`。整行可点击条目与图片链接用 `text-inherit no-underline` 保留其容器语义，不受该默认值影响。
+### 6.2 页签与筛选
 
-### 3.2 FilterBar
+`AdminTabs` 用于切换内容块，`SegmentedGroup` 用于切换同一区域的过滤维度。两者不可互换：前者语义是 tablist，后者是过滤控件。
 
-`primitives/display.FilterBar`：筛选条与页头同宽，`flex-wrap` 自然换行，`FilterActions` 用 `ml-auto` 把「查询 / 重置」推到最右。`AppliedFilters` 独占一行（`basis-full`）回显已生效条件，每条可单独清除。
+筛选规则：
 
-**文案口径**
-
-- 带清除的下拉：触发器与菜单里的复位项写同一句「全部 + 字段」（`全部状态` / `全部类型` / `全部渠道`）。只写「全部」时，五个下拉并排就分不清哪一格管什么；只写「状态」时，触发器又看不出当前是「不筛」还是「筛了某个值」。`SelectField` 因此让 `placeholder` 缺省取 `clearLabel`，只写一处就不会写岔。
-- 搜索框：直接列可搜字段，用 ` / ` 分隔（`券码 / 名称`、`商品编号 / 名称 / 供应商`），不加「搜索」前缀 —— 筛选条里的输入框本来就是搜索，前缀只是把有限的宽度用在废话上。可搜字段的顺序按运营的心智排（先精确的编号，再名称，最后描述性字段）。
-
-**提交时机**
-
-按控件性质分两档，不要在同一条筛选条里混用：
-
-| 控件 | 时机 | 理由 |
-| --- | --- | --- |
-| 输入框 / 下拉 / 日期范围（服务端筛选） | **草稿 + 「查询」**（回车等价） | 五个条件逐个改动会连发五次请求；草稿态还让「已生效条件」与「正在编辑的值」分得开，`AppliedFilters` 芯片回显的是后者 |
-| 分段控件、单选切换（告警级别、备份类型、视图切换） | 立即 | 一次点击就是一个决策，再加一个「查询」是多余的一步 |
-| 纯客户端过滤（列表一次取全量，前端过滤） | 立即 | 不发请求，没有代价 |
-
-一条筛选条只能有一种时机：工单页原先四个下拉是即选即生效、关键词却要按「查询」，而「查询」按钮实际上不管那四个下拉 —— 运营按了查询，以为是它生效的。下拉改成草稿后，`applyFilters` 一次提交全部条件。
-
-芯片与草稿必须同源：清除芯片时同时清掉对应的草稿值，否则下拉还停在上一次选中的值，与列表对不上；从地址栏进入（`?status=open`）时草稿也要跟着走。
-
-### 3.3 表格
-
-`primitives/table.AdminDataTable` —— 排序、批量勾选上限、固定操作列、行展开、分页、密度只有这一份实现。
-
-- 表格放在 `Panel` 内（白底卡片），表头 `bg-muted/40` + 12px / 600 `text-foreground`，行 hover `bg-muted/50`。
-- 行高由单元格结构决定，**同一张表内必须一致**：单元格最多三行（主值 + 说明 + 标识），实测行高按 1 行 44px / 2 行 58~63px / 3 行 76px 分档。一行 198px 夹在一堆 58px 里，视线会被那一行截断 —— 那正是「标签逐个平铺」撑出来的。
-- 贴着行数上限的内容必须折叠：标签列表（一个插件声明 8 个 Provider）只直显前两个 + 「+N」，悬停看全量与各自的注册状态；长文本用 `truncate` / `line-clamp-2` + `title`。**折叠的是展示，不是事实**：`+N` 的提示里要能看到被折掉的每一项及其状态。
-- 名称与徽标同处一行时，名称 `min-w-0 truncate`、徽标 `shrink-0`：反过来写会把徽标挤出列外，或者逼名称换行把行撑高。
-- 数值列：**单值**（金额、积分、条数、次数、耗时）`align: 'right'` + `tabular-nums`，让一列数字按个位对齐；**复合单元格**（金额 + 优惠说明、耗时 + 轮询次数）保持左对齐 —— 靠右的中文说明读起来是断的。
-- 固定列（右侧操作列）用 `sticky right-0` + 不透明底色，否则内容会从列后透出。
-- 操作列直显最多两个动作，其余收进 `RowMenu`（「更多」）。四个动作平铺会把操作列撑到 200px，右侧固定列抢走正文宽度。
-- 行内动作按钮统一 `sm`（32px）：与 `RowMenu` 触发器（`icon-sm`，32px）等高，也与筛选条、工具栏的按钮同档。`xs`（24px）只用于抽屉、卡片、设置项这类非表格的密集场景 —— 表格里混用两档时，24px 的文字按钮旁边站一个 32px 的「⋯」，高度对不齐最扎眼。实测所有表行高 ≥44px，32px 按钮不会把行撑高。
-- 高频动作留列上，低频与不可撤销的进菜单：插件表是「详情 / 启用停用」直显，「校验 / 卸载」收进菜单；任务表是「详情 + 重试·终止」直显，「删除」收进菜单。
-- 批量勾选上限 100（与后端 `common/batch.ts` 的 `MAX_BATCH` 对齐）。
-- 分页默认 20 条，可选 20 / 50 / 100。
-- **翻页或改筛选一律清空选择**，避免对看不见的行下手。
-
-三态：首次加载无数据 → 骨架；失败且无数据 → 失败态 + 重试；空数据 → 空态。**已有数据时**加载只在表体上叠一层淡化，不让整张表消失再出现。
-
-### 3.4 加载骨架
-
-`primitives/skeleton` —— 骨架件只有这一个来源。
-
-**核心契约：骨架占住位置，不是把版面清空。** 首屏加载时如果把标题、说明、动作区一起换成灰条，页面的版面就消失了：用户刷新一下看到的不是「正在加载」，而是「这页不见了」，回来时又是一片陌生的灰条。所以 `PageSkeleton` 的**页头照常渲染真实文字**，动作区也照常渲染（按钮在加载期间 `disabled`，点不动但位置在），只有数据区换成骨架。
-
-| 形态 | 用途 |
+| 控件 | 提交时机 |
 | --- | --- |
-| `PageSkeleton` | 页面级：真实页头 + 骨架正文。挂在 `data-testid="admin-page-loading"` |
-| `SkeletonPanel` | 整块面板（标题占位 + 内容行），表单 / 列表页用 |
-| `SkeletonBody` | 只替内容行，用在**真实面板已经渲染、只有里面在加载**时 |
-| `SkeletonStats` | 统计卡一行（会员套餐、概览这类） |
-| `SkeletonCards` | 卡片网格（存储后端这类「一格一个后端」的布局） |
-| `SkeletonTabs` | 分段页签栏（设置页的分组页签） |
-| `SkeletonDutyStrip` | 概览首屏的值班条 |
+| 输入框、下拉、日期范围 | 草稿值 +「查询」；Enter 等价查询 |
+| 分段控件、单选切换 | 立即生效 |
+| 纯客户端过滤 | 立即生效 |
 
-骨架一律用 **shadcn 原子件拼**：面板是 `Card` + `CardHeader` + `CardContent`，指标卡是 `Card`，每根占位条是 `Skeleton`，页签栏是 `Tabs` + `TabsList`。不手写 `div` —— 手写的话改了 `Panel` 的边框或投影，骨架不会跟着变，两边越走越远。
+一条筛选条只能采用一种提交时机。已生效条件用 `AppliedFilters` 芯片回显；清除芯片时同步清除草稿。
 
-`PageSkeleton` 的参数与页面真实结构一一对应：`title` / `description` / `actions` 对应页头，`notice` 对应页头与正文之间的固定提示条，`stats` / `panels` / `cards` 对应三个正文区，`panelRows` 是每个面板内的行数，`narrow` 限宽 760（与窄版 `Panel` 一致，数据到位时不会横向跳一下）。
+带清除的下拉统一写“全部 + 字段”，例如「全部状态」「全部渠道」。搜索框直接列出可搜字段，用 ` / ` 分隔，不加“搜索”前缀。
 
-三条约束：
+### 6.3 面板与统计卡
 
-- **`notice` 只放与数据无关的固定提示**（如「凭据不在界面配置」）。随数据出现 / 消失的提示（失败告警、过期位图）不要放进来 —— 那类提示在加载期间本来就无从知晓，强行占位反而是假的。
-- **`title` 可以不给**，用在标签页内部这种「页头已经在上面渲染好了」的场景：这时再插一个页头就是重复的标题。
-- **`body` 是逃生舱**：页面真实结构不是「统计卡 + 面板 + 卡片」这三段式时（概览页的值班条 + 62/38 双栏、设置页的分组页签），用它自己写骨架。用了 `body` 就不要再传 `stats` / `panels` / `cards` —— 两者同时渲染会多出一段假版面。
+- `Panel` 是内容层的基础容器：白底、1px 细线、8px 圆角、零阴影。
+- 面板标题 13px / 600；说明 12.5px；标题区与正文用一根细线分隔。
+- `StatCard` 数值 22px / 600；紧凑态 18px；数值必须 `tabular-nums`。
+- 统计卡栅格用 `repeat(auto-fit, minmax(170–190px, 1fr))`，不写死列数。
+- 警示态用警告或危险浅底，不得只把数字染红。
 
-**骨架的形状必须与真实版面同构。** 概览页真实是双栏，骨架也画双栏；AIGC 标识页真实是 2×2 面板网格，骨架也画 2×2；备份页真实是 5 张统计卡 + 2 块面板，骨架也给 5 张卡。叠成上下两块的话，数据到位时整页会横向重排一次 —— 那次重排比「先空着」更难受。
+### 6.4 表格
 
-`AdminDataTable` 的表格骨架另走一路：`TableSkeleton` 用**真实的 `<table>` 结构**渲染，按 `columns` 的 `width` / `align` / `fixed` 出列宽，所以加载态与加载完成的表格列宽一致，不会横向跳。它同样带 `data-testid="admin-page-loading"` —— 两者不会同时出现（页面骨架时表格还没渲染）。
+`AdminDataTable` 是唯一表格实现，状态由页面持有，表格只负责投影。排序、分页、勾选均由服务端驱动。
 
-**加载态按「真实内容是什么」分派，只有两条路：**
-
-| 真实内容 | 加载态 | 谁负责 |
-| --- | --- | --- |
-| `<table>` / `AdminDataTable` | 表格骨架（真实列宽 + 行高 + 末尾「加载中…」） | **表格自己**：把 `loading` 传下去 |
-| 卡片网格 / 面板列表 / 表单 | `SkeletonCards` / `SkeletonBody` | 页面或所在面板 |
-
-两条禁令，都是现网踩过的：
-
-- **面板里是表格时，不要在面板层再写一遍骨架。** `plugins` 与 `user-groups` 曾写 `loading && rows.length === 0 ? <SkeletonBody rows={4}/> : <XxxTable loading={loading}/>` —— 表格本来就自带骨架，这段短路让**更差的那个**永远生效：4 根 36px 等宽灰条既没有列宽、也没有行高，数据到位时整张表横竖都跳一次。删掉短路、让 `loading` 传到表格，形态立刻与另外 12 个表格页一致。
-- **不许用一行「加载中…」当加载态。** 它只有 24px，真实内容是 N×56px 的列表项，等于没占位（`channels` 的供应商列表曾如此）。`TableSkeleton` 末尾的「加载中…」是**骨架的附注**，不是骨架本身。
-
-`SkeletonBody` 的行高固定 36px，与表格行（44px 起）、列表项（56px 起）并不等值 —— 它占的是「大致位置」，不追求像素级同构；真正的像素级同构只有表格骨架做得到，这也是表格必须走自己那条路的原因。
-
-### 3.5 详情浮层（抽屉 / 弹窗）
-
-默认用 `AdminDrawer`，不跳独立路由。详情 id 与地址栏 `?id=` 同步，便于刷新与转发。内容需要并排区块、宽表格或大图预览时用 `AdminModal`（默认 960，任务详情 1120）—— 两者共用同一套取数生命周期，只是浮层形态不同。
-
-`AdminDrawer` / `AdminModal` 自己拉数据（列表只带摘要字段），`children` 是**渲染函数**而不是元素：详情到达前根本不渲染空壳。关闭即清空 —— 下次打开的可能是另一条记录，留着上一条的数据会让第一次渲染闪一下旧内容。
-
-抽屉内是「基本信息 → 关联数据 → 操作」三段，危险操作固定在底部，不与主要信息混排。可编辑抽屉关闭时若内容有改动，先确认「放弃修改 / 继续编辑」。
-
-**地址栏只有一个写者**：`useAdminUrlFilterSync`（筛选写回）与 `useAdminDetailParam`
-（`?id=`）都基于 `window.location.search` 的**实时值**合并，不基于 hook 的
-渲染快照。同一轮里两个写者先后落 URL 时，后一个拿到的快照里还没有前一个刚写
-进去的键 —— 少了实时值，「从全部模型点编辑」跳回渠道时 `?id=` 会被冲掉，
-编辑器永远打不开。
-
-### 3.6 高危确认
-
-两条路径，**不要混用**：
-
-| 场景 | 组件 | 形态 |
-| --- | --- | --- |
-| 页面内高危动作（删除渠道、退款） | `ConfirmDialog` | shadcn `AlertDialog` 组合壳（阻塞式弹窗）；`impact` 逐条列出连带影响 |
-| 跨页面复用的二次确认（离开未保存页、批量动作） | `useConfirm()` | shadcn Dialog；需要原因时聚焦输入框，原因随业务动作提交 |
-
-`ConfirmDialog` 只组合 AlertDialog 的标题 / 影响范围 / 附加表单 / 底部动作，弹层行为（焦点锁定、Esc、关闭后焦点归位）由 radix 提供。点击确认不自动关闭，由调用方在请求成功后再收起。`overlay.tsx` 不再保留手写的贴底确认条。
-
-### 3.7 指标卡
-
-`primitives/layout.StatCard`：`Card` 承载，最小高 92px。数值 22px / 600 / `tabular-nums` —— 等宽数字才能让一排卡片上的数字对齐成列。警示变体走 `border-warn-soft` / `border-danger-soft` 淡底。
-
-栅格用 `[grid-template-columns:repeat(auto-fit,minmax(170~190px,1fr))]`，不要写死 `2xl:grid-cols-5` —— 1440px 下断点不触发，5 张卡会排成 3+2。
-
-### 3.8 批量条与结果
-
-勾选后出现批量条（已选 N 项 + 动作 + 取消选择）。执行后用 **toast 汇报成功 / 失败条数**，不再弹二次结果框 —— 批量动作在前置确认里已经确认过一次，失败时运营可回到列表按状态筛选处理。
-
-### 3.9 提示条
-
-`primitives/display.Notice`：`Alert` 承载，五档 tone（`info` / `success` / `warn` / `danger` / `locked`）。`danger` 走 `role="alert"`，其余 `role="status"` —— 颜色不是唯一的严重性信号。
-
-`StaleError` 是刷新失败但手上有旧数据时的提示条（`Alert` + 重试按钮），文案明确写出「下面是上一次成功获取的数据」。
-
-## 4. 页面原型
-
-31 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
-
-| 原型 | 页面 | 结构 |
-| --- | --- | --- |
-| 看板页 | 平台概览 | 值班条 + 指标卡栅格 + 趋势图 + 交易概览 + 最近任务列表 |
-| 告警页 | 告警中心 | 级别统计卡 + 级别筛选 + 告警卡片列表 + 口径说明 |
-| 列表页 | 用户 / 素材 / 任务 / 工单 / 订单 / 积分 / 优惠券 / 活动 / 邀请与签到 / 商品 / 发票 / 支付订单 / 支付对账 / 调用记录 / 数据备份 | 页头 → 筛选条 → 批量条（可选）→ 表格 → 分页；行操作走抽屉或确认弹窗 |
-| 配置页 | 系统设置 / 存储配置 / AI 标识 / 角色权限 / 能力与模型 / 模型商品 / 用户分组 / 定时任务 / 保留期清理 / 站内消息 | 分区表单或页签；底部署固定操作条（保存 / 重置），供应商用列表 + 抽屉，能力与模型用分组卡片 + 商品售卖抽屉 |
-| 标签页 | 支付充值（支付渠道 / 充值商品 / 支付订单 / 支付对账） | 页头 → 提示条 → 分段页签（`SegmentedTabs`，`?tab=` 同步 URL）→ 每个标签自持数据与筛选 |
-
-### 4.1 各页特殊约定
-
-| 页面 | 约定 |
+| 项 | 规格 |
 | --- | --- |
-| 平台概览 | 首屏是 `DutyStrip`（值班条）：100 根产出刻度 + 四个计数 + 「接手最早异常」主动作；趋势图用 `TrendBarChart`（Recharts 真坐标轴，非 CSS 自绘） |
-| 模型商品 | 默认「商品台账」：跨供应商平铺商品，列为 商品 / 供应商 / 类型 / 消费能力 / 健康 / 售价 / 状态 / 操作；顶部状态条可点筛选；新建供应商可选服务商预设（自动带 Base URL / 凭证字段名），保存后自动打开上游导入；弹窗可统一填类型 / 接入方式 / 售价；勾选商品后可批量上架 / 下架；行操作收进「编辑 + ⋯」。切到「供应商」视图是主从布局：左列供应商导航与渠道级入口，右侧详情内联商品清单（模态 / 接入方式 / 权重 / 优先级 / 售价）；商品编辑走弹窗；停用与删除走 `ConfirmDialog`；健康列与连通性测试保留 |
-| AI 标识 | 左编辑、右预览两栏；上层是 CSS 还原的角标外观，下层是 Canvas 按服务端几何规则画在示例底图上的效果；关闭态预览显示「可见角标已关闭」而非空白；顶部开关配法律风险提示 |
-| 能力与模型 | 18 项能力按分组排成卡片网格；每卡直接展示运行状态、实现程度、能力上下线动作以及消费的模型商品，商品行展示用户实付、计费方式、可用商品数与编辑 / 测试消费 / 移除售卖动作；售卖配置走 `Drawer`，新建时可从商品台账选择可用商品并自动带入名称 / 编号 / 服务来源；消费测试结果在抽屉内展开。下线走 `ConfirmDialog` 列业务影响，下线原因统一生成并下发 C 端；孤儿售卖单元单独列在表格区，不因缺少能力定义而丢失 |
-| 商品管理 | 统计卡 + 筛选条（关键词 / 状态 / 发放方式，客户端即时生效，`?status=` `?grantType=` `?q=` 同步 URL）+ 商品卡片网格 + 客户端分页；卡片自上而下为身份（SKU / 状态 / 名称 / 说明）、数字面板（积分 / 售价 / 划线价·折合单价）、规格行与页脚动作（编辑 / 上下架 / 删除），点卡片主体打开编辑抽屉；删除只对无历史订单的 SKU 生效，有订单时提示改为下架；统计卡始终基于完整目录，不随筛选变化 |
-| 支付充值 | 五标签共页，`?tab=` 同步 URL 且非法值回落到「支付渠道」；筛选是**草稿 → 应用**两段式（草稿改完点「查询」才生效，避免「改了没生效」的误判）；刷新只重取当前筛选下的数据，不重置筛选与分页；渠道配置抽屉里密钥字段是密码框 + 「留空即沿用」提示，身份字段禁用；对账页只展示结果、**不提供改钱入口** |
-| 数据备份 | 列表 + 校验结果列（SHA-256 通过 / 不通过），下载与删除分开两类按钮，删除走高危确认 |
-| 保留期清理 | 先展示各目标可清理量，再允许执行；执行历史在下方日志区 |
+| 表头 | 13px / 600，底色 `radar-surface-muted` 或等价语义底 |
+| 默认行高 | 44px |
+| 紧凑行高 | 36px |
+| 单元格横向内边距 | 12px |
+| 批量上限 | 100 条 |
+| 默认分页 | 20 条 |
+| 可选分页 | 20 / 50 / 100 |
+| 行内主操作 | 最多 2 个 |
+| 其余操作 | 收进 `RowMenu` |
 
-## 5. 可达性
+表格细则：
 
-| 项 | 实现 |
+- 同一张表的行高必须一致；单元格最多三行：主值、说明、标识。
+- 标签列表只直显前两个，其余用 `+N`；悬停或展开后必须能看到全部事实与状态。
+- 固定操作列用 `sticky right-0` 和不透明背景。
+- 行内按钮高度统一 32px；24px 只用于卡片、抽屉等非表格密集区域。
+- 翻页或修改筛选必须清空选择，避免对不可见行执行批量操作。
+- 首次加载显示与真实列宽同构的表格骨架；已有数据刷新时只在表体上淡化，不让整表消失。
+
+### 6.5 详情抽屉与弹窗
+
+详情默认不跳独立路由，保留列表筛选与分页。详情 id 同步到 `?id=`；关闭后清空详情数据，避免下一条记录闪出旧内容。
+
+| 浮层 | 宽度档位 | 默认 |
+| --- | --- | --- |
+| `Drawer` | 520 / 640 / 760 / 1080 | 640 |
+| `ModalDialog` | 520 / 720 / 960 / 1200 | 720 |
+| `AdminDrawer` | 继承 Drawer | 760 |
+| `AdminModal` | 继承 ModalDialog | 960 |
+| 确认弹窗 | 最大 520 | 按内容 |
+
+选择规则：
+
+- 单列信息、时间线、少量图片：右侧抽屉。
+- 并排区块、宽表格、大图预览：居中弹窗。
+- 高危动作：阻塞式确认弹窗，列出影响范围。
+- 抽屉内容顺序固定为“基本信息 → 关联数据 → 操作”；危险操作固定在底部。
+- 有未保存修改时，关闭必须先确认“放弃修改 / 继续编辑”。
+
+### 6.6 批量操作
+
+勾选后显示 `BatchBar`：已选数量、动作、取消选择。执行前做一次确认；成功后用 toast 汇总成功与失败条数，不再弹二次结果框。失败项由运营回到列表按状态筛选处理。
+
+批量请求超过 100 条时在客户端阻断，并明确提示上限。分页改变、筛选改变、批量完成后均刷新当前数据与选择状态。
+
+### 6.7 空态、失败态与骨架
+
+四种数据状态必须分开：
+
+| 状态 | 呈现 |
+| --- | --- |
+| 首次加载 | 与真实结构同构的骨架；页头文字照常显示 |
+| 无数据失败 | `ListError` + 可读原因 + 重试 |
+| 空数据 | `EmptyState`，说明为什么为空以及下一步 |
+| 有数据但刷新失败 | `StaleError`，明确“下面是上一次成功获取的数据” |
+
+骨架必须占住真实版面。表格使用真实表格结构骨架；卡片网格、面板列表、表单各自使用对应骨架。禁止用一行“加载中…”代替内容骨架。
+
+### 6.8 提示与确认
+
+`Notice` 有五档：`info` / `success` / `warn` / `danger` / `locked`。
+
+- `danger` 使用 `role="alert"`，其余使用 `role="status"`。
+- 字段错误同时设置 `aria-invalid` 与 `role="alert"`。
+- 高危确认写明影响对象、影响条数、是否可撤销。
+- 确认按钮在请求期间保持加载态锁定；请求成功后由调用方关闭，不提前收起。
+- 需要业务原因的动作必须提供原因输入，并在提交前校验。
+
+## 7. 状态、文案与数据格式
+
+### 7.1 状态
+
+状态语义的单一事实源是 `frontend/src/components/admin/statusMeta.ts`。
+
+- 每个状态显示“浅色底 + 深色文字 + 中文标签”。
+- 同一状态词跨页面语义一致时复用 `STATUS_META`；页面语境不同时只覆盖中文标签，不复制整张映射。
+- 未登记状态显示原值，不得隐藏或默认标成正常。
+- 状态标签不使用产品品牌紫作为“进行中”的默认色；内容层进行中状态使用 `brand` 语义映射到近黑或静默灰。
+
+### 7.2 金额、数字与空值
+
+`frontend/src/admin-ui/lib/format.ts` 是唯一格式化入口。
+
+| 数据 | 规则 |
+| --- | --- |
+| 金额存储 | 内部一律用“分”的整数 |
+| 带符号金额 | `¥12.34`，固定两位小数 |
+| 裸金额 | `12.34`，用于表格单元格或自行拼接货币符号 |
+| 积分、条数 | 整数 + 千分位 |
+| 空值 | `—`，不显示 `null` / `undefined` |
+| 数字对齐 | `tabular-nums`；单值列右对齐 |
+
+### 7.3 时间
+
+后台统一使用北京时间，不依赖浏览器本地时区。
+
+| 场景 | 格式 |
+| --- | --- |
+| 完整时间 | `YYYY-MM-DD HH:mm:ss` |
+| 紧凑日期时间 | `MM-DD HH:mm` |
+| 当日时间 | `HH:mm` |
+| 仅日期 | `YYYY-MM-DD` |
+
+列表、详情、导出必须调用同一格式化函数。跨天场景不得只显示 `HH:mm`。
+
+### 7.4 文案
+
+- 使用职业、直接、可执行的中文；不用“您”，不用营销式形容词。
+- 按钮用动词开头：「保存」「重新连接」「确认退款」，不用「确定」「提交」这类脱离语境的词。
+- 错误文案写清“发生了什么 + 下一步怎么做”，不暴露堆栈、SQL、内部路径或英文异常原文。
+- 空态文案写清“为什么为空 + 可以做什么”，不只写“暂无数据”。
+- 不把技术字段名直接展示给运营；必须展示时同时给中文解释。
+
+## 8. 动效与可访问性
+
+### 8.1 动效
+
+| 场景 | 时长 |
+| --- | --- |
+| 抽屉进入 | 210ms |
+| 遮罩淡入 | 180ms |
+| 弹层进入 | 150–200ms |
+| toast 进入 | 180ms |
+
+默认曲线为 `cubic-bezier(0.22, 1, 0.36, 1)`；遮罩可用 `ease-out`。动效只表达层级变化，不用于装饰。`prefers-reduced-motion: reduce` 下禁用全部进入动画。
+
+### 8.2 可访问性
+
+| 项 | 要求 |
 | --- | --- |
 | 跳链 | 首个可聚焦元素是「跳到主要内容」，指向 `#adm-main` |
-| 键盘 | 搜索面板方向键选择、Enter 跳转、Esc 关闭；radix 浮层负责焦点锁定与归位 |
-| 图标按钮 | 一律带 `aria-label` |
-| 表格 | 表头 `scope="col"`，排序列给 `aria-sort`；展开行用 `aria-expanded` |
-| 状态 | 颜色 + 文字双编码；`aria-live` 用于加载与结果提示 |
-| 动效 | `prefers-reduced-motion: reduce` 时统一降级（`admin.css` 的 `@layer base`） |
-| 对比度 | 正文与次要文字只在 `--text-strong` / `--text-body` 之上 |
+| 键盘 | 所有操作可用 Tab / Enter / Space 完成；搜索面板支持方向键与 Esc |
+| 焦点 | 浮层打开时锁定焦点，关闭后回到触发器 |
+| 图标按钮 | 必须有 `aria-label`，装饰图标加 `aria-hidden` |
+| 表格 | 表头 `scope="col"`；排序列给 `aria-sort`；展开行给 `aria-expanded` |
+| 表单 | 标签与控件关联；错误字段有 `aria-invalid` 和错误说明 |
+| 动态反馈 | 加载、成功、失败使用 `aria-live`；危险提示用 `role="alert"` |
+| 对比度 | 正文与说明达到 WCAG AA；不得用颜色作为唯一状态信号 |
 
-## 6. 已知限制
+## 9. 禁用项
 
-| 项 | 现状 |
-| --- | --- |
-| 移动端 | 不做适配；侧栏 ≤1280 折叠为图标栏，表格横向滚动 |
-| 告警阅读状态 | 告警计数是「当前待处理数」，不记录谁点过；事项处理后自然消失，不提供「已读」标记 |
-| 自定义主题 | 不支持；品牌色只由 `tokens.css` 的 `:root` 与 `admin.css` 的 `@theme inline` 决定 |
-| 暗色模式 | 不支持。`shadcn add` 后的 `dark:` 变体由 `scripts/post-shadcn.mjs` 整段剥除 |
+以下写法一律拒绝：
+
+- 页面直连 `admin-ui/components/ui/*` 或 `admin-ui/primitives/*`。
+- 在业务内容中使用品牌紫、`bg-brand`、`text-brand` 或 shadcn 默认紫色焦点环。
+- 在页面内新增 `adm-*` 类或复制 Radar 令牌值。
+- 用阴影区分普通面板；弹窗和菜单加阴影。
+- 用 11px 及以下字号；用颜色单独表示成功、警告、危险。
+- 用整页骨架遮掉真实页头；用一行文字代替数据骨架。
+- 批量、翻页或筛选后保留不可见行的选择。
+- 行内平铺超过两个动作；把危险操作放在主操作旁。
+- 用本地时区格式化后台时间；用 `toLocaleString` 输出业务时间。
+- 引入暗色模式、自定义主题或移动端专属布局。
+
+## 10. 交付检查表
+
+提交后台页面前逐项确认：
+
+- [ ] 页面从 `~/admin-ui/radar` 取件，并由 `AdminPage` 或 `RadarPage` 包裹。
+- [ ] 外壳仍为品牌紫；业务内容中没有品牌紫泄漏。
+- [ ] 面板为白底、1px 细线、8px 圆角、零阴影；抽屉是唯一有阴影的浮层。
+- [ ] 页面标题 22px，面板标题 13px，浮层标题 15px；没有低于 12px 的文字。
+- [ ] 筛选条只有一种提交时机；清除芯片会同步清除草稿。
+- [ ] 表格行高一致；单值数字右对齐；操作列最多两个直显动作。
+- [ ] 翻页、改筛选、批量完成后清空或刷新选择。
+- [ ] 首次加载、无数据失败、空数据、刷新失败四种状态可区分。
+- [ ] 状态有颜色和中文文字；未知状态显示原值。
+- [ ] 金额用分存储并统一格式化；时间按北京时间输出。
+- [ ] 抽屉 / 弹窗宽度来自档位；危险操作有影响说明和二次确认。
+- [ ] 键盘可完成全流程；浮层焦点归位；错误字段有可读提示。
+- [ ] `prefers-reduced-motion` 下无进入动画。
+- [ ] 不新增 `adm-*`、裸 hex、页面级主题覆盖或第三套视觉语言。
 
 ---
 
-## 7. 组件分层
+## 附：允许的外壳例外
 
-### 7.1 两层结构
+以下例外仅限外壳不可用场景，不得扩散到业务页：
 
-| 层 | 路径 | 谁用 |
+| 边界 | 位置 | 约束 |
 | --- | --- | --- |
-| shadcn 原子件 | `admin-ui/components/ui/` | **只被 `primitives/` 引用**；页面不直连 |
-| 组合件（唯一取用层） | `admin-ui/primitives/`（barrel：`primitives/index.ts`） | 全部后台页面 |
-
-没有转发层：`admin-ui/shadcn`、`admin-ui/controls`、`admin-ui/widgets`、`components/admin/PageHeader|AdminWidgets` 均已删除，页面统一从 `primitives` 取件，primitives 直接包 shadcn 原子件。
-
-### 7.2 组合件与原子件的对应
-
-改观感只改组合件，不碰原子件：
-
-| 组合件 | 底层原子件 |
-| --- | --- |
-| `Panel` / `StatCard` | `Card` / `CardHeader` / `CardDescription` / `CardContent` |
-| `TextField` / `NumberField` | `Input` |
-| `TextAreaField` / `SelectField` / `SwitchField` / `CheckboxField` | `Textarea` / `Select` / `Switch` / `Checkbox` |
-| `Notice` / `StaleError` | `Alert` |
-| `EmptyState` / `ListError` | `Empty`（`EmptyMedia` / `EmptyHeader` / `EmptyContent`） |
-| `SegmentedTabs` | `Tabs` / `TabsList` / `TabsTrigger` |
-| `SegmentedGroup` | `ToggleGroup` / `ToggleGroupItem`（`spacing={1}` 保持胶囊间隙） |
-| `Meter` | `Progress` |
-| `PageSkeleton` / `SkeletonPanel` / `SkeletonBody` / `SkeletonStats` / `SkeletonCards` / `SkeletonTabs` / `SkeletonDutyStrip` / `Skeleton` | `Skeleton` / `Card` / `CardHeader` / `CardContent` / `TabsList` |
-| `StatusTag` / `AdminDataTable` | `Badge` / `Table` |
-| `ModalDialog` / `Drawer` / `RowMenu` | `Dialog` / `Sheet` / `DropdownMenu` |
-| `ChoiceButton`（AI 标识页） | `Toggle` |
-| 筛选胶囊（商品状态条 / 失败错误码 / 模板标签 / 权限矩阵） | `Toggle` |
-| 加载指示（按钮内 / 行内） | `Spinner` |
-
-表格里的**文字入口**（工单标题、券码、供应商名）用 `Button variant="link"`，不要
-裸 `<button>` + `hover:underline`：链接变体自带 `underline-offset`、focus ring 与
-禁用态，颜色仍由 `text-brand` 覆盖。加载指示统一 `Spinner`，不要再手写
-`Loader2 + animate-spin` —— 尺寸、`role="status"` 与旋转动画只维护一处。
-
-反过来，**内容型触发器**（整卡点击层 `absolute inset-0`、图片缩略图、侧栏树节点、
-标签胶囊）保持原生 `button`：`Button` 的固定高度、内边距与 `hover` 底色会把卡片
-整块染色，套上去只能靠覆盖类打架，不如不套。
-
-`Panel` 的标题仍渲染原生 `h2`（不套 `CardTitle` 的 `div`）：分区标题的 heading
-语义要留给读屏与 `getByRole('heading')` 的页面断言。
-
-### 7.3 组合件目录
-
-| 文件 | 内容 |
-| --- | --- |
-| `layout.tsx` | `PageHeader` / `Panel` / `StatCard` / `SaveBar` / `EmptyState` / `ListError` / `StaleError` |
-| `form.tsx` | `FormField` / `TextField` / `TextAreaField` / `NumberField` / `SelectField` / `SwitchField` / `ClearableField` / `ActionButton` / `ToneBadge` / `SegmentedTabs` / `SegmentedGroup` |
-| `display.tsx` | `FilterBar` / `FilterActions` / `AppliedFilters` / `StatusTag` / `Notice` / `Meter` / `Descriptions` / `Pagination` |
-| `skeleton.tsx` | `PageSkeleton` / `SkeletonPanel` / `SkeletonBody` / `SkeletonStats` / `SkeletonCards` / `SkeletonTabs` / `SkeletonDutyStrip` / `Skeleton` |
-| `fields.tsx` | `CheckboxField` / `FilePicker` / `HelpTip` / `IconButton` / `ColorField` / `RangeField` / `SuggestField` |
-| `table.tsx` | `AdminDataTable` |
-| `overlay.tsx` | `ModalDialog` / `Drawer` / `ConfirmDialog`（shadcn `AlertDialog` 组合壳）/ `RowMenu` |
-| `DetailDialog.tsx` | `AdminDrawer` / `AdminModal`（懒加载详情浮层，共用取数生命周期） |
-| `duty-strip.tsx` / `duty-tower.tsx` | 概览首屏的值班条与值班塔 |
-| `chart.tsx` | `TrendBarChart`（Recharts） |
-
-`SegmentedTabs` 与 `SegmentedGroup` 分开是刻意的：前者语义是「切到另一块内容」
-（下面跟着 tabpanel），后者是「换过滤维度」（同一块区域换数据）。用错会让读屏用户
-以为下面跟着面板。
-
-### 7.4 令牌桥接
-
-`styles/admin.css` 的 `@theme inline` 只做映射，不引入新颜色：
-
-- `--background` / `--card` / `--popover` → `--card-bg`；
-- `--foreground` → `--text-strong`；`--muted-foreground` → `--text-muted`；
-- `--primary` → `--brand`（#5546d8）；`--accent` → `--brand-bg`（悬停淡底，**不是**品牌强调色）；
-- `--destructive` → `--danger-text`；`--border` 直接沿用 `tokens.css` 的 `--border`；
-- 业务语义色 `--success-*` / `--warn-*` / `--danger-*` → `tokens.css` 里对应的 `--success-*` / `--warn-*` / `--danger-*`。
-
-两条必须记住的实现约束：
-
-1. **`@theme inline`，不是 `@theme`**。普通 `@theme` 会把 `--color-primary` 写进
-   `:root`，覆盖 C 端同名变量（`--color-border` 两处差 3 个色阶）。`inline` 不产出
-   `:root` 声明，工具类直接内联 `var(--primary)`。
-2. **没有 preflight**，裸 `border` 退回 `currentColor`，所以 `[data-slot]` 的描边
-   兜底写在 `@layer base`（unlayered 会压过所有 `@layer`，`border-transparent` 就失效）。
-
-新增 shadcn 语义色必须同时补 `admin-ui/lib/cn.ts` 的补登表，否则同名不同值的类
-不会被判定为冲突（如 `shadow-card` 与 `shadow-none` 会同时生效）。
-
-### 7.5 类名词汇
-
-全站只有一套：**shadcn 语义类**（`bg-card` / `text-muted-foreground` / `border-border`
-/ `bg-accent` / `text-brand` / `bg-success-soft`）。
-
-页面不写裸色值：新颜色先在 `tokens.css` 的 `:root` 定义令牌，再在 `styles/admin.css`
-的 `@theme inline` 桥接成 shadcn 语义变量。
-
-### 7.6 底座与后处理
-
-| 项 | 值 |
-| --- | --- |
-| 安装方式 | `npx shadcn@latest add <component>`，项目清单 `frontend/components.json` |
-| 底座 | `style: "new-york"` → `radix-ui` 1.8.1（统一包） |
-| 类名合并 | 官方 npm 包 `cn` 0.5.1（`createCn`） |
-| 安装后处理 | `node scripts/post-shadcn.mjs` —— 剥 `dark:` 变体、改写 `cn` 导入路径、检查圆角档 |
-
-组合写法是 radix 的 `asChild`。`shadcn add` 会连同底座一起装；**不要引回 `@base-ui/react`**。
-
-### 7.7 样式入口
-
-`styles/admin.css` 是后台唯一的样式入口，只被后台 chunk 导入，C 端不下载：
-
-- 只引 `theme.css` + `utilities.css`（**无 preflight**）+ `tw-animate-css`；
-- `@source` 白名单为 `admin-ui` / `pages/admin` / `components/admin` —— 新增后台目录必须补 `@source`，否则该目录的工具类不生成且构建不报错；
-- base 规则限定 `.admin-root` / `.admin-portal`，不写全局元素选择器（唯一的例外是 `border: 0 solid` 兜底，必须全局，否则 portal 浮层会独自丢掉全部边线）。
-
-## 8. 测试契约
-
-### 8.1 e2e 钩子
-
-后台共享控件与页面关键节点挂 `data-testid="admin-*"`；表单控件用 `aria-label`。
-测试一律 `getByTestId` / `getByLabel` / 角色名，**不追 Tailwind 工具类**。
-
-| 钩子 | 位置 |
-| --- | --- |
-| `admin-header` / `admin-sider` / `admin-nav-scroll` | 外壳 |
-| `admin-panel` / `admin-stat-card` / `admin-save-bar` | 面板 / 指标卡 / 保存条 |
-| `admin-filter` / `admin-filter-actions` / `admin-filter-chips` / `admin-filter-chip` | 筛选条 |
-| `admin-table` / `admin-table-scroll` / `admin-table-row` / `admin-table-expanded` | 表格 |
-| `admin-modal` / `admin-drawer` / `admin-confirm-action` / `admin-confirm-dialog` | 浮层 |
-| `admin-toast` | 轻提示 |
-| `admin-page-loading` / `admin-desc` | 骨架 / 键值描述 |
-| `admin-bulk-bar` / `admin-channel-*` / `admin-storage-*` / `admin-asset-cell` / `admin-task-row` / `admin-alert-row` | 页面自有节点 |
-
-### 8.2 单元测试
-
-具名导入 / 导出对账（`src/test/namedImportAudit.ts`）：后台与 C 端共用一份实现。
-
-这类错**单文件转译看不出来**（esbuild / tsc 单文件只校验语法），Vitest 也看不出来：
-Vite 把具名导入改写成对命名空间的属性访问，缺失的名字只会是 `undefined`，不会报错。
-所以直接读源码对账：凡 `import { A, B } from './相对路径'` 的每个名字，都必须能在目标模块的导出里找到。
-
-### 8.3 验收方式
-
-- `npx tsc --noEmit`：后台 0 错；
-- `npx vitest run`：全量单测；
-- `npx playwright test --config=playwright.admin.config.ts`：后台 e2e；
-- `node e2e/audit/sweep-admin.mjs`：32 条路由逐页打开，控制台错误 0；
-- `node e2e/audit/shot-admin.mjs`：概览 / 设置 / 渠道 / 用户 / 订单 / 积分 / 告警截图落 `/tmp`。
+| 外壳级故障页仍从 `primitives` 取件 | `frontend/src/pages/admin/layout-parts/AdminLoadError.tsx` 等 | 仅限外壳不可用场景，不扩散到业务页 |

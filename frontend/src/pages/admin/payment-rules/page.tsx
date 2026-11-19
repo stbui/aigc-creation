@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import '../../../styles/radar-admin.css';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { RotateCcw, ShieldCheck, WalletCards } from 'lucide-react';
 
 import {
@@ -59,7 +59,6 @@ function hasOwn(map: DraftMap, key: string): boolean {
 export function AdminPaymentRulesPage() {
   const { can } = useAdmin();
   const toast = useToast();
-  const navigate = useNavigate();
   const { hash } = useLocation();
   const editable = can('setting.write');
 
@@ -255,13 +254,11 @@ export function AdminPaymentRulesPage() {
       description="从客户支付体验到退款处理边界，集中管理影响收款与售后判断的规则。保存后立即生效。"
       actions={
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <ActionButton
-            variant="outline"
-            size="sm"
-            icon={WalletCards}
-            onClick={() => navigate(PAYMENT_CONFIG_HREF)}
-          >
-            管理收款渠道
+          <ActionButton asChild variant="outline" size="sm">
+            <Link to={PAYMENT_CONFIG_HREF}>
+              <WalletCards className="size-4" aria-hidden />
+              管理收款渠道
+            </Link>
           </ActionButton>
           <ToneBadge tone={dirtyCount > 0 ? 'warn' : editable ? 'success' : 'neutral'}>
             {dirtyCount > 0 ? `${dirtyCount} 项未保存` : editable ? '规则已保存' : '仅查看'}
@@ -314,7 +311,7 @@ export function AdminPaymentRulesPage() {
             >
               {renderGrid(REFUND_RULE_KEYS)}
               <div className="mt-5 flex items-start gap-3 rounded-lg bg-muted/50 p-3">
-                <RotateCcw className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+                <RotateCcw className="mt-0.5 size-4 shrink-0 text-radar-ink-950" aria-hidden />
                 <div>
                   <p className="m-0 text-[13px] font-medium text-foreground">客户可感知的退款边界</p>
                   <p className="m-0 mt-1 text-[12px] leading-5 text-muted-foreground">
@@ -335,7 +332,7 @@ export function AdminPaymentRulesPage() {
             >
               {renderGrid(ORDER_LIMIT_KEYS)}
               <div className="mt-4 flex items-start gap-3 rounded-lg bg-muted/50 p-3">
-                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-radar-ink-950" aria-hidden />
                 <p className="m-0 text-[12px] leading-5 text-muted-foreground">
                   {cancelLimitEnabled
                     ? `客户每 ${formatRuleValue(

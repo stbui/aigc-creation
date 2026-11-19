@@ -14,7 +14,6 @@ import {
   useAdmin,
   useAdminResource,
   useAdminUrlFilterSync,
-  useDiscardConfirm,
   useToast,
   useUnsavedGuard,
 } from './hooks';
@@ -193,7 +192,6 @@ export function AdminProductsPage() {
     setCreating(false);
     setEditing(null);
   };
-  const requestCloseForm = useDiscardConfirm(formDirty, closeForm);
 
   const patchDraft = (patch: Partial<ProductDraft>) => setDraft((prev) => ({ ...prev, ...patch }));
 
@@ -346,7 +344,7 @@ export function AdminProductsPage() {
         formDirty={formDirty}
         saving={saving}
         onPatch={patchDraft}
-        onClose={requestCloseForm}
+        onClose={closeForm}
         onSubmit={() => void submit()}
       />
 

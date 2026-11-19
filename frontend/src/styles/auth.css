@@ -315,9 +315,17 @@
   color: var(--text-muted);
 }
 
-.login-switch a {
+.login-switch .login-switch-action {
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--brand);
+  font: inherit;
   cursor: pointer;
+}
+
+.login-switch .login-switch-action:hover {
+  color: var(--brand-hover);
 }
 
 /* ── 通用 OAuth 登录按钮 ─────────────────────────────────────────────── */

@@ -24,7 +24,7 @@ import {
 
 /** 来源图标：内联小方块，避免拉外链图片（后台不该有第三方资源依赖） */
 const PROVIDER_ACCENTS: Record<string, string> = {
-  alipay: 'bg-brand/10 text-brand',
+  alipay: 'bg-radar-ink-100 text-radar-ink-950',
   wechat: 'bg-success-soft text-success-text',
   epay: 'bg-warn-soft text-warn-text',
 };
@@ -106,7 +106,7 @@ export function PaymentsProviderCard({
       data-enabled-instance-count={provider.instances.filter((instance) => instance.enabled).length}
       data-usable-instance-count={usableInstances}
       className={cn(
-        'group relative h-full min-h-[184px] gap-0 overflow-hidden rounded-xl border bg-card py-0 shadow-card transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+        'group relative h-full min-h-[184px] gap-0 overflow-hidden rounded-xl border bg-card py-0 transition-[transform,border-color] duration-200 hover:-translate-y-0.5',
         danger
           ? 'border-danger-soft bg-danger-soft/10 hover:border-danger-text/25'
           : 'border-border hover:border-primary/20',

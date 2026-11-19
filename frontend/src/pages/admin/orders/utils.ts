@@ -2,7 +2,7 @@
  * 订单管理的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
  */
 
-export { cn } from '../../../admin-ui/lib/cn';
+export { cn } from '~/admin-ui/radar';
 
 /** 跨模块上下文链接（回跳带 context / done 标记） */
 export { readAdminActionContext, readAdminDone, withAdminDone } from '../../../lib/admin-context-link';

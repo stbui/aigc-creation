@@ -125,6 +125,22 @@
   letter-spacing: 1.2px;
 }
 
+.sitemap-section-no[data-accent='1'] {
+  color: var(--sitemap-accent-1);
+}
+
+.sitemap-section-no[data-accent='2'] {
+  color: var(--sitemap-accent-2);
+}
+
+.sitemap-section-no[data-accent='3'] {
+  color: var(--sitemap-accent-3);
+}
+
+.sitemap-section-no[data-accent='4'] {
+  color: var(--sitemap-accent-4);
+}
+
 .sitemap-section-head {
   margin-top: var(--space-10);
   display: flex;

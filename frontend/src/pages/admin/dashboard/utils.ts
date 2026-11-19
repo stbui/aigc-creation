@@ -5,7 +5,7 @@
  * 可以直接在后续图表或测试中复用。
  */
 
-import { formatDate, formatHm, formatMonthDayTime } from '../../../admin-ui/lib/format';
+import { formatDate, formatHm, formatMonthDayTime, formatYuanGrouped } from '~/admin-ui/radar';
 
 export { taskErrorLabel } from '../../../lib/admin-error-codes';
 export { adminOrderDetailHref, adminTaskHref } from '../../../lib/admin-links';
@@ -48,8 +48,5 @@ export function hhmm(iso: string): string {
  * @param digits 小数位。柱状图上的数字用 0 位，否则刻度会挤成一片
  */
 export function yuan(cents: number, digits = 2): string {
-  return (cents / 100).toLocaleString('zh-CN', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
+  return formatYuanGrouped(cents, digits);
 }

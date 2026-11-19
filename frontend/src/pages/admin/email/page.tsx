@@ -1,4 +1,4 @@
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { FileText, ListChecks, Send, Settings2 } from 'lucide-react';
 
 import {
@@ -36,7 +36,6 @@ import { emailPageTab, emailRuntimeState } from './utils';
  * `emailRuntimeState` 统一算一次，三个分区各自成组件。
  */
 export function AdminEmailPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { can } = useAdmin();
   const writable = can('setting.write');
@@ -142,13 +141,11 @@ export function AdminEmailPage() {
             </ActionButton>
           ) : null}
           {can('message.write') ? (
-            <ActionButton
-              variant="outline"
-              size="sm"
-              icon={Send}
-              onClick={() => navigate('/admin/notifications')}
-            >
-              发送活动消息
+            <ActionButton asChild variant="outline" size="sm">
+              <Link to="/admin/notifications">
+                <Send className="size-4" aria-hidden />
+                发送活动消息
+              </Link>
             </ActionButton>
           ) : null}
           <ToneBadge

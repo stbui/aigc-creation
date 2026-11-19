@@ -35,7 +35,7 @@ const METHOD_VISUAL: Record<
   VisiblePaymentMethod,
   { Icon: typeof CreditCard; iconClassName: string }
 > = {
-  alipay: { Icon: CreditCard, iconClassName: 'bg-brand/10 text-brand' },
+  alipay: { Icon: CreditCard, iconClassName: 'bg-radar-ink-100 text-radar-ink-950' },
   wechat: { Icon: MessageCircle, iconClassName: 'bg-success-soft text-success-text' },
 };
 
@@ -161,7 +161,7 @@ export function PaymentsVisibleMethodsCard({
     <>
       <Card
         data-testid="admin-payment-visible-methods"
-        className="flex h-full flex-col gap-0 rounded-xl border-border bg-card py-0 shadow-card"
+        className="flex h-full flex-col gap-0 rounded-xl border-border bg-card py-0"
       >
         <CardHeader className="flex items-start justify-between gap-4 px-4 pt-4 pb-3">
           <div className="min-w-0">
@@ -302,7 +302,7 @@ export function PaymentsVisibleMethodsCard({
               return (
                 <div
                   key={method}
-                  className="rounded-xl border border-border bg-card p-4 shadow-card"
+                  className="rounded-xl border border-border bg-card p-4"
                 >
                   <div className="flex items-start gap-3">
                     <span

@@ -74,11 +74,11 @@ export function EmailOverview({
   return (
     <Card
       data-testid="email-overview"
-      className="mb-4 gap-0 overflow-hidden rounded-xl border-border bg-card py-0 shadow-card"
+      className="mb-4 gap-0 overflow-hidden rounded-xl border-border bg-card py-0"
     >
       <CardContent className="p-0">
         <div className="flex flex-wrap items-center gap-3 bg-gradient-to-r from-accent/70 via-card to-card px-5 py-4">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-radar-ink-100 text-radar-ink-950">
             <ProviderIcon className="size-5" aria-hidden />
           </span>
           <div className="min-w-0 flex-1">

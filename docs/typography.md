@@ -7,7 +7,8 @@
 | 字体导入 | `frontend/index.html` |
 | 设计令牌 | `frontend/src/styles/tokens.css` 的 `:root`（由 `global.css` 入口 @import）；分层与命名见 [`design-tokens.md`](design-tokens.md) |
 | 前台 UI 层 | `frontend/src/ui/styles.css`（Tailwind 主题变量桥接到 `tokens.css` 令牌） |
-| 后台 UI 层 | `frontend/src/styles/admin.css`（同一套令牌，页面不另定义色值） |
+| 后台外壳层 | `frontend/src/styles/admin.css`（品牌紫，作用于侧栏与顶栏） |
+| 后台内容层 | `frontend/src/styles/radar-admin.css`（Radar 中性令牌，作用于业务页面） |
 
 ## 1. 字体
 
@@ -41,10 +42,11 @@ Noto Sans SC 优先：Windows 没有 PingFang，把 webfont 放在首位才能�
 
 | 场景 | 字号 / 字重 |
 | --- | --- |
-| 正文与表单 | 14px / 400 |
+| 前台正文与表单 | 14px / 400 |
+| 后台正文、字段与输入值 | 13px / 400；字段标签 500 |
 | 卡片标题、菜单条目、导航项 | 13px / 600–700 |
-| 辅助说明、meta | 12px / 400 |
-| 页面标题 | 24–32px / 500–700（按页面规格） |
+| 辅助说明、meta | 12–12.5px / 400 |
+| 页面标题 | 后台 22px / 600；C 端按页面规格 24–32px / 500–700 |
 | 数字强调 | 600–800 |
 
 基准字号维持 14px。改成 16px 会连锁改变 Button / Input / Select 等全部控件高度，收益与风险不成比例。
@@ -62,7 +64,7 @@ Noto Sans SC 优先：Windows 没有 PingFang，把 webfont 放在首位才能�
 | `--color-border` / `--color-input` | `--border` |
 | `--radius-sm … --radius-2xl` | `--radius-tag … --radius-hero` |
 
-**令牌只有一处定义**：改品牌色只改 `tokens.css` 的 `:root`，前台与后台同时生效。页面不写裸 hex，也不新增同义色簇；`ui/styles.css` 缺映射时补映射，不要在组件里写颜色。
+**令牌按视觉层取源**：前台与后台外壳的品牌色由 `tokens.css` 的 `:root` 驱动，改 `--brand` 同时影响前台与后台外壳；后台业务内容的中性色与语义色由 `radar-admin.css` 驱动。页面不写裸 hex，也不新增同义色簇；`ui/styles.css` 缺映射时补映射，不要在组件里写颜色。
 
 ## 4. 圆角
 
@@ -114,7 +116,7 @@ shadcn 控件的 focus ring 取自 `--color-ring`（即 `--brand`），改令牌
 
 页面一律引用 `var(--token)`，不写裸 hex。`--color-primary` 历史上一度是蓝色 `#2563eb`，与紫系页面混用导致 hover 时蓝紫跳变 —— 这类同义色簇是最容易复发的样式缺陷。
 
-新增颜色前先查 `tokens.css` 是否已有语义合适的 token；确需新增则定义 token 并全站替换。
+新增颜色前先确认所在视觉层：前台与后台外壳查 `tokens.css`，后台业务内容查 `radar-admin.css`。确需新增时在对应层定义语义 token，并全量替换裸值。
 
 ## 附录 A · 字体生效的排查方法
 

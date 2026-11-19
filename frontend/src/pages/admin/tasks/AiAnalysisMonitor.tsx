@@ -60,7 +60,7 @@ const COLUMNS: Array<AdminColumn<ApiLogView>> = [
         </div>
         {row.userAccount ? (
           <Link
-            className="block truncate text-brand hover:underline"
+            className="block truncate text-radar-ink-950 hover:underline"
             title={row.userAccount}
             to={adminUserDetailHref(row.userId)}
           >
@@ -349,7 +349,7 @@ export function AiAnalysisMonitor() {
         extra={
           <>
             <Link
-              className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-brand hover:underline"
+              className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-radar-ink-950 hover:underline"
               to={fullRecordsHref}
             >
               完整调用记录

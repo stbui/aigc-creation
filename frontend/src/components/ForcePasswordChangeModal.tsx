@@ -101,7 +101,7 @@ export function ForcePasswordChangeModal() {
         />
       </div>
       {error && (
-        <p className="account-desc" role="alert" style={{ color: 'var(--danger-text)' }}>
+        <p className="ui-form-error" role="alert">
           {error}
         </p>
       )}

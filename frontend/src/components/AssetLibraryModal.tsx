@@ -195,13 +195,12 @@ export function AssetLibraryModal({
       <div className="alp-body">
         {/* ── 工具栏: 来源胶囊 + 日期筛选 + 搜索 ── */}
         <div className="alp-toolbar">
-          <div className="alp-groups" role="tablist" aria-label="素材来源">
+          <div className="alp-groups" role="group" aria-label="素材来源">
             {KIND_LABELS.map((k) => (
               <Button
                 key={k.id}
                 type="text"
-                role="tab"
-                aria-selected={kind === k.id}
+                aria-pressed={kind === k.id}
                 className={`alp-chip${kind === k.id ? ' is-active' : ''}`}
                 onClick={() => setKind(k.id)}
               >

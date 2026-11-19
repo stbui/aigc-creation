@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   ImageLightbox,
   MobileUploadModal,
@@ -25,7 +24,6 @@ import {
   buildEmptyStateCopy,
   capabilityName,
   isSupportedImageFile,
-  toolPath,
 } from './utils';
 import { useLibraryAssets } from './useLibraryAssets';
 import { useLibraryProjects } from './useLibraryProjects';
@@ -53,7 +51,6 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
 export function LibraryPage() {
   useDocumentMeta('素材库 · 货觉AI', '管理上传的原图与生成图，支持分组、下载与删除。');
   const { message } = useApp();
-  const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const { ensureProject } = useProject();
   const { data: caps } = useCapabilities();
@@ -359,7 +356,6 @@ export function LibraryPage() {
             onPreview={setPreviewIndex}
             onDownload={downloadAsset}
             onRemove={(id) => void removeAsset(id)}
-            onReuse={(capabilityId) => navigate(toolPath(capabilityId))}
           />
         )}
 

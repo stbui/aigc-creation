@@ -3,11 +3,11 @@
  */
 
 import type { AdminCoupon, CouponType, UpsertCouponPayload } from './types';
-import { formatYuanPlain } from '../../../admin-ui/lib/format';
+import { formatYuanPlain } from '~/admin-ui/radar';
 import type { FormState } from './constants';
 
 /** 分 → 元（统一实现在 admin-ui/lib/format.ts） */
-export { formatDate } from '../../../admin-ui/lib/format';
+export { formatDate } from '~/admin-ui/radar';
 export const yuan = formatYuanPlain;
 
 /** 面额展示：语义随类型而变，不统一按元显示 */

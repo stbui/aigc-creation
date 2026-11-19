@@ -237,7 +237,7 @@ export function ChannelListPanel({
                 className={cn(
                   'h-auto w-full rounded-lg px-3 py-2.5 text-left whitespace-normal hover:bg-muted',
                   'outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
-                  active && 'bg-accent ring-1 ring-inset ring-brand/30 hover:bg-accent',
+                  active && 'bg-accent ring-1 ring-inset ring-radar-ink-300 hover:bg-accent',
                 )}
                 onClick={() => onSelect(row.id)}
                 onKeyDown={(event) => handleChannelKeyDown(event, index)}

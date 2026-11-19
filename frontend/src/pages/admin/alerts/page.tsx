@@ -4,7 +4,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import {
   ALERT_CATEGORY_LABEL,
+  SEVERITY_BADGE_STYLE,
   SEVERITY_HINT,
+  SEVERITY_ICON_STYLE,
   SEVERITY_TONE,
   SeverityFilter,
 } from './constants';
@@ -31,7 +33,7 @@ import {
   RadarBadge,
   RadarPage,
   PageHeader,
-  RadarPanel,
+  Panel,
   StatCards,
   Segmented,
   EmptyState,
@@ -42,20 +44,6 @@ import {
   WorkQueueSection,
 } from '../../../admin-ui/radar';
 import '../../../styles/radar-admin.css';
-
-/** 严重级别 → 中性风格徽章底色（语义色成对：浅底 + 深字）。 */
-const SEVERITY_BADGE_STYLE: Record<AdminAlertSeverity, string> = {
-  critical: 'bg-radar-alert-subtle text-radar-alert',
-  warning: 'bg-radar-code-subtle text-radar-code',
-  info: 'bg-radar-ink-100 text-radar-ink-600',
-};
-
-/** 严重级别 → 列表行图标色。 */
-const SEVERITY_ICON_STYLE: Record<AdminAlertSeverity, string> = {
-  critical: 'text-radar-alert',
-  warning: 'text-radar-code',
-  info: 'text-radar-ink-500',
-};
 
 export function AdminAlertsPage() {
   const { data, loading, error, reload } = useAdminAlerts();
@@ -148,7 +136,7 @@ export function AdminAlertsPage() {
       {/* 四张卡固定一行：数字之间要能横向比较「哪一级在涨」，折行就断了这层对照 */}
       <StatCards items={statItems} columns={4} className="mb-4" />
 
-      <RadarPanel
+      <Panel
         title="待处理清单"
         note="来源按当前角色权限过滤，无权访问的模块不会出现在这里"
         extra={
@@ -215,7 +203,7 @@ export function AdminAlertsPage() {
                         title={item.detail}
                       >
                         {/* 来源用小字前缀，代替第二枚 badge —— 标题行已经没地方了 */}
-                        <span className="shrink-0 rounded bg-radar-ink-100 px-1 py-px text-[11px] leading-4 text-radar-ink-500">
+                        <span className="shrink-0 rounded bg-radar-ink-100 px-1 py-px text-[12px] leading-4 text-radar-ink-500">
                           {ALERT_CATEGORY_LABEL[item.category]}
                         </span>
                         <span className="truncate">{item.detail}</span>
@@ -237,7 +225,7 @@ export function AdminAlertsPage() {
             })}
           </ul>
         )}
-      </RadarPanel>
+      </Panel>
 
       <div className="mb-4">
         <WorkQueueSection
@@ -265,7 +253,7 @@ export function AdminAlertsPage() {
         </WorkQueueSection>
       </div>
 
-      <RadarPanel title="告警口径" note="计数是「当前待处理数」，被处理后自然消失">
+      <Panel title="告警口径" note="计数是「当前待处理数」，被处理后自然消失">
         {/* 两列：六条口径是参考文献，占满整宽会把页面拉长一屏 */}
         <ul className="list-disc pl-4 text-[12.5px] leading-5 text-radar-ink-400 lg:columns-2 lg:gap-x-10">
           <li className="mb-1.5 break-inside-avoid">
@@ -289,7 +277,7 @@ export function AdminAlertsPage() {
         <p className="mt-3 text-[12px] leading-4 text-radar-ink-400">
           不引入「已读」状态：事项被处理后自然消失，避免出现「点过就算解决」的假象。
         </p>
-      </RadarPanel>
+      </Panel>
     </RadarPage>
   );
 }

@@ -86,7 +86,7 @@ export function PaymentsProviderSummary({
     <Card
       data-testid="admin-provider-summary"
       className={cn(
-        'flex h-full flex-col gap-0 rounded-xl border-border bg-card py-0 shadow-card',
+        'flex h-full flex-col gap-0 rounded-xl border-border bg-card py-0',
         className,
       )}
     >

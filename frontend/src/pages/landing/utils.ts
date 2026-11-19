@@ -1,4 +1,5 @@
 import { capabilityById, toolPath } from '../../lib/capabilities';
+import { formatCompactDateTime } from '../../lib/format';
 import { CASE_CAPABILITY_MAP } from './constants';
 
 /**
@@ -18,6 +19,8 @@ export { isCapabilityVisible } from '../../lib/capabilities';
 export { toolPath } from '../../lib/capabilities';
 /** 套餐卡视觉装饰 (推荐标签等), 与定价无关 */
 export { PLAN_VISUALS } from '../../lib/constants';
+/** 积分与数量千分位 */
+export { formatNumber } from '../../lib/format';
 
 /**
  * 案例文件按商品去重。
@@ -39,10 +42,7 @@ export function uniqueCaseFiles(files: readonly string[]): string[] {
 
 /** 活动结束时间展示（本地时区，仅展示用，不参与任何判定） */
 export function formatCampaignEnd(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return formatCompactDateTime(iso, { separator: '-', fallback: '' });
 }
 
 /**

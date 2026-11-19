@@ -106,6 +106,7 @@
   background: var(--pkg-card);
   color: var(--pkg-muted);
   font-size: 12px;
+  text-decoration: none;
   cursor: pointer;
   transition:
     border-color 0.18s ease,

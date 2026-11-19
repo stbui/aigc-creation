@@ -55,11 +55,12 @@ npm run test:watch      # watch
 npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitignore）
 ```
 
-当前 129 个用例文件，下表列出与闸口直接相关的部分：
+当前 138 个用例文件，下表列出与闸口直接相关的部分：
 
 | 用例 | 守住什么 |
 | --- | --- |
 | `admin-ui/primitives/table.test.tsx` | 后台数据表格的列显隐：**表头与表体列数始终一致**（默认全可见各 2 列；隐藏一列后表头与每个表体行同时少一列，且不残留该列内容） |
+| `admin-ui/radar/FormDrawer.test.tsx` | 抽屉关闭只确认一次：`dirty` 时取消弹一层、放弃后才回调 `onClose` 一次；无修改直接关闭；`busy` 时不响应关闭也不弹确认（页面不得在 `onClose` 上再包一层 `useDiscardConfirm`） |
 | `components/ErrorBoundary.test.tsx` | 顶层 `ErrorBoundary` 未传 `resetKeys` 时稳定停留兜底页，不反复重置 |
 | `components/ColorSwatchGrid.test.tsx` | 色板选择、自定义色回显、禁用态 |
 | `components/ImageLightbox.test.tsx` | 大图查看器开合、缩放/翻页键盘语义 |
@@ -78,6 +79,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `lib/multiFusionBilling.test.ts` | 多图融合变体数 × 积分计费 |
 | `lib/optionSets.test.ts` | 平台/语言/比例等选项集合的默认值与排序 |
 | `lib/poll.test.ts` | 轮询重试、超时、视频上限放宽、中止语义 |
+| `pages/admin/prompts/utils.test.ts` | 提示词配图预览地址：解析失败的 `storage://` 返回 `undefined`（渲染占位而非拼必然 404 的地址）、云端地址原样、本地 `/uploads` 追加 `w/h`；标题为空用正文首行兜底、标签兼容中英文分隔符、表单提交体保留空字段且排序必须为整数、地址栏排序参数只认白名单字段 |
 | `lib/task-error-text.test.ts` | 任务失败文案：C 端已知码有专属文案、未知码不暴露数字码；后台保留原始码便于排障 |
 | `lib/routePreload.test.ts` | 路由预加载：精确路由只预热一次、通配路由匹配 |
 | `lib/skuBatches.test.ts` | SKU 行批量展开与坐标映射 |
@@ -142,6 +144,7 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | `common/setting-image.service.spec.ts` | 设置帮助图片的稳定存储引用解析、未知后端 / 目录穿越拒绝、本地与云存储预览地址生成、历史外链兼容 |
 | `model/proxy/proxy.payload.spec.ts` | 流式 Chat Completions 的 `stream_options.include_usage` 注入：非流式原样返回、缺失时补上、保留已有字段、非法 JSON / 非对象报文 / 非对象 `stream_options` 一律拒绝 |
 | `model/infra/outbound.spec.ts` | 自定义中转的 IPv6 保留网段拦截：`100::/64`（discard-only）、`2001:db8::/32`（文档网段）、IPv4-mapped loopback；普通出站不把保留网段当私网拦 |
+| `prompts/prompts.service.spec.ts` | 提示词库：标签解析与归一（去重 / 截断 / 最多 8 条）、配图解析（丢弃空 `ref`、保留 `assetId` / `name`）、配图按 `ref` 去重并限 9 张、列表 `enabled=false` 不丢、关键词同时匹配标题 / 正文 / 标签、正文必填而标题可空、创建补齐默认值、更新不存在返回 404 且不写库、空上传返回 400、multer 落盘后按 path 读文件上传、删除 / 更新后只回收 `prompts/` 前缀且仍被引用的对象不删、写库失败不删对象、回收查询失败不影响删除结果 |
 
 新增 service / 纯函数逻辑时优先补 L1.6；mock 成本过高或需要事务/真实 SQLite 的并发路径，再落到 L2/L3。
 

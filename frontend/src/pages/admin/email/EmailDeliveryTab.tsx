@@ -66,7 +66,7 @@ export function EmailDeliveryTab({
             itemFor={config.itemFor}
             valueFor={config.valueFor}
             disabled={!writable}
-            clearPending={config.isClearPending}
+            clearPending={config.clearPending}
             onChange={config.setValue}
             onClear={config.requestClear}
             onUndoClear={config.undoClear}

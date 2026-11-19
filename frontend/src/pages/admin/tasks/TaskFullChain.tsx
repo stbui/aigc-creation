@@ -207,7 +207,7 @@ function RouteAttempts({ task, attempts }: { task: AdminTaskDetail; attempts: Ad
           </span>
         </div>
         <Link
-          className="inline-flex items-center gap-1 text-[12px] text-brand hover:underline"
+          className="inline-flex items-center gap-1 text-[12px] text-radar-ink-950 hover:underline"
           to={adminModelCallsHref({ taskId: task.id })}
         >
           查看全部模型调用

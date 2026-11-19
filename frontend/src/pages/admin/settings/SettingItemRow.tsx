@@ -326,8 +326,8 @@ function renderControl({
 export function SettingItemRow({
   item,
   value,
-  isDraft,
-  isClearing,
+  draft,
+  clearing,
   editable,
   onChange,
   onRevert,
@@ -335,14 +335,14 @@ export function SettingItemRow({
 }: {
   item: SettingItem;
   value: AdminSettingValue;
-  isDraft: boolean;
-  isClearing: boolean;
+  draft: boolean;
+  clearing: boolean;
   editable: boolean;
   onChange: (value: AdminSettingValue) => void;
   onRevert: () => void;
   onClear: () => void;
 }) {
-  const showActions = !item.readOnly && (isDraft || isClearing || (item.overridden && editable));
+  const showActions = !item.readOnly && (draft || clearing || (item.overridden && editable));
   const changeControl = (next: AdminSettingValue) => {
     // 敏感值留空表示“保持原值”，不能生成一个提交后会把密钥覆盖为空串的草稿。
     if (item.sensitive && String(next ?? '') === '') {
@@ -358,12 +358,12 @@ export function SettingItemRow({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-semibold text-foreground">{item.label}</span>
           {item.readOnly && <ToneBadge tone="neutral">只读</ToneBadge>}
-          {item.overridden && !isClearing && (
+          {item.overridden && !clearing && (
             <ToneBadge tone="brand">
               <span title="已覆盖代码默认值">已自定义</span>
             </ToneBadge>
           )}
-          {isClearing && <ToneBadge tone="warn">待恢复默认</ToneBadge>}
+          {clearing && <ToneBadge tone="warn">待恢复默认</ToneBadge>}
         </div>
         <SettingDescription text={item.description} />
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
@@ -385,7 +385,7 @@ export function SettingItemRow({
             </span>
           )}
           {item.linkTo && (
-            <Link className="text-brand hover:underline" to={item.linkTo}>
+            <Link className="text-radar-ink-950 hover:underline" to={item.linkTo}>
               前往配置 →
             </Link>
           )}
@@ -397,12 +397,12 @@ export function SettingItemRow({
         <div className="flex w-full justify-end">{renderControl({ item, value, editable, onChange: changeControl })}</div>
         {showActions && (
           <div className="flex items-center gap-1">
-            {(isDraft || isClearing) && (
+            {(draft || clearing) && (
               <ActionButton variant="ghost" size="xs" onClick={onRevert} disabled={!editable}>
                 撤销
               </ActionButton>
             )}
-            {item.overridden && !isClearing && editable && (
+            {item.overridden && !clearing && editable && (
               <ActionButton variant="ghost" size="xs" onClick={onClear}>
                 恢复默认
               </ActionButton>

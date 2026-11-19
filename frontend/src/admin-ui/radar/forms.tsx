@@ -335,27 +335,25 @@ export function SelectField({
     >
       <SelectTrigger
         id={id}
+        size="sm"
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
         aria-required={ariaRequired}
         className={cn(
-          'h-8 w-full rounded-[8px] border border-radar-ink-200 bg-radar-surface text-[13px] text-radar-ink-900 focus-visible:ring-2 focus-visible:ring-radar-accent/30',
+          'h-8 w-full rounded-[8px] border border-radar-ink-200 bg-radar-surface text-[13px] text-radar-ink-900 shadow-none focus-visible:ring-2 focus-visible:ring-radar-accent/30',
           !value && 'text-radar-ink-400',
           className,
         )}
       >
         <SelectValue placeholder={placeholderText} />
       </SelectTrigger>
-      <SelectContent className="rounded-[8px] border border-radar-ink-200 bg-radar-surface shadow-none">
+      {/* 门户挂在 body 下，拿不到内容区的 `.radar-scope`，必须显式带上 */}
+      <SelectContent className="admin-portal radar-scope rounded-[8px] border border-radar-ink-200 bg-radar-surface shadow-none [&_[data-slot=select-item]]:text-[13px]">
         <SelectGroup>
           {allowClear && <SelectItem value={ALL}>{clearLabel}</SelectItem>}
           {options.map((option) => (
-            <SelectItem
-              key={option.value}
-              value={option.value}
-              className="text-[13px] text-radar-ink-900 focus:bg-radar-surface-hover"
-            >
+            <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
           ))}
@@ -516,7 +514,7 @@ export function ToneBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium',
+        'inline-flex items-center rounded px-1.5 py-0.5 text-[12px] leading-4 font-medium',
         tones[tone],
         className,
       )}
@@ -682,11 +680,12 @@ export function ActionButton({
   ariaLabel,
   ariaPressed,
   ariaExpanded,
+  asChild = false,
 }: {
   children?: ReactNode;
   onClick?: () => void;
   variant?: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive';
-  size?: 'xs' | 'sm' | 'default';
+  size?: 'xs' | 'sm' | 'md' | 'default';
   disabled?: boolean;
   icon?: React.ComponentType<{ className?: string }>;
   className?: string;
@@ -695,25 +694,43 @@ export function ActionButton({
   ariaLabel?: string;
   ariaPressed?: boolean;
   ariaExpanded?: boolean;
+  /** 把按钮外观交给子元素（如 `<Link>`）；导航必须保留链接语义 */
+  asChild?: boolean;
 }) {
-  const v: 'default' | 'secondary' | 'ghost' | 'danger' =
-    variant === 'outline' ? 'secondary' : variant === 'destructive' ? 'danger' : variant;
-  const s: 'sm' | 'md' = size === 'xs' ? 'sm' : size === 'default' ? 'md' : size;
+  const s: 'sm' | 'md' | 'xs' = size === 'xs' ? 'sm' : size === 'default' ? 'md' : size;
+  /*
+   * asChild 时由子元素（如 `<Link>`）持有原生语义，`type` / `form` 只属于
+   * `<button>`，不能透传过去。动作回调和可访问属性仍然保留。
+   */
+  const nativeProps = asChild ? {} : { type, form, disabled };
+  /*
+   * Radar 皮肤里 `secondary` 就是白底 + 细线的「带边界次级动作」，与
+   * `outline` 在内容区看起来一致；保留页面既有的 `outline` 写法，
+   * 统一落到 secondary，避免同一层级的按钮在灰底上变成透明底。
+   */
+  const v: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' =
+    variant === 'outline' ? 'secondary' : variant;
   return (
     <Button
-      type={type}
-      form={form}
+      {...nativeProps}
       variant={v}
       size={s}
-      disabled={disabled}
       onClick={onClick}
       aria-label={ariaLabel}
       aria-pressed={ariaPressed}
       aria-expanded={ariaExpanded}
-      className={className}
+      aria-disabled={asChild && disabled ? true : undefined}
+      asChild={asChild}
+      className={cn(asChild && disabled && 'pointer-events-none opacity-60', className)}
     >
-      {Icon ? <Icon className="size-4" aria-hidden /> : null}
-      {children}
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {Icon ? <Icon className="size-4" aria-hidden /> : null}
+          {children}
+        </>
+      )}
     </Button>
   );
 }
@@ -769,7 +786,7 @@ export function HelpTip({ tip, children }: { tip: ReactNode; children: ReactNode
         </TooltipTrigger>
         <TooltipContent
           sideOffset={6}
-          className="max-w-[340px] rounded-[8px] border border-radar-ink-200 bg-radar-ink-950 px-3 py-2 text-[12px] leading-relaxed text-white"
+          className="admin-portal radar-scope max-w-[340px] rounded-[8px] border border-radar-ink-200 bg-radar-ink-950 px-3 py-2 text-[12px] leading-relaxed text-white [&_svg]:bg-radar-ink-950 [&_svg]:fill-radar-ink-950"
         >
           {tip}
         </TooltipContent>

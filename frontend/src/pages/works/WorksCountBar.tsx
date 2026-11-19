@@ -9,14 +9,15 @@ export interface WorksCountBarProps {
   worksCount: number;
   /** 列表里尚未出图的任务数 */
   pendingCount: number;
-  isVideo: boolean;
+  /** 当前页签是否为视频作品 */
+  video: boolean;
 }
 
-export function WorksCountBar({ worksCount, pendingCount, isVideo }: WorksCountBarProps) {
+export function WorksCountBar({ worksCount, pendingCount, video }: WorksCountBarProps) {
   return (
     <div className="my-works-count-row">
       <span>
-        {worksCount} {isVideo ? '个视频' : '张作品'}
+        {worksCount} {video ? '个视频' : '张作品'}
         {pendingCount > 0 && (
           <em className="my-works-count-extra">
             {' · 另有 '}

@@ -1,34 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
 import { Bookmark, CircleAlert, Plus, X } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { ActionButton, TextField } from './form';
 import { ModalDialog } from './overlay';
-import { useAdmin } from '../../context/AdminContext';
-import {
-  ADMIN_BUILTIN_VIEWS,
-  createSavedView,
-  loadSavedViews,
-  persistSavedViews,
-  resolveViewFilters,
-  type AdminSavedView,
-  type AdminViewFilters,
-} from '../../lib/admin-saved-views';
-
-function normalized(filters: AdminViewFilters): string {
-  return JSON.stringify(
-    Object.fromEntries(
-      Object.entries(filters)
-        .filter(([, value]) => value !== undefined && value !== '')
-        .sort(([a], [b]) => a.localeCompare(b)),
-    ),
-  );
-}
+import { useSavedViewBar } from './saved-view-state';
+import type { AdminViewFilters } from '../../lib/admin-saved-views';
 
 /**
- * 保存视图条。
+ * 保存视图条（共享语义版）。
  *
  * 内置视图 + 本机保存的视图。应用视图只调用页面传入的 `onApply`，由页面
  * 走各自已有的 `setQuery` / URL 同步；组件本身不发请求、不改权限。
+ *
+ * 页面实际使用的是 `radar/SavedViewBar`（同一套 `useSavedViewBar` 逻辑、
+ * Radar 令牌视觉）。本文件供不在 `.radar-scope` 内的外壳级场景使用。
  */
 export function SavedViewBar({
   pageKey,
@@ -47,49 +31,19 @@ export function SavedViewBar({
   onApplyDraft?: () => void;
   className?: string;
 }) {
-  const { me } = useAdmin();
-  const [views, setViews] = useState<AdminSavedView[]>([]);
-  const [saveOpen, setSaveOpen] = useState(false);
-  const [name, setName] = useState('');
-
-  useEffect(() => {
-    setViews(loadSavedViews(me?.id, pageKey));
-  }, [me?.id, pageKey]);
-
-  const builtins = ADMIN_BUILTIN_VIEWS[pageKey] ?? [];
-  const currentKey = normalized(appliedFilters);
-  const hasUnappliedChanges =
-    draftFilters !== undefined && normalized(draftFilters) !== currentKey;
-
-  const items = useMemo(
-    () =>
-      [...builtins, ...views].map((view) => ({
-        view,
-        active: normalized(resolveViewFilters(view.filters, me?.id)) === currentKey,
-      })),
-    [builtins, currentKey, me?.id, views],
-  );
-
-  const apply = (view: AdminSavedView) => {
-    onApply(resolveViewFilters(view.filters, me?.id));
-  };
-
-  const save = () => {
-    if (hasUnappliedChanges) return;
-    const next = createSavedView(name, appliedFilters);
-    if (!next.name) return;
-    const merged = [...views, next];
-    setViews(merged);
-    persistSavedViews(me?.id, pageKey, merged);
-    setSaveOpen(false);
-    setName('');
-  };
-
-  const remove = (id: string) => {
-    const merged = views.filter((view) => view.id !== id);
-    setViews(merged);
-    persistSavedViews(me?.id, pageKey, merged);
-  };
+  const {
+    items,
+    apply,
+    hasUnappliedChanges,
+    canSave,
+    saveOpen,
+    openSave,
+    closeSave,
+    name,
+    setName,
+    save,
+    remove,
+  } = useSavedViewBar({ pageKey, appliedFilters, draftFilters, onApply });
 
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5', className)} data-testid="admin-saved-views">
@@ -103,7 +57,7 @@ export function SavedViewBar({
           className={cn(
             'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[13px] transition-colors',
             active
-              ? 'border-brand/30 bg-accent text-brand'
+              ? 'border-border bg-accent text-foreground'
               : 'border-border bg-card text-muted-foreground hover:bg-muted',
           )}
         >
@@ -146,8 +100,8 @@ export function SavedViewBar({
         variant="ghost"
         size="sm"
         icon={Plus}
-        disabled={!me?.id || hasUnappliedChanges}
-        onClick={() => setSaveOpen(true)}
+        disabled={!canSave}
+        onClick={openSave}
       >
         保存当前筛选
       </ActionButton>
@@ -155,15 +109,15 @@ export function SavedViewBar({
       <ModalDialog
         open={saveOpen}
         onOpenChange={(open) => {
-          setSaveOpen(open);
-          if (!open) setName('');
+          if (open) return;
+          closeSave();
         }}
         title="保存当前筛选为视图"
         description="只保存已应用的筛选；视图保存在本机浏览器，不改变其他同事看到的内容。"
         width={420}
         footer={
           <div className="flex justify-end gap-2">
-            <ActionButton variant="secondary" size="sm" onClick={() => setSaveOpen(false)}>
+            <ActionButton variant="secondary" size="sm" onClick={closeSave}>
               取消
             </ActionButton>
             <ActionButton variant="default" size="sm" disabled={!name.trim()} onClick={save}>

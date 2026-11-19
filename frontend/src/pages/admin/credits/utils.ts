@@ -10,7 +10,7 @@
  */
 
 /* 外部工具转出：目录内文件不直接引 `src/lib/*` */
-export { cn } from '../../../admin-ui/lib/cn';
+export { cn } from '~/admin-ui/radar';
 export {
   adminBillingOrderDetailHref,
   adminOrderDetailHref,

@@ -18,6 +18,8 @@ export interface ButtonProps extends Omit<ShadcnProps, 'variant' | 'size' | 'typ
   size?: 'small' | 'middle' | 'large' | ShadcnProps['size'];
   danger?: boolean;
   variant?: ShadcnProps['variant'];
+  /** 把按钮外观交给具有正确语义的子元素，例如 `<Link>`。 */
+  asChild?: boolean;
 }
 
 function normalizeVariant(type: ButtonProps['type'], variant: ButtonProps['variant'], danger?: boolean) {
@@ -45,18 +47,36 @@ export function Button({
   size,
   danger,
   variant,
+  asChild,
   className,
   children,
   disabled,
   ...props
 }: ButtonProps) {
+  const classes = cn('ui-btn', block && 'w-full', type === 'link' && 'h-auto p-0', className);
+
+  if (asChild) {
+    // 子元素自带语义（链接 / 路由），图标与加载态由子元素内容承担。
+    return (
+      <ShadcnButton
+        asChild
+        variant={normalizeVariant(type, variant, danger)}
+        size={normalizeSize(size)}
+        className={classes}
+        {...props}
+      >
+        {children}
+      </ShadcnButton>
+    );
+  }
+
   return (
     <ShadcnButton
       type={htmlType}
       variant={normalizeVariant(type, variant, danger)}
       size={normalizeSize(size)}
       disabled={disabled || loading}
-      className={cn('ui-btn', block && 'w-full', type === 'link' && 'h-auto p-0', className)}
+      className={classes}
       {...props}
     >
       {loading ? <span className="state-spinner is-small" aria-hidden /> : icon}

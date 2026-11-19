@@ -1,4 +1,4 @@
-import { Button } from '../../admin-ui/components/ui/button';
+import { Button, formatMonthDayTime } from '../../admin-ui/radar';
 import {
   AlertOctagon,
   AlertTriangle,
@@ -18,7 +18,7 @@ export const ALERT_SEVERITY_META: Record<
 };
 
 export function alertTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('zh-CN', { hour12: false });
+  return formatMonthDayTime(iso);
 }
 
 /**

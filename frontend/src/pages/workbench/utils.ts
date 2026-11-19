@@ -12,6 +12,8 @@ import { capabilityById } from '../../lib/capabilities';
 export { capabilityById, isCapabilityVisible, toolPath } from '../../lib/capabilities';
 /** 运行时结论（运营下线 / 无可用线路） */
 export { runtimeOf } from '../../lib/constants';
+/** 最近任务列表的时刻：月-日 时:分 */
+export { formatCompactDateTime } from '../../lib/format';
 
 /** 任务状态 → 用户可读文案 */
 export function statusLabel(s: string): string {

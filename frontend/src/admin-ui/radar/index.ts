@@ -6,10 +6,11 @@
  * 再用下方显式导出覆盖「品牌可见、高频」的件，改用 `radar-*` 令牌与零阴影 / 1px 细线
  * 语言。显式导出优先于 star 再导出，不冲突。
  *
- * 页面迁移：把 `from '~/admin-ui/primitives'` 改为 `from '~/admin-ui/radar'`，并用
- * `RadarPage` 包裹内容区即可，逻辑零改动。
+ * 页面接入：业务页面统一从 `~/admin-ui/radar` 取件，并用 `RadarPage` 包裹
+ * 内容区；数据 Hook 与格式化函数通过本入口透传，页面不直连 primitives。
  */
 export * from '../primitives';
+export { cn } from '../lib/cn';
 
 /* ── radar 覆盖件（优先于上面的 star 再导出）── */
 export { Button } from './Button';
@@ -28,8 +29,6 @@ export {
   SkeletonBody,
   WorkQueue,
   WorkQueueSection,
-  // 试点页曾用 `RadarPanel` 别名，保留以兼容既有写法。
-  Panel as RadarPanel,
 } from './blocks';
 export { Drawer, DRAWER_WIDTH, type DrawerSize } from './Drawer';
 export { SheetModal } from './SheetModal';
@@ -74,5 +73,8 @@ export {
   type RowMenuItem,
 } from './overlays';
 export { AdminPage, AdminTabs, TabsContent } from './page';
+export { AdminDrawer, AdminModal } from './DetailDialog';
+export { SavedViewBar } from './SavedViewBar';
+export { ConfirmAlert } from './ConfirmAlert';
 export { SaveBar, DetailSection, BatchBar } from './layout';
 export { FormDrawer } from './formDrawer';

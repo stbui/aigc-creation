@@ -87,6 +87,7 @@ export function ChannelFormDrawer({
       size="lg"
       title={editing ? '编辑供应商' : '接入供应商'}
       busy={saving}
+      dirty={dirty}
       submitLabel={editing ? '保存修改' : '接入'}
       submitDisabled={!writable}
       onSubmit={onSubmit}

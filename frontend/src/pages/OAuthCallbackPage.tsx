@@ -1,7 +1,7 @@
 import '../styles/auth.css';
 import './OAuthCallbackPage.css';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Spin } from '../ui';
 import { authApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -60,8 +60,10 @@ export function OAuthCallbackPage() {
           <>
             <h1>第三方登录失败</h1>
             <p>{error}</p>
-            <Button type="primary" size="large" onClick={() => navigate('/login', { replace: true })}>
-              返回登录
+            <Button asChild type="primary" size="large">
+              <Link replace to="/login">
+                返回登录
+              </Link>
             </Button>
           </>
         ) : (

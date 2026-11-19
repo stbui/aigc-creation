@@ -37,9 +37,9 @@ interface AuthContextValue {
   /**
    * 弹窗可见性与身份版本号, 供 `<LoginModalHost>` 渲染。
    *
-   * ⚠ 宿主不在这里渲染: AuthCard 内部用 useNavigate() 跳「忘记密码」,
+   * ⚠ 宿主不在这里渲染: AuthCard 内部用 <Link> 跳「忘记密码」,
    * 而 AuthProvider 位于 <BrowserRouter> 之外, 在此渲染会抛
-   * "useNavigate() may be used only in the context of a <Router> component",
+   * "useHref() may be used only in the context of a <Router> component",
    * 弹窗挂不上 —— 表现为「点登录免费生成毫无反应」。宿主见 App.tsx。
    */
   loginOpen: boolean;

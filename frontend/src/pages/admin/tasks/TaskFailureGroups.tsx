@@ -39,7 +39,7 @@ export function TaskFailureGroups({
             className={cn(
               'h-auto min-w-0 gap-1 rounded-md border-border bg-card px-2 py-1 text-xs font-normal',
               'text-muted-foreground hover:bg-muted hover:text-muted-foreground',
-              'data-[state=on]:border-brand/30 data-[state=on]:bg-accent data-[state=on]:text-brand',
+              'data-[state=on]:border-radar-ink-300 data-[state=on]:bg-accent data-[state=on]:text-radar-ink-950',
             )}
           >
             {taskErrorLabel(group.errorCode)}

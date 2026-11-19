@@ -33,6 +33,7 @@ import {
   Settings,
   Share2,
   ShieldCheck,
+  Sparkles,
   Tag,
   Ticket,
   Trash2,
@@ -110,6 +111,12 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         label: "写真模板",
         icon: Images,
         permission: "template.read",
+      },
+      {
+        path: "/admin/prompts",
+        label: "提示词管理",
+        icon: Sparkles,
+        permission: "prompt.read",
       },
       {
         path: "/admin/aigc-label",

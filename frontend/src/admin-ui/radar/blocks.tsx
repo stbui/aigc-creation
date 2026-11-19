@@ -1,12 +1,12 @@
 /**
  * 中性风格（freebie-radar 设计语言）后台构建块。
  *
- * 与 `~/admin-ui/primitives`（品牌紫 / shadcn 后台）一一对应的雷达版：同样的
+ * 与 `~/admin-ui/primitives` 的共享实现一一对应的 Radar 内容层构建块：同样的
  * 结构语义（页头 / 面板 / 统计卡 / 分段筛选 / 空态 / 失败态 / 骨架 / 待办队列），
  * 但全部走 `radar-*` 令牌与「零阴影 + 1px 细线 + 颜色编码语义」语言。
  *
- * 用途：后台页面从品牌紫逐步迁到中性风格的过渡期，先以这些块替换页面里的
- * shadcn 原语，逻辑（数据 Hook、severity 元数据、筛选）保持不变。
+ * 用途：后台业务页统一从本入口取件；共享中性实现可继续放在 primitives，
+ * 品牌可见、高频覆盖件放在这里，逻辑（数据 Hook、severity 元数据、筛选）保持不变。
  *
  * 约定：本文件只消费 radar 令牌与 `./Button` / `./Badge` 原语，**不 import 任何
  * shadcn / 品牌紫令牌**；令牌由 `styles/radar-admin.css` 在被消费页面 chunk 内载入。
@@ -112,20 +112,34 @@ export function Panel({
       style={narrow ? { maxWidth: 760 } : undefined}
       className={cn('panel mb-4 overflow-hidden', className)}
     >
-      {(title || extra) && (
+      {(title || note || extra) && (
         <div className="flex items-center gap-3 px-5 py-3">
           <div className="min-w-0 flex-1">
             {title && (
-              <h2 className="text-[13px] font-semibold text-radar-ink-900">{title}</h2>
+              <h2
+                className={cn(
+                  'text-[13px] font-semibold text-radar-ink-900',
+                  !note && 'leading-5',
+                )}
+              >
+                {title}
+              </h2>
             )}
             {note && (
-              <p className="mt-0.5 text-[12.5px] leading-5 text-radar-ink-400">{note}</p>
+              <p
+                className={cn(
+                  'text-[12.5px] leading-5 text-radar-ink-400',
+                  title && 'mt-0.5',
+                )}
+              >
+                {note}
+              </p>
             )}
           </div>
           {extra && <div className="flex shrink-0 items-center gap-2">{extra}</div>}
         </div>
       )}
-      <div className={cn('p-5', (title || extra) && 'border-t border-radar-ink-100')}>
+      <div className={cn('p-5', (title || note || extra) && 'border-t border-radar-ink-100')}>
         {children}
       </div>
     </section>

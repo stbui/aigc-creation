@@ -146,7 +146,7 @@ export function OrderActionDialog({
               退款受
               <Link
                 to={REFUND_RULES_HREF}
-                className="mx-0.5 text-brand hover:underline"
+                className="mx-0.5 text-radar-ink-950 hover:underline"
                 target="_blank"
                 rel="noreferrer"
               >

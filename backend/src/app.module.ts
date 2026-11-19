@@ -32,6 +32,7 @@ import { HealthModule } from './health/health.module';
 import { AigcLabelModule } from './aigc-label/aigc-label.module';
 import { ModelModule } from './model/model.module';
 import { TemplateCatalogModule } from './templates/template-catalog.module';
+import { PromptsModule } from './prompts/prompts.module';
 import { ProxyModule } from './model/proxy/proxy.module';
 
 @Module({
@@ -87,6 +88,8 @@ import { ProxyModule } from './model/proxy/proxy.module';
     ModelModule,
     // 写真模板目录：C 端公开读 + 后台三层 CRUD。
     TemplateCatalogModule,
+    // 提示词库：后台 CRUD（C 端页面未设计）。只依赖 Prisma，不接模型链路。
+    PromptsModule,
     // 代理中转（P6）：必须**最后一个**导入 —— 短路径入口
     // `/api/v1/:channelId/*path` 是 catch-all，排在业务路由之后才不会抢路由。
     ProxyModule,

@@ -32,6 +32,7 @@ import {
   AdminPaymentRulesPage,
   AdminPluginsPage,
   AdminProductsPage,
+  AdminPromptsPage,
   AdminRetentionPage,
   AdminRolesPage,
   AdminSchedulerPage,
@@ -179,6 +180,7 @@ export function AdminLayout() {
               />
               <Route path="notifications" element={<AdminNotificationsPage />} />
               <Route path="templates" element={<AdminTemplatesPage />} />
+              <Route path="prompts" element={<AdminPromptsPage />} />
               {/* AI 标识样式 */}
               <Route path="aigc-label" element={<AdminAigcLabelPage />} />
               {/* 中性风格（freebie-radar 设计语言）落地验证页 */}

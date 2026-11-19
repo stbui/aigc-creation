@@ -16,7 +16,7 @@ import { useApp } from './hooks';
 import { useNearViewport } from '../../hooks/useNearViewport';
 import { LibraryAssetActions } from './LibraryAssetActions';
 import { LibraryAssetMenu } from './LibraryAssetMenu';
-import { capabilityName } from './utils';
+import { capabilityName, toolPath } from './utils';
 import type { Asset } from '../../types/api';
 
 /**
@@ -40,7 +40,6 @@ export interface LibraryAssetCardProps {
   onPreview: (index: number) => void;
   onDownload: (asset: Asset) => void;
   onRemove: (id: string) => void;
-  onReuse: (capability: string) => void;
 }
 
 export function LibraryAssetCard({
@@ -52,7 +51,6 @@ export function LibraryAssetCard({
   onPreview,
   onDownload,
   onRemove,
-  onReuse,
 }: LibraryAssetCardProps) {
   const { modal } = useApp();
   const url = assetSrc(asset);
@@ -92,10 +90,6 @@ export function LibraryAssetCard({
       onOk: () => onRemove(asset.id),
     });
   }, [asset.id, modal, onRemove]);
-
-  const reuse = useCallback(() => {
-    if (asset.capability) onReuse(asset.capability);
-  }, [asset.capability, onReuse]);
 
   return (
     <ContextMenu>
@@ -148,7 +142,7 @@ export function LibraryAssetCard({
                 deleteLabel={`删除素材${asset.kind === 'generated' ? '及其作品记录' : ''}`}
                 onOpenOriginal={openOriginal}
                 onDownload={() => onDownload(asset)}
-                onReuse={reuse}
+                reuseTo={asset.capability ? toolPath(asset.capability) : undefined}
                 onRemove={confirmRemove}
               />
             </div>

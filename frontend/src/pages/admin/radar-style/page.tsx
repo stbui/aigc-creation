@@ -87,7 +87,7 @@ export function AdminRadarStylePage() {
             </p>
           </div>
         </div>
-        <span className="hidden items-center gap-1.5 rounded-md bg-radar-surface-muted px-2 py-1 text-[11px] font-medium text-radar-ink-600 sm:inline-flex">
+        <span className="hidden items-center gap-1.5 rounded-md bg-radar-surface-muted px-2 py-1 text-[12px] leading-4 font-medium text-radar-ink-600 sm:inline-flex">
           <ShieldCheck className="h-3.5 w-3.5 text-radar-deal" /> 设计验证页
         </span>
       </div>
@@ -109,7 +109,7 @@ export function AdminRadarStylePage() {
                   : 'text-radar-ink-600 hover:bg-radar-ink-100')
               }
             >
-              <Icon className="h-3.5 w-3.5 -translate-y-px" />
+              <Icon className="h-3.5 w-3.5 -translate-y-px" aria-hidden />
               {t.label}
             </button>
           );
@@ -136,20 +136,25 @@ export function AdminRadarStylePage() {
         title="LINUX DO · 福利羊毛"
         footer={
           <div className="flex flex-wrap gap-2">
-            <a className="inline-flex min-w-full flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-radar-brand px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-radar-brand-hover sm:min-w-0 sm:py-2">
-              <ArrowUpRight className="h-4 w-4" /> 打开原帖领取
-            </a>
-            <button className="inline-flex grow basis-[calc(50%-0.25rem)] items-center justify-center gap-1 rounded-[8px] border border-radar-ink-200 bg-radar-surface px-3 py-2.5 text-[13px] text-radar-ink-700 transition-colors hover:bg-radar-ink-100 sm:grow-0 sm:basis-auto sm:py-2">
-              <Star className="h-4 w-4" /> 收藏
+            {/* 示例数据没有真实帖地址：用按钮占位，避免无 href 的 <a> 不可聚焦 */}
+            <button
+              type="button"
+              className="inline-flex min-w-full flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-radar-brand px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-radar-brand-hover sm:min-w-0 sm:py-2"
+            >
+              <ArrowUpRight className="h-4 w-4" aria-hidden /> 打开原帖领取
+            </button>
+            <button type="button" className="inline-flex grow basis-[calc(50%-0.25rem)] items-center justify-center gap-1 rounded-[8px] border border-radar-ink-200 bg-radar-surface px-3 py-2.5 text-[13px] text-radar-ink-700 transition-colors hover:bg-radar-ink-100 sm:grow-0 sm:basis-auto sm:py-2">
+              <Star className="h-4 w-4" aria-hidden /> 收藏
             </button>
             <button
+              type="button"
               onClick={() => {
                 setDrawerOpen(false);
                 setModalOpen(true);
               }}
-              className="inline-flex grow basis-[calc(50%-0.25rem)] items-center justify-center gap-1 rounded-[8px] border border-radar-alert-border bg-radar-alert-subtle px-3 py-2.5 text-[13px] text-radar-alert transition-colors hover:bg-red-100/80 sm:grow-0 sm:basis-auto sm:py-2"
+              className="inline-flex grow basis-[calc(50%-0.25rem)] items-center justify-center gap-1 rounded-[8px] border border-radar-alert-border bg-radar-alert-subtle px-3 py-2.5 text-[13px] text-radar-alert transition-colors hover:bg-radar-alert-border/60 sm:grow-0 sm:basis-auto sm:py-2"
             >
-              <ShieldAlert className="h-4 w-4" /> 屏蔽
+              <ShieldAlert className="h-4 w-4" aria-hidden /> 屏蔽
             </button>
           </div>
         }
@@ -162,14 +167,14 @@ export function AdminRadarStylePage() {
         <h2 className="mt-2 text-[17px] font-semibold leading-snug text-radar-ink-950">
           Epic 本周喜加一：某 3A 大作限免领取
         </h2>
-        <div className="mt-3 flex items-center gap-2 rounded-[8px] border border-radar-deal-border bg-radar-deal-subtle/70 px-3.5 py-2.5 text-[12.5px] text-emerald-900">
+        <div className="mt-3 flex items-center gap-2 rounded-[8px] border border-radar-deal-border bg-radar-deal-subtle/70 px-3.5 py-2.5 text-[12.5px] text-radar-deal">
           <Sparkles className="h-3.5 w-3.5 text-radar-deal" />
           <span>
             <strong>AI 判定：</strong>可领取福利 · 直接白嫖，高价值
           </span>
         </div>
         <div className="mt-3 rounded-[8px] border border-radar-code-border bg-radar-code-subtle/70 p-3.5">
-          <div className="mb-2 text-[12px] font-medium text-amber-900">提取到的兑换码（点击复制）</div>
+          <div className="mb-2 text-[12px] font-medium text-radar-code">提取到的兑换码（点击复制）</div>
           <div className="flex flex-wrap gap-2">
             <CodeChip code="FREE-EPIC-XXXX" onCopy={onCopyCode} />
           </div>
@@ -197,17 +202,19 @@ export function AdminRadarStylePage() {
         footer={
           <>
             <button
+              type="button"
               onClick={() => setModalOpen(false)}
               className="rounded-[8px] border border-radar-ink-200 px-3 py-2 text-[12.5px] text-radar-ink-600 transition-colors hover:bg-radar-ink-100"
             >
               仅隐藏这一条
             </button>
             <button
+              type="button"
               onClick={() => {
                 setModalOpen(false);
                 showToast('已加入屏蔽规则');
               }}
-              className="rounded-[8px] bg-radar-alert px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-red-700"
+              className="rounded-[8px] bg-radar-alert px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-radar-alert/90"
             >
               加入屏蔽规则
             </button>
@@ -217,17 +224,17 @@ export function AdminRadarStylePage() {
         <p className="mb-3 line-clamp-2 rounded-[8px] border border-radar-ink-200 bg-radar-surface-hover p-2.5 text-[12.5px] text-radar-ink-700">
           求一个 Netflix 拼车车位，长期稳定优先
         </p>
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           <div>
             <div className="mb-1.5 text-[12px] text-radar-ink-500">点选标题关键词快速加入屏蔽：</div>
             <div className="flex flex-wrap gap-1.5">
-              <button className="rounded-[8px] border border-radar-ink-200 bg-radar-surface px-2 py-1 text-[12px] text-radar-ink-700 hover:bg-radar-ink-100">
+              <button type="button" className="rounded-[8px] border border-radar-ink-200 bg-radar-surface px-2 py-1 text-[12px] text-radar-ink-700 hover:bg-radar-ink-100">
                 Netflix
               </button>
-              <button className="rounded-[8px] border border-radar-alert-border bg-radar-alert-subtle px-2 py-1 text-[12px] font-medium text-radar-alert">
+              <button type="button" className="rounded-[8px] border border-radar-alert-border bg-radar-alert-subtle px-2 py-1 text-[12px] font-medium text-radar-alert">
                 拼车
               </button>
-              <button className="rounded-[8px] border border-radar-ink-200 bg-radar-surface px-2 py-1 text-[12px] text-radar-ink-700 hover:bg-radar-ink-100">
+              <button type="button" className="rounded-[8px] border border-radar-ink-200 bg-radar-surface px-2 py-1 text-[12px] text-radar-ink-700 hover:bg-radar-ink-100">
                 车位
               </button>
             </div>
@@ -240,10 +247,10 @@ export function AdminRadarStylePage() {
             />
           </label>
           <div className="flex flex-col gap-2 text-[12px] sm:flex-row">
-            <button className="flex-1 truncate rounded-[8px] border border-radar-ink-200 px-2.5 py-2.5 text-left text-radar-ink-600 hover:bg-radar-ink-100 sm:py-2">
+            <button type="button" className="flex-1 truncate rounded-[8px] border border-radar-ink-200 px-2.5 py-2.5 text-left text-radar-ink-600 hover:bg-radar-ink-100 sm:py-2">
               全部来源屏蔽
             </button>
-            <button className="flex-1 truncate rounded-[8px] border border-radar-alert-border bg-radar-alert-subtle px-2.5 py-2.5 text-left font-medium text-radar-alert sm:py-2">
+            <button type="button" className="flex-1 truncate rounded-[8px] border border-radar-alert-border bg-radar-alert-subtle px-2.5 py-2.5 text-left font-medium text-radar-alert sm:py-2">
               仅对该来源生效
             </button>
           </div>
@@ -279,18 +286,18 @@ function RulesPanel({
             关注词亮起提醒；屏蔽词防火墙在采集入库与推送前统一拦截，无需两处配置。
           </p>
         </div>
-        <Button variant="danger" onClick={onOpenModal}>
-          <ShieldAlert className="h-4 w-4" /> 快捷屏蔽
+        <Button variant="destructive" onClick={onOpenModal}>
+          <ShieldAlert className="h-4 w-4" aria-hidden /> 快捷屏蔽
         </Button>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-12">
-        <Panel className="space-y-4 p-5 lg:col-span-5">
+        <Panel className="flex flex-col gap-4 p-5 lg:col-span-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[14.5px] font-semibold text-radar-ink-950">
               <Bell className="h-4 w-4 text-radar-accent" /> 我的关注关键词
             </div>
-            <span className="rounded-md bg-radar-ink-100 px-2 py-0.5 font-mono text-[11px] font-medium text-radar-ink-700">
+            <span className="rounded-md bg-radar-ink-100 px-2 py-0.5 font-mono text-[12px] leading-4 font-medium text-radar-ink-700">
               {subs.length} 个
             </span>
           </div>
@@ -303,28 +310,32 @@ function RulesPanel({
               className="min-w-0 flex-1 rounded-[8px] border border-radar-ink-200 bg-radar-surface px-3 py-2 text-[13px] text-radar-ink-950 outline-none focus:border-radar-brand"
             />
             <Button variant="default">
-              <Plus className="h-4 w-4" /> 添加
+              <Plus className="h-4 w-4" aria-hidden /> 添加
             </Button>
           </div>
           <div className="divide-y divide-radar-ink-100 rounded-[8px] border border-radar-ink-200 bg-radar-surface">
             {subs.map((s) => (
               <div key={s} className="flex items-center justify-between px-3.5 py-2.5 text-[13px]">
                 <span className="font-medium text-radar-ink-900">{s}</span>
-                <button className="rounded-lg p-1 text-radar-ink-400 transition-colors hover:bg-radar-alert-subtle hover:text-radar-alert">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <button
+                  type="button"
+                  aria-label="删除该订阅关键词"
+                  className="rounded-lg p-1 text-radar-ink-400 transition-colors hover:bg-radar-alert-subtle hover:text-radar-alert"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
                 </button>
               </div>
             ))}
           </div>
         </Panel>
 
-        <Panel className="space-y-4 p-5 lg:col-span-7">
+        <Panel className="flex flex-col gap-4 p-5 lg:col-span-7">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-[14.5px] font-semibold text-radar-ink-950">
-              <ShieldBan className="h-4 w-4 text-radar-alert" /> 屏蔽词防火墙
+              <ShieldBan className="h-4 w-4 text-radar-alert" aria-hidden /> 屏蔽词防火墙
             </div>
-            <button className="inline-flex items-center gap-1 rounded-[8px] border border-radar-ink-200 px-2.5 py-1.5 text-[12px] font-medium text-radar-ink-700 hover:bg-radar-ink-100">
-              <Download className="h-3.5 w-3.5" /> 导入预设
+            <button type="button" className="inline-flex items-center gap-1 rounded-[8px] border border-radar-ink-200 px-2.5 py-1.5 text-[12px] font-medium text-radar-ink-700 hover:bg-radar-ink-100">
+              <Download className="h-3.5 w-3.5" aria-hidden /> 导入预设
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -337,7 +348,7 @@ function RulesPanel({
               <span className="bg-radar-ink-100 px-3 py-2 text-[12.5px] font-medium text-radar-ink-500">正则</span>
             </div>
             <Button variant="default">
-              <Plus className="h-4 w-4" /> 添加规则
+              <Plus className="h-4 w-4" aria-hidden /> 添加规则
             </Button>
           </div>
           <div className="overflow-hidden rounded-[8px] border border-radar-ink-200">
@@ -360,11 +371,11 @@ function RulesPanel({
                     <td className="px-3 py-2.5 text-right font-mono text-radar-ink-500">{r.hits}</td>
                     <td className="px-3 py-2.5 text-right">
                       {r.on ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-radar-deal-subtle px-1.5 py-0.5 text-[11px] font-medium text-radar-deal">
+                        <span className="inline-flex items-center gap-1 rounded bg-radar-deal-subtle px-1.5 py-0.5 text-[12px] leading-4 font-medium text-radar-deal">
                           <CheckCircle2 className="h-3 w-3" /> 启用
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded bg-radar-ink-100 px-1.5 py-0.5 text-[11px] font-medium text-radar-ink-500">
+                        <span className="inline-flex items-center gap-1 rounded bg-radar-ink-100 px-1.5 py-0.5 text-[12px] leading-4 font-medium text-radar-ink-500">
                           停用
                         </span>
                       )}
@@ -375,6 +386,7 @@ function RulesPanel({
             </table>
           </div>
           <button
+            type="button"
             onClick={onOpenDrawer}
             className="text-[12.5px] font-medium text-radar-accent hover:underline"
           >
@@ -402,7 +414,7 @@ function AiPanel({ onToast }: { onToast: (m: string) => void }) {
         </p>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
-        <Panel className="space-y-4 p-5 lg:col-span-7">
+        <Panel className="flex flex-col gap-4 p-5 lg:col-span-7">
           <div className="grid grid-cols-3 gap-3">
             {[
               { l: '保留', v: '1204', c: 'text-radar-deal' },
@@ -410,7 +422,7 @@ function AiPanel({ onToast }: { onToast: (m: string) => void }) {
               { l: '待审', v: '17', c: 'text-radar-ink-700' },
             ].map((s) => (
               <div key={s.l} className="rounded-[8px] border border-radar-ink-200 bg-radar-surface p-3">
-                <div className="text-[11.5px] text-radar-ink-500">{s.l}</div>
+                <div className="text-[12px] text-radar-ink-500">{s.l}</div>
                 <div className={'mt-1 font-mono text-[20px] font-semibold ' + s.c}>{s.v}</div>
               </div>
             ))}
@@ -459,7 +471,7 @@ function AiPanel({ onToast }: { onToast: (m: string) => void }) {
           </div>
         </Panel>
 
-        <Panel className="space-y-4 p-5 lg:col-span-5">
+        <Panel className="flex flex-col gap-4 p-5 lg:col-span-5">
           <div className="flex items-center gap-2 text-[14.5px] font-semibold text-radar-ink-950">
             <SlidersHorizontal className="h-4 w-4 text-radar-accent" /> 引擎配置
           </div>
@@ -485,18 +497,18 @@ function AiPanel({ onToast }: { onToast: (m: string) => void }) {
               className="w-full rounded-[8px] border border-radar-ink-200 bg-radar-surface px-3 py-2 text-[13px] text-radar-ink-950 outline-none focus:border-radar-brand"
             />
           </label>
-          <div className="space-y-2 rounded-[8px] border border-radar-ink-200 p-3">
+          <div className="flex flex-col gap-2 rounded-[8px] border border-radar-ink-200 p-3">
             <label className="flex items-center justify-between text-[12.5px]">
               <span>初筛前置过滤</span>
-              <input type="checkbox" defaultChecked className="h-4 w-4 accent-[#312e81]" />
+              <input type="checkbox" defaultChecked className="h-4 w-4 accent-radar-accent" />
             </label>
             <label className="flex items-center justify-between text-[12.5px]">
               <span>白嫖专源免审直通</span>
-              <input type="checkbox" defaultChecked className="h-4 w-4 accent-[#312e81]" />
+              <input type="checkbox" defaultChecked className="h-4 w-4 accent-radar-accent" />
             </label>
             <label className="flex items-center justify-between text-[12.5px]">
               <span>从收藏/关闭学习偏好</span>
-              <input type="checkbox" className="h-4 w-4 accent-[#312e81]" />
+              <input type="checkbox" className="h-4 w-4 accent-radar-accent" />
             </label>
           </div>
           <div className="flex gap-2">
@@ -534,12 +546,12 @@ function PushPanel({ onToast }: { onToast: (m: string) => void }) {
           </p>
         </div>
         <Button onClick={() => onToast('已新增路由')}>
-          <Plus className="h-4 w-4" /> 新增路由
+          <Plus className="h-4 w-4" aria-hidden /> 新增路由
         </Button>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {routes.map((r) => (
-          <article key={r.name} className="panel space-y-3 p-4">
+          <article key={r.name} className="panel flex flex-col gap-3 p-4">
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-radar-ink-950">
                 <span className="text-lg">{r.icon}</span>
@@ -547,17 +559,17 @@ function PushPanel({ onToast }: { onToast: (m: string) => void }) {
               </span>
               <span
                 className={
-                  'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium ' +
+                  'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] leading-4 font-medium ' +
                   (r.mode === '即时'
                     ? 'bg-radar-deal-subtle text-radar-deal'
                     : 'bg-radar-ink-100 text-radar-ink-500')
                 }
               >
-                {r.mode === '即时' ? <Zap className="h-3 w-3" /> : <Layers className="h-3 w-3" />}
+                {r.mode === '即时' ? <Zap className="h-3 w-3" aria-hidden /> : <Layers className="h-3 w-3" aria-hidden />}
                 {r.mode}
               </span>
             </div>
-            <div className="flex flex-wrap gap-1.5 text-[11px]">
+            <div className="flex flex-wrap gap-1.5 text-[12px] leading-4">
               {r.tags.map((t) => (
                 <span key={t} className="rounded bg-radar-brand-subtle px-1.5 py-0.5 font-medium text-radar-accent">
                   {t}
@@ -569,20 +581,24 @@ function PushPanel({ onToast }: { onToast: (m: string) => void }) {
                 命中 {r.hit} · 已推 {r.sent}
               </span>
               <div className="flex gap-1">
-                <button className="rounded-md p-1 text-radar-ink-400 transition-colors hover:bg-radar-ink-100">
+                <button type="button" className="rounded-md p-1 text-radar-ink-400 transition-colors hover:bg-radar-ink-100">
                   <span className="sr-only">编辑</span>✎
                 </button>
-                <button className="rounded-md p-1 text-radar-ink-400 transition-colors hover:bg-radar-alert-subtle hover:text-radar-alert">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <button
+                  type="button"
+                  aria-label="删除该推送路由"
+                  className="rounded-md p-1 text-radar-ink-400 transition-colors hover:bg-radar-alert-subtle hover:text-radar-alert"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
                 </button>
               </div>
             </div>
           </article>
         ))}
       </div>
-      <Panel className="mt-5 space-y-3 p-5">
+      <Panel className="mt-5 flex flex-col gap-3 p-5">
         <div className="flex items-center gap-2 text-[14.5px] font-semibold text-radar-ink-950">
-          <Activity className="h-4 w-4 text-radar-accent" /> 推送诊断预览
+          <Activity className="h-4 w-4 text-radar-accent" aria-hidden /> 推送诊断预览
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
@@ -593,7 +609,7 @@ function PushPanel({ onToast }: { onToast: (m: string) => void }) {
           ].map((s) => (
             <div key={s.l} className="rounded-[8px] bg-radar-surface-muted p-3 text-center">
               <div className={'font-mono text-[18px] font-semibold ' + s.c}>{s.v}</div>
-              <div className="text-[11.5px] text-radar-ink-500">{s.l}</div>
+              <div className="text-[12px] text-radar-ink-500">{s.l}</div>
             </div>
           ))}
         </div>
@@ -652,17 +668,17 @@ function OpsPanel({ onToast }: { onToast: (m: string) => void }) {
                 <td className="px-3 py-2.5 text-right font-mono text-radar-ink-700">{s.items}</td>
                 <td className="px-3 py-2.5 text-right">
                   {s.status === '正常' && (
-                    <span className="inline-flex items-center gap-1 rounded bg-radar-deal-subtle px-1.5 py-0.5 text-[11px] font-medium text-radar-deal">
+                    <span className="inline-flex items-center gap-1 rounded bg-radar-deal-subtle px-1.5 py-0.5 text-[12px] leading-4 font-medium text-radar-deal">
                       <CheckCircle2 className="h-3 w-3" /> 正常
                     </span>
                   )}
                   {s.status === '限流' && (
-                    <span className="inline-flex items-center gap-1 rounded bg-radar-alert-subtle px-1.5 py-0.5 text-[11px] font-medium text-radar-alert">
+                    <span className="inline-flex items-center gap-1 rounded bg-radar-alert-subtle px-1.5 py-0.5 text-[12px] leading-4 font-medium text-radar-alert">
                       <AlertTriangle className="h-3 w-3" /> 限流
                     </span>
                   )}
                   {s.status === '停用' && (
-                    <span className="inline-flex items-center gap-1 rounded bg-radar-ink-100 px-1.5 py-0.5 text-[11px] font-medium text-radar-ink-500">
+                    <span className="inline-flex items-center gap-1 rounded bg-radar-ink-100 px-1.5 py-0.5 text-[12px] leading-4 font-medium text-radar-ink-500">
                       停用
                     </span>
                   )}

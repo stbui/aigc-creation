@@ -3,9 +3,8 @@ import { PERMISSION_LABELS, MODULE_LABELS, ROLE_COL } from './constants';
 import { useAdmin, useConfirm, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from './api';
 
-import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, Toggle, ToneBadge } from '~/admin-ui/radar';
+import { AdminPage, ActionButton, CheckboxField, EmptyState, ListError, PageSkeleton, Panel, StaleError, Toggle, ToneBadge, cn } from '~/admin-ui/radar';
 import '../../../styles/radar-admin.css';
-import { cn } from '../../../admin-ui/lib/cn';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
 
@@ -372,7 +371,7 @@ export function AdminRolesPage() {
                               // 必须连同官方的 `data-[state=on]:text-accent-foreground`
                               // 一起顶掉，否则选中后文字变浅、在透明底上看不清。
                               'data-[state=on]:bg-transparent',
-                              all && 'text-brand hover:text-brand data-[state=on]:text-brand',
+                              all && 'text-radar-ink-950 hover:text-radar-ink-950 data-[state=on]:text-radar-ink-950',
                               none &&
                                 'text-muted-foreground/60 hover:text-muted-foreground/60 data-[state=on]:text-muted-foreground/60',
                             )}

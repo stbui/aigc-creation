@@ -240,7 +240,7 @@ export function AdminDashboardContent() {
             title="待办队列"
             note={duty ? `待付 ${duty.orders.length} 笔 · 最早在前` : '读取中…'}
             extra={
-              <Link className="text-[13px] text-brand hover:underline" to="/admin/orders?status=pending">
+              <Link className="text-[13px] text-radar-ink-950 hover:underline" to="/admin/orders?status=pending">
                 全部待付订单
               </Link>
             }
@@ -258,7 +258,7 @@ export function AdminDashboardContent() {
                 : '读取中…'
             }
             extra={
-              <Link className="text-[13px] text-brand hover:underline" to="/admin/tasks?status=failed">
+              <Link className="text-[13px] text-radar-ink-950 hover:underline" to="/admin/tasks?status=failed">
                 全部失败任务
               </Link>
             }
@@ -280,7 +280,7 @@ export function AdminDashboardContent() {
           }
           extra={
             !isFinance && can('channel.read') ? (
-              <Link className="text-[13px] text-brand hover:underline" to="/admin/channels">
+              <Link className="text-[13px] text-radar-ink-950 hover:underline" to="/admin/channels">
                 模型商品
               </Link>
             ) : undefined
@@ -305,10 +305,10 @@ export function AdminDashboardContent() {
        */}
       <Panel title="经营概况">
         <Subhead title={`近 ${days} 天`} note={`对比上一个 ${days} 天`} />
-        <WindowStrip data={data} isFinance={isFinance} />
+        <WindowStrip data={data} finance={isFinance} />
         <div className="mt-4 border-t border-border pt-4">
           <Subhead title="累计存量" note="不受指标窗口影响" />
-          <TotalsStrip data={data} isFinance={isFinance} />
+          <TotalsStrip data={data} finance={isFinance} />
         </div>
       </Panel>
 
@@ -323,7 +323,7 @@ export function AdminDashboardContent() {
           note={`近 ${days} 天 · 任务 ${w.tasks} 个 · 失败 ${w.failed} 个`}
           extra={
             w.failed > 0 ? (
-              <Link className="text-[13px] text-brand hover:underline" to="/admin/tasks?status=failed">
+              <Link className="text-[13px] text-radar-ink-950 hover:underline" to="/admin/tasks?status=failed">
                 查看失败任务
               </Link>
             ) : undefined
@@ -380,7 +380,7 @@ export function AdminDashboardContent() {
         title="订单收入（元）"
         note={`近 ${days} 天 ¥${yuan(c.gmvWindowCents)} · 累计 ¥${yuan(c.gmvCents)}`}
         extra={
-          <Link className="text-[13px] text-brand hover:underline" to="/admin/finance">
+          <Link className="text-[13px] text-radar-ink-950 hover:underline" to="/admin/finance">
             积分口径净收入
           </Link>
         }

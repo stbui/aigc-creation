@@ -79,7 +79,7 @@ export function useTaskTableColumns({
         cellTitle: (row) => row.user.email,
         render: (row) => (
           <Link
-            className="block truncate text-brand hover:underline"
+            className="block truncate text-radar-ink-950 hover:underline"
             to={adminUserDetailHref(row.user.id)}
           >
             {row.user.email}
@@ -93,7 +93,7 @@ export function useTaskTableColumns({
         cellTitle: (row) => row.project.name,
         render: (row) => (
           <Link
-            className="block truncate text-brand hover:underline"
+            className="block truncate text-radar-ink-950 hover:underline"
             to={adminTasksHref({ projectId: row.project.id })}
           >
             {row.project.name}

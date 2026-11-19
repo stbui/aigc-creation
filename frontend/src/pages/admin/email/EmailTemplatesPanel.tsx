@@ -402,7 +402,7 @@ function TemplateCard({
           <span
             className={cn(
               'flex size-9 shrink-0 items-center justify-center rounded-lg',
-              item?.enabled ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground',
+              item?.enabled ? 'bg-radar-ink-100 text-radar-ink-950' : 'bg-muted text-muted-foreground',
             )}
           >
             <Icon className="size-4" aria-hidden />

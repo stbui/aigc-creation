@@ -144,8 +144,8 @@ export function useEmailConfig(onSaved?: () => Promise<void> | void) {
     setValue,
     requestClear,
     undoClear,
-    isClearPending: (key: string) => clears.has(key),
-    isDirty: (key: string) =>
+    clearPending: (key: string) => clears.has(key),
+    dirty: (key: string) =>
       Object.prototype.hasOwnProperty.call(draft, key) || clears.has(key),
     discard,
     save,

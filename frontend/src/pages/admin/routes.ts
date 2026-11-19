@@ -80,6 +80,7 @@ export const AdminTemplatesPage = lazyAdminPage(
   () => import('./templates'),
   'AdminTemplatesPage',
 );
+export const AdminPromptsPage = lazyAdminPage(() => import('./prompts'), 'AdminPromptsPage');
 export const AdminAlertsPage = lazyAdminPage(() => import('./alerts'), 'AdminAlertsPage');
 // 中性风格（freebie-radar 设计语言）落地验证页：命名空间隔离，不接入业务权限树
 export const AdminRadarStylePage = lazyAdminPage(

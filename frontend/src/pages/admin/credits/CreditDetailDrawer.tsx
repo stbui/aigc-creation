@@ -186,7 +186,7 @@ export function CreditDetailDrawer({
             <>
               {' · '}
               <Link
-                className="text-brand hover:underline"
+                className="text-radar-ink-950 hover:underline"
                 to={adminOrderDetailHref(row.paymentOrderId)}
                 title={row.paymentOrderId}
               >
@@ -198,7 +198,7 @@ export function CreditDetailDrawer({
             <>
               {' · '}
               <Link
-                className="text-brand hover:underline"
+                className="text-radar-ink-950 hover:underline"
                 to={adminBillingOrderDetailHref(row.billingOrderId)}
                 title={row.billingOrderId}
               >
@@ -209,7 +209,7 @@ export function CreditDetailDrawer({
           {row.taskId ? (
             <>
               {' · '}
-              <Link className="text-brand hover:underline" to={adminTaskHref(row.taskId)} title={row.taskId}>
+              <Link className="text-radar-ink-950 hover:underline" to={adminTaskHref(row.taskId)} title={row.taskId}>
                 任务 {row.taskId.slice(-8)}
               </Link>
             </>
@@ -235,7 +235,7 @@ export function CreditDetailDrawer({
             {
               label: '用户',
               value: (
-                <Link className="text-brand hover:underline" to={adminUserDetailHref(user.userId)}>
+                <Link className="text-radar-ink-950 hover:underline" to={adminUserDetailHref(user.userId)}>
                   {user.email}
                 </Link>
               ),
@@ -245,10 +245,10 @@ export function CreditDetailDrawer({
               label: '关联记录',
               value: (
                 <span className="flex flex-wrap gap-x-3">
-                  <Link className="text-brand hover:underline" to={adminOrderHref({ email: user.email })}>
+                  <Link className="text-radar-ink-950 hover:underline" to={adminOrderHref({ email: user.email })}>
                     订单记录
                   </Link>
-                  <Link className="text-brand hover:underline" to={adminTasksHref({ userId: user.userId })}>
+                  <Link className="text-radar-ink-950 hover:underline" to={adminTasksHref({ userId: user.userId })}>
                     任务记录
                   </Link>
                 </span>

@@ -141,7 +141,28 @@ export function formatYuanPlain(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
-/** 字节 → `1.2 MB`。 */
+/**
+ * 分 → 带千分位的裸金额文本，例如 `1,234.56`（不带货币符号）。
+ *
+ * 用于金额旁边已经写了「元 / ¥」的列表与图表刻度；表单回填仍用
+ * {@link formatYuanPlain} —— 逗号会破坏输入框解析。
+ */
+export function formatYuanGrouped(cents: number, digits = 2): string {
+  return (cents / 100).toLocaleString('zh-CN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+/** 数字 → 千分位，最多保留 `digits` 位小数；非有限数回落到 `—`。 */
+export function formatDecimal(value: unknown, digits = 2): string {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return numeric.toLocaleString('zh-CN', { maximumFractionDigits: digits });
+}
+
+/**
+ * 字节 → `1.2 MB`。 */
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];

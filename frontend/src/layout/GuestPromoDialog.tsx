@@ -1,6 +1,6 @@
 import './GuestPromoDialog.css';
 import { useEffect, useId, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useGuestPromoOffer } from './hooks';
 
@@ -14,7 +14,6 @@ const FALLBACK_CTA_URL = '/background-remove';
  * 弹出条件、活动数据与关闭持久化由 `useGuestPromoOffer` 托管。
  */
 export function GuestPromoDialog() {
-  const navigate = useNavigate();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
@@ -58,12 +57,8 @@ export function GuestPromoDialog() {
 
   if (!open) return null;
 
-  const claim = () => {
-    const target = campaign?.ctaUrl;
-    const safeTarget = target?.startsWith('/') && !target.startsWith('//') ? target : FALLBACK_CTA_URL;
-    dismiss();
-    navigate(safeTarget);
-  };
+  const target = campaign?.ctaUrl;
+  const ctaTarget = target?.startsWith('/') && !target.startsWith('//') ? target : FALLBACK_CTA_URL;
 
   return (
     <div
@@ -117,9 +112,10 @@ export function GuestPromoDialog() {
             <li>素材统一管理</li>
           </ul>
 
-          <button type="button" className="guest-promo-claim" onClick={claim}>
+          {/* 领权益是站内跳转：用链接语义；先 dismiss 再跳，避免弹层盖住落地页 */}
+          <Link to={ctaTarget} className="guest-promo-claim" onClick={dismiss}>
             {campaign?.ctaText ?? '免费体验'}
-          </button>
+          </Link>
         </div>
       </section>
     </div>

@@ -291,7 +291,7 @@ export function ItemFormDrawer({
       </FormField>
 
       <FormField label="预览图" required hint="原图会保存到当前存储后端，C 端读取时重新生成访问地址">
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             className="group relative flex h-40 w-full items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40"

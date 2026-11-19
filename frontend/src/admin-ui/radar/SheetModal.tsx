@@ -1,62 +1,70 @@
-import { useEffect, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { XIcon } from 'lucide-react';
+import { Dialog as DialogPrimitive } from 'radix-ui';
 
 /**
- * 弹窗：移动端底部上滑 sheet（rounded-t-xl），桌面居中 pop（参考 freebie-radar QuickBlockModal）。
- * - 点击遮罩关闭；内容区 stopPropagation 防穿透。
- * - Esc 关闭。
+ * 响应式弹窗：移动端底部上滑，桌面居中弹出。
+ *
+ * 焦点锁定、Esc 关闭、遮罩点击和关闭后焦点归位由 Radix Dialog 负责，
+ * 不在此处手写键盘与浮层逻辑。
  */
 export function SheetModal({
   open,
   onClose,
   title,
+  description,
   children,
   footer,
 }: {
   open: boolean;
   onClose: () => void;
-  title?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-radar-ink-950/30 backdrop-blur-[1px] sm:items-center sm:p-4"
-      onClick={onClose}
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
     >
-      <div
-        className="radar-sheet-enter sm:radar-pop-enter panel max-h-[90vh] w-full max-w-md overflow-y-auto rounded-b-none rounded-t-[12px] p-5 sm:rounded-[12px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {title && (
-          <div className="mb-3 flex items-center justify-between">
-            <div className="text-[14.5px] font-semibold text-radar-ink-950">{title}</div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-1 text-radar-ink-500 transition-colors hover:bg-radar-ink-100"
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="radar-backdrop-enter fixed inset-0 z-50 bg-radar-ink-950/30 backdrop-blur-[1px]" />
+        <DialogPrimitive.Content
+          className="radar-sheet-enter admin-portal radar-scope fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] w-full flex-col rounded-t-[12px] rounded-b-none border border-radar-ink-200 bg-radar-surface outline-none sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[12px] sm:shadow-none"
+        >
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-radar-ink-100 px-5 py-4">
+            <div className="min-w-0">
+              <DialogPrimitive.Title className="text-[15px] font-semibold text-radar-ink-950">
+                {title}
+              </DialogPrimitive.Title>
+              {description && (
+                <DialogPrimitive.Description className="mt-0.5 text-pretty text-[12.5px] leading-5 text-radar-ink-400">
+                  {description}
+                </DialogPrimitive.Description>
+              )}
+            </div>
+            <DialogPrimitive.Close
               aria-label="关闭"
+              className="shrink-0 rounded-lg p-1.5 text-radar-ink-500 transition-colors hover:bg-radar-ink-100 hover:text-radar-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-radar-accent"
             >
-              <X className="h-4 w-4" />
-            </button>
+              <XIcon className="size-4" aria-hidden />
+            </DialogPrimitive.Close>
           </div>
-        )}
-        {children}
-        {footer && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">{footer}</div>
-        )}
-      </div>
-    </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+            {children}
+          </div>
+
+          {footer && (
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-3">
+              {footer}
+            </div>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

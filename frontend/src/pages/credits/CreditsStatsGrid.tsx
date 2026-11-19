@@ -26,9 +26,9 @@ export function CreditsStatsGrid({ balance }: CreditsStatsGridProps) {
   ];
 
   return (
-    <Row gutter={[12, 12]} className="credits-stats">
+    <Row className="credits-stats">
       {stats.map((item) => (
-        <Col xs={12} sm={6} key={item.label}>
+        <Col sm={6} key={item.label}>
           <Card size="small" className="credits-stat-card">
             <div className="credits-stat-label">{item.label}</div>
             <div className={`credits-stat-value${item.warn ? ' is-warn' : ''}`}>

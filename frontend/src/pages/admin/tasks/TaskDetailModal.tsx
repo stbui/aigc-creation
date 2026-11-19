@@ -37,7 +37,7 @@ type Row = AdminTask;
  * 生命周期，混在一个组件里会让列表重新渲染时详情跟着重算。
  *
  * 用居中弹窗而不是抽屉：全链路要并排 5 段摘要、产出图要按原比例预览，
- * 720px 的抽屉会把每一段都挤成两行。
+ * 760px 的抽屉会把每一段都挤成两行。
  */
 export function TaskDetailModal({
   detailId,
@@ -191,7 +191,7 @@ export function TaskDetailModal({
                   )}
                   {/* 42204 无可用线路 / 42205 无遮罩编辑线路：原因在供应侧，给一键入口 */}
                   {(d.errorCode === '42204' || d.errorCode === '42205') && canReadChannels && (
-                    <Link className="text-brand hover:underline" to={adminChannelHref()}>
+                    <Link className="text-radar-ink-950 hover:underline" to={adminChannelHref()}>
                       前往模型商品检查线路
                     </Link>
                   )}
@@ -209,14 +209,14 @@ export function TaskDetailModal({
                     value: (
                       <span className="flex flex-col gap-1">
                         <Link
-                          className="truncate text-brand hover:underline"
+                          className="truncate text-radar-ink-950 hover:underline"
                           to={adminUserDetailHref(d.user.id)}
                         >
                           {d.user.email}
                         </Link>
                         <span className="flex gap-3 text-[12px]">
                           <Link
-                            className="text-brand hover:underline"
+                            className="text-radar-ink-950 hover:underline"
                             to={adminCreditHref({
                               userId: d.user.id,
                               email: d.user.email,
@@ -225,7 +225,7 @@ export function TaskDetailModal({
                             积分账本
                           </Link>
                           <Link
-                            className="text-brand hover:underline"
+                            className="text-radar-ink-950 hover:underline"
                             to={adminOrderHref({ email: d.user.email })}
                           >
                             订单记录
@@ -238,7 +238,7 @@ export function TaskDetailModal({
                     label: '项目',
                     value: (
                       <Link
-                        className="text-brand hover:underline"
+                        className="text-radar-ink-950 hover:underline"
                         to={adminTasksHref({ projectId: d.project.id })}
                       >
                         {d.project.name}
@@ -275,7 +275,7 @@ export function TaskDetailModal({
                           label: '重试来源',
                           value: (
                             <Link
-                              className="text-brand hover:underline"
+                              className="text-radar-ink-950 hover:underline"
                               to={adminTaskHref(d.retriedFromId)}
                             >
                               <code className="break-all font-mono text-xs">{d.retriedFromId}</code>
@@ -367,7 +367,7 @@ export function TaskDetailModal({
                       ]}
                     />
                     <Link
-                      className="inline-flex items-center gap-1 text-[12px] text-brand hover:underline"
+                      className="inline-flex items-center gap-1 text-[12px] text-radar-ink-950 hover:underline"
                       to={adminAssetHref(d.outputAsset.id)}
                     >
                       在素材库查看

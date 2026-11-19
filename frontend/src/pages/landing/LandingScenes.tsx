@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 import { A, type BizCard } from './constants';
@@ -9,8 +9,6 @@ interface LandingScenesProps {
 
 /** 核心场景：商品主图 / 商品详情 / 爆款复刻三张入口卡。 */
 export function LandingScenes({ cards }: LandingScenesProps) {
-  const navigate = useNavigate();
-
   return (
     <section className="lp-section">
       <header className="lp-section-head">
@@ -37,10 +35,10 @@ export function LandingScenes({ cards }: LandingScenesProps) {
                 {card.title}
               </h3>
               <p>{card.desc}</p>
-              <button type="button" className="lp-scene-link" onClick={() => navigate(card.to)}>
+              <Link className="lp-scene-link" to={card.to}>
                 开始生成
                 <ArrowRight size={14} aria-hidden />
-              </button>
+              </Link>
             </div>
           </article>
         ))}

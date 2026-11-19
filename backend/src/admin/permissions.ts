@@ -96,6 +96,10 @@ export const PERMISSIONS = {
   templateRead: "template.read",
   templateWrite: "template.write",
 
+  // 提示词库（后台内容运营；C 端暂未接入）
+  promptRead: "prompt.read",
+  promptWrite: "prompt.write",
+
   // 能力与通道
   capabilityRead: "capability.read",
   capabilityWrite: "capability.write",
@@ -182,6 +186,8 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.contentRead,
     PERMISSIONS.templateRead,
     PERMISSIONS.templateWrite,
+    PERMISSIONS.promptRead,
+    PERMISSIONS.promptWrite,
     PERMISSIONS.capabilityRead,
     PERMISSIONS.modelCallRead,
     PERMISSIONS.channelRead,

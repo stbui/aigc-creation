@@ -20,7 +20,7 @@ export function CapabilityList({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-card">
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-foreground">能力清单</div>
@@ -46,7 +46,7 @@ export function CapabilityList({
               onClick={() => onSelect(row.capabilityId)}
               className={`rounded-md border px-2.5 py-2 text-left transition-colors ${
                 row.capabilityId === selectedId
-                  ? 'border-brand bg-brand-bg'
+                  ? 'border-radar-ink-300 bg-radar-ink-100'
                   : 'border-border hover:bg-accent'
               }`}
             >

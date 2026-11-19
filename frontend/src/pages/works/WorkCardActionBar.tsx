@@ -9,9 +9,10 @@ import { WorkCardAction } from './WorkCardAction';
  */
 export interface WorkCardActionBarProps {
   canReuse: boolean;
+  /** 「再来一张」的目标工具页；有产出能力时必传 */
+  reuseTo?: string;
   canPreview: boolean;
   canDownload: boolean;
-  onReuse: () => void;
   onPreview: () => void;
   onDownload: () => void;
   onRemove: () => void;
@@ -19,18 +20,18 @@ export interface WorkCardActionBarProps {
 
 export function WorkCardActionBar({
   canReuse,
+  reuseTo,
   canPreview,
   canDownload,
-  onReuse,
   onPreview,
   onDownload,
   onRemove,
 }: WorkCardActionBarProps) {
   return (
     <span className={`my-work-hover-actions${canDownload ? '' : ' is-placeholder'}`}>
-      {canReuse && (
+      {canReuse && reuseTo && (
         <span className="my-work-hover-top">
-          <WorkCardAction onActivate={onReuse}>
+          <WorkCardAction to={reuseTo}>
             <Sparkles size={12} /> 再来一张
           </WorkCardAction>
         </span>

@@ -28,7 +28,7 @@
 | [`admin-suite-design.md`](admin-suite-design.md) | 后台总体设计：全域地图、RBAC、信息架构 |
 | [`admin-console-design.md`](admin-console-design.md) | 后台运营域功能设计 |
 | [`admin-detailed-design.md`](admin-detailed-design.md) | 后台详细设计：页面结构、组件、数据流、接口、边界 |
-| [`admin-ui-design.md`](admin-ui-design.md) | 后台界面设计：布局、组件规格、状态与交互 |
+| [`admin-ui-design.md`](admin-ui-design.md) | 后台前端设计语言：双层视觉边界、令牌、布局、组件、状态与交付检查 |
 | [`commerce-design.md`](commerce-design.md) | 支付 / 积分 / 订单 / 商品 / 会员 / 营销设计 |
 
 ### 2.2 C 端页面规格
@@ -65,6 +65,7 @@
 | [`runtime-infrastructure.md`](runtime-infrastructure.md) | AIGC 标识、签名 URL、限流、健康检查、请求追踪、日志落盘 |
 | [`development-workflow.md`](development-workflow.md) | Agent 执行手册：阶段执行卡、闸口命令、证据标准、交人边界、Git 工作流（分支 / 提交 / PR / 回滚） |
 | [`frontend-module-conventions.md`](frontend-module-conventions.md) | 前端多文件功能目录的分层、入口文件、导入方向与新增文件落位 |
+| [`frontend-component-language.md`](frontend-component-language.md) | 前端组件语言：跨 C 端 / 后台的组件角色、Props 契约、状态、组合方式与评审规则 |
 | [`main-image-generation.md`](main-image-generation.md) | `/product-kit` 商品主图：变体互斥、字段到提示词的映射、文案闭集与禁字、按变体拆批与计费、结果聚合、删除与回填 |
 | [`product-detail-generation.md`](product-detail-generation.md) | `/product-detail` 商品详情图：模块拆批、任务与账单、提示词、执行状态机、轮询聚合、删除与失败边界 |
 | [`gen-prompt.md`](gen-prompt.md) | 生图链路与提示词：主图 / 详情图字段映射、变体与模块拆批、提示词结构、并发生图与配额、可见性与效果评估现状 |

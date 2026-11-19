@@ -11,6 +11,7 @@ export { assetThumbUrl } from '../../lib/api';
 /** 提交失败是否「结果不明」（5xx / 网络中断）—— 与写真模板页共用 */
 export { isUncertainSubmitError } from '../../lib/generateSubmit';
 
+import { formatCompactDateTime } from '../../lib/format';
 import type { GalleryItem } from './hooks';
 import { buildBatchRows, cellState, formatBatchDate, type BatchRowBase } from '../../components/batchResult';
 
@@ -138,8 +139,6 @@ export function buildRows(items: GalleryItem[]): ResultRow[] {
 /* 时间与文件名                                                             */
 /* ------------------------------------------------------------------------- */
 
-const pad2 = (n: number) => String(n).padStart(2, '0');
-
 /** 行头时间: 本地时区 `YYYY-MM-DD HH:mm`; 解析失败时不显示 */
 export const formatDate = formatBatchDate;
 
@@ -150,10 +149,7 @@ export const formatDate = formatBatchDate;
  * 「2026-11-03 16:22」中间断开。完整时间仍在卡片的 title 与「全部记录」里。
  */
 export function formatShortDate(iso?: string): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  return formatCompactDateTime(iso, { separator: '-', fallback: '' });
 }
 
 /**

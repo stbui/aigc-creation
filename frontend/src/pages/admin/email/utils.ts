@@ -22,7 +22,7 @@ import type {
   EmailTemplateMeta,
 } from './types';
 
-export { cn } from '~/admin-ui/lib/cn';
+export { cn } from '~/admin-ui/radar';
 
 /** 将后端通道标识转换为后台可读名称，避免直接暴露实现细节。 */
 export function deliveryProviderLabel(

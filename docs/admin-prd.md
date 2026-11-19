@@ -334,16 +334,16 @@
 | 类型 | 规范 |
 |---|---|
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页。统一 `rowKey="id"`、`size="small"`、带分页尺寸切换 |
-| 详情 | 一律浮层、不跳独立路由；窄内容用抽屉（宽 720px），任务等需要并排区块的详情用居中弹窗 |
+| 详情 | 一律浮层、不跳独立路由；窄内容用右侧抽屉（520 / 640 / 760 / 1080，默认 640），任务等需要并排区块的详情用居中弹窗（520 / 720 / 960 / 1200，默认 720） |
 | 危险操作 | `Popconfirm` + 明确文案（写明将影响多少条）；财务动作额外要求输入确认 |
 | 空态 | 明确空态说明，不留空白 |
 | 加载 | 表格 `loading`；骨架屏仅首屏 |
 | 数字 | 金额统一两位小数（内部存分）；积分整数千分位 |
-| 时间 | 统一 `YYYY-MM-DD HH:mm` |
+| 时间 | 北京时间；完整 `YYYY-MM-DD HH:mm:ss`，紧凑 `MM-DD HH:mm`，当日 `HH:mm` |
 
 ### 4.3 样式约束
 
-只使用 `tokens.css` 已定义的语义化 token，**禁止硬编码色值**。后台样式只写在 `styles/admin.css`（不碰 C 端样式层）；`adm-` 前缀只保留给外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内一律用 shadcn 语义类，不新增 `adm-*`。
+业务页面只从 `admin-ui/radar` 取件，共享实现由 Radar barrel 透传。外壳层使用 `tokens.css` / `styles/admin.css` 的品牌紫语义；业务内容层使用 `styles/radar-admin.css` 的 Radar 令牌，**禁止硬编码色值**。后台样式不触碰 C 端样式层；`adm-*` 只保留给外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增，也不直连 `admin-ui/primitives` 或 `admin-ui/components/ui`。
 
 ### 4.4 响应式
 

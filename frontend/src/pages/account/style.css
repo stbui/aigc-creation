@@ -262,7 +262,7 @@
   padding-top: var(--space-8);
 }
 
-/* 我的数据: 每格都是入口, 所以是 button 而不是 div; 描边 + 箭头给出可点的暗示 */
+/* 我的数据: 每格都是入口, 用链接语义承载; 描边 + 箭头给出可点的暗示 */
 .account-stats {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -279,6 +279,8 @@
   background: var(--card-bg);
   font-family: inherit;
   text-align: left;
+  text-decoration: none;
+  color: inherit;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -356,6 +358,8 @@
   background: var(--card-bg);
   font-family: inherit;
   text-align: left;
+  text-decoration: none;
+  color: inherit;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -440,6 +444,8 @@
   background: var(--card-bg);
   font-family: inherit;
   text-align: left;
+  text-decoration: none;
+  color: inherit;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }

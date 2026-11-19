@@ -176,9 +176,13 @@
   position: absolute;
   bottom: 8.5%;
   left: 34%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 32%;
   height: 12%;
   padding: 0;
+  text-decoration: none;
   border: 1px solid var(--gp-glass-border);
   border-radius: var(--radius-pill);
   background: linear-gradient(90deg, var(--shell-surface-brand-1) 0%, var(--shell-surface-brand-2) 48%, var(--shell-surface-info) 100%);

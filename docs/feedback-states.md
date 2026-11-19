@@ -127,10 +127,10 @@
 | C 端 | 骨架 / 行内加载 / 空 / 失败 | `components/StateViews.tsx` 的 `StateSkeleton` / `StateLoading` / `StateEmpty` / `StateError` |
 | C 端 | 工具结果空态 / 生成中 | `components/ToolEmptyState.tsx` |
 | C 端 | Toast / 确认 | `useApp()` 的 `message` / `modal` |
-| 后台 | 页面骨架 | `primitives` 的 `PageSkeleton` / `SkeletonPanel` / `SkeletonBody` / `SkeletonStats` / `SkeletonCards` / `SkeletonTabs` |
-| 后台 | 空 / 首屏失败 / 陈旧 | `primitives` 的 `EmptyState` / `ListError` / `StaleError` |
-| 后台 | 状态标签 | `primitives` 的 `StatusTag` + `components/admin/statusMeta.ts` 的 `STATUS_META` |
-| 后台 | Toast / 确认 | `ToastProvider` / `ConfirmProvider`（或 `useConfirm()`） |
+| 后台 | 页面骨架 | `admin-ui/radar` 的 `PageSkeleton` / `SkeletonPanel` / `SkeletonBody` / `SkeletonStats` / `SkeletonCards` / `SkeletonTabs`（共享实现可由 primitives 透传） |
+| 后台 | 空 / 首屏失败 / 陈旧 | `admin-ui/radar` 的 `EmptyState` / `ListError` / `StaleError`（共享实现可由 primitives 透传） |
+| 后台 | 状态标签 | `admin-ui/radar` 的 `StatusTag` + `components/admin/statusMeta.ts` 的 `STATUS_META`（共享实现可由 primitives 透传） |
+| 后台 | Toast / 确认 | `admin-ui/radar` 的 `ConfirmDialog`；全局触发使用 `ToastProvider` / `ConfirmProvider`（`useToast()` / `useConfirm()`） |
 
 新增页面不得另写一套「加载中 / 空 / 失败」；缺形态时先扩展上述组件，再接入页面。
 

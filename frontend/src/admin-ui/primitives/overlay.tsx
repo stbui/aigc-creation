@@ -101,10 +101,10 @@ export function ModalDialog({
       <DialogContent
         data-testid="admin-modal"
         style={{ maxWidth: resolvedWidth }}
-        className="admin-portal flex max-h-[calc(100dvh-48px)] flex-col gap-0 overflow-hidden p-0"
+        className="admin-portal flex max-h-[calc(100dvh-48px)] flex-col gap-0 overflow-hidden rounded-[12px] border border-border bg-background p-0 shadow-none"
       >
         <DialogHeader className="shrink-0 border-b border-border px-5 py-3.5">
-          <DialogTitle className="truncate pr-12 text-base">{title}</DialogTitle>
+          <DialogTitle className="truncate pr-12 text-[15px] font-semibold">{title}</DialogTitle>
           {description && (
             <DialogDescription className="text-pretty text-xs leading-5">
               {description}
@@ -189,10 +189,10 @@ export function Drawer({
         data-testid="admin-drawer"
         side="right"
         style={{ width: resolvedWidth, maxWidth: '100vw' }}
-        className="admin-portal flex w-full flex-col gap-0 p-0 sm:max-w-none"
+        className="admin-portal flex w-full flex-col gap-0 p-0 shadow-none sm:max-w-none"
       >
         <SheetHeader className="border-b border-border px-5 py-4">
-          <SheetTitle className="truncate pr-12 text-base">{title}</SheetTitle>
+          <SheetTitle className="truncate pr-12 text-[15px] font-semibold">{title}</SheetTitle>
           {description && (
             <p className="text-pretty text-xs leading-5 text-muted-foreground">{description}</p>
           )}
@@ -255,16 +255,16 @@ export function ConfirmDialog({
     >
       <AlertDialogContent
         data-testid="admin-confirm-action"
-        className="admin-portal w-[calc(100%-2rem)] max-w-[520px] gap-0 overflow-hidden p-0 sm:max-w-[520px]"
+        className="admin-portal w-[calc(100%-2rem)] max-w-[520px] gap-0 overflow-hidden rounded-[12px] border border-border bg-background p-0 shadow-none"
       >
         <AlertDialogHeader className="px-5 py-4 text-left">
-          <AlertDialogTitle className="flex items-center gap-1.5 text-base">
+          <AlertDialogTitle className="flex items-center gap-1.5 text-[15px] font-semibold">
             {danger && <AlertTriangle className="size-4 shrink-0 text-danger-text" aria-hidden />}
             {title}
           </AlertDialogTitle>
           {description && (
             <AlertDialogDescription asChild>
-              <div className="space-y-1 text-sm leading-6">{description}</div>
+              <div className="flex flex-col gap-1 text-[13px] leading-6">{description}</div>
             </AlertDialogDescription>
           )}
         </AlertDialogHeader>

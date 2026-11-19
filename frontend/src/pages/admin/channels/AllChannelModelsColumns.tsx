@@ -77,7 +77,7 @@ export function useAllChannelModelsColumns({
                   <Button
                     variant="link"
                     size="sm"
-                    className="h-auto min-w-0 justify-start overflow-hidden p-0 text-[12px] text-brand"
+                    className="h-auto min-w-0 justify-start overflow-hidden p-0 text-[12px] text-radar-ink-950"
                     title="在供应商中查看"
                     onClick={() => onOpenChannel(row.channelId)}
                   >

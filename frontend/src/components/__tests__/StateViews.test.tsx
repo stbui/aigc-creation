@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Link, MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { StateButton, StateEmpty, StateError, StateLoading, StateSkeleton } from '../StateViews';
 
@@ -97,6 +98,21 @@ describe('StateSkeleton', () => {
 });
 
 describe('StateButton', () => {
+  it('asChild 把导航主动作渲染为链接', () => {
+    render(
+      <MemoryRouter>
+        <StateButton asChild>
+          <Link to="/packages">去积分商城</Link>
+        </StateButton>
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link', { name: '去积分商城' });
+    expect(link).toHaveAttribute('href', '/packages');
+    expect(link).toHaveClass('state-btn', 'is-primary');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('disabled 时不可点击', async () => {
     const onClick = vi.fn();
     render(

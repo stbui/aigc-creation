@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   ChevronDown,
   CreditCard,
@@ -28,7 +28,6 @@ import { isCapabilityVisible, toolPath } from './utils';
 export function LandingHeader() {
   const { data } = useCapabilities();
   const { token } = useAuth();
-  const navigate = useNavigate();
   const [open, setOpen] = useState<string | null>(null);
 
   // 落地页顶导与应用外壳同口径: 参考站 landing/workspace 共用同一套外壳, 3 个分组下拉齐全。
@@ -106,21 +105,18 @@ export function LandingHeader() {
                 {navItems
                   .filter((i) => i.group === g.id)
                   .map((i) => (
-                    <button
+                    <Link
                       key={i.id}
-                      type="button"
                       className="landing-nav-menu-item"
                       title={i.summary}
-                      onClick={() => {
-                        setOpen(null);
-                        navigate(toolPath(i.id));
-                      }}
+                      to={toolPath(i.id)}
+                      onClick={() => setOpen(null)}
                     >
                       {NAV_ICONS[i.id] && (
                         <img src={NAV_ICONS[i.id]} alt="" aria-hidden loading="lazy" />
                       )}
                       <span className="landing-nav-menu-name">{i.name}</span>
-                    </button>
+                    </Link>
                   ))}
               </div>
             </div>

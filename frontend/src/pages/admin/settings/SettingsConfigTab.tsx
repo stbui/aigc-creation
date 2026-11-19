@@ -60,8 +60,8 @@ export function SettingsConfigTab({
                     key={item.key}
                     item={item}
                     value={item.key in model.draft ? model.draft[item.key] : item.value}
-                    isDraft={item.key in model.draft}
-                    isClearing={model.clears.has(item.key)}
+                    draft={item.key in model.draft}
+                    clearing={model.clears.has(item.key)}
                     editable={editable}
                     onChange={(value) => model.setValue(item.key, value)}
                     onRevert={() => model.revert(item.key)}
@@ -99,7 +99,7 @@ export function SettingsConfigTab({
             <ul className="flex flex-col gap-2 text-[12px] leading-5 text-muted-foreground">
               {meta.effects.map((effect) => (
                 <li key={effect} className="flex gap-2">
-                  <span aria-hidden className="mt-2 size-1 shrink-0 rounded-full bg-brand" />
+                  <span aria-hidden className="mt-2 size-1 shrink-0 rounded-full bg-radar-ink-950" />
                   <span>{effect}</span>
                 </li>
               ))}

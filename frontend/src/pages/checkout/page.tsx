@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 
 import { QUOTE_DEBOUNCE_MS } from './constants';
-import { StateError, StateSkeleton } from './components';
+import { StateButton, StateError, StateSkeleton } from './components';
 import { membershipApi, myMarketingApi, ordersApi, productsApi } from './api';
 import { blockedReasonOf, quoteErrorMessageOf } from './utils';
 import { useCheckoutPayment } from './hooks';
@@ -288,9 +288,9 @@ export function CheckoutPage() {
                 : '没能取回该商品的信息。可能是后端未启动、链接有误或商品已下架。'
             }
             action={
-              <button type="button" className="state-btn is-ghost" onClick={() => navigate('/packages')}>
-                返回积分商城
-              </button>
+              <StateButton asChild variant="ghost">
+                <Link to="/packages">返回积分商城</Link>
+              </StateButton>
             }
           />
         </div>

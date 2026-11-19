@@ -1,6 +1,7 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import type { Product } from '../../types/api';
+import { formatNumber } from './utils';
 import { A, ADDON_ICONS } from './constants';
 import type { LandingCatalogState } from './hooks';
 
@@ -15,8 +16,6 @@ interface LandingAddonGridProps {
  * 首页是入口不是价目表，15 张卡会把落地页拉成第二个商城。
  */
 export function LandingAddonGrid({ addons, state }: LandingAddonGridProps) {
-  const navigate = useNavigate();
-
   return (
     <div className="lp-addon-grid">
       {state === 'loading' && <p className="lp-empty">积分包加载中…</p>}
@@ -51,12 +50,12 @@ export function LandingAddonGrid({ addons, state }: LandingAddonGridProps) {
           {/* 可生成张数不写死「积分 ÷ 10」—— 实际每次扣多少以能力消耗价为准,
               与生成页显示的同一个数, 免得两处算法漂移 */}
           <p className="lp-addon-meta">
-            {addon.credits.toLocaleString('zh-CN')} 积分 ·{' '}
+            {formatNumber(addon.credits)} 积分 ·{' '}
             {addon.creditsValidDays > 0 ? `${addon.creditsValidDays} 天内有效` : '永久有效'}
           </p>
-          <button type="button" className="lp-plan-buy" onClick={() => navigate('/packages')}>
+          <Link className="lp-plan-buy" to="/packages">
             {addon.isFree ? '免费领取' : '立即购买'}
-          </button>
+          </Link>
         </article>
       ))}
     </div>

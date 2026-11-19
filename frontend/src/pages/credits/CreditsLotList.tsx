@@ -15,7 +15,7 @@ export function CreditsLotList({ rows }: CreditsLotListProps) {
         <li key={lot.id} className="credits-mobile-item">
           <div className="credits-mobile-line">
             <span className="credits-mobile-title">{SOURCE_LABEL[lot.source] ?? lot.source}</span>
-            <Tag variant="filled" className={`credits-status is-${lot.status}`}>
+            <Tag className={`credits-status is-${lot.status}`}>
               {LOT_STATUS[lot.status] ?? LOT_STATUS.active}
             </Tag>
           </div>

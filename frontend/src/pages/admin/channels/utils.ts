@@ -41,7 +41,7 @@ import {
 import { createDefaultTextCapabilityConfigJson } from './textCapability';
 
 /* 外部工具转出：目录内文件不直接引 `src/lib/*`，也不直接引 `~/admin-ui/lib/*` */
-export { cn } from '~/admin-ui/lib/cn';
+export { cn, formatNumber } from '~/admin-ui/radar';
 export {
   MAX_REPRICE_MARKUP_PERCENT,
   MAX_REPRICE_MODELS,

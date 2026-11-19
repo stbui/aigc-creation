@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 
 import { assetSrc, assetThumbSrc } from './api';
 import { ResultMedia, WorkImage } from './components';
-import { capabilityById, capabilityName, formatCreatedAt, taskModality } from './utils';
+import { capabilityById, capabilityName, formatCreatedAt, taskModality, toolPath } from './utils';
 import { WorkCardActionBar } from './WorkCardActionBar';
 import { WorkCardPlaceholder } from './WorkCardPlaceholder';
 import type { Task } from '../../types/api';
@@ -27,7 +27,6 @@ export interface WorkCardProps {
   onRetry: (task: Task) => void;
   onDownload: (task: Task) => void;
   onRemove: (id: string) => void;
-  onReuse: (capabilityId: string) => void;
 }
 
 export function WorkCard({
@@ -41,7 +40,6 @@ export function WorkCard({
   onRetry,
   onDownload,
   onRemove,
-  onReuse,
 }: WorkCardProps) {
   const capability = capabilityById(task.capability);
   const fullUrl = task.outputAsset ? assetSrc(task.outputAsset) : undefined;
@@ -92,9 +90,9 @@ export function WorkCard({
 
         <WorkCardActionBar
           canReuse={hasOutput}
+          reuseTo={hasOutput ? toolPath(task.capability) : undefined}
           canPreview={canPreview}
           canDownload={hasOutput}
-          onReuse={() => onReuse(task.capability)}
           onPreview={() => onPreview(lightboxIndex)}
           onDownload={() => onDownload(task)}
           onRemove={() => onRemove(task.id)}

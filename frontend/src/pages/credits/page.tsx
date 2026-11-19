@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
 
 import { CREDITS_PAGE_META, type Tab } from './constants';
@@ -25,7 +25,6 @@ import { CreditsStatsGrid } from './CreditsStatsGrid';
  */
 export function CreditsPage() {
   useDocumentMeta('积分明细 · 货觉AI', '查看积分余额、批次与每一笔流水。');
-  const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   /*
    * 表格在窄屏会被卡片右缘切断, 换成列表渲染 (见 CreditsLedgerList / CreditsLotList)。
@@ -79,8 +78,11 @@ export function CreditsPage() {
       title={CREDITS_PAGE_META.title}
       description={CREDITS_PAGE_META.description}
       extra={
-        <Button type="primary" icon={<ShoppingBag size={15} />} onClick={() => navigate('/packages')}>
-          购买积分 / 会员
+        <Button asChild type="primary">
+          <Link to="/packages">
+            <ShoppingBag size={15} aria-hidden />
+            购买积分 / 会员
+          </Link>
         </Button>
       }
     >
@@ -108,7 +110,6 @@ export function CreditsPage() {
                   onFilterChange={handleLedgerFilterChange}
                   onPageChange={(page) => void loadLedgerPage(page, ledgerFilter)}
                   onRetry={retryLedger}
-                  onGoPackages={() => navigate('/packages')}
                 />
               ),
             },
@@ -124,7 +125,6 @@ export function CreditsPage() {
                   page={lotsPage}
                   onPageChange={setLotsPage}
                   onRetry={retryAll}
-                  onGoPackages={() => navigate('/packages')}
                 />
               ),
             },

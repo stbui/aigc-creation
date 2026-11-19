@@ -1,4 +1,4 @@
-import { formatYuanPlain } from '../../../admin-ui/lib/format';
+import { formatYuanPlain } from '~/admin-ui/radar';
 import {
   PAYMENTS_TABS,
   PROVIDER_LABELS,
@@ -14,8 +14,8 @@ import type {
   VisiblePaymentMethod,
 } from './types';
 
-export { cn } from '~/admin-ui/lib/cn';
-export { formatDateTime } from '../../../admin-ui/lib/format';
+export { cn } from '~/admin-ui/radar';
+export { formatDateTime } from '~/admin-ui/radar';
 export { formatYuanPlain };
 
 /**

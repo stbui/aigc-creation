@@ -31,11 +31,11 @@ import type { AdminMenuGroup, AdminMenuItem } from '../../components/admin/admin
 /** 单个导航项。折叠态只留图标，名称由 `tooltip` 补位。 */
 function NavItem({
   item,
-  isActive,
+  active,
   onNavigate,
 }: {
   item: AdminMenuItem;
-  isActive: boolean;
+  active: boolean;
   onNavigate: (path: string) => void;
 }) {
   const Icon = item.icon;
@@ -45,17 +45,17 @@ function NavItem({
     <SidebarMenuItem>
       <SidebarMenuButton
         type="button"
-        isActive={isActive}
+        isActive={active}
         tooltip={tooltip}
         aria-label={item.label}
-        aria-current={isActive ? 'page' : undefined}
+        aria-current={active ? 'page' : undefined}
         onClick={() => onNavigate(item.path)}
         className={cn(
           'relative h-9 gap-2.5 px-2.5 text-sm font-medium data-[active=true]:font-semibold',
           'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center',
         )}
       >
-        {isActive && (
+        {active && (
           <span
             className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-primary group-data-[collapsible=icon]:hidden"
             aria-hidden
@@ -128,7 +128,7 @@ function SidebarNav({
                     <NavItem
                       key={item.path}
                       item={item}
-                      isActive={activePath === item.path}
+                      active={activePath === item.path}
                       onNavigate={onNavigate}
                     />
                   ))}
@@ -191,7 +191,7 @@ function SidebarNav({
                     <NavItem
                       key={item.path}
                       item={item}
-                      isActive={activePath === item.path}
+                      active={activePath === item.path}
                       onNavigate={onNavigate}
                     />
                   ))}

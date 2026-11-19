@@ -100,7 +100,7 @@ export interface AdminDataTableProps<T> {
   selectable?: boolean;
   selected?: string[];
   onSelectedChange?: (keys: string[]) => void;
-  isRowSelectable?: (row: T) => boolean;
+  rowSelectable?: (row: T) => boolean; // 行内是否可勾选；不传时所有行可选。
   rowSelectLabel?: (row: T) => string;
   pagination?: {
     current: number;
@@ -165,7 +165,7 @@ export function AdminDataTable<T>({
   selectable = false,
   selected = [],
   onSelectedChange,
-  isRowSelectable,
+  rowSelectable,
   rowSelectLabel,
   pagination,
   minWidth,
@@ -233,7 +233,7 @@ export function AdminDataTable<T>({
               size="sm"
               onClick={headerColumn.getToggleSortingHandler()}
               className={cn(
-                '-ml-2 h-7 gap-1 px-2 text-[13px] font-semibold',
+                '-ml-2 h-8 gap-1 px-2 text-[13px] font-semibold',
                 active && 'text-foreground',
               )}
             >
@@ -300,7 +300,7 @@ export function AdminDataTable<T>({
     enableMultiSort: false,
     sortDescFirst: true,
     enableRowSelection: selectable
-      ? (row) => (isRowSelectable ? isRowSelectable(row.original as unknown as T) : true)
+      ? (row) => (rowSelectable ? rowSelectable(row.original as unknown as T) : true)
       : false,
     onSortingChange: handleSortingChange,
     onPaginationChange: handlePaginationChange,
@@ -352,7 +352,7 @@ export function AdminDataTable<T>({
       >
         <Table
           data-testid="admin-table"
-          className={cn('text-sm', fixedLayout && 'table-fixed')}
+          className={cn('text-[13px]', fixedLayout && 'table-fixed')}
           style={minWidth ? { minWidth } : undefined}
         >
           <TableHeader>
@@ -500,15 +500,13 @@ export function AdminDataTable<T>({
                 value={String(pagination.pageSize)}
                 onValueChange={(next) => pagination.onChange(1, Number(next))}
               >
-                <SelectTrigger size="sm" aria-label="每页条数" className="h-7 w-[68px] text-xs">
+                <SelectTrigger size="sm" aria-label="每页条数" className="w-[68px] text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="admin-portal radar-scope rounded-[8px] border-radar-ink-200 bg-radar-surface shadow-none [&_[data-slot=select-item]]:text-[13px]">
                   <SelectGroup>
                     {[20, 50, 100].map((size) => (
-                      <SelectItem key={size} value={String(size)}>
-                        {size}
-                      </SelectItem>
+                      <SelectItem key={size} value={String(size)}>{size}</SelectItem>
                     ))}
                   </SelectGroup>
                 </SelectContent>
@@ -519,7 +517,7 @@ export function AdminDataTable<T>({
                 <PaginationItem>
                   <Button
                     variant="outline"
-                    size="xs"
+                    size="sm"
                     disabled={!table.getCanPreviousPage()}
                     onClick={() => table.previousPage()}
                   >
@@ -534,7 +532,7 @@ export function AdminDataTable<T>({
                 <PaginationItem>
                   <Button
                     variant="outline"
-                    size="xs"
+                    size="sm"
                     disabled={!table.getCanNextPage()}
                     onClick={() => table.nextPage()}
                   >
@@ -577,7 +575,7 @@ function TableSkeleton({
     <div className="py-3" data-testid="admin-page-loading">
       <div data-testid="admin-table-scroll" className="relative overflow-x-auto">
         <Table
-          className={cn('text-sm', fixedLayout && 'table-fixed')}
+          className={cn('text-[13px]', fixedLayout && 'table-fixed')}
           style={minWidth ? { minWidth } : undefined}
         >
           <TableHeader>

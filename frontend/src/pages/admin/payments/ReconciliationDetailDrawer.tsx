@@ -51,7 +51,7 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
       render: (row) =>
         row.orderId ? (
           <Link
-            className="font-mono text-[12px] text-brand hover:underline"
+            className="font-mono text-[12px] text-radar-ink-950 hover:underline"
             to={adminOrderDetailHref(row.orderId)}
             title="在订单管理中打开"
           >
@@ -150,7 +150,7 @@ export function ReconciliationDetailDrawer({ runId, onClose }: { runId: string; 
 
         <Notice tone="info" title="本页不改钱">
           核对发现「渠道已收款但本地未入账」时系统会自动补单；重复扣款等资金异常请到
-          <Link className="text-brand hover:underline" to="/admin/orders">
+          <Link className="text-radar-ink-950 hover:underline" to="/admin/orders">
             订单管理
           </Link>
           走退款流程。

@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { CapabilityGroup, CreditBalance, StatsOverview } from '../../types/api';
-import { groupNameOf, statusLabel } from './utils';
+import { formatCompactDateTime, groupNameOf, statusLabel } from './utils';
 import { StateError, StateSkeleton } from './components';
 
 /**
@@ -33,8 +33,6 @@ export function WorkbenchAccountPanel({
   onRetry,
   onOpenLogin,
 }: WorkbenchAccountPanelProps) {
-  const navigate = useNavigate();
-
   return (
     <article className="wb-panel wb-account">
       {!token ? (
@@ -46,9 +44,9 @@ export function WorkbenchAccountPanel({
         <>
           <div className="wb-panel-title">
             <strong>账号和作品数据</strong>
-            <button type="button" onClick={() => navigate('/credits')}>
-              积分明细 <ArrowRight size={12} />
-            </button>
+            <Link to="/credits">
+              积分明细 <ArrowRight size={12} aria-hidden />
+            </Link>
           </div>
           <div className="wb-user">
             <span className="wb-avatar">{(email?.[0] ?? 'U').toUpperCase()}</span>
@@ -84,7 +82,7 @@ export function WorkbenchAccountPanel({
               </div>
               <div className="wb-flow-head">
                 <strong>最近任务</strong>
-                <button type="button" onClick={() => navigate('/works')}>查看全部</button>
+                <Link to="/works">查看全部</Link>
               </div>
               <div className="wb-flow-table-wrap">
                 <table>
@@ -94,7 +92,7 @@ export function WorkbenchAccountPanel({
                   <tbody>
                     {stats.recentTasks.slice(0, 4).map((t) => (
                       <tr key={t.id}>
-                        <td>{t.createdAt ? new Date(t.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '—'}</td>
+                        <td>{formatCompactDateTime(t.createdAt)}</td>
                         <td>{t.name}</td>
                         <td><span className="wb-flow-type expense">{groupNameOf(t.capability, groups)}</span></td>
                         <td>{statusLabel(t.status)}</td>

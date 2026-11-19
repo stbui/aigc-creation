@@ -9,7 +9,7 @@ import type { AdminCheckinListResult, AdminInviteListResult, CheckinRule } from 
 export { adminUserHref } from '../../../lib/admin-links';
 
 /** 地址栏 `?tab=` → 页签。非法值回落规则页，不让页面停在一片空白上 */
-export { formatDateTime } from '../../../admin-ui/lib/format';
+export { formatDateTime } from '~/admin-ui/radar';
 export function resolveTab(value: string | null): TabValue {
   return TAB_OPTIONS.some((tab) => tab.value === value) ? (value as TabValue) : DEFAULT_TAB;
 }

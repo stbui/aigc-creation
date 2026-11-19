@@ -64,7 +64,7 @@ export function CouponTable({
         <Button
           variant="link"
           size="sm"
-          className="h-auto justify-start p-0 font-mono text-brand"
+          className="h-auto justify-start p-0 font-mono text-radar-ink-950"
           onClick={() => onEdit(row)}
         >
           {row.code}
@@ -83,7 +83,7 @@ export function CouponTable({
       title: '面额',
       width: 90,
       render: (row) => (
-        <span className="font-medium text-brand">
+        <span className="font-medium text-radar-ink-950">
           {faceValue({ type: row.type, value: row.value })}
         </span>
       ),

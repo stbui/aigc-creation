@@ -196,7 +196,7 @@ export function AdminCreditsPage() {
             {row.status === 'deleted' ? <StatusTag status="deleted" showDot /> : null}
           </span>
           <span className="text-muted-foreground">
-            <Link className="text-brand hover:underline" to={adminUserDetailHref(row.userId)}>
+            <Link className="text-radar-ink-950 hover:underline" to={adminUserDetailHref(row.userId)}>
               {row.email}
             </Link>
             {row.name ? '' : ' · 无昵称'}
@@ -381,7 +381,7 @@ export function AdminCreditsPage() {
           selectable={canDeleteUsers}
           selected={selected}
           onSelectedChange={setSelected}
-          isRowSelectable={(row) => row.status !== 'deleted' && row.userId !== me?.id}
+          rowSelectable={(row) => row.status !== 'deleted' && row.userId !== me?.id}
           rowSelectLabel={(row) => `选择账户 ${row.email}`}
           minWidth={1100}
           emptyText={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}

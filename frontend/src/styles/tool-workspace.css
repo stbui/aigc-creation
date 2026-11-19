@@ -67,6 +67,8 @@
 }
 
 .pk-editor-tab {
+  display: inline-flex;
+  align-items: center;
   font-size: 13px;
   font-weight: 700;
   color: var(--text-body);
@@ -74,6 +76,7 @@
   border: none;
   border-radius: var(--radius-panel);
   padding: 11px var(--space-12);
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -617,6 +620,13 @@
   font-weight: 500;
   color: var(--text-body);
   line-height: 18px;
+}
+
+.pk-settings-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
 }
 
 .pk-ratio-grid {

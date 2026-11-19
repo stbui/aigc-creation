@@ -955,7 +955,7 @@ interface CanvasNodeDefinition {
 
 需新增的 shadcn 件：`command`、`resizable`、`scroll-area`、`toggle-group`。`shadcn add` 后必须跑 `frontend/scripts/post-shadcn.mjs` 改写 `cn` 引用。
 
-C 端画布页面也遵守「后台组件一套 shadcn」：节点卡片、属性面板、工具栏全部复用 `admin-ui/primitives`，不另起一套。C 端 `frontend/src/ui` 兼容层只用于现有页面；画布新代码直接取 primitives，避免再增加一层转发。
+C 端画布页面复用后台的 shadcn 原子件与共享实现：节点卡片、属性面板、工具栏从 `admin-ui/primitives` 取件，不另起一套。该取件规则只适用于 C 端画布，不改变后台业务页统一从 `admin-ui/radar` 取件的边界。
 
 ### 12.8 样式
 
@@ -1008,7 +1008,7 @@ canvasShareRead: 'canvas.share_read',
 | `/admin/canvas/quota` | 配额与快照保留 | `canvas.quota` |
 | `/admin/canvas/storage` | 存储只读 / 迁移状态 | `canvas.write` |
 
-页面只从 `admin-ui/primitives` 取件；表格用 `primitives/table`，确认用 `ConfirmDialog`，跨页确认用 `useConfirm()`。
+页面只从 `admin-ui/radar` 取件；表格用 `AdminDataTable`，确认用 `ConfirmDialog`，跨页确认用 `useConfirm()`。
 
 ### 13.3 设置项
 

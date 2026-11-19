@@ -15,7 +15,7 @@ export function EmailEvents({
   itemFor,
   valueFor,
   disabled,
-  isDirty,
+  dirty,
   onChange,
   onOpenDelivery,
   onOpenTemplates,
@@ -24,14 +24,14 @@ export function EmailEvents({
   itemFor: (key: string) => EmailSettingItem | undefined;
   valueFor: (key: string) => unknown;
   disabled: boolean;
-  isDirty: (key: string) => boolean;
+  dirty: (key: string) => boolean;
   onChange: (key: string, value: boolean) => void;
   onOpenDelivery: () => void;
   onOpenTemplates: () => void;
 }) {
   const eventKeys = EVENT_GROUPS.flatMap((group) => group.items.map((item) => item.key));
   const enabledCount = eventKeys.filter((key) => Boolean(valueFor(key))).length;
-  const dirtyCount = eventKeys.filter((key) => isDirty(key)).length;
+  const dirtyCount = eventKeys.filter((key) => dirty(key)).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -72,7 +72,7 @@ export function EmailEvents({
               aria-labelledby={`email-event-${group.title}`}
             >
               <div className="flex items-start gap-3 border-b border-border bg-muted/20 px-4 py-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-radar-ink-100 text-radar-ink-950">
                   <GroupIcon className="size-4" aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -111,7 +111,7 @@ export function EmailEvents({
                                 ? '发送中'
                                 : '已停用'}
                           </ToneBadge>
-                          {isDirty(key) && <ToneBadge tone="warn">有修改</ToneBadge>}
+                          {dirty(key) && <ToneBadge tone="warn">有修改</ToneBadge>}
                         </div>
                         <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
                           {copy.hint}

@@ -1,23 +1,6 @@
-import { Fragment, type ComponentType, type ReactNode } from 'react';
-import { AlertTriangle, MoreHorizontal } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog';
+import { Fragment, type ReactNode } from 'react';
+import { AlertTriangle, MoreHorizontal, XIcon } from 'lucide-react';
+import { AlertDialog as AlertDialogPrimitive, Dialog as DialogPrimitive } from 'radix-ui';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import { cn } from '../lib/cn';
-import { Button } from './Button';
+import { buttonClass } from './Button';
 
 /* ────────────────────────── 居中弹窗 ────────────────────────── */
 
@@ -55,35 +38,50 @@ export function ModalDialog({
 }) {
   const resolvedWidth = width ?? MODAL_WIDTH[size];
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        data-testid="admin-modal"
-        style={{ maxWidth: resolvedWidth }}
-        className="radar-pop-enter flex max-h-[calc(100dvh-48px)] flex-col gap-0 overflow-hidden rounded-[12px] border border-radar-ink-200 bg-radar-surface p-0 shadow-none"
-      >
-        <DialogHeader className="shrink-0 border-b border-radar-ink-100 px-5 py-3.5">
-          <DialogTitle className="truncate pr-12 text-[15px] font-semibold text-radar-ink-950">
-            {title}
-          </DialogTitle>
-          {description && (
-            <DialogDescription className="mt-0.5 text-pretty text-[12.5px] leading-5 text-radar-ink-400">
-              {description}
-            </DialogDescription>
-          )}
-        </DialogHeader>
-        <div
-          data-testid="admin-modal-body"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay
+          data-slot="dialog-overlay"
+          className="radar-backdrop-enter fixed inset-0 z-50 bg-radar-ink-950/25 backdrop-blur-[1px]"
+        />
+        <DialogPrimitive.Content
+          data-testid="admin-modal"
+          data-slot="dialog-content"
+          style={{ maxWidth: resolvedWidth }}
+          className="admin-portal radar-scope radar-pop-enter fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-48px)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-[12px] border border-radar-ink-200 bg-radar-surface p-0 shadow-none outline-none"
         >
-          {children}
-        </div>
-        {footer && (
-          <DialogFooter className="shrink-0 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-3">
-            {footer}
-          </DialogFooter>
-        )}
-      </DialogContent>
-    </Dialog>
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-radar-ink-100 px-5 py-3.5">
+            <div className="min-w-0">
+              <DialogPrimitive.Title className="truncate text-[15px] font-semibold text-radar-ink-950">
+                {title}
+              </DialogPrimitive.Title>
+              {description && (
+                <DialogPrimitive.Description className="mt-0.5 text-pretty text-[12.5px] leading-5 text-radar-ink-400">
+                  {description}
+                </DialogPrimitive.Description>
+              )}
+            </div>
+            <DialogPrimitive.Close
+              aria-label="关闭"
+              className="shrink-0 rounded-lg p-1.5 text-radar-ink-500 transition-colors hover:bg-radar-ink-100 hover:text-radar-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-radar-accent"
+            >
+              <XIcon className="size-4" aria-hidden />
+            </DialogPrimitive.Close>
+          </div>
+          <div
+            data-testid="admin-modal-body"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
+          >
+            {children}
+          </div>
+          {footer && (
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-3">
+              {footer}
+            </div>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
@@ -114,76 +112,95 @@ export function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const body =
+    impact?.length || extra ? (
+      <>
+        {impact && impact.length > 0 && (
+          <div
+            className={cn(
+              'rounded-[8px] border px-3 py-2 text-[12px] leading-5',
+              danger
+                ? 'border-radar-alert-border bg-radar-alert-subtle text-radar-alert'
+                : 'border-radar-code-border bg-radar-code-subtle text-radar-code',
+            )}
+          >
+            <div className="font-medium">影响范围</div>
+            <ul className="mt-0.5 list-disc pl-4">
+              {impact.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {extra}
+      </>
+    ) : undefined;
+
   return (
-    <AlertDialog
+    <AlertDialogPrimitive.Root
       open={open}
       onOpenChange={(next) => {
         if (!next && !loading) onCancel();
       }}
     >
-      <AlertDialogContent
-        data-testid="admin-confirm-action"
-        className="radar-pop-enter w-[calc(100%-2rem)] max-w-[520px] gap-0 overflow-hidden rounded-[12px] border border-radar-ink-200 bg-radar-surface p-0 shadow-none sm:max-w-[520px]"
-      >
-        <AlertDialogHeader className="px-5 py-4 text-left">
-          <AlertDialogTitle className="flex items-center gap-1.5 text-[15px] font-semibold text-radar-ink-950">
-            {danger && <AlertTriangle className="size-4 shrink-0 text-radar-alert" aria-hidden />}
-            {title}
-          </AlertDialogTitle>
-          {description && (
-            <AlertDialogDescription asChild>
-              <div className="space-y-1 text-[13px] leading-6 text-radar-ink-500">{description}</div>
-            </AlertDialogDescription>
-          )}
-        </AlertDialogHeader>
-
-        {(impact?.length || extra) && (
-          <div
-            data-testid="admin-confirm-action-body"
-            className="flex flex-col gap-3 border-y border-radar-ink-100 bg-radar-surface-hover px-5 py-4"
-          >
-            {impact && impact.length > 0 && (
-              <div
-                className={cn(
-                  'rounded-[8px] border px-3 py-2 text-[12px] leading-5',
-                  danger
-                    ? 'border-radar-alert-border bg-radar-alert-subtle text-radar-alert'
-                    : 'border-radar-code-border bg-radar-code-subtle text-radar-code',
-                )}
-              >
-                <div className="font-medium">影响范围</div>
-                <ul className="mt-0.5 list-disc pl-4">
-                  {impact.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
+      <AlertDialogPrimitive.Portal>
+        <AlertDialogPrimitive.Overlay
+          data-slot="alert-dialog-overlay"
+          className="radar-backdrop-enter fixed inset-0 z-50 bg-radar-ink-950/25 backdrop-blur-[1px]"
+        />
+        <AlertDialogPrimitive.Content
+          data-testid="admin-confirm-action"
+          data-slot="alert-dialog-content"
+          className="admin-portal radar-scope radar-pop-enter fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-48px)] w-[calc(100%-2rem)] max-w-[520px] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-[12px] border border-radar-ink-200 bg-radar-surface p-0 shadow-none outline-none"
+        >
+          <div className="px-5 py-4 text-left">
+            <AlertDialogPrimitive.Title className="flex items-center gap-1.5 text-[15px] font-semibold text-radar-ink-950">
+              {danger && <AlertTriangle className="size-4 shrink-0 text-radar-alert" aria-hidden />}
+              {title}
+            </AlertDialogPrimitive.Title>
+            {description && (
+              <AlertDialogPrimitive.Description asChild>
+                <div className="mt-0.5 flex flex-col gap-1 text-[12.5px] leading-5 text-radar-ink-500">
+                  {description}
+                </div>
+              </AlertDialogPrimitive.Description>
             )}
-            {extra}
           </div>
-        )}
 
-        <AlertDialogFooter className="border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-3">
-          <AlertDialogCancel size="sm" disabled={loading} onClick={onCancel}>
-            取消
-          </AlertDialogCancel>
-          <AlertDialogAction
-            size="sm"
-            onClick={(event) => {
-              event.preventDefault();
-              onConfirm();
-            }}
-            className={cn(
-              'bg-radar-brand text-white hover:bg-radar-brand-hover',
-              danger && 'bg-radar-alert text-white hover:bg-red-700',
-              (loading || confirmDisabled) && 'pointer-events-none opacity-60',
-            )}
-          >
-            {confirmText}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          {body && (
+            <div
+              data-testid="admin-confirm-action-body"
+              className="flex flex-col gap-3 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-4"
+            >
+              {body}
+            </div>
+          )}
+
+          <div className="flex shrink-0 flex-row items-center justify-end gap-2 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-3">
+            <AlertDialogPrimitive.Cancel
+              className={buttonClass({ variant: 'secondary', size: 'sm' })}
+              disabled={loading}
+            >
+              取消
+            </AlertDialogPrimitive.Cancel>
+            <AlertDialogPrimitive.Action
+              className={buttonClass({
+                variant: danger ? 'destructive' : 'default',
+                size: 'sm',
+              })}
+              disabled={loading || confirmDisabled}
+              onClick={(event) => {
+                // 请求结束后再由父级关闭，避免加载期间弹框提前消失。
+                event.preventDefault();
+                onConfirm();
+              }}
+            >
+              {confirmText}
+            </AlertDialogPrimitive.Action>
+          </div>
+        </AlertDialogPrimitive.Content>
+      </AlertDialogPrimitive.Portal>
+    </AlertDialogPrimitive.Root>
   );
 }
 
@@ -214,7 +231,7 @@ export function RowMenu({ items, label = '更多' }: { items: RowMenuItem[]; lab
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="radar-pop-enter w-40 rounded-[8px] border border-radar-ink-200 bg-radar-surface p-1 shadow-none"
+        className="admin-portal radar-scope radar-pop-enter w-40 rounded-[8px] border border-radar-ink-200 bg-radar-surface p-1 shadow-none"
         aria-label="更多操作"
         aria-labelledby={undefined}
         onClick={(event) => event.stopPropagation()}
@@ -238,27 +255,5 @@ export function RowMenu({ items, label = '更多' }: { items: RowMenuItem[]; lab
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/* 兼容：部分页面直接引用带 icon 的确认动作按钮形态 */
-export function ConfirmActionButton({
-  icon: Icon,
-  children,
-  onClick,
-  disabled,
-  className,
-}: {
-  icon?: ComponentType<{ className?: string }>;
-  children?: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-}) {
-  return (
-    <Button variant="secondary" size="sm" disabled={disabled} onClick={onClick} className={className}>
-      {Icon ? <Icon className="size-4" aria-hidden /> : null}
-      {children}
-    </Button>
   );
 }

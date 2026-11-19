@@ -53,7 +53,6 @@ export function AccountDeleteModal({
       <div className="account-delete-body">
         <Alert
           type="warning"
-          showIcon
           title="此操作不可撤销"
           description={
             previewLoading

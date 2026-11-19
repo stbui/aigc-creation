@@ -22,7 +22,8 @@ export interface SitemapSection {
   no: string;
   label: string;
   title: string;
-  color: string;
+  /** 编号小标色调：1–4，对应 `--sitemap-accent-*` 令牌 */
+  accent: 1 | 2 | 3 | 4;
   links: SitemapLink[];
 }
 
@@ -31,7 +32,7 @@ export const SECTIONS: SitemapSection[] = [
     no: '01',
     label: 'START HERE',
     title: '首页与创作入口',
-    color: 'var(--sitemap-accent-1)',
+    accent: 1,
     links: [
       { name: '营销首页', to: '/', path: '/' },
       { name: '工作台', to: '/workbench', path: '/workbench' },
@@ -45,7 +46,7 @@ export const SECTIONS: SitemapSection[] = [
     no: '02',
     label: 'CREATE TOOLS',
     title: 'AI 图片工具',
-    color: 'var(--sitemap-accent-2)',
+    accent: 2,
     links: [
       { name: '局部重绘', to: '/local-redraw', path: '/local-redraw', capability: 'local_redraw' },
       { name: '去除水印', to: '/watermark-remove', path: '/watermark-remove', capability: 'remove_watermark' },
@@ -61,7 +62,7 @@ export const SECTIONS: SitemapSection[] = [
     no: '03',
     label: 'YOUR SPACE',
     title: '账户与内容',
-    color: 'var(--sitemap-accent-3)',
+    accent: 3,
     links: [
       { name: '我的作品', to: '/works', path: '/works' },
       { name: '素材库', to: '/library', path: '/library' },
@@ -80,7 +81,7 @@ export const SECTIONS: SitemapSection[] = [
     no: '04',
     label: 'ABOUT THE SITE',
     title: '站点页面',
-    color: 'var(--sitemap-accent-4)',
+    accent: 4,
     links: [
       { name: '网站地图', to: '/sitemap.html', path: '/sitemap.html' },
       { name: '投诉举报', to: '/tickets?type=complaint&compose=1', path: '/tickets?type=complaint&compose=1' },

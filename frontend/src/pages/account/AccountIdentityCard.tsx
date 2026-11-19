@@ -1,4 +1,5 @@
 import { Gem, Gift, LifeBuoy, Wallet } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import type { MyProfile } from '../../types/api';
 import { fmtDate, fmtDateTime } from './utils';
@@ -21,7 +22,6 @@ export function AccountIdentityCard({
   savingName,
   onNameChange,
   onSaveName,
-  onNavigate,
 }: {
   profile: MyProfile | null;
   unread: number;
@@ -30,7 +30,6 @@ export function AccountIdentityCard({
   savingName: boolean;
   onNameChange: (value: string) => void;
   onSaveName: () => void;
-  onNavigate: (to: string) => void;
 }) {
   const avatarChar = (profile?.name || profile?.email || 'U').charAt(0).toUpperCase();
 
@@ -54,18 +53,30 @@ export function AccountIdentityCard({
           </div>
         </div>
         <div className="account-quick">
-          <Button type="primary" icon={<Wallet size={14} />} onClick={() => onNavigate('/credits')}>
-            积分明细
+          <Button asChild type="primary">
+            <Link to="/credits">
+              <Wallet size={14} aria-hidden />
+              积分明细
+            </Link>
           </Button>
-          <Button icon={<Gem size={14} />} onClick={() => onNavigate('/packages')}>
-            购买套餐
+          <Button asChild>
+            <Link to="/packages">
+              <Gem size={14} aria-hidden />
+              购买套餐
+            </Link>
           </Button>
-          <Button icon={<LifeBuoy size={14} />} onClick={() => onNavigate('/tickets')}>
-            我的工单
+          <Button asChild>
+            <Link to="/tickets">
+              <LifeBuoy size={14} aria-hidden />
+              我的工单
+            </Link>
           </Button>
           {/* 邀请 / 签到此前只有顶导一个入口, 个人主页是用户找「还能做什么」的地方 */}
-          <Button icon={<Gift size={14} />} onClick={() => onNavigate('/invitations')}>
-            邀请有礼
+          <Button asChild>
+            <Link to="/invitations">
+              <Gift size={14} aria-hidden />
+              邀请有礼
+            </Link>
           </Button>
         </div>
       </div>

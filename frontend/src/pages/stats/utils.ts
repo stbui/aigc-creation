@@ -5,6 +5,7 @@
  */
 
 import type { StatsOverview } from '../../types/api';
+import { formatClock, formatCompactDateTime } from '../../lib/format';
 import { WEEKDAYS } from './constants';
 
 /** `2026-10-30` → 周几。按本地时间解析, 避免 UTC 偏移把日期挪一天 */
@@ -17,25 +18,14 @@ export function weekdayOf(date: string): string {
 export function formatTaskTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
-  const options: Intl.DateTimeFormatOptions = {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  };
-  if (date.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
-  return date.toLocaleString('zh-CN', options);
+  return formatCompactDateTime(iso, {
+    withYear: date.getFullYear() !== new Date().getFullYear(),
+  });
 }
 
 /** 数据刷新时间戳 */
 export function formatUpdatedAt(date: Date): string {
-  return date.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
+  return formatClock(date);
 }
 
 export interface TrendSummary {

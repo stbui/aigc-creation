@@ -165,7 +165,7 @@ export function BillingOrderTable({
       selectable={selectable}
       selected={selected}
       onSelectedChange={onSelectedChange}
-      isRowSelectable={(row) => row.reviewable}
+      rowSelectable={(row) => row.reviewable}
       pagination={pagination}
     />
   );

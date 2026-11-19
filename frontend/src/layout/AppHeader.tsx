@@ -2,9 +2,10 @@ import './AppHeader.css';
 import { useMemo, useState } from 'react';
 import { Button, Dropdown } from '../ui';
 import { ChevronDown, Menu, Wallet } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { MODE_LABELS } from '../lib/constants';
+import { formatNumber } from '../lib/format';
 import { isCapabilityVisible, toolPath } from '../lib/capabilities';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
@@ -27,7 +28,6 @@ interface Props {
  * 汉堡按钮唤起 `AppSidebar` 的移动抽屉。滚动阴影由 `useHeaderElevated` 托管。
  */
 export function AppHeader({ groups, items, mobileNavOpen, onOpenMobileNav }: Props) {
-  const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const { balance } = useCredits();
   const [navOpen, setNavOpen] = useState<string | null>(null);
@@ -73,7 +73,7 @@ export function AppHeader({ groups, items, mobileNavOpen, onOpenMobileNav }: Pro
                     </span>
                   ),
                   disabled: c.mode === 'planned',
-                  onClick: () => navigate(toolPath(c.id)),
+                  to: toolPath(c.id),
                 })),
             }}
             placement="bottomLeft"
@@ -111,7 +111,7 @@ export function AppHeader({ groups, items, mobileNavOpen, onOpenMobileNav }: Pro
           >
             <Wallet size={14} aria-hidden="true" />
             <span className="app-quota-num">
-              {balance ? balance.balance.toLocaleString('zh-CN') : '—'}
+              {formatNumber(balance?.balance)}
             </span>
             <span className="app-quota-label">积分</span>
           </Link>

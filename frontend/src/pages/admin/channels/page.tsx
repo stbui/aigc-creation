@@ -94,7 +94,8 @@ export function AdminChannelsPage() {
     updateDraft,
     openCreate,
     openEdit,
-    requestCloseForm,
+    // 关闭抽屉只做重置；未保存确认由 FormDrawer 内部负责
+    resetForm,
     submit,
     duplicate,
     deleteTarget,
@@ -251,7 +252,7 @@ export function AdminChannelsPage() {
             saving={saving}
             writable={writable}
             onChange={updateDraft}
-            onClose={requestCloseForm}
+            onClose={resetForm}
             onSubmit={() => void submit()}
           />
         </Suspense>

@@ -10,7 +10,7 @@ interface SitemapSectionCardProps {
 export function SitemapSectionCard({ section }: SitemapSectionCardProps) {
   return (
     <section className="sitemap-section">
-      <span className="sitemap-section-no" style={{ color: section.color }}>
+      <span className="sitemap-section-no" data-accent={section.accent}>
         {section.no} / {section.label}
       </span>
       <div className="sitemap-section-head">

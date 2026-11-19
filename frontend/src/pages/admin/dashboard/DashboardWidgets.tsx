@@ -100,7 +100,7 @@ export function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: b
         {shown.map((t, i) => (
           <li key={t.id}>
             <Link
-              className="grid min-h-11 grid-cols-[22px_minmax(0,1fr)_auto_14px] items-center gap-2.5 rounded-md border-t border-border px-1.5 py-1 text-inherit no-underline transition-colors first:border-t-0 hover:bg-muted focus-visible:outline-2 focus-visible:outline-brand focus-visible:-outline-offset-2"
+              className="grid min-h-11 grid-cols-[22px_minmax(0,1fr)_auto_14px] items-center gap-2.5 rounded-md border-t border-border px-1.5 py-1 text-inherit no-underline transition-colors first:border-t-0 hover:bg-muted focus-visible:outline-2 focus-visible:outline-radar-ink-950 focus-visible:-outline-offset-2"
               to={adminTaskHref(t.id)}
             >
               <span className="text-[12px] font-semibold text-muted-foreground">
@@ -135,7 +135,7 @@ export function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: b
       </ol>
       {failures.length > shown.length && (
         <p className="mt-2.5 border-t border-border pt-2.5 text-[13px]">
-          <Link className="text-brand hover:underline" to="/admin/tasks?status=failed">
+          <Link className="text-radar-ink-950 hover:underline" to="/admin/tasks?status=failed">
             另有 {failures.length - shown.length} 条失败任务 →
           </Link>
         </p>
@@ -210,7 +210,7 @@ export function OrderQueue({ orders, loading }: { orders: AdminOrderRow[]; loadi
       {orders.map((o, i) => (
         <li key={o.id}>
           <Link
-            className="grid min-h-11 grid-cols-[22px_minmax(0,1fr)_auto_auto_14px] items-center gap-2.5 rounded-md border-t border-border px-1.5 py-1 text-inherit no-underline transition-colors first:border-t-0 hover:bg-muted focus-visible:outline-2 focus-visible:outline-brand focus-visible:-outline-offset-2"
+            className="grid min-h-11 grid-cols-[22px_minmax(0,1fr)_auto_auto_14px] items-center gap-2.5 rounded-md border-t border-border px-1.5 py-1 text-inherit no-underline transition-colors first:border-t-0 hover:bg-muted focus-visible:outline-2 focus-visible:outline-radar-ink-950 focus-visible:-outline-offset-2"
             to={adminOrderDetailHref(o.id)}
           >
             <span className="text-[12px] font-semibold text-muted-foreground">

@@ -148,7 +148,7 @@ export function TemplateWorkspace({
           <Badge
             variant="outline"
             asChild
-            className="gap-1 rounded-full border-brand bg-brand-bg py-1 text-[12px] font-normal text-brand"
+            className="gap-1 rounded-full border-radar-ink-300 bg-radar-ink-100 py-1 text-[12px] font-normal text-radar-ink-950"
           >
             <button
               type="button"
@@ -216,7 +216,7 @@ export function TemplateWorkspace({
                     <button
                       type="button"
                       onClick={() => onGroupClick(item.groupId)}
-                      className="shrink-0 rounded-full border border-brand/40 bg-brand-bg px-1.5 py-0.5 text-[12px] leading-4 text-brand transition-colors hover:border-brand"
+                      className="shrink-0 rounded-full border border-radar-ink-300 bg-radar-ink-100 px-1.5 py-0.5 text-[12px] leading-4 text-radar-ink-950 transition-colors hover:border-radar-ink-300"
                       aria-label={`只看分组${groupNameById.get(item.groupId) ?? ''}`}
                       title="只看该分组"
                     >
@@ -235,9 +235,9 @@ export function TemplateWorkspace({
                         title={`按标签「${tag}」筛选`}
                         className={cn(
                           'h-auto min-w-0 shrink-0 gap-1 rounded-full border-border bg-muted/50 px-1.5 py-0.5 text-[12px] leading-4 font-normal shadow-none',
-                          'text-muted-foreground hover:border-brand hover:bg-muted/50 hover:text-brand',
-                          'data-[state=on]:border-brand data-[state=on]:bg-brand-bg data-[state=on]:text-brand',
-                          'data-[state=on]:hover:bg-brand-bg data-[state=on]:hover:text-brand',
+                          'text-muted-foreground hover:border-radar-ink-300 hover:bg-muted/50 hover:text-radar-ink-950',
+                          'data-[state=on]:border-radar-ink-300 data-[state=on]:bg-radar-ink-100 data-[state=on]:text-radar-ink-950',
+                          'data-[state=on]:hover:bg-radar-ink-100 data-[state=on]:hover:text-radar-ink-950',
                         )}
                       >
                         {tag}

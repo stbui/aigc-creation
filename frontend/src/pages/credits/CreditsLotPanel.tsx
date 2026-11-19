@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { CreditLot } from '../../types/api';
 import {
   Pagination,
@@ -20,7 +21,6 @@ interface CreditsLotPanelProps {
   page: number;
   onPageChange: (page: number) => void;
   onRetry: () => void;
-  onGoPackages: () => void;
 }
 
 /** 批次明细页签：桌面表格与窄屏列表（批次一次取回后前端分页）。 */
@@ -32,7 +32,6 @@ export function CreditsLotPanel({
   page,
   onPageChange,
   onRetry,
-  onGoPackages,
 }: CreditsLotPanelProps) {
   const columns = [
     {
@@ -70,7 +69,7 @@ export function CreditsLotPanel({
       width: 100,
       render: (value: CreditLot['status']) => (
         // 不用预设色: 默认绿字在淡绿底上对比度不足, 状态色统一走 .credits-status
-        <Tag variant="filled" className={`credits-status is-${value}`}>
+        <Tag className={`credits-status is-${value}`}>
           {LOT_STATUS[value] ?? LOT_STATUS.active}
         </Tag>
       ),
@@ -92,7 +91,11 @@ export function CreditsLotPanel({
       compact
       title="还没有积分批次"
       desc="每次购买或发放都会形成一个有有效期的积分批次。"
-      action={<StateButton onClick={onGoPackages}>去获取积分</StateButton>}
+      action={
+        <StateButton asChild>
+          <Link to="/packages">去获取积分</Link>
+        </StateButton>
+      }
     />
   ) : narrow ? (
     <>

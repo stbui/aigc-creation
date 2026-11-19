@@ -6,7 +6,7 @@ import { cn } from '../lib/cn';
 import { Button } from '../components/ui/button';
 import { useDuty, type DutyCounter, type DutyTask } from '../../components/admin/DutyContext';
 import { earliestFailure } from './duty-tower';
-import { formatDuration, formatNumber, tickHeight } from '../lib/format';
+import { formatDuration, formatHm, formatMonthDayTime, formatNumber, tickHeight } from '../lib/format';
 
 /**
  * 值班条（概览首屏）。
@@ -36,7 +36,7 @@ const FULL_TICKS = 100;
 const TICK_COLOR: Record<DutyTask['status'], string> = {
   succeeded: 'bg-border',
   failed: 'bg-danger-text',
-  running: 'bg-brand',
+  running: 'bg-foreground',
   queued: 'bg-warn-text',
   cancelled: 'bg-muted',
 };
@@ -256,17 +256,11 @@ function Counter({ counter }: { counter: DutyCounter }) {
   );
 }
 
-/** 时刻 → MM-DD HH:MM（跨天也不会读错顺序） */
+/** 时刻 → MM-DD HH:MM（固定北京时间，跨天也不会读错顺序） */
 function stamp(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${mm}-${dd} ${clock(iso)}`;
+  return formatMonthDayTime(iso);
 }
 
 function clock(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  return formatHm(iso);
 }

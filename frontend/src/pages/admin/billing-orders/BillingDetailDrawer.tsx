@@ -80,7 +80,7 @@ export function BillingDetailDrawer({
                 value: detail.userId ? (
                   <span className="flex items-center gap-2">
                     <Link
-                      className="text-brand hover:underline"
+                      className="text-radar-ink-950 hover:underline"
                       to={adminUserDetailHref(detail.userId)}
                     >
                       {detail.userEmail || detail.userId}
@@ -95,7 +95,7 @@ export function BillingDetailDrawer({
                 label: '任务',
                 value: detail.taskId ? (
                   <Link
-                    className="font-mono text-xs text-brand hover:underline"
+                    className="font-mono text-xs text-radar-ink-950 hover:underline"
                     to={adminTaskHref(detail.taskId)}
                   >
                     {detail.taskId}
@@ -111,7 +111,7 @@ export function BillingDetailDrawer({
                 label: '渠道',
                 value: detail.channelId ? (
                   <Link
-                    className="text-brand hover:underline"
+                    className="text-radar-ink-950 hover:underline"
                     to={adminModelCallsHref({ channelId: detail.channelId })}
                     title="查看该渠道的上游调用记录"
                   >

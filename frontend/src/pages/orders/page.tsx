@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
 import type { Order, OrderStatus } from '../../types/api';
 import type { Invoice } from '../../types/payment';
@@ -301,8 +301,11 @@ export function OrdersPage() {
           : '订单与支付记录，未支付订单可在有效期内继续支付。'
       }
       extra={
-        <Button type="primary" icon={<ShoppingBag size={15} />} onClick={() => navigate('/packages')}>
-          购买积分 / 会员
+        <Button asChild type="primary">
+          <Link to="/packages">
+            <ShoppingBag size={15} aria-hidden />
+            购买积分 / 会员
+          </Link>
         </Button>
       }
     >
@@ -319,7 +322,11 @@ export function OrdersPage() {
         <StateEmpty
           title="还没有订单"
           desc="购买积分或开通会员后，订单与支付记录会显示在这里。"
-          action={<StateButton onClick={() => navigate('/packages')}>去积分商城</StateButton>}
+          action={
+          <StateButton asChild>
+            <Link to="/packages">去积分商城</Link>
+          </StateButton>
+        }
         />
       )}
 

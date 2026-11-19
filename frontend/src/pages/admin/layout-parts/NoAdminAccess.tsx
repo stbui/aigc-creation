@@ -1,6 +1,6 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { ActionButton } from '../../../admin-ui/primitives';
+import { ActionButton, Button } from '../../../admin-ui/primitives';
 
 /**
  * 无后台权限页。
@@ -49,9 +49,10 @@ export function NoAdminAccess({ email }: { email: string | null }) {
         </div>
 
         <div className="flex gap-2">
-          <ActionButton variant="secondary" onClick={() => navigate('/workbench')}>
-            返回工作台
-          </ActionButton>
+          {/* 回工作台是纯导航：用链接语义，保留右键 / 新标签页 / 读屏角色 */}
+          <Button asChild variant="secondary" size="sm">
+            <Link to="/workbench">返回工作台</Link>
+          </Button>
           <ActionButton
             variant="default"
             onClick={() => {

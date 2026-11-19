@@ -11,7 +11,7 @@ import type {
   SettingsTabKey,
 } from './types';
 
-export { formatDateTime } from '../../../admin-ui/lib/format';
+export { formatDateTime } from '~/admin-ui/radar';
 export { UPLOAD_LIMITS_CHANGED_EVENT } from '../../../lib/api-settings';
 
 export function displayValue(value: AdminSettingValue, type: SettingItem['type']): string {

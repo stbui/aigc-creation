@@ -27,7 +27,6 @@ export interface WorksGridProps {
   onRetry: (task: Task) => void;
   onDownload: (task: Task) => void;
   onRemove: (id: string) => void;
-  onReuse: (capabilityId: string) => void;
 }
 
 interface WorksGridItem {
@@ -54,7 +53,6 @@ export function WorksGrid({
   onRetry,
   onDownload,
   onRemove,
-  onReuse,
 }: WorksGridProps) {
   const items = useMemo<WorksGridItem[]>(
     () => tasks.map((task, index) => ({ task, index })),
@@ -83,7 +81,6 @@ export function WorksGrid({
                 onRetry={onRetry}
                 onDownload={onDownload}
                 onRemove={onRemove}
-                onReuse={onReuse}
               />
             ))}
           </div>

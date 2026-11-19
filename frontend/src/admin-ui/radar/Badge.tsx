@@ -13,7 +13,7 @@ export function RadarBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium',
+        'inline-flex items-center rounded px-1.5 py-0.5 text-[12px] leading-4 font-medium',
         className,
       )}
     >
@@ -24,10 +24,10 @@ export function RadarBadge({
 
 /* 形态（kind）语义色：好价/开源/新闻/资讯各自浅底。 */
 const KIND_STYLE: Record<string, string> = {
-  deal: 'bg-amber-50 text-amber-700',
-  opensource: 'bg-emerald-50 text-emerald-700',
-  news: 'bg-rose-50 text-rose-700',
-  info: 'bg-sky-50 text-sky-700',
+  deal: 'bg-radar-code-subtle text-radar-code',
+  opensource: 'bg-radar-deal-subtle text-radar-deal',
+  news: 'bg-radar-alert-subtle text-radar-alert',
+  info: 'bg-radar-ink-100 text-radar-ink-700',
 };
 const KIND_LABEL: Record<string, string> = {
   freebie: '福利',
@@ -52,8 +52,8 @@ export function KindBadge({ kind }: { kind?: string | null }) {
 /* 获取方式（obtain）语义色：free 不显示，其余标出避免混入「白嫖」。 */
 const OBTAIN_STYLE: Record<string, string> = {
   conditional: 'bg-radar-code-subtle text-radar-code',
-  lottery: 'bg-purple-50 text-purple-700',
-  trial: 'bg-sky-50 text-sky-700',
+  lottery: 'bg-radar-brand-subtle text-radar-accent',
+  trial: 'bg-radar-ink-100 text-radar-ink-700',
   promo: 'bg-radar-ink-100 text-radar-ink-600',
   paid: 'bg-radar-ink-100 text-radar-ink-600',
 };
@@ -111,14 +111,15 @@ export function CodeChip({
         window.setTimeout(() => setCopied(false), 1400);
       }}
       className={cn(
-        'inline-flex max-w-[46vw] items-center gap-1 truncate rounded px-2 py-1 font-mono text-[11px] font-semibold transition-colors sm:max-w-none',
+        'inline-flex max-w-[46vw] items-center gap-1 truncate rounded px-2 py-1 font-mono text-[12px] leading-4 font-semibold transition-colors sm:max-w-none',
         copied
           ? 'bg-radar-deal-subtle text-radar-deal'
-          : 'bg-radar-code-subtle text-radar-code hover:bg-amber-200/70',
+          : 'bg-radar-code-subtle text-radar-code hover:bg-radar-code-subtle/70',
       )}
       title="点击复制兑换码"
+      aria-label={`复制兑换码 ${code}`}
     >
-      {copied ? <Check size={11} /> : <Copy size={11} />}
+      {copied ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />}
       {code}
     </button>
   );

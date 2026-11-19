@@ -5,8 +5,8 @@
  */
 
 /* 外部工具转出：目录内文件不直接引 `src/lib/*` */
-export { cn } from '../../../admin-ui/lib/cn';
-export { formatDateTime, formatDuration } from '../../../admin-ui/lib/format';
+export { cn } from '~/admin-ui/radar';
+export { formatDateTime, formatDuration } from '~/admin-ui/radar';
 export { taskErrorLabel } from '../../../lib/admin-error-codes';
 export { toCredits } from '../../../lib/microcredits';
 export {

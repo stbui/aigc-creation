@@ -1,8 +1,8 @@
 import { ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { StatsOverview } from '../../types/api';
 import { assetThumbUrl } from './api';
-import { statusLabel } from './utils';
+import { formatCompactDateTime, statusLabel } from './utils';
 import { CapabilityIcon, StateError, StateSkeleton } from './components';
 
 /**
@@ -27,8 +27,6 @@ export function WorkbenchRecentPanel({
   onRetry,
   onOpenLogin,
 }: WorkbenchRecentPanelProps) {
-  const navigate = useNavigate();
-
   return (
     <article className="wb-panel wb-recent">
       {!token ? (
@@ -40,9 +38,9 @@ export function WorkbenchRecentPanel({
         <>
           <div className="wb-panel-title">
             <strong>最近任务</strong>
-            <button type="button" onClick={() => navigate('/works')}>
-              全部作品 <ArrowRight size={12} />
-            </button>
+            <Link to="/works">
+              全部作品 <ArrowRight size={12} aria-hidden />
+            </Link>
           </div>
           {loading ? (
             <StateSkeleton variant="row" count={3} />
@@ -51,16 +49,16 @@ export function WorkbenchRecentPanel({
           ) : stats && stats.recentTasks.length > 0 ? (
             <div className="wb-jobs-list">
               {stats.recentTasks.slice(0, 4).map((t) => (
-                <button key={t.id} type="button" className="wb-job" onClick={() => navigate('/works')}>
+                <Link key={t.id} className="wb-job" to="/works">
                   <span className="wb-job-thumb">
                     {t.thumbnailUrl ? <img src={assetThumbUrl(t.thumbnailUrl, 96)} alt="" loading="lazy" /> : <CapabilityIcon id={t.capability} size={18} />}
                   </span>
                   <span className="wb-job-copy">
                     <b>{t.name}</b>
-                    <span>{t.createdAt ? new Date(t.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : ''}</span>
+                    <span>{formatCompactDateTime(t.createdAt, { fallback: '' })}</span>
                   </span>
                   <span className={`wb-job-status ${t.status === 'succeeded' ? 'completed' : t.status === 'failed' ? 'failed' : 'processing'}`}>{statusLabel(t.status)}</span>
-                </button>
+                </Link>
               ))}
             </div>
           ) : (

@@ -1,8 +1,6 @@
 import { Button, StatCards, StaleError, type StatCardItem } from './components';
-import { formatRate, toCredits } from './utils';
+import { formatNumber, formatRate, toCredits } from './utils';
 import type { ModelCommerceOverviewView } from './types';
-
-const counts = new Intl.NumberFormat('zh-CN');
 
 function money(microcredits: number | null): string {
   return microcredits === null ? '—' : toCredits(microcredits);
@@ -14,8 +12,8 @@ function statItems(overview: ModelCommerceOverviewView): StatCardItem[] {
     {
       key: 'calls',
       label: '调用量',
-      value: counts.format(summary.calls),
-      hint: `已结算 ${counts.format(summary.settledOrders)} 单`,
+      value: formatNumber(summary.calls),
+      hint: `已结算 ${formatNumber(summary.settledOrders)} 单`,
     },
     {
       key: 'net',
@@ -29,7 +27,7 @@ function statItems(overview: ModelCommerceOverviewView): StatCardItem[] {
       value: money(summary.marginMicrocredits),
       hint:
         summary.costMicrocredits === null
-          ? `成本未知 ${counts.format(summary.unknownCostOrders)} 笔，不按 0 计`
+          ? `成本未知 ${formatNumber(summary.unknownCostOrders)} 笔，不按 0 计`
           : `成本 ${money(summary.costMicrocredits)} 积分`,
       tone: summary.lowMarginProducts > 0 ? 'warn' : undefined,
     },
@@ -40,33 +38,33 @@ function statItems(overview: ModelCommerceOverviewView): StatCardItem[] {
       hint:
         summary.refundRate === null
           ? '暂无真实退款样本'
-          : `已退 ${counts.format(summary.refundedOrders)} 单`,
+          : `已退 ${formatNumber(summary.refundedOrders)} 单`,
       tone: summary.highRefundProducts > 0 ? 'danger' : undefined,
     },
     {
       key: 'pending-pricing',
       label: '待定价',
-      value: counts.format(summary.pendingPricingProducts),
+      value: formatNumber(summary.pendingPricingProducts),
       hint: '补价工作队列',
       tone: summary.pendingPricingProducts > 0 ? 'warn' : undefined,
     },
     {
       key: 'no-calls',
       label: '无调用',
-      value: counts.format(summary.noCallsProducts),
+      value: formatNumber(summary.noCallsProducts),
       hint: '近 7 天没有真实调用',
     },
     {
       key: 'low-margin',
       label: '低毛利',
-      value: counts.format(summary.lowMarginProducts),
+      value: formatNumber(summary.lowMarginProducts),
       hint: '毛利低于 20%',
       tone: summary.lowMarginProducts > 0 ? 'warn' : undefined,
     },
     {
       key: 'invalid-binding',
       label: '失效绑定',
-      value: counts.format(summary.invalidBindingCount),
+      value: formatNumber(summary.invalidBindingCount),
       hint: '能力绑定需要修复',
       tone: summary.invalidBindingCount > 0 ? 'danger' : undefined,
     },

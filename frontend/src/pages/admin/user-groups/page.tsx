@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { adminChannelsApi, adminUserGroupsApi } from './api';
 import { AdminPage, ActionButton, ConfirmDialog, Panel, StaleError } from './components';
-import { useAdmin, useAdminResource, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
+import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';
 import { EMPTY_DRAFT, type GroupDraft, type OverrideDraft } from './constants';
 import { buildGroupPayload, toDraft } from './utils';
 import { UserGroupTable } from './UserGroupTable';
@@ -50,7 +50,6 @@ export function AdminUserGroupsPage() {
     setCreating(false);
     setEditing(null);
   };
-  const requestCloseForm = useDiscardConfirm(formDirty, resetForm);
 
   const openCreate = () => {
     setDraft(EMPTY_DRAFT);
@@ -177,7 +176,7 @@ export function AdminUserGroupsPage() {
         onAddOverride={addOverride}
         onUpdateOverride={updateOverride}
         onRemoveOverride={removeOverride}
-        onClose={requestCloseForm}
+        onClose={resetForm}
         onSubmit={() => void submit()}
       />
 

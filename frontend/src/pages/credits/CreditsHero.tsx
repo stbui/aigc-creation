@@ -11,7 +11,7 @@ interface CreditsHeroProps {
 /** 顶部余额卡：可用积分、最近到期日与扣减口径。 */
 export function CreditsHero({ balance }: CreditsHeroProps) {
   return (
-    <Card className="credits-hero" variant="borderless">
+    <Card className="credits-hero">
       <div className="credits-hero-main">
         <span className="credits-hero-icon" aria-hidden>
           <Wallet size={22} />

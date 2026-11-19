@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 
 import type { StatsOverview } from '../../types/api';
@@ -13,15 +13,13 @@ interface StatsRecentPanelProps {
 
 /** 最近创作：缩略图 + 名称 + 状态，点击进入我的作品。 */
 export function StatsRecentPanel({ tasks }: StatsRecentPanelProps) {
-  const navigate = useNavigate();
-
   return (
     <article className="stats-panel">
       <header className="stats-panel-head">
         <h4 className="stats-panel-title">最近创作</h4>
         {tasks.length > 0 && (
-          <Button type="link" size="small" onClick={() => navigate('/works')}>
-            查看作品
+          <Button asChild type="link" size="small">
+            <Link to="/works">查看作品</Link>
           </Button>
         )}
       </header>
@@ -31,8 +29,8 @@ export function StatsRecentPanel({ tasks }: StatsRecentPanelProps) {
           title="暂无创作"
           desc="完成一次创作后，最近作品会出现在这里。"
           action={
-            <Button type="text" onClick={() => navigate('/workbench')}>
-              去创作
+            <Button asChild type="text">
+              <Link to="/workbench">去创作</Link>
             </Button>
           }
         />
@@ -42,10 +40,9 @@ export function StatsRecentPanel({ tasks }: StatsRecentPanelProps) {
             const status = TASK_STATUS[task.status] ?? { label: task.status, tone: 'run' };
             return (
               <li key={task.id}>
-                <button
-                  type="button"
+                <Link
                   className="stats-recent-row"
-                  onClick={() => navigate('/works')}
+                  to="/works"
                   aria-label={`查看 ${task.name} 作品`}
                 >
                   {task.thumbnailUrl ? (
@@ -65,7 +62,7 @@ export function StatsRecentPanel({ tasks }: StatsRecentPanelProps) {
                   </span>
                   <span className={`stats-task-status is-${status.tone}`}>{status.label}</span>
                   <ChevronRight size={14} className="stats-recent-arrow" aria-hidden />
-                </button>
+                </Link>
               </li>
             );
           })}

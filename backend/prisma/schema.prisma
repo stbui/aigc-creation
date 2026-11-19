@@ -2322,6 +2322,36 @@ model TemplateGroup {
   @@index([categoryId, enabled, sortOrder])
 }
 
+/// 提示词库条目：后台维护的可复用提示词，C 端暂未接入。
+model Prompt {
+  id             String   @id @default(cuid())
+  /// 标题，可留空；为空时列表用正文摘要辨认
+  title          String   @default("")
+  /// 分类（自由文本，后台以已有值作为筛选项）
+  category       String   @default("")
+  /// 正向提示词正文
+  content        String
+  /// 反向提示词，可为空
+  negativePrompt String   @default("")
+  /// 产出模态：image / video / text，与能力定义的 modality 同口径
+  modality       String   @default("image")
+  /// 标签 JSON 数组字符串，例如 `["人像","棚拍"]`
+  tags           String   @default("[]")
+  /// 配图 JSON 数组字符串，每项 `{ ref, assetId?, name? }`
+  ///
+  /// `ref` 是稳定引用（`storage://<backend>/<key>`、`/templates/...` 或 http 地址），
+  /// **不存签名地址** —— 签名 URL 有有效期，入库后过几小时就全部 403。
+  images         String   @default("[]")
+  /// 排序权重，小的靠前
+  sortOrder      Int      @default(0)
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([enabled, modality, sortOrder])
+  @@index([category])
+}
+
 /// 写真模板条目：一张预览图 + 提示词 + 标签。
 model TemplateItem {
   id        String   @id @default(cuid())

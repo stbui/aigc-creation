@@ -168,7 +168,7 @@ export function CapabilityOverview({
         </Notice>
       )}
 
-      <div className="rounded-lg border border-border bg-card p-4 shadow-card">
+      <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-sm font-semibold text-foreground">能力开关</div>

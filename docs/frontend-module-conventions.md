@@ -23,14 +23,14 @@
 
 清单表示**该目录适用本约定**，不代表已达到收敛标准：8 入口是否齐备、
 `radar-admin.css` 是否只被引入一次、非入口文件是否零外部直连，以目录实际为准。
-后台侧已逐目录校正至达标的（24 个，均满足 8 入口齐备、`radar-admin.css` 只引入 1 次、
+后台侧已逐目录校正至达标的（25 个，均满足 8 入口齐备、`radar-admin.css` 只引入 1 次、
 非入口文件零外部直连）：
 
 - 首批：`users/`、`storage/`、`settings/`、`payments/`、`model-calls/`、`email/`、
   `channels/`、`tasks/`
 - 第二批：`aigc-label/`、`assets/`、`capabilities/`、`orders/`、`plugins/`、
   `billing-orders/`、`tickets/`、`products/`、`backups/`、`membership-plans/`、
-  `templates/`、`credits/`、`campaigns/`、`coupons/`、`user-groups/`、`marketing-rules/`
+  `templates/`、`prompts/`、`credits/`、`campaigns/`、`coupons/`、`user-groups/`、`marketing-rules/`
 
 后台侧尚未达标、仍待收敛的：`dashboard/`、`payment-rules/`、`layout-parts/`、
 `alerts/`、`invoices/`、`notifications/`、`retention/`、`scheduler/`、`finance/`、

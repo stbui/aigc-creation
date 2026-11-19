@@ -23,12 +23,12 @@
 
 ## 2. 信息架构
 
-7 组 35 个菜单入口，按「日常运营 → 模型配置 → 商业化 → 资金 → 系统」的使用链路排序。菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
+7 组 36 个菜单入口，按「日常运营 → 模型配置 → 商业化 → 资金 → 系统」的使用链路排序。菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
 
 | 组 | 页面 |
 | --- | --- |
 | 总览 | 平台概览 / 告警中心 |
-| 运营与内容 | 用户管理 / 工单处理 / 素材管理 / 站内消息 / 写真模板 / AI 标识 |
+| 运营与内容 | 用户管理 / 工单处理 / 素材管理 / 站内消息 / 写真模板 / 提示词管理 / AI 标识 |
 | 模型与能力 | 模型商品 / 能力与模型 / 插件 / 用户分组 / 调用记录 / 任务监控 |
 | 商品与交易 | 商品管理 / 会员套餐 / 订单管理 / 积分账本 / 优惠券 / 限时活动 / 邀请与签到 |
 | 资金与财务 | 收款设置 / 交易核对 / 异常处理 / 支付与退费 / 发票管理 / 生成账单 / 财务分析 |
@@ -207,8 +207,8 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | 页面 | `pages/admin/` 33 个页面 + `channels/`、`payments/`、`payment-rules/` 子目录 |
 | 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
 | 类型 | `types/api.d.ts` 的 `Admin*` 段 |
-| 组件 | 通用骨架走 `admin-ui/primitives`（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），底层是 shadcn 原子件；后台树内不引 antd，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |
-| 样式 | 只用 `tokens.css` 的 token，禁裸 hex；不做移动端适配 |
+| 组件 | 业务页面只从 `admin-ui/radar` 取件（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），共享实现由 Radar barrel 透传，底层是 shadcn 原子件；后台树内不引 antd，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |
+| 样式 | 外壳用 `tokens.css` / `admin.css` 的品牌紫语义，业务内容用 `radar-admin.css` 的 Radar 令牌；禁裸 hex，不做移动端适配 |
 
 ## 7. 明确不做
 

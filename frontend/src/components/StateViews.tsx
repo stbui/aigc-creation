@@ -189,14 +189,18 @@ export function StateButton({
   onClick,
   variant = 'primary',
   disabled,
+  asChild,
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: 'primary' | 'ghost';
   disabled?: boolean;
+  /** 导航场景：把外观交给 `<Link>`，保留链接语义。 */
+  asChild?: boolean;
 }) {
   return (
     <Button
+      asChild={asChild}
       type="text"
       className={`state-btn${variant === 'primary' ? ' is-primary' : ' is-ghost'}`}
       onClick={onClick}

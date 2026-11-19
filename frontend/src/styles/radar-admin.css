@@ -1,70 +1,22 @@
-@layer theme, base, components, utilities;
-
 /*
- * freebie-radar 风格后台设计层（命名空间 radar-*）。
+ * freebie-radar 风格后台设计层（命名空间 radar-*）—— 纯 CSS 部分。
  *
  * 设计语言：中性灰 + 墨黑品牌 + 零面板阴影 + 1px 细线 + 颜色编码语义。
- * 与本产品现有品牌紫 / shadcn 后台（styles/admin.css、tokens.css）完全隔离，
- * 仅由后台 radar 页面 chunk 引入（pages/admin/radar-style/page.tsx），
- * 不污染全站令牌与现有后台视觉。
+ * 双层视觉体系：品牌紫外壳（styles/admin.css、tokens.css）保持产品识别，
+ * 页面内容区通过 `.radar-scope` 重映射为 Radar 中性语义。
  *
- * 接入方式参考 admin.css：CSS-first（无 tailwind.config），令牌走 @theme inline，
- * 自定义面板/抽屉阴影走 @utility。本文件只补充 radar 命名空间的令牌与工具类，
- * Tailwind 基础/工具层由 admin.css 已在后台 chunk 载入。
+ * ## 为什么这里没有 `@theme` / `@utility`
+ *
+ * 本文件被 39 个后台页面入口当**普通 CSS** 导入，不经过 `@vitejs/plugin-react`
+ * 之外的 Tailwind 插件处理链 —— Tailwind 只会编译它自己作为入口加载的文件。
+ * 曾经把 `@theme inline` / `@utility panel` 写在这里，结果是：
+ * 指令被原样输出到产物，`bg-radar-*` / `text-radar-*` / `border-radar-*`
+ * 一个工具类都不存在（实心按钮成白字透明底），**构建却完全不报错**。
+ *
+ * 所以令牌登记与 `panel` / `radar-drawer-shadow` 两个 `@utility` 一律写在
+ * `styles/admin.css`（唯一的 Tailwind 入口）。本文件只保留纯 CSS：
+ * 关键帧、动画类、`.radar-scope` 令牌重映射。
  */
-
-@theme inline {
-  /* 中性灰 ink 阶梯（freebie-radar 实测值） */
-  --color-radar-canvas: #f6f7f9;
-  --color-radar-surface: #ffffff;
-  --color-radar-surface-hover: #f7f8fb;
-  --color-radar-surface-muted: #f1f3f6;
-  --color-radar-ink-950: #111318;
-  --color-radar-ink-900: #1b1e26;
-  --color-radar-ink-700: #374151;
-  --color-radar-ink-600: #4b5563;
-  --color-radar-ink-500: #525c6b;
-  --color-radar-ink-400: #646f80;
-  --color-radar-ink-300: #d1d5de;
-  --color-radar-ink-200: #e6e8ec;
-  --color-radar-ink-100: #f1f3f6;
-
-  /* 品牌（近墨黑，区别于产品品牌紫 #5546d8） */
-  --color-radar-brand: #111318;
-  --color-radar-brand-hover: #272b36;
-  --color-radar-brand-dark: #090a0d;
-  --color-radar-brand-subtle: #eef0ff;
-  --color-radar-brand-border: #c7d0f8;
-  --color-radar-accent: #312e81;
-
-  /* 语义色：实色 + 浅底（成对，参考 freebie-radar） */
-  --color-radar-deal: #047857;
-  --color-radar-deal-subtle: #ecfdf5;
-  --color-radar-deal-border: #a7f3d0;
-  --color-radar-code: #92400e;
-  --color-radar-code-subtle: #fef3c7;
-  --color-radar-code-border: #fde68a;
-  --color-radar-alert: #dc2626;
-  --color-radar-alert-subtle: #fef2f2;
-  --color-radar-alert-border: #fecaca;
-
-  /* 圆角：面板/按钮 8px（freebie-radar 实值，绕过后台 chunk 的 --radius 重映射） */
-  --radius-radar: 8px;
-  /* 阴影：仅抽屉使用，其余面板零阴影 */
-  --shadow-radar-drawer: -8px 0 32px rgba(17, 19, 24, 0.08), -1px 0 0 rgba(17, 19, 24, 0.06);
-}
-
-/* 面板：白底 + 1px 细线 + 8px 圆角（零阴影） */
-@utility panel {
-  background-color: var(--color-radar-surface);
-  border: 1px solid var(--color-radar-ink-200);
-  border-radius: var(--radius-radar);
-}
-
-/* 抽屉阴影（唯一带阴影的元素） */
-@utility radar-drawer-shadow {
-  box-shadow: var(--shadow-radar-drawer);
-}
 
 /* ── 动效关键帧（命名空间 radar-*，避免与全站 .drawer-enter 等冲突） ── */
 @keyframes radar-drawer-in {
@@ -83,9 +35,11 @@
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: none; }
 }
+/* 只动 Y 与缩放：水平居中由类上的 `-translate-x-1/2`（独立 `translate` 属性）
+ * 负责，keyframe 再写 `translate(-50%)` 会与之叠加，整体左偏半个身位。 */
 @keyframes radar-toast-up {
-  from { opacity: 0; transform: translate(-50%, 10px) scale(0.97); }
-  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .radar-drawer-enter { animation: radar-drawer-in 210ms cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -110,8 +64,8 @@
  * freebie-radar 中性值：灰底 / 近黑品牌 / 零阴影 / 1px 细线 / 颜色编码语义。
  *
  * 作用：后台 chunk 里既有的 shadcn 原子件（Input / Select / Switch / Card /
- * Dialog / 表格等）只要落在页面内容区内，就自动中性化，无需逐件改写；
- * 同时作为过渡期安全网——页面尚未迁完时，混用的 shadcn 原语也不会露出品牌紫。
+ * Dialog / 表格等）只要落在页面内容区内，就自动采用 Radar 语义；
+ * 这也是浮层门户不泄漏品牌紫的边界保障。
  *
  * 仅作用于内容区（RadarPage 容器），不污染外壳（侧栏 / 顶栏）的品牌紫令牌，
  * 与「命名空间隔离」目标一致。
@@ -147,8 +101,86 @@
   --color-brand-hover: #272b36;
   --color-brand-bg: #f1f3f6;
   --color-brand-light: #f1f3f6;
+  /* ── 外壳原语变量：@theme inline 的内联兜底 ─────────────────────────
+   * admin.css 的 `@theme inline` 把 `bg-*` / `text-*` / `border-*` 直接编译成
+   * `var(--card-bg)` / `var(--text-body)` / `var(--border)` 这类**外壳原语变量**，
+   * 而不是 `var(--color-*)`。所以只重映射上面的 `--color-*` 对既有 shadcn
+   * 原子件无效——`.text-muted-foreground` 仍是 #4e5969、`.border-input` 仍是
+   * #e5e7ef。这里必须把真正被工具类引用的原语变量一并重映射。
+   *
+   * 只写在作用域选择器上（不进 `:root`），外壳与 C 端不受影响。
+   */
+  --border: #e6e8ec;
+  --border-soft: #e6e8ec;
+  --border-row: #f1f3f6;
+  --border-hover: #d1d5de;
+  --border-dot: #d1d5de;
+  --surface: #f1f3f6;
+  --surface-soft: #f7f8fb;
+  --surface-tint: #f7f8fb;
+  --card-bg: #ffffff;
+  --page-bg: #f6f7f9;
+  --text-strong: #1b1e26;
+  --text-body: #646f80;
+  --text-muted: #646f80;
+  --text-desc: #646f80;
+  --placeholder-text: #646f80;
+  --popover: #ffffff;
+  --popover-foreground: #1b1e26;
+  --foreground: #1b1e26;
+  --primary: #111318;
+  --secondary: #f1f3f6;
+  --muted: #f1f3f6;
+  --on-brand: #ffffff;
+  --color-bg: #f6f7f9;
+  /* 语义色同样被内联引用（`bg-success-soft` → `var(--success-soft-bg)`） */
+  --success-soft-bg: #ecfdf5;
+  --success-text: #047857;
+  --success-border: #a7f3d0;
+  --warn-bg: #fef3c7;
+  --warn-border: #fde68a;
+  --warn-text: #92400e;
+  --danger-soft-bg: #fef2f2;
+  --danger-text: #dc2626;
+  /* admin.css 的链接 / 默认焦点环直接消费 --brand 系列（不是 --color-brand）。
+   * 不重映射的话，门户里的链接与 shadcn 原子件焦点环仍是品牌紫。 */
+  --brand: #111318;
+  --brand-hover: #272b36;
+  --brand-bg: #f1f3f6;
+  --brand-light: #f1f3f6;
   --shadow-card: none;
+  /* 圆角同样被 `@theme inline` 内联：`rounded-md` → var(--radius-control)，
+   * `rounded-lg` → var(--radius-card)。只写 --radius-md 之类不生效。
+   * 规范：控件 / 面板 / 菜单项 8px，页签内部 6px，弹窗 12px。 */
+  --radius-control: 8px;
+  --radius-card: 8px;
+  --radius-panel: 12px;
+  /* 兼容仍直接消费酱色名的少量规则 */
   --radius-lg: 8px;
   --radius-md: 8px;
   --radius-sm: 6px;
+}
+
+/* ── 内容层零阴影 ──
+ * shadcn 原子件自带 `shadow-xs` / `shadow-sm` / `shadow-md`（输入框、outline
+ * 按钮、复选框、页签激活态、分页、下拉菜单）。Radar 语言规定面板与浮层零阴影，
+ * 抽屉是唯一例外。
+ *
+ * 只把 `--tw-shadow` 归零，不写 `box-shadow: none`：shadcn v4 的焦点环与
+ * `ring-*` 也走 box-shadow 的组合变量，整条抹掉会连键盘焦点一起丢失。
+ * 抽屉用 `@utility radar-drawer-shadow` 直接写 box-shadow，不受这条影响。
+ *
+ * 用 `[class*=...]` 而不是 `.shadow-sm`：页签激活态是
+ * `group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm`，
+ * 变体前缀让类名不等于 `shadow-sm`，精确类选择器匹配不到。
+ */
+.radar-scope :where(
+    [class*='shadow-xs'],
+    [class*='shadow-sm'],
+    [class*='shadow-md'],
+    [class*='shadow-lg'],
+    [class*='shadow-xl'],
+    [class*='shadow-2xl']
+  ) {
+  --tw-shadow: 0 0 #0000;
 }

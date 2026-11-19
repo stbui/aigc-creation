@@ -15,15 +15,14 @@ export interface OrdersFilterBarProps {
 
 export function OrdersFilterBar({ filter, counts, onChange }: OrdersFilterBarProps) {
   return (
-    <div className="order-filters" role="tablist" aria-label="按状态筛选订单">
+    <div className="order-filters" role="group" aria-label="按状态筛选订单">
       {FILTERS.map((f) => {
         const active = filter === f.value;
         return (
           <button
             key={f.value}
             type="button"
-            role="tab"
-            aria-selected={active}
+            aria-pressed={active}
             className={`order-filter${active ? ' is-active' : ''}`}
             onClick={() => onChange(f.value)}
           >

@@ -6,18 +6,11 @@ import { cn } from '../lib/cn';
 export function Tag({
   children,
   className,
-  color,
 }: {
   children?: ReactNode;
   className?: string;
-  color?: string;
-  variant?: string;
 }) {
-  return (
-    <span className={cn('ui-tag', className)} data-color={color}>
-      {children}
-    </span>
-  );
+  return <span className={cn('ui-tag', className)}>{children}</span>;
 }
 
 export function Card({
@@ -25,14 +18,12 @@ export function Card({
   className,
   title,
   extra,
-  variant,
   size,
 }: {
   children?: ReactNode;
   className?: string;
   title?: ReactNode;
   extra?: ReactNode;
-  variant?: string;
   size?: string;
 }) {
   return (
@@ -51,11 +42,9 @@ export function Card({
 export function Row({
   children,
   className,
-  gutter,
 }: {
   children?: ReactNode;
   className?: string;
-  gutter?: number | [number, number];
 }) {
   return <div className={cn('ui-row', className)}>{children}</div>;
 }
@@ -63,23 +52,14 @@ export function Row({
 export function Col({
   children,
   className,
-  span,
-  xs,
   sm,
 }: {
   children?: ReactNode;
   className?: string;
-  span?: number;
-  xs?: number;
   sm?: number;
 }) {
   return (
-    <div
-      className={cn('ui-col', className)}
-      data-span={span}
-      data-xs={xs}
-      data-sm={sm}
-    >
+    <div className={cn('ui-col', className)} data-sm={sm}>
       {children}
     </div>
   );
@@ -90,16 +70,13 @@ export function Alert({
   title,
   description,
   type = 'info',
-  showIcon,
   className,
 }: {
   message?: ReactNode;
   title?: ReactNode;
   description?: ReactNode;
   type?: 'success' | 'info' | 'warning' | 'error';
-  showIcon?: boolean;
   className?: string;
-  variant?: string;
 }) {
   return (
     <div className={cn('ui-alert', `is-${type}`, className)} role="alert">

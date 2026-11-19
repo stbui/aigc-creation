@@ -1,9 +1,9 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
 
 import type { MembershipPlan } from '../../types/api';
 import type { LandingCatalogState } from './hooks';
-import { PLAN_VISUALS } from './utils';
+import { PLAN_VISUALS, formatNumber } from './utils';
 
 interface LandingPlanGridProps {
   plans: MembershipPlan[];
@@ -12,7 +12,6 @@ interface LandingPlanGridProps {
 
 /** 订阅套餐卡：价格、积分与权益全部来自后端，不回落硬编码价目。 */
 export function LandingPlanGrid({ plans, state }: LandingPlanGridProps) {
-  const navigate = useNavigate();
   const payablePlans = plans.filter((plan) => plan.durationDays > 0);
 
   return (
@@ -39,7 +38,7 @@ export function LandingPlanGrid({ plans, state }: LandingPlanGridProps) {
               <em>/ {plan.durationDays} 天</em>
             </div>
             <p className="lp-plan-credits">
-              {plan.monthlyCredits.toLocaleString('zh-CN')} 积分 / 月
+              {formatNumber(plan.monthlyCredits)} 积分 / 月
             </p>
             {/* 权益文案由后端 buildPerkLabels 生成 —— 改权益只需改一处,
                 不会出现「宣传页写的和实际给的不一样」 */}
@@ -55,13 +54,12 @@ export function LandingPlanGrid({ plans, state }: LandingPlanGridProps) {
              * 订阅购买走订单+支付链路: MembershipPlan 不在 Product 表里,
              * 下单时走 `membershipPlanId`, 与积分包同一条支付通道。
              */}
-            <button
-              type="button"
+            <Link
               className="lp-plan-buy"
-              onClick={() => navigate(`/checkout/membership?planId=${encodeURIComponent(plan.id)}`)}
+              to={`/checkout/membership?planId=${encodeURIComponent(plan.id)}`}
             >
               立即订阅
-            </button>
+            </Link>
           </article>
         );
       })}

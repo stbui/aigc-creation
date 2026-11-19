@@ -172,7 +172,7 @@ export function AssetGrid({
         {Array.from({ length: 12 }).map((_, index) => (
           <div key={index} className="overflow-hidden border border-border bg-card">
             <div className="aspect-square animate-pulse bg-accent" />
-            <div className="space-y-1.5 px-2 pb-2 pt-1.5">
+            <div className="flex flex-col gap-1.5 px-2 pb-2 pt-1.5">
               <div className="h-3 w-2/3 animate-pulse rounded bg-accent" />
               <div className="h-3 w-1/2 animate-pulse rounded bg-accent" />
               <div className="h-3 w-4/5 animate-pulse rounded bg-accent" />
@@ -226,17 +226,17 @@ export function AssetGrid({
               data-asset-id={a.id}
               data-status={a.status}
               className={cn(
-                'group overflow-hidden border bg-card transition-[border-color,box-shadow]',
+                'group overflow-hidden border bg-card transition-colors',
                 checked
-                  ? 'border-brand ring-1 ring-brand/20'
-                  : 'border-border hover:border-brand/40 hover:shadow-card',
+                  ? 'border-radar-ink-300 ring-1 ring-radar-ink-950/20'
+                  : 'border-border hover:border-radar-ink-300',
                 a.status === 'hidden' && 'opacity-75',
               )}
             >
               <div className="relative aspect-square overflow-hidden bg-muted">
                 <button
                   type="button"
-                  className="block size-full focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset focus-visible:outline-none"
+                  className="block size-full focus-visible:ring-2 focus-visible:ring-radar-ink-950 focus-visible:ring-inset focus-visible:outline-none"
                   aria-label={`查看大图：${assetLabel(a)}`}
                   onClick={() => {
                     // 框选松手会补发一次 click，别让它顺手打开最后一张大图
@@ -255,7 +255,7 @@ export function AssetGrid({
                 {selectable && (
                   <span
                     data-marquee-ignore
-                    className="absolute left-2 top-2 flex size-6 items-center justify-center rounded-md bg-background/90 shadow-sm ring-1 ring-foreground/10 backdrop-blur-sm"
+                    className="absolute left-2 top-2 flex size-6 items-center justify-center rounded-md bg-background/90 ring-1 ring-foreground/10 backdrop-blur-sm"
                   >
                     <CheckboxField
                       ariaLabel={`选择 ${assetLabel(a)}`}
@@ -306,7 +306,7 @@ export function AssetGrid({
         {marquee && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute z-20 border border-brand bg-brand/10"
+            className="pointer-events-none absolute z-20 border border-radar-ink-300 bg-radar-ink-100"
             style={marquee}
           />
         )}

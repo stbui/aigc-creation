@@ -1,7 +1,5 @@
-import { cn, formatRate, toCredits } from './utils';
+import { cn, formatNumber, formatRate, toCredits } from './utils';
 import type { ModelCommerceProductView } from './types';
-
-const counts = new Intl.NumberFormat('zh-CN');
 
 /** 金额可能带 6 位小数；列只有半格宽，超出时缩成 1 位，完整值放 title。 */
 function shortCredits(microcredits: number): string {
@@ -64,9 +62,9 @@ export function ModelCommerceMetricsCell({
     <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[12px] leading-4">
       <Metric
         label="调用"
-        value={counts.format(commerce.calls)}
+        value={formatNumber(commerce.calls)}
         tone={commerce.noCalls ? 'muted' : undefined}
-        title={`近 7 天调用 ${counts.format(commerce.calls)} 次`}
+        title={`近 7 天调用 ${formatNumber(commerce.calls)} 次`}
       />
       <Metric
         label="净收"

@@ -112,7 +112,7 @@ export function DutyChannelTower({ limit = 3 }: { limit?: number }) {
         <li className="border-t border-border pt-2 text-[12px]">
           <Link
             to="/admin/channels"
-            className="text-muted-foreground no-underline hover:text-brand"
+            className="text-muted-foreground no-underline hover:text-foreground"
           >
             还有 {channels.length - limit} 条线路
           </Link>

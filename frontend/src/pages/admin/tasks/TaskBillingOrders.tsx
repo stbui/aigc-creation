@@ -246,7 +246,7 @@ function TaskBillingOrdersContent({ taskId }: { taskId: string }) {
           )}
         </div>
         <Link
-          className="inline-flex items-center gap-1 text-[12px] text-brand hover:underline"
+          className="inline-flex items-center gap-1 text-[12px] text-radar-ink-950 hover:underline"
           to={adminBillingOrdersHref({ taskId })}
         >
           查看账单列表

@@ -30,7 +30,7 @@ function CapabilityContext({ capability }: { capability: AdminCapabilityControl 
   const statusLabel = runtimeStatusLabel(capability.runtime.effective);
 
   return (
-    <div className="mb-3 rounded-lg border border-border bg-card px-4 py-3 shadow-card">
+    <div className="mb-3 rounded-lg border border-border bg-card px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="m-0 text-base font-semibold text-foreground">{capability.name}</h2>
         {statusLabel && (

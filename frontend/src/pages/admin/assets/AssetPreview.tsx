@@ -107,7 +107,7 @@ export function AssetPreview({
     >
       {/* 左：媒体舞台。点击黑色背景关闭，图片/视频本身不关闭 */}
       <div
-        className="relative flex min-w-0 flex-1 items-center justify-center bg-[rgba(10,12,20,0.96)] p-6"
+        className="relative flex min-w-0 flex-1 items-center justify-center bg-radar-ink-950/95 p-6"
         onClick={(event) => {
           if (event.target === event.currentTarget) onClose();
         }}
@@ -194,7 +194,7 @@ export function AssetPreview({
           </ActionButton>
         </header>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
           {generation && (
             <section aria-labelledby="asset-generation-heading">
               <h3 id="asset-generation-heading" className="mb-2 text-sm font-medium text-foreground">
@@ -309,7 +309,7 @@ export function AssetPreview({
  */
 function InfoList({ items }: { items: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <dl className="space-y-2">
+    <dl className="flex flex-col gap-2">
       {items.map((item, index) => (
         <div key={index} className="flex items-start gap-3 text-[12px] leading-5">
           <dt className="w-16 shrink-0 text-muted-foreground">{item.label}</dt>

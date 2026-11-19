@@ -1,6 +1,6 @@
 # 支付域重构与后台「支付充值」页实施方案
 
-> **UI 前提**：后台 UI 为 shadcn（页面只从 `admin-ui/primitives` 取件，见 `docs/admin-ui-design.md`）。接口、数据流与业务约束不受影响。
+> **UI 前提**：后台采用“品牌紫外壳 + Radar 中性内容层”；业务页面只从 `admin-ui/radar` 取件，见 `docs/admin-ui-design.md`。接口、数据流与业务约束不受影响。
 >
 > 状态：**部分实施（基线 commit 505319c）**。后端支付域主链路已落地；C 端支付方式选择、后台 `/admin/payments` 页面、存储商品与部分可靠性/测试项仍待补齐，详见 §25。
 > 目标页面：`/admin/payments`，以 `open-ai-canvas/web/src/pages/admin/payments/payments-page.tsx` 为交互与信息架构基准。

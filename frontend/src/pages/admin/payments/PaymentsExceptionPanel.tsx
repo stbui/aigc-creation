@@ -161,7 +161,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
         <div className="flex flex-col gap-0.5">
           {row.orderId ? (
             <Link
-              className="break-all font-mono text-xs text-brand hover:underline"
+              className="break-all font-mono text-xs text-radar-ink-950 hover:underline"
               to={adminOrderDetailHref(row.orderId)}
               title="在订单管理中打开"
             >

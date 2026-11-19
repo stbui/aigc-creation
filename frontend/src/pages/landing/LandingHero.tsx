@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Sparkles } from 'lucide-react';
 
 import { HERO_SHOTS } from './constants';
@@ -12,8 +12,6 @@ interface LandingHeroProps {
 
 /** 首屏：左文案 + 双 CTA + 三条保障，右 2x2 真实产出拼贴。 */
 export function LandingHero({ totalCapabilities, primaryTo }: LandingHeroProps) {
-  const navigate = useNavigate();
-
   return (
     <section className="lp-hero">
       <div className="lp-hero-inner">
@@ -32,17 +30,13 @@ export function LandingHero({ totalCapabilities, primaryTo }: LandingHeroProps) 
             真实模型生成，按能力计费。
           </p>
           <div className="lp-hero-actions">
-            <button
-              type="button"
-              className="lp-btn lp-btn-primary"
-              onClick={() => navigate(primaryTo)}
-            >
+            <Link className="lp-btn lp-btn-primary" to={primaryTo}>
               免费开始创作
               <ArrowRight size={16} aria-hidden />
-            </button>
-            <button type="button" className="lp-btn lp-btn-ghost" onClick={() => navigate('/packages')}>
+            </Link>
+            <Link className="lp-btn lp-btn-ghost" to="/packages">
               查看套餐价目
-            </button>
+            </Link>
           </div>
           <ul className="lp-hero-proof">
             <li>

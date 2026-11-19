@@ -13,12 +13,12 @@ import type {
   CreateAdminMembershipPlanPayload,
   UserGroupView,
 } from './types';
-import { formatYuanPlain } from '../../../admin-ui/lib/format';
+import { formatYuanPlain } from '~/admin-ui/radar';
 import type { PlanDraft } from './constants';
 
 /** 分 → 元（统一实现在 admin-ui/lib/format.ts） */
-export { formatNumber } from '../../../admin-ui/lib/format';
-export { cn } from '~/admin-ui/lib/cn';
+export { formatNumber } from '~/admin-ui/radar';
+export { cn } from '~/admin-ui/radar';
 export const centsToYuan = formatYuanPlain;
 
 /** 元 → 分。非法输入返回 null，由调用方拦截 */

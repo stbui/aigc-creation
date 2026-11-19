@@ -161,6 +161,6 @@ Biome formatter 已配置，但**暂不进入门禁**：
 - 裸 hex、`adm-*` 类名、状态组件复用尚未纳入 `verify:conventions`；当前仍靠评审与既有约束。
 - Biome 只覆盖语法与通用正确性；以下仓库硬规则仍需评审与既有测试守住：
   - 最小字号 12px、禁止裸 hex、只用设计令牌（见 `CLAUDE.md` 与 [`typography.md`](typography.md)）；
-  - 后台页面不得新增 `adm-*` 类、只从 `admin-ui/primitives` 取件；
+  - 后台页面不得新增 `adm-*` 类，业务组件只从 `admin-ui/radar` 取件，共享实现由 Radar barrel 透传；
   - 能力清单只在 `capabilities/definitions/` 定义、模型调用只走 `src/model/**`。
 - 没有 pre-commit hook；门禁依赖 CI 与本地自觉执行。

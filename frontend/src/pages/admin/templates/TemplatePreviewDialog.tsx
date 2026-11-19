@@ -35,7 +35,7 @@ export function TemplatePreviewDialog({
               className="max-h-[calc(100dvh-13rem)] w-full object-contain"
             />
           </div>
-          <div className="min-w-0 space-y-3">
+          <div className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap gap-1.5">
               {item.tags.map((tag) => (
                 <span

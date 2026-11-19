@@ -1,4 +1,4 @@
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 import type { CapabilityDef } from '../../types/api';
@@ -90,19 +90,16 @@ export function ToolPage() {
 
 function ToolPageContent({ def }: { def: CapabilityDef }) {
   useDocumentMeta(`${def.name} · 货觉AI`, def.summary);
-  const navigate = useNavigate();
   const [form] = Form.useForm();
   const state = useToolPageTask(def, form);
 
   return (
     <div className="tool-page">
-      <Button
-        type="text"
-        icon={<ArrowLeft size={15} />}
-        onClick={() => navigate('/workbench')}
-        className="tool-back"
-      >
-        返回工作台
+      <Button asChild type="text" className="tool-back">
+        <Link to="/workbench">
+          <ArrowLeft size={15} aria-hidden />
+          返回工作台
+        </Link>
       </Button>
 
       <ToolPageHeader def={def} />

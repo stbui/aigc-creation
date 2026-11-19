@@ -5,4 +5,4 @@
  * 引用时在这里补一行 re-export。
  */
 
-export { formatDate, formatDateTime } from '../../../admin-ui/lib/format';
+export { formatDate, formatDateTime } from '~/admin-ui/radar';

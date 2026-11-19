@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,8 @@ export interface DropdownItem {
   disabled?: boolean;
   danger?: boolean;
   type?: 'divider';
+  /** 路由目标：传了就把整行渲染为链接，保留右键 / 新标签页 / 读屏链接角色。 */
+  to?: string;
   /**
    * 条目自身的类名 —— 用于「当前选中项」这类需要给**整行**上样式的场合。
    *
@@ -71,6 +74,7 @@ export function Dropdown({
               <DropdownMenuItem
                 key={item.key}
                 disabled={item.disabled}
+                asChild={Boolean(item.to)}
                 className={cn(
                   'ui-dropdown-item',
                   item.danger && 'text-danger-text focus:text-danger-text',
@@ -78,8 +82,17 @@ export function Dropdown({
                 )}
                 onSelect={() => item.onClick?.()}
               >
-                {item.icon}
-                {item.label}
+                {item.to ? (
+                  <Link to={item.to}>
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                ) : (
+                  <>
+                    {item.icon}
+                    {item.label}
+                  </>
+                )}
               </DropdownMenuItem>
             ),
           )}

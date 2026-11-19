@@ -1,6 +1,6 @@
 # 设计令牌标准
 
-全站颜色、圆角、阴影与组件几何值的唯一事实源是 [`frontend/src/styles/tokens.css`](../frontend/src/styles/tokens.css) 的 `:root`。本文件规定令牌怎么分层、怎么命名、加在哪里、谁能引用。
+全站颜色、圆角、阴影与组件几何值的令牌体系以 [`frontend/src/styles/tokens.css`](../frontend/src/styles/tokens.css) 的 `:root` 为主；后台业务内容层的 Radar 令牌由 [`frontend/src/styles/radar-admin.css`](../frontend/src/styles/radar-admin.css) 独立定义。本文件规定令牌怎么分层、怎么命名、加在哪里、谁能引用。
 
 与 [`typography.md`](typography.md) 的分工：本文件管「令牌体系」，`typography.md` 管字体栈、字号与组件微规格。
 
@@ -61,7 +61,7 @@
 1. **页面与组件优先引用通用层**。品牌色、文字、边框、表面、状态一律走 `--brand` / `--text-*` / `--border*` / `--surface*` / `--danger-*` / `--success-*` / `--warn-*`。
 2. **基础层可直接引用**。圆角、阴影是布局与层级值，页面直接用 `--radius-control` / `--shadow-card`，不必再包一层语义别名。
 3. **组件层不得跨组件引用**。发现跨用即提升到通用层；在两个组件里各写一份同值令牌是错误的。
-4. **页面 CSS 不写裸 hex、不新增 `:root`**。色值只出现在 `tokens.css`；实际声明中的裸 hex 必须为 0。
+4. **页面 CSS 不写裸 hex、不新增 `:root`**。全站与后台外壳色值只出现在 `tokens.css`，后台业务内容层色值只出现在 `radar-admin.css`；页面 CSS 中的裸 hex 必须为 0。
 5. **字号不建令牌**。字号与行高按 [`typography.md`](typography.md) 的阶梯直接写，全站最小 12px。
 6. **禁止同值同义新令牌**。新增前先按语义搜索，再按值搜索；两处都命中就复用已有令牌。
 7. **间距走 `--space-*` 刻度**。`gap` / `padding` / `margin` 取 2 4 6 8 10 12 16 20 24 32 40 48 时一律引用刻度令牌（`var(--space-10)`）；off-scale 的对拍值（11 / 14 / 17 / 18 / 19 / 22）保留字面值，不进刻度；抵 padding 的负间距（`margin: -24px -24px -32px`）同样保留字面值。
@@ -69,8 +69,8 @@
 ## 4. 新增令牌流程
 
 1. 先判断用途：跨页面语义 → 通用层；单页面/组件 → 组件层；纯几何原子 → 基础层。
-2. 在 `tokens.css` 对应段落追加，带上用途注释与必要的对比度说明（状态色、弱文字需要给出 AA 依据）。
-3. 同步检查 `admin.css` / `ui/styles.css` 的 `@theme inline` 是否需要桥接（仅 shadcn 语义变量需要）。
+2. 在对应令牌文件追加：全站 / 后台外壳写 `tokens.css`，后台业务内容层写 `radar-admin.css`；带上用途注释与必要的对比度说明（状态色、弱文字需要给出 AA 依据）。
+3. 同步检查 `admin.css` / `radar-admin.css` / `ui/styles.css` 的 `@theme inline` 是否需要桥接（仅 shadcn 语义变量需要）。
 4. 若新增的是组件前缀，在 `docs/frontend-module-conventions.md` 的页面 CSS 归属段落里补一行归属。
 5. 跑审计：确认令牌无重复、页面无裸 hex、无 12px 以下字号。
 
@@ -92,7 +92,7 @@ import postcss from 'postcss';
 let n = 0;
 const files = execSync('find src -name "*.css"').toString().trim().split('\n');
 for (const f of files) {
-  if (/tokens\.css$|admin\.css$|ui\/styles\.css$/.test(f)) continue;
+  if (/tokens\.css$|admin\.css$|radar-admin\.css$|ui\/styles\.css$/.test(f)) continue;
   postcss.parse(fs.readFileSync(f, 'utf8')).walkDecls((d) => {
     if (/#[0-9a-f]{3,8}\b/i.test(d.value)) {
       n += 1;
@@ -106,7 +106,7 @@ EOF
 
 ## 6. 与代码同步
 
-- 令牌改动只改 `tokens.css`；`global.css` 只负责 `@import` 顺序，不承载声明。
+- 全站与后台外壳的令牌改动只改 `tokens.css`；后台业务内容层的 Radar 令牌改 `radar-admin.css`；`global.css` 只负责 `@import` 顺序，不承载声明。
 - 间距令牌化现状（2026-11-15）：共享层 `tool-workspace.css` 82 处、前台页面与组件样式 51 个文件 1433 处声明已改为 `var(--space-*)`，**数值未变**（零视觉差异）。off-scale 值（11/14/17/18/19/22 等）仍是字面值，收敛前需按页对拍参考站。
-- 页面规格文档与 `tokens.css` 冲突时，以 `tokens.css` 为准。
-- 后台 `styles/admin.css` 与前台 `ui/styles.css` 的 `@theme inline` 只做语义桥接，不另定义色值。
+- 页面规格文档与所属层的令牌文件冲突时，以令牌文件为准：全站 / 后台外壳看 `tokens.css`，后台业务内容层看 `radar-admin.css`。
+- 后台 `styles/admin.css`、后台内容层 `radar-admin.css` 与前台 `ui/styles.css` 的 `@theme inline` 只做语义桥接；品牌色由 `tokens.css` 提供，Radar 内容层色值由 `radar-admin.css` 提供。

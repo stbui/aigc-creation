@@ -18,14 +18,14 @@
 | 域 | 模块 | 界面 |
 | --- | --- | --- |
 | 总览 | 平台概览 / 告警中心 | `/admin` · `/admin/alerts` |
-| 运营与内容 | 用户 / 工单 / 素材 / 站内消息 / 写真模板 / AI 标识 | `/admin/users` · `/admin/tickets` · `/admin/assets` 等 6 页 |
+| 运营与内容 | 用户 / 工单 / 素材 / 站内消息 / 写真模板 / 提示词管理 / AI 标识 | `/admin/users` · `/admin/tickets` · `/admin/assets` 等 7 页 |
 | 模型与能力 | 模型商品 / 能力与模型 / 插件 / 用户分组 / 调用记录 / 任务监控 | `/admin/channels` · `/admin/capabilities` · `/admin/plugins` · `/admin/user-groups` · `/admin/model-calls` · `/admin/tasks` |
 | 商品与交易 | 商品 / 会员套餐 / 订单 / 积分账本 / 优惠券 / 限时活动 / 邀请与签到 | `/admin/products` 等 7 页 |
 | 资金与财务 | 收款设置 / 交易核对 / 异常处理 / 支付与退费 / 发票管理 / 生成账单 / 财务分析 | `/admin/payments` · `/admin/invoices` · `/admin/billing-orders` · `/admin/finance` |
 | 系统 | 角色权限 / 系统设置 / 邮箱配置 / 存储配置 / 定时任务 | `/admin/roles` 等 5 页 |
 | 数据与安全 | 数据备份 / 保留期清理 | `/admin/backups` · `/admin/retention` |
 
-合计 35 个菜单入口、7 组。菜单项的 `permission` 字段决定可见性；单个权限点或权限数组（任一满足）均可作为菜单可见条件，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
+合计 36 个菜单入口、7 组。菜单项的 `permission` 字段决定可见性；单个权限点或权限数组（任一满足）均可作为菜单可见条件，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
 
 ### 1.1 分组理由
 
@@ -180,16 +180,16 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 层 | 规范 |
 | --- | --- |
 | 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（shadcn `Sidebar` 组合：全高侧栏 + 内容区顶栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail`（C 端语义） |
-| 组件底座 | 页面**只从 `admin-ui/primitives` 取件**（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / 表单控件 / `AdminDataTable`），底层是 shadcn 原子件（`admin-ui/components/ui`）；后台树内**不引 antd**，也不要把通用组件退回自绘 `div/button/input`。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增 |
+| 组件底座 | 业务页面**只从 `admin-ui/radar` 取件**（`AdminPage` / `PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / 表单控件 / `AdminDataTable`），内容层使用 freebie-radar 中性令牌；外壳保留品牌紫。后台树内**不引 antd**，也不要把通用组件退回自绘 `div/button/input`。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增 |
 | 侧栏 | 分组折叠菜单，图标 lucide 16px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
-| 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页；`rowKey="id"`、`size="small"` |
-| 详情 | 一律浮层、不跳独立路由，便于保留筛选态；窄内容用右侧抽屉（720px），需要并排区块 / 大图预览用居中弹窗（≤1120px，任务详情即此） |
+| 列表页 | 页头（标题 + 主操作）→ 筛选条 → 批量条（可选）→ 表格 → 分页；`rowKey={row => row.id}`，默认行高 44px、分页 20 条 |
+| 详情 | 一律浮层、不跳独立路由，便于保留筛选态；抽屉 520 / 640 / 760 / 1080，默认 640（`AdminDrawer` 默认 760）；并排区块 / 大图预览用弹窗 520 / 720 / 960 / 1200，默认 720（`AdminModal` 默认 960） |
 | 危险操作 | `ConfirmDialog`（shadcn `AlertDialog` 阻塞式确认弹窗），写明影响条数；退款、发票驳回等确有业务依据要求的动作必须填原因，能力下架的下线提示由后台统一生成，普通管理写操作不要求填写原因 |
-| 空态 / 加载 | 空态给真实说明；列表 loading 与失败态走 `Skeleton` / `Result` |
-| 颜色 | 只用 `tokens.css` 已有 token，禁裸 hex |
+| 空态 / 加载 | 空态给真实说明；首次加载走同构骨架，无数据失败走 `ListError` + 重试，已有数据刷新失败走 `StaleError` |
+| 颜色 | 外壳用 `tokens.css` / `admin.css`；业务内容只用 `radar-admin.css` 的 Radar 令牌，禁裸 hex |
 | 数字 | 金额内部存分、展示 `¥` 两位小数；积分整数千分位 |
-| 时间 | 统一 `YYYY-MM-DD HH:mm` |
-| 批量 | 勾选 → 批量条 → 确认 → 结果弹窗（失败项排最前）→ 刷新；翻页或改筛选清空选择 |
+| 时间 | 北京时间；完整 `YYYY-MM-DD HH:mm:ss`，紧凑 `MM-DD HH:mm`，当日 `HH:mm` |
+| 批量 | 勾选（上限 100）→ 批量条 → 确认 → toast 汇总成功 / 失败条数 → 刷新；翻页或改筛选清空选择 |
 | 导出 | 统一 `common/csv.ts`（UTF-8 BOM + RFC4180 + 公式注入防护），CSV 不走 JSON 信封 |
 | 响应式 | 后台最小宽度 1280，窄于则横向滚动，**不做移动端适配** |
 

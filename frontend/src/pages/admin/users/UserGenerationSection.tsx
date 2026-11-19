@@ -126,7 +126,7 @@ export function UserGenerationSection({
                     )}
                     {day.succeeded > 0 && (
                       <div
-                        className="w-full rounded-t-sm bg-brand/75"
+                        className="w-full rounded-t-sm bg-radar-ink-950/75"
                         style={{
                           height: `${(day.succeeded / maxDaily) * 100}%`,
                         }}
@@ -140,7 +140,7 @@ export function UserGenerationSection({
               <span>{generation.trend[0]?.date}</span>
               <span className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
-                  <span className="size-2 rounded-sm bg-brand/75" />
+                  <span className="size-2 rounded-sm bg-radar-ink-950/75" />
                   成功
                 </span>
                 <span className="flex items-center gap-1">
@@ -197,7 +197,7 @@ export function UserGenerationSection({
 
         <div className="mt-2 text-right">
           <Link
-            className="text-xs font-medium text-brand hover:underline"
+            className="text-xs font-medium text-radar-ink-950 hover:underline"
             to={adminTasksHref({ userId })}
           >
             查看全部任务

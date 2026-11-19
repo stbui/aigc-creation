@@ -4,8 +4,8 @@
 
 import type { TicketStatus } from './types';
 
-export { formatDateTime, formatYuanPlain } from '../../../admin-ui/lib/format';
-export { cn } from '../../../admin-ui/lib/cn';
+export { formatDateTime, formatYuanPlain } from '~/admin-ui/radar';
+export { cn } from '~/admin-ui/radar';
 export {
   adminAssetHref,
   adminCreditHref,

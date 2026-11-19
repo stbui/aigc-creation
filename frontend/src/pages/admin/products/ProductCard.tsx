@@ -26,13 +26,13 @@ import type { AdminProduct } from './types';
  *
  * ## 质感
  *
- * 在售卡：顶部 2px 品牌渐变线 + 向下淡出的品牌色晕染 + 发丝描边的积分面板，
+ * 在售卡：顶部 2px 近墨黑渐变线 + 向下淡出的中性灰晕染 + 发丝描边的积分面板，
  * 形成「卡片 → 面板 → 数字」三层表面，不靠重阴影堆叠。
  * 下架卡退到中性灰表面，但数字仍保持可读对比度。
  *
  * ## 在售与下架
  *
- * 在售卡用品牌渐变顶线 + 品牌淡底面板；下架卡顶线走中性灰、面板走白底，
+ * 在售卡用近墨黑渐变顶线 + 中性灰淡底面板；下架卡顶线走中性灰、面板走白底，
  * 整体退到背景里，但不整片变灰 —— 变灰会让数字读不出来。
  *
  * ## 删除
@@ -81,19 +81,19 @@ export function ProductCard({
       data-row-key={row.id}
       data-product-status={row.status}
       className={cn(
-        'group relative flex h-full flex-col gap-0 overflow-hidden rounded-xl border py-0 transition-[transform,box-shadow,border-color] duration-200',
+        'group relative flex h-full flex-col gap-0 overflow-hidden rounded-xl border py-0 transition-[transform,border-color] duration-200',
         active
-          ? 'border-border bg-card shadow-card hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg'
+          ? 'border-border bg-card hover:-translate-y-0.5 hover:border-primary/25'
           : 'border-border/70 bg-muted/20 shadow-none hover:border-border',
       )}
     >
-      {/* 顶线：在售卡走品牌渐变，下架卡走中性细线 */}
+      {/* 顶线：在售卡走近墨黑渐变，下架卡走中性细线 */}
       <div
         aria-hidden
         className={cn(
           'relative z-20 h-[2px] w-full shrink-0',
           active
-            ? 'bg-gradient-to-r from-brand via-brand-light/80 to-brand/0'
+            ? 'bg-gradient-to-r from-radar-ink-950 via-radar-ink-400/80 to-radar-ink-950/0'
             : 'bg-border',
         )}
       />
@@ -102,7 +102,7 @@ export function ProductCard({
       {active && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-[2px] h-28 bg-gradient-to-b from-brand-bg/55 via-brand-bg/20 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-[2px] h-28 bg-gradient-to-b from-radar-ink-100/55 via-radar-ink-100/20 to-transparent"
         />
       )}
 
@@ -137,7 +137,7 @@ export function ProductCard({
                 to={adminProductOrdersHref(row.id, row.name)}
                 // 身份区整体是 pointer-events-none（点击走卡片上的整块遮罩打开编辑），
                 // 链接要单独恢复，否则点不动。
-                className="pointer-events-auto rounded text-[12px] leading-4 tabular-nums text-muted-foreground transition-colors hover:text-brand hover:underline"
+                className="pointer-events-auto rounded text-[12px] leading-4 tabular-nums text-muted-foreground transition-colors hover:text-radar-ink-950 hover:underline"
                 title={`查看「${row.name}」的 ${row.orderCount} 笔历史订单`}
                 onClick={(event) => event.stopPropagation()}
               >
@@ -172,7 +172,7 @@ export function ProductCard({
           className={cn(
             'overflow-hidden rounded-lg border',
             active
-              ? 'border-brand/15 bg-gradient-to-br from-brand-bg/75 via-brand-bg/35 to-card'
+              ? 'border-radar-ink-200 bg-gradient-to-br from-radar-ink-100/75 via-radar-ink-100/35 to-card'
               : 'border-border/60 bg-card/70',
           )}
         >
@@ -218,7 +218,7 @@ export function ProductCard({
           <div
             className={cn(
               'mt-3 flex items-end justify-between gap-3 border-t px-3.5 pt-2.5 pb-3',
-              active ? 'border-brand/12' : 'border-border/60',
+              active ? 'border-radar-ink-200' : 'border-border/60',
             )}
           >
             <div className="min-w-0">
@@ -228,7 +228,7 @@ export function ProductCard({
               <div
                 className={cn(
                   'mt-1 flex items-baseline gap-0.5',
-                  active ? 'text-brand' : 'text-muted-foreground',
+                  active ? 'text-radar-ink-950' : 'text-muted-foreground',
                 )}
               >
                 <span className="text-[13px] leading-none font-semibold">{symbol}</span>
@@ -264,7 +264,7 @@ export function ProductCard({
           <span
             className={cn(
               'flex size-6 shrink-0 items-center justify-center rounded-md',
-              active ? 'bg-brand-bg text-brand' : 'bg-muted text-muted-foreground',
+              active ? 'bg-radar-ink-100 text-radar-ink-950' : 'bg-muted text-muted-foreground',
             )}
           >
             <CalendarDays className="size-3.5" strokeWidth={1.7} aria-hidden />
@@ -285,7 +285,7 @@ export function ProductCard({
             aria-hidden
             className={cn(
               'size-1 shrink-0 rounded-full',
-              active ? 'bg-brand/60' : 'bg-muted-foreground/40',
+              active ? 'bg-radar-ink-950/60' : 'bg-muted-foreground/40',
             )}
           />
           <span className="truncate">

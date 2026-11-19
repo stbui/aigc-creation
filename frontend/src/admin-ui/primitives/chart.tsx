@@ -102,7 +102,7 @@ export function TrendBarChart({
           />
           <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={30} isAnimationActive={false}>
             {items.map((item) => (
-              <Cell key={item.key} fill={item.warn ? 'var(--danger-text)' : 'var(--brand)'} />
+              <Cell key={item.key} fill={item.warn ? 'var(--danger-text)' : 'var(--text-strong)'} />
             ))}
           </Bar>
         </BarChart>

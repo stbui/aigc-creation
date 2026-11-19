@@ -294,6 +294,7 @@
   padding: var(--space-8) var(--space-6);
   color: inherit;
   text-align: left;
+  text-decoration: none;
   background: transparent;
   border: 0;
   border-radius: var(--radius-control);

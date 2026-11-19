@@ -199,7 +199,7 @@ export function AdminInvoicesPage() {
       title: '订单号',
       width: 190,
       render: (row) => (
-        <Link className="text-brand hover:underline" to={adminOrderDetailHref(row.orderId)}>
+        <Link className="text-radar-ink-950 hover:underline" to={adminOrderDetailHref(row.orderId)}>
           <code className="font-mono">{row.orderNo ?? row.orderId}</code>
         </Link>
       ),

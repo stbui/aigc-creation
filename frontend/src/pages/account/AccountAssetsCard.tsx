@@ -1,7 +1,8 @@
 import { Wallet } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import type { CreditBalance, MyMembership } from '../../types/api';
-import { fmtDate } from './utils';
+import { fmtDate, formatNumber } from './utils';
 import { Button } from '../../ui';
 
 /**
@@ -15,32 +16,25 @@ export function AccountAssetsCard({
   membership,
   cancelling,
   onCancelMembership,
-  onNavigate,
 }: {
   credits: CreditBalance | null;
   membership: MyMembership | null;
   cancelling: boolean;
   onCancelMembership: () => void;
-  onNavigate: (to: string) => void;
 }) {
   return (
     <section className="account-card">
       <header className="account-card-head">
         <Wallet size={15} aria-hidden />
         <h2>积分与会员</h2>
-        <Button
-          type="link"
-          size="small"
-          className="account-card-more"
-          onClick={() => onNavigate('/credits')}
-        >
-          查看积分明细
+        <Button asChild type="link" size="small" className="account-card-more">
+          <Link to="/credits">查看积分明细</Link>
         </Button>
       </header>
       <div className="account-assets">
         <div className="account-asset">
           <span className="account-asset-label">可用积分</span>
-          <b>{credits ? credits.balance.toLocaleString('zh-CN') : '—'}</b>
+          <b>{formatNumber(credits?.balance)}</b>
           <small>
             {credits
               ? credits.expiringSoon > 0
@@ -49,8 +43,8 @@ export function AccountAssetsCard({
               : '积分余额加载失败，可前往积分明细页查看'}
           </small>
           <div className="account-asset-actions">
-            <Button size="small" onClick={() => onNavigate('/packages')}>
-              购买积分
+            <Button asChild size="small">
+              <Link to="/packages">购买积分</Link>
             </Button>
           </div>
         </div>
@@ -63,12 +57,8 @@ export function AccountAssetsCard({
               : '开通会员享专属折扣与每月赠送积分'}
           </small>
           <div className="account-asset-actions">
-            <Button
-              size="small"
-              type={membership?.isMember ? 'default' : 'primary'}
-              onClick={() => onNavigate('/packages')}
-            >
-              {membership?.isMember ? '续费会员' : '开通会员'}
+            <Button asChild size="small" type={membership?.isMember ? 'default' : 'primary'}>
+              <Link to="/packages">{membership?.isMember ? '续费会员' : '开通会员'}</Link>
             </Button>
             {membership?.isMember && !membership.cancelAtPeriodEnd && (
               <Button size="small" type="text" danger loading={cancelling} onClick={onCancelMembership}>

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Badge, Button, Empty, Popover, Spin } from '../ui';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { formatRelativeTime } from '../lib/format';
 import { safeInternalPath } from '../lib/safePath';
 import type { NotificationItem } from '../types/api';
 import { useNotificationInbox } from './hooks';
@@ -55,7 +56,7 @@ export function NotificationBell() {
             >
               <span className="app-notif-title">{n.title}</span>
               {n.body && <span className="app-notif-text">{n.body}</span>}
-              <span className="app-notif-time">{formatTime(n.createdAt)}</span>
+              <span className="app-notif-time">{formatRelativeTime(n.createdAt)}</span>
             </button>
           ))
         )}
@@ -76,23 +77,10 @@ export function NotificationBell() {
       className="app-notif-popover"
     >
       <button type="button" className="app-header-action app-notif-trigger" aria-label={unread ? `消息通知，${unread} 条未读` : '消息通知'}>
-        <Badge count={unread} size="small" offset={[0, -2]}>
+        <Badge count={unread}>
           <Bell size={18} />
         </Badge>
       </button>
     </Popover>
   );
-}
-
-/** 相对时间：24 小时内按分钟/小时，超过按日期。列表里读「3 分钟前」比读时间戳更快。 */
-function formatTime(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return '';
-  const diff = Date.now() - t;
-  const minute = 60_000;
-  if (diff < minute) return '刚刚';
-  if (diff < 60 * minute) return `${Math.floor(diff / minute)} 分钟前`;
-  if (diff < 24 * 60 * minute) return `${Math.floor(diff / (60 * minute))} 小时前`;
-  const d = new Date(t);
-  return `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
 }

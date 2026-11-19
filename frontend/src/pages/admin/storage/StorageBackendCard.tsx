@@ -19,7 +19,7 @@ function StorageBackendSetup({ meta }: { meta: (typeof META)[StorageBackendId] }
           <div className="mt-2 text-[12px] text-muted-foreground">① 安装 SDK</div>
           <code
             data-testid="admin-storage-sdk"
-            className="mt-1 block break-all rounded-sm border border-border bg-muted px-1.5 py-1 font-mono text-[11px] text-foreground"
+            className="mt-1 block break-all rounded-sm border border-border bg-muted px-1.5 py-1 font-mono text-[12px] leading-4 text-foreground"
           >
             {meta.sdk}
           </code>
@@ -45,7 +45,7 @@ function StorageBackendSetup({ meta }: { meta: (typeof META)[StorageBackendId] }
             {meta.optionalKeys.map((key) => (
               <code
                 key={key}
-                className="rounded-sm border border-dashed border-border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+                className="rounded-sm border border-dashed border-border px-1.5 py-0.5 font-mono text-[12px] leading-4 text-muted-foreground"
               >
                 {key}
               </code>
@@ -88,13 +88,13 @@ export function StorageBackendCard({
       data-backend={b.backend}
       data-active={b.active ? 'true' : 'false'}
       className={cn(
-        'flex flex-col rounded-lg border bg-card p-4 shadow-card',
+        'flex flex-col rounded-lg border bg-card p-4',
         b.active ? 'border-ring' : 'border-border',
         !b.configured && 'bg-muted/40',
       )}
     >
       <div className="flex items-start gap-2.5">
-        <span className={cn('mt-0.5 shrink-0', b.active ? 'text-brand' : 'text-muted-foreground')}>
+        <span className={cn('mt-0.5 shrink-0', b.active ? 'text-radar-ink-950' : 'text-muted-foreground')}>
           <Icon className="size-[18px]" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">

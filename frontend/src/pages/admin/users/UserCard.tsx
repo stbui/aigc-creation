@@ -56,7 +56,7 @@ export function UserCard({
       data-row-key={user.id}
       data-user-status={user.status}
       className={cn(
-        'relative gap-0 overflow-hidden rounded-lg border-border bg-card py-0 shadow-card transition-colors hover:border-primary/40 hover:bg-accent/10 focus-within:border-primary active:bg-accent/20',
+        'relative gap-0 overflow-hidden rounded-lg border-border bg-card py-0 transition-colors hover:border-primary/40 hover:bg-accent/10 focus-within:border-primary active:bg-accent/20',
         disabled &&
           'border-warn-border bg-warn-soft/20 hover:border-warn-text/40 hover:bg-warn-soft/30 active:bg-warn-soft/40',
       )}

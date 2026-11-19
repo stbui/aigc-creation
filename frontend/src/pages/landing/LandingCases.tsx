@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 import { A, type CaseGroup } from './constants';
@@ -14,8 +14,6 @@ interface LandingCasesProps {
  * 每个分类按商品去重后只陈列 5 张 —— 访客不必猜「别的能力能不能做」。
  */
 export function LandingCases({ groups }: LandingCasesProps) {
-  const navigate = useNavigate();
-
   return (
     <section className="lp-section">
       <div className="lp-cases-head">
@@ -31,21 +29,20 @@ export function LandingCases({ groups }: LandingCasesProps) {
             <article className="lp-case-group" key={group.key}>
               <header className="lp-case-group-head">
                 <h3>{group.label}</h3>
-                <button type="button" className="lp-text-link" onClick={() => navigate(target)}>
+                <Link className="lp-text-link" to={target}>
                   做同款
                   <ArrowRight size={14} aria-hidden />
-                </button>
+                </Link>
               </header>
               <div className="lp-case-strip">
                 {uniqueCaseFiles(group.files)
                   .slice(0, 5)
                   .map((file) => (
-                    <button
+                    <Link
                       key={file}
-                      type="button"
                       className="lp-case-card"
                       aria-label={`${group.label}示例，做同款`}
-                      onClick={() => navigate(target)}
+                      to={target}
                     >
                       {/* 按钮已有 aria-label, 图片作为卡面内容不再重复同一句 alt */}
                       <img
@@ -56,7 +53,7 @@ export function LandingCases({ groups }: LandingCasesProps) {
                         loading="lazy"
                       />
                       <span className="lp-case-label">做同款</span>
-                    </button>
+                    </Link>
                   ))}
               </div>
             </article>

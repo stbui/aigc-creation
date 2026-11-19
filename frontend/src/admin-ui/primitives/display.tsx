@@ -242,7 +242,7 @@ export function Meter({
         ? '[&>[data-slot=progress-indicator]]:bg-warn-text'
         : tone === 'success'
           ? '[&>[data-slot=progress-indicator]]:bg-success-text'
-          : '[&>[data-slot=progress-indicator]]:bg-brand';
+          : '[&>[data-slot=progress-indicator]]:bg-foreground';
 
   return (
     <Progress

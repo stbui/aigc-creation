@@ -25,7 +25,6 @@ export interface LibraryGridProps {
   onPreview: (index: number) => void;
   onDownload: (asset: Asset) => void;
   onRemove: (id: string) => void;
-  onReuse: (capabilityId: string) => void;
 }
 
 interface LibraryGridItem {
@@ -49,7 +48,6 @@ export function LibraryGrid({
   onPreview,
   onDownload,
   onRemove,
-  onReuse,
 }: LibraryGridProps) {
   const visible = useMemo<LibraryGridItem[]>(
     () => assets.slice(0, visibleCount).map((asset, index) => ({ asset, index })),
@@ -80,7 +78,6 @@ export function LibraryGrid({
                 onPreview={onPreview}
                 onDownload={onDownload}
                 onRemove={onRemove}
-                onReuse={onReuse}
               />
             ))}
           </div>

@@ -18,7 +18,6 @@ import {
   useAdmin,
   useAdminList,
   useAdminUrlFilterSync,
-  useDiscardConfirm,
   useToast,
   useUnsavedGuard,
 } from './hooks';
@@ -68,7 +67,6 @@ export function AdminCampaignsPage() {
 
   const formDirty = Boolean(formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase));
   useUnsavedGuard(formDirty);
-  const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -366,7 +364,7 @@ export function AdminCampaignsPage() {
         formDirty={formDirty}
         busy={busy}
         onPatch={patchForm}
-        onClose={requestCloseForm}
+        onClose={() => setFormOpen(false)}
         onSave={() => void save()}
       />
 

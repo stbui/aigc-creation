@@ -126,7 +126,7 @@ function TaskModelCallsContent({ taskId }: { taskId: string }) {
             </span>
           )}
           <Link
-            className="inline-flex items-center gap-1 text-brand hover:underline"
+            className="inline-flex items-center gap-1 text-radar-ink-950 hover:underline"
             to={adminModelCallsHref({ taskId })}
           >
             查看全部调用

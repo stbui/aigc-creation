@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { CreditLedgerEntry } from '../../types/api';
 import {
   Pagination,
@@ -33,7 +34,6 @@ interface CreditsLedgerPanelProps {
   onFilterChange: (filter: LedgerFilter) => void;
   onPageChange: (page: number) => void;
   onRetry: () => void;
-  onGoPackages: () => void;
 }
 
 /** 积分流水页签：筛选、加载 / 失败 / 空态、桌面表格与窄屏列表。 */
@@ -49,7 +49,6 @@ export function CreditsLedgerPanel({
   onFilterChange,
   onPageChange,
   onRetry,
-  onGoPackages,
 }: CreditsLedgerPanelProps) {
   const columns = [
     {
@@ -145,7 +144,11 @@ export function CreditsLedgerPanel({
               : '可以切换筛选条件，查看其他类型的积分变动。'
           }
           action={
-            filter === 'all' ? <StateButton onClick={onGoPackages}>去获取积分</StateButton> : undefined
+            filter === 'all' ? (
+              <StateButton asChild>
+                <Link to="/packages">去获取积分</Link>
+              </StateButton>
+            ) : undefined
           }
         />
       ) : narrow ? (

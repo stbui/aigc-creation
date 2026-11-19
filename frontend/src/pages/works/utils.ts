@@ -7,6 +7,7 @@
 
 import type { Modality, Task } from '../../types/api';
 import { capabilityById } from '../../lib/capabilities';
+import { formatCompactDateTime } from '../../lib/format';
 
 /** 能力 id → 能力定义 / 展示名 / 工具页路径 */
 export { capabilityById, capabilityName, toolPath } from '../../lib/capabilities';
@@ -47,14 +48,7 @@ export function outputExtension(task: Task): string {
   return taskModality(task) === 'video' ? 'mp4' : 'jpg';
 }
 
-/** 卡片脚注时间：月/日 时:分（本地时区，24 小时制） */
+/** 卡片脚注时间：月/日 时:分（本地时区，24 小时制）。无时间时留空，不占位。 */
 export function formatCreatedAt(iso: string | null | undefined): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+  return formatCompactDateTime(iso, { fallback: '' });
 }

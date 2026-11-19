@@ -263,6 +263,7 @@
   border-radius: 9px;
   background: var(--brand-bg);
   color: var(--brand);
+  text-decoration: none;
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
@@ -281,6 +282,7 @@
   padding: 7px 8px;
   border-radius: 11px;
   gap: 10px;
+  text-decoration: none;
   cursor: pointer;
 }
 

@@ -26,6 +26,12 @@ import { cn } from '../lib/cn';
  * - 成功 4s、警示 5s、失败 6s —— 失败信息通常更长，需要更多阅读时间；
  * - 同时最多 4 条，超出挤掉最早的一条 —— 连点批量操作时不至于铺满右半屏；
  * - `aria-live="polite"`，错误用 `role="alert"`，读屏用户能听到结果。
+ *
+ * ## 两层视觉边界
+ *
+ * toast 渲染在 `body` 下，拿不到内容层的 `.radar-scope`。后台挂载时传
+ * `surface="radar"`，容器补上 `radar-scope`，边框 / 文字 / hover 底才走
+ * Radar 中性值而不是外壳的品牌紫；C 端保持 `shell`（默认），外观不变。
  */
 
 type ToastTone = 'success' | 'error' | 'info' | 'warning';
@@ -51,12 +57,20 @@ const TONE_META: Record<ToastTone, { icon: typeof Info; className: string }> = {
   success: { icon: CheckCircle2, className: 'text-success-text' },
   error: { icon: XCircle, className: 'text-danger-text' },
   warning: { icon: TriangleAlert, className: 'text-warn-text' },
-  info: { icon: Info, className: 'text-brand' },
+  info: { icon: Info, className: 'text-foreground' },
 };
 
 const MAX_TOASTS = 4;
 
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({
+  children,
+  /** 浮层视觉边界：后台内容层用 radar 中性语义，C 端保持外壳原样。 */
+  surface = 'shell',
+}: {
+  children: ReactNode;
+  surface?: 'shell' | 'radar';
+}) {
+  const radar = surface === 'radar';
   const [items, setItems] = useState<ToastItem[]>([]);
   const seq = useRef(0);
   const timers = useRef(new Map<number, number>());
@@ -108,7 +122,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {createPortal(
         <div
-          className="admin-portal pointer-events-none fixed right-6 bottom-6 z-[1200] flex w-[380px] max-w-[calc(100vw-32px)] flex-col gap-2"
+          className={cn(
+            'admin-portal pointer-events-none fixed right-6 bottom-6 z-[1200] flex w-[380px] max-w-[calc(100vw-32px)] flex-col gap-2',
+            radar && 'radar-scope',
+          )}
           aria-live="polite"
         >
           {items.map((item) => {
@@ -118,7 +135,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 key={item.id}
                 data-testid="admin-toast"
                 role={item.tone === 'error' ? 'alert' : 'status'}
-                className="pointer-events-none flex items-start gap-2.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg"
+                className={cn(
+                  'pointer-events-none flex items-start gap-2.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground',
+                  // 内容层反馈零阴影；外壳/C 端保持原有浮层层级提示。
+                  radar ? 'shadow-none' : 'shadow-lg',
+                )}
               >
                 <Icon className={cn('mt-0.5 size-4 shrink-0', className)} aria-hidden />
                 <div className="min-w-0 flex-1">

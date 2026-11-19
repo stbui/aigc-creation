@@ -6,6 +6,7 @@
  */
 
 import { DEFAULT_CUSTOM_COLOR, qrColors, tokenColor } from '../../lib/colorPalette';
+import { formatDate } from '../../lib/format';
 import { POSTER_HEIGHT, POSTER_WIDTH } from './constants';
 import type { MyInvites } from '../../types/api';
 
@@ -65,10 +66,9 @@ export function formatForecastDay(day: string): string {
   return m ? `${Number(m[2])}/${Number(m[3])}` : day;
 }
 
-/** 邀请记录的时间只留年月日 */
+/** 邀请记录的时间只留年月日；无法解析时保留原值，便于排查脏数据。 */
 export function formatBoundDay(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('zh-CN');
+  return formatDate(iso, iso);
 }
 
 /** 海报下载文件名 */

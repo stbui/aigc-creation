@@ -146,7 +146,7 @@ export function AdminFinancePage() {
           return <span className="font-mono text-[12px] text-foreground">{row.label || '—'}</span>;
         }
         return (
-          <Link className="font-mono text-[12px] text-brand hover:underline" to={href}>
+          <Link className="font-mono text-[12px] text-radar-ink-950 hover:underline" to={href}>
             {row.label || '—'}
           </Link>
         );

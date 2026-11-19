@@ -258,20 +258,20 @@ export function OrderDetailDrawer({
                       <span>
                         {d.user.name ? `${d.user.name} · ` : ''}
                         <Link
-                          className="text-brand hover:underline"
+                          className="text-radar-ink-950 hover:underline"
                           to={adminUserDetailHref(d.userId)}
                         >
                           {d.user.email}
                         </Link>
                       </span>
                       <Link
-                        className="text-[12px] text-brand hover:underline"
+                        className="text-[12px] text-radar-ink-950 hover:underline"
                         to={adminCreditHref({ userId: d.userId, email: d.user.email })}
                       >
                         积分账本
                       </Link>
                       <Link
-                        className="text-[12px] text-brand hover:underline"
+                        className="text-[12px] text-radar-ink-950 hover:underline"
                         to={adminTasksHref({ userId: d.userId })}
                       >
                         任务记录

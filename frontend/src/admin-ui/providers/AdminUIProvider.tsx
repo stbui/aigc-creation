@@ -16,8 +16,8 @@ import { ConfirmProvider } from './ConfirmProvider';
 export function AdminUIProvider({ children }: { children: ReactNode }) {
   return (
     <TooltipProvider delayDuration={300}>
-      <ToastProvider>
-        <ConfirmProvider>{children}</ConfirmProvider>
+      <ToastProvider surface="radar">
+        <ConfirmProvider surface="radar">{children}</ConfirmProvider>
       </ToastProvider>
     </TooltipProvider>
   );

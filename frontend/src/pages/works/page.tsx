@@ -272,12 +272,6 @@ export function WorksPage() {
     message.success(`已下载 ${list.length} 个文件`);
   };
 
-  /** 「再来一张」：跳回该能力对应的工具页；能力清单未就绪时不做无意义跳转 */
-  const reuseWork = (capabilityId: string) => {
-    const capability = caps?.items.find((item) => item.id === capabilityId);
-    if (capability) navigate(toolPath(capability.id));
-  };
-
   /**
    * 切页签要清掉业务类型筛选: 两个页签的能力集合不相交, 留着上一页的选择
    * 只会得到「没有符合条件」的空网格, 而用户刚点的只是一个页签。
@@ -334,7 +328,7 @@ export function WorksPage() {
       <WorksCountBar
         worksCount={worksCount}
         pendingCount={matchingTasks.length - worksCount}
-        isVideo={tab === 'video'}
+        video={tab === 'video'}
       />
 
       {loading ? (
@@ -354,7 +348,6 @@ export function WorksPage() {
         <WorksEmptyState
           tab={tab}
           activeFilterCount={activeFilterCount}
-          onGoCreate={() => navigate('/workbench')}
         />
       ) : (
         <>
@@ -370,7 +363,6 @@ export function WorksPage() {
             onRetry={retryTask}
             onDownload={downloadTask}
             onRemove={removeTask}
-            onReuse={reuseWork}
           />
 
           {(visibleCount < matchingTasks.length || tasks.length < totalTasks) && (

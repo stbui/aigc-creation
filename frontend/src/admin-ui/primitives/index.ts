@@ -1,12 +1,13 @@
 /**
- * 后台页面唯一取用层。
+ * 后台共享组件与数据逻辑实现层。
  *
- * 页面**不直连** `components/ui`（那是 shadcn 的原子件）。这里把后台真正需要
- * 的组合形态收成一份：页面骨架、筛选、表格、表单、浮层、状态展示。
+ * 页面**不直连**本 barrel；`radar/index.ts` 先透传这里的全部导出，再用 Radar
+ * 覆盖品牌可见、高频的组件。页面统一从 `admin-ui/radar` 取件。
  *
  * 目录约定：
  *   - `components/ui/` —— shadcn 原始组件（CLI 生成 + `scripts/post-shadcn.mjs` 处理）；
- *   - `primitives/`    —— 本目录，业务页面唯一 import 来源；
+ *   - `primitives/`    —— 共享实现层，由 `radar/index.ts` 透传；
+ *   - `radar/`         —— 页面公开入口与中性风格覆盖件；
  *   - `hooks/`         —— 列表 / 单资源 / URL 同步等数据逻辑；
  *   - `providers/`     —— toast、二次确认、tooltip 上下文；
  *   - `shell/`         —— 外壳与全局搜索。
@@ -111,10 +112,10 @@ export {
   Skeleton,
 } from './skeleton';
 
+export { DateField, DateRangeField } from './date-fields';
+
 export {
   CheckboxField,
-  DateField,
-  DateRangeField,
   FilePicker,
   HelpTip,
   IconButton,
@@ -147,6 +148,14 @@ export {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+export {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 export { AdminDrawer, AdminModal } from './DetailDialog';
 export { DutyChannelTower, earliestFailure } from './duty-tower';
 export { DutyStrip } from './duty-strip';
@@ -166,6 +175,8 @@ export {
   formatRelative,
   formatYuan,
   formatYuanPlain,
+  formatYuanGrouped,
+  formatDecimal,
   formatBytes,
   formatNumber,
   tickHeight,

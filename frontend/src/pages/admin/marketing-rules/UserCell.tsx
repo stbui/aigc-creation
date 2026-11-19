@@ -20,7 +20,7 @@ export function UserCell({
         {name || <span className="text-muted-foreground">未命名用户</span>}
       </span>
       <Link
-        className="truncate text-[12px] text-brand hover:underline"
+        className="truncate text-[12px] text-radar-ink-950 hover:underline"
         to={adminUserHref(email)}
         title={email}
       >

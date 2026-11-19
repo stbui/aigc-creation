@@ -6,9 +6,6 @@ export interface BadgeProps {
   dot?: boolean;
   children?: ReactNode;
   className?: string;
-  color?: string;
-  size?: string;
-  offset?: [number, number];
 }
 
 /** antd Badge 的兼容壳：C 端只使用数字角标。 */

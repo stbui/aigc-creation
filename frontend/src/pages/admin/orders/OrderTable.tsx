@@ -79,7 +79,7 @@ export function OrderTable({
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <Link
-            className="truncate rounded font-mono font-medium text-brand hover:underline"
+            className="truncate rounded font-mono font-medium text-radar-ink-950 hover:underline"
             to={adminOrderDetailHref(row.id)}
           >
             {row.orderNo}
@@ -94,7 +94,7 @@ export function OrderTable({
       width: 135,
       render: (row) => (
         <Link
-          className="block max-w-[160px] truncate font-medium text-foreground transition-colors hover:text-brand hover:underline"
+          className="block max-w-[160px] truncate font-medium text-foreground transition-colors hover:text-radar-ink-950 hover:underline"
           to={adminUserDetailHref(row.userId)}
           title={row.userEmail}
         >
@@ -343,7 +343,7 @@ export function OrderTable({
         selected={selected}
         onSelectedChange={onSelectedChange}
         // 只有待支付能核销; 已支付/已退款选中后再点批量核销只会得到一堆失败项
-        isRowSelectable={(row) => row.status === 'pending'}
+        rowSelectable={(row) => row.status === 'pending'}
         pagination={{
           current: page,
           pageSize,

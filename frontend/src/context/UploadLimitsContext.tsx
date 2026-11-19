@@ -14,6 +14,7 @@ import {
   UPLOAD_LIMITS_CHANGED_EVENT,
   type PublicUploadLimits,
 } from '../lib/api-settings';
+import { formatNumber } from '../lib/format';
 import {
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
@@ -194,7 +195,7 @@ export function UploadLimitsProvider({ children }: { children: ReactNode }) {
         }
         const pixels = await readImagePixels(file);
         if (pixels !== null && pixels > limits.maxPixels) {
-          return `图片像素总数不能超过 ${limits.maxPixels.toLocaleString('zh-CN')}`;
+          return `图片像素总数不能超过 ${formatNumber(limits.maxPixels)}`;
         }
         return null;
       },

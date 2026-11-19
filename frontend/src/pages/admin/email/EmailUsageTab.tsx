@@ -35,7 +35,7 @@ export function EmailUsageTab({
         itemFor={config.itemFor}
         valueFor={config.valueFor}
         disabled={!writable}
-        isDirty={config.isDirty}
+        dirty={config.dirty}
         onChange={(key, next) => config.setValue(key, next)}
         onOpenDelivery={() => onChangeTab('delivery')}
         onOpenTemplates={() => onChangeTab('templates')}

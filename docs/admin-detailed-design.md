@@ -7,7 +7,7 @@
 | 后端模块注册与守卫顺序 | `backend/src/admin/admin.module.ts` |
 | 权限点与内置角色 | `backend/src/admin/permissions.ts` |
 | 菜单分组 | `frontend/src/components/admin/adminNav.ts` |
-| 通用组件与列表 hook | `frontend/src/admin-ui/primitives/index.ts`（控件 + hook 统一出口） |
+| 页面组件与列表 hook | `frontend/src/admin-ui/radar/index.ts`（页面公开入口；共享实现由 primitives 透传） |
 | 请求层 | `frontend/src/lib/api.ts` 的 `adminApi` |
 
 ---
@@ -46,9 +46,10 @@ backend/src/admin/
 
 ```text
 frontend/src/admin-ui/              # 后台 UI（shadcn · radix 底座）
-├── components/ui/                  # shadcn 原子件（只被 primitives 引用）
+├── components/ui/                  # shadcn 原子件（被 primitives / radar 消费）
 ├── shell/AdminBoardLayout.tsx      # 外壳（shadcn Sidebar：全高侧栏 + 内容区顶栏）
-├── primitives/                     # 页面唯一取用层：layout / form / display / fields / table / overlay / drawer / batch-result / duty-* / chart
+├── radar/                          # 页面公开入口：Radar 中性内容层与品牌可见覆盖件
+├── primitives/                     # 共享实现层：layout / form / display / fields / table / overlay / drawer / batch-result / duty-* / chart；由 Radar barrel 透传
 ├── providers/                      # Toast / Confirm / AdminUIProvider
 ├── hooks/useAdminList.ts           # useAdminList / useAdminResource / useAdminUrlFilterSync / useAdminDetailParam
 └── lib/                            # cn（官方 cn 包 + 补登表）、density（DensityContext）、format（时间 / 金额 / 字节）
@@ -83,7 +84,7 @@ frontend/src/pages/admin/            # 33 个页面 + channels/、payments/、pa
 
 ### 0.4 列表页通用模式
 
-`admin-ui/hooks/useAdminList.ts` 的 `useAdminList` 统一处理分页、筛选、刷新与失败态（随 `admin-ui/primitives` 导出）：
+`admin-ui/hooks/useAdminList.ts` 的 `useAdminList` 统一处理分页、筛选、刷新与失败态（经 `admin-ui/radar` 公开）：
 
 ```ts
 const { data, total, loading, error, reload, setPage, setFilters } = useAdminList(fetcher, {
@@ -104,11 +105,11 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 `AdminDrawer` 统一宽度、标题、底部操作区与关闭行为，详情不跳独立路由——保留列表筛选态比省一层路由更重要。
 
-`AdminModal` 与 `AdminDrawer` 共用同一套懒加载取数、竞态丢弃与失败重试，只换浮层形态：内容包含并排区块、宽表格或大图预览时改用居中弹窗（`width` 默认 960，任务详情 1120），避免抽屉把每一段都挤成两行。两者都在 `admin-ui/primitives/DetailDialog`，页面从 barrel 取件。
+`AdminModal` 与 `AdminDrawer` 共用同一套懒加载取数、竞态丢弃与失败重试，只换浮层形态：内容包含并排区块、宽表格或大图预览时改用居中弹窗（默认 960，任务详情等最宽场景用 `xl` 1200），避免抽屉把每一段都挤成两行。两者共用 `admin-ui/primitives/detail-data` 的数据生命周期（懒加载、关闭清空、竞态丢弃、失败重试），Radar 展示层位于 `admin-ui/radar/DetailDialog`；`admin-ui/primitives/DetailDialog` 只作为 `.radar-scope` 外的外壳级 fallback。页面统一从 `admin-ui/radar` 取件。
 
 ### 0.6 高危操作确认
 
-`ConfirmDialog`（shadcn `AlertDialog` 组合壳，`admin-ui/primitives/overlay`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写原因。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
+`ConfirmDialog`（由 `admin-ui/radar` 公开的 shadcn `AlertDialog` 组合壳）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写原因。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 

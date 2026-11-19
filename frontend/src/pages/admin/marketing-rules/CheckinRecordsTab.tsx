@@ -84,7 +84,7 @@ export function CheckinRecordsTab() {
       align: 'right',
       render: (row) =>
         row.credits > 0 ? (
-          <span className="font-medium tabular-nums text-brand">+{row.credits}</span>
+          <span className="font-medium tabular-nums text-radar-ink-950">+{row.credits}</span>
         ) : (
           /* 0 分是真实结果（当日已达上限或规则为 0），如实显示而不是留白 */
           <span className="text-muted-foreground">0</span>

@@ -139,6 +139,72 @@
   --color-sidebar-ring: var(--brand);
 }
 
+/*
+ * ── Radar 命名空间（freebie-radar 中性灰内容层） ──────────────────
+ *
+ * 这些令牌**必须**登记在这个 Tailwind 入口里。`styles/radar-admin.css` 只被
+ * 后台页面当普通 CSS 导入，不经过 Vite 的 Tailwind 插件，写在那里的
+ * `@theme` / `@utility` 会被原样输出，导致 `bg-radar-*` / `text-radar-*` /
+ * `border-radar-*` 一个工具类都不生成（实心按钮变白字透明底、面板无白底
+ * 和细线），而构建完全不报错。
+ *
+ * 这里用普通 `@theme`（不是 `inline`）：令牌会写进 `:root`，`@utility panel`
+ * 里的 `var(--color-radar-*)` 才有值。`radar-` 前缀只存在于后台 chunk，
+ * 与 C 端和外壳的品牌紫令牌不冲突。
+ */
+@theme {
+  /* 中性灰 ink 阶梯（freebie-radar 实测值） */
+  --color-radar-canvas: #f6f7f9;
+  --color-radar-surface: #ffffff;
+  --color-radar-surface-hover: #f7f8fb;
+  --color-radar-surface-muted: #f1f3f6;
+  --color-radar-ink-950: #111318;
+  --color-radar-ink-900: #1b1e26;
+  --color-radar-ink-700: #374151;
+  --color-radar-ink-600: #4b5563;
+  --color-radar-ink-500: #525c6b;
+  --color-radar-ink-400: #646f80;
+  --color-radar-ink-300: #d1d5de;
+  --color-radar-ink-200: #e6e8ec;
+  --color-radar-ink-100: #f1f3f6;
+
+  /* 品牌：近墨黑，区别于产品品牌紫 #5546d8 */
+  --color-radar-brand: #111318;
+  --color-radar-brand-hover: #272b36;
+  --color-radar-brand-dark: #090a0d;
+  --color-radar-brand-subtle: #eef0ff;
+  --color-radar-brand-border: #c7d0f8;
+  --color-radar-accent: #312e81;
+
+  /* 语义色：实色 + 浅底（成对，参考 freebie-radar） */
+  --color-radar-deal: #047857;
+  --color-radar-deal-subtle: #ecfdf5;
+  --color-radar-deal-border: #a7f3d0;
+  --color-radar-code: #92400e;
+  --color-radar-code-subtle: #fef3c7;
+  --color-radar-code-border: #fde68a;
+  --color-radar-alert: #dc2626;
+  --color-radar-alert-subtle: #fef2f2;
+  --color-radar-alert-border: #fecaca;
+
+  /* 圆角 8px（绕过后台 chunk 的 --radius 重映射） */
+  --radius-radar: 8px;
+  /* 阴影：仅抽屉使用，其余面板零阴影 */
+  --shadow-radar-drawer: -8px 0 32px rgba(17, 19, 24, 0.08), -1px 0 0 rgba(17, 19, 24, 0.06);
+}
+
+/* 面板：白底 + 1px 细线 + 8px 圆角（零阴影） */
+@utility panel {
+  background-color: var(--color-radar-surface);
+  border: 1px solid var(--color-radar-ink-200);
+  border-radius: var(--radius-radar);
+}
+
+/* 抽屉阴影（唯一带阴影的浮层） */
+@utility radar-drawer-shadow {
+  box-shadow: var(--shadow-radar-drawer);
+}
+
 @layer base {
   /*
    * ① 外壳骨架的 `.adm-*` 钩子。

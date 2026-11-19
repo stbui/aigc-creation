@@ -17,7 +17,7 @@ export interface TicketFiltersProps {
 
 export function TicketFilters({ filter, counts, loaded, onChange }: TicketFiltersProps) {
   return (
-    <div className="ticket-filters" role="tablist" aria-label="按状态筛选工单">
+    <div className="ticket-filters" role="group" aria-label="按状态筛选工单">
       {FILTERS.map((f) => {
         const count = f.value === 'all' ? loaded : (counts[f.value] ?? 0);
         const active = filter === f.value;
@@ -25,8 +25,7 @@ export function TicketFilters({ filter, counts, loaded, onChange }: TicketFilter
           <button
             key={f.value}
             type="button"
-            role="tab"
-            aria-selected={active}
+            aria-pressed={active}
             className={`ticket-filter${active ? ' is-active' : ''}`}
             onClick={() => onChange(f.value)}
           >

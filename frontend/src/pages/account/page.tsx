@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BarChart3 } from 'lucide-react';
 
 import {
@@ -360,8 +360,11 @@ export function AccountPage() {
       title="账户设置"
       description="管理资料、安全与数据；积分、订单与工单可从卡片直接进入。"
       extra={
-        <Button icon={<BarChart3 size={15} />} onClick={() => navigate('/stats')}>
-          创作数据
+        <Button asChild>
+          <Link to="/stats">
+            <BarChart3 size={15} aria-hidden />
+            创作数据
+          </Link>
         </Button>
       }
     >
@@ -373,7 +376,6 @@ export function AccountPage() {
         savingName={savingName}
         onNameChange={setName}
         onSaveName={() => void saveName()}
-        onNavigate={navigate}
       />
 
       {/* ── 积分与会员 ─────────────────────────────────────────── */}
@@ -382,16 +384,15 @@ export function AccountPage() {
         membership={membership}
         cancelling={cancelling}
         onCancelMembership={cancelMembership}
-        onNavigate={navigate}
       />
 
       {/* ── 我的数据 ───────────────────────────────────────────── */}
-      <AccountStatsCard counts={counts} ticketTotal={ticketTotal} onNavigate={navigate} />
+      <AccountStatsCard counts={counts} ticketTotal={ticketTotal} />
 
       {/* ── 最近订单 / 最近消息 ───────────────────────────────── */}
       {/* 两列并排: 单列铺满 1120 时每行两侧都是空白, 上下叠起来又多滚一屏 */}
       <div className="account-split">
-        <AccountOrdersCard orders={recentOrders} onNavigate={navigate} />
+        <AccountOrdersCard orders={recentOrders} />
         <AccountMessagesCard
           messages={messages}
           unread={unread}

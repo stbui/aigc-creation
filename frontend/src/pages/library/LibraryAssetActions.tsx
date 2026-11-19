@@ -1,4 +1,5 @@
 import { Download, Eye, Sparkles, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { Button } from './components';
 
@@ -14,7 +15,8 @@ export interface LibraryAssetActionsProps {
   deleteLabel: string;
   onOpenOriginal: () => void;
   onDownload: () => void;
-  onReuse: () => void;
+  /** 「再来一张」的目标工具页；有可复用能力时传入 */
+  reuseTo?: string;
   onRemove: () => void;
 }
 
@@ -23,7 +25,7 @@ export function LibraryAssetActions({
   deleteLabel,
   onOpenOriginal,
   onDownload,
-  onReuse,
+  reuseTo,
   onRemove,
 }: LibraryAssetActionsProps) {
   return (
@@ -48,14 +50,12 @@ export function LibraryAssetActions({
       >
         下载
       </Button>
-      {canReuse && (
-        <Button
-          type="text"
-          size="small"
-          icon={<Sparkles className="size-3" />}
-          onClick={onReuse}
-        >
-          再来一张
+      {canReuse && reuseTo && (
+        <Button asChild type="text" size="small">
+          <Link to={reuseTo}>
+            <Sparkles className="size-3" aria-hidden />
+            再来一张
+          </Link>
         </Button>
       )}
       <Button

@@ -372,7 +372,7 @@ export function UserListSection({
               selectable={canSelect}
               selected={selected}
               onSelectedChange={onSelectedChange}
-              isRowSelectable={(row) =>
+              rowSelectable={(row) =>
                 canSelect && row.status !== 'deleted' && row.id !== selfId
               }
               rowSelectLabel={(row) => `选择用户 ${row.email}`}
@@ -392,7 +392,7 @@ export function UserListSection({
           )}
 
           {view === 'cards' && data && data.total > 0 && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-card">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
               <span className="text-xs text-muted-foreground">
                 共 {data.total} 位用户
               </span>

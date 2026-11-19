@@ -405,7 +405,7 @@ export function SelectField({
           ) : undefined}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="admin-portal radar-scope rounded-[8px] border-radar-ink-200 bg-radar-surface shadow-none [&_[data-slot=select-item]]:text-[13px]">
         <SelectGroup>
           {allowClear && <SelectItem value={ALL}>{clearLabel}</SelectItem>}
           {options.map((option) => (
@@ -739,7 +739,7 @@ export function ActionButton({
       aria-expanded={ariaExpanded}
       className={className}
     >
-      {Icon ? <Icon className="size-4" /> : null}
+      {Icon ? <Icon className="size-4" aria-hidden /> : null}
       {children}
     </Button>
   );

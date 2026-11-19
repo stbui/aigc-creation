@@ -48,9 +48,8 @@ const BASELINE = {
   // `pages/CreditsPage.tsx`、`pages/ToolPage.tsx` 已在 54b6a58 改为 `pages/credits/`、
   // `pages/tool/` 目录，旧单文件不存在。
   'src/admin-ui/components/ui/sidebar.tsx': 726,
-  'src/admin-ui/primitives/fields.tsx': 547,
   'src/admin-ui/primitives/form.tsx': 777,
-  'src/admin-ui/primitives/table.tsx': 643,
+  'src/admin-ui/primitives/table.tsx': 641,
   'src/lib/api.ts': 720,
   'src/pages/admin/channels/AllChannelModelsPanel.tsx': 508,
   'src/pages/admin/channels/ChannelModelManager.tsx': 625,

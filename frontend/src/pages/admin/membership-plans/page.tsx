@@ -10,7 +10,7 @@ import {
   RefreshButton,
   StaleError,
 } from './components';
-import { useAdmin, useAdminResource, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
+import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';
 import { EMPTY_DRAFT, type PlanDraft } from './constants';
 import { buildPlanPayload, groupOptions, toDraft } from './utils';
 import { PlanCardGrid } from './PlanCardGrid';
@@ -94,7 +94,6 @@ export function AdminMembershipPlansPage() {
     setCreating(false);
     setEditing(null);
   };
-  const requestCloseForm = useDiscardConfirm(formDirty, resetForm);
 
   const patchDraft = (patch: Partial<PlanDraft>) =>
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -254,7 +253,7 @@ export function AdminMembershipPlansPage() {
         saving={saving}
         groupChoices={groupChoices}
         onPatch={patchDraft}
-        onClose={requestCloseForm}
+        onClose={resetForm}
         onSubmit={() => void submit()}
       />
 

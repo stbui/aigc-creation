@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Gem, Wallet } from 'lucide-react';
 
 import { formatNumber } from './utils';
@@ -29,17 +29,12 @@ export function PackagesHero({ loggedIn, balance }: PackagesHeroProps) {
           </div>
         </div>
         {loggedIn && (
-          <button
-            type="button"
-            className="pkg-shop-balance"
-            onClick={() => navigate('/credits')}
-            title="查看积分明细"
-          >
+          <Link className="pkg-shop-balance" to="/credits" title="查看积分明细">
             <Wallet size={15} aria-hidden />
             <span>当前积分</span>
             <strong>{balance ? formatNumber(balance) : '—'}</strong>
             <ChevronRight size={14} aria-hidden />
-          </button>
+          </Link>
         )}
       </header>
     </>

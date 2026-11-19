@@ -25,12 +25,12 @@ export function ContextBanner({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-2 rounded-lg border border-brand/20 bg-accent px-3.5 py-2.5 text-sm',
+        'flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/60 px-3.5 py-2.5 text-sm',
         className,
       )}
       data-testid="admin-context-banner"
     >
-      <Link2 className="size-4 shrink-0 text-brand" aria-hidden />
+      <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       <span className="min-w-0 flex-1">
         <span className="font-medium text-foreground">{title}</span>
         {detail && <span className="ml-2 text-xs text-muted-foreground">{detail}</span>}
@@ -38,7 +38,7 @@ export function ContextBanner({
       {returnTo && (
         <Link
           to={returnTo}
-          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-brand hover:underline"
+          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-foreground hover:underline"
         >
           <ArrowLeft className="size-3.5" aria-hidden />
           {returnLabel}

@@ -7,13 +7,13 @@
  */
 
 import type { AdminProduct, CreateProductPayload, UpdateProductPayload } from './types';
-import { formatMonthDayTime, formatYuanPlain } from '../../../admin-ui/lib/format';
+import { formatMonthDayTime, formatYuanGrouped, formatYuanPlain } from '~/admin-ui/radar';
 export { adminProductOrdersHref } from '../../../lib/admin-links';
 import { DEFAULT_SORT_ORDER, type ProductCurrency, type ProductDraft } from './constants';
 
 /** 币种符号。商品只有 CNY / USD 两种，不做通用货币库 */
-export { formatNumber } from '../../../admin-ui/lib/format';
-export { cn } from '~/admin-ui/lib/cn';
+export { formatNumber } from '~/admin-ui/radar';
+export { cn } from '~/admin-ui/radar';
 export function currencySymbol(currency: ProductCurrency | string): string {
   return currency === 'USD' ? '$' : '¥';
 }
@@ -55,10 +55,7 @@ export function perCreditYuanText(
  * 不复用 `centsToYuanText` —— 那个函数同时服务表单回填，带逗号会破坏输入框解析。
  */
 export function moneyText(cents: number): string {
-  return (cents / 100).toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return formatYuanGrouped(cents);
 }
 
 /**

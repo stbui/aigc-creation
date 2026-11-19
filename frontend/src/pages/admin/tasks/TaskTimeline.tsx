@@ -33,7 +33,7 @@ export function TaskTimeline({
                   : node.state === 'failed'
                     ? 'border-danger-text bg-danger-soft text-danger-text'
                     : node.state === 'active'
-                      ? 'border-brand bg-accent text-brand'
+                      ? 'border-radar-ink-300 bg-accent text-radar-ink-950'
                       : 'border-border bg-muted text-muted-foreground',
               )}
             >

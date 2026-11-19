@@ -1,4 +1,5 @@
 import { toCredits } from '../../../lib/microcredits';
+import { formatDateTime } from '~/admin-ui/radar';
 export { parseCredits, toCredits, toCreditsInput } from '../../../lib/microcredits';
 export { BILLING_MODE_OPTIONS } from '../../../lib/billing-mode';
 import type {
@@ -26,17 +27,9 @@ export function runtimeTone(effective: AdminCapabilityControl['runtime']['effect
   return 'warn' as const;
 }
 
-export function formatUpdatedAt(value: string | null): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+/** 开关更新时间：统一走后台格式化（固定北京时间，与列表 / 抽屉同口径）。 */
+export function formatUpdatedAt(value: string | null | undefined): string {
+  return formatDateTime(value);
 }
 
 type BindingExecutionFields = {

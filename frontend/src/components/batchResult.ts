@@ -1,4 +1,5 @@
 import type { GalleryItem } from '../hooks/useResultGallery';
+import { formatCompactDateTime } from '../lib/format';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
 /**
@@ -52,11 +53,7 @@ export function batchIndexOf(item: GalleryItem): number {
 
 /** 行头时间: 本地时区 `YYYY-MM-DD HH:mm`; 无值或解析失败返回空串 */
 export function formatBatchDate(iso?: string): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return formatCompactDateTime(iso, { withYear: true, separator: '-', fallback: '' });
 }
 
 /**
