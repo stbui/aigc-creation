@@ -44,7 +44,7 @@ export interface DropdownProps {
   classNames?: { root?: string };
 }
 
-/** antd Dropdown 的兼容壳：menu.items → radix DropdownMenu。 */
+/** 旧版 UI 库 Dropdown 的兼容壳：menu.items → radix DropdownMenu。 */
 export function Dropdown({
   menu,
   children,

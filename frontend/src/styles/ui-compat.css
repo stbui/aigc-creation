@@ -152,7 +152,7 @@
   padding: 0 24px 18px;
 }
 
-/* Radix 弹窗的定点定位 + 旧 antd 类名映射。
+/* Radix 弹窗的定点定位 + 旧版 UI 库类名映射。
    页面级 CSS 仍以 .login-modal / .alp-modal / .mum-modal 等选择器命中，
    这里只补容器定位与关闭按钮，不改这些页面的视觉数值。 */
 

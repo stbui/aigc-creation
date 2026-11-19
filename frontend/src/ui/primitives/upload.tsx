@@ -131,5 +131,5 @@ function UploadInner({
   );
 }
 
-/** antd Upload 的兼容壳：C 端只用 picture-card + 自定义上传逻辑。 */
+/** 旧版 UI 库 Upload 的兼容壳：C 端只用 picture-card + 自定义上传逻辑。 */
 export const Upload = Object.assign(UploadInner, { LIST_IGNORE });

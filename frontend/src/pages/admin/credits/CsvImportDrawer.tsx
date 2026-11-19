@@ -196,7 +196,7 @@ export function CsvImportDrawer({
           note={`共 ${result.total} 行 · 成功 ${result.succeeded} · 失败 ${result.failed}`}
         >
           {/*
-            失败行排在最后 (原 antd 版同样如此): 运营最先要处理的是失败。
+            失败行排在最后 (原 旧版 UI 库版同样如此): 运营最先要处理的是失败。
             结果是纯前端一次返回的, 所以这里做客户端分页 —— 不走 DataTable 的
             `pagination` prop, 那个会带出 20/50/100 的每页条数选择器, 与
             这里每页 10 行的口径打架。

@@ -10,7 +10,7 @@
   min-height: 100vh;
 }
 
-/* 侧栏与内容并排。以前依赖 antd Layout 提供 display:flex, 移除 antd 后
+/* 侧栏与内容并排。以前依赖 旧版 UI 库 Layout 提供 display:flex, 移除 旧版 UI 库后
    只剩 flex-direction 会让 .app-body 退回块级, 内容区被推到侧栏下方
    (视觉上像"主区空白")。display / 方向都显式写在这里。 */
 .app-body {

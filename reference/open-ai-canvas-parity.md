@@ -1207,7 +1207,7 @@
 
 **有意差异（不应当按缺陷计）**
 
-1. 全部后台页面使用本仓 `admin-ui/primitives` + Tailwind，而不是上游 antd/自研 overlay；布局、表单控件、Modal/Drawer 外观不同但语义大多等价。
+1. 全部后台页面使用本仓 `admin-ui/primitives` + Tailwind，而不是上游 旧版 UI 库/自研 overlay；布局、表单控件、Modal/Drawer 外观不同但语义大多等价。
 2. 服务商目录三步向导（`provider-catalog-wizard.tsx`）与 `provider-catalog-pricing.ts` 不做；新增渠道走手填表单。代价是失去「目录带价一键接入」。
 3. 本仓统一调价与删除只保留业务影响确认，不要求人工填写原因。
 4. 本仓把「线路健康」做成独立面板、把「财务分析」做成独立页，属于信息架构重构，不是功能缺失。

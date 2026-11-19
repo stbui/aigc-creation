@@ -50,7 +50,7 @@
   font-weight: 600;
 }
 
-/* 批次状态: 深色前景 + 淡底胶囊, 不再用 antd 预设 success / error 的 2.41:1 绿字
+/* 批次状态: 深色前景 + 淡底胶囊, 不再用 旧版 UI 库预设 success / error 的 2.41:1 绿字
    （Tag 的 DOM 形见文件末尾「状态标签」适配层 .credits-status.ui-tag） */
 .credits-status.is-active {
   color: var(--credits-plus);

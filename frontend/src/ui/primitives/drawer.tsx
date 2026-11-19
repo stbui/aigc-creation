@@ -18,7 +18,7 @@ export interface DrawerProps {
   styles?: { body?: React.CSSProperties };
 }
 
-/** antd Drawer 的兼容壳，侧边方向映射到 shadcn Sheet。 */
+/** 旧版 UI 库 Drawer 的兼容壳，侧边方向映射到 shadcn Sheet。 */
 export function Drawer({
   open,
   title,

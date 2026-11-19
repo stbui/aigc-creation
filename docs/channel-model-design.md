@@ -497,7 +497,7 @@ model: {
 | `/admin/model-calls` | 调用记录（`ApiCallLog` 维度） |
 | `/admin/billing-orders` | 账单：状态、用量、成本、人工核对 |
 
-批量改价规则：`售价 = cost × (1 + markup)`，四舍五入（half-up），单次 ≤ 100 个价格档。全部使用 `admin-ui` 组件与 `DataTable`，不引 antd，不做移动端适配。
+批量改价规则：`售价 = cost × (1 + markup)`，四舍五入（half-up），单次 ≤ 100 个价格档。全部使用 `admin-ui` 组件与 `DataTable`，不引 旧版 UI 库，不做移动端适配。
 
 ### 9.2 C 端
 

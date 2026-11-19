@@ -30,7 +30,7 @@ export interface SelectProps {
   'aria-label'?: string;
 }
 
-/** antd Select 的兼容壳：options / value / onChange 语义保持不变。 */
+/** 旧版 UI 库 Select 的兼容壳：options / value / onChange 语义保持不变。 */
 export function Select({
   value,
   defaultValue,

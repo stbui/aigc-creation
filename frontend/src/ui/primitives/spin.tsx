@@ -1,6 +1,6 @@
 import { cn } from '../lib/cn';
 
-/** antd Spin 的兼容件：尺寸/颜色沿用项目已有的 `.state-spinner`。 */
+/** 旧版 UI 库 Spin 的兼容件：尺寸/颜色沿用项目已有的 `.state-spinner`。 */
 export function Spin({
   size = 'default',
   className,

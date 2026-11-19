@@ -132,7 +132,7 @@ export function useToolPageTask(def: CapabilityDef, form: FormInstance) {
     return outcome.task;
   }
 
-  /** antd 兼容 Upload 的 beforeUpload：校验后走自身上传逻辑 */
+  /** 旧版 UI 库兼容 Upload 的 beforeUpload：校验后走自身上传逻辑 */
   const beforeUpload = async (file: File): Promise<boolean | string> => {
     if (generating) return Upload.LIST_IGNORE;
     if (!isSupportedImageFile(file)) {

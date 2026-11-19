@@ -125,7 +125,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
     };
   }, []);
 
-  // 弹窗打开时把焦点落到账号输入框 (antd Modal 默认会聚焦第一个可聚焦元素 = 激活 tab),
+  // 弹窗打开时把焦点落到账号输入框 (旧版 UI 库 Modal 默认会聚焦第一个可聚焦元素 = 激活 tab),
   // 用户可直接敲键盘; 关闭时归还焦点由 Modal 处理。
   useEffect(() => {
     const t = window.setTimeout(() => emailRef.current?.focus(), 60);

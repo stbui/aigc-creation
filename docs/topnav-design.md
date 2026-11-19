@@ -34,7 +34,7 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 | 布局 | flex，gap 24，`align-items: center` |
 | 行高 | `normal` |
 
-`line-height: normal` 是必需的：旧 antd `<Header>` 曾默认 `line-height: 64px` 并被继承；顶栏已改为原生 `header`，仍显式写 `normal`，否则会被 `.app-quota` / 用户菜单继承，把行盒撑到 64px 再加 padding 即 72px，上下各溢出 4px。
+`line-height: normal` 是必需的：旧版 UI 库 `<Header>` 曾默认 `line-height: 64px` 并被继承；顶栏已改为原生 `header`，仍显式写 `normal`，否则会被 `.app-quota` / 用户菜单继承，把行盒撑到 64px 再加 padding 即 72px，上下各溢出 4px。
 
 ### 2.2 品牌区
 

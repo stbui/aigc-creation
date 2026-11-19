@@ -188,7 +188,7 @@
 
 /* 输入框样式交给组件自身: 再叠一层 border/padding 会与字数统计、缩放手柄打架 */
 /* 字数统计默认绝对定位在输入框下沿, 会压到按钮行上; 改常规流内右对齐。
-   兼容壳输出的是 .login-textarea-count（.ant-input-data-count 已随 antd 移除）。 */
+   兼容壳输出的是 .login-textarea-count（.ant-input-data-count 已随 旧版 UI 库移除）。 */
 .ticket-compose .login-textarea-count,
   .ticket-reply .login-textarea-count {
   position: static;

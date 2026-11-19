@@ -36,7 +36,7 @@ function getRowKey<T>(row: T, rowKey: TableProps<T>['rowKey'], index: number) {
   return String(index);
 }
 
-/** antd Table 的兼容壳：只支持 C 端现有的只读表格形态。 */
+/** 旧版 UI 库 Table 的兼容壳：只支持 C 端现有的只读表格形态。 */
 export function Table<T>({
   columns,
   dataSource = [],

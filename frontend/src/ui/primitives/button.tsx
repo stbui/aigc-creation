@@ -5,15 +5,15 @@ import { cn } from '../lib/cn';
 type ShadcnProps = React.ComponentProps<typeof ShadcnButton>;
 
 export interface ButtonProps extends Omit<ShadcnProps, 'variant' | 'size' | 'type'> {
-  /** antd 兼容: primary / default / text / link / dashed */
+  /** 旧版 UI 库兼容: primary / default / text / link / dashed */
   type?: 'primary' | 'default' | 'text' | 'link' | 'dashed';
-  /** antd 兼容: htmlType 映射为原生 type */
+  /** 旧版 UI 库兼容: htmlType 映射为原生 type */
   htmlType?: 'button' | 'submit' | 'reset';
-  /** antd 兼容: block 撑满父宽 */
+  /** 旧版 UI 库兼容: block 撑满父宽 */
   block?: boolean;
-  /** antd 兼容: loading 时禁用并显示转圈 */
+  /** 旧版 UI 库兼容: loading 时禁用并显示转圈 */
   loading?: boolean;
-  /** antd 兼容: 图标节点 */
+  /** 旧版 UI 库兼容: 图标节点 */
   icon?: React.ReactNode;
   size?: 'small' | 'middle' | 'large' | ShadcnProps['size'];
   danger?: boolean;
@@ -37,7 +37,7 @@ function normalizeSize(size: ButtonProps['size']) {
   return size;
 }
 
-/** antd Button 的兼容壳：保留业务类名，内部用 shadcn Button。 */
+/** 旧版 UI 库 Button 的兼容壳：保留业务类名，内部用 shadcn Button。 */
 export function Button({
   type = 'default',
   htmlType = 'button',

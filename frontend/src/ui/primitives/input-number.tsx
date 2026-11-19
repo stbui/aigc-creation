@@ -16,7 +16,7 @@ export interface InputNumberProps {
   onPressEnter?: () => void;
 }
 
-/** antd InputNumber 的兼容壳：允许清空，越界值交给 min/max。 */
+/** 旧版 UI 库 InputNumber 的兼容壳：允许清空，越界值交给 min/max。 */
 export function InputNumber({
   value,
   defaultValue,

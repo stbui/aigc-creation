@@ -207,7 +207,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | 页面 | `pages/admin/` 33 个页面 + `channels/`、`payments/`、`payment-rules/` 子目录 |
 | 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
 | 类型 | `types/api.d.ts` 的 `Admin*` 段 |
-| 组件 | 业务页面只从 `admin-ui/radar` 取件（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），共享实现由 Radar barrel 透传，底层是 shadcn 原子件；后台树内不引 antd，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |
+| 组件 | 业务页面只从 `admin-ui/radar` 取件（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），共享实现由 Radar barrel 透传，底层是 shadcn 原子件；后台树内不引 旧版 UI 库，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |
 | 样式 | 外壳用 `tokens.css` / `admin.css` 的品牌紫语义，业务内容用 `radar-admin.css` 的 Radar 令牌；禁裸 hex，不做移动端适配 |
 
 ## 7. 明确不做

@@ -18,7 +18,7 @@ export interface SwitchProps {
   'aria-label'?: string;
 }
 
-/** antd Switch 的兼容壳。 */
+/** 旧版 UI 库 Switch 的兼容壳。 */
 export function Switch({
   checked,
   defaultChecked,

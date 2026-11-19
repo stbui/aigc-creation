@@ -15,7 +15,7 @@ export interface SliderProps {
   onChangeComplete?: (value: number) => void;
 }
 
-/** antd Slider 的兼容壳：单值场景，保留 min/max/step 与 onChange 语义。 */
+/** 旧版 UI 库 Slider 的兼容壳：单值场景，保留 min/max/step 与 onChange 语义。 */
 export function Slider({
   min = 0,
   max = 100,

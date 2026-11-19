@@ -180,7 +180,7 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 层 | 规范 |
 | --- | --- |
 | 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（shadcn `Sidebar` 组合：全高侧栏 + 内容区顶栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail`（C 端语义） |
-| 组件底座 | 业务页面**只从 `admin-ui/radar` 取件**（`AdminPage` / `PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / 表单控件 / `AdminDataTable`），内容层使用 freebie-radar 中性令牌；外壳保留品牌紫。后台树内**不引 antd**，也不要把通用组件退回自绘 `div/button/input`。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增 |
+| 组件底座 | 业务页面**只从 `admin-ui/radar` 取件**（`AdminPage` / `PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / 表单控件 / `AdminDataTable`），内容层使用 freebie-radar 中性令牌；外壳保留品牌紫。后台树内**不引 旧版 UI 库**，也不要把通用组件退回自绘 `div/button/input`。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增 |
 | 侧栏 | 分组折叠菜单，图标 lucide 16px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 批量条（可选）→ 表格 → 分页；`rowKey={row => row.id}`，默认行高 44px、分页 20 条 |
 | 详情 | 一律浮层、不跳独立路由，便于保留筛选态；抽屉 520 / 640 / 760 / 1080，默认 640（`AdminDrawer` 默认 760）；并排区块 / 大图预览用弹窗 520 / 720 / 960 / 1200，默认 720（`AdminModal` 默认 960） |

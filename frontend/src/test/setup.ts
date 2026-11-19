@@ -8,7 +8,7 @@ import { cleanup } from '@testing-library/react';
  * React Testing Library 在 vitest 未开 `globals` 时不会自动注册 cleanup，
  * 这里显式清理，避免同一文件内的用例互相看到对方渲染的 DOM。
  *
- * 其余 mock 是 antd / 响应式组件在 jsdom 下的必需品：jsdom 没实现
+ * 其余 mock 是 旧版 UI 库 / 响应式组件在 jsdom 下的必需品：jsdom 没实现
  * matchMedia、ResizeObserver 与 scrollIntoView，不补会在渲染时抛
  * "not a function"，让组件测试看起来像业务回归。
  */

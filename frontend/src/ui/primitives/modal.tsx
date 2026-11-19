@@ -18,7 +18,7 @@ export interface ModalProps {
   okText?: string;
   cancelText?: string;
   width?: number | string;
-  /** antd 兼容：false 时按顶部定位，true（本项目既有默认）时垂直居中。 */
+  /** 旧版 UI 库兼容：false 时按顶部定位，true（本项目既有默认）时垂直居中。 */
   centered?: boolean;
   /** Radix 默认在关闭时卸载内容；显式传 false 可保留 DOM 状态。 */
   destroyOnHidden?: boolean;
@@ -33,14 +33,14 @@ export interface ModalProps {
   cancelButtonProps?: { disabled?: boolean };
   className?: string;
   styles?: { body?: CSSProperties; mask?: CSSProperties; container?: CSSProperties };
-  /** antd 6 兼容：`mask={{ closable }}` */
+  /** 旧版 UI 库兼容：`mask={{ closable }}` */
   mask?: { closable?: boolean };
   keyboard?: boolean;
   closeIcon?: ReactNode;
 }
 
 /**
- * antd Modal 的兼容壳。
+ * 旧版 UI 库 Modal 的兼容壳。
  *
  * 标题与关闭按钮交给 radix Dialog；内容区沿用调用方已有的 className / styles，
  * 让 `.mum-modal`、`.login-modal` 等页面级样式仍然命中。

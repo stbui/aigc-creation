@@ -192,7 +192,7 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
       closeIcon={null}
       styles={{
         body: { padding: 0 },
-        // 参考站 backdrop: #14122180 (不带模糊)。antd 默认是 45% 纯黑, 比参考站更重。
+        // 参考站 backdrop: #14122180 (不带模糊)。旧版 UI 库默认是 45% 纯黑, 比参考站更重。
         mask: { background: 'var(--overlay-mask-soft)' },
       }}
       title={null}

@@ -25,7 +25,7 @@
 | D7 | 存储扩容商品（`kind=storage`）**不进本轮**，页面保留该选项但禁用并说明原因 | 本仓库没有存储配额与上传容量校验，先做会变成「卖了容量但不限流」的假功能 |
 | D8 | 支付通知收件箱 + **独立 15s worker**；不复用 10 分钟一次的 `SchedulerService.tick()` | 现有调度间隔是 10 分钟（`scheduler.service.ts:11`），用它消费回调会把「已付款」晾十分钟 |
 | D9 | 对账新建 `PaymentReconciliationRun/Item`，旧 `ReconciliationBatch/Item` 停止写入 | 新模型需要「每个渠道每天一次运行、自动补发、失败原因」；旧模型是人工导入批次，语义不同 |
-| D10 | 后台页面使用本仓库 shadcn + `admin-ui` 原语，**不引入 antd** | 后台 32 页已统一为 shadcn；参考页的 antd 组件只作为交互参照，不照搬实现 |
+| D10 | 后台页面使用本仓库 shadcn + `admin-ui` 原语，**不引入 旧版 UI 库** | 后台 32 页已统一为 shadcn；参考页的 旧版 UI 库组件只作为交互参照，不照搬实现 |
 
 > 仍未定的两项（建议按上表执行，评审时只需确认）：
 > 1. **USD 商品是否本轮开放**：建议开放字段与校验，但没有支持 USD 的渠道时前后端都拒绝上架/支付；
@@ -123,7 +123,7 @@ OrderService.create()                      订单快照 + 优惠 + 幂等键    
 | 回调 | `/api/payments/notify/:provider/:configId` | `/api/v1/payment/webhook/:channel` | 固定 URL 由订单历史 Payment 反查下单时的配置版本；旧带 `configId` 路由保留兼容 |
 | 后端 worker | 15s 独立循环 | 15s `PaymentWorkerService` | 不用 10 分钟的调度器 |
 | 对账 | `PaymentReconciliationRun/Item` | 同名新表，替换旧批次表 | 旧表只读保留一个版本周期 |
-| 后台 UI | antd + 自定义 admin-ui | shadcn + `admin-ui` | 视觉语言按本仓库，不引 antd |
+| 后台 UI | 旧版 UI 库 + 自定义 admin-ui | shadcn + `admin-ui` | 视觉语言按本仓库，不引 旧版 UI 库 |
 | 退款 | 本页不提供 | 保留在订单管理 | 参考页的「平台不提供支付退款」提示需改写（本仓库有退款） |
 | 存储商品 | 支持 | 本轮不做，选项禁用 | 缺配额子系统 |
 
@@ -920,7 +920,7 @@ npm run check
 
 ## 14. 验收标准
 
-- [ ] `/admin/payments` 四个标签页与参考页的信息架构、列、抽屉、筛选、分页、导出一致；使用 shadcn，无 antd 新引用。
+- [ ] `/admin/payments` 四个标签页与参考页的信息架构、列、抽屉、筛选、分页、导出一致；使用 shadcn，无 旧版 UI 库新引用。
 - [ ] 渠道配置可保存新版本；密钥不回显；历史订单固定版本；回调 configId 与订单一致。
 - [ ] 多渠道同时可用；C 端可选择支付方式；缺凭据 503，不降级沙箱；生产过滤沙箱。
 - [ ] 查单/关单顺序正确；关单前已支付会入账；失败保持 pending 并可重试。
@@ -953,7 +953,7 @@ npm run check
 - 页面事实源：`open-ai-canvas/web/src/pages/admin/payments/payments-page.tsx`。参考站当前不可达，因此复刻依据是源码中的列、筛选、抽屉、空态、导出与按钮启用条件，不以截图猜测。
 - 后端事实源：`open-ai-canvas/backend/internal/app/payment*.go` 与 `backend/payment-plugins/`；协议细节仍以支付宝/微信官方文档为准。
 - 本仓库现状事实源：`backend/src/payments/*`、`backend/src/orders/order.service.ts`、`backend/prisma/schema.prisma`、`frontend/src/admin-ui/*`。
-- “完整复刻”的范围是四个标签页的**信息架构与可操作项**：列、工具栏、筛选口径、分页、导出、详情/配置/商品抽屉、五态与按钮禁用条件。视觉不照搬 antd，改用本仓库 shadcn 原语；不新增 antd 引用。
+- “完整复刻”的范围是四个标签页的**信息架构与可操作项**：列、工具栏、筛选口径、分页、导出、详情/配置/商品抽屉、五态与按钮禁用条件。视觉不照搬 旧版 UI 库，改用本仓库 shadcn 原语；不新增 旧版 UI 库引用。
 - 本轮仍不实现存储扩容商品、聚合支付渠道、支付页内退款。
 
 ### 16.2 参考字段到本仓库字段的映射
@@ -2517,7 +2517,7 @@ frontend/tests/admin-payments.spec.ts
 
 约束：
 
-- 只引用 `frontend/src/admin-ui/*`、`lucide-react`；不新增 antd 引用。
+- 只引用 `frontend/src/admin-ui/*`、`lucide-react`；不新增 旧版 UI 库引用。
 - 不新增状态管理库；列表状态用现有 `useAdminList` / `useAdminResource`，页签状态直接用 URL。
 - 金额格式化统一 `${currency === 'USD' ? '$' : '¥'}${(cents / 100).toFixed(2)}`；积分整数用千分位。
 
@@ -3396,7 +3396,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - 参考文件：`open-ai-canvas/web/src/pages/admin/payments/payments-page.tsx`（1180 行）与其引用的 `admin-ui` 组件；以当前工作区版本为准。
 - 「一致」指：标签顺序、可见文案、列顺序与含义、筛选默认值、空/错/加载态、抽屉标题与宽度、按钮可用条件一致。
 - 「偏差」指：本仓库没有对应概念，或照搬会与本仓库安全/资金规则冲突；每一条都必须登记，不能默默改。
-- 视觉上使用 shadcn + `admin-ui` 原语，不追求与 antd 像素级相同；间距、圆角、字体跟随现有后台页面。
+- 视觉上使用 shadcn + `admin-ui` 原语，不追求与 旧版 UI 库像素级相同；间距、圆角、字体跟随现有后台页面。
 
 ### 24.2 逐屏对照
 
@@ -3423,7 +3423,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 | 对账空态 | 「还没有对账记录」 | 同 | 一致 |
 | 对账明细 | 1080 宽；结果筛选、刷新、导出、分页 | 同；默认 50/页；失败 run 顶部展示 error | 一致 |
 | 明细空态 | failed→「本次对账未生成明细」，否则「账单没有交易记录」 | 同 | 一致 |
-| 五态 | antd message + 表格 loading/empty | `AdminListLoading/AdminListError/AdminStaleError/EmptyState` + 403 页 | 一致 + 组件化 |
+| 五态 | 旧版 UI 库 message + 表格 loading/empty | `AdminListLoading/AdminListError/AdminStaleError/EmptyState` + 403 页 | 一致 + 组件化 |
 
 ### 24.3 有意偏差登记
 
@@ -3433,7 +3433,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 | E2 | 渠道状态去掉「插件已开放/停用」副行，空态去掉「插件」二字 | 本仓库支付是适配器注册表，没有宿主插件运行时 | 不影响操作 |
 | E3 | 积分显示整数，不显示 6 位小数微积分 | 本仓库积分域是整数（D6） | 金额/权益列格式 |
 | E4 | 存储扩容选项保留但禁用 | 没有配额子系统（D7） | 商品抽屉 |
-| E5 | 日期用两个原生 date，而非 RangePicker | 后台 31 页统一用原生 date；不引入 antd | 交互等价 |
+| E5 | 日期用两个原生 date，而非 RangePicker | 后台 31 页统一用原生 date；不引入 旧版 UI 库 | 交互等价 |
 | E6 | 订单状态 8 个（增加已退款/部分退款） | 参考页没有退款态，但不映射会让退款单显示成已入账 | 状态筛选 |
 | E7 | 点用户跳 `/admin/users?id=`，不内嵌用户抽屉 | 用户详情抽屉目前内嵌在 `AdminUsersPage`，未抽成可复用组件；不为一个入口做跨页重构 | 多一次跳转 |
 | E8 | 订单详情增加 payments 历史、配置版本、失败原因 | 参考页缺少排障信息；本仓库有这些数据 | 详情更完整 |
@@ -3460,7 +3460,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - 对账结果颜色：一致 success、已自动补发 info、其余异常 danger。
 - 行操作只显示当前状态可执行项：已入账/已关闭只剩详情；关单只出现在 created/pending/create_failed/closing。
 - 页面不出现退款按钮；退款链接指向 `/admin/orders?orderNo=...`。
-- 不引入 antd；不出现 `amountFen`、`creditsMicrocredits` 等参考实现字段名。
+- 不引入 旧版 UI 库；不出现 `amountFen`、`creditsMicrocredits` 等参考实现字段名。
 
 ### 24.5 验收步骤
 
@@ -3480,7 +3480,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - 参考页每个可见字符串都能在 §24.2 找到「一致」或 §24.3 的偏差编号；没有未登记的改动。
 - 四个标签均可 URL 直达，刷新不丢筛选与详情。
 - 三档权限、五态、八个订单状态、八种对账结果都有可见验收记录。
-- 不新增 antd、不新增状态管理库；组件全部复用 `admin-ui`/shadcn。
+- 不新增 旧版 UI 库、不新增状态管理库；组件全部复用 `admin-ui`/shadcn。
 - 浏览器控制台无未处理异常，接口失败时页面保留旧数据并给出可重试提示。
 - 截图与验收记录附在 PR 描述中；偏差项由产品/设计确认后再合并。
 
@@ -3575,7 +3575,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 
 - **不新建 `PaymentOrder` / `TopupProduct` 表**：复用 `Order` / `Product`，避免打断优惠券、会员、退款、发票、积分回收链路（D1）。
 - **不引入微积分**：本仓库积分为整数，参考实现 `creditsMicrocredits` 不适用（D6）。
-- **不引入 antd**：后台继续用 shadcn / `admin-ui`（D10）。
+- **不引入 旧版 UI 库**：后台继续用 shadcn / `admin-ui`（D10）。
 - **插件运行时不是当前阻塞项**：只接支付宝/微信时内置适配器足够；接聚合支付或插件市场时再立项。
 
 ### 25.7 建议实施顺序

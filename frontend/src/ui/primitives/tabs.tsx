@@ -25,7 +25,7 @@ export interface TabsProps {
   tabBarAriaLabel?: string;
 }
 
-/** antd Tabs 的兼容壳：items[].key/label/children。 */
+/** 旧版 UI 库 Tabs 的兼容壳：items[].key/label/children。 */
 export function Tabs({
   activeKey,
   defaultActiveKey,
@@ -43,7 +43,7 @@ export function Tabs({
       className={className}
     >
       {/*
-        线形页签（antd 默认观感）：C 端页签都是页面级导航，不用 shadcn 默认的灰底胶囊。
+        线形页签（旧版 UI 库默认观感）：C 端页签都是页面级导航，不用 shadcn 默认的灰底胶囊。
         宽度交给内容本身，`w-full` 会把两个页签拉成半屏宽的开关。
       */}
       <TabsList

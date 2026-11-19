@@ -12,7 +12,7 @@ export interface PaginationProps {
   className?: string;
 }
 
-/** antd Pagination 的兼容壳：保留 current / pageSize / total 语义。 */
+/** 旧版 UI 库 Pagination 的兼容壳：保留 current / pageSize / total 语义。 */
 export function Pagination({
   current = 1,
   pageSize = 20,

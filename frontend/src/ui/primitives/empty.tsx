@@ -7,7 +7,7 @@ export interface EmptyProps {
   children?: ReactNode;
 }
 
-/** antd Empty 的兼容壳。 */
+/** 旧版 UI 库 Empty 的兼容壳。 */
 export function Empty({ description = '暂无数据', className, children }: EmptyProps) {
   return (
     <div className={className ? `ui-empty ${className}` : 'ui-empty'} role="status">

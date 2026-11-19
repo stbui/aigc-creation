@@ -48,7 +48,7 @@
 | `json-canonicalize` | 仅当客户端需要本地计算摘要时使用；当前设计摘要只在服务端算，可暂不引入 |
 | `leafer-ui` | 连线/选择/覆盖层渲染（按上游用法） |
 
-`antd` 不引入。上游的 `App.useApp()`、`Button`、`Input`、`Modal`、`InputNumber`、`Popover`、`Dropdown`、`Slider`、`Segmented`、`ColorPicker` 全部按 `canvas-port-design.md` §7 F2 的清单替换为 shadcn / 自持 primitives。
+`旧版 UI 库` 不引入。上游的 `App.useApp()`、`Button`、`Input`、`Modal`、`InputNumber`、`Popover`、`Dropdown`、`Slider`、`Segmented`、`ColorPicker` 全部按 `canvas-port-design.md` §7 F2 的清单替换为 shadcn / 自持 primitives。
 
 ## 3. P0 基础设施改造
 
@@ -938,7 +938,7 @@ interface CanvasNodeDefinition {
 
 新增节点类型只改注册表，不改 `project.tsx`。
 
-### 12.7 antd → shadcn 替换
+### 12.7 旧版 UI 库 → shadcn 替换
 
 | 上游用法 | 次数 | 本仓落点 |
 | --- | --- | --- |
@@ -1160,7 +1160,7 @@ Agent run、工具、审批、SSE、`canvas_updated`、撤销、记忆；creatio
 | 隐藏项目暴露 | 工作台项目列表出现「画布 xxx」 | `Project.origin` + 列表过滤；不要靠名称前缀 |
 | WS 票据 / 设备号存储 | Redis 缺失时票据与设备号无法分配（已取消内存回退） | 生产由启动门禁 + `/health/ready` 探针拦截；dev / test 降级不影响交付 |
 | 4 MiB 文档 + 5 MiB 请求 | Nginx / Express 默认 100KB 会 413 | `main.ts` 对该路由单独放宽 body limit；Nginx `client_max_body_size`；WS 不入 HTTP body |
-| 上游 9,673 行 CSS 与 antd | 替换遗漏、样式回退 | 先产出 antd 使用清单；CI 禁止 `from 'antd'`；按页面逐步替换 |
+| 上游 9,673 行 CSS 与 旧版 UI 库 | 替换遗漏、样式回退 | 先产出 旧版 UI 库使用清单；CI 禁止引入旧版 UI 库；按页面逐步替换 |
 | Agent / 3D 体量大 | 拖累核心里程碑 | M6 独立排队；7 张表不提前塞 Agent 字段 |
 | 公开分享泄露 | token、storageKey、任务字段外泄 | 白名单投影 + 资源 allow-list + `nosniff` + CSP + 限流 |
 | 单人排期失真 | 495–725 人日不可压缩 | M0–M3 至少 2 后端 + 2 前端；按里程碑验收，不按人日承诺 |

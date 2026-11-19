@@ -16,7 +16,7 @@ interface Props {
 /**
  * 登录弹窗 —— 复刻参考站「顶栏登录/注册按钮 → 遮罩弹窗」的唤起方式。
  *
- * 参考站的遮罩是 `.auth-overlay`(暗色半透明 + 居中), 本地用 antd Modal 承载,
+ * 参考站的遮罩是 `.auth-overlay`(暗色半透明 + 居中), 本地用 旧版 UI 库 Modal 承载,
  * 但**内容区尺寸与 AuthCard 完全一致** (840×478), 视觉与 `/login` 独立页同源同实现。
  */
 export function LoginModal({ open, onClose, authEpoch }: Props) {

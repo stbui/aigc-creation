@@ -5,7 +5,7 @@ import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
  * 后台布局回归。
  *
  * 守住两个曾经出过的问题:
- *   1. antd Layout 默认 column → 侧栏与内容竖排重叠(内容未扣侧栏宽度)
+ *   1. 旧版 Layout 默认 column → 侧栏与内容竖排重叠(内容未扣侧栏宽度)
  *   2. 操作列平铺过多动作 → 换行把行高从 44 撑到 51+
  *
  * 断言用几何量测而非截图比对 —— 截图会被无关的样式改动弄红,

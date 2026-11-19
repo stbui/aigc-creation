@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '../lib/cn';
 
-/* antd 的展示型小件兼容层。C 端只使用最朴素的形态。 */
+/* 旧版 UI 库的展示型小件兼容层。C 端只使用最朴素的形态。 */
 
 export function Tag({
   children,

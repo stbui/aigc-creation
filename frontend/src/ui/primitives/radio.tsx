@@ -113,7 +113,7 @@ function RadioButton({ value, children, className, disabled, onChange }: RadioPr
   );
 }
 
-/** antd Radio / Radio.Group / Radio.Button 的兼容壳。 */
+/** 旧版 UI 库 Radio / Radio.Group / Radio.Button 的兼容壳。 */
 export const Radio = Object.assign(RadioItem, {
   Group: RadioGroup,
   Button: RadioButton,

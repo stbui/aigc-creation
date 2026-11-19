@@ -7,7 +7,7 @@ type ShadcnProps = React.ComponentProps<typeof ShadcnInput>;
 export interface InputProps extends Omit<ShadcnProps, 'size' | 'prefix'> {
   prefix?: React.ReactNode;
   suffix?: React.ReactNode;
-  /** antd 兼容 */
+  /** 旧版 UI 库兼容 */
   allowClear?: boolean;
   size?: 'small' | 'middle' | 'large';
   onPressEnter?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -51,7 +51,7 @@ function InputBase({
   );
 }
 
-/** antd Input 的兼容壳，含 `.Password` / `.TextArea`。 */
+/** 旧版 UI 库 Input 的兼容壳，含 `.Password` / `.TextArea`。 */
 export const Input = Object.assign(InputBase, {
   Password: function Password(props: Omit<InputProps, 'type'>) {
     return <InputBase {...props} type="password" />;

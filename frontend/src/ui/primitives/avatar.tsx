@@ -9,7 +9,7 @@ export interface AvatarProps {
   alt?: string;
 }
 
-/** antd Avatar 的兼容壳（C 端只使用文字头像）。 */
+/** 旧版 UI 库 Avatar 的兼容壳（C 端只使用文字头像）。 */
 export function Avatar({ size = 32, className, children, src, alt }: AvatarProps) {
   return (
     <span

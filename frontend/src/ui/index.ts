@@ -31,7 +31,7 @@ export { UiDialog } from './primitives/dialog';
 export { ToggleGroup, type ToggleGroupOption, type ToggleGroupProps } from './primitives/toggle-group';
 export { Form, FormItem, useForm, useWatch, type FormInstance } from './primitives/form';
 
-/* shadcn 组合式原子件的 C 端别名：避免与 antd 兼容壳 Card 同名冲突。 */
+/* shadcn 组合式原子件的 C 端别名：避免与 旧版 UI 库兼容壳 Card 同名冲突。 */
 export {
   Card as Surface,
   CardHeader as SurfaceHeader,

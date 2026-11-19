@@ -28,12 +28,12 @@
 ### 1.2 已定技术口径
 
 1. **数据库与缓存：PostgreSQL + Redis**。不保留 SQLite 双轨。**Redis 是生产硬依赖**：`REDIS_URL` 非空、scheme 合法且连通才允许生产启动，`/health/ready` 纳入 Redis 探针；「单实例内存 Hub + 前端 2 秒轮询」降级仅允许 development / test。多实例下的全局限流、缓存失效广播、定时任务分布式锁一并收敛到 Redis。
-2. **前端：shadcn 重画**。不引入 antd，不保留两套 UI 体系。
+2. **前端：shadcn 重画**。不引入 旧版 UI 库，不保留两套 UI 体系。
 3. **Agent 与 3D 扩展排在最后实现**，但属于最终交付范围，不做功能裁剪。
 
 ### 1.3 不照搬的部分
 
-- 上游 Go/Gin/GORM、cookie session、antd 6、React Query 列表页外壳不照搬，按本仓 NestJS/Prisma/JWT/shadcn 改写。
+- 上游 Go/Gin/GORM、cookie session、旧版 UI 库、React Query 列表页外壳不照搬，按本仓 NestJS/Prisma/JWT/shadcn 改写。
 - 上游遗留的死代码 `internal/model/canvas_extensions.go`、`repository/canvas_extensions.go` 不迁移。
 - 上游 `yingce:*` 本地存储键不沿用；本仓是新增功能，无存量草稿，直接使用新命名空间。
 
@@ -52,7 +52,7 @@
 | 前端画布测试 | 132 个 / 14,272 行（89 个为纯逻辑测试） |
 | 画布专属表 | 7 张 |
 
-可复用部分：`lib/canvas` 纯逻辑约 2.4 万行、核心渲染 8 个文件约 4,800 行、同步/生成服务约 6,000 行、89 个纯逻辑测试。这些都不依赖 antd。
+可复用部分：`lib/canvas` 纯逻辑约 2.4 万行、核心渲染 8 个文件约 4,800 行、同步/生成服务约 6,000 行、89 个纯逻辑测试。这些都不依赖 旧版 UI 库。
 
 ## 3. 目标架构
 
@@ -268,7 +268,7 @@ PostgreSQL + Prisma。所有表带 `ownerId`，所有查询必须带 `ownerId` �
 - 全部节点类型、36 个属性/编辑弹窗、批量表格、分镜、脚本、资产托盘、工作台面板。
 - 拆分上游 3,700 行的 `project.tsx`。
 - 9,673 行画布 CSS 迁入本仓令牌体系。
-- antd 组件替换：`App.useApp()` 49 处、Button 56、Input 36、Modal 20、InputNumber 11、Popover 10、Dropdown 10、Slider 6、Segmented 6、ColorPicker 5。
+- 旧版 UI 库组件替换：`App.useApp()` 49 处、Button 56、Input 36、Modal 20、InputNumber 11、Popover 10、Dropdown 10、Slider 6、Segmented 6、ColorPicker 5。
 - 需新增的 shadcn 件：`command`、`resizable`、`scroll-area`、`toggle-group`；手写 `color-picker`、`number-input` 到 primitives。
 
 ### F3 前端业务扩展（80–115 人日）
@@ -356,7 +356,7 @@ Agent 与 3D 扩展按要求排在最后；此前里程碑不减少最终功能�
 | --- | --- |
 | Postgres 迁移影响全仓（备份、测试、脚本） | 独立 M0，先完成并演练，再开始画布 |
 | 摘要跨语言不稳定 | canonical JSON + 版本号；迁移窗口不复用旧回执 |
-| antd 替换量大且易漏 | 先产出 49 处 `App.useApp()` 清单，CI 禁止 `from 'antd'` |
+| 旧版 UI 库替换量大且易漏 | 先产出 49 处 `App.useApp()` 清单，CI 禁止引入旧版 UI 库 |
 | 上游无历史 HTTP 接口 | 按新增接口排期，不按「已有历史」估 |
 | 生成链路两套模型 | 能力定义单一事实源，禁止画布私建 task |
 | Agent / 3D 域体量大 | 独立工作流，排在最后，画布核心不被绑死 |

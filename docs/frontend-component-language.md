@@ -417,7 +417,7 @@ C 端日期按展示密度选择 `frontend/src/lib/format.ts`：`formatDate` 只
 
 ## 15. 已知缺口
 
-- C 端 `Button` 仍保留 antd 风格兼容参数，存在 `type` / `variant` 两套外观入口；新组件不应继续复制这种双轨 API，存量收敛需单独评估。
+- C 端 `Button` 仍保留 旧版 UI 库风格兼容参数，存在 `type` / `variant` 两套外观入口；新组件不应继续复制这种双轨 API，存量收敛需单独评估。
 - C 端 `Badge` 表示数字角标，后台 `Badge` / `RadarBadge` 表示标签；同名词的职责需要根据公开入口理解，跨端新增组件必须使用更明确的名称。
 - `className` 与 `style` 仍可在调用点覆盖部分视觉，`verify:conventions` 目前只强制最小字号等少数规则，组件 API 约束主要依赖评审。
 - 公开入口尚无统一的 API 契约快照或禁止直连检查；新增组件仍需测试与人工核对。

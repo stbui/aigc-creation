@@ -8,7 +8,7 @@ export interface BadgeProps {
   className?: string;
 }
 
-/** antd Badge 的兼容壳：C 端只使用数字角标。 */
+/** 旧版 UI 库 Badge 的兼容壳：C 端只使用数字角标。 */
 export function Badge({ count, dot, children, className }: BadgeProps) {
   const show = dot || (count !== undefined && count > 0);
   return (

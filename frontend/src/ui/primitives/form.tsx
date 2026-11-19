@@ -17,10 +17,10 @@ import { cn } from '../lib/cn';
 /**
  * C 端表单兼容层。
  *
- * 保留 antd Form 最常用的三件事：字段收集、提交校验、布局。
+ * 保留 旧版 UI 库 Form 最常用的三件事：字段收集、提交校验、布局。
  * 控件值通过 FormItem 注入；未注入时仍可完全受控使用。
  *
- * 与 antd 的一处关键差异：`useForm()` 返回的是**稳定的外部实例**，
+ * 与 旧版 UI 库的一处关键差异：`useForm()` 返回的是**稳定的外部实例**，
  * 值存放在实例自己的 store 里（`useSyncExternalStore` 订阅），而不是
  * 只活在 `<Form>` 内部。这样 `useWatch` / `form.getFieldValue` 在
  * `<Form>` 之外（如 AuthCard 的「发送验证码」）也能读到用户刚输入的值。
@@ -388,7 +388,7 @@ export function FormItem({
  * 把 `value` / `onChange` 注入到可受控的元素里。
  *
  * FormItem 的子节点经常是布局容器（例如登录验证码的 `.login-code-row`
- * 里同时放输入框和「获取验证码」按钮）。antd 只克隆直接子元素，容器
+ * 里同时放输入框和「获取验证码」按钮）。旧版 UI 库只克隆直接子元素，容器
  * 本身不消费 value，输入框就永远拿不到值。这里对 DOM 容器向下找到
  * **第一个组件节点**再注入，同时保持按钮等兄弟节点不受影响。
  */

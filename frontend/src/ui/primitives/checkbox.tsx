@@ -9,7 +9,7 @@ export interface CheckboxProps
   onChange?: (event: { target: { checked: boolean } }) => void;
 }
 
-/** antd Checkbox 的兼容壳。 */
+/** 旧版 UI 库 Checkbox 的兼容壳。 */
 export function Checkbox({ checked, defaultChecked, onChange, className, ...props }: CheckboxProps) {
   return (
     <ShadcnCheckbox

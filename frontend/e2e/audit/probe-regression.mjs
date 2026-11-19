@@ -43,7 +43,7 @@ for (const path of PATHS) {
   const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
   const errs = [];
   p.on('pageerror', (e) => errs.push('pageerror: ' + e.message.split('\n')[0]));
-  p.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('[antd:')) errs.push('console: ' + m.text().slice(0, 120)); });
+  p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 120)); });
 
   await p.goto(`http://localhost:5100${path}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(3500);

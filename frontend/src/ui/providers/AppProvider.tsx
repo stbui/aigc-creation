@@ -3,12 +3,12 @@ import { useToast, type ToastApi } from '~/admin-ui/providers/ToastProvider';
 import { UiDialog } from '../primitives/dialog';
 
 /**
- * antd `App.useApp()` 的兼容层。
+ * 旧版 UI 库 `App.useApp()` 的兼容层。
  *
  * 迁移期页面只改 import：`const { message, modal } = useApp()`。
  * - `message.*` 走项目 toast；
  * - `modal.confirm` 走项目确认弹窗，返回 Promise<boolean>；
- * - 不提供 antd 的 notification / contextHolder 等 C 端未使用的能力。
+ * - 不提供 旧版 UI 库的 notification / contextHolder 等 C 端未使用的能力。
  */
 export interface ConfirmOptions {
   title: ReactNode;
@@ -43,7 +43,7 @@ export interface AppApi {
 interface PendingConfirm {
   options: ConfirmOptions | InfoOptions;
   resolve: (value: boolean) => void;
-  /** confirm 有取消/确认两个按钮；info 类只有确认（antd 同此语义） */
+  /** confirm 有取消/确认两个按钮；info 类只有确认（旧版 UI 库同此语义） */
   kind: 'confirm' | 'info';
 }
 

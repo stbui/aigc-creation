@@ -118,7 +118,7 @@
   align-items: center;
 }
 
-/* `.tool-submit` 的样式只在文件末尾「shadcn 适配层」定义一次（原 antd 版已删：
+/* `.tool-submit` 的样式只在文件末尾「shadcn 适配层」定义一次（原 旧版 UI 库版已删：
    适配层不再输出 .ant-btn，此处规则永不命中，且曾导致迁移时漏抄字重/字距）。 */
 /* .tool-result-loading 的定义已移至文件末尾「通用工具页结果卡『生成中』骨架」小节 */
 .tool-result-img {
@@ -149,7 +149,7 @@
 
 /* 通用工具页结果卡「生成中」骨架 (2026-10-20) */
 .tool-result-loading {
-  /* 2026-10-20: 原为 `padding: 48px 0; justify-content: center` 配 antd Spin。
+  /* 2026-10-20: 原为 `padding: 48px 0; justify-content: center` 配 旧版 UI 库 Spin。
      改用骨架屏占位后, 块内是骨架 + 提示文字的竖排, 需 flex-column。 */
   display: flex;
   flex-direction: column;
@@ -181,7 +181,7 @@
 }
 
 /* ───────── shadcn 适配层：旧页面选择器映射 ─────────
-   下面只新增选择器，把仍按 antd DOM 命中的页面规则映射到当前适配层。
+   下面只新增选择器，把仍按 旧版 UI 库 DOM 命中的页面规则映射到当前适配层。
    所有数值延续上方原有规则，避免迁移 shadcn 后布局/间距发生变化。 */
 
 /* 按钮：业务类名仍写在 Button 上，但 DOM 已不再带 .ant-btn */

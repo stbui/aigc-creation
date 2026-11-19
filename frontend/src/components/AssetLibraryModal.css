@@ -39,7 +39,7 @@
 .alp-modal .ant-modal-body {
   flex: 1 1 auto;
   min-height: 0;
-  /* antd 6 的 body 默认是 block。只给外层 max-height 时，block 子级会按
+  /* 旧版 UI 库的 body 默认是 block。只给外层 max-height 时，block 子级会按
      内容自然高度排版，内部 .alp-body 的 100% 高度因此失效，footer 被撑到
      可视区之外（实拍 900px 视口里 footer 的 y=1818）。这里让 body 成为
      纵向 flex 容器，中间素材区才能收缩并滚动。 */
