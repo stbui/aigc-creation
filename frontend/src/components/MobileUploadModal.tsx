@@ -6,7 +6,15 @@ import { mobileUploadApi } from '../lib/api';
 import { qrColors } from '../lib/colorPalette';
 import { useProject } from '../hooks/useProject';
 import type { MobileUploadAsset } from '../types/api';
-import { useApp, Button, Modal, Spin } from '../ui';
+import {
+  useApp,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Spin,
+} from '../ui';
 
 /**
  * 手机上传二维码弹窗
@@ -175,60 +183,56 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
   const remainSec = expiresAt ? Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)) : 0;
 
   return (
-    <Modal
-      open={open}
-      onCancel={close}
-      footer={null}
-      /* 宽度写成 min() 而不是 440: 窄屏下容器要按 `100vw - 40px` 收窄。 */
-      width="min(440px, calc(100vw - 40px))"
-      className="mum-modal"
-      closeIcon={null}
-      styles={{
-        body: { padding: 0 },
-        // 参考站 backdrop: #14122180 (不带模糊), 比通用遮罩更轻。
-        mask: { background: 'var(--overlay-mask-soft)' },
-      }}
-      title={null}
-    >
-      <div className="mum">
-        <Button variant="ghost" className="mum-close" aria-label="取消手机上传" onClick={close}>
-          <X size={16} />
-        </Button>
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      {/* 宽度写成 min() 而不是 440: 窄屏下容器要按 `100vw - 40px` 收窄。 */}
+      <DialogContent
+        className="mum-modal gap-0 p-0 sm:max-w-[min(440px,calc(100vw-40px))]"
+        showCloseButton={false}
+      >
+        <DialogTitle className="sr-only">手机上传</DialogTitle>
+        <DialogDescription className="sr-only">
+          使用手机扫描二维码，选择或拍摄图片上传到电脑
+        </DialogDescription>
+        <div className="mum">
+          <Button variant="ghost" className="mum-close" aria-label="取消手机上传" onClick={close}>
+            <X size={16} />
+          </Button>
 
-        <h2 className="mum-title">手机上传</h2>
-        <p className="mum-desc">使用手机扫描二维码，选择或拍摄图片上传到电脑</p>
+          <h2 className="mum-title">手机上传</h2>
+          <p className="mum-desc">使用手机扫描二维码，选择或拍摄图片上传到电脑</p>
 
-        {loading && !qrDataUrl ? (
-          <div className="mum-qr-box">
-            <div className="mum-qr-state">
-              <Spin className="size-4" />
-              <span>正在生成二维码…</span>
-            </div>
-          </div>
-        ) : expired ? (
-          <>
+          {loading && !qrDataUrl ? (
             <div className="mum-qr-box">
-              <div className="mum-qr-state is-error">二维码已失效，请重新生成二维码</div>
+              <div className="mum-qr-state">
+                <Spin className="size-4" />
+                <span>正在生成二维码…</span>
+              </div>
             </div>
-            <Button variant="ghost" className="mum-refresh" onClick={() => void start()}>
-              <RefreshCw size={13} className="size-[13px]" />
-              刷新二维码
-            </Button>
-          </>
-        ) : (
-          <>
-            <div className="mum-qr-box">
-              {qrDataUrl && <img src={qrDataUrl} alt="手机上传二维码" />}
-            </div>
-            <div className="mum-waiting">
-              <Spin className="size-4" />
-              <span>手机扫码上传 · 等待扫码完成</span>
-            </div>
-            {remainSec > 0 && <small className="mum-expiry">{remainSec} 秒后失效</small>}
-          </>
-        )}
-      </div>
-    </Modal>
+          ) : expired ? (
+            <>
+              <div className="mum-qr-box">
+                <div className="mum-qr-state is-error">二维码已失效，请重新生成二维码</div>
+              </div>
+              <Button variant="ghost" className="mum-refresh" onClick={() => void start()}>
+                <RefreshCw size={13} className="size-[13px]" />
+                刷新二维码
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="mum-qr-box">
+                {qrDataUrl && <img src={qrDataUrl} alt="手机上传二维码" />}
+              </div>
+              <div className="mum-waiting">
+                <Spin className="size-4" />
+                <span>手机扫码上传 · 等待扫码完成</span>
+              </div>
+              {remainSec > 0 && <small className="mum-expiry">{remainSec} 秒后失效</small>}
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

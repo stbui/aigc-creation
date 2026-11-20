@@ -1,6 +1,14 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useToast, type ToastApi } from '~/admin-ui/providers/ToastProvider';
-import { UiDialog } from '../primitives/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/admin-ui/components/ui/dialog';
+import { Button } from '~/admin-ui/components/ui/button';
 
 /**
  * C 端反馈 API：toast 与确认弹窗。
@@ -80,24 +88,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [message],
   );
 
+  const options = pending?.options;
+  const isInfo = pending?.kind === 'info';
+  const width = options && 'width' in options ? options.width : undefined;
+
   return (
     <AppContext.Provider value={api}>
       {children}
-      <UiDialog
-        open={pending !== null}
-        title={pending?.options.title}
-        description={pending?.options.content}
-        confirmText={pending?.options.okText ?? '确定'}
-        cancelText={pending?.options.cancelText}
-        hideCancel={pending?.kind === 'info'}
-        danger={pending?.options.danger}
-        onCancel={() => close(false)}
-        onConfirm={() => {
-          const options = pending?.options;
-          close(true);
-          void options?.onOk?.();
-        }}
-      />
+      <Dialog open={pending !== null} onOpenChange={(next) => !next && close(false)}>
+        <DialogContent
+          data-testid="ui-app-dialog"
+          className="gap-4 p-6"
+          style={{ maxWidth: width ?? (options?.content ? 560 : 480) }}
+          showCloseButton={false}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-base">{options?.title}</DialogTitle>
+            {options?.content && (
+              <DialogDescription className="mt-1.5 text-sm leading-6">
+                {options.content}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <DialogFooter>
+            {!isInfo && (
+              <Button variant="secondary" onClick={() => close(false)}>
+                {options?.cancelText ?? '取消'}
+              </Button>
+            )}
+            <Button
+              variant={options?.danger ? 'destructive' : 'default'}
+              onClick={() => {
+                const current = pending?.options;
+                close(true);
+                void current?.onOk?.();
+              }}
+            >
+              {options?.okText ?? '确定'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppContext.Provider>
   );
 }

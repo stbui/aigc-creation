@@ -77,13 +77,15 @@ export function ToolUploadCard({
         从素材库导入
       </Button>
 
-      <Form form={form} className="tool-form">
-        {/* hidden 的参数由具体页面代填（如遮罩素材 id），通用表单不渲染 */}
-        {def.params
-          .filter((param) => !param.hidden)
-          .map((param) => (
-            <ToolParamField key={param.key} param={param} />
-          ))}
+      <Form {...form}>
+        <form className="tool-form" onSubmit={(event) => event.preventDefault()} noValidate>
+          {/* hidden 的参数由具体页面代填（如遮罩素材 id），通用表单不渲染 */}
+          {def.params
+            .filter((param) => !param.hidden)
+            .map((param) => (
+              <ToolParamField key={param.key} param={param} />
+            ))}
+        </form>
       </Form>
 
       <Button

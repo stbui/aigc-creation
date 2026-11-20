@@ -4,7 +4,12 @@ import { Eye } from 'lucide-react';
 import { ImageLightbox, type LightboxItem } from './components';
 import { templateBeatsText } from './utils';
 import type { ShoppableCarouselTemplate } from './api';
-import { Modal } from '../../ui';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../../ui';
 
 /**
  * 模板网格（右栏主内容）。
@@ -123,28 +128,30 @@ function TemplateGridImpl({ templates, selectedId, onSelect, error, loading }: T
       </div>
 
       {group && (
-        <Modal
+        <Dialog
           open
-          title={`${group.name} · 三张一组`}
-          width={880}
-          footer={null}
-          onCancel={() => setGroup(null)}
+          onOpenChange={(next) => !next && setGroup(null)}
         >
-          <div className="sc-template-group">
-            {group.thumbFiles.map((url, index) => (
-              <button
-                key={`${group.id}-group-${index}`}
-                type="button"
-                className="sc-template-group-item"
-                aria-label={`查看模板${group.name}第 ${index + 1} 张大图`}
-                onClick={() => openFromGroup(group, index)}
-              >
-                <img src={url} alt={`${group.name} 第 ${index + 1} 张`} />
-                <span>{group.beats[index] ?? `第 ${index + 1} 拍`}</span>
-              </button>
-            ))}
-          </div>
-        </Modal>
+          <DialogContent className="gap-4 p-6 sm:max-w-[880px]">
+            <DialogHeader>
+              <DialogTitle>{`${group.name} · 三张一组`}</DialogTitle>
+            </DialogHeader>
+            <div className="sc-template-group">
+              {group.thumbFiles.map((url, index) => (
+                <button
+                  key={`${group.id}-group-${index}`}
+                  type="button"
+                  className="sc-template-group-item"
+                  aria-label={`查看模板${group.name}第 ${index + 1} 张大图`}
+                  onClick={() => openFromGroup(group, index)}
+                >
+                  <img src={url} alt={`${group.name} 第 ${index + 1} 张`} />
+                  <span>{group.beats[index] ?? `第 ${index + 1} 拍`}</span>
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {preview && (

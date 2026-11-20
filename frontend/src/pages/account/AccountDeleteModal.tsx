@@ -1,7 +1,18 @@
 
 import type { DeletionPreview } from '../../types/api';
 import { DELETE_CONFIRM_WORD } from './constants';
-import { InlineAlert, InlineAlertDescription, InlineAlertTitle, Input, Modal } from '../../ui';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  InlineAlert,
+  InlineAlertDescription,
+  InlineAlertTitle,
+  Input,
+} from '../../ui';
 
 /**
  * 注销账号弹窗。
@@ -36,47 +47,54 @@ export function AccountDeleteModal({
   onCancel: () => void;
 }) {
   return (
-    <Modal
-      open={open}
-      title="确认注销账号"
-      okText="确认注销"
-      confirmState={{
-        danger: true,
-        loading: deleting,
-        disabled: deleteConfirm !== DELETE_CONFIRM_WORD || (hasPassword && !deletePassword),
-      }}
-      cancelText="取消"
-      onOk={onOk}
-      onCancel={onCancel}
-    >
-      <div className="account-delete-body">
-        <InlineAlert className="border-warn-border bg-warn-soft text-warn-text">
-          <InlineAlertTitle>此操作不可撤销</InlineAlertTitle>
-          <InlineAlertDescription>
-            {previewLoading
-              ? '正在统计影响面…'
-              : preview
-                ? `将清除 ${preview.projects} 个项目、${preview.tasks} 个作品、${preview.assets} 个素材、${preview.notifications} 条消息；${preview.orders} 笔订单将匿名化保留。`
-                : '未能获取影响面预览，但不影响注销流程。'}
-          </InlineAlertDescription>
-        </InlineAlert>
-        {hasPassword ? (
+    <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
+      <DialogContent className="gap-4 p-6 sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle>确认注销账号</DialogTitle>
+        </DialogHeader>
+        <div className="account-delete-body">
+          <InlineAlert className="border-warn-border bg-warn-soft text-warn-text">
+            <InlineAlertTitle>此操作不可撤销</InlineAlertTitle>
+            <InlineAlertDescription>
+              {previewLoading
+                ? '正在统计影响面…'
+                : preview
+                  ? `将清除 ${preview.projects} 个项目、${preview.tasks} 个作品、${preview.assets} 个素材、${preview.notifications} 条消息；${preview.orders} 笔订单将匿名化保留。`
+                  : '未能获取影响面预览，但不影响注销流程。'}
+            </InlineAlertDescription>
+          </InlineAlert>
+          {hasPassword ? (
+            <Input
+              type="password"
+              placeholder="当前密码"
+              value={deletePassword}
+              onChange={(e) => onPasswordChange(e.target.value)}
+              autoComplete="current-password"
+            />
+          ) : (
+            <p className="account-hint">当前账号未设置密码，将凭当前登录会话确认注销。</p>
+          )}
           <Input
-            type="password"
-            placeholder="当前密码"
-            value={deletePassword}
-            onChange={(e) => onPasswordChange(e.target.value)}
-            autoComplete="current-password"
+            placeholder={`请输入确认词：${DELETE_CONFIRM_WORD}`}
+            value={deleteConfirm}
+            onChange={(e) => onConfirmChange(e.target.value)}
           />
-        ) : (
-          <p className="account-hint">当前账号未设置密码，将凭当前登录会话确认注销。</p>
-        )}
-        <Input
-          placeholder={`请输入确认词：${DELETE_CONFIRM_WORD}`}
-          value={deleteConfirm}
-          onChange={(e) => onConfirmChange(e.target.value)}
-        />
-      </div>
-    </Modal>
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" onClick={onCancel}>
+            取消
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={
+              deleting || deleteConfirm !== DELETE_CONFIRM_WORD || (hasPassword && !deletePassword)
+            }
+            onClick={onOk}
+          >
+            确认注销
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

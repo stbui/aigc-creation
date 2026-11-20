@@ -1,5 +1,5 @@
 import '../styles/auth.css';
-import { Modal } from '../ui';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui';
 import { AuthCard } from './AuthCard';
 import { useAuth } from '../context/AuthContext';
 
@@ -21,23 +21,19 @@ interface Props {
  */
 export function LoginModal({ open, onClose, authEpoch }: Props) {
   return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      closable={false}
-      keyboard
-      width={840}
-      className="login-modal"
-      styles={{
-        container: { background: 'transparent', boxShadow: 'none', border: 'none' },
-        // AuthCard 自己按 840px 双栏排版；通用 modal 内边距会把内容撑宽并产生横向滚动。
-        body: { padding: 0 },
-      }}
-    >
-      {/* key 绑定身份版本: 每次登录成功都重建卡片, 清空内部表单态 */}
-      <AuthCard key={authEpoch} onSuccess={onClose} />
-    </Modal>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        className="login-modal gap-0 p-0 sm:max-w-[840px]"
+        showCloseButton={false}
+      >
+        <DialogTitle className="sr-only">登录 / 注册</DialogTitle>
+        <DialogDescription className="sr-only">
+          登录或注册货觉AI账号，支持账号、短信与扫码登录。
+        </DialogDescription>
+        {/* key 绑定身份版本: 每次登录成功都重建卡片, 清空内部表单态 */}
+        <AuthCard key={authEpoch} onSuccess={onClose} />
+      </DialogContent>
+    </Dialog>
   );
 }
 

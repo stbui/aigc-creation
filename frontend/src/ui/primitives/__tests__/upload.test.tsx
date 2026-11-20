@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Upload } from '../upload';
@@ -40,7 +40,7 @@ describe('Upload', () => {
   });
 
   it('达到 maxCount 后不再渲染触发按钮', () => {
-    const { queryByRole } = render(
+    render(
       <Upload
         maxCount={1}
         files={[{ uid: 'a', name: 'a.png', status: 'done' }]}
@@ -49,6 +49,24 @@ describe('Upload', () => {
         上传
       </Upload>,
     );
-    expect(queryByRole('button', { name: '上传' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '上传' })).toBeNull();
+  });
+
+  it('已选文件用 shadcn Attachment 渲染，并提供预览与移除入口', () => {
+    const onRemove = vi.fn();
+    const onPreview = vi.fn();
+    render(
+      <Upload
+        files={[{ uid: 'a', name: 'a.png', status: 'done', thumbUrl: '/thumb.png' }]}
+        onRemove={onRemove}
+        onPreview={onPreview}
+      />,
+    );
+
+    expect(screen.getByText('a.png').closest('[data-slot="attachment"]')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '预览 a.png' }));
+    expect(onPreview).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: '移除 a.png' }));
+    expect(onRemove).toHaveBeenCalledTimes(1);
   });
 });

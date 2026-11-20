@@ -32,7 +32,13 @@ import {
 } from './hooks';
 import { generateApi, newIdempotencyKey, resolveModelKey } from './api';
 import { flattenCatalog, isUncertainSubmitError, type TemplateEntry } from './utils';
-import { Modal, useApp } from '../../ui';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  useApp,
+} from '../../ui';
 
 /**
  * 婚纱写真模板工作台
@@ -303,30 +309,29 @@ export function TemplatePage() {
       {/* 手机上传弹窗（二维码方案） */}
       <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
 
-      {/* 全部记录抽屉 */}
-      <Modal
-        open={historyOpen}
-        title="全部生成记录"
-        width={960}
-        onCancel={() => setHistoryOpen(false)}
-        footer={null}
-      >
-        <ResultGalleryPane
-          title="生成记录"
-          items={gallery.items}
-          loading={gallery.loading}
-          error={gallery.error}
-          emptyTitle="还没有生成记录"
-          emptyDesc={
-            token
-              ? '提交任务后，你生成的婚纱写真会陈列在这里'
-              : '登录后，你在这个页面生成过的写真都会显示在这里'
-          }
-          onRefresh={refreshGallery}
-          onDelete={deleteItem}
-          downloadNamePrefix="wedding-template"
-        />
-      </Modal>
+      {/* 全部生成记录弹窗 */}
+      <Dialog open={historyOpen} onOpenChange={(next) => !next && setHistoryOpen(false)}>
+        <DialogContent className="max-h-[calc(100vh-32px)] gap-4 overflow-y-auto p-6 sm:max-w-[960px]">
+          <DialogHeader>
+            <DialogTitle>全部生成记录</DialogTitle>
+          </DialogHeader>
+          <ResultGalleryPane
+            title="生成记录"
+            items={gallery.items}
+            loading={gallery.loading}
+            error={gallery.error}
+            emptyTitle="还没有生成记录"
+            emptyDesc={
+              token
+                ? '提交任务后，你生成的婚纱写真会陈列在这里'
+                : '登录后，你在这个页面生成过的写真都会显示在这里'
+            }
+            onRefresh={refreshGallery}
+            onDelete={deleteItem}
+            downloadNamePrefix="wedding-template"
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

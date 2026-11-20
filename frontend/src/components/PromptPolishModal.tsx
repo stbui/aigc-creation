@@ -1,10 +1,17 @@
 import './PromptPolishModal.css';
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, X } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { promptToolsApi } from '../lib/api';
 import { promptToolErrorMessage } from '../lib/promptToolMessages';
 import type { PromptToolResult } from '../types/api';
-import { useApp, Modal, Spin } from '../ui';
+import {
+  useApp,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Spin,
+} from '../ui';
 
 /**
  * AI 润色弹窗
@@ -86,71 +93,66 @@ export function PromptPolishModal({ open, value, onApply, onCancel }: PromptPoli
   };
 
   return (
-    <Modal
-      open={open}
-      onCancel={onCancel}
-      footer={null}
-      width={600}
-      className="pt-polish-modal"
-      closeIcon={<X size={18} />}
-      title={
+    <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
+      <DialogContent className="pt-polish-modal gap-4 p-6 sm:max-w-[600px]">
+        <DialogTitle className="sr-only">AI润色</DialogTitle>
+        <DialogDescription className="sr-only">使用 AI 润色当前提示词。</DialogDescription>
         <div className="pt-modal-head">
           <span className="pt-modal-eyebrow">创意生图</span>
           <h2 className="pt-modal-title">AI润色</h2>
         </div>
-      }
-    >
-      {/* 原始提示词 (只读, 供对照) */}
-      <div className="pt-polish-source">
-        <div className="pt-polish-source-head">
-          <span className="pt-polish-source-label">原始提示词</span>
-          <button
-            type="button"
-            className={`pt-polish-textonly${textOnly ? ' is-on' : ''}`}
-            onClick={() => setTextOnly((v) => !v)}
-            title="仅润色文字：不增删画面要素"
-          >
-            仅润色文字
-          </button>
-        </div>
-        <div className="pt-polish-source-body">{value || '（提示词为空）'}</div>
-      </div>
-
-      {/* 输出区 */}
-      <div className="pt-polish-output">
-        <textarea
-          className="pt-polish-textarea"
-          value={output}
-          placeholder={'点击下方"开始润色"后, AI 将在这里生成优化后的提示词'}
-          onChange={(e) => setOutput(e.target.value)}
-        />
-        {loading && (
-          <div className="pt-polish-loading">
-            <Spin className="size-4" />
+        {/* 原始提示词 (只读, 供对照) */}
+        <div className="pt-polish-source">
+          <div className="pt-polish-source-head">
+            <span className="pt-polish-source-label">原始提示词</span>
+            <button
+              type="button"
+              className={`pt-polish-textonly${textOnly ? ' is-on' : ''}`}
+              onClick={() => setTextOnly((v) => !v)}
+              title="仅润色文字：不增删画面要素"
+            >
+              仅润色文字
+            </button>
           </div>
-        )}
-      </div>
-
-      {/* 底部: 字数 + 操作 */}
-      <div className="pt-polish-foot">
-        <span className="pt-polish-count">{output.length} 字</span>
-        <div className="pt-polish-actions">
-          <button type="button" className="pt-btn pt-btn-ghost" onClick={() => void run()} disabled={loading}>
-            <RefreshCw size={13} />
-            开始润色
-          </button>
-          <button
-            type="button"
-            className="pt-btn pt-btn-primary"
-            disabled={!output.trim()}
-            onClick={() => onApply(output.trim())}
-          >
-            应用
-          </button>
+          <div className="pt-polish-source-body">{value || '（提示词为空）'}</div>
         </div>
-      </div>
 
-      {result && <p className="pt-polish-source-note">内容由智能助手生成</p>}
-    </Modal>
+        {/* 输出区 */}
+        <div className="pt-polish-output">
+          <textarea
+            className="pt-polish-textarea"
+            value={output}
+            placeholder={'点击下方"开始润色"后, AI 将在这里生成优化后的提示词'}
+            onChange={(e) => setOutput(e.target.value)}
+          />
+          {loading && (
+            <div className="pt-polish-loading">
+              <Spin className="size-4" />
+            </div>
+          )}
+        </div>
+
+        {/* 底部: 字数 + 操作 */}
+        <div className="pt-polish-foot">
+          <span className="pt-polish-count">{output.length} 字</span>
+          <div className="pt-polish-actions">
+            <button type="button" className="pt-btn pt-btn-ghost" onClick={() => void run()} disabled={loading}>
+              <RefreshCw size={13} />
+              开始润色
+            </button>
+            <button
+              type="button"
+              className="pt-btn pt-btn-primary"
+              disabled={!output.trim()}
+              onClick={() => onApply(output.trim())}
+            >
+              应用
+            </button>
+          </div>
+        </div>
+
+        {result && <p className="pt-polish-source-note">内容由智能助手生成</p>}
+      </DialogContent>
+    </Dialog>
   );
 }

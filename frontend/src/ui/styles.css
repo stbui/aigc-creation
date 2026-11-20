@@ -98,16 +98,16 @@
    只新增 ui-* / login-input-* 选择器与 data-slot，不改原有页面类。
    颜色、圆角、字号全部消费 :root 令牌，保持与迁移前一致。
 
-   【选择器与 DOM 的对应关系】页面样式只能命中真实存在的节点。当前
-   `frontend/src/ui/primitives/**` 实际输出的类只有这些：
-     .ui-action / .ui-input
-     .ui-form-label / .ui-form-error
-     .ui-select-trigger / .ui-dropdown-content / .ui-dropdown-item
-     .ui-badge-count / [data-slot="badge-count"]
+   【选择器与 DOM 的对应关系】页面样式只能命中真实存在的节点。C 端页面现在
+   直接组合 shadcn 原子件，自造封装只剩步进器与文件选择器，页面样式应优先
+   命中 `[data-slot]` 槽位：
+     [data-slot="dialog-content"] / [data-slot="dialog-overlay"]
+     [data-slot="form-field"] / [data-slot="form-message"]
+     [data-slot="attachment"] / [data-slot="attachment-media"]
+     [data-slot="badge"]
+     .tool-upload-trigger / .tool-form / .login-field
      .login-input-wrap / .login-input-inner / .login-input-prefix
      .login-textarea-count
-     .ui-modal-head / .ui-modal-body / [data-slot="c-modal-container"]
-     （弹窗外壳，见 ui/primitives/modal.tsx）
    写页面样式时按这份清单取类名；Tabs / 表格 / 分页直接用 shadcn 的
    `[data-slot="tabs-list"]` / `[data-slot="table-head"]` 等槽位，
    次要文字用 shadcn 的 `text-muted-foreground`。

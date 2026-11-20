@@ -8,7 +8,12 @@
    素材库导入选择器 (asset-library-picker)
    ═══════════════════════════════════════════════════════════════════ */
 
-/* `className` 与 `ui-modal-surface` 挂在同一个容器上，直接命中 `.alp-modal`。 */
+/* `className` 直接挂在 shadcn `DialogContent` 上，命中 `.alp-modal`。 */
+[data-slot='dialog-overlay']:has(+ .alp-modal) {
+  background: var(--overlay-mask-strong);
+  backdrop-filter: blur(3px);
+}
+
 .alp-modal {
   padding: 0 !important;
   border-radius: 20px;
@@ -22,48 +27,24 @@
   max-height: min(760px, calc(100vh - 40px));
 }
 
-/* header / body 是容器的**子元素** */
-.alp-modal [data-slot="c-modal-header"] {
-  flex: none;
-}
-
-.alp-modal [data-slot="c-modal-body"] {
-  flex: 1 1 auto;
-  min-height: 0;
-  /* 弹窗 body 默认是 block。只给外层 max-height 时，block 子级会按
-     内容自然高度排版，内部 .alp-body 的 100% 高度因此失效，footer 被撑到
-     可视区之外（实拍 900px 视口里 footer 的 y=1818）。这里让 body 成为
-     纵向 flex 容器，中间素材区才能收缩并滚动。 */
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 /* 参考站 dialog 的三段: header(固定) / toolbar+layout(自适应) / footer(固定) */
 .alp-body {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.alp-modal [data-slot="c-modal-header"] {
-  padding: 0;
-  margin: 0;
-  border-bottom: 1px solid var(--alp-border-8);
-}
-
-.alp-modal [data-slot="c-modal-body"] {
-  padding: 0;
+  overflow: hidden;
 }
 
 /* 头部 */
 .alp-header {
   display: flex;
+  flex: none;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-16);
   padding: 22px 26px 18px;
+  border-bottom: 1px solid var(--alp-border-8);
 }
 
 .alp-header-main {

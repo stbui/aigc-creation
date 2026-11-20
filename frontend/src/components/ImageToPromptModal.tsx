@@ -7,7 +7,14 @@ import { assetsApi, promptToolsApi } from '../lib/api';
 import { promptToolErrorMessage } from '../lib/promptToolMessages';
 import { useProject } from '../hooks/useProject';
 import type { PromptToolResult } from '../types/api';
-import { useApp, Modal, Spin } from '../ui';
+import {
+  useApp,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Spin,
+} from '../ui';
 
 /**
  * 图片转提示词弹窗 —— 1:1 复刻参考站 (ijihua.cn/free-creation) 的同名弹窗。
@@ -116,90 +123,87 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
   };
 
   return (
-    <Modal
-      open={open}
-      onCancel={onCancel}
-      footer={null}
-      width={600}
-      className="pt-i2p-modal"
-      closeIcon={<X size={18} />}
-      title={
+    <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
+      <DialogContent className="pt-i2p-modal gap-4 p-6 sm:max-w-[600px]">
+        <DialogTitle className="sr-only">图片转提示词</DialogTitle>
+        <DialogDescription className="sr-only">
+          上传一张图片，由视觉模型解析出可直接使用的提示词。
+        </DialogDescription>
         <div className="pt-modal-head">
           <span className="pt-modal-eyebrow">创意生图</span>
           <h2 className="pt-modal-title">图片转提示词</h2>
         </div>
-      }
-    >
-      {/* 上传区 */}
-      <div className="pt-i2p-upload">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={accept}
-          hidden
-          onChange={(e) => {
-            void pickFile(e.target.files?.[0]);
-            e.target.value = '';
-          }}
-        />
-        <button
-          type="button"
-          className={`pt-i2p-upload-btn${file ? ' is-filled' : ''}`}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {preview ? (
-            <img src={preview} alt="待解析图片" />
-          ) : (
-            <>
-              <ImagePlus size={20} />
-              <span>上传图片</span>
-            </>
-          )}
-        </button>
-        <div className="pt-i2p-upload-text">
-          <strong>{file ? file.name : '上传一张图片'}</strong>
-          <span>支持 {allowedLabel}，单张不超过 {maxMb}MB</span>
-        </div>
-      </div>
-
-      {/* 输出区 */}
-      <div className="pt-polish-output">
-        <textarea
-          className="pt-polish-textarea"
-          value={output}
-          placeholder="上传图片解析提示词"
-          onChange={(e) => setOutput(e.target.value)}
-        />
-        {loading && (
-          <div className="pt-polish-loading">
-            <Spin className="size-4" />
+        {/* 上传区 */}
+        <div className="pt-i2p-upload">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={accept}
+            hidden
+            onChange={(e) => {
+              void pickFile(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            className={`pt-i2p-upload-btn${file ? ' is-filled' : ''}`}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {preview ? (
+              <img src={preview} alt="待解析图片" />
+            ) : (
+              <>
+                <ImagePlus size={20} />
+                <span>上传图片</span>
+              </>
+            )}
+          </button>
+          <div className="pt-i2p-upload-text">
+            <strong>{file ? file.name : '上传一张图片'}</strong>
+            <span>支持 {allowedLabel}，单张不超过 {maxMb}MB</span>
           </div>
-        )}
-      </div>
-
-      <div className="pt-polish-foot">
-        <span className="pt-polish-count">{output.length} 字</span>
-        <div className="pt-polish-actions">
-          <button
-            type="button"
-            className="pt-btn pt-btn-ghost"
-            onClick={() => void submit()}
-            disabled={loading || !file}
-          >
-            提交解析
-          </button>
-          <button
-            type="button"
-            className="pt-btn pt-btn-primary"
-            disabled={!output.trim()}
-            onClick={() => onApply(output.trim())}
-          >
-            应用
-          </button>
         </div>
-      </div>
 
-      {result && <p className="pt-polish-source-note">内容由智能助手生成</p>}
-    </Modal>
+        {/* 输出区 */}
+        <div className="pt-polish-output">
+          <textarea
+            className="pt-polish-textarea"
+            value={output}
+            placeholder="上传图片解析提示词"
+            onChange={(e) => setOutput(e.target.value)}
+          />
+          {loading && (
+            <div className="pt-polish-loading">
+              <Spin className="size-4" />
+            </div>
+          )}
+        </div>
+
+        <div className="pt-polish-foot">
+          <span className="pt-polish-count">{output.length} 字</span>
+          <div className="pt-polish-actions">
+            <button
+              type="button"
+              className="pt-btn pt-btn-ghost"
+              onClick={() => void submit()}
+              disabled={loading || !file}
+            >
+              提交解析
+            </button>
+            <button
+              type="button"
+              className="pt-btn pt-btn-primary"
+              disabled={!output.trim()}
+              onClick={() => onApply(output.trim())}
+            >
+              应用
+            </button>
+          </div>
+        </div>
+
+        {result && <p className="pt-polish-source-note">内容由智能助手生成</p>}
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -15,7 +15,17 @@ import {
   type PickerKind,
 } from './assetLibraryFilters';
 import type { Asset } from '../types/api';
-import { useApp, Button, Input, InputGroup, InputGroupAddon, InputGroupInput, Modal } from '../ui';
+import {
+  useApp,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '../ui';
 
 /**
  * 素材库导入选择器
@@ -162,242 +172,233 @@ export function AssetLibraryModal({
   };
 
   return (
-    <Modal
-      open={open}
-      onCancel={onCancel}
-      footer={null}
-      width="min(1180px, calc(100vw - 40px))"
-      className="alp-modal"
-      closeIcon={null}
-      styles={{
-        body: { padding: 0 },
-        mask: { background: 'var(--overlay-mask-strong)', backdropFilter: 'blur(3px)' },
-      }}
-      /* `className` 作用于容器几何：它与 `ui-modal-surface` 在同一个元素上。 */
-      title={
+    <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
+      <DialogContent
+        className="alp-modal gap-0 p-0 sm:max-w-[min(1180px,calc(100vw-40px))]"
+        showCloseButton={false}
+      >
         <div className="alp-header">
           <div className="alp-header-main">
-            <h2 className="alp-title">从素材库导入</h2>
+            <DialogTitle className="alp-title">从素材库导入</DialogTitle>
           </div>
           <Button variant="ghost" className="alp-close" aria-label="关闭素材库" onClick={onCancel}>
             <X size={19} className="size-[19px]" />
           </Button>
         </div>
-      }
-    >
-      <div className="alp-body">
-        {/* ── 工具栏: 来源胶囊 + 日期筛选 + 搜索 ── */}
-        <div className="alp-toolbar">
-          <div className="alp-groups" role="group" aria-label="素材来源">
-            {KIND_LABELS.map((k) => (
-              <Button
-                key={k.id}
-                variant="ghost"
-                aria-pressed={kind === k.id}
-                className={`alp-chip${kind === k.id ? ' is-active' : ''}`}
-                onClick={() => setKind(k.id)}
-              >
-                {k.label}
-              </Button>
-            ))}
-          </div>
-
-          <div className="alp-toolbar-right">
-            <div className="alp-date-flat" role="group" aria-label="日期筛选">
-              <span className="alp-filter-label">日期</span>
-              {DATE_LABELS.map((d) => (
-                <Button
-                  key={d.id}
-                  variant="ghost"
-                  className={`alp-date-option${dateFilter === d.id ? ' is-active' : ''}`}
-                  aria-pressed={dateFilter === d.id}
-                  onClick={() => setDateFilter(d.id)}
-                >
-                  {d.label}
-                </Button>
-              ))}
-            </div>
-
-            {/*
-              搜索框走 shadcn `InputGroup`, 不再手写
-              「div 包图标 + 裸 input + 条件清除键」。
-              清除键用共享 `Button` (variant=ghost) 而不是裸 button。
-            */}
-              <InputGroup>
-                <InputGroupAddon>
-                  {<Search size={14} />}
-                </InputGroupAddon>
-                <InputGroupInput
-                  className="alp-search"
-                  value={keyword}
-                  placeholder="搜索素材名称 / 地址"
-                  onChange={(e) => setKeyword(e.target.value)}
-                />
-                <InputGroupAddon align="inline-end">
-                  {keyword ? (
-                  <Button
-                    variant="ghost"
-                    className="alp-search-clear"
-                    aria-label="清除搜索"
-                    onClick={() => setKeyword('')}
-                  >
-                    <X size={12} className="size-[12px]" />
-                  </Button>
-                ) : null}
-                </InputGroupAddon>
-              </InputGroup>
-          </div>
-        </div>
-
-        {/* ── 主体: 来源/用途侧栏 + 内容区 ── */}
-        <div className="alp-layout">
-          <aside className="alp-sidebar">
-            <strong>素材来源</strong>
-            <nav aria-label="素材来源">
+        <div className="alp-body">
+          {/* ── 工具栏: 来源胶囊 + 日期筛选 + 搜索 ── */}
+          <div className="alp-toolbar">
+            <div className="alp-groups" role="group" aria-label="素材来源">
               {KIND_LABELS.map((k) => (
                 <Button
                   key={k.id}
                   variant="ghost"
-                  className={kind === k.id ? 'is-active' : ''}
-                  aria-current={kind === k.id}
+                  aria-pressed={kind === k.id}
+                  className={`alp-chip${kind === k.id ? ' is-active' : ''}`}
                   onClick={() => setKind(k.id)}
                 >
                   {k.label}
                 </Button>
               ))}
-            </nav>
+            </div>
 
-            {capabilityOptions.length > 0 && (
-              <section className="alp-sidebar-section">
-                <strong>用途分类</strong>
-                <nav aria-label="用途分类">
+            <div className="alp-toolbar-right">
+              <div className="alp-date-flat" role="group" aria-label="日期筛选">
+                <span className="alp-filter-label">日期</span>
+                {DATE_LABELS.map((d) => (
                   <Button
+                    key={d.id}
                     variant="ghost"
-                    className={capabilityFilter === 'all' ? 'is-active' : ''}
-                    aria-current={capabilityFilter === 'all'}
-                    onClick={() => setCapabilityFilter('all')}
+                    className={`alp-date-option${dateFilter === d.id ? ' is-active' : ''}`}
+                    aria-pressed={dateFilter === d.id}
+                    onClick={() => setDateFilter(d.id)}
                   >
-                    <span>全部用途</span>
-                    <em className="alp-sidebar-count">{items.length}</em>
+                    {d.label}
                   </Button>
-                  {capabilityOptions.map((option) => (
-                    <Button
-                      key={option.id}
-                      variant="ghost"
-                      className={capabilityFilter === option.id ? 'is-active' : ''}
-                      aria-current={capabilityFilter === option.id}
-                      title={`${option.label}（${option.count}）`}
-                      onClick={() => setCapabilityFilter(option.id)}
-                    >
-                      <span>{option.label}</span>
-                      <em className="alp-sidebar-count">{option.count}</em>
-                    </Button>
-                  ))}
-                </nav>
-              </section>
-            )}
-          </aside>
+                ))}
+              </div>
 
-          <div className="alp-main">
-            <div className="alp-content">
-              {loading ? (
-                <div className="alp-state">
-                  <StateLoading tip="正在加载素材库…" />
-                </div>
-              ) : error ? (
-                /* 「没连上」不是「没素材」 */
-                <div className="alp-state">
-                  <StateError
-                    compact
-                    title="素材库加载失败"
-                    desc="素材库加载失败，请稍后重试。"
+              {/*
+                搜索框走 shadcn `InputGroup`, 不再手写
+                「div 包图标 + 裸 input + 条件清除键」。
+                清除键用共享 `Button` (variant=ghost) 而不是裸 button。
+              */}
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<Search size={14} />}
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    className="alp-search"
+                    value={keyword}
+                    placeholder="搜索素材名称 / 地址"
+                    onChange={(e) => setKeyword(e.target.value)}
                   />
-                </div>
-              ) : visible.length === 0 ? (
-                /*
-                 * ⚠️ 「筛完没剩」≠「库里没有」。两者原先共用一句「素材库暂无图片 /
-                 * 请先上传图片」—— 素材有 70 张、只是搜索词或日期档位筛空了时,
-                 * 这句话是**谎报**: 用户以为素材没了, 会去重复上传。
-                 * (StateViews.tsx 的空态注释本来就要求把这两种分开。)
-                 */
-                <div className="alp-state">
-                  {items.length === 0 ? (
-                    <StateEmpty compact title="素材库暂无图片" desc="请先上传图片，再从这里导入。" />
-                  ) : (
-                    <StateEmpty
-                      compact
-                      title="没有符合条件的素材"
-                      desc="试试换个关键词，或把日期与维度放宽。"
-                      action={
-                        <StateButton
-                          onClick={() => {
-                            setKind('all');
-                            setCapabilityFilter('all');
-                            setDateFilter('all');
-                            setKeyword('');
-                          }}
-                        >
-                          清除筛选
-                        </StateButton>
-                      }
-                    />
-                  )}
-                </div>
-              ) : (
-                <div className="alp-grid">
-                  {visible.map((a, index) => (
-                    <AssetLibraryPickerCard
-                      key={a.id}
-                      asset={a}
-                      selected={selected.includes(a.id)}
-                      priority={index < 8}
-                      atLimit={atLimit}
-                      maxSelectable={maxSelectable}
-                      capabilityLabel={capabilityLabel}
-                      onToggle={toggle}
-                    />
-                  ))}
-                </div>
+                  <InputGroupAddon align="inline-end">
+                    {keyword ? (
+                    <Button
+                      variant="ghost"
+                      className="alp-search-clear"
+                      aria-label="清除搜索"
+                      onClick={() => setKeyword('')}
+                    >
+                      <X size={12} className="size-[12px]" />
+                    </Button>
+                  ) : null}
+                  </InputGroupAddon>
+                </InputGroup>
+            </div>
+          </div>
+
+          {/* ── 主体: 来源/用途侧栏 + 内容区 ── */}
+          <div className="alp-layout">
+            <aside className="alp-sidebar">
+              <strong>素材来源</strong>
+              <nav aria-label="素材来源">
+                {KIND_LABELS.map((k) => (
+                  <Button
+                    key={k.id}
+                    variant="ghost"
+                    className={kind === k.id ? 'is-active' : ''}
+                    aria-current={kind === k.id}
+                    onClick={() => setKind(k.id)}
+                  >
+                    {k.label}
+                  </Button>
+                ))}
+              </nav>
+
+              {capabilityOptions.length > 0 && (
+                <section className="alp-sidebar-section">
+                  <strong>用途分类</strong>
+                  <nav aria-label="用途分类">
+                    <Button
+                      variant="ghost"
+                      className={capabilityFilter === 'all' ? 'is-active' : ''}
+                      aria-current={capabilityFilter === 'all'}
+                      onClick={() => setCapabilityFilter('all')}
+                    >
+                      <span>全部用途</span>
+                      <em className="alp-sidebar-count">{items.length}</em>
+                    </Button>
+                    {capabilityOptions.map((option) => (
+                      <Button
+                        key={option.id}
+                        variant="ghost"
+                        className={capabilityFilter === option.id ? 'is-active' : ''}
+                        aria-current={capabilityFilter === option.id}
+                        title={`${option.label}（${option.count}）`}
+                        onClick={() => setCapabilityFilter(option.id)}
+                      >
+                        <span>{option.label}</span>
+                        <em className="alp-sidebar-count">{option.count}</em>
+                      </Button>
+                    ))}
+                  </nav>
+                </section>
               )}
+            </aside>
+
+            <div className="alp-main">
+              <div className="alp-content">
+                {loading ? (
+                  <div className="alp-state">
+                    <StateLoading tip="正在加载素材库…" />
+                  </div>
+                ) : error ? (
+                  /* 「没连上」不是「没素材」 */
+                  <div className="alp-state">
+                    <StateError
+                      compact
+                      title="素材库加载失败"
+                      desc="素材库加载失败，请稍后重试。"
+                    />
+                  </div>
+                ) : visible.length === 0 ? (
+                  /*
+                   * ⚠️ 「筛完没剩」≠「库里没有」。两者原先共用一句「素材库暂无图片 /
+                   * 请先上传图片」—— 素材有 70 张、只是搜索词或日期档位筛空了时,
+                   * 这句话是**谎报**: 用户以为素材没了, 会去重复上传。
+                   * (StateViews.tsx 的空态注释本来就要求把这两种分开。)
+                   */
+                  <div className="alp-state">
+                    {items.length === 0 ? (
+                      <StateEmpty compact title="素材库暂无图片" desc="请先上传图片，再从这里导入。" />
+                    ) : (
+                      <StateEmpty
+                        compact
+                        title="没有符合条件的素材"
+                        desc="试试换个关键词，或把日期与维度放宽。"
+                        action={
+                          <StateButton
+                            onClick={() => {
+                              setKind('all');
+                              setCapabilityFilter('all');
+                              setDateFilter('all');
+                              setKeyword('');
+                            }}
+                          >
+                            清除筛选
+                          </StateButton>
+                        }
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className="alp-grid">
+                    {visible.map((a, index) => (
+                      <AssetLibraryPickerCard
+                        key={a.id}
+                        asset={a}
+                        selected={selected.includes(a.id)}
+                        priority={index < 8}
+                        atLimit={atLimit}
+                        maxSelectable={maxSelectable}
+                        capabilityLabel={capabilityLabel}
+                        onToggle={toggle}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/*
+            ── 底部: 已选计数 + 清除选择 + 取消/确定 ──
+            参考站 .asset-library-picker-footer 是 dialog 的**直接子元素**(与 layout 平级),
+            横跨整个弹窗宽度, 而不是缩在内容列里 —— 放进 .alp-main 会让「已选 N」从
+            侧栏右边 26px 处才开始, 与参考站差 184px。
+          */}
+          <div className="alp-footer">
+            <div className="alp-footer-info">
+              <span>
+                已选 {selected.length}
+                {maxSelectable !== undefined ? ` / 最多选择 ${maxSelectable} 张` : ' 张'}
+              </span>
+              {selected.length > 0 && (
+                <Button variant="ghost" className="alp-clear" onClick={() => setSelected([])}>
+                  清除选择
+                </Button>
+              )}
+            </div>
+            <div className="alp-footer-actions">
+              <Button variant="ghost" className="alp-btn alp-btn-cancel" onClick={onCancel}>
+                取消
+              </Button>
+              <Button
+                variant="ghost"
+                className="alp-btn alp-btn-confirm"
+                disabled={selected.length === 0}
+                onClick={confirm}
+              >
+                {/* 单选入口（如 SKU 模板图）明确写「使用此素材」，避免用户
+                    在已选 1 张后仍找不到完成导入的按钮。 */}
+                {maxSelectable === 1 ? '使用此素材' : '可多选 · 选择'}
+              </Button>
             </div>
           </div>
         </div>
-
-        {/*
-          ── 底部: 已选计数 + 清除选择 + 取消/确定 ──
-          参考站 .asset-library-picker-footer 是 dialog 的**直接子元素**(与 layout 平级),
-          横跨整个弹窗宽度, 而不是缩在内容列里 —— 放进 .alp-main 会让「已选 N」从
-          侧栏右边 26px 处才开始, 与参考站差 184px。
-        */}
-        <div className="alp-footer">
-          <div className="alp-footer-info">
-            <span>
-              已选 {selected.length}
-              {maxSelectable !== undefined ? ` / 最多选择 ${maxSelectable} 张` : ' 张'}
-            </span>
-            {selected.length > 0 && (
-              <Button variant="ghost" className="alp-clear" onClick={() => setSelected([])}>
-                清除选择
-              </Button>
-            )}
-          </div>
-          <div className="alp-footer-actions">
-            <Button variant="ghost" className="alp-btn alp-btn-cancel" onClick={onCancel}>
-              取消
-            </Button>
-            <Button
-              variant="ghost"
-              className="alp-btn alp-btn-confirm"
-              disabled={selected.length === 0}
-              onClick={confirm}
-            >
-              {/* 单选入口（如 SKU 模板图）明确写「使用此素材」，避免用户
-                  在已选 1 张后仍找不到完成导入的按钮。 */}
-              {maxSelectable === 1 ? '使用此素材' : '可多选 · 选择'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Modal>
+      </DialogContent>
+    </Dialog>
   );
 }

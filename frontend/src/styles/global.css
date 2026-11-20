@@ -1,6 +1,6 @@
-/* 级联层次先在这里定序：global.css 比 ui/styles.css 先载入。C 端 UI 基线里的
-   `@layer components` 会抢先把 components 注册成第一层，后声明的 theme / base
-   反而压在它之上（`.ui-action` 的边框会被 base 的 `border: 0 solid` 兜底吃掉）。
+/* 级联层次先在这里定序：global.css 比 ui/styles.css 先载入。页面自带皮肤是
+   未分层样式，必须先注册好 theme / base / components / utilities 四层，
+   否则 base 的 `border: 0 solid` 兜底会吃掉未分层的组件边框。
    顺序与 ui/styles.css 一致：主题 < 基础 < 组件 < 工具类。 */
 @layer theme, base, components, utilities;
 

@@ -1,4 +1,15 @@
 import { useRef, type ReactNode } from 'react';
+import { ImageIcon, Plus, X } from 'lucide-react';
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentMedia,
+  AttachmentTitle,
+} from '~/admin-ui/components/ui/attachment';
+import { Button } from '~/admin-ui/components/ui/button';
 import { cn } from '../lib/cn';
 
 export interface UploadFile {
@@ -92,41 +103,59 @@ export function Upload({
           event.target.value = '';
         }}
       />
-      <div className="ui-upload-list">
+      <div className="flex flex-wrap gap-2">
         {files.map((file, index) => (
-          <div key={keyOf(file, index)} className="ui-upload-item">
-            {(file.thumbUrl || file.url) && (
-              <button
-                type="button"
-                className="ui-upload-thumb"
-                onClick={() => onPreview?.(file)}
-                aria-label={`预览 ${file.name}`}
-              >
+          <Attachment
+            key={keyOf(file, index)}
+            state={file.status === 'removed' ? 'error' : (file.status ?? 'done')}
+            orientation={file.thumbUrl || file.url ? 'vertical' : 'horizontal'}
+          >
+            <AttachmentMedia variant={file.thumbUrl || file.url ? 'image' : 'icon'}>
+              {file.thumbUrl || file.url ? (
                 <img src={file.thumbUrl ?? file.url} alt={file.name} />
-              </button>
-            )}
-            {showRemove && (
-              <button
-                type="button"
-                className="ui-upload-remove"
-                aria-label={`移除 ${file.name}`}
-                disabled={disabled}
-                onClick={() => void onRemove?.(file)}
-              >
-                ×
-              </button>
-            )}
-          </div>
+              ) : (
+                <ImageIcon aria-hidden />
+              )}
+            </AttachmentMedia>
+            <AttachmentContent>
+              <AttachmentTitle>{file.name}</AttachmentTitle>
+              {file.status === 'uploading' && (
+                <AttachmentDescription>上传中…</AttachmentDescription>
+              )}
+              {file.status === 'error' && <AttachmentDescription>上传失败</AttachmentDescription>}
+            </AttachmentContent>
+            <AttachmentActions>
+              {file.thumbUrl || file.url ? (
+                <AttachmentAction
+                  aria-label={`预览 ${file.name}`}
+                  disabled={disabled}
+                  onClick={() => onPreview?.(file)}
+                >
+                  <ImageIcon aria-hidden />
+                </AttachmentAction>
+              ) : null}
+              {showRemove && (
+                <AttachmentAction
+                  aria-label={`移除 ${file.name}`}
+                  disabled={disabled}
+                  onClick={() => void onRemove?.(file)}
+                >
+                  <X aria-hidden />
+                </AttachmentAction>
+              )}
+            </AttachmentActions>
+          </Attachment>
         ))}
         {(!maxCount || files.length < maxCount) && (
-          <button
+          <Button
             type="button"
-            className="ui-upload-trigger"
+            variant="ghost"
+            className="aspect-square h-auto w-24 shrink-0 rounded-lg border border-dashed border-border bg-secondary p-0 hover:border-brand hover:text-brand"
             disabled={disabled}
             onClick={() => inputRef.current?.click()}
           >
-            {children}
-          </button>
+            {children ?? <Plus aria-hidden />}
+          </Button>
         )}
       </div>
     </div>

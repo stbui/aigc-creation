@@ -22,6 +22,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  /* 给右上角 shadcn 关闭键留位，标题不与它相撞 */
+  padding-right: 32px;
 }
 
 .pt-modal-eyebrow {

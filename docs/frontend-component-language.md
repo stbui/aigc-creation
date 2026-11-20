@@ -28,6 +28,7 @@
 2. 后台业务页面只从 `~/admin-ui/radar` 取件，`radar` 再透传或覆盖 `primitives`。
 3. 后台页面禁止直连 `admin-ui/components/ui/*` 或 `admin-ui/primitives/*`。外壳不可用时的 `AdminLoadError`、`AdminLoading`、`NoAdminAccess` 是既有例外，不向业务页扩散。
 4. 页面不得为了少写一层包装，直接使用第三方组件库重新实现已有按钮、字段、弹层、表格和反馈状态。
+5. shadcn 已有的组件必须直接组合：C 端 `~/ui` 对 `Dialog` / `Sheet` / `Popover` / `ToggleGroup` / `FormField` / `Attachment` 等只做转出，不再保留 `Modal` / `Drawer` / `CountBadge` 一类同名自造封装。
 
 ## 2. 组件语言的五个原则
 
@@ -55,7 +56,7 @@
 | --- | --- | --- | --- |
 | 原子层 | Radix / shadcn 的基础角色、焦点管理和原生交互 | Radix、React | 业务字段、接口、页面布局 |
 | 语义组件层 | `Button`、`Input`、`Badge`、`Select` 等稳定公开组件 | 原子层、`cn`、令牌 | 页面专属文案与接口 |
-| 复合模式层 | `FormField`、`AdminDataTable`、`Notice`、`ModalDialog` | 语义组件层 | 跨业务域取数 |
+| 复合模式层 | `FormField`、`AdminDataTable`、`Notice`、`Dialog` 组合件 | 语义组件层 | 跨业务域取数 |
 | 业务组合层 | `<业务组件>.tsx`、状态卡、结果栏、详情区 | 公共组件、本目录 Hook | 反向导出给公共层 |
 | 页面层 | 路由状态、查询编排、写操作、URL 同步 | 本目录入口与全部下层 | 重写公共组件 |
 
@@ -80,8 +81,8 @@
 | 瞬时操作反馈 | Toast | 用 Toast 承载必须持续阅读的结果 | 成功、警示、失败时长由 Provider 统一 |
 | 页面内持续提示 | `Notice` / `InlineAlert` | 用 Toast 代替字段错误或不可恢复风险 | `danger` 使用警告语义，不只换颜色 |
 | 确认不可逆动作 | `ConfirmDialog` / `ConfirmAlert` / `modal.confirm` | 点击即删除或退款 | 写明对象、后果、可否撤销与影响数量 |
-| 查看详情 | `Drawer` / `AdminDrawer` | 所有详情无条件跳新页面 | 保留列表筛选和返回上下文 |
-| 聚焦完成一个短表单或并排详情 | `ModalDialog` / `Modal` | 用多个弹层串联流程 | 每个弹层只承担一个决策 |
+| 查看详情 | `Sheet` / `AdminDrawer` | 所有详情无条件跳新页面 | 保留列表筛选和返回上下文 |
+| 聚焦完成一个短表单或并排详情 | `Dialog`（`DialogHeader` / `DialogFooter`） | 用多个弹层串联流程 | 每个弹层只承担一个决策 |
 | 短暂附加操作 | `DropdownMenu` / `RowMenu` / `Popover` | 把关键操作只藏在 hover 中 | 触发器必须有可读名称与键盘入口 |
 
 ### 4.1 按钮语言
@@ -148,7 +149,7 @@
 ### 4.5 浮层与确认语言
 
 1. 浮层只使用 Radix + shadcn 组合件，由底座负责焦点陷阱、`Esc`、读屏角色和关闭后焦点归位。
-2. `Dialog` / `Modal` 必须有可读标题；有说明时使用描述，不得只靠视觉布局表达警告。
+2. `Dialog` 必须有可读标题（`DialogTitle`）；有说明时使用 `DialogDescription`，不得只靠视觉布局表达警告。
 3. 支持受控与默认打开时，统一使用 `open` / `defaultOpen` / `onOpenChange`。
 4. 浮层中的主操作与关闭操作要区分；危险确认的操作按钮使用 danger，不使用主按钮样式伪装。
 5. 浮层请求进行中时，确认按钮加载并锁定，调用方不得提前关闭；失败后保留上下文并显示可执行原因。

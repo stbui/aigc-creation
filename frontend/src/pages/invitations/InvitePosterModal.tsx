@@ -1,6 +1,12 @@
 import { Download } from 'lucide-react';
 
-import { Button, Modal } from './components';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from './components';
 
 interface InvitePosterModalProps {
   open: boolean;
@@ -12,23 +18,22 @@ interface InvitePosterModalProps {
 /** 邀请海报预览与下载；海报由 `utils.buildInvitePoster` 在本地合成。 */
 export function InvitePosterModal({ open, posterUrl, onClose, onDownload }: InvitePosterModalProps) {
   return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={420}
-      title="邀请海报"
-    >
-      {posterUrl && <img src={posterUrl} alt="邀请海报" className="invite-poster-image" />}
-      <Button
-        variant="default"
-        className="w-full invite-poster-download"
-        onClick={onDownload}
-      >
-        {<Download size={15} />}
-        下载海报
-      </Button>
-      <p className="invite-poster-note">海报含你的专属邀请码，好友扫码注册后自动绑定邀请关系。</p>
-    </Modal>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="gap-4 p-6 sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle>邀请海报</DialogTitle>
+        </DialogHeader>
+        {posterUrl && <img src={posterUrl} alt="邀请海报" className="invite-poster-image" />}
+        <Button
+          variant="default"
+          className="w-full invite-poster-download"
+          onClick={onDownload}
+        >
+          {<Download size={15} />}
+          下载海报
+        </Button>
+        <p className="invite-poster-note">海报含你的专属邀请码，好友扫码注册后自动绑定邀请关系。</p>
+      </DialogContent>
+    </Dialog>
   );
 }

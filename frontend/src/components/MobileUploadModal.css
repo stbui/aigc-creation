@@ -11,9 +11,8 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── 桌面端: 二维码弹窗 ──
-   `.mum-modal` 与 `ui-modal-surface` 挂在同一个容器上；选择器不再依赖
-   弹窗的私有类。窄屏宽度由 MobileUploadModal 直接传
-   `width="min(440px, calc(100vw - 40px))"` 解决。 */
+   `.mum-modal` 直接挂在 shadcn `DialogContent` 上；窄屏宽度由
+   `sm:max-w-[min(440px,calc(100vw-40px))]` 解决。 */
 
 /* ═══════════════════════════════════════════════════════════════════
    手机上传弹窗 (二维码方案)
@@ -95,15 +94,15 @@
   width: min(440px, 100vw - 40px);
 }
 
+[data-slot='dialog-overlay']:has(+ .mum-modal) {
+  background: var(--overlay-mask-soft);
+}
+
 .mum-modal {
   padding: 0 !important;
   border-radius: 20px;
   overflow: visible;
   box-shadow: 0 24px 80px rgb(28 22 59 / 0.2392);
-}
-
-.mum-modal [data-slot="c-modal-body"] {
-  padding: 0;
 }
 
 .mum-close {

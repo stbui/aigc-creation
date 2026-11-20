@@ -1,4 +1,4 @@
-import { ToggleGroup } from './components';
+import { ToggleGroup, ToggleGroupItem } from './components';
 import type { AssetGroup } from './constants';
 import { LibraryGroupOptionLabel } from './LibraryGroupOptionLabel';
 
@@ -23,24 +23,25 @@ export function LibraryGroupFilter({
   if (groups.length === 0) return null;
   return (
     <ToggleGroup
+      type="single"
       aria-label="素材分组筛选"
       value={activeGroup ?? '__all__'}
-      itemClassName="asset-library-group-item"
+      onValueChange={(next) => onChange(next && next !== '__all__' ? next : null)}
       className="asset-library-group-list"
-      options={[
-        {
-          value: '__all__',
-          label: <LibraryGroupOptionLabel label="全部素材" count={totalCount} />,
-        },
-        ...groups.map((group) => ({
-          value: group.key,
-          title: group.label,
-          label: <LibraryGroupOptionLabel label={group.label} count={group.count} />,
-        })),
-      ]}
-      onValueChange={(next) => {
-        onChange(next && next !== '__all__' ? next : null);
-      }}
-    />
+    >
+      <ToggleGroupItem value="__all__" className="asset-library-group-item">
+        <LibraryGroupOptionLabel label="全部素材" count={totalCount} />
+      </ToggleGroupItem>
+      {groups.map((group) => (
+        <ToggleGroupItem
+          key={group.key}
+          value={group.key}
+          title={group.label}
+          className="asset-library-group-item"
+        >
+          <LibraryGroupOptionLabel label={group.label} count={group.count} />
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }

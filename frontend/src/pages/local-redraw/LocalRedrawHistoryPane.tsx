@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { ChevronRight, ChevronUp, History } from 'lucide-react';
 
 import type { ToolHistoryTask } from './hooks';
-import { Drawer, ToolHistoryGrid } from './components';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, ToolHistoryGrid } from './components';
 
 interface LocalRedrawHistoryPaneProps {
   tasks: ToolHistoryTask[];
@@ -83,21 +83,22 @@ export const LocalRedrawHistoryPane = memo(function LocalRedrawHistoryPane({
         <History size={16} />
       </button>
 
-      <Drawer
-        title="历史记录"
-        open={drawerOpen}
-        onClose={onCloseDrawer}
-        width={320}
-        bodyPadding={12}
-      >
-        <ToolHistoryGrid
-          tasks={tasks}
-          loading={loading}
-          error={error}
-          emptyText=""
-          onRetry={onRetry}
-        />
-      </Drawer>
+      <Sheet open={drawerOpen} onOpenChange={(next) => !next && onCloseDrawer()}>
+        <SheetContent side="right" style={{ width: 320 }}>
+          <SheetHeader>
+            <SheetTitle>历史记录</SheetTitle>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <ToolHistoryGrid
+              tasks={tasks}
+              loading={loading}
+              error={error}
+              emptyText=""
+              onRetry={onRetry}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 });

@@ -1,6 +1,20 @@
 import '../styles/auth.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Form, FormItem, InputGroup, InputGroupAddon, InputGroupInput, useApp, useForm, useWatch } from '../ui';
+import {
+  Button,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  useApp,
+  useForm,
+  useWatch,
+} from '../ui';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, X } from 'lucide-react';
 import { authApi, oauthAuthorizeUrl, type OAuthProviderInfo } from '../lib/api';
@@ -106,8 +120,8 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
 
   // 注册模式下手机号是选填的；只有填了才显示验证码输入框
-  const phoneValue = useWatch<AuthForm>('phone', form);
-  const emailValue = useWatch<AuthForm>('email', form);
+  const phoneValue = useWatch({ control: form.control, name: 'phone' });
+  const emailValue = useWatch({ control: form.control, name: 'email' });
   const needPhoneCode = mode === 'register' && Boolean(phoneValue);
 
   useEffect(() => {
@@ -273,72 +287,80 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
 
   /** 短信验证码输入框 + 获取按钮。登录与注册验证手机号共用同一段 UI */
   const codeField = (purpose: SmsPurpose) => (
-    <FormItem
+    <FormField
       name="smsCode"
-      label="验证码"
-      className="login-field"
-      rules={[{ required: true, message: '请输入验证码' }]}
-    >
-      {({ field }) => (
-        <div className="login-code-row">
-          <InputGroup>
-            <InputGroupAddon>
-              {<ShieldCheck size={15} />}
-            </InputGroupAddon>
-            <InputGroupInput
-              {...field}
-              placeholder="6 位验证码"
-              maxLength={6}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-            />
-          </InputGroup>
-          <Button
-            className="login-code-btn"
-            onClick={() => handleSendSms(purpose)}
-            disabled={smsCountdown > 0 || sendingSms}
-          >
-            <span className="state-spinner is-small" aria-hidden />
-            {smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码'}
-          </Button>
-        </div>
+      rules={{ required: '请输入验证码' }}
+      render={({ field }) => (
+        <FormItem className="login-field">
+          <FormLabel>验证码</FormLabel>
+          <div className="login-code-row">
+            <FormControl>
+              <InputGroup>
+                <InputGroupAddon>
+                  {<ShieldCheck size={15} />}
+                </InputGroupAddon>
+                <InputGroupInput
+                  {...field}
+                  placeholder="6 位验证码"
+                  maxLength={6}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                />
+              </InputGroup>
+            </FormControl>
+            <Button
+              type="button"
+              className="login-code-btn"
+              onClick={() => handleSendSms(purpose)}
+              disabled={smsCountdown > 0 || sendingSms}
+            >
+              <span className="state-spinner is-small" aria-hidden />
+              {smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码'}
+            </Button>
+          </div>
+          <FormMessage />
+        </FormItem>
       )}
-    </FormItem>
+    />
   );
 
   /** 注册邮箱验证码输入框；与短信验证码完全独立 */
   const emailCodeField = (
-    <FormItem
+    <FormField
       name="emailCode"
-      label="邮箱验证码"
-      className="login-field"
-      rules={[{ required: true, message: '请输入邮箱验证码' }]}
-    >
-      {({ field }) => (
-        <div className="login-code-row">
-          <InputGroup>
-            <InputGroupAddon>
-              {<ShieldCheck size={15} />}
-            </InputGroupAddon>
-            <InputGroupInput
-              {...field}
-              placeholder="6 位验证码"
-              maxLength={6}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-            />
-          </InputGroup>
-          <Button
-            className="login-code-btn"
-            onClick={() => void handleSendEmail()}
-            disabled={emailCountdown > 0 || !emailValue || sendingEmail}
-          >
-            <span className="state-spinner is-small" aria-hidden />
-            {emailCountdown > 0 ? `${emailCountdown}s` : '获取验证码'}
-          </Button>
-        </div>
+      rules={{ required: '请输入邮箱验证码' }}
+      render={({ field }) => (
+        <FormItem className="login-field">
+          <FormLabel>邮箱验证码</FormLabel>
+          <div className="login-code-row">
+            <FormControl>
+              <InputGroup>
+                <InputGroupAddon>
+                  {<ShieldCheck size={15} />}
+                </InputGroupAddon>
+                <InputGroupInput
+                  {...field}
+                  placeholder="6 位验证码"
+                  maxLength={6}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                />
+              </InputGroup>
+            </FormControl>
+            <Button
+              type="button"
+              className="login-code-btn"
+              onClick={() => void handleSendEmail()}
+              disabled={emailCountdown > 0 || !emailValue || sendingEmail}
+            >
+              <span className="state-spinner is-small" aria-hidden />
+              {emailCountdown > 0 ? `${emailCountdown}s` : '获取验证码'}
+            </Button>
+          </div>
+          <FormMessage />
+        </FormItem>
       )}
-    </FormItem>
+    />
   );
 
   return (
@@ -410,20 +432,22 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
           )}
 
           {mode !== 'qr' && (
-          <Form
-            form={form}
-            onSubmit={onFinish}
-            aria-label="账号表单"
-            className="login-form"
-          >
-            <AuthFormFields
-              mode={mode}
-              emailRef={emailRef}
-              emailCodeField={emailCodeField}
-              codeField={codeField}
-              needPhoneCode={needPhoneCode}
-              submitting={submitting}
-            />
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onFinish)}
+              aria-label="账号表单"
+              className="login-form"
+              noValidate
+            >
+              <AuthFormFields
+                mode={mode}
+                emailRef={emailRef}
+                emailCodeField={emailCodeField}
+                codeField={codeField}
+                needPhoneCode={needPhoneCode}
+                submitting={submitting}
+              />
+            </form>
           </Form>
           )}
 

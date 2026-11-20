@@ -501,21 +501,22 @@
   }
 }
 
-/* 登录弹窗遮罩容器: 兼容壳只负责遮罩与居中, 内容区完全透明,
+/* 登录弹窗容器: 只负责遮罩与居中, 内容区完全透明,
    卡片本体 (840x478 / radius 32 / 阴影) 由 .login-split 承担, 与独立页同一套样式。
 
-   页面级类与容器类在**同一个元素**上, 直接命中 `.login-modal`。
-   因为 LoginModal 另外用 `styles.container` 内联了同一组值, 视觉未暴露差异;
-   内联值拿掉后这里才真正生效, 故两条都要保留。
+   类直接挂在 shadcn `DialogContent` 上, 因此这里要清掉它的默认边框 / 底色 / 内边距。
 
    不要在这里写 `max-height: none`: 卡片本体 515px 高, 矮视口下
-   `.ui-modal-surface` 的 `calc(100vh - 32px)` 与 `overflow: auto` 是唯一的
-   兜底滚动 —— 去掉后卡片底部（含登录按钮）会被裁到视口外。 */
+   shadcn 弹窗的 `max-h` 与 `overflow` 是唯一的兜底滚动 ——
+   去掉后卡片底部（含登录按钮）会被裁到视口外。 */
 .login-modal {
   padding: 0;
+  gap: 0;
   background: transparent;
   box-shadow: none;
   border: none;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
 }
 
 /* ── 登录卡新增块 (B2: 忘记密码 / 短信验证码 / 注册协议) ─────────────────── */
@@ -590,7 +591,7 @@
 
 /* 找回密码 / 重置密码的表单要显示 label 行（登录卡片不显示）——
    等价规则见文件末尾「登录 / 认证卡片」适配层
-   (.auth-plain-card .login-field .ui-form-label) */
+   (.auth-plain-card .login-field [data-slot="form-label"]) */
 .auth-plain-card .auth-plain-actions {
   margin-top: 16px;
   text-align: center;
@@ -621,18 +622,18 @@
 }
 
 /* 登录卡片只有 placeholder，不显示 label 行；找回/重置页是独立卡片，需要 label */
-.login-field .ui-form-label {
+.login-field [data-slot='form-label'] {
   display: none;
 }
 
-.auth-plain-card .login-field .ui-form-label {
+.auth-plain-card .login-field [data-slot='form-label'] {
   display: block;
   font-size: 13px;
   font-weight: 400;
   color: var(--text-body);
 }
 
-.login-field .ui-form-error {
+.login-field [data-slot='form-message'] {
   font-size: 12px;
   line-height: 18px;
   padding-top: 4px;
@@ -642,11 +643,4 @@
   display: flex;
   gap: 10px;
   align-items: center;
-}
-
-/* 弹层关闭按钮：保留隐藏语义
-   (登录弹窗按设计不显示右上角关闭键, `closable={false}` 已不渲染;
-    这条是兜底, 防止日后误开 closable 时冒出一个关闭键) */
-.login-modal .ui-modal-close {
-  display: none;
 }

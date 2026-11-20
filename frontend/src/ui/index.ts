@@ -43,9 +43,6 @@ export { RadioGroup, RadioGroupItem } from '~/admin-ui/components/ui/radio-group
 export { Slider } from '~/admin-ui/components/ui/slider';
 export { NumberStepper, type NumberStepperProps } from './primitives/number-stepper';
 export { Upload, type UploadFile, type UploadProps } from './primitives/upload';
-export { Modal, type ModalProps } from './primitives/modal';
-export { Drawer, type DrawerProps } from './primitives/drawer';
-export { Popover, type PopoverProps } from './primitives/popover';
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -54,21 +51,33 @@ export {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '~/admin-ui/components/ui/dropdown-menu';
-export { CountBadge, type CountBadgeProps } from './primitives/count-badge';
 import { Spinner } from '~/admin-ui/components/ui/spinner';
 
 export { Spinner as Spin };
-export { UiDialog } from './primitives/dialog';
-export { ToggleGroup, type ToggleGroupOption, type ToggleGroupProps } from './primitives/toggle-group';
+/* 表单直连 shadcn 组合件 + react-hook-form；`Form` 即 shadcn 的 FormProvider。 */
 export {
   Form,
+  FormField,
   FormItem,
-  useForm,
-  useWatch,
-  type FormInstance,
-  type FormItemProps,
-  type FormItemRule,
-} from './primitives/form';
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+  useFormField,
+} from '~/admin-ui/components/ui/form';
+export { useForm, useWatch, type UseFormReturn as FormInstance } from 'react-hook-form';
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
+} from '~/admin-ui/components/ui/dialog';
 
 /* shadcn 组合式原子件的 C 端别名。 */
 export {
@@ -81,6 +90,7 @@ export {
   CardAction as SurfaceAction,
 } from '~/admin-ui/components/ui/card';
 export { Badge as StatusBadge } from '~/admin-ui/components/ui/badge';
+export { Badge } from '~/admin-ui/components/ui/badge';
 export {
   Empty as EmptyState,
   EmptyHeader as EmptyStateHeader,
@@ -94,6 +104,26 @@ export {
   AlertTitle as InlineAlertTitle,
   AlertDescription as InlineAlertDescription,
 } from '~/admin-ui/components/ui/alert';
+export {
+  Sheet,
+  SheetTrigger,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+} from '~/admin-ui/components/ui/sheet';
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverAnchor,
+} from '~/admin-ui/components/ui/popover';
+export {
+  ToggleGroup,
+  ToggleGroupItem,
+} from '~/admin-ui/components/ui/toggle-group';
 export {
   Tabs as NavigationTabs,
   TabsList as NavigationTabsList,

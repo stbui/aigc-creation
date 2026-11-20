@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { Input, Modal, useApp } from '../ui';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  useApp,
+} from '../ui';
 import { meApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -52,61 +62,51 @@ export function ForcePasswordChangeModal() {
   };
 
   return (
-    <Modal
-      open
-      title="请先修改登录密码"
-      closable={false}
-      closeOnMaskClick={false}
-      keyboard={false}
-      okText="确认修改"
-      confirmState={{ loading: submitting, disabled: !canSubmit }}
-      onOk={() => void submit()}
-      onCancel={() => undefined}
-      footer={
-        <div className="ui-modal-foot">
-          <button
-            type="button"
-            className="ui-action is-primary"
-            disabled={!canSubmit}
-            onClick={() => void submit()}
-          >
-            {submitting ? '提交中…' : '确认修改'}
-          </button>
+    <Dialog open>
+      <DialogContent
+        className="gap-4 p-6 sm:max-w-[480px]"
+        showCloseButton={false}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>请先修改登录密码</DialogTitle>
+          <DialogDescription>
+            管理员已重置你的登录密码。为保护账号安全，请先用临时密码登录后设置新密码，
+            完成前无法使用其他功能。临时密码 24 小时内有效。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="account-form">
+          <Input
+            type="password"
+            placeholder="当前密码（管理员提供的临时密码）"
+            value={oldPassword}
+            onChange={(e) => setOldPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+          <Input
+            type="password"
+            placeholder={`新密码（至少 ${MIN_PASSWORD_LENGTH} 位）`}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+          <Input
+            type="password"
+            placeholder="再次输入新密码"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+          />
         </div>
-      }
-    >
-      <p className="account-desc">
-        管理员已重置你的登录密码。为保护账号安全，请先用临时密码登录后设置新密码，
-        完成前无法使用其他功能。临时密码 24 小时内有效。
-      </p>
-      <div className="account-form">
-        <Input
-          type="password"
-          placeholder="当前密码（管理员提供的临时密码）"
-          value={oldPassword}
-          onChange={(e) => setOldPassword(e.target.value)}
-          autoComplete="current-password"
-        />
-        <Input
-          type="password"
-          placeholder={`新密码（至少 ${MIN_PASSWORD_LENGTH} 位）`}
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          autoComplete="new-password"
-        />
-        <Input
-          type="password"
-          placeholder="再次输入新密码"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          autoComplete="new-password"
-        />
-      </div>
-      {error && (
-        <p className="ui-form-error" role="alert">
-          {error}
-        </p>
-      )}
-    </Modal>
+        {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
+        <DialogFooter>
+          <Button disabled={!canSubmit} onClick={() => void submit()}>
+            {submitting ? '提交中…' : '确认修改'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -3,7 +3,11 @@ import { useState } from 'react';
 import {
   Button,
   Form,
+  FormControl,
+  FormField,
   FormItem,
+  FormLabel,
+  FormMessage,
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
@@ -80,63 +84,76 @@ export function ResetPasswordPage() {
           <>
             <h1>设置新密码</h1>
             <p className="auth-plain-desc">请设置至少 6 位的新密码。提交后旧密码立即失效。</p>
-            <Form form={form} onSubmit={onSubmit} aria-label="重置密码" className="login-form">
-              <FormItem
-                name="password"
-                label="新密码"
-                className="login-field"
-                rules={[
-                  { required: true, message: '请输入新密码' },
-                  { min: 6, message: '密码至少 6 位' },
-                ]}
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                aria-label="重置密码"
+                className="login-form"
+                noValidate
               >
-                {({ field }) => (
-                  <InputGroup>
-                    <InputGroupAddon>{<Lock size={15} />}</InputGroupAddon>
-                    <InputGroupInput
-                      {...field}
-                      type="password"
-                      placeholder="至少 6 位"
-                      autoComplete="new-password"
-                      autoFocus
-                    />
-                  </InputGroup>
-                )}
-              </FormItem>
-              <FormItem
-                name="confirm"
-                label="确认新密码"
-                className="login-field"
-                rules={[
-                  { required: true, message: '请再次输入新密码' },
-                  {
-                    validate: (value, instance) =>
-                      !value || instance.getValues('password') === value
-                        ? undefined
+                <FormField
+                  control={form.control}
+                  name="password"
+                  rules={{
+                    required: '请输入新密码',
+                    minLength: { value: 6, message: '密码至少 6 位' },
+                  }}
+                  render={({ field }) => (
+                    <FormItem className="login-field">
+                      <FormLabel>新密码</FormLabel>
+                      <FormControl>
+                        <InputGroup>
+                          <InputGroupAddon>{<Lock size={15} />}</InputGroupAddon>
+                          <InputGroupInput
+                            {...field}
+                            type="password"
+                            placeholder="至少 6 位"
+                            autoComplete="new-password"
+                            autoFocus
+                          />
+                        </InputGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirm"
+                  rules={{
+                    required: '请再次输入新密码',
+                    validate: (value) =>
+                      !value || form.getValues('password') === value
+                        ? true
                         : '两次输入的密码不一致',
-                  },
-                ]}
-              >
-                {({ field }) => (
-                  <InputGroup>
-                    <InputGroupAddon>{<Lock size={15} />}</InputGroupAddon>
-                    <InputGroupInput
-                      {...field}
-                      type="password"
-                      placeholder="再次输入"
-                      autoComplete="new-password"
-                    />
-                  </InputGroup>
-                )}
-              </FormItem>
-              <Button disabled={submitting}
-                variant="default"
-                type="submit"
-                className="w-full login-submit"
-              >
-                <span className="state-spinner is-small" aria-hidden />
-                重置密码
-              </Button>
+                  }}
+                  render={({ field }) => (
+                    <FormItem className="login-field">
+                      <FormLabel>确认新密码</FormLabel>
+                      <FormControl>
+                        <InputGroup>
+                          <InputGroupAddon>{<Lock size={15} />}</InputGroupAddon>
+                          <InputGroupInput
+                            {...field}
+                            type="password"
+                            placeholder="再次输入"
+                            autoComplete="new-password"
+                          />
+                        </InputGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button disabled={submitting}
+                  variant="default"
+                  type="submit"
+                  className="w-full login-submit"
+                >
+                  <span className="state-spinner is-small" aria-hidden />
+                  重置密码
+                </Button>
+              </form>
             </Form>
             <div className="auth-plain-actions">
               <Link to="/forgot-password">重新申请重置链接</Link>

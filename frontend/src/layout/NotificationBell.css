@@ -6,7 +6,7 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    顶导消息铃铛 (B4, 2026-10-21)
    与 .app-quota 同一视觉尺度: 32px 高、12px 字号、中性色, 避免在 64px 顶栏里
-   抢过品牌与导航。未读角标由 CountBadge 托管, 不自定义。
+  抢过品牌与导航。未读角标直接用 shadcn `Badge`。
    ───────────────────────────────────────────────────────────────────────────── */
 .app-notif-trigger {
   width: 32px;
@@ -92,14 +92,4 @@
 .app-notif-time {
   font-size: 12px;
   color: var(--text-desc);
-}
-
-.app-notif-trigger [data-slot='badge-count'] {
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  line-height: 16px;
-  font-size: 12px;
-  font-weight: 600;
-  box-shadow: 0 0 0 2px var(--color-card);
 }

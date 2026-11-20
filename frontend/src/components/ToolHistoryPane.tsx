@@ -6,7 +6,7 @@ import { useToolHistory, type ToolHistoryTask } from '../hooks/useToolHistory';
 import { ImageLightbox } from './ImageLightbox';
 import { ToolTrailingContext } from './ToolShell';
 import { StateError } from './StateViews';
-import { useApp, Drawer, Spin } from '../ui';
+import { useApp, Sheet, SheetContent, SheetHeader, SheetTitle, Spin } from '../ui';
 
 /**
  * 修图工具的通用历史侧栏。
@@ -234,16 +234,16 @@ export function ToolHistoryPane({
         <History size={18} />
       </button>
 
-      <Drawer
-        title={title}
-        open={drawerOpen}
-        side="right"
-        width={320}
-        onClose={() => setDrawerOpen(false)}
-        bodyPadding={12}
-      >
-        {content}
-      </Drawer>
+      <Sheet open={drawerOpen} onOpenChange={(next) => !next && setDrawerOpen(false)}>
+        <SheetContent side="right" style={{ width: 320 }}>
+          <SheetHeader>
+            <SheetTitle>{title}</SheetTitle>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {content}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

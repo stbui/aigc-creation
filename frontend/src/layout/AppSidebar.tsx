@@ -1,5 +1,5 @@
 import './AppSidebar.css';
-import { Drawer } from '../ui';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui';
 import { Link, useLocation } from 'react-router-dom';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { SideRail } from './SideRail';
@@ -27,34 +27,37 @@ export function AppSidebar({ groups, items, mobileOpen, onCloseMobile }: Props) 
         <SideRail groups={groups} items={items} activePath={activePath} />
       </div>
 
-      <Drawer
-        title="导航菜单"
-        side="left"
-        width={280}
-        open={mobileOpen}
-        onClose={onCloseMobile}
-        className="app-mobile-drawer"
-        bodyPadding={0}
-      >
-        {/* 移动端补齐顶导隐藏后的高频入口 */}
-        <nav className="app-mobile-links" aria-label="快捷导航">
-          <Link to="/" onClick={onCloseMobile}>
-            首页
-          </Link>
-          <Link to="/packages" onClick={onCloseMobile}>
-            购买套餐
-          </Link>
-          <Link to="/invitations" onClick={onCloseMobile}>
-            邀请有奖
-          </Link>
-        </nav>
-        <SideRail
-          groups={groups}
-          items={items}
-          activePath={activePath}
-          onNavigate={onCloseMobile}
-        />
-      </Drawer>
+      <Sheet open={mobileOpen} onOpenChange={(next) => !next && onCloseMobile()}>
+        <SheetContent
+          side="left"
+          className="app-mobile-drawer"
+          style={{ width: 280 }}
+          showCloseButton={false}
+        >
+          <SheetHeader>
+            <SheetTitle>导航菜单</SheetTitle>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <nav className="app-mobile-links" aria-label="快捷导航">
+              <Link to="/" onClick={onCloseMobile}>
+                首页
+              </Link>
+              <Link to="/packages" onClick={onCloseMobile}>
+                购买套餐
+              </Link>
+              <Link to="/invitations" onClick={onCloseMobile}>
+                邀请有奖
+              </Link>
+            </nav>
+            <SideRail
+              groups={groups}
+              items={items}
+              activePath={activePath}
+              onNavigate={onCloseMobile}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

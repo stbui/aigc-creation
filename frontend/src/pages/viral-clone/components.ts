@@ -93,6 +93,7 @@ export {
   SurfaceTitle,
   Textarea,
   ToggleGroup,
+  ToggleGroupItem,
   cn,
 } from '../../ui';
 export type { SelectOption } from '../../ui';

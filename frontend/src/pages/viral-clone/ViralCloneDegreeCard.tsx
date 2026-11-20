@@ -1,5 +1,5 @@
 import { CLONE_DEGREES, type CloneDegree } from './constants';
-import { ToggleGroup } from './components';
+import { ToggleGroup, ToggleGroupItem } from './components';
 
 /**
  * 复刻程度两档（独立配置卡，默认高度复刻）。
@@ -21,26 +21,24 @@ export function ViralCloneDegreeCard({
       <div className="pk-section">
         <strong className="pk-section-title u-font-14">复刻程度</strong>
         <ToggleGroup
+          type="single"
           value={degree}
           onValueChange={(value) => {
             if (value) onDegreeChange(value as CloneDegree);
           }}
           aria-label="复刻程度"
           className="vc-degree-options"
-          itemClassName="vc-degree-option"
-          options={CLONE_DEGREES.map((d) => ({
-            value: d.value,
-            label: (
-              <>
-                <span className="vc-degree-title">
-                  <span className="vc-degree-dot" aria-hidden />
-                  {d.label}
-                </span>
-                <span className="vc-degree-desc">{d.desc}</span>
-              </>
-            ),
-          }))}
-        />
+        >
+          {CLONE_DEGREES.map((d) => (
+            <ToggleGroupItem key={d.value} value={d.value} className="vc-degree-option">
+              <span className="vc-degree-title">
+                <span className="vc-degree-dot" aria-hidden />
+                {d.label}
+              </span>
+              <span className="vc-degree-desc">{d.desc}</span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </div>
     </section>
   );

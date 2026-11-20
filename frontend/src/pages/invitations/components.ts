@@ -11,4 +11,14 @@ export { PersonalPage } from '../../components/PersonalPage';
 export { StateEmpty, StateError, StateSkeleton } from '../../components/StateViews';
 
 /** shadcn 组合件 */
-export { Button, Modal } from '../../ui';
+export {
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../../ui';

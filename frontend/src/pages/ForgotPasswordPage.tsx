@@ -3,7 +3,11 @@ import { useState } from 'react';
 import {
   Button,
   Form,
+  FormControl,
+  FormField,
   FormItem,
+  FormLabel,
+  FormMessage,
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
@@ -72,36 +76,50 @@ export function ForgotPasswordPage() {
             <p className="auth-plain-desc">
               输入注册时使用的邮箱，我们会发送一封包含重置链接的邮件。
             </p>
-            <Form form={form} onSubmit={onSubmit} aria-label="找回密码" className="login-form">
-              <FormItem
-                name="email"
-                label="邮箱"
-                className="login-field"
-                rules={[
-                  { required: true, message: '请输入邮箱' },
-                  { type: 'email', message: '邮箱格式不正确' },
-                ]}
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                aria-label="找回密码"
+                className="login-form"
+                noValidate
               >
-                {({ field }) => (
-                  <InputGroup>
-                    <InputGroupAddon>{<Mail size={15} />}</InputGroupAddon>
-                    <InputGroupInput
-                      {...field}
-                      placeholder="账号（邮箱）"
-                      autoComplete="username"
-                      autoFocus
-                    />
-                  </InputGroup>
-                )}
-              </FormItem>
-              <Button disabled={submitting}
-                variant="default"
-                type="submit"
-                className="w-full login-submit"
-              >
-                <span className="state-spinner is-small" aria-hidden />
-                发送重置链接
-              </Button>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  rules={{
+                    required: '请输入邮箱',
+                    pattern: {
+                      value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                      message: '邮箱格式不正确',
+                    },
+                  }}
+                  render={({ field }) => (
+                    <FormItem className="login-field">
+                      <FormLabel>邮箱</FormLabel>
+                      <FormControl>
+                        <InputGroup>
+                          <InputGroupAddon>{<Mail size={15} />}</InputGroupAddon>
+                          <InputGroupInput
+                            {...field}
+                            placeholder="账号（邮箱）"
+                            autoComplete="username"
+                            autoFocus
+                          />
+                        </InputGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button disabled={submitting}
+                  variant="default"
+                  type="submit"
+                  className="w-full login-submit"
+                >
+                  <span className="state-spinner is-small" aria-hidden />
+                  发送重置链接
+                </Button>
+              </form>
             </Form>
             <div className="auth-plain-actions">
               想起来了？<Link to="/login">返回登录</Link>

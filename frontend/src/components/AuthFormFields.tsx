@@ -1,6 +1,16 @@
 import type { ReactNode, RefObject } from 'react';
 import { Lock, Mail, Smartphone, User } from 'lucide-react';
-import { Button, FormItem, InputGroup, InputGroupAddon, InputGroupInput } from '../ui';
+import {
+  Button,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '../ui';
 import type { SmsPurpose } from '../types/api';
 
 /**
@@ -48,130 +58,154 @@ export function AuthFormFields({
        * 邀请与订单等所有对外位置, 缺省值拼得难看还会撞名。
        */}
       {mode === 'register' && (
-        <FormItem
+        <FormField
           name="name"
-          label="昵称"
-          className="login-field"
-          rules={[
-            { required: true, message: '请输入昵称', whitespace: true },
-            { max: 20, message: '昵称最多 20 个字符' },
-          ]}
-        >
-          {({ field }) => (
-            <InputGroup>
-              <InputGroupAddon>
-                {<User size={15} />}
-              </InputGroupAddon>
-              <InputGroupInput {...field} placeholder="展示名称" maxLength={20} />
-            </InputGroup>
+          rules={{
+            validate: (value: unknown) =>
+              String(value ?? '').trim() ? true : '请输入昵称',
+            maxLength: { value: 20, message: '昵称最多 20 个字符' },
+          }}
+          render={({ field }) => (
+            <FormItem className="login-field">
+              <FormLabel>昵称</FormLabel>
+              <FormControl>
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<User size={15} />}
+                  </InputGroupAddon>
+                  <InputGroupInput {...field} placeholder="展示名称" maxLength={20} />
+                </InputGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
           )}
-        </FormItem>
+        />
       )}
 
       {mode !== 'sms' && (
-        <FormItem
+        <FormField
           name="email"
-          label="邮箱"
-          className="login-field"
-          rules={[
-            { required: true, message: '请输入邮箱' },
-            { type: 'email', message: '邮箱格式不正确' },
-          ]}
-        >
-          {({ field }) => (
-            <InputGroup>
-              <InputGroupAddon>
-                {<Mail size={15} />}
-              </InputGroupAddon>
-              <InputGroupInput
-                {...field}
-                ref={emailRef}
-                placeholder="账号（邮箱）"
-                autoComplete="username"
-              />
-            </InputGroup>
+          rules={{
+            required: '请输入邮箱',
+            pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: '邮箱格式不正确' },
+          }}
+          render={({ field }) => (
+            <FormItem className="login-field">
+              <FormLabel>邮箱</FormLabel>
+              <FormControl>
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<Mail size={15} />}
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    {...field}
+                    ref={emailRef}
+                    placeholder="账号（邮箱）"
+                    autoComplete="username"
+                  />
+                </InputGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
           )}
-        </FormItem>
+        />
       )}
 
       {mode === 'register' && emailCodeField}
 
       {mode === 'sms' && (
-        <FormItem
+        <FormField
           name="phone"
-          label="手机号"
-          className="login-field"
-          rules={[
-            { required: true, message: '请输入手机号' },
-            { pattern: /^(\+?86[\s-]?)?1[3-9]\d{9}$/, message: '手机号格式不正确' },
-          ]}
-        >
-          {({ field }) => (
-            <InputGroup>
-              <InputGroupAddon>
-                {<Smartphone size={15} />}
-              </InputGroupAddon>
-              <InputGroupInput
-                {...field}
-                placeholder="已绑定的手机号"
-                maxLength={14}
-                inputMode="tel"
-                autoComplete="tel"
-              />
-            </InputGroup>
+          rules={{
+            required: '请输入手机号',
+            pattern: {
+              value: /^(\+?86[\s-]?)?1[3-9]\d{9}$/,
+              message: '手机号格式不正确',
+            },
+          }}
+          render={({ field }) => (
+            <FormItem className="login-field">
+              <FormLabel>手机号</FormLabel>
+              <FormControl>
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<Smartphone size={15} />}
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    {...field}
+                    placeholder="已绑定的手机号"
+                    maxLength={14}
+                    inputMode="tel"
+                    autoComplete="tel"
+                  />
+                </InputGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
           )}
-        </FormItem>
+        />
       )}
 
       {mode !== 'sms' && (
-        <FormItem
+        <FormField
           name="password"
-          label="密码"
-          className="login-field"
-          rules={[
-            { required: true, message: '请输入密码' },
-            { min: 6, message: '密码至少 6 位' },
-          ]}
-        >
-          {({ field }) => (
-            <InputGroup>
-              <InputGroupAddon>
-                {<Lock size={15} />}
-              </InputGroupAddon>
-              <InputGroupInput
-                {...field}
-                type="password"
-                placeholder="请输入密码"
-                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-              />
-            </InputGroup>
+          rules={{
+            required: '请输入密码',
+            minLength: { value: 6, message: '密码至少 6 位' },
+          }}
+          render={({ field }) => (
+            <FormItem className="login-field">
+              <FormLabel>密码</FormLabel>
+              <FormControl>
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<Lock size={15} />}
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    {...field}
+                    type="password"
+                    placeholder="请输入密码"
+                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                  />
+                </InputGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
           )}
-        </FormItem>
+        />
       )}
 
       {/* 注册时的可选手机号 —— 填了才出现验证码（后端强校验归属才能绑定） */}
       {mode === 'register' && (
-        <FormItem
+        <FormField
           name="phone"
-          label="手机号（选填）"
-          className="login-field"
-          rules={[{ pattern: /^(\+?86[\s-]?)?1[3-9]\d{9}$/, message: '手机号格式不正确' }]}
-        >
-          {({ field }) => (
-            <InputGroup>
-              <InputGroupAddon>
-                {<Smartphone size={15} />}
-              </InputGroupAddon>
-              <InputGroupInput
-                {...field}
-                placeholder="选填，用于短信登录"
-                maxLength={14}
-                inputMode="tel"
-                autoComplete="tel"
-              />
-            </InputGroup>
+          rules={{
+            pattern: {
+              value: /^(\+?86[\s-]?)?1[3-9]\d{9}$/,
+              message: '手机号格式不正确',
+            },
+          }}
+          render={({ field }) => (
+            <FormItem className="login-field">
+              <FormLabel>手机号（选填）</FormLabel>
+              <FormControl>
+                <InputGroup>
+                  <InputGroupAddon>
+                    {<Smartphone size={15} />}
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    {...field}
+                    placeholder="选填，用于短信登录"
+                    maxLength={14}
+                    inputMode="tel"
+                    autoComplete="tel"
+                  />
+                </InputGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
           )}
-        </FormItem>
+        />
       )}
 
       {mode === 'sms' && codeField('login')}

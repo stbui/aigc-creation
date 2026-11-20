@@ -9,7 +9,12 @@
 export {
   Button,
   Form,
+  FormControl,
+  FormDescription,
+  FormField,
   FormItem,
+  FormLabel,
+  FormMessage,
   Input,
   RadioGroup,
   RadioGroupItem,

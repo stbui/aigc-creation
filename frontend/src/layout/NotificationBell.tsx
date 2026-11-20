@@ -1,6 +1,6 @@
 import './NotificationBell.css';
 import { useState } from 'react';
-import { Button, CountBadge, Popover, Spin } from '../ui';
+import { Badge, Button, Popover, PopoverContent, PopoverTrigger, Spin } from '../ui';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatRelativeTime } from '../lib/format';
@@ -67,21 +67,35 @@ export function NotificationBell() {
 
   return (
     <Popover
-      content={content}
-      trigger="click"
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
         if (v) void reload(true);
       }}
-      placement="bottom"
-      className="app-notif-popover"
     >
-      <button type="button" className="app-header-action app-notif-trigger" aria-label={unread ? `消息通知，${unread} 条未读` : '消息通知'}>
-        <CountBadge count={unread}>
-          <Bell size={18} />
-        </CountBadge>
-      </button>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="app-header-action app-notif-trigger"
+          aria-label={unread ? `消息通知，${unread} 条未读` : '消息通知'}
+        >
+          <span className="relative inline-flex">
+            <Bell size={18} />
+            {unread > 0 && (
+              <Badge
+                variant="destructive"
+                aria-hidden
+                className="absolute -top-1.5 -right-2 h-4 min-w-4 justify-center rounded-full px-1 text-xs leading-4 shadow-[0_0_0_2px_var(--color-card)]"
+              >
+                {unread > 99 ? '99+' : unread}
+              </Badge>
+            )}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="app-notif-popover w-auto p-0">
+        {content}
+      </PopoverContent>
     </Popover>
   );
 }
