@@ -1,5 +1,6 @@
-import type { PointerEvent as ReactPointerEvent } from 'react';
 import { X } from 'lucide-react';
+
+import { Button } from '../ui';
 import type { Draft, SkuHandle, SkuRegion } from '../lib/skuRegionGeometry';
 
 /**
@@ -7,6 +8,10 @@ import type { Draft, SkuHandle, SkuRegion } from '../lib/skuRegionGeometry';
  *
  * 2026-11-15 从 `SkuRegionEditorModal` 抽出。三种元素都挂在模板图容器内、
  * 跟着 `scale(zoom)` 一起缩放，因此用百分比定位而不是像素。
+ *
+ * 这些元素**没有 shadcn 对应角色**（画布上的可拖拽几何体），所以视觉细节
+ * 留在工具类里；四角手柄与删除按钮使用 shadcn `Button`，保证焦点环、
+ * 禁用与点击语义一致。
  *
  * 注意：选中区域的四角手柄只对矩形/椭圆出现 —— 画笔区域按笔迹点裁切，
  * 没有可拖拽的边界框。
@@ -19,9 +24,33 @@ interface Props {
   draft: Draft | null;
   /** 笔迹点直径（CSS 像素，不随缩放变化） */
   brushSize: number;
-  onRegionPointerDown: (event: ReactPointerEvent<HTMLDivElement>, region: SkuRegion) => void;
-  onHandlePointerDown: (event: ReactPointerEvent<HTMLButtonElement>, region: SkuRegion, handle: SkuHandle) => void;
+  onRegionPointerDown: (event: React.PointerEvent<HTMLDivElement>, region: SkuRegion) => void;
+  onHandlePointerDown: (
+    event: React.PointerEvent<HTMLButtonElement>,
+    region: SkuRegion,
+    handle: SkuHandle,
+  ) => void;
   onRemoveRegion: (id: string) => void;
+}
+
+const REGION_BASE = 'absolute box-border leading-normal touch-none';
+
+const HANDLE_POS: Record<SkuHandle, string> = {
+  nw: '-top-1.5 -left-1.5 cursor-nwse-resize',
+  ne: '-top-1.5 -right-1.5 cursor-nesw-resize',
+  sw: '-bottom-1.5 -left-1.5 cursor-nesw-resize',
+  se: '-right-1.5 -bottom-1.5 cursor-nwse-resize',
+};
+
+function regionClass(region: SkuRegion, selected: boolean): string {
+  if (region.type === 'brush') {
+    return `${REGION_BASE} cursor-move border-0 bg-transparent${selected ? ' z-[4]' : ''}`;
+  }
+  const shape = region.type === 'ellipse' ? 'rounded-full' : 'rounded-[5px]';
+  const state = selected
+    ? 'z-[4] border-solid bg-brand/25 ring-1 ring-brand/35'
+    : 'border-dashed bg-brand/10';
+  return `${REGION_BASE} cursor-move border-2 border-brand/60 ${state} ${shape}`;
 }
 
 export function SkuRegionOverlay({
@@ -41,7 +70,7 @@ export function SkuRegionOverlay({
         return (
           <div
             key={region.id}
-            className={`product-sku-editor-region ${region.type}${selected ? ' is-selected' : ''}`}
+            className={regionClass(region, selected)}
             data-region-id={region.id}
             style={{
               left: `${region.x * 100}%`,
@@ -55,6 +84,7 @@ export function SkuRegionOverlay({
               region.points?.map((point, pointIndex) => (
                 <i
                   key={`${pointIndex}-${point.x}-${point.y}`}
+                  className="pointer-events-none absolute block -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/50"
                   style={{
                     left: `${((point.x - region.x) / Math.max(region.width, 0.0001)) * 100}%`,
                     top: `${((point.y - region.y) / Math.max(region.height, 0.0001)) * 100}%`,
@@ -63,35 +93,43 @@ export function SkuRegionOverlay({
                   }}
                 />
               ))}
-            <b>{index + 1}</b>
+            <span className="absolute -top-[9px] -left-[9px] grid size-[18px] place-items-center rounded-full bg-brand text-xs font-medium text-primary-foreground">
+              {index + 1}
+            </span>
             {selected &&
               region.type !== 'brush' &&
               (['nw', 'ne', 'sw', 'se'] as SkuHandle[]).map((handle) => (
-                <button
+                <Button
                   key={handle}
                   type="button"
-                  className={`resize-handle ${handle}`}
+                  variant="outline"
+                  size="icon-xs"
+                  className={`absolute size-2.5 min-w-2.5 rounded-[2px] border-2 border-brand bg-card p-0 ${HANDLE_POS[handle]}`}
                   aria-label={`调整区域 ${index + 1}`}
                   onPointerDown={(event) => onHandlePointerDown(event, region, handle)}
                 />
               ))}
-            <button
+            <Button
               type="button"
-              className="product-sku-editor-region-remove"
+              variant="secondary"
+              size="icon-xs"
+              className="absolute top-1 right-1 bg-foreground/65 p-0 text-primary-foreground hover:bg-foreground/90"
               aria-label={`删除区域 ${index + 1}`}
               onClick={(event) => {
                 event.stopPropagation();
                 onRemoveRegion(region.id);
               }}
             >
-              <X size={12} />
-            </button>
+              <X aria-hidden />
+            </Button>
           </div>
         );
       })}
       {draftBox && (
         <div
-          className={`product-sku-editor-region draft ${draft?.type === 'ellipse' ? 'ellipse' : 'rect'}`}
+          className={`${REGION_BASE} pointer-events-none border-2 border-dashed border-brand/60 bg-brand/10 opacity-70 ${
+            draft?.type === 'ellipse' ? 'rounded-full' : 'rounded-[5px]'
+          }`}
           style={{
             left: `${draftBox.x * 100}%`,
             top: `${draftBox.y * 100}%`,
@@ -104,7 +142,7 @@ export function SkuRegionOverlay({
         draft.points.map((point, index) => (
           <i
             key={`${index}-${point.x}-${point.y}`}
-            className="product-sku-editor-brush-dot"
+            className="pointer-events-none absolute block -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/60"
             style={{
               left: `${point.x * 100}%`,
               top: `${point.y * 100}%`,

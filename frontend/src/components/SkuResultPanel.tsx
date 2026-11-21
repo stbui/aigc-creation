@@ -1,9 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, ImageIcon, RotateCcw } from 'lucide-react';
+import { Download, ImageIcon, RotateCcw, TriangleAlert } from 'lucide-react';
 import { ImageLightbox } from './ImageLightbox';
 import type { TaskStatus } from '../types/api';
 import { taskErrorText } from '../lib/constants';
 import { assetThumbUrl } from '../lib/api';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  EmptyStateDescription,
+  EmptyStateHeader,
+  EmptyStateMedia,
+  EmptyStateTitle,
+  InlineAlert,
+  InlineAlertDescription,
+  InlineAlertTitle,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '../ui';
 
 export interface SkuResultItem {
   id: string;
@@ -38,6 +55,15 @@ interface Props {
   onRetryFailed?: (itemId?: string) => void;
   retrying?: boolean;
 }
+
+const isDone = (item?: SkuResultItem) =>
+  Boolean(
+    item?.url &&
+      item.status !== 'queued' &&
+      item.status !== 'running' &&
+      item.status !== 'failed' &&
+      item.status !== 'cancelled',
+  );
 
 export function SkuResultPanel({
   items,
@@ -99,46 +125,108 @@ export function SkuResultPanel({
   }));
   const activePreviewIndex = active?.url ? previewItems.findIndex((item) => item.url === active.url) : -1;
 
+  const stage = active ? (
+    !active || active.status === 'queued' || active.status === 'running' ? (
+      <div className="flex flex-col items-center gap-2" aria-live="polite">
+        <Skeleton className="size-11 rounded-xl" />
+        <strong className="text-[13px] font-medium text-foreground">
+          正在生成 {active?.label ?? 'SKU 图'}…
+        </strong>
+        <span className="text-xs text-muted-foreground">模型正在保持版式并替换框选区域</span>
+      </div>
+    ) : active.status === 'failed' || active.status === 'cancelled' ? (
+      <InlineAlert variant="destructive" className="w-auto">
+        <TriangleAlert aria-hidden />
+        <InlineAlertTitle>{active.label} 生成失败</InlineAlertTitle>
+        <InlineAlertDescription>
+          {active.errorCode ? taskErrorText(active.errorCode) : '任务未能完成，可重试这一张'}
+          {onRetryFailed && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={retrying}
+              className="mt-1"
+              onClick={() => onRetryFailed(active.id)}
+            >
+              <RotateCcw aria-hidden />
+              {retrying ? '重试中…' : '重试此 SKU'}
+            </Button>
+          )}
+        </InlineAlertDescription>
+      </InlineAlert>
+    ) : active.url ? (
+      <>
+        <Button
+          type="button"
+          variant="ghost"
+          className="size-full cursor-zoom-in rounded-none p-0 hover:bg-transparent"
+          aria-label={`预览 ${active.label}`}
+          onClick={() => setPreviewIndex(activePreviewIndex)}
+        >
+          <img
+            src={active.url}
+            alt={`${active.label} SKU 图`}
+            className="block max-h-full max-w-full object-contain"
+          />
+        </Button>
+        <Badge variant="secondary" className="pointer-events-none absolute right-2 bottom-2">
+          {active.label}
+        </Badge>
+      </>
+    ) : null
+  ) : null;
+
   return (
-    <section className="product-sku-result-panel" aria-label="SKU 批量结果">
+    <section
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[14px] bg-card p-3.5 max-[1024px]:min-h-[560px] max-[560px]:min-h-[520px] max-[560px]:p-3"
+      aria-label="SKU 批量结果"
+    >
       {items.length > 0 && (
-        <div className="product-sku-result-heading">
-          <div>
-            <p>本批次 {items.length} 个 SKU</p>
-          </div>
-          <div>
+        <div className="mb-3 flex min-h-7 flex-wrap items-center justify-between gap-2">
+          <Badge variant="secondary">本批次 {items.length} 个 SKU</Badge>
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             {failed.length > 0 && onRetryFailed && (
-              <button
+              <Button
                 type="button"
-                className="product-sku-result-retry"
+                variant="outline"
+                size="sm"
                 disabled={retrying}
+                className="text-brand"
                 onClick={() => onRetryFailed()}
               >
-                <RotateCcw size={14} />
+                <RotateCcw aria-hidden />
                 重试失败项 ({failed.length})
-              </button>
+              </Button>
             )}
             {ready.length > 0 && (
-              <button type="button" className="product-sku-result-download-all" onClick={onDownloadAll}>
-                <Download size={15} />
+              <Button type="button" size="sm" onClick={onDownloadAll}>
+                <Download aria-hidden />
                 一键下载
-              </button>
+              </Button>
             )}
           </div>
         </div>
       )}
 
-      {(notice || error) && (
-        <p className={`product-sku-result-notice${error ? ' is-error' : ''}`} role="status">
-          {error || notice}
-        </p>
-      )}
+      {error || notice ? (
+        <InlineAlert
+          variant={error ? 'destructive' : 'default'}
+          className="mb-2.5"
+          role="status"
+        >
+          <InlineAlertDescription>{error || notice}</InlineAlertDescription>
+        </InlineAlert>
+      ) : null}
 
       {items.length === 0 ? (
         source?.url ? (
-          <div className="product-sku-stage product-sku-stage-source" ref={sourceStageRef}>
+          <div
+            ref={sourceStageRef}
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[2px]"
+          >
             <span
-              className={`product-sku-stage-media${sourceMediaSize ? ' is-sized' : ''}`}
+              className="relative block max-h-full max-w-full"
               style={
                 sourceMediaSize
                   ? { width: sourceMediaSize.width, height: sourceMediaSize.height }
@@ -148,6 +236,7 @@ export function SkuResultPanel({
               <img
                 src={source.url}
                 alt={source.label ?? '已选图片'}
+                className={`block max-h-full max-w-full object-contain${sourceMediaSize ? ' size-full' : ''}`}
                 onLoad={(event) => {
                   const { naturalWidth, naturalHeight } = event.currentTarget;
                   if (naturalWidth > 0 && naturalHeight > 0) {
@@ -158,7 +247,9 @@ export function SkuResultPanel({
               {source.regions?.map((region, index) => (
                 <span
                   key={region.id ?? index}
-                  className={`product-sku-stage-region${region.type === 'ellipse' ? ' is-ellipse' : ''}`}
+                  className={`pointer-events-none absolute box-border border-2 border-dashed border-brand bg-brand/10 ${
+                    region.type === 'ellipse' ? 'rounded-full' : 'rounded-[5px]'
+                  }`}
                   style={{
                     left: `${region.x * 100}%`,
                     top: `${region.y * 100}%`,
@@ -166,91 +257,65 @@ export function SkuResultPanel({
                     height: `${region.height * 100}%`,
                   }}
                 >
-                  <b>{index + 1}</b>
+                  <Badge className="absolute -top-[9px] -left-[9px] size-[18px] justify-center rounded-full p-0 text-xs">
+                    {index + 1}
+                  </Badge>
                 </span>
               ))}
             </span>
           </div>
         ) : (
-          <div className="product-sku-result-empty">
-            <div className="product-sku-result-empty-stage" aria-hidden="true">
-              <ImageIcon size={36} />
-            </div>
-            <strong>商品SKU图</strong>
-            <p>一张图，批量套出版式完全一致的整组 SKU 图。</p>
-          </div>
+          <EmptyState className="flex-1 border-0">
+            <EmptyStateMedia variant="icon">
+              <ImageIcon aria-hidden />
+            </EmptyStateMedia>
+            <EmptyStateHeader>
+              <EmptyStateTitle className="text-sm font-semibold">商品SKU图</EmptyStateTitle>
+              <EmptyStateDescription className="text-xs">
+                一张图，批量套出版式完全一致的整组 SKU 图。
+              </EmptyStateDescription>
+            </EmptyStateHeader>
+          </EmptyState>
         )
       ) : (
-        <>
-          <div
-            className={`product-sku-stage${
-              active?.url &&
-              active.status !== 'queued' &&
-              active.status !== 'running' &&
-              active.status !== 'failed' &&
-              active.status !== 'cancelled'
-                ? ' product-sku-stage-image'
-                : ''
+        <Tabs
+          value={active?.id}
+          onValueChange={onActiveChange}
+          className="min-h-0 flex-1 gap-3"
+          aria-label="SKU 结果"
+        >
+          <TabsContent
+            value={active?.id ?? ''}
+            className={`relative m-0 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[2px] data-[state=active]:flex ${
+              isDone(active) ? 'bg-transparent' : 'bg-muted'
             }`}
           >
-            {!active || active.status === 'queued' || active.status === 'running' ? (
-              <div className="product-sku-generating" aria-live="polite">
-                <span className="product-sku-generating-pulse" aria-hidden="true" />
-                <strong>正在生成 {active?.label ?? 'SKU 图'}…</strong>
-                <span>模型正在保持版式并替换框选区域</span>
-              </div>
-            ) : active.status === 'failed' || active.status === 'cancelled' ? (
-              <div className="product-sku-generating is-error">
-                <strong>{active.label} 生成失败</strong>
-                <span>{active.errorCode ? taskErrorText(active.errorCode) : '任务未能完成，可重试这一张'}</span>
-                {onRetryFailed && (
-                  <button
-                    type="button"
-                    className="product-sku-stage-retry"
-                    disabled={retrying}
-                    onClick={() => onRetryFailed(active.id)}
-                  >
-                    <RotateCcw size={13} />
-                    {retrying ? '重试中…' : '重试此 SKU'}
-                  </button>
-                )}
-              </div>
-            ) : active.url ? (
-              <>
-                <button
-                  type="button"
-                  className="product-sku-stage-preview"
-                  aria-label={`预览 ${active.label}`}
-                  onClick={() => setPreviewIndex(activePreviewIndex)}
-                >
-                  <img src={active.url} alt={`${active.label} SKU 图`} />
-                </button>
-                <span className="product-sku-stage-label">{active.label}</span>
-              </>
-            ) : null}
-          </div>
-
-          <div className="product-sku-result-thumbnails" role="tablist" aria-label="SKU 结果缩略图">
+            {stage}
+          </TabsContent>
+          <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto rounded-none bg-transparent p-0">
             {items.map((item) => (
-              <button
+              <TabsTrigger
                 key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={active?.id === item.id}
-                className={active?.id === item.id ? 'active' : undefined}
-                title={item.label}
-                onClick={() => onActiveChange(item.id)}
+                value={item.id}
+                className="relative h-16 w-14 flex-none overflow-hidden rounded-md border-2 border-transparent bg-muted p-0 data-[state=active]:border-brand/60 data-[state=active]:bg-muted data-[state=active]:shadow-none"
               >
                 {item.url ? (
-                  <img src={assetThumbUrl(item.url, 240) ?? item.url} alt="" loading="lazy" />
+                  <img
+                    src={assetThumbUrl(item.url, 240) ?? item.url}
+                    alt=""
+                    loading="lazy"
+                    className="size-full object-cover"
+                  />
                 ) : (
-                  <span className="product-sku-thumb-placeholder" />
+                  <Skeleton className="size-full rounded-none" />
                 )}
-                <span>{item.label}</span>
-              </button>
+                <span className="absolute inset-x-0 bottom-0 truncate bg-foreground/55 px-0.5 py-[3px] text-xs leading-3 text-primary-foreground">
+                  {item.label}
+                </span>
+              </TabsTrigger>
             ))}
-          </div>
-        </>
+          </TabsList>
+        </Tabs>
       )}
 
       {previewIndex !== null && previewIndex >= 0 && (
@@ -264,4 +329,3 @@ export function SkuResultPanel({
     </section>
   );
 }
-

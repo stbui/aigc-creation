@@ -35,6 +35,7 @@ import {
   parseLocalRedrawAnnotations,
 } from '../../capabilities/definitions/local_redraw';
 import { AppError } from '../../common/app.exception';
+import { currentClientIp } from '../../common/request-context';
 import { CreditPriceService } from '../../credits/credit-price.service';
 import { CreateGenerationDto } from '../../generate/dto/create-generation.dto';
 import { MembershipService } from '../../membership/membership.service';
@@ -275,6 +276,9 @@ export class TaskAdmissionService {
       channelModelId: routed.channelModel.id,
       channelId: routed.channelModel.channelId,
       routeRun: 1,
+      // 建任务请求的客户端地址：worker 执行时已经拿不到 req，只能在这里快照。
+      // 取不到就写空串，让调用记录显示「未知」而不是一个假的「本机」。
+      clientIp: currentClientIp() ?? '',
       heartbeatAt: new Date(),
     };
 

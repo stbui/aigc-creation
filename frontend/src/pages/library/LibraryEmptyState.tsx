@@ -26,22 +26,20 @@ export interface LibraryEmptyStateProps {
 
 export function LibraryEmptyState({ copy, primary, onAction }: LibraryEmptyStateProps) {
   return (
-    <EmptyState className="asset-library-empty asset-library-state-empty">
+    <EmptyState className="min-h-[300px] gap-2 rounded-[14px] border border-dashed border-border bg-[rgba(255,255,255,0.66)]">
       <EmptyStateMedia>
-        <img src="/asset-library/empty.svg" alt="" width={160} height={160} />
+        <img src="/asset-library/empty.svg" alt="" width={160} height={160} className="size-40 object-contain" />
       </EmptyStateMedia>
       <EmptyStateHeader>
-        <EmptyStateTitle>{copy.title}</EmptyStateTitle>
-        <EmptyStateDescription>{copy.description}</EmptyStateDescription>
+        <EmptyStateTitle className="text-sm leading-5 font-semibold text-foreground">{copy.title}</EmptyStateTitle>
+        <EmptyStateDescription className="text-xs leading-5 text-muted-foreground">
+          {copy.description}
+        </EmptyStateDescription>
       </EmptyStateHeader>
       <EmptyStateContent>
         <Button
           variant={primary ? 'default' : 'outline'}
-          className={cn(
-            'asset-library-button',
-            'asset-library-empty-action',
-            primary && 'asset-library-button-primary',
-          )}
+          className={cn('mt-2', primary && 'bg-brand text-primary-foreground')}
           onClick={onAction}
         >
           {primary ? <Upload className="size-3.5" /> : undefined}

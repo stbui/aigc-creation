@@ -106,7 +106,7 @@ WCAG 2.2 AA 要求：
 | 端 | 取件 |
 | --- | --- |
 | C 端 | `frontend/src/ui` barrel（底层 shadcn/radix 原子件） |
-| 后台 | `admin-ui/radar`（页面公开 barrel；共享实现由 primitives 透传） |
+| 后台 | `admin-ui/radar`（页面唯一公开 barrel） |
 | 浮层 / 菜单 / 对话框 | radix + shadcn 组合件，不手写焦点管理 |
 
 不要覆盖底座的 `role` / `tabIndex` / `aria-*`；确需扩展时在组合层补，不改原子件。

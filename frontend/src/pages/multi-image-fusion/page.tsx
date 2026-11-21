@@ -20,14 +20,16 @@ import { MultiFusionSubmitBar } from './MultiFusionSubmitBar';
 import { MultiFusionUploadCard } from './MultiFusionUploadCard';
 
 /**
- * 多图融合 —— 严格 1:1 复刻参考站 https://ijihua.cn/multi-image-fusion。
+ * 多图融合 —— 两步流（场景网关 → 工作区）。
  *
- * 依据docs/multi-image-fusion-spec.md (2026-10-17 设计师产出, 唯一依据):
+ * 依据 docs/multi-image-fusion-spec.md (2026-10-17 设计师产出, 唯一依据):
  *   §2  区块地图 (两步流, 无路由变化)          → 本文件 DOM 结构
  *   §4.1 参考站实测文案 (逐字照录)             → SCENE_GROUPS / 各处文案
- *   §5  参考站 203 条规则字面值                 → style.css 的 multi-image-fusion-* 区块
- *   §6  --mif-* token 组                        → global.css :root
  *   §7  逐项差异清单 S-1~S-17 / D-1~D-96        → 实施范围
+ *
+ * 2026-11-21 组件层重构: 原 `multi-image-fusion-*` 控件皮肤（1902 行页面 CSS）
+ * 全部换成 shadcn 组合件与 C 端语义组件（`TextAction` / `ImageDropzone`）。
+ * 页面 CSS 只剩外壳几何（视口高度、两列骨架、控制列滚动、舞台棋盘格）。
  *
  * 命名隔离: 本页只使用 `multi-image-fusion-*` 命名空间, 不复用也不改名 `pk-*`
  * (pk-* 同时服务 ProductKit 等页面, 改动会外溢)。
@@ -90,7 +92,8 @@ export function MultiFusionPage() {
   });
 
   const resolutionMultiplier =
-    resolutionOptions('multi_fusion').find((option) => option.value === resolution)?.multiplier ?? 1;
+    resolutionOptions('multi_fusion').find((option) => option.value === resolution)?.multiplier ??
+    1;
   const currentCreditCost =
     baseCreditCost === null
       ? null
@@ -114,12 +117,14 @@ export function MultiFusionPage() {
   // ── 状态 1: 场景网关 (无 header / 无返回键, 见 §2) ──
   if (step === 'gateway') {
     return (
-      <MultiFusionSceneGateway
-        onSelect={(value) => {
-          setScene(value);
-          setStep('workspace');
-        }}
-      />
+      <div className="multi-image-fusion-page is-scene-selection">
+        <MultiFusionSceneGateway
+          onSelect={(value) => {
+            setScene(value);
+            setStep('workspace');
+          }}
+        />
+      </div>
     );
   }
 
@@ -128,16 +133,14 @@ export function MultiFusionPage() {
   const resultRatio = task.requestedRatio ?? ratio;
   const [resultRatioW, resultRatioH] = resultRatio.split(':').map(Number);
   // §1.3: --fusion-ratio-width/height 参考站 CSS 产物中无定义, 由 JS 按所选比例内联注入。
-  // 注入在页面根 (而非仅 preview-stage), 因为参考站 rule #155 的自适应宽度规则
-  // 同时作用于 .multi-image-fusion-preview-stage 与 .multi-image-fusion-result-empty,
-  // 空态也必须拿到这两个变量 (E3 实测空态宽 193px = 100vh - 104 - 280, 1:1)。
+  // 注入在页面根 (而非仅舞台), 因为空态与舞台都要按比例取值。
   const fusionRatioVars = {
     '--fusion-ratio-width': ratioW,
     '--fusion-ratio-height': ratioH,
   } as CSSProperties;
 
   return (
-    <div className="multi-image-fusion-page is-editor" style={fusionRatioVars}>
+    <div className="multi-image-fusion-page" style={fusionRatioVars}>
       <MultiFusionEditorHeader scene={scene} onBack={() => setStep('gateway')} />
 
       <div className="multi-image-fusion-layout">

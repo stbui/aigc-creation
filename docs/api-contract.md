@@ -123,6 +123,10 @@
 | PATCH | `/api/v1/admin/payments/providers/:providerId/instances/order` | 按 `{ instanceIds }` 调整实例排序，`payment.write` |
 | GET | `/api/v1/admin/system-performance` | 系统性能只读快照：运行时（内存 / CPU 累计时间 / 事件循环延迟）、数据库探活与库文件大小、存储探活（30 秒缓存）、近 24 小时任务与上游调用 P95、线路冷却与调度器状态；`setting.read` |
 | POST | `/api/v1/admin/settings/upload` | 上传设置图片（multipart 字段 `file`），返回 `{ value, previewUrl, width, height, sizeBytes }`；`setting.write` |
+| GET | `/api/v1/admin/storage/status` | 存储后端状态：各后端 `available`/`configured`/`active`/`config`（可编辑字段定义 + 非密钥明文 + 密钥是否配置与脱敏，明文密钥不出服务端）+ `editable=true`；`setting.read` |
+| PUT | `/api/v1/admin/storage/config/:backend` | 保存 OSS / MinIO 配置（`{ values: Record<string,string> }`），凭据加密落库并即时生效免重启；密钥留空沿用旧值，`updatedBy` 记管理员 id；`setting.write`。契约反转见 `docs/non-upstream-extensions.md` EXT-2026-11-20-01 |
+| POST | `/api/v1/admin/storage/probe` | 连通性测试（`?backend=` 可选），写 1 字节探针读回校验后删除；`channel.test` |
+| POST | `/api/v1/admin/storage/active` | 切换默认后端（`?backend=local\|oss\|minio`），仅影响新上传；`setting.write` |
 | GET/PUT | `/api/v1/admin/payments/settings` | 支付设置：`defaultCurrency` / `alipaySource` / `wechatSource`，字段均可选，PUT 只更新实际提交项；读 `payment.read` / 写 `payment.write` |
 | GET | `/api/v1/admin/payments/orders` | 支付订单列表（服务端分页，默认 30）：筛选 `status` / `providerId` / `keyword` / `timeField` / `from` / `to` / `sort`，`payment.read` |
 | GET | `/api/v1/admin/payments/orders/:id` | 订单详情（含最近 50 次支付尝试），`payment.read` |
@@ -141,7 +145,7 @@
 | GET | `/api/v1/admin/channel-models?channelId=&includeDisabled=` | 跨渠道模型视图（一行 = 一条渠道模型，条目带 `channelName` / `channelEnabled`）。`includeDisabled=1` 含已停用线路 —— 后台「全部模型」视图要用；不传时只给启用线路（前台模型的线路选择器用，停用线路进了下拉会让人以为选了就能用），`channel.model_read` |
 | GET/PUT | `/api/v1/admin/channels/order`、`/api/v1/admin/channels/:id/models/order` | 渠道排序 / 渠道内模型排序。`GET` 返回当前顺序的 id 数组；`PUT` 请求体 `{ ids, expectedIds }` —— `expectedIds` 是**读取时看到的顺序**，与库中不一致说明期间有人改过，整单拒绝 **409**（`code 40900`，「排序列表已变化，请重新加载后再保存」），不做部分落库。权限 `channel.write` / `channel.model_write`， |
 | GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；同时下发清单声明的 `baseUrl`、鉴权字段与配置字段，供渠道表单做服务商预设；`channel.model_read` |
-| GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔使用，`channel.read` |
+| GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），`channel.read` |
 | POST | `/api/v1/admin/channels/health/reset` | 解除本进程内全部线路冷却，返回 `{ cleared }`；只清内存不动数据库，多实例部署只影响处理本次请求的实例，`channel.write`， |
 | GET | `/api/v1/admin/channel-models/health?channelId=` | 线路**历史表现**：一行 = 一条渠道模型，给 24h / 7d 两个窗口的成功率与 P95 耗时 + 最近 10 条终态样本，`channel.model_read`。与 `/admin/channels/health` 的分工：后者是「现在」（启停 / 协议 / 冷却），本端点是「过去」（成功率 / 耗时），值班时两个都要看。成功率 = `success` ÷ 终态次数（`pending` / `canceled` 不计入分母），**无终态样本时为 `null`**（不是 0 ——「没数据」与「全失败」要分得开）；P95 用最近邻法（不插值），样本被采样上限截断时 `sampled=true` |
 | POST | `/api/v1/admin/channels/:id/models/import` | 导入勾选的上游商品。请求体 `{ models, config?, capabilitiesByModel? }`；`config`（类型 / 接入方式 / 计费与售价 / `enabled`）优先于供应商默认配置，两者都没有则只建骨架行；`capabilitiesByModel` 给出时导入后立即写入能力绑定。返回 `{ models, added, configured, bindings }`。配置应用失败的商品回落为骨架行，不阻断整次导入；`channel.model_write` |

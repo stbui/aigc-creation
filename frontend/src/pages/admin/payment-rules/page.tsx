@@ -3,20 +3,6 @@ import '../../../styles/radar-admin.css';
 import { Link, useLocation } from 'react-router-dom';
 import { RotateCcw, ShieldCheck, WalletCards } from 'lucide-react';
 
-import {
-  ActionButton,
-  AdminPage,
-  EmptyState,
-  FieldGroup,
-  ListError,
-  Notice,
-  PageSkeleton,
-  Panel,
-  SaveBar,
-  SkeletonPanel,
-  StaleError,
-  ToneBadge,
-} from '~/admin-ui/radar';
 import { adminSettingsApi } from './api';
 import type { AdminSettingValue } from '../../../types/api';
 import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';
@@ -35,9 +21,21 @@ import {
 } from './constants';
 import { PaymentRuleField } from './fields';
 import {
+  ActionButton,
+  AdminPage,
+  EmptyState,
+  FieldGroup,
+  ListError,
+  Notice,
   OperationGuidePanel,
+  PageSkeleton,
+  Panel,
   PaymentRulesOverview,
+  SaveBar,
   SaveRulesDialog,
+  SkeletonPanel,
+  StaleError,
+  ToneBadge,
   formatRuleValue,
   refundBoundaryText,
   type RuleChange,

@@ -5,3 +5,19 @@
  * 取，不直接连 `~/components`。
  */
 export { ALERT_SEVERITY_META, alertTime } from '~/components/admin/AlertCenter';
+
+export {
+  Button,
+  EmptyState,
+  ListError,
+  PageHeader,
+  Panel,
+  RadarBadge,
+  RadarPage,
+  Segmented,
+  SkeletonBody,
+  StatCards,
+  StaleError,
+  WorkQueue,
+  WorkQueueSection,
+} from '~/admin-ui/radar';

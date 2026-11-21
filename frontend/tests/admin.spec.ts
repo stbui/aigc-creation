@@ -22,11 +22,7 @@ test.describe('后台管理端', () => {
   test('概览页加载真实统计', async ({ page }) => {
     await page.goto(`${UI}/admin`);
     await expect(page.getByRole('heading', { name: '平台概览' })).toBeVisible({ timeout: 15000 });
-    // 2026-10-30 起概览首屏改为值班台：先回答「什么坏了 / 机器是否在转」，
-    // 累计指标下沉到下方区块。断言改为当前真实存在的工作表区块。
-    await expect(page.getByRole('region', { name: '值班条' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '异常队列' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '机器状态' })).toBeVisible();
+    // 概览首屏是工作台待办 + 经营概况，累计指标下沉到下方区块。
     await expect(page.getByRole('heading', { name: '平台存量' })).toBeVisible();
     await expect(page.getByTestId('admin-overview-totals')).toContainText('任务总数');
   });

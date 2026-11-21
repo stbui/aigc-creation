@@ -266,7 +266,7 @@ export function CreativeImagePage() {
   const submitDisabled = !formValid || (Boolean(token) && capabilityBlocked);
 
   return (
-    <div className="pk-workspace fc-workspace">
+    <div className="pk-workspace pr-4!">
       <CreativeImageInputPane
         capability={capability}
         capabilityLabel={capabilityLabel}

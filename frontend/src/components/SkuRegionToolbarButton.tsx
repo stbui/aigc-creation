@@ -18,7 +18,9 @@ export function SkuRegionToolbarButton({ active, disabled, label, onClick, child
   return (
     <button
       type="button"
-      className={active ? 'active' : undefined}
+      className={`inline-flex min-h-6 items-center gap-1 border-0 bg-transparent px-0 py-[3px] text-xs leading-[18px] whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-[.38] ${
+        active ? 'cursor-pointer text-brand' : 'cursor-pointer text-muted-foreground'
+      }`}
       disabled={disabled}
       aria-label={label}
       title={label}

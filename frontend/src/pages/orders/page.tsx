@@ -293,7 +293,6 @@ export function OrdersPage() {
 
   return (
     <PersonalPage
-      className="orders-page"
       title="我的订单"
       description={
         pendingCount > 0
@@ -335,7 +334,7 @@ export function OrdersPage() {
         <OrdersFilterBar filter={filter} counts={counts} onChange={setFilter} />
       )}
       {orders.length > 0 && visibleOrders.length === 0 && (
-        <p className="order-filter-empty">该状态下还没有订单</p>
+        <p className="m-0 py-10 text-center text-[13px] text-muted-foreground">该状态下还没有订单</p>
       )}
 
       {visibleOrders.map((o) => (
@@ -358,9 +357,9 @@ export function OrdersPage() {
       ))}
 
       {!loading && !error && orders.length > 0 && orders.length < total && (
-        <div className="order-load-more">
+        <div className="my-4 mb-2 flex justify-center">
           <Button disabled={loadingMore} onClick={() => void load({ append: true })}>
-            <span className="state-spinner is-small" aria-hidden />
+            {loadingMore && <span className="state-spinner is-small" aria-hidden />}
             加载更多订单（已加载 {orders.length} / {total}）
           </Button>
         </div>

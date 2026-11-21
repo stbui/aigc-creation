@@ -27,7 +27,21 @@ export { SkuRegionEditorModal, type SkuRegion } from '../../components/SkuRegion
 
 /** shadcn 组合件：卡片、输入、按钮与加载态统一从 C 端 UI 入口取用。 */
 export {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentMedia,
+  Badge,
   Button,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  ImageDropzone,
+  InlineAlert,
+  InlineAlertDescription,
+  InlineAlertTitle,
   Input,
   InputGroup,
   InputGroupInput,
@@ -39,4 +53,6 @@ export {
   SurfaceDescription,
   SurfaceHeader,
   SurfaceTitle,
+  TextAction,
+  useApp,
 } from '../../ui';

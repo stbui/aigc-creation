@@ -12,6 +12,19 @@ export const STATS_PAGE_META = {
 
 export const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
+/**
+ * 任务状态色调 → 胶囊样式。
+ *
+ * 状态与颜色的映射只在这里维护一份；`TASK_STATUS` 只回答「文案 + 色调名」，
+ * 具体类名按色调名查这张表。
+ */
+export const TASK_STATUS_TONE: Record<string, string> = {
+  ok: 'bg-success-soft text-success-text',
+  bad: 'bg-danger-soft text-danger-text',
+  run: 'bg-warn-soft text-warn-text',
+  muted: 'bg-muted text-[color:var(--text-muted)]',
+};
+
 /** 任务状态 → 文案与色调（仅用户侧语义，不含运营指标） */
 export const TASK_STATUS: Record<string, { label: string; tone: string }> = {
   succeeded: { label: '已完成', tone: 'ok' },

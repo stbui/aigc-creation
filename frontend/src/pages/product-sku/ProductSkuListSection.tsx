@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react';
 
 import { MAX_SKUS, type SkuItem } from './constants';
-import { Button, type SkuRegion } from './components';
+import { type SkuRegion, TextAction } from './components';
 import { ProductSkuListItem } from './ProductSkuListItem';
 
 interface ProductSkuListSectionProps {
@@ -30,7 +30,8 @@ interface ProductSkuListSectionProps {
  * SKU 清单编辑器：标题栏 + 添加按钮 + 逐行 SKU。
  *
  * 行内状态由 `ProductSkuListItem` / `ProductSkuVariantRow` 展示，
- * 增删与字段更新全部回到页面的 `items` 状态。
+ * 增删与字段更新全部回到页面的 `items` 状态。标题栏吸顶：清单可以很长，
+ * 滚动时「添加 SKU」必须一直在手边。
  */
 export function ProductSkuListSection({
   items,
@@ -48,19 +49,17 @@ export function ProductSkuListSection({
   onPreview,
 }: ProductSkuListSectionProps) {
   return (
-    <section className="product-sku-list-section" aria-label="SKU 清单">
-      <div className="product-sku-list-heading">
-        <strong>SKU 清单</strong>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
+    <section className="grid min-h-0 content-start gap-2.5" aria-label="SKU 清单">
+      <div className="sticky top-0 z-[2] flex items-center justify-between gap-2 bg-page px-3 py-0.5">
+        <strong className="text-xs font-semibold text-foreground">SKU 清单</strong>
+        <TextAction
+          icon={<Plus size={12} aria-hidden />}
           disabled={items.length >= MAX_SKUS}
-          className="h-auto text-brand hover:bg-transparent"
+          className="font-medium text-brand hover:text-brand"
           onClick={onAdd}
         >
-          <Plus className="size-3" /> 添加 SKU
-        </Button>
+          添加 SKU
+        </TextAction>
       </div>
 
       {items.map((item, itemIndex) => (

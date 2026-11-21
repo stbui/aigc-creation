@@ -343,7 +343,7 @@
 
 ### 4.3 样式约束
 
-业务页面只从 `admin-ui/radar` 取件，共享实现由 Radar barrel 透传。外壳层使用 `tokens.css` / `styles/admin.css` 的品牌紫语义；业务内容层使用 `styles/radar-admin.css` 的 Radar 令牌，**禁止硬编码色值**。后台样式不触碰 C 端样式层；`adm-*` 只保留给外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增，也不直连 `admin-ui/primitives` 或 `admin-ui/components/ui`。
+业务页面只从 `admin-ui/radar` 取件，实现全部在 `radar/` 内并由其 barrel 公开。外壳层使用 `tokens.css` / `styles/admin.css` 的品牌紫语义；业务内容层使用 `styles/radar-admin.css` 的 Radar 令牌，**禁止硬编码色值**。后台样式不触碰 C 端样式层；`adm-*` 只保留给外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增，也不直连 `admin-ui/components/ui`。
 
 ### 4.4 响应式
 

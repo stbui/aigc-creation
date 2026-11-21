@@ -11,6 +11,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { currentClientIp } from '../../common/request-context';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SecretCipher } from '../infra/secret-cipher';
 import { badRequest } from '../domain/json';
@@ -141,6 +142,9 @@ export class ProtocolTestService {
     let upstreamUrl = '';
     let responsePreview = '';
     let requestPreview = '';
+    /** 最后一次真实发送的字节数：轮询会覆盖 create 的值，与 `statusCode` 同口径 */
+    let requestBytes = 0;
+    let responseBytes = 0;
     let createResult: ProtocolCreateResult | null = null;
     let finalResult: ProtocolResult | null = null;
     let status: ProtocolStatus = 'failed';
@@ -154,6 +158,8 @@ export class ProtocolTestService {
       statusCode = response.status;
       upstreamUrl = response.url;
       responsePreview = previewCallText(response.text);
+      requestBytes = response.requestBytes;
+      responseBytes = response.responseBytes;
       if (response.status < 200 || response.status >= 300) {
         errorCode = 'upstream_http_error';
         throw new Error(`上游返回 HTTP ${response.status}：${upstreamErrorText(response.text)}`);
@@ -184,6 +190,8 @@ export class ProtocolTestService {
           statusCode = pollResponse.status;
           upstreamUrl = pollResponse.url;
           responsePreview = previewCallText(pollResponse.text);
+          requestBytes = pollResponse.requestBytes;
+          responseBytes = pollResponse.responseBytes;
           if (pollResponse.status < 200 || pollResponse.status >= 300) {
             errorCode = 'upstream_http_error';
             throw new Error(`轮询返回 HTTP ${pollResponse.status}：${upstreamErrorText(pollResponse.text)}`);
@@ -245,6 +253,10 @@ export class ProtocolTestService {
         requestContentType: spec.contentType,
         requestBody: requestPreview,
         responseBody: responsePreview,
+        /* 连通性测试由管理员在后台同步触发，请求上下文仍在 */
+        clientIp: currentClientIp() ?? '',
+        requestBytes,
+        responseBytes,
         startedAt,
       },
     });

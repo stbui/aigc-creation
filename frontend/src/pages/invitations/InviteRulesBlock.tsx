@@ -11,13 +11,13 @@ interface InviteRulesBlockProps {
 /** 规则说明：奖励口径、绑定限制与待发放预估。 */
 export function InviteRulesBlock({ rule, enabled, metrics }: InviteRulesBlockProps) {
   return (
-    <section className="invite-block">
-      <div className="invite-block-head">
-        <h2>
+    <section className="rounded-xl border border-border bg-card px-6 pt-[22px] pb-6 max-[640px]:px-4 max-[640px]:pt-[18px] max-[640px]:pb-5">
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="m-0 flex items-center gap-2 text-base font-semibold text-foreground">
           <ScrollText size={16} aria-hidden /> 规则说明
         </h2>
       </div>
-      <ul className="invite-rules">
+      <ul className="m-0 flex list-disc flex-col gap-2 pl-[18px] text-[13px] leading-[22px] text-muted-foreground">
         <li>
           被邀请人奖励 {rule.inviteeCredits} 积分，
           {rule.inviterCredits > 0 ? `邀请人奖励 ${rule.inviterCredits} 积分` : '当前不设邀请人奖励'}

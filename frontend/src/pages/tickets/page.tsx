@@ -6,6 +6,8 @@ import {
   EMPTY_TICKET_FORM,
   PRIORITY_LABELS,
   STATUS_LABELS,
+  STATUS_PILL,
+  STATUS_TONE,
   TYPE_OPTIONS,
   type TicketFilterValue,
   type TicketFormState,
@@ -248,7 +250,6 @@ export function TicketsPage() {
   if (detail) {
     return (
       <PersonalPage
-        className="ticket-page"
         title={detail.subject}
         description={
           <>
@@ -257,11 +258,11 @@ export function TicketsPage() {
             {detail.status === 'resolved' && ' · 客服认为已解决，如仍有问题请继续回复'}
           </>
         }
-        extra={<span className={`ticket-status is-${detail.status}`}>{STATUS_LABELS[detail.status]}</span>}
+        extra={<span className={`${STATUS_PILL} ${STATUS_TONE[detail.status]}`}>{STATUS_LABELS[detail.status]}</span>}
         /* 详情是同页二级视图: 返回要回到本页列表, 而不是浏览器的上一页 */
         onBack={closeDetail}
       >
-        {detailError && <p className="ticket-error">{detailError}</p>}
+        {detailError && <p className="m-2 mb-0 text-[13px] text-[color:var(--danger-soft-text)]">{detailError}</p>}
 
         {detailLoading && <StateSkeleton variant="row" count={2} />}
 
@@ -279,7 +280,6 @@ export function TicketsPage() {
 
   return (
     <PersonalPage
-      className="ticket-page"
       title="我的工单"
       description="提交问题、投诉或咨询，客服回复会出现在这里，也会推送站内消息。"
       extra={
@@ -329,9 +329,9 @@ export function TicketsPage() {
           />
 
           {visibleItems.length === 0 ? (
-            <p className="ticket-filter-empty">该状态下还没有工单</p>
+            <p className="m-0 py-10 text-center text-[13px] text-muted-foreground">该状态下还没有工单</p>
           ) : (
-            <div className="ticket-list">
+            <div className="flex flex-col gap-2.5">
               {visibleItems.map((t) => (
                 <TicketCard
                   key={t.id}
@@ -343,9 +343,9 @@ export function TicketsPage() {
             </div>
           )}
           {!loading && items.length > 0 && items.length < total && (
-            <div className="ticket-load-more">
+            <div className="my-4 mb-2 flex justify-center">
               <Button disabled={loadingMore} onClick={() => void load({ append: true })}>
-                <span className="state-spinner is-small" aria-hidden />
+                {loadingMore && <span className="state-spinner is-small" aria-hidden />}
                 加载更多工单（已加载 {items.length} / {total}）
               </Button>
             </div>

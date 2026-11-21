@@ -7,7 +7,7 @@
 | 后端模块注册与守卫顺序 | `backend/src/admin/admin.module.ts` |
 | 权限点与内置角色 | `backend/src/admin/permissions.ts` |
 | 菜单分组 | `frontend/src/components/admin/adminNav.ts` |
-| 页面组件与列表 hook | `frontend/src/admin-ui/radar/index.ts`（页面公开入口；共享实现由 primitives 透传） |
+| 页面组件与列表 hook | `frontend/src/admin-ui/radar/index.ts`（页面唯一公开入口） |
 | 请求层 | `frontend/src/lib/api.ts` 的 `adminApi` |
 
 ---
@@ -46,10 +46,9 @@ backend/src/admin/
 
 ```text
 frontend/src/admin-ui/              # 后台 UI（shadcn · radix 底座）
-├── components/ui/                  # shadcn 原子件（被 primitives / radar 消费）
+├── components/ui/                  # shadcn 原子件（只被 radar 消费）
 ├── shell/AdminBoardLayout.tsx      # 外壳（shadcn Sidebar：全高侧栏 + 内容区顶栏）
-├── radar/                          # 页面公开入口：Radar 中性内容层与品牌可见覆盖件
-├── primitives/                     # 共享实现层：layout / form / display / fields / table / overlay / drawer / batch-result / duty-* / chart；由 Radar barrel 透传
+├── radar/                          # 页面唯一公开入口：中性内容层、表单 / 表格 / 浮层与品牌可见覆盖件
 ├── providers/                      # Toast / Confirm / AdminUIProvider
 ├── hooks/useAdminList.ts           # useAdminList / useAdminResource / useAdminUrlFilterSync / useAdminDetailParam
 └── lib/                            # cn（官方 cn 包 + 补登表）、density（DensityContext）、format（时间 / 金额 / 字节）
@@ -57,7 +56,6 @@ frontend/src/admin-ui/              # 后台 UI（shadcn · radix 底座）
 frontend/src/components/admin/
 ├── adminNav.ts                     # ADMIN_MENU 单一事实源
 ├── AlertCenter.tsx                 # 告警来源聚合（告警中心页）
-├── DutyContext.tsx                 # 概览首屏值班塔的数据轮询
 └── statusMeta.ts                   # 状态 → 文案 / 色调映射
 
 frontend/src/pages/admin/            # 33 个页面 + channels/、payments/、payment-rules/ 子目录
@@ -105,7 +103,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 `AdminDrawer` 统一宽度、标题、底部操作区与关闭行为，详情不跳独立路由——保留列表筛选态比省一层路由更重要。
 
-`AdminModal` 与 `AdminDrawer` 共用同一套懒加载取数、竞态丢弃与失败重试，只换浮层形态：内容包含并排区块、宽表格或大图预览时改用居中弹窗（默认 960，任务详情等最宽场景用 `xl` 1200），避免抽屉把每一段都挤成两行。两者共用 `admin-ui/primitives/detail-data` 的数据生命周期（懒加载、关闭清空、竞态丢弃、失败重试），Radar 展示层位于 `admin-ui/radar/DetailDialog`；`admin-ui/primitives/DetailDialog` 只作为 `.radar-scope` 外的外壳级 fallback。页面统一从 `admin-ui/radar` 取件。
+`AdminModal` 与 `AdminDrawer` 共用同一套懒加载取数、竞态丢弃与失败重试，只换浮层形态：内容包含并排区块、宽表格或大图预览时改用居中弹窗（默认 960，任务详情等最宽场景用 `xl` 1200），避免抽屉把每一段都挤成两行。两者共用 `admin-ui/radar/detail-data` 的数据生命周期（懒加载、关闭清空、竞态丢弃、失败重试），展示层位于 `admin-ui/radar/DetailDialog`。页面统一从 `admin-ui/radar` 取件。
 
 ### 0.6 高危操作确认
 
@@ -437,7 +435,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 容量统计复用 `GET /admin/assets/stats`（`asset.read`）：`totalBytes` / `total` / `byStatus` / `byBackend` / `byKind`。后台只在这一处做容量聚合，存储域不另写一套 `groupBy` —— 两处统计必然与素材管理页漂移。页面用 4 张指标卡（已占用容量、素材总数、当前默认后端、已下架仍占用）加分布面板（按后端 / 按来源，占比按条数）呈现；无 `asset.read` 时只隐藏容量区，后端状态与连通性测试照常可用。口径按 `Asset` 记录算，不含未入库的孤儿文件；下架不删文件，所以「已下架仍占用」单列。
 
-- 后端：`local`（默认）/ `oss` / `minio`，由 `STORAGE_BACKEND` 决定初始值。
+- 后端：`local`（默认）/ `oss` / `minio`；OSS / MinIO 的连接参数和凭据只在后台存储配置页维护。
 - 切换**只影响新上传**：`Asset.storageBackend` 记录写入时的后端，老素材仍从原后端读。
 - 后端未就绪（SDK 未安装或凭据缺失）时，上传直接失败并给出明确文案，不静默写本地盘。
 - 云端 SDK 是可选依赖，切之前必须先装包。
@@ -548,7 +546,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 `GET /admin/api-logs`（`model.call_read`）记录每次上游调用：`requestKind`（task / tool / test / proxy）、渠道、模型、协议、耗时、结果、`RouteAttempt.failureCode` 与错误摘要，可按状态 / 类型 / 渠道 / 任务 / 用户 / 模型筛选。用于回答「这次扣的是谁、走的是哪条线路、为什么失败」。列表不下发请求 / 响应报文。
 
-`GET /admin/api-logs/:id`（`model.call_read`）返回单条调用详情，在列表字段上补 `upstreamUrl`、`requestContentType`、`requestBody`、`responseBody`。报文**明文入库**，保留提示词与上游正文；写入侧只折叠内嵌媒体（data URL / base64 字段 / multipart 文件）并截断超长报文（`model/protocol/call-payload.ts`，256 K 字符上限；中转路径同一套规则）。后台详情抽屉原样展示，不做二次裁剪。报文只经这条接口下发（列表与 CSV 导出都不含），安全边界是 `model.call_read` 权限与 90 天保留期，而不是写入侧过滤。`:id` 路由必须声明在 `GET /export` 之后 —— 两者都是单段路径，反过来会让导出请求先命中详情、把 `export` 当成 id 去查。
+`GET /admin/api-logs/:id`（`model.call_read`）返回单条调用详情，在列表字段上补 `upstreamUrl`、`requestContentType`、`requestBody`、`responseBody`，以及 `clientIp`（来源 IP）、`requestBytes`（发往上游字节数）、`responseBytes`（收到字节数）。后三项是**真实测量值**而非从报文预览推算：`requestBytes` / `responseBytes` 在出站 / 代理边界按实际字节记（流式响应以 `receivedBytes` 记，超长被截断时仍记实际收量），`clientIp` 在请求作用域内从 `req.ip` 快照，任务链路经 `GenerationTask.clientIp` 带到 worker —— 后台重试会优先记当前请求方地址、回落到原任务地址。历史数据与「未测量」都落空串 / 0，后台统一显示「—」与「未知」，不伪装成「本机」或「0 B」；回环地址显示「本机 · 127.0.0.1」。报文**明文入库**，保留提示词与上游正文；写入侧只折叠内嵌媒体（data URL / base64 字段 / multipart 文件）并截断超长报文（`model/protocol/call-payload.ts`，256 K 字符上限；中转路径同一套规则）。后台详情抽屉原样展示，不做二次裁剪。报文只经这条接口下发（列表与 CSV 导出都不含），安全边界是 `model.call_read` 权限与 90 天保留期，而不是写入侧过滤。`:id` 路由必须声明在 `GET /export` 之后 —— 两者都是单段路径，反过来会让导出请求先命中详情、把 `export` 当成 id 去查。
 
 `GET /admin/api-logs/export`（`model.call_read + data.export`）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。后台页面不摆放导出按钮：该页用于逐条排障，导出能力保留在接口层，需要时按同一筛选直接调用。
 

@@ -36,7 +36,7 @@ export interface AssetSourceInput {
  *
  * 改造要点 (对应 admin-prd.md §3.4/ §3.17):
  *   1. **走存储抽象层**, 不再硬编码 join(cwd,'uploads',...) —— 接 OSS/MinIO
- *      只需改 STORAGE_BACKEND 环境变量, 本文件零改动。
+ *      只需在后台切换默认后端, 本文件零改动。
  *   2. **写入时记录 storageBackend**: 切换默认后端后老素材仍从原后端读。
  *      不加这个字段, 切换后端会让全部历史素材404。
  *   3. **status='hidden' 对用户端不可见** (B-26 下架): 记录与文件保留,

@@ -82,8 +82,7 @@ server {
 
     # ── 上传图静态直出 ─────────────────────────────────────────────────────
     # 后端也提供 /uploads（useStaticAssets），这里直出省一次 Node 往返。
-    # ⚠ 若生产把 STORAGE_BACKEND 换成 OSS/MinIO，本段应删除，
-    #   让请求走 /api 的签名 URL 逻辑。
+    # ⚠ 使用 OSS/MinIO 时，本段应删除，让请求走 /api 的签名 URL 逻辑。
     location /uploads/ {
         proxy_pass       http://$huojue_backend;
         proxy_set_header Host             $host;

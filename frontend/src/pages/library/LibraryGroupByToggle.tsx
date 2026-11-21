@@ -31,13 +31,13 @@ export function LibraryGroupByToggle({ value, onChange }: LibraryGroupByTogglePr
         if (!next) return;
         onChange(next as GroupBy);
       }}
-      className="asset-library-group-list"
+      className="flex flex-wrap items-center gap-2.5"
     >
       {GROUP_BY_OPTIONS.map((option) => (
         <ToggleGroupItem
           key={option.value}
           value={option.value}
-          className="asset-library-new-group"
+          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-border bg-card px-3 text-[13px] text-muted-foreground hover:border-brand hover:text-brand-hover data-[state=on]:border-solid data-[state=on]:border-brand data-[state=on]:bg-brand-bg data-[state=on]:text-brand-hover"
         >
           {option.icon}
           {option.label}

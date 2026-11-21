@@ -64,6 +64,30 @@ export const RESIZE_HANDLES: ResizeHandle[] = [
   'w',
 ];
 
+/**
+ * 单条标注卡：标题行 + 描述，右侧 64px 参考图上传位。
+ *
+ * 共享 `.redraw-prompt` 是 flex 列布局，这里按参考站改成两行两列网格；
+ * 基础皮肤（底色 / 圆角 / 内边距）仍来自共享 class。
+ */
+export const ANNOTATION_CARD =
+  'relative grid! grid-cols-[minmax(0,1fr)_64px] grid-rows-[20px_minmax(44px,auto)] gap-x-2! gap-y-0 mt-0! p-4 rounded-[var(--radius-control)] bg-[var(--tool-surface-12)]';
+
+export const ANNOTATION_LABEL =
+  '[grid-area:1/1] flex min-h-5 items-center gap-2 text-sm leading-5 text-[color:var(--wb-text)]';
+
+export const ANNOTATION_TEXTAREA = '[grid-area:2/1]';
+
+/** 参考图上传位：空态虚线框，有图时实线并铺满缩略图 */
+export const ANNOTATION_REFERENCE =
+  '[grid-area:1/2/3/3] flex! size-16 flex-col! items-center! justify-center gap-[3px]! self-center m-0! cursor-pointer overflow-hidden rounded-[var(--radius-control)] border border-dashed border-border bg-[var(--surface)] p-0 text-xs leading-4 text-[color:var(--text-body)]';
+
+export const ANNOTATION_REFERENCE_FILLED = 'relative border-solid';
+
+export const ANNOTATION_REFERENCE_REMOVE =
+  'absolute top-0.5 right-0.5 z-2 grid size-4 cursor-pointer place-items-center rounded-full border-0 bg-[rgba(51,51,51,0.78)] p-0 text-card';
+
+
 /** 画布对外的动作 */
 export interface MaskPainterHandle {
   toBlob: () => Promise<Blob | null>;

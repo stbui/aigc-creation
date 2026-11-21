@@ -50,6 +50,28 @@ import { LocalRedrawUploadPreview } from './LocalRedrawUploadPreview';
  * 空态 `LocalRedrawIntro`；历史取数复用共享 `useToolHistory`（经 `hooks.ts` 转出），
  * 画布 / 提交 / 删除等写操作仍留在本文件。
  */
+/**
+ * 页面根栅格（挂在 ToolShell 根节点，不额外包一层 div）。
+ *
+ * 参考站三栏：输入 432 / 画布自适应（中栏有 560 的下限）/ 历史 192；
+ * 收起历史时宽屏仍保留第三列，只隐藏列表，≤1180 才让历史栏彻底让位。
+ */
+const PAGE_BASE =
+  'box-border min-h-0! p-4! gap-4! items-stretch! overflow-hidden! grid-rows-[minmax(0,1fr)]! bg-[var(--page-bg)] max-h-[calc(100vh_-_var(--workspace-topbar-height))]';
+
+const PAGE_COLUMNS =
+  'grid-cols-[432px_minmax(560px,1fr)_192px]! min-[1367px]:max-[1500px]:grid-cols-[390px_minmax(520px,1fr)_176px]! min-[1181px]:max-[1366px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)_192px]! max-[1180px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
+
+const PAGE_COLUMNS_COLLAPSED =
+  'grid-cols-[432px_minmax(560px,1fr)_192px]! min-[1181px]:max-[1366px]:grid-cols-[216px_minmax(0,1fr)_192px]! max-[1180px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
+
+const PAGE_MOBILE =
+  'max-[900px]:grid-cols-1! max-[900px]:-mx-2.5! max-[900px]:-mt-4! max-[900px]:-mb-6! max-[900px]:h-auto max-[900px]:max-h-none max-[900px]:gap-3! max-[900px]:grid-rows-[auto]! max-[900px]:content-start max-[900px]:overflow-visible! max-[900px]:p-4';
+
+/** 上传区参考站底色 #f6f7f9 / 虚线边 #d9dee8；已上传时收成 160px 的居中预览框 */
+const DROPZONE =
+  'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2! [&>.pk-upload-prompt]:w-full [&>.pk-upload-prompt]:min-h-0 [&>.pk-upload-prompt]:gap-2 [&_.pk-thumb-grid-single]:w-40 [&_.pk-thumb-grid-single]:max-w-full [&.pk-dropzone-filled]:flex! [&.pk-dropzone-filled]:h-40! [&.pk-dropzone-filled]:min-h-40! [&.pk-dropzone-filled]:items-center [&.pk-dropzone-filled]:justify-center [&.pk-dropzone-filled]:border-0! [&.pk-dropzone-filled]:rounded-none [&.pk-dropzone-filled]:bg-card!';
+
 export function LocalRedrawPage() {
   const { message } = useApp();
   const { ensureProject } = useProject();
@@ -337,10 +359,18 @@ export function LocalRedrawPage() {
   return (
     <ToolShell
       capability="local_redraw"
-      pageClass={`local-redraw-page${historyCollapsed ? ' history-collapsed' : ''}`}
+      pageClass={`local-redraw-page${historyCollapsed ? ' history-collapsed' : ''} ${PAGE_BASE} ${
+        historyCollapsed ? PAGE_COLUMNS_COLLAPSED : PAGE_COLUMNS
+      } ${PAGE_MOBILE}`}
       title="局部重绘"
       desc="只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素"
-      upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      upload={{
+        title: '上传图片',
+        required: true,
+        max: 1,
+        hint: '点击、拖拽或粘贴图片上传，最多 1 张',
+        dropzoneClassName: DROPZONE,
+      }}
       requiredInputs={['mask']}
       replaceUpload
       onImagesChange={handleImagesChange}

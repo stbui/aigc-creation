@@ -48,7 +48,7 @@
 | `json-canonicalize` | 仅当客户端需要本地计算摘要时使用；当前设计摘要只在服务端算，可暂不引入 |
 | `leafer-ui` | 连线/选择/覆盖层渲染（按上游用法） |
 
-`旧版 UI 库` 不引入。上游的 `App.useApp()`、`Button`、`Input`、`Modal`、`InputNumber`、`Popover`、`Dropdown`、`Slider`、`Segmented`、`ColorPicker` 全部按 `canvas-port-design.md` §7 F2 的清单替换为 shadcn / 自持 primitives。
+`旧版 UI 库` 不引入。上游的 `App.useApp()`、`Button`、`Input`、`Modal`、`InputNumber`、`Popover`、`Dropdown`、`Slider`、`Segmented`、`ColorPicker` 全部按 `canvas-port-design.md` §7 F2 的清单替换为 shadcn 原子件与自持组件。
 
 ## 3. P0 基础设施改造
 
@@ -943,19 +943,19 @@ interface CanvasNodeDefinition {
 | 上游用法 | 次数 | 本仓落点 |
 | --- | --- | --- |
 | `App.useApp()`（message / modal / notification） | 49 | `sonner` toast + `useConfirm()` + `ConfirmDialog` |
-| `Button` | 56 | `admin-ui/components/ui/button`（经 primitives） |
+| `Button` | 56 | `admin-ui/components/ui/button`（经 `src/ui` 转出） |
 | `Input` / `Input.TextArea` | 36 | `Input` / `Textarea` |
 | `Modal` | 20 | `Dialog` / `AlertDialog` |
-| `InputNumber` | 11 | 手写 `primitives/fields/number-input` |
+| `InputNumber` | 11 | 手写 `src/ui` 的 number-input |
 | `Popover` | 10 | `Popover` |
 | `Dropdown` | 10 | `DropdownMenu` |
 | `Slider` | 6 | `Slider` |
 | `Segmented` | 6 | `ToggleGroup` |
-| `ColorPicker` | 5 | 手写 `primitives/fields/color-picker` |
+| `ColorPicker` | 5 | 手写 `src/ui` 的 color-picker |
 
 需新增的 shadcn 件：`command`、`resizable`、`scroll-area`、`toggle-group`。`shadcn add` 后必须跑 `frontend/scripts/post-shadcn.mjs` 改写 `cn` 引用。
 
-C 端画布页面复用后台的 shadcn 原子件与共享实现：节点卡片、属性面板、工具栏从 `admin-ui/primitives` 取件，不另起一套。该取件规则只适用于 C 端画布，不改变后台业务页统一从 `admin-ui/radar` 取件的边界。
+C 端画布页面复用 shadcn 原子件与共享实现：节点卡片、属性面板、工具栏经 `src/ui` 取件（底层实现来自 `admin-ui/components/ui` 与 `admin-ui/radar`），不另起一套，也不直连 `admin-ui/*`。该取件规则只适用于 C 端画布，不改变后台业务页统一从 `admin-ui/radar` 取件的边界。
 
 ### 12.8 样式
 

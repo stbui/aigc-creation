@@ -1,4 +1,4 @@
-import { ActionButton } from '../../../admin-ui/primitives';
+import { ActionButton } from '~/admin-ui/radar';
 
 /** 后台身份接口失败（非权限原因）时的显式失败态 —— 提供重试，不误导成权限问题 */
 export function AdminLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {

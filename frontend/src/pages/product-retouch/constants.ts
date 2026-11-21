@@ -36,3 +36,15 @@ export const MODE_TO_TEMPLATE: Record<string, string> = {
 
 /** 补充要求输入上限 (与参考站一致) */
 export const NOTE_MAX_LENGTH = 200;
+
+/**
+ * 产品精修的业务卡（参考站 product-retouch-main-page）：
+ * 块级、14px 内边距，标题行与内容间距 12px（共享 ToolCard 是 grid + 16px）。
+ */
+export const RETOUCH_CARD = 'block! p-3.5! [&>.card-title-row]:mb-3 [&>.card-title-row]:min-h-5';
+
+export const NOTE_TEXTAREA =
+  'inline-block box-border h-14 w-full resize-none rounded-[var(--radius-control)] border border-[var(--border-1)] bg-card px-2.5 py-2 text-xs leading-normal text-[color:var(--wb-text-hero)] outline-none max-[900px]:h-[72px] max-[900px]:px-2.5';
+
+/** 精修模式 pill：32 高 / 12px 字号，比共享 pill 紧一档 */
+export const MODE_PILLS = 'gap-2! [&_button]:h-8! [&_button]:px-2.5! [&_button]:text-xs! [&_button]:leading-5!';

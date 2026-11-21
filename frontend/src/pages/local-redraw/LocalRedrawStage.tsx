@@ -62,12 +62,18 @@ export function LocalRedrawStage({
   onZoomIn,
   onZoomOut,
 }: LocalRedrawStageProps) {
+  const canvasWidth = `min(680px, calc(100% - 80px), calc((100vh - var(--workspace-topbar-height) - 144px) * ${aspect}))`;
+  /** 提交期间画布保持可见（402 等确定性拒绝后不丢标注），但锁住交互 */
+  const dimmed = submitting ? ' pointer-events-none opacity-[0.72]' : '';
+
   return (
     <div
-      className={`pk-source-pane redraw-stage${submitting ? ' is-submitting' : ''}`}
+      className={`pk-source-pane redraw-stage relative flex items-center justify-center gap-0! overflow-hidden! rounded-[var(--radius-panel)] p-0! max-[860px]:min-h-[720px]`}
       aria-busy={submitting}
     >
-      <div className="redraw-stage-topbar">
+      <div
+        className={`redraw-stage-topbar absolute top-0 left-0 z-5 flex min-h-10 w-full items-center justify-center max-[1180px]:left-1/2 max-[1180px]:w-[calc(100%_-_32px)] max-[1180px]:-translate-x-1/2 max-[860px]:w-[calc(100%_-_24px)]${dimmed}`}
+      >
         <LocalRedrawToolbar
           tool={tool}
           brush={brush}
@@ -75,10 +81,15 @@ export function LocalRedrawStage({
           onBrushChange={onBrushChange}
         />
       </div>
-      <div className="redraw-stage-main">
+      <div className="redraw-stage-main absolute inset-0 flex items-center justify-center">
         <div
-          className="redraw-canvas-wrap"
-          style={{ '--redraw-image-aspect': aspect } as CSSProperties}
+          className={`redraw-canvas-wrap relative flex-none! w-[var(--redraw-canvas-w)]! max-w-full max-h-full aspect-[var(--redraw-image-aspect)] flex items-center justify-center overflow-hidden max-[860px]:w-[600px] max-[860px]:max-w-[calc(100%_-_24px)]${dimmed}`}
+          style={
+            {
+              '--redraw-image-aspect': aspect,
+              '--redraw-canvas-w': canvasWidth,
+            } as CSSProperties
+          }
         >
           <MaskPainter
             url={image.url}
@@ -99,6 +110,7 @@ export function LocalRedrawStage({
         canUndo={canUndo}
         canRedo={canRedo}
         busy={busy}
+        dimmed={submitting}
         zoom={zoom}
         onUndo={() => painter.current?.undo()}
         onRedo={() => painter.current?.redo()}

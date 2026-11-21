@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from './components';
-import { LOT_STATUS, PAGE_SIZE, SOURCE_LABEL } from './constants';
+import { LOT_STATUS, LOT_STATUS_TONE, PAGE_SIZE, SOURCE_LABEL } from './constants';
 import { formatDate, shortId } from './utils';
 import { CreditsLotList } from './CreditsLotList';
 
@@ -67,7 +67,7 @@ export function CreditsLotPanel({
     <>
       <CreditsLotList rows={view} />
       {lots.length > PAGE_SIZE && (
-        <div className="credits-mobile-pager">
+        <div className="flex justify-center pt-3">
           <Pagination>
             <PaginationContent>
               <PaginationItem>
@@ -117,10 +117,10 @@ export function CreditsLotPanel({
             <TableCell className="text-right">{lot.remainingCredits}</TableCell>
             <TableCell>{lot.expireAt ? formatDate(lot.expireAt) : '永久'}</TableCell>
             <TableCell>
-              {/* 不用预设色: 默认绿字在淡绿底上对比度不足, 状态色统一走 .credits-status */}
+              {/* 不用预设色: 默认绿字在淡绿底上对比度不足, 状态色统一走 LOT_STATUS_TONE */}
               <StatusBadge
                 variant="secondary"
-                className={`credits-status is-${lot.status}`}
+                className={`h-[22px] rounded-full border-0 px-2 text-xs font-medium ${LOT_STATUS_TONE[lot.status]}`}
               >
                 {LOT_STATUS[lot.status] ?? LOT_STATUS.active}
               </StatusBadge>

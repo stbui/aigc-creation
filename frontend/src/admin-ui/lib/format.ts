@@ -181,16 +181,3 @@ export function formatNumber(value: number | null | undefined): string {
   return value.toLocaleString('zh-CN');
 }
 
-/**
- * 值班塔刻度高度：对数映射耗时到 8–24px。
- *
- * 线性映射会让 5 秒和 60 秒挤在同样高度；对数把短任务拉开，又不让一个
- * 超时任务把整排刻度压成一条线。
- */
-export function tickHeight(durationMs: number, dense = false): number {
-  const min = dense ? 4 : 8;
-  const max = dense ? 14 : 24;
-  const clamped = Math.min(Math.max(durationMs, 0), 60_000);
-  const ratio = Math.log1p(clamped / 1000) / Math.log1p(60);
-  return Math.round(min + (max - min) * ratio);
-}

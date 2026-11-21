@@ -74,6 +74,23 @@ export const LOT_STATUS: Record<CreditLot['status'], string> = {
   exhausted: '已用尽',
 };
 
+/**
+ * 批次状态胶囊配色。深色前景 + 淡底，不用预设 success / error 的
+ * 2.41:1 绿字；配色只在这里定义一次，桌面表格与窄屏列表共用。
+ */
+export const LOT_STATUS_TONE: Record<CreditLot['status'], string> = {
+  active: 'bg-success-soft text-[color:var(--misc-text-success)]',
+  expired: 'bg-danger-soft text-[color:var(--misc-text-danger)]',
+  exhausted: 'bg-muted text-muted-foreground',
+};
+
+/** 金额增减色。13px 数字下 --success-text / --danger-text 在淡底上不达标，
+ *  这里用压深一档的 --misc-text-*。 */
+export const AMOUNT_TONE = {
+  plus: 'font-semibold text-[color:var(--misc-text-success)]',
+  minus: 'font-semibold text-[color:var(--misc-text-danger)]',
+} as const;
+
 /** 每页条数: 桌面表格与窄屏列表共用, 换结构不改分页节奏 */
 export const PAGE_SIZE = 20;
 

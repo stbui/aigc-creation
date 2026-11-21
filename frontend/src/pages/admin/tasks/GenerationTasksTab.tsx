@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ContextBanner, Notice, SavedViewBar } from './components';
 import { readAdminDone } from './utils';
-import { useAdmin, useAdminDetailParam, useDuty, useSelectionPrune } from './hooks';
+import { useAdmin, useAdminDetailParam, useSelectionPrune } from './hooks';
 import { TaskActionDialogs } from './TaskActionDialogs';
 import { TaskDetailModal } from './TaskDetailModal';
 import { TaskFailureGroups } from './TaskFailureGroups';
@@ -42,12 +42,11 @@ export function GenerationTasksTab() {
 
   const [searchParams] = useSearchParams();
   const done = readAdminDone(searchParams);
-  const { data: duty } = useDuty();
   const list = filters.data?.result;
   /* 换筛选与翻页都会清空勾选；再按当前页裁剪一次，兜住页大小与排序变化 */
   const visibleTaskIds = useMemo(() => (list?.items ?? []).map((row) => row.id), [list]);
   useSelectionPrune(setSelected, visibleTaskIds);
-  const liveCongestion = duty?.congestion ?? filters.data?.congestion;
+  const liveCongestion = filters.data?.congestion;
   const overloaded = (liveCongestion?.running ?? 0) > (liveCongestion?.runningThreshold ?? 50);
 
   return (

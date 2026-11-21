@@ -31,6 +31,25 @@ import { WatermarkRemoveUploadPreview } from './WatermarkRemoveUploadPreview';
  * 遮罩 / 提交 / 删除等写操作仍留在本文件。
  */
 
+/**
+ * 页面根栅格：与局部重绘同一套画布三栏骨架（输入 432 / 画布 / 历史 192）。
+ *
+ * 根节点同时带 `local-redraw-page` —— 右侧历史栏与画布结果骨架按这个类挂载；
+ * 本页只覆盖工具栏宽度与画布高度等自己的差异。
+ */
+const PAGE_BASE =
+  'box-border min-h-0! p-4! gap-4! items-stretch! overflow-hidden! grid-rows-[minmax(0,1fr)]! bg-[var(--page-bg)] max-h-[calc(100vh_-_var(--workspace-topbar-height))]';
+
+const PAGE_COLUMNS =
+  'grid-cols-[432px_minmax(560px,1fr)_192px]! min-[1367px]:max-[1500px]:grid-cols-[390px_minmax(520px,1fr)_176px]! min-[1181px]:max-[1366px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)_192px]! max-[1180px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
+
+const PAGE_MOBILE =
+  'max-[900px]:grid-cols-1! max-[900px]:-mx-2.5! max-[900px]:-mt-4! max-[900px]:-mb-6! max-[900px]:h-auto max-[900px]:max-h-none max-[900px]:gap-3! max-[900px]:grid-rows-[auto]! max-[900px]:content-start max-[900px]:overflow-visible! max-[900px]:p-4';
+
+/** 上传区底色 #f6f7f9 / 虚线边 #d9dee8，与局部重绘同源 */
+const DROPZONE =
+  'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2! [&>.pk-upload-prompt]:w-full [&>.pk-upload-prompt]:min-h-0 [&>.pk-upload-prompt]:gap-2 [&_.pk-thumb-grid-single]:w-40 [&_.pk-thumb-grid-single]:max-w-full';
+
 export function WatermarkRemovePage() {
   const { message } = useApp();
   const { ensureProject } = useProject();
@@ -186,7 +205,7 @@ export function WatermarkRemovePage() {
   return (
     <ToolShell
       capability="remove_watermark"
-      pageClass="watermark-removal-page local-redraw-page"
+      pageClass={`watermark-removal-page local-redraw-page ${PAGE_BASE} ${PAGE_COLUMNS} ${PAGE_MOBILE}`}
       title="去除水印"
       desc="框选、圈选或涂抹水印区域，即可去除图片中的水印"
       upload={{
@@ -195,6 +214,7 @@ export function WatermarkRemovePage() {
         max: 1,
         hint: '点击、拖拽或粘贴图片上传，最多 1 张',
         promptIcon: <Plus size={22} />,
+        dropzoneClassName: DROPZONE,
       }}
       requiredInputs={['mask']}
       replaceUpload

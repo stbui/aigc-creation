@@ -56,7 +56,6 @@ export function ToolShell(props: Props) {
   const {
     capability,
     pageClass,
-    inputPaneClassName,
     title,
     desc,
     upload,
@@ -176,7 +175,7 @@ export function ToolShell(props: Props) {
       }`}
     >
       {/* ── 左: 输入栏 ── */}
-      <aside className={`pk-input-pane${inputPaneClassName ? ` ${inputPaneClassName}` : ''}`}>
+      <aside className="pk-input-pane">
         <div className="pk-form-card">
           <div className="pk-form-scroll">
             {/* 上传卡 (页面自带上传区时跳过) */}

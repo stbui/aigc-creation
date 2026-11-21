@@ -97,7 +97,6 @@ body {
 @media (max-width: 900px) {
   :root {
     --workspace-topbar-height: 54px;
-    --mif-workspace-topbar-height: 54px;
   }
 }
 

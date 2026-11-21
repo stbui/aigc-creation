@@ -1,6 +1,7 @@
 import { Bell, CheckCheck } from 'lucide-react';
 
 import type { NotificationItem } from '../../types/api';
+import { ACCOUNT_CARD, ACCOUNT_CARD_HEAD } from './constants';
 import { fmtDateTime } from './utils';
 import { Button } from '../../ui';
 
@@ -22,14 +23,14 @@ export function AccountMessagesCard({
   onMarkAllRead: () => void;
 }) {
   return (
-    <section className="account-card">
-      <header className="account-card-head">
-        <Bell size={15} aria-hidden />
-        <h2>最近消息</h2>
+    <section className={ACCOUNT_CARD}>
+      <header className={ACCOUNT_CARD_HEAD}>
+        <Bell size={15} aria-hidden className="flex-none text-muted-foreground" />
+        <h2 className="m-0 text-sm font-semibold">最近消息</h2>
         <Button
           variant="link"
           size="sm"
-          className="account-card-more"
+          className="ml-auto p-0 text-xs"
           disabled={unread === 0}
           onClick={onMarkAllRead}
         >
@@ -38,29 +39,48 @@ export function AccountMessagesCard({
         </Button>
       </header>
       {messages.length === 0 ? (
-        <p className="account-empty">暂无消息。支付、任务失败退款与工单回复会在这里通知你。</p>
+        <p className="m-0 px-0 pt-3 pb-0.5 text-[13px] text-muted-foreground">
+          暂无消息。支付、任务失败退款与工单回复会在这里通知你。
+        </p>
       ) : (
-        <ul className="account-msg-list">
-          {messages.map((notification) => (
-            <li key={notification.id}>
-              <button
-                type="button"
-                className={`account-msg${notification.readAt ? '' : ' is-unread'}`}
-                onClick={() => onOpenMessage(notification)}
-              >
-                <span className="account-msg-dot" aria-hidden />
-                <span className="account-msg-main">
-                  <span className="account-msg-title">{notification.title}</span>
-                  {notification.body && (
-                    <span className="account-msg-body" title={notification.body}>
-                      {notification.body}
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {messages.map((notification) => {
+            const unreadItem = !notification.readAt;
+            return (
+              <li key={notification.id}>
+                <button
+                  type="button"
+                  className={`flex w-full items-start gap-2.5 rounded-md border border-[var(--border-row)] bg-card px-3 py-2.5 text-left text-inherit transition-colors hover:border-brand hover:bg-brand-bg`}
+                  onClick={() => onOpenMessage(notification)}
+                >
+                  <span
+                    className={`mt-1.5 size-1.5 flex-none rounded-full ${unreadItem ? 'bg-brand' : 'bg-transparent'}`}
+                    aria-hidden
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span
+                      className={`text-[13px] ${
+                        unreadItem ? 'font-semibold text-foreground' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {notification.title}
                     </span>
-                  )}
-                </span>
-                <span className="account-msg-time">{fmtDateTime(notification.createdAt, true)}</span>
-              </button>
-            </li>
-          ))}
+                    {notification.body && (
+                      <span
+                        className="line-clamp-2 text-xs whitespace-normal text-muted-foreground"
+                        title={notification.body}
+                      >
+                        {notification.body}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex-none pt-px text-xs text-muted-foreground">
+                    {fmtDateTime(notification.createdAt, true)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

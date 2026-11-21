@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import type { AdminOverview } from '../../../types/api';
-import { formatNumber } from '~/admin-ui/radar';
-import { yuan } from './utils';
+import { formatNumber, yuan } from './utils';
 
 /**
  * 窗口指标带。

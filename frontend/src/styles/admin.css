@@ -5,7 +5,8 @@
  *
  * 前台（C 端）样式由 `styles/global.css` 入口分层装载（tokens / base / tool-workspace / ui），**本文件不碰它们**。
  * 本文件只被后台 chunk 导入（`pages/admin/AdminDashboardPage.tsx`），C 端不下载。
- * 两者共享的只有 `tokens.css` 的 `:root` 设计令牌（品牌紫、中性色、圆角档、状态色）。
+ * 两者共享 `tokens.css` 的 `:root` 设计令牌（品牌紫、中性色、圆角档、状态色），
+ * 以及 `styles/tailwind-theme.css` 的 Tailwind 语义映射（两端同一份，避免同名不同值）。
  *
  * ## 为什么不是 `@import "tailwindcss"`
  *
@@ -26,118 +27,12 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities) source(none);
 @import 'tw-animate-css';
+/* 主题映射与 C 端共用一份，见 styles/tailwind-theme.css */
+@import './tailwind-theme.css';
 
 @source '../admin-ui';
 @source '../pages/admin';
 @source '../components/admin';
-
-@theme inline {
-  /* 字体沿用全站栈：Tailwind 默认 Inter，中文会掉到系统字体且字重不一致 */
-  --font-sans:
-    'Noto Sans SC', Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
-
-  /*
-   * 圆角阶梯对齐全站五档（global.css 的 `--radius-tag/control/card/panel/hero`）。
-   *
-   * Tailwind v4 默认阶梯 2/4/6/8/12/16/24 与项目规定对不齐：
-   * `rounded-md` = 6px 不在任何一档（项目控件档是 8px）。重映射后：
-   *   rounded-sm → 4px  (--radius-tag)
-   *   rounded-md → 8px  (--radius-control)  ← 按钮 / 输入框
-   *   rounded-lg → 12px (--radius-card)     ← 卡片 / 面板
-   *   rounded-xl → 16px (--radius-panel)
-   *   rounded-2xl → 24px (--radius-hero)
-   *
-   * 用 `var()` 引用而非抄字面值：圆角档位只定义一处。
-   * `inline` 保证不产出 `:root` 声明（global.css 已定义同名 `--radius`）。
-   */
-  --radius-sm: var(--radius-tag);
-  --radius-md: var(--radius-control);
-  --radius-lg: var(--radius-card);
-  --radius-xl: var(--radius-panel);
-  --radius-2xl: var(--radius-hero);
-
-  /* shadow-card 登记进命名空间，`shadow-card` 才成为可用工具类。
-     值仍只在 global.css 的 `:root` 定义一处；inline 避免自引用。 */
-  --shadow-card: var(--shadow-card);
-
-  /* 品牌色登记成工具类：`bg-brand` / `text-brand` / `border-brand` */
-  --color-brand: var(--brand);
-  --color-brand-hover: var(--brand-hover);
-  --color-brand-bg: var(--brand-bg);
-  /* 渐变浅端。缺这一条时 `via-brand-light` / `to-brand-light` 静默失效 ——
-     工具类不存在不报错，渐变悄悄少一个色标，排查成本很高。 */
-  --color-brand-light: var(--brand-light);
-
-  /* ── shadcn 语义变量 → 项目令牌 ──────────────────────────────
-   *
-   * shadcn 组件只认固定的一套变量名（`--background` / `--primary` / `--border` …）。
-   * 这里**只做映射，不引入新颜色**，改品牌色仍然只改 global.css 一处。
-   *
-   * 必须用 `inline`：global.css 已在 `:root` 定义 `--color-primary` / `--color-card` /
-   * `--color-border` 三枚同名变量，普通 `@theme` 会把本文件的值写进 `:root`，
-   * 覆盖全站同名值，C 端跟着变色。
-   */
-  --color-background: var(--card-bg);
-  --color-foreground: var(--text-strong);
-
-  /* 页面底色（卡片浮在其上）。shadcn 的 `background` 语义是「内容底」，
-     在后台这里等于卡片白；整页底色另给一个名字，避免与卡片混用。 */
-  --color-page: var(--page-bg);
-
-  --color-card: var(--card-bg);
-  --color-card-foreground: var(--text-strong);
-
-  --color-popover: var(--card-bg);
-  --color-popover-foreground: var(--text-strong);
-
-  --color-primary: var(--brand);
-  --color-primary-foreground: #ffffff;
-
-  /* secondary / muted 都是「次级灰底」，接 --surface（#f2f4f7） */
-  --color-secondary: var(--surface);
-  --color-secondary-foreground: var(--text-body);
-  --color-muted: var(--surface);
-  /* 后台信息密度高、字号偏小，次级文字改用正文色而非更浅的 --text-muted，
-     避免表头、说明和导航在长时间使用时发灰难读。 */
-  --color-muted-foreground: var(--text-body);
-
-  /* shadcn 的 `accent` 是「悬停淡底」，不是品牌强调色 —— 两者同名不同义 */
-  --color-accent: var(--brand-bg);
-  --color-accent-foreground: var(--brand-hover);
-
-  --color-destructive: var(--danger-text);
-  --color-destructive-foreground: #ffffff;
-
-  /* `--border` 在 global.css 已存在且语义一致，直接消费，不重新定义 */
-  --color-border: var(--border);
-  --color-input: var(--border);
-  --color-ring: var(--brand);
-
-  /*
-   * 业务语义色（成功 / 警示 / 危险）。
-   *
-   * shadcn 默认只有 destructive 一档，后台需要区分三档。值取 global.css 已有令牌，
-   * 不新造颜色。名字加 `status-` 前缀是必须的：global.css 已有 `--danger-text` /
-   * `--warn-text` / `--success-text`，同名会变成自引用循环，变量解析失败后
-   * 退回继承值，表现是「颜色随页面上下文乱变」。
-   */
-  --color-success-soft: var(--success-soft-bg);
-  --color-success-text: var(--success-text);
-  --color-success-border: var(--success-border);
-  --color-warn-soft: var(--warn-bg);
-  --color-warn-border: var(--warn-border);
-  --color-warn-text: var(--warn-text);
-  --color-danger-soft: var(--danger-soft-bg);
-  --color-danger-text: var(--danger-text);
-  --color-sidebar: var(--surface);
-  --color-sidebar-foreground: var(--text-strong);
-  --color-sidebar-primary: var(--brand);
-  --color-sidebar-primary-foreground: #ffffff;
-  --color-sidebar-accent: var(--brand-bg);
-  --color-sidebar-accent-foreground: var(--brand-hover);
-  --color-sidebar-border: var(--border);
-  --color-sidebar-ring: var(--brand);
-}
 
 /*
  * ── Radar 命名空间（freebie-radar 中性灰内容层） ──────────────────

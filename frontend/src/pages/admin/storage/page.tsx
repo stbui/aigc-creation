@@ -12,6 +12,7 @@ import {
 import { useAdmin } from './hooks';
 import { StorageBackendList } from './StorageBackendList';
 import { StorageCapacitySection } from './StorageCapacitySection';
+import { StorageConfigDrawer } from './StorageConfigDrawer';
 import { StorageCredentialNotice } from './StorageCredentialNotice';
 import { useStorageActions } from './useStorageActions';
 import { useStorageOverview } from './useStorageOverview';
@@ -19,9 +20,8 @@ import { useStorageOverview } from './useStorageOverview';
 /**
  * 存储后端配置 (B-62/B-63)。
  *
- * 凭据只读：PRD §3.11 明确约束「凭据走部署期环境变量，界面不可编辑」。
- * 所以本页没有任何写凭据的输入框 —— 展示脱敏值 + 连通性 + 切换默认后端。
- * 这不是功能缺失，是刻意的安全边界。
+ * 2026-11 起凭据改为页面可编辑、加密落库（见 docs/non-upstream-extensions.md）：
+ * 卡片支持「编辑配置」抽屉，展示脱敏值 + 连通性 + 切换默认后端。明文密钥不回传。
  *
  * 容量统计复用素材域 `GET /admin/assets/stats`（后台唯一的容量事实源），
  * 不在存储域另写一份聚合 —— 两处 groupBy 迟早和素材管理页的数字对不上。
@@ -87,9 +87,24 @@ export function AdminStoragePage() {
         busy={actions.busy}
         canProbe={can('channel.test')}
         canSwitch={can('setting.write')}
+        canEdit={status.editable && can('setting.write')}
         onProbe={actions.probe}
         onSwitch={actions.doSwitch}
+        onEdit={actions.openEditor}
       />
+
+      {actions.editing && (
+        <StorageConfigDrawer
+          backend={actions.editing.backend}
+          view={actions.editing.view}
+          open
+          saving={actions.busy}
+          testing={actions.testing}
+          onClose={actions.closeEditor}
+          onSubmit={(values) => void actions.doSave(values)}
+          onTest={actions.testDraft}
+        />
+      )}
     </AdminPage>
   );
 }

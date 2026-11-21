@@ -3,14 +3,11 @@
  */
 
 import {
-  EMAIL_ERROR_COPY,
   EMAIL_FIELD_COPY,
   EMAIL_GROUP_KEY,
   EMAIL_KEYS,
-  EMAIL_PROVIDER_LABELS,
   EVENT_GROUPS,
   PROVIDERS,
-  SMS_PROVIDER_LABELS,
 } from './constants';
 import type {
   AdminSettings,
@@ -24,31 +21,8 @@ import type {
 
 export { cn } from '~/admin-ui/radar';
 
-/** 将后端通道标识转换为后台可读名称，避免直接暴露实现细节。 */
-export function deliveryProviderLabel(
-  provider: string,
-  channel: 'email' | 'sms' = 'email',
-): string {
-  const labels = channel === 'sms' ? SMS_PROVIDER_LABELS : EMAIL_PROVIDER_LABELS;
-  return labels[provider] ?? (channel === 'sms' ? '其他短信通道' : '其他邮件通道');
-}
-
-/** 将历史配置错误转换为运营可读文案；未知错误保留原文，便于服务商排障。 */
-export function emailErrorText(
-  error: string | null | undefined,
-  fallback = '请检查邮箱配置后重试。',
-): string {
-  const text = String(error ?? '').trim();
-  if (!text) return fallback;
-  return (
-    EMAIL_ERROR_COPY[text] ??
-    text
-      .replace(/HTTP API/g, '自定义邮件接口')
-      .replace(/console/g, '本地记录')
-      .replace(/outbox/g, '本地记录')
-      .replace(/回落/g, '切换为')
-  );
-}
+/* 通道名与错误转写由 `src/lib/email-status.ts` 维护，与消息通知页共用一份口径 */
+export { deliveryProviderLabel, emailErrorText } from '../../../lib/email-status';
 
 export function providerMeta(provider: string) {
   return PROVIDERS.find((item) => item.value === provider) ?? PROVIDERS[0];

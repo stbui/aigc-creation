@@ -1,6 +1,14 @@
 import { Plus, X } from 'lucide-react';
 
 import type { AnnotationDraft, RegionBounds } from './constants';
+import {
+  ANNOTATION_CARD,
+  ANNOTATION_LABEL,
+  ANNOTATION_REFERENCE,
+  ANNOTATION_REFERENCE_FILLED,
+  ANNOTATION_REFERENCE_REMOVE,
+  ANNOTATION_TEXTAREA,
+} from './constants';
 import { assetThumbUrl } from './api';
 
 const MAX_PROMPT_LEN = 200;
@@ -33,7 +41,7 @@ export function LocalRedrawAnnotationItem({
   const reference = draft?.reference ?? null;
 
   return (
-    <div className="redraw-prompt">
+    <div className={`redraw-prompt ${ANNOTATION_CARD}`}>
       <button
         type="button"
         className="remove-annotation"
@@ -44,11 +52,12 @@ export function LocalRedrawAnnotationItem({
       >
         <X size={13} />
       </button>
-      <label className="redraw-prompt-label is-marked">
+      <label className={`redraw-prompt-label is-marked ${ANNOTATION_LABEL}`}>
         <i />
         {label}
       </label>
       <textarea
+        className={ANNOTATION_TEXTAREA}
         rows={2}
         maxLength={MAX_PROMPT_LEN}
         value={draft?.prompt ?? ''}
@@ -56,15 +65,21 @@ export function LocalRedrawAnnotationItem({
         onChange={(event) => onDraftChange(region.id, { prompt: event.target.value })}
       />
       <label
-        className={`redraw-prompt-tools reference-upload${reference ? ' has-image' : ''}`}
+        className={`redraw-prompt-tools reference-upload ${ANNOTATION_REFERENCE}${
+          reference ? ` ${ANNOTATION_REFERENCE_FILLED}` : ''
+        }`}
         title={reference ? `替换${label}参考图` : `上传${label}参考图`}
       >
         {reference && (
           <>
-            <img src={assetThumbUrl(reference.url, 240) ?? reference.url} alt={`${label}参考图`} />
+            <img
+              className="block size-full object-cover"
+              src={assetThumbUrl(reference.url, 240) ?? reference.url}
+              alt={`${label}参考图`}
+            />
             <button
               type="button"
-              className="remove-reference"
+              className={`remove-reference ${ANNOTATION_REFERENCE_REMOVE}`}
               aria-label={`移除${label}参考图`}
               onClick={(event) => {
                 event.preventDefault();

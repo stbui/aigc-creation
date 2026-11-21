@@ -58,8 +58,8 @@ export function TemplateInputPane({
   onSubmit,
 }: TemplateInputPaneProps) {
   return (
-    <aside className="pk-input-pane">
-      <div className="pk-form-scroll">
+    <aside className="pk-input-pane min-[901px]:max-[1024px]:h-full! min-[901px]:max-[1024px]:min-h-0!">
+      <div className="pk-form-scroll min-[901px]:max-[1024px]:overflow-y-auto!">
         <section className="pk-config-card">
           <ToolImageDropzone
             title="上传人像照片"
@@ -79,15 +79,21 @@ export function TemplateInputPane({
 
           <TemplateSelectedCard template={selectedTemplate} onClear={onClearTemplate} />
 
-          <div className="tpl-tips">
-            <strong className="pk-section-title u-font-14">
-              <Lightbulb size={14} />
+          <div className="grid gap-2.5">
+            <strong className="pk-section-title u-font-14 inline-flex items-center gap-1.5">
+              <Lightbulb size={14} className="text-brand" />
               拍摄建议
             </strong>
-            <ul className="tpl-tips-list">
-              <li>正脸清晰、五官无遮挡，生成的相似度更高</li>
-              <li>光线均匀的日常照、证件照都可以直接使用</li>
-              <li>选好模板后，可点封面左上角的眼睛查看大图</li>
+            <ul className="m-0 grid list-none gap-1.5 p-0">
+              <li className="relative pl-3 text-xs leading-[18px] text-[color:var(--text-desc)] before:absolute before:top-[7px] before:left-0 before:size-1 before:rounded-full before:bg-brand before:opacity-60 before:content-['']">
+                正脸清晰、五官无遮挡，生成的相似度更高
+              </li>
+              <li className="relative pl-3 text-xs leading-[18px] text-[color:var(--text-desc)] before:absolute before:top-[7px] before:left-0 before:size-1 before:rounded-full before:bg-brand before:opacity-60 before:content-['']">
+                光线均匀的日常照、证件照都可以直接使用
+              </li>
+              <li className="relative pl-3 text-xs leading-[18px] text-[color:var(--text-desc)] before:absolute before:top-[7px] before:left-0 before:size-1 before:rounded-full before:bg-brand before:opacity-60 before:content-['']">
+                选好模板后，可点封面左上角的眼睛查看大图
+              </li>
             </ul>
           </div>
         </section>

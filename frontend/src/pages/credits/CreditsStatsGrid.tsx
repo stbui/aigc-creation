@@ -26,12 +26,12 @@ export function CreditsStatsGrid({ balance }: CreditsStatsGridProps) {
   ];
 
   return (
-    <div className="credits-stats grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2">
       {stats.map((item) => (
-        <Surface className="credits-stat-card" key={item.label}>
-          <SurfaceContent>
-            <div className="credits-stat-label">{item.label}</div>
-            <div className={`credits-stat-value${item.warn ? ' is-warn' : ''}`}>
+        <Surface key={item.label}>
+          <SurfaceContent className="px-4 py-3.5">
+            <div className="mb-1 text-xs text-muted-foreground">{item.label}</div>
+            <div className={`text-[22px] font-bold ${item.warn ? 'text-warn-text' : 'text-foreground'}`}>
               {item.value ?? '—'}
             </div>
           </SurfaceContent>

@@ -47,10 +47,16 @@ export function RotateAngleSettingsCard({
   onReset,
 }: RotateAngleSettingsCardProps) {
   return (
-    <section className="local-redraw-card rotate-angle-settings">
-      <div className="rotate-angle-settings-head">
-        <h2>旋转角度</h2>
-        <button type="button" aria-label="重置参数" title="重置参数" onClick={onReset}>
+    <section className="flex flex-none flex-col gap-3 rounded-[14px] border-0 bg-card px-4 py-3.5 max-[900px]:p-3.5">
+      <div className="flex items-center justify-between gap-2.5">
+        <h2 className="m-0 text-sm leading-[22px] font-bold text-[color:var(--tool-text-1)]">旋转角度</h2>
+        <button
+          type="button"
+          aria-label="重置参数"
+          title="重置参数"
+          className="grid size-7 cursor-pointer place-items-center rounded-[7px] border-0 bg-[var(--surface-3)] p-0 text-[color:var(--text-6)] hover:bg-[var(--wb-flow-income-bg)] hover:text-brand"
+          onClick={onReset}
+        >
           <RotateCcw size={16} />
         </button>
       </div>
@@ -86,8 +92,8 @@ export function RotateAngleSettingsCard({
         onChange={onZoomChange}
       />
 
-      <p className="rotate-angle-tip">
-        <Info size={13} />
+      <p className="m-0 flex gap-[7px] pt-0.5 text-xs leading-[17px] text-[color:var(--tool-text-5)]">
+        <Info size={13} className="mt-px flex-none text-brand" />
         <span>相机保持静止，生成时按主体旋转角度重建商品展示。</span>
       </p>
     </section>

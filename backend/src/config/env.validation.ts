@@ -20,7 +20,6 @@
  *    值完全相同，否则等于偷偷改了默认行为。
  */
 
-import { STORAGE_BACKENDS } from '../storage/storage.provider';
 
 /** 日志级别，映射到 NestJS LoggerService 的方法优先级 */
 export type LogLevel = 'error' | 'warn' | 'log' | 'debug' | 'verbose';
@@ -238,20 +237,6 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'asset.thumbnailEnabled', env: 'ASSET_THUMBNAIL_ENABLED', type: 'boolean', def: false },
   // 未处理异常的告警 webhook（可选）。留空则只落盘，不发外部请求。
   { key: 'observability.errorWebhookUrl', env: 'ERROR_WEBHOOK_URL', type: 'string', def: '' },
-
-  // ── 存储（后端白名单与默认值取自 storage/storage.provider.ts）──────────
-  { key: 'storage.backend', env: 'STORAGE_BACKEND', type: 'string', def: 'local', oneOf: STORAGE_BACKENDS },
-  { key: 'storage.ossRegion', env: 'OSS_REGION', type: 'string', def: '' },
-  { key: 'storage.ossBucket', env: 'OSS_BUCKET', type: 'string', def: '' },
-  { key: 'storage.ossAccessKeyId', env: 'OSS_ACCESS_KEY_ID', type: 'string', def: '' },
-  { key: 'storage.ossAccessKeySecret', env: 'OSS_ACCESS_KEY_SECRET', type: 'string', def: '' },
-  { key: 'storage.ossEndpoint', env: 'OSS_ENDPOINT', type: 'string', def: '' },
-  { key: 'storage.minioEndpoint', env: 'MINIO_ENDPOINT', type: 'string', def: '' },
-  { key: 'storage.minioPort', env: 'MINIO_PORT', type: 'number', def: 9000, min: 1, max: 65535 },
-  { key: 'storage.minioUseSsl', env: 'MINIO_USE_SSL', type: 'boolean', def: false },
-  { key: 'storage.minioAccessKey', env: 'MINIO_ACCESS_KEY', type: 'string', def: '' },
-  { key: 'storage.minioSecretKey', env: 'MINIO_SECRET_KEY', type: 'string', def: '' },
-  { key: 'storage.minioBucket', env: 'MINIO_BUCKET', type: 'string', def: 'huojue' },
 
   // ── 渠道与模型子系统（移植自 open-ai-canvas）───────────────────────────
   // 渠道凭证加密密钥（base64 编码的 32 字节）。留空 = 开发态自动生成并落盘；

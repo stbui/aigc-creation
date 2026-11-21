@@ -94,8 +94,8 @@ function ToolPageContent({ def }: { def: CapabilityDef }) {
   const state = useToolPageTask(def, form);
 
   return (
-    <div className="tool-page">
-      <Button asChild variant="ghost" className="tool-back">
+    <div className="mx-auto max-w-[1100px]">
+      <Button asChild variant="ghost" className="-ml-2 mb-1 text-muted-foreground">
         <Link to="/workbench">
           <ArrowLeft size={15} aria-hidden />
           返回工作台
@@ -104,7 +104,7 @@ function ToolPageContent({ def }: { def: CapabilityDef }) {
 
       <ToolPageHeader def={def} />
 
-      <div className="tool-body">
+      <div className="grid items-start gap-4 max-[900px]:grid-cols-1 min-[901px]:grid-cols-[minmax(320px,420px)_1fr]">
         <ToolUploadCard
           def={def}
           form={form}

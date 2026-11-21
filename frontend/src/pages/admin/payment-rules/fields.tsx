@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
 
+import { adminSettingsApi } from './api';
+import type { AdminSettingValue } from '../../../types/api';
+import {
+  PAYMENT_RULE_COPY,
+  PAYMENT_RULES_KEYS,
+  type PaymentRuleItem,
+} from './constants';
 import {
   ActionButton,
   Field,
@@ -20,14 +27,7 @@ import {
   TextAreaField,
   TextField,
   ToneBadge,
-} from '~/admin-ui/radar';
-import { adminSettingsApi } from './api';
-import type { AdminSettingValue } from '../../../types/api';
-import {
-  PAYMENT_RULE_COPY,
-  PAYMENT_RULES_KEYS,
-  type PaymentRuleItem,
-} from './constants';
+} from './components';
 import '../../../styles/radar-admin.css';
 
 function ruleValue(value: unknown): string {

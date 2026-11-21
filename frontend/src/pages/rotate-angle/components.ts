@@ -21,3 +21,6 @@ export {
   productSourcePane,
   productSourceUploadPreview,
 } from '../../components/ProductSourcePreview';
+
+/** 产品系五页共用的页面根类与上传区皮肤（翻译 / 精修 / 换色 / 旋转 / 扩图） */
+export { PRODUCT_TOOL_DROPZONE, PRODUCT_TOOL_PAGE } from '../../components/productToolPageClasses';

@@ -33,46 +33,62 @@ export function TemplateSelectedCard({ template, onClear }: TemplateSelectedCard
         选择模板
       </strong>
       {template ? (
-        <div className="tpl-selected">
+        <div className="flex gap-3 rounded-lg border border-border bg-[var(--surface-soft)] p-3">
           <button
             type="button"
-            className="tpl-selected-thumb"
+            className="group h-[100px] w-[76px] shrink-0 cursor-zoom-in overflow-hidden rounded-md border-0 bg-card p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             onClick={() => setPreviewOpen(true)}
             aria-label={`查看${template.name}大图`}
             title="看大图"
           >
-            <img src={template.thumbFile} alt={`${template.name} 模板预览`} loading="lazy" />
+            <img
+              className="block size-full rounded-md object-cover transition-transform duration-200 group-hover:scale-[1.04]"
+              src={template.thumbFile}
+              alt={`${template.name} 模板预览`}
+              loading="lazy"
+            />
           </button>
-          <div className="tpl-selected-copy">
-            <span className="tpl-selected-path">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="truncate text-xs leading-4 text-[color:var(--text-desc)]">
               {template.categoryName} · {template.groupName}
             </span>
-            <strong className="tpl-selected-name">{template.name}</strong>
+            <strong className="text-sm font-semibold text-foreground">{template.name}</strong>
             {visibleTags.length > 0 && (
-              <span className="tpl-selected-tags" title={tags.join('、')}>
+              <span className="flex flex-wrap gap-1" title={tags.join('、')}>
                 {visibleTags.map((tag) => (
-                  <span key={tag} className="tpl-selected-tag">
+                  <span
+                    key={tag}
+                    className="rounded-full bg-brand-bg px-2 py-px text-xs leading-[18px] text-[color:var(--text-brand-1)]"
+                  >
                     {tag}
                   </span>
                 ))}
                 {restCount > 0 && (
-                  <span className="tpl-selected-tag is-more">+{restCount}</span>
+                  <span className="rounded-full bg-muted px-2 py-px text-xs leading-[18px] text-[color:var(--text-desc)]">
+                    +{restCount}
+                  </span>
                 )}
               </span>
             )}
-            <button type="button" className="tpl-selected-clear" onClick={onClear}>
+            <button
+              type="button"
+              className="mt-1 cursor-pointer self-start border-0 bg-transparent p-0 text-xs leading-[18px] text-brand hover:text-brand-hover"
+              onClick={onClear}
+            >
               清除
             </button>
           </div>
         </div>
       ) : (
-        <div className="tpl-selected-empty">
-          <span className="tpl-selected-empty-icon">
+        <div className="flex min-h-[100px] items-center gap-3 rounded-lg border border-dashed border-border bg-[var(--surface-soft)] p-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-bg text-brand">
             <MousePointerClick size={18} />
           </span>
-          <span className="tpl-selected-empty-copy">
-            <strong>在右侧选择一个模板</strong>
-            <small>选中后会回显在这里</small>
+          <span className="grid gap-0.5">
+            <strong className="text-sm font-semibold text-foreground">在右侧选择一个模板</strong>
+            <small className="text-xs leading-[18px] text-[color:var(--text-desc)]">
+              选中后会回显在这里
+            </small>
           </span>
         </div>
       )}

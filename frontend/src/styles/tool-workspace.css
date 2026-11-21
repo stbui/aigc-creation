@@ -386,7 +386,7 @@
 
 .pk-ai-btn:hover {
   color: var(--tool-text-brand-1);
-  background: var(--mif-surface-back-hover);
+  background: var(--tool-surface-back-hover);
   border-color: var(--tool-border-brand-1);
   outline: none;
 }
@@ -528,14 +528,14 @@
 
 .pk-settings-label {
   font-weight: 600;
-  color: var(--mif-settings-summary-label);
+  color: var(--tool-settings-label);
   margin-right: auto;
 }
 
 .pk-settings-chip {
   /* 参考站 .image-output-settings-chip 实拍 rgb(72,80,94) + radius 5px
      (token --text-body #4e5969 / --radius-tag 4px 各差一档) @2026-10-19 */
-  color: var(--mif-settings-chip);
+  color: var(--tool-settings-chip);
   border: 1px solid var(--border-soft);
   border-radius: 5px;
   padding: 0 9px;
@@ -704,7 +704,7 @@
   line-height: 16px;
   /* 参考站 .image-output-resolution-option span: rgb(124,132,147)
      (此前继承 strong 的 --text-body, 副文与主文同色, 卡片看起来是一整块) @2026-10-21 */
-  color: var(--mif-resolution-option-sub);
+  color: var(--tool-resolution-sub);
 }
 
 .pk-resolution-option:hover:not(:disabled) {

@@ -8,5 +8,4 @@
  * hook `./hooks`、纯函数 `./utils`、常量 `./constants`。
  * 分层约定见 `docs/frontend-module-conventions.md`。
  */
-import './style.css';
 export { RotateAnglePage } from './page';

@@ -175,6 +175,9 @@ export class SystemProxyService {
         statusCode: 0,
         error: messageOf(error),
         errorCode: error instanceof ChannelUnavailableError ? error.reason : 'channel_busy',
+        /* 请求没发出去：响应字节必然为 0；请求体仍是已读到的真实长度 */
+        requestBytes: input.body.length,
+        responseBytes: 0,
       });
       const busy = error instanceof ChannelUnavailableError;
       writeProxyError(res, busy ? 429 : 503, busy ? 42901 : 50303, messageOf(error));
@@ -210,6 +213,8 @@ export class SystemProxyService {
             statusCode: 0,
             error: messageOf(error),
             errorCode: 'billing_rejected',
+            requestBytes: input.body.length,
+            responseBytes: 0,
           });
           writeProxyError(res, appStatus(error), appCode(error), messageOf(error));
           return;
@@ -350,6 +355,9 @@ export class SystemProxyService {
         statusCode: 0,
         error: messageOf(error),
         errorCode: outboundCode(error),
+        /* 上游连不上，一个字节的响应都没收到 */
+        requestBytes: request.body.length,
+        responseBytes: 0,
       });
       writeProxyError(res, 502, 50201, '系统渠道连接失败');
       return;
@@ -359,6 +367,13 @@ export class SystemProxyService {
     const streamed = isEventStream(response.headers);
     const responseLimit = limits.systemResponseBytes;
     let captured = Buffer.alloc(0);
+    /**
+     * 上游实际发出的响应字节数。
+     *
+     * 流式分支用 `receivedBytes`（超上限被截断时它仍大于 `captured.length`），
+     * 非流式分支就是读完的 buffer 长度。都没读到时为 0。
+     */
+    let responseBytes = 0;
     let readError = '';
 
     if (streamed) {
@@ -366,6 +381,7 @@ export class SystemProxyService {
       beginEventStream(res, statusCode);
       const result = await copyUpstreamStream(response, res, responseLimit);
       captured = result.captured;
+      responseBytes = result.receivedBytes;
       if (result.exceeded) readError = '系统渠道流式响应超过配置上限';
     } else {
       let body: Buffer | null = null;
@@ -376,6 +392,7 @@ export class SystemProxyService {
       }
       if (readError === '' && body === null) readError = '系统渠道响应超过配置上限';
       captured = body ?? Buffer.alloc(0);
+      responseBytes = captured.length;
     }
 
     const success = statusCode >= 200 && statusCode < 300 && readError === '';
@@ -397,6 +414,8 @@ export class SystemProxyService {
       error: readError || (success ? '' : `上游返回 HTTP ${statusCode}`),
       responseBody: captured,
       streamed,
+      requestBytes: request.body.length,
+      responseBytes,
     });
 
     /*
@@ -468,6 +487,8 @@ export class SystemProxyService {
     errorCode?: string;
     responseBody?: Buffer;
     streamed?: boolean;
+    requestBytes?: number;
+    responseBytes?: number;
   }): Promise<boolean> {
     const { input, channel, channelModel, authorization } = entry;
     try {
@@ -494,6 +515,8 @@ export class SystemProxyService {
         responseBody: formatCallPayload(entry.responseBody ?? Buffer.alloc(0), ''),
         responseBodyBuffer: entry.responseBody,
         streamed: entry.streamed,
+        requestBytes: entry.requestBytes,
+        responseBytes: entry.responseBytes,
         errorCode: entry.errorCode,
         error: entry.error,
       });

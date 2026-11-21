@@ -39,3 +39,6 @@ export {
   TextField,
   ToneBadge,
 } from '~/admin-ui/radar';
+
+/* 跨页共用的后台组件（消息通知页使用同一个测试发信面板） */
+export { TestEmailPanel } from '~/components/admin/TestEmailPanel';

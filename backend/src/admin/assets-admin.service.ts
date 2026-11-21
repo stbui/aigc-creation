@@ -425,7 +425,7 @@ export class AdminAssetsService {
    * 删除素材 (B-27): 连带磁盘文件与产出任务。
    *
    * 文件删除按**写入时的后端**, 不能用当前默认后端 —— 否则切换过
-   * STORAGE_BACKEND 后老素材的云端文件永远删不掉。
+   * 切换默认后端后老素材的云端文件永远删不掉。
    */
   async remove(id: string) {
     const asset = await this.prisma.asset.findUnique({

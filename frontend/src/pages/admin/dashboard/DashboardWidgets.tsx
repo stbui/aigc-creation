@@ -1,24 +1,13 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
-import { formatNumber, formatDateTime, Meter, formatDuration } from '~/admin-ui/radar';
-import type { DutyTask } from './components';
-import type { AdminOrderRow, AdminOverview } from '../../../types/api';
-import {
-  QUEUE_LIMIT,
-  hhmm,
-  queueTime,
-  yuan,
-  taskErrorLabel,
-  adminOrderDetailHref,
-  adminTaskHref,
-} from './utils';
+import { Meter } from './components';
+import type { AdminOverview } from '../../../types/api';
+import { formatNumber, yuan } from './utils';
 import '../../../styles/radar-admin.css';
 
 /**
- * 概览页首屏构件与展示小节。
+ * 概览页展示小节。
  *
- * 这里只放「怎么画」：队列、机器读数、财务读数与概览内的通用排版件。
+ * 这里只放「怎么画」：财务读数与概览内的通用排版件。
  * 取数、权限判定与页面编排留在 `AdminDashboardContent`。
  */
 
@@ -68,176 +57,6 @@ export function MeterRow({
         {hint ?? String(value)}
       </span>
     </div>
-  );
-}
-
-/**
- * 异常队列。
- *
- * 最早的在最上面：值班条的主按钮「接手最早异常」跳到的那条，就是这里的
- * 第一行 —— 值班条与队列指向同一条任务，人不需要再找一次。
- */
-export function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: boolean }) {
-  const failures = tasks
-    .filter((t) => t.status === 'failed')
-    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
-  const shown = failures.slice(0, QUEUE_LIMIT);
-
-  if (loading && tasks.length === 0) {
-    return <EmptyInline>读取任务快照…</EmptyInline>;
-  }
-  if (shown.length === 0) {
-    return (
-      <EmptyInline>
-        最近 {tasks.length} 条任务没有失败 —— 暂时没有需要接手的异常。
-      </EmptyInline>
-    );
-  }
-
-  return (
-    <>
-      <ol className="list-none">
-        {shown.map((t, i) => (
-          <li key={t.id}>
-            <Link
-              className="grid min-h-11 grid-cols-[22px_minmax(0,1fr)_auto_14px] items-center gap-2.5 rounded-md border-t border-border px-1.5 py-1 text-inherit no-underline transition-colors first:border-t-0 hover:bg-muted focus-visible:outline-2 focus-visible:outline-radar-ink-950 focus-visible:-outline-offset-2"
-              to={adminTaskHref(t.id)}
-            >
-              <span className="text-[12px] font-semibold text-muted-foreground">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <span className="flex min-w-0 flex-col gap-px">
-                <span className="overflow-hidden text-sm leading-[18px] font-semibold text-ellipsis whitespace-nowrap text-foreground">
-                  {/* 状态点先于文字：一列红点让「这是异常」在扫视时成立 */}
-                  <span
-                    className="mr-1.5 inline-block size-[5px] rounded-full bg-danger-text align-[2px]"
-                    aria-hidden
-                  />
-                  {t.capabilityName}
-                </span>
-                <span className="overflow-hidden text-[13px] leading-5 text-ellipsis whitespace-nowrap text-muted-foreground">
-                  {/* 错误码放在原因前面：排障时先拿码去查日志 */}
-                  {t.errorCode ? `${t.errorCode} · ` : ''}
-                  {taskErrorLabel(t.errorCode)}
-                  {` · ${formatDuration(t.durationMs)}`}
-                </span>
-              </span>
-              <span
-                className="text-[12px] text-muted-foreground"
-                title={formatDateTime(t.createdAt)}
-              >
-                {queueTime(t.createdAt)}
-              </span>
-              <ChevronRight className="size-3.5 text-muted-foreground/60" aria-hidden />
-            </Link>
-          </li>
-        ))}
-      </ol>
-      {failures.length > shown.length && (
-        <p className="mt-2.5 border-t border-border pt-2.5 text-[13px]">
-          <Link className="text-radar-ink-950 hover:underline" to="/admin/tasks?status=failed">
-            另有 {failures.length - shown.length} 条失败任务 →
-          </Link>
-        </p>
-      )}
-    </>
-  );
-}
-
-/**
- * 最近一批已结算任务的成功率与中位耗时。
- *
- * 样本是最近 100 条任务里的已完成项，不是全量 —— 说明里写明，避免被
- * 读成「平台历史成功率」。
- */
-export function MachineStats({ tasks }: { tasks: DutyTask[] }) {
-  const finished = tasks.filter((t) => t.status === 'succeeded' || t.status === 'failed');
-  const ok = finished.filter((t) => t.status === 'succeeded').length;
-  const rate = finished.length > 0 ? Math.round((ok / finished.length) * 100) : null;
-  const durations = finished
-    .map((t) => t.durationMs)
-    .filter((ms) => ms >= 0)
-    .sort((a, b) => a - b);
-  const median = durations.length > 0 ? durations[Math.floor(durations.length / 2)] : null;
-
-  return (
-    <dl className="grid grid-cols-3 gap-2.5 border-t border-border pt-3">
-      <div className="min-w-0">
-        {/* 「近期」是要紧的限定：下面还有一条近 N 天的成功率，不区分会被读成打架 */}
-        <dt
-          className="mb-0.5 overflow-hidden text-[13px] text-ellipsis whitespace-nowrap text-muted-foreground"
-          title={`最近 ${tasks.length} 条任务中的已结算项`}
-        >
-          近期成功率
-        </dt>
-        <dd
-          className={
-            rate !== null && rate < 90
-              ? 'text-base leading-5 font-semibold tracking-tight text-danger-text'
-              : 'text-base leading-5 font-semibold tracking-tight text-foreground'
-          }
-        >
-          {rate === null ? '—' : `${rate}%`}
-        </dd>
-      </div>
-      <div className="min-w-0">
-        <dt className="mb-0.5 overflow-hidden text-[13px] text-ellipsis whitespace-nowrap text-muted-foreground">
-          中位耗时
-        </dt>
-        <dd className="text-base leading-5 font-semibold tracking-tight text-foreground">
-          {median === null ? '—' : formatDuration(median)}
-        </dd>
-      </div>
-      <div className="min-w-0">
-        <dt className="mb-0.5 overflow-hidden text-[13px] text-ellipsis whitespace-nowrap text-muted-foreground">
-          样本
-        </dt>
-        <dd className="text-base leading-5 font-semibold tracking-tight text-foreground">
-          {finished.length}
-        </dd>
-      </div>
-    </dl>
-  );
-}
-
-/** 财务待办：最早的几笔待付订单，点开就是订单列表里的同一条 */
-export function OrderQueue({ orders, loading }: { orders: AdminOrderRow[]; loading: boolean }) {
-  if (loading) return <EmptyInline>读取订单…</EmptyInline>;
-  if (orders.length === 0) return <EmptyInline>没有待支付订单。</EmptyInline>;
-
-  return (
-    <ol className="list-none">
-      {orders.map((o, i) => (
-        <li key={o.id}>
-          <Link
-            className="grid min-h-11 grid-cols-[22px_minmax(0,1fr)_auto_auto_14px] items-center gap-2.5 rounded-md border-t border-border px-1.5 py-1 text-inherit no-underline transition-colors first:border-t-0 hover:bg-muted focus-visible:outline-2 focus-visible:outline-radar-ink-950 focus-visible:-outline-offset-2"
-            to={adminOrderDetailHref(o.id)}
-          >
-            <span className="text-[12px] font-semibold text-muted-foreground">
-              {String(i + 1).padStart(2, '0')}
-            </span>
-            <span className="flex min-w-0 flex-col gap-px">
-              <span className="overflow-hidden text-sm leading-[18px] font-semibold text-ellipsis whitespace-nowrap text-foreground">
-                {o.orderNo}
-              </span>
-              <span className="overflow-hidden text-[13px] leading-5 text-ellipsis whitespace-nowrap text-muted-foreground">
-                {o.userEmail}
-              </span>
-            </span>
-            <span className="text-[13px] font-semibold text-foreground">
-              ¥{yuan(o.totalCents, 0)}
-            </span>
-            <span
-              className="text-[12px] text-muted-foreground"
-              title={formatDateTime(o.createdAt)}
-            >
-              {hhmm(o.createdAt)}
-            </span>
-            <ChevronRight className="size-3.5 text-muted-foreground/60" aria-hidden />
-          </Link>
-        </li>
-      ))}
-    </ol>
   );
 }
 

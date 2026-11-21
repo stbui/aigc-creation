@@ -107,21 +107,28 @@ const POSITION_CELLS: Array<{ value: string; glyph: string; label: string }> = [
 /** 原图位置九宫格 (参考站 smart-expand-position-grid; center 默认) */
 export function PositionGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div className="smart-expand-position-grid" role="radiogroup" aria-label="原图位置">
-      {POSITION_CELLS.map((c) => (
-        <button
-          key={c.value}
-          type="button"
-          role="radio"
-          aria-checked={c.value === value}
-          aria-label={`原图${c.label}`}
-          title={`原图${c.label}`}
-          className={c.value === value ? 'active' : ''}
-          onClick={() => onChange(c.value)}
-        >
-          {c.glyph}
-        </button>
-      ))}
+    <div className="grid w-24 grid-cols-[repeat(3,28px)] gap-1" role="radiogroup" aria-label="原图位置">
+      {POSITION_CELLS.map((c) => {
+        const active = c.value === value;
+        return (
+          <button
+            key={c.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={`原图${c.label}`}
+            title={`原图${c.label}`}
+            className={`grid size-7 cursor-pointer place-items-center rounded-[3px] border p-0 text-sm leading-none ${
+              active
+                ? 'border-[var(--brand-active)] bg-brand-bg text-[color:var(--brand-active)]'
+                : 'border-[var(--border-1)] bg-card text-[color:var(--tool-text-2)] hover:border-brand-light hover:text-brand'
+            }`}
+            onClick={() => onChange(c.value)}
+          >
+            {c.glyph}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -146,9 +153,9 @@ export function RangeRow({
 }) {
   const progress = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
-    <label className="rotate-angle-range">
-      <span>
-        {label} <b>{display ?? value}</b>
+    <label className="grid gap-2 border-t border-[var(--tool-border-8)] pt-2.5">
+      <span className="flex items-center justify-between text-xs leading-4 text-[color:var(--text-5)]">
+        {label} <b className="font-semibold text-brand tabular-nums">{display ?? value}</b>
       </span>
       <input
         type="range"
@@ -157,6 +164,7 @@ export function RangeRow({
         step={step}
         value={value}
         style={{ ['--range-progress' as string]: `${progress}%` }}
+        className="h-1 w-full cursor-pointer appearance-none rounded-[var(--radius-tag)] bg-[linear-gradient(90deg,var(--brand)_var(--range-progress),var(--tool-surface-3)_var(--range-progress))] outline-none [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-[var(--card-bg)] [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:shadow-[0_1px_4px_rgba(85,70,216,0.4)] [&::-moz-range-thumb]:size-2.5 [&::-moz-range-thumb]:cursor-grab [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-[var(--card-bg)] [&::-moz-range-thumb]:bg-brand [&::-moz-range-thumb]:shadow-[0_1px_4px_rgba(85,70,216,0.4)]"
         onChange={(e) => onChange(Number(e.target.value))}
       />
     </label>
@@ -205,17 +213,25 @@ export function ToolCard({
   children,
   actions,
   className,
+  dense = false,
+  titleGap = false,
 }: {
   title?: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
   /** 参考站页面级卡片 class（如 background-color-card / product-retouch-card） */
   className?: string;
+  /** 紧凑内边距与间距（14px），用于颜色卡这类矮卡片 */
+  dense?: boolean;
+  /** 标题行下方留出 16px 间距，用于标题与内容需要拉开距离的卡片 */
+  titleGap?: boolean;
 }) {
   return (
-    <section className={`local-redraw-card tool-card${className ? ` ${className}` : ''}`}>
+    <section
+      className={`local-redraw-card tool-card grid gap-4 rounded-[var(--radius-panel)] bg-card p-4${dense ? ' is-dense' : ''}${className ? ` ${className}` : ''}`}
+    >
       {title && (
-        <div className="card-title-row">
+        <div className={`card-title-row${titleGap ? ' has-gap' : ''}`}>
           <h2>{title}</h2>
           {actions}
         </div>
@@ -236,16 +252,18 @@ export function ToolSwitch({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="image-translate-protect">
-      <span>{label}</span>
+    <div className="flex h-5 items-center justify-between gap-2.5">
+      <span className="text-[13px] leading-[17.5px] text-[color:var(--wb-text)]">{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
-        className={checked ? 'active' : ''}
+        className={`flex h-5 w-9 cursor-pointer items-center rounded-full border-0 p-0 transition-colors ${
+          checked ? 'justify-end bg-[color:var(--brand-accent)]' : 'justify-start bg-border'
+        }`}
         onClick={() => onChange(!checked)}
       >
-        <i />
+        <i className="block size-[18px] rounded-full bg-card shadow-[0_1px_3px_rgba(17,24,39,0.24)] transition-transform" />
       </button>
     </div>
   );

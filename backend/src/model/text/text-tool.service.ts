@@ -22,7 +22,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppError } from '../../common/app.exception';
-import { currentRequestId } from '../../common/request-context';
+import { currentClientIp, currentRequestId } from '../../common/request-context';
 import {
   ChannelRuntimeService,
   ChannelUnavailableError,
@@ -289,6 +289,14 @@ export class TextToolService {
           requestContentType: 'application/json',
           requestBody: input.requestBody,
           responseBody: previewCallText(input.response?.text),
+          /*
+           * 文本工具是**同步**调用，请求上下文还在，直接取当前请求的客户端地址。
+           * 字节数取发送时实测值：请求体在协议构建后才确定（系统指令会被并进
+           * messages），不能用 `requestBody` 预览长度代替。
+           */
+          clientIp: currentClientIp() ?? '',
+          requestBytes: input.response?.requestBytes ?? 0,
+          responseBytes: input.response?.responseBytes ?? 0,
           startedAt: new Date(input.startedAt),
         },
       });

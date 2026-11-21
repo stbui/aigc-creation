@@ -1,18 +1,22 @@
 # 渠道与模型子系统整体移植方案（对齐 open-ai-canvas）
 
-> 状态：已实施 —— P0 ~ P6 全部交付；旧 `src/providers/**`、`GATEWAY_*` 变量、`ModelCallLog` 写入方与后台 `/admin/model-config`、`/admin/model-channels` 已删除，`docs/model-architecture.md` 已按新层重写。真实厂商密钥连通性验收待在部署环境配好凭据后执行。
+> 状态：历史移植记录，已实施部分以当前代码和 [`docs/model-architecture.md`](./model-architecture.md) 为准；可实施增量规格见 [`docs/model-channel-architecture.md`](./model-channel-architecture.md)。本文早期章节仍保留迁移背景，但其中涉及 `LogicalModel` 的旧目标模型已被当前实现取代。
 > 日期：2026-10-31
 > 决策：**废弃本仓现有模型层，按 `open-ai-canvas` 全量移植，不做功能裁剪**
 > 参考实现：`/Users/bright/github/open-ai-canvas`（Go 1.25 + Gin + GORM，MIT）
 > 关联：`docs/model-architecture.md`、`docs/api-contract.md`、`docs/commerce-design.md`、`docs/testing.md`、`CLAUDE.md`
 
-## 0. 本版取代上一版
+> 当前实现勘误：前台不再使用 `LogicalModel / LogicalModelRevision / LogicalModelRoute`，也不提交 `logicalModelId`。前台选择使用“能力 + `modelKey`（模型分组键）”，运行时通过 `CapabilityModelBinding` 选择 `ChannelModel`；`providerModelKey` 只作为上游模型键。任务的结果不明表示为 `status=failed + errorCode=42206 + stage=uncertain`，账单才进入 `status=uncertain`。
+
+## 0. 本版取代上一版（历史记录）
+
+本节记录 2026-10-31 的移植决策，保留用于解释迁移背景；它不是当前运行时模型定义。当前定义以本文顶部勘误、`docs/model-architecture.md` 和 `docs/model-channel-architecture.md` 为准。
 
 上一版方案（「能力即逻辑模型、只补 `ChannelModel`、不做路由/插件/微积分/代理」）**整体作废**。被推翻的判断逐条列出，避免实现时两套思路混用：
 
 | 上一版判断 | 本版决定 | 理由 |
 | --- | --- | --- |
-| 能力即逻辑模型，不复制 `LogicalModel / Revision / Route` | 原样复制三层，能力只做工作流定义 | 能力是表单与提示词，逻辑模型是可售 SKU；改价换线路不该发版，改能力文案不该动账单 |
+| 能力即逻辑模型，不复制 `LogicalModel / Revision / Route` | 当时决定原样复制三层 | 历史决策；后续实现已删除这三层，当前使用能力 + 模型分组 |
 | 用户扣费仍按能力积分价，`ChannelModelPriceTier` 只算成本 | 售价由「价格档 × 分组倍率 × 货币」决定 | 参考实现里价格档同时承载售价；拆成两套价会让「后台看到的价」与「实际扣费」再次分叉 |
 | 不做用户自建渠道、代理路由、插件、加权路由 | 全部移植 | 渠道模型依赖协议插件；代理与自定义渠道属于渠道域 |
 | 不做加权随机，只按 priority 顺序 | priority 硬分层 + 同层加权随机 | 故障切换、灰度与新线路放量都依赖这一层 |
@@ -28,7 +32,7 @@
 | --- | --- |
 | 渠道 | 系统渠道 CRUD、复制、导出/导入、排序、凭证加密、请求头、代理解析、出站校验 |
 | 渠道模型 | 多模型接入、能力与协议、上游模型键、能力配置、价格档、批量改价/删除、上游目录拉取与测试、排序 |
-| 前台模型 | `LogicalModel / Revision / Route`、能力合同、默认参数、价格策略、归档、路由模拟 |
+| 前台模型选择 | 能力 + `modelKey` 模型分组、参数合同、报价和路由模拟；不再有 `LogicalModel / Revision / Route` 三层 |
 | 路由运行时 | 路由目录缓存、意图解析、能力匹配、priority 分层 + 加权、冷却、尝试状态机、故障切换 |
 | 计费 | 微积分账户、预留/结算/退款、Token 与按秒计量、不确定订单人工核对、自动退款 |
 | 用户分组 | 分组可见渠道、倍率、货币兑换、模型级覆盖、默认分组 |
@@ -82,13 +86,13 @@ backend/src/model/
 ├── catalog/
 │   ├── route-catalog.service.ts        # 路由快照、TTL、版本失效
 │   ├── catalog.service.ts              # 公开目录 / 可用性 / 分组投影
-│   └── quote.service.ts                # 渠道模型报价 / 前台模型报价
+│   └── quote.service.ts                # 能力 / 渠道模型报价
 ├── intent/
 │   ├── capability-spec.ts              # CapabilitySpec 类型与规范化
 │   ├── capability-match.ts             # MatchCapability
 │   └── model-intent.ts                 # 任务输入 → ModelRequestIntent
 ├── routing/
-│   ├── router.service.ts               # ResolveLogicalModel / 候选池 / 加权
+│   ├── router.service.ts               # 能力 + 模型分组解析 / 候选池 / 加权
 │   ├── price-tier.service.ts           # SKU 选择器与价格档匹配
 │   ├── attempt.service.ts              # RouteAttempt 生命周期与故障切换
 │   └── route-health.service.ts         # 冷却（进程内存）
@@ -100,7 +104,6 @@ backend/src/model/
 │   ├── channel-order.service.ts
 │   ├── channel-transfer.service.ts
 │   └── channel-health.service.ts
-├── logical-models/logical-model.service.ts
 ├── user-groups/user-group.service.ts
 ├── billing/
 │   ├── billing-order.service.ts
@@ -130,10 +133,10 @@ backend/src/model/
 
 ### 2.3 请求时序（创建一次生成任务）
 
-1. 客户端取目录：`POST /models/available`（带意图）→ 可用前台模型与价格档。
+1. 客户端取目录：`POST /models/available`（带意图）→ 可用模型分组与价格摘要。
 2. 客户端选模型并报价：`POST /models/:id/quote` → `amountMicrocredits`。
-3. 提交：`POST /generate` 携带 `logicalModelId` + 能力参数。
-4. 服务端重新解析（**不信客户端的模型/渠道/价格**）：`ResolveLogicalModel` → 选线路 → 选价格档 → 构造账单。
+3. 提交：`POST /generate` 携带 `capability` + `modelKey` + 能力参数。
+4. 服务端重新解析（**不信客户端的渠道/价格**）：能力目录 → 模型分组 → 选线路 → 构造账单。
 5. 预留：`ReserveBillingOrder`（available → reserved），与任务创建同一事务。
 6. worker 领取任务 → 创建/恢复 `RouteAttempt` → 派发上游。
 7. 成功 → 下载产物 → `SettleBillingOrder`；失败 → 按 `dispatchState` 决定切换线路或终态退款。
@@ -149,10 +152,8 @@ backend/src/model/
 | `ModelChannel`（重建） | `scope`(system/user)、`enabled`、`name`、`sortOrder`、`baseUrl`、`apiKey`(密文)、`secretKey`(密文)、`apiFormat`、`concurrencyLimit`(0=用全局)、`proxyUrl`、`modelsJson`、`retiredModelsJson`、`headersJson`(密文)、`catalogProviderId`、`deletedAt` | `@@index([scope, enabled])`、`@@index([deletedAt])` |
 | `ChannelModel` | `channelId`、`modelKey`、`providerModelKey`、`displayName`、`channelLabel`、`tags`(JSON)、`description`(≤500)、`sortOrder`、`icon`、`capability`、`protocol`、`billingMode`、四个售价、`priceConfigured`、`enabled`、`priceVersion`、`priceCurrency`、`capabilityConfigJson`、`capabilityVersion`、`catalogModelKey`、`deletedAt`、`activeKey` | `@@unique([channelId, activeKey])`、`@@index([channelId, enabled])`、`@@index([capability, protocol])` |
 | `ChannelModelPriceTier` | 成本四价（`cost*`）、`selectorKey`、`selectorJson`、`resolution`、`videoSeconds`、`providerModelKey`、`billingMode`、四个售价、`priceConfigured`、`enabled`、`priceVersion`、`deletedAt`、`activeKey` | `@@unique([channelModelId, activeKey])` |
-| `LogicalModel` | `code`、`name`、`icon`、`description`、`capability`、`enabled`、`sortOrder`、`revisionSequence`、`activeRevisionId`、`sourceChannelModelId`、`pricePolicy`(默认 `unified`)、`billingMode`、四个统一售价、`legacyModelIdsJson`、`archivedAt`、`activeKey` | `@@unique([activeKey])`（code，仅未归档）、`@@index([capability, enabled])` |
-| `LogicalModelRevision` | `logicalModelId`、`version`、`capabilitySpecJson`、`defaultOptionsJson`、`createdBy` | `@@unique([logicalModelId, version])` |
-| `LogicalModelRoute` | `logicalModelRevisionId`、`channelModelId`、`enabled`、`priority`、`weight` | `@@unique([logicalModelRevisionId, channelModelId])`、`@@index([enabled, priority])` |
-| `RouteAttempt` | `taskId`、`routeRun`、`attemptNumber`、`logicalModelId`、`logicalModelRevisionId`、`routeId`、`channelModelId`、`channelId`、`status`、`dispatchState`、`providerRequestId`、`failureCode`、`failureMessage`、`startedAt`、`completedAt` | `@@unique([taskId, routeRun, attemptNumber])` |
+| `CapabilityModelBinding` | `capabilityId`、`channelModelId`、`enabled`、`priority`、`weight` | 当前候选池和后台“能力选模型”的唯一事实源 |
+| `RouteAttempt` | `taskId`、`routeRun`、`attemptNumber`、`capabilityId`、`modelKey`、`channelModelId`、`channelId`、`status`、`dispatchState`、`providerRequestId`、`failureCode`、`failureMessage`、`startedAt`、`completedAt` | `@@unique([taskId, routeRun, attemptNumber])` |
 | `UserGroup` | `code`、`name`、`description`、`badgeLabel`、`badgeStyle`、`sortOrder`、`ratioBasisPoints`(10000=1.0)、`pointsPerUsd`、`pointsPerCny`、`allChannels`、`modelOverridesJson`、`deletedAt`、`activeKey` | `@@unique([activeKey])`、`@@index([sortOrder])` |
 | `UserGroupChannel` | `groupId`、`channelId` | `@@id([groupId, channelId])` |
 | `BillingOrder` | 见 §6.2 | `@@index([userId, status])`、`@@index([taskId])`、`@@unique([userId, idempotencyKey])` |
@@ -163,7 +164,7 @@ backend/src/model/
 | `PluginPlatformState` / `UserPluginState` | 系统插件可用性 / 单用户启用状态 | 分表，见 §7.4 |
 | `RouteCatalogVersion` | `id`(单行)、`version` | 跨进程失效（无 Redis 时靠 DB 版本号） |
 
-`LogicalModelPriceSKU` 在参考实现中**只有定义、无运行时引用**，本次不建表；统一售价由 `LogicalModel` 标量价 + 价格档投影表达。
+旧方案中的 `LogicalModelPriceSKU` 不属于当前实现；当前售价由 `CapabilityPricing` 提供，供应侧成本和规格仍来自渠道模型价格档。
 
 ### 3.2 SQLite / Prisma 适配规则
 
@@ -185,7 +186,7 @@ backend/src/model/
 | `ModelChannel`（modality/priority/health 版） | 删除，按 §3.1 重建；不做数据迁移（开发阶段无存量运营数据） |
 | `ModelChannelConfig` | 删除；通道配置全部迁入 `ModelChannel` |
 | `ModelCallLog` | 删除，由 `ApiCallLog` + `RouteAttempt` 取代 |
-| `GenerationTask` | 原地扩展：`logicalModelId`、`logicalModelRevisionId`、`routeId`、`channelModelId`、`routeRun`、`billingOrderId`、`providerRequestId`、`pollStage`、`nextPollAt`、`leaseOwner`、`leaseUntil`、`attempts`、`stage`、`progress`、`authorizedChargeMicrocredits`；`creditCost` 改为账单金额只读投影 |
+| `GenerationTask` | 当前已保存 `capability`、`modelKey`、`channelModelId`、`channelId`、`routeRun`、`billingOrderId`、`providerRequestId`、`pollStage`、`nextPollAt`、`leaseOwner`、`leaseUntil`、`attempts`、`stage`、`progress`、`authorizedChargeMicrocredits`；后续新增 `traceId` / `admissionRequestId` 等追踪快照 |
 | `CreditLot` | 保留为「发放批次」，`amount` → `remainingMicrocredits BigInt`，增加 `expiresAt`；FEFO 扣减仍按批次 |
 | `CreditTransaction` | 迁移为 `CreditLedgerEntry`（微积分、available/reserved 双列） |
 | `User` | **不改表**：分组由「有效会员订单的分组快照 → `MembershipPlan.userGroupCode`（仅历史订单兜底）」解析，无有效会员落 `default` 分组，见 §14.2。控制器不得读用户列推断分组；运营修改套餐映射只影响之后创建的订单 |
@@ -205,7 +206,7 @@ backend/src/model/
 | --- | --- | --- |
 | GET | `/models` | 前台模型目录（按分组过滤线路与价格） |
 | POST | `/models/available` | 带意图的可用性过滤 |
-| POST | `/models/:id/quote` | 前台模型报价 |
+| POST | `/models/quote` | 能力 + 模型分组报价 |
 | GET | `/model-catalog` | 系统渠道与渠道模型公开目录（`models: []` 恒为空，模型在 `channels[].models` 内）。**P5 交付**：P3 只上线 `/models*`，原始渠道模型目录与 C 端选型同批发布 |
 | POST | `/model-catalog/available` | 带意图的渠道模型可用性（P5） |
 | POST | `/model-catalog/quote` | 渠道模型报价（P5） |
@@ -219,7 +220,7 @@ backend/src/model/
 | 渠道 | `GET/POST /channels`、`PATCH/DELETE /channels/:id`、`POST /channels/:id/duplicate`、`POST /channels/export`、`POST /channels/import`、`GET/PUT /channels/order` |
 | 渠道模型 | `GET /channels/:id/models`、`POST/PATCH/DELETE`、`PATCH .../enabled`、`PATCH .../sort`、`POST .../fetch`、`POST .../import`、`POST .../test`、`POST .../batch-delete`、`POST .../batch-reprice`、`GET/PUT /channels/:id/models/order` |
 | 全量模型 | `GET /channel-models`、`GET /channel-models/health?channelId=` |
-| 前台模型 | `GET/POST /logical-models`、`PATCH/DELETE /logical-models/:id`、`POST /logical-models/:id/simulate` |
+| 能力与模型分组 | `GET/PUT /capabilities/:id/models`、`GET/PUT /capabilities/:id/pricing`、`POST /capabilities/:id/simulate` |
 | 用户分组 | `GET/POST /user-groups`、`PATCH/DELETE /user-groups/:id` |
 | 插件 | `GET /plugins`、`POST /plugins/install`、`PATCH /plugins/:id`、`DELETE /plugins/:id`、`POST /plugins/:id/verify` |
 | 账单与日志 | `GET /billing-orders`、`POST /billing-orders/:id/resolve`、`GET /api-logs`、`GET /analytics/finance` |
@@ -245,8 +246,8 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 
 ### 5.1 任务准入
 
-1. `POST /generate` 必须带 `logicalModelId`（`FeatureFrontendModels` 开关**删除**，恒为前台模型模式）。
-2. 文本工具（提示词工具）同样走 `capability=text` 的前台模型。
+1. `POST /generate` 必须带 `capability` 和 `modelKey`；前台只选择模型分组，不携带供应侧线路。
+2. 文本工具（提示词工具）同样走 `capability=text` 的模型分组。
 3. 准入顺序：能力存在 → 参数白名单 → 素材归属 → 会员/并发 → 存储容量 → 模型解析 → 价格档 → 预留 → 建任务。
 4. 模型解析失败一律在**扣费前**拒绝，映射到本仓错误码：
    - 模型不可用 / 已下线 → `40005`
@@ -257,9 +258,9 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 ### 5.2 路由目录缓存
 
 - 内存快照：`TTL 30s`、最大过期 `5min`、刷新失败冷却 `2s`；
-- 失效：后台任何渠道/模型/前台模型/分组写入后 `invalidate()`，并将 `RouteCatalogVersion.version + 1`；会员激活、周期切换、退款撤销、到期以及套餐分组映射修改也属于分组来源变更，事务提交后同样必须清用户分组缓存并递增版本；
-- 装载时剔除：渠道或模型停用、`pricePolicy=unified && billingMode=token` 但协议不支持 Token、`pricePolicy=channel` 但无有效价格档、能力配置非法；
-- 快照内容：前台模型、revision、可路由线路、线路能力规格、默认参数。
+- 失效：后台任何渠道/渠道模型/能力绑定/能力售价/分组写入后 `invalidate()`，并将 `RouteCatalogVersion.version + 1`；会员激活、周期切换、退款撤销、到期以及套餐分组映射修改也属于分组来源变更，事务提交后同样必须清用户分组缓存并递增版本；
+- 装载时剔除：渠道或渠道模型停用、能力绑定停用、协议不支持当前能力、能力配置非法；供应侧价格档按当前能力和意图匹配，生成售价由 `CapabilityPricing` 提供；
+- 快照内容：能力、模型分组、可路由线路、线路能力规格、默认参数和目录版本。
 
 ### 5.3 意图与能力匹配
 
@@ -272,10 +273,10 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 
 ### 5.4 选路
 
-1. 过滤：线路启用、`weight > 0`、本轮未尝试、未被冷却、分组可见、能力匹配、`pricePolicy=channel` 时有命中价格档；
+1. 过滤：线路启用、`weight > 0`、本轮未尝试、未被冷却、分组可见、能力匹配；需要供应侧规格时再匹配启用价格档，生成售价不由价格档决定；
 2. **只保留最高 priority 的一层**（priority 是硬分层，不参与加权）；
 3. 同层按 `weight` 加权随机（crypto 随机 + 拒绝采样消除取模偏差）；
-4. 结果写入任务快照：`logicalModelId / revisionId / routeId / channelModelId / routeRun=1`。
+4. 结果写入任务快照：`capability / modelKey / channelModelId / channelId / routeRun=1`。
 
 ### 5.5 价格档（SKU）选择
 
@@ -311,7 +312,7 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 ### 5.7 故障切换
 
 - `switchTaskToNextRoute`：从持久化 revision 重建候选池，以本轮已尝试 `routeId` 为排除集；重新选路、重建价格档；
-- `pricePolicy=channel` 时必须生成**替换账单**并与任务切换同事务提交；余额不足或超 `chargeLimit` 则拒绝切换；
+- 线路切换时生成链路售价不变；供应侧成本和渠道模型快照随实际线路替换，并与任务切换同事务提交；余额不足或超 `chargeLimit` 按当前计费规则处理；
 - 切换成功后清空 `providerRequestId`、新建下一 attempt，`routeRun` **不变**；
 - `routeRun` 只在用户手动重试时 `+1`。
 
@@ -388,10 +389,10 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 
 | 策略 | 售价来源 | 叠加规则 |
 | --- | --- | --- |
-| `channel` | 渠道模型价格档单价 | 渠道档 × 分组倍率 × 货币换算；建单后把 `order.model` 改写为前台模型 code，供应线路留在内部字段 |
-| `unified` | 前台模型标量价 | 只叠分组倍率，**不叠全局积分策略倍率** |
+| `channel` | 渠道模型价格档单价 | 仅适用于渠道模型 / 中转侧价格口径；生成链路当前使用能力级售价 |
+| `unified` | 能力级售价 | 生成链路按 `CapabilityPricing` 计算，线路切换不改变用户售价 |
 
-- `LogicalModel.pricePolicy` 默认 `unified`；`channel` 策略强制 `billingMode=fixed_request`（沿用参考实现约束）；
+- 当前没有 `LogicalModel.pricePolicy`；生成链路的价格事实源是 `CapabilityPricing`，供应侧成本来自渠道模型价格档；
 - 渠道模型 `priceCurrency`：`credits / USD / CNY`；成本价恒为微积分、不叠倍率、不参与售价；
 - 分组倍率：`ratioBasisPoints`（10000 = 1.0）+ `pointsPerUsd / pointsPerCny`；模型级覆盖优先；覆盖值 0 表示沿用分组；
 - 货币换算：`price × PointsPerUSD/CNY ÷ 1e6` 向上取整；`credits` 原样；
@@ -481,8 +482,8 @@ model: {
 
 ### 8.4 任务快照与重试
 
-- 任务保存模型快照；重试沿用同一 `logicalModelId`，重新解析当前 revision；
-- 前台模型已归档时，历史任务重试只允许使用原 revision/route/channelModel 快照；原线路失效则明确拒绝，不静默换模型。
+- 任务保存能力、模型分组和供应侧线路快照；故障切换只更新当前线路，不改变 `modelKey`；
+- 后台重试必须新建任务并通过 `retriedFromId` 关联，不能原地复活；结果不明任务不能直接重试，必须先核对账单。
 
 ## 9. 后台与前端
 
@@ -491,7 +492,7 @@ model: {
 | 页面 | 内容 |
 | --- | --- |
 | `/admin/channels` | 渠道工作台：列表、编辑抽屉（连接/凭证/请求头/代理/并发）、模型列表与价格档、成本与售价并列、批量调价/删除、排序、导出导入、上游拉取/导入/测试、健康 |
-| `/admin/capabilities` | 能力与模型：能力上下线与所属前台模型共用一个工作台；模型支持能力合同编辑、线路选择（priority/weight）、默认参数、价格策略与路由模拟，`channel` 策略下价格只读并提示去渠道模型定价。旧地址 `/admin/logical-models` 重定向到本页 |
+| `/admin/capabilities` | 能力与模型分组：能力上下线、候选线路、能力售价、默认参数与路由模拟；不再维护 `LogicalModel` 页面 |
 | `/admin/user-groups` | 分组：可见渠道、倍率、货币兑换、模型覆盖、用户数 |
 | `/admin/plugins` | 插件：内置/上传、启停、能力统计、校验结果 |
 | `/admin/model-calls` | 调用记录（`ApiCallLog` 维度） |
@@ -503,7 +504,7 @@ model: {
 
 - 工作台与工具页接入模型选择器（`frontend/src/components/model-picker`），展示名称/图标/标签/价格档；
 - 参数控件按模型能力合同渲染；
-- 提交请求增加 `logicalModelId`；报价展示实时金额；
+- 提交请求使用 `capability + modelKey`；报价展示实时金额；
 - 任务详情展示实际模型名称与计费金额（不展示渠道与上游标识）。
 
 ### 9.3 权限点（新增）
@@ -523,9 +524,9 @@ model: {
 | P0 | 依赖与地基：microcredits、`CreditAccount/CreditLedgerEntry`、`outbound`（SSRF/代理/自定义头）、`secret-cipher`、插件包入库、协议 registry 骨架 | 单测：金额算术、SSRF、密文往返、110 个清单全部可解析 |
 | P1 | 渠道与模型数据层：全部新表、仓库、渠道 CRUD/复制/导入导出/排序、模型 CRUD/价格档/批量 | `prisma:push` 通过；后台渠道页完成一次完整配置；`verify` 脚本校验模型/价格档一致性 |
 | P2 | 协议与执行：manifest 适配器、表达式 DSL、内置协议、测试调用、上游拉取 | 用真实密钥对至少 1 家 image + 1 家 video 完成连通性测试；`api-logs` 有记录 |
-| P3 ✅ 已交付 | 前台模型与路由：revision/route、目录快照、意图匹配、选路、报价。落地 `src/model/{intent,routing,catalog,user-groups}`，公开 `/models`、`/models/available`、`/models/:id/quote` 与后台 `POST /admin/logical-models/:id/simulate`；`/model-catalog*`（原始渠道模型目录）按 P5 与 C 端选型一起交付，避免半成品接口 | `npm run verify:route-catalog`：priority 分层与下沉、同层加权分布、SKU 选择（精确/通配/1.5K 相邻/停用档）、冷却三键、`simulate` 与 `resolve` 选中同一线路与价格档、目录投影的渠道可见性与换算顺序；后半段起 Nest 打真实 HTTP 校验四个端点的接线与守卫 |
+| P3 ✅ 已交付 | 能力目录与路由：目录快照、意图匹配、选路、报价。落地 `src/model/{intent,routing,catalog,user-groups}`，公开 `/models`、`/models/available`、`/models/quote` 与后台 `POST /admin/capabilities/:id/simulate`；`/model-catalog*`（原始渠道模型目录）按 P5 与 C 端选型一起交付，避免半成品接口 | `npm run verify:route-catalog`：priority 分层与下沉、同层加权分布、SKU 选择（精确/通配/1.5K 相邻/停用档）、冷却三键、`simulate` 与 `resolve` 选中同一线路与价格档、目录投影的渠道可见性与换算顺序；后半段起 Nest 打真实 HTTP 校验四个端点的接线与守卫 |
 | P4 ✅ 已交付 | 任务与计费：准入改造、worker/租约/轮询、attempt 状态机、预留/结算/退款。落地 `src/model/billing/{billing,credit-wallet}.service`（含 `CreditLedgerEntry.lotId`）与 `src/model/tasks/*`（准入 / 执行 / 尝试 / 生命周期 / 轮询 / 并发槽） | `npm run verify:billing`：预留幂等、固定价结算、Token 差额退回 / 超预授权补扣 / 授权上限截断、按秒重算、失败退款幂等、已结算拒绝自动退款、`uncertain` 转人工、余额不足 `40002`，每步校验 `available == Σ remaining`。`npm run verify:task-runtime`：本机 HTTP mock 上游跑端到端——同步成功（产物落盘 + `settled` + 按目录价扣费）、401 切线（旧账单退回、新账单按新线路价结算、`task.creditCost` 同步）、轮询超时（`42206`、`uncertain`、**不切线**、上游零调用）、唯一线路 429（`42204`、全额退款、余额回正），并校验「可用余额 == Σ 批次剩余」 |
-| P5 ✅ 已交付 | 后台页面与 C 端选型：`AdminChannelsPage`（渠道主从布局 + 左列承载新建 / 导入 / 导出全部 / 排序，详情头部承载编辑 / 复制 / 导出 / 启停 / 删除，内联模型管理 + 全部模型视图 + 结构化请求头编辑）、`AdminLogicalModelsPage`（revision / 线路 / 路由模拟）、`AdminUserGroupsPage`、`AdminPluginsPage`、`AdminBillingOrdersPage`、`AdminModelCallsPage`（改走 `/admin/api-logs`）；C 端 `ModelPicker` + `lib/modelSelection`（按能力记忆）+ `resolveModelId` 记忆优先，历史卡显示模型名与 `creditCost` 快照；`/model-catalog*` 公开 | `frontend/tests/admin-model-suite.spec.ts`：配置 → 选型 → 报价 → 生成 → 账单核对。生成段需要一条可用 image 线路（`cd test && node server.js` 仿真网关，或真实密钥），无线路时该段如实跳过并断言 C 端给出「当前没有可用线路」 |
+| P5 ✅ 已交付 | 后台页面与 C 端选型：`AdminChannelsPage`（渠道主从布局 + 左列承载新建 / 导入 / 导出全部 / 排序，详情头部承载编辑 / 复制 / 导出 / 启停 / 删除，内联模型管理 + 全部模型视图 + 结构化请求头编辑）、能力与模型分组工作台、`AdminUserGroupsPage`、`AdminPluginsPage`、`AdminBillingOrdersPage`、`AdminModelCallsPage`（改走 `/admin/api-logs`）；C 端模型选择器按能力记忆模型分组，历史卡显示模型名与 `creditCost` 快照；`/model-catalog*` 公开 | `frontend/tests/admin-model-suite.spec.ts`：配置 → 选型 → 报价 → 生成 → 账单核对。生成段需要一条可用 image 线路（`cd test && node server.js` 仿真网关，或真实密钥），无线路时该段如实跳过并断言 C 端给出「当前没有可用线路」 |
 | P6 ✅ 已交付 | 代理与运营：系统中转、短路径、自定义中转、分组、插件管理、财务分析、自动退款。落地 `src/model/proxy/**`（路径授权 / SSRF 出站 / 计费 / 调用记录 / 并发槽 / 清扫）与 `src/model/{billing/finance-analytics,plugins,user-groups}` | `npm run verify:proxy-runtime`：A 段纯逻辑——`validateCustomRelayUrl` 与 `resolveOutboundHost` 的回环 / 私网 / 链路本地 / 云 metadata / 保留网段 / IPv6 / `localhost` / HTTP 仅可信主机、路径白名单与密钥查询参数、并发槽、插件包解析拒绝分支；B 段自起 Nest + 本机 mock 上游——`GET /models` 不计费并剥离客户端密钥、`POST` 的 `reserved → settled` 与调用记录、SSE 透传、500 退款、524 `uncertain` 不退款、渠道与用户并发槽 `429`、自定义中转 401/403 与 JSON/SSE 双路径脱敏、系统中转限流 `42901`、分组可见性 `40301` 且不建账单、清扫两条迁移且不碰任务账单、钱包恒等式、财务口径与 `BillingOrder` 聚合逐项一致、插件安装/重复 `40909`/被引用拒卸 `40909`/内置 `40001`/卸载成功。未覆盖项见 `docs/testing.md` §5.6 |
 
 ### 10.1 删除清单（P6 完成后一次性执行）
@@ -550,7 +551,7 @@ model: {
 | 单测 | 微积分算术与溢出、价格档选择、意图匹配、加权分布、冷却矩阵、账单状态机、表达式 DSL、清单校验、SSRF、密文 |
 | 集成 | 目录 → 报价 → 预留 → 派发 → 结算全链路（仿真上游）；切线；不确定订单；自动退款 |
 | 契约 | 110 个插件清单解析快照；公开目录响应结构；后台接口字段 |
-| e2e | 后台配置渠道模型 → 建前台模型 → C 端选型 → 报价 → 生成 → 账单与调用记录 |
+| e2e | 后台配置渠道模型 → 绑定能力与模型分组 → C 端选型 → 报价 → 生成 → 账单与调用记录 |
 | 迁移 | `db:reset:test` 后种子可建出默认可运行配置；`probe-environments` 通过 |
 
 ## 12. 风险与对策
@@ -579,8 +580,8 @@ model: {
 | `internal/app/model_router_capability.go` | `src/model/intent/capability-match.ts` |
 | `internal/app/finance.go` / `credit_policy.go` | `src/model/billing/billing-order.service.ts` + `src/model/infra/microcredits.ts` |
 | `internal/kernel/token_billing.go` | `src/model/billing/token-billing.ts` |
-| `internal/app/logical_models.go` | `src/model/logical-models/logical-model.service.ts` |
-| `internal/app/logical_models_catalog.go` | `src/model/catalog/catalog.service.ts` |
+| `internal/app/logical_models.go` | 当前无一一对应的前台逻辑模型模块；职责由 `catalog/`、`routing/` 与 `capabilities/` 共同承担 |
+| `internal/app/logical_models_catalog.go` | `src/model/catalog/catalog.service.ts` + `capability-catalog.service.ts` |
 | `internal/app/logical_model_quote.go` | `src/model/catalog/quote.service.ts` |
 | `internal/app/channel_models.go` | `src/model/channels/channel-model.service.ts` |
 | `internal/app/channel_model_pricing.go` | `src/model/channels/channel-model-pricing.service.ts` |
@@ -604,7 +605,7 @@ model: {
 | `internal/platform/coordination.go` | `src/model/proxy/concurrency.service.ts` |
 | `plugin-packages/*` | `backend/plugins/*` |
 | `web/src/pages/admin/channels/**` | `frontend/src/pages/admin/channels/**` |
-| `web/src/pages/admin/logical-models/**` | `frontend/src/pages/admin/logical-models/**` |
+| `web/src/pages/admin/logical-models/**` | 当前无一一对应页面；能力与模型分组工作台位于 `frontend/src/pages/admin/capabilities/**` |
 | `web/src/pages/admin/user-groups/**` | `frontend/src/pages/admin/user-groups/**` |
 | `web/src/components/model-picker.tsx` | `frontend/src/components/model-picker/**` |
 | `web/src/components/model-capability-editor.tsx` | `frontend/src/components/model-capability-editor/**` |
@@ -614,4 +615,4 @@ model: {
 1. **积分为整数还是微积分对外展示**：本方案对外仍展示「积分」，内部微积分；C 端金额四舍五入展示，扣费按微积分精确结算。若产品要求展示到小数点后 2 位，需在站内设置增加展示精度。
 2. **会员与分组的关系**：本方案用 `MembershipPlan.userGroupCode` 映射；若运营希望「一个会员可对应多个分组」，改为多对多。
 3. **插件包是否全部入库**：110 个清单包体积可控；若只保留当前在用的厂商，需在 P0 明确清单，避免后续「插件缺失」被误判为功能裁剪。
-4. **是否保留前台模型灰度开关**：本方案删除 `FeatureFrontendModels`（恒开）。若需灰度，改为站内设置 `model.frontendModels` 运行时开关，默认开。
+4. **是否引入独立供应商主数据**：当前 `ModelChannel` 仍承担供应商连接实例的展示职责；若需要供应商级聚合、成本和账号管理，再按 `docs/model-channel-architecture.md` 的 P3 引入 `ModelSupplier`，不要重新引入 `LogicalModel`。

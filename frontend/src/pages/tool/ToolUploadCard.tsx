@@ -50,7 +50,7 @@ export function ToolUploadCard({
   const { accept, maxMb } = useUploadLimits();
 
   return (
-    <Surface className="tool-form-card">
+    <Surface>
       <SurfaceHeader>
         <SurfaceTitle>{inputs > 1 ? '输入素材' : '上传商品图'}</SurfaceTitle>
       </SurfaceHeader>
@@ -64,12 +64,10 @@ export function ToolUploadCard({
         onSelect={onSelect}
         onRemove={onRemoveFile}
       >
-        <div className="tool-upload-trigger">
+        <div className="flex flex-col items-center gap-1 text-[13px] text-muted-foreground">
           <UploadIcon size={20} />
           <span>上传图片</span>
-          <span className="tool-upload-hint text-muted-foreground">
-            ≤ {maxMb}MB
-          </span>
+          <span className="text-xs">≤ {maxMb}MB</span>
         </div>
       </Upload>
 
@@ -78,7 +76,7 @@ export function ToolUploadCard({
       </Button>
 
       <Form {...form}>
-        <form className="tool-form" onSubmit={(event) => event.preventDefault()} noValidate>
+        <form className="mt-3.5" onSubmit={(event) => event.preventDefault()} noValidate>
           {/* hidden 的参数由具体页面代填（如遮罩素材 id），通用表单不渲染 */}
           {def.params
             .filter((param) => !param.hidden)
@@ -88,18 +86,19 @@ export function ToolUploadCard({
         </form>
       </Form>
 
+      {/* 品牌色主 CTA：`bg-primary` 本身就是 `--brand`，这里只补字重、字距
+          与置灰态（置灰用浅紫底 + 品牌字，与旧样式表一致）。 */}
       <Button
-        variant="default"
         size="lg"
-        className="w-full tool-submit"
+        className="w-full font-semibold tracking-[0.125em] disabled:bg-brand-bg disabled:text-brand"
         disabled={busy || assets.length < inputs || generating}
         onClick={onSubmit}
       >
-        <span className="state-spinner is-small" aria-hidden />
+        {busy && <span className="state-spinner is-small" aria-hidden />}
         {generating ? '生成中…' : uploadingCount > 0 ? '上传中…' : '立即生成'}
       </Button>
       {creditLabel && (
-        <span className="tool-credit-hint text-muted-foreground">
+        <span className="mt-2 block text-center text-xs text-muted-foreground">
           {creditLabel}
         </span>
       )}

@@ -85,7 +85,6 @@ export function CreditsPage() {
 
   return (
     <PersonalPage
-      className="credits-page"
       title={CREDITS_PAGE_META.title}
       description={CREDITS_PAGE_META.description}
       extra={
@@ -100,13 +99,18 @@ export function CreditsPage() {
       <CreditsHero balance={balance} />
       <CreditsStatsGrid balance={balance} />
 
-      <Surface className="credits-list-card">
-        <SurfaceContent>
+      <Surface className="rounded-xl">
+        <SurfaceContent className="px-5 pt-4 pb-5 max-[900px]:px-3.5 max-[900px]:pt-3 max-[900px]:pb-4">
         <Tabs value={tab} onValueChange={(key) => setTab(key as Tab)}>
+          {/*
+            线形页签：下划线压在列表底边的分隔线上。
+            shadcn 的 line 变体默认把下划线放在触发器下方 5px，这里把触发器
+            内边距补到 12px 并让下划线回到 -1px，与旧页面样式一致。
+          */}
           <TabsList
             variant="line"
             aria-label="积分明细"
-            className="h-auto justify-start gap-6"
+            className="h-auto justify-start gap-6 border-b border-border [&_[data-slot=tabs-trigger]]:h-auto [&_[data-slot=tabs-trigger]]:px-0 [&_[data-slot=tabs-trigger]]:pb-3 [&_[data-slot=tabs-trigger]]:text-sm [&_[data-slot=tabs-trigger]]:font-semibold [&_[data-slot=tabs-trigger]]:after:bottom-[-1px] [&_[data-slot=tabs-trigger]]:after:h-0.5 [&_[data-slot=tabs-trigger]]:after:bg-brand [&_[data-slot=tabs-trigger][data-state=active]]:text-brand"
           >
             <TabsTrigger value="ledger">积分流水</TabsTrigger>
             <TabsTrigger value="lots">批次明细</TabsTrigger>

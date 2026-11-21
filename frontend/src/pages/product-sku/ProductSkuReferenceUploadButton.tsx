@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Upload } from 'lucide-react';
 
 import { SUPPORTED_IMAGE_ACCEPT } from './constants';
-import { Button } from './components';
+import { TextAction } from './components';
 
 interface ProductSkuReferenceUploadButtonProps {
   /** 该区域的参考图正在上传；按钮进入禁用并显示「上传中…」 */
@@ -24,17 +24,13 @@ export function ProductSkuReferenceUploadButton({
 
   return (
     <>
-      <Button
-        type="button"
-        variant="link"
-        size="xs"
+      <TextAction
+        icon={<Upload size={12} aria-hidden />}
         disabled={busy}
-        className="h-auto gap-1 border-0 bg-transparent p-0 text-xs font-normal text-muted-foreground underline underline-offset-4 hover:text-brand"
         onClick={() => inputRef.current?.click()}
       >
-        <Upload className="size-3" />
         {busy ? '上传中…' : '上传参考图'}
-      </Button>
+      </TextAction>
       <input
         ref={inputRef}
         type="file"

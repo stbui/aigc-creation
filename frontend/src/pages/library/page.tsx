@@ -287,8 +287,8 @@ export function LibraryPage() {
   };
 
   return (
-    <div className="asset-library-page">
-      <div className="asset-library-shell">
+    <div className="asset-library-page flex min-h-[calc(100vh-var(--workspace-topbar-height))] flex-col px-6 pt-6 pb-14 text-foreground max-[980px]:px-5 max-[980px]:pb-11 max-[720px]:px-3 max-[720px]:pt-[18px] max-[720px]:pb-9">
+      <div className="w-full">
         <LibraryToolbar
           loggedIn={Boolean(token)}
           assetKind={assetKind}
@@ -360,7 +360,7 @@ export function LibraryPage() {
         )}
 
         {/* 无限滚动哨兵常驻：进入视口即自动加载更多（见 useInfiniteScroll） */}
-        <div ref={sentinelRef} className="asset-library-sentinel" aria-hidden="true" />
+        <div ref={sentinelRef} className="h-px w-full" aria-hidden="true" />
 
         {previewIndex !== null && lightboxItems[previewIndex] && (
           <ImageLightbox

@@ -1,27 +1,15 @@
 import '../styles/auth.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Button,
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  useApp,
-  useForm,
-  useWatch,
-} from '../ui';
+import { Form, useApp, useForm, useWatch } from '../ui';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, X } from 'lucide-react';
-import { authApi, oauthAuthorizeUrl, type OAuthProviderInfo } from '../lib/api';
+import { X } from 'lucide-react';
+import { authApi, type OAuthProviderInfo } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { QrLoginPanel } from './QrLoginPanel';
+import { EmailCodeField, SmsCodeField } from './AuthCodeFields';
 import { AuthFormFields } from './AuthFormFields';
-import { LoginGiftArt } from './LoginGiftArt';
+import { AuthOauthBlock } from './AuthOauthBlock';
+import { AuthShowcase } from './AuthShowcase';
 import type { SmsPurpose } from '../types/api';
 
 interface AuthForm {
@@ -54,31 +42,6 @@ interface AuthForm {
  *   - 登录态增加「忘记密码」
  *   - 注册增加可选手机号 + 短信验证码, 以及协议勾选
  */
-
-/** 参考站左栏两行礼遇 (auth-showcase-benefit-row × 3 / × 4) 的本地化文案 */
-const BENEFIT_GROUPS: Array<{ key: 'signup' | 'usage'; items: string[] }> = [
-  { key: 'signup', items: ['新用户注册', '老用户签到', '每邀请 1 位好友'] },
-  { key: 'usage', items: ['AI 生图', 'AI 修图', 'AI 抠图', '去水印'] },
-];
-
-/*
- * 权益数字必须与后端一致, 不能照抄参考站:
- *   · 注册不发积分 (auth.service 建号时不写 CreditLot);
- *   · 签到基础 5 分 (seed-marketing 的 CheckinRule), 第 3/7/15 天有加成;
- *   · 邀请是邀请人 200 / 被邀请人 100, 且首次付费才触发;
- *   · 生图价格按能力 0~40 不等 (matting/remove_watermark 为 0)。
- * 写死「注册送 100 / 签到送 150 / 邀请送 600」属于全站可见的虚假承诺。
- */
-function benefitValue(group: string, item: string): string {
-  if (group === 'signup') {
-    if (item === '新用户注册') return '注册即可使用';
-    if (item === '老用户签到') return '每日 5 积分起';
-    return '邀请双方得积分';
-  }
-  if (item === 'AI 生图') return '10 积分起';
-  if (item === 'AI 修图') return '5 积分起';
-  return '免费';
-}
 
 /**
  * tab 顺序与参考站一致 (扫码 / 短信 / 账号)。
@@ -287,79 +250,21 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
 
   /** 短信验证码输入框 + 获取按钮。登录与注册验证手机号共用同一段 UI */
   const codeField = (purpose: SmsPurpose) => (
-    <FormField
-      name="smsCode"
-      rules={{ required: '请输入验证码' }}
-      render={({ field }) => (
-        <FormItem className="login-field">
-          <FormLabel>验证码</FormLabel>
-          <div className="login-code-row">
-            <FormControl>
-              <InputGroup>
-                <InputGroupAddon>
-                  {<ShieldCheck size={15} />}
-                </InputGroupAddon>
-                <InputGroupInput
-                  {...field}
-                  placeholder="6 位验证码"
-                  maxLength={6}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                />
-              </InputGroup>
-            </FormControl>
-            <Button
-              type="button"
-              className="login-code-btn"
-              onClick={() => handleSendSms(purpose)}
-              disabled={smsCountdown > 0 || sendingSms}
-            >
-              <span className="state-spinner is-small" aria-hidden />
-              {smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码'}
-            </Button>
-          </div>
-          <FormMessage />
-        </FormItem>
-      )}
+    <SmsCodeField
+      purpose={purpose}
+      countdown={smsCountdown}
+      sending={sendingSms}
+      onSend={handleSendSms}
     />
   );
 
   /** 注册邮箱验证码输入框；与短信验证码完全独立 */
   const emailCodeField = (
-    <FormField
-      name="emailCode"
-      rules={{ required: '请输入邮箱验证码' }}
-      render={({ field }) => (
-        <FormItem className="login-field">
-          <FormLabel>邮箱验证码</FormLabel>
-          <div className="login-code-row">
-            <FormControl>
-              <InputGroup>
-                <InputGroupAddon>
-                  {<ShieldCheck size={15} />}
-                </InputGroupAddon>
-                <InputGroupInput
-                  {...field}
-                  placeholder="6 位验证码"
-                  maxLength={6}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                />
-              </InputGroup>
-            </FormControl>
-            <Button
-              type="button"
-              className="login-code-btn"
-              onClick={() => void handleSendEmail()}
-              disabled={emailCountdown > 0 || !emailValue || sendingEmail}
-            >
-              <span className="state-spinner is-small" aria-hidden />
-              {emailCountdown > 0 ? `${emailCountdown}s` : '获取验证码'}
-            </Button>
-          </div>
-          <FormMessage />
-        </FormItem>
-      )}
+    <EmailCodeField
+      countdown={emailCountdown}
+      sending={sendingEmail}
+      disabled={!emailValue}
+      onSend={() => void handleSendEmail()}
     />
   );
 
@@ -367,25 +272,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
     // 840x478 双栏卡: 参考站 .auth-card-split (radius 32 / grid 420 420 / shadow 0 20px 60px)
     <section className="login-split">
       {/* ── 左栏: 礼宾面板 (参考站 .auth-showcase) ── */}
-      <aside className="login-showcase" aria-hidden>
-        <div className="login-showcase-bg" />
-        <LoginGiftArt />
-        <div className="login-showcase-content">
-          <h1 className="login-showcase-title">登录即享好礼</h1>
-          <div className="login-showcase-benefits">
-            {BENEFIT_GROUPS.map((g) => (
-              <div key={g.key} className="login-benefit">
-                {g.items.map((it) => (
-                  <div key={it} className="login-benefit-row">
-                    <span className="login-benefit-name">{it}</span>
-                    <span className="login-benefit-value">{benefitValue(g.key, it)}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </aside>
+      <AuthShowcase />
 
       {/* ── 右栏: 表单面板 (参考站 .auth-form-panel, padding 32px 40px) ── */}
       <div className="login-form-panel">
@@ -465,24 +352,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
           )}
 
           {/* 通用 OAuth 登录：只有后端 /auth/oauth/providers 返回已启用项才渲染 */}
-          {oauthProviders.length > 0 && (
-            <div className="login-oauth">
-              <span className="login-oauth-divider">或</span>
-              {oauthProviders.map((provider) => (
-                <button
-                  key={provider.id}
-                  type="button"
-                  className="login-oauth-btn"
-                  onClick={() => {
-                    const returnTo = window.location.pathname + window.location.search;
-                    window.location.assign(oauthAuthorizeUrl(provider.id, returnTo));
-                  }}
-                >
-                  使用 {provider.name} 登录
-                </button>
-              ))}
-            </div>
-          )}
+          <AuthOauthBlock providers={oauthProviders} />
 
           {/* 注册入口: 参考站无 (走短信/扫码), 本项目邮箱注册体系需要 → 保留文字链接 */}
           <div className="login-switch">

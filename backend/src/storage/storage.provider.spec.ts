@@ -55,6 +55,7 @@ function minioClient() {
       if (!store.has(key)) throw new Error('not found');
     }),
     bucketExists: vi.fn(async () => true),
+    makeBucket: vi.fn(async () => undefined),
     presignedGetObject: vi.fn(
       (bucket: string, key: string) => `https://minio.example/${bucket}/${key}`,
     ),
@@ -164,6 +165,38 @@ describe('OssStorageProvider', () => {
     expect(status.endpoint).toContain('test-bucket');
     expect(JSON.stringify(status)).not.toContain(OSS_CFG.accessKeySecret);
   });
+
+  it('配置公开域名后 url 直读、不签名；未配置时按有效期签名', async () => {
+    const signed = new OssStorageProvider(
+      { ...OSS_CFG, urlExpiresSeconds: 120 },
+      ossClient(),
+    );
+    expect(await signed.url('a/b.png')).toContain('sign=1');
+
+    const cdn = new OssStorageProvider(
+      { ...OSS_CFG, publicBaseUrl: 'https://media.example.com/' },
+      ossClient(),
+    );
+    expect(await cdn.url('a/b.png')).toBe('https://media.example.com/a/b.png');
+  });
+
+  it('STS 临时凭证透传给 SDK（注入 client 时不构造，仅验证不抛错）', () => {
+    expect(
+      () => new OssStorageProvider({ ...OSS_CFG, sessionToken: 'sts-token' }, ossClient()),
+    ).not.toThrow();
+  });
+
+  it('probe 失败时给出步骤与目标桶 / 地域', async () => {
+    const client = ossClient();
+    client.list.mockRejectedValue(new Error('AccessDenied'));
+    const p = new OssStorageProvider(OSS_CFG, client);
+
+    const res = await p.probe();
+
+    expect(res.message).toContain('AccessDenied');
+    expect(res.message).toContain('test-bucket');
+    expect(res.message).toContain(OSS_CFG.region);
+  });
 });
 
 describe('MinioStorageProvider', () => {
@@ -220,6 +253,40 @@ describe('MinioStorageProvider', () => {
     const status = p.credentialStatus();
     expect(status.masked).toBe('****cess');
     expect(JSON.stringify(status)).not.toContain(MINIO_CFG.secretKey);
+  });
+
+  it('配置公开域名后 url 直读', async () => {
+    const client = minioClient();
+    const p = new MinioStorageProvider(
+      { ...MINIO_CFG, publicBaseUrl: 'https://cdn.example.com' },
+      client,
+    );
+    expect(await p.url('a/b.png')).toBe('https://cdn.example.com/a/b.png');
+  });
+
+  it('桶不存在且未开启自动创建时明确报出桶名', async () => {
+    const client = minioClient();
+    client.bucketExists.mockResolvedValue(false);
+    client.makeBucket = vi.fn();
+    const p = new MinioStorageProvider(MINIO_CFG, client);
+
+    const res = await p.probe();
+
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain('huojue');
+    expect(client.makeBucket).not.toHaveBeenCalled();
+  });
+
+  it('开启自动创建后会创建桶并继续探测', async () => {
+    const client = minioClient();
+    client.bucketExists.mockResolvedValue(false);
+    client.makeBucket = vi.fn(async () => undefined);
+    const p = new MinioStorageProvider({ ...MINIO_CFG, autoCreateBucket: true }, client);
+
+    const res = await p.probe();
+
+    expect(client.makeBucket).toHaveBeenCalledOnce();
+    expect(res.ok).toBe(true);
   });
 });
 

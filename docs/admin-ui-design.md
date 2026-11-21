@@ -20,7 +20,7 @@
 | 页面组件入口 | `frontend/src/admin-ui/radar/index.ts:1` |
 | Radar 令牌与动效 | `frontend/src/styles/radar-admin.css:16` |
 | 页面骨架 | `frontend/src/admin-ui/radar/page.tsx:8` |
-| 表格 | `frontend/src/admin-ui/primitives/table.tsx:154` |
+| 表格 | `frontend/src/admin-ui/radar/table.tsx:129` |
 | 状态语义 | `frontend/src/components/admin/statusMeta.ts:19` |
 | 格式化 | `frontend/src/admin-ui/lib/format.ts:54` |
 | 全站字号下限 | `docs/typography.md` |
@@ -67,10 +67,18 @@
 | 页面入口 | 只从 `~/admin-ui/radar` 导入业务组件、格式化函数与数据 Hook |
 | 页面容器 | `AdminPage` 自动包裹 `RadarPage`；自定义页面直接用 `RadarPage` |
 | 品牌色 | 内容层品牌动作使用近黑 `#111318`，不是产品紫 `#5546d8` |
-| 禁止直连 | 不得从 `admin-ui/components/ui/*` 或 `admin-ui/primitives/*` 直接取品牌可见组件 |
+| 禁止直连 | 不得从 `admin-ui/components/ui/*` 直接取品牌可见组件 |
 | 禁止新模式 | 不新增 `adm-*` 类，不在页面内重定义 Radar 令牌 |
 
 允许的例外只有外壳级故障页：`AdminLoadError`、`NoAdminAccess` 与路由加载骨架。它们发生在外壳内容尚不可用时，可由外壳层承载。业务成功页不属于例外。
+
+### 2.3 已安装但未启用的原子件
+
+`admin-ui/components/ui/` 里有一批 `shadcn add` 装入、当前没有任何消费方的原子件。**保留、不删除**——它们是官方件，重装/升级由 CLI 维护，删掉后下次需要又得重新对齐 `post-shadcn.mjs`；但页面与 `radar/` 都不要直接引用，启用时先经 `radar/` 组合成业务件再公开。
+
+当前清单（24 个，按字母序）：`accordion`、`aspect-ratio`、`bubble`、`button-group`、`carousel`、`chart`、`combobox`、`command`、`direction`、`drawer`、`hover-card`、`input-otp`、`item`、`kbd`、`label`、`marker`、`menubar`、`message`、`message-scroller`、`native-select`、`navigation-menu`、`resizable`、`scroll-area`、`sonner`。
+
+其中 `drawer`（vaul 底部抽屉）与后台「不做移动端与响应式」的约束冲突，`sonner` 与现有的 Toast provider 重复：两者保留仅作上游同步基线，业务上不作为候选件。
 
 ## 3. 色彩与令牌
 
@@ -167,7 +175,7 @@ RadarPage
     └── Pagination
 ```
 
-`RadarPage` 用负外边距抵消外壳的 `26px / 18px` padding，再铺满灰画布。外壳几何变更时，`RadarPage` 与外壳必须同步，见 `frontend/src/admin-ui/radar/blocks.tsx:42` 与 `frontend/src/admin-ui/shell/AdminBoardLayout.tsx:293`。
+`RadarPage` 用负外边距抵消外壳的 `26px / 18px` padding，再铺满灰画布。外壳几何变更时，`RadarPage` 与外壳必须同步，见 `frontend/src/admin-ui/radar/blocks.tsx:26` 与 `frontend/src/admin-ui/shell/AdminBoardLayout.tsx:293`。
 
 ### 5.2 间距
 
@@ -275,6 +283,8 @@ RadarPage
 - 抽屉内容顺序固定为“基本信息 → 关联数据 → 操作”；危险操作固定在底部。
 - 有未保存修改时，关闭必须先确认“放弃修改 / 继续编辑”。
 
+实现统一落在 shadcn 原子件上：抽屉用 `Sheet`（`side="right"`），`ModalDialog` 用 `Dialog`，`ConfirmDialog` / `ConfirmAlert` 用 `AlertDialog`；遮罩、头部、标题、关闭按钮与底栏的类名只在 `admin-ui/radar/overlayClasses.ts` 维护一份。弹层不得再直接组合 Radix 原语。
+
 ### 6.6 批量操作
 
 勾选后显示 `BatchBar`：已选数量、动作、取消选择。执行前做一次确认；成功后用 toast 汇总成功与失败条数，不再弹二次结果框。失败项由运营回到列表按状态筛选处理。
@@ -379,7 +389,7 @@ RadarPage
 
 以下写法一律拒绝：
 
-- 页面直连 `admin-ui/components/ui/*` 或 `admin-ui/primitives/*`。
+- 页面直连 `admin-ui/components/ui/*`。
 - 在业务内容中使用品牌紫、`bg-brand`、`text-brand` 或 shadcn 默认紫色焦点环。
 - 在页面内新增 `adm-*` 类或复制 Radar 令牌值。
 - 用阴影区分普通面板；弹窗和菜单加阴影。
@@ -417,4 +427,4 @@ RadarPage
 
 | 边界 | 位置 | 约束 |
 | --- | --- | --- |
-| 外壳级故障页仍从 `primitives` 取件 | `frontend/src/pages/admin/layout-parts/AdminLoadError.tsx` 等 | 仅限外壳不可用场景，不扩散到业务页 |
+| 外壳级故障页绕过 Radar | `frontend/src/pages/admin/layout-parts/AdminLoadError.tsx` 等 | 仅限外壳不可用场景，不扩散到业务页 |

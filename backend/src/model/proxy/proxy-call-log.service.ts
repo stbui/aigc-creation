@@ -14,7 +14,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { currentRequestId } from '../../common/request-context';
+import { currentClientIp, currentRequestId } from '../../common/request-context';
 import { extractMediaCount, extractProxyUsage, extractProviderRequestId, type ProxyUsage } from './proxy.payload';
 
 export type ProxyCallSource = 'system-channel' | 'custom-relay';
@@ -43,6 +43,10 @@ export interface ProxyCallLogEntry {
   responseBody: string;
   responseBodyBuffer?: Buffer;
   streamed?: boolean;
+  /** 实际写出的请求体字节数（原始字节，不含头部） */
+  requestBytes?: number;
+  /** 实际收到的响应字节数；流式下可能大于 `responseBodyBuffer.length`（被上限截断时） */
+  responseBytes?: number;
   errorCode?: string;
   error?: string;
   /** 已解析的用量；不给时从响应体提取 */
@@ -103,6 +107,14 @@ export class ProxyCallLogService {
           requestContentType: truncate(entry.requestContentType ?? '', 200),
           requestBody: entry.requestBody,
           responseBody: entry.responseBody,
+          clientIp: currentClientIp() ?? '',
+          /*
+           * 中转请求的字节数在 HTTP 边界就是现成的：客户端请求体已按上限读好
+           * （`input.body`），响应体以 `responseBodyBuffer` 回传。不能拿入库的
+           * 报文预览算 —— `formatCallPayload` 会折叠内联媒体并截断到 256K。
+           */
+          requestBytes: entry.requestBytes ?? 0,
+          responseBytes: entry.responseBytes ?? entry.responseBodyBuffer?.length ?? 0,
           startedAt: new Date(Date.now() - Math.max(0, Math.trunc(entry.durationMs))),
         },
       });

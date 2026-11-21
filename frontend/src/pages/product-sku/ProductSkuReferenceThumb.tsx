@@ -1,6 +1,12 @@
 import { X } from 'lucide-react';
 
-import { Button, type ToolAsset } from './components';
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentMedia,
+  type ToolAsset,
+} from './components';
 import { assetThumbUrl } from './api';
 
 interface ProductSkuReferenceThumbProps {
@@ -14,8 +20,9 @@ interface ProductSkuReferenceThumbProps {
 /**
  * 变体区域右上角的参考图缩略图。
  *
- * 缩略图走 `assetThumbUrl()`（小图），点开预览用原图地址；
- * 移除按钮独立于图片，避免点关闭时误触放大。
+ * 走 shadcn `Attachment` 的竖排缩略图形态：媒体位裁切方形、移除按钮落在
+ * 附件操作位上（Radix/Button 的焦点环与读屏名称都由原子件提供）。
+ * 缩略图用 `assetThumbUrl()` 小图，点开预览用原图地址。
  */
 export function ProductSkuReferenceThumb({
   reference,
@@ -24,21 +31,26 @@ export function ProductSkuReferenceThumb({
   onPreview,
 }: ProductSkuReferenceThumbProps) {
   return (
-    <div className="product-sku-reference-thumb">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        aria-label="移除参考图"
-        onClick={onRemove}
-      >
-        <X className="size-4" />
-      </Button>
-      <img
-        src={assetThumbUrl(reference.url, 240) ?? reference.url}
-        alt={label}
-        onClick={() => onPreview(reference.url)}
-      />
-    </div>
+    <Attachment
+      orientation="vertical"
+      size="xs"
+      className="absolute top-4 right-4 w-16 border border-border"
+    >
+      <AttachmentMedia variant="image" className="group-data-[size=xs]/attachment:w-full">
+        <button
+          type="button"
+          className="size-full cursor-zoom-in border-0 bg-transparent p-0"
+          aria-label={`预览 ${label}`}
+          onClick={() => onPreview(reference.url)}
+        >
+          <img src={assetThumbUrl(reference.url, 240) ?? reference.url} alt={label} />
+        </button>
+      </AttachmentMedia>
+      <AttachmentActions>
+        <AttachmentAction aria-label="移除参考图" onClick={onRemove}>
+          <X aria-hidden />
+        </AttachmentAction>
+      </AttachmentActions>
+    </Attachment>
   );
 }

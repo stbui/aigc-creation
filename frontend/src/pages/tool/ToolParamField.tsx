@@ -43,7 +43,7 @@ function ParamTextArea({
         onChange={onChange}
         placeholder={placeholder}
       />
-      <span className="login-textarea-count">{length}/{maxLength}</span>
+      <span className="login-textarea-count is-block">{length}/{maxLength}</span>
     </div>
   );
 }
@@ -93,7 +93,7 @@ export function ToolParamField({ param }: ToolParamFieldProps) {
             <FormItem>
               <FormLabel>{param.label}</FormLabel>
               <FormControl>
-                <div className="tool-param-number">
+                <div className="grid grid-cols-[1fr_88px] items-center gap-3">
                   <Slider
                     min={param.min}
                     max={param.max}

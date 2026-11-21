@@ -6,7 +6,6 @@ import { AdminUIProvider } from '../../admin-ui/providers/AdminUIProvider';
 import { AdminBoardLayout } from '../../admin-ui/shell/AdminBoardLayout';
 import '../../styles/admin.css';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
-import { AdminDutyProvider } from '../../components/admin/DutyContext';
 import { AdminWorkbenchProvider } from '../../components/admin/WorkbenchContext';
 import { AdminDashboardContent } from './dashboard/AdminDashboardContent';
 import {
@@ -43,7 +42,6 @@ import {
   AdminTicketsPage,
   AdminUserGroupsPage,
   AdminUsersPage,
-  AdminRadarStylePage,
 } from './routes';
 
 // 内部展示组件（加载态 / 鉴权失败 / 无权限 / 占位）拆分到 `layout-parts/`，
@@ -105,18 +103,7 @@ export function AdminLayout() {
           <ErrorBoundary resetKeys={[`${location.pathname}${location.search}`]}>
           <Suspense fallback={<AdminLoading tip="加载页面…" />}>
             <Routes>
-              {/*
-               * 值班数据只服务概览：Provider 包在这一条路由上，切到别的页面即
-               * 卸载，30 秒轮询随之停止。
-               */}
-              <Route
-                index
-                element={
-                  <AdminDutyProvider>
-                    <AdminDashboardContent />
-                  </AdminDutyProvider>
-                }
-              />
+              <Route index element={<AdminDashboardContent />} />
               <Route path="alerts" element={<AdminAlertsPage />} />
               <Route path="users" element={<AdminUsersPage />} />
               <Route path="roles" element={<AdminRolesPage />} />
@@ -184,8 +171,6 @@ export function AdminLayout() {
               <Route path="prompts" element={<AdminPromptsPage />} />
               {/* AI 标识样式 */}
               <Route path="aigc-label" element={<AdminAigcLabelPage />} />
-              {/* 中性风格（freebie-radar 设计语言）落地验证页 */}
-              <Route path="radar-style" element={<AdminRadarStylePage />} />
               {/* 未实现的模块：显式提示而非静默跳回概览 */}
               <Route path="*" element={<NotImplementedPage />} />
             </Routes>

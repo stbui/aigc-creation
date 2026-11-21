@@ -91,6 +91,9 @@
   line-height: 22px;
 }
 
+/* 商品换色：窄屏下色卡压到 132px 最小高，避免色板换行后卡片过高。
+ * 页面级差异由页面的 `ToolCard className` 表达（见 product-recolor/page.tsx）。 */
+
 /* 901–1366: 色板改为 4 列网格 (与 ToolWidgets 的色板基础规则同源)。 */
 @media (min-width: 901px) and (max-width: 1366px) {
   .background-color-options {
@@ -110,4 +113,19 @@
     width: 32px;
     height: 32px;
   }
+}
+
+/* 卡片变体：由 `ToolCard` 的 `dense` / `titleGap` 属性驱动，
+   页面不再用同级选择器覆写卡片的 padding 与标题间距。 */
+.local-redraw-card.tool-card.is-dense {
+  padding: 14px;
+  gap: var(--space-16);
+}
+
+.card-title-row.has-gap {
+  margin: 0 0 var(--space-16);
+}
+
+.card-title-row.has-gap h2 {
+  margin: 0 0 var(--space-12);
 }

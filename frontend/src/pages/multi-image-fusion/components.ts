@@ -7,6 +7,9 @@
  *
  * 第三方库 (lucide-react) 不经本文件 —— 它们不是本项目的共享控件。
  * 本页不走 `ToolShell` 外壳: 两步流 (场景网关 / 工作区) 有自己的版式。
+ *
+ * 2026-11-21: 组件视觉统一落到 shadcn 原子件 + C 端语义组件（`TextAction` /
+ * `ImageDropzone`），页面不再自带 `multi-image-fusion-*` 控件皮肤。
  */
 
 /** 图片与结果的口径类型 (与 ToolShell 共用) */
@@ -17,3 +20,39 @@ export { ToolGeneratingState } from '../../components/ToolEmptyState';
 export { MobileUploadModal } from '../../components/MobileUploadModal';
 /** 素材库选择弹窗 */
 export { AssetLibraryModal } from '../../components/AssetLibraryModal';
+
+/** shadcn 组合件与 C 端语义组件：卡片、按钮、选项、空态与浮层统一从 C 端入口取用。 */
+export {
+  AspectRatio,
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentMedia,
+  Badge,
+  Button,
+  EmptyState,
+  EmptyStateDescription,
+  EmptyStateHeader,
+  EmptyStateMedia,
+  EmptyStateTitle,
+  Field,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  FieldTitle,
+  ImageDropzone,
+  InlineAlert,
+  InlineAlertDescription,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Spin,
+  Surface,
+  SurfaceContent,
+  SurfaceHeader,
+  SurfaceTitle,
+  TextAction,
+  Textarea,
+  ToggleGroup,
+  ToggleGroupItem,
+} from '../../ui';

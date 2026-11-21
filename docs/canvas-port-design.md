@@ -269,7 +269,7 @@ PostgreSQL + Prisma。所有表带 `ownerId`，所有查询必须带 `ownerId` �
 - 拆分上游 3,700 行的 `project.tsx`。
 - 9,673 行画布 CSS 迁入本仓令牌体系。
 - 旧版 UI 库组件替换：`App.useApp()` 49 处、Button 56、Input 36、Modal 20、InputNumber 11、Popover 10、Dropdown 10、Slider 6、Segmented 6、ColorPicker 5。
-- 需新增的 shadcn 件：`command`、`resizable`、`scroll-area`、`toggle-group`；手写 `color-picker`、`number-input` 到 primitives。
+- 需新增的 shadcn 件：`command`、`resizable`、`scroll-area`、`toggle-group`；手写 `color-picker`、`number-input` 到 `src/ui`。
 
 ### F3 前端业务扩展（80–115 人日）
 

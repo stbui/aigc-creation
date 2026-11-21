@@ -43,7 +43,7 @@ import {
 /**
  * 婚纱写真模板工作台
  *
- * 页面结构：`.tpl-workspace` 两列网格（432px 左配置栏 + 右模板区），
+ * 页面结构：两列网格（432px 左配置栏 + 右模板区），
  * 左栏（上传人像照片 + 已选模板回显 + 提交区）与右栏（「创作灵感 / 创作结果」
  * 两个页签；灵感页是分类 tab + 模板网格，结果页是创作结果区）各自内部滚动，
  * 页面本身不滚动。提交时自动切到「创作结果」。
@@ -245,7 +245,11 @@ export function TemplatePage() {
 
   return (
     <>
-      <div className="tpl-workspace">
+      {/*
+        两列网格：432px 左配置栏 + 右模板区。
+        桌面锁死工作区高度、两栏各自内部滚动；≤900 改为单列文档流自然滚动。
+      */}
+      <div className="-mx-6 -mt-6 -mb-8 box-border grid h-[calc(100vh-var(--workspace-topbar-height))] min-h-[620px] grid-cols-[432px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] items-stretch gap-4 pr-6 pt-4 pb-4 pl-4 max-[900px]:m-0 max-[900px]:h-auto max-[900px]:min-h-[calc(100vh-var(--workspace-topbar-height))] max-[900px]:grid-cols-1 max-[900px]:grid-rows-[auto_auto] max-[900px]:px-4 max-[900px]:pt-3 max-[900px]:pb-4">
         {/* ── 左: 配置栏 ── */}
         <TemplateInputPane
           images={images}

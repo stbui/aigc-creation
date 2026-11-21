@@ -11,7 +11,7 @@ import {
 } from './constants';
 import { useToast } from './hooks';
 import type { ApiLogDetailView } from './types';
-import { formatDateTime, formatDuration } from './utils';
+import { formatClientIp, formatDateTime, formatDuration, formatPayloadBytes } from './utils';
 
 /**
  * 单条调用记录的详情抽屉。
@@ -62,9 +62,19 @@ export function Detail({ detailId, onClose }: { detailId: string | null; onClose
 
           <Descriptions
             items={[
+              /*
+               * 字段顺序即排障顺序：先回答「成没成」，再回答「走的哪条路」，
+               * 然后是「发了多少 / 收了多少」，最后才是各类标识与时间。
+               * 两列布局下，成对的行读起来是一组；别把「状态」与「追踪号」
+               * 排在同一行 —— 一个是结论、一个是溯源，混排会让人误读优先级。
+               */
               {
                 label: '状态',
                 value: `${STATUS_LABELS[detail.status] ?? detail.status} · HTTP ${detail.statusCode || '—'}`,
+              },
+              {
+                label: '耗时',
+                value: `${formatDuration(detail.durationMs)}${detail.pollCount > 0 ? ` · 第 ${detail.pollCount} 次轮询` : ''}`,
               },
               {
                 label: '请求类型',
@@ -73,6 +83,10 @@ export function Detail({ detailId, onClose }: { detailId: string | null; onClose
               {
                 label: '来源',
                 value: (SOURCE_LABELS[detail.source] ?? detail.source) || '—',
+              },
+              {
+                label: '来源 IP',
+                value: <span className="font-mono text-xs">{formatClientIp(detail.clientIp)}</span>,
               },
               {
                 label: '渠道',
@@ -87,10 +101,6 @@ export function Detail({ detailId, onClose }: { detailId: string | null; onClose
                 label: '能力 / 操作',
                 value: `${CAPABILITY_LABELS[detail.capability] ?? detail.capability ?? '—'} · ${OPERATION_LABELS[detail.operation] ?? detail.operation ?? '—'}`,
               },
-              {
-                label: '耗时',
-                value: `${formatDuration(detail.durationMs)}${detail.pollCount > 0 ? ` · 第 ${detail.pollCount} 次轮询` : ''}`,
-              },
               { label: '上游状态', value: detail.providerStatus || '—' },
               {
                 label: '请求方法',
@@ -100,6 +110,13 @@ export function Detail({ detailId, onClose }: { detailId: string | null; onClose
                 label: '请求路径',
                 value: <span className="break-all font-mono text-xs">{detail.path || '—'}</span>,
               },
+              /*
+               * 体积紧跟在「请求路径」之后：这几行一起回答「这次到底往上游发了
+               * 多大的东西、拿回了多大的东西」——排查「为什么慢 / 为什么超时 /
+               * 为什么被上游 413」时看的就是这一组。
+               */
+              { label: '发往上游', value: formatPayloadBytes(detail.requestBytes) },
+              { label: '收到', value: formatPayloadBytes(detail.responseBytes) },
               {
                 label: '上游请求号',
                 value: <span className="font-mono text-xs">{detail.providerRequestId || '—'}</span>,

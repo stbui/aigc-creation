@@ -4,3 +4,6 @@
 
 /** 失败态 / 骨架屏 */
 export { StateError, StateSkeleton } from '../../components/StateViews';
+
+/** shadcn 组合件 */
+export { Button } from '../../ui';

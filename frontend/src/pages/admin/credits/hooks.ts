@@ -21,7 +21,7 @@ export {
 export { useAdminList, useAdminResource };
 export { useToast } from '../../../admin-ui/providers/ToastProvider';
 export { useAdmin } from '../../../context/AdminContext';
-export { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
+export { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/hooks/useUnsavedGuard';
 
 /**
  * 用户积分总览列表。

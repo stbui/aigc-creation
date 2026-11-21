@@ -3,6 +3,10 @@ import { X } from 'lucide-react';
 import { MAX_SKU_NAME, type SkuItem } from './constants';
 import {
   Button,
+  Field,
+  FieldContent,
+  FieldError,
+  FieldLabel,
   InputGroup,
   InputGroupInput,
   InputGroupText,
@@ -58,34 +62,46 @@ export function ProductSkuListItem({
   onPreview,
 }: ProductSkuListItemProps) {
   return (
-    <Surface className="product-sku-item-card gap-0 border-0 shadow-none">
-      <div className="product-sku-item-heading">
-        <InputGroup className="h-8 min-h-8 min-w-0 flex-1 border-0 shadow-none focus-within:bg-brand-bg focus-within:ring-2 focus-within:ring-primary">
-          <InputGroupInput
-            value={item.name}
-            maxLength={MAX_SKU_NAME}
-            aria-label={`SKU ${itemIndex + 1} 名称`}
-            className="text-sm"
-            onChange={(event) => onNameChange(item.key, event.target.value)}
-          />
-          <InputGroupText className="shrink-0 pr-2 text-xs">
-            {item.name.length}/{MAX_SKU_NAME}
-          </InputGroupText>
-        </InputGroup>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label={`移除 SKU ${itemIndex + 1}`}
-          title="移除 SKU"
-          disabled={!canRemove}
-          className="text-muted-foreground"
-          onClick={() => onRemove(item.key)}
-        >
-          <X className="size-4" />
-        </Button>
-      </div>
-      {duplicate && <p className="product-sku-item-error">SKU 名称不可重复（忽略大小写）</p>}
+    <Surface className="gap-0 border-0 bg-card p-4 shadow-none">
+      <Field data-invalid={duplicate || undefined} className="gap-0">
+        <FieldLabel htmlFor={`sku-name-${item.key}`} className="sr-only">
+          SKU {itemIndex + 1} 名称
+        </FieldLabel>
+        <FieldContent className="gap-0">
+          <div className="mb-3 flex min-h-5 items-center justify-between gap-2">
+            <InputGroup className="h-8 min-h-8 min-w-0 flex-1 border-0 shadow-none focus-within:bg-brand-bg focus-within:ring-2 focus-within:ring-primary">
+              <InputGroupInput
+                id={`sku-name-${item.key}`}
+                value={item.name}
+                maxLength={MAX_SKU_NAME}
+                aria-invalid={duplicate || undefined}
+                className="text-sm"
+                onChange={(event) => onNameChange(item.key, event.target.value)}
+              />
+              <InputGroupText className="shrink-0 pr-2 text-xs">
+                {item.name.length}/{MAX_SKU_NAME}
+              </InputGroupText>
+            </InputGroup>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`移除 SKU ${itemIndex + 1}`}
+              title="移除 SKU"
+              disabled={!canRemove}
+              className="text-muted-foreground"
+              onClick={() => onRemove(item.key)}
+            >
+              <X className="size-4" aria-hidden />
+            </Button>
+          </div>
+          {duplicate && (
+            <FieldError className="-mt-1.5 mb-2.5 text-xs">
+              SKU 名称不可重复（忽略大小写）
+            </FieldError>
+          )}
+        </FieldContent>
+      </Field>
 
       {regions.map((region, regionIndex) => (
         <ProductSkuVariantRow

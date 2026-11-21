@@ -23,7 +23,7 @@ import {
   TooltipTrigger,
 } from '../components/ui/tooltip';
 
-export type { Tone } from '../primitives/form';
+export type Tone = 'neutral' | 'brand' | 'success' | 'warn' | 'danger';
 
 /* ────────────────────────── 字段容器 ────────────────────────── */
 
@@ -89,8 +89,6 @@ export function FormField({
   );
 }
 
-/* ────────────────────────── 文本输入 ────────────────────────── */
-
 export function TextField({
   value,
   onChange,
@@ -152,7 +150,6 @@ export function TextField({
     </div>
   );
 }
-
 export function TextAreaField({
   value,
   onChange,
@@ -203,8 +200,6 @@ export function TextAreaField({
     </div>
   );
 }
-
-/* ────────────────────────── 数字输入 ────────────────────────── */
 
 export function NumberField({
   value,
@@ -298,7 +293,6 @@ export interface SelectFieldOption {
   value: string;
   label: string;
 }
-
 export function SelectField({
   value,
   onChange,
@@ -346,7 +340,15 @@ export function SelectField({
           className,
         )}
       >
-        <SelectValue placeholder={placeholderText} />
+        {/* 显式 placeholder 优先于 clearLabel：`allowClear` 在触发器里的回显值是
+            选项里的「全部」，而 placeholder 表达的是「还没选」。旧实现在这里
+            用 children 强制接管，radar 改造后丢了这层判断，导致传了
+            placeholder 的调用点仍然显示「全部类型」。 */}
+        <SelectValue placeholder={placeholderText}>
+          {value === undefined && placeholder ? (
+            <span className="text-radar-ink-400">{placeholder}</span>
+          ) : undefined}
+        </SelectValue>
       </SelectTrigger>
       {/* 门户挂在 body 下，拿不到内容区的 `.radar-scope`，必须显式带上 */}
       <SelectContent className="admin-portal radar-scope rounded-[8px] border border-radar-ink-200 bg-radar-surface shadow-none [&_[data-slot=select-item]]:text-[13px]">
@@ -362,242 +364,6 @@ export function SelectField({
     </Select>
   );
 }
-
-/* ────────────────────────── 开关 ────────────────────────── */
-
-export function SwitchField({
-  checked,
-  onChange,
-  label,
-  disabled = false,
-  ariaLabel,
-  className,
-  'aria-describedby': ariaDescribedBy,
-  'aria-invalid': ariaInvalid,
-  'aria-required': ariaRequired,
-}: {
-  checked: boolean;
-  onChange: (value: boolean) => void;
-  label?: ReactNode;
-  disabled?: boolean;
-  ariaLabel?: string;
-  className?: string;
-} & AriaAttributes) {
-  const control = (
-    <Switch
-      checked={checked}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      aria-describedby={ariaDescribedBy}
-      aria-invalid={ariaInvalid}
-      aria-required={ariaRequired}
-      onCheckedChange={onChange}
-      className="data-[state=checked]:bg-radar-brand data-[state=unchecked]:bg-radar-ink-300"
-    />
-  );
-  if (!label) return <span className={className}>{control}</span>;
-  return (
-    <label className={cn('inline-flex cursor-pointer items-center gap-2', className)}>
-      {control}
-      <span className="text-[13px] text-radar-ink-700">{label}</span>
-    </label>
-  );
-}
-
-/* ────────────────────────── 复选 ────────────────────────── */
-
-export function CheckboxField({
-  checked,
-  onChange,
-  label,
-  ariaLabel,
-  disabled = false,
-  indeterminate = false,
-  size = 'md',
-  className,
-}: {
-  checked: boolean;
-  onChange: (value: boolean) => void;
-  label?: ReactNode;
-  ariaLabel?: string;
-  disabled?: boolean;
-  indeterminate?: boolean;
-  size?: 'md' | 'sm';
-  className?: string;
-}) {
-  return (
-    <label className={cn('inline-flex cursor-pointer items-center gap-2', className)}>
-      <Checkbox
-        checked={indeterminate ? 'indeterminate' : checked}
-        disabled={disabled}
-        aria-label={ariaLabel}
-        onCheckedChange={(next) => onChange(next === true)}
-        className="data-[state=checked]:bg-radar-brand data-[state=checked]:border-radar-brand"
-      />
-      {label && (
-        <span className={cn('text-radar-ink-700', size === 'sm' ? 'text-[12px]' : 'text-[13px]')}>
-          {label}
-        </span>
-      )}
-    </label>
-  );
-}
-
-/* ────────────────────────── 滑块 ────────────────────────── */
-
-export function RangeField({
-  value,
-  min,
-  max,
-  step = 1,
-  suffix,
-  onChange,
-  disabled = false,
-  ariaLabel,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  suffix?: string;
-  onChange: (value: number) => void;
-  disabled?: boolean;
-  ariaLabel?: string;
-}) {
-  const safe = Number.isFinite(value) ? value : min;
-  return (
-    <div className="flex items-center gap-3">
-      <Slider
-        className="flex-1"
-        value={[safe]}
-        min={min}
-        max={max}
-        step={step}
-        disabled={disabled}
-        thumbAriaLabel={ariaLabel}
-        onValueChange={([next]) => onChange(next)}
-      />
-      <div className="flex shrink-0 items-center gap-1.5">
-        <NumberField
-          value={safe}
-          min={min}
-          max={max}
-          disabled={disabled}
-          onChange={(next) => onChange(next ?? min)}
-          ariaLabel={ariaLabel}
-          className="w-20"
-        />
-        {suffix && <span className="text-[12px] text-radar-ink-400">{suffix}</span>}
-      </div>
-    </div>
-  );
-}
-
-/* ────────────────────────── 语义标签 ────────────────────────── */
-
-export function ToneBadge({
-  children,
-  tone = 'neutral',
-  className,
-}: {
-  children: ReactNode;
-  tone?: 'neutral' | 'brand' | 'success' | 'warn' | 'danger';
-  className?: string;
-}) {
-  const tones: Record<string, string> = {
-    neutral: 'bg-radar-ink-100 text-radar-ink-600',
-    brand: 'bg-radar-ink-100 text-radar-ink-700',
-    success: 'bg-radar-deal-subtle text-radar-deal',
-    warn: 'bg-radar-code-subtle text-radar-code',
-    danger: 'bg-radar-alert-subtle text-radar-alert',
-  };
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded px-1.5 py-0.5 text-[12px] leading-4 font-medium',
-        tones[tone],
-        className,
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-/* ────────────────────────── 分段切换 ────────────────────────── */
-
-export function SegmentedTabs({
-  value,
-  onChange,
-  options,
-  ariaLabel,
-  className,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: ReactNode }>;
-  ariaLabel?: string;
-  className?: string;
-}) {
-  return (
-    <Tabs value={value} onValueChange={onChange} className={cn('gap-0', className)}>
-      <TabsList aria-label={ariaLabel} className="h-9 gap-1 rounded-[8px] border border-radar-ink-200 bg-radar-surface p-1">
-        {options.map((option) => (
-          <TabsTrigger
-            key={option.value}
-            value={option.value}
-            className="h-7 rounded-[6px] px-3 text-[13px] font-medium data-[state=active]:bg-radar-brand data-[state=active]:text-white"
-          >
-            {option.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
-  );
-}
-
-export function SegmentedGroup({
-  value,
-  onChange,
-  options,
-  ariaLabel,
-  className,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: ReactNode }>;
-  ariaLabel?: string;
-  className?: string;
-}) {
-  return (
-    <ToggleGroup
-      type="single"
-      value={value}
-      onValueChange={(next) => {
-        if (next) onChange(next);
-      }}
-      aria-label={ariaLabel}
-      size="sm"
-      className={cn('h-9 rounded-[8px] border border-radar-ink-200 bg-radar-surface p-1', className)}
-    >
-      {options.map((option) => (
-        <ToggleGroupItem
-          key={option.value}
-          value={option.value}
-          className={cn(
-            'h-7 rounded-[6px] px-3 text-[13px] font-medium text-radar-ink-600 transition-colors',
-            'hover:bg-radar-ink-100 hover:text-radar-ink-900',
-            'data-[state=on]:bg-radar-brand data-[state=on]:text-white',
-          )}
-        >
-          {option.label}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
-  );
-}
-
-/* ────────────────────────── 可清空输入 ────────────────────────── */
 
 export function ClearableField({
   value,
@@ -665,132 +431,3 @@ export function ClearableField({
   );
 }
 
-/* ────────────────────────── 操作按钮 ────────────────────────── */
-
-export function ActionButton({
-  children,
-  onClick,
-  variant = 'default',
-  size = 'sm',
-  disabled = false,
-  icon: Icon,
-  className,
-  type = 'button',
-  form,
-  ariaLabel,
-  ariaPressed,
-  ariaExpanded,
-  asChild = false,
-}: {
-  children?: ReactNode;
-  onClick?: () => void;
-  variant?: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive';
-  size?: 'xs' | 'sm' | 'md' | 'default';
-  disabled?: boolean;
-  icon?: React.ComponentType<{ className?: string }>;
-  className?: string;
-  type?: 'button' | 'submit';
-  form?: string;
-  ariaLabel?: string;
-  ariaPressed?: boolean;
-  ariaExpanded?: boolean;
-  /** 把按钮外观交给子元素（如 `<Link>`）；导航必须保留链接语义 */
-  asChild?: boolean;
-}) {
-  const s: 'sm' | 'md' | 'xs' = size === 'xs' ? 'sm' : size === 'default' ? 'md' : size;
-  /*
-   * asChild 时由子元素（如 `<Link>`）持有原生语义，`type` / `form` 只属于
-   * `<button>`，不能透传过去。动作回调和可访问属性仍然保留。
-   */
-  const nativeProps = asChild ? {} : { type, form, disabled };
-  /*
-   * Radar 皮肤里 `secondary` 就是白底 + 细线的「带边界次级动作」，与
-   * `outline` 在内容区看起来一致；保留页面既有的 `outline` 写法，
-   * 统一落到 secondary，避免同一层级的按钮在灰底上变成透明底。
-   */
-  const v: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' =
-    variant === 'outline' ? 'secondary' : variant;
-  return (
-    <Button
-      {...nativeProps}
-      variant={v}
-      size={s}
-      onClick={onClick}
-      aria-label={ariaLabel}
-      aria-pressed={ariaPressed}
-      aria-expanded={ariaExpanded}
-      aria-disabled={asChild && disabled ? true : undefined}
-      asChild={asChild}
-      className={cn(asChild && disabled && 'pointer-events-none opacity-60', className)}
-    >
-      {asChild ? (
-        children
-      ) : (
-        <>
-          {Icon ? <Icon className="size-4" aria-hidden /> : null}
-          {children}
-        </>
-      )}
-    </Button>
-  );
-}
-
-/* ────────────────────────── 纯图标按钮 ────────────────────────── */
-
-export function IconButton({
-  icon: Icon,
-  label,
-  title,
-  size = 'sm',
-  disabled = false,
-  onClick,
-  className,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  title?: string;
-  size?: 'xs' | 'sm' | 'md';
-  disabled?: boolean;
-  onClick?: () => void;
-  className?: string;
-}) {
-  const sizes = { xs: 'size-7', sm: 'size-8', md: 'size-9' } as const;
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      disabled={disabled}
-      aria-label={label}
-      title={title ?? label}
-      onClick={onClick}
-      className={cn('text-radar-ink-400 hover:bg-radar-ink-100 hover:text-radar-ink-900', sizes[size], className)}
-    >
-      <Icon className="size-4" aria-hidden />
-    </Button>
-  );
-}
-
-/* ────────────────────────── 悬停说明 ────────────────────────── */
-
-export function HelpTip({ tip, children }: { tip: ReactNode; children: ReactNode }) {
-  return (
-    <TooltipProvider delayDuration={120}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            tabIndex={0}
-            className="inline-flex cursor-help items-center rounded outline-none focus-visible:ring-2 focus-visible:ring-radar-accent/40"
-          >
-            {children}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent
-          sideOffset={6}
-          className="admin-portal radar-scope max-w-[340px] rounded-[8px] border border-radar-ink-200 bg-radar-ink-950 px-3 py-2 text-[12px] leading-relaxed text-white [&_svg]:bg-radar-ink-950 [&_svg]:fill-radar-ink-950"
-        >
-          {tip}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}

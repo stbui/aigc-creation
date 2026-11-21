@@ -11,17 +11,16 @@ import { SitemapTopbar } from './SitemapTopbar';
 /**
  * 网站地图
  *
- * 版面数值来自参考站实拍 (2026-10-17, 1280 视口):
- *   顶部条: 品牌 + 「机器地图 XML」(/sitemap.xml) + 「返回首页 ↗」
- *   hero 1100x172: eyebrow「IJIHUA / SITE INDEX」+ h1「网站地图.」
- *     68px/780 #182033 lh66.64; 下方 15px 说明文案
- *   主体 main 1100, 两列网格 (各列起点 x=162 / x=721)
- *   每组: 编号小标 12px/750 letterSpacing 1.2 (四组四色)
- *     取 --sitemap-accent-1..4: 第一组即品牌紫, 其余三色压到白底 ≥4.9:1
- *     (参考站的 42,168,192 / 230,134,98 / 53,168,137 在白底只有 2.6–3.0:1)
- *     + 组标题 17px/720 #182033 + 条目数
- *   条目 li 491x38 display list-item: 名称 16px #182033 + 路径 12px #9AA1B1
- *   页脚: © 2026 + 「查看 XML Sitemap ↗」
+ * 版面尺寸沿用参考站实拍 (2026-10-17, 1280 视口)，样式全部走 Tailwind
+ * 语义类与 `tokens.css` 令牌，本页不再有独占样式表：
+ *   顶部条: 品牌 + 「本页即站点索引」说明 + 「返回首页 ↗」
+ *   hero 宽 1100: eyebrow「HUOJUE AI / SITE INDEX」+ h1「网站地图.」
+ *     68px / leading 66.64px; 下方说明文案，窄屏 40px
+ *   主体 main 宽 1100，两列网格，窄屏单列
+ *   每组: 编号小标 + 组标题 + 条目数，编号四组四色
+ *     取 `--sitemap-accent-1..4`：第一组即品牌紫，其余三色压到白底 ≥4.9:1
+ *   条目: 名称 + 路径，整行可点，悬停底色
+ *   页脚: © 2026
  *
  * 板块拆分见 `docs/frontend-module-conventions.md`：顶部条 `SitemapTopbar`、
  * 页头 `SitemapHero`、分组卡 `SitemapSectionCard`、页脚 `SitemapFooter`；
@@ -36,13 +35,13 @@ export function SitemapPage() {
   );
 
   return (
-    <div className="sitemap-page">
+    <div className="flex min-h-screen flex-col bg-card">
       <SitemapTopbar />
 
-      <main className="sitemap-main">
+      <main className="mx-auto w-[1100px] max-w-full px-6 pt-[58px] pb-10">
         <SitemapHero />
 
-        <div className="sitemap-grid">
+        <div className="grid grid-cols-1 gap-x-24 gap-y-8 min-[901px]:grid-cols-2">
           {sections.map((section) => (
             <SitemapSectionCard key={section.no} section={section} />
           ))}

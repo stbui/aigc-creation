@@ -8,7 +8,7 @@ export function LibraryGroupOptionLabel({ label, count }: LibraryGroupOptionLabe
   return (
     <>
       {label}
-      <em className="asset-library-group-count">{count}</em>
+      <em className="text-xs not-italic text-muted-foreground group-data-[state=on]:text-brand-hover">{count}</em>
     </>
   );
 }

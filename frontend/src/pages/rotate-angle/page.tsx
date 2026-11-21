@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import { DEFAULT_PITCH, DEFAULT_YAW, DEFAULT_ZOOM, type RotateTab } from './constants';
 import {
+  PRODUCT_TOOL_DROPZONE,
+  PRODUCT_TOOL_PAGE,
   ToolHistoryPane,
   ToolShell,
   productSourcePane,
@@ -67,11 +69,16 @@ export function RotateAnglePage() {
   return (
     <ToolShell
       capability="rotate"
-      pageClass="product-retouch-page rotate-angle-page rotate-angle-grid"
-      inputPaneClassName="rotate-angle-controls"
+      pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page rotate-angle-page [&_.pk-config-card]:min-h-[226px]! max-[900px]:[&_.pk-config-card]:p-4! max-[900px]:[&_.pk-form-scroll]:mb-3! max-[900px]:[&_.source-row]:gap-6! max-[900px]:[&_.pk-result-pane]:min-h-[360px]! max-[900px]:[&_.pk-result-pane]:h-auto! max-[900px]:[&_.pk-result-pane]:flex-none!`}
       title="旋转角度"
       desc="视角平滑旋转，细节立体呈现"
-      upload={{ title: '上传图片', required: true, max: 1, hint: '支持 JPG、PNG、WebP，最多 1 张' }}
+      upload={{
+        title: '上传图片',
+        required: true,
+        max: 1,
+        hint: '支持 JPG、PNG、WebP，最多 1 张',
+        dropzoneClassName: PRODUCT_TOOL_DROPZONE,
+      }}
       replaceUpload
       renderUploadPreview={productSourceUploadPreview('待生成商品图')}
       settings={{ ratio: true, resolution: true }}
@@ -91,7 +98,7 @@ export function RotateAnglePage() {
         setSourceUrl(inputs[0]?.url ?? '');
         return run(inputs, rotatePayload(tab, yaw, pitch, zoom, settings));
       }}
-      sourcePane={productSourcePane('待生成商品图', 'rotate-angle-result')}
+      sourcePane={productSourcePane('待生成商品图')}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="rotate" refreshKey={result?.url} emptyText="暂无旋转记录" />

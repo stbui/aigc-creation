@@ -17,7 +17,11 @@ export interface TicketFiltersProps {
 
 export function TicketFilters({ filter, counts, loaded, onChange }: TicketFiltersProps) {
   return (
-    <div className="ticket-filters" role="group" aria-label="按状态筛选工单">
+    <div
+      className="mb-4 flex flex-wrap gap-2 max-[640px]:flex-nowrap max-[640px]:flex-nowrap max-[640px]:overflow-x-auto max-[640px]:pb-1 max-[640px]:[scrollbar-width:thin]"
+      role="group"
+      aria-label="按状态筛选工单"
+    >
       {FILTERS.map((f) => {
         const count = f.value === 'all' ? loaded : (counts[f.value] ?? 0);
         const active = filter === f.value;
@@ -26,11 +30,19 @@ export function TicketFilters({ filter, counts, loaded, onChange }: TicketFilter
             key={f.value}
             type="button"
             aria-pressed={active}
-            className={`ticket-filter${active ? ' is-active' : ''}`}
+            className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[13px] leading-none transition-colors max-[640px]:shrink-0 ${
+              active
+                ? 'border-brand-bg bg-brand-bg font-semibold text-brand'
+                : 'border-border bg-card text-muted-foreground hover:border-[color-mix(in_srgb,var(--brand)_35%,var(--border))] hover:text-foreground'
+            }`}
             onClick={() => onChange(f.value)}
           >
             {f.label}
-            <span className="ticket-filter-count">{count}</span>
+            <span
+              className={`text-xs tabular-nums ${active ? 'text-brand' : 'text-muted-foreground'}`}
+            >
+              {count}
+            </span>
           </button>
         );
       })}

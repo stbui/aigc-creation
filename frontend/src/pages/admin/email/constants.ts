@@ -114,38 +114,13 @@ export const PROVIDERS: ProviderMeta[] = [
   },
 ];
 
-export const EMAIL_PROVIDER_LABELS: Record<string, string> = {
-  env: '部署环境配置',
-  smtp: 'SMTP 邮箱',
-  console: '本地记录',
-  http: '自定义邮件接口',
-  aliyun: '阿里云邮件推送',
-  'aliyun-dm': '阿里云邮件推送',
-  disabled: '邮件通知已关闭',
-  unknown: '未知通道',
-};
-
-export const SMS_PROVIDER_LABELS: Record<string, string> = {
-  env: '部署环境配置',
-  console: '本地记录',
-  http: '自定义短信接口',
-  'aliyun-sms': '阿里云短信服务',
-  disabled: '短信通知已关闭',
-  unknown: '未知通道',
-};
-
-/** 历史配置错误 → 运营可读文案。未知错误保留原文，便于服务商排障。 */
-export const EMAIL_ERROR_COPY: Record<string, string> = {
-  '邮件通知已关闭': '邮件通知已关闭，请先启用并保存配置。',
-  '邮件通道配置不完整': '邮件投递配置不完整，请补全后重试。',
-  '生产环境未配置真实邮件通道，邮件未投递': '生产环境尚未配置可实际发送的邮件通道，邮件未投递。',
-  'HTTP API 地址未配置，已回落 console': '邮件接口地址尚未配置，请补全后重试。',
-  '阿里云 AccessKey 或发信地址未配置，已回落 console':
-    '阿里云 AccessKey 或发信地址尚未配置，请补全后重试。',
-  'SMTP 服务器、端口、账号或客户端授权码尚未配置，请补全后重试。':
-    'SMTP 服务器、端口、登录账号或客户端授权码尚未配置，请补全后重试。',
-  '控制台通道只写本地 outbox，不会真实投递': '当前为本地记录模式，邮件不会实际发送。',
-};
+/* 通道名与错误文案是「消息通知」与「邮箱配置」两页共用的展示口径，
+ * 实现在 `src/lib/email-status.ts`，这里只转出给本目录使用。 */
+export {
+  EMAIL_ERROR_COPY,
+  EMAIL_PROVIDER_LABELS,
+  SMS_PROVIDER_LABELS,
+} from '../../../lib/email-status';
 
 export const EVENT_GROUPS: EventGroupMeta[] = [
   {

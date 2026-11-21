@@ -31,9 +31,11 @@ export function LibraryGroupPanel({
   onOpenProjectManager,
 }: LibraryGroupPanelProps) {
   return (
-    <Surface className="asset-library-groups-panel gap-0">
-      <div className="asset-library-groups-bar">
-        <SurfaceTitle className="asset-library-group-title">素材分组</SurfaceTitle>
+    <Surface className="mb-[18px] gap-0 rounded-xl border border-border bg-card px-5 py-[18px] shadow-[0_8px_24px_rgba(40,37,84,0.03)]">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <SurfaceTitle className="flex-none text-sm leading-5 font-semibold whitespace-nowrap text-foreground">
+          素材分组
+        </SurfaceTitle>
         <LibraryGroupByToggle value={groupBy} onChange={onGroupByChange} />
         <Button
           variant="ghost"

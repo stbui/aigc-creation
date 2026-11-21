@@ -5,9 +5,12 @@ import { MAX_REGIONS, type LibraryTarget } from './constants';
 import {
   AssetLibraryModal,
   ImageLightbox,
+  InlineAlert,
+  InlineAlertDescription,
   MobileUploadModal,
   SkuRegionEditorModal,
-  Surface,
+  Spin,
+  useApp,
   type SkuRegion,
   type ToolAsset,
   type ToolSettings,
@@ -35,7 +38,6 @@ import {
   restoreSkuDraft,
   type SkuBatchGroup,
 } from './utils';
-import { useApp, Spin } from '../../ui';
 
 export function ProductSkuPage() {
   const { message } = useApp();
@@ -298,9 +300,14 @@ export function ProductSkuPage() {
       />
 
       {restoringId && (
-        <Surface className="product-sku-restoring flex-row border-0" role="status">
-          <Spin className="size-4" /> 正在恢复历史提交…
-        </Surface>
+        <InlineAlert
+          className="fixed right-6 bottom-6 z-[2500] w-auto shadow-card"
+          role="status"
+          aria-live="polite"
+        >
+          <Spin className="size-4" />
+          <InlineAlertDescription>正在恢复历史提交…</InlineAlertDescription>
+        </InlineAlert>
       )}
 
       {previewUrl && (

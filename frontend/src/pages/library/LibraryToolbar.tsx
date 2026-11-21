@@ -41,19 +41,21 @@ export function LibraryToolbar({
   onUpload,
 }: LibraryToolbarProps) {
   return (
-    <header className="asset-library-header">
+    <header className="mb-[22px] flex items-end justify-between gap-6 max-[720px]:mb-[17px] max-[720px]:items-start max-[700px]:flex-col max-[700px]:items-stretch max-[640px]:gap-3">
       <div>
-        <h1 className="asset-library-title">素材库</h1>
+        <h1 className="m-0 text-[28px] leading-10 font-bold text-foreground max-[720px]:text-2xl max-[720px]:leading-[34px]">
+          素材库
+        </h1>
       </div>
       {loggedIn && (
-        <div className="asset-library-header-actions">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Select
             value={assetKind}
             onValueChange={(next) => onAssetKindChange(next as AssetKind)}
           >
             <SelectTrigger
               aria-label={'来源筛选'}
-              className={'asset-library-date-filter'}
+              className="gap-1.5 px-[11px] text-muted-foreground hover:border-brand hover:bg-brand-bg hover:text-brand-hover"
             >
               <SelectValue placeholder={'请选择'} />
             </SelectTrigger>
@@ -105,7 +107,7 @@ export function LibraryToolbar({
             variant="default"
             onClick={onUpload}
           >
-            <span className="state-spinner is-small" aria-hidden />
+            {uploading && <span className="state-spinner is-small" aria-hidden />}
             上传素材
           </Button>
         </div>

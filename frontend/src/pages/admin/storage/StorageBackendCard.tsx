@@ -5,9 +5,8 @@ import type { StorageBackendId, StorageBackendRow } from './types';
 import { cn } from './utils';
 
 /**
- * 未启用不是终点：把「装 SDK → 配变量 → 重启」三步摆出来，
- * 运营不必去翻代码或后端日志才知道下一步做什么。
- * 凭据仍只从环境变量读，这里只给变量名与命令，不提供输入框。
+ * 未启用不是终点：装 SDK 后，直接在页面点「编辑配置」填入连接信息即可启用。
+ * SDK 属部署期依赖，仍需命令行安装一次；连接参数只保存到数据库。
  */
 function StorageBackendSetup({ meta }: { meta: (typeof META)[StorageBackendId] }) {
   return (
@@ -16,7 +15,7 @@ function StorageBackendSetup({ meta }: { meta: (typeof META)[StorageBackendId] }
 
       {meta.sdk && (
         <>
-          <div className="mt-2 text-[12px] text-muted-foreground">① 安装 SDK</div>
+          <div className="mt-2 text-[12px] text-muted-foreground">① 安装 SDK（部署期一次）</div>
           <code
             data-testid="admin-storage-sdk"
             className="mt-1 block break-all rounded-sm border border-border bg-muted px-1.5 py-1 font-mono text-[12px] leading-4 text-foreground"
@@ -26,36 +25,9 @@ function StorageBackendSetup({ meta }: { meta: (typeof META)[StorageBackendId] }
         </>
       )}
 
-      <div className="mt-2 text-[12px] text-muted-foreground">② 配置环境变量（必填）</div>
-      <div data-testid="admin-storage-env" className="mt-1 flex flex-wrap gap-1">
-        {meta.envKeys.map((key) => (
-          <code
-            key={key}
-            className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[12px] text-foreground"
-          >
-            {key}
-          </code>
-        ))}
-      </div>
-
-      {meta.optionalKeys && meta.optionalKeys.length > 0 && (
-        <>
-          <div className="mt-1.5 text-[12px] text-muted-foreground">可选 / 有默认值</div>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {meta.optionalKeys.map((key) => (
-              <code
-                key={key}
-                className="rounded-sm border border-dashed border-border px-1.5 py-0.5 font-mono text-[12px] leading-4 text-muted-foreground"
-              >
-                {key}
-              </code>
-            ))}
-          </div>
-        </>
-      )}
-
+      <div className="mt-2 text-[12px] text-muted-foreground">② 点下方「配置后端」填入连接信息</div>
       <p className="mt-2 text-[12px] leading-4 text-muted-foreground">
-        ③ 写入 <code className="font-mono">{'.env.<env>.local'}</code> 并重启后端，本卡片即可探测与切换。
+        保存后即时生效，无需重启后端。配置仅保存于数据库，不读取环境变量；建议先「测试连接」再保存。
       </p>
     </div>
   );
@@ -68,16 +40,20 @@ export function StorageBackendCard({
   busy,
   canProbe,
   canSwitch,
+  canEdit,
   onProbe,
   onSwitch,
+  onEdit,
 }: {
   backend: StorageBackendRow;
   probing: boolean;
   busy: boolean;
   canProbe: boolean;
   canSwitch: boolean;
+  canEdit: boolean;
   onProbe: () => void;
   onSwitch: () => void;
+  onEdit: () => void;
 }) {
   const meta = META[b.backend as StorageBackendId] ?? META.local;
   const Icon = meta.icon;
@@ -144,11 +120,32 @@ export function StorageBackendCard({
         </dd>
         <dt className="text-muted-foreground">地址</dt>
         <dd className="min-w-0 truncate font-mono text-foreground">{b.endpoint ?? '—'}</dd>
+        {b.backend !== 'local' && b.config?.values.pathPrefix && (
+          <>
+            <dt className="text-muted-foreground">前缀</dt>
+            <dd className="min-w-0 truncate font-mono text-foreground">{b.config.values.pathPrefix}</dd>
+          </>
+        )}
+        {b.config?.values.publicBaseUrl && (
+          <>
+            <dt className="text-muted-foreground">公开域名</dt>
+            <dd className="min-w-0 truncate font-mono text-foreground">{b.config.values.publicBaseUrl}</dd>
+          </>
+        )}
       </dl>
 
       {!b.configured && b.backend !== 'local' && <StorageBackendSetup meta={meta} />}
 
       <div className="mt-auto flex items-center gap-2 pt-3">
+        {canEdit && (
+          <ActionButton
+            variant={b.configured ? 'secondary' : 'default'}
+            disabled={busy}
+            onClick={onEdit}
+          >
+            {b.backend === 'local' ? '访问地址' : b.configured ? '编辑配置' : '配置后端'}
+          </ActionButton>
+        )}
         {canProbe && b.configured && (
           <ActionButton
             variant="secondary"

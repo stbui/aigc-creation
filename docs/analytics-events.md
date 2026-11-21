@@ -7,7 +7,7 @@
 - **没有独立事件存储，也没有客户端埋点 SDK**：当前所有统计都从业务表实时聚合。
 - C 端数据中心（`GET /stats/overview`）从 `GenerationTask` / `Asset` / `Project` 聚合。
 - 后台财务分析（`GET /admin/analytics/finance`）从 `BillingOrder` 聚合，口径以账单为准。
-- 后台概览、渠道健康、值班塔从任务、账单、调用记录聚合。
+- 后台概览、渠道健康从任务、账单、调用记录聚合。
 - 邀请归因来自 `InviteRelation` 与 `User.inviteCode`；没有 UTM、落地页来源或广告点击数据。
 
 因此本文的「事件」定义为**业务表中已经发生的事实**，不是另建一套埋点。新增客户端事件前必须先按 §8 评审。

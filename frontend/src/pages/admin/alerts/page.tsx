@@ -12,7 +12,24 @@ import {
 } from './constants';
 import { readSeverity } from './utils';
 import { useAdminAlerts, useAdminUrlFilterSync, useAdminWorkbench } from './hooks';
-import { ALERT_SEVERITY_META, alertTime } from './components';
+import {
+  ALERT_SEVERITY_META,
+  alertTime,
+  Button,
+  EmptyState,
+  ListError,
+  PageHeader,
+  Panel,
+  RadarBadge,
+  RadarPage,
+  Segmented,
+  StatCards,
+  StaleError,
+  SkeletonBody,
+  WorkQueue,
+  WorkQueueSection,
+} from './components';
+import '../../../styles/radar-admin.css';
 import type { AdminAlertSeverity } from '../../../types/api';
 
 /**
@@ -20,7 +37,7 @@ import type { AdminAlertSeverity } from '../../../types/api';
  *
  * 本次改造只换「呈现层」：数据 Hook（`useAdminAlerts` / `useAdminUrlFilterSync`
  * / `useAdminWorkbench`）、severity 元数据、筛选与 URL 同步逻辑**全部保留**，
- * 仅把 shadcn 原语（`~/admin-ui/primitives` 的 `AdminPage` / `Panel` / `StatCards`
+ * 仅把 shadcn 原语（原 `~/admin-ui/primitives`、现 `~/admin-ui/radar` 的 `AdminPage` / `Panel` / `StatCards`
  * / `SegmentedGroup` / `EmptyState` / `ListError` / `StaleError` / `SkeletonBody`
  * / `WorkQueue` 与 `AlertCenter` 的 shadcn `Button`）替换为 `admin-ui/radar`
  * 构建块。视觉语言改为：灰底画布 + 白底细线面板（零阴影）+ 颜色编码语义。
@@ -28,21 +45,6 @@ import type { AdminAlertSeverity } from '../../../types/api';
  * 版面顺序不变：态势（统计卡）→ 清单（级别筛选 + 待处理列表）→ 明细（可处理
  * 队列）→ 口径。这是后台从品牌紫逐步迁到中性风格的试点页之一。
  */
-import {
-  Button,
-  RadarBadge,
-  RadarPage,
-  PageHeader,
-  Panel,
-  StatCards,
-  Segmented,
-  EmptyState,
-  ListError,
-  StaleError,
-  SkeletonBody,
-  WorkQueue,
-  WorkQueueSection,
-} from '../../../admin-ui/radar';
 import '../../../styles/radar-admin.css';
 
 export function AdminAlertsPage() {

@@ -15,9 +15,9 @@ export const REWARD_STATUS: Record<
   MyInvites['relations'][number]['rewardStatus'],
   { label: string; className: string }
 > = {
-  granted: { label: '已发放', className: 'is-granted' },
-  pending: { label: '待发放', className: 'is-pending' },
-  rejected: { label: '未通过', className: 'is-rejected' },
+  granted: { label: '已发放', className: 'bg-success-soft text-success-text' },
+  pending: { label: '待发放', className: 'bg-warn-soft text-warn-text' },
+  rejected: { label: '未通过', className: 'bg-muted text-muted-foreground' },
 };
 
 /** 邀请记录每次加载的条数 */

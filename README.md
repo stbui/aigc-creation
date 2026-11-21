@@ -137,7 +137,7 @@ aigc-creation/
     └── src/
         ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
         ├── pages/              # 35 个 C 端页面 + pages/admin/ 34 个后台页面
-        ├── admin-ui/           # 后台 UI：components/ui（shadcn 原子件）/ primitives（页面唯一取用层）/ shell / providers / hooks / lib
+        ├── admin-ui/           # 后台 UI：radar（页面唯一取用层）/ components/ui（shadcn 原子件）/ shell / providers / hooks / lib
         ├── layout/             # C 端外壳：AppLayout（组合）/ AppHeader / AppSidebar / SideRail
         │                       #   NotificationBell / UserAccountMenu / GuestPromoDialog / RouteExperience / hooks.ts
         ├── components/         # ToolShell / 共享弹窗与页面片段；admin/（adminNav、AlertCenter、DutyContext、statusMeta）

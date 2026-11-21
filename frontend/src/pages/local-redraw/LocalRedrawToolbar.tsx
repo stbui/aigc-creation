@@ -11,6 +11,18 @@ const BRUSH_MIN = 10;
 const BRUSH_MAX = 60;
 const BRUSH_STEP = 2;
 
+/**
+ * 工具栏浮在画布顶部、居中固定 532px；≤1180 回到文档流并横向滚动。
+ * 画笔滑块是原生 range，轨道填充与白芯紫边滑块只能靠伪元素皮肤。
+ */
+const TOOLBAR =
+  'redraw-toolbar absolute top-0 left-1/2 box-border w-[532px] max-w-[calc(100%_-_32px)]! h-10 min-h-10 py-0! px-4! flex-nowrap! gap-1.5! overflow-hidden -translate-x-1/2 max-[1180px]:static! max-[1180px]:w-full! max-[1180px]:max-w-none! max-[1180px]:overflow-x-auto! max-[1180px]:overflow-y-hidden! max-[1180px]:justify-start! max-[1180px]:translate-none';
+
+const TOOL_BTN_PADDING = 'p-1!';
+
+const RANGE =
+  'h-4 w-[100px] cursor-pointer appearance-none border-0 bg-transparent p-0 outline-none [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:rounded-[10px] [&::-webkit-slider-runnable-track]:bg-[linear-gradient(to_right,var(--brand)_0_var(--range-progress),var(--surface)_var(--range-progress)_100%)] [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:box-border [&::-webkit-slider-thumb]:size-[18px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-brand [&::-webkit-slider-thumb]:bg-card [&::-moz-range-track]:h-1 [&::-moz-range-track]:rounded-[10px] [&::-moz-range-track]:bg-[var(--surface)] [&::-moz-range-progress]:h-1 [&::-moz-range-progress]:rounded-[10px] [&::-moz-range-progress]:bg-[var(--brand)] [&::-moz-range-thumb]:box-border [&::-moz-range-thumb]:size-[18px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-brand [&::-moz-range-thumb]:bg-card';
+
 interface LocalRedrawToolbarProps {
   tool: PaintTool;
   brush: number;
@@ -33,7 +45,7 @@ export function LocalRedrawToolbar({
       <button
         key={item.value}
         type="button"
-        className={`redraw-tool-btn${tool === item.value ? ' active' : ''}`}
+        className={`redraw-tool-btn${tool === item.value ? ' active' : ''} ${TOOL_BTN_PADDING}`}
         aria-pressed={tool === item.value}
         title={`${item.label} (${item.shortcut})`}
         onClick={() => onToolChange(item.value)}
@@ -45,18 +57,19 @@ export function LocalRedrawToolbar({
   };
 
   return (
-    <div className="redraw-toolbar" role="toolbar" aria-label="重绘工具">
+    <div className={TOOLBAR} role="toolbar" aria-label="重绘工具">
       {LEADING_TOOLS.map(renderTool)}
-      <button type="button" className="redraw-tool-btn" title="对比" disabled>
+      <button type="button" className={`redraw-tool-btn ${TOOL_BTN_PADDING}`} title="对比" disabled>
         <Columns2 size={16} />
         对比
       </button>
       {TRAILING_TOOLS.map(renderTool)}
-      <label className="redraw-toolbar-brush">
+      <label className="redraw-toolbar-brush ml-0!">
         <span className="sr-only">画笔大小</span>
         <input
           aria-label="画笔大小"
           type="range"
+          className={RANGE}
           min={BRUSH_MIN}
           max={BRUSH_MAX}
           step={BRUSH_STEP}

@@ -149,14 +149,18 @@ export async function copyUpstreamStream(
   source: IncomingMessage,
   res: ServerResponse,
   limitBytes: number,
-): Promise<{ captured: Buffer; exceeded: boolean }> {
+): Promise<{ captured: Buffer; exceeded: boolean; receivedBytes: number }> {
   const captured: Buffer[] = [];
   let total = 0;
   let exceeded = false;
   return new Promise((resolve) => {
     const finish = () => {
       if (exceeded) res.destroy();
-      resolve({ captured: Buffer.concat(captured), exceeded });
+      /*
+       * `receivedBytes` 是**真实收到的字节数**，与 `captured.length` 不同：
+       * 超过上限时 `captured` 只保留上限内的部分。调用记录要的是前者。
+       */
+      resolve({ captured: Buffer.concat(captured), exceeded, receivedBytes: total });
     };
     source.on('data', (chunk: Buffer) => {
       total += chunk.length;
@@ -192,7 +196,7 @@ export async function copyRedactedStream(
   res: ServerResponse,
   limitBytes: number,
   redactor: RelayStreamRedactor,
-): Promise<{ captured: Buffer; exceeded: boolean }> {
+): Promise<{ captured: Buffer; exceeded: boolean; receivedBytes: number }> {
   const captured: Buffer[] = [];
   let total = 0;
   let exceeded = false;
@@ -205,7 +209,7 @@ export async function copyRedactedStream(
       }
       if (exceeded) res.destroy();
       else res.end();
-      resolve({ captured: Buffer.concat(captured), exceeded });
+      resolve({ captured: Buffer.concat(captured), exceeded, receivedBytes: total });
     };
     source.on('data', (chunk: Buffer) => {
       total += chunk.length;

@@ -1,7 +1,7 @@
 /**
  * 网站地图页面的复用组件入口 —— 目录内文件的唯一外部组件来源。
  *
- * 本页全部使用原生 DOM 与页面独占样式，没有从 `src/components` / `src/ui`
- * 取共享控件；路由跳转直接使用 react-router 的 `Link`。
+ * 本页是纯排版页面（只有链接与文字），没有交互控件需要从 `src/ui` 取件；
+ * 路由跳转直接使用 react-router 的 `Link`，样式全部来自 Tailwind 语义类。
  */
 export {};

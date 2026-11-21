@@ -1,6 +1,20 @@
 import { Fragment, type ReactNode } from 'react';
 import { AlertTriangle, MoreHorizontal, XIcon } from 'lucide-react';
-import { AlertDialog as AlertDialogPrimitive, Dialog as DialogPrimitive } from 'radix-ui';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '../components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +25,15 @@ import {
 } from '../components/ui/dropdown-menu';
 import { cn } from '../lib/cn';
 import { buttonClass } from './Button';
+import {
+  OVERLAY_BACKDROP,
+  OVERLAY_CLOSE,
+  OVERLAY_DESC,
+  OVERLAY_FOOTER,
+  OVERLAY_HEADER,
+  OVERLAY_SURFACE,
+  OVERLAY_TITLE,
+} from './overlayClasses';
 
 /* ────────────────────────── 居中弹窗 ────────────────────────── */
 
@@ -38,50 +61,32 @@ export function ModalDialog({
 }) {
   const resolvedWidth = width ?? MODAL_WIDTH[size];
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay
-          data-slot="dialog-overlay"
-          className="radar-backdrop-enter fixed inset-0 z-50 bg-radar-ink-950/25 backdrop-blur-[1px]"
-        />
-        <DialogPrimitive.Content
-          data-testid="admin-modal"
-          data-slot="dialog-content"
-          style={{ maxWidth: resolvedWidth }}
-          className="admin-portal radar-scope radar-pop-enter fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-48px)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-[12px] border border-radar-ink-200 bg-radar-surface p-0 shadow-none outline-none"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName={OVERLAY_BACKDROP}
+        data-testid="admin-modal"
+        style={{ maxWidth: resolvedWidth }}
+        className={`radar-pop-enter max-h-[calc(100dvh-48px)] w-[calc(100%-2rem)] rounded-[12px] border border-radar-ink-200 ${OVERLAY_SURFACE}`}
+      >
+        <div className={`${OVERLAY_HEADER} px-5 py-3.5`}>
+          <div className="min-w-0">
+            <DialogTitle className={OVERLAY_TITLE}>{title}</DialogTitle>
+            {description && <DialogDescription className={OVERLAY_DESC}>{description}</DialogDescription>}
+          </div>
+          <DialogClose aria-label="关闭" className={OVERLAY_CLOSE}>
+            <XIcon className="size-4" aria-hidden />
+          </DialogClose>
+        </div>
+        <div
+          data-testid="admin-modal-body"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
         >
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-radar-ink-100 px-5 py-3.5">
-            <div className="min-w-0">
-              <DialogPrimitive.Title className="truncate text-[15px] font-semibold text-radar-ink-950">
-                {title}
-              </DialogPrimitive.Title>
-              {description && (
-                <DialogPrimitive.Description className="mt-0.5 text-pretty text-[12.5px] leading-5 text-radar-ink-400">
-                  {description}
-                </DialogPrimitive.Description>
-              )}
-            </div>
-            <DialogPrimitive.Close
-              aria-label="关闭"
-              className="shrink-0 rounded-lg p-1.5 text-radar-ink-500 transition-colors hover:bg-radar-ink-100 hover:text-radar-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-radar-accent"
-            >
-              <XIcon className="size-4" aria-hidden />
-            </DialogPrimitive.Close>
-          </div>
-          <div
-            data-testid="admin-modal-body"
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
-          >
-            {children}
-          </div>
-          {footer && (
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-3">
-              {footer}
-            </div>
-          )}
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+          {children}
+        </div>
+        {footer && <div className={OVERLAY_FOOTER}>{footer}</div>}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -137,70 +142,62 @@ export function ConfirmDialog({
     ) : undefined;
 
   return (
-    <AlertDialogPrimitive.Root
+    <AlertDialog
       open={open}
       onOpenChange={(next) => {
         if (!next && !loading) onCancel();
       }}
     >
-      <AlertDialogPrimitive.Portal>
-        <AlertDialogPrimitive.Overlay
-          data-slot="alert-dialog-overlay"
-          className="radar-backdrop-enter fixed inset-0 z-50 bg-radar-ink-950/25 backdrop-blur-[1px]"
-        />
-        <AlertDialogPrimitive.Content
-          data-testid="admin-confirm-action"
-          data-slot="alert-dialog-content"
-          className="admin-portal radar-scope radar-pop-enter fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-48px)] w-[calc(100%-2rem)] max-w-[520px] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-[12px] border border-radar-ink-200 bg-radar-surface p-0 shadow-none outline-none"
-        >
-          <div className="px-5 py-4 text-left">
-            <AlertDialogPrimitive.Title className="flex items-center gap-1.5 text-[15px] font-semibold text-radar-ink-950">
-              {danger && <AlertTriangle className="size-4 shrink-0 text-radar-alert" aria-hidden />}
-              {title}
-            </AlertDialogPrimitive.Title>
-            {description && (
-              <AlertDialogPrimitive.Description asChild>
-                <div className="mt-0.5 flex flex-col gap-1 text-[12.5px] leading-5 text-radar-ink-500">
-                  {description}
-                </div>
-              </AlertDialogPrimitive.Description>
-            )}
-          </div>
-
-          {body && (
-            <div
-              data-testid="admin-confirm-action-body"
-              className="flex flex-col gap-3 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-4"
-            >
-              {body}
-            </div>
+      <AlertDialogContent
+        overlayClassName={OVERLAY_BACKDROP}
+        data-testid="admin-confirm-action"
+        style={{ maxWidth: 520 }}
+        className={`radar-pop-enter max-h-[calc(100dvh-48px)] w-[calc(100%-2rem)] rounded-[12px] border border-radar-ink-200 ${OVERLAY_SURFACE}`}
+      >
+        <div className="px-5 py-4 text-left">
+          <AlertDialogTitle className="flex items-center gap-1.5 text-[15px] font-semibold text-radar-ink-950">
+            {danger && <AlertTriangle className="size-4 shrink-0 text-radar-alert" aria-hidden />}
+            {title}
+          </AlertDialogTitle>
+          {description && (
+            <AlertDialogDescription asChild>
+              <div className="mt-0.5 flex flex-col gap-1 text-[12.5px] leading-5 text-radar-ink-500">
+                {description}
+              </div>
+            </AlertDialogDescription>
           )}
+        </div>
 
-          <div className="flex shrink-0 flex-row items-center justify-end gap-2 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-3">
-            <AlertDialogPrimitive.Cancel
-              className={buttonClass({ variant: 'secondary', size: 'sm' })}
-              disabled={loading}
-            >
-              取消
-            </AlertDialogPrimitive.Cancel>
-            <AlertDialogPrimitive.Action
-              className={buttonClass({
-                variant: danger ? 'destructive' : 'default',
-                size: 'sm',
-              })}
-              disabled={loading || confirmDisabled}
-              onClick={(event) => {
-                // 请求结束后再由父级关闭，避免加载期间弹框提前消失。
-                event.preventDefault();
-                onConfirm();
-              }}
-            >
-              {confirmText}
-            </AlertDialogPrimitive.Action>
+        {body && (
+          <div
+            data-testid="admin-confirm-action-body"
+            className="flex flex-col gap-3 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-4"
+          >
+            {body}
           </div>
-        </AlertDialogPrimitive.Content>
-      </AlertDialogPrimitive.Portal>
-    </AlertDialogPrimitive.Root>
+        )}
+
+        <div className="flex shrink-0 flex-row items-center justify-end gap-2 border-t border-radar-ink-100 bg-radar-surface-hover px-5 py-3">
+          <AlertDialogCancel className={buttonClass({ variant: 'secondary', size: 'sm' })} disabled={loading}>
+            取消
+          </AlertDialogCancel>
+          <AlertDialogAction
+            className={buttonClass({
+              variant: danger ? 'destructive' : 'default',
+              size: 'sm',
+            })}
+            disabled={loading || confirmDisabled}
+            onClick={(event) => {
+              // 请求结束后再由父级关闭，避免加载期间弹框提前消失。
+              event.preventDefault();
+              onConfirm();
+            }}
+          >
+            {confirmText}
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

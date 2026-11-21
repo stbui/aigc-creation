@@ -12,7 +12,7 @@ import { join, resolve } from 'path';
  * 设计要点:
  *   1. **云SDK 按需 require**: 配置未启用该后端时不加载对应 SDK。
  *      本地开发零云依赖, npm install 体积与启动时间都不受影响。
- *   2. **凭据只从环境变量读, 永不进 DB**: B-63 要求界面不可编辑凭据。
+ *   2. **凭据只在服务端使用**: 页面配置以密文落库，状态接口永不返回明文。
  *   3. **key 是唯一真相**: DB 存 storageKey (相对路径), 不存可变的完整 URL ——
  *      切换域名/CDN 后只需改配置, 不必刷库。
  */
@@ -81,6 +81,8 @@ export class LocalStorageProvider implements StorageProvider {
   constructor(
     private readonly root = resolve(process.cwd(), 'uploads'),
     private readonly publicPrefix = '/uploads',
+    /** 对外根地址；配置后页面拿到绝对地址，便于 CDN / 反代场景 */
+    private readonly publicBaseUrl?: string,
   ) {}
 
   private abs(key: string): string {
@@ -92,6 +94,8 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async url(key: string): Promise<string> {
+    assertSafeKey(key);
+    if (this.publicBaseUrl) return publicObjectUrl(this.publicBaseUrl, key);
     return `${this.publicPrefix}/${key}`;
   }
 
@@ -124,12 +128,15 @@ export class LocalStorageProvider implements StorageProvider {
       await this.delete(probeKey);
       return { ok: true, message: `可读可写: ${this.root}`, latencyMs: Date.now() - t0 };
     } catch (e) {
-      return { ok: false, message: `不可写: ${(e as Error).message}` };
+      return { ok: false, message: `不可写: ${(e as Error).message}（${this.root}）` };
     }
   }
 
   credentialStatus() {
-    return { configured: true, endpoint: this.root };
+    return {
+      configured: true,
+      endpoint: this.publicBaseUrl ? `${this.root} → ${this.publicBaseUrl}` : this.root,
+    };
   }
 }
 
@@ -157,11 +164,39 @@ export function isSdkInstalled(name: 'ali-oss' | 'minio'): boolean {
 }
 
 /**
+ * 写探针失败时携带「哪一步」，让后台能直接指出是权限还是读回被改写。
+ *
+ * 只看 ok=false 的笼统报错，运维无法区分「没有 put 权限」与「出网代理改写了
+ * 读回内容」—— 这两种故障的处置方式完全不同。
+ */
+export class ProbeStepError extends Error {
+  constructor(
+    public readonly step: '写入' | '读回' | '删除',
+    cause: unknown,
+  ) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super(`${step}失败: ${detail}`);
+    this.name = 'ProbeStepError';
+  }
+}
+
+/** 读取内容与刚写入的不一致（单独成类，便于 probe 给出针对性提示）。 */
+export class ProbeReadMismatchError extends Error {
+  constructor() {
+    super('读回内容与写入不一致');
+    this.name = 'ProbeReadMismatchError';
+  }
+}
+
+/**
  * 云端写探针：写 1 字节对象、读回校验、尽力删除。
  *
  * 只读探测（list / bucketExists）只能证明凭据有效且桶可达，证明不了
  * put / get 权限 —— 切过去之后才发现传不上去就晚了。local 的 probe 本来就
  * 实写探针文件，这里把三个后端的「主动测试」语义对齐。
+ *
+ * 删除放在 finally 里：即使读回失败也要清理探针对象，不能因为一次测试
+ * 在桶里留下垃圾。
  */
 async function verifyWriteProbe(io: {
   put: (key: string, data: Buffer, contentType: string) => Promise<unknown>;
@@ -171,9 +206,18 @@ async function verifyWriteProbe(io: {
   const key = `.probe-${Date.now()}`;
   const payload = Buffer.from('ok');
   try {
-    await io.put(key, payload, 'text/plain');
-    const back = await io.get(key);
-    if (!back.equals(payload)) throw new Error('读回内容与写入不一致');
+    try {
+      await io.put(key, payload, 'text/plain');
+    } catch (e) {
+      throw new ProbeStepError('写入', e);
+    }
+    let back: Buffer;
+    try {
+      back = await io.get(key);
+    } catch (e) {
+      throw new ProbeStepError('读回', e);
+    }
+    if (!back.equals(payload)) throw new ProbeReadMismatchError();
     return '读写正常';
   } finally {
     // 删除失败不掩盖探测结论，但对象可能残留 —— 交给 bucket 生命周期规则兜底
@@ -181,18 +225,44 @@ async function verifyWriteProbe(io: {
   }
 }
 
+/** 探测结论落地文案：把步骤错误翻译成可执行的诊断。 */
+function probeFailureMessage(e: unknown): string {
+  if (e instanceof ProbeReadMismatchError) {
+    return `读写不一致: ${e.message}（检查 Endpoint 或出网代理是否改写请求）`;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
+/** CDN / 公开域名直读地址：base 已保证不带尾斜杠，key 已由 assertSafeKey 收窄。 */
+export function publicObjectUrl(base: string, key: string): string {
+  const cleanBase = String(base ?? '').trim().replace(/\/+$/, '');
+  const cleanKey = String(key ?? '').trim().replace(/^\/+/, '');
+  if (!cleanBase) throw new Error('公开访问域名未配置');
+  if (!cleanKey) throw new Error('对象 key 为空');
+  return `${cleanBase}/${cleanKey}`;
+}
+
+export interface OssProviderConfig {
+  region: string;
+  bucket: string;
+  accessKeyId: string;
+  accessKeySecret: string;
+  /** 自定义 Endpoint（公有云可留空，由 SDK 按 region 推导） */
+  endpoint?: string;
+  /** STS 临时凭证；与长期 AK 二选一 */
+  sessionToken?: string;
+  /** CDN / 自定义公开域名：配置后页面预览走直读，不签名 */
+  publicBaseUrl?: string;
+  /** 私有桶签名有效期（秒），默认 3600 */
+  urlExpiresSeconds?: number;
+}
+
 export class OssStorageProvider implements StorageProvider {
   readonly backend = 'oss' as const;
   private client: any; // ali-oss 实例, 类型随 SDK 版本变化, 用 any 隔离
 
   constructor(
-    private readonly cfg: {
-      region: string;
-      bucket: string;
-      accessKeyId: string;
-      accessKeySecret: string;
-      endpoint?: string;
-    },
+    private readonly cfg: OssProviderConfig,
     /** 注入已有 client（单测 / 复用连接池）；不传才按需 require SDK */
     client?: unknown,
   ) {
@@ -208,13 +278,21 @@ export class OssStorageProvider implements StorageProvider {
       bucket: cfg.bucket,
       accessKeyId: cfg.accessKeyId,
       accessKeySecret: cfg.accessKeySecret,
+      ...(cfg.sessionToken ? { stsToken: cfg.sessionToken } : {}),
       ...(cfg.endpoint ? { endpoint: cfg.endpoint } : {}),
     });
   }
 
+  /**
+   * 预览地址：配置了 CDN / 公开域名就走直读，否则签名。
+   *
+   * 私有桶的签名 URL 会过期，所以只用于页面即时预览、不入库；
+   * 公开域名由 CDN 自己处理鉴权，签名参数反而会让缓存失效。
+   */
   async url(key: string): Promise<string> {
     assertSafeKey(key);
-    return this.client.signatureUrl(key, { expires: 3600 });
+    if (this.cfg.publicBaseUrl) return publicObjectUrl(this.cfg.publicBaseUrl, key);
+    return this.client.signatureUrl(key, { expires: this.cfg.urlExpiresSeconds ?? 3600 });
   }
 
   async put(key: string, data: Buffer, contentType: string): Promise<StorageObject> {
@@ -259,9 +337,16 @@ export class OssStorageProvider implements StorageProvider {
         get: (k) => this.get(k),
         remove: (k) => this.client.delete(k),
       });
-      return { ok: true, message: `${base} · ${detail}`, latencyMs: Date.now() - t0 };
+      return {
+        ok: true,
+        message: `${base} · ${detail}${this.cfg.publicBaseUrl ? ` · 公开域名 ${this.cfg.publicBaseUrl}` : ''}`,
+        latencyMs: Date.now() - t0,
+      };
     } catch (e) {
-      return { ok: false, message: `连通失败: ${(e as Error).message}` };
+      return {
+        ok: false,
+        message: `连通失败: ${probeFailureMessage(e)}（Bucket=${this.cfg.bucket} Region=${this.cfg.region}）`,
+      };
     }
   }
 
@@ -278,20 +363,30 @@ export class OssStorageProvider implements StorageProvider {
 // MinIO (S3 兼容)
 // ─────────────────────────────────────────────────────────────────────
 
+export interface MinioProviderConfig {
+  endPoint: string;
+  port: number;
+  useSSL: boolean;
+  accessKey: string;
+  secretKey: string;
+  bucket: string;
+  /** S3 区域；MinIO 默认 us-east-1，云厂商兼容服务需按控制台填写 */
+  region?: string;
+  /** CDN / 自定义公开域名：配置后预览走直读，不签名 */
+  publicBaseUrl?: string;
+  /** 预签名有效期（秒）；MinIO SDK 默认 7 天 */
+  urlExpiresSeconds?: number;
+  /** 桶不存在时是否自动创建（仅私有部署的 MinIO 适用） */
+  autoCreateBucket?: boolean;
+}
+
 export class MinioStorageProvider implements StorageProvider {
   readonly backend = 'minio' as const;
   private client: any;
   private bucket: string;
 
   constructor(
-    private readonly cfg: {
-      endPoint: string;
-      port: number;
-      useSSL: boolean;
-      accessKey: string;
-      secretKey: string;
-      bucket: string;
-    },
+    private readonly cfg: MinioProviderConfig,
     /** 注入已有 client（单测 / 复用连接池）；不传才按需 require SDK */
     client?: unknown,
   ) {
@@ -308,6 +403,7 @@ export class MinioStorageProvider implements StorageProvider {
       useSSL: cfg.useSSL,
       accessKey: cfg.accessKey,
       secretKey: cfg.secretKey,
+      ...(cfg.region ? { region: cfg.region } : {}),
     });
   }
 
@@ -317,8 +413,12 @@ export class MinioStorageProvider implements StorageProvider {
 
   async url(key: string): Promise<string> {
     assertSafeKey(key);
-    // presignedGetObject 默认 7 天过期, 足够页面预览
-    return this.client.presignedGetObject(this.bucket, key);
+    if (this.cfg.publicBaseUrl) return publicObjectUrl(this.cfg.publicBaseUrl, key);
+    const seconds = this.cfg.urlExpiresSeconds;
+    // presignedGetObject 默认 7 天过期；配置了有效期就按配置签发
+    return seconds
+      ? this.client.presignedGetObject(this.bucket, key, seconds)
+      : this.client.presignedGetObject(this.bucket, key);
   }
 
   async put(key: string, data: Buffer, contentType: string): Promise<StorageObject> {
@@ -355,7 +455,16 @@ export class MinioStorageProvider implements StorageProvider {
     const t0 = Date.now();
     try {
       const ok = await this.client.bucketExists(this.bucket);
-      if (!ok) return { ok: false, message: `bucket 不存在: ${this.bucket}` };
+      if (!ok) {
+        if (!this.cfg.autoCreateBucket) {
+          return { ok: false, message: `bucket 不存在: ${this.bucket}（可在配置中开启自动创建）` };
+        }
+        try {
+          await this.client.makeBucket(this.bucket, this.cfg.region || 'us-east-1');
+        } catch (e) {
+          return { ok: false, message: `bucket 不存在且创建失败: ${this.bucket} · ${(e as Error).message}` };
+        }
+      }
       const base = `连通正常 · ${this.base()}`;
       if (!opts?.verifyWrite) {
         return { ok: true, message: `${base}（只读探测）`, latencyMs: Date.now() - t0 };
@@ -365,9 +474,16 @@ export class MinioStorageProvider implements StorageProvider {
         get: (k) => this.get(k),
         remove: (k) => this.client.removeObject(this.bucket, k),
       });
-      return { ok: true, message: `${base} · ${detail}`, latencyMs: Date.now() - t0 };
+      return {
+        ok: true,
+        message: `${base} · ${detail}${this.cfg.publicBaseUrl ? ` · 公开域名 ${this.cfg.publicBaseUrl}` : ''}`,
+        latencyMs: Date.now() - t0,
+      };
     } catch (e) {
-      return { ok: false, message: `连通失败: ${(e as Error).message}` };
+      return {
+        ok: false,
+        message: `连通失败: ${probeFailureMessage(e)}（Endpoint=${this.cfg.endPoint}:${this.cfg.port} Bucket=${this.bucket}）`,
+      };
     }
   }
 

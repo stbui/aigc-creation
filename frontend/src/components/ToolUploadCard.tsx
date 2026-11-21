@@ -76,7 +76,9 @@ export function ToolUploadCard({
         </div>
 
         <div
-          className={`pk-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${filled ? ' pk-dropzone-filled' : ''}`}
+          className={`pk-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${filled ? ' pk-dropzone-filled' : ''}${
+            upload.dropzoneClassName ? ` ${upload.dropzoneClassName}` : ''
+          }`}
           onClick={() => images.length < upload.max && fileInputRef.current?.click()}
           onDragOver={(e) => {
             e.preventDefault();

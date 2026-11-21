@@ -9,7 +9,7 @@
 | 请求 | `AppFileLogger` 落盘日志 | `requestId` / `userId` / `method` / `path` |
 | 调用 | `ApiCallLog` | `taskId` / `billingOrderId` / `channelModelId` / `providerRequestId` |
 | 健康 | `/health`、`/health/ready` | 数据库 / 存储 / 各模态线路状态 |
-| 业务 | 告警中心、工作台、值班塔 | 阈值来自 `admin/alert-thresholds.ts` |
+| 业务 | 告警中心、工作台 | 阈值来自 `admin/alert-thresholds.ts` |
 
 同一次故障必须能用 `requestId`、`taskId`、`billingOrderId`、`channelModelId` 中的至少一个把四份数据串起来。新增日志或记录时必须带其中一个关联键。
 
@@ -54,7 +54,7 @@
 用途：
 
 - 渠道健康：24 小时成功率、P95、样本数；路由分层与冷却读同一批数据。
-- 值班塔与任务监控：成功 / 失败 / 耗时分布。
+- 任务监控：成功 / 失败 / 耗时分布。
 - 调用记录页：按渠道、模型、任务、状态排障。
 - 计费与成本核对。
 
@@ -72,7 +72,7 @@
 
 - `ChannelModelMetricsService`：近 24 小时成功率、P95、样本数。
 - `RouteScoreService`：按成功率划分健康层，供选路使用。
-- 值班塔：当日任务量、成功率、P95、失败数。
+- 任务监控：当日任务量、成功率、P95、失败数。
 - 告警中心与工作台：积压、失败、退款、对账、备份等业务计数。
 
 规则：

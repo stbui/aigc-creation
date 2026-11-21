@@ -19,8 +19,7 @@ export const KIND_LABEL: Record<string, string> = {
 export const KIND_ORDER = ['original', 'generated'];
 
 /**
- * envKeys 必须与 `StorageService.requiredEnv` 逐项对齐：列了有默认值的项会让
- * 运营以为必须配，漏了必填项则配完仍显示未启用。两者改一处就要改另一处。
+ * SDK 命令属于部署期依赖；连接参数和凭据统一由后端字段定义驱动，保存在数据库。
  */
 export const META: Record<
   StorageBackendId,
@@ -28,38 +27,25 @@ export const META: Record<
     label: string;
     desc: string;
     icon: typeof HardDrive;
-    envKeys: string[];
-    /** 有默认值 / 可选的项，单独分组展示 */
-    optionalKeys?: string[];
     /** 切换前需手工安装的 SDK（刻意不进 package.json） */
     sdk?: string;
   }
 > = {
   local: {
     label: '本地磁盘',
-    desc: '文件存于 backend/uploads/，由静态服务提供访问',
+    desc: '文件存于 backend/uploads/，可配置对外访问地址',
     icon: HardDrive,
-    envKeys: ['STORAGE_BACKEND=local'],
   },
   oss: {
     label: '阿里云 OSS',
-    desc: '对象存储，私有读 + 签名 URL 访问',
+    desc: '对象存储，私有读 + 签名 URL；支持 CDN 域名与路径前缀',
     icon: Cloud,
-    envKeys: [
-      'OSS_REGION',
-      'OSS_BUCKET',
-      'OSS_ACCESS_KEY_ID',
-      'OSS_ACCESS_KEY_SECRET',
-    ],
-    optionalKeys: ['OSS_ENDPOINT'],
     sdk: 'npm --prefix backend install --no-save ali-oss',
   },
   minio: {
     label: 'MinIO',
-    desc: 'S3 兼容对象存储，自建或用云厂商的兼容服务',
+    desc: 'S3 兼容对象存储，支持自建或云厂商兼容服务',
     icon: Server,
-    envKeys: ['MINIO_ENDPOINT', 'MINIO_ACCESS_KEY', 'MINIO_SECRET_KEY'],
-    optionalKeys: ['MINIO_PORT=9000', 'MINIO_USE_SSL=false', 'MINIO_BUCKET=huojue'],
     sdk: 'npm --prefix backend install --no-save minio',
   },
 };

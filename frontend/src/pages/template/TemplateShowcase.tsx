@@ -92,14 +92,18 @@ export function TemplateShowcase({
       demoLabel="创作灵感"
       ariaLabel="右栏面板"
       demo={
-        <section className="tpl-showcase" aria-label="写真模板">
+        <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[var(--page-bg)] max-[900px]:h-auto max-[900px]:min-h-[560px]" aria-label="写真模板">
           <TemplateCategoryNav catalog={catalog} categoryId={categoryId} onSelect={onCategoryChange} />
 
           {activeCategory && activeCategory.groups.length > 0 && (
             <TemplateGroupNav groups={activeCategory.groups} groupId={groupId} onChange={onGroupChange} />
           )}
 
-          <div className="tpl-template-scroll" ref={scrollRef}>
+          {/* `tpl-template-scroll` 同时是网格滚动容器：TemplateGallery 用 closest() 取它作 IntersectionObserver 的 root */}
+          <div
+            className="tpl-template-scroll min-h-0 flex-1 overflow-y-auto pb-5 max-[900px]:overflow-visible max-[900px]:pb-4"
+            ref={scrollRef}
+          >
             <TemplateGallery
               /* 换分类 / 分组时重挂载：分页条数、大图状态立即归零，不残留上一组 */
               key={`${categoryId}|${groupId}`}

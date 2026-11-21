@@ -23,6 +23,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
 import type { NextFunction, Request, Response } from 'express';
 
 export const REQUEST_ID_HEADER = 'x-request-id';
@@ -35,6 +36,8 @@ interface RequestContext {
   userId?: string;
   method?: string;
   path?: string;
+  /** 客户端地址（`req.ip`，已剥离 IPv4-mapped IPv6 前缀） */
+  clientIp?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -46,6 +49,19 @@ export function currentRequestId(): string | undefined {
 /** 供守卫/日志使用；无上下文时返回 undefined（如脚本、定时任务） */
 export function currentRequestContext(): Readonly<RequestContext> | undefined {
   return storage.getStore();
+}
+
+/**
+ * 当前请求的客户端地址。
+ *
+ * 供调用记录使用：`ApiCallLog.clientIp` 要回答「这次上游调用是谁触发的」，
+ * 异步任务里已经没有原始 `req`，只能靠这里在请求作用域内取一次再随任务带上。
+ *
+ * 没有上下文（脚本 / 定时任务）时返回 undefined —— 调用方据此写空串，
+ * 而不是编一个「本机」。
+ */
+export function currentClientIp(): string | undefined {
+  return storage.getStore()?.clientIp;
 }
 
 /** 鉴权成功后回填 userId（不产生新上下文，只补充当前这一条） */
@@ -65,7 +81,34 @@ export function requestContextMiddleware(req: Request, res: Response, next: Next
   res.setHeader('Access-Control-Expose-Headers', 'X-Request-Id, Retry-After');
   (req as Request & { requestId?: string }).requestId = requestId;
 
-  storage.run({ requestId, method: req.method, path: req.originalUrl?.split('?')[0] }, () => {
-    next();
-  });
+  /*
+   * 客户端地址取 `req.ip`：是否信任 `X-Forwarded-For` 由 `trust proxy` 决定
+   * （见 main.ts 的 RATE_LIMIT_TRUST_PROXY），这里不另写一套解析 —— 两处口径
+   * 不一致时会出现「限流按真实 IP、调用记录按代理 IP」这种对不上的现象。
+   */
+  storage.run(
+    {
+      requestId,
+      method: req.method,
+      path: req.originalUrl?.split('?')[0],
+      clientIp: normalizeClientIp(req.ip || req.socket?.remoteAddress),
+    },
+    () => {
+      next();
+    },
+  );
+}
+
+/**
+ * 规范化客户端地址：剥掉 IPv4-mapped IPv6 前缀，非 IP 一律丢弃。
+ *
+ * 与支付链路（`payments.controller.ts` 的 `normalizeClientIp`）同一口径：
+ * `::ffff:127.0.0.1` 与 `127.0.0.1` 是同一条记录，存两种写法只会让检索变麻烦；
+ * 拿不到合法地址时返回 undefined，由调用方写空串。
+ */
+export function normalizeClientIp(raw?: string): string | undefined {
+  const value = String(raw ?? '').trim();
+  if (value === '') return undefined;
+  const candidate = value.startsWith('::ffff:') ? value.slice(7) : value;
+  return isIP(candidate) ? candidate : undefined;
 }

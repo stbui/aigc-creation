@@ -8,6 +8,13 @@ import {
   type Mark,
   type RegionBounds,
 } from '../mask-sdk';
+import {
+  MASK_LAYER,
+  MASK_MARK_BASE,
+  MASK_MARK_INDEX,
+  MASK_MARK_SELECTED,
+  resizeHandleClass,
+} from './canvasMaskClasses';
 
 /** 去水印标注工具：参考站上传态只提供抓手与框选，默认框选。 */
 export type WatermarkMaskTool = 'hand' | 'rect';
@@ -220,15 +227,21 @@ export const WatermarkMaskEditor = memo(function WatermarkMaskEditor({
       style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom / 100})` }}
     >
       <div
-        className={`redraw-canvas tool-${tool}${panning ? ' is-panning' : ''}`}
+        className={`redraw-canvas relative size-full touch-none overflow-hidden overscroll-contain bg-[var(--surface-2)] select-none tool-${tool}${panning ? ' is-panning' : ''}${
+          tool === 'rect' ? ' cursor-crosshair' : ' cursor-grab active:cursor-grabbing'
+        }`}
         onPointerDown={onCanvasPointerDown}
         onPointerMove={onCanvasPointerMove}
         onPointerUp={onCanvasPointerUp}
         onPointerCancel={onCanvasPointerCancel}
       >
-        <div ref={frameRef} className="redraw-image-frame" style={frame}>
+        <div
+          ref={frameRef}
+          className="redraw-image-frame absolute touch-none overflow-hidden bg-card"
+          style={frame}
+        >
           <img
-            className="canvas-original"
+            className="canvas-original absolute inset-0 block size-full! object-contain pointer-events-none select-none"
             src={url}
             alt={alt}
             draggable={false}
@@ -240,7 +253,7 @@ export const WatermarkMaskEditor = memo(function WatermarkMaskEditor({
               session.setSourceSize(width, height);
             }}
           />
-          <div className="mask-layer" aria-hidden="true">
+          <div className={MASK_LAYER} aria-hidden="true">
             {marks.map((mark) => {
               if (mark.kind !== 'shape') return null;
               const selected = selectedId === mark.id;
@@ -248,7 +261,9 @@ export const WatermarkMaskEditor = memo(function WatermarkMaskEditor({
               return (
                 <i
                   key={mark.id}
-                  className={`mask-mark rect has-index${selected ? ' is-selected' : ''}`}
+                  className={`${MASK_MARK_BASE} z-10 rounded-[3px]${
+                    selected ? ` ${MASK_MARK_SELECTED}` : ''
+                  }`}
                   style={{
                     left: `${((mark.x + mark.width / 2) / Math.max(naturalRef.current.w, 1)) * 100}%`,
                     top: `${((mark.y + mark.height / 2) / Math.max(naturalRef.current.h, 1)) * 100}%`,
@@ -260,12 +275,12 @@ export const WatermarkMaskEditor = memo(function WatermarkMaskEditor({
                   onPointerUp={endMarkInteraction}
                   onPointerCancel={endMarkInteraction}
                 >
-                  {index ? <span className="mask-mark-index">{index}</span> : null}
+                  {index ? <span className={MASK_MARK_INDEX}>{index}</span> : null}
                   {selected
                     ? RESIZE_HANDLES.map((handle) => (
                         <span
                           key={handle}
-                          className={`resize-handle ${handle}`}
+                          className={resizeHandleClass(handle)}
                           onPointerDown={(event) => beginMarkInteraction(event, mark, 'resize', handle)}
                           onPointerMove={onMarkPointerMove}
                           onPointerUp={endMarkInteraction}

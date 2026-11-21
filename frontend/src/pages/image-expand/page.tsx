@@ -3,8 +3,12 @@ import { Plus } from 'lucide-react';
 
 import { DEFAULT_OCCUPY, QUICK_PERCENTS } from './constants';
 import { ExpandLayoutPreview, PositionGrid, ToolHistoryPane, ToolShell } from './components';
+import {
+  PRODUCT_TOOL_DROPZONE,
+  PRODUCT_TOOL_PAGE,
+  productSourceUploadPreview,
+} from './components';
 import { useToolTask } from './hooks';
-import { assetThumbUrl } from './api';
 import {
   committedOccupyOf,
   effectiveOccupyOf,
@@ -68,7 +72,7 @@ export function ImageExpandPage() {
   return (
     <ToolShell
       capability="expand"
-      pageClass="product-retouch-page smart-expand-page"
+      pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page smart-expand-page`}
       title="智能扩图"
       desc="智能扩展画面尺寸，快速适配不同平台展示需求"
       upload={{
@@ -77,35 +81,10 @@ export function ImageExpandPage() {
         max: 1,
         hint: '点击、拖拽或粘贴图片上传，最多 1 张',
         promptIcon: <Plus size={22} />,
+        dropzoneClassName: PRODUCT_TOOL_DROPZONE,
       }}
       replaceUpload
-      renderUploadPreview={(uploads, controls) => {
-        const image = uploads[0];
-        if (!image) return null;
-        return (
-          <div
-            className={`smart-expand-source-row${controls.uploading ? ' processing' : ''}`}
-            aria-busy={controls.uploading}
-          >
-            <button
-              type="button"
-              className="smart-expand-source-thumb"
-              aria-label="预览待扩图图片"
-              onClick={() => controls.preview(image)}
-            >
-              <img src={assetThumbUrl(image.url, 320) ?? image.url} alt="待扩图原图" draggable={false} />
-            </button>
-            <button
-              type="button"
-              className="smart-expand-source-reupload"
-              disabled={controls.uploading}
-              onClick={controls.open}
-            >
-              重新上传
-            </button>
-          </div>
-        );
-      }}
+      renderUploadPreview={productSourceUploadPreview('待扩图原图')}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即扩图"
       emptyVideo="/static/mp4/06_znkt.mp4"
@@ -135,7 +114,7 @@ export function ImageExpandPage() {
         const image = images[0];
         if (!image) return null;
         return (
-          <div className="smart-expand-preview-stage">
+          <div className="relative flex size-full min-h-0 flex-col items-center justify-center">
             <ExpandLayoutPreview
               sourceUrl={image.url}
               ratio={previewRatio}
@@ -150,27 +129,37 @@ export function ImageExpandPage() {
         <ToolHistoryPane capability="expand" refreshKey={result?.url} emptyText="暂无扩图记录" />
       }
     >
-      <section className="local-redraw-card smart-expand-card">
-        <h2>原图占比</h2>
-        <div className="smart-expand-scale-options">
-          {QUICK_PERCENTS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              role="radio"
-              aria-checked={p === occupy}
-              className={p === occupy ? 'active' : ''}
-              onClick={() => {
-                setOccupy(p);
-                setOccupyText('');
-              }}
-            >
-              {p}%
-            </button>
-          ))}
-          <label>
+      <section className="flex flex-col gap-3 rounded-[var(--radius-panel)] bg-card px-4 py-3.5 max-[900px]:p-3.5">
+        <h2 className="m-0 text-sm leading-[22px] font-bold text-[color:var(--wb-text)] max-[900px]:mb-3 max-[900px]:leading-5">
+          原图占比
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          {QUICK_PERCENTS.map((p) => {
+            const active = p === occupy;
+            return (
+              <button
+                key={p}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                className={`box-border h-7 min-w-10 cursor-pointer rounded-[7px] border px-2.5 text-xs leading-[26px] ${
+                  active
+                    ? 'border-[var(--tool-border-brand-5)] bg-[var(--wb-flow-income-bg)] font-semibold text-brand'
+                    : 'border-[var(--border-1)] bg-card text-[color:var(--tool-text-1)]'
+                }`}
+                onClick={() => {
+                  setOccupy(p);
+                  setOccupyText('');
+                }}
+              >
+                {p}%
+              </button>
+            );
+          })}
+          <label className="box-border h-7 w-[72px] overflow-hidden rounded-[7px] border border-[var(--border-1)] bg-card text-xs leading-[26px] text-[color:var(--tool-text-1)] has-[input[aria-invalid=true]]:border-[var(--tool-border-danger)] has-[input[aria-invalid=true]]:shadow-[0_0_0_2px_rgba(229,72,77,0.12)]">
             <span className="sr-only">自定义占比</span>
             <input
+              className="box-border size-full border-0 px-[9px] text-[color:var(--text-body)] outline-0 placeholder:text-[color:var(--text-8)]"
               aria-label="自定义占比"
               value={occupyText}
               placeholder="1-99%"
@@ -187,14 +176,16 @@ export function ImageExpandPage() {
           </label>
         </div>
         {!occupyValid && (
-          <p className="smart-expand-field-error" role="alert">
+          <p className="mx-0 -mt-1 mb-0 text-xs leading-4 text-[color:var(--tool-text-danger)]" role="alert">
             请输入 1-99 之间的整数占比
           </p>
         )}
       </section>
 
-      <section className="local-redraw-card smart-expand-card">
-        <h2>原图位置</h2>
+      <section className="flex flex-col gap-3 rounded-[var(--radius-panel)] bg-card px-4 py-3.5 max-[900px]:p-3.5">
+        <h2 className="m-0 text-sm leading-[22px] font-bold text-[color:var(--wb-text)] max-[900px]:mb-3 max-[900px]:leading-5">
+          原图位置
+        </h2>
         <PositionGrid value={position} onChange={setPosition} />
       </section>
     </ToolShell>

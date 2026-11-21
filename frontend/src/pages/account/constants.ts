@@ -23,6 +23,21 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 /** 新密码最少位数 (前端先拦一道, 后端仍会校验) */
 export const MIN_PASSWORD_LENGTH = 6;
 
+/** 账户卡片容器（白底 + 描边 + 面板圆角）。各卡共用一份，改一处全页一致。 */
+export const ACCOUNT_CARD = 'min-w-0 rounded-xl border border-border bg-card px-5 py-[18px] max-[640px]:p-4';
+
+/** 账户卡片标题行（图标 + 标题，可选右侧动作）。 */
+export const ACCOUNT_CARD_HEAD = 'mb-3.5 flex items-center gap-2 text-foreground';
+
+/** 订单状态 → 中文标签 */
+export const ORDER_STATUS_TONE: Record<OrderStatus, string> = {
+  pending: 'bg-warn-soft text-warn-text',
+  paid: 'bg-success-soft text-success-text',
+  cancelled: 'bg-danger-soft text-[color:var(--danger-soft-text)]',
+  refunded: 'bg-danger-soft text-[color:var(--danger-soft-text)]',
+  partial_refunded: 'bg-danger-soft text-[color:var(--danger-soft-text)]',
+};
+
 /** 注销账号需要用户逐字输入的确认词 */
 export const DELETE_CONFIRM_WORD = '注销';
 

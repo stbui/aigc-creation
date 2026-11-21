@@ -1,7 +1,29 @@
 import { Check } from 'lucide-react';
 
 import type { MembershipPlan, MyMembership } from '../../types/api';
+import {
+  BADGE_FREE,
+  BADGE_HOT,
+  CARD,
+  CARD_BADGE,
+  CARD_CURRENT,
+  CARD_DESC,
+  CARD_HOVER,
+  CARD_NAME,
+  CARD_POINTS,
+  CARD_POINTS_VALUE,
+  CARD_PRICE,
+  CARD_PRICE_UNIT,
+  CARD_PRICE_VALUE,
+  CARD_TOP,
+  SECTION,
+  SECTION_COPY,
+  SECTION_DESC,
+  SECTION_HEAD,
+  SECTION_TITLE,
+} from './constants';
 import { PLAN_VISUALS, formatDate, formatNumber, formatYuan, planActionLabel } from './utils';
+import { Button } from './components';
 
 interface PackagesPlanSectionProps {
   /** 付费档：视觉标签按付费档顺序取 */
@@ -14,6 +36,12 @@ interface PackagesPlanSectionProps {
   onSubscribe: (plan: MembershipPlan) => void;
 }
 
+/** 会员档：固定 240px 横排，一行放不下就横向滚动，不折行 */
+const PLAN_CARD =
+  `${CARD} ${CARD_HOVER} flex-[0_0_240px] min-w-[240px] max-w-[240px] snap-start ` +
+  'max-[640px]:flex-[0_0_240px] max-[640px]:min-w-[240px] max-[640px]:max-w-[240px] ' +
+  'max-[640px]:gap-3 max-[640px]:px-4 max-[640px]:pt-[18px] max-[640px]:pb-4';
+
 /** 会员套餐：免费档说明 + 付费档卡片。 */
 export function PackagesPlanSection({
   paidPlans,
@@ -24,14 +52,14 @@ export function PackagesPlanSection({
   onSubscribe,
 }: PackagesPlanSectionProps) {
   return (
-    <section className="pkg-section">
-      <div className="pkg-section-head">
-        <div className="pkg-section-copy">
-          <h2>会员套餐</h2>
-          <p>订阅后每月自动发放积分，享专属权益</p>
+    <section className={SECTION}>
+      <div className={SECTION_HEAD}>
+        <div className={SECTION_COPY}>
+          <h2 className={SECTION_TITLE}>会员套餐</h2>
+          <p className={SECTION_DESC}>订阅后每月自动发放积分，享专属权益</p>
         </div>
         {membership?.isMember && (
-          <span className="pkg-section-note">
+          <span className="shrink-0 rounded-full bg-brand-bg px-2.5 py-[3px] text-xs leading-[18px] text-brand">
             当前：{membership.planName}
             {membership.expiresAt ? ` · ${formatDate(membership.expiresAt, '')} 到期` : ''}
           </span>
@@ -43,54 +71,73 @@ export function PackagesPlanSection({
        * 付费档就能整齐排成 3×2。
        */}
       {freePlan && (
-        <div className="pkg-free-strip">
-          <span className="pkg-free-strip-name">{freePlan.name}</span>
-          <span className="pkg-card-badge is-free">永久免费</span>
-          <span className="pkg-free-strip-desc">{freePlan.description}</span>
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-dashed border-border bg-card px-[18px] py-3">
+          <span className="text-sm leading-5 font-bold text-foreground">{freePlan.name}</span>
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-xs leading-4 font-semibold whitespace-nowrap ${BADGE_FREE}`}
+          >
+            永久免费
+          </span>
+          <span className="text-xs leading-[18px] text-[color:var(--text-muted)]">
+            {freePlan.description}
+          </span>
         </div>
       )}
-      <div className="pkg-grid is-plans">
+      <div className="-mt-3 flex snap-x snap-proximity flex-nowrap justify-start gap-4 overflow-x-auto px-0.5 pt-3 pb-3 [scrollbar-width:thin] max-[640px]:gap-3">
         {paidPlans.map((plan, index) => {
           const isCurrent = currentPlanCode === plan.code;
           // 视觉标签按付费档顺序取; 后台新加的档位没有标签时回落有效期
           const visual = PLAN_VISUALS[index];
+          // 当前方案描边 + 外环; 仅推荐档只换描边, 两者同时命中时当前方案优先
+          const highlight = isCurrent
+            ? CARD_CURRENT
+            : visual?.recommended
+              ? 'border-brand'
+              : '';
           return (
             <article
               key={plan.id}
-              className={`pkg-card${isCurrent ? ' is-current' : visual?.recommended ? ' is-recommended' : ''}`}
+              className={`${PLAN_CARD}${highlight ? ` ${highlight}` : ''}`}
             >
-              {isCurrent && <span className="pkg-card-flag">当前方案</span>}
-              <div className="pkg-card-top">
-                <span className="pkg-card-name">{plan.name}</span>
-                <span className={`pkg-card-badge${visual?.recommended ? ' is-hot' : ''}`}>
+              {isCurrent && (
+                <span className="absolute -top-2.5 right-4 rounded-full bg-brand px-2.5 py-0.5 text-xs leading-4 font-semibold text-primary-foreground shadow-[0_4px_10px_rgba(85,70,216,0.25)]">
+                  当前方案
+                </span>
+              )}
+              <div className={CARD_TOP}>
+                <span className={CARD_NAME}>{plan.name}</span>
+                <span className={`${CARD_BADGE}${visual?.recommended ? ` ${BADGE_HOT}` : ''}`}>
                   {visual?.tag ?? `${plan.durationDays} 天有效`}
                 </span>
               </div>
-              <div className="pkg-card-points">
-                <strong>{formatNumber(plan.monthlyCredits)}</strong>
-                <span>积分 / 月</span>
+              <div className={CARD_POINTS}>
+                <strong className={CARD_POINTS_VALUE}>{formatNumber(plan.monthlyCredits)}</strong>
+                <span className="text-xs text-[color:var(--text-muted)]">积分 / 月</span>
               </div>
-              <p className="pkg-card-desc">
+              <p className={CARD_DESC}>
                 {plan.description ||
                   `订阅 ${plan.durationDays} 天，每月发放 ${plan.monthlyCredits} 积分`}
               </p>
               {plan.perkLabels.length > 0 && (
-                <ul className="pkg-card-perks">
+                <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                   {plan.perkLabels.map((label) => (
-                    <li key={label}>
-                      <Check size={13} aria-hidden />
+                    <li
+                      key={label}
+                      className="flex items-start gap-1.5 text-xs leading-[18px] text-[color:var(--text-body)]"
+                    >
+                      <Check size={13} className="mt-0.5 shrink-0 text-brand" aria-hidden />
                       {label}
                     </li>
                   ))}
                 </ul>
               )}
-              <div className="pkg-card-price">
-                <strong>{formatYuan(plan.priceCents)}</strong>
-                <span className="pkg-card-price-unit">/ {plan.durationDays} 天</span>
+              <div className={CARD_PRICE}>
+                <strong className={CARD_PRICE_VALUE}>{formatYuan(plan.priceCents)}</strong>
+                <span className={CARD_PRICE_UNIT}>/ {plan.durationDays} 天</span>
               </div>
-              <button type="button" className="pkg-select-btn" onClick={() => onSubscribe(plan)}>
+              <Button className="h-auto w-full py-2.5 text-[13px] font-semibold" onClick={() => onSubscribe(plan)}>
                 {planActionLabel(plan, currentPlanCode, currentPlan)}
-              </button>
+              </Button>
             </article>
           );
         })}

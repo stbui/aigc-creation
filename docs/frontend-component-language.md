@@ -12,10 +12,9 @@
 | --- | --- |
 | C 端公开组件入口 | `frontend/src/ui/index.ts` |
 | 后台页面公开入口 | `frontend/src/admin-ui/radar/index.ts` |
-| 后台共享实现层 | `frontend/src/admin-ui/primitives/index.ts` |
 | shadcn / Radix 原子件 | `frontend/src/admin-ui/components/ui/*`，仅供组合层使用 |
 | C 端状态反馈组件 | `frontend/src/components/StateViews.tsx`、`frontend/src/components/ToolEmptyState.tsx` |
-| 后台状态反馈组件 | `frontend/src/admin-ui/radar/feedback.tsx`、`frontend/src/admin-ui/radar/blocks.tsx`、`frontend/src/admin-ui/primitives/skeleton.tsx` |
+| 后台状态反馈组件 | `frontend/src/admin-ui/radar/feedback.tsx`、`frontend/src/admin-ui/radar/states.tsx`、`frontend/src/admin-ui/radar/skeleton.tsx` |
 | 后台跨域状态到中文与色调的映射 | `frontend/src/components/admin/statusMeta.ts` 的 `STATUS_META` |
 | C 端任务失败状态文案 | `frontend/src/lib/constants.ts` 的 `taskErrorText()` 与 `TASK_ERROR_TEXT` |
 | 用户可见文案 | [`copywriting.md`](copywriting.md)、[`error-copy.md`](error-copy.md) |
@@ -25,9 +24,10 @@
 取件边界：
 
 1. C 端页面只从 `~/ui` 取公开组件；共享业务流程可以继续使用 `components/` 下的状态与组合件。
-2. 后台业务页面只从 `~/admin-ui/radar` 取件，`radar` 再透传或覆盖 `primitives`。
-3. 后台页面禁止直连 `admin-ui/components/ui/*` 或 `admin-ui/primitives/*`。外壳不可用时的 `AdminLoadError`、`AdminLoading`、`NoAdminAccess` 是既有例外，不向业务页扩散。
+2. 后台业务页面只从 `~/admin-ui/radar` 取件；实现全部在 `radar/` 内并由其 barrel 公开。
+3. 后台页面禁止直连 `admin-ui/components/ui/*`。外壳不可用时的 `AdminLoadError`、`AdminLoading`、`NoAdminAccess` 是既有例外，不向业务页扩散。
 4. 页面不得为了少写一层包装，直接使用第三方组件库重新实现已有按钮、字段、弹层、表格和反馈状态。
+5. C 端页面样式改造的顺序是**先换组件、再收样式**：能落到 shadcn 原子件的直接组合；原子件没有对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（如 `TextAction`、`SegmentedControl`、`ImageDropzone`），再由页面取用；不得在页面里手写 class 拼出按钮、分段控件或拖拽区的外观。只有画布几何体这类没有交互语义的图形才留在工具类里。
 5. shadcn 已有的组件必须直接组合：C 端 `~/ui` 对 `Dialog` / `Sheet` / `Popover` / `ToggleGroup` / `FormField` / `Attachment` 等只做转出，不再保留 `Modal` / `Drawer` / `CountBadge` 一类同名自造封装。
 
 ## 2. 组件语言的五个原则
@@ -370,7 +370,7 @@ C 端日期按展示密度选择 `frontend/src/lib/format.ts`：`formatDate` 只
 | --- | --- | --- |
 | `<div onClick>` 当按钮 | 无键盘与读屏语义 | `Button` |
 | 用 Button 执行导航 | 丢失链接行为 | `Button asChild` + `Link` |
-| 页面直连 shadcn / primitives | 绕过公共主题与状态契约 | 从 `~/ui` 或 `~/admin-ui/radar` 取件 |
+| 页面直连 shadcn 原子件 | 绕过公共主题与状态契约 | 从 `~/ui` 或 `~/admin-ui/radar` 取件 |
 | 复制一套按钮、字段或空态 | 同类交互分裂 | 扩展公共组件 |
 | 同一组件新增十几个布尔开关 | API 不可预测 | 复合组件、联合类型、插槽 |
 | `className` 覆盖颜色、字号、圆角 | 绕过令牌与视觉边界 | 在语义组件或令牌层解决 |
@@ -393,10 +393,10 @@ C 端日期按展示密度选择 `frontend/src/lib/format.ts`：`formatDate` 只
 5. **定无障碍**：确定 DOM 角色、可读名称、焦点行为、错误关联、live region 与键盘路径。
 6. **接入视觉**：只使用语义类和令牌；跨端差异放在公共视觉层，不复制业务实现。
 7. **补测试**：至少覆盖主要变体、键盘触发、禁用 / loading、错误关联和公开入口导入；后台关键节点保留 `admin-*` 测试锚点。
-8. **更新入口**：C 端更新 `frontend/src/ui/index.ts`；后台更新 `primitives/index.ts` 或 `radar/index.ts`。页面只消费稳定公开入口。
+8. **更新入口**：C 端更新 `frontend/src/ui/index.ts`；后台更新 `admin-ui/radar/index.ts`。页面只消费稳定公开入口。
 9. **同步文档**：新增组件角色、参数轴或视觉规则时，同步本文件及对应设计文档；只修样式不改语言时至少检查这里是否仍成立。
 
-新增官方 shadcn 组件的流程仍以 `CLAUDE.md` 为准：使用 CLI 添加，运行 `frontend/scripts/post-shadcn.mjs`，再由 primitives / radar 组合成业务可用件。
+新增官方 shadcn 组件的流程仍以 `CLAUDE.md` 为准：使用 CLI 添加，运行 `frontend/scripts/post-shadcn.mjs`，再由 `radar/` 组合成业务可用件。
 
 ## 14. 评审清单
 

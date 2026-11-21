@@ -255,6 +255,12 @@ export interface ApiLogDetailView extends ApiLogView {
   requestBody: string;
   /** 上游响应报文预览 */
   responseBody: string;
+  /** 发起本次调用的客户端地址；空串 = 未知（历史数据 / 脚本触发） */
+  clientIp: string;
+  /** 实际写出的请求体字节数（与报文预览长度无关，预览会折叠内联媒体并截断） */
+  requestBytes: number;
+  /** 上游响应体字节数（与报文预览长度无关） */
+  responseBytes: number;
 }
 
 export interface ApiLogSummaryView {

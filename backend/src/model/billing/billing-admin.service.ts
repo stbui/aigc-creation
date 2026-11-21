@@ -82,6 +82,10 @@ const API_LOG_DETAIL_SELECT = {
   requestContentType: true,
   requestBody: true,
   responseBody: true,
+  /* 客户端地址与收发体积只在详情展示：列表页不摆放这三列，不必为 50 行多带字段 */
+  clientIp: true,
+  requestBytes: true,
+  responseBytes: true,
 } as const;
 
 export interface BillingOrderQuery {
@@ -448,6 +452,9 @@ export class BillingAdminService {
       requestContentType: row.requestContentType,
       requestBody: row.requestBody,
       responseBody: row.responseBody,
+      clientIp: row.clientIp,
+      requestBytes: row.requestBytes,
+      responseBytes: row.responseBytes,
     };
   }
 
@@ -642,6 +649,17 @@ export interface ApiLogDetailView extends ApiLogView {
   requestBody: string;
   /** 上游响应报文预览；流式响应记录的是首个数据块或整段文本 */
   responseBody: string;
+  /**
+   * 发起本次调用的客户端地址；空串 = 未知（历史数据 / 脚本触发）。
+   *
+   * 任务路径记的是**建任务那个请求**的地址（随任务快照），不是 worker 所
+   * 在主机的地址 —— 后者永远是回环，等于没有信息。
+   */
+  clientIp: string;
+  /** 实际写出的请求体字节数。与 `requestBody` 预览长度无关（预览会折叠内联媒体并截断） */
+  requestBytes: number;
+  /** 上游响应体字节数。与 `responseBody` 预览长度无关 */
+  responseBytes: number;
 }
 
 /** 调用记录的关联投影（只读展示字段，不落库） */

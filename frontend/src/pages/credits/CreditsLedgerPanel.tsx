@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from './components';
-import { LEDGER_FILTER_OPTIONS, PAGE_SIZE, type LedgerFilter } from './constants';
+import { AMOUNT_TONE, LEDGER_FILTER_OPTIONS, PAGE_SIZE, type LedgerFilter } from './constants';
 import {
   formatDateTime,
   ledgerReference,
@@ -61,7 +61,7 @@ export function CreditsLedgerPanel({
 }: CreditsLedgerPanelProps) {
   return (
     <>
-      <div className="credits-ledger-toolbar">
+      <div className="mb-3 flex justify-end">
         <Select
           value={filter}
           onValueChange={(value) => onFilterChange(value as LedgerFilter)}
@@ -69,6 +69,7 @@ export function CreditsLedgerPanel({
         >
           <SelectTrigger
             aria-label={'筛选积分流水'}
+            className="w-[148px]"
           >
             <SelectValue placeholder={'请选择'} />
           </SelectTrigger>
@@ -112,7 +113,7 @@ export function CreditsLedgerPanel({
         <>
           <CreditsLedgerList rows={rows} />
           {total > PAGE_SIZE && (
-            <div className="credits-mobile-pager">
+            <div className="flex justify-center pt-3">
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
@@ -139,7 +140,7 @@ export function CreditsLedgerPanel({
         </>
       ) : (
         <Table
-          className={`min-w-[850px]${tableLoading ? ' pointer-events-none opacity-60' : ''}`}
+          className={`min-w-[850px] [&_[data-slot=table-head]]:font-semibold [&_[data-slot=table-head]]:whitespace-nowrap${tableLoading ? ' pointer-events-none opacity-60' : ''}`}
           aria-busy={tableLoading || undefined}
         >
           <TableHeader>
@@ -169,9 +170,7 @@ export function CreditsLedgerPanel({
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <span
-                      className={`credits-amount ${row.amount >= 0 ? 'is-plus' : 'is-minus'}`}
-                    >
+                    <span className={row.amount >= 0 ? AMOUNT_TONE.plus : AMOUNT_TONE.minus}>
                       {row.amount >= 0 ? `+${row.amount}` : row.amount}
                     </span>
                   </TableCell>

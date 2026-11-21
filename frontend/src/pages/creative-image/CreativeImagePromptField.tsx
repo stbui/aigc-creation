@@ -10,6 +10,10 @@ interface CreativeImagePromptFieldProps {
   onExpand: () => void;
 }
 
+/** 提示词工具入口（AI润色 / 图片转提示词）共用的文字按钮皮肤 */
+const TOOL_BTN =
+  'flex h-4 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-xs text-brand';
+
 /** 创作提示词输入区：工具入口与主文本域保持同页视觉和交互。 */
 export function CreativeImagePromptField({
   value,
@@ -19,17 +23,25 @@ export function CreativeImagePromptField({
   onExpand,
 }: CreativeImagePromptFieldProps) {
   return (
-    <div className="pk-section fc-prompt-field">
-      <div className="fc-prompt-label-row">
-        <span>创作提示词</span>
-        <div className="fc-prompt-tools">
-          <button type="button" className="fc-prompt-tool-btn" title="AI 优化当前创作提示词" onClick={onPolish}>
+    <div className="pk-section">
+      <div className="flex min-h-4 items-center justify-between gap-2.5">
+        {/* 必填星由 ::before 提供，与参考站同一位置 */}
+        <span className="text-sm leading-[13px] font-bold text-[color:var(--wb-text)] before:mr-0.5 before:text-[color:var(--danger-ref)] before:content-['*']">
+          创作提示词
+        </span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className={TOOL_BTN}
+            title="AI 优化当前创作提示词"
+            onClick={onPolish}
+          >
             <Sparkles size={13} />
             <span>AI润色</span>
           </button>
           <button
             type="button"
-            className="fc-prompt-tool-btn"
+            className={TOOL_BTN}
             title="上传图片，AI 反推创作提示词"
             onClick={onImageToPrompt}
           >
@@ -39,8 +51,9 @@ export function CreativeImagePromptField({
         </div>
       </div>
       <div className="pk-desc-editor">
+        {/* 共享皮肤给的是 80px + resize:none；本页拉高到 140px 并允许纵向拉伸 */}
         <textarea
-          className="fc-prompt-textarea"
+          className="h-[140px]! resize-y!"
           rows={8}
           maxLength={MAX_PROMPT_LEN}
           value={value}

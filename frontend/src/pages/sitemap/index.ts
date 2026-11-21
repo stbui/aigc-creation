@@ -8,5 +8,4 @@
  * 纯函数 `./utils`、常量与静态数据 `./constants`。
  * 分层约定见 `docs/frontend-module-conventions.md`。
  */
-import './style.css';
 export { SitemapPage } from './page';

@@ -25,28 +25,29 @@ export function ToolResultCard({
   const { message } = useApp();
 
   return (
-    <Surface className="tool-result-card">
+    <Surface>
       <SurfaceHeader>
         <SurfaceTitle>生成结果</SurfaceTitle>
       </SurfaceHeader>
       <SurfaceContent>
       {generating && !resultUrl ? (
-        /* 生成中 → 骨架占位 (与工具页结果栏同构), 不退回空态 */
-        <div className="tool-result-loading">
+        /* 生成中 → 骨架占位 (与工具页结果栏同构), 不退回空态。
+           骨架块最小高度 220px，避免出图瞬间卡片高度跳变。 */
+        <div className="flex flex-col gap-3 [&_.state-skeleton.is-block]:min-h-[220px]">
           <StateSkeleton variant="block" count={1} />
-          <p className="tool-result-loading-tip">正在生成，请稍候…</p>
+          <p className="m-0 text-center text-xs leading-5 text-muted-foreground">正在生成，请稍候…</p>
         </div>
       ) : resultUrl ? (
         <>
           {/* 视频产出必须用 <video> —— 浏览器会把 mp4 当图片解码, 表现为空白预览 */}
           <ResultMedia
-            className="tool-result-img"
+            className="block w-full rounded-md bg-muted"
             url={resultUrl}
             modality={task?.outputAsset?.modality}
             aigc={task?.outputAsset?.aigc}
             alt={name}
           />
-          <div className="tool-result-meta">
+          <div className="mt-2.5 flex items-center justify-between text-xs">
             <div>
               <span className="text-muted-foreground">
                 {task?.outputAsset?.width}×{task?.outputAsset?.height} · {task?.outputAsset?.format}
@@ -58,7 +59,7 @@ export function ToolResultCard({
             </div>
             <div className="tool-result-actions">
               <Button disabled={generating} size="sm" onClick={onRegenerate} >
-                <span className="state-spinner is-small" aria-hidden />
+                {generating && <span className="state-spinner is-small" aria-hidden />}
                 重新生成
               </Button>
               <Button

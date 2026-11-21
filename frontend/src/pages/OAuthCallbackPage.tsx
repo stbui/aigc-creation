@@ -1,5 +1,4 @@
 import '../styles/auth.css';
-import './OAuthCallbackPage.css';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Spin } from '../ui';
@@ -55,11 +54,11 @@ export function OAuthCallbackPage() {
 
   return (
     <div className="login-page">
-      <div className="oauth-callback-card">
+      <div className="mx-auto mt-[12vh] w-[480px] max-w-[calc(100vw_-_32px)] rounded-xl bg-card px-8 py-10 text-center shadow-[0_10px_30px_rgba(35,39,74,0.12)]">
         {error ? (
           <>
-            <h1>第三方登录失败</h1>
-            <p>{error}</p>
+            <h1 className="mx-0 mt-0 mb-3 text-xl font-semibold text-foreground">第三方登录失败</h1>
+            <p className="mx-0 my-4 text-[color:var(--text-muted)]">{error}</p>
             <Button asChild variant="default" size="lg">
               <Link replace to="/login">
                 返回登录
@@ -69,7 +68,7 @@ export function OAuthCallbackPage() {
         ) : (
           <>
             <Spin className="size-7" />
-            <p>正在完成登录…</p>
+            <p className="mx-0 my-4 text-[color:var(--text-muted)]">正在完成登录…</p>
           </>
         )}
       </div>

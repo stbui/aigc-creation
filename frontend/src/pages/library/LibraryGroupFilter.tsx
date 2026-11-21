@@ -27,9 +27,12 @@ export function LibraryGroupFilter({
       aria-label="素材分组筛选"
       value={activeGroup ?? '__all__'}
       onValueChange={(next) => onChange(next && next !== '__all__' ? next : null)}
-      className="asset-library-group-list"
+      className="mt-3 flex flex-wrap items-center gap-2.5"
     >
-      <ToggleGroupItem value="__all__" className="asset-library-group-item">
+      <ToggleGroupItem
+        value="__all__"
+        className="group inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-muted px-3.5 text-[13px] text-foreground data-[state=on]:border-brand data-[state=on]:bg-brand-bg data-[state=on]:text-brand-hover"
+      >
         <LibraryGroupOptionLabel label="全部素材" count={totalCount} />
       </ToggleGroupItem>
       {groups.map((group) => (
@@ -37,7 +40,7 @@ export function LibraryGroupFilter({
           key={group.key}
           value={group.key}
           title={group.label}
-          className="asset-library-group-item"
+          className="group inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-muted px-3.5 text-[13px] text-foreground data-[state=on]:border-brand data-[state=on]:bg-brand-bg data-[state=on]:text-brand-hover"
         >
           <LibraryGroupOptionLabel label={group.label} count={group.count} />
         </ToggleGroupItem>

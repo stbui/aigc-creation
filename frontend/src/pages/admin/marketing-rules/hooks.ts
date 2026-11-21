@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { useAdminList, useAdminResource, useAdminUrlFilterSync } from '~/admin-ui/radar';
 import { useAdmin } from '../../../context/AdminContext';
-import { useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
+import { useUnsavedGuard } from '~/admin-ui/hooks/useUnsavedGuard';
 import type { CheckinRule, InviteRule } from './types';
 import { marketingApi } from './api';
 

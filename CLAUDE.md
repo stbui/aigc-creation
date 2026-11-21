@@ -56,7 +56,7 @@ backend/src/
   account/ auth/ assets/ projects/ storage/ tickets/ notifications/
 backend/plugins/    内置协议插件清单；后台上传包另存 plugins-installed
 frontend/src/
-  admin-ui/         后台 shadcn 原子件、primitives、外壳、providers
+  admin-ui/         后台 shadcn 原子件、radar 组件层、外壳、providers
   ui/               C 端组件取用层
   pages/admin/      后台页面
   pages/<域>/       C 端功能目录：index/page/components/api/hooks/utils/constants
@@ -103,7 +103,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 ### 3.4 后台与前端
 
 - 权限链为 `AdminGuard` → `PermissionGuard` → controller。前端 `AdminContext.can()` 只隐藏入口，安全边界必须在后端。
-- 后台页面只从 `admin-ui/radar` barrel 取件，不直连 `admin-ui/components/ui` 或 `admin-ui/primitives`；原子件仅供 primitives 与 radar 组合。
+- 后台页面只从 `admin-ui/radar` barrel 取件，不直连 `admin-ui/components/ui`；原子件仅供 radar 组合。
 - 后台组件底座是 radix，官方 `new-york` 风格，组合使用 `asChild`。新增官方件用 `shadcn add`，完成后必须运行 `frontend/scripts/post-shadcn.mjs`。
 - 类名合并只走 `admin-ui/lib/cn.ts`；修改 `admin.css` 的 `@theme inline` 后，同步补登 `cn` 的 token 合并表。
 - 后台不做移动端与响应式设计。页面关键节点使用 `data-testid="admin-*"`，表单控件使用 `aria-label`；e2e 按 test id、label 与角色查询，不追 Tailwind 类名。
@@ -118,7 +118,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 | 一次提交多张产出 | 能力定义中的 `outputPlan` | 拆任务、逐张账单、批次聚合与测试 |
 | 接入厂商 | `backend/plugins/<plugin>/manifest.json` | `verify-plugin-manifests`、`verify-protocol-runtime` |
 | 新增后台页面 | `permissions.ts` → controller 权限 → `adminNav.ts` → `pages/admin/<域>` → 路由 → `lib/api.ts` | 后端再次校验动作权限 |
-| 新增后台 UI 组件 | 查 `components/ui` → `shadcn add` → `post-shadcn.mjs` → 需要时落入 `primitives/*` | 页面只从 radar 取件 |
+| 新增后台 UI 组件 | 查 `components/ui` → `shadcn add` → `post-shadcn.mjs` → 需要时落入 `radar/*` | 页面只从 radar 取件 |
 | 新增环境变量 | `ENV_SPECS`、`.env.example`、三档 env | 影响库路径时同步 `scripts/db-url.js`；跑环境探针 |
 | 调整积分价 / 退款规则 | 能力定义 `creditCost` / `common/setting-defs.ts` | 运行时走 `resolve()` 与设置读取 |
 | 新增前端功能目录 | `pages/<域>/` 分层入口 | `docs/frontend-module-conventions.md` 与模块导入测试 |
@@ -184,7 +184,7 @@ npx biome format --write <files>
 8. **`ConfigModule` 必须是 `AppModule.imports` 第一项**。顺序错误可能不立即报错，而是在运行期注入 `undefined`。
 9. **新增环境变量同步四处**：`ENV_SPECS`、`.env.example`、三档 env；影响库路径时再加 `scripts/db-url.js`。随后运行环境探针。
 10. **嵌套依赖 pin 不可被“正常重装”覆盖**。关键是 `multer` 下的 `type-is@1.6.18` / `media-typer@0.3.0`；错误版本会让 multipart 静默不解析，接口收到 0 个文件。另有 `webpack` 的 `mime-types@2.1.35` 与 `@nestjs/config` 的 `dotenv@18.0.3`。依赖安装遇 5 分钟 broker 超时属已知环境限制。
-11. **云存储 SDK 当前不是依赖**。`STORAGE_BACKEND` 支持 `local` / `oss` / `minio`，但切云端前需安装 `ali-oss` 或 `minio`。
+11. **云存储 SDK 当前不是依赖**。默认使用 local；OSS / MinIO 的连接参数和凭据只在后台存储配置页维护，切云端前需安装 `ali-oss` 或 `minio`。
 12. **普通账号与后台管理员是两套**。`seed` 普通账号永远没有 admin 角色；production 必须显式生成后台密码，重复 seed 不重置已有密码。
 
 ## 8. 工作纪律

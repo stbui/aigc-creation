@@ -12,7 +12,7 @@
 | 三种角色首屏与管理员视角切换 | 已实施 | `frontend/src/components/admin/WorkbenchContext.tsx`、`pages/admin/dashboard/AdminDashboardContent.tsx` |
 | 工单行内认领、回复模板、内部备注、转交、上一条/下一条 | 已实施 | `pages/admin/tickets/*`、`backend/src/tickets/tickets.service.ts` |
 | 上下文直达（工单 ↔ 订单、任务 ↔ 账单、告警 → 实体） | 已实施 | `frontend/src/lib/admin-context-link.ts`、各目标页 |
-| 保存视图（工单 / 任务 / 订单 / 生成账单 / 发票） | 已实施 | `frontend/src/lib/admin-saved-views.ts`、`admin-ui/primitives/saved-view-bar.tsx`（经 `admin-ui/radar` 公开） |
+| 保存视图（工单 / 任务 / 订单 / 生成账单 / 发票） | 已实施 | `frontend/src/lib/admin-saved-views.ts`、`admin-ui/radar/SavedViewBar.tsx`（经 `admin-ui/radar` 公开） |
 | 命令面板（导航 / 新建 / 视图） | 已移除（2026-11 外壳重建） | 后端 `GET /admin/search` 保留；前端 `GlobalSearch.tsx` / `admin-commands.ts` 已删除，入口未挂载 |
 | 任务 `uncertain` 账单禁止重试 | 已实施（后端硬校验） | `backend/src/admin/tasks-admin.service.ts` |
 | 告警页实体展开 | 已实施 | `pages/admin/alerts/page.tsx` + `WorkQueue` |
@@ -41,7 +41,6 @@
 | 全局搜索 | 后端接口保留；前端入口未挂载（2026-11 外壳重建移除） | `backend/src/admin/search.service.ts:52` |
 | 深链 | 详情抽屉与地址栏 `?id=` 双向同步；列表筛选写回 URL | `admin-console-design.md` §3.14 |
 | 批量 | 用户/素材/任务/订单支持 `≤100` 条串行批量，逐条返回 | `backend/src/admin/*.controller.ts` |
-| 值班带 | 任务视角/财务视角的常驻计数，30 秒轮询，外壳与页面共享快照 | `frontend/src/components/admin/DutyContext.tsx` |
 
 ### 1.2 七处主要摩擦
 
@@ -70,7 +69,7 @@
 | 不做第二套列表 | 工作台每类只取前 5 条 + 总数，完整列表回到对应页面；搜索与列表的筛选口径不复制 |
 | 权限只在后端定 | 新端点沿用 `AdminIdentityOnly` + service 内按权限过滤；前端 `can()` 只决定展示 |
 | 不引入自定义角色 | 仍只有 `admin / operator / finance`，角色工作台不改变权限矩阵 |
-| 页面只从 Radar 取件 | 业务页面统一从 `admin-ui/radar` 导入；共享中性实现可放 `admin-ui/primitives` 并由 Radar barrel 透传，品牌可见覆盖件放 `admin-ui/radar`；页面不直连 `components/ui` 或 `primitives` |
+| 页面只从 Radar 取件 | 业务页面统一从 `admin-ui/radar` 导入；实现全部落在 `admin-ui/radar` 并由其 barrel 公开；页面不直连 `components/ui` |
 
 ## 3. 角色工作台
 
@@ -118,7 +117,7 @@
 2. **配置漂移**：前台模型无线路、线路指向未注册协议、能力无可用模型、渠道模型权重全为 0。每项给「去修复」深链。
 3. **角色工作台预览**：管理员可切换查看运营/财务首屏，用同一套数据检查队列是否为空。
 
-其中「服务健康」的渠道冷却与协议注册状态来自 `DutyContext` / 模型层接口，不在工作台端点里重复查询；工作台只负责工单、任务、退款、对账、发票、账单、备份这七类可落 SQL 的待办。
+其中「服务健康」的渠道冷却与协议注册状态来自模型层接口，不在工作台端点里重复查询；工作台只负责工单、任务、退款、对账、发票、账单、备份这七类可落 SQL 的待办。
 
 ### 3.5 管理员视角切换
 
@@ -232,7 +231,7 @@ interface AdminWorkGroup {
 | `billing` | `BillingOrder.status=uncertain` | 任务、能力、金额、账龄 | `/admin/billing-orders?id=&intent=settle` |
 | `backup` | 最近失败/超过 48h/未验证 | 无实体行，只给摘要 | `/admin/backups` |
 
-渠道健康（冷却、协议未注册、能力不可用）**不进工作台聚合查询**：管理员首屏直接复用 `DutyContext` 的渠道快照与 `/admin/capabilities` 的运行状态。协议注册表与进程内冷却只有模型层能判定，放进工作台等于在 admin 域重写一套判定，必然漂移。
+渠道健康（冷却、协议未注册、能力不可用）**不进工作台聚合查询**：由 `/admin/capabilities` 与模型层接口承载。协议注册表与进程内冷却只有模型层能判定，放进工作台等于在 admin 域重写一套判定，必然漂移。
 
 **实现约束**
 
@@ -244,8 +243,8 @@ interface AdminWorkGroup {
 
 **前端**
 
-- 外壳挂 `AdminWorkbenchProvider`（类似 `DutyContext`），60 秒轮询，页面隐藏时暂停；铃铛、`/admin`、`/admin/alerts` 共用。
-- `WorkQueue` / `WorkQueueRow` 的事实源落在 `admin-ui/radar/blocks.tsx`，经 `admin-ui/radar` 导出：统一「严重度色条 + 主标题 + 元信息 + 主操作」的行样式。
+- 外壳挂 `AdminWorkbenchProvider`，60 秒轮询，页面隐藏时暂停；铃铛、`/admin`、`/admin/alerts` 共用。
+- `WorkQueue` / `WorkQueueRow` 的事实源落在 `admin-ui/radar/workQueue.tsx`，经 `admin-ui/radar` 导出：统一「严重度色条 + 主标题 + 元信息 + 主操作」的行样式。
 - 首屏只渲染当前角色有权查看的组；空组不渲染，避免「0 条待办」的噪音。
 
 ### 4.2 上下文直达
@@ -480,12 +479,12 @@ interface AdminWorkGroup {
 | --- | --- | --- |
 | 工作台数据 | `frontend/src/components/admin/WorkbenchContext.tsx` | 60 秒轮询，首屏与告警页实体区块共享；铃铛继续读 `/admin/alerts` |
 | 角色首屏 | `frontend/src/pages/admin/dashboard/AdminDashboardContent.tsx` | 用 `roleView` 分支替代当前 `isFinance` 二元判断；复用现有 widgets |
-| 待办行 | `admin-ui/radar/blocks.tsx`（`WorkQueue` + 内部 `WorkQueueRow`） | 统一严重度、元信息、主操作 |
-| 上下文条 | `admin-ui/primitives/context-banner.tsx`，经 `admin-ui/radar` 公开 | 来源、目标、返回 |
-| 保存视图 | `admin-ui/primitives/saved-view-bar.tsx` + `lib/admin-saved-views.ts`，经 `admin-ui/radar` 公开 | localStorage + 内置视图常量 |
+| 待办行 | `admin-ui/radar/workQueue.tsx`（`WorkQueue` + 内部 `WorkQueueRow`） | 统一严重度、元信息、主操作 |
+| 上下文条 | `admin-ui/radar/context-banner.tsx`，经 `admin-ui/radar` 公开 | 来源、目标、返回 |
+| 保存视图 | `admin-ui/radar/SavedViewBar.tsx` + `lib/admin-saved-views.ts`，经 `admin-ui/radar` 公开 | localStorage + 内置视图常量 |
 | 命令面板 | `admin-ui/shell/GlobalSearch.tsx` 扩展 + `lib/admin-commands.ts` | 不新建第二套搜索 |
 | 快捷键 | `admin-ui/shell/AdminShortcutsProvider.tsx` | 全局注册，输入框聚焦时禁用 |
-| 结果条 | 页面从 `admin-ui/radar` 取件；实现按视觉职责落到 Radar 或共享 primitives | `?done=` 渲染，不自动消失（需人确认） |
+| 结果条 | 页面从 `admin-ui/radar` 取件；实现按视觉职责落在 `admin-ui/radar` | `?done=` 渲染，不自动消失（需人确认） |
 | 链接构造 | `lib/admin-context-link.ts` | `buildContextLink({ path, id, intent, from, returnTo })`，统一编码与白名单校验 |
 
 页面改动集中在 `pages/admin/{tickets,tasks,orders,payments,invoices,billing-orders,users,channels}/`，不新建路由。
@@ -600,10 +599,10 @@ interface AdminWorkGroup {
 | `frontend/src/lib/admin-commands.ts`（新） | 命令注册表（导航/新建/视图） |
 | `frontend/src/lib/admin-saved-views.ts`（新） | 内置视图 + localStorage 读写 |
 | `frontend/src/lib/admin-context-link.ts`（新） | `intent` / `returnTo` / `from` 构造与校验 |
-| `frontend/src/admin-ui/radar/blocks.tsx` | 待办队列与行 |
-| `frontend/src/admin-ui/primitives/context-banner.tsx` | 来源与返回，经 Radar barrel 公开 |
-| `frontend/src/admin-ui/primitives/saved-view-bar.tsx` | 视图条，经 Radar barrel 公开 |
-| `frontend/src/admin-ui/radar/*` 或 `frontend/src/admin-ui/primitives/*` | 动作结果条；页面只从 Radar 取件，实现按视觉职责落点 |
+| `frontend/src/admin-ui/radar/workQueue.tsx` | 待办队列与行 |
+| `frontend/src/admin-ui/radar/context-banner.tsx` | 来源与返回，经 Radar barrel 公开 |
+| `frontend/src/admin-ui/radar/SavedViewBar.tsx` | 视图条，经 Radar barrel 公开 |
+| `frontend/src/admin-ui/radar/*` | 动作结果条；页面只从 Radar 取件，实现按视觉职责落点 |
 | `frontend/src/admin-ui/radar/index.ts` | 统一公开页面组件 |
 | `frontend/src/pages/admin/tickets/*` | 行内认领、模板、内部备注、转交、下一条 |
 | `frontend/src/pages/admin/tickets/reply-templates.ts`（新） | P0 内置回复模板与变量替换；P1 改为后端模板表 |

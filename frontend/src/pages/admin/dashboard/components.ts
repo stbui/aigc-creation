@@ -3,4 +3,17 @@
  * 新增外部控件 / 类型引用时在这里补一行 re-export。
  */
 export { ExceptionPage } from '../../../components/ExceptionPage';
-export type { DutyTask } from '../../../components/admin/DutyContext';
+export {
+  ActionButton,
+  AdminPage,
+  Button,
+  Meter,
+  PageSkeleton,
+  Panel,
+  RefreshButton,
+  SegmentedTabs,
+  Skeleton,
+  StaleError,
+  TrendBarChart,
+  WorkQueue,
+} from '~/admin-ui/radar';

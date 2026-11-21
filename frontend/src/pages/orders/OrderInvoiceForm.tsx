@@ -29,24 +29,25 @@ export function OrderInvoiceForm({
   onSubmit,
 }: OrderInvoiceFormProps) {
   return (
-    <div className="order-invoice-form">
-      <div className="order-invoice-head">
-        <span className="order-invoice-title">开票信息</span>
-        <span className="order-invoice-amount">
+    <div className="mt-3 rounded-lg border border-border bg-[var(--surface-tint)] p-4">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <span className="text-[13px] font-semibold text-foreground">开票信息</span>
+        <span className="text-xs text-muted-foreground">
           开票金额 {formatYuan(order.paidCents - order.refundedCents)}
         </span>
       </div>
-      <div className="order-invoice-grid">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 max-[640px]:grid-cols-1">
         {/* Select 不能包在 <label> 里：label 会把点击二次转发给触发按钮，
             表现为「点开立刻关闭」。无障碍名走 aria-label。 */}
-        <div className="order-field">
-          <span>抬头类型</span>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">抬头类型</span>
             <Select
               value={form.kind}
               onValueChange={(value) => onChange({ kind: value as 'personal' | 'company' })}
             >
               <SelectTrigger
                 aria-label={'抬头类型'}
+                className="w-full"
               >
                 <SelectValue placeholder={'请选择'} />
               </SelectTrigger>
@@ -64,8 +65,8 @@ export function OrderInvoiceForm({
               </SelectContent>
             </Select>
         </div>
-        <label className="order-field">
-          <span>发票抬头</span>
+        <label className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">发票抬头</span>
           <Input
             value={form.title}
             maxLength={60}
@@ -74,8 +75,8 @@ export function OrderInvoiceForm({
           />
         </label>
         {form.kind === 'company' && (
-          <label className="order-field">
-            <span>税号</span>
+          <label className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">税号</span>
             <Input
               value={form.taxNo}
               maxLength={30}
@@ -84,8 +85,8 @@ export function OrderInvoiceForm({
             />
           </label>
         )}
-        <label className="order-field">
-          <span>接收邮箱</span>
+        <label className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-xs text-muted-foreground">接收邮箱</span>
           <Input
             value={form.email}
             maxLength={120}
@@ -95,18 +96,18 @@ export function OrderInvoiceForm({
         </label>
       </div>
       {error && (
-        <p className="order-form-error" role="alert">
+        <p className="mt-2.5 mb-0 text-xs leading-[18px] text-danger-text" role="alert">
           {error}
         </p>
       )}
-      <div className="order-invoice-actions">
+      <div className="mt-3.5 flex justify-end gap-2 max-[640px]:[&_[data-slot=button]]:flex-1">
         <Button onClick={onCancel}>取消</Button>
         <Button
           variant="default"
           disabled={!form.title.trim() || submitting}
           onClick={onSubmit}
         >
-          <span className="state-spinner is-small" aria-hidden />
+          {submitting && <span className="state-spinner is-small" aria-hidden />}
           提交开票申请
         </Button>
       </div>

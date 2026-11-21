@@ -305,29 +305,8 @@
   max-width: 100%;
 }
 
-.pk-workspace.product-recolor-page .product-recolor-generating-card .state-loading {
-  box-sizing: border-box;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: var(--space-24);
-  color: var(--text-desc);
-  font-size: 12px;
-  line-height: 22px;
-}
-
-.pk-workspace.product-recolor-page .product-recolor-generating-card .state-loading-tip {
-  color: var(--text-desc);
-  font-size: 12px;
-  line-height: 22px;
-}
-
-.pk-workspace.product-recolor-page .product-recolor-generating-card .state-spinner {
-  width: 32px;
-  height: 32px;
-  border-color: var(--tool-border-6);
-  border-top-color: var(--tool-border-brand-3);
-}
+/* 换色生成中卡的内部尺寸由 `ToolResultCards` 的元素变体直接表达，
+ * 这里不再为某一页写选择器。 */
 
 .state-spinner.is-large {
   width: 28px;

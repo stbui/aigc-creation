@@ -790,7 +790,7 @@ model Asset {
   // ── 存储后端 (src/storage) ───────────────────────────────────────
   // storageBackend: 'local' | 'oss' | 'minio'
   // 素材记录**必须记住写入时的后端**: 默认后端切换后, 老素材仍要从原后端读。
-  // 不加这个字段, 切换 STORAGE_BACKEND 会让全部历史素材 404。
+  // 不加这个字段, 切换默认后端会让全部历史素材 404。
   storageBackend String  @default("local")
   // storageKey 是唯一真相 (如 original/202610/abc123.jpg);
   // sourceUrl 保留为可访问路径, 但切换域名/CDN 时只需改配置, 不必刷库。
@@ -911,6 +911,16 @@ model GenerationTask {
 
   /// 账单 id（`BillingOrder.id`）。故障切换会替换账单，故这里存**当前**账单。
   billingOrderId    String?
+
+  /// 建任务时的客户端地址（`req.ip`，已规范化）。
+  ///
+  /// 任务由 worker 异步执行，执行时 HTTP 请求早已返回，`req.ip` 拿不到了；
+  /// 而调用记录的 `clientIp` 要回答「这次上游调用是谁触发的」，所以必须在
+  /// 建任务的请求作用域内取一次并快照到任务行上。
+  ///
+  /// 不放进 `params`：`params` 会在作品详情接口里原样下发给 C 端用户，
+  /// 把自己的 IP 回显给他既无用又多泄露一个字段。空串 = 未知。
+  clientIp          String    @default("")
   /// 上游返回的任务 id。异步协议轮询与人工核对都依赖它
   providerRequestId String?
   /// 轮询阶段的人类可读描述（如「候车 · 前面 3 条」），仅用于展示
@@ -2102,6 +2112,25 @@ model ApiCallLog {
   requestBody        String @default("")
   responseBody       String @default("")
 
+  /// 发起本次调用的客户端地址（`req.ip`，剥离 `::ffff:` 前缀）。
+  ///
+  /// 只对**同步**链路有意义：任务路径由 worker 异步执行，HTTP 请求早已返回，
+  /// 那时按「发起建任务请求的地址」记录（建任务时随 params 带入），而不是
+  /// worker 所在主机的地址 —— 后者永远是本机回环，排障时毫无信息量。
+  ///
+  /// 空串 = 未知（历史数据、脚本 / 定时任务触发）。不做回填猜测。
+  clientIp           String @default("")
+  /// 实际写出的请求体字节数（含 multipart 边界与内联媒体）。
+  ///
+  /// 与 `requestBody` 的长度**不是**一回事：报文预览在入库前被折叠内联媒体
+  /// 并截断到 256K 字符，按它反推体积会系统性偏小。这里记的是真实发出的字节。
+  requestBytes       Int    @default(0)
+  /// 上游响应体字节数（流式响应记实际收到的字节）。
+  ///
+  /// 与 `responseBody` 的关系同上：预览会被截断，不能当体积用。0 = 未收到响应
+  /// （建连前失败 / 超时前无数据），不从预览长度反推。
+  responseBytes      Int    @default(0)
+
   startedAt DateTime
   createdAt DateTime @default(now())
 
@@ -2370,4 +2399,22 @@ model TemplateItem {
   group TemplateGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@index([groupId, enabled, sortOrder])
+}
+
+/// 对象存储后端的可编辑配置（OSS / MinIO）。
+/// 每个后端一行；凭据字段随整个配置 JSON 一起加密落库，界面永不接触明文之外的传输。
+/// local 后端内建，不在此表存行。
+model StorageConfig {
+  /// 后端标识：oss | minio（白名单见 storage.provider.ts）
+  backend      String   @id
+  /// 完整配置的密文 JSON（SecretCipher, enc:v1:...）；空串 = 未配置
+  configCipher String   @default("")
+  /// 规范化明文摘要（sha256），用于识别「无改动保存」
+  configDigest String   @default("")
+  /// 最后修改的后台用户 id
+  updatedBy    String?
+  /// 是否为当前默认后端；local 不在此表，未配置时默认 local
+  active       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

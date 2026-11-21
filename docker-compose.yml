@@ -87,18 +87,6 @@ services:
       LOG_CONSOLE: "1"
       LOG_ERROR_FILE: "1"
 
-      # ---- 存储后端 ----
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
-      OSS_REGION: ${OSS_REGION:-}
-      OSS_BUCKET: ${OSS_BUCKET:-}
-      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
-      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
-      OSS_ENDPOINT: ${OSS_ENDPOINT:-}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
-      MINIO_BUCKET: ${MINIO_BUCKET:-huojue}
-
     ports:
       # 容器内外统一 4100；宿主机同一端口，与本地 npm 起法一致。
       - "${BACKEND_HOST_PORT:-4100}:4100"
@@ -210,7 +198,6 @@ services:
       LOG_RETENTION_DAYS: 3
       LOG_CONSOLE: "1"
       LOG_ERROR_FILE: "1"
-      STORAGE_BACKEND: local
     ports:
       - "${BACKEND_TEST_HOST_PORT:-4100}:4100"
     volumes:

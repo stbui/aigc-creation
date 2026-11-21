@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { ActionButton, Button } from '../../../admin-ui/primitives';
+import { ActionButton, Button } from '~/admin-ui/radar';
 
 /**
  * 无后台权限页。

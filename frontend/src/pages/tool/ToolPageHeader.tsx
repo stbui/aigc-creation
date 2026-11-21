@@ -12,14 +12,18 @@ export function ToolPageHeader({ def }: ToolPageHeaderProps) {
 
   return (
     <>
-      <div className="tool-header">
-        <span className="tool-header-icon">
+      <div className="mb-3 flex items-start gap-3">
+        <span className="inline-flex size-11 items-center justify-center rounded-lg bg-brand-bg text-brand">
           <CapabilityIcon id={def.id} size={22} />
         </span>
         <div>
-          <h3 className="tool-header-title">
+          <h3 className="m-0 mb-0.5 flex flex-wrap items-center gap-2 text-xl">
             {def.name}
-            {def.badge && <StatusBadge variant="secondary" className="tool-tag-free">{def.badge}</StatusBadge>}
+            {def.badge && (
+              <StatusBadge variant="secondary" className="border-0 bg-[color-mix(in_oklab,var(--color-cta)_12%,transparent)] text-[color:var(--color-cta-text)]">
+                {def.badge}
+              </StatusBadge>
+            )}
             {/*
               标注以**运行时结论**为准（云端模型 / 不可用），
               mode 只在后端未下发 runtime 时兜底 —— 同一项能力在不同部署下
@@ -27,18 +31,22 @@ export function ToolPageHeader({ def }: ToolPageHeaderProps) {
             */}
             <StatusBadge
               variant="secondary"
-              className={`tool-tag-mode tool-tag-${runtime.effective === 'remote' ? 'real' : runtime.effective}`}
+              className={`border-0 text-xs ${
+                runtime.effective === 'remote'
+                  ? 'bg-[color-mix(in_oklab,var(--color-success-text)_12%,transparent)] text-[color:var(--color-success-text)]'
+                  : 'bg-muted text-muted-foreground'
+              }`}
             >
               {RUNTIME_LABELS[runtime.effective] ?? MODE_LABELS[def.mode]}
             </StatusBadge>
           </h3>
-          <p className="tool-header-sub">{def.summary}</p>
+          <p className="m-0 text-muted-foreground">{def.summary}</p>
         </div>
       </div>
 
       {def.help && (
-        <div className="tool-notice tool-notice-help">
-          <span className="text-muted-foreground">{def.help}</span>
+        <div className="mb-3 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          <span>{def.help}</span>
         </div>
       )}
     </>

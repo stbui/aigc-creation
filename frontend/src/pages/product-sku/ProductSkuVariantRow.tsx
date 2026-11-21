@@ -1,6 +1,6 @@
 import type { SkuRegion } from './components';
 import type { SkuVariantContent } from './constants';
-import { Button, Input } from './components';
+import { Badge, Field, FieldLabel, Input, TextAction } from './components';
 import { ProductSkuReferenceThumb } from './ProductSkuReferenceThumb';
 import { ProductSkuReferenceUploadButton } from './ProductSkuReferenceUploadButton';
 
@@ -47,44 +47,37 @@ export function ProductSkuVariantRow({
   const regionLabel = `SKU ${itemIndex + 1} 区域 ${regionIndex + 1}`;
 
   return (
-    <div className="product-sku-variant-row">
-      <div className="product-sku-variant-title">
-        <span className="grid size-4.5 shrink-0 place-items-center rounded-full bg-brand text-xs text-primary-foreground">
-          {regionIndex + 1}
-        </span>
-        <strong>区域 {regionIndex + 1}</strong>
+    <div
+      className={`relative rounded-md border border-transparent bg-muted p-4${
+        regionIndex > 0 ? ' mt-4' : ''
+      } ${variant?.reference ? 'pr-16 max-[1366px]:pr-4' : ''}`}
+    >
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <Badge className="mr-auto gap-1.5 py-0 text-xs font-normal">
+          <span className="grid size-4 place-items-center rounded-full bg-primary-foreground text-brand">
+            {regionIndex + 1}
+          </span>
+          区域 {regionIndex + 1}
+        </Badge>
         <ProductSkuReferenceUploadButton
           busy={busy}
           onPick={(file, input) => onUploadReference(file, itemKey, region.id, input)}
         />
-        <Button
-          type="button"
-          variant="link"
-          size="xs"
-          className="h-auto border-0 bg-transparent p-0 text-xs font-normal text-muted-foreground underline underline-offset-4 hover:text-brand"
-          onClick={() => onOpenReferenceLibrary(itemKey, region.id)}
-        >
-          素材库
-        </Button>
-        <Button
-          type="button"
-          variant="link"
-          size="xs"
-          className="h-auto border-0 bg-transparent p-0 text-xs font-normal text-muted-foreground underline underline-offset-4 hover:text-brand"
-          onClick={() => onOpenReferenceMobile(itemKey, region.id)}
-        >
-          手机上传
-        </Button>
+        <TextAction onClick={() => onOpenReferenceLibrary(itemKey, region.id)}>素材库</TextAction>
+        <TextAction onClick={() => onOpenReferenceMobile(itemKey, region.id)}>手机上传</TextAction>
       </div>
-      <div className="product-sku-variant-body">
+      <Field className="gap-0">
+        <FieldLabel htmlFor={`sku-instruction-${itemKey}-${region.id}`} className="sr-only">
+          {regionLabel} 说明
+        </FieldLabel>
         <Input
+          id={`sku-instruction-${itemKey}-${region.id}`}
           value={variant?.instruction ?? ''}
           placeholder="文字说明（可选），如：改为绿色"
-          aria-label={`${regionLabel} 说明`}
-          className="h-5 text-sm focus-visible:bg-brand-bg"
+          className="h-6 w-full min-w-0 border-0 bg-transparent px-0 text-sm text-foreground shadow-none focus-visible:bg-brand-bg focus-visible:ring-0"
           onChange={(event) => onInstructionChange(itemKey, region.id, event.target.value)}
         />
-      </div>
+      </Field>
       {variant?.reference && (
         <ProductSkuReferenceThumb
           reference={variant.reference}

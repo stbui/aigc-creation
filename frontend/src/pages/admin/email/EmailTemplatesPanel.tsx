@@ -1,14 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Pencil, RefreshCw, RotateCcw } from 'lucide-react';
+import { RefreshCw, RotateCcw } from 'lucide-react';
 
 import {
   ActionButton,
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
   FormDrawer,
   FormField,
   Notice,
@@ -23,8 +17,10 @@ import {
 import { adminNotificationsApi } from './api';
 import { EMAIL_TEMPLATE_BY_CODE, EMAIL_TEMPLATE_GROUPS, EMAIL_TEMPLATES } from './constants';
 import { useAdminResource, useToast, useUnsavedGuard } from './hooks';
+import { TemplateCard } from './TemplateCard';
+import { TemplatePreview } from './TemplatePreview';
 import type { EmailTemplateDraft, EmailTemplateMeta, MessageTemplateItem } from './types';
-import { cn, renderEmailTemplatePreview, templatePlaceholder } from './utils';
+import { templatePlaceholder } from './utils';
 
 function draftFrom(meta: EmailTemplateMeta, item?: MessageTemplateItem): EmailTemplateDraft {
   return {
@@ -368,135 +364,3 @@ export function EmailTemplatesPanel({ canManage }: { canManage: boolean }) {
   );
 }
 
-function TemplateCard({
-  meta,
-  item,
-  saving,
-  canManage,
-  onEdit,
-  onToggle,
-}: {
-  meta: EmailTemplateMeta;
-  item?: MessageTemplateItem;
-  saving: boolean;
-  canManage: boolean;
-  onEdit: () => void;
-  onToggle: (enabled: boolean) => void;
-}) {
-  const Icon = meta.icon;
-  const status = !item
-    ? { label: '使用备用文案', tone: 'neutral' as const }
-    : item.enabled
-      ? { label: '自定义模板启用', tone: 'success' as const }
-      : { label: '自定义模板停用', tone: 'warn' as const };
-  const subject = item?.subject || meta.defaultSubject;
-  const body = item?.body || meta.defaultBody;
-
-  return (
-    <Card
-      data-testid={`email-template-${meta.code}`}
-      className="min-w-0 gap-0 overflow-hidden rounded-xl border-border bg-card py-0 shadow-none"
-    >
-      <CardHeader className="gap-3 px-4 pt-4 pb-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <span
-            className={cn(
-              'flex size-9 shrink-0 items-center justify-center rounded-lg',
-              item?.enabled ? 'bg-radar-ink-100 text-radar-ink-950' : 'bg-muted text-muted-foreground',
-            )}
-          >
-            <Icon className="size-4" aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-[13px]">{meta.label}</CardTitle>
-              <ToneBadge tone={status.tone}>{status.label}</ToneBadge>
-            </div>
-            <CardDescription className="mt-1 text-[12px] leading-5">
-              {meta.description}
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="flex flex-col gap-3 border-t border-border px-4 py-3">
-        <div>
-          <p className="m-0 text-xs font-medium text-muted-foreground">邮件主题</p>
-          <p className="m-0 mt-0.5 truncate text-[13px] font-medium text-foreground" title={subject}>
-            {subject}
-          </p>
-        </div>
-        <div>
-          <p className="m-0 text-xs font-medium text-muted-foreground">正文预览</p>
-          <p className="m-0 mt-0.5 line-clamp-3 whitespace-pre-line text-[12px] leading-5 text-muted-foreground">
-            {body}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-1.5" aria-label="模板可用变量">
-          {meta.variables.map((variable) => (
-            <code
-              key={variable.key}
-              className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
-              title={variable.label}
-            >
-              {templatePlaceholder(meta, variable.key)}
-            </code>
-          ))}
-        </div>
-      </CardContent>
-
-      <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-2.5">
-        <SwitchField
-          ariaLabel={`启用${meta.label}邮件模板`}
-          label="启用模板"
-          checked={Boolean(item?.enabled)}
-          disabled={!canManage || saving}
-          onChange={onToggle}
-        />
-        <ActionButton
-          variant="outline"
-          size="sm"
-          icon={Pencil}
-          disabled={!canManage || saving}
-          onClick={onEdit}
-        >
-          编辑
-        </ActionButton>
-      </CardFooter>
-    </Card>
-  );
-}
-
-function TemplatePreview({
-  meta,
-  subject,
-  body,
-}: {
-  meta: EmailTemplateMeta;
-  subject: string;
-  body: string;
-}) {
-  return (
-    <section aria-labelledby="email-template-preview-title" className="flex flex-col gap-2">
-      <h3 id="email-template-preview-title" className="m-0 text-[13px] font-semibold text-foreground">
-        示例预览
-      </h3>
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="border-b border-border bg-muted/30 px-4 py-3">
-          <p className="m-0 text-xs text-muted-foreground">主题</p>
-          <p className="m-0 mt-1 whitespace-pre-wrap break-words text-[13px] font-semibold text-foreground">
-            {renderEmailTemplatePreview(meta, subject) || '未填写邮件主题'}
-          </p>
-        </div>
-        <div className="px-4 py-4">
-          <p className="m-0 whitespace-pre-wrap break-words text-[13px] leading-6 text-foreground">
-            {renderEmailTemplatePreview(meta, body) || '未填写邮件正文'}
-          </p>
-        </div>
-      </div>
-      <p className="m-0 text-[12px] leading-5 text-muted-foreground">
-        预览使用示例数据，仅用于检查文案结构；实际发送时会替换为当前用户与业务数据。
-      </p>
-    </section>
-  );
-}

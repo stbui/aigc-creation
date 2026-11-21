@@ -287,10 +287,10 @@ export function InvitationsPage() {
 
   return (
     <PersonalPage
-      className="invite-page"
       title="邀请有奖"
       description="分享专属链接，好友完成指定动作后奖励自动到账；每天签到也能积累积分。"
     >
+      <div className="flex flex-col gap-4 py-6 pb-2">
       <InviteHero
         enabled={enabled}
         rule={rule}
@@ -331,6 +331,7 @@ export function InvitationsPage() {
         onClose={() => setPosterOpen(false)}
         onDownload={downloadPoster}
       />
+      </div>
     </PersonalPage>
   );
 }

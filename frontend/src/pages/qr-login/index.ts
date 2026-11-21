@@ -9,5 +9,4 @@
  * `docs/frontend-module-conventions.md`。
  */
 import '../../styles/auth.css';
-import './style.css';
 export { QrLoginPage } from './page';

@@ -175,7 +175,6 @@ export function AccountPage() {
       <PersonalPage
         title="账户设置"
         description="管理你的资料、安全与数据。"
-        className="account-page"
       >
         {/* 与工单 / 积分等个人页一致: 空态用居中的引导块, 而不是一条通栏提示 */}
         <StateEmpty
@@ -189,7 +188,7 @@ export function AccountPage() {
 
   if (loading) {
     return (
-      <PersonalPage title="账户设置" description="管理你的资料、安全与数据。" className="account-page">
+      <PersonalPage title="账户设置" description="管理你的资料、安全与数据。">
         <StateSkeleton variant="panel" count={4} />
       </PersonalPage>
     );
@@ -356,7 +355,6 @@ export function AccountPage() {
 
   return (
     <PersonalPage
-      className="account-page"
       title="账户设置"
       description="管理资料、安全与数据；积分、订单与工单可从卡片直接进入。"
       extra={
@@ -391,7 +389,7 @@ export function AccountPage() {
 
       {/* ── 最近订单 / 最近消息 ───────────────────────────────── */}
       {/* 两列并排: 单列铺满 1120 时每行两侧都是空白, 上下叠起来又多滚一屏 */}
-      <div className="account-split">
+      <div className="grid grid-cols-2 items-stretch gap-4 max-[900px]:grid-cols-1">
         <AccountOrdersCard orders={recentOrders} />
         <AccountMessagesCard
           messages={messages}

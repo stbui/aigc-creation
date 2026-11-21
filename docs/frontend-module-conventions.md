@@ -34,7 +34,7 @@
 
 后台侧尚未达标、仍待收敛的：`dashboard/`、`payment-rules/`、`layout-parts/`、
 `alerts/`、`invoices/`、`notifications/`、`retention/`、`scheduler/`、`finance/`、
-`roles/`、`radar-style/`。
+`roles/`。
 
 适用于 `frontend/src/pages/**` 下**多文件**的功能目录。单文件页面不强制套用；
 当页面长到需要拆分时，按本约定落位。参考实现见
@@ -92,6 +92,15 @@ pages/admin/channels/
   `.my-works-page`）。共享骨架（`.pk-workspace` / `.tool-*` 在
   `styles/tool-workspace.css`，C 端 UI 基线在 `styles/ui.css`）与全局
   设计令牌（`styles/tokens.css`）不搬进页面文件。
+- **页面视觉落成 shadcn 组件，不是把 CSS 机械翻译成类名**：卡片 / 按钮 / 弹层 /
+  列表 / 空态各自换成对应 shadcn 组合件（`Surface` / `Button` / `Dialog` / `Sheet` /
+  `Item` / `EmptyState` / `InlineAlert` 等，统一从 `frontend/src/ui` 取）。shadcn 没有
+  对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（`TextAction` /
+  `SegmentedControl` / `ImageDropzone`），组件内部组合 shadcn 原子件，页面只使用语义组件，
+  不在页里手写 class 拼控件外观。参照 `pages/product-sku/`：其 `style.css` 只剩三栏列宽、
+  窄屏折叠等**共享骨架覆盖**，组件相关的 `.sku-*` 选择器与 `--sku-*` 令牌已全部删除。
+  原因有两层：一是视觉只维护一套（组件层），二是 `tool-workspace.css` 未进 `@layer`，
+  未分层规则优先于 `@layer utilities`，`.pk-workspace` 的几何属性只能由页面样式表覆盖。
 - 多文件目录用 `style.css`，由 `index.ts` 以 `import './style.css';` 引入；
   单文件页面用同名 `<PageName>.css`（如 `CreditsPage.tsx` + `CreditsPage.css`），
   在页面文件顶部引入。两者都随路由 chunk 懒加载，不要在组件里另行引入。
@@ -148,7 +157,7 @@ import type { AdminChannelView } from './types';           // 跨模块类型（
   `./types` 取**，不再直连 `src/types/*` —— 两套写法混用会出现同一类型两个来源。
 - **第三方库（lucide-react / react-router-dom）不经入口转出** —— 它们不是本项目的
   共享控件，直接引即可（`channels/` 与 `product-detail/` 一致）。项目 UI 控件统一从
-  `src/admin-ui/primitives` 取件，不从模块入口再包一层。
+  `src/admin-ui/radar` 取件，不从模块入口再包一层。
 - 入口之间是单向的：`utils` → `constants`；`hooks` → `api` / `constants`；
   `constants` → `components`（只取选项类型）。`types` 只转出外部类型、不依赖任何
   入口，可被所有入口与业务文件引用。业务组件与 `page` 可以依赖全部入口；

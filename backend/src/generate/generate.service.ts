@@ -16,6 +16,7 @@ import { Prisma } from '@prisma/client';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 import { AppError } from '../common/app.exception';
+import { currentClientIp } from '../common/request-context';
 import { SignedUrlService } from '../common/signed-url.service';
 import { resolveUploadsDir } from '../config/env-files';
 import { isBillingOrderReviewable } from '../model/billing/billing.service';
@@ -150,6 +151,9 @@ export class GenerateService {
             channelId: origin.channelId,
             // 新的一轮：attempt 编号从 1 重来，历史尝试留在原任务上可追溯
             routeRun: origin.routeRun + 1,
+            // 重试也是「谁点的谁负责」：优先记当前请求方地址，脚本/无上下文时
+            // 回落到原任务的建单地址，避免重试产生的调用记录丢失来源。
+            clientIp: currentClientIp() ?? origin.clientIp,
             retriedFromId: origin.id,
             retryKey,
             heartbeatAt: new Date(),

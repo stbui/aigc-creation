@@ -73,9 +73,13 @@ export function CreativeImageInputPane({
     <aside className="pk-input-pane">
       <div className="pk-form-card">
         {/* 窄屏标题头 (桌面 display:none 实拍确认) */}
-        <div className="fc-section-head">
-          <span>{capabilityLabel}</span>
-          <h1>输入提示词，直接生成图片</h1>
+        <div className="hidden max-[1024px]:mb-3 max-[1024px]:block">
+          <span className="text-sm leading-[13px] font-bold text-[color:var(--wb-text)]">
+            {capabilityLabel}
+          </span>
+          <h1 className="mx-0 mt-2 mb-0 text-base leading-[22px] font-bold text-[color:var(--wb-text)]">
+            输入提示词，直接生成图片
+          </h1>
         </div>
 
         <div className="pk-form-scroll">
@@ -106,7 +110,7 @@ export function CreativeImageInputPane({
           disabled={submitDisabled}
           guestLabel="登录免费生成"
           creditLabel={creditLabel}
-          className="fc-actions"
+          className="mt-auto flex flex-col gap-4 bg-[var(--page-bg)] pt-4 max-[1024px]:gap-2 max-[1024px]:px-4 max-[1024px]:pt-3"
           notice={
             unavailableReason && !generating ? (
               <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
@@ -120,15 +124,16 @@ export function CreativeImageInputPane({
           onResolutionChange={onResolutionChange}
           onModelQuoteChange={onModelQuoteChange}
           settingsProps={{
-            popoverClassName: 'fc-settings-popover',
             popoverRole: 'dialog',
             popoverAriaLabel: '高级设置',
             header: (
-              <div className="fc-settings-popover-head">
-                <h2>高级设置</h2>
+              <div className="mb-4 flex min-h-5 items-center justify-between gap-3">
+                <h2 className="m-0 text-base leading-5 font-bold text-[color:var(--text-2)]">
+                  高级设置
+                </h2>
                 <button
                   type="button"
-                  className="fc-settings-close"
+                  className="grid size-6 cursor-pointer place-items-center border-0 bg-transparent p-0 text-[color:var(--text-4)] hover:text-foreground"
                   aria-label="关闭高级设置"
                   title="关闭"
                   onClick={() => onToggleSettings()}

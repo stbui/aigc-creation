@@ -94,10 +94,15 @@ export function LibraryAssetCard({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <Surface className={cn('asset-library-card', selected && 'is-selected')}>
-          <SurfaceContent className="asset-library-card-body p-0">
+        <Surface
+          className={cn(
+            'group relative block overflow-hidden rounded-none border border-border-soft bg-card p-0 shadow-none',
+            selected && 'border-brand ring-1 ring-brand',
+          )}
+        >
+          <SurfaceContent className="p-0">
             <div
-              className="asset-library-cover"
+              className="relative overflow-hidden bg-muted"
               ref={coverRef}
               style={coverRatio ? { aspectRatio: coverRatio } : undefined}
             >
@@ -112,7 +117,7 @@ export function LibraryAssetCard({
               ) : (
                 <Button
                   variant="ghost"
-                  className="asset-library-cover-button"
+                  className="block h-auto w-full cursor-zoom-in rounded-none border-0 bg-transparent p-0 hover:bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-[3px] focus-visible:outline-brand"
                   aria-label={`查看${capabilityName(asset.capability)}素材大图`}
                   title="点击查看大图"
                   onClick={openPreview}
@@ -125,15 +130,18 @@ export function LibraryAssetCard({
                   />
                 </Button>
               ))}
-              {!shouldLoad && <div className="asset-library-cover-placeholder" aria-hidden="true" />}
+              {!shouldLoad && <div className="h-full min-h-[160px] animate-pulse bg-muted" aria-hidden="true" />}
               <Checkbox
                 checked={selected}
                 onCheckedChange={() => onToggle(asset.id)}
-                className={cn('asset-library-check', selected && 'on')}
+                className="absolute top-2.5 left-2.5 z-[2] size-[22px] rounded-[7px] border-2 border-card bg-[rgba(38,43,65,0.24)] text-card shadow-[0_1px_4px_rgba(27,31,51,0.16)] data-[state=checked]:border-brand data-[state=checked]:bg-brand"
                 aria-label={selected ? '取消选择' : '选择该素材'}
               />
               {asset.kind === 'original' && (
-                <StatusBadge variant="secondary" className="asset-library-source-badge">
+                <StatusBadge
+                  variant="secondary"
+                  className="pointer-events-none absolute top-2 right-2 z-[1] h-6 px-2"
+                >
                   上传原图
                 </StatusBadge>
               )}

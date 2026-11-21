@@ -303,17 +303,15 @@ test.describe('存储配置', () => {
     await expect(cards(page).filter({ hasText: 'MinIO' })).toBeVisible();
     await expect(page.getByTestId('admin-storage-badge')).toContainText('当前');
 
-    // 未配置的后端应列出启用所需的环境变量 —— 比「未启用」三个字有用
+    // 未配置的后端应提供页面配置入口 —— 对象存储不读取环境变量
     const ossCard = cards(page).filter({ hasText: '阿里云 OSS' });
-    await expect(ossCard.getByTestId('admin-storage-env')).toContainText('OSS_ACCESS_KEY_ID');
+    await expect(ossCard.getByRole('button', { name: '配置后端' })).toBeVisible();
 
-    // 两个云端后端各自给出完整启用链路：SDK 安装命令 + 必填变量 + 可选默认值
+    // 两个云端后端各自给出 SDK 安装命令和页面配置入口
     await expect(ossCard.getByTestId('admin-storage-sdk')).toContainText('ali-oss');
-    await expect(ossCard.getByTestId('admin-storage-env')).toContainText('OSS_ACCESS_KEY_SECRET');
     const minioCard = cards(page).filter({ hasText: 'MinIO' });
     await expect(minioCard.getByTestId('admin-storage-sdk')).toContainText('minio');
-    await expect(minioCard.getByTestId('admin-storage-env')).toContainText('MINIO_SECRET_KEY');
-    await expect(minioCard.getByText('MINIO_USE_SSL=false')).toBeVisible();
+    await expect(minioCard.getByRole('button', { name: '配置后端' })).toBeVisible();
 
     // 容量统计：指标卡 + 分布面板（数据来自 /admin/assets/stats，与素材管理页同源）
     await expect(page.getByTestId('admin-stat-grid')).toBeVisible();
@@ -323,18 +321,13 @@ test.describe('存储配置', () => {
     ).toBeVisible();
   });
 
-  test('B-63 凭据只读: 界面无凭据输入框', async ({ page }) => {
+  test('B-63 凭据可在页面配置且不显示环境变量入口', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/storage`);
     await cards(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    // 全页不应有可编辑的凭据输入框
-    const inputs = cards(page).locator('input[type="password"], input[type="text"]');
-    expect(await inputs.count()).toBe(0);
-
-    // 明确告知凭据来源与不可编辑
-    await expect(page.getByText(/凭据不在界面配置/)).toBeVisible();
-    await expect(page.getByText(/STORAGE_BACKEND/)).toBeVisible();
+    await expect(page.getByText(/凭据加密存储，页面即可配置/)).toBeVisible();
+    await expect(page.getByText(/不读取环境变量/)).toBeVisible();
   });
 
   test('连通性测试可用', async ({ page }) => {
@@ -354,5 +347,34 @@ test.describe('存储配置', () => {
 
     const activeCard = cards(page).filter({ has: page.getByTestId('admin-storage-badge') });
     await expect(activeCard.getByRole('button', { name: '设为默认' })).toHaveCount(0);
+  });
+
+  test('配置抽屉按分组展示字段，并支持先测后存', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/storage`);
+    await cards(page).first().waitFor({ state: 'visible', timeout: 20000 });
+
+    // 本地后端也可编辑：公开访问地址决定素材链接的对外形态
+    const localCard = cards(page).filter({ hasText: '本地磁盘' });
+    await localCard.getByRole('button', { name: '访问地址' }).click();
+    await expect(page.getByTestId('admin-storage-group').first()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: '服务器访问地址' })).toBeVisible();
+    await page.keyboard.press('Escape');
+  });
+
+  test('未配置的 OSS 抽屉展示分组字段与草稿测试入口', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/storage`);
+    await cards(page).first().waitFor({ state: 'visible', timeout: 20000 });
+
+    const ossCard = cards(page).filter({ hasText: '阿里云 OSS' });
+    await ossCard.getByRole('button', { name: '配置后端' }).click();
+
+    // 字段由后端定义驱动，按分组渲染
+    await expect(page.getByRole('textbox', { name: 'Region' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Bucket' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: '路径前缀' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '测试连接' })).toBeVisible();
+    await page.keyboard.press('Escape');
   });
 });

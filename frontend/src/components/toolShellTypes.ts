@@ -83,6 +83,13 @@ export interface UploadSpec {
   /** 主提示图标 (局部重绘/去水印参考站使用简单加号) */
   promptIcon?: ReactNode;
   accept?: string;
+  /**
+   * dropzone 的页面级皮肤（底纹 / 已上传态高度等）。
+   *
+   * 上传区的 DOM 属于共享骨架，页面不再另写页面级选择器去改它的内部，
+   * 需要差异时由页面把工具类传进来。状态选择用 `[&.pk-dropzone-filled]` 这类变体。
+   */
+  dropzoneClassName?: string;
 }
 
 export interface SettingsSpec {
@@ -105,8 +112,6 @@ export interface Props {
    * grid/padding/height，再套一层会让负 margin 逃逸后的宽度与内层栅格错位。
    */
   pageClass?: string;
-  /** 输入栏附加 class (如参考站 rotate-angle-controls) */
-  inputPaneClassName?: string;
   /** 页标题 (空态 h3 与结果栏标题) */
   title: string;
   /** 提交按钮下方的一句话描述 (参考站各页固定文案) */

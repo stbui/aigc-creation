@@ -31,30 +31,16 @@
   from { opacity: 0; transform: translateY(-4px) scale(0.97); }
   to { opacity: 1; transform: none; }
 }
-@keyframes radar-sheet-up {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: none; }
-}
-/* 只动 Y 与缩放：水平居中由类上的 `-translate-x-1/2`（独立 `translate` 属性）
- * 负责，keyframe 再写 `translate(-50%)` 会与之叠加，整体左偏半个身位。 */
-@keyframes radar-toast-up {
-  from { opacity: 0; transform: translateY(10px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
 
 .radar-drawer-enter { animation: radar-drawer-in 210ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .radar-backdrop-enter { animation: radar-backdrop-in 180ms ease-out both; }
 .radar-pop-enter { animation: radar-pop-in 150ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.radar-sheet-enter { animation: radar-sheet-up 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.radar-toast-enter { animation: radar-toast-up 180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* 无障碍：尊重系统“减少动态效果”设置 */
 @media (prefers-reduced-motion: reduce) {
   .radar-drawer-enter,
   .radar-backdrop-enter,
-  .radar-pop-enter,
-  .radar-sheet-enter,
-  .radar-toast-enter {
+  .radar-pop-enter {
     animation: none !important;
   }
 }

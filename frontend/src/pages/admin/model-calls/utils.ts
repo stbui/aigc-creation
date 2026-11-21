@@ -1,10 +1,43 @@
+import { formatBytes, formatDateTime, formatDuration, formatNumber } from '~/admin-ui/radar';
 import type { ModelCallFilterValues } from './types';
 
 /**
  * 调用记录的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
  */
 
-export { formatDateTime, formatDuration } from '~/admin-ui/radar';
+export { formatBytes, formatDateTime, formatDuration, formatNumber };
+
+/** 回环地址：开发态与「同机反代」下最常见，直接标成「本机」比一串数字好读 */
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '0.0.0.0']);
+
+/**
+ * 调用记录的「来源 IP」展示值。
+ *
+ * 三种情况分开：
+ *   · 空串 → 「未知」：历史数据没有这一列，脚本 / 定时任务也没有请求上下文。
+ *     不能写「本机」，那会把「不知道」伪装成一个具体结论；
+ *   · 回环 → 「本机 · 127.0.0.1」：明确是本机，同时保留原值供复制比对；
+ *   · 其余 → 原样 IP。
+ */
+export function formatClientIp(ip: string): string {
+  const value = String(ip ?? '').trim();
+  if (value === '') return '未知';
+  return LOOPBACK_IPS.has(value) ? `本机 · ${value}` : value;
+}
+
+/**
+ * 报文体积展示。
+ *
+ * `0` 显示「—」而不是「0 B」：这列对历史数据是默认值 0，本身分不清「真的
+ * 没发任何字节（如 GET 轮询）」与「这条记录没测过」。写成「0 B」会让人以为
+ * 测量过且为零，反而误导；「—」表示「没有可用的测量值」，两种情况都成立。
+ */
+export function formatPayloadBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '—';
+  // `formatBytes` 对 KB 及以上固定保留一位小数（如 `278.0 KB`）。整数字节量
+  // 尾部这个 `.0` 没有信息量，去掉后读起来更接近样本里的 `278 KB`。
+  return formatBytes(bytes).replace(/\.0 (B|KB|MB|GB|TB)$/, ' $1');
+}
 
 /**
  * 地址栏 → 筛选初值。

@@ -24,3 +24,10 @@ export const DEFAULT_SIZE = '2k';
 export const ALL_CATEGORY = '';
 /** 二级分类的「全部分组」项 */
 export const ALL_GROUP = '';
+
+/**
+ * 骨架屏与懒加载占位的流光底：400% 宽的浅灰三段渐变 + 横向平移动画。
+ * 渐变本身也是图片未解码时的占位底色，动画只负责让它流动。
+ */
+export const SHIMMER_BG =
+  'bg-[linear-gradient(90deg,var(--surface-soft)_25%,var(--surface)_37%,var(--surface-soft)_63%)] bg-[length:400%_100%] animate-[shimmer-slide_1.4s_ease_infinite] motion-reduce:animate-none';

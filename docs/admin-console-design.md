@@ -194,7 +194,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | --- | --- |
 | 平台级聚合独立 | C 端 `stats/overview` 强制按 `ownerId` 过滤，后台看板用独立的 admin 聚合，不复用 |
 | 能力清单不落库 | 能力的名称、分组、参数、默认价仍以 `definitions/<id>.ts` 为准；后台只写「上下线」与「运行期价格」两类覆盖 |
-| 凭据只从环境变量读 | 支付通道、模型凭据、对象存储密钥均无写入端点；界面只展示是否齐备与脱敏值 |
+| 凭据来源 | 支付通道、模型凭据按各自契约处理；对象存储密钥只在后台存储配置页填写并加密落库，界面只展示脱敏值 |
 | 金额与积分用快照 | 退款按订单快照计算，人工调整写流水，不按当前价重算 |
 | 删除走统一生命周期 | 用户删除与 C 端自助注销共用 `account-lifecycle.service.ts`，两条路径行为一致 |
 
@@ -207,7 +207,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | 页面 | `pages/admin/` 33 个页面 + `channels/`、`payments/`、`payment-rules/` 子目录 |
 | 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
 | 类型 | `types/api.d.ts` 的 `Admin*` 段 |
-| 组件 | 业务页面只从 `admin-ui/radar` 取件（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），共享实现由 Radar barrel 透传，底层是 shadcn 原子件；后台树内不引 旧版 UI 库，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |
+| 组件 | 业务页面只从 `admin-ui/radar` 取件（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / `ConfirmDialog`），实现全部在 `admin-ui/radar` 内，底层是 shadcn 原子件；后台树内不引 旧版 UI 库，`adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`） |
 | 样式 | 外壳用 `tokens.css` / `admin.css` 的品牌紫语义，业务内容用 `radar-admin.css` 的 Radar 令牌；禁裸 hex，不做移动端适配 |
 
 ## 7. 明确不做

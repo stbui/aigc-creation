@@ -4,7 +4,7 @@ import { ChannelStateHint } from './ChannelStateHint';
 import { EMAIL_KEYS } from './constants';
 import { ProviderFields } from './ProviderFields';
 import { SettingTextField } from './SettingTextField';
-import { TestEmailPanel } from './TestEmailPanel';
+import { TestEmailPanel } from './components';
 import type { EmailRuntimeState } from './types';
 import type { EmailChannelState } from './useEmailChannel';
 import type { EmailConfigState } from './useEmailConfig';

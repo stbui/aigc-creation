@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 
-import { useDetailData } from '../primitives/detail-data';
+import { useDetailData } from './detail-data';
 import { Button } from './Button';
 import { Drawer } from './Drawer';
-import { EmptyState, SkeletonBody } from './blocks';
+import { EmptyState } from './states';
+import { SkeletonBody } from './skeleton';
 import { ModalDialog, type ModalSize } from './overlays';
 
 /** 加载 / 失败 / 空态三种前置状态收口；调用方的渲染函数只写成功态。 */

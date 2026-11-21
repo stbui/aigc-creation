@@ -858,6 +858,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       requestBody: result.requestBody,
       responseBody: result.responseBody,
       upstreamUrl: result.upstreamUrl,
+      clientIp: task.clientIp,
+      requestBytes: result.requestBytes,
+      responseBytes: result.responseBytes,
       videoSeconds: videoSecondsOf(params),
     });
 
@@ -1018,6 +1021,9 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       requestBody: result.requestBody,
       responseBody: result.responseBody,
       upstreamUrl: result.upstreamUrl,
+      clientIp: task.clientIp,
+      requestBytes: result.requestBytes,
+      responseBytes: result.responseBytes,
       videoSeconds: videoSecondsOf(params),
     });
 

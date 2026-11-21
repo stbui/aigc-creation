@@ -21,6 +21,14 @@ export interface TemplateHistoryProps {
   onOpenAll: () => void;
 }
 
+/** 卡片缩略图与占位共用尺寸，缺图时不塌行 */
+const THUMB =
+  'flex h-16 w-[90px] items-center justify-center rounded-md border border-border object-cover';
+
+/** 结果区内的文字动作（全部记录 / 刷新） */
+const TEXT_ACTION =
+  'inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-xs hover:text-brand-hover disabled:cursor-not-allowed disabled:text-[color:var(--text-desc)] disabled:hover:text-[color:var(--text-desc)]';
+
 function TemplateHistoryImpl({
   items,
   templates,
@@ -60,22 +68,34 @@ function TemplateHistoryImpl({
   };
 
   return (
-    <section className="tpl-history" aria-label="创作结果">
-      <header className="tpl-history-head">
-        <strong className="tpl-history-title">
+    <section
+      className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-card px-5 py-3"
+      aria-label="创作结果"
+    >
+      <header className="mb-2 flex items-center justify-between gap-3">
+        <strong className="inline-flex items-center gap-2 text-[13px] font-semibold text-foreground">
           创作结果
-          {items.length > 0 && <span className="tpl-history-count">{items.length} 张</span>}
+          {items.length > 0 && (
+            <span className="text-xs font-normal text-[color:var(--text-desc)]">
+              {items.length} 张
+            </span>
+          )}
         </strong>
-        <div className="tpl-history-actions">
+        <div className="inline-flex items-center gap-3">
           <button
             type="button"
-            className="tpl-history-link"
+            className={`${TEXT_ACTION} text-brand`}
             onClick={onOpenAll}
             disabled={items.length === 0}
           >
             全部记录
           </button>
-          <button type="button" className="tpl-history-refresh" disabled={loading} onClick={onRefresh}>
+          <button
+            type="button"
+            className={`${TEXT_ACTION} text-[color:var(--text-body)]`}
+            disabled={loading}
+            onClick={onRefresh}
+          >
             <RefreshCw size={12} />
             {loading ? '刷新中' : '刷新'}
           </button>
@@ -85,32 +105,41 @@ function TemplateHistoryImpl({
       {error && <p className="tool-submit-notice tool-submit-notice-error">历史记录加载失败：{error}</p>}
 
       {loading && items.length === 0 ? (
-        <div className="tpl-history-empty">
+        <div className="flex h-12 items-center justify-center text-xs text-[color:var(--text-desc)]">
           <Spin />
         </div>
       ) : items.length === 0 ? (
-        <div className="tpl-history-empty">还没有生成记录，提交任务后会显示在这里。</div>
+        <div className="flex h-12 items-center justify-center text-xs text-[color:var(--text-desc)]">
+          还没有生成记录，提交任务后会显示在这里。
+        </div>
       ) : (
-        <div className="tpl-history-strip">
+        <div className="flex flex-wrap gap-2.5 overflow-visible pb-0.5">
           {items.slice(0, 12).map((item) => (
             <button
               type="button"
               key={item.id}
-              className={`tpl-history-card${item.url ? '' : ' is-pending'}`}
+              className="group flex w-[90px] shrink-0 cursor-pointer flex-col gap-1 border-0 bg-transparent p-0 text-left"
               title={nameOf(item) ? `查看${nameOf(item)}生成写真` : '查看生成写真'}
               onClick={() => openAt(item)}
             >
               {item.url ? (
                 <img
+                  className={`${THUMB} bg-[var(--surface-soft)] group-hover:border-brand`}
                   src={assetThumbUrl(item.url, 320) ?? item.url}
                   alt={nameOf(item) ? `${nameOf(item)}生成写真` : '生成写真'}
                   loading="lazy"
                   decoding="async"
                 />
               ) : (
-                <span className="tpl-history-placeholder">{emptyResultLabel(item)}</span>
+                <span
+                  className={`${THUMB} bg-[var(--surface-soft)] text-xs text-[color:var(--text-desc)] group-hover:border-brand`}
+                >
+                  {emptyResultLabel(item)}
+                </span>
               )}
-              <small>{nameOf(item) ?? '写真模板'}</small>
+              <small className="truncate text-xs text-[color:var(--text-muted)]">
+                {nameOf(item) ?? '写真模板'}
+              </small>
             </button>
           ))}
         </div>

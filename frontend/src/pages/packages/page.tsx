@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import type { MembershipPlan, Product } from '../../types/api';
-import { PACKAGES_PAGE_META, type PackCounts, type PackFilter } from './constants';
+import { PACKAGES_PAGE_META, SHOP_DISCLOSURE, type PackCounts, type PackFilter } from './constants';
 import { StateError, StateSkeleton } from './components';
 import { useAuth, useCredits, useDocumentMeta, usePackagesCatalog } from './hooks';
 import { pickBestValueId } from './utils';
@@ -80,60 +80,58 @@ export function PackagesPage() {
   };
 
   return (
-    <div className="pkg-shop-page">
-      <div className="pkg-shop-container">
-        <PackagesHero loggedIn={Boolean(token)} balance={balance?.balance ?? null} />
+    <div className="px-6 pt-6 pb-10 max-[900px]:px-4 max-[900px]:pt-4 max-[900px]:pb-8 max-[640px]:px-2.5 max-[640px]:pt-3 max-[640px]:pb-7">
+      <PackagesHero loggedIn={Boolean(token)} balance={balance?.balance ?? null} />
 
-        {/*
-          加载 / 失败 / 空 三态分开 (2026-10-20 修)。
+      {/*
+        加载 / 失败 / 空 三态分开 (2026-10-20 修)。
 
-          此前失败态复用了 `.pkg-sandbox-notice` —— 那个 class 的语义是
-          "沙箱支付说明", 拿来渲染"商品加载失败"会把一条环境说明
-          和一条错误混在同一视觉里, 用户以为这是正常提示的一部分。
-        */}
-        {loading && <StateSkeleton variant="card" count={3} columns={3} />}
+        此前失败态复用了「沙箱支付说明」的样式 —— 那个语义是
+        "沙箱支付说明", 拿来渲染"商品加载失败"会把一条环境说明
+        和一条错误混在同一视觉里, 用户以为这是正常提示的一部分。
+      */}
+      {loading && <StateSkeleton variant="card" count={3} columns={3} />}
 
-        {!loading && error && (
-          <StateError
-            title="商品加载失败"
-            desc="没能取回积分包价目。可能是后端未启动或网络异常，重试一次即可。"
-            onRetry={() => void reload()}
-          />
-        )}
+      {!loading && error && (
+        <StateError
+          title="商品加载失败"
+          desc="没能取回积分包价目。可能是后端未启动或网络异常，重试一次即可。"
+          onRetry={() => void reload()}
+        />
+      )}
 
-        {!loading && plans.length > 0 && (
-          <PackagesPlanSection
-            paidPlans={paidPlans}
-            freePlan={freePlan}
-            membership={membership}
-            currentPlanCode={currentPlanCode}
-            currentPlan={currentPlan}
-            onSubscribe={subscribe}
-          />
-        )}
+      {!loading && plans.length > 0 && (
+        <PackagesPlanSection
+          paidPlans={paidPlans}
+          freePlan={freePlan}
+          membership={membership}
+          currentPlanCode={currentPlanCode}
+          currentPlan={currentPlan}
+          onSubscribe={subscribe}
+        />
+      )}
 
-        {!loading && !error && products.length === 0 && plans.length === 0 && (
-          <p className="pkg-shop-disclosure">当前没有在售积分包或会员套餐</p>
-        )}
+      {!loading && !error && products.length === 0 && plans.length === 0 && (
+        <p className={SHOP_DISCLOSURE}>当前没有在售积分包或会员套餐</p>
+      )}
 
-        {!loading && products.length > 0 && (
-          <PackagesProductSection
-            products={shownPacks}
-            counts={packCounts}
-            bestValueId={bestValueId}
-            filter={packFilter}
-            onFilterChange={setPackFilter}
-            onBuy={buy}
-          />
-        )}
+      {!loading && products.length > 0 && (
+        <PackagesProductSection
+          products={shownPacks}
+          counts={packCounts}
+          bestValueId={bestValueId}
+          filter={packFilter}
+          onFilterChange={setPackFilter}
+          onBuy={buy}
+        />
+      )}
 
-        {!loading && (
-          <p className="pkg-shop-disclosure">
-            支付成功后积分自动到账，有效期以卡片标注为准；生成任务按对应能力的消耗价实时扣减，
-            任务失败时原额退还。支付方式与金额以结算页为准。
-          </p>
-        )}
-      </div>
+      {!loading && (
+        <p className={SHOP_DISCLOSURE}>
+          支付成功后积分自动到账，有效期以卡片标注为准；生成任务按对应能力的消耗价实时扣减，
+          任务失败时原额退还。支付方式与金额以结算页为准。
+        </p>
+      )}
     </div>
   );
 }

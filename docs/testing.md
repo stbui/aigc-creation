@@ -59,7 +59,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 
 | 用例 | 守住什么 |
 | --- | --- |
-| `admin-ui/primitives/table.test.tsx` | 后台数据表格的列显隐：**表头与表体列数始终一致**（默认全可见各 2 列；隐藏一列后表头与每个表体行同时少一列，且不残留该列内容） |
+| `admin-ui/radar/table.test.tsx` | 后台数据表格的列显隐：**表头与表体列数始终一致**（默认全可见各 2 列；隐藏一列后表头与每个表体行同时少一列，且不残留该列内容） |
 | `admin-ui/radar/FormDrawer.test.tsx` | 抽屉关闭只确认一次：`dirty` 时取消弹一层、放弃后才回调 `onClose` 一次；无修改直接关闭；`busy` 时不响应关闭也不弹确认（页面不得在 `onClose` 上再包一层 `useDiscardConfirm`） |
 | `components/ErrorBoundary.test.tsx` | 顶层 `ErrorBoundary` 未传 `resetKeys` 时稳定停留兜底页，不反复重置 |
 | `components/ColorSwatchGrid.test.tsx` | 色板选择、自定义色回显、禁用态 |

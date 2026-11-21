@@ -3,5 +3,5 @@
  * 新增外部 hook / provider 引用时在这里补一行 re-export。
  */
 export { useAdmin } from '../../../context/AdminContext';
-export { useDuty } from '../../../components/admin/DutyContext';
 export { useAdminWorkbench } from '../../../components/admin/WorkbenchContext';
+export { useAdminResource } from '~/admin-ui/radar';

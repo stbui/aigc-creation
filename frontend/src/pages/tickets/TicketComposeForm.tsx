@@ -17,6 +17,8 @@ export interface TicketComposeFormProps {
   onSubmit: () => void;
 }
 
+const FIELD = 'flex flex-col gap-1.5 text-[13px] text-muted-foreground';
+
 export function TicketComposeForm({
   form,
   formError,
@@ -26,13 +28,15 @@ export function TicketComposeForm({
   onSubmit,
 }: TicketComposeFormProps) {
   return (
-    <section className="ticket-compose">
-      <div className="ticket-compose-head">
-        <h2>新建工单</h2>
-        <p>说明发生了什么、在哪一步发生。信息越具体，客服越不必来回追问。</p>
+    <section className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3.5 rounded-xl border border-border bg-card px-6 pt-[22px] pb-6 max-[900px]:grid-cols-1 max-[900px]:p-4">
+      <div className="col-span-full flex flex-col gap-1 border-b border-[var(--border-row)] pb-3.5">
+        <h2 className="m-0 text-[15px] font-semibold text-foreground">新建工单</h2>
+        <p className="m-0 text-xs leading-[18px] text-muted-foreground">
+          说明发生了什么、在哪一步发生。信息越具体，客服越不必来回追问。
+        </p>
       </div>
       {/* Select 不用 <label> 包裹：label 会把点击二次转发给触发按钮（打开即关闭） */}
-      <div>
+      <div className={FIELD}>
         问题类型
           <Select
             value={form.type}
@@ -40,6 +44,7 @@ export function TicketComposeForm({
           >
             <SelectTrigger
               aria-label={'问题类型'}
+              className="w-full"
             >
               <SelectValue placeholder={'请选择'} />
             </SelectTrigger>
@@ -54,7 +59,7 @@ export function TicketComposeForm({
             </SelectContent>
           </Select>
       </div>
-      <div>
+      <div className={FIELD}>
         优先级
           <Select
             value={form.priority}
@@ -62,6 +67,7 @@ export function TicketComposeForm({
           >
             <SelectTrigger
               aria-label={'优先级'}
+              className="w-full"
             >
               <SelectValue placeholder={'请选择'} />
             </SelectTrigger>
@@ -76,7 +82,7 @@ export function TicketComposeForm({
             </SelectContent>
           </Select>
       </div>
-      <label className="is-full">
+      <label className={`${FIELD} col-span-full max-[900px]:col-auto`}>
         标题
         <Input
           maxLength={80}
@@ -85,7 +91,7 @@ export function TicketComposeForm({
           placeholder="一句话说明问题，如：生成的主图保存后是空白"
         />
       </label>
-      <label className="is-full">
+      <label className={`${FIELD} col-span-full max-[900px]:col-auto`}>
         详细描述
         <div className="login-textarea-wrap">
           <Textarea
@@ -96,14 +102,16 @@ export function TicketComposeForm({
             onChange={(e) => onChange({ content: e.target.value })}
             placeholder="复现步骤、涉及的能力名称或订单号；有报错截图可一并描述。"
           />
-          <span className="login-textarea-count">{form.content.length}/2000</span>
+          <span className="login-textarea-count is-block">{form.content.length}/2000</span>
         </div>
       </label>
-      {formError && <p className="ticket-error is-full">{formError}</p>}
-      <div className="ticket-compose-actions">
+      {formError && (
+        <p className="col-span-full max-[900px]:col-auto m-2 mb-0 text-[13px] text-[color:var(--danger-soft-text)]">{formError}</p>
+      )}
+      <div className="col-span-full flex items-center justify-end gap-2 max-[900px]:col-auto max-[900px]:flex-wrap max-[900px]:[&_[data-slot=button]]:flex-[1_1_auto]">
         <Button onClick={onCancel}>取消</Button>
         <Button disabled={submitting} variant="default" onClick={onSubmit}>
-          <span className="state-spinner is-small" aria-hidden />
+          {submitting && <span className="state-spinner is-small" aria-hidden />}
           提交工单
         </Button>
       </div>

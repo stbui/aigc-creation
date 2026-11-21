@@ -1,6 +1,6 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { RotateCcw, X } from 'lucide-react';
-import { useApp } from '../ui';
+import { Badge, Button, FieldDescription, TextAction, useApp } from '../ui';
 
 /** 归一化坐标 (0~1)，与模板图原始像素尺寸无关。 */
 export interface SkuRegionBox {
@@ -48,6 +48,13 @@ function normalizeDraft(draft: DraftBox): SkuRegionBox {
   };
 }
 
+/**
+ * 模板图上的真实框选（归一化坐标随任务提交）。
+ *
+ * 画布本体没有 shadcn 对应角色；外壳的可读部分用 shadcn 语义：
+ * 计数与空态提示用 `Badge`，清空用 `TextAction`，说明用 `FieldDescription`。
+ * 区域框与删除按钮是画布内的几何元素，仍走工具类。
+ */
 export function SkuRegionSelector({ url, alt = 'SKU 模板图', regions, max = 3, onChange }: Props) {
   const { message } = useApp();
   const [draft, setDraft] = useState<DraftBox | null>(null);
@@ -113,35 +120,31 @@ export function SkuRegionSelector({ url, alt = 'SKU 模板图', regions, max = 3
   const draftBox = draft ? normalizeDraft(draft) : null;
 
   return (
-    <div className="product-sku-region-selector">
-      <div className="product-sku-region-toolbar">
-        <span className="product-sku-region-count">
-          变体区域 <strong>{regions.length}</strong> / {max}
+    <div className="grid gap-[7px]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs leading-5 text-muted-foreground">
+          变体区域 <strong className="font-bold text-brand">{regions.length}</strong> / {max}
         </span>
-        <button
-          type="button"
-          className="pk-text-link product-sku-region-clear u-font-12"
-          disabled={regions.length === 0}
-          onClick={() => onChange([])}
-        >
-          <RotateCcw size={12} />
+        <TextAction icon={<RotateCcw size={12} aria-hidden />} disabled={regions.length === 0} onClick={() => onChange([])}>
           清空框选
-        </button>
+        </TextAction>
       </div>
 
       <div
-        className={`product-sku-region-stage${regions.length >= max ? ' is-limit' : ''}`}
+        className={`relative w-full touch-none overflow-hidden rounded-md border border-border bg-muted leading-none select-none ${
+          regions.length >= max ? 'cursor-default' : 'cursor-crosshair'
+        }`}
         onPointerDown={startDraw}
         onPointerMove={moveDraw}
         onPointerUp={finishDraw}
         onPointerCancel={cancelDraw}
         aria-label="在模板图上拖拽框选 SKU 变体区域"
       >
-        <img src={url} alt={alt} draggable={false} />
+        <img src={url} alt={alt} draggable={false} className="pointer-events-none block h-auto w-full" />
         {regions.map((region, index) => (
           <div
             key={`${index}-${region.x}-${region.y}-${region.width}-${region.height}`}
-            className="product-sku-region-box"
+            className="pointer-events-none absolute box-border rounded-[4px] border-2 border-brand bg-brand/15 leading-normal"
             style={{
               left: `${region.x * 100}%`,
               top: `${region.y * 100}%`,
@@ -149,10 +152,14 @@ export function SkuRegionSelector({ url, alt = 'SKU 模板图', regions, max = 3
               height: `${region.height * 100}%`,
             }}
           >
-            <span>区域 {index + 1}</span>
-            <button
+            <span className="absolute -top-px -left-px rounded-[4px_0_4px_0] bg-brand px-1.5 py-0.5 text-xs leading-[14px] whitespace-nowrap text-primary-foreground">
+              区域 {index + 1}
+            </span>
+            <Button
               type="button"
-              className="product-sku-region-remove"
+              variant="secondary"
+              size="icon-xs"
+              className="pointer-events-auto absolute top-1 right-1 bg-foreground/70 p-0 text-primary-foreground hover:bg-foreground/90"
               aria-label={`删除区域 ${index + 1}`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -160,13 +167,13 @@ export function SkuRegionSelector({ url, alt = 'SKU 模板图', regions, max = 3
                 removeRegion(index);
               }}
             >
-              <X size={12} />
-            </button>
+              <X aria-hidden />
+            </Button>
           </div>
         ))}
         {draftBox && (
           <div
-            className="product-sku-region-box is-draft"
+            className="pointer-events-none absolute box-border rounded-[4px] border-2 border-dashed border-brand bg-brand/10 leading-normal"
             style={{
               left: `${draftBox.x * 100}%`,
               top: `${draftBox.y * 100}%`,
@@ -174,17 +181,24 @@ export function SkuRegionSelector({ url, alt = 'SKU 模板图', regions, max = 3
               height: `${draftBox.height * 100}%`,
             }}
           >
-            <span>释放完成框选</span>
+            <span className="absolute -top-px -left-px rounded-[4px_0_4px_0] bg-brand/80 px-1.5 py-0.5 text-xs leading-[14px] whitespace-nowrap text-primary-foreground">
+              释放完成框选
+            </span>
           </div>
         )}
         {regions.length === 0 && !draft && (
-          <span className="product-sku-region-empty-hint">在图片上拖拽框选变体区域</span>
+          <Badge
+            variant="secondary"
+            className="pointer-events-none absolute bottom-2.5 left-1/2 -translate-x-1/2 bg-foreground/60 text-primary-foreground"
+          >
+            在图片上拖拽框选变体区域
+          </Badge>
         )}
       </div>
 
-      <p className="product-sku-region-hint">
+      <FieldDescription className="text-xs leading-[18px]">
         框选要跟随 SKU 变化的位置，最多 3 个；框选坐标会随任务提交，框外保持模板不变。
-      </p>
+      </FieldDescription>
     </div>
   );
 }

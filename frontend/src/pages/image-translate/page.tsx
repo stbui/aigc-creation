@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import { DEFAULT_TARGET_LANG } from './constants';
 import {
+  PRODUCT_TOOL_DROPZONE,
+  PRODUCT_TOOL_PAGE,
   ToolCard,
   ToolHistoryPane,
   ToolShell,
@@ -45,10 +47,16 @@ export function ImageTranslatePage() {
   return (
     <ToolShell
       capability="image_translate"
-      pageClass="product-retouch-page image-translate-page"
+      pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page image-translate-page`}
       title="图片翻译"
       desc="智能翻译图片文字，保留原版式快速本地化"
-      upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      upload={{
+        title: '上传图片',
+        required: true,
+        max: 1,
+        hint: '点击、拖拽或粘贴图片上传，最多 1 张',
+        dropzoneClassName: PRODUCT_TOOL_DROPZONE,
+      }}
       replaceUpload
       renderUploadPreview={productSourceUploadPreview('待翻译图片')}
       settings={{ resolution: true }}
@@ -74,10 +82,14 @@ export function ImageTranslatePage() {
         <ToolHistoryPane capability="image_translate" refreshKey={result?.url} emptyText="暂无翻译记录" />
       }
     >
-      <ToolCard title="翻译语言" className="product-retouch-card image-translate-settings">
-        <label className="image-translate-language-field">
-          <span>目标语言</span>
-          <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
+      <ToolCard title="翻译语言" dense>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] leading-[17.5px] text-[color:var(--wb-text)]">目标语言</span>
+          <select
+            className="box-border h-9 w-full rounded-sm border border-border bg-card px-2.5 text-[13px] text-[color:var(--wb-text)] outline-none focus:border-brand-light"
+            value={targetLang}
+            onChange={(e) => setTargetLang(e.target.value)}
+          >
             {languageOptions().map((l) => (
               <option key={l.value} value={l.value}>
                 {l.label}

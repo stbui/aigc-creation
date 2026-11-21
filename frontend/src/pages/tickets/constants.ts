@@ -28,6 +28,20 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   closed: '已关闭',
 };
 
+/**
+ * 状态胶囊形态：前置圆点跟随文字色，四态只换配色不改形状。
+ * 桌面列表 / 详情头共用一份，避免两处漂移。
+ */
+export const STATUS_PILL = 'inline-flex flex-none items-center gap-1.5 rounded-full px-2.5 py-[3px] text-xs leading-[18px] whitespace-nowrap before:size-1.5 before:rounded-full before:bg-current before:content-[\'\']';
+
+/** 工单状态 → 胶囊配色 */
+export const STATUS_TONE: Record<TicketStatus, string> = {
+  open: 'bg-warn-soft text-warn-text',
+  processing: 'bg-brand-bg text-brand',
+  resolved: 'bg-success-soft text-success-text',
+  closed: 'bg-muted text-muted-foreground',
+};
+
 /** 优先级 → 中文标签 */
 export const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: '低',

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 
-import { MODE_LABEL, MODE_OPTIONS, NOTE_MAX_LENGTH } from './constants';
+import { MODE_LABEL, MODE_OPTIONS, MODE_PILLS, NOTE_MAX_LENGTH, NOTE_TEXTAREA, RETOUCH_CARD } from './constants';
 import {
+  PRODUCT_TOOL_DROPZONE,
+  PRODUCT_TOOL_PAGE,
   PillOptions,
   ToolCard,
   ToolHistoryPane,
@@ -44,10 +46,16 @@ export function ProductRetouchPage() {
   return (
     <ToolShell
       capability="enhance"
-      pageClass="product-retouch-page product-retouch-main-page"
+      pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page product-retouch-main-page`}
       title="产品精修"
       desc="商品图去瑕疵，提高清晰度"
-      upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      upload={{
+        title: '上传图片',
+        required: true,
+        max: 1,
+        hint: '点击、拖拽或粘贴图片上传，最多 1 张',
+        dropzoneClassName: PRODUCT_TOOL_DROPZONE,
+      }}
       replaceUpload
       renderUploadPreview={productSourceUploadPreview('待精修商品图')}
       settings={{ ratio: true, resolution: true }}
@@ -73,12 +81,15 @@ export function ProductRetouchPage() {
         <ToolHistoryPane capability="enhance" refreshKey={result?.url} emptyText="暂无精修记录" />
       }
     >
-      <ToolCard title="精修模式" className="product-retouch-card">
-        <PillOptions options={MODE_OPTIONS} value={mode} onChange={setMode} ariaLabel="精修模式" />
+      <ToolCard title="精修模式" className={`product-retouch-card ${RETOUCH_CARD}`}>
+        <div className={MODE_PILLS}>
+          <PillOptions options={MODE_OPTIONS} value={mode} onChange={setMode} ariaLabel="精修模式" />
+        </div>
       </ToolCard>
 
-      <ToolCard title="补充要求（选填）" className="product-retouch-card">
+      <ToolCard title="补充要求（选填）" className={`product-retouch-card ${RETOUCH_CARD}`}>
         <textarea
+          className={NOTE_TEXTAREA}
           maxLength={NOTE_MAX_LENGTH}
           value={note}
           placeholder="如：去掉电镀件上的指纹，让皮革看起来更有光泽"

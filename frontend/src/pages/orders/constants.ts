@@ -23,6 +23,15 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   partial_refunded: '部分退款',
 };
 
+/** 订单状态胶囊配色（前景自带状态点，用 bg-current 继承）。 */
+export const ORDER_STATUS_TONE: Record<OrderStatus, string> = {
+  pending: 'bg-warn-soft text-warn-text',
+  paid: 'bg-success-soft text-success-text',
+  cancelled: 'bg-muted text-muted-foreground',
+  refunded: 'bg-danger-soft text-danger-text',
+  partial_refunded: 'bg-danger-soft text-danger-text',
+};
+
 /** 状态筛选档位；`refund` 合并 `refunded` / `partial_refunded` 两种退款态 */
 export const FILTERS = [
   { value: 'all', label: '全部' },

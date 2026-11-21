@@ -10,7 +10,7 @@ import {
 } from './components';
 import { SOURCE_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import type { ApiLogView } from './types';
-import { formatDateTime, formatDuration } from './utils';
+import { formatDateTime, formatDuration, formatNumber } from './utils';
 
 /**
  * 调用明细列表。
@@ -110,24 +110,41 @@ export function List({
         ),
       },
       {
-        key: 'usage',
-        title: '用量',
-        width: 170,
+        key: 'inputTokens',
+        title: '输入',
+        width: 90,
+        align: 'right',
+        render: (row) =>
+          row.usageAvailable ? (
+            <span className="tabular-nums">{formatNumber(row.inputTokens)}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        key: 'outputTokens',
+        title: '输出',
+        width: 90,
+        align: 'right',
+        render: (row) =>
+          row.usageAvailable ? (
+            <span className="tabular-nums">{formatNumber(row.outputTokens)}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        key: 'mediaCount',
+        title: '产出',
+        width: 130,
         render: (row) => {
-          const lines: string[] = [];
-          if (row.usageAvailable) {
-            lines.push(`输入 ${row.inputTokens} / 输出 ${row.outputTokens}`);
-          }
-          if (row.mediaCount > 0) lines.push(`产出 ${row.mediaCount} 个`);
-          if (row.videoSeconds > 0) lines.push(`${row.videoSeconds}s 视频`);
-          if (lines.length === 0) {
+          if (row.mediaCount === 0 && row.videoSeconds === 0) {
             return <span className="text-muted-foreground">—</span>;
           }
           return (
             <div className="flex flex-col tabular-nums">
-              {lines.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
+              {row.mediaCount > 0 && <span>{row.mediaCount} 个媒体</span>}
+              {row.videoSeconds > 0 && <span>{row.videoSeconds}s 视频</span>}
             </div>
           );
         },
@@ -187,7 +204,7 @@ export function List({
             </ActionButton>
           ) : undefined
         }
-        minWidth={1300}
+        minWidth={1440}
         pagination={pagination}
       />
     </Panel>

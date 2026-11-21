@@ -90,7 +90,9 @@ export function RotateAnglePreview({
 
   return (
     <div
-      className={`rotate-angle-preview${dragging ? ' dragging' : ''}`}
+      className={`relative block h-[236px] touch-none overflow-hidden rounded-[10px] border border-[var(--tool-border-9)] bg-[radial-gradient(circle_at_50%_48%,var(--card-bg)_0,var(--tool-surface-brand-2)_62%,var(--tool-surface-9)_100%)] select-none max-[900px]:h-[230px] ${
+        dragging ? 'cursor-grabbing' : 'cursor-grab'
+      }`}
       onPointerDown={startDrag}
       onPointerMove={moveDrag}
       onPointerUp={endDrag}

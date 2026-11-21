@@ -23,16 +23,24 @@ export function InvitePosterModal({ open, posterUrl, onClose, onDownload }: Invi
         <DialogHeader>
           <DialogTitle>邀请海报</DialogTitle>
         </DialogHeader>
-        {posterUrl && <img src={posterUrl} alt="邀请海报" className="invite-poster-image" />}
+        {posterUrl && (
+          <img
+            src={posterUrl}
+            alt="邀请海报"
+            className="block w-full rounded-lg border border-border"
+          />
+        )}
         <Button
           variant="default"
-          className="w-full invite-poster-download"
+          className="mt-4 h-10 w-full justify-center"
           onClick={onDownload}
         >
           {<Download size={15} />}
           下载海报
         </Button>
-        <p className="invite-poster-note">海报含你的专属邀请码，好友扫码注册后自动绑定邀请关系。</p>
+        <p className="mt-2.5 mb-0 text-center text-xs leading-[18px] text-muted-foreground">
+          海报含你的专属邀请码，好友扫码注册后自动绑定邀请关系。
+        </p>
       </DialogContent>
     </Dialog>
   );

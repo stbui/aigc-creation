@@ -50,12 +50,13 @@ export function ExpandLayoutPreview({
 
   return (
     <figure
-      className="smart-expand-source-preview"
+      className="relative block h-[min(680px,calc(100%-48px))] max-h-[calc(100%-48px)] w-auto max-w-[calc(100%-48px)] shrink-0 overflow-hidden rounded-xl bg-muted"
       style={{ aspectRatio: canvasAspect }}
       aria-label="原图在目标画布中的布局预览"
     >
       {placement && sourceUrl && (
         <img
+          className="absolute block max-w-full object-contain"
           src={sourceUrl}
           alt="待扩图原图"
           data-expand-preview="true"
@@ -67,7 +68,11 @@ export function ExpandLayoutPreview({
           }}
         />
       )}
-      {failed && <figcaption className="smart-expand-preview-error">无法读取原图尺寸</figcaption>}
+      {failed && (
+        <figcaption className="absolute inset-0 grid place-items-center text-xs text-[color:var(--tool-text-danger)]">
+          无法读取原图尺寸
+        </figcaption>
+      )}
     </figure>
   );
 }

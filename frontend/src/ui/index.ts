@@ -184,3 +184,37 @@ export {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '~/admin-ui/components/ui/context-menu';
+export {
+  Attachment,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentContent,
+  AttachmentTitle,
+  AttachmentDescription,
+  AttachmentActions,
+  AttachmentAction,
+  AttachmentTrigger,
+} from '~/admin-ui/components/ui/attachment';
+export {
+  Item,
+  ItemGroup,
+  ItemSeparator,
+  ItemMedia,
+  ItemContent,
+  ItemTitle,
+  ItemDescription,
+  ItemActions,
+  ItemHeader,
+  ItemFooter,
+} from '~/admin-ui/components/ui/item';
+export { Kbd, KbdGroup } from '~/admin-ui/components/ui/kbd';
+export { Toggle } from '~/admin-ui/components/ui/toggle';
+export { AspectRatio } from '~/admin-ui/components/ui/aspect-ratio';
+export { ScrollArea, ScrollBar } from '~/admin-ui/components/ui/scroll-area';
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '~/admin-ui/components/ui/tooltip';
+/* 文字动作：`Button variant="link"` 的 C 端默认密度，避免每处重复写尺寸与下划线。 */
+export { TextAction, type TextActionProps } from './primitives/text-action';
+/* 分段选择：Radix ToggleGroup 的受控单选封装，替代手写 tab 外观的过滤条。 */
+export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './primitives/segmented-control';
+/* 图片拖拽上传区：shadcn Button 外壳 + 拖拽落点，空态统一入口。 */
+export { ImageDropzone, type ImageDropzoneProps } from './primitives/dropzone';

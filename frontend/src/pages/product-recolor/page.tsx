@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
 import {
+  PRODUCT_TOOL_DROPZONE,
+  PRODUCT_TOOL_PAGE,
   ColorStudio,
   ToolCard,
   ToolHistoryPane,
@@ -54,10 +56,16 @@ export function ProductRecolorPage() {
   return (
     <ToolShell
       capability="recolor"
-      pageClass="product-retouch-page product-recolor-page"
+      pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page product-recolor-page max-[900px]:[&_.pk-result-pane]:min-h-[360px]!`}
       title="商品换色"
       desc="一键生成商品多色效果，快速制作全SKU展示图"
-      upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      upload={{
+        title: '上传图片',
+        required: true,
+        max: 1,
+        hint: '点击、拖拽或粘贴图片上传，最多 1 张',
+        dropzoneClassName: PRODUCT_TOOL_DROPZONE,
+      }}
       replaceUpload
       renderUploadPreview={productSourceUploadPreview('待换色商品图')}
       settings={{ ratio: true, resolution: true }}
@@ -87,7 +95,12 @@ export function ProductRecolorPage() {
         <ToolHistoryPane capability="recolor" refreshKey={result?.url} emptyText="暂无换色记录" />
       }
     >
-      <ToolCard title="商品颜色" className="background-color-card product-recolor-color-card">
+      <ToolCard
+        title="商品颜色"
+        dense
+        titleGap
+        className="background-color-card product-recolor-color-card max-[900px]:min-h-[132px]"
+      >
         <ColorStudio
           options={RECOLOR_COLOR_SWATCHES}
           value={color}

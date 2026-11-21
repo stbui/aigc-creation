@@ -38,7 +38,7 @@ export function OrderInvoiceStatus({
   }
   if (invoice.status === 'issued') {
     return (
-      <span className="order-invoice-state is-issued">
+      <span className="inline-flex flex-wrap items-center gap-1.5 text-xs leading-5 text-success-text">
         发票 {invoice.invoiceNo} 已开具
         <Button size="sm" variant="link" onClick={() => previewInvoice(invoice.id)}>
           查看
@@ -47,11 +47,15 @@ export function OrderInvoiceStatus({
     );
   }
   if (invoice.status === 'pending') {
-    return <span className="order-invoice-state is-pending">发票 {invoice.invoiceNo} 审核中</span>;
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1.5 text-xs leading-5 text-muted-foreground">
+        发票 {invoice.invoiceNo} 审核中
+      </span>
+    );
   }
   if (invoice.status === 'red_flushed') {
     return (
-      <span className="order-invoice-state is-rejected">
+      <span className="inline-flex flex-wrap items-center gap-1.5 text-xs leading-5 text-danger-text">
         发票 {invoice.invoiceNo} 已冲红
         {invoice.redFlushReason ? `：${invoice.redFlushReason}` : ''}
         <Button size="sm" variant="link" onClick={() => previewInvoice(invoice.id)}>
@@ -61,7 +65,7 @@ export function OrderInvoiceStatus({
     );
   }
   return (
-    <span className="order-invoice-state is-rejected">
+    <span className="inline-flex flex-wrap items-center gap-1.5 text-xs leading-5 text-danger-text">
       发票被驳回：{invoice.rejectReason ?? '未说明原因'}
       <Button size="sm" onClick={onReapply}>
         重新申请

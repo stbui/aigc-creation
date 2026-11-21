@@ -6,7 +6,7 @@
  *
  * - `routes.ts`                          —— 路由路径 → 懒加载组件
  * - `layout.tsx`                        —— 路由守卫 + 布局 + 子路由挂载
- * - `dashboard/AdminDashboardContent.tsx` —— 平台概览（值班台）内容
+ * - `dashboard/AdminDashboardContent.tsx` —— 平台概览内容
  *
  * 保留本文件是因为 `App.tsx` 以 `import('./pages/admin/AdminDashboardPage')`
  * 的方式按名取 `AdminLayout`；这里的再导出是应用入口契约，不是兼容层。

@@ -38,4 +38,5 @@ export { useRightTab, type RightTab } from './useRightTab';
 export { useTaskPoller } from './useTaskPoller';
 export { useToolHistory, type ToolHistoryTask } from './useToolHistory';
 export { useToolTask } from './useToolTask';
-export { useDiscardConfirm, useUnsavedGuard } from './useUnsavedGuard';
+/* 未保存拦截只服务后台：实现位于 `~/admin-ui/hooks/useUnsavedGuard`，
+   后台页面经各自目录的 `hooks.ts` 取用，本入口不再转出。 */

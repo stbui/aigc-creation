@@ -1,9 +1,35 @@
+import type { ReactNode } from 'react';
 import { ImagePlus, Layers, Sparkles } from 'lucide-react';
 
 import { EMPTY_HINT, EMPTY_TITLE } from './constants';
 import { ToolGeneratingState, type ToolResult } from './components';
+import {
+  AspectRatio,
+  Badge,
+  EmptyState,
+  EmptyStateDescription,
+  EmptyStateHeader,
+  EmptyStateMedia,
+  EmptyStateTitle,
+  ToggleGroup,
+  ToggleGroupItem,
+} from './components';
 import { assetThumbUrl } from './api';
 import { fusionFailureText, type FusionResultStatus } from './utils';
+
+/**
+ * 舞台外框：宽度按所选比例自适应（页面 CSS 的 `multi-image-fusion-stage-frame`），
+ * 内层是 shadcn `AspectRatio` 撑高的棋盘格舞台。
+ */
+function FusionStage({ ratio, children }: { ratio: number; children: ReactNode }) {
+  return (
+    <div className="multi-image-fusion-stage-frame">
+      <AspectRatio ratio={ratio} className="multi-image-fusion-stage">
+        {children}
+      </AspectRatio>
+    </div>
+  );
+}
 
 /**
  * 结果面板的舞台区 —— 按状态渲染五种画面：
@@ -11,6 +37,11 @@ import { fusionFailureText, type FusionResultStatus } from './utils';
  *
  * 状态判定与提交按钮由 `MultiFusionResultPanel` 持有，本组件只负责把
  * `status.state` 映射成对应的画面，不参与任何取数或动作判定。
+ *
+ * 2026-11-21 舞台、空态与失败态改由 shadcn 组合：比例框 `AspectRatio`、
+ * 空态 `EmptyState`（三卡片斜叠插画作为 `EmptyStateMedia`）、尺寸胶囊 `Badge`、
+ * 变体切换 `ToggleGroup`（单选，`aria-pressed` 由 Radix 维护）。
+ * 棋盘格底是本页标志性视觉，作为舞台底色保留在页面 CSS（无交互语义的图形）。
  */
 export function MultiFusionResultStage({
   status,
@@ -36,7 +67,7 @@ export function MultiFusionResultStage({
   ratioHeight: number;
   onSelectResult: (index: number) => void;
 }) {
-  const ratioStyle = { aspectRatio: `${ratioWidth} / ${ratioHeight}` };
+  const ratio = ratioWidth / ratioHeight;
   const failureHeading =
     status.state === 'timeout'
       ? '结果暂未返回'
@@ -52,108 +83,128 @@ export function MultiFusionResultStage({
 
   if (submitting && results.length === 0 && !lastFailure) {
     return (
-      <div
-        className="multi-image-fusion-preview-stage multi-image-fusion-generating-stage"
-        style={ratioStyle}
-      >
-        <ToolGeneratingState tip={`正在生成 ${Math.max(1, requestedCount)} 张融合变体…`} />
-      </div>
+      <FusionStage ratio={ratio}>
+        <div className="grid size-full place-items-center p-5.5">
+          <ToolGeneratingState tip={`正在生成 ${Math.max(1, requestedCount)} 张融合变体…`} />
+        </div>
+      </FusionStage>
     );
   }
 
   if (lastFailure && results.length === 0) {
     return (
-      <div
-        className={`multi-image-fusion-preview-stage ${
-          status.state === 'timeout'
-            ? 'multi-image-fusion-timeout-stage'
-            : 'multi-image-fusion-failure-stage'
-        }`}
-        style={ratioStyle}
-      >
-        <div className="multi-image-fusion-result-empty">
-          <strong>{failureHeading}</strong>
-          <p>{failureDetail}</p>
-        </div>
-      </div>
+      <FusionStage ratio={ratio}>
+        <EmptyState className="size-full border-0 p-5.5">
+          <EmptyStateHeader>
+            <EmptyStateTitle className="text-xs font-semibold text-foreground">
+              {failureHeading}
+            </EmptyStateTitle>
+            <EmptyStateDescription className="text-xs leading-4.25">
+              {failureDetail}
+            </EmptyStateDescription>
+          </EmptyStateHeader>
+        </EmptyState>
+      </FusionStage>
     );
   }
 
   if (results.length === 0) {
     return (
-      <div className="multi-image-fusion-result-empty" style={ratioStyle}>
-        {/* D-84: 参考站是 96x78 三卡片斜叠插画 (-9deg / 0 / +9deg), 非共用插画组件 */}
-        <div className="multi-image-fusion-empty-art" aria-hidden>
-          <span>
-            <ImagePlus size={18} />
-          </span>
-          <span>
-            <Sparkles size={16} />
-          </span>
-          <span>
-            <Layers size={18} />
-          </span>
-        </div>
-        <strong>{EMPTY_TITLE}</strong>
-        <p>{EMPTY_HINT}</p>
-      </div>
+      <FusionStage ratio={ratio}>
+        <EmptyState className="size-full border-0 p-5.5">
+          {/* D-84: 参考站是 96x78 三卡片斜叠插画 (-9deg / 0 / +9deg), 非共用插画组件 */}
+          <EmptyStateMedia className="mb-2 h-[78px] w-24 bg-transparent">
+            <span className="relative block size-full" aria-hidden>
+              <span className="absolute top-3 left-0.75 grid size-12.5 -rotate-9 place-items-center rounded-lg border border-border bg-card text-brand shadow-card">
+                <ImagePlus className="size-4.5" />
+              </span>
+              <span className="absolute top-0 left-8 z-1 grid size-11.5 place-items-center rounded-lg border border-border bg-brand-bg text-brand">
+                <Sparkles className="size-4" />
+              </span>
+              <span className="absolute top-4 right-0.25 grid size-12.5 rotate-9 place-items-center rounded-lg border border-border bg-card text-brand shadow-card">
+                <Layers className="size-4.5" />
+              </span>
+            </span>
+          </EmptyStateMedia>
+          <EmptyStateHeader>
+            <EmptyStateTitle className="text-xs font-semibold text-foreground">
+              {EMPTY_TITLE}
+            </EmptyStateTitle>
+            <EmptyStateDescription className="text-xs">{EMPTY_HINT}</EmptyStateDescription>
+          </EmptyStateHeader>
+        </EmptyState>
+      </FusionStage>
     );
   }
 
   if (!activeResult?.url) {
     return (
-      <div className="multi-image-fusion-preview-stage" style={ratioStyle}>
-        <div className="multi-image-fusion-result-empty">
-          <strong>生成失败</strong>
-          <p>模型没有返回可用图片，请重试</p>
-        </div>
-      </div>
+      <FusionStage ratio={ratio}>
+        <EmptyState className="size-full border-0 p-5.5">
+          <EmptyStateHeader>
+            <EmptyStateTitle className="text-xs font-semibold text-foreground">
+              生成失败
+            </EmptyStateTitle>
+            <EmptyStateDescription className="text-xs">
+              模型没有返回可用图片，请重试
+            </EmptyStateDescription>
+          </EmptyStateHeader>
+        </EmptyState>
+      </FusionStage>
     );
   }
 
+  const previewRatio =
+    activeResult.width && activeResult.height ? activeResult.width / activeResult.height : ratio;
+
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* D-86: 参考站成功态是棋盘格预览舞台 + 缩略图网格, 不是本地详情卡 */}
-      <div
-        className="multi-image-fusion-preview-stage"
-        style={{
-          aspectRatio:
-            activeResult.width && activeResult.height
-              ? `${activeResult.width} / ${activeResult.height}`
-              : `${ratioWidth} / ${ratioHeight}`,
-        }}
-      >
-        <img
-          className="multi-image-fusion-preview-image"
-          src={activeResult.url}
-          alt={`多图融合结果 ${activeResultIndex + 1}`}
-        />
-        {activeResult.width && activeResult.height && (
-          <span className="multi-image-fusion-preview-size">
-            {activeResult.width}×{activeResult.height}
-          </span>
-        )}
+      <div className="multi-image-fusion-stage-frame">
+        <AspectRatio ratio={previewRatio} className="multi-image-fusion-stage">
+          <img
+            src={activeResult.url}
+            alt={`多图融合结果 ${activeResultIndex + 1}`}
+            className="size-full cursor-zoom-in object-contain"
+          />
+          {activeResult.width && activeResult.height && (
+            <Badge className="absolute right-3 bottom-3 h-6.25 gap-1 rounded-full bg-foreground/55 px-2 text-xs font-normal backdrop-blur-sm">
+              {activeResult.width}×{activeResult.height}
+            </Badge>
+          )}
+        </AspectRatio>
       </div>
-      <div className="multi-image-fusion-thumbnails">
+
+      <ToggleGroup
+        type="single"
+        value={String(activeResultIndex)}
+        onValueChange={(next) => {
+          if (next !== '') onSelectResult(Number(next));
+        }}
+        aria-label="融合变体"
+        spacing={2.25}
+        className="mt-3 grid grid-cols-4 justify-center"
+      >
         {results.map((item, index) => (
-          <button
+          <ToggleGroupItem
             key={item.url ?? index}
-            type="button"
-            className={index === activeResultIndex ? 'selected' : undefined}
+            value={String(index)}
             aria-label={`查看第 ${index + 1} 个融合变体`}
-            aria-pressed={index === activeResultIndex}
-            onClick={() => onSelectResult(index)}
+            className="relative size-18.5 min-w-0 overflow-hidden rounded-[10px] border-2 border-transparent bg-muted p-0 hover:-translate-y-0.25 data-[state=on]:border-brand/70"
           >
             <img
               src={assetThumbUrl(item.url, 240) ?? item.url}
               alt={`融合结果缩略图 ${index + 1}`}
               loading="lazy"
               decoding="async"
+              className="size-full object-contain"
             />
-            <span>{index + 1}</span>
-          </button>
+            <Badge className="absolute right-1 bottom-1 size-4.25 justify-center rounded-md bg-foreground/65 p-0 text-xs font-normal">
+              {index + 1}
+            </Badge>
+          </ToggleGroupItem>
         ))}
-      </div>
-    </>
+      </ToggleGroup>
+    </div>
   );
 }

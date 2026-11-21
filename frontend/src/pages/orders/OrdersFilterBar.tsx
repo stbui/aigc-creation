@@ -15,7 +15,7 @@ export interface OrdersFilterBarProps {
 
 export function OrdersFilterBar({ filter, counts, onChange }: OrdersFilterBarProps) {
   return (
-    <div className="order-filters" role="group" aria-label="按状态筛选订单">
+    <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="按状态筛选订单">
       {FILTERS.map((f) => {
         const active = filter === f.value;
         return (
@@ -23,11 +23,19 @@ export function OrdersFilterBar({ filter, counts, onChange }: OrdersFilterBarPro
             key={f.value}
             type="button"
             aria-pressed={active}
-            className={`order-filter${active ? ' is-active' : ''}`}
+            className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[13px] leading-none transition-colors ${
+              active
+                ? 'border-brand-bg bg-brand-bg font-semibold text-brand'
+                : 'border-border bg-card text-muted-foreground hover:border-[color-mix(in_srgb,var(--brand)_35%,var(--border))] hover:text-foreground'
+            }`}
             onClick={() => onChange(f.value)}
           >
             {f.label}
-            <span className="order-filter-count">{counts[f.value]}</span>
+            <span
+              className={`text-xs tabular-nums ${active ? 'text-brand' : 'text-muted-foreground'}`}
+            >
+              {counts[f.value]}
+            </span>
           </button>
         );
       })}

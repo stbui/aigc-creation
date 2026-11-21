@@ -7,6 +7,8 @@
 >
 > 前台模型层（`LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute`）已于 2026-11-13 删除：
 > 渠道模型直接作为售卖供给，按能力绑定后由运行时自动切换线路。
+>
+> 详细实施规格见 [`docs/model-channel-architecture.md`](./model-channel-architecture.md)，包括接口契约、追踪字段、发布检查、状态机和开发任务拆分。
 
 ## 1. 一句话
 
@@ -82,6 +84,24 @@ TaskWorkerService（领取 / 轮询 / 切线 / 收尾）
 | `CreditReservationItem` | 预留明细：账单 → 批次 → 金额 | 退款按它**原路**退回原批次 |
 | `ApiCallLog` | 每次上游 HTTP：请求类型 / 渠道 / 模型 / 状态 / 耗时 / 错误 / 用量 | 只 INSERT；是结算读 Token 用量的来源 |
 | `GenerationTask` | 任务：`capability` / `modelKey` / `channelModelId` / `channelId` 快照 | 任务建成后供应侧字段不再随后台改配置而变 |
+
+### 4.1 追踪现状与目标
+
+当前已有 `requestId`、`taskId`、`providerRequestId`、`RouteAttempt` 和 `ApiCallLog`，但异步任务还没有完整保存入口请求到 worker 的稳定链路标识。
+
+当前主要依赖：
+
+```text
+taskId → RouteAttempt → providerRequestId → ApiCallLog
+```
+
+目标闭环：
+
+```text
+traceId → GenerationTask → RouteAttempt → ApiCallLog → providerRequestId → 供应商任务
+```
+
+目标字段和接口属于待实施增量，不应误认为当前已经存在；详见本文第 15 节。
 
 ## 5. 请求时序
 
@@ -176,7 +196,7 @@ running ──nextPollAt 到期──► 回查上游
 | --- | --- | --- |
 | 准入阶段拦下（下线 / 参数 / 余额） | 任务不创建 | 不动 |
 | 有线路但全部 `rejected_no_job`（含建连前网络失败） | `failed` + `42204`（遮罩任务 `42205`） | 按预留明细原路全额退还 |
-| 建连后 5xx / 超时 / 连接中断 / 解析失败 | `failed` + `42206`（结果不明） | **不切线、不自动退款**，账单停 `uncertain`，等人工核对 |
+| 建连后 5xx / 超时 / 连接中断 / 解析失败 | `failed` + `42206`、`stage=uncertain`（结果不明） | **不切线、不自动退款**，账单停 `uncertain`，等人工核对 |
 | 进程崩溃后回收 | `failed` + `42202` | 退款 |
 | AIGC 标识失败 | `failed` + `42203`（fail-closed） | 退款 |
 | 成功 | `succeeded` | 结算（Token 模式按上游 usage 补扣 / 退差额） |
@@ -300,7 +320,7 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
    跨进程最多滞后 30s。
 2. **界面说可用、提交 42204**：对照 `RouteAttempt.failureCode`。最常见是协议 id 写成插件 id，
    或绑定已停用 / 商品被渠道停用。
-3. **账单停在 `uncertain` 不是 bug**：它只表示「请求可能已经到达上游，结果无法确认」，
+3. **账单停在 `uncertain` 不是 bug**：它只表示「请求可能已经到达上游，结果无法确认」；任务侧对应 `failed + errorCode=42206 + stage=uncertain`，
    只能人工核对后 `settle` / `refund`。
 4. **冷却只反映本进程**：`/admin/channels/health` 只报当前实例看到的状态。
 5. **健康分层有 30s 延迟**：刚恢复的线路最多 30s 后才回到健康层，不需要人工干预。
@@ -314,3 +334,39 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 - 接口清单与错误码：`docs/api-contract.md`
 - 积分扣费与退款口径：`docs/commerce-design.md`
 - 测试闸口与已知缺口：`docs/testing.md`
+
+## 15. 追踪闭环与配置发布（待实施）
+
+这部分是当前实现的增量设计，与前文“当前实际实现”分开记录。
+
+### 15.1 追踪字段
+
+| 对象 | 新增字段 | 用途 |
+| --- | --- | --- |
+| `GenerationTask` | `traceId` | 一次提交或批次跨 HTTP、worker、轮询持续存在的链路标识 |
+| `GenerationTask` | `admissionRequestId` | 创建任务的入口 HTTP 请求标识 |
+| `RouteAttempt` | `traceId` | 与任务直接关联，支持链路查询 |
+| `RouteAttempt` | `selectionSnapshotJson` | 候选数、健康层、priority、weight、目录版本等非敏感选路摘要 |
+| `RouteAttempt` | `channelSnapshotJson` | 渠道、渠道模型、协议和上游键快照，不含密钥 |
+| `ApiCallLog` | `routeAttemptId` | 精确关联 create / poll / result 等物理调用 |
+| `ApiCallLog` | `phase` | `upload` / `create` / `poll` / `result` / `cancel` / `agent` / `proxy` |
+| `ApiCallLog` | `routeRun`、`attemptNumber` | 直接按重试轮次和线路尝试排序 |
+
+worker 不得依赖入口请求的 `AsyncLocalStorage` 获取这些值；必须从任务和尝试快照传递。
+
+### 15.2 统一追踪接口
+
+```text
+GET /admin/model-traces/:traceId
+GET /admin/model-traces?taskId=&providerRequestId=&billingOrderId=&status=&from=&to=
+```
+
+返回任务、账单、路由尝试、物理调用、上游任务号、产物和人工处置的只读聚合视图。详情可以返回脱敏报文预览，但永不返回鉴权头、API Key、Secret Key 或解密后的自定义头。
+
+### 15.3 配置发布检查
+
+保存配置与发布配置分离。发布前统一检查协议注册和能力、渠道启停与 Base URL、凭证完整性、能力合同、有效价格档、能力绑定和用户可见性。检查接口一次返回全部 `blocking` / `warnings`，发布成功后才递增 `RouteCatalogVersion`。
+
+### 15.4 MVP
+
+第一期只实施：任务链路 `traceId`、尝试与调用精确关联、trace 详情、渠道模型发布检查、后台明确区分 `modelKey` / `modelGroupKey` / `providerModelKey`，以及一条 OpenAI 主线路和备用线路的端到端测试。

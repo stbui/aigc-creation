@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import type { MyProfile } from '../../types/api';
+import { ACCOUNT_CARD, ACCOUNT_CARD_HEAD } from './constants';
 
 /**
  * 「我的数据」卡。
@@ -26,20 +27,28 @@ export function AccountStatsCard({
   ];
 
   return (
-    <section className="account-card">
-      <header className="account-card-head">
-        <BarChart3 size={15} aria-hidden />
-        <h2>我的数据</h2>
+    <section className={ACCOUNT_CARD}>
+      <header className={ACCOUNT_CARD_HEAD}>
+        <BarChart3 size={15} aria-hidden className="flex-none text-muted-foreground" />
+        <h2 className="m-0 text-sm font-semibold">我的数据</h2>
       </header>
-      <div className="account-stats">
+      <div className="grid grid-cols-5 gap-2.5 max-[900px]:grid-cols-3 max-[640px]:grid-cols-2">
         {stats.map((stat) => (
-          <Link key={stat.label} className="account-stat" to={stat.to}>
-            <span className="account-stat-label">
-              {stat.icon}
+          <Link
+            key={stat.label}
+            className="flex flex-col gap-1.5 rounded-md border border-[var(--border-row)] bg-card px-3.5 py-3 text-inherit no-underline transition-colors hover:border-brand hover:bg-brand-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand [&:hover_.stat-arrow]:translate-x-0.5 [&:hover_.stat-arrow]:text-brand [&:hover_.stat-arrow]:opacity-100"
+            to={stat.to}
+          >
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="flex-none text-muted-foreground">{stat.icon}</span>
               {stat.label}
-              <ChevronRight size={13} className="account-stat-arrow" aria-hidden />
+              <ChevronRight
+                size={13}
+                className="stat-arrow ml-auto flex-none text-muted-foreground opacity-50 transition-[opacity,transform]"
+                aria-hidden
+              />
             </span>
-            <b>{stat.value ?? '—'}</b>
+            <b className="text-xl font-semibold text-foreground tabular-nums">{stat.value ?? '—'}</b>
           </Link>
         ))}
       </div>

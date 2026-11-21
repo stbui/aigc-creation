@@ -4,7 +4,7 @@
  * 后台的 `styles/admin.css` 只扫描 `admin-ui` / `pages/admin` / `components/admin`，
  * C 端组件不在它的 source 白名单里，因此这里单独生成 utilities。扫描范围 =
  * C 端目录 + `admin-ui/components/ui` + `admin-ui/providers`（ui 兼容层组合了它们）。
- * 主题变量沿用 admin.css 的映射，不新增颜色。
+ * 主题映射与后台共用 `styles/tailwind-theme.css`，本文件不再单独声明 `@theme`。
  */
 @layer theme, base, components, utilities;
 
@@ -14,6 +14,7 @@
 
 @source '../ui';
 @source '../components';
+@source '../layout';
 @source '../pages';
 /*
  * C 端 ui 兼容层直接组合 admin-ui 的 shadcn 原子件与 toast 实现，
@@ -23,54 +24,9 @@
 @source '../admin-ui/components/ui';
 @source '../admin-ui/providers';
 
-@theme inline {
-  --font-sans: 'Noto Sans SC', Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+/* 主题映射与后台共用一份，见 styles/tailwind-theme.css */
+@import '../styles/tailwind-theme.css';
 
-  --radius-sm: var(--radius-tag);
-  --radius-md: var(--radius-control);
-  --radius-lg: var(--radius-card);
-  --radius-xl: var(--radius-panel);
-  --radius-2xl: var(--radius-hero);
-
-  --shadow-card: var(--shadow-card);
-
-  --color-brand: var(--brand);
-  --color-brand-hover: var(--brand-hover);
-  --color-brand-bg: var(--brand-bg);
-
-  --color-background: var(--card-bg);
-  --color-foreground: var(--text-strong);
-  --color-page: var(--page-bg);
-
-  --color-card: var(--card-bg);
-  --color-card-foreground: var(--text-strong);
-  --color-popover: var(--card-bg);
-  --color-popover-foreground: var(--text-strong);
-
-  --color-primary: var(--brand);
-  --color-primary-foreground: #ffffff;
-  --color-secondary: var(--surface);
-  --color-secondary-foreground: var(--text-body);
-  --color-muted: var(--surface);
-  --color-muted-foreground: var(--text-muted);
-  --color-accent: var(--brand-bg);
-  --color-accent-foreground: var(--brand-hover);
-  --color-destructive: var(--danger-text);
-  --color-destructive-foreground: #ffffff;
-
-  --color-border: var(--border);
-  --color-input: var(--border);
-  --color-ring: var(--brand);
-
-  --color-success-soft: var(--success-soft-bg);
-  --color-success-text: var(--success-text);
-  --color-success-border: var(--success-border);
-  --color-warn-soft: var(--warn-bg);
-  --color-warn-border: var(--warn-border);
-  --color-warn-text: var(--warn-text);
-  --color-danger-soft: var(--danger-soft-bg);
-  --color-danger-text: var(--danger-text);
-}
 
 @layer base {
   /*
@@ -105,8 +61,8 @@
      [data-slot="form-field"] / [data-slot="form-message"]
      [data-slot="attachment"] / [data-slot="attachment-media"]
      [data-slot="badge"]
-     .tool-upload-trigger / .tool-form / .login-field
-     .login-input-wrap / .login-input-inner / .login-input-prefix
+     .login-field / .login-input-wrap / .login-input-inner
+     .login-input-prefix / .login-textarea-wrap / .login-textarea
      .login-textarea-count
    写页面样式时按这份清单取类名；Tabs / 表格 / 分页直接用 shadcn 的
    `[data-slot="tabs-list"]` / `[data-slot="table-head"]` 等槽位，
@@ -225,7 +181,38 @@
   color: var(--text-muted);
 }
 
+/* 常规流内的字数统计：默认绝对定位会压到下方的按钮行 (工单表单 / 回复框) */
+.login-textarea-count.is-block {
+  position: static;
+  display: block;
+  padding: 2px 2px 0;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .login-code-row > .login-input-wrap {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* 「N 个生成中」的呼吸点：Tailwind 只能引用动画名，关键帧必须落在 CSS 里 */
+@keyframes brand-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 42%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+/* 骨架屏与懒加载占位的流光：背景由调用方给出 400% 宽的渐变 */
+@keyframes shimmer-slide {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
 }

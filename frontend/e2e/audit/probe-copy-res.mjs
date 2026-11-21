@@ -23,24 +23,33 @@ const page = await ctx.newPage();
 for (const route of ['/free-creation', '/product-kit', '/product-detail', '/viral-clone', '/multi-image-fusion']) {
   await page.goto(`${SITE}${route}`, { waitUntil: 'networkidle' }).catch(() => {});
   await page.waitForTimeout(1500);
+  // 两套入口：工具页共享壳是 .pk-settings-summary，多图融合是 shadcn Popover 触发器。
   const sum = page.locator('.pk-settings-summary').first();
-  if (!(await sum.count())) {
-    // multi-fusion 用独立入口
-    const alt = page.locator('button:has-text("高级设置"), .multi-image-fusion-settings-toggle').first();
-    if (!(await alt.count())) { console.log(`${route}: 无入口`); continue; }
+  const alt = page.locator('button[aria-label="高级设置"]').first();
+  if (await sum.count()) {
+    await sum.click();
+  } else if (await alt.count()) {
     await alt.click();
   } else {
-    await sum.click();
+    console.log(`${route}: 无入口`);
+    continue;
   }
   await page.waitForTimeout(600);
   const out = await page.evaluate(() => {
-    const pop = document.querySelector('.pk-settings-popover');
+    // 工具页走自绘 popover，多图融合走 shadcn Popover（portal + data-slot）。
+    const pop =
+      document.querySelector('.pk-settings-popover') ??
+      document.querySelector('[data-slot="popover-content"]');
     if (!pop) return null;
-    const label = [...pop.querySelectorAll('.pk-settings-group-label, .image-output-settings-label')].map((e) => e.textContent.trim());
-    const cards = [...pop.querySelectorAll('.pk-resolution-option, .multi-image-fusion-resolution-option')].map((c) => ({
-      strong: c.querySelector('strong')?.textContent,
+    const label = [
+      ...pop.querySelectorAll('.pk-settings-group-label, .image-output-settings-label, [data-slot="field-legend"]'),
+    ].map((e) => e.textContent.trim());
+    const cards = [
+      ...pop.querySelectorAll('.pk-resolution-option, [data-slot="toggle-group-item"]'),
+    ].map((c) => ({
+      strong: c.querySelector('strong')?.textContent ?? c.textContent?.trim(),
       span: c.querySelector('span')?.textContent,
-      dis: c.disabled,
+      dis: c.matches('[disabled], [data-disabled]') || c.getAttribute('aria-disabled') === 'true',
       title: c.getAttribute('title'),
     }));
     return { label, cards };

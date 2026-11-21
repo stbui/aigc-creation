@@ -29,15 +29,16 @@ export function WatermarkRemoveAnnotationRow({
         {label}
       </label>
       {region && sourceImage ? (
-        <div className="annotation-mark-preview">
+        <div className="relative size-16 self-center overflow-hidden rounded-[var(--radius-control)] border border-[var(--border-brand)] bg-[var(--surface)]">
           <img
+            className="block max-w-none object-fill"
             src={sourceImage.url}
             alt={`${label}框选区域`}
             style={previewStyleOf(region)}
           />
           <button
             type="button"
-            className="annotation-remove"
+            className="absolute top-0.5 right-0.5 z-3 grid size-[18px] cursor-pointer place-items-center rounded-full border-0 bg-[rgba(51,51,51,0.78)] p-0 text-card hover:bg-[rgba(31,35,41,0.92)] focus-visible:bg-[rgba(31,35,41,0.92)] focus-visible:outline-none"
             aria-label={`删除${label}`}
             title={`删除${label}`}
             onClick={() => onRemove(region.id)}

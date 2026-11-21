@@ -1,4 +1,4 @@
-import { Skeleton } from '../../../admin-ui/primitives';
+import { Skeleton } from '~/admin-ui/radar';
 
 /**
  * 通用加载态：标题占位 + 内容占位，加载期间不闪白。

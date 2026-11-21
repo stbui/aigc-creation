@@ -21,11 +21,9 @@ export function WatermarkRemoveAnnotationPanel({
     <ToolCard
       title={
         <>
-          <i className="pk-required-mark u-font-14">*</i>水印标记
+          <i className="pk-required-mark u-font-14 mr-2">*</i>水印标记
         </>
-      }
-      className="prompt-card watermark-mark-card"
-    >
+      }    >
       {(regions.length > 0 ? regions : [null]).map((region, index) => (
         <WatermarkRemoveAnnotationRow
           key={region?.id ?? 'pending'}

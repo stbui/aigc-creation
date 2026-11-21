@@ -8,6 +8,17 @@ import {
   type PaintTool,
   type ResizeHandle,
 } from './constants';
+import {
+  BRUSH_CURSOR,
+  MASK_BRUSH_STROKE,
+  MASK_LAYER,
+  MASK_MARK_BASE,
+  MASK_MARK_BRUSH,
+  MASK_MARK_INDEX,
+  MASK_MARK_INDEX_BRUSH,
+  MASK_MARK_SELECTED,
+  resizeHandleClass,
+} from '../../components/canvasMaskClasses';
 import { MaskSession, sourcePoint } from './utils';
 
 /**
@@ -253,7 +264,7 @@ export const MaskPainter = memo(function MaskPainter({
   return (
     <div
       ref={stageRef}
-      className={`redraw-mask-stage tool-${tool}`}
+      className={`redraw-mask-stage tool-${tool} mt-0! border-0! rounded-none! bg-[var(--surface-2)]!`}
       style={fittedSize ? { width: `${fittedSize.width}px`, height: `${fittedSize.height}px` } : undefined}
     >
       <div
@@ -263,7 +274,7 @@ export const MaskPainter = memo(function MaskPainter({
       >
         <div
           ref={frameRef}
-          className={`redraw-image-frame tool-${tool}`}
+          className={`redraw-image-frame tool-${tool} relative size-full touch-none overflow-hidden bg-[var(--surface-2)]`}
           onPointerMove={(e) => {
             if (tool === 'brush' || tool === 'eraser') {
               updateCursor(pointFromClient(e.clientX, e.clientY));
@@ -272,7 +283,7 @@ export const MaskPainter = memo(function MaskPainter({
           onPointerLeave={() => updateCursor(null)}
         >
           <img
-            className="redraw-mask-bg"
+            className="redraw-mask-bg absolute inset-0 block size-full! object-fill select-none"
             src={url}
             alt="待重绘的原图"
             draggable={false}
@@ -280,14 +291,14 @@ export const MaskPainter = memo(function MaskPainter({
           />
           {/* 交互面本身不绘制内容：尺寸交给 CSS 拉伸，避免按原图尺寸分配一块空 canvas。 */}
           <canvas
-            className={`redraw-mask-overlay tool-${tool}`}
+            className={`redraw-mask-overlay tool-${tool} z-1${tool === 'brush' || tool === 'eraser' ? ' cursor-none' : ''}`}
             aria-label="在图上涂抹、框选或圈选要重绘的区域"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerCancel}
           />
-          <div className="mask-layer" aria-hidden="true">
+          <div className={MASK_LAYER} aria-hidden="true">
             {renderedMarks.map((mark) => {
               if (mark.kind === 'stroke' && mark.tool === 'eraser') return null;
               const index = regionIndex.get(mark.id);
@@ -297,11 +308,11 @@ export const MaskPainter = memo(function MaskPainter({
                 const first = dots[0];
                 return (
                   <div key={mark.id}>
-                    <span className="mask-brush-stroke">
+                    <span className={MASK_BRUSH_STROKE}>
                       {dots.map((point, pointIndex) => (
                         <i
                           key={pointIndex}
-                          className="mask-mark brush"
+                          className={`${MASK_MARK_BASE} ${MASK_MARK_BRUSH}`}
                           style={{
                             left: `${(point.x / sourceWidth) * 100}%`,
                             top: `${(point.y / sourceHeight) * 100}%`,
@@ -316,7 +327,7 @@ export const MaskPainter = memo(function MaskPainter({
                     </span>
                     {first && index ? (
                       <span
-                        className="mask-mark-index brush-index"
+                        className={`${MASK_MARK_INDEX} ${MASK_MARK_INDEX_BRUSH}`}
                         style={{
                           left: `${(first.x / sourceWidth) * 100}%`,
                           top: `${(first.y / sourceHeight) * 100}%`,
@@ -334,7 +345,9 @@ export const MaskPainter = memo(function MaskPainter({
               return (
                 <i
                   key={mark.id}
-                  className={`mask-mark ${mark.tool} has-index${selectedId === mark.id ? ' is-selected' : ''}`}
+                  className={`${MASK_MARK_BASE} z-10 ${mark.tool === 'rect' ? 'rounded-[3px]' : ''}${
+                    selectedId === mark.id ? ` ${MASK_MARK_SELECTED}` : ''
+                  }`}
                   style={{
                     left: `${(centerX / sourceWidth) * 100}%`,
                     top: `${(centerY / sourceHeight) * 100}%`,
@@ -346,12 +359,12 @@ export const MaskPainter = memo(function MaskPainter({
                   onPointerUp={endMarkInteraction}
                   onPointerCancel={endMarkInteraction}
                 >
-                  {index ? <span className="mask-mark-index">{index}</span> : null}
+                  {index ? <span className={MASK_MARK_INDEX}>{index}</span> : null}
                   {selectedId === mark.id
                     ? RESIZE_HANDLES.map((handle) => (
                         <span
                           key={handle}
-                          className={`resize-handle ${handle}`}
+                          className={resizeHandleClass(handle)}
                           onPointerDown={(e) => beginMarkInteraction(e, mark, 'resize', handle)}
                           onPointerMove={onMarkPointerMove}
                           onPointerUp={endMarkInteraction}
@@ -365,7 +378,7 @@ export const MaskPainter = memo(function MaskPainter({
             {tool === 'brush' || tool === 'eraser' ? (
               <i
                 ref={cursorRef}
-                className={`brush-cursor ${tool}`}
+                className={BRUSH_CURSOR}
                 aria-hidden="true"
                 style={{ display: 'none', width: `${cursorWidth}%` }}
               />

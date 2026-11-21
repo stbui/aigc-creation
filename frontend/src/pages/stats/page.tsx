@@ -93,17 +93,22 @@ export function StatsPage() {
 
   return (
     <PersonalPage
-      className="stats-page"
+      className="stats-page max-w-none"
       title={STATS_PAGE_META.title}
       description={
-        <span className="stats-page-summary">
+        <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>你的作品积累与创作趋势，都在这里。</span>
           {lastUpdated && (
-            <span className="stats-updated-at">更新于 {formatUpdatedAt(lastUpdated)}</span>
+            <span className="text-xs tabular-nums text-[color:var(--text-desc)]">
+              更新于 {formatUpdatedAt(lastUpdated)}
+            </span>
           )}
           {totals.running > 0 && (
-            <span className="stats-live">
-              <i aria-hidden />
+            <span className="inline-flex items-center gap-[5px] text-xs text-brand">
+              <i
+                className="size-1.5 rounded-full bg-current animate-[brand-pulse_1.8s_ease-out_infinite]"
+                aria-hidden
+              />
               {totals.running} 个作品生成中，自动更新
             </span>
           )}
@@ -111,14 +116,17 @@ export function StatsPage() {
       }
       showBack={false}
       extra={
-        <div className="stats-actions">
+        <div className="flex items-center justify-end gap-2">
           {refreshFailed && (
-            <span className="stats-refresh-error" title={error ?? undefined}>
+            <span
+              className="max-w-[190px] overflow-hidden truncate text-xs text-danger-text"
+              title={error ?? undefined}
+            >
               刷新失败，显示上次数据
             </span>
           )}
           <Button disabled={refreshing} onClick={refresh}>
-            <span className="state-spinner is-small" aria-hidden />
+            {refreshing && <span className="state-spinner is-small" aria-hidden />}
             刷新数据
           </Button>
           <Button asChild variant="default">
@@ -133,7 +141,7 @@ export function StatsPage() {
         <StatsEmptyPanel />
       ) : (
         <>
-          <section className="stats-split">
+          <section className="grid grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-3 max-[900px]:grid-cols-1">
             <StatsTrendPanel days={stats.last7Days} summary={trend} />
             <StatsRecentPanel tasks={stats.recentTasks} />
           </section>

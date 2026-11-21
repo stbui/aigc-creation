@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 
 import { LibraryAssetCard } from './LibraryAssetCard';
 import { modalityOfFormat } from './components';
@@ -58,11 +58,11 @@ export function LibraryGrid({
   return (
     <>
       <div
-        className="asset-library-grid"
-        style={{ ['--asset-library-columns' as string]: columns.length } as CSSProperties}
+        className="grid items-start gap-2 max-[640px]:gap-1.5"
+        style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
       >
         {columns.map((column, columnIndex) => (
-          <div className="asset-library-column" key={columnIndex}>
+          <div className="flex min-w-0 flex-col gap-2 max-[640px]:gap-1.5" key={columnIndex}>
             {column.map(({ asset, index }) => (
               <LibraryAssetCard
                 key={asset.id}

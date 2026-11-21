@@ -81,7 +81,7 @@ export function LandingPage() {
   const primaryTo = bizCards[0]?.to ?? '/workbench';
 
   return (
-    <div className="landing-page" data-route-stage>
+    <div className="landing-page bg-page" data-route-stage>
       <LandingHeader />
 
       <LandingHero totalCapabilities={totalCapabilities} primaryTo={primaryTo} />

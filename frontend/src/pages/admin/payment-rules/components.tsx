@@ -306,3 +306,35 @@ export function SaveRulesDialog({
     </ModalDialog>
   );
 }
+
+/* 目录内的页面与字段文件统一从本入口取外部控件 */
+export {
+  ActionButton,
+  AdminPage,
+  EmptyState,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldTitle,
+  FilePicker,
+  FormField,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+  ListError,
+  Notice,
+  NumberField,
+  PageSkeleton,
+  Panel,
+  SaveBar,
+  SelectField,
+  SkeletonPanel,
+  Spinner,
+  StaleError,
+  SwitchField,
+  TextAreaField,
+  TextField,
+  ToneBadge,
+} from '~/admin-ui/radar';

@@ -45,7 +45,7 @@ export function CreativeImageUploadSection({
   };
 
   return (
-    <div className="pk-section fc-upload-section">
+    <div className="pk-section gap-3!">
       <div className="pk-upload-title-row">
         <strong className="pk-section-title u-font-14">上传参考图</strong>
         <div className="pk-upload-title-actions">
@@ -67,7 +67,11 @@ export function CreativeImageUploadSection({
       </div>
 
       <div
-        className={`pk-dropzone fc-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${images.length > 0 ? ' fc-dropzone-ready' : ''}`}
+        className={`pk-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${
+          images.length > 0
+            ? ' pk-dropzone-filled min-h-0! cursor-default border-0! bg-transparent! p-0! [display:block]! hover:border-0! hover:bg-transparent! hover:shadow-none!'
+            : ''
+        }`}
         onClick={openFilePicker}
         onDragOver={(event) => {
           event.preventDefault();
@@ -97,16 +101,16 @@ export function CreativeImageUploadSection({
           </div>
         )}
         {images.length === 0 ? (
-          <label className="pk-upload-prompt fc-upload-prompt">
-            <ImagePlus size={14} />
-            <span>点击、拖拽或粘贴参考图片到此处上传</span>
+          <label className="pk-upload-prompt max-w-none! rounded-md p-2 text-xs leading-5">
+            <ImagePlus size={14} className="mb-5" />
+            <span className="text-[color:var(--text-1)]!">点击、拖拽或粘贴参考图片到此处上传</span>
             <small>
               最多可上传 {maxImages} 张参考图片，单张不超过 {MAX_IMAGE_MB}MB
             </small>
           </label>
         ) : (
           <>
-            <div className="fc-thumb-grid">
+            <div className="grid w-full grid-cols-[repeat(auto-fill,80px)] content-start items-start justify-start gap-2.5">
               {images.map((image, index) => (
                 <CreativeImageReferenceThumb
                   key={image.id}
@@ -120,18 +124,20 @@ export function CreativeImageUploadSection({
               {hasRoom && (
                 <button
                   type="button"
-                  className="fc-thumb-add"
+                  className="flex size-20 cursor-pointer flex-col items-center justify-center gap-2.5 rounded-md border border-muted bg-muted p-0 text-[color:var(--text-body)] hover:border-[var(--border-hover)]"
                   onClick={(event) => {
                     event.stopPropagation();
                     openFilePicker();
                   }}
                 >
                   <Plus size={18} />
-                  <span>添加</span>
+                  <span className="text-xs leading-[22px] text-[color:var(--text-body)]">添加</span>
                 </button>
               )}
             </div>
-            <p className="fc-sort-tip">使用箭头调整参考图顺序，顺序会影响生成构图</p>
+            <p className="mx-0 mt-2 mb-0 text-xs leading-[18px] text-[color:var(--text-desc)]">
+              使用箭头调整参考图顺序，顺序会影响生成构图
+            </p>
           </>
         )}
       </div>

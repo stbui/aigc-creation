@@ -1,6 +1,6 @@
 import type { Order } from '../../types/api';
 import type { Invoice } from '../../types/payment';
-import { STATUS_LABEL, type InvoiceFormState } from './constants';
+import { ORDER_STATUS_TONE, STATUS_LABEL, type InvoiceFormState } from './constants';
 import { canPay, formatDateTime, formatYuan } from './utils';
 import { Button } from './components';
 import { OrderInvoiceForm } from './OrderInvoiceForm';
@@ -63,18 +63,22 @@ export function OrderCard({
   const totalValue = o.status === 'cancelled' ? o.totalCents : o.paidCents;
 
   return (
-    <article className="order-card">
-      <div className="order-card-head">
-        <span className="order-no">{o.orderNo}</span>
-        <span className={`order-status is-${o.status}`}>{STATUS_LABEL[o.status]}</span>
+    <article className="mb-3 rounded-xl border border-border bg-card px-5 py-4 transition-[border-color,box-shadow] hover:border-[color-mix(in_srgb,var(--brand)_18%,var(--border))] hover:shadow-card max-[640px]:px-4 max-[640px]:py-3.5">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-row)] pb-3">
+        <span className="font-mono text-xs tracking-[0.2px] text-muted-foreground">{o.orderNo}</span>
+        <span
+          className={`inline-flex flex-none items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs leading-[18px] font-semibold before:size-1.5 before:rounded-full before:bg-current before:content-[''] ${ORDER_STATUS_TONE[o.status]}`}
+        >
+          {STATUS_LABEL[o.status]}
+        </span>
       </div>
 
-      <div className="order-lines">
+      <div className="grid gap-0.5 py-1.5 pb-2.5">
         {o.membershipPlanId && (
-          <div className="order-line">
-            <div className="order-line-main">
-              <span className="order-line-name">{o.membershipPlanName ?? '会员套餐'}</span>
-              <span className="order-line-meta">
+          <div className="flex items-start justify-between gap-4 py-1.5">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-sm leading-5 text-foreground">{o.membershipPlanName ?? '会员套餐'}</span>
+              <span className="text-xs leading-[18px] text-muted-foreground">
                 {o.status === 'pending'
                   ? '会员订阅 · 支付后自动发放'
                   : o.status === 'paid' || o.status === 'partial_refunded'
@@ -84,19 +88,23 @@ export function OrderCard({
                     : '会员订阅 · 已结束'}
               </span>
             </div>
-            <span className="order-line-amount">{formatYuan(o.totalCents)}</span>
+            <span className="flex-none text-[13px] text-muted-foreground tabular-nums">
+              {formatYuan(o.totalCents)}
+            </span>
           </div>
         )}
         {o.items.map((it) => (
-          <div key={it.id} className="order-line">
-            <div className="order-line-main">
-              <span className="order-line-name">{it.name}</span>
-              <span className="order-line-meta">
+          <div key={it.id} className="flex items-start justify-between gap-4 py-1.5">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-sm leading-5 text-foreground">{it.name}</span>
+              <span className="text-xs leading-[18px] text-muted-foreground">
                 × {it.quantity} · {it.credits} 积分
                 {it.validDays > 0 ? ` · ${it.validDays} 天有效` : ' · 永久有效'}
               </span>
             </div>
-            <span className="order-line-amount">{formatYuan(it.priceCents * it.quantity)}</span>
+            <span className="flex-none text-[13px] text-muted-foreground tabular-nums">
+              {formatYuan(it.priceCents * it.quantity)}
+            </span>
           </div>
         ))}
 
@@ -106,10 +114,12 @@ export function OrderCard({
          * 账说清楚才不会有客服工单。
          */}
         {o.refunds.map((r) => (
-          <div key={r.id} className="order-line is-refund">
-            <div className="order-line-main">
-              <span className="order-line-name">退款 {formatYuan(r.amountCents)}</span>
-              <span className="order-line-meta">
+          <div key={r.id} className="flex items-start justify-between gap-4 py-1.5">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-[13px] font-semibold text-danger-text">
+                退款 {formatYuan(r.amountCents)}
+              </span>
+              <span className="text-xs leading-[18px] text-muted-foreground">
                 扣回 {r.creditsReclaimed} 积分
                 {r.creditsUnreclaimable > 0 &&
                   `（${r.creditsUnreclaimable} 已消耗无法追回）`}
@@ -122,21 +132,27 @@ export function OrderCard({
         ))}
       </div>
 
-      <div className="order-card-foot">
-        <span className="order-card-meta">{meta.join(' · ')}</span>
-        <div className="order-total">
+      <div className="flex items-baseline justify-between gap-5 border-t border-[var(--border-row)] pt-3 max-[640px]:flex-col max-[640px]:items-stretch max-[640px]:gap-2">
+        <span className="text-xs leading-[18px] text-muted-foreground">{meta.join(' · ')}</span>
+        <div className="flex flex-none flex-wrap items-baseline justify-end gap-x-3 gap-y-1 max-[640px]:items-start">
           {(o.discountCents > 0 || o.refundedCents > 0) && (
-            <span className="order-total-note">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {o.discountCents > 0 && `优惠 -${formatYuan(o.discountCents)}`}
               {o.discountCents > 0 && o.refundedCents > 0 && ' · '}
               {o.refundedCents > 0 && `已退 ${formatYuan(o.refundedCents)}`}
             </span>
           )}
-          <span className="order-total-main">
-            <span className="order-total-label">
+          <span className="inline-flex items-baseline gap-2">
+            <span className="text-xs text-muted-foreground">
               {o.status === 'cancelled' ? '订单金额' : o.status === 'pending' ? '应付' : '实付'}
             </span>
-            <strong className={`order-total-value${o.status === 'cancelled' ? ' is-void' : ''}`}>
+            <strong
+              className={`tabular-nums ${
+                o.status === 'cancelled'
+                  ? 'text-base font-semibold text-muted-foreground'
+                  : 'text-lg font-bold text-foreground'
+              }`}
+            >
               {formatYuan(totalValue)}
             </strong>
           </span>
@@ -144,9 +160,9 @@ export function OrderCard({
       </div>
 
       {(payable || invoiceable) && (
-        <div className="order-card-actions">
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-dashed border-[var(--border-row)] pt-3 max-[640px]:flex-col max-[640px]:items-stretch">
           {/* 发票: 一单一票, 有发票后只展示进度与查看, 不再给重复申请 */}
-          <div className="order-invoice-slot">
+          <div className="flex min-w-0 items-center">
             {invoiceable ? (
               <OrderInvoiceStatus
                 invoice={invoice}
@@ -157,7 +173,7 @@ export function OrderCard({
             ) : null}
           </div>
           {payable && (
-            <div className="order-action-btns">
+            <div className="ml-auto flex gap-2 max-[640px]:w-full max-[640px]:[&_[data-slot=button]]:flex-1">
               <Button disabled={cancelling} onClick={onCancel}>
                 {cancelling ? '取消中…' : '取消订单'}
               </Button>

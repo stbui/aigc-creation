@@ -40,22 +40,26 @@
 key 格式：
 
 ```
-<category>/<yyyyMM>/<随机>.<ext>          # 上传、设置图、模板图
-generated/task/<taskId>/output-<n>.<ext>  # 生成产出（确定性，重试复用）
+<prefix>/<category>/<yyyyMM>/<随机>.<ext>          # 云端后端新写入：带可配置前缀
+<category>/<yyyyMM>/<随机>.<ext>                  # 本地后端：不带前缀，/uploads 路由即部署契约
+generated/task/<taskId>/output-<n>.<ext>          # 生成产出（确定性，重试复用；云端另加前缀）
 ```
 
 - 类别当前有 `original` / `generated` / `settings` / `templates` / `invoices`。
+- `prefix` 取自当前默认后端的 `pathPrefix`（默认 `huojue`）；只影响**新写入**，历史 key 原样保留。
 - 生成产出的 key 必须确定性：落盘失败重试时按 `storageBackend + storageKey` 查重，不能每次重写一份。
 - key 只允许 `[A-Za-z0-9/_.-]`，禁止 `..`、反斜杠与开头 `/`；解析后的绝对路径必须仍在根目录内。
-- 凭据只从环境变量读取，永不入库、不回显明文。
+- 连接参数和凭据只在后台「存储配置」页编辑，**加密落库**（`StorageConfig.configCipher`，AES-256-GCM，密钥复用 `MODEL_SECRET_KEY`），永不回显明文；不读取对象存储环境变量。
 - 配置了云端后端但 SDK/凭据缺失时**直接失败，不回落本地**，避免生产数据静默写进容器盘。
 - 读取按素材记录的 `storageBackend` 走原后端；切换默认后端不影响历史素材。
 
 ### 3.1 云端后端接入（OSS / MinIO）
 
-`local` 零配置；`oss` / `minio` 走同一套启用流程。凭据仍只从环境变量读（B-63），后台界面不可编辑。
+> 2026-11 变更：凭据由「只读环境变量」改为「页面可编辑 + 加密落库 + 即时生效」。这是对 B-63 既定契约的反转，登记于 `docs/non-upstream-extensions.md`。
 
-**第 1 步 · 装 SDK**。云端 SDK 刻意不进 `package.json` —— 本地开发不该背两个云 SDK 的体积与启动开销。切哪个装哪个：
+`local` 零配置；`oss` / `minio` 走同一套启用流程。后台 `/admin/storage` 卡片点「配置后端 / 编辑配置」打开抽屉，字段由后端 `config.fields` 驱动，密钥留空表示沿用旧值。
+
+**第 1 步 · 装 SDK**。云端 SDK 刻意不进 `package.json` —— 本地开发不该背两个云 SDK 的体积与启动开销。切哪个装哪个（部署期一次，仍需命令行）：
 
 ```bash
 npm --prefix backend install --no-save ali-oss   # 阿里云 OSS
@@ -64,25 +68,43 @@ npm --prefix backend install --no-save minio     # MinIO / S3 兼容
 
 `--no-save` 保证不改依赖清单；生产请把对应命令写进镜像构建步骤，否则容器重建后 SDK 又没了。
 
-**第 2 步 · 配环境变量**。写进 `backend/.env.{env}.local`（不入库），变量名逐项对齐 `backend/.env.example`：
+**第 2 步 · 页面填写配置**。对象存储的连接参数和凭据唯一来源是数据库中的后台页面配置：
 
-| 后端 | 必填 | 可选 / 有默认 |
-| --- | --- | --- |
-| OSS | `OSS_REGION`、`OSS_BUCKET`、`OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET` | `OSS_ENDPOINT`（自定义域名） |
-| MinIO | `MINIO_ENDPOINT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY` | `MINIO_PORT=9000`、`MINIO_USE_SSL=false`、`MINIO_BUCKET=huojue` |
+- **页面配置（推荐）**：在 `/admin/storage` 对应卡片点「配置后端」，填入连接信息保存，即时生效、无需重启。字段按分组排列（连接位置 → 读取出口 → 服务端凭据 → 高级），由后端字段定义驱动：
 
-`STORAGE_BACKEND` 决定**初始**默认后端（`local` / `oss` / `minio`）；非法值在启动日志报错并回落 `local`，不会静默当作没配。必填项缺任意一个，该后端就不注册 —— 不构造密钥为空的 client 让探测失败得莫名其妙；缺哪些变量、SDK 装没装，启动日志逐项点名。
+  | 后端 | 分组 | 必填 | 可选 / 有默认 |
+  | --- | --- | --- | --- |
+  | OSS | 连接位置 | `region`、`bucket` | `pathPrefix=huojue`、`endpoint`（服务根地址，留空由 SDK 推导） |
+  | OSS | 读取出口 | — | `publicBaseUrl`（CDN / 自定义域名）、`urlExpiresSeconds=3600` |
+  | OSS | 服务端凭据 | `accessKeyId`、`accessKeySecret` | `sessionToken`（STS 临时凭证） |
+  | OSS | 高级 | — | `autoCreateBucket=false` |
+  | MinIO | 连接位置 | `endPoint`、`accessKey`、`secretKey` | `port=9000`、`useSSL=false`、`region=us-east-1`、`bucket=huojue`、`pathPrefix=huojue` |
+  | MinIO | 读取出口 | — | `publicBaseUrl`、`urlExpiresSeconds`（留空用 SDK 默认 7 天） |
+  | MinIO | 高级 | — | `autoCreateBucket=false` |
+  | local | 读取出口 | — | `publicBaseUrl`（服务器访问地址；留空返回 `/uploads` 相对路径） |
 
-**第 3 步 · 重启后端并验证**：
+  字段语义要点：
 
-1. 重启后端进程（`./start.sh --backend-only` 或 build + restart）。本仓库跑的是 `node dist/main.js`，改 env 不会热生效。
-2. 打开 `/admin/storage`：卡片从「未启用」变为已配置，显示脱敏凭据与地址；容量分布可核对各后端的实际归属。
-3. 点「连通性测试」：除只读探测（OSS `list` / MinIO `bucketExists`）外，还会写 1 字节探针、读回校验并删除，证明 put / get 权限可用。状态轮询与健康检查**只做只读探测**，不会高频写云。
+  - **`pathPrefix`** 只作用于**新写入**的云端 key，用于同桶多应用隔离。历史素材的 key 原样留在库里，改前缀不会让老图 404；本地盘不加前缀（`/uploads/<key>` 是部署契约）。
+  - **`publicBaseUrl`** 是浏览器读取出口：配置后预览走直读、不生成签名参数（CDN 自己处理鉴权）；私有桶不配置时仍走签名 URL。
+  - **`endpoint`** 必须是服务根地址，不能包含 Bucket、路径、查询参数或认证信息；不符合时保存直接被拒绝。
+  - **`urlExpiresSeconds`** 只影响签发的预览链接，不入库；OSS 默认 1 小时，MinIO 留空沿用 SDK 默认 7 天。
+  - **`sessionToken`** 用于 STS 临时凭证；切换厂商时不会沿用另一厂商的 Token。
+
+**先测后存**：抽屉底部「测试连接」用**当前草稿**做真实读写（写 1 字节探针、读回校验、删除），不落库、不切换默认后端；连接字段变化后旧测试结论标记为「配置已变化」，避免拿过期结论背书新配置。
+
+未配置数据库记录时仅启用本地存储。云端后端保存成功后，可在对应卡片点击「设为默认」；默认后端也保存到数据库，重启后保持不变。
+
+**第 3 步 · 验证**：
+
+1. 页面保存配置后即时生效（重建 provider），无需重启；默认后端切换也保存到数据库。
+2. 卡片从「未启用」变为已配置，显示脱敏凭据、地址、路径前缀与公开域名；容量分布可核对各后端的实际归属。
+3. 卡片「连通性测试」对已保存配置做只读探测 + 写探针读回（OSS `list` / MinIO `bucketExists`，再写 1 字节探针、读回校验并删除），证明 put / get 权限可用。失败消息会带上 Bucket / Region / Endpoint 与失败步骤（写入 / 读回 / 删除）。状态轮询与健康检查**只做只读探测**，不会高频写云。
 4. 需要切默认后端时点「设为默认」。切换只影响新上传，历史素材仍按各自的 `storageBackend` 读取。
 
-权限：「连通性测试」需 `channel.test`，「设为默认」需 `setting.write`。预览链接只用于页面即时预览、不入库 —— OSS 签名 1 小时，MinIO 预签名默认 7 天。
+权限：「编辑配置」「访问地址」「设为默认」需 `setting.write`，「连通性测试」（含草稿测试）需 `channel.test`，查看状态需 `setting.read`。预览链接只用于页面即时预览、不入库 —— OSS 签名按 `urlExpiresSeconds`（默认 1 小时），MinIO 预签名默认 7 天。
 
-**回退**：把 `STORAGE_BACKEND` 改回 `local` 并重启即可。已写到云端的素材**不会自动迁回本地**；仓库内没有云端 → 本地的自动回迁工具，需要人工迁文件并改 `Asset.storageBackend` / `storageKey`。
+**回退**：在页面把默认后端切回「本地磁盘」即可。已写到云端的素材**不会自动迁回本地**；仓库内没有云端 → 本地的自动回迁工具，需要人工迁文件并改 `Asset.storageBackend` / `storageKey`。
 
 ## 4. 缩略图
 

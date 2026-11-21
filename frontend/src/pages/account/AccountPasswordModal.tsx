@@ -55,7 +55,7 @@ export function AccountPasswordModal({
               : '当前账号通过第三方登录创建，尚未设置密码。设置后可使用邮箱和密码登录。'}
           </DialogDescription>
         </DialogHeader>
-        <div className="account-form">
+        <div className="flex flex-col gap-2.5">
           {hasPassword && (
             <Input
               type="password"

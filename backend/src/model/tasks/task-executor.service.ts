@@ -109,8 +109,14 @@ export interface CallLogInput {
   requestBody: string;
   responseBody: string;
   upstreamUrl: string;
+  /** 客户端地址（建任务时的 `req.ip` 快照）；取不到为空串 */
+  clientIp?: string;
   /** 业务请求中的视频时长；轮询 GET 没有请求体，不能只靠 requestBody 推断 */
   videoSeconds?: number;
+  /** 实际写出的请求体字节数；请求未发出（协议构建失败）时为 0 */
+  requestBytes?: number;
+  /** 上游响应体字节数；没收到响应时为 0 */
+  responseBytes?: number;
 }
 
 @Injectable()
@@ -133,6 +139,8 @@ export class TaskExecutorService {
     upstreamUrl: string;
     requestBody: string;
     responseBody: string;
+    requestBytes: number;
+    responseBytes: number;
     spec: ProtocolRequestSpec;
   }> {
     const startedAt = Date.now();
@@ -212,6 +220,8 @@ export class TaskExecutorService {
       upstreamUrl: response?.url ?? '',
       requestBody,
       responseBody,
+      requestBytes: response?.requestBytes ?? 0,
+      responseBytes: response?.responseBytes ?? 0,
       spec: spec ?? { method: 'POST', path: '', contentType: '' },
     };
   }
@@ -228,6 +238,8 @@ export class TaskExecutorService {
     upstreamUrl: string;
     requestBody: string;
     responseBody: string;
+    requestBytes: number;
+    responseBytes: number;
     spec: ProtocolRequestSpec;
   }> {
     const startedAt = Date.now();
@@ -298,6 +310,8 @@ export class TaskExecutorService {
       upstreamUrl: response?.url ?? '',
       requestBody,
       responseBody,
+      requestBytes: response?.requestBytes ?? 0,
+      responseBytes: response?.responseBytes ?? 0,
       spec: spec ?? { method: 'GET', path: '', contentType: '' },
     };
   }
@@ -353,6 +367,9 @@ export class TaskExecutorService {
           requestContentType: input.spec.contentType,
           requestBody: input.requestBody,
           responseBody: input.responseBody,
+          clientIp: input.clientIp ?? '',
+          requestBytes: input.requestBytes ?? 0,
+          responseBytes: input.responseBytes ?? 0,
           startedAt: new Date(Date.now() - outcome.durationMs),
         },
       });

@@ -1,4 +1,5 @@
 import type { AnnotationDraft, RegionBounds } from './constants';
+import { ANNOTATION_CARD, ANNOTATION_LABEL, ANNOTATION_TEXTAREA } from './constants';
 import { ToolCard } from './components';
 import { LocalRedrawAnnotationItem } from './LocalRedrawAnnotationItem';
 
@@ -39,19 +40,24 @@ export function LocalRedrawAnnotationPanel({
         </>
       }
       actions={
-        <span>
+        <span className="text-xs text-[color:var(--text-body)]">
           {filledCount}/{regions.length}
         </span>
       }
-      className="prompt-card"
     >
       {regions.length === 0 ? (
-        <div className="redraw-prompt is-pending">
-          <label className="redraw-prompt-label is-pending">
+        <div className={`redraw-prompt is-pending ${ANNOTATION_CARD}`}>
+          <label className={`redraw-prompt-label is-pending ${ANNOTATION_LABEL}`}>
             <i />
             标注1
           </label>
-          <textarea rows={2} value="" disabled placeholder="请先在图片上标注区域..." />
+          <textarea
+            className={ANNOTATION_TEXTAREA}
+            rows={2}
+            value=""
+            disabled
+            placeholder="请先在图片上标注区域..."
+          />
         </div>
       ) : (
         regions.map((region, index) => (

@@ -1,11 +1,13 @@
 import { MultiFusionOutputSettings } from './MultiFusionOutputSettings';
-import { Spin } from '../../ui';
+import { Button, InlineAlert, InlineAlertDescription, Spin } from './components';
 
 /**
- * 提交区（sticky 白底容器，参考站 §5.13）。
+ * 提交区（参考站 §5.13 的 sticky 白底容器）。
  *
- * 该元素同时挂 `image-tool-submit-area` 与 `multi-image-fusion-submit-area`：
- * 两者特异度相同，后定义者胜 → 真实底色 #fff / z-index 10（非 #f6f7fb / 5）。
+ * 2026-11-21 由同时挂 `image-tool-submit-area`（共享 CSS 覆盖游戏）改为
+ * shadcn 结构：容器用 `sticky bottom-0` + 卡片底，禁止原因用 `InlineAlert`，
+ * 主 CTA 用 shadcn `Button`（全宽 43px 圆角 11px），价格作为按钮内 `small`。
+ * 共享 `image-output-settings-*` 的整套实测皮肤随之退场（见 `MultiFusionOutputSettings`）。
  */
 export function MultiFusionSubmitBar({
   submitting,
@@ -36,7 +38,7 @@ export function MultiFusionSubmitBar({
   onSubmit: () => void;
 }) {
   return (
-    <div className="image-tool-submit-area multi-image-fusion-submit-area">
+    <div className="sticky bottom-0 z-10 mt-auto grid w-full min-w-0 gap-3.5 rounded-xl bg-card px-4 pt-3.5 pb-4">
       <MultiFusionOutputSettings
         open={settingsOpen}
         ratio={ratio}
@@ -45,9 +47,10 @@ export function MultiFusionSubmitBar({
         onRatioChange={onRatioChange}
         onResolutionChange={onResolutionChange}
       />
-      <button
+
+      <Button
         type="button"
-        className="multi-image-fusion-submit-button"
+        className="h-10.75 w-full gap-1.75 rounded-[11px] text-xs font-bold"
         disabled={disabled}
         onClick={onSubmit}
       >
@@ -62,12 +65,19 @@ export function MultiFusionSubmitBar({
             {/* creditLabel 为 null = 能力清单未到 (加载中)。
                 此时不显示任何价格占位 —— "加载中…"放在价格位上会被读成价格文案,
                 且用户点下按钮前看不到扣费提示。空着即可, 清单到达后会补上。 */}
-            {creditLabel && <small>{creditLabel}</small>}
+            {creditLabel && (
+              <small className="text-xs font-normal whitespace-nowrap text-primary-foreground/80">
+                {creditLabel}
+              </small>
+            )}
           </>
         )}
-      </button>
+      </Button>
+
       {blockedReason && (
-        <p className="tool-submit-notice tool-submit-notice-error">{blockedReason}</p>
+        <InlineAlert variant="destructive">
+          <InlineAlertDescription className="text-xs">{blockedReason}</InlineAlertDescription>
+        </InlineAlert>
       )}
     </div>
   );

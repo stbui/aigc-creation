@@ -52,7 +52,7 @@ export function AccountDeleteModal({
         <DialogHeader>
           <DialogTitle>确认注销账号</DialogTitle>
         </DialogHeader>
-        <div className="account-delete-body">
+        <div className="flex flex-col gap-3">
           <InlineAlert className="border-warn-border bg-warn-soft text-warn-text">
             <InlineAlertTitle>此操作不可撤销</InlineAlertTitle>
             <InlineAlertDescription>
@@ -72,7 +72,7 @@ export function AccountDeleteModal({
               autoComplete="current-password"
             />
           ) : (
-            <p className="account-hint">当前账号未设置密码，将凭当前登录会话确认注销。</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">当前账号未设置密码，将凭当前登录会话确认注销。</p>
           )}
           <Input
             placeholder={`请输入确认词：${DELETE_CONFIRM_WORD}`}

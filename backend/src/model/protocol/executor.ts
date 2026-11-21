@@ -43,6 +43,20 @@ export interface ProtocolHttpResponse {
   /** 实际请求地址，供调用记录与排障 */
   url: string;
   durationMs: number;
+  /**
+   * 实际写出的请求体字节数（multipart 边界与内联媒体都算在内）。
+   *
+   * 调用记录用它记「发往上游」。不能用 `requestBody` 预览的长度代替 ——
+   * 预览在入库前折叠了内联媒体并截断到 256K 字符，按它反推会系统性偏小。
+   */
+  requestBytes: number;
+  /**
+   * 上游响应体字节数。
+   *
+   * 与 `responseBody` 预览的关系同上。响应体超过 `MAX_PROVIDER_RESPONSE_BYTES`
+   * 时 `send` 会直接抛错，因此走到这里的响应都是完整读到的，`body.length` 即真实值。
+   */
+  responseBytes: number;
 }
 
 /** 可识别的 API 版本前缀（与参考实现 `channelAPIPrefixes` 一致） */
@@ -310,6 +324,8 @@ export class ProtocolExecutor {
        */
       url: stripAuthQuery(originalQuery, target),
       durationMs: Date.now() - startedAt,
+      requestBytes: body?.length ?? 0,
+      responseBytes: response.body.length,
     };
   }
 

@@ -107,8 +107,8 @@ export function ToolResultPane({
           onPreview={() => onPreview(results[0].url!)}
         />
       ) : resultView === 'canvas' && results.length === 1 && results[0].status === 'succeeded' && results[0].url ? (
-        <div className="pk-source-pane redraw-stage redraw-result-stage">
-          <div className="redraw-stage-topbar result-actions-only">
+        <div className="pk-source-pane redraw-stage redraw-result-stage relative flex flex-1! items-center justify-center gap-0! min-h-0! overflow-hidden! rounded-[var(--radius-panel)] p-0!">
+          <div className="redraw-stage-topbar result-actions-only absolute top-0 left-0 z-5 flex min-h-10 w-full items-center justify-center">
             <div className="stage-actions">
               {resultActions}
               <button type="button" disabled={submitting} onClick={onRegenerate}>
@@ -117,7 +117,7 @@ export function ToolResultPane({
               </button>
             </div>
           </div>
-          <div className="redraw-stage-main">
+          <div className="redraw-stage-main absolute inset-0 flex items-center justify-center">
             <div
               className="redraw-canvas-wrap"
               style={

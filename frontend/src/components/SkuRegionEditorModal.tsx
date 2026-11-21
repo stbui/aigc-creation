@@ -4,26 +4,18 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
-  type CSSProperties,
 } from 'react';
-import { createPortal } from 'react-dom';
+import { RotateCcw } from 'lucide-react';
 import {
-  Brush,
-  Check,
-  Circle,
-  Eraser,
-  Hand,
-  Redo2,
-  RotateCcw,
-  Square,
-  Trash2,
-  Undo2,
-  X,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react';
-import { useApp } from '../ui';
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  TextAction,
+  useApp,
+} from '../ui';
 import {
   boundsOfPoints,
   clamp01,
@@ -40,7 +32,7 @@ import {
   type SkuHandle as Handle,
   type SkuTool as Tool,
 } from '../lib/skuRegionGeometry';
-import { SkuRegionToolbarButton as ToolbarButton } from './SkuRegionToolbarButton';
+import { SkuRegionEditorToolbar } from './SkuRegionEditorToolbar';
 import { SkuRegionOverlay } from './SkuRegionOverlay';
 
 /** 区域坐标模型与几何运算的唯一来源是 `lib/skuRegionGeometry`，此处按原路径再导出。 */
@@ -95,8 +87,6 @@ export function SkuRegionEditorModal({
     panRef.current = null;
   }, [initialRegions, open]);
 
-  useBodyScrollLock(open);
-
   const commit = useCallback(
     (next: SkuRegion[]) => {
       setPast((items) => [...items, regions].slice(-MAX_HISTORY));
@@ -139,10 +129,7 @@ export function SkuRegionEditorModal({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-        return;
-      }
+      // Esc 由 Radix Dialog 负责关闭与焦点归位，这里只处理编辑器快捷键。
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
         const target = event.target as HTMLElement | null;
         if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
@@ -158,7 +145,7 @@ export function SkuRegionEditorModal({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose, open, redo, removeRegion, selectedId, undo]);
+  }, [open, redo, removeRegion, selectedId, undo]);
 
   if (!open) return null;
 
@@ -370,100 +357,73 @@ export function SkuRegionEditorModal({
     { x: draft.currentX, y: draft.currentY },
   ) : null;
 
+  const frameCursor: Record<Tool, string> = {
+    hand: 'cursor-grab',
+    rect: 'cursor-crosshair',
+    ellipse: 'cursor-crosshair',
+    brush: 'cursor-crosshair',
+    eraser: 'cursor-crosshair',
+  };
+
   const dialog = (
-    <div
-      className="product-sku-modal-backdrop"
-      onPointerDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="product-sku-region-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="product-sku-region-title"
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName="z-[2400] bg-[var(--overlay-mask-strong)]"
+        className="z-[2400] flex h-[min(800px,calc(100vh-48px))] min-h-0 w-[min(1200px,calc(100%-48px))] max-w-none flex-col gap-0 rounded-3xl border-0 bg-page px-8 pt-[33px] pb-[22px] sm:max-w-none max-[900px]:rounded-[18px] max-[900px]:px-3.5 max-[900px]:py-5"
+        aria-describedby="product-sku-region-desc"
       >
-        <button type="button" className="product-sku-modal-close" aria-label="关闭区域编辑器" onClick={onClose}>
-          <X size={20} />
-        </button>
-        <h2 id="product-sku-region-title">框选 SKU 变体区域</h2>
-        <p>在模板图上框选需要跟随 SKU 变化的位置，最多 3 个区域；框外内容保持不变。</p>
-
-        <div className="product-sku-editor-actions">
-          <div className="product-sku-editor-toolbar" role="toolbar" aria-label="区域编辑工具">
-            <ToolbarButton active={tool === 'hand'} label="抓手" onClick={() => setTool('hand')}>
-              <Hand size={14} />
-            </ToolbarButton>
-            <ToolbarButton active={tool === 'rect'} label="矩形" onClick={() => setTool('rect')}>
-              <Square size={14} />
-            </ToolbarButton>
-            <ToolbarButton active={tool === 'ellipse'} label="椭圆" onClick={() => setTool('ellipse')}>
-              <Circle size={14} />
-            </ToolbarButton>
-            <ToolbarButton active={tool === 'brush'} label="画笔" onClick={() => setTool('brush')}>
-              <Brush size={14} />
-            </ToolbarButton>
-            <ToolbarButton active={tool === 'eraser'} label="橡皮" onClick={() => setTool('eraser')}>
-              <Eraser size={14} />
-            </ToolbarButton>
-            <span className="product-sku-brush-size">
-              <input
-                type="range"
-                min={6}
-                max={48}
-                value={brushSize}
-                aria-label="画笔大小"
-                style={{ '--range-progress': `${((brushSize - 6) / 42) * 100}%` } as CSSProperties}
-                onChange={(event) => setBrushSize(Number(event.target.value))}
-              />
-              <b>{brushSize}</b>
-            </span>
-            <span className="product-sku-toolbar-divider" aria-hidden="true" />
-            <ToolbarButton disabled={past.length === 0} label="撤销" onClick={undo}>
-              <Undo2 size={14} />
-            </ToolbarButton>
-            <ToolbarButton disabled={future.length === 0} label="重做" onClick={redo}>
-              <Redo2 size={14} />
-            </ToolbarButton>
-            <ToolbarButton disabled={regions.length === 0} label="清空区域" onClick={() => {
-              commit([]);
-              setSelectedId(null);
-            }}>
-              <Trash2 size={14} />
-            </ToolbarButton>
-            <span className="product-sku-toolbar-divider" aria-hidden="true" />
-            <span className="product-sku-zoom-controls">
-              <button type="button" aria-label="缩小画布" onClick={() => setZoom((value) => Math.max(1, value - 0.25))}>
-                <ZoomOut size={14} />
-              </button>
-              <b>{Math.round(zoom * 100)}%</b>
-              <button type="button" aria-label="放大画布" onClick={() => setZoom((value) => Math.min(2.5, value + 0.25))}>
-                <ZoomIn size={14} />
-              </button>
-            </span>
-          </div>
-          <button
-            type="button"
-            className="product-sku-region-confirm"
-            disabled={regions.length === 0}
-            onClick={() => onConfirm(regions)}
+        <DialogHeader className="gap-1.5">
+          <DialogTitle className="text-center text-base leading-[22px] font-semibold text-foreground">
+            框选 SKU 变体区域
+          </DialogTitle>
+          <DialogDescription
+            id="product-sku-region-desc"
+            className="text-center text-xs leading-[18px] text-muted-foreground max-[560px]:mx-auto max-[560px]:max-w-[270px]"
           >
-            <Check size={15} />
-            确认 ({regions.length})
-          </button>
-        </div>
+            在模板图上框选需要跟随 SKU 变化的位置，最多 3 个区域；框外内容保持不变。
+          </DialogDescription>
+        </DialogHeader>
 
-        <div ref={stageRef} className="product-sku-editor-stage">
+        <SkuRegionEditorToolbar
+          tool={tool}
+          onToolChange={setTool}
+          brushSize={brushSize}
+          onBrushSizeChange={setBrushSize}
+          canUndo={past.length > 0}
+          canRedo={future.length > 0}
+          canClear={regions.length > 0}
+          onUndo={undo}
+          onRedo={redo}
+          onClear={() => {
+            commit([]);
+            setSelectedId(null);
+          }}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          count={regions.length}
+          onConfirm={() => onConfirm(regions)}
+        />
+
+        <div
+          ref={stageRef}
+          className="flex min-h-0 flex-1 items-center justify-center overflow-auto pt-[23px] pb-[9px] max-[900px]:h-[min(60vh,500px)] max-[900px]:p-2.5"
+        >
           <div
             ref={frameRef}
-            className={`product-sku-editor-frame tool-${tool}`}
+            className={`relative inline-block max-h-full max-w-full flex-none origin-center leading-none transition-transform duration-[160ms] touch-none select-none motion-reduce:transition-none ${frameCursor[tool]}`}
             style={{ transform: `scale(${zoom})` }}
             onPointerDown={onFramePointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={cancelPointer}
           >
-            <img src={url} alt={alt} draggable={false} />
+            <img
+              src={url}
+              alt={alt}
+              draggable={false}
+              className="pointer-events-none block h-auto w-auto max-h-[min(510px,calc(100vh-290px))] max-w-[min(100%,1100px)] object-contain select-none max-[900px]:max-h-[min(54vh,440px)]"
+            />
             <SkuRegionOverlay
               regions={regions}
               selectedId={selectedId}
@@ -477,20 +437,25 @@ export function SkuRegionEditorModal({
           </div>
         </div>
 
-        <p className="product-sku-editor-shortcut-hint">
-          抓手可移动区域或画布 · Delete 删除选中区域 · Ctrl/⌘ + Z 撤销
-        </p>
-        <button type="button" className="product-sku-editor-reset" disabled={regions.length === 0} onClick={() => {
-          commit([]);
-          setSelectedId(null);
-        }}>
-          <RotateCcw size={13} />
-          清空全部区域
-        </button>
-      </div>
-    </div>
+        <DialogFooter className="mt-2 items-center justify-between gap-2 max-[900px]:flex-wrap">
+          <TextAction
+            icon={<RotateCcw size={13} aria-hidden />}
+            disabled={regions.length === 0}
+            onClick={() => {
+              commit([]);
+              setSelectedId(null);
+            }}
+          >
+            清空全部区域
+          </TextAction>
+          <p className="m-0 text-center text-xs leading-4 text-muted-foreground">
+            抓手可移动区域或画布 · Delete 删除选中区域 · Ctrl/⌘ + Z 撤销
+          </p>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 
-  return createPortal(dialog, document.body);
+  return dialog;
 }
 

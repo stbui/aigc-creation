@@ -17,13 +17,14 @@ export interface LibraryBatchBarProps {
 
 export function LibraryBatchBar({ count, onDownload, onMove, onClear }: LibraryBatchBarProps) {
   return (
-    <Surface className="asset-library-batch-bar flex-row gap-3 py-0">
+    <Surface className="mb-3.5 flex-row gap-3 rounded-lg bg-brand-bg px-3.5 py-2.5 text-xs text-brand-hover">
       <SurfaceContent className="flex flex-wrap items-center gap-3 p-0">
         {/* 只播报选中个数；整条容器挂 role=status 会让内部按钮失去按钮语义 */}
         <span aria-live="polite">已选 {count} 个素材</span>
         <Button
           variant="ghost"
           size="sm"
+          className="text-muted-foreground hover:text-brand"
           onClick={onDownload}
         >
           {<Download className="size-3" />}
@@ -32,6 +33,7 @@ export function LibraryBatchBar({ count, onDownload, onMove, onClear }: LibraryB
         <Button
           variant="ghost"
           size="sm"
+          className="text-muted-foreground hover:text-brand"
           onClick={onMove}
         >
           {<FolderInput className="size-3" />}
@@ -40,7 +42,7 @@ export function LibraryBatchBar({ count, onDownload, onMove, onClear }: LibraryB
         <Button
           variant="ghost"
           size="sm"
-          className="asset-library-batch-cancel"
+          className="text-inherit hover:bg-transparent"
           onClick={onClear}
         >
           取消选择

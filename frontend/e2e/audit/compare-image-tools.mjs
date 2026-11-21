@@ -27,7 +27,7 @@ const NODES = {
   history: ['.redraw-history', '.redraw-history-pane'],
   result: ['.product-retouch-result', '.pk-result-pane'],
   stage: ['.background-remove-stage', '.pk-result-pane'],
-  controls: ['.rotate-angle-controls', '.rotate-angle-controls'],
+  controls: ['.rotate-angle-controls', '.pk-input-pane'],
   translateSettings: ['.image-translate-settings', '.image-translate-settings'],
   intro: ['.redraw-intro', '.redraw-intro'],
   introArt: ['.redraw-intro-video', '.redraw-intro-video'],

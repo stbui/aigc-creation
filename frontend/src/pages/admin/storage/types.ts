@@ -11,6 +11,9 @@ export type {
   AdminAssetStats,
   AdminStorageStatus,
   StorageBackendId,
+  StorageConfigField,
+  StorageConfigView,
+  AdminStorageSaveConfigResult,
 } from '../../../types/api';
 
 /** 单个存储后端的状态行（凭据、连通性、是否默认）。 */

@@ -2,7 +2,6 @@ import type { RefObject } from 'react';
 
 import { SUPPORTED_IMAGE_ACCEPT } from './constants';
 import {
-  Button,
   Spin,
   Surface,
   SurfaceAction,
@@ -10,6 +9,7 @@ import {
   SurfaceDescription,
   SurfaceHeader,
   SurfaceTitle,
+  TextAction,
   type ToolAsset,
 } from './components';
 import { ProductSkuTemplateDropzone } from './ProductSkuTemplateDropzone';
@@ -46,28 +46,14 @@ export function ProductSkuTemplateCard({
   const openFilePicker = () => templateInputRef.current?.click();
 
   return (
-    <Surface className="product-sku-card product-sku-template-card border-0 shadow-none">
+    <Surface className="block gap-0 rounded-xl border-0 bg-card p-4 shadow-none">
       <SurfaceHeader className="mb-3 gap-1 px-0">
         <SurfaceTitle className="text-sm leading-5 font-bold">SKU模板图</SurfaceTitle>
-        <SurfaceAction className="product-sku-card-heading-actions">
-          <Button
-            type="button"
-            variant="ghost"
-            className="workspace-material-library-trigger h-auto hover:bg-transparent"
-            onClick={onOpenLibrary}
-          >
-            从素材库导入
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="mobile-upload-trigger mobile-upload-qr-trigger h-auto hover:bg-transparent"
-            onClick={onOpenMobile}
-          >
-            手机上传
-          </Button>
+        <SurfaceAction className="flex items-center gap-2">
+          <TextAction onClick={onOpenLibrary}>从素材库导入</TextAction>
+          <TextAction onClick={onOpenMobile}>手机上传</TextAction>
         </SurfaceAction>
-        <SurfaceDescription className="product-sku-card-heading-copy">
+        <SurfaceDescription className="mt-1.5 w-full text-xs leading-5 font-normal text-muted-foreground">
           选一张结构最完整的成品图作为模板，框选要跟随SKU变动的区域，最多支持3个SKU变体区域
         </SurfaceDescription>
       </SurfaceHeader>
@@ -84,14 +70,7 @@ export function ProductSkuTemplateCard({
           }}
         />
 
-        <div
-          className="relative grid gap-2"
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault();
-            onUpload(event.dataTransfer.files);
-          }}
-        >
+        <div className="relative grid gap-2">
           {uploading && (
             <span
               className="absolute inset-0 z-10 grid place-items-center rounded-md bg-background/70"
@@ -109,7 +88,7 @@ export function ProductSkuTemplateCard({
               onReupload={openFilePicker}
             />
           ) : (
-            <ProductSkuTemplateDropzone onPick={openFilePicker} />
+            <ProductSkuTemplateDropzone onPick={openFilePicker} onFiles={onUpload} />
           )}
         </div>
       </SurfaceContent>
