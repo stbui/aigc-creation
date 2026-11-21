@@ -9,11 +9,11 @@ export {
 export {
   useDiscardConfirm,
   useUnsavedGuard,
-} from '~/admin-ui/hooks/useUnsavedGuard';
+} from '~/admin-ui/radar';
 
 export {
   useToast,
-} from '../../../admin-ui/providers/ToastProvider';
+} from '~/admin-ui/providers/ToastProvider';
 
 export {
   useAdminResource,
