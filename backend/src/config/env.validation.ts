@@ -48,6 +48,20 @@ interface Spec {
  *
  * 新增变量必须同时加到这里，否则它不在配置树里（仍可被 process.env 读到，
  * 但拿不到类型保证，也进不了启动自检摘要）。
+ *
+ * 例外：以下 6 个由请求期 / 业务层直接读 `process.env`，**刻意不进本表**，
+ * 因为它们随单条路由或单次调用变化，放进配置树反而要把静态值抄一遍：
+ *   · `RATE_LIMIT_AUTH_PER_MIN` / `RATE_LIMIT_RESET_TOKEN` —— 限流守卫按
+ *     `limitEnv` 动态读取（common/rate-limit.guard.ts），用于测试放宽配额；
+ *   · `MODEL_PROXY_SYSTEM_RATE_LIMIT` / `MODEL_PROXY_CUSTOM_RATE_LIMIT` ——
+ *     同上，中转路由的限流 override（model/proxy/*.controller.ts）；
+ *   · `AUTH_EMAIL_VERIFICATION_BYPASS` —— 仅 test 档跳过邮箱验证码
+ *     （auth/auth.service.ts）；
+ *   · `ALIPAY_MOBILE_PRECREATE_DEEP_LINK` —— 支付宝移动端唤起的环境级强制开关
+ *     （common/settings.service.ts），与后台设置项合并生效。
+ *
+ * 上述例外在各 env 文件里仍有键位；新增同类「请求期读取」变量时，
+ * 请同时更新本例外清单与 `docs/environments.md`。
  */
 export const ENV_SPECS: readonly Spec[] = [
   // ── 应用 ──────────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@
     "test:e2e:smoke": "npm --prefix frontend run e2e:smoke",
     "verify:deps": "npm --prefix backend run verify:deps:critical",
     "verify:conventions": "node scripts/verify-conventions.mjs",
+    "verify:env-sync": "node backend/scripts/verify-env-sync.mjs",
     "verify:compose": "node scripts/verify-compose.mjs",
     "verify:payment-bills": "npm --prefix backend run verify:payment-bills",
     "verify:payment-signatures": "npm --prefix backend run verify:payment-signatures",
