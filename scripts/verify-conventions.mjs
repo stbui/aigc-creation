@@ -267,6 +267,164 @@ if (!claudeText) {
       );
     }
   }
+
+  /*
+   * 4.3 菜单与 4.4 壳内路由。
+   *
+   * 2026-11-22 补：此前 4.1/4.2 只盯「能力」和「插件包/provider」，菜单与壳内
+   * 路由这两条仍靠人守 —— 而它们恰恰随信息架构调整最容易漂：`b34751f` 把概览的
+   * 「平台存量」Panel 拆成「经营概况」+ Subhead 后，E2E 断言跟着过期、main 连红
+   * 五次（T-013）。所以按同一套路补成机器校验。
+   *
+   * ## 为什么不写死 36 / 7 / 35
+   *
+   * 写死等于把常量搬到脚本里，信息架构一调就要改两处，只是换个地方腐化。这里
+   * 一律「代码实测值 vs 文档声明值」比对：文档改了（无论改成多少）脚本自动跟着走，
+   * 不一致才报。
+   *
+   * ## 为什么要花括号配对 + 剥注释
+   *
+   * 菜单项里有 `path: "/admin"` 这类字符串，路由里有 `lazyRoute('/tools/*', ...)`
+   * 这类调用，正则数 `path:` / `<Route` 很容易把字符串、函数体里的同名片段算进去；
+   * 而 `Shell()` 内和 `adminNav.ts` 的注释都合法地提到 `<Routes>`、catch-all 等
+   * 字样，不剥注释会当场误报（T-009 踩过同一坑）。故：先剥注释（保留换行以免行号
+   * 错位），再用「跳字符串的花括号配对」圈定函数体/数组体，只在体内计数。
+   */
+  function stripCommentsKeepingLayout(source) {
+    const blank = (text) => text.replace(/[^\n]/g, ' ');
+    return source
+      .replace(/\/\*[\s\S]*?\*\//g, blank) // 块注释，含 JSX 的 {/* ... */}
+      .replace(/^[ \t]*\/\/[^\n]*$/gm, blank); // 整行注释；行内 // 保守不剥
+  }
+
+  /** 从开括号出发找配对的闭括号下标（跳过字符串与模板串），找不到返回 -1。 */
+  function matchBracket(source, openIndex) {
+    const open = source[openIndex];
+    const close = open === '{' ? '}' : ']';
+    let depth = 0;
+    let quote = null;
+    for (let i = openIndex; i < source.length; i += 1) {
+      const ch = source[i];
+      if (quote) {
+        if (ch === '\\') i += 1;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') {
+        quote = ch;
+      } else if (ch === open) {
+        depth += 1;
+      } else if (ch === close) {
+        depth -= 1;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * 数 `ADMIN_MENU` 数组体：深度 0→1 的对象是分组，1→2 的对象是菜单项。
+   * 只在数组体内数，`findAdminMenuGroup` 之类函数体不计。
+   */
+  function countAdminMenu(source) {
+    const text = stripCommentsKeepingLayout(source);
+    const decl = /export\s+const\s+ADMIN_MENU\b[^=]*=\s*\[/.exec(text);
+    if (!decl) return null;
+    const openIndex = decl.index + decl[0].length - 1;
+    const closeIndex = matchBracket(text, openIndex);
+    if (closeIndex < 0) return null;
+
+    let depth = 0;
+    let groups = 0;
+    let items = 0;
+    let quote = null;
+    for (let i = openIndex + 1; i < closeIndex; i += 1) {
+      const ch = text[i];
+      if (quote) {
+        if (ch === '\\') i += 1;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') {
+        quote = ch;
+      } else if (ch === '{') {
+        depth += 1;
+        if (depth === 1) groups += 1;
+        else if (depth === 2) items += 1;
+      } else if (ch === '}') {
+        depth -= 1;
+      }
+    }
+    return { groups, items, line: lineOf(text, decl.index) };
+  }
+
+  /**
+   * 数 `Shell()` 函数体内的 `<Route`。`<RouteFallback` / `<Routes` 不算，
+   * `lazyRoute(...)` 这类不带 `<` 的调用也不算。
+   */
+  function countShellRoutes(source) {
+    const text = stripCommentsKeepingLayout(source);
+    const decl = /function\s+Shell\s*\(/.exec(text);
+    if (!decl) return null;
+    const openIndex = text.indexOf('{', decl.index);
+    const closeIndex = openIndex < 0 ? -1 : matchBracket(text, openIndex);
+    if (closeIndex < 0) return null;
+    const body = text.slice(openIndex, closeIndex);
+    return {
+      total: (body.match(/<Route(?![A-Za-z0-9_])/g) ?? []).length,
+      line: lineOf(text, decl.index),
+    };
+  }
+
+  // 4.3 后台菜单入口数与分组数
+  const adminNavFile = join(ROOT, 'frontend/src/components/admin/adminNav.ts');
+  if (!existsSync(adminNavFile)) {
+    violations.push('frontend/src/components/admin/adminNav.ts 不存在，无法核对后台菜单数量');
+  } else {
+    const menu = countAdminMenu(readFileSync(adminNavFile, 'utf8'));
+    if (!menu) {
+      violations.push(
+        'adminNav.ts 中找不到 `export const ADMIN_MENU = [...]` 数组字面量，无法核对菜单数量',
+      );
+    } else {
+      // 文档行形如：| 36 个后台菜单入口 / 7 个分组 | ...
+      const docEntries = tableNumber(quantityTable, /(\d+) 个后台菜单入口/, '个后台菜单入口');
+      if (docEntries !== null && docEntries !== menu.items) {
+        violations.push(
+          `CLAUDE.md 写「${docEntries} 个后台菜单入口」，adminNav.ts 的 ADMIN_MENU 实为` +
+            ` ${menu.items} 项（adminNav.ts:${menu.line}）`,
+        );
+      }
+
+      const docGroups = tableNumber(quantityTable, /(\d+) 个分组/, '个分组');
+      if (docGroups !== null && docGroups !== menu.groups) {
+        violations.push(
+          `CLAUDE.md 写「${docGroups} 个分组」，adminNav.ts 的 ADMIN_MENU 实为` +
+            ` ${menu.groups} 组（adminNav.ts:${menu.line}）`,
+        );
+      }
+    }
+  }
+
+  // 4.4 壳内路由：只数 Shell() 体内，App() 层的 /login、/admin/* 不属本口径
+  const appFile = join(ROOT, 'frontend/src/App.tsx');
+  if (!existsSync(appFile)) {
+    violations.push('frontend/src/App.tsx 不存在，无法核对壳内路由数量');
+  } else {
+    const routes = countShellRoutes(readFileSync(appFile, 'utf8'));
+    if (!routes) {
+      violations.push('App.tsx 中找不到 `function Shell()` 函数体，无法核对壳内路由数量');
+    } else {
+      // 文档行形如：| 35 条壳内路由 | ...
+      const docRoutes = tableNumber(quantityTable, /(\d+) 条壳内路由/, '条壳内路由');
+      if (docRoutes !== null && docRoutes !== routes.total) {
+        violations.push(
+          `CLAUDE.md 写「${docRoutes} 条壳内路由」，App.tsx 的 Shell() 内实为` +
+            ` ${routes.total} 条 <Route>（App.tsx:${routes.line}）`,
+        );
+      }
+    }
+  }
 }
 
 // ── 5. 后台取件边界：页面不直连 admin-ui 原子件 ──────────────────────
