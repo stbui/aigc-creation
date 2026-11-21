@@ -7,8 +7,8 @@
  */
 
 export { useAdmin } from '../../../context/AdminContext';
-export { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
-export { useToast } from '../../../admin-ui/providers/ToastProvider';
+export { useConfirm } from '~/admin-ui/providers/ConfirmProvider';
+export { useToast } from '~/admin-ui/providers/ToastProvider';
 
 export { useAdminResource, useAdminUrlFilterSync } from '~/admin-ui/radar';
 export { ConfirmProvider } from '~/admin-ui/providers/ConfirmProvider';

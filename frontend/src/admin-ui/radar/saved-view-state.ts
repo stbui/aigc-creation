@@ -26,8 +26,8 @@ function normalized(filters: AdminViewFilters): string {
  * 内置视图 + 本机保存的视图。应用视图只调用页面传入的 `onApply`，由页面
  * 走各自已有的 `setQuery` / URL 同步；这里不发请求、不改权限。
  *
- * 展示层分两套：`primitives/saved-view-bar` 用共享语义组件，
- * `radar/SavedViewBar` 用 Radar 令牌；两边共用本 Hook，避免逻辑分叉。
+ * 展示层在 `radar/SavedViewBar`，用 Radar 令牌；本 Hook 只出数据与交互，
+ * 避免逻辑分叉。
  */
 export function useSavedViewBar({
   pageKey,

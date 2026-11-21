@@ -11,7 +11,7 @@
  */
 
 /* 跨模块共享组件：测试包 Provider 时也从这里取，与页面用同一个模块实例 */
-export { ToastProvider } from '../../../admin-ui/providers/ToastProvider';
+export { ToastProvider } from '~/admin-ui/providers/ToastProvider';
 
 export {
   ActionButton,

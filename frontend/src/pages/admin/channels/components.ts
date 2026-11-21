@@ -12,7 +12,7 @@
  */
 
 /* 跨模块共享组件 */
-export { ToastProvider } from '../../../admin-ui/providers/ToastProvider';
+export { ToastProvider } from '~/admin-ui/providers/ToastProvider';
 
 /* admin-ui/radar UI 控件 */
 export {

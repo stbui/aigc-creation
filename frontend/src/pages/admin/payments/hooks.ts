@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
  * 从这里转出。
  */
 
-export { useToast } from '../../../admin-ui/providers/ToastProvider';
+export { useToast } from '~/admin-ui/providers/ToastProvider';
 export { useAdmin } from '../../../context/AdminContext';
 export {
   useAdminDetailParam,
@@ -19,7 +19,7 @@ export {
   useAdminResource,
   useAdminUrlFilterSync,
 } from '~/admin-ui/radar';
-export { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/hooks/useUnsavedGuard';
+export { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/radar';
 
 export { usePaymentExceptionFilters } from './usePaymentExceptionFilters';
 export { useReconciliationFilters } from './useReconciliationFilters';

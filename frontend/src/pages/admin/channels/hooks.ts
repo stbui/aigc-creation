@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
-import { useToast } from '../../../admin-ui/providers/ToastProvider';
+import { useConfirm } from '~/admin-ui/providers/ConfirmProvider';
+import { useToast } from '~/admin-ui/providers/ToastProvider';
 import { useAdminDetailParam, useAdminResource, useAdminUrlFilterSync, useSelectionPrune } from '~/admin-ui/radar';
 import { useAdmin } from '../../../context/AdminContext';
-import { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/hooks/useUnsavedGuard';
+import { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/radar';
 import type { AdminChannelView } from './types';
 import { fetchAllChannels, fetchChannelHealth } from './api';
 import type { ChannelHealthSummary } from './constants';

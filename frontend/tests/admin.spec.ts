@@ -23,7 +23,9 @@ test.describe('后台管理端', () => {
     await page.goto(`${UI}/admin`);
     await expect(page.getByRole('heading', { name: '平台概览' })).toBeVisible({ timeout: 15000 });
     // 概览首屏是工作台待办 + 经营概况，累计指标下沉到下方区块。
-    await expect(page.getByRole('heading', { name: '平台存量' })).toBeVisible();
+    // 「累计存量」是 Panel 内的 Subhead（div/span），不是 heading 角色，
+    // 故断言承载它的 Panel 标题；累计数字本身由下一行的 totals 区块覆盖。
+    await expect(page.getByRole('heading', { name: '经营概况' })).toBeVisible();
     await expect(page.getByTestId('admin-overview-totals')).toContainText('任务总数');
   });
 
