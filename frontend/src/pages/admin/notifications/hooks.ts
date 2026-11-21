@@ -13,7 +13,7 @@ export {
 
 export {
   useToast,
-} from '../../../admin-ui/providers/ToastProvider';
+} from '~/admin-ui/providers/ToastProvider';
 
 export {
   useAdminResource,

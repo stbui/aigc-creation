@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
  * 从这里转出。
  */
 
-export { useToast } from '../../../admin-ui/providers/ToastProvider';
+export { useToast } from '~/admin-ui/providers/ToastProvider';
 export { useAdmin } from '../../../context/AdminContext';
 export {
   useAdminDetailParam,

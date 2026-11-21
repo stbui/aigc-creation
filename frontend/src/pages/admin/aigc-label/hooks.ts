@@ -4,5 +4,5 @@
 
 export { useAdminResource } from '~/admin-ui/radar';
 export { useAdmin } from '../../../context/AdminContext';
-export { useToast } from '../../../admin-ui/providers/ToastProvider';
+export { useToast } from '~/admin-ui/providers/ToastProvider';
 export { useUnsavedGuard } from '~/admin-ui/radar';

@@ -8,7 +8,7 @@ export {
 
 export {
   useToast,
-} from '../../../admin-ui/providers/ToastProvider';
+} from '~/admin-ui/providers/ToastProvider';
 
 export {
   useUnsavedGuard,
@@ -16,7 +16,7 @@ export {
 
 export {
   useConfirm,
-} from '../../../admin-ui/providers/ConfirmProvider';
+} from '~/admin-ui/providers/ConfirmProvider';
 
 export {
   useAdminResource,

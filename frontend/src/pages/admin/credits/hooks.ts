@@ -19,7 +19,7 @@ export {
   useAdminUrlFilterSync,
 } from '~/admin-ui/radar';
 export { useAdminList, useAdminResource };
-export { useToast } from '../../../admin-ui/providers/ToastProvider';
+export { useToast } from '~/admin-ui/providers/ToastProvider';
 export { useAdmin } from '../../../context/AdminContext';
 export { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/radar';
 
