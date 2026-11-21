@@ -6,12 +6,13 @@
  *   1. 最小字号 12px；
  *   2. C 端 StateError 不得把原始错误透给用户；
  *   3. 根 / backend / frontend / agent 版本号一致；
- *   4. CLAUDE.md §1「易腐化数量」表与代码实际数量一致。
+ *   4. CLAUDE.md §1「易腐化数量」表与代码实际数量一致；
+ *   5. 后台页面只从 `admin-ui/radar` 取件，不直连原子件。
  *
  * 只做静态扫描，不需要起服务。退出码非零表示有违规。
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join, posix, relative, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const violations = [];
@@ -268,6 +269,112 @@ if (!claudeText) {
   }
 }
 
+// ── 5. 后台取件边界：页面不直连 admin-ui 原子件 ──────────────────────
+/*
+ * CLAUDE.md:106「后台页面只从 `admin-ui/radar` barrel 取件，不直连
+ * `admin-ui/components/ui`；原子件仅供 radar 组合」。这条此前只靠人守，
+ * 2026-11-21 的审计（T-002）发现 `admin-ui/primitives/` 删除后仍有漂移风险，
+ * 故落成机器校验。
+ *
+ * ## 为什么要先归一化 specifier
+ *
+ * 同一个目标有三种写法，只匹配 `~/` 别名等于留了后门：
+ *   - `~/admin-ui/components/ui/button`        → 别名
+ *   - `../../../admin-ui/components/ui/button` → 相对路径
+ *   - `admin-ui/components/ui/button`          → 裸写（与第三方包同形）
+ * 前两种归一成「src 相对路径」后比较；裸写以 `admin-ui/` 开头的一律按本仓
+ * 路径处理 —— 否则它会被当成第三方包放过（原型已验证）。当前代码里裸写
+ * 零实例，但规则必须拦住，否则将来就是可绕的口子。
+ *
+ * ## 为什么要剥注释
+ *
+ * 注释里合法地提到这些路径：`pages/admin/alerts/page.tsx` 的迁移说明写着
+ * 「原 `~/admin-ui/primitives`、现 `~/admin-ui/radar`」，另有 5 个页面模块的
+ * 入口注释写着「本目录文件不从 `src/admin-ui/providers` 取」。不剥注释会
+ * 当场误报。剥块注释与整行 `//`；行内 `//` 保守不剥（避免剥坏字符串里的
+ * `//`，而 import 语句里不会出现）。
+ */
+
+const PAGE_ADMIN_TREES = ['frontend/src/pages/admin', 'frontend/src/components/admin'];
+
+/* 白名单：这几类不是「原子件泄漏」的风险点，页面取它们是正当的。 */
+const ALLOWED_ADMIN_IMPORT_PREFIXES = [
+  'admin-ui/providers/',
+  'admin-ui/hooks/',
+  'admin-ui/shell/',
+  'admin-ui/radar',
+  'admin-ui/lib/',
+];
+/*
+ * 债务而非设计：`providers/` 之所以放行，是因为它当前有 39 处直取、分布在
+ * 33 个模块入口文件（`hooks.ts` / `components.ts`），收窄会当场红一片。
+ * **收窄路径 = 等方案 B（radar barrel 转出 useToast / useConfirm）落地后，
+ * 把上面 `admin-ui/providers/` 这一行删掉**，规则自然收紧，无需再改段号。
+ */
+
+const FORBIDDEN_ADMIN_IMPORT = [/^admin-ui\/components(\/|$)/, /^admin-ui\/primitives(\/|$)/];
+
+/** 把 import specifier 归一成「以 frontend/src 为根的相对路径」，第三方包返回 null。 */
+function resolveSpecifier(file, specifier) {
+  if (specifier.startsWith('~/')) return specifier.slice(2);
+  if (specifier.startsWith('admin-ui/')) return specifier;
+  if (specifier.startsWith('.')) {
+    const base = relative(join(ROOT, 'frontend/src'), join(file, '..'));
+    return posix.normalize(posix.join(base.split('\\').join('/'), specifier));
+  }
+  return null;
+}
+
+/** 剥掉块注释与整行 `//`，让注释里的路径不参与匹配。 */
+function stripComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '');
+}
+
+/**
+ * 取出文件中所有 import / export-from / 动态 import 的 specifier，
+ * 连同各自在原文中的偏移量一起返回，便于报出行号。
+ */
+function importTargets(source) {
+  const found = [];
+  const patterns = [
+    // import ... from 'x' / export ... from 'x'（允许跨行）
+    /(?:^|\n)[ \t]*(?:import|export)\s[^;'"]*?from\s*['"]([^'"]+)['"]/g,
+    // import 'x'（side-effect）
+    /(?:^|\n)[ \t]*import\s*['"]([^'"]+)['"]/g,
+    // import('x')（动态）
+    /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      found.push({ specifier: match[1], index: match.index });
+    }
+  }
+  return found;
+}
+
+for (const tree of PAGE_ADMIN_TREES) {
+  for (const file of walk(join(ROOT, tree))) {
+    if (!/\.(ts|tsx)$/.test(file)) continue;
+    if (/\.(test|spec)\.(ts|tsx)$/.test(file)) continue;
+
+    const source = stripComments(readFileSync(file, 'utf8'));
+    for (const { specifier, index } of importTargets(source)) {
+      const target = resolveSpecifier(file, specifier);
+      if (!target) continue;
+      if (!FORBIDDEN_ADMIN_IMPORT.some((pattern) => pattern.test(target))) continue;
+      if (ALLOWED_ADMIN_IMPORT_PREFIXES.some((prefix) => target.startsWith(prefix))) continue;
+
+      report(
+        file,
+        lineOf(source, index),
+        `后台页面直连原子件：${specifier} → ${target}；请改从 ~/admin-ui/radar 取件`,
+      );
+    }
+  }
+}
+
 if (violations.length > 0) {
   console.error(`约定检查失败（${violations.length} 项）：`);
   for (const item of violations) console.error(`  - ${item}`);
@@ -275,5 +382,5 @@ if (violations.length > 0) {
 }
 
 console.log(
-  '约定检查通过：字号 >= 12px、C 端无 StateError detail、版本号一致、CLAUDE.md 易腐化数量与代码一致。',
+  '约定检查通过：字号 >= 12px、C 端无 StateError detail、版本号一致、CLAUDE.md 易腐化数量与代码一致、后台取件边界合规。',
 );
