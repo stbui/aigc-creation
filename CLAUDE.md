@@ -37,7 +37,7 @@
 | 107 个插件包 / 115 个 provider | `backend/plugins/*/manifest.json` | 3 个 `src-*` 镜像目录（`src-a6api` / `src-antigravity-proxy` / `src-metaso-h3`）不参与运行 |
 | 17 项能力 / 16 image + 1 video / 14 项进工作台 | `definitions/index.ts` 的 `CAPABILITY_PLUGINS` | `*.spec.ts`、`*-options.ts`、`*.templates.ts` 不是能力定义 |
 | 36 个后台菜单入口 / 7 个分组 | `adminNav.ts` 的 `ADMIN_MENU` | 外壳、概览内容组件与测试目录不是菜单页 |
-| 35 条壳内路由 | `frontend/src/App.tsx` 的 `Shell()` 内路由 | catch-all、3 条裸外壳页、6 条独立页不计入 |
+| 35 条壳内路由 | `frontend/src/App.tsx` 的 `Shell()` 内全部 `<Route>`（含裸外壳 2 页 + catch-all 2 条，业务路由 31 条） | `/login` 等 6 条独立页与 `/admin/*` 在 `App()` 层、不在 Shell 内，不属本口径 |
 
 本地账号：development / test 的后台预设为 `admin@admin.com` / `123456789`；普通账号由 `seed` 创建，不能获得 admin 角色。production 不设默认密码，必须显式提供 `ADMIN_PASSWORD` 或使用一次性随机密码。
 
@@ -119,7 +119,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 | 接入厂商 | `backend/plugins/<plugin>/manifest.json` | `verify-plugin-manifests`、`verify-protocol-runtime` |
 | 新增后台页面 | `permissions.ts` → controller 权限 → `adminNav.ts` → `pages/admin/<域>` → 路由 → `lib/api.ts` | 后端再次校验动作权限 |
 | 新增后台 UI 组件 | 查 `components/ui` → `shadcn add` → `post-shadcn.mjs` → 需要时落入 `radar/*` | 页面只从 radar 取件 |
-| 新增环境变量 | `ENV_SPECS`、`.env.example`、三档 env | 影响库路径时同步 `scripts/db-url.js`；跑环境探针 |
+| 新增环境变量 | `ENV_SPECS`、`backend/.env.example`、三档 env | 影响库路径时同步 `scripts/db-url.js`；跑环境探针 |
 | 调整积分价 / 退款规则 | 能力定义 `creditCost` / `common/setting-defs.ts` | 运行时走 `resolve()` 与设置读取 |
 | 新增前端功能目录 | `pages/<域>/` 分层入口 | `docs/frontend-module-conventions.md` 与模块导入测试 |
 
@@ -182,7 +182,7 @@ npx biome format --write <files>
 6. **`test` / `production` 不回落 `.env` 与 `.env.local`**。避免继承 `DATABASE_URL=file:./dev.db` 造成无报错的数据污染。`env-files.ts` 与 `scripts/db-url.js` 的档位规则必须逐字一致。
 7. **空串不等于未设置**。例如 `CORS_ORIGINS=""` 会跳过覆盖并静默失效；不要批量导出空值。
 8. **`ConfigModule` 必须是 `AppModule.imports` 第一项**。顺序错误可能不立即报错，而是在运行期注入 `undefined`。
-9. **新增环境变量同步四处**：`ENV_SPECS`、`.env.example`、三档 env；影响库路径时再加 `scripts/db-url.js`。随后运行环境探针。
+9. **新增环境变量同步四处**：`ENV_SPECS`、`backend/.env.example`、三档 env；影响库路径时再加 `scripts/db-url.js`。随后运行环境探针。
 10. **嵌套依赖 pin 不可被“正常重装”覆盖**。关键是 `multer` 下的 `type-is@1.6.18` / `media-typer@0.3.0`；错误版本会让 multipart 静默不解析，接口收到 0 个文件。另有 `webpack` 的 `mime-types@2.1.35` 与 `@nestjs/config` 的 `dotenv@18.0.3`。依赖安装遇 5 分钟 broker 超时属已知环境限制。
 11. **云存储 SDK 当前不是依赖**。默认使用 local；OSS / MinIO 的连接参数和凭据只在后台存储配置页维护，切云端前需安装 `ali-oss` 或 `minio`。
 12. **普通账号与后台管理员是两套**。`seed` 普通账号永远没有 admin 角色；production 必须显式生成后台密码，重复 seed 不重置已有密码。

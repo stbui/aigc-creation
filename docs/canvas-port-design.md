@@ -224,7 +224,7 @@ PostgreSQL + Prisma。所有表带 `ownerId`，所有查询必须带 `ownerId` �
 - 本地与生产 compose 增加 postgres / redis 服务、健康检查、持久卷。
 - 重写备份服务：`pg_dump --format=custom` + `pg_restore --list` 校验；Docker 镜像加入 postgresql-client。
 - 集成测试改为独立 Postgres schema；测试数据清理策略更新。
-- 环境变量：`DATABASE_URL`、`REDIS_URL` 加入 `ENV_SPECS`、`.env.example`、三档 env；生产门禁拒绝 `file:` 开头的 `DATABASE_URL`，要求 `REDIS_URL` 非空、scheme 合法且连通；`/health/ready` 增加 Redis 探针。
+- 环境变量：`DATABASE_URL`、`REDIS_URL` 加入 `ENV_SPECS`、`backend/.env.example`、三档 env；生产门禁拒绝 `file:` 开头的 `DATABASE_URL`，要求 `REDIS_URL` 非空、scheme 合法且连通；`/health/ready` 增加 Redis 探针。
 - 多实例状态收敛：全局限流、目录/积分价缓存失效广播、定时任务分布式锁改走 Redis（现为进程内存，多实例下会放大配额与旧价窗口）。
 - 现有 SQLite 数据迁移脚本（若已有生产数据）：按外键顺序搬迁、行数与校验和比对；无数据则记录为空迁移。
 

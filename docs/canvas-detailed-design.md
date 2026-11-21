@@ -106,7 +106,7 @@ redis/
 
 ### 3.3 环境变量
 
-新增到 `backend/src/config/env.validation.ts` 的 `ENV_SPECS`，并同步 `.env.example`、`.env.development`、`.env.test`、`.env.production.example`：
+新增到 `backend/src/config/env.validation.ts` 的 `ENV_SPECS`，并同步 `backend/.env.example`、`backend/.env.development`、`backend/.env.test`、`backend/.env.production.example`：
 
 | 变量 | 类型 | 默认 | 校验 |
 | --- | --- | --- | --- |
