@@ -23,6 +23,7 @@ export { cn } from '../lib/cn';
 export { useAdminList, useAdminResource, useAdminUrlFilterSync, useAdminDetailParam } from '../hooks/useAdminList';
 export { useSelectionPrune } from '../hooks/useSelection';
 export { useAdminExport } from '../hooks/useAdminExport';
+export { useDiscardConfirm, useUnsavedGuard } from '../hooks/useUnsavedGuard';
 export { useDetailData } from './detail-data';
 export { useSavedViewBar } from './saved-view-state';
 
