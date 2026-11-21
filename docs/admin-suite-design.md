@@ -64,9 +64,9 @@
 
 | 角色 | code | 定位 | 权限点数 |
 | --- | --- | --- | ---: |
-| 平台管理员 | `admin` | 全部权限 | 67 |
-| 运营 | `operator` | 用户/项目/素材/任务只读或受限写、营销、消息、工单、模型侧只读 | 32 |
-| 财务 | `finance` | 商品/订单/退款/积分调整/发票/对账，模型成本与生成账单只读、账单可处置 | 28 |
+| 平台管理员 | `admin` | 全部权限 | 70 |
+| 运营 | `operator` | 用户/项目/素材/任务只读或受限写、营销、消息、工单、模型侧只读 | 36 |
+| 财务 | `finance` | 商品/订单/退款/积分调整/发票/对账，模型成本与生成账单只读、账单可处置 | 27 |
 
 **为什么必须拆**：财务能退款 = 能改钱，运营能删用户 = 能毁数据。两种权限绑在一个布尔位上，出了事无法区分是谁做的，责任边界也失去意义。
 
@@ -74,18 +74,20 @@
 
 ### 2.2 权限点
 
-67 个，命名格式 `<模块>.<动作>`，定义在 `backend/src/admin/permissions.ts` 的 `PERMISSIONS`，按角色存为 `AdminRole.permissions` 的 JSON 数组字符串。
+70 个，命名格式 `<模块>.<动作>`，定义在 `backend/src/admin/permissions.ts` 的 `PERMISSIONS`，按角色存为 `AdminRole.permissions` 的 JSON 数组字符串。
 
 | 模块 | 权限点 |
 | --- | --- |
 | 平台 | `platform.dashboard` |
 | 用户 | `user.read` / `user.write` / `user.disable` / `user.delete` / `user.reset_password` |
-| 项目与素材 | `project.read` / `project.delete` / `asset.read` / `asset.hide` / `asset.delete` |
+| 项目与素材 | `project.read` / `project.write` / `project.delete` / `asset.read` / `asset.hide` / `asset.delete` |
 | 任务 | `task.read` / `task.retry` / `task.cancel` / `task.delete` |
 | 商品 | `product.read` / `product.write` / `product.price` / `product.publish` / `product.delete` |
-| 订单与支付 | `order.read` / `order.mark_paid` / `order.refund` / `payment.read` / `payment.write` / `payment.operate` / `finance.dashboard` / `invoice.write` / `finance.reconcile` |
+| 订单与支付 | `order.read` / `order.mark_paid` / `order.refund` / `order.delete` / `payment.read` / `payment.write` / `payment.operate` / `finance.dashboard` / `invoice.write` / `finance.reconcile` |
 | 积分 | `credit.read` / `credit.adjust` |
 | 合规与内容 | `compliance.read` / `compliance.gate` / `compliance.takedown` / `content.read` |
+| 写真模板 | `template.read` / `template.write` |
+| 提示词库 | `prompt.read` / `prompt.write` |
 | 能力 | `capability.read` / `capability.write` |
 | 渠道与线路 | `channel.read` / `channel.write` / `channel.test` / `channel.model_read` / `channel.model_write` |
 | 前台模型与分组 | `logical_model.read` / `logical_model.write` / `user_group.read` / `user_group.write` |

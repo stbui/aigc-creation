@@ -67,11 +67,11 @@
 
 **卡片缩略图**：取该能力最近一次成功产出（`GET /stats/overview` 的 `byCapability[].thumbnailUrl`），所以卡片里是用户自己真实生成的结果；没有产出时显示设计化空态，不放假示例图。
 
-## 能力清单（18 项，14 项进工作台）
+## 能力清单（17 项，14 项进工作台）
 
 能力清单只在后端 `src/capabilities/definitions/<id>.ts` 逐项声明，由 `capability.registry.ts` 门面聚合，通过 `GET /api/v1/capabilities` 下发给前端；侧栏、卡片、表单、统计分布全部由这份数据渲染，新增能力不需要改前端。
 
-当前 18 项全部 `real`，0 `mock` / 0 `planned`。新任务产出恒来自模型线路。能力当前能否提交看 `runtime.effective`，不靠 `mode` 猜。
+当前 17 项全部 `real`，0 `mock` / 0 `planned`。新任务产出恒来自模型线路。能力当前能否提交看 `runtime.effective`，不靠 `mode` 猜。
 
 **入口可见性口径**（`frontend/src/lib/capabilities.ts` 的 `isCapabilityVisible()`）：`planned` 与运营下线的能力（`runtime.effective === 'disabled'`）从顶导 / 侧栏 / 工作台 / 首页案例页签 / 站点地图一并隐藏；`unavailable`（代码已实现、但此刻没有绑定可用商品）保留入口，页面内说明原因并只拦截已登录用户的提交——访客点击仍走登录流程。
 

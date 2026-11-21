@@ -74,7 +74,7 @@ frontend/src/pages/admin/            # 33 个页面 + channels/、payments/、pa
 
 ### 0.3 权限点命名
 
-`<模块>.<动作>`，67 个，完整清单见 `permissions.ts` 的 `PERMISSIONS`（分组表见 `docs/admin-suite-design.md` §2.2）。三条约束：
+`<模块>.<动作>`，70 个，完整清单见 `permissions.ts` 的 `PERMISSIONS`（分组表见 `docs/admin-suite-design.md` §2.2）。三条约束：
 
 1. 权限点从清单移除后，角色里残留的值比对不上即等同无权（兜底默认拒），`AdminRoleService.getPermissions()` 读取时过滤；过滤只在内存生效，不回写库。
 2. 三个内置角色不可删除，但权限点均可调整（含 `admin`）：批量更新会校验未知权限点与角色是否存在，不阻止裁剪；整批写入在同一事务中完成，改动因守卫每次请求查库而立即生效。
@@ -239,7 +239,7 @@ AI 分析标签查询 `GET /admin/api-logs?source=tool&operation=image_to_prompt
 | PATCH | `/admin/tickets/:id` | 改状态或指派 |
 | GET | `/admin/tickets/export` | CSV 导出 |
 
-状态机只在 `tickets.service.ts` 的 `TRANSITIONS` 定义（`open → processing → resolved/closed`、`resolved → closed/open`、`closed → open`），跳步返回 400。指派只能给启用中的后台账号，`assigneeId: null` 表示取消指派。越权访问一律 404 而非 403，不泄露 id 是否存在。
+状态机只在 `tickets.service.ts` 的 `TRANSITIONS` 定义（`open → processing → resolved/closed`、`processing → resolved/closed/open`、`resolved → closed/open`、`closed → open`），跳步返回 400。指派只能给启用中的后台账号，`assigneeId: null` 表示取消指派。越权访问一律 404 而非 403，不泄露 id 是否存在。
 
 **退款的边界**：工单只做沟通与流转，退款到订单模块执行，避免两处都能改钱。
 
@@ -425,7 +425,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 - 未知权限点整体拒绝（400 `40001`），不静默丢弃 —— 否则调用方会以为保存成功。
 - 多角色改动在一个事务中写入，避免部分角色已生效、部分失败的半保存状态。
 - 改动立即生效：`AdminGuard` / `PermissionGuard` 每次请求查库，不需要重启或重新登录。操作者把自己权限改没了也会当场生效（可由其他 admin 恢复）。
-- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 69 个权限点分组勾选，高危权限点单独标注。
+- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 70 个权限点分组勾选，高危权限点单独标注。
 
 ---
 
@@ -568,7 +568,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 `GET /admin/capabilities`（`capability.read`）、`PUT /admin/capabilities/:id`（`capability.write`，高危）。
 
-- 18 项能力的上下线与原因；列表按分组渲染为卡片网格（卡片展示实现程度与开关状态，运行结论仅用于筛选），`CapabilityControl` 无行 = 启用。
+- 17 项能力的上下线与原因；列表按分组渲染为卡片网格（卡片展示实现程度与开关状态，运行结论仅用于筛选），`CapabilityControl` 无行 = 启用。
 - 下架后 C 端 `runtime.effective='disabled'`；`generate.service` 在**扣费之前**拦截并返回 `40005`，原因原样透传到 C 端。
 - 只覆盖「上下线」这一层：能力的名称、分组、参数、默认价仍以 `definitions/<id>.ts` 为准，后台不能改代码里的 `mode`。
 - 保存即 `invalidate()`，无需等缓存过期。
