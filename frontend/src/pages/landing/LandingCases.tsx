@@ -66,9 +66,7 @@ export function LandingCases({ groups }: LandingCasesProps) {
                           loading="lazy"
                           className="block size-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                         />
-                        <Badge
-                          className="absolute bottom-2.5 left-2.5 h-auto translate-y-1 rounded-full bg-[color-mix(in_srgb,var(--text-strong)_70%,transparent)] px-2.5 py-1 text-xs font-medium text-card opacity-0 backdrop-blur-[6px] transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
-                        >
+                        <Badge className="absolute bottom-2.5 left-2.5 h-auto translate-y-1 rounded-full bg-[color-mix(in_srgb,var(--text-strong)_70%,transparent)] px-2.5 py-1 text-xs font-medium text-card opacity-0 backdrop-blur-[6px] transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
                           做同款
                         </Badge>
                       </AspectRatio>

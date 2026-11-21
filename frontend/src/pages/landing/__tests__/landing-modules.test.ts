@@ -10,13 +10,7 @@ import { auditNamedImports, PROJECT_ROOT } from '../../../test/namedImportAudit'
  * 一个名字写错就是整页白屏。这里直接读源码对账。
  */
 
-const ROOTS = [
-  'src/pages/landing',
-  'src/components',
-  'src/hooks',
-  'src/lib',
-  'src/context',
-];
+const ROOTS = ['src/pages/landing', 'src/components', 'src/hooks', 'src/lib', 'src/context'];
 
 describe('营销首页目录具名导入', () => {
   it('每条相对导入的名字都能在目标模块里找到', () => {

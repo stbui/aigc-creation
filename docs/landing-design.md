@@ -11,23 +11,25 @@
 
 ## 2. 结构
 
-| 区块 | 类名 | 内容 |
+| 区块 | 组件 | 内容 |
 | --- | --- | --- |
-| 顶部导航 | `.landing-topbar` | 品牌 + 首页 + 能力分组下拉 + 工作台；右侧作品 / 数据 / 登录入口。≤900px 收进汉堡抽屉 |
-| 1 首屏 | `.lp-hero` | 左侧：能力数徽标（取运行时可见能力数）、两行标题、说明、双 CTA（免费开始创作 → 首个场景页；查看套餐价目 → `/packages`）、三条保障；右侧：2×2 真实产出拼贴，每张带场景标签 |
-| 2 核心场景 | `.lp-section` + `.lp-scene-grid` | 商品主图 / 商品详情 / 爆款复刻三张卡，图片与文案来自 `BIZ_CARDS` |
-| 3 修图工具 | `.lp-tool-grid` | 8 个常用工具入口，四列一行；右上「全部工具」进 `/workbench` |
-| 4 使用流程 | `.lp-flow-panel` | 上传 → 选择能力与风格 → 下载，三步固定文案 |
-| 5 优秀案例 | `.lp-case-groups` | 7 个分类（商品主图 / 商品详情图 / 爆款复刻 / 自由创作 / 产品精修 / 一键抠图 / 旋转角度）按顺序平铺长式陈列，**不切页签**；每类按商品去重后 5 张，按源图 3:4 展示；组头「做同款」跳对应工具页，悬停卡片浮出同一入口 |
-| 6 套餐与积分 | `#packages` + `.lp-tabs` | 订阅套餐 / 加油包 / 限时活动三个页签；订阅 6 卡 3×2，加油包只陈列前 4 款，全量在 `/packages`；角标取 `lib/constants.ts` 的 `PLAN_VISUALS`（与 `/packages` 同源） |
-| 7 产品特性 | `.lp-feature-wide` / `.lp-feature-grid` | 宽卡（文案 + 5 张真实产出拼贴）与两张补充卡 |
-| 8 底部行动区 | `.lp-cta` | 品牌紫渐变通栏，主 CTA 同首屏 |
-| 页脚 | `.landing-footer` | 品牌说明、客户 logo、三组链接、版权 |
+| 顶部导航 | `LandingHeader` | 品牌 + 首页 + 能力分组下拉 + 工作台；右侧作品 / 数据 / 登录入口。分组下拉是 `DropdownMenu`，≤900px 收进 `Sheet` 右侧抽屉 |
+| 1 首屏 | `LandingHero` | 左侧：能力数徽标（取运行时可见能力数）、两行标题、说明、双 CTA（`Button asChild`，免费开始创作 → 首个场景页；查看套餐价目 → `/packages`）、三条保障；右侧：2×2 真实产出拼贴，每张带场景标签 |
+| 2 核心场景 | `LandingScenes` | 商品主图 / 商品详情 / 爆款复刻三张 `Surface` 卡，图片与文案来自 `BIZ_CARDS` |
+| 3 修图工具 | `LandingTools` | 8 个常用 `Button asChild` 工具入口，四列一行；右上 `TextAction`「全部工具」进 `/workbench` |
+| 4 使用流程 | `LandingFlow` | 上传 → 选择能力与风格 → 下载，三步固定文案 |
+| 5 优秀案例 | `LandingCases` | 7 个分类（商品主图 / 商品详情图 / 爆款复刻 / 自由创作 / 产品精修 / 一键抠图 / 旋转角度）按顺序平铺长式陈列，**不切页签**；每类按商品去重后 5 张，`AspectRatio` 3:4 展示；组头「做同款」跳对应工具页，悬停 `Badge` 浮出同一入口 |
+| 6 套餐与积分 | `LandingPackages`（`#packages`，`Tabs`） | 订阅套餐 / 加油包 / 限时活动三个页签；订阅 6 卡 3×2，加油包只陈列前 4 款，全量在 `/packages`；角标取 `lib/constants.ts` 的 `PLAN_VISUALS`（与 `/packages` 同源） |
+| 7 产品特性 | `LandingFeatures` | 宽卡（文案 + 5 张真实产出拼贴）与两张补充卡 |
+| 8 底部行动区 | `LandingCta` | 品牌紫渐变通栏，主 CTA 同首屏 |
+| 页脚 | `LandingFooter` | 品牌说明、客户 logo、三组链接、版权 |
+
+组件统一从 `frontend/src/ui` 取件，目录内经由 `components.ts` 单一入口再导出。段落外壳（容器宽度 + 段前间距 + 小标题）由页面本地的 `LandingSection` / `LandingKicker` / `LandingHeading` / `LandingLede` 组合层承担，不是控件外观。
 
 ## 3. 数据与可见性
 
 - 场景卡、工具入口、案例页签都按 `isCapabilityVisible()` 过滤：运营下线的能力从首页消失；能力清单未到达时保留全部入口（公开首屏不因一次请求抖动整块消失）。
-- 首屏能力数取 `visibleCapabilityIds.size`，清单未到达时兜底 16。
+- 首屏能力数取 `visibleCapabilityIds.size`，清单未到达时兜底 `CAPABILITY_PLUGINS` 的声明数（当前 17）。
 - 案例文件名成对产出（`*_1` / `*_2`），`uniqueCaseFiles()` 去配对后缀后按商品去重，避免同一商品在案例墙出现两次。
 - 套餐权益文案由后端 `buildPerkLabels()` 生成，页面不另写一套权益说明。
 - 首页限时活动页签只在真有活动时出现；活动价与商品过滤由后端完成，前端不做二次判断。
@@ -40,6 +42,6 @@
 
 ## 5. 约束
 
-- 类名统一 `lp-` 前缀；旧 `home-v2-*`（参考站逐像素复刻版）已随本次改版删除，不要复用。
+- 不再有 `lp-` 类名前缀：控件视觉全部由 shadcn 组合件与语义类承担，页面 `style.css` 只剩 `.app-content` 内边距逃逸与 `#packages` 的 `scroll-margin-top`，新增版面不要再写前缀类。旧 `home-v2-*`（参考站逐像素复刻版）已删除，不要复用。
 - 首屏 CTA 不直接弹登录框，交给目标工具页的鉴权链处理；未登录访客仍能浏览完整价目。
 - 页面不承诺「无水印」「可商用」等授权口径，避免未兑现的商业承诺。

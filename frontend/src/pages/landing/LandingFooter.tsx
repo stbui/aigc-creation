@@ -19,9 +19,7 @@ export function LandingFooter({ canUse }: LandingFooterProps) {
     <footer className="mt-24 bg-card px-8 pt-8 pb-7 max-[640px]:px-5">
       <div className="mx-auto grid max-w-[1226px] grid-cols-[2fr_1fr_1fr_1fr] gap-6 max-[640px]:grid-cols-1">
         <div>
-          <strong className="block text-base text-foreground">
-            货觉AI · 电商视觉创作平台
-          </strong>
+          <strong className="block text-base text-foreground">货觉AI · 电商视觉创作平台</strong>
           <p className="mt-2 text-[13px] text-muted-foreground">
             好图，好卖 —— 商品图 · 详情页 · 营销视觉，一站生成
           </p>

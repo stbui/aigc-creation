@@ -117,7 +117,11 @@ export const HERO_SHOTS = [
 /** 使用流程三步: 固定文案, 不随接口变化 —— 这是产品口径, 不是商品数据 */
 export const FLOW_STEPS = [
   { icon: Upload, title: '上传商品图', desc: '拖入或选择本地图片，作为整套视觉的起点' },
-  { icon: SlidersHorizontal, title: '选择能力与风格', desc: '白底、场景、卖点、详情，按需勾选组合' },
+  {
+    icon: SlidersHorizontal,
+    title: '选择能力与风格',
+    desc: '白底、场景、卖点、详情，按需勾选组合',
+  },
   { icon: Download, title: '下载成品', desc: '生成即入库，可在作品库继续复用与二创' },
 ];
 
@@ -166,10 +170,30 @@ export interface CaseGroup {
  * 首页按顺序平铺全部 7 个分类, 不再用页签切换 —— 访客一屏滚动就能看全能力覆盖。
  */
 export const CASE_GROUPS: CaseGroup[] = [
-  { key: 'spzt', capability: 'main_image', label: '商品主图', files: buildFiles('spzt', 16, 'png', 'jpg') },
-  { key: 'spxqt', capability: 'detail_image', label: '商品详情图', files: buildFiles('spxqt', 16, 'png') },
-  { key: 'bkfk', capability: 'hot_remake', label: '爆款复刻', files: buildFiles('bkfk', 8, 'png', undefined, 0) },
-  { key: 'cyst', capability: 'free_create', label: '自由创作', files: buildFiles('cyst', 8, 'png', undefined, 0) },
+  {
+    key: 'spzt',
+    capability: 'main_image',
+    label: '商品主图',
+    files: buildFiles('spzt', 16, 'png', 'jpg'),
+  },
+  {
+    key: 'spxqt',
+    capability: 'detail_image',
+    label: '商品详情图',
+    files: buildFiles('spxqt', 16, 'png'),
+  },
+  {
+    key: 'bkfk',
+    capability: 'hot_remake',
+    label: '爆款复刻',
+    files: buildFiles('bkfk', 8, 'png', undefined, 0),
+  },
+  {
+    key: 'cyst',
+    capability: 'free_create',
+    label: '自由创作',
+    files: buildFiles('cyst', 8, 'png', undefined, 0),
+  },
   { key: 'cpjx', capability: 'enhance', label: '产品精修', files: buildFiles('cpjx', 16, 'png') },
   { key: 'yjkt', capability: 'matting', label: '一键抠图', files: buildFiles('yjkt', 16, 'png') },
   { key: 'xzjd', capability: 'rotate', label: '旋转角度', files: buildFiles('xzjd', 16, 'png') },

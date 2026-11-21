@@ -67,14 +67,16 @@ export function LandingHeader() {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header
-      className="relative z-10 grid h-16 grid-cols-[266px_minmax(0,1fr)_182px] items-center bg-card px-8 shadow-[0_1px_var(--color-border-soft)] max-[1024px]:grid-cols-[266px_minmax(0,1fr)_max-content] max-[1024px]:px-5 max-[900px]:flex max-[900px]:h-[54px] max-[900px]:items-center max-[900px]:justify-between max-[900px]:gap-2.5 max-[900px]:px-3.5"
-    >
+    <header className="relative z-10 grid h-16 grid-cols-[266px_minmax(0,1fr)_182px] items-center bg-card px-8 shadow-[0_1px_var(--color-border-soft)] max-[1024px]:grid-cols-[266px_minmax(0,1fr)_max-content] max-[1024px]:px-5 max-[900px]:flex max-[900px]:h-[54px] max-[900px]:items-center max-[900px]:justify-between max-[900px]:gap-2.5 max-[900px]:px-3.5">
       <Link
         to="/"
         className="flex h-9.5 w-[266px] items-center gap-2.5 px-1.5 text-foreground no-underline max-[900px]:h-[34px] max-[900px]:w-auto max-[900px]:gap-2"
       >
-        <img src="/brand/huojue-mark.svg" alt="货觉AI" className="block size-9 max-[900px]:size-8" />
+        <img
+          src="/brand/huojue-mark.svg"
+          alt="货觉AI"
+          className="block size-9 max-[900px]:size-8"
+        />
         <span className="text-base font-bold whitespace-nowrap max-[900px]:text-sm">
           货觉<span className="text-brand">AI</span>
         </span>
@@ -139,9 +141,7 @@ export function LandingHeader() {
           <Link to="/stats">数据中心</Link>
         </Button>
         <Button asChild variant="ghost" className="h-8 rounded-md px-2 text-[13px] font-bold">
-          <Link to={token ? '/workbench' : '/login'}>
-            {token ? '进入工作台' : '登录/注册'}
-          </Link>
+          <Link to={token ? '/workbench' : '/login'}>{token ? '进入工作台' : '登录/注册'}</Link>
         </Button>
       </div>
 
@@ -251,7 +251,9 @@ export function LandingHeader() {
 function MobileSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="grid gap-1 border-b border-border pb-2.5 last:border-b-0">
-      <span className="mx-1 text-xs font-bold tracking-[0.04em] text-muted-foreground">{title}</span>
+      <span className="mx-1 text-xs font-bold tracking-[0.04em] text-muted-foreground">
+        {title}
+      </span>
       <div className="grid grid-cols-2 gap-x-1.5 gap-y-1">{children}</div>
     </section>
   );

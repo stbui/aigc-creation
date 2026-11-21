@@ -39,7 +39,10 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
               ]}
             />
             {canUse('main_image') && (
-              <Button asChild className="mt-6 h-10.5 gap-1.5 px-5 text-[14.5px] font-semibold hover:bg-brand-hover">
+              <Button
+                asChild
+                className="mt-6 h-10.5 gap-1.5 px-5 text-[14.5px] font-semibold hover:bg-brand-hover"
+              >
                 <Link to="/product-kit">
                   去试试
                   <ArrowRight size={15} aria-hidden />

@@ -48,6 +48,29 @@
     color: var(--text-strong);
     -webkit-font-smoothing: antialiased;
   }
+
+  /*
+   * 交互元素复位（preflight 子集）。
+   *
+   * shadcn 的 `ghost` 变体不写背景类，靠 preflight 把 `<button>` 的 UA 灰底
+   * （`buttonface`）清掉；本项目不导 preflight，于是每个 ghost 按钮都显示成
+   * 一块实心灰（顶导的能力分组下拉、移动端汉堡都是这个症状）。
+   * `asChild` 到 `<Link>` 时更明显：锚点保留 UA 的蓝字与下划线，
+   * 按钮文字变成「蓝色带下划线」。
+   *
+   * 用 `data-variant` 而不是 `data-slot='button'`：Slot 合并时
+   * `DropdownMenuTrigger` 会把槽位改成 `dropdown-menu-trigger`，
+   * 但变体标记会透传到触发器与锚点上。只命中 Button 渲染出的元素，
+   * 页面里的裸 `<a>` / `<button>` 不受影响；`@layer base` 优先级低于
+   * utilities，`bg-primary` / `text-brand` / `no-underline` 等类照常覆盖。
+   */
+  [data-variant='ghost'] {
+    background-color: transparent;
+  }
+  a[data-variant] {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 /* ───────── C 端 shadcn 适配层 ─────────
