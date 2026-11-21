@@ -32,7 +32,7 @@
     "verify:payment-bills": "npm --prefix backend run verify:payment-bills",
     "verify:payment-signatures": "npm --prefix backend run verify:payment-signatures",
     "check:node": "node scripts/check-node-version.mjs",
-    "check": "npm run check:node && npm run verify:deps && npm run verify:conventions && npm run lint:ci && npm run build && npm run test"
+    "check": "npm run check:node && npm run verify:deps && npm run verify:conventions && npm run verify:env-sync && npm run lint:ci && npm run build && npm run test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7"
