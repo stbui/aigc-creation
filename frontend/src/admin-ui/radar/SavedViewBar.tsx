@@ -9,7 +9,7 @@ import { ModalDialog } from './overlays';
 /**
  * 保存视图条（Radar 视觉）。
  *
- * 与 `primitives/saved-view-bar` 共用 `useSavedViewBar` 的数据与交互逻辑，
+ * 数据与交互逻辑由 `useSavedViewBar`（见 `saved-view-state`）提供，
  * 这里只负责展示：中性灰底、1px 细线、零阴影，选中视图用近黑动作色而不是
  * 品牌紫。
  */

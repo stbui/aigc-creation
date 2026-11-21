@@ -19,7 +19,7 @@ export {
   useAdminResource,
   useAdminUrlFilterSync,
 } from '~/admin-ui/radar';
-export { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/hooks/useUnsavedGuard';
+export { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/radar';
 
 export { usePaymentExceptionFilters } from './usePaymentExceptionFilters';
 export { useReconciliationFilters } from './useReconciliationFilters';

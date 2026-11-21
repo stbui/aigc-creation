@@ -12,7 +12,7 @@ export {
 
 export {
   useUnsavedGuard,
-} from '~/admin-ui/hooks/useUnsavedGuard';
+} from '~/admin-ui/radar';
 
 export {
   useConfirm,
