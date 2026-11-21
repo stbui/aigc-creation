@@ -199,7 +199,7 @@ interface PaymentAdapter {
 4. `version = max(version) + 1`。
 5. 读取时解密，只回传非密钥字段；密钥字段回 `secretConfigured: true` 与掩码，**永不回传明文**。
 
-`SecretCipher` 从 `model/infra/` 抽到 `common/security/`，做成全局模块；`ModelModule` 继续 re-export，模型域调用点不改。`MODEL_SECRET_KEY` 语义不变：模型与支付凭证共用该密钥，轮换会使两者密文同时失效（写进 `.env.example` 与 NOTICE）。
+`SecretCipher` 从 `model/infra/` 抽到 `common/security/`，做成全局模块；`ModelModule` 继续 re-export，模型域调用点不改。`MODEL_SECRET_KEY` 语义不变：模型与支付凭证共用该密钥，轮换会使两者密文同时失效（写进 `backend/.env.example` 与 NOTICE）。
 
 ### 4.4 订单与支付尝试
 
@@ -787,7 +787,7 @@ model PaymentReconciliationItem {
 - `PAYMENT_PROVIDER` 保留为**首次启动的引导值**：若数据库没有任何 `PaymentProviderConfig`，启动时按该值生成 v1 配置（凭据从 env 读取一次），之后以数据库为准。
 - `ALIPAY_*` / `WECHAT_*` 保留为引导凭据；后台保存后不再读取。
 - `PAYMENT_NOTIFY_BASE` 保留（回调基址），配置页可展示但不在界面修改（避免把回调地址改到不可达域名）。
-- `.env.example` 与 `docs/environments.md` 注明：引导完成后以数据库配置为准；`MODEL_SECRET_KEY` 同时保护模型与支付凭证。
+- `backend/.env.example` 与 `docs/environments.md` 注明：引导完成后以数据库配置为准；`MODEL_SECRET_KEY` 同时保护模型与支付凭证。
 
 ### 10.3 前端路由
 

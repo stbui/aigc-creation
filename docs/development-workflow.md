@@ -144,7 +144,7 @@
 1. **定位层**：能力（`capabilities/definitions`）→ 模型层（`model/intent` → `model/routing` → `model/tasks` → `model/protocol` → `model/channels`）→ 计费（`model/billing`）；依赖方向不可反转，说明错在哪层、改在哪层。
 2. **指到事实源**：对照 `CLAUDE.md` 单一事实源表，写出具体文件（如能力价 `definitions/<id>.ts`、退款 `SETTING_DEFS`、任务状态机 `TRANSITIONS`、账单状态机 `BILLING_STATUSES`、协议 `plugins/<plugin>/manifest.json`）。
 3. **数据模型**：新增字段 / 表 / 索引、是否需要迁移存量数据；计费字段一律快照。
-4. **配置同步**：环境变量四处（`ENV_SPECS`、`.env.example`、三档 env、`docs/environments.md`）；模型层变量统一 `MODEL_*`，渠道与价格在后台配置，不改代码。
+4. **配置同步**：环境变量四处（`ENV_SPECS`、`backend/.env.example`、三档 env、`docs/environments.md`）；模型层变量统一 `MODEL_*`，渠道与价格在后台配置，不改代码。
 5. **风险分级**：涉及钱 / 权限 / 合规 / 后台高危配置的，写明权限校验、二次确认、拒绝路径用例；确有业务依据要求时再补原因填写。
 6. **验证命令**：用哪层闸口、哪条专项冒烟、需要什么前置数据。
 
