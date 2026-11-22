@@ -511,7 +511,7 @@
   }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   /* 窄屏右栏不再是满高列, 列表回到内容高度 */
   .pd-result-list {
     overflow: visible;
