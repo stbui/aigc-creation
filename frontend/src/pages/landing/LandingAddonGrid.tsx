@@ -67,12 +67,13 @@ export function LandingAddonGrid({ addons, state }: LandingAddonGridProps) {
                 与生成页显示的同一个数, 免得两处算法漂移 */}
             <p className="mt-2.5 text-[12.5px] leading-[1.6] text-muted-foreground">
               {formatNumber(addon.credits)} 积分 ·{' '}
-              {addon.creditsValidDays > 0
-                ? `${addon.creditsValidDays} 天内有效`
-                : '永久有效'}
+              {addon.creditsValidDays > 0 ? `${addon.creditsValidDays} 天内有效` : '永久有效'}
             </p>
 
-            <Button asChild className="mt-4 w-full rounded-md text-sm font-semibold hover:bg-brand-hover">
+            <Button
+              asChild
+              className="mt-4 w-full rounded-md text-sm font-semibold hover:bg-brand-hover"
+            >
               <Link to="/packages">{addon.isFree ? '免费领取' : '立即购买'}</Link>
             </Button>
           </SurfaceContent>

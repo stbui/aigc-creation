@@ -294,11 +294,12 @@
   --wb-surface-brand: #fafaff;
   --wb-surface-warning: #f0b969;
 
-  /* 2026-11-21 组件层重构：多图融合（原 `--mif-*`）与商品 SKU（原 `--sku-*`）
-     的控件令牌组整组删除 —— 这些页面的控件视觉已由 shadcn 组合件与
-     `styles/tailwind-theme.css` 的语义映射承担，页面 `style.css` 只剩共享骨架覆盖。
-     两个页面现在直接引用基础层 / 通用层令牌（`--workspace-topbar-height` /
-     `--space-*` / `--page-bg` / `--surface` / `--border`），不再自建前缀组。 */
+  /* 2026-11-21 组件层重构：多图融合（原 `--mif-*`）、商品 SKU（原 `--sku-*`）
+     与营销首页（原 `--lp-*`）的控件令牌组整组删除 —— 这些页面的控件视觉已由
+     shadcn 组合件与 `styles/tailwind-theme.css` 的语义映射承担，页面 `style.css`
+     只剩共享骨架覆盖。三个页面现在直接引用基础层 / 通用层令牌
+     （`--workspace-topbar-height` / `--space-*` / `--page-bg` / `--surface` /
+     `--border`），不再自建前缀组。 */
 
   /* ═════════ 3.5 工具页族（tool-*） ═════════ */
   /* 工具页族 (pk-* / fc-* / vc-* …) */
@@ -433,13 +434,7 @@
   --login-surface-brand-5: #efeaff;
   --login-surface-brand-6: #f6f2ff;
 
-  /* ═════════ 3.9 首页（lp-*） ═════════ */
-  /* 首页 */
-  --lp-border-brand: #d8d2ff;
-  --lp-text-1: #1f2329;
-  --lp-text-2: #676d79;
-
-  /* ═════════ 3.10 网站地图（sitemap-*） ═════════ */
+  /* ═════════ 3.9 网站地图（sitemap-*） ═════════ */
   /* 网站地图四组的编号色 (2026-11-03 从页面内联 hex 收到令牌)
        第一组直接用品牌紫 —— 原 #625DF5 是 2026-10-17 已收拢的近似紫之一, 不再单列。
        其余三色是分类色 (不是品牌 / 状态色), 原值在白底只有 2.64–2.95:1,

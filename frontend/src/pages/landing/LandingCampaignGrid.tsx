@@ -50,9 +50,7 @@ export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
                 asChild
                 className="mt-4 w-full rounded-md text-sm font-semibold hover:bg-brand-hover"
               >
-                <Link to={`/checkout/${encodeURIComponent(campaign.product!.sku)}`}>
-                  立即抢购
-                </Link>
+                <Link to={`/checkout/${encodeURIComponent(campaign.product!.sku)}`}>立即抢购</Link>
               </Button>
             </SurfaceContent>
           </Surface>
@@ -70,9 +68,7 @@ export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
                 <strong className="text-[28px] font-bold">
                   {campaign.onlyNewUsers ? '新客' : '0'}
                 </strong>
-                <span className="text-sm font-bold">
-                  {campaign.onlyNewUsers ? '专享' : '积分'}
-                </span>
+                <span className="text-sm font-bold">{campaign.onlyNewUsers ? '专享' : '积分'}</span>
               </div>
               <p className="mt-2.5 text-[12.5px] leading-[1.6] text-muted-foreground">
                 {(campaign.capabilityIds ?? []).map((id) => capabilityName(id)).join(' / ')}
