@@ -787,10 +787,10 @@
 }
 
 /*
- * 窄档（<=1240）右栏宽度不足：220px 会退化成两列大卡，
+ * 窄档（<=1200）右栏宽度不足：220px 会退化成两列大卡，
  * 降到 180px 保持三列 / 两列的小卡密度，与写真模板页一致。
  */
-@media (max-width: 1240px) {
+@media (max-width: 1200px) {
   .sc-template-grid {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
