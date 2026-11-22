@@ -41,7 +41,7 @@ const PAGE_BASE =
   'box-border min-h-0! p-4! gap-4! items-stretch! overflow-hidden! grid-rows-[minmax(0,1fr)]! bg-[var(--page-bg)] max-h-[calc(100vh_-_var(--workspace-topbar-height))]';
 
 const PAGE_COLUMNS =
-  'grid-cols-[432px_minmax(560px,1fr)_192px]! min-[1367px]:max-[1500px]:grid-cols-[390px_minmax(520px,1fr)_176px]! min-[1181px]:max-[1366px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)_192px]! max-[1180px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
+  'grid-cols-[390px_minmax(520px,1fr)_176px]! max-[1367px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)_192px]! max-[1200px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
 
 const PAGE_MOBILE =
   'max-[900px]:grid-cols-1! max-[900px]:-mx-2.5! max-[900px]:-mt-4! max-[900px]:-mb-6! max-[900px]:h-auto max-[900px]:max-h-none max-[900px]:gap-3! max-[900px]:grid-rows-[auto]! max-[900px]:content-start max-[900px]:overflow-visible! max-[900px]:p-4';
