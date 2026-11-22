@@ -20,7 +20,7 @@ interface LandingHeroProps {
 export function LandingHero({ totalCapabilities, primaryTo }: LandingHeroProps) {
   return (
     <section className="relative overflow-hidden bg-page" style={HERO_BACKGROUND}>
-      <div className="mx-auto grid max-w-[1200px] grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] items-center gap-14 px-6 pt-14 pb-12 max-[1080px]:gap-9 max-[900px]:grid-cols-1 max-[900px]:gap-9 max-[900px]:px-5 max-[900px]:pt-12 max-[900px]:pb-10">
+      <div className="mx-auto grid max-w-[1200px] grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] items-center gap-14 px-6 pt-14 pb-12 max-[1200px]:gap-9 max-[900px]:grid-cols-1 max-[900px]:gap-9 max-[900px]:px-5 max-[900px]:pt-12 max-[900px]:pb-10">
         <div className="min-w-0">
           <Badge
             variant="outline"
@@ -29,7 +29,7 @@ export function LandingHero({ totalCapabilities, primaryTo }: LandingHeroProps) 
             <Sparkles size={13} aria-hidden />
             货觉AI · {totalCapabilities} 项电商视觉能力
           </Badge>
-          <h1 className="mt-5 text-[50px] leading-[1.18] font-bold tracking-[-1.5px] text-foreground max-[1080px]:text-[42px] max-[900px]:text-[38px] max-[640px]:text-[32px] max-[640px]:tracking-[-0.8px]">
+          <h1 className="mt-5 text-[50px] leading-[1.18] font-bold tracking-[-1.5px] text-foreground max-[1200px]:text-[42px] max-[900px]:text-[38px] max-[640px]:text-[32px] max-[640px]:tracking-[-0.8px]">
             一张商品图
             <br />
             <em className="bg-[linear-gradient(96deg,var(--brand)_10%,var(--brand-light)_90%)] bg-clip-text text-transparent [font-style:normal]">
