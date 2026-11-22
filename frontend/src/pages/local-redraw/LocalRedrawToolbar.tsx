@@ -16,7 +16,7 @@ const BRUSH_STEP = 2;
  * 画笔滑块是原生 range，轨道填充与白芯紫边滑块只能靠伪元素皮肤。
  */
 const TOOLBAR =
-  'redraw-toolbar absolute top-0 left-1/2 box-border w-[532px] max-w-[calc(100%_-_32px)]! h-10 min-h-10 py-0! px-4! flex-nowrap! gap-1.5! overflow-hidden -translate-x-1/2 max-[1180px]:static! max-[1180px]:w-full! max-[1180px]:max-w-none! max-[1180px]:overflow-x-auto! max-[1180px]:overflow-y-hidden! max-[1180px]:justify-start! max-[1180px]:translate-none';
+  'redraw-toolbar absolute top-0 left-1/2 box-border w-[532px] max-w-[calc(100%_-_32px)]! h-10 min-h-10 py-0! px-4! flex-nowrap! gap-1.5! overflow-hidden -translate-x-1/2 max-[1200px]:static! max-[1200px]:w-full! max-[1200px]:max-w-none! max-[1200px]:overflow-x-auto! max-[1200px]:overflow-y-hidden! max-[1200px]:justify-start! max-[1200px]:translate-none';
 
 const TOOL_BTN_PADDING = 'p-1!';
 
