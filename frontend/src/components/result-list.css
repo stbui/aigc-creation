@@ -17,7 +17,7 @@
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 640px) {
 
   .fc-result-actions {
     width: 100%;
@@ -265,7 +265,7 @@
 
 /* 窄屏一刀切 2 列: 432px 输入栏 + 结果栏在手机/小窗口下本来就挤,
    再按用户选的 5~6 列, 单张只剩几十像素, 等于没法看。 */
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .fc-result-gallery {
     --fc-cols: 2;
   }
