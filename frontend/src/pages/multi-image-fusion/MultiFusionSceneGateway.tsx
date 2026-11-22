@@ -21,7 +21,7 @@ export function MultiFusionSceneGateway({ onSelect }: { onSelect: (scene: string
           <h2 className="mb-2.5 ml-0.5 text-sm leading-5 font-bold text-foreground">
             {group.name}
           </h2>
-          <div className="grid grid-cols-6 gap-3 max-[1200px]:grid-cols-5 max-[899px]:grid-cols-3 max-[767px]:grid-cols-2 max-[520px]:grid-cols-2">
+          <div className="grid grid-cols-6 gap-3 max-[1200px]:grid-cols-5 max-[900px]:grid-cols-3 max-[640px]:grid-cols-2">
             {group.scenes.map((scene) => (
               <Button
                 key={scene.value}
