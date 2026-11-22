@@ -67,7 +67,7 @@ export function LandingHeader() {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header className="relative z-10 grid h-16 grid-cols-[266px_minmax(0,1fr)_182px] items-center bg-card px-8 shadow-[0_1px_var(--color-border-soft)] max-[1024px]:grid-cols-[266px_minmax(0,1fr)_max-content] max-[1024px]:px-5 max-[900px]:flex max-[900px]:h-[54px] max-[900px]:items-center max-[900px]:justify-between max-[900px]:gap-2.5 max-[900px]:px-3.5">
+    <header className="relative z-10 grid h-16 grid-cols-[266px_minmax(0,1fr)_182px] items-center bg-card px-8 shadow-[0_1px_var(--color-border-soft)] max-[900px]:grid-cols-[266px_minmax(0,1fr)_max-content] max-[900px]:px-5 max-[900px]:flex max-[900px]:h-[54px] max-[900px]:items-center max-[900px]:justify-between max-[900px]:gap-2.5 max-[900px]:px-3.5">
       <Link
         to="/"
         className="flex h-9.5 w-[266px] items-center gap-2.5 px-1.5 text-foreground no-underline max-[900px]:h-[34px] max-[900px]:w-auto max-[900px]:gap-2"
@@ -127,10 +127,10 @@ export function LandingHeader() {
         </Button>
       </nav>
 
-      <div className="flex items-center gap-6 justify-self-end max-[1024px]:gap-3 max-[900px]:hidden">
+      <div className="flex items-center gap-6 justify-self-end max-[900px]:gap-3 max-[900px]:hidden">
         <Badge
           variant="outline"
-          className="h-8 rounded-full border-[var(--border-brand)] bg-brand-bg px-3 text-[13px] font-bold text-brand max-[1024px]:hidden"
+          className="h-8 rounded-full border-[var(--border-brand)] bg-brand-bg px-3 text-[13px] font-bold text-brand max-[900px]:hidden"
         >
           AI 创作 · 按能力计费
         </Badge>
