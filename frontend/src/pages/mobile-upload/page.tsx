@@ -19,11 +19,11 @@ import { MobileUploadEditor } from './MobileUploadEditor';
 
 /** 落地页外壳：渐变底 + 居中卡片 */
 const PAGE =
-  'grid min-h-[100dvh] box-border items-center justify-items-center p-5 text-[color:var(--mup-text-1)] bg-[linear-gradient(150deg,var(--mup-surface-brand-3)_0%,var(--mup-surface-brand-5)_44%,var(--mup-surface-info)_100%)] max-[520px]:items-start max-[520px]:p-3';
+  'grid min-h-[100dvh] box-border items-center justify-items-center p-5 text-[color:var(--mup-text-1)] bg-[linear-gradient(150deg,var(--mup-surface-brand-3)_0%,var(--mup-surface-brand-5)_44%,var(--mup-surface-info)_100%)] max-[480px]:items-start max-[480px]:p-3';
 
 /** 卡片：宽上限 520，窄屏收紧圆角与内边距 */
 const CARD =
-  'box-border w-[min(520px,100%)] rounded-[22px] border border-white/80 bg-white/95 p-6 shadow-[0_24px_70px_rgba(70,55,130,0.14)] max-[520px]:mt-2 max-[520px]:rounded-[18px] max-[520px]:p-[18px]';
+  'box-border w-[min(520px,100%)] rounded-[22px] border border-white/80 bg-white/95 p-6 shadow-[0_24px_70px_rgba(70,55,130,0.14)] max-[480px]:mt-2 max-[480px]:rounded-[18px] max-[480px]:p-[18px]';
 
 /** 成功 / 失败终态：居中列 */
 const STATE_CARD = 'flex min-h-[280px] flex-col items-center justify-center gap-3 text-center';
