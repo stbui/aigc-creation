@@ -618,7 +618,7 @@
   }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .image-to-video-result-pane {
     min-height: 480px;
   }
@@ -632,7 +632,7 @@
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .image-to-video-upload-preview {
     grid-template-columns: 112px minmax(0, 1fr);
     gap: var(--space-10);
