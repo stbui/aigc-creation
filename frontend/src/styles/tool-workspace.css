@@ -1157,7 +1157,7 @@
   cursor: zoom-in;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .pk-workspace {
     height: auto;
     min-height: 0;
@@ -1495,7 +1495,7 @@
 /* 高级设置面板桌面固定 400px；其锚点在输入卡内，390 视口下右缘会到 442px。
      跟随视口收缩并在高度不足时内部滚动。 */
 
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .pk-settings-popover {
     width: min(400px, calc(100vw - 48px));
     /* 参考站窄屏弹层 padding-inline 12px（桌面 16px），比例/画质卡片随之变宽。 */
@@ -1505,7 +1505,7 @@
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .pk-result-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -1526,18 +1526,12 @@
 /* ───────── 局部重绘三栏布局 (2026-10-25, 对齐参考站 local-redraw) ─────────
  *
  * 参考站桌面宽屏是「输入 390 / 画布自适应 / 历史 176」三栏；
- * 1180 以下历史栏收起，改由浮动按钮打开抽屉；1024 以下回到单列。
+ * 1200 以下历史栏收起，改由浮动按钮打开抽屉；900 以下回到单列。
  * 只有传入 trailingPane 的工具页才带 `.pk-workspace-trailing`，
  * 其他工具页继续是两栏，避免共享骨架被局部需求污染。 */
 
 .pk-workspace.pk-workspace-trailing {
   grid-template-columns: 432px minmax(0, 1fr) 192px;
-}
-
-@media (max-width: 1500px) {
-  .pk-workspace.pk-workspace-trailing {
-    grid-template-columns: 390px minmax(520px, 1fr) 176px;
-  }
 }
 
 /* 历史栏收起后释放第三列；窄屏本来就只显示两列 */
@@ -1546,13 +1540,12 @@
   grid-template-columns: 432px minmax(0, 1fr);
 }
 
-@media (max-width: 1500px) {
+/* ≤1200：历史栏收起改抽屉，只剩左栏 + 结果两栏；≤900 再回单列 */
+@media (max-width: 1200px) {
   .pk-workspace.pk-workspace-trailing-collapsed {
     grid-template-columns: 390px minmax(520px, 1fr);
   }
-}
 
-@media (max-width: 1180px) {
   .pk-workspace.pk-workspace-trailing {
     grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
   }
@@ -1562,7 +1555,7 @@
   }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .pk-workspace.pk-workspace-trailing {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1617,7 +1610,7 @@
   height: 100%;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .pk-workspace {
     height: auto;
   }
