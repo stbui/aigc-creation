@@ -209,6 +209,6 @@ npx biome format --write <files>
 - 前端模块分层：`docs/frontend-module-conventions.md`。
 - 前端组件角色、Props 与状态契约：`docs/frontend-component-language.md`。
 - 文案、状态反馈、可访问性与代码风格：`docs/copywriting.md`、`docs/feedback-states.md`、`docs/accessibility.md`、`docs/code-style.md`。
-- 设计令牌、字号与响应式：`docs/design-tokens.md`、`docs/typography.md`。
+- 设计令牌、字号与响应式：`docs/design-tokens.md`、`docs/typography.md`、`docs/responsive-layout.md`。
 - 安全、可观测性与发布：`docs/security.md`、`docs/observability.md`、`docs/release.md`。
 - 其他文档的类别与放置规则：`docs/README.md`。
