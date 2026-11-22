@@ -339,7 +339,7 @@
   color: var(--text-muted);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .redraw-canvas-wrap .redraw-mask-bg {
     max-height: none;
   }
@@ -511,7 +511,7 @@
   transform: translateY(-1px);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .pk-workspace.local-redraw-page .redraw-canvas-wrap {
     width: min(600px, calc(100% - 24px));
   }
