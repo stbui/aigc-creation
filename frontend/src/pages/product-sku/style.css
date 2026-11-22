@@ -129,7 +129,7 @@
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 480px) {
   .pk-workspace.product-sku-page,
   .pk-workspace.product-sku-page.pk-workspace-trailing,
   .pk-workspace.product-sku-page.pk-workspace-trailing-collapsed {
