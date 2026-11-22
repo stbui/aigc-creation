@@ -23,74 +23,6 @@
   margin: 0;
 }
 
-@media (max-width: 900px) {
-  .wb-dashboard-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .wb-account-metrics {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 700px) {
-  .wb-hero {
-    height: auto;
-    min-height: 196px;
-    padding: 22px var(--space-20);
-  }
-
-  .wb-hero-title {
-    font-size: 24px;
-    line-height: 1.4;
-    margin-bottom: var(--space-12);
-    letter-spacing: 0;
-  }
-
-  .wb-hero-sub {
-    font-size: 14px;
-    line-height: 1.65;
-    margin-top: 0;
-  }
-}
-
-@media (max-width: 720px) {
-  .workbench-content { padding: 12px 10px 40px; }
-
-  .wb-workflow-banner {
-    height: 160px;
-    padding: 18px var(--space-20);
-    background-position: 65%;
-  }
-
-  .wb-workflow-banner h1 { max-width: 220px; font-size: 20px; line-height: 28px; }
-
-  .wb-workflow-banner p { max-width: 230px; margin-top: 12px; font-size: 12px; line-height: 20px; }
-
-  .wb-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-
-  .wb-panel.wb-account,
-  .wb-panel.wb-recent,
-  .wb-panel.wb-dashboard { padding: 16px; }
-
-  .wb-account-metrics { grid-template-columns: 1fr; }
-
-  .wb-dashboard-head,
-  .wb-dashboard-head > div:first-child { flex-direction: column; align-items: flex-start; }
-
-  .wb-dashboard-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-
-  .wb-dashboard-stats > div { padding: 16px; }
-
-  .wb-jobs-list { gap: 16px; margin-top: 16px; }
-
-  .wb-job { gap: 12px; height: 64px; }
-
-  .wb-job-thumb { flex-basis: 64px; width: 64px; height: 64px; border-radius: 7px; }
-
-  .wb-job-status { display: none; }
-}
-
 .wb-hero {
   position: relative;
   display: flex;
@@ -129,17 +61,6 @@
   top: 0;
   width: 440px;
   height: 212px;
-}
-
-@media (max-width: 1200px) {
-  /* 窄容器放不下 440px 拼贴: 收起拼贴, hero 保留渐变 + 文案 (不塞假图) */
-  .wb-hero {
-    padding: 0 var(--space-48);
-  }
-  .wb-hero-collage,
-  .wb-hero-art {
-    display: none;
-  }
 }
 
 .wb-hero-photo {
@@ -257,41 +178,12 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 700px) {
-  .wb-hero {
-    padding: var(--space-24);
-  }
-  .wb-hero-title {
-    font-size: 24px;
-  }
-}
-
 /* 工具网格: 参考站 6 列, gap 16 (1280 实测卡 178 = (1148-5*16)/6), 区块间距统一 16 */
 .wb-tools {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--space-16);
   margin-bottom: var(--space-16);
-}
-
-@media (max-width: 1100px) {
-  .wb-tools {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 760px) {
-  .wb-tools {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 520px) {
-  .wb-tools {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    /* 参考站 390 实测 gap 8 (卡 181 = (370-8)/2), 桌面 16 在 2 列下过疏 */
-    gap: var(--space-8);
-  }
 }
 
 /* 卡片: 177x197, 白底 radius 16, 缩略图通顶无内边距 */
@@ -440,12 +332,6 @@
   gap: var(--space-16);
   margin-top: var(--space-16);
   margin-bottom: var(--space-16);
-}
-
-@media (max-width: 900px) {
-  .wb-panels {
-    grid-template-columns: 1fr;
-  }
 }
 
 .wb-panel {
@@ -690,22 +576,6 @@
 .wb-trend-date {
   font-size: 12px;
   color: var(--wb-text-desc);
-}
-
-@media (max-width: 1200px) {
-  .wb-account-metrics {
-    grid-template-columns: 1fr 1fr;
-  }
-  .wb-dashboard-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 700px) {
-  .wb-account-metrics,
-  .wb-dashboard-stats {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* ── 工作台严格 1:1 覆盖层 (参考站 wb-* 规则字面值, 2026-10-17)
@@ -970,7 +840,7 @@
 
 .workbench-content {
   min-width: 0;
-  padding: var(--space-24) var(--space-24) 64px;
+  padding: var(--space-24) var(--space-24) var(--space-32);
   color: var(--wb-text);
   font-size: 16px;
   line-height: normal;
@@ -1473,17 +1343,88 @@
   text-align: center;
 }
 
-@media (max-width: 1050px) {
-  .workbench-content { padding: 16px 14px 48px; }
-  .wb-workflow-banner { height: 180px; padding: 0 48px; }
-  .wb-tool-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-  .wb-data-layout { grid-template-columns: 1fr; margin-top: 16px; }
-  .wb-dashboard-stats { grid-template-columns: repeat(3, 1fr); }
+/* ── 内容断点四档：1200 / 900 / 640 / 480（docs/responsive-layout.md §1.1）
+   降序书写，同属性后档覆盖前档；结构属性（grid-template-columns）只在
+   每个断点声明一次，覆盖层不重复声明。列数按 §4.1 标准阶梯：
+   N=6 → 5 / 3 / 2 / 1；N=3 → 3 / 2 / 2 / 1；间距 16 / 12 / 8 / 8。 ── */
+
+@media (max-width: 1200px) {
+  .wb-tool-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+  .wb-dashboard-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+  /* 窄容器放不下 440px 拼贴：收起拼贴，hero 保留渐变 + 文案（不塞假图） */
+  .wb-hero { padding: 0 var(--space-48); }
+
+  .wb-hero-collage,
+  .wb-hero-art { display: none; }
 }
 
-@media (max-width: 600px) {
-  .wb-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .workbench-content { padding: 16px 16px 24px; }
+
+  .wb-workflow-banner { height: 180px; padding: 0 48px; }
+
+  .wb-tool-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+  .wb-dashboard-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+  .wb-account-metrics { grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* 横向「2fr + 1fr」双栏在 ≤900 改单列 */
+  .wb-data-layout { grid-template-columns: 1fr; margin-top: 16px; }
+}
+
+@media (max-width: 640px) {
+  .workbench-content { padding: 12px 14px 20px; }
+
+  .wb-workflow-banner {
+    height: 160px;
+    padding: 18px 20px;
+    background-position: 65%;
+  }
+
+  .wb-workflow-banner h1 { max-width: 220px; font-size: 20px; line-height: 28px; }
+
+  .wb-workflow-banner p { max-width: 230px; margin-top: 12px; font-size: 12px; line-height: 20px; }
+
+  .wb-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+  .wb-dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+  .wb-account-metrics { grid-template-columns: 1fr 1fr; gap: 8px; }
+
   .wb-panel.wb-account,
   .wb-panel.wb-recent,
   .wb-panel.wb-dashboard { padding: 16px; }
+
+  .wb-dashboard-stats > div { padding: 16px; }
+
+  .wb-dashboard-head,
+  .wb-dashboard-head > div:first-child { flex-direction: column; align-items: flex-start; }
+
+  .wb-jobs-list { gap: 16px; margin-top: 16px; }
+
+  .wb-job { gap: 12px; height: 64px; }
+
+  .wb-job-thumb { flex-basis: 64px; width: 64px; height: 64px; border-radius: 7px; }
+
+  .wb-job-status { display: none; }
+
+  /* .wb-hero* 目前仅 HeroArt 组件使用（该组件未挂到任何页面），规则随档保留 */
+  .wb-hero { height: auto; min-height: 196px; padding: var(--space-24); }
+
+  .wb-hero-title { font-size: 24px; line-height: 1.4; margin-bottom: var(--space-12); letter-spacing: 0; }
+
+  .wb-hero-sub { font-size: 14px; line-height: 1.65; margin-top: 0; }
+}
+
+@media (max-width: 480px) {
+  .workbench-content { padding: 10px 12px 16px; }
+
+  .wb-tool-grid { grid-template-columns: 1fr; gap: 8px; }
+
+  .wb-dashboard-stats { grid-template-columns: 1fr; gap: 8px; }
+
+  .wb-account-metrics { grid-template-columns: 1fr; gap: 8px; }
 }
