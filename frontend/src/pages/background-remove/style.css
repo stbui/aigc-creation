@@ -135,74 +135,12 @@
   color: var(--brand);
 }
 
-@media (min-width: 901px) and (max-width: 1366px) {
-
-  .pk-workspace.background-remove-page {
-    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
-  }
-
-  .pk-workspace.background-remove-page .pk-section-title {
-    font-size: 12px;
-  }
-
-  .pk-workspace.background-remove-page .pk-upload-prompt small {
-    font-size: 12px;
-  }
-
-  .pk-workspace.background-remove-page .pk-upload-title-row {
-    gap: var(--space-4);
-  }
-
-  .pk-workspace.background-remove-page .pk-upload-title-actions {
-    gap: var(--space-4);
-  }
-}
-
-@media (max-width: 900px) {
-  .pk-workspace.background-remove-page {
-    box-sizing: border-box;
-    width: auto;
-    height: auto;
-    min-height: 0;
-    max-height: none;
-    margin: -16px -10px -24px;
-    padding: var(--space-16);
-    gap: var(--space-12);
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto;
-    align-content: start;
-    overflow: visible;
-  }
-
-  .pk-workspace.background-remove-page .pk-input-pane,
-  .pk-workspace.background-remove-page .pk-result-pane {
-    width: 100%;
-    height: auto;
-    min-height: 0;
-  }
-
-  .pk-workspace.background-remove-page .pk-result-pane {
-    min-height: 720px;
-  }
-}
-
 /* 上传区底色与虚线边：参考站 .local-redraw-source-upload 实测
    #f6f7f9 / #d9dee8，不能沿用商品主图页的 --surface #f2f4f7。 */
 
 .pk-workspace.background-remove-page .pk-dropzone {
   background: var(--surface-5);
   border-color: var(--tool-border-4);
-}
-
-@media (max-width: 900px) {
-  .pk-workspace.background-remove-page .pk-form-card {
-    height: auto;
-  }
-
-  .pk-workspace.background-remove-page .pk-form-scroll {
-    flex: none;
-    overflow: visible;
-  }
 }
 
 /* 上传区内部留白：参考站桌面 .local-redraw-source-upload 为 padding:0，
@@ -218,53 +156,8 @@
   max-width: 100%;
 }
 
-@media (max-width: 900px) {
-  .pk-workspace.background-remove-page .pk-input-pane,
-  .pk-workspace.background-remove-page .pk-form-card {
-    display: block;
-  }
-
-  .pk-workspace.background-remove-page .pk-form-scroll {
-    display: grid;
-    margin-bottom: var(--space-10);
-  }
-
-  .pk-workspace.background-remove-page .pk-input-pane {
-    height: max-content;
-  }
-
-  .pk-workspace.background-remove-page {
-    height: auto;
-    max-height: none;
-  }
-
-  .pk-workspace.background-remove-page .pk-form-scroll {
-    margin-bottom: var(--space-12);
-  }
-
-  .pk-workspace.background-remove-page .pk-submit-actions {
-    padding: var(--space-12) 14px 14px;
-  }
-
-  .pk-workspace.background-remove-page .background-source-row {
-    gap: var(--space-12);
-  }
-
-  .pk-workspace.background-remove-page .background-source-preview {
-    flex-basis: min(160px, 48vw);
-    width: min(160px, 48vw);
-    height: min(160px, 48vw);
-  }
-}
-
 /* 参考站抠图卡标题 22px + 16px 底距，色板换行后自然高 176；
    * .pk-form-scroll 的 10px gap 与 12px 底部留白已由共享骨架提供。 */
-
-@media (max-width: 900px) {
-  .pk-workspace.background-remove-page .background-color-card {
-    min-height: 176px;
-  }
-}
 
 .background-remove-stage {
   position: relative;
@@ -558,36 +451,6 @@
   pointer-events: none;
 }
 
-@media (max-width: 640px) {
-  .background-remove-preview {
-    width: calc(100% - 24px);
-    height: calc(100% - 190px);
-  }
-  .background-result-toolbar {
-    top: 8px;
-    gap: 3px;
-    width: calc(100% - 16px);
-    height: auto;
-    min-height: 40px;
-    padding: 5px var(--space-8);
-    overflow-x: auto;
-  }
-  .background-result-toolbar input[type='range'] {
-    width: 72px;
-  }
-  .background-result-footer {
-    bottom: 8px;
-    gap: 5px;
-    max-width: calc(100% - 16px);
-    height: 36px;
-    padding: 0 var(--space-8);
-    overflow-x: auto;
-  }
-  .background-result-shortcuts {
-    display: none;
-  }
-}
-
 /* 一键抠图：参考站没有历史栏，固定两栏 */
 .pk-workspace.background-remove-page {
   box-sizing: border-box;
@@ -748,10 +611,131 @@
   background: var(--tool-surface-6);
 }
 
+/* ── 断点块统一置于文件末尾（2026-11-22）
+   原先 5 个 @media (max-width: 900px) 分散在基础规则之间，而
+   `.pk-workspace.background-remove-page` 的基础规则写在它们之后：两者特异性相同，
+   后置的基础规则（432px + minmax(560px,1fr)）压掉了媒体块里的单列声明，
+   390 宽因此横向溢出。这里按 docs/responsive-layout.md §4.2 重排：
+   基础规则在前、媒体块在后（901–1366 → ≤900 → ≤640），数值一律未改。 ── */
+
+@media (min-width: 901px) and (max-width: 1366px) {
+
+  .pk-workspace.background-remove-page {
+    grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+  }
+
+  .pk-workspace.background-remove-page .pk-section-title {
+    font-size: 12px;
+  }
+
+  .pk-workspace.background-remove-page .pk-upload-prompt small {
+    font-size: 12px;
+  }
+
+  .pk-workspace.background-remove-page .pk-upload-title-row {
+    gap: var(--space-4);
+  }
+
+  .pk-workspace.background-remove-page .pk-upload-title-actions {
+    gap: var(--space-4);
+  }
+}
+
 @media (max-width: 900px) {
+  .pk-workspace.background-remove-page {
+    box-sizing: border-box;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    margin: -16px -10px -24px;
+    padding: var(--space-16);
+    gap: var(--space-12);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    align-content: start;
+    overflow: visible;
+  }
+
+  .pk-workspace.background-remove-page .pk-input-pane,
+  .pk-workspace.background-remove-page .pk-result-pane {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    display: block;
+  }
+
+  .pk-workspace.background-remove-page .pk-input-pane {
+    height: max-content;
+  }
+
+  .pk-workspace.background-remove-page .pk-result-pane {
+    min-height: 720px;
+  }
+
+  .pk-workspace.background-remove-page .pk-form-card {
+    display: block;
+    height: auto;
+  }
+
+  .pk-workspace.background-remove-page .pk-form-scroll {
+    display: grid;
+    flex: none;
+    margin-bottom: var(--space-12);
+    overflow: visible;
+  }
+
+  .pk-workspace.background-remove-page .pk-submit-actions {
+    padding: var(--space-12) 14px 14px;
+  }
+
+  .pk-workspace.background-remove-page .background-source-row {
+    gap: var(--space-12);
+  }
+
+  .pk-workspace.background-remove-page .background-source-preview {
+    flex-basis: min(160px, 48vw);
+    width: min(160px, 48vw);
+    height: min(160px, 48vw);
+  }
+
+  .pk-workspace.background-remove-page .background-color-card {
+    min-height: 176px;
+  }
+
   /* 本页 CSS 懒加载晚于 global.css，同特异性下会覆盖旧的 40px 移动端规则；
    * 移动端保持与桌面一致的 40px 点击高度。 */
   .pk-workspace.background-remove-page .background-source-reupload {
     height: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .background-remove-preview {
+    width: calc(100% - 24px);
+    height: calc(100% - 190px);
+  }
+  .background-result-toolbar {
+    top: 8px;
+    gap: 3px;
+    width: calc(100% - 16px);
+    height: auto;
+    min-height: 40px;
+    padding: 5px var(--space-8);
+    overflow-x: auto;
+  }
+  .background-result-toolbar input[type='range'] {
+    width: 72px;
+  }
+  .background-result-footer {
+    bottom: 8px;
+    gap: 5px;
+    max-width: calc(100% - 16px);
+    height: 36px;
+    padding: 0 var(--space-8);
+    overflow-x: auto;
+  }
+  .background-result-shortcuts {
+    display: none;
   }
 }
