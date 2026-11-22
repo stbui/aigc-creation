@@ -58,8 +58,8 @@ export function TemplateInputPane({
   onSubmit,
 }: TemplateInputPaneProps) {
   return (
-    <aside className="pk-input-pane min-[901px]:max-[1024px]:h-full! min-[901px]:max-[1024px]:min-h-0!">
-      <div className="pk-form-scroll min-[901px]:max-[1024px]:overflow-y-auto!">
+    <aside className="pk-input-pane min-[901px]:h-full! min-[901px]:min-h-0!">
+      <div className="pk-form-scroll min-[901px]:overflow-y-auto!">
         <section className="pk-config-card">
           <ToolImageDropzone
             title="上传人像照片"
