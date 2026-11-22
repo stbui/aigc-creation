@@ -26,7 +26,7 @@ const PAGE_SIZE = 24;
 
 /** 网格：宽屏 220px 起、窄档 180px、≤900 降 140px 保三列密度 */
 const GRID =
-  'grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 max-[1240px]:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] max-[900px]:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] max-[900px]:gap-3';
+  'grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 max-[1200px]:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] max-[900px]:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] max-[900px]:gap-3';
 
 /** 卡片骨架；选中态另加描边与外环 */
 const CARD =
