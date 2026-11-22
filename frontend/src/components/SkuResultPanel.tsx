@@ -179,7 +179,7 @@ export function SkuResultPanel({
 
   return (
     <section
-      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[14px] bg-card p-3.5 max-[1024px]:min-h-[560px] max-[560px]:min-h-[520px] max-[560px]:p-3"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[14px] bg-card p-3.5 max-[900px]:min-h-[560px] max-[480px]:min-h-[520px] max-[480px]:p-3"
       aria-label="SKU 批量结果"
     >
       {items.length > 0 && (
