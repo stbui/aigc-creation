@@ -1376,7 +1376,7 @@
 }
 
 @media (max-width: 640px) {
-  .workbench-content { padding: 12px 14px 20px; }
+  .workbench-content { padding: 14px 12px 20px; }
 
   .wb-workflow-banner {
     height: 160px;
@@ -1420,7 +1420,7 @@
 }
 
 @media (max-width: 480px) {
-  .workbench-content { padding: 10px 12px 16px; }
+  .workbench-content { padding: 12px 10px 16px; }
 
   .wb-tool-grid { grid-template-columns: 1fr; gap: 8px; }
 
