@@ -648,7 +648,7 @@
     height: auto;
     min-height: 0;
     max-height: none;
-    margin: -16px -10px -24px;
+    margin: -16px -16px -24px;
     padding: var(--space-16);
     gap: var(--space-12);
     grid-template-columns: minmax(0, 1fr);
