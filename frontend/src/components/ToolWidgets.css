@@ -94,8 +94,10 @@
 /* 商品换色：窄屏下色卡压到 132px 最小高，避免色板换行后卡片过高。
  * 页面级差异由页面的 `ToolCard className` 表达（见 product-recolor/page.tsx）。 */
 
-/* 901–1366: 色板改为 4 列网格 (与 ToolWidgets 的色板基础规则同源)。 */
-@media (min-width: 901px) and (max-width: 1366px) {
+/* 901–1200: 中宽桌面（§1.2 四档的「小笔记本」档）色板改为 4 列网格。
+   原上限 1366 是外壳断点，内容层不使用；对齐到 1200 后，1201–1366 改走
+   基础规则（40px 圆形 flex 换行），与四档刻度一致。 */
+@media (min-width: 901px) and (max-width: 1200px) {
   .background-color-options {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
