@@ -497,7 +497,7 @@
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .vc-result-starter {
     align-items: flex-start;
     flex-direction: column;
@@ -565,7 +565,14 @@
   background: var(--surface);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
+  /* 示例卡 4 → 3 列（§4.1：>1200 N，≤1200 N−1） */
+  .vc-demo-cases {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
   .vc-demo-cases {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -744,14 +751,19 @@
   }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   /* 单列文档流下结果列表不内滚，交给页面整体滚动 */
   .vc-result-list {
     overflow: visible;
   }
+
+  /* 对照三联 3 → 2 列（§4.1：N≤3 时为 2），gap 12 保持 */
+  .vc-compare-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .vc-result-row-head {
     padding: var(--space-10) var(--space-10) var(--space-8);
   }
@@ -762,5 +774,13 @@
 
   .vc-result-loading-grid {
     gap: var(--space-6);
+  }
+}
+
+@media (max-width: 480px) {
+  /* §4.1 末档：对照三联与示例卡改单列 */
+  .vc-compare-grid,
+  .vc-demo-cases {
+    grid-template-columns: 1fr;
   }
 }

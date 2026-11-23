@@ -11,16 +11,17 @@ import { useMediaQuery } from './useMediaQuery';
  * 「从左到右、从上到下」，最新内容仍在左上角。
  *
  * 列高只用调用方给的**相对值**（同一列宽下的高/宽比即可）比较，不测量 DOM；
- * 懒加载与滚动追加都不会引起重排。列数与设计断点一致：5 / 4 / 3 / 2 / 1。
+ * 懒加载与滚动追加都不会引起重排。列数与设计断点一致：5 / 4 / 3 / 2 / 1
+ * （1200 / 900 / 640 / 480，见 docs/responsive-layout.md §4.1）。
  */
 
 const DEFAULT_COLUMNS = 5;
 
 function useColumnCount(): number {
   // hooks 不能写在循环里，四个断点固定订阅
-  const isExtraSmall = useMediaQuery('(max-width: 380px)');
+  const isExtraSmall = useMediaQuery('(max-width: 480px)');
   const isSmall = useMediaQuery('(max-width: 640px)');
-  const isMedium = useMediaQuery('(max-width: 980px)');
+  const isMedium = useMediaQuery('(max-width: 900px)');
   const isLarge = useMediaQuery('(max-width: 1200px)');
   if (isExtraSmall) return 1;
   if (isSmall) return 2;

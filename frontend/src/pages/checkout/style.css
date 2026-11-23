@@ -812,7 +812,7 @@
 /* ── 响应式 ───────────────────────────────────────────────────────────────
    必须放在所有基础规则之后: @media 不提升特异性, 写在文件头会被后面的
    .co-layout / .co-side 覆盖, 移动端就会退回 1fr 336px 双列。            */
-@media (max-width: 980px) {
+@media (max-width: 900px) {
   .co-layout {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-16);

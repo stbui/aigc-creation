@@ -19,7 +19,7 @@
    - 所有颜色回落设计令牌 (--brand / --border / --surface / --text-*), 不写裸 hex。
    ───────────────────────────────────────────────────────────────────────────── */
 
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .my-works-filter-popover,
   .my-works-filter-popover.my-works-business-popover,
   .my-works-filter-popover.my-works-date-popover,
@@ -599,7 +599,7 @@
 @media (max-width: 640px) {
   .my-works-grid,
   .my-works-column {
-    gap: var(--space-10);
+    gap: var(--space-8);
   }
 }
 
@@ -1036,16 +1036,14 @@
   }
 }
 
-/* 计数行在 390 宽下会与排序说明挤成一行，允许换行。 */
-@media (max-width: 700px) {
+/* 计数行在 390 宽下会与排序说明挤成一行，允许换行。
+   窄屏: 筛选器两列排布，下载通栏；恢复参考站 14px 工具栏内边距与 10px 间距。 */
+@media (max-width: 640px) {
   .my-works-count-row {
     flex-wrap: wrap;
     row-gap: var(--space-6);
   }
-}
 
-/* 窄屏: 筛选器两列排布，下载通栏；恢复参考站 14px 工具栏内边距与 10px 间距。 */
-@media (max-width: 640px) {
   .my-works-toolbar {
     gap: var(--space-10);
     padding: var(--space-12) 14px;

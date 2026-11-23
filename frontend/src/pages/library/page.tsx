@@ -287,7 +287,7 @@ export function LibraryPage() {
   };
 
   return (
-    <div className="asset-library-page flex min-h-[calc(100vh-var(--workspace-topbar-height))] flex-col px-6 pt-6 pb-14 text-foreground max-[980px]:px-5 max-[980px]:pb-11 max-[720px]:px-3 max-[720px]:pt-[18px] max-[720px]:pb-9">
+    <div className="asset-library-page flex min-h-[calc(100vh-var(--workspace-topbar-height))] flex-col px-6 pt-6 pb-14 text-foreground max-[900px]:px-4 max-[900px]:pt-4 max-[900px]:pb-6 max-[640px]:px-3 max-[640px]:pt-[14px] max-[640px]:pb-5 max-[480px]:px-[10px] max-[480px]:pt-3 max-[480px]:pb-4">
       <div className="w-full">
         <LibraryToolbar
           loggedIn={Boolean(token)}

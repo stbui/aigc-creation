@@ -58,11 +58,11 @@ export function LibraryGrid({
   return (
     <>
       <div
-        className="grid items-start gap-2 max-[640px]:gap-1.5"
+        className="grid items-start gap-2"
         style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
       >
         {columns.map((column, columnIndex) => (
-          <div className="flex min-w-0 flex-col gap-2 max-[640px]:gap-1.5" key={columnIndex}>
+          <div className="flex min-w-0 flex-col gap-2" key={columnIndex}>
             {column.map(({ asset, index }) => (
               <LibraryAssetCard
                 key={asset.id}

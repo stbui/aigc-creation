@@ -41,9 +41,9 @@ export function LibraryToolbar({
   onUpload,
 }: LibraryToolbarProps) {
   return (
-    <header className="mb-[22px] flex items-end justify-between gap-6 max-[720px]:mb-[17px] max-[720px]:items-start max-[700px]:flex-col max-[700px]:items-stretch max-[640px]:gap-3">
+    <header className="mb-[22px] flex items-end justify-between gap-6 max-[640px]:mb-[17px] max-[640px]:flex-col max-[640px]:items-stretch max-[640px]:gap-3">
       <div>
-        <h1 className="m-0 text-[28px] leading-10 font-bold text-foreground max-[720px]:text-2xl max-[720px]:leading-[34px]">
+        <h1 className="m-0 text-[28px] leading-10 font-bold text-foreground max-[640px]:text-2xl max-[640px]:leading-[34px]">
           素材库
         </h1>
       </div>
