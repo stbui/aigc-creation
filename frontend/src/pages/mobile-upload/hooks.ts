@@ -16,11 +16,18 @@ export { useDocumentMeta } from '../../hooks/useDocumentMeta';
 /** 隐藏 input / 打开 / 清空 value 的共享上传逻辑 */
 export { useImageUploadArea } from '../../ui';
 
+/** 失败时回收本批已创建的预览 URL，避免中断后遗留 objectURL。 */
+function revokePickedUrls(items: Picked[]): void {
+  for (const item of items) URL.revokeObjectURL(item.url);
+}
+
 /**
  * 手机端选图与回传。
  *
  * 选图逐张压缩（失败回退原图），并对张数、单张体积与整批体积做三重校验；
- * objectURL 只在真正卸载时释放（按 picked 释放会把仍被引用的预览撤销成破图）。
+ * 已进入 picked 的 objectURL 只在移除或真正卸载时释放；失败批次的临时 URL
+ * 在失败出口立即回收，避免循环中途退出后遗留（按 picked 统一释放会把仍被
+ * 引用的预览撤销成破图）。
  */
 export function useMobileUpload(sessionId: string, token: string) {
   const [picked, setPicked] = useState<Picked[]>([]);
@@ -72,27 +79,34 @@ export function useMobileUpload(sessionId: string, token: string) {
     const results: Picked[] = [];
     let compressedCount = 0;
     let minEdge = Infinity;
-    for (const file of files) {
-      if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
-        setError(`单张不超过 ${MAX_IMAGE_MB}MB`);
-        return;
+    try {
+      for (const file of files) {
+        if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+          revokePickedUrls(results);
+          setError(`单张不超过 ${MAX_IMAGE_MB}MB`);
+          return;
+        }
+        const compressed = await compressImage(file);
+        if (compressed.compressed) {
+          compressedCount++;
+          minEdge = Math.min(minEdge, compressed.edge ?? 0);
+        }
+        results.push({
+          file: compressed.file,
+          url: URL.createObjectURL(compressed.file),
+          size: compressed.file.size,
+          compressed: compressed.compressed,
+          edge: compressed.edge,
+        });
       }
-      const compressed = await compressImage(file);
-      if (compressed.compressed) {
-        compressedCount++;
-        minEdge = Math.min(minEdge, compressed.edge ?? 0);
-      }
-      results.push({
-        file: compressed.file,
-        url: URL.createObjectURL(compressed.file),
-        size: compressed.file.size,
-        compressed: compressed.compressed,
-        edge: compressed.edge,
-      });
+    } catch (cause) {
+      revokePickedUrls(results);
+      setError(cause instanceof Error ? cause.message : '图片处理失败，请重试');
+      return;
     }
     const nextTotal = [...pickedRef.current, ...results].reduce((sum, item) => sum + item.size, 0);
     if (nextTotal > MAX_TOTAL_BYTES) {
-      for (const item of results) URL.revokeObjectURL(item.url);
+      revokePickedUrls(results);
       setError(`一次上传总大小不能超过 ${MAX_TOTAL_MB}MB`);
       return;
     }
