@@ -81,7 +81,7 @@ export function ViralCloneFormSection({
           dropzoneClassName="[&_[data-slot=image-upload-prompt]_svg]:mb-5"
           single
           showCount={false}
-          emptyHint={`上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过${MAX_IMAGE_MB}MB`}
+          emptyHint={`上传要复刻风格的参考图，最多 1 张，单张不超过${MAX_IMAGE_MB}MB`}
         />
       </SectionCard>
 

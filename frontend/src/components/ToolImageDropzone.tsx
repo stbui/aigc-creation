@@ -1,6 +1,6 @@
 import { useUploadLimits } from '../context/UploadLimitsContext';
 import { assetThumbUrl } from '../lib/api';
-import { ImageUploadArea, ImageUploadHeader } from '../ui';
+import { Button, ImageUploadArea, ImageUploadHeader, ImageUploadThumb } from '../ui';
 
 /**
  * 工具页图片上传区 —— 2026-10-19 从 4 个大页面抽出。
@@ -96,6 +96,33 @@ export function ToolImageDropzone({
         single={single}
         className={dropzoneClassName}
         ariaLabel={title}
+        replaceOnClick={single && images.length > 0}
+        renderThumb={
+          single
+            ? (image, _index, controls) => (
+                <div className="relative w-full">
+                  <ImageUploadThumb
+                    item={image}
+                    removeLabel={`移除 ${image.name}`}
+                    className="w-full"
+                    onRemove={onRemove}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={`替换${noun}`}
+                    className="absolute inset-x-1.5 bottom-1.5 h-auto min-h-7 border border-white/40 bg-foreground/70 px-2 text-xs font-normal text-primary-foreground hover:bg-foreground/85 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      controls.open();
+                    }}
+                  >
+                    替换图片
+                  </Button>
+                </div>
+              )
+            : undefined
+        }
         addLabel={`添加${noun}`}
         emptyTitle={`点击、拖拽或粘贴${noun}到此处上传`}
         emptyHint={emptyHint ?? `最多可上传 ${max} 张${noun}，单张不超过 ${maxMb}MB`}

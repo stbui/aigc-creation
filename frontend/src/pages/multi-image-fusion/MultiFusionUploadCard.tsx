@@ -9,6 +9,7 @@ import {
 } from './constants';
 import {
   Badge,
+  Button,
   Field,
   FieldTitle,
   ImageDropzone,
@@ -116,6 +117,7 @@ export function MultiFusionUploadCard({
           uploading={uploading}
           accept={SUPPORTED_IMAGE_ACCEPT}
           ariaLabel="上传主体图"
+          replaceOnClick={Boolean(subject)}
           emptyContent={(controls) => (
             <ImageDropzone
               title="上传主体图"
@@ -128,13 +130,26 @@ export function MultiFusionUploadCard({
             const image = items[0];
             if (!image) return null;
             return (
-              <MultiFusionImageThumb
-                asset={image}
-                uploading={uploading}
-                removeLabel="移除主体图"
-                className="h-[138px] w-full [&_[data-slot=attachment-media]]:h-full"
-                onRemove={() => controls.remove(image.id)}
-              />
+              <div className="relative h-[138px] w-full">
+                <MultiFusionImageThumb
+                  asset={image}
+                  uploading={uploading}
+                  removeLabel="移除主体图"
+                  className="h-full w-full [&_[data-slot=attachment-media]]:h-full"
+                  onRemove={() => controls.remove(image.id)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="absolute inset-x-1.5 bottom-1.5 h-auto min-h-7 border border-white/40 bg-foreground/70 px-2 text-xs font-normal text-primary-foreground hover:bg-foreground/85 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    controls.open();
+                  }}
+                >
+                  替换主体图
+                </Button>
+              </div>
             );
           }}
           onFiles={(files) => onUploadFiles('subject', files)}
