@@ -8,6 +8,13 @@ import { expect, test, type Page } from '@playwright/test';
  *   - §2.1 内边距阶梯：`.app-content` 水平内边距 >900 → 24、≤900 → 16、≤640 → 12、≤480 → 10；
  *   - §3 页头三级：每页唯一 `h1`；L2 28 → ≤640 24，L3 18 → ≤640 16。
  *
+ * ## 唯一 `h1` 与「视觉可见」是两件事
+ *
+ * 数量断言（每页恰好 1 个 `h1`）**永远执行**，多一个少一个都红。字号断言只对
+ * **视觉可见**的 `h1` 执行：§3.1 管的是视觉字号阶，读屏用的 `sr-only` 标题
+ * 不参与视觉排版，它的计算字号只是浏览器默认值。可见性按计算样式与盒子尺寸
+ * 判定（见 `measure()` 的注释），不按类名 —— 类名随组件库变动，不是契约。
+ *
  * ## 为什么四档都要跑，且必须有 899
  *
  * Tailwind 的 `max-[900px]:` 编译成 `@media (width < 900px)`（开区间），手写
@@ -110,15 +117,24 @@ interface LayoutMetrics {
   h1Count: number;
   h1Texts: string[];
   h1Size: number | null;
+  /** 首个 h1 是否视觉可见；不可见时字号断言不适用（见 measure 内的判定注释） */
+  h1Visible: boolean;
 }
 
 /**
  * 等到页面真正画出内容。开发服务器按需编译懒加载块，首次访问某条路由时
  * 只有骨架；只等 `load` 会在骨架态就量尺寸，得到假的「没有溢出」。
+ *
+ * 这里显式等 `h1`：导航文案比页头先到，只等「文本 > 40 字」会在 h1 挂载前
+ * 就量，表现为「首档偶发 0 个 h1」（1366 是每条路由的第一档，最慢）。
+ * 超时不视为失败 —— 由用例里的数量断言给出真实数字。
  */
 async function gotoAndSettle(page: Page, path: string): Promise<void> {
   await page.goto(`${UI}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.app-content, .landing-page', { timeout: 30000 });
+  await page.waitForSelector('h1', { timeout: 15000 }).catch(() => {
+    /* 真没有 h1 时交给数量断言报错，这里不吞成超时异常 */
+  });
   await page
     .waitForFunction(() => (document.body.innerText ?? '').trim().length > 40, { timeout: 30000 })
     .catch(() => {
@@ -133,9 +149,35 @@ async function measure(page: Page): Promise<LayoutMetrics> {
     const doc = document.documentElement;
     const content = document.querySelector('.app-content');
     const root = content ?? document.querySelector('.landing-page');
-    const rootStyle = root ? getComputedStyle(root) : null;
     const h1s = Array.from(document.querySelectorAll('h1'));
     const first = h1s[0];
+
+    /*
+     * 「视觉可见」判定：只看计算样式与盒子尺寸，**不看类名**。
+     *
+     * 类名会随主题、构建与组件库升级变动，而 `sr-only` 本身是 Tailwind 内置
+     * 工具类，不是本仓契约；拿 `classList.contains('sr-only')` 判等于把实现
+     * 细节写进测试。这里用它的产物特征判：
+     *   - 硬隐藏：display:none / visibility:hidden / opacity:0；
+     *   - 裁剪隐藏：clip-path 非 none（Tailwind v4 的 sr-only 用 inset(50%)）
+     *     或 clip 为 rect(0,0,0,0) 这类全零矩形；
+     *   - 盒模型隐藏：宽或高 ≤ 1px（sr-only 固定 1px×1px）。
+     * 三者任一命中即视为不可见。可见的 h1 仍按 §3.1 断言字号，字号不符照样红。
+     */
+    const isVisuallyHidden = (el: Element): boolean => {
+      const style = getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return true;
+      if (Number.parseFloat(style.opacity || '1') === 0) return true;
+      const clipPath = style.clipPath;
+      if (clipPath && clipPath !== 'none') return true;
+      const clip = style.clip;
+      if (clip && clip !== 'auto' && /rect\(\s*0(px)?[,\s]+0(px)?[,\s]+0(px)?[,\s]+0(px)?\s*\)/.test(clip)) {
+        return true;
+      }
+      const rect = el.getBoundingClientRect();
+      return rect.width <= 1 || rect.height <= 1;
+    };
+
     return {
       rootSelector: content ? '.app-content' : root ? '.landing-page' : null,
       docScroll: doc.scrollWidth,
@@ -147,6 +189,7 @@ async function measure(page: Page): Promise<LayoutMetrics> {
       h1Count: h1s.length,
       h1Texts: h1s.map((el) => (el.textContent ?? '').trim().slice(0, 20)),
       h1Size: first ? Number.parseFloat(getComputedStyle(first).fontSize) : null,
+      h1Visible: first ? !isVisuallyHidden(first) : false,
     };
   });
 }
@@ -187,6 +230,22 @@ for (const route of ROUTES) {
           `${route.path} 应有且仅有 1 个 h1，实测 ${m.h1Count} 个` +
             `（${m.h1Texts.length ? m.h1Texts.join(' / ') : '无'}）`,
         ).toBe(1);
+
+        /*
+         * 数量与唯一性永远断言；字号只在 h1 **视觉可见**时断言。
+         *
+         * §3.1 是视觉字号阶。给读屏用的 `sr-only` 标题不参与视觉排版，它的
+         * 计算字号只是浏览器默认值（32px），按字号判会红成假阳性。可见性判据
+         * 见 measure() 里的注释：只看计算样式与盒子尺寸，不看类名。
+         * 判定为不可见时把原因记进 annotations，避免它悄悄被跳过。
+         */
+        if (!m.h1Visible) {
+          test.info().annotations.push({
+            type: 'h1-hidden',
+            description: `${route.path} 的 h1「${m.h1Texts[0] ?? ''}」视觉隐藏（sr-only），跳过字号断言`,
+          });
+          return;
+        }
 
         if (route.level === 'L1') {
           // §3.1 L1：桌面 48–68（按页面规格），且必须成组声明「桌面 → ≤900 降一档 → ≤640 降一档」。
