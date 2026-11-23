@@ -68,6 +68,7 @@ function makeHarness() {
     reconciliation as never,
     configs as never,
     exceptions as never,
+    { get: () => undefined } as never,
   );
   return { service, states, prisma, orders, reconciliation, exceptions };
 }

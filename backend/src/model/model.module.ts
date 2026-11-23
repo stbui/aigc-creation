@@ -34,6 +34,7 @@ import { ChannelRuntimeService } from './channels/channel-runtime.service';
 import { TextToolService } from './text/text-tool.service';
 import { AdminChannelModelsController, AdminChannelsController } from './channels/channel.controller';
 import { PublicChannelsController } from './channels/public-channels.controller';
+import { PublicChannelsService } from './channels/public-channels.service';
 import { CapabilityCatalogService } from './catalog/capability-catalog.service';
 import { CatalogService } from './catalog/catalog.service';
 import { QuoteService } from './catalog/quote.service';
@@ -122,6 +123,7 @@ export class ModelBootstrapService implements OnModuleInit {
     CatalogVersionService,
     ChannelModelService,
     ChannelRuntimeService,
+    PublicChannelsService,
     TextToolService,
     ChannelService,
     ChannelHealthService,

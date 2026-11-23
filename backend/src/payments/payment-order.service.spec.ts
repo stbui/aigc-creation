@@ -19,6 +19,23 @@ import type { VisiblePaymentOption } from './payment-config.service';
 const ORDER_ID = 'order_1';
 const CONFIG_ID = 'cfg_1';
 
+/**
+ * ConfigService 替身：用例在运行期改写 process.env，因此按调用时刻读取。
+ * 数值型键保持原始字符串即可，模板拼接与 `|| 默认值` 的语义一致。
+ */
+const envConfig = {
+  get: (key: string, fallback?: unknown): unknown => {
+    const envName: Record<string, string> = {
+      'payment.notifyBase': 'PAYMENT_NOTIFY_BASE',
+      'app.host': 'HOST',
+      'app.port': 'PORT',
+      'app.webBase': 'WEB_BASE_URL',
+    };
+    const raw = process.env[envName[key] ?? ''];
+    return raw === undefined || raw === '' ? fallback : raw;
+  },
+};
+
 function makePaymentRules(overrides: Record<string, unknown> = {}) {
   return {
     enabled: true,
@@ -205,6 +222,7 @@ function makeHarness(order = makeOrder()) {
     orders as never,
     configs as never,
     settings as never,
+    envConfig as never,
   );
   return { service, prisma, orders, configs, settings };
 }

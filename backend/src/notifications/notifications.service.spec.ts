@@ -28,6 +28,7 @@ function createDependencies() {
     prisma as never,
     email as never,
     settings as never,
+    { get: () => undefined } as never,
   );
   return { service, prisma, email, settings };
 }

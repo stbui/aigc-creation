@@ -161,7 +161,7 @@ export class AdminAssetsController {
     return this.assets.batchAction(dto.ids, dto.action);
   }
 
-  /** 素材导出 (CSV) */
+  /** 素材导出 (CSV)。文件流直接写响应，走统一信封会变成 JSON 字符串而不是可下载文件 */
   @Get("assets/export")
   @RequireAllPermissions(PERMISSIONS.assetRead, PERMISSIONS.dataExport)
   async export(@Query() query: AssetListQueryDto, @Res() res: Response) {

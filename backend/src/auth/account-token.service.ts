@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -60,7 +61,10 @@ export class AccountTokenService {
   /** 单个验证码允许的失败次数，超过即作废 */
   static readonly MAX_ATTEMPTS = 5;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   /** 32 字节随机串，base64url（可直接放进 URL，无需再编码） */
   static newResetToken(): string {
@@ -72,9 +76,10 @@ export class AccountTokenService {
     return String(randomInt(0, 1_000_000)).padStart(6, '0');
   }
 
-  /** HMAC-SHA256，输出 64 位十六进制 */
-  static hash(raw: string): string {
-    const secret = process.env.JWT_SECRET || 'dev-huojue-secret-do-not-use-in-prod';
+  /** HMAC-SHA256，输出 64 位十六进制。密钥与 JWT 同源，走配置层 */
+  hash(raw: string): string {
+    const secret =
+      this.config.get<string>('jwt.secret') || 'dev-huojue-secret-do-not-use-in-prod';
     return createHmac('sha256', secret).update(raw, 'utf8').digest('hex');
   }
 
@@ -127,7 +132,7 @@ export class AccountTokenService {
         userId: params.userId ?? null,
         phone: params.phone ?? null,
         email: params.email ?? null,
-        tokenHash: AccountTokenService.hash(raw),
+        tokenHash: this.hash(raw),
         expiresAt,
         requestedIp: params.ip ?? null,
       },
@@ -149,7 +154,7 @@ export class AccountTokenService {
     phone?: string;
     email?: string;
   }): Promise<ConsumeResult> {
-    const tokenHash = AccountTokenService.hash(String(params.raw || '').trim());
+    const tokenHash = this.hash(String(params.raw || '').trim());
     const record = await this.prisma.accountToken.findUnique({ where: { tokenHash } });
 
     if (!record || record.type !== params.type) return { ok: false, reason: 'invalid' };
@@ -215,7 +220,7 @@ export class AccountTokenService {
 
     if (candidates.length === 0) return { ok: false, reason: '验证码已过期，请重新获取' };
 
-    const target = AccountTokenService.hash(String(params.code || '').trim());
+    const target = this.hash(String(params.code || '').trim());
     for (const candidate of candidates) {
       if (AccountTokenService.safeEqualHex(candidate.tokenHash, target)) {
         const claimed = await this.prisma.accountToken.updateMany({

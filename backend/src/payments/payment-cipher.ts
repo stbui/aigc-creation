@@ -57,7 +57,7 @@ export class PaymentCipher {
 
   private requireKey(): Buffer {
     if (this.key) return this.key;
-    const configured = String(process.env.PAYMENT_SECRET_KEY ?? '').trim();
+    const configured = String(this.config.get<string>('payment.secretKey') ?? '').trim();
     if (configured) {
       const decoded = Buffer.from(configured, 'base64');
       if (decoded.length !== KEY_BYTES) {
@@ -66,7 +66,7 @@ export class PaymentCipher {
       this.key = decoded;
       return this.key;
     }
-    if (process.env.NODE_ENV === 'production') {
+    if (this.config.get<string>('app.env') === 'production') {
       throw new Error('生产环境必须配置 PAYMENT_SECRET_KEY（base64 编码的 32 字节密钥）');
     }
     this.key = this.loadOrCreateFileKey();

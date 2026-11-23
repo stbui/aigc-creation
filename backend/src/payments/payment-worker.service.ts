@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentNotificationService } from './payment-notification.service';
@@ -42,10 +43,11 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly reconciliation: PaymentReconciliationService,
     private readonly configs: PaymentConfigService,
     private readonly exceptions: PaymentExceptionService,
+    private readonly config: ConfigService,
   ) {}
 
   onModuleInit(): void {
-    if (process.env.PAYMENT_WORKER_ENABLED === 'false') {
+    if (this.config.get<boolean>('payment.workerEnabled') === false) {
       this.logger.warn('支付后台任务已禁用 (PAYMENT_WORKER_ENABLED=false)');
       return;
     }

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { MessageTemplate } from '@prisma/client';
 import { EmailService } from '../channels/email/email.service';
 import { maskEmail } from '../channels/channel.types';
@@ -111,6 +112,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     private readonly settings: SettingsService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -410,7 +412,10 @@ export class NotificationsService {
     try {
       return new URL(value).toString();
     } catch {
-      const base = (process.env.WEB_BASE_URL || 'http://localhost:5100').replace(/\/+$/, '');
+      const base = (this.config.get<string>('app.webBase') || 'http://localhost:5100').replace(
+        /\/+$/,
+        '',
+      );
       return `${base}${value.startsWith('/') ? value : `/${value}`}`;
     }
   }

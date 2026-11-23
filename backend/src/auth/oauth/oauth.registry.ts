@@ -1,25 +1,21 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { buildOAuthProviders } from './oauth.providers';
 import { OAuthProvider, OAuthProviderInfo } from './oauth.types';
 
 /**
  * OAuth provider 注册表。
  *
- * 构造时从环境变量装配一次；启用判定 = 凭据齐全 && 显式开关允许。
+ * 构造时从配置装配一次；启用判定 = 凭据齐全 && 显式开关允许。
  */
 @Injectable()
 export class OAuthRegistryService {
   private readonly providers: OAuthProvider[];
   private readonly enabledIds: Set<string>;
 
-  constructor() {
-    this.providers = buildOAuthProviders(process.env);
-    this.enabledIds = new Set(
-      (process.env.OAUTH_ENABLED ?? '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
-    );
+  constructor(private readonly config: ConfigService) {
+    this.providers = buildOAuthProviders(this.config);
+    this.enabledIds = new Set(this.config.get<string[]>('oauth.enabled') ?? []);
   }
 
   list(): OAuthProviderInfo[] {

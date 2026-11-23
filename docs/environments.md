@@ -33,6 +33,7 @@
 | `HOST` | `127.0.0.1` | `127.0.0.1` | `0.0.0.0`（容器必须） |
 | `JWT_SECRET` | 留空（用内置开发密钥） | 独立测试密钥 | **必填**，缺失则拒绝启动 |
 | `JWT_TTL` | `7d` | `1h` | 建议 `2h` |
+| `AUTH_EMAIL_VERIFICATION_BYPASS` | `false` | `true` | `false`（强制） | 仅 test 档可跳过邮箱验证码；服务端也只在该档承认此开关 |
 | `CORS_ORIGINS` | 留空走默认本机白名单 | 显式放行 5100 | **必填**线上域名 |
 | 后台管理员预设 | `admin@admin.com / 123456789` | 同开发 | 不设默认密码，必须显式配置或用随机密码 |
 | 界面角标 | 「开发」 | 「测试」 | 不显示 |
@@ -47,11 +48,14 @@ PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付配置 → �
 | 变量 | 开发 | 测试 | 生产 | 说明 |
 |---|---|---|---|---|
 | `PAYMENT_SECRET_KEY` | 空 | 空 | **必填** | base64 编码的 32 字节密钥，AES-256-GCM 加密渠道凭据。开发留空会在 `data/.payment-secret-key` 生成持久化密钥；生产留空会拒绝加解密 |
+| `PAYMENT_WORKER_ENABLED` | `true` | `true` | `true` | 支付后台任务开关；仅测试/排障时设 `false` |
 | `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址。支付宝 / 微信 / 易支付 / Stripe 拼成固定地址 `{base}/api/v1/payment/webhook/{channel}`；PayPal / ZPay 仍拼成 `{base}/api/v1/payments/callback/{channel}/{configId}`。也可在单个渠道配置 `publicBaseUrl`；真实渠道两者都为空时发起支付返回 503 |
 | `ALIPAY_APP_ID` / `ALIPAY_PRIVATE_KEY` / `ALIPAY_PUBLIC_KEY` | 空 | 空 | 按需 | RSA2。私钥是**应用私钥**，公钥是**支付宝公钥**（不是应用公钥，填反表现为回调一律验签失败） |
 | `ALIPAY_GATEWAY` | 空 | 空 | 按需 | 空则用正式网关；沙箱联调用 `https://openapi-sandbox.dl.alipaydev.com/gateway.do` |
+| `ALIPAY_SELLER_ID` | 空 | 空 | 可选 | 支付宝收款账号 PID（`seller_id`） |
 | `ALIPAY_MOBILE_PRECREATE_DEEP_LINK` | 空 | 空 | 可选 | 设为 `true` 可强制开启支付宝移动端当面付唤起；未设置时使用后台 `payment.alipayMobilePrecreateDeepLink`。仅对路由到支付宝官方的移动端订单生效，且应用需开通当面付 / 扫码支付 |
 | `WECHAT_MCH_ID` / `WECHAT_APP_ID` / `WECHAT_API_V3_KEY` / `WECHAT_SERIAL_NO` / `WECHAT_PRIVATE_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY_ID` | 空 | 空 | 按需 | API v3。`API_V3_KEY` 必须 **32 字节**；`PLATFORM_PUBLIC_KEY` 用于验回调，`PLATFORM_PUBLIC_KEY_ID` 必须与回调/响应头 `Wechatpay-Serial` 完全一致 |
+| `WECHAT_API_BASE` | 空 | 空 | 可选 | 微信 API 基址覆盖；留空使用官方地址 |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | 空 | 空 | 按需 | PayPal REST App 凭据。生产用 Live App，联调可用 Sandbox App |
 | `PAYPAL_WEBHOOK_ID` | 空 | 空 | 按需 | PayPal 开发者后台 Webhook 的 ID，不是 URL；回调通过 PayPal 官方 `verify-webhook-signature` 验签 |
 | `PAYPAL_API_BASE` | 空 | 空 | 按需 | 留空用 `https://api-m.paypal.com`；Sandbox 显式填 `https://api-m.sandbox.paypal.com` |

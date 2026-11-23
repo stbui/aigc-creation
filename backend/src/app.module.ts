@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ConfigModule } from './config/config.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { CommonModule } from './common/common.module';
@@ -7,6 +7,8 @@ import { RateLimitGuard } from './common/rate-limit.guard';
 import { TestSupportController } from './common/test-support.controller';
 import { ChannelsModule } from './channels/channels.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { AppValidationPipe } from './common/app-validation.pipe';
+import { ResponseInterceptor } from './common/response.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -99,6 +101,10 @@ import { ProxyModule } from './model/proxy/proxy.module';
   // 而那个实例由下面的 APP_GUARD 注册产生（useExisting 复用）。
   controllers: [TestSupportController],
   providers: [
+    // 全局管道与拦截器使用 Nest 的 APP_* 令牌注册，和请求生命周期共享同一套
+    // 测试装配；避免 main.ts 手工 new 与集成测试各自复制一份配置而漂移。
+    { provide: APP_PIPE, useClass: AppValidationPipe },
+    { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
     // 异常过滤器在此注册 (而非 main.ts 的 useGlobalFilters), 因为它要注入
     // AppFileLogger 才能落盘。⚠️ 与 useGlobalFilters 互斥, 只能二选一。
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

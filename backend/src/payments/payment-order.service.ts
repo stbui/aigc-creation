@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError } from "../common/app.exception";
@@ -146,6 +147,7 @@ export class PaymentOrderService {
     private readonly orders: OrderService,
     private readonly configs: PaymentConfigService,
     private readonly settings: SettingsService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -165,7 +167,7 @@ export class PaymentOrderService {
     publicBaseUrl?: string,
   ): string {
     const configuredBase =
-      publicBaseUrl?.trim() || process.env.PAYMENT_NOTIFY_BASE?.trim();
+      publicBaseUrl?.trim() || (this.config.get<string>("payment.notifyBase") ?? "").trim();
     if (providerId !== "sandbox" && !configuredBase) {
       throw new AppError(
         50301,
@@ -173,10 +175,9 @@ export class PaymentOrderService {
         503,
       );
     }
-    const base = (
-      configuredBase ||
-      `http://${process.env.HOST || "127.0.0.1"}:${process.env.PORT || 4100}`
-    ).replace(/\/$/, "");
+    const host = this.config.get<string>("app.host") || "127.0.0.1";
+    const port = this.config.get<number>("app.port") || 4100;
+    const base = (configuredBase || `http://${host}:${port}`).replace(/\/$/, "");
     const canonicalPath = CANONICAL_NOTIFY_PATHS[providerId];
     return canonicalPath
       ? `${base}/api/v1/payment/webhook/${canonicalPath}`
@@ -1552,7 +1553,7 @@ export class PaymentOrderService {
   }
 
   private webBase(): string {
-    return (process.env.WEB_BASE_URL || "http://localhost:5100").replace(
+    return (this.config.get<string>("app.webBase") || "http://localhost:5100").replace(
       /\/$/,
       "",
     );

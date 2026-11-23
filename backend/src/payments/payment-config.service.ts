@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Payment, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -172,6 +173,7 @@ export class PaymentConfigService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly cipher: PaymentCipher,
     private readonly settings: SettingsService,
+    private readonly config: ConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -249,7 +251,7 @@ export class PaymentConfigService implements OnModuleInit {
     for (const adapter of allAdapters()) {
       const d = adapter.descriptor;
       if (!d.supportedCurrencies.includes(currency)) continue;
-      if (d.id === 'sandbox' && process.env.NODE_ENV === 'production') continue;
+      if (d.id === 'sandbox' && this.config.get<string>('app.env') === 'production') continue;
       const rows = await this.latestRowsByInstance(d.id);
       const usable = rows.some((row) => {
         if (!row.enabled) return false;
@@ -876,70 +878,71 @@ export class PaymentConfigService implements OnModuleInit {
 
   /** env → v1；仅当库内完全没有该渠道配置时生效。 */
   async bootstrapFromEnv(): Promise<void> {
-    const epayMchId = process.env.EPAY_MCH_ID || process.env.EPAY_PID || '';
+    const get = (key: string): string => this.config.get<string>(key) ?? '';
+    const epayMchId = get('payment.epay.mchId') || get('payment.epay.pid');
     const epayType = normalizeEpayType(
-      process.env.EPAY_TYPE || process.env.EPAY_PAY_TYPE || '2',
+      get('payment.epay.type') || get('payment.epay.payType') || '2',
     );
     const seeds: Array<{ id: PaymentProviderId; values: Record<string, string> }> = [
       { id: 'sandbox', values: {} },
       {
         id: 'alipay',
         values: {
-          appId: process.env.ALIPAY_APP_ID ?? '',
-          sellerId: process.env.ALIPAY_SELLER_ID ?? '',
-          merchantPrivateKey: process.env.ALIPAY_PRIVATE_KEY ?? '',
-          alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY ?? '',
-          gateway: process.env.ALIPAY_GATEWAY ?? '',
+          appId: get('payment.alipay.appId'),
+          sellerId: get('payment.alipay.sellerId'),
+          merchantPrivateKey: get('payment.alipay.privateKey'),
+          alipayPublicKey: get('payment.alipay.publicKey'),
+          gateway: get('payment.alipay.gateway'),
         },
       },
       {
         id: 'wechat',
         values: {
-          appId: process.env.WECHAT_APP_ID ?? '',
-          mchId: process.env.WECHAT_MCH_ID ?? '',
-          merchantSerialNo: process.env.WECHAT_SERIAL_NO ?? '',
-          merchantPrivateKey: process.env.WECHAT_PRIVATE_KEY ?? '',
-          apiV3Key: process.env.WECHAT_API_V3_KEY ?? '',
-          wechatPayPublicKey: process.env.WECHAT_PLATFORM_PUBLIC_KEY ?? '',
-          wechatPayPublicKeyId: process.env.WECHAT_PLATFORM_PUBLIC_KEY_ID ?? '',
-          apiBase: process.env.WECHAT_API_BASE ?? '',
+          appId: get('payment.wechat.appId'),
+          mchId: get('payment.wechat.mchId'),
+          merchantSerialNo: get('payment.wechat.serialNo'),
+          merchantPrivateKey: get('payment.wechat.privateKey'),
+          apiV3Key: get('payment.wechat.apiV3Key'),
+          wechatPayPublicKey: get('payment.wechat.platformPublicKey'),
+          wechatPayPublicKeyId: get('payment.wechat.platformPublicKeyId'),
+          apiBase: get('payment.wechat.apiBase'),
         },
       },
       {
         id: 'paypal',
         values: {
-          clientId: process.env.PAYPAL_CLIENT_ID ?? '',
-          clientSecret: process.env.PAYPAL_CLIENT_SECRET ?? '',
-          webhookId: process.env.PAYPAL_WEBHOOK_ID ?? '',
-          apiBase: process.env.PAYPAL_API_BASE ?? '',
+          clientId: get('payment.paypal.clientId'),
+          clientSecret: get('payment.paypal.clientSecret'),
+          webhookId: get('payment.paypal.webhookId'),
+          apiBase: get('payment.paypal.apiBase'),
         },
       },
       {
         id: 'stripe',
         values: {
-          secretKey: process.env.STRIPE_SECRET_KEY ?? '',
-          publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? '',
-          webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
-          apiBase: process.env.STRIPE_API_BASE ?? '',
+          secretKey: get('payment.stripe.secretKey'),
+          publishableKey: get('payment.stripe.publishableKey'),
+          webhookSecret: get('payment.stripe.webhookSecret'),
+          apiBase: get('payment.stripe.apiBase'),
         },
       },
       {
         id: 'epay',
         values: {
-          apiBase: process.env.EPAY_API_BASE || 'https://epay.jylt.cc',
+          apiBase: get('payment.epay.apiBase') || 'https://epay.jylt.cc',
           mchId: epayMchId,
-          key: process.env.EPAY_KEY ?? '',
+          key: get('payment.epay.key'),
           type: epayType,
         },
       },
       {
         id: 'zpay',
         values: {
-          apiBase: process.env.ZPAY_API_BASE || 'https://zpayz.cn',
-          pid: process.env.ZPAY_PID ?? '',
-          key: process.env.ZPAY_KEY ?? '',
-          type: process.env.ZPAY_TYPE || 'alipay',
-          cid: process.env.ZPAY_CID ?? '',
+          apiBase: get('payment.zpay.apiBase') || 'https://zpayz.cn',
+          pid: get('payment.zpay.pid'),
+          key: get('payment.zpay.key'),
+          type: get('payment.zpay.type') || 'alipay',
+          cid: get('payment.zpay.cid'),
         },
       },
     ];
@@ -954,7 +957,8 @@ export class PaymentConfigService implements OnModuleInit {
       const adapter = requireAdapter(seed.id);
       const values = Object.fromEntries(Object.entries(seed.values).filter(([, v]) => v !== ''));
       const complete = adapter.validateConfig(values).length === 0;
-      const enabled = seed.id === 'sandbox' ? process.env.NODE_ENV !== 'production' : complete;
+      const enabled =
+        seed.id === 'sandbox' ? this.config.get<string>('app.env') !== 'production' : complete;
       const paymentMethods = defaultPaymentMethods(seed.id);
       await this.prisma.paymentProviderConfig.create({
         data: {
@@ -1200,7 +1204,7 @@ export class PaymentConfigService implements OnModuleInit {
       descriptor.id !== 'sandbox' &&
       missing.length === 0 &&
       !values.publicBaseUrl?.trim() &&
-      !process.env.PAYMENT_NOTIFY_BASE?.trim()
+      !this.config.get<string>('payment.notifyBase')?.trim()
     ) {
       warnings.push({
         level: 'danger',
@@ -1211,15 +1215,15 @@ export class PaymentConfigService implements OnModuleInit {
     if (
       row?.enabled &&
       descriptor.id !== 'sandbox' &&
-      process.env.NODE_ENV === 'production' &&
-      !process.env.PAYMENT_SECRET_KEY?.trim()
+      this.config.get<string>('app.env') === 'production' &&
+      !this.config.get<string>('payment.secretKey')?.trim()
     ) {
       warnings.push({
         level: 'danger',
         message: '生产环境未配置 PAYMENT_SECRET_KEY，支付实例凭据无法安全加密/解密。',
       });
     }
-    if (descriptor.id === 'sandbox' && process.env.NODE_ENV === 'production') {
+    if (descriptor.id === 'sandbox' && this.config.get<string>('app.env') === 'production') {
       warnings.push({
         level: 'danger',
         message: '生产环境仍启用沙箱渠道：不会产生真实资金流转，上线前必须停用。',

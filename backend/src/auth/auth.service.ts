@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -55,6 +56,8 @@ export class AuthService {
     private readonly email: EmailService,
     private readonly sms: SmsService,
     private readonly notifications: NotificationsService,
+    private readonly config: ConfigService,
+    private readonly jwt: JwtService,
   ) {}
 
   // 注册后直接签发 token (前端 LoginPage 注册模式同样消费 accessToken 自动登录)
@@ -67,8 +70,8 @@ export class AuthService {
 
     // 仅测试环境允许显式旁路；生产即使误配该变量也仍然强制验证。
     const emailVerificationBypassed =
-      process.env.NODE_ENV === 'test' &&
-      process.env.AUTH_EMAIL_VERIFICATION_BYPASS === 'true';
+      this.config.get<string>('app.env') === 'test' &&
+      this.config.get<boolean>('auth.emailVerificationBypass') === true;
     if (!emailVerificationBypassed) {
       if (!dto.emailCode) {
         throw new AppError(40002, '请先获取并填写邮箱验证码', 400);
@@ -137,7 +140,7 @@ export class AuthService {
         emailEvent: 'welcome',
       });
 
-      const accessToken = JwtService.sign({
+      const accessToken = this.jwt.sign({
         sub: user.id,
         email: user.email,
         tv: user.tokenVersion,
@@ -229,7 +232,7 @@ export class AuthService {
       reason: 'password',
     });
 
-    const accessToken = JwtService.sign({
+    const accessToken = this.jwt.sign({
       sub: user.id,
       email: user.email,
       tv: user.tokenVersion,
@@ -480,7 +483,7 @@ export class AuthService {
       reason: 'sms',
     });
 
-    const accessToken = JwtService.sign({
+    const accessToken = this.jwt.sign({
       sub: user.id,
       email: user.email,
       tv: user.tokenVersion,
@@ -513,7 +516,7 @@ export class AuthService {
       .catch(() => undefined);
     await this.recordLogin({ userId: user.id, email: user.email, ctx, success: true, reason });
 
-    const accessToken = JwtService.sign({
+    const accessToken = this.jwt.sign({
       sub: user.id,
       email: user.email,
       tv: user.tokenVersion,
@@ -549,7 +552,10 @@ export class AuthService {
 
   /** 重置链接的前端基址。未配置时按开发端口兜底 */
   private webBase(): string {
-    return (process.env.WEB_BASE_URL || 'http://localhost:5100').replace(/\/+$/, '');
+    return (this.config.get<string>('app.webBase') || 'http://localhost:5100').replace(
+      /\/+$/,
+      '',
+    );
   }
 
   private toPublic(user: {

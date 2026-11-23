@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
@@ -229,7 +229,6 @@ beforeAll(async () => {
   });
 
   const { AppModule } = await import('../app.module');
-  const { ResponseInterceptor } = await import('../common/response.interceptor');
   const { PrismaService } = await import('../prisma/prisma.service');
   const { MembershipService } = await import('../membership/membership.service');
   const { OrderService } = await import('../orders/order.service');
@@ -252,8 +251,6 @@ beforeAll(async () => {
 
   app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api/v1');
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.useGlobalInterceptors(new ResponseInterceptor());
   await app.init();
   // 先监听一个真实随机端口：supertest 传 URL 字符串，并发请求不会互相关监听
   await app.listen(0, '127.0.0.1');

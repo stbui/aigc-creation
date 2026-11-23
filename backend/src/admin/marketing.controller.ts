@@ -101,6 +101,7 @@ export class AdminCouponsController {
    *
    * ⚠️ 路由必须声明在 `:id` 之前，否则 `export` 会被当成券 id。
    * 导出把券的发行与核销数据带出系统，使用独立的 `data.export` 权限点。
+   * CSV 文件流直接写响应，不能走统一信封（否则会被包成 JSON 字符串）。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.marketingWrite, PERMISSIONS.dataExport)
@@ -157,7 +158,10 @@ export class AdminCampaignsController {
     });
   }
 
-  /** 导出限时活动 (CSV)。筛选口径与列表一致，使用独立 `data.export` 权限 */
+  /**
+   * 导出限时活动 (CSV)。筛选口径与列表一致，使用独立 `data.export` 权限。
+   * 文件流直接写响应，不能走统一信封。
+   */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.marketingWrite, PERMISSIONS.dataExport)
   async export(@Query() query: CampaignListQueryDto, @Res() res: Response) {

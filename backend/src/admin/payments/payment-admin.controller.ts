@@ -209,6 +209,7 @@ export class AdminPaymentOrdersController {
     });
   }
 
+  /** 支付订单导出 (CSV)。文件流直接写响应，不能走统一信封 */
   @Get("export.csv")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
   async export(@Query() query: PaymentOrderListQueryDto, @Res() res: Response) {
@@ -330,6 +331,7 @@ export class AdminPaymentReconciliationController {
     });
   }
 
+  /** 对账批次日志导出 (CSV)。文件流直接写响应，不能走统一信封 */
   @Get("export.csv")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
   async exportRuns(
@@ -363,6 +365,7 @@ export class AdminPaymentReconciliationController {
     sendCsv(res, "支付对账", csv);
   }
 
+  /** 对账明细导出 (CSV)。文件流直接写响应，不能走统一信封 */
   @Get(":id/items/export.csv")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
   async exportItems(

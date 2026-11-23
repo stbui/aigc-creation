@@ -31,6 +31,7 @@ export class OAuthService {
     private readonly registry: OAuthRegistryService,
     private readonly state: OAuthStateService,
     private readonly auth: AuthService,
+    private readonly tokens: AccountTokenService,
   ) {}
 
   providers(): OAuthProviderInfo[] {
@@ -193,7 +194,7 @@ export class OAuthService {
   }
 
   private fallbackEmail(provider: string, subject: string): string {
-    const digest = AccountTokenService.hash(`${provider}:${subject}`).slice(0, 32);
+    const digest = this.tokens.hash(`${provider}:${subject}`).slice(0, 32);
     return `oauth-${provider}-${digest}@oauth.local`;
   }
 

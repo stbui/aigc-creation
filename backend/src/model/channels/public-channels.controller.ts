@@ -15,49 +15,22 @@
  *
  * 为什么单独开一个端点而不是复用 `/admin/channels`：后台列表带完整模型与
  * 价格档（管理视角），C 端只需要「有哪些模型、怎么连」这一层。
+ *
+ * 角色判定与投影选择在 PublicChannelsService，Controller 只做 HTTP 适配。
  */
 
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { OptionalJwtAuthGuard } from '../../common/optional-jwt-auth.guard';
-import { PrismaService } from '../../prisma/prisma.service';
-import { isAdminRole } from '../../admin/permissions';
-import { ChannelService } from './channel.service';
+import { PublicChannelsService } from './public-channels.service';
 
 @Controller('channels')
 export class PublicChannelsController {
-  constructor(
-    private readonly channels: ChannelService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly publicChannels: PublicChannelsService) {}
 
   /** 系统渠道连接信息：渠道 id、中转入口、可用模型与售价口径 */
   @Get('system')
   @UseGuards(OptionalJwtAuthGuard)
-  async system(@Req() req: { user?: { id: string } }) {
-    const admin = await this.isAdmin(req.user?.id);
-    const rows = admin
-      ? await this.channels.adminSystemChannels()
-      : await this.channels.publicSystemChannels();
-    return { channels: rows };
-  }
-
-  /**
-   * 是否为后台角色。
-   *
-   * 实时查库而不是信 token 里的 role —— 降权与停用必须立即生效。
-   * 查库失败按「非管理员」处理：宁可少给上游地址，也不能因为一次数据库
-   * 抖动就把内部拓扑暴露给匿名访客。
-   */
-  private async isAdmin(userId?: string): Promise<boolean> {
-    if (!userId) return false;
-    try {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true, status: true },
-      });
-      return Boolean(user && user.status === 'active' && isAdminRole(user.role));
-    } catch {
-      return false;
-    }
+  system(@Req() req: { user?: { id: string } }) {
+    return this.publicChannels.systemChannels(req.user?.id);
   }
 }

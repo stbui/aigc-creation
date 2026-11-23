@@ -99,6 +99,7 @@ export class AdminTasksController {
    *
    * 路由必须声明在 `:id` 之前，否则 `export` 会被当成任务 id。
    * 导出把用户数据带出系统，使用独立的 `data.export` 权限点。
+   * CSV 文件流直接写响应，不能走统一信封。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.taskRead, PERMISSIONS.dataExport)

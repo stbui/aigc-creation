@@ -12,6 +12,9 @@
  *
  * `ai/models` 是**普通业务接口**（请求体只有几百字节，走 DTO 校验），
  * 因此被 `isProxyRequestPath` 显式排除在跳过解析的名单之外。
+ *
+ * `ai/custom` 的响应也用 `@Res()` 直写：要原样透传上游状态码与流式 body，
+ * 套统一信封会让 SDK 收到 `{code,data,message}` 而不是上游协议响应。
  */
 
 import { All, Body, Controller, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';

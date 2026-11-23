@@ -46,6 +46,8 @@ export class AdminTicketsController {
   /**
    * 导出（CSV）。
    *
+   * 文件流直接写响应，不能走统一信封（否则会被包成 JSON 字符串）。
+   *
    * ⚠️ 路由必须声明在 `:id` 之前，否则 `export` 会被当成工单 id。
    */
   @Get("export")

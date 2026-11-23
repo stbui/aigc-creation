@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { CreditService } from '../credits/credit.service';
@@ -119,6 +120,7 @@ export class OrderService {
     private readonly gateway: PaymentGateway,
     private readonly paymentExceptions: PaymentExceptionService,
     private readonly settings: SettingsService,
+    private readonly config: ConfigService,
   ) {}
 
   // ── 下单 ──────────────────────────────────────────────────────────
@@ -632,7 +634,7 @@ export class OrderService {
      * POST 一次就能免费拿积分/会员；生产环境更不该存在这条路径。
      * 按「不存在」处理（404），不对外暴露端点存在性。
      */
-    if (process.env.NODE_ENV === 'production') {
+    if (this.config.get<string>('app.env') === 'production') {
       throw new AppError(40400, '订单不存在', 404);
     }
 

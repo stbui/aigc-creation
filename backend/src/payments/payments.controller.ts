@@ -217,6 +217,8 @@ export class PaymentsController {
  * URL 刻意不携带 configId：服务端会按明文订单号（微信则先解密）反查该订单
  * 历史 Payment 引用的配置版本。旧 `/payments/callback/:provider/:configId`
  * 保留在 PaymentsController，兼容历史渠道配置和尚未规范化的支付渠道。
+ *
+ * 响应同样由渠道协议决定（纯文本 / JSON），用 @Res 直接写，不走统一信封。
  */
 @Controller('payment')
 export class PaymentWebhookController {

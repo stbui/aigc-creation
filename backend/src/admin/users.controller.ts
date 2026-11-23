@@ -73,6 +73,9 @@ export class AdminUsersController {
   /**
    * 导出用户 (CSV)。
    *
+   * 用 @Res() 直接写文件流：统一信封会把 CSV 包成 JSON，浏览器拿到的是字符串
+   * 而不是可下载的文件。
+   *
    * ⚠️ 必须声明在 `:id` 之前：否则 `/admin/users/export` 会被当成 id 为 export 的用户。
    */
   @Get("export")

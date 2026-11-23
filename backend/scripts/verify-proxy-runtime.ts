@@ -668,6 +668,7 @@ async function runHttpChecks(): Promise<void> {
   const proxyBilling = app.get(ProxyBillingService);
   const proxyChannels = app.get(ProxyChannelService);
   const rateLimit = app.get(RateLimitGuard, { strict: false });
+  const jwt = app.get(JwtService);
 
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const created = {
@@ -773,7 +774,7 @@ async function runHttpChecks(): Promise<void> {
     });
     created.userIds.push(user.id);
     await grantCredits(prisma, { userId: user.id, credits: 100, reason: '中转验收夹具' });
-    const token = JwtService.sign({ sub: user.id, email: user.email, tv: (user as any).tokenVersion ?? 0 });
+    const token = jwt.sign({ sub: user.id, email: user.email, tv: (user as any).tokenVersion ?? 0 });
 
     const channel = await makeChannel('main', { concurrencyLimit: 1 });
     const okKey = `verify-ok-${stamp}`;

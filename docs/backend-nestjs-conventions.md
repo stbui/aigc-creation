@@ -42,8 +42,9 @@
 ## 3. DTO 与参数校验
 
 - 所有写接口必须有 DTO 类，字段用 `class-validator` 声明类型、范围、长度、枚举和可选性。
-- 全局 `ValidationPipe` 已开启 `whitelist: true`、`transform: true`；未声明字段会被剥离，
-  因此新增可写字段必须同时补 DTO，不能依赖请求体透传。
+- 全局 `ValidationPipe` 通过 `AppModule` 的 `APP_PIPE` 注册，已开启 `whitelist: true`、
+  `transform: true`；未声明字段会被剥离，因此新增可写字段必须同时补 DTO，
+  不能依赖请求体透传。
 - `forbidNonWhitelisted` 当前为 `false`；如果需要严格拒绝未知字段，只在接口级单独开启并说明原因。
 - 校验消息面向用户，使用中文短句；字段名、内部类型、堆栈不得进入用户文案。
 - 数字查询参数优先用 DTO + `@Type(() => Number)`；手工 `Number()` 只允许出现在兼容旧接口的最小改动中。

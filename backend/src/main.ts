@@ -1,35 +1,17 @@
 import { NestFactory } from '@nestjs/core';
-import {
-  NestExpressApplication,
-} from '@nestjs/platform-express';
-import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import type { NextFunction, Request, Response } from 'express';
 import * as express from 'express';
 import { join, resolve } from 'path';
 import * as fs from 'fs';
 import { AppModule } from './app.module';
-import { ResponseInterceptor } from './common/response.interceptor';
-import { AppError } from './common/app.exception';
 import { buildCorsAllowList } from './common/cors-allow-list';
 import { AppFileLogger } from './common/logger/file-logger';
 import { requestContextMiddleware } from './common/request-context';
 import { createSignedAssetMiddleware } from './common/signed-asset.middleware';
 import { createAssetThumbnailMiddleware } from './assets/asset-thumbnail.middleware';
 import { isProxyRequestPath } from './model/proxy/proxy.paths';
-
-function flattenValidationErrors(errors: any[]): string {
-  for (const error of errors) {
-    if (error?.constraints && Object.keys(error.constraints).length > 0) {
-      return Object.values(error.constraints)[0] as string;
-    }
-    if (error?.children && error.children.length > 0) {
-      const nested = flattenValidationErrors(error.children);
-      if (nested) return nested;
-    }
-  }
-  return '参数校验失败';
-}
 
 async function bootstrap(): Promise<void> {
   // bufferLogs: DI 初始化期间的启动日志先缓存, 待 useLogger 换成落盘logger后
@@ -175,21 +157,9 @@ async function bootstrap(): Promise<void> {
   // 静态服务: GET /uploads/* 直接返回图片
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
-  // 全局参数校验
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: false,
-      exceptionFactory: (errors) =>
-        new AppError(40001, flattenValidationErrors(errors as any[]), 400),
-    }),
-  );
-
-  // 统一响应包装与异常处理
-  // 异常过滤器已在 AppModule 用 APP_FILTER 注册 (它要注入落盘 logger),
-  // 此处不得再 useGlobalFilters —— 并存会导致过滤器执行两次
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  // 全局管道、响应拦截器与异常过滤器统一由 AppModule 的 APP_* 令牌注册。
+  // 不要在这里再 useGlobalPipes / useGlobalInterceptors / useGlobalFilters，
+  // 否则真实启动与集成测试会出现重复执行或配置漂移。
 
   // Docker/K8s 停止容器时先发 SIGTERM。开启 Nest 关闭钩子，让 Prisma 在退出前
   // 断开 SQLite 连接，避免正在提交的事务被硬中断。
@@ -231,7 +201,7 @@ async function bootstrap(): Promise<void> {
     'Bootstrap',
   );
   // 安全面横切开关放在启动日志里回显: 「以为开了签名其实没配密钥」是最难查的一类问题
-  const rateLimitOn = (process.env.RATE_LIMIT_ENABLED ?? 'true').toLowerCase() !== 'false';
+  const rateLimitOn = config.get<boolean>('rateLimit.enabled') ?? true;
   const signingOn = (config.get<string>('asset.signingSecret') ?? '').trim().length > 0;
   logger.log(
     `限流 ${rateLimitOn ? '开启' : '已关闭'} · 素材签名 ${signingOn ? '开启(/uploads 需 sig)' : '关闭(公开)'} · 健康检查 /api/v1/health`,

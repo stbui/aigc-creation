@@ -1,3 +1,4 @@
+import type { ConfigService } from '@nestjs/config';
 import { OAuthProvider, OAuthProfile, OAuthTokenSet } from './oauth.types';
 import { getJson, postForm } from './oauth-http';
 
@@ -147,63 +148,71 @@ class GenericOAuthProvider extends StandardOAuth2Provider {
   }
 }
 
-function str(env: NodeJS.ProcessEnv, key: string): string {
-  return (env[key] ?? '').trim();
+function str(config: ConfigService, key: string): string {
+  return (config.get<string>(key) ?? '').trim();
 }
 
-function list(env: NodeJS.ProcessEnv, key: string, fallback: string[]): string[] {
-  const raw = str(env, key);
-  return raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : fallback;
+function list(config: ConfigService, key: string, fallback: string[]): string[] {
+  const value = config.get<string[]>(key);
+  return Array.isArray(value) && value.length > 0 ? value : fallback;
 }
 
-function callbackBase(env: NodeJS.ProcessEnv): string {
-  const explicit = str(env, 'OAUTH_CALLBACK_BASE');
+function callbackBase(config: ConfigService): string {
+  const explicit = str(config, 'oauth.callbackBase');
   if (explicit) return explicit.replace(/\/+$/, '');
-  return `${str(env, 'WEB_BASE_URL') || 'http://localhost:5100'}/api/v1`.replace(/\/+$/, '');
+  return `${str(config, 'app.webBase') || 'http://localhost:5100'}/api/v1`.replace(/\/+$/, '');
 }
 
 /**
- * 从环境变量构造所有 provider。
+ * 从配置构造所有 provider。
  *
  * `enabled` 由三项凭据是否配齐决定，`OAUTH_ENABLED` 只做额外的显式开关：
  * 未配在 `OAUTH_ENABLED` 里的 provider 即使凭据齐全也不启用。
  */
-export function buildOAuthProviders(env: NodeJS.ProcessEnv = process.env): OAuthProvider[] {
-  const base = callbackBase(env);
+export function buildOAuthProviders(config: ConfigService): OAuthProvider[] {
+  const base = callbackBase(config);
   const google = new GoogleOAuthProvider({
     id: 'google',
     name: 'Google',
-    clientId: str(env, 'OAUTH_GOOGLE_CLIENT_ID'),
-    clientSecret: str(env, 'OAUTH_GOOGLE_CLIENT_SECRET'),
-    redirectUri: str(env, 'OAUTH_GOOGLE_REDIRECT_URI') || `${base}/auth/oauth/google/callback`,
-    authorizationEndpoint: str(env, 'OAUTH_GOOGLE_AUTHORIZATION_ENDPOINT') || 'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenEndpoint: str(env, 'OAUTH_GOOGLE_TOKEN_ENDPOINT') || 'https://oauth2.googleapis.com/token',
-    userinfoEndpoint: str(env, 'OAUTH_GOOGLE_USERINFO_ENDPOINT') || 'https://openidconnect.googleapis.com/v1/userinfo',
-    scopes: list(env, 'OAUTH_GOOGLE_SCOPES', ['openid', 'email', 'profile']),
+    clientId: str(config, 'oauth.google.clientId'),
+    clientSecret: str(config, 'oauth.google.clientSecret'),
+    redirectUri: str(config, 'oauth.google.redirectUri') || `${base}/auth/oauth/google/callback`,
+    authorizationEndpoint:
+      str(config, 'oauth.google.authorizationEndpoint') ||
+      'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenEndpoint:
+      str(config, 'oauth.google.tokenEndpoint') || 'https://oauth2.googleapis.com/token',
+    userinfoEndpoint:
+      str(config, 'oauth.google.userinfoEndpoint') ||
+      'https://openidconnect.googleapis.com/v1/userinfo',
+    scopes: list(config, 'oauth.google.scopes', ['openid', 'email', 'profile']),
   });
 
   const github = new GitHubOAuthProvider({
     id: 'github',
     name: 'GitHub',
-    clientId: str(env, 'OAUTH_GITHUB_CLIENT_ID'),
-    clientSecret: str(env, 'OAUTH_GITHUB_CLIENT_SECRET'),
-    redirectUri: str(env, 'OAUTH_GITHUB_REDIRECT_URI') || `${base}/auth/oauth/github/callback`,
-    authorizationEndpoint: str(env, 'OAUTH_GITHUB_AUTHORIZATION_ENDPOINT') || 'https://github.com/login/oauth/authorize',
-    tokenEndpoint: str(env, 'OAUTH_GITHUB_TOKEN_ENDPOINT') || 'https://github.com/login/oauth/access_token',
+    clientId: str(config, 'oauth.github.clientId'),
+    clientSecret: str(config, 'oauth.github.clientSecret'),
+    redirectUri: str(config, 'oauth.github.redirectUri') || `${base}/auth/oauth/github/callback`,
+    authorizationEndpoint:
+      str(config, 'oauth.github.authorizationEndpoint') ||
+      'https://github.com/login/oauth/authorize',
+    tokenEndpoint:
+      str(config, 'oauth.github.tokenEndpoint') || 'https://github.com/login/oauth/access_token',
     userinfoEndpoint: 'https://api.github.com/user',
-    scopes: list(env, 'OAUTH_GITHUB_SCOPES', ['read:user', 'user:email']),
+    scopes: list(config, 'oauth.github.scopes', ['read:user', 'user:email']),
   });
 
   const generic = new GenericOAuthProvider({
     id: 'generic',
-    name: str(env, 'OAUTH_GENERIC_NAME') || 'OAuth 2.0',
-    clientId: str(env, 'OAUTH_GENERIC_CLIENT_ID'),
-    clientSecret: str(env, 'OAUTH_GENERIC_CLIENT_SECRET'),
-    redirectUri: str(env, 'OAUTH_GENERIC_REDIRECT_URI') || `${base}/auth/oauth/generic/callback`,
-    authorizationEndpoint: str(env, 'OAUTH_GENERIC_AUTHORIZATION_ENDPOINT'),
-    tokenEndpoint: str(env, 'OAUTH_GENERIC_TOKEN_ENDPOINT'),
-    userinfoEndpoint: str(env, 'OAUTH_GENERIC_USERINFO_ENDPOINT'),
-    scopes: list(env, 'OAUTH_GENERIC_SCOPES', ['openid', 'email', 'profile']),
+    name: str(config, 'oauth.generic.name') || 'OAuth 2.0',
+    clientId: str(config, 'oauth.generic.clientId'),
+    clientSecret: str(config, 'oauth.generic.clientSecret'),
+    redirectUri: str(config, 'oauth.generic.redirectUri') || `${base}/auth/oauth/generic/callback`,
+    authorizationEndpoint: str(config, 'oauth.generic.authorizationEndpoint'),
+    tokenEndpoint: str(config, 'oauth.generic.tokenEndpoint'),
+    userinfoEndpoint: str(config, 'oauth.generic.userinfoEndpoint'),
+    scopes: list(config, 'oauth.generic.scopes', ['openid', 'email', 'profile']),
   });
 
   return [google, github, generic];

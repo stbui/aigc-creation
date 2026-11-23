@@ -146,6 +146,7 @@ export class AdminApiLogsController {
    *
    * 导出把用户数据带出系统，使用独立的 `data.export` 权限点 —— 与任务
    * 导出同一口径。筛选与列表共用 `apiLogQueryOf`，不会出现两个口径。
+   * CSV 文件流直接写响应，不能走统一信封。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.modelCallRead, PERMISSIONS.dataExport)

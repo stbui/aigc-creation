@@ -77,6 +77,7 @@ export class AdminInvoicesController {
    *
    * 导出把用户抬头与税号带出系统，使用独立的 `data.export` 权限点；
    * 列出口径与列表完全一致（同一 status / keyword）。
+   * CSV 文件流直接写响应，不能走统一信封。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.invoiceWrite, PERMISSIONS.dataExport)
@@ -92,6 +93,7 @@ export class AdminInvoicesController {
     sendCsv(res, "invoices", csv);
   }
 
+  /** 发票 HTML 直接内联展示：浏览器需要原始文档，统一信封会把它包成 JSON */
   @Get(":id/file")
   @RequirePermission(PERMISSIONS.invoiceWrite)
   async file(@Param("id") id: string, @Res() res: Response) {

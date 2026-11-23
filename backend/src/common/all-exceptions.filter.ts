@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Injectable,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AppError } from './app.exception';
 import { currentRequestId } from './request-context';
@@ -19,12 +20,16 @@ import { AppFileLogger } from './logger/file-logger';
  * 它需要 AppFileLogger 才能让异常落盘，而构造注入拿实例是唯一途径。
  * 于是注册方式从 `app.useGlobalFilters()` 改为 AppModule 里的 `APP_FILTER`
  * —— 两者**不能并存**，并存会让过滤器跑两次。
- * ResponseInterceptor 没有 DI 需求，故仍保留 useGlobalInterceptors，不为对齐而改。
+ * 全局管道、拦截器与过滤器现在统一使用 APP_* 令牌注册，避免 main.ts
+ * 与测试装配各自维护一份配置。
  */
 @Injectable()
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  constructor(private readonly logger: AppFileLogger) {}
+  constructor(
+    private readonly logger: AppFileLogger,
+    private readonly config: ConfigService,
+  ) {}
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -65,7 +70,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     // 5xx 才外发告警: 4xx 是用户输入问题, 打给值班群里只会淹没真正的故障
     if (status >= 500) {
-      void notifyErrorWebhook({
+      void this.notifyErrorWebhook({
         requestId,
         status,
         code,
@@ -78,30 +83,30 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     response.status(status).json({ code, data: null, message, requestId: requestId ?? null });
   }
-}
 
-/**
- * 未处理异常外发（可选, ERROR_WEBHOOK_URL 为空则不做事）。
- *
- * 只发**摘要**: 完整堆栈里可能夹带凭据与用户数据, 外发前不做脱敏就是
- * 一次数据出境。这里只带 message 与堆栈前 8 行, 且整体 3s 超时 ——
- * 告警链路绝不能反过来拖住错误响应。
- */
-async function notifyErrorWebhook(payload: Record<string, unknown>): Promise<void> {
-  const url = (process.env.ERROR_WEBHOOK_URL ?? '').trim();
-  if (!url) return;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service: 'huojue-ai', at: new Date().toISOString(), ...payload }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-  } catch {
-    // 告警失败只能咽下: 再抛异常就变成"错误处理里的错误"
+  /**
+   * 未处理异常外发（可选, ERROR_WEBHOOK_URL 为空则不做事）。
+   *
+   * 只发**摘要**: 完整堆栈里可能夹带凭据与用户数据, 外发前不做脱敏就是
+   * 一次数据出境。这里只带 message 与堆栈前 8 行, 且整体 3s 超时 ——
+   * 告警链路绝不能反过来拖住错误响应。
+   */
+  private async notifyErrorWebhook(payload: Record<string, unknown>): Promise<void> {
+    const url = (this.config.get<string>('observability.errorWebhookUrl') ?? '').trim();
+    if (!url) return;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: 'huojue-ai', at: new Date().toISOString(), ...payload }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+    } catch {
+      // 告警失败只能咽下: 再抛异常就变成"错误处理里的错误"
+    }
   }
 }
 

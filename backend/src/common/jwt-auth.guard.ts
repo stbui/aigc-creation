@@ -20,7 +20,10 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -33,7 +36,7 @@ export class JwtAuthGuard implements CanActivate {
     const token = authHeader.slice('Bearer '.length).trim();
     let payload: JwtPayload;
     try {
-      payload = JwtService.verify(token);
+      payload = this.jwt.verify(token);
     } catch {
       throw new AppError(40101, '令牌无效或已过期', 401);
     }

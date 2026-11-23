@@ -13,11 +13,10 @@ import { AdminBackupController } from './backup.controller';
 import { AdminAssetsController } from './assets-admin.controller';
 import { AdminStorageController } from './storage.controller';
 import { AdminCommerceController } from './commerce.controller';
-import {
-  AdminMembershipPlansController,
-  AdminMembershipPlansService,
-} from './membership-plans.controller';
+import { AdminMembershipPlansController } from './membership-plans.controller';
+import { AdminMembershipPlansService } from './membership-plans.service';
 import { AdminRetentionController } from './retention.controller';
+import { AdminRetentionService } from './retention.service';
 import { AdminInvoicesController } from './invoices-admin.controller';
 import {
   AdminPaymentConfigController,
@@ -164,6 +163,7 @@ import { SchedulerService } from './scheduler.service';
     AdminAssetsService,
     AdminCommerceService,
     AdminMembershipPlansService,
+    AdminRetentionService,
     TasksAdminService,
     AdminAlertsService,
     AdminWorkbenchService,

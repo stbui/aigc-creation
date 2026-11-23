@@ -3,6 +3,7 @@ import { CreditsModule } from '../credits/credits.module';
 import { PricingModule } from '../credits/pricing.module';
 import { ModelModule } from '../model/model.module';
 import { CapabilitiesController } from './capabilities.controller';
+import { CapabilitiesService } from './capabilities.service';
 import { ShoppableCarouselController } from './shoppable-carousel.controller';
 import { CapabilityAvailabilityService } from './capability-availability.service';
 
@@ -21,7 +22,7 @@ import { CapabilityAvailabilityService } from './capability-availability.service
 @Module({
   imports: [CreditsModule, PricingModule, ModelModule],
   controllers: [CapabilitiesController, ShoppableCarouselController],
-  providers: [CapabilityAvailabilityService],
+  providers: [CapabilityAvailabilityService, CapabilitiesService],
   exports: [CapabilityAvailabilityService],
 })
 export class CapabilitiesModule {}

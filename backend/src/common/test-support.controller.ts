@@ -1,4 +1,5 @@
 import { Controller, Headers, Post } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AppError } from './app.exception';
 import { RateLimitGuard } from './rate-limit.guard';
 
@@ -26,14 +27,18 @@ import { RateLimitGuard } from './rate-limit.guard';
  */
 @Controller('test')
 export class TestSupportController {
-  constructor(private readonly rateLimit: RateLimitGuard) {}
+  constructor(
+    private readonly rateLimit: RateLimitGuard,
+    private readonly config: ConfigService,
+  ) {}
 
   @Post('rate-limit/reset')
   reset(@Headers('x-test-token') token?: string) {
-    const env = (process.env.NODE_ENV ?? '').toLowerCase();
-    if (env !== 'test') {
+    if (this.config.get<string>('app.env') !== 'test') {
       throw new AppError(40400, 'Not Found', 404);
     }
+    // 例外：测试令牌属于单次调用即可轮换的开关，按 env.validation 的
+    // 「请求期读取」清单直接读 process.env，不进配置树。
     const expected = process.env.RATE_LIMIT_RESET_TOKEN ?? '';
     if (!expected || token !== expected) {
       throw new AppError(40100, '测试令牌无效', 401);

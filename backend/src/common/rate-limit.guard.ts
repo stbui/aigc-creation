@@ -28,17 +28,13 @@
  *   `trust proxy` 决定，见 main.ts 的 RATE_LIMIT_TRUST_PROXY —— 默认**不信任**。
  *   不设防时任何人都能用伪造的 XFF 头绕开所有限流。
  */
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  SetMetadata,
-  Logger,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, SetMetadata } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 import { AppError } from './app.exception';
 import { JwtService } from './jwt.service';
+import { AppFileLogger } from './logger/file-logger';
 
 export interface RateLimitRule {
   /** 窗口内允许的次数 */
@@ -80,16 +76,24 @@ interface Bucket {
 
 @Injectable()
 export class RateLimitGuard implements CanActivate {
-  private readonly logger = new Logger(RateLimitGuard.name);
   private readonly buckets = new Map<string, Bucket>();
-  private readonly enabled = (process.env.RATE_LIMIT_ENABLED ?? 'true').toLowerCase() !== 'false';
+  private readonly enabled: boolean;
 
-  constructor(private readonly reflector: Reflector) {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly config: ConfigService,
+    private readonly logger: AppFileLogger,
+    private readonly jwt: JwtService,
+  ) {
+    this.enabled = this.config.get<boolean>('rateLimit.enabled') ?? true;
     // 定期清过期桶：不清理的话 key 数会随 IP 基数无限增长，长期运行必然吃内存
     const timer = setInterval(() => this.sweep(), 60_000);
     (timer as any).unref?.();
     if (!this.enabled) {
-      this.logger.warn('RATE_LIMIT_ENABLED=false：全站限流已关闭（仅限本地压测，生产禁用）');
+      this.logger.warn(
+        'RATE_LIMIT_ENABLED=false：全站限流已关闭（仅限本地压测，生产禁用）',
+        'RateLimitGuard',
+      );
     }
   }
 
@@ -117,6 +121,9 @@ export class RateLimitGuard implements CanActivate {
         : [{ limit: options.limit ?? 60, windowSec: options.windowSec ?? 60 }]
     ).map((r) => ({ ...r }));
     if (options.limitEnv) {
+      // 这里刻意直接读 process.env 而不是 ConfigService：@nestjs/config 开启了
+      // cache，运行期改写这个测试覆写变量会被缓存成启动时的旧值，
+      // verify-proxy-runtime 正是在请求之间改它来验证限流。
       const override = Number(process.env[options.limitEnv]);
       if (Number.isFinite(override) && override > 0) rules[0].limit = override;
     }
@@ -163,7 +170,7 @@ export class RateLimitGuard implements CanActivate {
     const header = req.headers['authorization'];
     if (typeof header === 'string' && header.startsWith('Bearer ')) {
       try {
-        return JwtService.verify(header.slice('Bearer '.length).trim()).sub;
+        return this.jwt.verify(header.slice('Bearer '.length).trim()).sub;
       } catch {
         // 令牌无效 → 退回 IP 计数，避免匿名请求绕过限流
       }

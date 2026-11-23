@@ -52,6 +52,24 @@ const EPAY_VALUES = {
 
 const originalNotifyBase = process.env.PAYMENT_NOTIFY_BASE;
 
+/**
+ * ConfigService 替身。
+ *
+ * 生产代码改为经 ConfigService 读配置后，用例仍在运行期改写 process.env，
+ * 因此替身必须按调用时刻读取，而不是启动时快照。
+ */
+const envConfig = {
+  get: (key: string, fallback?: unknown): unknown => {
+    const envName: Record<string, string> = {
+      'app.env': 'NODE_ENV',
+      'payment.notifyBase': 'PAYMENT_NOTIFY_BASE',
+      'payment.secretKey': 'PAYMENT_SECRET_KEY',
+    };
+    const raw = process.env[envName[key] ?? ''];
+    return raw === undefined || raw === '' ? fallback : raw;
+  },
+};
+
 function row(
   providerId: PaymentProviderId,
   values: Record<string, string>,
@@ -106,6 +124,7 @@ function makeService(input: {
     prisma as never,
     cipher as never,
     settings as never,
+    envConfig as never,
   );
   return { service, prisma, cipher, settings };
 }
@@ -169,6 +188,7 @@ function makeReserveService(input: {
     prisma as never,
     cipher as never,
     settings as never,
+    envConfig as never,
   );
   return { service, prisma, cursor, settings };
 }

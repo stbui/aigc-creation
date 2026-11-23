@@ -60,7 +60,7 @@ export class SystemPerformanceService {
     const usage = process.cpuUsage();
     const cpuCount = Math.max(1, cpus().length);
     return {
-      env: this.config.get<string>('app.env') ?? process.env.NODE_ENV ?? 'development',
+      env: this.config.get<string>('app.env') ?? 'development',
       version: this.version(),
       uptimeSec: Math.round(process.uptime()),
       pid: process.pid,

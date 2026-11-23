@@ -17,7 +17,10 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 @Injectable()
 export class OptionalJwtAuthGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -28,7 +31,7 @@ export class OptionalJwtAuthGuard implements CanActivate {
     const token = authHeader.slice('Bearer '.length).trim();
     let payload: JwtPayload;
     try {
-      payload = JwtService.verify(token);
+      payload = this.jwt.verify(token);
     } catch {
       // 令牌无效按未登录处理: 公开接口不该因过期 token 而 401,
       // 那会让用户刷新页面就白屏, 且掩盖了"这个接口本来就不需要登录"的事实

@@ -4,6 +4,7 @@ import { SettingsService } from './settings.service';
 import { SettingImageService } from './setting-image.service';
 import { SecretCipher } from '../model/infra/secret-cipher';
 import { SettingsController } from './settings.controller';
+import { JwtService } from './jwt.service';
 
 /**
  * 横切关注点模块（B5）。
@@ -14,11 +15,14 @@ import { SettingsController } from './settings.controller';
  *
  * 限流守卫**不在这里**：它作为 APP_GUARD 在 AppModule 注册（全局守卫按
  * 元数据触发，没标注 @RateLimit 的路由完全不受影响）。
+ *
+ * JwtService 必须全局：三个鉴权守卫（JwtAuthGuard / OptionalJwtAuthGuard /
+ * AdminGuard）与限流守卫都在各自模块上下文里实例化，逐个导入只会漏。
  */
 @Global()
 @Module({
   controllers: [SettingsController],
-  providers: [SignedUrlService, SettingsService, SettingImageService, SecretCipher],
-  exports: [SignedUrlService, SettingsService, SettingImageService, SecretCipher],
+  providers: [SignedUrlService, SettingsService, SettingImageService, SecretCipher, JwtService],
+  exports: [SignedUrlService, SettingsService, SettingImageService, SecretCipher, JwtService],
 })
 export class CommonModule {}

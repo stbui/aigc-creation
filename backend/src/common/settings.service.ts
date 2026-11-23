@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SecretCipher } from '../model/infra/secret-cipher';
 import { AppError } from './app.exception';
@@ -47,6 +48,7 @@ export class SettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cipher: SecretCipher,
+    private readonly config: ConfigService,
   ) {}
 
   /** 后台改设置后立即失效缓存。不调也能等 TTL，但改设置应即时生效 */
@@ -271,7 +273,8 @@ export class SettingsService {
         loadBalancingStrategy === 'least-amount' ? 'least-amount' : 'round-robin',
       alipayMobilePrecreateDeepLink:
         alipayMobilePrecreateDeepLink ||
-        process.env.ALIPAY_MOBILE_PRECREATE_DEEP_LINK?.trim().toLowerCase() === 'true',
+        this.config.get<string>('payment.alipay.mobilePrecreateDeepLink')?.trim().toLowerCase() ===
+          'true',
       helpImage,
       helpText,
     };

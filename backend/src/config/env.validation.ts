@@ -49,16 +49,12 @@ interface Spec {
  * 新增变量必须同时加到这里，否则它不在配置树里（仍可被 process.env 读到，
  * 但拿不到类型保证，也进不了启动自检摘要）。
  *
- * 例外：以下 6 个由请求期 / 业务层直接读 `process.env`，**刻意不进本表**，
+ * 例外：以下 4 个由请求期直接读 `process.env`，**刻意不进本表**，
  * 因为它们随单条路由或单次调用变化，放进配置树反而要把静态值抄一遍：
  *   · `RATE_LIMIT_AUTH_PER_MIN` / `RATE_LIMIT_RESET_TOKEN` —— 限流守卫按
  *     `limitEnv` 动态读取（common/rate-limit.guard.ts），用于测试放宽配额；
  *   · `MODEL_PROXY_SYSTEM_RATE_LIMIT` / `MODEL_PROXY_CUSTOM_RATE_LIMIT` ——
- *     同上，中转路由的限流 override（model/proxy/*.controller.ts）；
- *   · `AUTH_EMAIL_VERIFICATION_BYPASS` —— 仅 test 档跳过邮箱验证码
- *     （auth/auth.service.ts）；
- *   · `ALIPAY_MOBILE_PRECREATE_DEEP_LINK` —— 支付宝移动端唤起的环境级强制开关
- *     （common/settings.service.ts），与后台设置项合并生效。
+ *     同上，中转路由的限流 override（model/proxy/*.controller.ts）。
  *
  * 上述例外在各 env 文件里仍有键位；新增同类「请求期读取」变量时，
  * 请同时更新本例外清单与 `docs/environments.md`。
@@ -86,6 +82,8 @@ export const ENV_SPECS: readonly Spec[] = [
   // ── 鉴权 ──────────────────────────────────────────────────────────────
   { key: 'jwt.secret', env: 'JWT_SECRET', type: 'string', def: 'dev-huojue-secret-do-not-use-in-prod' },
   { key: 'jwt.ttl', env: 'JWT_TTL', type: 'string', def: '7d' },
+  /** 仅 test 档可跳过邮箱验证码；生产即使误配也强制验证 */
+  { key: 'auth.emailVerificationBypass', env: 'AUTH_EMAIL_VERIFICATION_BYPASS', type: 'boolean', def: false },
   // 前端站点基址 —— 邮件里的「重置密码」链接用它拼绝对地址。
   // 与 ASSET_PUBLIC_BASE 分开：后者是给**外部模型网关**拉参考图用的，
   // 需要公网可达；这里只需要用户浏览器能打开。
@@ -182,17 +180,25 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'payment.secretKey', env: 'PAYMENT_SECRET_KEY', type: 'string', def: '' },
   /** 渠道异步通知基址；只允许沙箱回落到 HOST:PORT，真实渠道缺失会拒绝发起支付 */
   { key: 'payment.notifyBase', env: 'PAYMENT_NOTIFY_BASE', type: 'string', def: '' },
+  /** 支付后台任务开关；仅测试/排障时置 false */
+  { key: 'payment.workerEnabled', env: 'PAYMENT_WORKER_ENABLED', type: 'boolean', def: true },
   // 支付宝（网页支付, RSA2）
   { key: 'payment.alipay.appId', env: 'ALIPAY_APP_ID', type: 'string', def: '' },
+  /** 支付宝收款账号 PID（seller_id），可选 */
+  { key: 'payment.alipay.sellerId', env: 'ALIPAY_SELLER_ID', type: 'string', def: '' },
   { key: 'payment.alipay.privateKey', env: 'ALIPAY_PRIVATE_KEY', type: 'string', def: '' },
   { key: 'payment.alipay.publicKey', env: 'ALIPAY_PUBLIC_KEY', type: 'string', def: '' },
   { key: 'payment.alipay.gateway', env: 'ALIPAY_GATEWAY', type: 'string', def: '' },
+  /** 环境级强制开关：'true' 时忽略后台的移动端当面付开关 */
+  { key: 'payment.alipay.mobilePrecreateDeepLink', env: 'ALIPAY_MOBILE_PRECREATE_DEEP_LINK', type: 'string', def: '' },
   // 微信支付 API v3（Native 扫码）
   { key: 'payment.wechat.mchId', env: 'WECHAT_MCH_ID', type: 'string', def: '' },
   { key: 'payment.wechat.appId', env: 'WECHAT_APP_ID', type: 'string', def: '' },
   { key: 'payment.wechat.apiV3Key', env: 'WECHAT_API_V3_KEY', type: 'string', def: '' },
   { key: 'payment.wechat.serialNo', env: 'WECHAT_SERIAL_NO', type: 'string', def: '' },
   { key: 'payment.wechat.privateKey', env: 'WECHAT_PRIVATE_KEY', type: 'string', def: '' },
+  /** 微信 API 基址覆盖；留空使用官方地址 */
+  { key: 'payment.wechat.apiBase', env: 'WECHAT_API_BASE', type: 'string', def: '' },
   // 回调验签用的是**微信支付平台证书公钥**，不是商户私钥；ID 对应 Wechatpay-Serial
   { key: 'payment.wechat.platformPublicKey', env: 'WECHAT_PLATFORM_PUBLIC_KEY', type: 'string', def: '' },
   { key: 'payment.wechat.platformPublicKeyId', env: 'WECHAT_PLATFORM_PUBLIC_KEY_ID', type: 'string', def: '' },
@@ -210,10 +216,12 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'payment.epay.apiBase', env: 'EPAY_API_BASE', type: 'string', def: 'https://epay.jylt.cc' },
   { key: 'payment.epay.mchId', env: 'EPAY_MCH_ID', type: 'string', def: '' },
   { key: 'payment.epay.key', env: 'EPAY_KEY', type: 'string', def: '' },
-  { key: 'payment.epay.type', env: 'EPAY_TYPE', type: 'string', def: '2' },
+  // 默认留空：bootstrapFromEnv 按「EPAY_TYPE → EPAY_PAY_TYPE → '2'」取值，
+  // 这里若给默认值会把旧变量名彻底遮住。
+  { key: 'payment.epay.type', env: 'EPAY_TYPE', type: 'string', def: '' },
   // 兼容旧变量名；bootstrapFromEnv 会优先读取上面的新变量
   { key: 'payment.epay.pid', env: 'EPAY_PID', type: 'string', def: '' },
-  { key: 'payment.epay.payType', env: 'EPAY_PAY_TYPE', type: 'string', def: 'alipay' },
+  { key: 'payment.epay.payType', env: 'EPAY_PAY_TYPE', type: 'string', def: '' },
   // ZPay：支付宝 type=alipay、微信 type=wxpay；下单还要求服务端注入用户 IP
   { key: 'payment.zpay.apiBase', env: 'ZPAY_API_BASE', type: 'string', def: 'https://zpayz.cn' },
   { key: 'payment.zpay.pid', env: 'ZPAY_PID', type: 'string', def: '' },

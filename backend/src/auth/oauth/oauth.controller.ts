@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { OAuthService } from './oauth.service';
 import { OAuthAuthorizeQueryDto, OAuthCompleteDto } from './oauth.dto';
@@ -35,7 +36,10 @@ const RL_OAUTH_COMPLETE: RateLimitOptions = {
  */
 @Controller('auth/oauth')
 export class OAuthController {
-  constructor(private readonly oauth: OAuthService) {}
+  constructor(
+    private readonly oauth: OAuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   /** 前端「第三方登录」按钮只渲染这里列出的 provider */
   @Get('providers')
@@ -117,6 +121,9 @@ export class OAuthController {
   }
 
   private webBase(): string {
-    return (process.env.WEB_BASE_URL || 'http://localhost:5100').replace(/\/+$/, '');
+    return (this.config.get<string>('app.webBase') || 'http://localhost:5100').replace(
+      /\/+$/,
+      '',
+    );
   }
 }

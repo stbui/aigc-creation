@@ -29,7 +29,10 @@ export interface OAuthTicketPayload {
 
 @Injectable()
 export class OAuthStateService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tokens: AccountTokenService,
+  ) {}
 
   async createState(payload: OAuthStatePayload): Promise<string> {
     return this.createChallenge({
@@ -79,7 +82,7 @@ export class OAuthStateService {
     const raw = randomBytes(32).toString('base64url');
     await this.prisma.oAuthChallenge.create({
       data: {
-        tokenHash: AccountTokenService.hash(raw),
+        tokenHash: this.tokens.hash(raw),
         kind: params.kind,
         provider: params.provider,
         userId: params.userId ?? null,
@@ -93,7 +96,7 @@ export class OAuthStateService {
 
   private async consumeChallenge(raw: string, kind: 'state' | 'ticket') {
     const label = kind === 'state' ? 'OAuth state' : 'OAuth 登录票';
-    const tokenHash = AccountTokenService.hash(String(raw || '').trim());
+    const tokenHash = this.tokens.hash(String(raw || '').trim());
     const record = await this.prisma.oAuthChallenge.findUnique({ where: { tokenHash } });
     if (!record || record.kind !== kind) {
       throw new Error(`${label}无效，请重新登录`);

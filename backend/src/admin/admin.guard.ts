@@ -24,6 +24,7 @@ export class AdminGuard implements CanActivate {
   constructor(
     private readonly prisma: PrismaService,
     private readonly roles: AdminRoleService,
+    private readonly jwt: JwtService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -43,7 +44,7 @@ export class AdminGuard implements CanActivate {
     const token = authHeader.slice('Bearer '.length).trim();
     let payload: JwtPayload;
     try {
-      payload = JwtService.verify(token);
+      payload = this.jwt.verify(token);
     } catch {
       throw new AppError(40101, '令牌无效或已过期', 401);
     }

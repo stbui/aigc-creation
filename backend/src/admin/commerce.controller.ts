@@ -481,6 +481,7 @@ export class AdminCommerceController {
     });
   }
 
+  /** 支付流水导出 (CSV)。同订单导出：必须直接写文件流，不能走统一信封 */
   @Get("payments/export")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
   async exportPayments(
@@ -512,7 +513,7 @@ export class AdminCommerceController {
     });
   }
 
-  /** 积分总览导出 (CSV) */
+  /** 积分总览导出 (CSV)。同订单导出：必须直接写文件流，不能走统一信封 */
   @Get("credits/export")
   @RequireAllPermissions(PERMISSIONS.creditRead, PERMISSIONS.dataExport)
   async exportCredits(

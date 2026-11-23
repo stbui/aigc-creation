@@ -83,6 +83,7 @@ export class AdminBackupController {
    * 下载备份文件。
    *
    * 只允许下载已验证的备份 —— 未验证的视为无效 (B-97)。
+   * 二进制文件流直接写响应，统一信封会把内容包成 JSON。
    */
   @Get(":id/download")
   @RequireAllPermissions(PERMISSIONS.backupRead, PERMISSIONS.dataExport)

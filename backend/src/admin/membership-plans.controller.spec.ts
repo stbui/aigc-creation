@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppError } from '../common/app.exception';
-import { AdminMembershipPlansService } from './membership-plans.controller';
+import { AdminMembershipPlansService } from './membership-plans.service';
 
 describe('AdminMembershipPlansService 删除套餐', () => {
   let prisma: Record<string, any>;
