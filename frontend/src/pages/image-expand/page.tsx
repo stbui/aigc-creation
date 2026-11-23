@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 
 import { DEFAULT_OCCUPY, QUICK_PERCENTS } from './constants';
-import { ExpandLayoutPreview, PositionGrid, ToolHistoryPane, ToolShell } from './components';
+import { ExpandLayoutPreview, PositionGrid, SectionCard, ToolHistoryPane, ToolShell } from './components';
 import {
   PRODUCT_TOOL_DROPZONE,
   PRODUCT_TOOL_PAGE,
@@ -129,10 +129,13 @@ export function ImageExpandPage() {
         <ToolHistoryPane capability="expand" refreshKey={result?.url} emptyText="暂无扩图记录" />
       }
     >
-      <section className="flex flex-col gap-3 rounded-[var(--radius-panel)] bg-card px-4 py-3.5 max-[900px]:p-3.5">
-        <h2 className="m-0 text-sm leading-[22px] font-bold text-[color:var(--wb-text)] max-[900px]:mb-3 max-[900px]:leading-5">
-          原图占比
-        </h2>
+      <SectionCard
+        title="原图占比"
+        className="gap-3 px-4 py-3.5 max-[900px]:p-3.5"
+        headerClassName="max-[900px]:mb-3"
+        titleClassName="max-[900px]:leading-5"
+        contentClassName="gap-3"
+      >
         <div className="flex flex-wrap items-center gap-2">
           {QUICK_PERCENTS.map((p) => {
             const active = p === occupy;
@@ -180,14 +183,17 @@ export function ImageExpandPage() {
             请输入 1-99 之间的整数占比
           </p>
         )}
-      </section>
+      </SectionCard>
 
-      <section className="flex flex-col gap-3 rounded-[var(--radius-panel)] bg-card px-4 py-3.5 max-[900px]:p-3.5">
-        <h2 className="m-0 text-sm leading-[22px] font-bold text-[color:var(--wb-text)] max-[900px]:mb-3 max-[900px]:leading-5">
-          原图位置
-        </h2>
+      <SectionCard
+        title="原图位置"
+        className="gap-3 px-4 py-3.5 max-[900px]:p-3.5"
+        headerClassName="max-[900px]:mb-3"
+        titleClassName="max-[900px]:leading-5"
+        contentClassName="gap-3"
+      >
         <PositionGrid value={position} onChange={setPosition} />
-      </section>
+      </SectionCard>
     </ToolShell>
   );
 }

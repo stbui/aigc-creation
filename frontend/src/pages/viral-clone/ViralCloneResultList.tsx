@@ -3,15 +3,15 @@ import { CircleAlert, Images } from 'lucide-react';
 
 import { toAbsoluteUrl } from './api';
 import {
-  EmptyState,
-  EmptyStateContent,
-  EmptyStateDescription,
-  EmptyStateHeader,
-  EmptyStateMedia,
-  EmptyStateTitle,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
   ImageLightbox,
-  InlineAlert,
-  InlineAlertDescription,
+  Alert,
+  AlertDescription,
   Skeleton,
   ToolWorkflowSteps,
   type LightboxItem,
@@ -213,18 +213,18 @@ function ViralCloneResultListImpl({
     <section className="pk-result-pane">
       <div className="pk-result-body">
         {error && (
-          <InlineAlert variant="destructive" className="vc-result-alert">
+          <Alert variant="destructive" className="vc-result-alert">
             <CircleAlert />
-            <InlineAlertDescription>历史生成图加载失败：{error}</InlineAlertDescription>
-          </InlineAlert>
+            <AlertDescription>历史生成图加载失败：{error}</AlertDescription>
+          </Alert>
         )}
         {showFailureNotice && (
-          <InlineAlert variant="destructive" className="vc-result-alert">
+          <Alert variant="destructive" className="vc-result-alert">
             <CircleAlert />
-            <InlineAlertDescription>
+            <AlertDescription>
               本次生成失败：{taskErrorText(result.errorCode)}，可调整后重新生成
-            </InlineAlertDescription>
-          </InlineAlert>
+            </AlertDescription>
+          </Alert>
         )}
 
         {loading && rows.length === 0 ? (
@@ -237,20 +237,20 @@ function ViralCloneResultListImpl({
             <span>正在加载复刻记录…</span>
           </div>
         ) : showStarter ? (
-          <EmptyState className="vc-result-empty">
-            <EmptyStateHeader>
-              <EmptyStateMedia variant="icon">
+          <Empty className="vc-result-empty">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
                 <Images />
-              </EmptyStateMedia>
-              <EmptyStateTitle>上传商品图和参考图开始复刻</EmptyStateTitle>
-              <EmptyStateDescription>
+              </EmptyMedia>
+              <EmptyTitle>上传商品图和参考图开始复刻</EmptyTitle>
+              <EmptyDescription>
                 每次生成都会保留一组「商品上传图 → 参考图 → 生成图」对照，方便回看与继续调整。
-              </EmptyStateDescription>
-            </EmptyStateHeader>
-            <EmptyStateContent>
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
               <ToolWorkflowSteps />
-            </EmptyStateContent>
-          </EmptyState>
+            </EmptyContent>
+          </Empty>
         ) : (
           <div className="vc-result-list">
             {rows.map((row) => (

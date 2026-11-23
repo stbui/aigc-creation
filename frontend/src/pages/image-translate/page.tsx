@@ -4,6 +4,12 @@ import { DEFAULT_TARGET_LANG } from './constants';
 import {
   PRODUCT_TOOL_DROPZONE,
   PRODUCT_TOOL_PAGE,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   ToolCard,
   ToolHistoryPane,
   ToolShell,
@@ -83,20 +89,24 @@ export function ImageTranslatePage() {
       }
     >
       <ToolCard title="翻译语言" dense>
-        <label className="flex flex-col gap-1.5">
+        {/* Select 不用 <label> 包裹: label 会把点击转发给内部 input, 导致下拉打开即关闭 */}
+        <div className="flex flex-col gap-1.5">
           <span className="text-[13px] leading-[17.5px] text-[color:var(--wb-text)]">目标语言</span>
-          <select
-            className="box-border h-9 w-full rounded-sm border border-border bg-card px-2.5 text-[13px] text-[color:var(--wb-text)] outline-none focus:border-brand-light"
-            value={targetLang}
-            onChange={(e) => setTargetLang(e.target.value)}
-          >
-            {languageOptions().map((l) => (
-              <option key={l.value} value={l.value}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select value={targetLang} onValueChange={(next) => setTargetLang(String(next))}>
+            <SelectTrigger aria-label="目标语言" className="w-full text-[13px]">
+              <SelectValue placeholder="请选择" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {languageOptions().map((l) => (
+                  <SelectItem key={String(l.value)} value={String(l.value)}>
+                    {l.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
         <ToolSwitch label="保护商品主体" checked={protect} onChange={setProtect} />
       </ToolCard>
     </ToolShell>

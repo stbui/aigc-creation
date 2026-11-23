@@ -69,7 +69,7 @@ export function RotateAnglePage() {
   return (
     <ToolShell
       capability="rotate"
-      pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page rotate-angle-page [&_.pk-config-card]:min-h-[226px]! max-[900px]:[&_.pk-config-card]:p-4! max-[900px]:[&_.pk-form-scroll]:mb-3! max-[900px]:[&_.source-row]:gap-6! max-[900px]:[&_.pk-result-pane]:min-h-[360px]! max-[900px]:[&_.pk-result-pane]:h-auto! max-[900px]:[&_.pk-result-pane]:flex-none!`}
+      pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page rotate-angle-page [&_.pk-form-scroll>[data-slot=section-card]:first-child]:min-h-[226px]! max-[900px]:[&_.pk-form-scroll>[data-slot=section-card]:first-child]:p-4! max-[900px]:[&_.pk-form-scroll]:mb-3! max-[900px]:[&_.source-row]:gap-6! max-[900px]:[&_.pk-result-pane]:min-h-[360px]! max-[900px]:[&_.pk-result-pane]:h-auto! max-[900px]:[&_.pk-result-pane]:flex-none!`}
       title="旋转角度"
       desc="视角平滑旋转，细节立体呈现"
       upload={{

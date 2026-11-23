@@ -54,7 +54,10 @@ export function ImageDropzone({
         compact ? 'min-h-27 gap-1 px-2 py-2' : 'min-h-40 gap-1.5 px-4 py-4 max-[480px]:min-h-32',
         className,
       )}
-      onClick={onClick}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       onDragOver={(event) => {
         if (disabled || !onFiles) return;
         event.preventDefault();

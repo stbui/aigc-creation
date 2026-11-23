@@ -290,29 +290,8 @@
   height: 100%;
 }
 
-/* ── 整页状态容器 (2026-10-20) ────────────────────────────────────
-   加载 / 失败 / 空 三种整页态的统一容器。
-   此前各页各写 wrapper (list-page / list-page-empty / co-shell …),
-   宽度与内边距不一致, 同一套状态组件在不同页呈现不同宽度。 */
-.state-page {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--space-32) var(--space-24) 64px;
-  box-sizing: border-box;
-}
-
-.state-page .state-skeleton {
-  max-width: 100%;
-}
-
 /* 换色生成中卡的内部尺寸由 `ToolResultCards` 的元素变体直接表达，
  * 这里不再为某一页写选择器。 */
-
-.state-spinner.is-large {
-  width: 28px;
-  height: 28px;
-  border-width: 3px;
-}
 
 /* ── 动效降级: 尊重系统「减少动态效果」偏好 ───────────────────── */
 @media (prefers-reduced-motion: reduce) {

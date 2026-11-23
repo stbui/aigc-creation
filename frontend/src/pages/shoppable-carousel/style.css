@@ -29,24 +29,6 @@
   align-items: stretch;
 }
 
-.sc-page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-  height: 54px;
-  padding: 0 var(--space-24);
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border);
-}
-
-.sc-page-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
 @media (max-width: 900px) {
   .sc-workspace {
     margin: 0;
@@ -68,23 +50,8 @@
   gap: var(--space-10);
 }
 
-.sc-new-task {
-  font-size: 13px;
-  color: var(--text-body);
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  padding: 5px var(--space-12);
-  cursor: pointer;
-}
-
-.sc-new-task:hover {
-  color: var(--brand);
-  border-color: var(--border-brand);
-}
-
 /*
- * 左栏滚动区：内容收进 `.pk-config-card` 白卡（与商品主图 / 写真模板一致），
+ * 左栏滚动区：内容收进 `SectionCard` 白卡（与商品主图 / 写真模板一致），
  * 滚动区本身透明，卡片四周的留白由卡内 padding 提供。
  */
 .sc-form-scroll {
@@ -105,8 +72,7 @@
 }
 
 /* 区块标题 (参考站 15px / #0f172a / margin-bottom 12px) */
-.sc-sections .pk-section-title,
-  .sc-sections .sc-section-title {
+.sc-sections .pk-section-title {
   display: block;
   font-size: 15px;
   font-weight: 700;
@@ -571,12 +537,12 @@
  * 「创作灵感」的模板区与「创作结果」的批次列表各自吃掉右栏剩余高度，
  * 面板内部自行滚动。原右栏底部「最近生成」历史条及其白卡样式已删除。
  */
-.pd-right-panel > .sc-showcase {
+[data-slot='output-tab-panel'] > .sc-showcase {
   flex: 1;
   min-height: 0;
 }
 
-.pd-right-panel > .pk-result-pane {
+[data-slot='output-tab-panel'] > .pk-result-pane {
   flex: 1;
   min-height: 0;
 }
@@ -584,25 +550,10 @@
 /*
  * 带货图文: 左栏逐项对齐参考站实测 (docs/shoppable-carousel-design.md §3 / §12)。
  *
- * 1. 上传区: 参考站拖拽框 364×104 (2px dashed 虚线, 圆角 12), 站点工具页族的
- *    .pk-dropzone 是 min-height 160 —— 差 56px, 把整栏往下推。
+ * 1. 上传区尺寸与提示字号由 `ShoppableCarouselConfig` 的 `UPLOAD_ZONE` 负责。
  * 2. 底栏: 参考站 sidebarFooter 白底 + 上边框 1px #f1f5f9 + 内边距 16px 24px 20px,
  *    步进按钮 24×24 圆角 6。
  */
-.sc-sections .pk-dropzone {
-  min-height: 104px;
-  border-width: 2px;
-  border-style: dashed;
-  border-color: var(--border-2);
-  border-radius: var(--radius-card);
-  background: var(--card-bg);
-  padding: var(--space-12);
-}
-
-.sc-sections .pk-upload-prompt small {
-  font-size: 14px;
-  color: var(--text-desc);
-}
 
 /*
  * 步进器走共享 `NumberStepper`（shadcn InputGroup 组合件）。
@@ -621,23 +572,9 @@
 }
 
 /*
- * 带货图文: 左栏控件尺寸保留参考站实测值（上传拖拽框 104、下拉 40）；
+ * 带货图文: 左栏控件尺寸保留参考站实测值（下拉 40）；
  * 底栏与主按钮改用全站共享样式（白卡 + 品牌渐变按钮），不再单独覆写。
  */
-/* 上传区: 104 高, 内容居中, 提示 14px */
-.sc-sections .pk-dropzone {
-  min-height: 104px;
-  padding: var(--space-8);
-}
-
-.sc-sections .pk-upload-prompt {
-  min-height: 0;
-  gap: var(--space-6);
-}
-
-.sc-sections .pk-upload-prompt span {
-  font-size: 14px;
-}
 
 /* 生成设置的四组下拉: 高 40 (参考站实测), 底 rgba(0,30,89,.04), 圆角 8 */
 .sc-sections .pk-field [class*='select'] button,

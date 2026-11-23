@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import type { MembershipPlan } from '../../types/api';
 import type { LandingCatalogState } from './hooks';
 import { PLAN_VISUALS, formatNumber } from './utils';
-import { Badge, Button, Surface, SurfaceContent } from './components';
+import { Badge, Button, Card, CardContent } from './components';
 
 interface LandingPlanGridProps {
   plans: MembershipPlan[];
@@ -15,7 +15,7 @@ interface LandingPlanGridProps {
 /**
  * 订阅套餐卡：价格、积分与权益全部来自后端，不回落硬编码价目。
  *
- * 卡片壳 `Surface`，推荐角标 `Badge`（品牌实底），底部购买是 `Button asChild`
+ * 卡片壳 `Card`，推荐角标 `Badge`（品牌实底），底部购买是 `Button asChild`
  * 指向结算页 —— 订阅购买走订单 + 支付链路，链接语义不变。
  */
 export function LandingPlanGrid({ plans, state }: LandingPlanGridProps) {
@@ -34,7 +34,7 @@ export function LandingPlanGrid({ plans, state }: LandingPlanGridProps) {
         const visual = PLAN_VISUALS[index];
         const recommended = visual?.recommended ?? false;
         return (
-          <Surface
+          <Card
             key={plan.id}
             className={[
               'relative gap-0 rounded-xl border py-0 transition-[border-color,box-shadow,transform] duration-200',
@@ -56,7 +56,7 @@ export function LandingPlanGrid({ plans, state }: LandingPlanGridProps) {
               </Badge>
             )}
 
-            <SurfaceContent className="flex flex-1 flex-col px-[22px] pt-6 pb-5">
+            <CardContent className="flex flex-1 flex-col px-[22px] pt-6 pb-5">
               <h3 className="m-0 pr-16 text-base font-semibold text-foreground">{plan.name}</h3>
 
               <div className="mt-3.5 flex items-baseline gap-0.75 text-foreground">
@@ -99,8 +99,8 @@ export function LandingPlanGrid({ plans, state }: LandingPlanGridProps) {
                   立即订阅
                 </Link>
               </Button>
-            </SurfaceContent>
-          </Surface>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

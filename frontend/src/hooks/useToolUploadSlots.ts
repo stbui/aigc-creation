@@ -46,10 +46,8 @@ export function useToolUploadSlots({
     validateImageFile,
   } = useUploadLimits();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<ToolAsset[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [dragging, setDragging] = useState(false);
 
   /** 手机上传弹窗 (二维码方案, 手机端传回后进入图片位) */
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -273,9 +271,6 @@ export function useToolUploadSlots({
     allowedAccept,
     images,
     uploading,
-    dragging,
-    setDragging,
-    fileInputRef,
     mobileOpen,
     setMobileOpen,
     library,

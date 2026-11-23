@@ -1,10 +1,8 @@
-import type { RefObject } from 'react';
 import { Sparkles } from 'lucide-react';
 
 import {
   LANGUAGE_OPTIONS,
   MARKET_OPTIONS,
-  MAX_IMAGE_MB,
   MAX_IMAGES,
   MAX_SELLING_POINTS_LEN,
   PLATFORM_OPTIONS,
@@ -27,10 +25,16 @@ import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, 
  * 同名件；视觉令牌走 `--brand` 一族，不沿用参考站品牌蓝。
  */
 
+/** 参考站上传框 364×104、2px 虚线、圆角 12；提示收成 14px 并去掉空态最小高。 */
+const UPLOAD_ZONE = [
+  'min-h-[104px]! border-2 border-dashed border-[var(--border-2)]! rounded-lg! bg-card! p-2!',
+  '[&>[data-slot=image-upload-prompt]]:min-h-0! [&>[data-slot=image-upload-prompt]]:gap-1.5!',
+  '[&>[data-slot=image-upload-prompt]>span:last-child]:text-sm!',
+].join(' ');
+
 export interface ShoppableCarouselConfigProps {
   images: UploadedImage[];
   uploading: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
   onRemove: (id: string) => void;
   onOpenLibrary: () => void;
@@ -66,7 +70,6 @@ export interface ShoppableCarouselConfigProps {
 export function ShoppableCarouselConfig({
   images,
   uploading,
-  fileInputRef,
   onFiles,
   onRemove,
   onOpenLibrary,
@@ -104,15 +107,13 @@ export function ShoppableCarouselConfig({
           title="上传图片"
           images={images}
           max={MAX_IMAGES}
-          maxMb={MAX_IMAGE_MB}
           uploading={uploading}
-          fileInputRef={fileInputRef}
           onFiles={onFiles}
           onRemove={onRemove}
           onOpenLibrary={onOpenLibrary}
           onOpenMobile={onOpenMobile}
           noun="商品图片"
-          emptyHint="同一产品，最多 5 张。"
+          dropzoneClassName={UPLOAD_ZONE}
         />
 
         {/* ── 2. 生成设置（2×2 四组下拉 + 不加文字开关） ── */}
@@ -122,92 +123,68 @@ export function ShoppableCarouselConfig({
             {/* Select 不用 <label> 包裹: label 会把点击转发给内部 input,
                 已知会让下拉「打开即关闭」; 无障碍名走 aria-label */}
             <div className="pk-field">
-              <span className="pk-field-label">投放平台</span>
-                <Select
-                  value={platform}
-                  onValueChange={onPlatformChange}
-                >
-                  <SelectTrigger
-                    aria-label={'投放平台'}
-                  >
-                    <SelectValue placeholder={'请选择'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {PLATFORM_OPTIONS.map((option) => (
-                        <SelectItem key={String(option.value)} value={String(option.value)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              <Select value={platform} onValueChange={onPlatformChange}>
+                <SelectTrigger aria-label="投放平台" className="w-full">
+                  <SelectValue placeholder="请选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {PLATFORM_OPTIONS.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="pk-field">
-              <span className="pk-field-label">目标市场</span>
-                <Select
-                  value={market}
-                  onValueChange={onMarketChange}
-                >
-                  <SelectTrigger
-                    aria-label={'目标市场'}
-                  >
-                    <SelectValue placeholder={'请选择'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {MARKET_OPTIONS.map((option) => (
-                        <SelectItem key={String(option.value)} value={String(option.value)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              <Select value={market} onValueChange={onMarketChange}>
+                <SelectTrigger aria-label="目标市场" className="w-full">
+                  <SelectValue placeholder="请选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {MARKET_OPTIONS.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="pk-field">
-              <span className="pk-field-label">输出语言</span>
-                <Select
-                  value={language}
-                  onValueChange={onLanguageChange}
-                >
-                  <SelectTrigger
-                    aria-label={'输出语言'}
-                  >
-                    <SelectValue placeholder={'请选择'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {LANGUAGE_OPTIONS.map((option) => (
-                        <SelectItem key={String(option.value)} value={String(option.value)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              <Select value={language} onValueChange={onLanguageChange}>
+                <SelectTrigger aria-label="输出语言" className="w-full">
+                  <SelectValue placeholder="请选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="pk-field">
-              <span className="pk-field-label">画面比例</span>
-                <Select
-                  value={ratio}
-                  onValueChange={onRatioChange}
-                >
-                  <SelectTrigger
-                    aria-label={'画面比例'}
-                  >
-                    <SelectValue placeholder={'请选择'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {RATIO_OPTIONS.map((option) => (
-                        <SelectItem key={String(option.value)} value={String(option.value)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              <Select value={ratio} onValueChange={onRatioChange}>
+                <SelectTrigger aria-label="画面比例" className="w-full">
+                  <SelectValue placeholder="请选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {RATIO_OPTIONS.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

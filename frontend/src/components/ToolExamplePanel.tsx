@@ -1,3 +1,5 @@
+import '../styles/product-detail-kit.css';
+
 import type { ReactNode } from 'react';
 
 export interface ToolExampleStep {

@@ -1,5 +1,3 @@
-import type { RefObject } from 'react';
-
 import { DETAIL_CAPABILITY } from './api';
 import type { PublicModelGroup } from './components';
 import { ProductFormSection, ToolGenerationSubmitBar, ToolTypeTabs } from './components';
@@ -22,7 +20,6 @@ export interface DetailInputPaneProps {
   /** 已选素材超过模型上限时的可读原因 */
   limitError?: string | null;
   uploading: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
   onRemove: (id: string) => void;
   onOpenLibrary: () => void;
@@ -75,7 +72,6 @@ export function DetailInputPane({
   max,
   limitError,
   uploading,
-  fileInputRef,
   onFiles,
   onRemove,
   onOpenLibrary,
@@ -112,65 +108,62 @@ export function DetailInputPane({
   onSubmit,
 }: DetailInputPaneProps) {
   return (
-    <aside className="pk-input-pane">
-      <div className="pk-form-card">
-        <ToolTypeTabs active="product-detail" />
+    <aside className="pk-input-pane gap-0!">
+      <ToolTypeTabs active="product-detail" />
 
-        <div className="pk-form-scroll">
-          <ProductFormSection
-            images={images}
-            max={max}
-            limitError={limitError}
-            uploading={uploading}
-            fileInputRef={fileInputRef}
-            onFiles={onFiles}
-            onRemove={onRemove}
-            onOpenLibrary={onOpenLibrary}
-            onOpenMobile={onOpenMobile}
-            productName={productName}
-            onProductNameChange={onProductNameChange}
-            brand={brand}
-            onBrandChange={onBrandChange}
-            platform={platform}
-            onPlatformChange={onPlatformChange}
-            language={language}
-            onLanguageChange={onLanguageChange}
-            description={description}
-            onDescriptionChange={onDescriptionChange}
-            analyzing={analyzing}
-            onAnalyze={onAnalyze}
-            onExpandDescription={onExpandDescription}
-            maxLength={MAX_DESC_LEN}
-            descriptionRows={3}
-          />
-
-          <DetailSectionPicker selected={sections} onToggle={onToggleSection} />
-        </div>
-
-        {/* 高级设置 + 提交 (sticky 底部) */}
-        <ToolGenerationSubmitBar
-          capability={DETAIL_CAPABILITY}
-          generating={generating}
-          disabled={submitDisabled}
-          guestLabel={guestLabel}
-          creditLabel={creditLabel}
-          hint={
-            submitHint ? (
-              <span className="tool-submit-notice tool-submit-notice-error">{submitHint}</span>
-            ) : undefined
-          }
-          settingsOpen={settingsOpen}
-          onToggleSettings={onToggleSettings}
-          ratio={ratio}
-          onRatioChange={onRatioChange}
-          resolution={resolution}
-          onResolutionChange={onResolutionChange}
-          resolutionValues={resolutionValues}
-          onModelQuoteChange={onModelQuoteChange}
-          onModelChange={onModelChange}
-          onSubmit={onSubmit}
+      <div className="pk-form-scroll">
+        <ProductFormSection
+          images={images}
+          max={max}
+          limitError={limitError}
+          uploading={uploading}
+          onFiles={onFiles}
+          onRemove={onRemove}
+          onOpenLibrary={onOpenLibrary}
+          onOpenMobile={onOpenMobile}
+          productName={productName}
+          onProductNameChange={onProductNameChange}
+          brand={brand}
+          onBrandChange={onBrandChange}
+          platform={platform}
+          onPlatformChange={onPlatformChange}
+          language={language}
+          onLanguageChange={onLanguageChange}
+          description={description}
+          onDescriptionChange={onDescriptionChange}
+          analyzing={analyzing}
+          onAnalyze={onAnalyze}
+          onExpandDescription={onExpandDescription}
+          maxLength={MAX_DESC_LEN}
+          descriptionRows={3}
         />
+
+        <DetailSectionPicker selected={sections} onToggle={onToggleSection} />
       </div>
+
+      {/* 高级设置 + 提交 (sticky 底部) */}
+      <ToolGenerationSubmitBar
+        capability={DETAIL_CAPABILITY}
+        generating={generating}
+        disabled={submitDisabled}
+        guestLabel={guestLabel}
+        creditLabel={creditLabel}
+        hint={
+          submitHint ? (
+            <span className="tool-submit-notice tool-submit-notice-error">{submitHint}</span>
+          ) : undefined
+        }
+        settingsOpen={settingsOpen}
+        onToggleSettings={onToggleSettings}
+        ratio={ratio}
+        onRatioChange={onRatioChange}
+        resolution={resolution}
+        onResolutionChange={onResolutionChange}
+        resolutionValues={resolutionValues}
+        onModelQuoteChange={onModelQuoteChange}
+        onModelChange={onModelChange}
+        onSubmit={onSubmit}
+      />
     </aside>
   );
 }

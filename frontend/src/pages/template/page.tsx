@@ -78,7 +78,7 @@ export function TemplatePage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   // ── 上传 ──
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, library, mobile } = useImageUpload({
+  const { images, uploading, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
     maxMb: MAX_IMAGE_MB,
     noun: '人像照片',
@@ -254,7 +254,6 @@ export function TemplatePage() {
         <TemplateInputPane
           images={images}
           uploading={uploading}
-          fileInputRef={fileInputRef}
           onFiles={(files) => void uploadFiles(files)}
           onRemove={removeImage}
           onOpenLibrary={openLibrary}

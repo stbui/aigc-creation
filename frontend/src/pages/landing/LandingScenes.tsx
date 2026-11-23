@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 import { A, type BizCard } from './constants';
-import { Surface, SurfaceContent, TextAction } from './components';
+import { Card, CardContent, TextAction } from './components';
 import { LandingHeading, LandingKicker, LandingLede, LandingSection } from './LandingSection';
 
 interface LandingScenesProps {
@@ -12,7 +12,7 @@ interface LandingScenesProps {
 /**
  * 核心场景：商品主图 / 商品详情 / 爆款复刻三张入口卡。
  *
- * 卡片壳换 shadcn `Surface`（悬停只改边框与投影，不自己写过渡），
+ * 卡片壳换 shadcn `Card`（悬停只改边框与投影，不自己写过渡），
  * 底部入口换 `TextAction asChild` 指向工具页 —— 语义是链接，密度与其它
  * 文字入口一致。
  */
@@ -27,7 +27,7 @@ export function LandingScenes({ cards }: LandingScenesProps) {
 
       <div className="mt-8 grid grid-cols-3 gap-5 max-[900px]:grid-cols-1">
         {cards.map((card) => (
-          <Surface
+          <Card
             key={card.title}
             className="group gap-0 overflow-hidden rounded-2xl border-border py-0 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.75 hover:border-brand hover:shadow-card"
           >
@@ -41,7 +41,7 @@ export function LandingScenes({ cards }: LandingScenesProps) {
                 className="block size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
               />
             </div>
-            <SurfaceContent className="flex flex-1 flex-col gap-1.5 px-[22px] pt-5 pb-4.5">
+            <CardContent className="flex flex-1 flex-col gap-1.5 px-[22px] pt-5 pb-4.5">
               <h3 className="m-0 flex items-center gap-2 text-[17px] font-semibold text-foreground">
                 <img
                   className="size-[22px] object-contain"
@@ -60,8 +60,8 @@ export function LandingScenes({ cards }: LandingScenesProps) {
                   <ArrowRight size={14} aria-hidden />
                 </Link>
               </TextAction>
-            </SurfaceContent>
-          </Surface>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </LandingSection>

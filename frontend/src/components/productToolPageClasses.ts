@@ -6,8 +6,8 @@
  * 现在作为 `pageClass` / `UploadSpec.dropzoneClassName` 传入，由 Tailwind
  * 工具类表达，不再依赖某个路由的样式表是否已加载。
  *
- * 骨架内侧元素（`.pk-config-card` / `.pk-submit-actions` 等）不接受页面重写结构，
- * 只用 `[&_.x]` 变体调尺寸；断点变体写在元素变体之前
+ * 骨架内侧元素（`SectionCard` / `.pk-submit-actions` 等）不接受页面重写结构，
+ * 只用 `[&_.x]` / `[&_[data-slot=…]]` 变体调尺寸；断点变体写在元素变体之前
  * （`max-[900px]:[&_.x]:…`），避免任意变体嵌套造成无效选择器。
  */
 
@@ -31,9 +31,8 @@ const PAGE_INNER = [
   '[&_.pk-input-pane]:w-full! [&_.pk-input-pane]:h-full! [&_.pk-input-pane]:min-h-0!',
   'min-[901px]:[&_.pk-input-pane]:pr-1!',
   '[&_.pk-result-pane]:w-full! [&_.pk-result-pane]:h-full! [&_.pk-result-pane]:min-h-0!',
-  // 配置卡 / 区块 / 提交区比骨架紧一档
-  '[&_.pk-config-card]:p-4! [&_.pk-config-card]:rounded-[var(--radius-panel)]!',
-  '[&_.pk-section]:gap-3!',
+  // 卡片内容间距 / 提交区比骨架紧一档（卡片本身的 p-4 与 16px 圆角已是默认）
+  '[&_[data-slot=section-card-content]]:gap-3!',
   '[&_.pk-submit-actions]:pt-3.5! [&_.pk-submit-actions]:px-4! [&_.pk-submit-actions]:pb-4! [&_.pk-submit-actions]:gap-3.5!',
   '[&_.pk-primary-btn]:h-[34px]!',
   '[&_.pk-form-scroll]:gap-3!',
@@ -46,10 +45,9 @@ const PAGE_INNER = [
   '[&_.pk-preview-inner_p]:text-xs! [&_.pk-preview-inner_p]:leading-5!',
   '[&_.pk-result-pane-editor]:bg-transparent!',
   // 1366：上传卡标题行与说明收一档
-  'min-[1181px]:max-[1366px]:[&_.pk-section-title]:text-xs!',
-  'min-[1181px]:max-[1366px]:[&_.pk-upload-prompt_small]:text-xs!',
-  'min-[1181px]:max-[1366px]:[&_.pk-upload-title-row]:gap-1!',
-  'min-[1181px]:max-[1366px]:[&_.pk-upload-title-actions]:gap-1!',
+  'min-[1181px]:max-[1366px]:[&_[data-slot=image-upload-header]_strong]:text-xs!',
+  'min-[1181px]:max-[1366px]:[&_[data-slot=image-upload-header]]:gap-1!',
+  'min-[1181px]:max-[1366px]:[&_[data-slot=image-upload-actions]]:gap-1!',
 ].join(' ');
 
 const PAGE_MOBILE = [
@@ -62,8 +60,8 @@ const PAGE_MOBILE = [
   'max-[900px]:[&_.pk-form-card]:block! max-[900px]:[&_.pk-form-card]:h-auto!',
   'max-[900px]:[&_.pk-form-scroll]:grid! max-[900px]:[&_.pk-form-scroll]:flex-none! max-[900px]:[&_.pk-form-scroll]:overflow-visible! max-[900px]:[&_.pk-form-scroll]:mb-3!',
   'max-[900px]:[&_.pk-result-pane]:h-auto! max-[900px]:[&_.pk-result-pane]:min-h-[720px]!',
-  'max-[900px]:[&_.pk-config-card]:p-3.5!',
-  'max-[900px]:[&_.pk-section]:gap-2.5!',
+  'max-[900px]:[&_[data-slot=section-card]]:p-3.5!',
+  'max-[900px]:[&_[data-slot=section-card-content]]:gap-2.5!',
   'max-[900px]:[&_.pk-submit-actions]:pt-3! max-[900px]:[&_.pk-submit-actions]:px-3.5! max-[900px]:[&_.pk-submit-actions]:pb-3.5!',
   'max-[900px]:[&_.pk-primary-btn]:h-10!',
 ].join(' ');
@@ -74,17 +72,18 @@ export const PRODUCT_TOOL_PAGE = `${PAGE_ROOT} ${PAGE_INNER} ${PAGE_MOBILE}`;
 /**
  * 上传区：参考站底色 #f6f7f9 / 虚线边 #d9dee8；有图后不再保留虚线框，
  * 而是 160px 高的居中预览（`productSourceUploadPreview` 自带 160×160 缩略图）。
+ * 选择器挂在 `ImageUploadArea` 的 `data-slot` / `data-*` 状态槽位上，不依赖页面 class。
  */
 export const PRODUCT_TOOL_DROPZONE = [
   'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2!',
   'max-[900px]:p-4!',
-  '[&>.pk-upload-prompt]:w-full [&>.pk-upload-prompt]:min-h-0 [&>.pk-upload-prompt]:gap-2',
-  '[&_.pk-thumb-grid-single]:w-40! [&_.pk-thumb-grid-single]:max-w-full!',
-  'max-[900px]:[&_.pk-thumb-grid-single]:w-[min(160px,100%)]!',
-  '[&.pk-dropzone-filled]:flex! [&.pk-dropzone-filled]:h-40! [&.pk-dropzone-filled]:min-h-40!',
-  '[&.pk-dropzone-filled]:items-center! [&.pk-dropzone-filled]:justify-center!',
-  '[&.pk-dropzone-filled]:cursor-default! [&.pk-dropzone-filled]:border-0! [&.pk-dropzone-filled]:rounded-none!',
-  '[&.pk-dropzone-filled]:bg-transparent! [&.pk-dropzone-filled]:shadow-none!',
-  '[&.pk-dropzone-filled:hover]:border-0! [&.pk-dropzone-filled:hover]:bg-transparent! [&.pk-dropzone-filled:hover]:shadow-none!',
-  'min-[901px]:max-[1366px]:[&.pk-dropzone-filled]:h-auto! min-[901px]:max-[1366px]:[&.pk-dropzone-filled]:min-h-40!',
+  '[&>[data-slot=image-upload-prompt]]:w-full [&>[data-slot=image-upload-prompt]]:min-h-0 [&>[data-slot=image-upload-prompt]]:gap-2',
+  '[&_[data-slot=image-upload-thumbs][data-single]]:w-40! [&_[data-slot=image-upload-thumbs][data-single]]:max-w-full!',
+  'max-[900px]:[&_[data-slot=image-upload-thumbs][data-single]]:w-[min(160px,100%)]!',
+  '[&[data-filled]]:flex! [&[data-filled]]:h-40! [&[data-filled]]:min-h-40!',
+  '[&[data-filled]]:items-center! [&[data-filled]]:justify-center!',
+  '[&[data-filled]]:cursor-default! [&[data-filled]]:border-0! [&[data-filled]]:rounded-none!',
+  '[&[data-filled]]:bg-transparent! [&[data-filled]]:shadow-none!',
+  '[&[data-filled]]:hover:border-0! [&[data-filled]]:hover:bg-transparent! [&[data-filled]]:hover:ring-0!',
+  'min-[901px]:max-[1366px]:[&[data-filled]]:h-auto! min-[901px]:max-[1366px]:[&[data-filled]]:min-h-40!',
 ].join(' ');

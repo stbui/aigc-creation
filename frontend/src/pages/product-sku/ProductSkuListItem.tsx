@@ -10,7 +10,7 @@ import {
   InputGroup,
   InputGroupInput,
   InputGroupText,
-  Surface,
+  SectionCard,
   type SkuRegion,
 } from './components';
 import { ProductSkuVariantRow } from './ProductSkuVariantRow';
@@ -31,7 +31,6 @@ interface ProductSkuListItemProps {
     file: File | undefined,
     itemKey: number,
     regionId: string,
-    input: HTMLInputElement,
   ) => void;
   onOpenReferenceLibrary: (itemKey: number, regionId: string) => void;
   onOpenReferenceMobile: (itemKey: number, regionId: string) => void;
@@ -62,7 +61,7 @@ export function ProductSkuListItem({
   onPreview,
 }: ProductSkuListItemProps) {
   return (
-    <Surface className="gap-0 border-0 bg-card p-4 shadow-none">
+    <SectionCard contentClassName="gap-0">
       <Field data-invalid={duplicate || undefined} className="gap-0">
         <FieldLabel htmlFor={`sku-name-${item.key}`} className="sr-only">
           SKU {itemIndex + 1} 名称
@@ -120,6 +119,6 @@ export function ProductSkuListItem({
           onPreview={onPreview}
         />
       ))}
-    </Surface>
+    </SectionCard>
   );
 }

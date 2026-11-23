@@ -48,31 +48,22 @@
 
   /* ═════════ 2.1 兼容别名（历史名，新代码不要新增） ═════════ */
   /* 下列名称保留给存量引用；新代码使用 2.2–2.6 的语义名，清理后再删除。 */
-  /* 2026-10-18 去蓝: 原为 #2563eb 蓝系 (与全站紫系冲突, 10-17 审计标记的 bug, 外壳 9 处引用已全部改字面值, 定义同步归位品牌紫防复发) */
-  --color-primary: #5546d8;
   /* 橙 / 绿各分「填充」与「文字」两版 (2026-11-03)
-       原 --color-cta / --color-success 同时当背景与文字用。作背景没问题,
-       作文字在同色 12% 淡底上只有 3.07/2.89:1 —— 浅底上还要再压深才读得出。
-       现在: --color-cta / --color-success 保持原值, 只用于填充;
+       原 --color-cta 同时当背景与文字用。作背景没问题,
+       作文字在同色 12% 淡底上只有 3.07:1 —— 浅底上还要再压深才读得出。
+       现在: --color-cta 保持原值, 只用于填充;
              --color-cta-text / --color-success-text 是压深后的文字版 (≥4.6:1)。 */
   --color-cta: #ea580c;
   --color-cta-text: #b94509;
-  --color-cta-hover: #c2410c;
   --color-bg: #f6f7fb;
   --color-card: #ffffff;
   --color-border: #e2e8f0;
   /* 参考站外壳描边实测 #f2f3f5, 比全局边框色更浅 —— 仅用于顶栏/侧栏等外壳分隔线 */
   --color-border-soft: #f2f3f5;
   --color-text: #0f172a;
-  --color-text-secondary: #475569;
   /* 参考站实测文本色: hero 副标题 #667085 / 卡片描述 #86909C */
-  --color-success: #16a34a;
   --color-success-text: #117c39;
-  --color-slate-100: #f1f5f9;
-  /* 原 #94a3b8 在白底只有 2.56:1, 收到 #627693 后 4.63:1 */
-  --color-slate-400: #5b6e89;
   /* 兼容旧名: 全部指向收拢后的三态, 保证语义不丢 */
-  --brand-strong: var(--brand);
   --brand-active: var(--brand-hover);
   --brand-accent: var(--brand);
   --brand-grad-end: var(--brand);
@@ -179,8 +170,6 @@
   --warn-border: #f0dfa8;
   --warn-text: #b45309;
   --accent-amber: #f59e0b;
-  --accent-orange: #ff7a45;
-  --cta-text: #f7593a;
   --danger-soft-bg: #fff1f2;
   /* 2026-11-03 压到 AA: 原 #ef4444 在 --danger-soft-bg 上 3.43:1、白底 3.76:1 */
   --danger-soft-text: #c5221f;
@@ -306,14 +295,12 @@
   --tool-border-brand-1: #6b4eff;
   --tool-border-brand-2: #8b73ff;
   --tool-border-brand-3: #9888ef;
-  --tool-border-brand-4: #a89bff;
   --tool-border-brand-5: #d8d0ff;
   --tool-border-danger: #e5484d;
   --tool-border-1: #a9a4b2;
   --tool-border-2: #b8b4c1;
   --tool-border-3: #dedbea;
   --tool-border-4: #d9dee8;
-  --tool-border-5: #e1e5ed;
   --tool-border-6: #e3e6ed;
   --tool-border-7: #e6e8ef;
   --tool-border-8: #f0eff5;
@@ -328,7 +315,6 @@
   --tool-surface-5: #eceaf0;
   --tool-surface-6: #eceef3;
   --tool-surface-7: #eceef5;
-  --tool-surface-8: #edf0f5;
   --tool-surface-9: #f3f4f9;
   --tool-surface-10: #f5f4f7;
   --tool-surface-11: #f5f6fa;
@@ -351,43 +337,28 @@
 
   /* ═════════ 3.6 素材库（alp-*） ═════════ */
   /* 素材库页 */
-  --alp-border-brand-1: #6353eb;
-  --alp-border-brand-2: #7668ef;
-  --alp-border-brand-3: #8275ef;
-  --alp-border-brand-4: #9c91f1;
   --alp-border-brand-5: #a69bef;
   --alp-border-brand-6: #d8d1ff;
   --alp-border-1: #c7cbd8;
   --alp-border-2: #d8dbe5;
-  --alp-border-3: #d9dce8;
-  --alp-border-4: #e2e5ed;
   --alp-border-6: #e3e6ee;
   --alp-border-7: #e5e8f0;
   --alp-border-8: #eef0f5;
-  --alp-shadow-brand: #8275ef;
   --alp-surface-brand-1: #4738c5;
-  --alp-surface-brand-2: #6353eb;
   --alp-surface-brand-3: #efeffa;
-  --alp-surface-brand-4: #f4f2ff;
   --alp-surface-brand-6: #f7f8fd;
   --alp-surface-info: #fbfcfe;
   --alp-surface-1: #e7e9ef;
   --alp-surface-2: #f3f4f7;
-  --alp-text-brand-1: #5545d7;
-  --alp-text-brand-2: #5848da;
-  --alp-text-1: #30364a;
   --alp-text-2: #343b50;
   --alp-text-3: #4b556a;
   --alp-text-4: #4d5568;
   --alp-text-5: #5f687b;
-  --alp-text-6: #5f687d;
   --alp-text-7: #636d82;
   --alp-text-8: #656d7d;
   --alp-text-9: #676c7a;
   --alp-text-10: #676d79;
-  --alp-text-11: #676d77;
   --alp-text-12: #686c75;
-  --alp-text-13: #686d75;
 
   /* ═════════ 3.7 手机上传（mup-* / mum-*） ═════════ */
   /* 手机上传页 */

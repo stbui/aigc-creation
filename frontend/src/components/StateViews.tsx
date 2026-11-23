@@ -13,7 +13,7 @@ import { Button } from '../ui';
  *   ① 旧的 `<Empty>`  —— WorkbenchPage / StatsPage / ToolPage / AdminWidgets,
  *      用的是默认灰蓝插画, 与站内自绘的品牌紫插画不是同一套设计语言
  *      (ExceptionPage 抽取时已认定该问题, 但只修了异常页, 普通空态没修)。
- *   ② 旧的 `<Spin>`   —— App.tsx / StatsPage / ToolPage / AdminWidgets。
+ *   ② 旧的 `<Spinner>`   —— App.tsx / StatsPage / ToolPage / AdminWidgets。
  *   ③ lucide `Loader2` + 自定义 CSS 动画 —— WorksPage / LibraryPage / PackagesPage。
  *   ④ 纯文本          —— CreditsPage「正在加载…」、InvitationsPage「加载中…」
  *      直接拿 h2/p 充当加载指示器。
@@ -73,7 +73,7 @@ export function StateSkeleton({
 /* ────────────────────────── 行内加载 ────────────────────────── */
 
 /**
- * 行内加载指示器 —— 替代裸 `<Spin>` 与「正在加载…」纯文本。
+ * 行内加载指示器 —— 替代裸 `<Spinner>` 与「正在加载…」纯文本。
  *
  * `full` 撑满可视区 (整页加载), 否则作为块内居中 (面板 / 弹窗内加载)。
  * 文案默认必显: 纯图形转圈用户无法判断是"在加载"还是"卡住了"。

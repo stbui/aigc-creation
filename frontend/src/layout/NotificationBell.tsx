@@ -1,6 +1,6 @@
 import './NotificationBell.css';
 import { useState } from 'react';
-import { Badge, Button, Popover, PopoverContent, PopoverTrigger, Spin } from '../ui';
+import { Badge, Button, Popover, PopoverContent, PopoverTrigger, Spinner } from '../ui';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatRelativeTime } from '../lib/format';
@@ -43,7 +43,7 @@ export function NotificationBell() {
       <div className="app-notif-body">
         {loading ? (
           <div className="app-notif-empty">
-            <Spin className="size-4" />
+            <Spinner className="size-4" />
           </div>
         ) : items.length === 0 ? (
           <p className="app-notif-empty">暂无消息</p>

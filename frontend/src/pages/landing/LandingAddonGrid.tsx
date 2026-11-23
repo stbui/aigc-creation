@@ -4,7 +4,7 @@ import type { Product } from '../../types/api';
 import { formatNumber } from './utils';
 import { A, ADDON_ICONS } from './constants';
 import type { LandingCatalogState } from './hooks';
-import { Button, Surface, SurfaceContent } from './components';
+import { Button, Card, CardContent } from './components';
 import { LandingCatalogEmpty } from './LandingPlanGrid';
 
 interface LandingAddonGridProps {
@@ -28,11 +28,11 @@ export function LandingAddonGrid({ addons, state }: LandingAddonGridProps) {
         <LandingCatalogEmpty>暂无可用积分包</LandingCatalogEmpty>
       )}
       {addons.slice(0, 4).map((addon, index) => (
-        <Surface
+        <Card
           key={addon.id}
           className="items-center gap-0 rounded-xl border-border py-0 text-center transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-card"
         >
-          <SurfaceContent className="flex flex-1 flex-col items-center px-5 pt-6 pb-5">
+          <CardContent className="flex flex-1 flex-col items-center px-5 pt-6 pb-5">
             {ADDON_ICONS[index] && (
               <img
                 className="size-10 object-contain"
@@ -76,8 +76,8 @@ export function LandingAddonGrid({ addons, state }: LandingAddonGridProps) {
             >
               <Link to="/packages">{addon.isFree ? '免费领取' : '立即购买'}</Link>
             </Button>
-          </SurfaceContent>
-        </Surface>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

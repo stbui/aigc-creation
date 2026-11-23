@@ -13,7 +13,7 @@
 硬约束：
 
 - **前端 `AdminContext.can()` 只用于隐藏按钮，不是安全边界**；真正的拒绝必须在后端。
-- 后台端点**默认拒绝**：未声明权限点的处理器直接 403 并打 ERROR，不降级为「只校验身份」。需要全员开放的端点显式使用 `@AdminIdentityOnly()` / `@RequireAnyPermission()`。
+- 后台端点**默认拒绝**：未声明权限点的处理器直接 403 并打 ERROR，不降级为「只校验身份」。需要全员开放的端点显式使用 `@AdminIdentityOnly()` / `@RequireAnyPermissions()`。
 - 权限点定义唯一在 `backend/src/admin/permissions.ts`，命名 `<模块>.<动作>`，当前 68 个。新增后台路由必须同时补权限点与装饰器。
 - 身份与状态**每次请求实时查库**：`status`（禁用 / 注销）、`tokenVersion`、`mustChangePassword` 都不能依赖 token 载荷。
 - 后台与 C 端使用同一套 JWT 签发逻辑，但守卫分开；后台守卫只处理 `/admin` 路径，C 端请求不进入后台鉴权链。

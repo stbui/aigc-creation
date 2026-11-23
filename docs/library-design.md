@@ -73,7 +73,7 @@
 
 | 角色 | Token | 值 | 用法 |
 | --- | --- | --- | --- |
-| 品牌主色 | `--brand` / `--brand-strong` | `#5546d8` | 主按钮、链接、关键强调 |
+| 品牌主色 | `--brand` | `#5546d8` | 主按钮、链接、关键强调 |
 | 品牌交互态 | `--brand-hover` | `#5b4bd7` | hover、active、选中文字 |
 | 品牌浅底 | `--brand-bg` | `#f1efff` | 选中胶囊、批量条 |
 | 主标题 | `--text-strong` | `#171a2b` | 页面标题、区块标题 |
@@ -244,7 +244,7 @@
 
 ### 8.5 上传原图徽标
 
-- 组件：`StatusBadge variant="secondary"`。
+- 组件：`Badge variant="secondary"`。
 - 文案：`上传原图`。
 - 位置：封面右上角，距边 8px。
 - 尺寸：高 24px、字号 12px、胶囊圆角。
@@ -305,13 +305,13 @@
 
 | 页面区域 | 必须使用 |
 | --- | --- |
-| 分组面板 | `Surface` + `SurfaceHeader` + `SurfaceTitle` + `SurfaceDescription` + `SurfaceContent` |
+| 分组面板 | `Card` + `CardHeader` + `CardTitle` + `CardDescription` + `CardContent` |
 | 筛选 | `Select` |
 | 分组单选 | `ToggleGroup` |
 | 操作按钮 | `Button` |
 | 素材多选 | `Checkbox` |
-| 来源标记 | `StatusBadge` |
-| 空态 | `EmptyState` + `EmptyStateMedia` + `EmptyStateHeader` + `EmptyStateTitle` + `EmptyStateDescription` + `EmptyStateContent` |
+| 来源标记 | `Badge` |
+| 空态 | `Empty` + `EmptyMedia` + `EmptyHeader` + `EmptyTitle` + `EmptyDescription` + `EmptyContent` |
 | 删除确认 | `modal.confirm({ danger: true })` |
 
 实现规则：

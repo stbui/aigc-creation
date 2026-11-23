@@ -27,7 +27,7 @@ import {
 } from './hooks';
 import { generateApi, newIdempotencyKey, promptToolsApi, resolveModelKey } from './api';
 import { clampCount, isUncertainSubmitError } from './utils';
-import { useApp } from '../../ui';
+import { SectionCard, useApp } from '../../ui';
 import type { ShoppableCarouselTemplate } from '../../types/api';
 
 /**
@@ -65,7 +65,7 @@ export function ShoppableCarouselPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   // ── 上传 ──
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, library, mobile } = useImageUpload({
+  const { images, uploading, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
     maxMb: MAX_IMAGE_MB,
   });
@@ -378,11 +378,10 @@ export function ShoppableCarouselPage() {
         {/* ── 左: 配置栏 ── */}
         <aside className="sc-input-pane">
           <div className="sc-form-scroll">
-            <section className="pk-config-card">
+            <SectionCard>
               <ShoppableCarouselConfig
                 images={images}
                 uploading={uploading}
-                fileInputRef={fileInputRef}
                 onFiles={(files) => void uploadFiles(files)}
                 onRemove={removeImage}
                 onOpenLibrary={openLibrary}
@@ -408,7 +407,7 @@ export function ShoppableCarouselPage() {
                 socialCaption={socialCaption}
                 onSocialCaptionChange={setSocialCaption}
               />
-            </section>
+            </SectionCard>
           </div>
 
           <ShoppableCarouselFooter

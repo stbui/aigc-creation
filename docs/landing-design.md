@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | 顶部导航 | `LandingHeader` | 品牌 + 首页 + 能力分组下拉 + 工作台；右侧作品 / 数据 / 登录入口。分组下拉是 `DropdownMenu`，≤900px 收进 `Sheet` 右侧抽屉 |
 | 1 首屏 | `LandingHero` | 左侧：能力数徽标（取运行时可见能力数）、两行标题、说明、双 CTA（`Button asChild`，免费开始创作 → 首个场景页；查看套餐价目 → `/packages`）、三条保障；右侧：2×2 真实产出拼贴，每张带场景标签 |
-| 2 核心场景 | `LandingScenes` | 商品主图 / 商品详情 / 爆款复刻三张 `Surface` 卡，图片与文案来自 `BIZ_CARDS` |
+| 2 核心场景 | `LandingScenes` | 商品主图 / 商品详情 / 爆款复刻三张 `Card` 卡，图片与文案来自 `BIZ_CARDS` |
 | 3 修图工具 | `LandingTools` | 8 个常用 `Button asChild` 工具入口，四列一行；右上 `TextAction`「全部工具」进 `/workbench` |
 | 4 使用流程 | `LandingFlow` | 上传 → 选择能力与风格 → 下载，三步固定文案 |
 | 5 优秀案例 | `LandingCases` | 7 个分类（商品主图 / 商品详情图 / 爆款复刻 / 自由创作 / 产品精修 / 一键抠图 / 旋转角度）按顺序平铺长式陈列，**不切页签**；每类按商品去重后 5 张，`AspectRatio` 3:4 展示；组头「做同款」跳对应工具页，悬停 `Badge` 浮出同一入口 |

@@ -3,10 +3,10 @@ import { Download, ImagePlus, LoaderCircle, Maximize2, RotateCcw, Trash2, X } fr
 import { assetThumbUrl, toAbsoluteUrl } from './api';
 import {
   Button,
-  StatusBadge,
-  Surface,
-  SurfaceContent,
-  SurfaceHeader,
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
   cn,
   formatBatchDate,
   resultMetaOf,
@@ -128,8 +128,8 @@ export function ViralCloneResultRow({
   const readyCount = [row.productUrls[0], row.referenceUrl, row.outputUrl].filter(Boolean).length;
 
   return (
-    <Surface className={cn('vc-result-row', isCurrent && 'is-current')}>
-      <SurfaceHeader className="vc-result-row-head">
+    <Card className={cn('vc-result-row', isCurrent && 'is-current')}>
+      <CardHeader className="vc-result-row-head">
         <div className="vc-result-row-main">
           <div className="vc-result-row-meta">
             {isCurrent ? (
@@ -140,9 +140,9 @@ export function ViralCloneResultRow({
               </strong>
             )}
             {row.caption && (
-              <StatusBadge className="vc-degree-badge" variant="secondary">
+              <Badge className="vc-degree-badge" variant="secondary">
                 {row.caption}
-              </StatusBadge>
+              </Badge>
             )}
             {status && <span className={`vc-result-status is-${status.tone} u-font-12`}>{status.label}</span>}
             {row.createdAt && <time dateTime={row.createdAt}>{formatBatchDate(row.createdAt)}</time>}
@@ -201,9 +201,9 @@ export function ViralCloneResultRow({
             </Button>
           )}
         </div>
-      </SurfaceHeader>
+      </CardHeader>
 
-      <SurfaceContent className="vc-result-row-content">
+      <CardContent className="vc-result-row-content">
         <div className="vc-compare-grid">
           <figure className="vc-compare-card is-product">
             <div className="vc-compare-media">
@@ -408,7 +408,7 @@ export function ViralCloneResultRow({
             </figcaption>
           </figure>
         </div>
-      </SurfaceContent>
-    </Surface>
+      </CardContent>
+    </Card>
   );
 }

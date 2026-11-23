@@ -10,7 +10,7 @@ import {
   ZOOM_STEP,
   type RotateTab,
 } from './constants';
-import { RangeRow } from './components';
+import { RangeRow, SectionCard } from './components';
 import { RotateAngleModeTabs } from './RotateAngleModeTabs';
 import { RotateAnglePreview } from './RotateAnglePreview';
 
@@ -47,9 +47,11 @@ export function RotateAngleSettingsCard({
   onReset,
 }: RotateAngleSettingsCardProps) {
   return (
-    <section className="flex flex-none flex-col gap-3 rounded-[14px] border-0 bg-card px-4 py-3.5 max-[900px]:p-3.5">
-      <div className="flex items-center justify-between gap-2.5">
-        <h2 className="m-0 text-sm leading-[22px] font-bold text-[color:var(--tool-text-1)]">旋转角度</h2>
+    <SectionCard
+      title="旋转角度"
+      className="flex-none gap-3 rounded-[14px] px-4 py-3.5 max-[900px]:p-3.5"
+      contentClassName="gap-3"
+      extra={
         <button
           type="button"
           aria-label="重置参数"
@@ -59,8 +61,8 @@ export function RotateAngleSettingsCard({
         >
           <RotateCcw size={16} />
         </button>
-      </div>
-
+      }
+    >
       <RotateAngleModeTabs tab={tab} onChange={onTabChange} />
 
       <RotateAnglePreview
@@ -96,6 +98,6 @@ export function RotateAngleSettingsCard({
         <Info size={13} className="mt-px flex-none text-brand" />
         <span>相机保持静止，生成时按主体旋转角度重建商品展示。</span>
       </p>
-    </section>
+    </SectionCard>
   );
 }

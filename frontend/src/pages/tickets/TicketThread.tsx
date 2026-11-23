@@ -1,7 +1,7 @@
-import { CheckCircle2, MessageSquare, Send, User } from 'lucide-react';
+import { CheckCircle2, MessageSquare, User } from 'lucide-react';
 import type { Ticket } from '../../types/api';
 import { formatDateTime } from './utils';
-import { Button, Input, Textarea } from './components';
+import { Button, CharacterCountTextarea } from './components';
 
 /**
  * 工单详情的对话线 + 回复区。
@@ -60,7 +60,9 @@ export function TicketThread({
                 <span className="inline-flex items-center gap-2 text-[13px] font-medium text-foreground">
                   <span
                     className={`grid size-[22px] place-items-center rounded-full text-xs font-semibold ${
-                      isAdmin ? 'bg-brand text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      isAdmin
+                        ? 'bg-brand text-primary-foreground'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     {isAdmin ? '服' : <User size={12} aria-hidden />}
@@ -92,27 +94,19 @@ export function TicketThread({
             </h3>
             <span className="text-xs text-muted-foreground">客服回复会同时推送站内消息</span>
           </div>
-          <div className="login-textarea-wrap">
-            <Textarea
-              className="login-textarea field-sizing-fixed"
-              rows={4}
-              maxLength={2000}
-              value={reply}
-              disabled={busy}
-              onChange={(e) => onReplyChange(e.target.value)}
-              placeholder="补充说明或继续追问…"
-            />
-            <span className="login-textarea-count is-block">{reply.length}/2000</span>
-          </div>
+          <CharacterCountTextarea
+            rows={4}
+            maxLength={2000}
+            value={reply}
+            disabled={busy}
+            onChange={(e) => onReplyChange(e.target.value)}
+            placeholder="补充说明或继续追问…"
+          />
           <div className="flex flex-wrap justify-between gap-2">
             <Button disabled={busy} onClick={onCloseTicket}>
               问题已解决，关闭工单
             </Button>
-            <Button
-              variant="default"
-              disabled={busy || !reply.trim()}
-              onClick={onSendReply}
-            >
+            <Button variant="default" disabled={busy || !reply.trim()} onClick={onSendReply}>
               {busy && <span className="state-spinner is-small" aria-hidden />}
               发送
             </Button>

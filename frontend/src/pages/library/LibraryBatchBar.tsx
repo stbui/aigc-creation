@@ -1,6 +1,6 @@
 import { Download, FolderInput } from 'lucide-react';
 
-import { Button, Surface, SurfaceContent } from './components';
+import { Button, Card, CardContent } from './components';
 
 /**
  * 批量操作条：勾选素材后出现。
@@ -17,8 +17,8 @@ export interface LibraryBatchBarProps {
 
 export function LibraryBatchBar({ count, onDownload, onMove, onClear }: LibraryBatchBarProps) {
   return (
-    <Surface className="mb-3.5 flex-row gap-3 rounded-lg bg-brand-bg px-3.5 py-2.5 text-xs text-brand-hover">
-      <SurfaceContent className="flex flex-wrap items-center gap-3 p-0">
+    <Card className="mb-3.5 flex-row gap-3 rounded-lg bg-brand-bg px-3.5 py-2.5 text-xs text-brand-hover">
+      <CardContent className="flex flex-wrap items-center gap-3 p-0">
         {/* 只播报选中个数；整条容器挂 role=status 会让内部按钮失去按钮语义 */}
         <span aria-live="polite">已选 {count} 个素材</span>
         <Button
@@ -47,7 +47,7 @@ export function LibraryBatchBar({ count, onDownload, onMove, onClear }: LibraryB
         >
           取消选择
         </Button>
-      </SurfaceContent>
-    </Surface>
+      </CardContent>
+    </Card>
   );
 }

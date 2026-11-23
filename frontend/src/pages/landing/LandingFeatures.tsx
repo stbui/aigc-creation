@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 import { A } from './constants';
-import { Button, Surface, SurfaceContent, TextAction } from './components';
+import { Button, Card, CardContent, TextAction } from './components';
 import { LandingHeading, LandingKicker, LandingLede, LandingSection } from './LandingSection';
 
 interface LandingFeaturesProps {
@@ -26,7 +26,7 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
       </div>
 
       <div className="mt-8 text-left">
-        <Surface className="grid grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] items-center gap-8 rounded-2xl border-border px-7 py-7 max-[1200px]:grid-cols-1 max-[640px]:px-5">
+<Card className="grid grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] items-center gap-8 rounded-2xl border-border px-7 py-7 max-[1200px]:grid-cols-1 max-[640px]:px-5">
           <div>
             <h3 className="m-0 text-[21px] font-bold tracking-[-0.3px] text-foreground">
               一张商品图，搞定全套图
@@ -80,7 +80,7 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
               />
             ))}
           </div>
-        </Surface>
+        </Card>
 
         <div className="mt-5 grid grid-cols-2 gap-5 max-[640px]:grid-cols-1">
           {[
@@ -105,11 +105,11 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
               to: '/viral-clone',
             },
           ].map((card) => (
-            <Surface
+            <Card
               key={card.title}
               className="items-start gap-0 rounded-2xl border-border px-7 py-7 max-[640px]:px-5"
             >
-              <SurfaceContent className="flex flex-1 flex-col items-start px-0">
+              <CardContent className="flex flex-1 flex-col items-start px-0">
                 <h3 className="m-0 text-[21px] font-bold tracking-[-0.3px] text-foreground">
                   {card.title}
                 </h3>
@@ -122,8 +122,8 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
                     </Link>
                   </TextAction>
                 )}
-              </SurfaceContent>
-            </Surface>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>

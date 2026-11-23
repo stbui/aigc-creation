@@ -17,7 +17,6 @@ export {
   ProductFieldsGrid,
   ProductFormSection,
   ProductImageField,
-  SelectField,
   type ProductDescriptionFieldProps,
   type ProductFieldsGridProps,
   type ProductFormSectionProps,

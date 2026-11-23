@@ -1,5 +1,5 @@
 import type { CreditLot } from '../../types/api';
-import { StatusBadge } from './components';
+import { Badge } from './components';
 import { LOT_STATUS, LOT_STATUS_TONE, SOURCE_LABEL } from './constants';
 import { formatDate } from './utils';
 
@@ -20,12 +20,12 @@ export function CreditsLotList({ rows }: CreditsLotListProps) {
             <span className="text-[13px] font-semibold text-foreground">
               {SOURCE_LABEL[lot.source] ?? lot.source}
             </span>
-            <StatusBadge
+            <Badge
               variant="secondary"
               className={`h-[22px] rounded-full border-0 px-2 text-xs font-medium ${LOT_STATUS_TONE[lot.status]}`}
             >
               {LOT_STATUS[lot.status] ?? LOT_STATUS.active}
-            </StatusBadge>
+            </Badge>
           </div>
           <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] leading-5 text-muted-foreground tabular-nums">
             <span>

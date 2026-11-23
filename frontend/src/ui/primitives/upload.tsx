@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { ImageIcon, Plus, X } from 'lucide-react';
 import {
   Attachment,
@@ -11,6 +11,8 @@ import {
 } from '~/admin-ui/components/ui/attachment';
 import { Button } from '~/admin-ui/components/ui/button';
 import { cn } from '../lib/cn';
+import { ImageUploadInput } from './image-upload-input';
+import { useImageUploadArea } from './use-image-upload-area';
 
 export interface UploadFile {
   uid?: string | number;
@@ -56,12 +58,11 @@ export function Upload({
   onPreview,
   showRemove = true,
 }: UploadProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const keyOf = (file: UploadFile, index: number) =>
     String(file.uid ?? (file.originFileObj as File & { uid?: string | number })?.uid ?? `${file.name}-${index}`);
 
-  const pick = async (pickedFiles: FileList | null) => {
-    if (!pickedFiles || disabled) return;
+  const pick = async (pickedFiles: FileList | File[]) => {
+    if (disabled) return;
     const remaining =
       maxCount === undefined ? pickedFiles.length : Math.max(0, maxCount - files.length);
     const picked = Array.from(pickedFiles).slice(0, remaining);
@@ -79,29 +80,27 @@ export function Upload({
     if (accepted.length > 0) onFilesChange?.([...files, ...accepted]);
   };
 
+  const { inputRef, open, onDragOver, onDragLeave, onDrop, onInputChange } = useImageUploadArea({
+    disabled: Boolean(disabled),
+    room: !maxCount || files.length < maxCount,
+    filled: files.length > 0,
+    renderPreviewProvided: true,
+    onFiles: (picked) => void pick(picked),
+  });
+
   return (
     <div
-      className={cn('ui-upload', disabled && 'is-disabled', className)}
-      onDragOver={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void pick(event.dataTransfer.files);
-      }}
+      className={cn('w-full', disabled && 'pointer-events-none opacity-60', className)}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
     >
-      <input
-        ref={inputRef}
-        type="file"
+      <ImageUploadInput
+        inputRef={inputRef}
         accept={accept}
         multiple={multiple}
-        hidden
-        onChange={(event) => {
-          void pick(event.target.files);
-          event.target.value = '';
-        }}
+        disabled={disabled}
+        onChange={onInputChange}
       />
       <div className="flex flex-wrap gap-2">
         {files.map((file, index) => (
@@ -152,7 +151,7 @@ export function Upload({
             variant="ghost"
             className="aspect-square h-auto w-24 shrink-0 rounded-lg border border-dashed border-border bg-secondary p-0 hover:border-brand hover:text-brand"
             disabled={disabled}
-            onClick={() => inputRef.current?.click()}
+            onClick={open}
           >
             {children ?? <Plus aria-hidden />}
           </Button>

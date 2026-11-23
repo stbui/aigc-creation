@@ -183,62 +183,6 @@
   box-shadow: 0 1px 4px rgb(43 45 83 / 0.102);
 }
 
-/* 搜索 —— 结构由 `Input` 兼容壳给出 (`.login-input-wrap` 外壳 + `-prefix` / `-inner`
-   / `-suffix` 三段), 这里只按参考站数值覆写。`.alp-search` 是加在外壳上的 class,
-   故下面每条都要带 `.alp-search` 前缀才能压过 `.login-input-wrap` 的同名属性。 */
-.alp-search.login-input-wrap {
-  gap: 7px;
-  width: 250px;
-  height: 34px;
-  padding: 0 var(--space-10);
-  color: var(--alp-text-11);
-  background: var(--card-bg);
-  border: 1px solid var(--alp-border-4);
-  border-radius: 9px;
-}
-
-.alp-search.login-input-wrap:focus-within {
-  border-color: var(--alp-border-brand-4);
-  box-shadow: 0 0 0 3px rgb(85 70 216 / 0.102);
-}
-
-/* 前缀图标: 兼容壳默认 margin-right 10 → 覆写为 0 (间距交给外层 gap=7)。
-   `flex: 0 1 auto` 是刻意的: 兼容壳给的是 `flex: 0 0 auto`, 图标因此保持 14px 宽,
-   而原先裸 svg 作为 flex 子项会被压缩到 13px —— 用不可收缩会让整个输入框
-   右移 1px、占位文案跟着挪位。这里保留可收缩语义, 与改动前的实测盒一致。 */
-.alp-search .login-input-prefix {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-right: 0;
-  color: var(--alp-text-11);
-}
-
-.alp-search .login-input-inner {
-  width: 100%;
-  height: auto;
-  /* 浏览器对 input 的默认内边距是 1px 2px; shadcn Input 的 px-3/py-1 已被覆盖,
-     这里写回参考站实测值 —— 写 0 会让文字整体上移 1px、行高变矮 2px */
-  padding: 1px var(--space-2);
-  /* 覆盖 shadcn Input 自带的 rounded-md(8px) —— 参考站这个内在 input 是方角,
-     圆角只属于外层外壳 (9px) */
-  border-radius: 0;
-  font: inherit;
-  font-size: 12px;
-  color: var(--alp-text-1);
-  background: none;
-  border: 0;
-  outline: 0;
-  box-shadow: none;
-}
-
-.alp-search .login-input-inner::placeholder {
-  color: var(--alp-text-13);
-}
-
-.alp-search .login-input-suffix {
-  margin-left: 0;
-}
-
 .alp-search-clear[data-slot="button"] {
   flex: none;
   width: 20px;

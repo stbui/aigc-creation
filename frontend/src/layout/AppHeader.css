@@ -239,7 +239,7 @@
 }
 
 /* 顶部导航下拉：Radix DropdownMenu Content */
-.app-topnav-dropdown.ui-dropdown-content {
+.app-topnav-dropdown[data-slot='dropdown-menu-content'] {
   min-width: 137px;
   padding: var(--space-10) var(--space-8);
   border-radius: var(--radius-card);
@@ -248,7 +248,7 @@
   box-shadow: 0 18px 42px rgba(31, 41, 55, 0.14);
 }
 
-.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item {
+.app-topnav-dropdown[data-slot='dropdown-menu-content'] [data-slot='dropdown-menu-item'] {
   height: 36px;
   padding: 0 var(--space-12);
   border-radius: 9px;
@@ -258,12 +258,12 @@
   color: var(--text-3);
 }
 
-.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item:hover {
+.app-topnav-dropdown[data-slot='dropdown-menu-content'] [data-slot='dropdown-menu-item']:hover {
   background: var(--surface-brand-4);
   color: var(--text-brand-2);
 }
 
-.app-topnav-dropdown.ui-dropdown-content .ui-dropdown-item[data-disabled] {
+.app-topnav-dropdown[data-slot='dropdown-menu-content'] [data-slot='dropdown-menu-item'][data-disabled] {
   color: var(--shell-text-2);
 }
 

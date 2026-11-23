@@ -93,16 +93,17 @@ pages/admin/channels/
   `styles/tool-workspace.css`，C 端 UI 基线在 `styles/ui.css`）与全局
   设计令牌（`styles/tokens.css`）不搬进页面文件。
 - **页面视觉落成 shadcn 组件，不是把 CSS 机械翻译成类名**：卡片 / 按钮 / 弹层 /
-  列表 / 空态各自换成对应 shadcn 组合件（`Surface` / `Button` / `Dialog` / `Sheet` /
-  `Item` / `EmptyState` / `InlineAlert` 等，统一从 `frontend/src/ui` 取）。shadcn 没有
+  列表 / 空态各自换成对应 shadcn 组合件（`Card` / `Button` / `Dialog` / `Sheet` /
+  `Item` / `Empty` / `Alert` 等，统一从 `frontend/src/ui` 取）。shadcn 没有
   对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（`TextAction` /
-  `SegmentedControl` / `ImageDropzone`），组件内部组合 shadcn 原子件，页面只使用语义组件，
-  不在页里手写 class 拼控件外观。参照 `pages/product-sku/`：其 `style.css` 只剩三栏列宽、
-  窄屏折叠等**共享骨架覆盖**，组件相关的 `.sku-*` 选择器与 `--sku-*` 令牌已全部删除。
+  `SegmentedControl` / `ImageUploadHeader` / `ImageUploadArea` / `ImageUploadPrompt` / `ImageUploadInput` / `ImageUploadTrigger` / `ImageUploadThumb` / `ImageUploadAddTile` / `ImageUploadLoading` / `ImageDropzone` / `IconInput` / `CharacterCountTextarea`），
+  组件内部组合 shadcn 原子件，页面只使用语义组件，不在页里手写 class 拼控件外观。
+  参照 `pages/product-sku/`：其 `style.css` 只剩三栏列宽、窄屏折叠等**共享骨架覆盖**，
+  组件相关的 `.sku-*` 选择器与 `--sku-*` 令牌已全部删除。
   营销首页 `pages/landing/` 是第二个参照：`style.css` 由 1594 行收到约 40 行，只保留
   `.app-content` 的内边距逃逸与 `#packages` 的 `scroll-margin-top`；`.lp-*` / `.landing-*`
   控件皮肤与 `--lp-*` 令牌组整体删除，导航下拉 / 移动抽屉 / 页签 / 卡片 / CTA 分别换成
-  `DropdownMenu` / `Sheet` / `Tabs` / `Surface` / `Button asChild`，段落外壳另起页面本地
+  `DropdownMenu` / `Sheet` / `Tabs` / `Card` / `Button asChild`，段落外壳另起页面本地
   组合层 `LandingSection.tsx`（容器、段前间距、小标题、导语），不塞回 `ui/primitives`。
   原因有两层：一是视觉只维护一套（组件层），二是 `tool-workspace.css` 未进 `@layer`，
   未分层规则优先于 `@layer utilities`，`.pk-workspace` 的几何属性只能由页面样式表覆盖。
@@ -123,7 +124,7 @@ pages/admin/channels/
   顶部 `import './<Component>.css';` 引入；被多个组件共用的类（如结果画廊的
   `fc-result-*`）放共用 CSS，由使用它的组件各自引入。
 - 跨页面共享的域样式放 `styles/<域>.css`（如 `redraw.css` 给局部重绘 / 去水印，
-  `product-detail-kit.css` 给商品详情 / 商品主图），由相关页面入口或共享组件引入；
+  `product-detail-kit.css` 给功能示例面板），由相关页面入口或共享组件引入；
   不要再塞回 `global.css` 入口。
 
 ## 2. 每个入口的职责
@@ -222,7 +223,7 @@ import type { AdminChannelView } from './types';           // 跨模块类型（
   - `frontend/src/pages/product-sku/__tests__/product-sku-modules.test.ts` ——
     C 端商品 SKU 图目录（`src/pages/product-sku` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`；页面按板块拆成 `ProductSkuWorkspace`（三栏外壳）内的
-    `ProductSkuTemplateCard`（空态 `ProductSkuTemplateDropzone` / 已选态
+    `ProductSkuTemplateCard`（空态由共享 `ImageUploadArea` 承载 / 已选态
     `ProductSkuTemplatePreview`）/ `ProductSkuStepsCard` / `ProductSkuListSection`，
     清单再拆行 `ProductSkuListItem` → 区域 `ProductSkuVariantRow`（参考图原子件
     `ProductSkuReferenceThumb` / `ProductSkuReferenceUploadButton`）；使用步骤文案落
@@ -277,7 +278,8 @@ import type { AdminChannelView } from './types';           // 跨模块类型（
     `lib/promptToolMessages` 的转出；页面按板块拆成 `MultiFusionSceneGateway` /
     `MultiFusionEditorHeader` / `MultiFusionUploadCard` / `MultiFusionAnalysisCard` /
     `MultiFusionParameterCard` / `MultiFusionSubmitBar` / `MultiFusionResultPanel`
-    七个展示块，块内再拆 `MultiFusionSlotActions` / `MultiFusionImageThumb`（上传卡）、
+    七个展示块，块内再拆 `MultiFusionSlotActions` / `MultiFusionImageThumb`（上传卡，
+    两个图位的隐藏 input、拖拽命中与 loading 由共享 `ImageUploadArea` 承担）、
     `MultiFusionOutputSettings`（高级设置浮层）、`MultiFusionResultStage`（结果舞台）；
     图位状态落 `useMultiFusionAssets.ts`（复用共享 `useTargetedAssetPicker`）、
     画面描述与 AI 分析落 `useMultiFusionPrompt.ts`、提交 / 轮询 / 超时重查落
@@ -312,8 +314,9 @@ import type { AdminChannelView } from './types';           // 跨模块类型（
     页面按板块拆成 `LibraryToolbar` / `LibraryGroupPanel`（由
     `LibraryGroupByToggle` + `LibraryGroupFilter` + `LibraryGroupOptionLabel`
     组合）/ `LibraryBatchBar` / `LibraryLoadingState` / `LibraryErrorState` /
-    `LibraryEmptyState` / `LibraryGrid`（`LibraryLoadMore`）/ `LibraryUploadInput`，
-    卡片与弹窗为 `LibraryAssetCard`（操作区 `LibraryAssetActions`、右键菜单
+    `LibraryEmptyState` / `LibraryGrid`（`LibraryLoadMore`）；上传入口复用共享
+    `ImageUploadInput` + `useImageUploadArea`，卡片与弹窗为 `LibraryAssetCard`
+    （操作区 `LibraryAssetActions`、右键菜单
     `LibraryAssetMenu`）/ `LibraryMoveAssetsDialog` / `LibraryProjectManagerDialog`；
     取数落 `useLibraryAssets.ts`、项目列表落 `useLibraryProjects.ts`、分组状态与
     可见集合落 `useLibraryGroups.ts`、滚动哨兵落 `useInfiniteScroll.ts`、卡片

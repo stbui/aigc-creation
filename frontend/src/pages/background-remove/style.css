@@ -135,27 +135,6 @@
   color: var(--brand);
 }
 
-/* 上传区底色与虚线边：参考站 .local-redraw-source-upload 实测
-   #f6f7f9 / #d9dee8，不能沿用商品主图页的 --surface #f2f4f7。 */
-
-.pk-workspace.background-remove-page .pk-dropzone {
-  background: var(--surface-5);
-  border-color: var(--tool-border-4);
-}
-
-/* 上传区内部留白：参考站桌面 .local-redraw-source-upload 为 padding:0，
- * 产品系移动端再补回 16px；不能统一沿用商品主图页的 16px。 */
-
-.pk-workspace.background-remove-page .pk-dropzone {
-  padding: 0;
-  gap: var(--space-8);
-}
-
-.pk-workspace.background-remove-page .pk-thumb-grid-single {
-  width: 160px;
-  max-width: 100%;
-}
-
 /* 参考站抠图卡标题 22px + 16px 底距，色板换行后自然高 176；
    * .pk-form-scroll 的 10px gap 与 12px 底部留白已由共享骨架提供。 */
 
@@ -535,26 +514,6 @@
   object-fit: contain;
 }
 
-/* 一键抠图上传态：参考站是 160×160 预览 + 单个重新上传按钮，
- * 不能沿用通用 pk-thumb-grid 的填充上传区。 */
-.pk-workspace.background-remove-page .pk-dropzone-filled {
-  box-sizing: border-box;
-  min-height: 160px;
-  height: 160px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  cursor: default;
-}
-
-.pk-workspace.background-remove-page .pk-dropzone-filled:hover {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
 .pk-workspace.background-remove-page .background-source-row {
   display: flex;
   align-items: center;
@@ -626,18 +585,6 @@
 
   .pk-workspace.background-remove-page .pk-section-title {
     font-size: 12px;
-  }
-
-  .pk-workspace.background-remove-page .pk-upload-prompt small {
-    font-size: 12px;
-  }
-
-  .pk-workspace.background-remove-page .pk-upload-title-row {
-    gap: var(--space-4);
-  }
-
-  .pk-workspace.background-remove-page .pk-upload-title-actions {
-    gap: var(--space-4);
   }
 }
 

@@ -4,7 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import { ImageLightbox, type LightboxItem } from './components';
 import { assetThumbUrl, emptyResultLabel, templateIdOf, type TemplateEntry } from './utils';
 import type { GalleryItem } from './hooks';
-import { Spin } from '../../ui';
+import { Spinner } from '../../ui';
 
 /**
  * 右栏「创作结果」页签的结果区。
@@ -106,7 +106,7 @@ function TemplateHistoryImpl({
 
       {loading && items.length === 0 ? (
         <div className="flex h-12 items-center justify-center text-xs text-[color:var(--text-desc)]">
-          <Spin />
+          <Spinner />
         </div>
       ) : items.length === 0 ? (
         <div className="flex h-12 items-center justify-center text-xs text-[color:var(--text-desc)]">

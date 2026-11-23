@@ -6,9 +6,9 @@ import {
   ContextMenu,
   ContextMenuTrigger,
   ResultMedia,
-  StatusBadge,
-  Surface,
-  SurfaceContent,
+  Badge,
+  Card,
+  CardContent,
   cn,
   modalityOfFormat,
 } from './components';
@@ -94,13 +94,13 @@ export function LibraryAssetCard({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <Surface
+        <Card
           className={cn(
             'group relative block overflow-hidden rounded-none border border-border-soft bg-card p-0 shadow-none',
             selected && 'border-brand ring-1 ring-brand',
           )}
         >
-          <SurfaceContent className="p-0">
+          <CardContent className="p-0">
             <div
               className="relative overflow-hidden bg-muted"
               ref={coverRef}
@@ -138,12 +138,12 @@ export function LibraryAssetCard({
                 aria-label={selected ? '取消选择' : '选择该素材'}
               />
               {asset.kind === 'original' && (
-                <StatusBadge
+                <Badge
                   variant="secondary"
                   className="pointer-events-none absolute top-2 right-2 z-[1] h-6 px-2"
                 >
                   上传原图
-                </StatusBadge>
+                </Badge>
               )}
               <LibraryAssetActions
                 canReuse={asset.kind === 'generated' && Boolean(asset.capability)}
@@ -154,8 +154,8 @@ export function LibraryAssetCard({
                 onRemove={confirmRemove}
               />
             </div>
-          </SurfaceContent>
-        </Surface>
+          </CardContent>
+        </Card>
       </ContextMenuTrigger>
 
       <LibraryAssetMenu

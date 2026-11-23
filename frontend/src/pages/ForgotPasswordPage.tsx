@@ -8,9 +8,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
+  IconInput,
   useApp,
   useForm,
 } from '../ui';
@@ -97,21 +95,20 @@ export function ForgotPasswordPage() {
                     <FormItem className="login-field">
                       <FormLabel>邮箱</FormLabel>
                       <FormControl>
-                        <InputGroup>
-                          <InputGroupAddon>{<Mail size={15} />}</InputGroupAddon>
-                          <InputGroupInput
-                            {...field}
-                            placeholder="账号（邮箱）"
-                            autoComplete="username"
-                            autoFocus
-                          />
-                        </InputGroup>
+                        <IconInput
+                          {...field}
+                          icon={<Mail size={15} />}
+                          placeholder="账号（邮箱）"
+                          autoComplete="username"
+                          autoFocus
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button disabled={submitting}
+                <Button
+                  disabled={submitting}
                   variant="default"
                   type="submit"
                   className="w-full login-submit"

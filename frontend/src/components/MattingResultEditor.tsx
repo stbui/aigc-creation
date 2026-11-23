@@ -6,7 +6,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { Spin, useApp } from '../ui';
+import { Spinner, useApp } from '../ui';
 import {
   appendPaintPoint,
   backdropOf,
@@ -448,7 +448,7 @@ export function MattingResultEditor({
 
         {loading && (
           <div className="matting-editor-loading" role="status">
-            <Spin />
+            <Spinner />
             <span>正在载入抠图结果…</span>
           </div>
         )}

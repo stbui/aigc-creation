@@ -8,9 +8,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  InlineAlert,
-  InlineAlertDescription,
-  InlineAlertTitle,
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Input,
 } from '../../ui';
 
@@ -53,16 +53,16 @@ export function AccountDeleteModal({
           <DialogTitle>确认注销账号</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <InlineAlert className="border-warn-border bg-warn-soft text-warn-text">
-            <InlineAlertTitle>此操作不可撤销</InlineAlertTitle>
-            <InlineAlertDescription>
+          <Alert className="border-warn-border bg-warn-soft text-warn-text">
+            <AlertTitle>此操作不可撤销</AlertTitle>
+            <AlertDescription>
               {previewLoading
                 ? '正在统计影响面…'
                 : preview
                   ? `将清除 ${preview.projects} 个项目、${preview.tasks} 个作品、${preview.assets} 个素材、${preview.notifications} 条消息；${preview.orders} 笔订单将匿名化保留。`
                   : '未能获取影响面预览，但不影响注销流程。'}
-            </InlineAlertDescription>
-          </InlineAlert>
+            </AlertDescription>
+          </Alert>
           {hasPassword ? (
             <Input
               type="password"

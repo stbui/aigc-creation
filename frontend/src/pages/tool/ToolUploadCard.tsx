@@ -4,10 +4,10 @@ import type { Asset, CapabilityDef } from '../../types/api';
 import {
   Button,
   Form,
-  Surface,
-  SurfaceContent,
-  SurfaceHeader,
-  SurfaceTitle,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Upload,
   type FormInstance,
   type UploadFile,
@@ -50,11 +50,11 @@ export function ToolUploadCard({
   const { accept, maxMb } = useUploadLimits();
 
   return (
-    <Surface>
-      <SurfaceHeader>
-        <SurfaceTitle>{inputs > 1 ? '输入素材' : '上传商品图'}</SurfaceTitle>
-      </SurfaceHeader>
-      <SurfaceContent>
+    <Card>
+      <CardHeader>
+        <CardTitle>{inputs > 1 ? '输入素材' : '上传商品图'}</CardTitle>
+      </CardHeader>
+      <CardContent>
       <Upload
         files={files}
         accept={accept}
@@ -102,7 +102,7 @@ export function ToolUploadCard({
           {creditLabel}
         </span>
       )}
-    </SurfaceContent>
-    </Surface>
+    </CardContent>
+    </Card>
   );
 }

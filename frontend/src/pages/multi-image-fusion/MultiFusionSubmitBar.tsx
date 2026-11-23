@@ -1,11 +1,11 @@
 import { MultiFusionOutputSettings } from './MultiFusionOutputSettings';
-import { Button, InlineAlert, InlineAlertDescription, Spin } from './components';
+import { Button, Alert, AlertDescription, Spinner } from './components';
 
 /**
  * 提交区（参考站 §5.13 的 sticky 白底容器）。
  *
  * 2026-11-21 由同时挂 `image-tool-submit-area`（共享 CSS 覆盖游戏）改为
- * shadcn 结构：容器用 `sticky bottom-0` + 卡片底，禁止原因用 `InlineAlert`，
+ * shadcn 结构：容器用 `sticky bottom-0` + 卡片底，禁止原因用 `Alert`，
  * 主 CTA 用 shadcn `Button`（全宽 43px 圆角 11px），价格作为按钮内 `small`。
  * 共享 `image-output-settings-*` 的整套实测皮肤随之退场（见 `MultiFusionOutputSettings`）。
  */
@@ -56,7 +56,7 @@ export function MultiFusionSubmitBar({
       >
         {submitting ? (
           <>
-            <Spin className="size-4" />
+            <Spinner className="size-4" />
             <span>生成中…</span>
           </>
         ) : (
@@ -75,9 +75,9 @@ export function MultiFusionSubmitBar({
       </Button>
 
       {blockedReason && (
-        <InlineAlert variant="destructive">
-          <InlineAlertDescription className="text-xs">{blockedReason}</InlineAlertDescription>
-        </InlineAlert>
+        <Alert variant="destructive">
+          <AlertDescription className="text-xs">{blockedReason}</AlertDescription>
+        </Alert>
       )}
     </div>
   );

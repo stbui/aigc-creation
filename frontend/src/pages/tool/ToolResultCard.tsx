@@ -1,7 +1,7 @@
 import { RefreshCw, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../types/api';
-import { Button, ResultMedia, StateEmpty, StateSkeleton, Surface, SurfaceContent, SurfaceHeader, SurfaceTitle, formatDuration } from './components';
+import { Button, ResultMedia, StateEmpty, StateSkeleton, Card, CardContent, CardHeader, CardTitle, formatDuration } from './components';
 import { useApp } from './hooks';
 
 interface ToolResultCardProps {
@@ -25,11 +25,11 @@ export function ToolResultCard({
   const { message } = useApp();
 
   return (
-    <Surface>
-      <SurfaceHeader>
-        <SurfaceTitle>生成结果</SurfaceTitle>
-      </SurfaceHeader>
-      <SurfaceContent>
+    <Card>
+      <CardHeader>
+        <CardTitle>生成结果</CardTitle>
+      </CardHeader>
+      <CardContent>
       {generating && !resultUrl ? (
         /* 生成中 → 骨架占位 (与工具页结果栏同构), 不退回空态。
            骨架块最小高度 220px，避免出图瞬间卡片高度跳变。 */
@@ -82,7 +82,7 @@ export function ToolResultCard({
           desc="上传素材并点击生成后，结果会显示在这里。"
         />
       )}
-      </SurfaceContent>
-    </Surface>
+      </CardContent>
+    </Card>
   );
 }

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 import type { PromoCampaign } from '../../types/api';
 import { capabilityName, formatCampaignEnd, toolPath } from './utils';
-import { Badge, Button, Surface, SurfaceContent } from './components';
+import { Badge, Button, Card, CardContent } from './components';
 
 interface LandingCampaignGridProps {
   campaigns: PromoCampaign[];
@@ -23,14 +23,14 @@ export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
         return campaign.type === 'limited_price' &&
           campaign.product &&
           typeof campaign.priceCents === 'number' ? (
-          <Surface
+          <Card
             key={campaign.id}
             className="relative items-center gap-0 rounded-xl border-[color-mix(in_srgb,var(--brand)_22%,var(--border))] py-0 text-center transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-card"
           >
             <Badge className="absolute top-3 left-3 h-auto rounded-full px-2.5 py-0.5 text-xs font-semibold">
               限时价
             </Badge>
-            <SurfaceContent className="flex flex-1 flex-col items-center px-5 pt-6 pb-5">
+            <CardContent className="flex flex-1 flex-col items-center px-5 pt-6 pb-5">
               <h3 className="mt-3 text-[15px] font-semibold text-foreground">
                 {campaign.product.name}
               </h3>
@@ -52,17 +52,17 @@ export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
               >
                 <Link to={`/checkout/${encodeURIComponent(campaign.product!.sku)}`}>立即抢购</Link>
               </Button>
-            </SurfaceContent>
-          </Surface>
+            </CardContent>
+          </Card>
         ) : (
-          <Surface
+          <Card
             key={campaign.id}
             className="relative items-center gap-0 rounded-xl border-[color-mix(in_srgb,var(--brand)_22%,var(--border))] py-0 text-center transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-card"
           >
             <Badge className="absolute top-3 left-3 h-auto rounded-full px-2.5 py-0.5 text-xs font-semibold">
               限时免费
             </Badge>
-            <SurfaceContent className="flex flex-1 flex-col items-center px-5 pt-6 pb-5">
+            <CardContent className="flex flex-1 flex-col items-center px-5 pt-6 pb-5">
               <h3 className="mt-3 text-[15px] font-semibold text-foreground">{campaign.name}</h3>
               <div className="mt-2 flex items-baseline justify-center gap-0.5 text-foreground">
                 <strong className="text-[28px] font-bold">
@@ -82,8 +82,8 @@ export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
               >
                 <Link to={freeTarget}>去使用</Link>
               </Button>
-            </SurfaceContent>
-          </Surface>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

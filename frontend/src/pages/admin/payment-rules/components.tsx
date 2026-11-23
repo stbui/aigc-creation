@@ -23,7 +23,6 @@ import {
   PAYMENT_RULES_KEYS,
   refundRatioPercent,
 } from './constants';
-import '../../../styles/radar-admin.css';
 
 export interface RuleChange {
   key: string;

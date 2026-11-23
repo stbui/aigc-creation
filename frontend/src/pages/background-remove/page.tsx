@@ -28,6 +28,21 @@ import { colorLabelOf, isValidHexColor, normalizeHexColor } from './utils';
  * `BackgroundRemoveUploadPreview`、空态 `BackgroundRemoveIntro`、结果面板
  * `BackgroundResultPane`；颜色状态与提交仍留在 `page.tsx`。
  */
+
+/** 上传区参考站底色 #f6f7f9 / 虚线边 #d9dee8；有图后收成 160px 居中预览 */
+const DROPZONE = [
+  'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2!',
+  '[&_[data-slot=image-upload-thumbs][data-single]]:w-40! [&_[data-slot=image-upload-thumbs][data-single]]:max-w-full!',
+  '[&[data-filled]]:box-border [&[data-filled]]:h-40! [&[data-filled]]:min-h-40!',
+  '[&[data-filled]]:p-0! [&[data-filled]]:border-0! [&[data-filled]]:rounded-none!',
+  '[&[data-filled]]:bg-transparent! [&[data-filled]]:shadow-none! [&[data-filled]]:cursor-default!',
+  '[&[data-filled]]:hover:border-0! [&[data-filled]]:hover:bg-transparent! [&[data-filled]]:hover:ring-0!',
+].join(' ');
+
+/** 平板档：上传标题行与动作组收紧到 4px（与产品系工具页一致） */
+const PAGE_TW =
+  'min-[901px]:max-[1366px]:[&_[data-slot=image-upload-header]]:gap-1! min-[901px]:max-[1366px]:[&_[data-slot=image-upload-actions]]:gap-1!';
+
 export function BackgroundRemovePage() {
   const { message } = useApp();
   const { submitting, result, run } = useToolTask({ capability: 'matting', successMessage: '抠图结果已生成' });
@@ -49,7 +64,7 @@ export function BackgroundRemovePage() {
   return (
     <ToolShell
       capability="matting"
-      pageClass="background-remove-page"
+      pageClass={`background-remove-page ${PAGE_TW}`}
       title="一键抠图"
       desc="上传图片后，自动去除图片背景"
       upload={{
@@ -58,6 +73,7 @@ export function BackgroundRemovePage() {
         max: 1,
         hint: '点击、拖拽或粘贴图片上传，最多 1 张',
         promptIcon: <Plus size={22} />,
+        dropzoneClassName: DROPZONE,
       }}
       replaceUpload
       renderUploadPreview={(uploads, controls) => {

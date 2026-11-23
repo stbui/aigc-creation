@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Checkbox } from '../../ui';
+import { Checkbox, SectionCard } from '../../ui';
 import { MAX_SECTIONS, SECTION_MODULES } from './constants';
 
 /**
@@ -25,42 +25,41 @@ interface DetailSectionPickerProps {
 function DetailSectionPickerBase({ selected, onToggle }: DetailSectionPickerProps) {
   const atLimit = selected.length >= MAX_SECTIONS;
   return (
-    <section className="pk-config-card pk-detail-card">
-      <div className="pk-section">
-        <div className="pk-section-title-row">
-          <strong className="pk-section-title u-font-14">包含模块（多选）</strong>
-          <span className="pk-section-counter">
-            已选 {selected.length}/{MAX_SECTIONS}
-          </span>
-        </div>
-        <div className="pk-section-picker">
-          {SECTION_MODULES.map((m) => {
-            const checked = selected.includes(m.value);
-            // 已选满时未选项置灰并给 hover 说明, 已选项仍可取消
-            const locked = atLimit && !checked;
-            return (
-              <label
-                key={m.value}
-                className={`pk-section-option${checked ? ' pk-section-option-selected' : ''}${locked ? ' pk-section-option-limit' : ''}`}
-                title={locked ? `最多选择 ${MAX_SECTIONS} 个模块` : undefined}
-              >
-                <Checkbox
-                  className="pk-section-check align-middle"
-                  checked={checked}
-                  disabled={locked}
-                  aria-label={m.label}
-                  onCheckedChange={() => onToggle(m.value)}
-                />
-                <span>
-                  <strong>{m.label}</strong>
-                  <small>{m.desc}</small>
-                </span>
-              </label>
-            );
-          })}
-        </div>
+    <SectionCard
+      title="包含模块（多选）"
+      extra={
+        <span className="text-[color:var(--danger-ref)]">
+          已选 {selected.length}/{MAX_SECTIONS}
+        </span>
+      }
+    >
+      <div className="grid grid-cols-2 gap-4">
+        {SECTION_MODULES.map((m) => {
+          const checked = selected.includes(m.value);
+          // 已选满时未选项置灰并给 hover 说明, 已选项仍可取消
+          const locked = atLimit && !checked;
+          return (
+            <label
+              key={m.value}
+              className={`pk-section-option${checked ? ' pk-section-option-selected' : ''}${locked ? ' pk-section-option-limit' : ''}`}
+              title={locked ? `最多选择 ${MAX_SECTIONS} 个模块` : undefined}
+            >
+              <Checkbox
+                className="pk-section-check align-middle"
+                checked={checked}
+                disabled={locked}
+                aria-label={m.label}
+                onCheckedChange={() => onToggle(m.value)}
+              />
+              <span>
+                <strong>{m.label}</strong>
+                <small>{m.desc}</small>
+              </span>
+            </label>
+          );
+        })}
       </div>
-    </section>
+    </SectionCard>
   );
 }
 

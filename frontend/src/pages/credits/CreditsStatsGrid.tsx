@@ -1,5 +1,5 @@
 import type { CreditBalance } from '../../types/api';
-import { Surface, SurfaceContent } from './components';
+import { Card, CardContent } from './components';
 
 interface CreditsStatsGridProps {
   balance: CreditBalance | null;
@@ -28,14 +28,14 @@ export function CreditsStatsGrid({ balance }: CreditsStatsGridProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {stats.map((item) => (
-        <Surface key={item.label}>
-          <SurfaceContent className="px-4 py-3.5">
+        <Card key={item.label}>
+          <CardContent className="px-4 py-3.5">
             <div className="mb-1 text-xs text-muted-foreground">{item.label}</div>
             <div className={`text-[22px] font-bold ${item.warn ? 'text-warn-text' : 'text-foreground'}`}>
               {item.value ?? '—'}
             </div>
-          </SurfaceContent>
-        </Surface>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

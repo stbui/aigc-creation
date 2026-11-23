@@ -90,7 +90,6 @@ export function ProductDetailPage() {
   const {
     images,
     uploading,
-    fileInputRef,
     uploadFiles,
     removeImage,
     replaceImages,
@@ -359,73 +358,70 @@ export function ProductDetailPage() {
   );
 
   const canSubmit = formValid && !(token && capabilityBlocked);
-  // 通道不可用时挂 guestLabel 会让按钮写成「登录后生成…」—— 登录也解决不了，
-  // 保持禁用态与真实原因更重要。
   const guestLabel = capabilityBlocked ? undefined : '登录后生成商品详情图';
 
   return (
     <div className="pk-workspace">
-      {/* ── 左: 输入栏 ── */}
-      <DetailInputPane
-        images={images}
-        max={maxImages}
-        limitError={imageLimitError}
-        uploading={uploading}
-        fileInputRef={fileInputRef}
-        onFiles={(f) => void uploadFiles(f)}
-        onRemove={removeImage}
-        onOpenLibrary={openLibrary}
-        onOpenMobile={mobile.openMobile}
-        productName={productName}
-        onProductNameChange={setProductName}
-        brand={brand}
-        onBrandChange={setBrand}
-        platform={platform}
-        onPlatformChange={changePlatform}
-        language={language}
-        onLanguageChange={setLanguage}
-        description={description}
-        onDescriptionChange={setDescription}
-        analyzing={analyzing}
-        onAnalyze={() => void runAiAnalyze()}
-        onExpandDescription={() => setExpandOpen(true)}
-        sections={sections}
-        onToggleSection={toggleSection}
-        settingsOpen={settingsOpen}
-        onToggleSettings={toggleSettings}
-        ratio={ratio}
-        onRatioChange={changeRatio}
-        resolution={resolution}
-        onResolutionChange={changeResolution}
-        resolutionValues={resolutionValues}
-        onModelQuoteChange={onModelQuoteChange}
-        onModelChange={setSelectedModel}
-        generating={generating}
-        guestLabel={guestLabel}
-        submitDisabled={!canSubmit}
-        submitHint={capabilityBlocked && token && capabilityReason ? capabilityReason : undefined}
-        creditLabel={creditLabel}
-        onSubmit={() => void submit()}
-      />
+      <div className="h-full min-h-0 min-w-0">
+        <DetailInputPane
+          images={images}
+          max={maxImages}
+          limitError={imageLimitError}
+          uploading={uploading}
+          onFiles={(f) => void uploadFiles(f)}
+          onRemove={removeImage}
+          onOpenLibrary={openLibrary}
+          onOpenMobile={mobile.openMobile}
+          productName={productName}
+          onProductNameChange={setProductName}
+          brand={brand}
+          onBrandChange={setBrand}
+          platform={platform}
+          onPlatformChange={changePlatform}
+          language={language}
+          onLanguageChange={setLanguage}
+          description={description}
+          onDescriptionChange={setDescription}
+          analyzing={analyzing}
+          onAnalyze={() => void runAiAnalyze()}
+          onExpandDescription={() => setExpandOpen(true)}
+          sections={sections}
+          onToggleSection={toggleSection}
+          settingsOpen={settingsOpen}
+          onToggleSettings={toggleSettings}
+          ratio={ratio}
+          onRatioChange={changeRatio}
+          resolution={resolution}
+          onResolutionChange={changeResolution}
+          resolutionValues={resolutionValues}
+          onModelQuoteChange={onModelQuoteChange}
+          onModelChange={setSelectedModel}
+          generating={generating}
+          guestLabel={guestLabel}
+          submitDisabled={!canSubmit}
+          submitHint={capabilityBlocked && token && capabilityReason ? capabilityReason : undefined}
+          creditLabel={creditLabel}
+          onSubmit={() => void submit()}
+        />
+      </div>
 
-      {/* ── 右: 功能示例 / 创作结果 ──
-          创作结果按批次逐行陈列 (一次生成一行, 原图 + 各模块图);
-          提交后重拉列表拿到整批占位卡, 由 useResultGallery 轮询到全部到终态。 */}
-      <ToolBatchOutputPane
-        rightTab={rightTab}
-        onPickTab={pickRightTab}
-        generationCount={generationCount}
-        demo={<DetailExamplePanel />}
-        items={gallery.items}
-        loading={gallery.loading}
-        error={gallery.error}
-        emptyDesc={resultEmptyDesc}
-        emptyChildren={resultEmptyChildren}
-        onDeleteRow={deleteRow}
-        onRegenerateRow={regenerateFromRow}
-        labelOf={labelOf}
-        downloadNamePrefix="product-detail"
-      />
+      <div className="h-full min-h-0 min-w-0">
+        <ToolBatchOutputPane
+          rightTab={rightTab}
+          onPickTab={pickRightTab}
+          generationCount={generationCount}
+          demo={<DetailExamplePanel />}
+          items={gallery.items}
+          loading={gallery.loading}
+          error={gallery.error}
+          emptyDesc={resultEmptyDesc}
+          emptyChildren={resultEmptyChildren}
+          onDeleteRow={deleteRow}
+          onRegenerateRow={regenerateFromRow}
+          labelOf={labelOf}
+          downloadNamePrefix="product-detail"
+        />
+      </div>
 
       {/* 素材库选择弹窗 (真实数据) */}
       <AssetLibraryModal

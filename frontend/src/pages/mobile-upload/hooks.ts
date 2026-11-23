@@ -1,7 +1,7 @@
 /**
  * 手机上传页面的 hooks —— 目录内文件的唯一 hooks 入口。
  *
- * 本页使用原生 DOM 上传区，没有外部共享控件；SEO hook 从这里转出，
+ * 视觉保持手机端独立皮肤；选图输入 / 打开 / 清空 value 复用共享 UI hook，
  * 选图 / 压缩 / 排序 / 回传状态直接定义在下方。
  */
 
@@ -13,6 +13,8 @@ import { MAX_IMAGE_MB, SUPPORTED_IMAGE_LABEL, compressImage, isSupportedImageFil
 
 /** 路由级 SEO 元信息 */
 export { useDocumentMeta } from '../../hooks/useDocumentMeta';
+/** 隐藏 input / 打开 / 清空 value 的共享上传逻辑 */
+export { useImageUploadArea } from '../../ui';
 
 /**
  * 手机端选图与回传。

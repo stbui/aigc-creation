@@ -1,16 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { Lock, Mail, Smartphone, User } from 'lucide-react';
-import {
-  Button,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from '../ui';
+import { Button, FormControl, FormField, FormItem, FormLabel, FormMessage, IconInput } from '../ui';
 import type { SmsPurpose } from '../types/api';
 
 /**
@@ -61,20 +51,19 @@ export function AuthFormFields({
         <FormField
           name="name"
           rules={{
-            validate: (value: unknown) =>
-              String(value ?? '').trim() ? true : '请输入昵称',
+            validate: (value: unknown) => (String(value ?? '').trim() ? true : '请输入昵称'),
             maxLength: { value: 20, message: '昵称最多 20 个字符' },
           }}
           render={({ field }) => (
             <FormItem className="login-field">
               <FormLabel>昵称</FormLabel>
               <FormControl>
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<User size={15} />}
-                  </InputGroupAddon>
-                  <InputGroupInput {...field} placeholder="展示名称" maxLength={20} />
-                </InputGroup>
+                <IconInput
+                  {...field}
+                  icon={<User size={15} />}
+                  placeholder="展示名称"
+                  maxLength={20}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -93,17 +82,13 @@ export function AuthFormFields({
             <FormItem className="login-field">
               <FormLabel>邮箱</FormLabel>
               <FormControl>
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<Mail size={15} />}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    {...field}
-                    ref={emailRef}
-                    placeholder="账号（邮箱）"
-                    autoComplete="username"
-                  />
-                </InputGroup>
+                <IconInput
+                  {...field}
+                  ref={emailRef}
+                  icon={<Mail size={15} />}
+                  placeholder="账号（邮箱）"
+                  autoComplete="username"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -127,18 +112,14 @@ export function AuthFormFields({
             <FormItem className="login-field">
               <FormLabel>手机号</FormLabel>
               <FormControl>
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<Smartphone size={15} />}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    {...field}
-                    placeholder="已绑定的手机号"
-                    maxLength={14}
-                    inputMode="tel"
-                    autoComplete="tel"
-                  />
-                </InputGroup>
+                <IconInput
+                  {...field}
+                  icon={<Smartphone size={15} />}
+                  placeholder="已绑定的手机号"
+                  maxLength={14}
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -157,17 +138,13 @@ export function AuthFormFields({
             <FormItem className="login-field">
               <FormLabel>密码</FormLabel>
               <FormControl>
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<Lock size={15} />}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    {...field}
-                    type="password"
-                    placeholder="请输入密码"
-                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                  />
-                </InputGroup>
+                <IconInput
+                  {...field}
+                  icon={<Lock size={15} />}
+                  type="password"
+                  placeholder="请输入密码"
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -189,18 +166,14 @@ export function AuthFormFields({
             <FormItem className="login-field">
               <FormLabel>手机号（选填）</FormLabel>
               <FormControl>
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<Smartphone size={15} />}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    {...field}
-                    placeholder="选填，用于短信登录"
-                    maxLength={14}
-                    inputMode="tel"
-                    autoComplete="tel"
-                  />
-                </InputGroup>
+                <IconInput
+                  {...field}
+                  icon={<Smartphone size={15} />}
+                  placeholder="选填，用于短信登录"
+                  maxLength={14}
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -212,7 +185,7 @@ export function AuthFormFields({
       {needPhoneCode && codeField('verify')}
 
       {/* 参考站 .auth-submit: 340x48 / linear-gradient(90deg,#8064f6,#5546d8) / 14px 600 / radius 8 */}
-      <Button disabled={submitting} variant="default" type="submit" className="w-full login-submit" >
+      <Button disabled={submitting} variant="default" type="submit" className="w-full login-submit">
         <span className="state-spinner is-small" aria-hidden />
         {mode === 'login' ? '登录' : mode === 'sms' ? '登录' : '注册并登录'}
       </Button>

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Button, Spin } from '../ui';
+import { Button, Spinner } from '../ui';
 
 /**
  * 提交区（sticky 底部）—— 工具页通用能力。
@@ -73,7 +73,7 @@ export function ToolSubmitBar({
         >
           {submitting ? (
             <>
-              <Spin className="size-4" />
+              <Spinner className="size-4" />
               <strong className="u-font-14">生成中…</strong>
             </>
           ) : (

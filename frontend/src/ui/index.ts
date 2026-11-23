@@ -5,21 +5,21 @@ export { cn } from './lib/cn';
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Button } from '~/admin-ui/components/ui/button';
-import { Textarea as ShadcnTextarea } from '~/admin-ui/components/ui/textarea';
-import { Checkbox as ShadcnCheckbox } from '~/admin-ui/components/ui/checkbox';
-import { Switch as ShadcnSwitch } from '~/admin-ui/components/ui/switch';
+import { Textarea } from '~/admin-ui/components/ui/textarea';
+import { Checkbox } from '~/admin-ui/components/ui/checkbox';
+import { Switch } from '~/admin-ui/components/ui/switch';
 
 export { Button };
 export type ButtonProps = ComponentProps<typeof Button>;
 
-export { ShadcnTextarea as Textarea };
-export type TextareaProps = ComponentProps<typeof ShadcnTextarea>;
+export { Textarea };
+export type TextareaProps = ComponentProps<typeof Textarea>;
 
-export { ShadcnCheckbox as Checkbox };
-export type CheckboxProps = ComponentProps<typeof ShadcnCheckbox>;
+export { Checkbox };
+export type CheckboxProps = ComponentProps<typeof Checkbox>;
 
-export { ShadcnSwitch as Switch };
-export type SwitchProps = ComponentProps<typeof ShadcnSwitch>;
+export { Switch };
+export type SwitchProps = ComponentProps<typeof Switch>;
 
 /* Select 直连 shadcn 组合件：调用点自行组合 Trigger/Content/Item。 */
 export {
@@ -34,15 +34,45 @@ export interface SelectOption {
   value: string | number;
   label: ReactNode;
 }
-import { Input as ShadcnInput } from '~/admin-ui/components/ui/input';
+import { Input } from '~/admin-ui/components/ui/input';
 
-export { ShadcnInput as Input };
-export type InputProps = ComponentProps<typeof ShadcnInput>;
+export { Input };
+export type InputProps = ComponentProps<typeof Input>;
 
 export { RadioGroup, RadioGroupItem } from '~/admin-ui/components/ui/radio-group';
 export { Slider } from '~/admin-ui/components/ui/slider';
 export { NumberStepper, type NumberStepperProps } from './primitives/number-stepper';
+export { SectionCard, type SectionCardProps } from './primitives/section-card';
+export {
+  ImageUploadArea,
+  type ImageUploadAreaProps,
+  type ImageUploadControls,
+  type ImageUploadItem,
+} from './primitives/image-upload-area';
+export { ImageUploadHeader, type ImageUploadHeaderProps } from './primitives/image-upload-header';
+export { ImageUploadPrompt, type ImageUploadPromptProps } from './primitives/image-upload-prompt';
+export { ImageUploadThumb, type ImageUploadThumbProps } from './primitives/image-upload-thumb';
+export {
+  ImageUploadAddTile,
+  type ImageUploadAddTileProps,
+} from './primitives/image-upload-add-tile';
+export { ImageUploadLoading } from './primitives/image-upload-loading';
+export { ImageUploadInput, type ImageUploadInputProps } from './primitives/image-upload-input';
+export {
+  ImageUploadTrigger,
+  type ImageUploadTriggerProps,
+} from './primitives/image-upload-trigger';
+export {
+  useImageUploadArea,
+  type UseImageUploadAreaOptions,
+  type UseImageUploadAreaResult,
+} from './primitives/use-image-upload-area';
 export { Upload, type UploadFile, type UploadProps } from './primitives/upload';
+export { IconInput, type IconInputProps } from './primitives/icon-input';
+export {
+  CharacterCountTextarea,
+  type CharacterCountTextareaProps,
+} from './primitives/character-count-textarea';
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -53,7 +83,7 @@ export {
 } from '~/admin-ui/components/ui/dropdown-menu';
 import { Spinner } from '~/admin-ui/components/ui/spinner';
 
-export { Spinner as Spin };
+export { Spinner };
 /* 表单直连 shadcn 组合件 + react-hook-form；`Form` 即 shadcn 的 FormProvider。 */
 export {
   Form,
@@ -79,30 +109,29 @@ export {
   DialogTrigger,
 } from '~/admin-ui/components/ui/dialog';
 
-/* shadcn 组合式原子件的 C 端别名。 */
+/* shadcn 组合式原子件：保留 shadcn 原名，C 端不再起 Surface / EmptyState 等别名。 */
 export {
-  Card as Surface,
-  CardHeader as SurfaceHeader,
-  CardTitle as SurfaceTitle,
-  CardDescription as SurfaceDescription,
-  CardContent as SurfaceContent,
-  CardFooter as SurfaceFooter,
-  CardAction as SurfaceAction,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  CardAction,
 } from '~/admin-ui/components/ui/card';
-export { Badge as StatusBadge } from '~/admin-ui/components/ui/badge';
 export { Badge } from '~/admin-ui/components/ui/badge';
 export {
-  Empty as EmptyState,
-  EmptyHeader as EmptyStateHeader,
-  EmptyMedia as EmptyStateMedia,
-  EmptyTitle as EmptyStateTitle,
-  EmptyDescription as EmptyStateDescription,
-  EmptyContent as EmptyStateContent,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from '~/admin-ui/components/ui/empty';
 export {
-  Alert as InlineAlert,
-  AlertTitle as InlineAlertTitle,
-  AlertDescription as InlineAlertDescription,
+  Alert,
+  AlertTitle,
+  AlertDescription,
 } from '~/admin-ui/components/ui/alert';
 export {
   Sheet,
@@ -125,12 +154,11 @@ export {
   ToggleGroupItem,
 } from '~/admin-ui/components/ui/toggle-group';
 export {
-  Tabs as NavigationTabs,
-  TabsList as NavigationTabsList,
-  TabsTrigger as NavigationTabsTrigger,
-  TabsContent as NavigationTabsContent,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
 } from '~/admin-ui/components/ui/tabs';
-export { Tabs, TabsList, TabsTrigger, TabsContent } from '~/admin-ui/components/ui/tabs';
 export {
   Table,
   TableHeader,
@@ -211,10 +239,19 @@ export { Kbd, KbdGroup } from '~/admin-ui/components/ui/kbd';
 export { Toggle } from '~/admin-ui/components/ui/toggle';
 export { AspectRatio } from '~/admin-ui/components/ui/aspect-ratio';
 export { ScrollArea, ScrollBar } from '~/admin-ui/components/ui/scroll-area';
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '~/admin-ui/components/ui/tooltip';
+export {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '~/admin-ui/components/ui/tooltip';
 /* 文字动作：`Button variant="link"` 的 C 端默认密度，避免每处重复写尺寸与下划线。 */
 export { TextAction, type TextActionProps } from './primitives/text-action';
 /* 分段选择：Radix ToggleGroup 的受控单选封装，替代手写 tab 外观的过滤条。 */
-export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './primitives/segmented-control';
+export {
+  SegmentedControl,
+  type SegmentedControlProps,
+  type SegmentedOption,
+} from './primitives/segmented-control';
 /* 图片拖拽上传区：shadcn Button 外壳 + 拖拽落点，空态统一入口。 */
 export { ImageDropzone, type ImageDropzoneProps } from './primitives/dropzone';

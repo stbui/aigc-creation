@@ -69,7 +69,6 @@ vi.mock('../hooks', async () => {
     useImageUpload: () => ({
       images: [{ id: 'asset-1', url: '/uploads/probe.png', name: 'probe.png' }],
       uploading: false,
-      fileInputRef: { current: null },
       uploadFiles: vi.fn(),
       removeImage: vi.fn(),
       replaceImages: vi.fn(),

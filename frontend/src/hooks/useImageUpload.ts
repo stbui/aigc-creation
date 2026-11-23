@@ -52,7 +52,6 @@ export function useImageUpload({ max, noun = '商品图片', initial = [] }: Opt
     validateImageFile,
   } = useUploadLimits();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<UploadedImage[]>(initial);
   const [uploading, setUploading] = useState(false);
   /** 上传互斥：拖拽/粘贴/选择文件可能在一次上传途中再次触发 */
@@ -261,7 +260,6 @@ export function useImageUpload({ max, noun = '商品图片', initial = [] }: Opt
   return {
     images,
     uploading,
-    fileInputRef,
     uploadFiles,
     removeImage,
     moveImage,
