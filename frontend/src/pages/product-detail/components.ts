@@ -40,7 +40,6 @@ export {
   type ProductFormSectionProps,
   ProductImageField,
   type ProductImageFieldProps,
-  SelectField,
 } from '../../components/ProductFormSection';
 /** 批次结果列表 / 右栏（与商品主图共用） */
 export {

@@ -2,12 +2,12 @@ import { Upload } from 'lucide-react';
 
 import {
   Button,
-  EmptyState,
-  EmptyStateContent,
-  EmptyStateDescription,
-  EmptyStateHeader,
-  EmptyStateMedia,
-  EmptyStateTitle,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
   cn,
 } from './components';
 import type { EmptyStateCopy } from './utils';
@@ -26,17 +26,17 @@ export interface LibraryEmptyStateProps {
 
 export function LibraryEmptyState({ copy, primary, onAction }: LibraryEmptyStateProps) {
   return (
-    <EmptyState className="min-h-[300px] gap-2 rounded-[14px] border border-dashed border-border bg-[rgba(255,255,255,0.66)]">
-      <EmptyStateMedia>
+    <Empty className="min-h-[300px] gap-2 rounded-[14px] border border-dashed border-border bg-[rgba(255,255,255,0.66)]">
+      <EmptyMedia>
         <img src="/asset-library/empty.svg" alt="" width={160} height={160} className="size-40 object-contain" />
-      </EmptyStateMedia>
-      <EmptyStateHeader>
-        <EmptyStateTitle className="text-sm leading-5 font-semibold text-foreground">{copy.title}</EmptyStateTitle>
-        <EmptyStateDescription className="text-xs leading-5 text-muted-foreground">
+      </EmptyMedia>
+      <EmptyHeader>
+        <EmptyTitle className="text-sm leading-5 font-semibold text-foreground">{copy.title}</EmptyTitle>
+        <EmptyDescription className="text-xs leading-5 text-muted-foreground">
           {copy.description}
-        </EmptyStateDescription>
-      </EmptyStateHeader>
-      <EmptyStateContent>
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
         <Button
           variant={primary ? 'default' : 'outline'}
           className={cn('mt-2', primary && 'bg-brand text-primary-foreground')}
@@ -45,7 +45,7 @@ export function LibraryEmptyState({ copy, primary, onAction }: LibraryEmptyState
           {primary ? <Upload className="size-3.5" /> : undefined}
           {copy.action}
         </Button>
-      </EmptyStateContent>
-    </EmptyState>
+      </EmptyContent>
+    </Empty>
   );
 }

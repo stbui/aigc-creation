@@ -123,92 +123,68 @@ export function ShoppableCarouselConfig({
             {/* Select 不用 <label> 包裹: label 会把点击转发给内部 input,
                 已知会让下拉「打开即关闭」; 无障碍名走 aria-label */}
             <div className="pk-field">
-              <span className="pk-field-label">投放平台</span>
-                <Select
-                  value={platform}
-                  onValueChange={onPlatformChange}
-                >
-                  <SelectTrigger
-                    aria-label={'投放平台'}
-                  >
-                    <SelectValue placeholder={'请选择'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {PLATFORM_OPTIONS.map((option) => (
-                        <SelectItem key={String(option.value)} value={String(option.value)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              <Select value={platform} onValueChange={onPlatformChange}>
+                <SelectTrigger aria-label="投放平台" className="w-full">
+                  <SelectValue placeholder="请选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {PLATFORM_OPTIONS.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="pk-field">
-              <span className="pk-field-label">目标市场</span>
-                <Select
-                  value={market}
-                  onValueChange={onMarketChange}
-                >
-                  <SelectTrigger
-                    aria-label={'目标市场'}
-                  >
-                    <SelectValue placeholder={'请选择'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {MARKET_OPTIONS.map((option) => (
-                        <SelectItem key={String(option.value)} value={String(option.value)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              <Select value={market} onValueChange={onMarketChange}>
+                <SelectTrigger aria-label="目标市场" className="w-full">
+                  <SelectValue placeholder="请选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {MARKET_OPTIONS.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="pk-field">
-              <span className="pk-field-label">输出语言</span>
-                <Select
-                  value={language}
-                  onValueChange={onLanguageChange}
-                >
-                  <SelectTrigger
-                    aria-label={'输出语言'}
-                  >
-                    <SelectValue placeholder={'请选择'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {LANGUAGE_OPTIONS.map((option) => (
-                        <SelectItem key={String(option.value)} value={String(option.value)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              <Select value={language} onValueChange={onLanguageChange}>
+                <SelectTrigger aria-label="输出语言" className="w-full">
+                  <SelectValue placeholder="请选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="pk-field">
-              <span className="pk-field-label">画面比例</span>
-                <Select
-                  value={ratio}
-                  onValueChange={onRatioChange}
-                >
-                  <SelectTrigger
-                    aria-label={'画面比例'}
-                  >
-                    <SelectValue placeholder={'请选择'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {RATIO_OPTIONS.map((option) => (
-                        <SelectItem key={String(option.value)} value={String(option.value)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+              <Select value={ratio} onValueChange={onRatioChange}>
+                <SelectTrigger aria-label="画面比例" className="w-full">
+                  <SelectValue placeholder="请选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {RATIO_OPTIONS.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

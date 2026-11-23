@@ -102,58 +102,56 @@ export function ProductKitInputPane({
   onSubmit,
 }: ProductKitInputPaneProps) {
   return (
-    <aside className="pk-input-pane">
-      <div className="pk-form-card">
-        <ToolTypeTabs active="product-kit" />
+    <aside className="pk-input-pane gap-0!">
+      <ToolTypeTabs active="product-kit" />
 
-        <div className="pk-form-scroll">
-          <ProductFormSection
-            images={images}
-            max={maxImages}
-            uploading={uploading}
-            onFiles={onFiles}
-            onRemove={onRemoveImage}
-            onOpenLibrary={onOpenLibrary}
-            onOpenMobile={onOpenMobile}
-            limitError={imageLimitError}
-            productName={productName}
-            onProductNameChange={onProductNameChange}
-            brand={brand}
-            onBrandChange={onBrandChange}
-            platform={platform}
-            onPlatformChange={onPlatformChange}
-            language={language}
-            onLanguageChange={onLanguageChange}
-            description={description}
-            onDescriptionChange={onDescriptionChange}
-            analyzing={analyzing}
-            onAnalyze={onAnalyze}
-            onExpandDescription={onExpandDescription}
-            maxLength={MAX_DESC_LEN}
-            descriptionRows={5}
-          />
-
-          {/* 自定义配置 */}
-          <ProductKitVariantConfig counts={counts} onCountChange={onCountChange} />
-        </div>
-
-        {/* 高级设置 + 提交 (sticky 底部) */}
-        <ToolGenerationSubmitBar
-          capability={PRODUCT_KIT_CAPABILITY}
-          generating={generating}
-          disabled={!formValid}
-          creditLabel={creditLabel}
-          settingsOpen={settingsOpen}
-          onToggleSettings={onToggleSettings}
-          ratio={ratio}
-          onRatioChange={onRatioChange}
-          resolution={resolution}
-          onResolutionChange={onResolutionChange}
-          onModelQuoteChange={onModelQuoteChange}
-          onModelChange={onModelChange}
-          onSubmit={onSubmit}
+      <div className="pk-form-scroll">
+        <ProductFormSection
+          images={images}
+          max={maxImages}
+          uploading={uploading}
+          onFiles={onFiles}
+          onRemove={onRemoveImage}
+          onOpenLibrary={onOpenLibrary}
+          onOpenMobile={onOpenMobile}
+          limitError={imageLimitError}
+          productName={productName}
+          onProductNameChange={onProductNameChange}
+          brand={brand}
+          onBrandChange={onBrandChange}
+          platform={platform}
+          onPlatformChange={onPlatformChange}
+          language={language}
+          onLanguageChange={onLanguageChange}
+          description={description}
+          onDescriptionChange={onDescriptionChange}
+          analyzing={analyzing}
+          onAnalyze={onAnalyze}
+          onExpandDescription={onExpandDescription}
+          maxLength={MAX_DESC_LEN}
+          descriptionRows={5}
         />
+
+        {/* 自定义配置 */}
+        <ProductKitVariantConfig counts={counts} onCountChange={onCountChange} />
       </div>
+
+      {/* 高级设置 + 提交 (sticky 底部) */}
+      <ToolGenerationSubmitBar
+        capability={PRODUCT_KIT_CAPABILITY}
+        generating={generating}
+        disabled={!formValid}
+        creditLabel={creditLabel}
+        settingsOpen={settingsOpen}
+        onToggleSettings={onToggleSettings}
+        ratio={ratio}
+        onRatioChange={onRatioChange}
+        resolution={resolution}
+        onResolutionChange={onResolutionChange}
+        onModelQuoteChange={onModelQuoteChange}
+        onModelChange={onModelChange}
+        onSubmit={onSubmit}
+      />
     </aside>
   );
 }

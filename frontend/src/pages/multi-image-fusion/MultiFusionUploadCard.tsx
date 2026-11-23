@@ -13,10 +13,7 @@ import {
   FieldTitle,
   ImageDropzone,
   ImageUploadArea,
-  Surface,
-  SurfaceContent,
-  SurfaceHeader,
-  SurfaceTitle,
+  SectionCard,
   type ImageUploadControls,
   type ToolAsset,
 } from './components';
@@ -26,8 +23,8 @@ import { MultiFusionSlotActions } from './MultiFusionSlotActions';
 /**
  * 上传卡 —— 主体图（1 张）+ 搭配图（1-5 张）两个图位。
  *
- * 2026-11-21 由 1902 行页面 CSS 的 `multi-image-fusion-*` 自绘结构改为 shadcn：
- * 卡片壳 `Surface`、计数器 `Badge`、图位标签 `Field` / `FieldLabel`、
+ * 2026-11-21 由 1902 行页面 CSS 的 `multi-image-fusion-*` 自绘结构改为 C 端组件层：
+ * 卡片壳 `SectionCard`、计数器 `Badge`、图位标签 `Field` / `FieldLabel`、
  * 上传空态 `ImageDropzone`（只负责空态外观）、已上传图 `MultiFusionImageThumb`
  * （内部为 `Attachment`）。搭配图网格只保留列宽，拖拽命中由外层上传区接管。
  *
@@ -90,89 +87,86 @@ export function MultiFusionUploadCard({
   };
 
   return (
-    <Surface className="gap-4.5 rounded-xl border-border/70 bg-card p-4.5 shadow-card">
-      <SurfaceHeader className="mb-3 flex items-start gap-3 px-0">
-        <SurfaceTitle className="text-sm leading-5.5 font-bold text-foreground">
-          上传图片
-        </SurfaceTitle>
-        <Badge variant="secondary" className="ml-auto min-w-9 shrink-0 text-xs font-normal">
+    <SectionCard
+      title="上传图片"
+      extra={
+        <Badge variant="secondary" className="min-w-9 shrink-0 text-xs font-normal">
           {totalCount} / {MAX_TOTAL}
         </Badge>
-      </SurfaceHeader>
+      }
+      contentClassName="flex flex-col gap-4.5"
+    >
+      {/* 主体图: 必传 1 张 */}
+      <Field className="gap-2">
+        <div className="flex min-h-5.5 w-full items-center gap-2">
+          <FieldTitle className="text-xs font-bold text-foreground">主体图</FieldTitle>
+          <span className="text-xs font-normal text-muted-foreground">必传 · 1 张</span>
+          <MultiFusionSlotActions
+            target="subject"
+            onOpenLibrary={onOpenLibrary}
+            onOpenMobile={onOpenMobile}
+          />
+        </div>
 
-      <SurfaceContent className="flex flex-col gap-4.5 px-0">
-        {/* 主体图: 必传 1 张 */}
-        <Field className="gap-2">
-          <div className="flex min-h-5.5 w-full items-center gap-2">
-            <FieldTitle className="text-xs font-bold text-foreground">主体图</FieldTitle>
-            <span className="text-xs font-normal text-muted-foreground">必传 · 1 张</span>
-            <MultiFusionSlotActions
-              target="subject"
-              onOpenLibrary={onOpenLibrary}
-              onOpenMobile={onOpenMobile}
+        <ImageUploadArea
+          images={subject ? [subject] : []}
+          max={1}
+          single
+          variant="plain"
+          uploading={uploading}
+          accept={SUPPORTED_IMAGE_ACCEPT}
+          ariaLabel="上传主体图"
+          emptyContent={(controls) => (
+            <ImageDropzone
+              title="上传主体图"
+              hint={UPLOAD_SUBJECT_HINT}
+              icon={<ImagePlus aria-hidden />}
+              onClick={controls.open}
             />
-          </div>
-
-          <ImageUploadArea
-            images={subject ? [subject] : []}
-            max={1}
-            single
-            variant="plain"
-            uploading={uploading}
-            accept={SUPPORTED_IMAGE_ACCEPT}
-            ariaLabel="上传主体图"
-            emptyContent={(controls) => (
-              <ImageDropzone
-                title="上传主体图"
-                hint={UPLOAD_SUBJECT_HINT}
-                icon={<ImagePlus aria-hidden />}
-                onClick={controls.open}
+          )}
+          renderPreview={(items, controls) => {
+            const image = items[0];
+            if (!image) return null;
+            return (
+              <MultiFusionImageThumb
+                asset={image}
+                uploading={uploading}
+                removeLabel="移除主体图"
+                className="h-[138px] w-full [&_[data-slot=attachment-media]]:h-full"
+                onRemove={() => controls.remove(image.id)}
               />
-            )}
-            renderPreview={(items, controls) => {
-              const image = items[0];
-              if (!image) return null;
-              return (
-                <MultiFusionImageThumb
-                  asset={image}
-                  uploading={uploading}
-                  removeLabel="移除主体图"
-                  className="h-[138px] w-full [&_[data-slot=attachment-media]]:h-full"
-                  onRemove={() => controls.remove(image.id)}
-                />
-              );
-            }}
-            onFiles={(files) => onUploadFiles('subject', files)}
-            onRemove={onRemoveSubject}
-          />
-        </Field>
+            );
+          }}
+          onFiles={(files) => onUploadFiles('subject', files)}
+          onRemove={onRemoveSubject}
+        />
+      </Field>
 
-        {/* 搭配图: 必传 1-5 张, 参考站是网格小槽 (S-8) */}
-        <Field className="gap-2">
-          <div className="flex min-h-5.5 w-full items-center gap-2">
-            <FieldTitle className="text-xs font-bold text-foreground">搭配图</FieldTitle>
-            <span className="text-xs font-normal text-muted-foreground">必传 · 1-5 张</span>
-            <MultiFusionSlotActions
-              target="accent"
-              onOpenLibrary={onOpenLibrary}
-              onOpenMobile={onOpenMobile}
-            />
-          </div>
-
-          <ImageUploadArea
-            images={accents}
-            max={MAX_ACCENTS}
-            variant="plain"
-            uploading={uploading}
-            accept={SUPPORTED_IMAGE_ACCEPT}
-            ariaLabel="上传搭配图"
-            emptyContent={(controls) => renderAccentGrid([], controls)}
-            renderPreview={renderAccentGrid}
-            onFiles={(files) => onUploadFiles('accent', files)}
-            onRemove={onRemoveAccent}
+      {/* 搭配图: 必传 1-5 张, 参考站是网格小槽 (S-8) */}
+      <Field className="gap-2">
+        <div className="flex min-h-5.5 w-full items-center gap-2">
+          <FieldTitle className="text-xs font-bold text-foreground">搭配图</FieldTitle>
+          <span className="text-xs font-normal text-muted-foreground">必传 · 1-5 张</span>
+          <MultiFusionSlotActions
+            target="accent"
+            onOpenLibrary={onOpenLibrary}
+            onOpenMobile={onOpenMobile}
           />
-        </Field>
-      </SurfaceContent>
-    </Surface>
+        </div>
+
+        <ImageUploadArea
+          images={accents}
+          max={MAX_ACCENTS}
+          variant="plain"
+          uploading={uploading}
+          accept={SUPPORTED_IMAGE_ACCEPT}
+          ariaLabel="上传搭配图"
+          emptyContent={(controls) => renderAccentGrid([], controls)}
+          renderPreview={renderAccentGrid}
+          onFiles={(files) => onUploadFiles('accent', files)}
+          onRemove={onRemoveAccent}
+        />
+      </Field>
+    </SectionCard>
   );
 }

@@ -51,7 +51,7 @@
 }
 
 /*
- * 左栏滚动区：内容收进 `.pk-config-card` 白卡（与商品主图 / 写真模板一致），
+ * 左栏滚动区：内容收进 `SectionCard` 白卡（与商品主图 / 写真模板一致），
  * 滚动区本身透明，卡片四周的留白由卡内 padding 提供。
  */
 .sc-form-scroll {
@@ -537,12 +537,12 @@
  * 「创作灵感」的模板区与「创作结果」的批次列表各自吃掉右栏剩余高度，
  * 面板内部自行滚动。原右栏底部「最近生成」历史条及其白卡样式已删除。
  */
-.pd-right-panel > .sc-showcase {
+[data-slot='output-tab-panel'] > .sc-showcase {
   flex: 1;
   min-height: 0;
 }
 
-.pd-right-panel > .pk-result-pane {
+[data-slot='output-tab-panel'] > .pk-result-pane {
   flex: 1;
   min-height: 0;
 }

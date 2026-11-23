@@ -21,3 +21,6 @@ export { ExpandLayoutPreview } from '../../components/ExpandLayoutPreview';
 export { PRODUCT_TOOL_DROPZONE, PRODUCT_TOOL_PAGE } from '../../components/productToolPageClasses';
 /** 产品系共用的上传态与结果卡渲染 */
 export { productSourcePane, productSourceUploadPreview } from '../../components/ProductSourcePreview';
+
+/** 配置卡外壳（白底面板 + 可选标题行） */
+export { SectionCard } from '../../ui';

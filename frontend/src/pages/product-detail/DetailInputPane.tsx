@@ -108,64 +108,62 @@ export function DetailInputPane({
   onSubmit,
 }: DetailInputPaneProps) {
   return (
-    <aside className="pk-input-pane">
-      <div className="pk-form-card">
-        <ToolTypeTabs active="product-detail" />
+    <aside className="pk-input-pane gap-0!">
+      <ToolTypeTabs active="product-detail" />
 
-        <div className="pk-form-scroll">
-          <ProductFormSection
-            images={images}
-            max={max}
-            limitError={limitError}
-            uploading={uploading}
-            onFiles={onFiles}
-            onRemove={onRemove}
-            onOpenLibrary={onOpenLibrary}
-            onOpenMobile={onOpenMobile}
-            productName={productName}
-            onProductNameChange={onProductNameChange}
-            brand={brand}
-            onBrandChange={onBrandChange}
-            platform={platform}
-            onPlatformChange={onPlatformChange}
-            language={language}
-            onLanguageChange={onLanguageChange}
-            description={description}
-            onDescriptionChange={onDescriptionChange}
-            analyzing={analyzing}
-            onAnalyze={onAnalyze}
-            onExpandDescription={onExpandDescription}
-            maxLength={MAX_DESC_LEN}
-            descriptionRows={3}
-          />
-
-          <DetailSectionPicker selected={sections} onToggle={onToggleSection} />
-        </div>
-
-        {/* 高级设置 + 提交 (sticky 底部) */}
-        <ToolGenerationSubmitBar
-          capability={DETAIL_CAPABILITY}
-          generating={generating}
-          disabled={submitDisabled}
-          guestLabel={guestLabel}
-          creditLabel={creditLabel}
-          hint={
-            submitHint ? (
-              <span className="tool-submit-notice tool-submit-notice-error">{submitHint}</span>
-            ) : undefined
-          }
-          settingsOpen={settingsOpen}
-          onToggleSettings={onToggleSettings}
-          ratio={ratio}
-          onRatioChange={onRatioChange}
-          resolution={resolution}
-          onResolutionChange={onResolutionChange}
-          resolutionValues={resolutionValues}
-          onModelQuoteChange={onModelQuoteChange}
-          onModelChange={onModelChange}
-          onSubmit={onSubmit}
+      <div className="pk-form-scroll">
+        <ProductFormSection
+          images={images}
+          max={max}
+          limitError={limitError}
+          uploading={uploading}
+          onFiles={onFiles}
+          onRemove={onRemove}
+          onOpenLibrary={onOpenLibrary}
+          onOpenMobile={onOpenMobile}
+          productName={productName}
+          onProductNameChange={onProductNameChange}
+          brand={brand}
+          onBrandChange={onBrandChange}
+          platform={platform}
+          onPlatformChange={onPlatformChange}
+          language={language}
+          onLanguageChange={onLanguageChange}
+          description={description}
+          onDescriptionChange={onDescriptionChange}
+          analyzing={analyzing}
+          onAnalyze={onAnalyze}
+          onExpandDescription={onExpandDescription}
+          maxLength={MAX_DESC_LEN}
+          descriptionRows={3}
         />
+
+        <DetailSectionPicker selected={sections} onToggle={onToggleSection} />
       </div>
+
+      {/* 高级设置 + 提交 (sticky 底部) */}
+      <ToolGenerationSubmitBar
+        capability={DETAIL_CAPABILITY}
+        generating={generating}
+        disabled={submitDisabled}
+        guestLabel={guestLabel}
+        creditLabel={creditLabel}
+        hint={
+          submitHint ? (
+            <span className="tool-submit-notice tool-submit-notice-error">{submitHint}</span>
+          ) : undefined
+        }
+        settingsOpen={settingsOpen}
+        onToggleSettings={onToggleSettings}
+        ratio={ratio}
+        onRatioChange={onRatioChange}
+        resolution={resolution}
+        onResolutionChange={onResolutionChange}
+        resolutionValues={resolutionValues}
+        onModelQuoteChange={onModelQuoteChange}
+        onModelChange={onModelChange}
+        onSubmit={onSubmit}
+      />
     </aside>
   );
 }

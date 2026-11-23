@@ -27,7 +27,7 @@ import {
 } from './hooks';
 import { generateApi, newIdempotencyKey, promptToolsApi, resolveModelKey } from './api';
 import { clampCount, isUncertainSubmitError } from './utils';
-import { useApp } from '../../ui';
+import { SectionCard, useApp } from '../../ui';
 import type { ShoppableCarouselTemplate } from '../../types/api';
 
 /**
@@ -378,7 +378,7 @@ export function ShoppableCarouselPage() {
         {/* ── 左: 配置栏 ── */}
         <aside className="sc-input-pane">
           <div className="sc-form-scroll">
-            <section className="pk-config-card">
+            <SectionCard>
               <ShoppableCarouselConfig
                 images={images}
                 uploading={uploading}
@@ -407,7 +407,7 @@ export function ShoppableCarouselPage() {
                 socialCaption={socialCaption}
                 onSocialCaptionChange={setSocialCaption}
               />
-            </section>
+            </SectionCard>
           </div>
 
           <ShoppableCarouselFooter

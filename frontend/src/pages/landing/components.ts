@@ -14,7 +14,7 @@
  * - `DropdownMenu`：顶导能力分组下拉（替代手写 hover 菜单）
  * - `Sheet`：≤900px 导航抽屉（替代手写 scrim + 滑入面板）
  * - `Tabs`：套餐三个页签（页面里是内容面板切换，用页签语义而不是过滤条）
- * - `Surface`：场景卡 / 套餐卡 / 特性卡
+ * - `Card`：场景卡 / 套餐卡 / 特性卡
  * - `Badge`：能力数徽标、推荐角标、限时价角标、悬停浮出的「做同款」
  * - `AspectRatio`：案例卡的 3:4 画幅
  */
@@ -32,8 +32,8 @@ export {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  Surface,
-  SurfaceContent,
+  Card,
+  CardContent,
   Tabs,
   TabsContent,
   TabsList,

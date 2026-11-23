@@ -2,10 +2,7 @@ import { VARIANT_COUNTS } from './constants';
 import {
   FieldLegend,
   FieldSet,
-  Surface,
-  SurfaceContent,
-  SurfaceHeader,
-  SurfaceTitle,
+  SectionCard,
   ToggleGroup,
   ToggleGroupItem,
 } from './components';
@@ -28,40 +25,32 @@ export function MultiFusionParameterCard({
   onVariantCountChange: (value: string) => void;
 }) {
   return (
-    <Surface className="gap-0 rounded-xl border-border/70 bg-card px-4.5 py-4 shadow-card">
-      <SurfaceHeader className="mb-3 px-0">
-        <SurfaceTitle className="text-sm leading-5.5 font-bold text-foreground">
-          输出参数
-        </SurfaceTitle>
-      </SurfaceHeader>
-
-      <SurfaceContent className="px-0">
-        <FieldSet className="gap-2">
-          <FieldLegend variant="label" className="mb-0 text-xs font-bold text-foreground">
-            变体张数
-          </FieldLegend>
-          <ToggleGroup
-            type="single"
-            value={variantCount}
-            onValueChange={(next) => next && onVariantCountChange(next)}
-            aria-label="变体张数"
-            variant="outline"
-            size="sm"
-            spacing={1.75}
-            className="grid w-full grid-cols-4"
-          >
-            {VARIANT_COUNTS.map((value) => (
-              <ToggleGroupItem
-                key={value}
-                value={value}
-                className="h-8.5 min-w-0 rounded-md border-border bg-card text-xs font-medium text-muted-foreground data-[state=on]:border-transparent data-[state=on]:bg-brand-bg data-[state=on]:text-brand"
-              >
-                {value} 张
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </FieldSet>
-      </SurfaceContent>
-    </Surface>
+    <SectionCard title="输出参数">
+      <FieldSet className="gap-2">
+        <FieldLegend variant="label" className="mb-0 text-xs font-bold text-foreground">
+          变体张数
+        </FieldLegend>
+        <ToggleGroup
+          type="single"
+          value={variantCount}
+          onValueChange={(next) => next && onVariantCountChange(next)}
+          aria-label="变体张数"
+          variant="outline"
+          size="sm"
+          spacing={1.75}
+          className="grid w-full grid-cols-4"
+        >
+          {VARIANT_COUNTS.map((value) => (
+            <ToggleGroupItem
+              key={value}
+              value={value}
+              className="h-8.5 min-w-0 rounded-md border-border bg-card text-xs font-medium text-muted-foreground data-[state=on]:border-transparent data-[state=on]:bg-brand-bg data-[state=on]:text-brand"
+            >
+              {value} 张
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </FieldSet>
+    </SectionCard>
   );
 }

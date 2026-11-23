@@ -27,7 +27,7 @@
 2. 后台业务页面只从 `~/admin-ui/radar` 取件；实现全部在 `radar/` 内并由其 barrel 公开。
 3. 后台页面禁止直连 `admin-ui/components/ui/*`。外壳不可用时的 `AdminLoadError`、`AdminLoading`、`NoAdminAccess` 是既有例外，不向业务页扩散。
 4. 页面不得为了少写一层包装，直接使用第三方组件库重新实现已有按钮、字段、弹层、表格和反馈状态。
-5. C 端页面样式改造的顺序是**先换组件、再收样式**：能落到 shadcn 原子件的直接组合；原子件没有对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（如 `TextAction`、`SegmentedControl`、`ImageUploadHeader`、`ImageUploadArea`、`ImageUploadPrompt`、`ImageDropzone`、`IconInput`、`CharacterCountTextarea`），再由页面取用；不得在页面里手写 class 拼出按钮、分段控件、图标输入框、字符计数文本域或拖拽区的外观。只有画布几何体这类没有交互语义的图形才留在工具类里。
+5. C 端页面样式改造的顺序是**先换组件、再收样式**：能落到 shadcn 原子件的直接组合；原子件没有对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（如 `SectionCard`、`TextAction`、`SegmentedControl`、`ImageUploadHeader`、`ImageUploadArea`、`ImageUploadPrompt`、`ImageDropzone`、`IconInput`、`CharacterCountTextarea`），再由页面取用；不得在页面里手写 class 拼出白卡、按钮、分段控件、图标输入框、字符计数文本域或拖拽区的外观。只有画布几何体这类没有交互语义的图形才留在工具类里。
 5. shadcn 已有的组件必须直接组合：C 端 `~/ui` 对 `Dialog` / `Sheet` / `Popover` / `ToggleGroup` / `FormField` / `Attachment` 等只做转出，不再保留 `Modal` / `Drawer` / `CountBadge` 一类同名自造封装。
 
 图片上传的交互壳统一为 `ImageUploadArea`（隐藏 input、点击 / 拖拽命中、loading、默认缩略图网格与移除 / 补位，视觉走通用 Tailwind 类；页面差异只通过 `className` 与 `data-slot` / `data-*` 状态槽位覆盖）。UI 状态由 `useImageUploadArea` 持有；`ImageUploadInput` / `ImageUploadTrigger` 收口隐藏 input 与文字型入口；`ImageUploadHeader` / `ImageUploadPrompt` / `ImageUploadThumb` / `ImageUploadAddTile` / `ImageUploadLoading` 是互不绑业务逻辑的纯展示原子件，`ImageDropzone` 只表达网格 / 槽位内的空态卡片。
@@ -81,7 +81,7 @@
 | 展示页面、详情或数据集合 | `Panel` / `Card` / `Descriptions` / `AdminDataTable` | 多层卡片套卡片 | 容器只负责层级，不重复业务状态 |
 | 展示完整数据状态 | `StateSkeleton` / `StateEmpty` / `StateError` 或后台对应组件 | 用一行“加载中”“暂无数据”代替 | 状态判定顺序遵循反馈规范 |
 | 瞬时操作反馈 | Toast | 用 Toast 承载必须持续阅读的结果 | 成功、警示、失败时长由 Provider 统一 |
-| 页面内持续提示 | `Notice` / `InlineAlert` | 用 Toast 代替字段错误或不可恢复风险 | `danger` 使用警告语义，不只换颜色 |
+| 页面内持续提示 | `Notice` / `Alert` | 用 Toast 代替字段错误或不可恢复风险 | `danger` 使用警告语义，不只换颜色 |
 | 确认不可逆动作 | `ConfirmDialog` / `ConfirmAlert` / `modal.confirm` | 点击即删除或退款 | 写明对象、后果、可否撤销与影响数量 |
 | 查看详情 | `Sheet` / `AdminDrawer` | 所有详情无条件跳新页面 | 保留列表筛选和返回上下文 |
 | 聚焦完成一个短表单或并排详情 | `Dialog`（`DialogHeader` / `DialogFooter`） | 用多个弹层串联流程 | 每个弹层只承担一个决策 |

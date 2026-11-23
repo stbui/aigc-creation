@@ -6,8 +6,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  InlineAlert,
-  InlineAlertDescription,
+  Alert,
+  AlertDescription,
   Input,
   Select,
   SelectTrigger,
@@ -15,7 +15,7 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  StatusBadge,
+  Badge,
 } from './components';
 import type { ProjectListItem } from '../../types/api';
 
@@ -144,9 +144,9 @@ export function LibraryProjectManagerDialog({
           </section>
 
           {error && (
-            <InlineAlert variant="destructive">
-              <InlineAlertDescription>{error}</InlineAlertDescription>
-            </InlineAlert>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
           <section>
@@ -186,7 +186,7 @@ export function LibraryProjectManagerDialog({
                               <div className="flex items-center gap-2">
                                 <span className="truncate text-sm font-medium">{project.name}</span>
                                 {currentProjectId === project.id && (
-                                  <StatusBadge variant="secondary">当前</StatusBadge>
+                                  <Badge variant="secondary">当前</Badge>
                                 )}
                               </div>
                               <p className="mt-1 text-xs text-muted-foreground">

@@ -254,60 +254,64 @@ export function ProductKitPage() {
   return (
     <div className="pk-workspace">
       {/* ── 左: 输入栏 ── */}
-      <ProductKitInputPane
-        images={images}
-        maxImages={maxImages}
-        imageLimitError={imageLimitError}
-        uploading={uploading}
-        onFiles={(f) => void uploadFiles(f)}
-        onRemoveImage={removeImage}
-        onOpenLibrary={openLibrary}
-        onOpenMobile={mobile.openMobile}
-        productName={productName}
-        onProductNameChange={setProductName}
-        brand={brand}
-        onBrandChange={setBrand}
-        platform={platform}
-        onPlatformChange={changePlatform}
-        language={language}
-        onLanguageChange={setLanguage}
-        description={description}
-        onDescriptionChange={setDescription}
-        analyzing={analyzing}
-        onAnalyze={() => void runAiAnalyze()}
-        onExpandDescription={() => setExpandOpen(true)}
-        counts={counts}
-        onCountChange={(key, value) => setCounts((c) => ({ ...c, [key]: value }))}
-        settingsOpen={settingsOpen}
-        onToggleSettings={toggleSettings}
-        ratio={ratio}
-        onRatioChange={changeRatio}
-        resolution={resolution}
-        onResolutionChange={changeResolution}
-        onModelQuoteChange={onModelQuoteChange}
-        onModelChange={setSelectedModel}
-        generating={generating}
-        formValid={formValid}
-        creditLabel={creditLabel}
-        onSubmit={() => void submit()}
-      />
+      <div className="h-full min-h-0 min-w-0">
+        <ProductKitInputPane
+          images={images}
+          maxImages={maxImages}
+          imageLimitError={imageLimitError}
+          uploading={uploading}
+          onFiles={(f) => void uploadFiles(f)}
+          onRemoveImage={removeImage}
+          onOpenLibrary={openLibrary}
+          onOpenMobile={mobile.openMobile}
+          productName={productName}
+          onProductNameChange={setProductName}
+          brand={brand}
+          onBrandChange={setBrand}
+          platform={platform}
+          onPlatformChange={changePlatform}
+          language={language}
+          onLanguageChange={setLanguage}
+          description={description}
+          onDescriptionChange={setDescription}
+          analyzing={analyzing}
+          onAnalyze={() => void runAiAnalyze()}
+          onExpandDescription={() => setExpandOpen(true)}
+          counts={counts}
+          onCountChange={(key, value) => setCounts((c) => ({ ...c, [key]: value }))}
+          settingsOpen={settingsOpen}
+          onToggleSettings={toggleSettings}
+          ratio={ratio}
+          onRatioChange={changeRatio}
+          resolution={resolution}
+          onResolutionChange={changeResolution}
+          onModelQuoteChange={onModelQuoteChange}
+          onModelChange={setSelectedModel}
+          generating={generating}
+          formValid={formValid}
+          creditLabel={creditLabel}
+          onSubmit={() => void submit()}
+        />
+      </div>
 
       {/* ── 右: 功能示例 / 创作结果 ── */}
-      <ToolBatchOutputPane
-        rightTab={rightTab}
-        onPickTab={pickRightTab}
-        generationCount={generationCount}
-        demo={<ProductKitExamplePanel />}
-        items={gallery.items}
-        loading={gallery.loading}
-        error={gallery.error}
-        emptyDesc={resultEmptyDesc}
-        emptyChildren={resultEmptyChildren}
-        onDeleteRow={deleteRow}
-        onRegenerateRow={regenerateFromRow}
-        labelOf={labelOf}
-        downloadNamePrefix="main-image"
-      />
+      <div className="h-full min-h-0 min-w-0">
+        <ToolBatchOutputPane
+          rightTab={rightTab}
+          onPickTab={pickRightTab}
+          generationCount={generationCount}
+          demo={<ProductKitExamplePanel />}
+          items={gallery.items}
+          loading={gallery.loading}
+          error={gallery.error}
+          emptyDesc={resultEmptyDesc}
+          emptyChildren={resultEmptyChildren}
+          onDeleteRow={deleteRow}
+          onRegenerateRow={regenerateFromRow}
+          labelOf={labelOf}
+          downloadNamePrefix="main-image"
+        />
+      </div>
 
       {/* 素材库选择弹窗 (真实数据) */}
       <AssetLibraryModal

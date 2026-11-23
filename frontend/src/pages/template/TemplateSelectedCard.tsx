@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MousePointerClick } from 'lucide-react';
 
-import { ImageLightbox, type LightboxItem } from './components';
+import { ImageLightbox, SectionCard, type LightboxItem } from './components';
 import type { TemplateEntry } from './utils';
 
 interface TemplateSelectedCardProps {
@@ -27,11 +27,14 @@ export function TemplateSelectedCard({ template, onClear }: TemplateSelectedCard
     : [];
 
   return (
-    <section className="pk-section">
-      <strong className="pk-section-title u-font-14">
-        <i className="pk-required-mark u-font-14">*</i>
-        选择模板
-      </strong>
+    <SectionCard
+      title={
+        <>
+          <i className="pk-required-mark u-font-14">*</i>
+          选择模板
+        </>
+      }
+    >
       {template ? (
         <div className="flex gap-3 rounded-lg border border-border bg-[var(--surface-soft)] p-3">
           <button
@@ -102,6 +105,6 @@ export function TemplateSelectedCard({ template, onClear }: TemplateSelectedCard
           ariaLabel="模板大图预览"
         />
       )}
-    </section>
+    </SectionCard>
   );
 }

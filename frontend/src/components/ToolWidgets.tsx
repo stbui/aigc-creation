@@ -3,12 +3,13 @@ import type { ReactNode } from 'react';
 import { Check } from 'lucide-react';
 
 import { DEFAULT_CUSTOM_COLOR, type ColorOption } from '../lib/colorPalette';
+import { cn, SectionCard, Slider } from '../ui';
 
 /**
  * 修图系工具页共享控件 —— 数值均来自参考站 computed styles 实拍:
  *   背景颜色 (background-color-options): 7 项, 透明白底用棋盘格, 自定义带调色盘图标
  *   原图位置 (smart-expand-position-grid): 3x3 方向键九宫格
- *   滑杆 (rotate-angle-range): 标签 + 值 + range (--range-progress 驱动填充)
+ *   滑杆 (rotate-angle-range): 标签 + 值 + shadcn Slider
  *   胶囊选项 (retouch-mode-options / 变体张数): 单选 pill, active 用品牌紫
  *
  * 色板取值不在这里定义 —— 见 `src/lib/colorPalette`。
@@ -151,23 +152,25 @@ export function RangeRow({
   value: number;
   onChange: (v: number) => void;
 }) {
-  const progress = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
-    <label className="grid gap-2 border-t border-[var(--tool-border-8)] pt-2.5">
+    <div data-slot="range-row" className="grid gap-2 border-t border-[var(--tool-border-8)] pt-2.5">
       <span className="flex items-center justify-between text-xs leading-4 text-[color:var(--text-5)]">
-        {label} <b className="font-semibold text-brand tabular-nums">{display ?? value}</b>
+        {label}
+        <b data-slot="range-value" className="font-semibold text-brand tabular-nums">
+          {display ?? value}
+        </b>
       </span>
-      <input
-        type="range"
+      <Slider
+        value={[value]}
         min={min}
         max={max}
         step={step}
-        value={value}
-        style={{ ['--range-progress' as string]: `${progress}%` }}
-        className="h-1 w-full cursor-pointer appearance-none rounded-[var(--radius-tag)] bg-[linear-gradient(90deg,var(--brand)_var(--range-progress),var(--tool-surface-3)_var(--range-progress))] outline-none [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-[var(--card-bg)] [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:shadow-[0_1px_4px_rgba(85,70,216,0.4)] [&::-moz-range-thumb]:size-2.5 [&::-moz-range-thumb]:cursor-grab [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-[var(--card-bg)] [&::-moz-range-thumb]:bg-brand [&::-moz-range-thumb]:shadow-[0_1px_4px_rgba(85,70,216,0.4)]"
-        onChange={(e) => onChange(Number(e.target.value))}
+        thumbAriaLabel={label}
+        onValueChange={([next]) => {
+          if (typeof next === 'number') onChange(next);
+        }}
       />
-    </label>
+    </div>
   );
 }
 
@@ -207,7 +210,7 @@ export function PillOptions({
   );
 }
 
-/** 业务卡 (参考站 local-redraw-card: 白底圆角 + 标题行) */
+/** 业务卡：外壳与标题行走 `SectionCard`，保留工具页的 `dense` / `titleGap` 变体 */
 export function ToolCard({
   title,
   children,
@@ -227,17 +230,15 @@ export function ToolCard({
   titleGap?: boolean;
 }) {
   return (
-    <section
-      className={`local-redraw-card tool-card grid gap-4 rounded-[var(--radius-panel)] bg-card p-4${dense ? ' is-dense' : ''}${className ? ` ${className}` : ''}`}
+    <SectionCard
+      title={title}
+      extra={title ? actions : undefined}
+      titleAs="h2"
+      className={cn('local-redraw-card tool-card', dense && 'is-dense', className)}
+      headerClassName={cn('card-title-row', titleGap && 'has-gap')}
     >
-      {title && (
-        <div className={`card-title-row${titleGap ? ' has-gap' : ''}`}>
-          <h2>{title}</h2>
-          {actions}
-        </div>
-      )}
       {children}
-    </section>
+    </SectionCard>
   );
 }
 

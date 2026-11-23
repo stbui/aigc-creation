@@ -6,7 +6,7 @@ import { useToolHistory, type ToolHistoryTask } from '../hooks/useToolHistory';
 import { ImageLightbox } from './ImageLightbox';
 import { ToolTrailingContext } from './ToolShell';
 import { StateError } from './StateViews';
-import { useApp, Sheet, SheetContent, SheetHeader, SheetTitle, Spin } from '../ui';
+import { useApp, Sheet, SheetContent, SheetHeader, SheetTitle, Spinner } from '../ui';
 
 /**
  * 修图工具的通用历史侧栏。
@@ -79,7 +79,7 @@ export function ToolHistoryGrid({
       <div className="redraw-history-scroll">
         {loading ? (
           <div className="redraw-history-loading" aria-live="polite">
-            <Spin className="size-4" />
+            <Spinner className="size-4" />
             <span>加载中…</span>
           </div>
         ) : error ? (

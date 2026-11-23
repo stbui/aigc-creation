@@ -5,7 +5,7 @@ import { Download, ImagePlus, RotateCcw, Trash2 } from 'lucide-react';
 
 import { ImageLightbox, type LightboxItem } from './ImageLightbox';
 import { ToolEmptyState } from './ToolEmptyState';
-import { Spin, useApp } from '../ui';
+import { Spinner, useApp } from '../ui';
 import { assetThumbUrl } from '../lib/api';
 import { downloadUrlsAsZip } from '../lib/zip';
 import type { GalleryItem } from '../hooks/useResultGallery';
@@ -258,7 +258,7 @@ function BatchResultListImpl<Row extends BatchRow>({
     return (
       <section className="pk-result-pane">
         <div className="fc-result-loading">
-          <Spin />
+          <Spinner />
         </div>
       </section>
     );

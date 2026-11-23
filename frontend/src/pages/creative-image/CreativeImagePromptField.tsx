@@ -1,6 +1,7 @@
 import { Maximize2, Sparkles } from 'lucide-react';
 
 import { CREATION_PROMPT_PLACEHOLDER, MAX_PROMPT_LEN } from './constants';
+import { SectionCard } from './components';
 
 interface CreativeImagePromptFieldProps {
   value: string;
@@ -23,13 +24,14 @@ export function CreativeImagePromptField({
   onExpand,
 }: CreativeImagePromptFieldProps) {
   return (
-    <div className="pk-section">
-      <div className="flex min-h-4 items-center justify-between gap-2.5">
-        {/* 必填星由 ::before 提供，与参考站同一位置 */}
-        <span className="text-sm leading-[13px] font-bold text-[color:var(--wb-text)] before:mr-0.5 before:text-[color:var(--danger-ref)] before:content-['*']">
+    <SectionCard
+      title={
+        <span className="before:mr-0.5 before:text-[color:var(--danger-ref)] before:content-['*']">
           创作提示词
         </span>
-        <div className="flex items-center gap-3">
+      }
+      extra={
+        <>
           <button
             type="button"
             className={TOOL_BTN}
@@ -48,8 +50,9 @@ export function CreativeImagePromptField({
             <Sparkles size={13} />
             <span>图片转提示词</span>
           </button>
-        </div>
-      </div>
+        </>
+      }
+    >
       <div className="pk-desc-editor">
         {/* 共享皮肤给的是 80px + resize:none；本页拉高到 140px 并允许纵向拉伸 */}
         <textarea
@@ -70,6 +73,6 @@ export function CreativeImagePromptField({
           <Maximize2 size={15} />
         </button>
       </div>
-    </div>
+    </SectionCard>
   );
 }

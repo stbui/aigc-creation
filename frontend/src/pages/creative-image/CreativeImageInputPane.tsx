@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 
 import { MAX_REF_IMAGES } from './constants';
-import { ToolGenerationSubmitBar } from './components';
+import { SectionCard, ToolGenerationSubmitBar } from './components';
 import type { ToolAsset } from './components';
 import { CreativeImagePromptField } from './CreativeImagePromptField';
 import { CreativeImageUploadSection } from './CreativeImageUploadSection';
@@ -83,7 +83,7 @@ export function CreativeImageInputPane({
         </div>
 
         <div className="pk-form-scroll">
-          <section className="pk-config-card">
+          <SectionCard>
             <CreativeImageUploadSection
               images={images}
               maxImages={MAX_REF_IMAGES}
@@ -94,14 +94,15 @@ export function CreativeImageInputPane({
               onOpenLibrary={onOpenLibrary}
               onOpenMobile={onOpenMobile}
             />
-            <CreativeImagePromptField
-              value={prompt}
-              onChange={onPromptChange}
-              onPolish={onPolish}
-              onImageToPrompt={onImageToPrompt}
-              onExpand={onExpandPrompt}
-            />
-          </section>
+          </SectionCard>
+
+          <CreativeImagePromptField
+            value={prompt}
+            onChange={onPromptChange}
+            onPolish={onPolish}
+            onImageToPrompt={onImageToPrompt}
+            onExpand={onExpandPrompt}
+          />
         </div>
 
         <ToolGenerationSubmitBar

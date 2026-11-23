@@ -1,7 +1,7 @@
 import { Wallet } from 'lucide-react';
 
 import type { CreditBalance } from '../../types/api';
-import { Surface, SurfaceContent } from './components';
+import { Card, CardContent } from './components';
 import { formatDate } from './utils';
 
 interface CreditsHeroProps {
@@ -11,8 +11,8 @@ interface CreditsHeroProps {
 /** 顶部余额卡：可用积分、最近到期日与扣减口径。 */
 export function CreditsHero({ balance }: CreditsHeroProps) {
   return (
-    <Surface className="rounded-xl border border-border bg-[linear-gradient(120deg,var(--brand-bg)_0%,var(--card-bg)_62%)]">
-      <SurfaceContent className="flex flex-col items-start gap-5 px-5 py-5 min-[901px]:flex-row min-[901px]:items-center min-[901px]:justify-between min-[901px]:px-6">
+    <Card className="rounded-xl border border-border bg-[linear-gradient(120deg,var(--brand-bg)_0%,var(--card-bg)_62%)]">
+      <CardContent className="flex flex-col items-start gap-5 px-5 py-5 min-[901px]:flex-row min-[901px]:items-center min-[901px]:justify-between min-[901px]:px-6">
       <div className="flex min-w-0 items-center gap-3.5">
         <span
           className="grid size-11 flex-none place-items-center rounded-lg bg-card text-brand shadow-[0_2px_10px_color-mix(in_oklab,var(--brand)_12%,transparent)]"
@@ -51,7 +51,7 @@ export function CreditsHero({ balance }: CreditsHeroProps) {
           </span>
         </div>
       )}
-      </SurfaceContent>
-    </Surface>
+      </CardContent>
+    </Card>
   );
 }

@@ -13,7 +13,7 @@ import {
   DialogTitle,
   ImageUploadArea,
   ImageUploadThumb,
-  Spin,
+  Spinner,
 } from '../ui';
 
 /**
@@ -187,7 +187,7 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
           />
           {loading && (
             <div className="pt-polish-loading">
-              <Spin className="size-4" />
+              <Spinner className="size-4" />
             </div>
           )}
         </div>

@@ -10,7 +10,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-  Spin,
+  Spinner,
 } from '../ui';
 
 /**
@@ -127,7 +127,7 @@ export function PromptPolishModal({ open, value, onApply, onCancel }: PromptPoli
           />
           {loading && (
             <div className="pt-polish-loading">
-              <Spin className="size-4" />
+              <Spinner className="size-4" />
             </div>
           )}
         </div>

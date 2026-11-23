@@ -7,14 +7,14 @@ import { assetThumbUrl } from '../lib/api';
 import {
   Badge,
   Button,
-  EmptyState,
-  EmptyStateDescription,
-  EmptyStateHeader,
-  EmptyStateMedia,
-  EmptyStateTitle,
-  InlineAlert,
-  InlineAlertDescription,
-  InlineAlertTitle,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Skeleton,
   Tabs,
   TabsContent,
@@ -135,10 +135,10 @@ export function SkuResultPanel({
         <span className="text-xs text-muted-foreground">模型正在保持版式并替换框选区域</span>
       </div>
     ) : active.status === 'failed' || active.status === 'cancelled' ? (
-      <InlineAlert variant="destructive" className="w-auto">
+      <Alert variant="destructive" className="w-auto">
         <TriangleAlert aria-hidden />
-        <InlineAlertTitle>{active.label} 生成失败</InlineAlertTitle>
-        <InlineAlertDescription>
+        <AlertTitle>{active.label} 生成失败</AlertTitle>
+        <AlertDescription>
           {active.errorCode ? taskErrorText(active.errorCode) : '任务未能完成，可重试这一张'}
           {onRetryFailed && (
             <Button
@@ -153,8 +153,8 @@ export function SkuResultPanel({
               {retrying ? '重试中…' : '重试此 SKU'}
             </Button>
           )}
-        </InlineAlertDescription>
-      </InlineAlert>
+        </AlertDescription>
+      </Alert>
     ) : active.url ? (
       <>
         <Button
@@ -210,13 +210,13 @@ export function SkuResultPanel({
       )}
 
       {error || notice ? (
-        <InlineAlert
+        <Alert
           variant={error ? 'destructive' : 'default'}
           className="mb-2.5"
           role="status"
         >
-          <InlineAlertDescription>{error || notice}</InlineAlertDescription>
-        </InlineAlert>
+          <AlertDescription>{error || notice}</AlertDescription>
+        </Alert>
       ) : null}
 
       {items.length === 0 ? (
@@ -265,17 +265,17 @@ export function SkuResultPanel({
             </span>
           </div>
         ) : (
-          <EmptyState className="flex-1 border-0">
-            <EmptyStateMedia variant="icon">
+          <Empty className="flex-1 border-0">
+            <EmptyMedia variant="icon">
               <ImageIcon aria-hidden />
-            </EmptyStateMedia>
-            <EmptyStateHeader>
-              <EmptyStateTitle className="text-sm font-semibold">商品SKU图</EmptyStateTitle>
-              <EmptyStateDescription className="text-xs">
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle className="text-sm font-semibold">商品SKU图</EmptyTitle>
+              <EmptyDescription className="text-xs">
                 一张图，批量套出版式完全一致的整组 SKU 图。
-              </EmptyStateDescription>
-            </EmptyStateHeader>
-          </EmptyState>
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )
       ) : (
         <Tabs

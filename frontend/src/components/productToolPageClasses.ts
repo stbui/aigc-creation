@@ -6,8 +6,8 @@
  * 现在作为 `pageClass` / `UploadSpec.dropzoneClassName` 传入，由 Tailwind
  * 工具类表达，不再依赖某个路由的样式表是否已加载。
  *
- * 骨架内侧元素（`.pk-config-card` / `.pk-submit-actions` 等）不接受页面重写结构，
- * 只用 `[&_.x]` 变体调尺寸；断点变体写在元素变体之前
+ * 骨架内侧元素（`SectionCard` / `.pk-submit-actions` 等）不接受页面重写结构，
+ * 只用 `[&_.x]` / `[&_[data-slot=…]]` 变体调尺寸；断点变体写在元素变体之前
  * （`max-[900px]:[&_.x]:…`），避免任意变体嵌套造成无效选择器。
  */
 
@@ -31,9 +31,8 @@ const PAGE_INNER = [
   '[&_.pk-input-pane]:w-full! [&_.pk-input-pane]:h-full! [&_.pk-input-pane]:min-h-0!',
   'min-[901px]:[&_.pk-input-pane]:pr-1!',
   '[&_.pk-result-pane]:w-full! [&_.pk-result-pane]:h-full! [&_.pk-result-pane]:min-h-0!',
-  // 配置卡 / 区块 / 提交区比骨架紧一档
-  '[&_.pk-config-card]:p-4! [&_.pk-config-card]:rounded-[var(--radius-panel)]!',
-  '[&_.pk-section]:gap-3!',
+  // 卡片内容间距 / 提交区比骨架紧一档（卡片本身的 p-4 与 16px 圆角已是默认）
+  '[&_[data-slot=section-card-content]]:gap-3!',
   '[&_.pk-submit-actions]:pt-3.5! [&_.pk-submit-actions]:px-4! [&_.pk-submit-actions]:pb-4! [&_.pk-submit-actions]:gap-3.5!',
   '[&_.pk-primary-btn]:h-[34px]!',
   '[&_.pk-form-scroll]:gap-3!',
@@ -46,7 +45,7 @@ const PAGE_INNER = [
   '[&_.pk-preview-inner_p]:text-xs! [&_.pk-preview-inner_p]:leading-5!',
   '[&_.pk-result-pane-editor]:bg-transparent!',
   // 1366：上传卡标题行与说明收一档
-  'min-[1181px]:max-[1366px]:[&_.pk-section-title]:text-xs!',
+  'min-[1181px]:max-[1366px]:[&_[data-slot=image-upload-header]_strong]:text-xs!',
   'min-[1181px]:max-[1366px]:[&_[data-slot=image-upload-header]]:gap-1!',
   'min-[1181px]:max-[1366px]:[&_[data-slot=image-upload-actions]]:gap-1!',
 ].join(' ');
@@ -61,8 +60,8 @@ const PAGE_MOBILE = [
   'max-[900px]:[&_.pk-form-card]:block! max-[900px]:[&_.pk-form-card]:h-auto!',
   'max-[900px]:[&_.pk-form-scroll]:grid! max-[900px]:[&_.pk-form-scroll]:flex-none! max-[900px]:[&_.pk-form-scroll]:overflow-visible! max-[900px]:[&_.pk-form-scroll]:mb-3!',
   'max-[900px]:[&_.pk-result-pane]:h-auto! max-[900px]:[&_.pk-result-pane]:min-h-[720px]!',
-  'max-[900px]:[&_.pk-config-card]:p-3.5!',
-  'max-[900px]:[&_.pk-section]:gap-2.5!',
+  'max-[900px]:[&_[data-slot=section-card]]:p-3.5!',
+  'max-[900px]:[&_[data-slot=section-card-content]]:gap-2.5!',
   'max-[900px]:[&_.pk-submit-actions]:pt-3! max-[900px]:[&_.pk-submit-actions]:px-3.5! max-[900px]:[&_.pk-submit-actions]:pb-3.5!',
   'max-[900px]:[&_.pk-primary-btn]:h-10!',
 ].join(' ');

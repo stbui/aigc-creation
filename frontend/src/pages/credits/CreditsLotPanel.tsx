@@ -10,7 +10,7 @@ import {
   StateEmpty,
   StateError,
   StateSkeleton,
-  StatusBadge,
+  Badge,
   Table,
   TableBody,
   TableCell,
@@ -118,12 +118,12 @@ export function CreditsLotPanel({
             <TableCell>{lot.expireAt ? formatDate(lot.expireAt) : '永久'}</TableCell>
             <TableCell>
               {/* 不用预设色: 默认绿字在淡绿底上对比度不足, 状态色统一走 LOT_STATUS_TONE */}
-              <StatusBadge
+              <Badge
                 variant="secondary"
                 className={`h-[22px] rounded-full border-0 px-2 text-xs font-medium ${LOT_STATUS_TONE[lot.status]}`}
               >
                 {LOT_STATUS[lot.status] ?? LOT_STATUS.active}
-              </StatusBadge>
+              </Badge>
             </TableCell>
           </TableRow>
         ))}

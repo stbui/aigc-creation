@@ -6,11 +6,11 @@ import { ToolGeneratingState, type ToolResult } from './components';
 import {
   AspectRatio,
   Badge,
-  EmptyState,
-  EmptyStateDescription,
-  EmptyStateHeader,
-  EmptyStateMedia,
-  EmptyStateTitle,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
   ToggleGroup,
   ToggleGroupItem,
 } from './components';
@@ -39,7 +39,7 @@ function FusionStage({ ratio, children }: { ratio: number; children: ReactNode }
  * `status.state` 映射成对应的画面，不参与任何取数或动作判定。
  *
  * 2026-11-21 舞台、空态与失败态改由 shadcn 组合：比例框 `AspectRatio`、
- * 空态 `EmptyState`（三卡片斜叠插画作为 `EmptyStateMedia`）、尺寸胶囊 `Badge`、
+ * 空态 `Empty`（三卡片斜叠插画作为 `EmptyMedia`）、尺寸胶囊 `Badge`、
  * 变体切换 `ToggleGroup`（单选，`aria-pressed` 由 Radix 维护）。
  * 棋盘格底是本页标志性视觉，作为舞台底色保留在页面 CSS（无交互语义的图形）。
  */
@@ -94,16 +94,16 @@ export function MultiFusionResultStage({
   if (lastFailure && results.length === 0) {
     return (
       <FusionStage ratio={ratio}>
-        <EmptyState className="size-full border-0 p-5.5">
-          <EmptyStateHeader>
-            <EmptyStateTitle className="text-xs font-semibold text-foreground">
+        <Empty className="size-full border-0 p-5.5">
+          <EmptyHeader>
+            <EmptyTitle className="text-xs font-semibold text-foreground">
               {failureHeading}
-            </EmptyStateTitle>
-            <EmptyStateDescription className="text-xs leading-4.25">
+            </EmptyTitle>
+            <EmptyDescription className="text-xs leading-4.25">
               {failureDetail}
-            </EmptyStateDescription>
-          </EmptyStateHeader>
-        </EmptyState>
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </FusionStage>
     );
   }
@@ -111,9 +111,9 @@ export function MultiFusionResultStage({
   if (results.length === 0) {
     return (
       <FusionStage ratio={ratio}>
-        <EmptyState className="size-full border-0 p-5.5">
+        <Empty className="size-full border-0 p-5.5">
           {/* D-84: 参考站是 96x78 三卡片斜叠插画 (-9deg / 0 / +9deg), 非共用插画组件 */}
-          <EmptyStateMedia className="mb-2 h-[78px] w-24 bg-transparent">
+          <EmptyMedia className="mb-2 h-[78px] w-24 bg-transparent">
             <span className="relative block size-full" aria-hidden>
               <span className="absolute top-3 left-0.75 grid size-12.5 -rotate-9 place-items-center rounded-lg border border-border bg-card text-brand shadow-card">
                 <ImagePlus className="size-4.5" />
@@ -125,14 +125,14 @@ export function MultiFusionResultStage({
                 <Layers className="size-4.5" />
               </span>
             </span>
-          </EmptyStateMedia>
-          <EmptyStateHeader>
-            <EmptyStateTitle className="text-xs font-semibold text-foreground">
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle className="text-xs font-semibold text-foreground">
               {EMPTY_TITLE}
-            </EmptyStateTitle>
-            <EmptyStateDescription className="text-xs">{EMPTY_HINT}</EmptyStateDescription>
-          </EmptyStateHeader>
-        </EmptyState>
+            </EmptyTitle>
+            <EmptyDescription className="text-xs">{EMPTY_HINT}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </FusionStage>
     );
   }
@@ -140,16 +140,16 @@ export function MultiFusionResultStage({
   if (!activeResult?.url) {
     return (
       <FusionStage ratio={ratio}>
-        <EmptyState className="size-full border-0 p-5.5">
-          <EmptyStateHeader>
-            <EmptyStateTitle className="text-xs font-semibold text-foreground">
+        <Empty className="size-full border-0 p-5.5">
+          <EmptyHeader>
+            <EmptyTitle className="text-xs font-semibold text-foreground">
               生成失败
-            </EmptyStateTitle>
-            <EmptyStateDescription className="text-xs">
+            </EmptyTitle>
+            <EmptyDescription className="text-xs">
               模型没有返回可用图片，请重试
-            </EmptyStateDescription>
-          </EmptyStateHeader>
-        </EmptyState>
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </FusionStage>
     );
   }

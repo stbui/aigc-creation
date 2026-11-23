@@ -22,3 +22,5 @@ export { ResultGalleryPane } from '../../components/ResultGalleryPane';
 export { OutputTabsPane, type OutputTab } from '../../components/OutputTabsPane';
 /** 模型选择器（写真模板页隐藏实时报价行，见 TemplateInputPane） */
 export { ModelPicker } from '../../components/ModelPicker';
+/** 配置卡外壳（白底面板 + 可选标题行） */
+export { SectionCard } from '../../ui';

@@ -1,7 +1,7 @@
 import '../styles/auth.css';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Spin } from '../ui';
+import { Button, Spinner } from '../ui';
 import { authApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { safeInternalPath } from '../lib/safePath';
@@ -67,7 +67,7 @@ export function OAuthCallbackPage() {
           </>
         ) : (
           <>
-            <Spin className="size-7" />
+            <Spinner className="size-7" />
             <p className="mx-0 my-4 text-[color:var(--text-muted)]">正在完成登录…</p>
           </>
         )}

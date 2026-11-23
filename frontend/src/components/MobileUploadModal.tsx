@@ -13,7 +13,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-  Spin,
+  Spinner,
 } from '../ui';
 
 /**
@@ -204,7 +204,7 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
           {loading && !qrDataUrl ? (
             <div className="mum-qr-box">
               <div className="mum-qr-state">
-                <Spin className="size-4" />
+                <Spinner className="size-4" />
                 <span>正在生成二维码…</span>
               </div>
             </div>
@@ -224,7 +224,7 @@ export function MobileUploadModal({ open, projectId, onReceived, onCancel }: Mob
                 {qrDataUrl && <img src={qrDataUrl} alt="手机上传二维码" />}
               </div>
               <div className="mum-waiting">
-                <Spin className="size-4" />
+                <Spinner className="size-4" />
                 <span>手机扫码上传 · 等待扫码完成</span>
               </div>
               {remainSec > 0 && <small className="mum-expiry">{remainSec} 秒后失效</small>}

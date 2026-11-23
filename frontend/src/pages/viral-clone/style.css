@@ -434,8 +434,8 @@
  * 间距」，在爆款复刻是「一整张卡 + 16px 间距」，两页并排看明显不是一套组件。
  *
  * 现在骨架统一走 `tool-workspace.css` 里的 `pk-workspace` / `pk-input-pane` /
- * `pk-form-card` / `pk-form-scroll` / `pk-config-card`，本文件只保留爆款复刻
- * 特有的控件皮肤（复刻程度选项、结果对照行）。
+ * `pk-form-card` / `pk-form-scroll`，左栏分组统一用 `SectionCard`；本文件只保留
+ * 爆款复刻特有的控件皮肤（复刻程度选项、结果对照行）。
  */
 
 .vc-result-alert {

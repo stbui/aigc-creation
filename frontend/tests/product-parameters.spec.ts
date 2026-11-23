@@ -263,6 +263,14 @@ async function setRange(locator: ReturnType<Page['locator']>, value: number) {
   }, value);
 }
 
+/** Radix Slider：Home 回到下界，PageUp 每次 +10 个 step，再从下界点按到目标值 */
+async function setSlider(locator: ReturnType<Page['locator']>, keys: string[]) {
+  await locator.focus();
+  for (const key of keys) {
+    await locator.press(key);
+  }
+}
+
 type Size = [number, number];
 
 const PRODUCT_SOURCE_DESKTOP: Record<string, Size> = {
@@ -311,7 +319,7 @@ async function readProductSourceLayout(page: Page) {
     const card = document.querySelector<HTMLElement>('.product-retouch-result-card');
     const sourceImage = document.querySelector<HTMLImageElement>('.product-retouch-result-preview img');
     return {
-      uploadCard: size('.pk-workspace.product-retouch-page .pk-config-card'),
+      uploadCard: size('.pk-workspace.product-retouch-page [data-slot=section-card]'),
       row: size('.pk-workspace.product-retouch-page .source-row'),
       thumb: size('.product-retouch-source-preview'),
       thumbImage: size('.product-retouch-source-preview img'),
@@ -491,7 +499,8 @@ test.describe('8 个工具页参数与结果态', () => {
     await uploadAndWait(page);
     await expectProductSourceLayout(page, PRODUCT_SOURCE_DESKTOP);
 
-    await page.locator('.image-translate-language-field select').selectOption('ja-JP');
+    await page.getByRole('combobox', { name: '目标语言' }).click();
+    await page.getByRole('option', { name: '日本語' }).click();
     await page.getByRole('switch').click();
     await chooseResolution(page, '2K');
 
@@ -528,7 +537,7 @@ test.describe('8 个工具页参数与结果态', () => {
         return box ? [Math.round(box.width), Math.round(box.height)] : null;
       };
       return {
-        card: rect('.smart-expand-page .pk-config-card'),
+        card: rect('.smart-expand-page [data-slot=section-card]'),
         row: rect('.smart-expand-source-row'),
         thumb: rect('.smart-expand-source-thumb'),
         reupload: rect('.smart-expand-source-reupload'),
@@ -752,7 +761,8 @@ test.describe('8 个工具页参数与结果态', () => {
     await expectProductSourceLayout(page, PRODUCT_SOURCE_DESKTOP);
 
     const preview = page.locator('.rotate-angle-preview');
-    const before = await page.locator('.rotate-angle-range b').first().textContent();
+    const valueText = page.locator('[data-slot=range-row] [data-slot=range-value]').first();
+    const before = await valueText.textContent();
     await preview.scrollIntoViewIfNeeded();
     const box = await preview.boundingBox();
     expect(box).not.toBeNull();
@@ -760,12 +770,16 @@ test.describe('8 个工具页参数与结果态', () => {
     await page.mouse.down();
     await page.mouse.move(box!.x + box!.width / 2 + 55, box!.y + box!.height / 2 - 18, { steps: 6 });
     await page.mouse.up();
-    await expect(page.locator('.rotate-angle-range b').first()).not.toHaveText(before ?? '');
+    await expect(valueText).not.toHaveText(before ?? '');
 
-    const sliders = page.locator('.rotate-angle-range input[type=range]');
-    await setRange(sliders.nth(0), 35);
-    await setRange(sliders.nth(1), 20);
-    await setRange(sliders.nth(2), 1.1);
+    // 旋转 -90→35：12×PageUp(10) + 5×ArrowRight(1)；倾斜 -30→20：5×PageUp；缩放 0.8→1.1：3×PageUp(0.1)
+    await setSlider(page.getByRole('slider', { name: '旋转' }), [
+      'Home',
+      ...Array(12).fill('PageUp'),
+      ...Array(5).fill('ArrowRight'),
+    ]);
+    await setSlider(page.getByRole('slider', { name: '倾斜' }), ['Home', ...Array(5).fill('PageUp')]);
+    await setSlider(page.getByRole('slider', { name: '缩放' }), ['Home', ...Array(3).fill('PageUp')]);
     await chooseRatio(page, '16:9');
 
     const posted = await waitForPosted(page, env.posted);
@@ -1093,7 +1107,7 @@ test.describe('移动端布局烟测', () => {
         const box = document.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
         return box ? [Math.round(box.width), Math.round(box.height)] : null;
       };
-      const cards = [...document.querySelectorAll<HTMLElement>('.smart-expand-page .smart-expand-card')].map(
+      const cards = [...document.querySelectorAll<HTMLElement>('.smart-expand-page [data-slot=section-card]')].map(
         (card) => {
           const box = card.getBoundingClientRect();
           return [Math.round(box.width), Math.round(box.height)];
@@ -1101,12 +1115,12 @@ test.describe('移动端布局烟测', () => {
       );
       return {
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        uploadCard: rect('.smart-expand-page .pk-config-card'),
+        uploadCard: rect('.smart-expand-page [data-slot=section-card]'),
         row: rect('.smart-expand-source-row'),
         thumb: rect('.smart-expand-source-thumb'),
         reupload: rect('.smart-expand-source-reupload'),
-        scaleCard: cards[0] ?? null,
-        positionCard: cards[1] ?? null,
+        scaleCard: cards[1] ?? null,
+        positionCard: cards[2] ?? null,
         preview: rect('.smart-expand-source-preview'),
       };
     });

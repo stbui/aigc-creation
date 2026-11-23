@@ -7,8 +7,8 @@ import {
   PersonalPage,
   StateButton,
   StateEmpty,
-  Surface,
-  SurfaceContent,
+  Card,
+  CardContent,
   Tabs,
   TabsContent,
   TabsList,
@@ -99,8 +99,8 @@ export function CreditsPage() {
       <CreditsHero balance={balance} />
       <CreditsStatsGrid balance={balance} />
 
-      <Surface className="rounded-xl">
-        <SurfaceContent className="px-5 pt-4 pb-5 max-[900px]:px-3.5 max-[900px]:pt-3 max-[900px]:pb-4">
+      <Card className="rounded-xl">
+        <CardContent className="px-5 pt-4 pb-5 max-[900px]:px-3.5 max-[900px]:pt-3 max-[900px]:pb-4">
         <Tabs value={tab} onValueChange={(key) => setTab(key as Tab)}>
           {/*
             线形页签：下划线压在列表底边的分隔线上。
@@ -142,8 +142,8 @@ export function CreditsPage() {
             />
           </TabsContent>
         </Tabs>
-        </SurfaceContent>
-      </Surface>
+        </CardContent>
+      </Card>
     </PersonalPage>
   );
 }

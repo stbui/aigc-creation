@@ -4,12 +4,7 @@ import { SUPPORTED_IMAGE_ACCEPT } from './constants';
 import {
   ImageDropzone,
   ImageUploadArea,
-  Surface,
-  SurfaceAction,
-  SurfaceContent,
-  SurfaceDescription,
-  SurfaceHeader,
-  SurfaceTitle,
+  SectionCard,
   TextAction,
   type ToolAsset,
 } from './components';
@@ -42,50 +37,49 @@ export function ProductSkuTemplateCard({
   onPreview,
 }: ProductSkuTemplateCardProps) {
   return (
-    <Surface className="block gap-0 rounded-xl border-0 bg-card p-4 shadow-none">
-      <SurfaceHeader className="mb-3 gap-1 px-0">
-        <SurfaceTitle className="text-sm leading-5 font-bold">SKU模板图</SurfaceTitle>
-        <SurfaceAction className="flex items-center gap-2">
+    <SectionCard
+      title="SKU模板图"
+      extra={
+        <>
           <TextAction onClick={onOpenLibrary}>从素材库导入</TextAction>
           <TextAction onClick={onOpenMobile}>手机上传</TextAction>
-        </SurfaceAction>
-        <SurfaceDescription className="mt-1.5 w-full text-xs leading-5 font-normal text-muted-foreground">
-          选一张结构最完整的成品图作为模板，框选要跟随SKU变动的区域，最多支持3个SKU变体区域
-        </SurfaceDescription>
-      </SurfaceHeader>
+        </>
+      }
+    >
+      <p className="m-0 text-xs leading-5 font-normal text-muted-foreground">
+        选一张结构最完整的成品图作为模板，框选要跟随SKU变动的区域，最多支持3个SKU变体区域
+      </p>
 
-      <SurfaceContent className="px-0">
-        <ImageUploadArea
-          variant="plain"
-          images={template ? [template] : []}
-          max={1}
-          single
-          uploading={uploading}
-          accept={SUPPORTED_IMAGE_ACCEPT}
-          ariaLabel="上传SKU模板图"
-          emptyContent={(controls) => (
-            <ImageDropzone
-              title="点击或拖拽图片到此处上传"
-              hint="点击、拖拽或粘贴图片上传，最多 1 张"
-              icon={<ImagePlus aria-hidden />}
-              onClick={controls.open}
+      <ImageUploadArea
+        variant="plain"
+        images={template ? [template] : []}
+        max={1}
+        single
+        uploading={uploading}
+        accept={SUPPORTED_IMAGE_ACCEPT}
+        ariaLabel="上传SKU模板图"
+        emptyContent={(controls) => (
+          <ImageDropzone
+            title="点击或拖拽图片到此处上传"
+            hint="点击、拖拽或粘贴图片上传，最多 1 张"
+            icon={<ImagePlus aria-hidden />}
+            onClick={controls.open}
+          />
+        )}
+        renderPreview={(items, controls) => {
+          const image = items[0];
+          if (!image) return null;
+          return (
+            <ProductSkuTemplatePreview
+              template={image}
+              onPreview={onPreview}
+              onEditRegions={onEditRegions}
+              onReupload={controls.open}
             />
-          )}
-          renderPreview={(items, controls) => {
-            const image = items[0];
-            if (!image) return null;
-            return (
-              <ProductSkuTemplatePreview
-                template={image}
-                onPreview={onPreview}
-                onEditRegions={onEditRegions}
-                onReupload={controls.open}
-              />
-            );
-          }}
-          onFiles={onUpload}
-        />
-      </SurfaceContent>
-    </Surface>
+          );
+        }}
+        onFiles={onUpload}
+      />
+    </SectionCard>
   );
 }

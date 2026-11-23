@@ -14,9 +14,8 @@ import { ViralCloneRequirementCard } from './ViralCloneRequirementCard';
  * 展示组件不持有业务状态，避免把「提交 / 扣费」逻辑分散到布局层。
  *
  * 骨架与商品主图 / 商品详情同源：`pk-input-pane` → `pk-form-card` →
- * `pk-form-scroll`（内含多张 `pk-config-card`）+ 底部 `ToolGenerationSubmitBar`。
- * 三页共用同一套工具页皮肤，不再各自包一层 Card，否则栏内分组、圆角与留白
- * 会与相邻页面对不上。
+ * `pk-form-scroll`（内含多张 `SectionCard`）+ 底部 `ToolGenerationSubmitBar`。
+ * 三页共用同一套卡片组件与 10px 栏内间距，分组、圆角与留白保持一致。
  */
 export interface ViralCloneInputPaneProps {
   // ── 上传 ──

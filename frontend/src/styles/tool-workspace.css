@@ -94,16 +94,6 @@
   align-content: start;
 }
 
-.pk-config-card {
-  background: var(--card-bg);
-  border-radius: var(--radius-panel);
-  padding: var(--space-16);
-  display: grid;
-  gap: var(--space-24);
-  /* 窄屏时配置卡是 grid 项, 默认 min-width:auto 会被内部固定宽子项顶开 */
-  min-width: 0;
-}
-
 .pk-section {
   display: grid;
   gap: var(--space-16);
@@ -274,41 +264,6 @@
 .pk-desc-expand:hover {
   color: var(--brand);
   border-color: var(--brand-light);
-}
-
-/* 自定义配置 */
-
-.pk-count-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-16);
-}
-
-.pk-count-field {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: var(--space-16);
-  align-items: center;
-  height: 32px;
-}
-
-.pk-count-label {
-  color: var(--text-muted);
-  line-height: 13px;
-}
-
-/* 自定义配置：标题行 + 张数合计 */
-
-.pk-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-}
-
-.pk-section-count {
-  color: var(--text-muted);
-  line-height: 13px;
 }
 
 /* 高级设置 + 提交 */
@@ -857,26 +812,6 @@
 
 /* ───────── 商品详情页: 包含模块选择器 (实拍: 2 列 x 192, 选项 192x66 var(--surface)) ───────── */
 
-.pk-section-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-  min-height: 20px;
-}
-
-.pk-section-counter {
-  font-size: 12px;
-  color: var(--danger-ref);
-  line-height: 20px;
-}
-
-.pk-section-picker {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-16);
-}
-
 .pk-section-option {
   min-height: 66px;
   background: var(--surface);
@@ -1267,16 +1202,6 @@
 @media (max-width: 480px) {
   .pk-form-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .pk-count-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-10);
-  }
-
-  .pk-count-field {
-    grid-template-columns: 52px minmax(0, 1fr);
-    gap: var(--space-12);
   }
 }
 

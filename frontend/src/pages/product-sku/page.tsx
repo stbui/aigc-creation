@@ -5,11 +5,11 @@ import { MAX_REGIONS, type LibraryTarget } from './constants';
 import {
   AssetLibraryModal,
   ImageLightbox,
-  InlineAlert,
-  InlineAlertDescription,
+  Alert,
+  AlertDescription,
   MobileUploadModal,
   SkuRegionEditorModal,
-  Spin,
+  Spinner,
   useApp,
   type SkuRegion,
   type ToolAsset,
@@ -298,14 +298,14 @@ export function ProductSkuPage() {
       />
 
       {restoringId && (
-        <InlineAlert
+        <Alert
           className="fixed right-6 bottom-6 z-[2500] w-auto shadow-card"
           role="status"
           aria-live="polite"
         >
-          <Spin className="size-4" />
-          <InlineAlertDescription>正在恢复历史提交…</InlineAlertDescription>
-        </InlineAlert>
+          <Spinner className="size-4" />
+          <AlertDescription>正在恢复历史提交…</AlertDescription>
+        </Alert>
       )}
 
       {previewUrl && (

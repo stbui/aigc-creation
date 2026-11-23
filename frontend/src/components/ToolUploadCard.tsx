@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 
 import { assetThumbUrl } from '../lib/api';
-import { ImageUploadArea, ImageUploadHeader } from '../ui';
+import { ImageUploadArea, ImageUploadHeader, SectionCard } from '../ui';
 import type { ToolAsset, UploadPreviewControls, UploadSpec } from './toolShellTypes';
 
 /**
@@ -43,37 +43,35 @@ export function ToolUploadCard({
   onPreview,
 }: Props) {
   return (
-    <section className="pk-config-card">
-      <div className="pk-section">
-        <ImageUploadHeader
-          title={upload.title}
-          required={upload.required}
-          count={upload.max > 1 ? `${images.length}/${upload.max}` : undefined}
-          onOpenLibrary={onOpenLibrary}
-          onOpenMobile={onOpenMobile}
-          mobileHint="用手机扫码上传，图片回填到左侧"
-        />
+    <SectionCard>
+      <ImageUploadHeader
+        title={upload.title}
+        required={upload.required}
+        count={upload.max > 1 ? `${images.length}/${upload.max}` : undefined}
+        onOpenLibrary={onOpenLibrary}
+        onOpenMobile={onOpenMobile}
+        mobileHint="用手机扫码上传，图片回填到左侧"
+      />
 
-        <ImageUploadArea
-          images={images.map((image) => ({
-            ...image,
-            thumbUrl: assetThumbUrl(image.url, 320) ?? image.url,
-          }))}
-          max={upload.max}
-          uploading={uploading}
-          accept={upload.accept ?? allowedAccept}
-          single={upload.max === 1}
-          className={upload.dropzoneClassName}
-          ariaLabel={upload.title}
-          emptyTitle={upload.prompt ?? '点击或拖拽图片到此处上传'}
-          emptyHint={upload.hint}
-          emptyIcon={upload.promptIcon ?? <Plus size={22} />}
-          renderPreview={renderUploadPreview}
-          onFiles={onFiles}
-          onRemove={onRemove}
-          onPreview={onPreview}
-        />
-      </div>
-    </section>
+      <ImageUploadArea
+        images={images.map((image) => ({
+          ...image,
+          thumbUrl: assetThumbUrl(image.url, 320) ?? image.url,
+        }))}
+        max={upload.max}
+        uploading={uploading}
+        accept={upload.accept ?? allowedAccept}
+        single={upload.max === 1}
+        className={upload.dropzoneClassName}
+        ariaLabel={upload.title}
+        emptyTitle={upload.prompt ?? '点击或拖拽图片到此处上传'}
+        emptyHint={upload.hint}
+        emptyIcon={upload.promptIcon ?? <Plus size={22} />}
+        renderPreview={renderUploadPreview}
+        onFiles={onFiles}
+        onRemove={onRemove}
+        onPreview={onPreview}
+      />
+    </SectionCard>
   );
 }

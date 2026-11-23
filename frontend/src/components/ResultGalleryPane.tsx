@@ -26,7 +26,7 @@ import { assetThumbUrl } from '../lib/api';
 import { ImageContextMenu, type ImageMenuItem } from './ImageContextMenu';
 import { ToolEmptyState } from './ToolEmptyState';
 import type { GalleryItem } from '../hooks/useResultGallery';
-import { useApp, Spin } from '../ui';
+import { useApp, Spinner } from '../ui';
 
 /**
  * 结果栏「全部生成图」网格。
@@ -321,7 +321,7 @@ export function ResultGalleryPane({
     <section className="pk-result-pane">
       {showLoading ? (
         <div className="fc-result-loading">
-          <Spin />
+          <Spinner />
         </div>
       ) : showEmpty ? (
         <ToolEmptyState title={emptyTitle} desc={emptyDesc}>

@@ -5,21 +5,21 @@ export { cn } from './lib/cn';
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Button } from '~/admin-ui/components/ui/button';
-import { Textarea as ShadcnTextarea } from '~/admin-ui/components/ui/textarea';
-import { Checkbox as ShadcnCheckbox } from '~/admin-ui/components/ui/checkbox';
-import { Switch as ShadcnSwitch } from '~/admin-ui/components/ui/switch';
+import { Textarea } from '~/admin-ui/components/ui/textarea';
+import { Checkbox } from '~/admin-ui/components/ui/checkbox';
+import { Switch } from '~/admin-ui/components/ui/switch';
 
 export { Button };
 export type ButtonProps = ComponentProps<typeof Button>;
 
-export { ShadcnTextarea as Textarea };
-export type TextareaProps = ComponentProps<typeof ShadcnTextarea>;
+export { Textarea };
+export type TextareaProps = ComponentProps<typeof Textarea>;
 
-export { ShadcnCheckbox as Checkbox };
-export type CheckboxProps = ComponentProps<typeof ShadcnCheckbox>;
+export { Checkbox };
+export type CheckboxProps = ComponentProps<typeof Checkbox>;
 
-export { ShadcnSwitch as Switch };
-export type SwitchProps = ComponentProps<typeof ShadcnSwitch>;
+export { Switch };
+export type SwitchProps = ComponentProps<typeof Switch>;
 
 /* Select 直连 shadcn 组合件：调用点自行组合 Trigger/Content/Item。 */
 export {
@@ -34,14 +34,15 @@ export interface SelectOption {
   value: string | number;
   label: ReactNode;
 }
-import { Input as ShadcnInput } from '~/admin-ui/components/ui/input';
+import { Input } from '~/admin-ui/components/ui/input';
 
-export { ShadcnInput as Input };
-export type InputProps = ComponentProps<typeof ShadcnInput>;
+export { Input };
+export type InputProps = ComponentProps<typeof Input>;
 
 export { RadioGroup, RadioGroupItem } from '~/admin-ui/components/ui/radio-group';
 export { Slider } from '~/admin-ui/components/ui/slider';
 export { NumberStepper, type NumberStepperProps } from './primitives/number-stepper';
+export { SectionCard, type SectionCardProps } from './primitives/section-card';
 export {
   ImageUploadArea,
   type ImageUploadAreaProps,
@@ -82,7 +83,7 @@ export {
 } from '~/admin-ui/components/ui/dropdown-menu';
 import { Spinner } from '~/admin-ui/components/ui/spinner';
 
-export { Spinner as Spin };
+export { Spinner };
 /* 表单直连 shadcn 组合件 + react-hook-form；`Form` 即 shadcn 的 FormProvider。 */
 export {
   Form,
@@ -108,30 +109,29 @@ export {
   DialogTrigger,
 } from '~/admin-ui/components/ui/dialog';
 
-/* shadcn 组合式原子件的 C 端别名。 */
+/* shadcn 组合式原子件：保留 shadcn 原名，C 端不再起 Surface / EmptyState 等别名。 */
 export {
-  Card as Surface,
-  CardHeader as SurfaceHeader,
-  CardTitle as SurfaceTitle,
-  CardDescription as SurfaceDescription,
-  CardContent as SurfaceContent,
-  CardFooter as SurfaceFooter,
-  CardAction as SurfaceAction,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  CardAction,
 } from '~/admin-ui/components/ui/card';
-export { Badge as StatusBadge } from '~/admin-ui/components/ui/badge';
 export { Badge } from '~/admin-ui/components/ui/badge';
 export {
-  Empty as EmptyState,
-  EmptyHeader as EmptyStateHeader,
-  EmptyMedia as EmptyStateMedia,
-  EmptyTitle as EmptyStateTitle,
-  EmptyDescription as EmptyStateDescription,
-  EmptyContent as EmptyStateContent,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from '~/admin-ui/components/ui/empty';
 export {
-  Alert as InlineAlert,
-  AlertTitle as InlineAlertTitle,
-  AlertDescription as InlineAlertDescription,
+  Alert,
+  AlertTitle,
+  AlertDescription,
 } from '~/admin-ui/components/ui/alert';
 export {
   Sheet,
@@ -154,12 +154,11 @@ export {
   ToggleGroupItem,
 } from '~/admin-ui/components/ui/toggle-group';
 export {
-  Tabs as NavigationTabs,
-  TabsList as NavigationTabsList,
-  TabsTrigger as NavigationTabsTrigger,
-  TabsContent as NavigationTabsContent,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
 } from '~/admin-ui/components/ui/tabs';
-export { Tabs, TabsList, TabsTrigger, TabsContent } from '~/admin-ui/components/ui/tabs';
 export {
   Table,
   TableHeader,

@@ -11,5 +11,4 @@
  * （它同时依赖 api / utils，不再经 `./hooks` 转一层）。
  * 分层约定见 `docs/frontend-module-conventions.md`。
  */
-import '../../styles/product-detail-kit.css';
 export { ProductKitPage } from './page';

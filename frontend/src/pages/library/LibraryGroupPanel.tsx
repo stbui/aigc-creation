@@ -1,6 +1,6 @@
 import { FolderKanban } from 'lucide-react';
 
-import { Button, Surface, SurfaceContent, SurfaceTitle } from './components';
+import { Button, Card, CardContent, CardTitle } from './components';
 import type { AssetGroup, GroupBy } from './constants';
 import { LibraryGroupByToggle } from './LibraryGroupByToggle';
 import { LibraryGroupFilter } from './LibraryGroupFilter';
@@ -31,11 +31,11 @@ export function LibraryGroupPanel({
   onOpenProjectManager,
 }: LibraryGroupPanelProps) {
   return (
-    <Surface className="mb-[18px] gap-0 rounded-xl border border-border bg-card px-5 py-[18px] shadow-[0_8px_24px_rgba(40,37,84,0.03)]">
+    <Card className="mb-[18px] gap-0 rounded-xl border border-border bg-card px-5 py-[18px] shadow-[0_8px_24px_rgba(40,37,84,0.03)]">
       <div className="flex flex-wrap items-center gap-2.5">
-        <SurfaceTitle className="flex-none text-sm leading-5 font-semibold whitespace-nowrap text-foreground">
+        <CardTitle className="flex-none text-sm leading-5 font-semibold whitespace-nowrap text-foreground">
           素材分组
-        </SurfaceTitle>
+        </CardTitle>
         <LibraryGroupByToggle value={groupBy} onChange={onGroupByChange} />
         <Button
           variant="ghost"
@@ -47,14 +47,14 @@ export function LibraryGroupPanel({
           项目管理
         </Button>
       </div>
-      <SurfaceContent className="px-0">
+      <CardContent className="px-0">
         <LibraryGroupFilter
           groups={groups}
           activeGroup={activeGroup}
           totalCount={totalCount}
           onChange={onSelectGroup}
         />
-      </SurfaceContent>
-    </Surface>
+      </CardContent>
+    </Card>
   );
 }

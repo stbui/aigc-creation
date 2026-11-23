@@ -1,5 +1,5 @@
 import type { CapabilityDef } from '../../types/api';
-import { CapabilityIcon, StatusBadge } from './components';
+import { CapabilityIcon, Badge } from './components';
 import { MODE_LABELS, RUNTIME_LABELS, runtimeOf } from './utils';
 
 interface ToolPageHeaderProps {
@@ -20,16 +20,16 @@ export function ToolPageHeader({ def }: ToolPageHeaderProps) {
           <h3 className="m-0 mb-0.5 flex flex-wrap items-center gap-2 text-xl">
             {def.name}
             {def.badge && (
-              <StatusBadge variant="secondary" className="border-0 bg-[color-mix(in_oklab,var(--color-cta)_12%,transparent)] text-[color:var(--color-cta-text)]">
+              <Badge variant="secondary" className="border-0 bg-[color-mix(in_oklab,var(--color-cta)_12%,transparent)] text-[color:var(--color-cta-text)]">
                 {def.badge}
-              </StatusBadge>
+              </Badge>
             )}
             {/*
               标注以**运行时结论**为准（云端模型 / 不可用），
               mode 只在后端未下发 runtime 时兜底 —— 同一项能力在不同部署下
               按下去走的路不同，标 mode 会把「没配通道的 real」说成「已接入」。
             */}
-            <StatusBadge
+            <Badge
               variant="secondary"
               className={`border-0 text-xs ${
                 runtime.effective === 'remote'
@@ -38,7 +38,7 @@ export function ToolPageHeader({ def }: ToolPageHeaderProps) {
               }`}
             >
               {RUNTIME_LABELS[runtime.effective] ?? MODE_LABELS[def.mode]}
-            </StatusBadge>
+            </Badge>
           </h3>
           <p className="m-0 text-muted-foreground">{def.summary}</p>
         </div>
