@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToolImageDropzone } from '../ToolImageDropzone';
@@ -19,6 +20,27 @@ function renderDropzone(overrides: Partial<Parameters<typeof ToolImageDropzone>[
       {...overrides}
     />,
   );
+}
+
+function renderFilledSingle(onFiles = vi.fn()) {
+  const result = render(
+    <ToolImageDropzone
+      title="上传参考图"
+      images={[IMAGE]}
+      max={1}
+      uploading={false}
+      onFiles={onFiles}
+      onRemove={vi.fn()}
+      onOpenLibrary={vi.fn()}
+      onOpenMobile={vi.fn()}
+      noun="参考图片"
+      single
+    />,
+  );
+  const dropzone = result.container.querySelector<HTMLElement>('[data-slot="image-upload-area"]');
+  const input = dropzone?.querySelector<HTMLInputElement>('input[type="file"]');
+  if (!dropzone || !input) throw new Error('单图上传区未渲染完整');
+  return { ...result, dropzone, input, onFiles };
 }
 
 describe('ToolImageDropzone', () => {
@@ -91,6 +113,45 @@ describe('ToolImageDropzone', () => {
     fireEvent.click(screen.getByRole('button', { name: /点击、拖拽或粘贴商品图片到此处上传/ }));
 
     expect(click).toHaveBeenCalledTimes(1);
+    click.mockRestore();
+  });
+
+  it('点击满位单图上传区会重新打开文件选择框', () => {
+    const { dropzone, input } = renderFilledSingle();
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {});
+
+    fireEvent.click(dropzone);
+
+    expect(click).toHaveBeenCalledTimes(1);
+    click.mockRestore();
+  });
+
+  it('替换按钮可聚焦、可用键盘触发且不会让上传区重复打开文件框', async () => {
+    const user = userEvent.setup();
+    const { input } = renderFilledSingle();
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {});
+    const replace = screen.getByRole('button', { name: '替换参考图片' });
+
+    replace.focus();
+    expect(document.activeElement).toBe(replace);
+    await user.keyboard('{Enter}');
+
+    expect(click).toHaveBeenCalledTimes(1);
+    click.mockRestore();
+  });
+
+  it('替换按钮可点击，满位后拖拽仍会回传文件', () => {
+    const onFiles = vi.fn();
+    const { dropzone, input } = renderFilledSingle(onFiles);
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {});
+
+    fireEvent.click(screen.getByRole('button', { name: '替换参考图片' }));
+    expect(click).toHaveBeenCalledTimes(1);
+
+    const file = new File(['image'], 'next.png', { type: 'image/png' });
+    fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+    expect(onFiles).toHaveBeenCalledTimes(1);
+    expect(onFiles.mock.calls[0][0][0]).toBe(file);
     click.mockRestore();
   });
 });
