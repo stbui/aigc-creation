@@ -174,7 +174,15 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
               </div>
             );
           }}
-          onFiles={(files) => void pickFile(Array.from(files)[0])}
+          onFiles={(files) => {
+            const list = Array.from(files);
+            if (list.length > 1) {
+              message.info(
+                `一次只支持 1 张图片，已使用 ${list[0].name}，其余 ${list.length - 1} 张未采用`,
+              );
+            }
+            void pickFile(list[0]);
+          }}
         />
 
         {/* 输出区 */}
