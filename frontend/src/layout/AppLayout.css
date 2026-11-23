@@ -56,10 +56,10 @@
 /* 页面自带内边距的「逃逸」约定 (2026-10-19)
    参考站 .workspace-route-content 无内边距，页面自带 padding，内容列从 route 边缘起算；
    本地 .app-content 再包一层 padding 就会右移并变窄。修法：页面盒用负 margin 逃到
-   .app-content 的 padding 之外，同时底部 -32 抵消外壳 32px 下内边距。
+   .app-content 的 padding 之外，底部负值与外壳下内边距逐档抵消。
    素材库 / 我的作品是同一骨架，规则只在这里声明一次，页面样式不再各写一份。
-   ≤900px 时 .app-content padding 按规范 §2.1 收成 16 / 16 / 24（原为 16 / 10 / 24），
-   负值逐值跟随，换成 -16 / -16 / -24。 */
+   内边距按规范 §2.1 四档：>900 24 / 24 / 32，≤900 16 / 16 / 24，
+   ≤640 14 / 12 / 20，≤480 12 / 10 / 16；负值逐值跟随。 */
   .app-content > .asset-library-page,
   .app-content > .my-works-page {
     margin: -24px -24px -32px;
@@ -85,14 +85,40 @@
 
 @media (max-width: 900px) {
   /* 侧栏已隐藏, 撤销 1366 块的 -16px 重叠, 否则内容会向左溢出 16px。
-     左右 16px 按规范 §2.1 的 ≤900 档（16 / 16 / 24）。参考站原始实测是左右 10px
-     （390 视口 hero 宽 370 = 390 − 20、卡片 2 列 181），本项目按规范升到 16，逃逸负边距逐值跟随。 */
+     左右 16px 按规范 §2.1 的 ≤900 档（16 / 16 / 24）；≤640 / ≤480 两档继续收口。
+     参考站原始实测是左右 10px（390 视口 hero 宽 370 = 390 − 20、卡片 2 列 181），
+     本项目按规范升到 16，窄屏再按四档逐值跟随。 */
   .app-body {
     min-height: calc(100vh - 54px);
   }
   .app-content {
     margin-left: 0;
     padding: var(--space-16) var(--space-16) var(--space-24);
+  }
+}
+
+@media (max-width: 640px) {
+  /* 规范 §2.1 的 640 档，tokens.css 不为 14px 新增刻度。 */
+  .app-content > .asset-library-page,
+  .app-content > .my-works-page {
+    margin: -14px -12px -20px;
+    width: auto;
+  }
+
+  .app-content {
+    padding: 14px 12px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-content > .asset-library-page,
+  .app-content > .my-works-page {
+    margin: -12px -10px -16px;
+    width: auto;
+  }
+
+  .app-content {
+    padding: 12px 10px 16px;
   }
 }
 
