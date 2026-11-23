@@ -71,6 +71,7 @@
 | [`gen-prompt.md`](gen-prompt.md) | 生图链路与提示词：主图 / 详情图字段映射、变体与模块拆批、提示词结构、并发生图与配额、可见性与效果评估现状 |
 | [`typography.md`](typography.md) | 字体、主题桥接、圆角阴影与组件微规格 |
 | [`design-tokens.md`](design-tokens.md) | 设计令牌标准：基础 / 通用 / 组件三层、命名、引用规则、新增流程与审计命令 |
+| [`responsive-layout.md`](responsive-layout.md) | 布局与响应式规范：断点四档刻度、页面容器与内边距、页头三级体系、网格降列、工具页骨架、移动端规则与迁移纪律 |
 | [`copywriting.md`](copywriting.md) | 用户可见文案规范：任务边界、写作基准、禁止项、分场景写法、语言规范、执行与自检 |
 | [`feedback-states.md`](feedback-states.md) | 状态与反馈规范：加载 / 空 / 失败 / 进行中 / 成功 / 结果不明的判定顺序、组件取用与文案 |
 | [`code-style.md`](code-style.md) | 代码风格与静态检查：Biome 工具链、规则基线、CI 门禁、格式化策略与收紧流程 |
