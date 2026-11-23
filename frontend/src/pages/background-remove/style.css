@@ -648,7 +648,7 @@
     height: auto;
     min-height: 0;
     max-height: none;
-    margin: -16px -10px -24px;
+    margin: -16px -16px -24px;
     padding: var(--space-16);
     gap: var(--space-12);
     grid-template-columns: minmax(0, 1fr);
@@ -711,6 +711,10 @@
 }
 
 @media (max-width: 640px) {
+  .pk-workspace.background-remove-page {
+    margin: -14px -12px -20px;
+  }
+
   .background-remove-preview {
     width: calc(100% - 24px);
     height: calc(100% - 190px);
@@ -737,5 +741,11 @@
   }
   .background-result-shortcuts {
     display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .pk-workspace.background-remove-page {
+    margin: -12px -10px -16px;
   }
 }
