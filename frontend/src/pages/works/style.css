@@ -1039,6 +1039,13 @@
 /* 计数行在 390 宽下会与排序说明挤成一行，允许换行。
    窄屏: 筛选器两列排布，下载通栏；恢复参考站 14px 工具栏内边距与 10px 间距。 */
 @media (max-width: 640px) {
+  /* 页头 L2 在 ≤640 降到 24 / 行高 32（docs/responsive-layout.md §3.1）。
+     必须写在本档：上面 ≤900 档把 h1 固定成 28/35，这里同特异性后置才生效。 */
+  .my-works-heading h1 {
+    font-size: 24px;
+    line-height: 32px;
+  }
+
   .my-works-count-row {
     flex-wrap: wrap;
     row-gap: var(--space-6);
