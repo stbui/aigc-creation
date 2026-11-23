@@ -76,9 +76,9 @@ export function useImageUploadArea({
 
   const onDragOver = useCallback(
     (event: DragEvent<HTMLElement>) => {
-      if (disabled) return;
       event.preventDefault();
       event.stopPropagation();
+      if (disabled) return;
       setDragging(true);
     },
     [disabled],
@@ -88,9 +88,9 @@ export function useImageUploadArea({
 
   const onDrop = useCallback(
     (event: DragEvent<HTMLElement>) => {
-      if (disabled) return;
       event.preventDefault();
       event.stopPropagation();
+      if (disabled) return;
       setDragging(false);
       pick(event.dataTransfer.files);
     },

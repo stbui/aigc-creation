@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ImageUploadArea, type ImageUploadItem } from '../image-upload-area';
@@ -57,10 +57,14 @@ describe('ImageUploadArea', () => {
     const zone = container.firstElementChild!;
     const file = new File(['image'], 'drop.png', { type: 'image/png' });
 
-    fireEvent.dragOver(zone, { dataTransfer: { files: [file] } });
+    const dragOver = createEvent.dragOver(zone, { dataTransfer: { files: [file] } });
+    fireEvent(zone, dragOver);
+    expect(dragOver.defaultPrevented).toBe(true);
     expect(zone.getAttribute('data-dragging')).toBe('true');
 
-    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+    const drop = createEvent.drop(zone, { dataTransfer: { files: [file] } });
+    fireEvent(zone, drop);
+    expect(drop.defaultPrevented).toBe(true);
     expect(onFiles).toHaveBeenCalledTimes(1);
     expect(onFiles.mock.calls[0][0][0]).toBe(file);
     expect(zone.getAttribute('data-dragging')).toBeNull();
@@ -130,7 +134,36 @@ describe('ImageUploadArea', () => {
       />,
     );
 
-    expect(container.querySelector('[data-slot="image-upload-loading"]')).not.toBeNull();
+    const loading = container.querySelector('[data-slot="image-upload-loading"]');
+    expect(loading).toHaveAttribute('aria-live', 'polite');
+    expect(loading).toHaveTextContent('上传中，请稍候');
+    expect(loading?.querySelector('svg')).not.toBeNull();
+  });
+
+  it('禁用态拖拽仍阻止浏览器默认行为，但不回传文件', () => {
+    const onFiles = vi.fn();
+    const { container } = render(
+      <ImageUploadArea
+        images={[]}
+        max={3}
+        disabled
+        ariaLabel="上传商品图"
+        onFiles={onFiles}
+        onRemove={() => undefined}
+      />,
+    );
+    const zone = container.firstElementChild!;
+    const file = new File(['image'], 'disabled.png', { type: 'image/png' });
+
+    const dragOver = createEvent.dragOver(zone, { dataTransfer: { files: [file] } });
+    fireEvent(zone, dragOver);
+    expect(dragOver.defaultPrevented).toBe(true);
+    expect(zone.getAttribute('data-dragging')).toBeNull();
+
+    const drop = createEvent.drop(zone, { dataTransfer: { files: [file] } });
+    fireEvent(zone, drop);
+    expect(drop.defaultPrevented).toBe(true);
+    expect(onFiles).not.toHaveBeenCalled();
   });
 
   it('优先使用 thumbUrl 渲染缩略图', () => {
