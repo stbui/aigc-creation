@@ -204,7 +204,7 @@
   background-size: 6px 6px;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 480px) {
   .color-studio-presets {
     grid-template-columns: repeat(6, 1fr);
   }

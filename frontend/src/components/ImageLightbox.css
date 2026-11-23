@@ -468,7 +468,7 @@
 }
 
 /* 窄屏: 左右翻页按钮收进底栏上方, 舞台左右留白减小 */
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .img-viewer-stage {
     padding: 52px var(--space-12) 104px;
   }

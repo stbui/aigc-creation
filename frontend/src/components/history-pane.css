@@ -283,7 +283,7 @@
   display: grid;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1200px) {
   .redraw-history-float-toggle {
     display: grid;
   }
@@ -337,7 +337,7 @@
 /* 单列窄屏（≤1024）里历史入口不再贴视口中线：中线正好落在商品换色的色卡行、
  * 画布工具栏这类可点控件上，触摸时点不到下面的色块。改到右下角常规浮动位，
  * 并避开 iOS 底部安全区。SKU 页的历史是右侧滑出面板，按钮仍作侧边把手，不参与。 */
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .tool-history-float-toggle:not(.product-sku-history-float-toggle),
   .redraw-history-float-toggle {
     top: auto;
@@ -347,7 +347,7 @@
 }
 
 /* 桌面收起后以标题行原地展开，不出现浮动按钮；浮动入口只在窄屏生效。 */
-@media (min-width: 1181px) {
+@media (min-width: 1201px) {
   .redraw-history-float-toggle {
     display: none;
   }
