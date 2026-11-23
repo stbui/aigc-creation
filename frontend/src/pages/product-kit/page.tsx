@@ -75,7 +75,7 @@ export function ProductKitPage() {
   const modelImageMax = selectedModel ? modelImageInputLimit(selectedModel) : null;
   const maxImages = Math.min(MAX_IMAGES, modelImageMax ?? MAX_IMAGES);
   // 上传 (三重校验 / 素材库回填 / 粘贴) 统一由 useImageUpload 处理
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, replaceImage, replaceImages, library, mobile } = useImageUpload({
+  const { images, uploading, uploadFiles, removeImage, replaceImage, replaceImages, library, mobile } = useImageUpload({
     max: maxImages,
     maxMb: MAX_IMAGE_MB,
   });
@@ -259,7 +259,6 @@ export function ProductKitPage() {
         maxImages={maxImages}
         imageLimitError={imageLimitError}
         uploading={uploading}
-        fileInputRef={fileInputRef}
         onFiles={(f) => void uploadFiles(f)}
         onRemoveImage={removeImage}
         onOpenLibrary={openLibrary}

@@ -39,6 +39,8 @@ export {
   FieldError,
   FieldLabel,
   ImageDropzone,
+  ImageUploadArea,
+  ImageUploadTrigger,
   InlineAlert,
   InlineAlertDescription,
   InlineAlertTitle,

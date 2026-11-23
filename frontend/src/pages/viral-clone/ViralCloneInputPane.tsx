@@ -1,5 +1,3 @@
-import type { RefObject } from 'react';
-
 import type { PublicModelGroup } from './api';
 import type { AssetSlot, CloneDegree } from './constants';
 import { ToolGenerationSubmitBar, ToolTypeTabs } from './components';
@@ -27,8 +25,6 @@ export interface ViralCloneInputPaneProps {
   maxImages: number;
   reference: UploadedImage | null;
   uploading: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  referenceInputRef: RefObject<HTMLInputElement | null>;
   onProductFiles: (files: FileList | File[]) => void;
   onReferenceFiles: (files: FileList | File[]) => void;
   onRemoveImage: (id: string) => void;
@@ -77,8 +73,6 @@ export function ViralCloneInputPane({
   maxImages,
   reference,
   uploading,
-  fileInputRef,
-  referenceInputRef,
   onProductFiles,
   onReferenceFiles,
   onRemoveImage,
@@ -123,8 +117,6 @@ export function ViralCloneInputPane({
             maxImages={maxImages}
             reference={reference}
             uploading={uploading}
-            fileInputRef={fileInputRef}
-            referenceInputRef={referenceInputRef}
             productName={productName}
             brand={brand}
             platform={platform}

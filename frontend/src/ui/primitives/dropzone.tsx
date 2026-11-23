@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { ImagePlus } from 'lucide-react';
 
 import { Button } from '~/admin-ui/components/ui/button';
@@ -15,18 +15,17 @@ export interface ImageDropzoneProps {
   size?: 'default' | 'compact';
   disabled?: boolean;
   className?: string;
-  /** 点击 / 回车触发文件选择；拖拽落点由本组件接管 */
+  /** 点击 / 回车触发文件选择；拖拽落点由外层的 `ImageUploadArea` 接管 */
   onClick: () => void;
-  onFiles?: (files: FileList) => void;
 }
 
 /**
- * C 端图片拖拽上传区（空态）。
+ * C 端图片拖拽上传空态。
  *
  * shadcn 没有「大面积拖拽区」这一角色，`Attachment` 只表达已选文件的横条；
  * 因此按语义组件层封装：外壳复用 shadcn `Button`（真正的按钮语义、焦点环、
- * 禁用态），内部图标与两行文案由调用点提供。拖拽高亮只改变边框与底色，
- * 不改变语义。
+ * 禁用态），内部图标与两行文案由调用点提供。拖拽命中与高亮属于上传区状态，
+ * 由 `ImageUploadArea` 统一承担，本组件只负责空态外观。
  */
 export function ImageDropzone({
   title,
@@ -36,9 +35,7 @@ export function ImageDropzone({
   disabled = false,
   className,
   onClick,
-  onFiles,
 }: ImageDropzoneProps) {
-  const [dragging, setDragging] = useState(false);
   const compact = size === 'compact';
 
   return (
@@ -50,22 +47,12 @@ export function ImageDropzone({
         'h-auto w-full flex-col rounded-md border-dashed bg-muted shadow-none',
         'text-muted-foreground hover:border-brand hover:bg-muted hover:text-muted-foreground',
         'focus-visible:border-brand focus-visible:ring-[3px] focus-visible:ring-brand/30',
-        dragging && 'border-brand bg-brand-bg',
         compact ? 'min-h-27 gap-1 px-2 py-2' : 'min-h-40 gap-1.5 px-4 py-4 max-[560px]:min-h-32',
         className,
       )}
-      onClick={onClick}
-      onDragOver={(event) => {
-        if (disabled || !onFiles) return;
-        event.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(event) => {
-        if (disabled || !onFiles) return;
-        event.preventDefault();
-        setDragging(false);
-        if (event.dataTransfer.files.length > 0) onFiles(event.dataTransfer.files);
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
       }}
     >
       <span

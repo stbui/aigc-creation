@@ -1,8 +1,6 @@
-import './ImageToPromptModal.css';
 import './PromptPolishModal.css';
 import { useUploadLimits } from '../context/UploadLimitsContext';
 import { useEffect, useRef, useState } from 'react';
-import { ImagePlus, X } from 'lucide-react';
 import { assetsApi, promptToolsApi } from '../lib/api';
 import { promptToolErrorMessage } from '../lib/promptToolMessages';
 import { useProject } from '../hooks/useProject';
@@ -13,6 +11,8 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  ImageUploadArea,
+  ImageUploadThumb,
   Spin,
 } from '../ui';
 
@@ -57,7 +57,6 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
   const { message } = useApp();
   const { ensureProject } = useProject();
   const { accept, allowedLabel, maxMb, validateImageFile } = useUploadLimits();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -100,6 +99,16 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
     });
   };
 
+  const clearFile = () => {
+    setFile(null);
+    setOutput('');
+    setResult(null);
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return null;
+    });
+  };
+
   const submit = async () => {
     if (!file) {
       message.warning('请先上传一张图片');
@@ -134,36 +143,39 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
           <h2 className="pt-modal-title">图片转提示词</h2>
         </div>
         {/* 上传区 */}
-        <div className="pt-i2p-upload">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={accept}
-            hidden
-            onChange={(e) => {
-              void pickFile(e.target.files?.[0]);
-              e.target.value = '';
-            }}
-          />
-          <button
-            type="button"
-            className={`pt-i2p-upload-btn${file ? ' is-filled' : ''}`}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {preview ? (
-              <img src={preview} alt="待解析图片" />
-            ) : (
-              <>
-                <ImagePlus size={20} />
-                <span>上传图片</span>
-              </>
-            )}
-          </button>
-          <div className="pt-i2p-upload-text">
-            <strong>{file ? file.name : '上传一张图片'}</strong>
-            <span>支持 {allowedLabel}，单张不超过 {maxMb}MB</span>
-          </div>
-        </div>
+        <ImageUploadArea
+          images={file && preview ? [{ id: 'draft', url: preview, name: file.name }] : []}
+          max={1}
+          single
+          accept={accept}
+          replaceOnClick
+          ariaLabel="上传图片"
+          emptyTitle="点击或拖拽图片到此处上传"
+          emptyHint={`支持 ${allowedLabel}，单张不超过 ${maxMb}MB`}
+          renderPreview={(items) => {
+            const image = items[0];
+            if (!image) return null;
+            return (
+              <div className="flex w-full items-center gap-3">
+                <ImageUploadThumb
+                  item={image}
+                  removeLabel="移除图片"
+                  className="size-[72px] w-[72px] shrink-0"
+                  onRemove={clearFile}
+                />
+                <div className="min-w-0">
+                  <strong className="block truncate text-sm leading-[18px] text-foreground">
+                    {image.name}
+                  </strong>
+                  <span className="block text-xs leading-[18px] text-[color:var(--text-desc)]">
+                    支持 {allowedLabel}，单张不超过 {maxMb}MB
+                  </span>
+                </div>
+              </div>
+            );
+          }}
+          onFiles={(files) => void pickFile(Array.from(files)[0])}
+        />
 
         {/* 输出区 */}
         <div className="pt-polish-output">

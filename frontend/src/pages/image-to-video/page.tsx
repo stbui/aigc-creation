@@ -18,6 +18,11 @@ import { buildImageToVideoPayload, isVideoFormReady, videoParamDefaults, type Vi
  * 只禁用提交并说明原因，不再由通用 ToolPage 整页替换成「暂不可用」异常页。
  * 所有视频参数、默认值与模型价格均从后端清单读取。
  */
+
+/** 上传首帧后，缩略图替代虚线拖拽框；保留真实构图，不用方图裁切。 */
+const DROPZONE =
+  '[&[data-filled]]:block! [&[data-filled]]:p-0! [&[data-filled]]:border-0! [&[data-filled]]:bg-transparent! [&[data-filled]]:shadow-none! [&[data-filled]]:cursor-default! [&[data-filled]]:hover:border-0! [&[data-filled]]:hover:bg-transparent! [&[data-filled]]:hover:ring-0!';
+
 export function ImageToVideoPage() {
   const { data: capabilities, loading, error } = useCapabilities();
   const definition = capabilities?.items.find((item) => item.id === IMAGE_TO_VIDEO_CAPABILITY) ?? null;
@@ -60,6 +65,7 @@ export function ImageToVideoPage() {
         hint: '点击、拖拽或粘贴图片上传，支持 JPG、PNG、WebP，最多 1 张',
         prompt: '点击或拖拽图片到此处，作为视频首帧',
         promptIcon: <Plus size={22} />,
+        dropzoneClassName: DROPZONE,
       }}
       replaceUpload
       renderUploadPreview={(images, controls) =>

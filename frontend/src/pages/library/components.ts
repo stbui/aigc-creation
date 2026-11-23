@@ -42,6 +42,7 @@ export {
   InlineAlert,
   InlineAlertDescription,
   Input,
+  ImageUploadInput,
   Select,
   SelectContent,
   SelectGroup,

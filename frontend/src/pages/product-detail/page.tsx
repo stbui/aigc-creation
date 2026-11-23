@@ -90,7 +90,6 @@ export function ProductDetailPage() {
   const {
     images,
     uploading,
-    fileInputRef,
     uploadFiles,
     removeImage,
     replaceImages,
@@ -371,7 +370,6 @@ export function ProductDetailPage() {
         max={maxImages}
         limitError={imageLimitError}
         uploading={uploading}
-        fileInputRef={fileInputRef}
         onFiles={(f) => void uploadFiles(f)}
         onRemove={removeImage}
         onOpenLibrary={openLibrary}

@@ -132,8 +132,6 @@ export function ViralClonePage() {
     images,
     reference,
     uploading,
-    fileInputRef,
-    referenceInputRef,
     uploadFiles,
     uploadReference,
     removeImage,
@@ -331,8 +329,6 @@ export function ViralClonePage() {
         maxImages={imageMax}
         reference={reference}
         uploading={uploading}
-        fileInputRef={fileInputRef}
-        referenceInputRef={referenceInputRef}
         onProductFiles={(files) => void uploadFiles(files)}
         onReferenceFiles={(files) => void uploadReference(files)}
         onRemoveImage={removeImage}

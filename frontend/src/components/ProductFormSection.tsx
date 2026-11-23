@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react';
+import type { ReactNode } from 'react';
 import { Maximize2, Sparkles } from 'lucide-react';
 
 import { ToolImageDropzone } from './ToolImageDropzone';
@@ -169,7 +169,6 @@ export interface ProductImageFieldProps {
   /** 当前模型能力合同允许的图片数（已与页面上限取较小值） */
   max: number;
   uploading: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
   onRemove: (id: string) => void;
   onOpenLibrary: () => void;
@@ -185,7 +184,6 @@ export function ProductImageField({
   images,
   max,
   uploading,
-  fileInputRef,
   onFiles,
   onRemove,
   onOpenLibrary,
@@ -201,7 +199,6 @@ export function ProductImageField({
         images={images}
         max={max}
         uploading={uploading}
-        fileInputRef={fileInputRef}
         onFiles={onFiles}
         onRemove={onRemove}
         onOpenLibrary={onOpenLibrary}
@@ -247,7 +244,6 @@ export function ProductFormSection({
   images,
   max,
   uploading,
-  fileInputRef,
   onFiles,
   onRemove,
   onOpenLibrary,
@@ -276,7 +272,6 @@ export function ProductFormSection({
         images={images}
         max={max}
         uploading={uploading}
-        fileInputRef={fileInputRef}
         onFiles={onFiles}
         onRemove={onRemove}
         onOpenLibrary={onOpenLibrary}

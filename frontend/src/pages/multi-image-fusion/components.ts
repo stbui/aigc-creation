@@ -41,6 +41,7 @@ export {
   FieldSet,
   FieldTitle,
   ImageDropzone,
+  ImageUploadArea,
   InlineAlert,
   InlineAlertDescription,
   Popover,
@@ -55,4 +56,5 @@ export {
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
+  type ImageUploadControls,
 } from '../../ui';

@@ -94,9 +94,6 @@ export function ToolShell(props: Props) {
     allowedAccept,
     images,
     uploading,
-    dragging,
-    setDragging,
-    fileInputRef,
     mobileOpen,
     setMobileOpen,
     library,
@@ -184,13 +181,9 @@ export function ToolShell(props: Props) {
                 upload={upload}
                 images={images}
                 uploading={uploading}
-                dragging={dragging}
                 allowedAccept={allowedAccept}
-                fileInputRef={fileInputRef}
                 renderUploadPreview={renderUploadPreview}
-                onDragStateChange={setDragging}
-                onDropFiles={(files) => void uploadFiles(files)}
-                onPickFiles={(files) => void uploadFiles(files)}
+                onFiles={(files) => void uploadFiles(files)}
                 onOpenLibrary={library.openLibrary}
                 onOpenMobile={() => setMobileOpen(true)}
                 onRemove={removeImage}

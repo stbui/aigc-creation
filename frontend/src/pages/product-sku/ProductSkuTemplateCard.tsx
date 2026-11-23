@@ -1,8 +1,9 @@
-import type { RefObject } from 'react';
+import { ImagePlus } from 'lucide-react';
 
 import { SUPPORTED_IMAGE_ACCEPT } from './constants';
 import {
-  Spin,
+  ImageDropzone,
+  ImageUploadArea,
   Surface,
   SurfaceAction,
   SurfaceContent,
@@ -12,14 +13,11 @@ import {
   TextAction,
   type ToolAsset,
 } from './components';
-import { ProductSkuTemplateDropzone } from './ProductSkuTemplateDropzone';
 import { ProductSkuTemplatePreview } from './ProductSkuTemplatePreview';
 
 interface ProductSkuTemplateCardProps {
   template: ToolAsset | null;
   uploading: boolean;
-  /** 隐藏文件选择框由卡片自持，页面只接收选中的文件 */
-  templateInputRef: RefObject<HTMLInputElement | null>;
   onUpload: (files: FileList | File[]) => void;
   onOpenLibrary: () => void;
   onOpenMobile: () => void;
@@ -30,21 +28,19 @@ interface ProductSkuTemplateCardProps {
 /**
  * 模板图卡片：上传 / 拖拽 / 素材库 / 手机上传与重新框选。
  *
- * 上传、框选与预览动作由页面提供；这里只负责卡片编排与拖拽命中区，
- * 空态与已选态分别落在 `ProductSkuTemplateDropzone` / `ProductSkuTemplatePreview`。
+ * 上传、框选与预览动作由页面提供；隐藏 input、拖拽命中与 loading 由共享
+ * `ImageUploadArea` 承担，空态与已选态分别落在 `ImageDropzone` /
+ * `ProductSkuTemplatePreview`。
  */
 export function ProductSkuTemplateCard({
   template,
   uploading,
-  templateInputRef,
   onUpload,
   onOpenLibrary,
   onOpenMobile,
   onEditRegions,
   onPreview,
 }: ProductSkuTemplateCardProps) {
-  const openFilePicker = () => templateInputRef.current?.click();
-
   return (
     <Surface className="block gap-0 rounded-xl border-0 bg-card p-4 shadow-none">
       <SurfaceHeader className="mb-3 gap-1 px-0">
@@ -59,38 +55,36 @@ export function ProductSkuTemplateCard({
       </SurfaceHeader>
 
       <SurfaceContent className="px-0">
-        <input
-          ref={templateInputRef}
-          type="file"
+        <ImageUploadArea
+          variant="plain"
+          images={template ? [template] : []}
+          max={1}
+          single
+          uploading={uploading}
           accept={SUPPORTED_IMAGE_ACCEPT}
-          hidden
-          onChange={(event) => {
-            if (event.target.files) onUpload(event.target.files);
-            event.target.value = '';
-          }}
-        />
-
-        <div className="relative grid gap-2">
-          {uploading && (
-            <span
-              className="absolute inset-0 z-10 grid place-items-center rounded-md bg-background/70"
-              aria-live="polite"
-            >
-              <Spin className="size-4" />
-            </span>
-          )}
-
-          {template ? (
-            <ProductSkuTemplatePreview
-              template={template}
-              onPreview={onPreview}
-              onEditRegions={onEditRegions}
-              onReupload={openFilePicker}
+          ariaLabel="上传SKU模板图"
+          emptyContent={(controls) => (
+            <ImageDropzone
+              title="点击或拖拽图片到此处上传"
+              hint="点击、拖拽或粘贴图片上传，最多 1 张"
+              icon={<ImagePlus aria-hidden />}
+              onClick={controls.open}
             />
-          ) : (
-            <ProductSkuTemplateDropzone onPick={openFilePicker} onFiles={onUpload} />
           )}
-        </div>
+          renderPreview={(items, controls) => {
+            const image = items[0];
+            if (!image) return null;
+            return (
+              <ProductSkuTemplatePreview
+                template={image}
+                onPreview={onPreview}
+                onEditRegions={onEditRegions}
+                onReupload={controls.open}
+              />
+            );
+          }}
+          onFiles={onUpload}
+        />
       </SurfaceContent>
     </Surface>
   );

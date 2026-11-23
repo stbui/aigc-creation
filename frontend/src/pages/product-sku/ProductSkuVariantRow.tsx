@@ -17,7 +17,6 @@ interface ProductSkuVariantRowProps {
     file: File | undefined,
     itemKey: number,
     regionId: string,
-    input: HTMLInputElement,
   ) => void;
   onOpenReferenceLibrary: (itemKey: number, regionId: string) => void;
   onOpenReferenceMobile: (itemKey: number, regionId: string) => void;
@@ -61,7 +60,7 @@ export function ProductSkuVariantRow({
         </Badge>
         <ProductSkuReferenceUploadButton
           busy={busy}
-          onPick={(file, input) => onUploadReference(file, itemKey, region.id, input)}
+          onPick={(file) => onUploadReference(file, itemKey, region.id)}
         />
         <TextAction onClick={() => onOpenReferenceLibrary(itemKey, region.id)}>素材库</TextAction>
         <TextAction onClick={() => onOpenReferenceMobile(itemKey, region.id)}>手机上传</TextAction>

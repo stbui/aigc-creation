@@ -87,6 +87,9 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `lib/zip.test.ts` | 浏览器内批量下载打包 |
 | `styles/style-entry.test.ts` | 全局样式入口只做 `@layer` / `@import`；不保留未使用的 shadcn 深色主题脚手架；`tokens.css` 不留零引用令牌；共享基线只用 `data-slot` 槽位，不回退 `.ui-input` / `.ui-select-trigger` / `.ui-dropdown-*` 旧别名 |
 | `ui/primitives/input-primitives.test.tsx` | C 端语义输入件：`IconInput` 组合 shadcn `InputGroup` 并透传表单控件无障碍属性；`CharacterCountTextarea` 用 shadcn `Textarea` 显示计数并把计数关联到输入框 |
+| `ui/primitives/image-upload-area.test.tsx` | 通用图片上传区：补位块开框并回传文件、拖拽高亮与落点、移除不冒泡、达到上限隐藏补位、单图位空态补位块与 input 不带 `multiple`、上传遮罩、`thumbUrl` 优先、空态 / 已选区自定义渲染与 controls 透传、空态点击命中区空白处开框、`replaceOnClick` 仅已选满时开框 |
+| `ui/primitives/image-upload-trigger.test.tsx` | 文字型上传入口：点击开框并回传文件、清空 value、禁用时不打开 |
+| `components/ToolImageDropzone.test.tsx` | 工具页上传外壳：标题 / 必填标记 / 计数器、素材库与手机入口、移除与补位透传、单图位不渲染计数器与补位块、空态提示与默认 / 自定义额度文案、点击空态提示开框 |
 | `pages/admin/admin-modules.test.ts` | 后台目录具名导入 / 导出对账：相对导入的每个名字都必须在目标模块导出（防 `/admin` 整块白屏）。判据实现与 C 端共用 `src/test/namedImportAudit.ts` |
 | `pages/admin/channels/ChannelHeadersEditor.test.tsx` | 自定义请求头编辑器：系统托管的头（鉴权 / 协议 / `x-canvas-*` / `x-forwarded-*`）一律拒绝且文案点名，名称大小写不敏感去重，值里只允许可打印 ASCII 与制表符，名称 / 值 / 总大小上限拦截，**空行不算错误**（点了「添加请求头」还没填不该报错），只有名称的行保留（空值是合法请求头），疑似凭据的值渲染为密码框 |
 | `pages/admin/channels/ChannelModelHealthCell.test.tsx` | 「全部模型」视图的稳定性单元格：**无样本时显示「近 24 小时无调用」而不是 0%**、成功率三档（≥95% / ≥80% / 其余）、接近 100% 时不显示小数尾巴且 99.5% 不得进位成 100%、无健康数据时给可读文案 |

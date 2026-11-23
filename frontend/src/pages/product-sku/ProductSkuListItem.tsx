@@ -31,7 +31,6 @@ interface ProductSkuListItemProps {
     file: File | undefined,
     itemKey: number,
     regionId: string,
-    input: HTMLInputElement,
   ) => void;
   onOpenReferenceLibrary: (itemKey: number, regionId: string) => void;
   onOpenReferenceMobile: (itemKey: number, regionId: string) => void;

@@ -51,7 +51,10 @@ export function MultiFusionImageThumb({
         <AttachmentAction
           aria-label={removeLabel}
           className="bg-foreground/65 text-primary-foreground hover:bg-danger-text hover:text-primary-foreground"
-          onClick={onRemove}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove();
+          }}
         >
           <X aria-hidden />
         </AttachmentAction>

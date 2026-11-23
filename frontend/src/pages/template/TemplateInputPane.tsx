@@ -1,7 +1,6 @@
-import type { RefObject } from 'react';
 import { Lightbulb } from 'lucide-react';
 
-import { CAPABILITY_ID, MAX_IMAGES, MAX_IMAGE_MB } from './constants';
+import { CAPABILITY_ID, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
 import { ToolGenerationSubmitBar, ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
 import type { TemplateEntry } from './utils';
@@ -10,7 +9,6 @@ import { TemplateSelectedCard } from './TemplateSelectedCard';
 interface TemplateInputPaneProps {
   images: UploadedImage[];
   uploading: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
   onRemove: (id: string) => void;
   onOpenLibrary: () => void;
@@ -36,7 +34,6 @@ interface TemplateInputPaneProps {
 export function TemplateInputPane({
   images,
   uploading,
-  fileInputRef,
   onFiles,
   onRemove,
   onOpenLibrary,
@@ -67,9 +64,7 @@ export function TemplateInputPane({
             required
             images={images}
             max={MAX_IMAGES}
-            maxMb={MAX_IMAGE_MB}
             uploading={uploading}
-            fileInputRef={fileInputRef}
             onFiles={onFiles}
             onRemove={onRemove}
             onOpenLibrary={onOpenLibrary}

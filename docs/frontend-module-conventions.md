@@ -96,7 +96,7 @@ pages/admin/channels/
   列表 / 空态各自换成对应 shadcn 组合件（`Surface` / `Button` / `Dialog` / `Sheet` /
   `Item` / `EmptyState` / `InlineAlert` 等，统一从 `frontend/src/ui` 取）。shadcn 没有
   对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（`TextAction` /
-  `SegmentedControl` / `ImageDropzone` / `IconInput` / `CharacterCountTextarea`），
+  `SegmentedControl` / `ImageUploadHeader` / `ImageUploadArea` / `ImageUploadPrompt` / `ImageUploadInput` / `ImageUploadTrigger` / `ImageUploadThumb` / `ImageUploadAddTile` / `ImageUploadLoading` / `ImageDropzone` / `IconInput` / `CharacterCountTextarea`），
   组件内部组合 shadcn 原子件，页面只使用语义组件，不在页里手写 class 拼控件外观。
   参照 `pages/product-sku/`：其 `style.css` 只剩三栏列宽、窄屏折叠等**共享骨架覆盖**，
   组件相关的 `.sku-*` 选择器与 `--sku-*` 令牌已全部删除。
@@ -223,7 +223,7 @@ import type { AdminChannelView } from './types';           // 跨模块类型（
   - `frontend/src/pages/product-sku/__tests__/product-sku-modules.test.ts` ——
     C 端商品 SKU 图目录（`src/pages/product-sku` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`；页面按板块拆成 `ProductSkuWorkspace`（三栏外壳）内的
-    `ProductSkuTemplateCard`（空态 `ProductSkuTemplateDropzone` / 已选态
+    `ProductSkuTemplateCard`（空态由共享 `ImageUploadArea` 承载 / 已选态
     `ProductSkuTemplatePreview`）/ `ProductSkuStepsCard` / `ProductSkuListSection`，
     清单再拆行 `ProductSkuListItem` → 区域 `ProductSkuVariantRow`（参考图原子件
     `ProductSkuReferenceThumb` / `ProductSkuReferenceUploadButton`）；使用步骤文案落
@@ -278,7 +278,8 @@ import type { AdminChannelView } from './types';           // 跨模块类型（
     `lib/promptToolMessages` 的转出；页面按板块拆成 `MultiFusionSceneGateway` /
     `MultiFusionEditorHeader` / `MultiFusionUploadCard` / `MultiFusionAnalysisCard` /
     `MultiFusionParameterCard` / `MultiFusionSubmitBar` / `MultiFusionResultPanel`
-    七个展示块，块内再拆 `MultiFusionSlotActions` / `MultiFusionImageThumb`（上传卡）、
+    七个展示块，块内再拆 `MultiFusionSlotActions` / `MultiFusionImageThumb`（上传卡，
+    两个图位的隐藏 input、拖拽命中与 loading 由共享 `ImageUploadArea` 承担）、
     `MultiFusionOutputSettings`（高级设置浮层）、`MultiFusionResultStage`（结果舞台）；
     图位状态落 `useMultiFusionAssets.ts`（复用共享 `useTargetedAssetPicker`）、
     画面描述与 AI 分析落 `useMultiFusionPrompt.ts`、提交 / 轮询 / 超时重查落
@@ -313,8 +314,9 @@ import type { AdminChannelView } from './types';           // 跨模块类型（
     页面按板块拆成 `LibraryToolbar` / `LibraryGroupPanel`（由
     `LibraryGroupByToggle` + `LibraryGroupFilter` + `LibraryGroupOptionLabel`
     组合）/ `LibraryBatchBar` / `LibraryLoadingState` / `LibraryErrorState` /
-    `LibraryEmptyState` / `LibraryGrid`（`LibraryLoadMore`）/ `LibraryUploadInput`，
-    卡片与弹窗为 `LibraryAssetCard`（操作区 `LibraryAssetActions`、右键菜单
+    `LibraryEmptyState` / `LibraryGrid`（`LibraryLoadMore`）；上传入口复用共享
+    `ImageUploadInput` + `useImageUploadArea`，卡片与弹窗为 `LibraryAssetCard`
+    （操作区 `LibraryAssetActions`、右键菜单
     `LibraryAssetMenu`）/ `LibraryMoveAssetsDialog` / `LibraryProjectManagerDialog`；
     取数落 `useLibraryAssets.ts`、项目列表落 `useLibraryProjects.ts`、分组状态与
     可见集合落 `useLibraryGroups.ts`、滚动哨兵落 `useInfiniteScroll.ts`、卡片

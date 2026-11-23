@@ -48,7 +48,7 @@ const PAGE_MOBILE =
 
 /** 上传区底色 #f6f7f9 / 虚线边 #d9dee8，与局部重绘同源 */
 const DROPZONE =
-  'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2! [&>.pk-upload-prompt]:w-full [&>.pk-upload-prompt]:min-h-0 [&>.pk-upload-prompt]:gap-2 [&_.pk-thumb-grid-single]:w-40 [&_.pk-thumb-grid-single]:max-w-full';
+  'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2! [&>[data-slot=image-upload-prompt]]:w-full [&>[data-slot=image-upload-prompt]]:min-h-0 [&>[data-slot=image-upload-prompt]]:gap-2 [&_[data-slot=image-upload-thumbs][data-single]]:w-40! [&_[data-slot=image-upload-thumbs][data-single]]:max-w-full!';
 
 export function WatermarkRemovePage() {
   const { message } = useApp();

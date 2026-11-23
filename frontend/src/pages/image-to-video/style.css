@@ -5,21 +5,7 @@
  * `styles/tool-workspace.css` 提供。
  */
 
-/* 上传首帧后，缩略图替代虚线拖拽框；保留真实构图，不用方图裁切。 */
-.pk-workspace.image-to-video-page .pk-dropzone.pk-dropzone-filled {
-  display: block;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  cursor: default;
-}
-
-.pk-workspace.image-to-video-page .pk-dropzone.pk-dropzone-filled:hover {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
+/* 上传首帧后，缩略图替代虚线拖拽框；覆盖规则由 `page.tsx` 的 DROPZONE 承担。 */
 
 .image-to-video-upload-preview {
   display: grid;

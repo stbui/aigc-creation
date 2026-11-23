@@ -1,5 +1,3 @@
-import type { RefObject } from 'react';
-
 import { MAX_IMAGE_MB, type AssetSlot } from './constants';
 import { ProductFieldsGrid, ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
@@ -17,8 +15,6 @@ export function ViralCloneFormSection({
   maxImages,
   reference,
   uploading,
-  fileInputRef,
-  referenceInputRef,
   productName,
   brand,
   platform,
@@ -39,8 +35,6 @@ export function ViralCloneFormSection({
   maxImages: number;
   reference: UploadedImage | null;
   uploading: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  referenceInputRef: RefObject<HTMLInputElement | null>;
   productName: string;
   brand: string;
   platform: string;
@@ -62,9 +56,7 @@ export function ViralCloneFormSection({
         title="上传商品图"
         images={images}
         max={maxImages}
-        maxMb={MAX_IMAGE_MB}
         uploading={uploading}
-        fileInputRef={fileInputRef}
         onFiles={onProductFiles}
         onRemove={onRemoveImage}
         onOpenLibrary={() => onOpenLibrary('product')}
@@ -75,16 +67,14 @@ export function ViralCloneFormSection({
         title="上传参考图（爆款图）"
         images={reference ? [reference] : []}
         max={1}
-        maxMb={MAX_IMAGE_MB}
         uploading={uploading}
-        fileInputRef={referenceInputRef}
         onFiles={onReferenceFiles}
         onRemove={onRemoveReference}
         onOpenLibrary={() => onOpenLibrary('reference')}
         onOpenMobile={() => onOpenMobile('reference')}
         noun="参考图片"
         sectionClassName="vc-reference-section"
-        dropzoneClassName="pk-dropzone-reference"
+        dropzoneClassName="[&_[data-slot=image-upload-prompt]_svg]:mb-5"
         single
         showCount={false}
         emptyHint={`上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过${MAX_IMAGE_MB}MB`}

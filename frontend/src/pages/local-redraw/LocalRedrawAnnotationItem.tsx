@@ -8,8 +8,10 @@ import {
   ANNOTATION_REFERENCE_FILLED,
   ANNOTATION_REFERENCE_REMOVE,
   ANNOTATION_TEXTAREA,
+  SUPPORTED_IMAGE_ACCEPT,
 } from './constants';
 import { assetThumbUrl } from './api';
+import { ImageUploadArea } from './components';
 
 const MAX_PROMPT_LEN = 200;
 
@@ -64,52 +66,66 @@ export function LocalRedrawAnnotationItem({
         placeholder="请输入您要重绘的内容，例如：更换颜色..."
         onChange={(event) => onDraftChange(region.id, { prompt: event.target.value })}
       />
-      <label
-        className={`redraw-prompt-tools reference-upload ${ANNOTATION_REFERENCE}${
+      <ImageUploadArea
+        variant="plain"
+        max={1}
+        single
+        uploading={uploading}
+        disabled={uploading}
+        accept={SUPPORTED_IMAGE_ACCEPT}
+        replaceOnClick
+        className={`redraw-prompt-tools ${ANNOTATION_REFERENCE}${
           reference ? ` ${ANNOTATION_REFERENCE_FILLED}` : ''
         }`}
+        ariaLabel={reference ? `替换${label}参考图` : `上传${label}参考图`}
         title={reference ? `替换${label}参考图` : `上传${label}参考图`}
-      >
-        {reference && (
-          <>
-            <img
-              className="block size-full object-cover"
-              src={assetThumbUrl(reference.url, 240) ?? reference.url}
-              alt={`${label}参考图`}
-            />
-            <button
-              type="button"
-              className={`remove-reference ${ANNOTATION_REFERENCE_REMOVE}`}
-              aria-label={`移除${label}参考图`}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onDraftChange(region.id, { reference: null });
-              }}
-            >
-              <X size={12} />
-            </button>
-          </>
-        )}
-        {uploading && !reference ? (
-          <span>上传中…</span>
-        ) : !reference ? (
-          <>
-            <Plus size={16} />
-            <span>上传图片</span>
-          </>
-        ) : null}
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          hidden
-          disabled={uploading}
-          onChange={(event) => {
-            onUploadReference(region.id, event.target.files?.[0]);
-            event.target.value = '';
-          }}
-        />
-      </label>
+        images={
+          reference
+            ? [
+                {
+                  ...reference,
+                  thumbUrl: assetThumbUrl(reference.url, 240) ?? reference.url,
+                },
+              ]
+            : []
+        }
+        emptyContent={() =>
+          uploading && !reference ? (
+            <span>上传中…</span>
+          ) : (
+            <>
+              <Plus size={16} aria-hidden />
+              <span>上传图片</span>
+            </>
+          )
+        }
+        renderPreview={(items) => {
+          const image = items[0];
+          if (!image) return null;
+          return (
+            <>
+              <img
+                className="block size-full object-cover"
+                src={image.thumbUrl ?? image.url}
+                alt={`${label}参考图`}
+              />
+              <button
+                type="button"
+                className={`remove-reference ${ANNOTATION_REFERENCE_REMOVE}`}
+                aria-label={`移除${label}参考图`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDraftChange(region.id, { reference: null });
+                }}
+              >
+                <X size={12} aria-hidden />
+              </button>
+            </>
+          );
+        }}
+        onFiles={(files) => onUploadReference(region.id, Array.from(files)[0])}
+      />
     </div>
   );
 }

@@ -82,9 +82,7 @@ export function useSkuDraft({ onResetBatch }: UseSkuDraftOptions) {
     file: File | undefined,
     itemKey: number,
     regionId: string,
-    input: HTMLInputElement,
   ) => {
-    input.value = '';
     if (!file) return;
     if (!isSupportedImageFile(file)) {
       message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);

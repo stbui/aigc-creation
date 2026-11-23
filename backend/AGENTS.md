@@ -20,7 +20,8 @@
 3. `docs/database.md`：Prisma / SQLite、金额精度、状态、迁移与种子
 4. `docs/security.md`：鉴权链、令牌、SSRF、上传、支付回调、日志脱敏
 5. `docs/api-contract.md` 与 `docs/error-copy.md`：响应信封、错误码、用户文案
-6. `docs/testing.md`：L1–L4 分层、脚本清单与覆盖矩阵
+6. `docs/backend-nestjs-conventions.md`：模块分层、Controller / Service 边界、DTO、异常、鉴权、事务与测试口径
+7. `docs/testing.md`：L1–L4 分层、脚本清单与覆盖矩阵
 
 ## 3. 分层与目录
 

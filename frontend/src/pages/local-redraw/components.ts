@@ -16,4 +16,4 @@ export { ToolCard } from '../../components/ToolWidgets';
 /** 历史产出网格 */
 export { ToolHistoryGrid } from '../../components/ToolHistoryPane';
 /** 窄屏历史抽屉 */
-export { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui';
+export { ImageUploadArea, Sheet, SheetContent, SheetHeader, SheetTitle } from '../../ui';

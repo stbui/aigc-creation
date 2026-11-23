@@ -1,5 +1,3 @@
-import type { RefObject } from 'react';
-
 import { DETAIL_CAPABILITY } from './api';
 import type { PublicModelGroup } from './components';
 import { ProductFormSection, ToolGenerationSubmitBar, ToolTypeTabs } from './components';
@@ -22,7 +20,6 @@ export interface DetailInputPaneProps {
   /** 已选素材超过模型上限时的可读原因 */
   limitError?: string | null;
   uploading: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
   onRemove: (id: string) => void;
   onOpenLibrary: () => void;
@@ -75,7 +72,6 @@ export function DetailInputPane({
   max,
   limitError,
   uploading,
-  fileInputRef,
   onFiles,
   onRemove,
   onOpenLibrary,
@@ -122,7 +118,6 @@ export function DetailInputPane({
             max={max}
             limitError={limitError}
             uploading={uploading}
-            fileInputRef={fileInputRef}
             onFiles={onFiles}
             onRemove={onRemove}
             onOpenLibrary={onOpenLibrary}

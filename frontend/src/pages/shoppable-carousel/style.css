@@ -550,25 +550,10 @@
 /*
  * 带货图文: 左栏逐项对齐参考站实测 (docs/shoppable-carousel-design.md §3 / §12)。
  *
- * 1. 上传区: 参考站拖拽框 364×104 (2px dashed 虚线, 圆角 12), 站点工具页族的
- *    .pk-dropzone 是 min-height 160 —— 差 56px, 把整栏往下推。
+ * 1. 上传区尺寸与提示字号由 `ShoppableCarouselConfig` 的 `UPLOAD_ZONE` 负责。
  * 2. 底栏: 参考站 sidebarFooter 白底 + 上边框 1px #f1f5f9 + 内边距 16px 24px 20px,
  *    步进按钮 24×24 圆角 6。
  */
-.sc-sections .pk-dropzone {
-  min-height: 104px;
-  border-width: 2px;
-  border-style: dashed;
-  border-color: var(--border-2);
-  border-radius: var(--radius-card);
-  background: var(--card-bg);
-  padding: var(--space-12);
-}
-
-.sc-sections .pk-upload-prompt small {
-  font-size: 14px;
-  color: var(--text-desc);
-}
 
 /*
  * 步进器走共享 `NumberStepper`（shadcn InputGroup 组合件）。
@@ -587,23 +572,9 @@
 }
 
 /*
- * 带货图文: 左栏控件尺寸保留参考站实测值（上传拖拽框 104、下拉 40）；
+ * 带货图文: 左栏控件尺寸保留参考站实测值（下拉 40）；
  * 底栏与主按钮改用全站共享样式（白卡 + 品牌渐变按钮），不再单独覆写。
  */
-/* 上传区: 104 高, 内容居中, 提示 14px */
-.sc-sections .pk-dropzone {
-  min-height: 104px;
-  padding: var(--space-8);
-}
-
-.sc-sections .pk-upload-prompt {
-  min-height: 0;
-  gap: var(--space-6);
-}
-
-.sc-sections .pk-upload-prompt span {
-  font-size: 14px;
-}
 
 /* 生成设置的四组下拉: 高 40 (参考站实测), 底 rgba(0,30,89,.04), 圆角 8 */
 .sc-sections .pk-field [class*='select'] button,

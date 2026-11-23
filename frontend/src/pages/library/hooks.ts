@@ -19,3 +19,5 @@ export { useProject } from '../../hooks/useProject';
 export { useCapabilities } from '../../hooks/useCapabilities';
 /** 全局反馈 (message) */
 export { useApp } from '../../ui';
+/** 图片上传入口的隐藏 input / 打开 / 清空 value 逻辑 */
+export { useImageUploadArea } from '../../ui';

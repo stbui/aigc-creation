@@ -82,9 +82,6 @@ interface ViralCloneAssetsOptions {
 export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAssetsOptions) {
   const { message } = useApp();
   const { ensureProject } = useProject();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const referenceInputRef = useRef<HTMLInputElement>(null);
-
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [reference, setReference] = useState<UploadedImage | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -232,8 +229,6 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
     images,
     reference,
     uploading,
-    fileInputRef,
-    referenceInputRef,
     uploadFiles,
     uploadReference,
     removeImage,

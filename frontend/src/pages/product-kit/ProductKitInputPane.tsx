@@ -1,5 +1,3 @@
-import type { RefObject } from 'react';
-
 import { MAX_DESC_LEN, PRODUCT_KIT_CAPABILITY } from './constants';
 import {
   ProductFormSection,
@@ -25,7 +23,6 @@ export interface ProductKitInputPaneProps {
   /** 已选素材超过模型上限时的可读原因 */
   imageLimitError?: string | null;
   uploading: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
   onRemoveImage: (id: string) => void;
   onOpenLibrary: () => void;
@@ -72,7 +69,6 @@ export function ProductKitInputPane({
   maxImages,
   imageLimitError,
   uploading,
-  fileInputRef,
   onFiles,
   onRemoveImage,
   onOpenLibrary,
@@ -115,7 +111,6 @@ export function ProductKitInputPane({
             images={images}
             max={maxImages}
             uploading={uploading}
-            fileInputRef={fileInputRef}
             onFiles={onFiles}
             onRemove={onRemoveImage}
             onOpenLibrary={onOpenLibrary}

@@ -26,3 +26,5 @@ export { PromptPolishModal } from '../../components/PromptPolishModal';
 export { ImageToPromptModal } from '../../components/ImageToPromptModal';
 /** 参考图 / 结果的口径类型 (与 ToolShell 共用, 不再本页自定义) */
 export type { ToolAsset, ToolResult } from '../../components/ToolShell';
+/** 通用图片上传区（隐藏 input / 拖拽命中 / loading / 缩略图网格） */
+export { ImageUploadArea, type ImageUploadControls } from '../../ui';

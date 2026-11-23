@@ -37,23 +37,12 @@
   }
 }
 
-.ui-upload {
-  width: 100%;
-}
-
-.ui-upload.is-disabled {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
 /* * shadcn Button 的默认 size 带 `h-9`（36px）。下列皮肤的高度由内容或
  * `aspect-ratio` 决定，页面 CSS 里没有写 height，`h-9` 会压过宽高比 ——
  * 表现为图片型按钮被压成 36px 高的横条（结果缩略图、素材卡整张被裁掉）。
  * 这些类只加显式高度，其余尺寸仍由各自皮肤决定。 */
 
-.pk-text-link[data-slot="button"],
-  .pk-ai-btn[data-slot="button"],
-  .pk-thumb-add[data-slot="button"],
+.pk-ai-btn[data-slot="button"],
   .pd-result-thumb[data-slot="button"],
   .pd-result-source-thumb[data-slot="button"] {
   height: auto;

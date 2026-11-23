@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ImageLightbox,
   MobileUploadModal,
@@ -8,7 +8,7 @@ import {
 import { LibraryMoveAssetsDialog } from './LibraryMoveAssetsDialog';
 import { LibraryProjectManagerDialog } from './LibraryProjectManagerDialog';
 import { assetsApi, assetSrc, projectsApi } from './api';
-import { useApp, useAuth, useCapabilities, useDocumentMeta, useLightboxIndex, useProject } from './hooks';
+import { useApp, useAuth, useCapabilities, useDocumentMeta, useImageUploadArea, useLightboxIndex, useProject } from './hooks';
 import {
   DEFAULT_ASSET_KIND,
   MAX_IMAGE_BYTES,
@@ -36,7 +36,7 @@ import { LibraryGrid } from './LibraryGrid';
 import { LibraryLoadingState } from './LibraryLoadingState';
 import { LibraryErrorState } from './LibraryErrorState';
 import { LibraryEmptyState } from './LibraryEmptyState';
-import { LibraryUploadInput } from './LibraryUploadInput';
+import { ImageUploadInput } from './components';
 import type { Asset, MobileUploadAsset } from '../../types/api';
 
 /**
@@ -54,7 +54,6 @@ export function LibraryPage() {
   const { token, openLogin } = useAuth();
   const { ensureProject } = useProject();
   const { data: caps } = useCapabilities();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [assetKind, setAssetKind] = useState<AssetKind>(DEFAULT_ASSET_KIND);
   const [capability, setCapability] = useState('all');
@@ -218,6 +217,15 @@ export function LibraryPage() {
     }
   };
 
+  /** 素材库上传入口与工具页共用同一套隐藏 input / value 清空逻辑。 */
+  const uploadPicker = useImageUploadArea({
+    disabled: uploading,
+    room: true,
+    filled: false,
+    renderPreviewProvided: false,
+    onFiles: (files) => void uploadFiles(files),
+  });
+
   /**
    * 手机端传回图片 → 刷新素材列表。
    *
@@ -273,7 +281,7 @@ export function LibraryPage() {
       return;
     }
     if (activeProject) {
-      fileInputRef.current?.click();
+      uploadPicker.open();
       return;
     }
     if (hasActiveFilters) {
@@ -283,7 +291,7 @@ export function LibraryPage() {
       setProjectParam(null);
       return;
     }
-    fileInputRef.current?.click();
+    uploadPicker.open();
   };
 
   return (
@@ -299,7 +307,7 @@ export function LibraryPage() {
           onCapabilityChange={setCapability}
           onRefresh={() => void load()}
           onMobileUpload={() => setMobileOpen(true)}
-          onUpload={() => fileInputRef.current?.click()}
+          onUpload={uploadPicker.open}
         />
 
         {/* 分组面板: 客户端按项目 / 能力 / 日期真实聚合, 点选分组即筛选 */}
@@ -328,10 +336,12 @@ export function LibraryPage() {
           />
         )}
 
-        <LibraryUploadInput
-          inputRef={fileInputRef}
+        <ImageUploadInput
+          inputRef={uploadPicker.inputRef}
           accept={SUPPORTED_IMAGE_ACCEPT}
-          onSelect={(files) => void uploadFiles(files)}
+          multiple
+          disabled={uploading}
+          onChange={uploadPicker.onInputChange}
         />
 
         {loading ? (

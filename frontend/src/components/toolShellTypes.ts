@@ -87,7 +87,7 @@ export interface UploadSpec {
    * dropzone 的页面级皮肤（底纹 / 已上传态高度等）。
    *
    * 上传区的 DOM 属于共享骨架，页面不再另写页面级选择器去改它的内部，
-   * 需要差异时由页面把工具类传进来。状态选择用 `[&.pk-dropzone-filled]` 这类变体。
+   * 需要差异时由页面把工具类传进来。状态选择用 `[&[data-filled]]` 这类变体。
    */
   dropzoneClassName?: string;
 }
@@ -145,7 +145,7 @@ export interface Props {
   /**
    * 自定义已上传图片位。
    *
-   * 默认使用 pk-thumb-grid；局部重绘参考站是「160×160 预览 + 重新编辑/重新上传」，
+   * 默认使用共享缩略图网格；局部重绘参考站是「160×160 预览 + 重新编辑/重新上传」，
    * 由页面渲染这组操作，但仍复用 ToolShell 的图片状态、素材库与手机上传。
    */
   renderUploadPreview?: (images: ToolAsset[], controls: UploadPreviewControls) => ReactNode;

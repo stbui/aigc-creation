@@ -65,7 +65,7 @@ export function ShoppableCarouselPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   // ── 上传 ──
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, library, mobile } = useImageUpload({
+  const { images, uploading, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
     maxMb: MAX_IMAGE_MB,
   });
@@ -382,7 +382,6 @@ export function ShoppableCarouselPage() {
               <ShoppableCarouselConfig
                 images={images}
                 uploading={uploading}
-                fileInputRef={fileInputRef}
                 onFiles={(files) => void uploadFiles(files)}
                 onRemove={removeImage}
                 onOpenLibrary={openLibrary}

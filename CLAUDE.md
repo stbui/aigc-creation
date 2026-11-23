@@ -206,6 +206,7 @@ npx biome format --write <files>
 - 商品、订单、支付、退款、积分与会员：`docs/commerce-design.md`。
 - 测试闸口、覆盖矩阵与已知缺口：`docs/testing.md`。
 - Agent 执行卡、证据标准与交人边界：`docs/development-workflow.md`。
+- 后端 NestJS 结构、DTO、异常、鉴权与事务：`docs/backend-nestjs-conventions.md`。
 - 前端模块分层：`docs/frontend-module-conventions.md`。
 - 前端组件角色、Props 与状态契约：`docs/frontend-component-language.md`。
 - 文案、状态反馈、可访问性与代码风格：`docs/copywriting.md`、`docs/feedback-states.md`、`docs/accessibility.md`、`docs/code-style.md`。

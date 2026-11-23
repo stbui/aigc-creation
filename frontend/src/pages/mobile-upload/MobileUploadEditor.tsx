@@ -1,9 +1,10 @@
-import { useRef } from 'react';
 import { ImagePlus, Upload } from 'lucide-react';
 
 import { MAX_FILES, type Phase, type Picked } from './constants';
 import { SUPPORTED_IMAGE_ACCEPT } from './utils';
 import { MobileUploadPreview } from './MobileUploadPreview';
+import { ImageUploadAddTile, ImageUploadInput } from './components';
+import { useImageUploadArea } from './hooks';
 
 interface MobileUploadEditorProps {
   picked: Picked[];
@@ -11,7 +12,7 @@ interface MobileUploadEditorProps {
   notice: string | null;
   error: string | null;
   totalSize: number;
-  onFiles: (files: FileList | null) => void;
+  onFiles: (files: FileList | File[]) => void;
   onRemove: (index: number) => void;
   onMove: (index: number, delta: -1 | 1) => void;
   onSubmit: () => void;
@@ -32,7 +33,13 @@ export function MobileUploadEditor({
   onMove,
   onSubmit,
 }: MobileUploadEditorProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const { inputRef, open, onInputChange } = useImageUploadArea({
+    disabled: phase === 'uploading',
+    room: picked.length < MAX_FILES,
+    filled: picked.length > 0,
+    renderPreviewProvided: true,
+    onFiles,
+  });
 
   return (
     <>
@@ -76,29 +83,25 @@ export function MobileUploadEditor({
         ))}
 
         {picked.length < MAX_FILES && (
-          <button
-            type="button"
-            className="relative flex aspect-square cursor-pointer flex-col items-center justify-center gap-[5px] overflow-hidden rounded-lg border-[1.5px] border-dashed border-[var(--mup-border-brand)] bg-[var(--mup-surface-drag)] p-0 font-[inherit] text-[color:var(--mup-text-brand-2)]"
-            onClick={() => inputRef.current?.click()}
+          <ImageUploadAddTile
+            label="选择图片"
             disabled={phase === 'uploading'}
+            onClick={open}
+            className="relative flex aspect-square w-full flex-col items-center justify-center gap-[5px] overflow-hidden rounded-lg border-[1.5px] border-dashed border-[var(--mup-border-brand)] bg-[var(--mup-surface-drag)] p-0 text-[color:var(--mup-text-brand-2)] hover:border-[var(--mup-border-brand)] hover:bg-[var(--mup-surface-drag)] hover:text-[color:var(--mup-text-brand-2)]"
           >
-            <ImagePlus size={22} />
+            <ImagePlus size={22} aria-hidden />
             <strong className="text-[13px]">选择图片</strong>
             <small className="text-xs text-[color:var(--mup-text-4)]">可多选</small>
-          </button>
+          </ImageUploadAddTile>
         )}
       </div>
 
-      <input
-        ref={inputRef}
-        type="file"
+      <ImageUploadInput
+        inputRef={inputRef}
         accept={SUPPORTED_IMAGE_ACCEPT}
         multiple
-        hidden
-        onChange={(event) => {
-          onFiles(event.target.files);
-          event.target.value = '';
-        }}
+        disabled={phase === 'uploading'}
+        onChange={onInputChange}
       />
 
       {picked.length > 0 && (

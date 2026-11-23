@@ -47,9 +47,8 @@ const PAGE_INNER = [
   '[&_.pk-result-pane-editor]:bg-transparent!',
   // 1366：上传卡标题行与说明收一档
   'min-[1181px]:max-[1366px]:[&_.pk-section-title]:text-xs!',
-  'min-[1181px]:max-[1366px]:[&_.pk-upload-prompt_small]:text-xs!',
-  'min-[1181px]:max-[1366px]:[&_.pk-upload-title-row]:gap-1!',
-  'min-[1181px]:max-[1366px]:[&_.pk-upload-title-actions]:gap-1!',
+  'min-[1181px]:max-[1366px]:[&_[data-slot=image-upload-header]]:gap-1!',
+  'min-[1181px]:max-[1366px]:[&_[data-slot=image-upload-actions]]:gap-1!',
 ].join(' ');
 
 const PAGE_MOBILE = [
@@ -74,17 +73,18 @@ export const PRODUCT_TOOL_PAGE = `${PAGE_ROOT} ${PAGE_INNER} ${PAGE_MOBILE}`;
 /**
  * 上传区：参考站底色 #f6f7f9 / 虚线边 #d9dee8；有图后不再保留虚线框，
  * 而是 160px 高的居中预览（`productSourceUploadPreview` 自带 160×160 缩略图）。
+ * 选择器挂在 `ImageUploadArea` 的 `data-slot` / `data-*` 状态槽位上，不依赖页面 class。
  */
 export const PRODUCT_TOOL_DROPZONE = [
   'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2!',
   'max-[900px]:p-4!',
-  '[&>.pk-upload-prompt]:w-full [&>.pk-upload-prompt]:min-h-0 [&>.pk-upload-prompt]:gap-2',
-  '[&_.pk-thumb-grid-single]:w-40! [&_.pk-thumb-grid-single]:max-w-full!',
-  'max-[900px]:[&_.pk-thumb-grid-single]:w-[min(160px,100%)]!',
-  '[&.pk-dropzone-filled]:flex! [&.pk-dropzone-filled]:h-40! [&.pk-dropzone-filled]:min-h-40!',
-  '[&.pk-dropzone-filled]:items-center! [&.pk-dropzone-filled]:justify-center!',
-  '[&.pk-dropzone-filled]:cursor-default! [&.pk-dropzone-filled]:border-0! [&.pk-dropzone-filled]:rounded-none!',
-  '[&.pk-dropzone-filled]:bg-transparent! [&.pk-dropzone-filled]:shadow-none!',
-  '[&.pk-dropzone-filled:hover]:border-0! [&.pk-dropzone-filled:hover]:bg-transparent! [&.pk-dropzone-filled:hover]:shadow-none!',
-  'min-[901px]:max-[1366px]:[&.pk-dropzone-filled]:h-auto! min-[901px]:max-[1366px]:[&.pk-dropzone-filled]:min-h-40!',
+  '[&>[data-slot=image-upload-prompt]]:w-full [&>[data-slot=image-upload-prompt]]:min-h-0 [&>[data-slot=image-upload-prompt]]:gap-2',
+  '[&_[data-slot=image-upload-thumbs][data-single]]:w-40! [&_[data-slot=image-upload-thumbs][data-single]]:max-w-full!',
+  'max-[900px]:[&_[data-slot=image-upload-thumbs][data-single]]:w-[min(160px,100%)]!',
+  '[&[data-filled]]:flex! [&[data-filled]]:h-40! [&[data-filled]]:min-h-40!',
+  '[&[data-filled]]:items-center! [&[data-filled]]:justify-center!',
+  '[&[data-filled]]:cursor-default! [&[data-filled]]:border-0! [&[data-filled]]:rounded-none!',
+  '[&[data-filled]]:bg-transparent! [&[data-filled]]:shadow-none!',
+  '[&[data-filled]]:hover:border-0! [&[data-filled]]:hover:bg-transparent! [&[data-filled]]:hover:ring-0!',
+  'min-[901px]:max-[1366px]:[&[data-filled]]:h-auto! min-[901px]:max-[1366px]:[&[data-filled]]:min-h-40!',
 ].join(' ');

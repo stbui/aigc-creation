@@ -42,6 +42,30 @@ export type InputProps = ComponentProps<typeof ShadcnInput>;
 export { RadioGroup, RadioGroupItem } from '~/admin-ui/components/ui/radio-group';
 export { Slider } from '~/admin-ui/components/ui/slider';
 export { NumberStepper, type NumberStepperProps } from './primitives/number-stepper';
+export {
+  ImageUploadArea,
+  type ImageUploadAreaProps,
+  type ImageUploadControls,
+  type ImageUploadItem,
+} from './primitives/image-upload-area';
+export { ImageUploadHeader, type ImageUploadHeaderProps } from './primitives/image-upload-header';
+export { ImageUploadPrompt, type ImageUploadPromptProps } from './primitives/image-upload-prompt';
+export { ImageUploadThumb, type ImageUploadThumbProps } from './primitives/image-upload-thumb';
+export {
+  ImageUploadAddTile,
+  type ImageUploadAddTileProps,
+} from './primitives/image-upload-add-tile';
+export { ImageUploadLoading } from './primitives/image-upload-loading';
+export { ImageUploadInput, type ImageUploadInputProps } from './primitives/image-upload-input';
+export {
+  ImageUploadTrigger,
+  type ImageUploadTriggerProps,
+} from './primitives/image-upload-trigger';
+export {
+  useImageUploadArea,
+  type UseImageUploadAreaOptions,
+  type UseImageUploadAreaResult,
+} from './primitives/use-image-upload-area';
 export { Upload, type UploadFile, type UploadProps } from './primitives/upload';
 export { IconInput, type IconInputProps } from './primitives/icon-input';
 export {

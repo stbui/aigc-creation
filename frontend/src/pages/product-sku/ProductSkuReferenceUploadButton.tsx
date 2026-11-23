@@ -1,44 +1,32 @@
-import { useRef } from 'react';
 import { Upload } from 'lucide-react';
 
 import { SUPPORTED_IMAGE_ACCEPT } from './constants';
-import { TextAction } from './components';
+import { ImageUploadTrigger } from './components';
 
 interface ProductSkuReferenceUploadButtonProps {
   /** 该区域的参考图正在上传；按钮进入禁用并显示「上传中…」 */
   busy: boolean;
-  onPick: (file: File | undefined, input: HTMLInputElement) => void;
+  onPick: (file: File | undefined) => void;
 }
 
 /**
  * 变体区域内的「上传参考图」入口。
  *
- * 隐藏文件选择框由本组件自持，页面只拿到选中的文件与 input 引用
- * （后者用于清空 value，允许重复选择同一文件）。
+ * 隐藏 input、打开选择与 value 清空由共享 `ImageUploadTrigger` 承担，
+ * 页面只拿到选中的文件。
  */
 export function ProductSkuReferenceUploadButton({
   busy,
   onPick,
 }: ProductSkuReferenceUploadButtonProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
   return (
-    <>
-      <TextAction
-        icon={<Upload size={12} aria-hidden />}
-        disabled={busy}
-        onClick={() => inputRef.current?.click()}
-      >
-        {busy ? '上传中…' : '上传参考图'}
-      </TextAction>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={SUPPORTED_IMAGE_ACCEPT}
-        hidden
-        disabled={busy}
-        onChange={(event) => onPick(event.target.files?.[0], event.currentTarget)}
-      />
-    </>
+    <ImageUploadTrigger
+      icon={<Upload size={12} aria-hidden />}
+      accept={SUPPORTED_IMAGE_ACCEPT}
+      disabled={busy}
+      onFiles={(files) => onPick(Array.from(files)[0])}
+    >
+      {busy ? '上传中…' : '上传参考图'}
+    </ImageUploadTrigger>
   );
 }

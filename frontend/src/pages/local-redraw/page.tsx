@@ -70,7 +70,7 @@ const PAGE_MOBILE =
 
 /** 上传区参考站底色 #f6f7f9 / 虚线边 #d9dee8；已上传时收成 160px 的居中预览框 */
 const DROPZONE =
-  'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2! [&>.pk-upload-prompt]:w-full [&>.pk-upload-prompt]:min-h-0 [&>.pk-upload-prompt]:gap-2 [&_.pk-thumb-grid-single]:w-40 [&_.pk-thumb-grid-single]:max-w-full [&.pk-dropzone-filled]:flex! [&.pk-dropzone-filled]:h-40! [&.pk-dropzone-filled]:min-h-40! [&.pk-dropzone-filled]:items-center [&.pk-dropzone-filled]:justify-center [&.pk-dropzone-filled]:border-0! [&.pk-dropzone-filled]:rounded-none [&.pk-dropzone-filled]:bg-card!';
+  'bg-[var(--surface-5)]! border-[var(--tool-border-4)]! p-0! gap-2! [&>[data-slot=image-upload-prompt]]:w-full [&>[data-slot=image-upload-prompt]]:min-h-0 [&>[data-slot=image-upload-prompt]]:gap-2 [&_[data-slot=image-upload-thumbs][data-single]]:w-40! [&_[data-slot=image-upload-thumbs][data-single]]:max-w-full! [&[data-filled]]:flex! [&[data-filled]]:h-40! [&[data-filled]]:min-h-40! [&[data-filled]]:items-center! [&[data-filled]]:justify-center! [&[data-filled]]:border-0! [&[data-filled]]:rounded-none [&[data-filled]]:bg-card! [&[data-filled]]:hover:border-0! [&[data-filled]]:hover:bg-card! [&[data-filled]]:hover:ring-0!';
 
 export function LocalRedrawPage() {
   const { message } = useApp();

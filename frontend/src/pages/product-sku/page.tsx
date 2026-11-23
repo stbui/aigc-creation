@@ -45,7 +45,6 @@ export function ProductSkuPage() {
   const [searchParams] = useSearchParams();
   const submissionId = searchParams.get('submissionId');
 
-  const templateInputRef = useRef<HTMLInputElement>(null);
   const restoredSubmissionRef = useRef(false);
   const pollSignal = usePollAbort();
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -236,7 +235,6 @@ export function ProductSkuPage() {
         <ProductSkuTemplateCard
           template={template}
           uploading={uploading}
-          templateInputRef={templateInputRef}
           onUpload={(files) => void uploadTemplate(files)}
           onOpenLibrary={() => openLibraryFor({ kind: 'template' })}
           onOpenMobile={() => mobile.openMobile({ kind: 'template' })}
@@ -256,8 +254,8 @@ export function ProductSkuPage() {
             onRemove={removeSku}
             onNameChange={updateItemName}
             onInstructionChange={updateInstruction}
-            onUploadReference={(file, itemKey, regionId, input) =>
-              void uploadReferenceFile(file, itemKey, regionId, input)
+            onUploadReference={(file, itemKey, regionId) =>
+              void uploadReferenceFile(file, itemKey, regionId)
             }
             onOpenReferenceLibrary={(itemKey, regionId) =>
               openLibraryFor({ kind: 'reference', itemKey, regionId })
