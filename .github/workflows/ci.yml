@@ -91,6 +91,13 @@ jobs:
         working-directory: frontend
         timeout-minutes: 15
         run: npx playwright test --config playwright.config.ts --project=chromium tests/layout-responsive.spec.ts
+      # 上传运行时回归（T-052）：拖拽/粘贴/非法文件拦截/390 无溢出。
+      # 断言按 toast 的 data-testid + role 判状态类型，不锁用户文案（T-051）。
+      # 阻塞式；2 条素材库与手机回传路径在文件内显式 skip。
+      - name: Run upload runtime
+        working-directory: frontend
+        timeout-minutes: 10
+        run: npx playwright test --config playwright.config.ts --project=chromium tests/upload-runtime.spec.ts
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v4
