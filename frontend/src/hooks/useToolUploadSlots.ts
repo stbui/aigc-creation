@@ -48,6 +48,8 @@ export function useToolUploadSlots({
 
   const [images, setImages] = useState<ToolAsset[]>([]);
   const [uploading, setUploading] = useState(false);
+  /** 上传互斥：拖拽/点选/粘贴可能在一次上传途中再次触发。 */
+  const uploadingRef = useRef(false);
 
   /** 手机上传弹窗 (二维码方案, 手机端传回后进入图片位) */
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -77,6 +79,10 @@ export function useToolUploadSlots({
   const pickFromLibrary = useCallback(
     (asset: Asset): boolean => {
       if (!upload) return false;
+      if (uploadingRef.current) {
+        message.info('正在上传上一批图片，请稍候');
+        return false;
+      }
       const current = imagesRef.current;
       const replacing = replaceUpload && upload.max === 1 && current.length > 0;
       if (!replacing && current.length >= upload.max) {
@@ -114,6 +120,10 @@ export function useToolUploadSlots({
    */
   const addMobileAssets = useCallback(
     (assets: MobileUploadAsset[]) => {
+      if (uploadingRef.current) {
+        message.info('正在上传上一批图片，请稍候');
+        return;
+      }
       const max = upload?.max ?? 0;
       const prev = imagesRef.current;
       const replacing = replaceUpload && max === 1 && prev.length > 0;
@@ -150,6 +160,10 @@ export function useToolUploadSlots({
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
+      if (uploadingRef.current) {
+        message.info('正在上传上一批图片，请稍候');
+        return;
+      }
       if (!upload) return;
       const all = Array.from(files);
       const list = all.filter(isSupportedImageFile);
@@ -169,6 +183,7 @@ export function useToolUploadSlots({
       }
       const accepted = list.slice(0, room);
       if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
+      uploadingRef.current = true;
       setUploading(true);
       try {
         for (const file of accepted) {
@@ -191,6 +206,7 @@ export function useToolUploadSlots({
       } catch (e) {
         message.error((e as Error).message || '上传失败');
       } finally {
+        uploadingRef.current = false;
         setUploading(false);
       }
     },
