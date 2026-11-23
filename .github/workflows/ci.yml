@@ -47,7 +47,7 @@ jobs:
   e2e-smoke:
     name: Admin E2E smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,6 +83,14 @@ jobs:
           exit 1
       - name: Run admin smoke
         run: npm run test:e2e:smoke
+      # 布局与响应式门禁（T-029）：1366/900/899/390 四档 × 8 路由，
+      # 断言无横向滚动、`.app-content` 内边距阶梯、每页唯一 h1 与页头字号分级。
+      # 阻塞式，不加 continue-on-error。用默认 playwright.config.ts 的 chromium
+      # 单项目（另两个浏览器未在 CI 安装，且会三倍增加时长）。
+      - name: Run layout responsive
+        working-directory: frontend
+        timeout-minutes: 15
+        run: npx playwright test --config playwright.config.ts --project=chromium tests/layout-responsive.spec.ts
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v4
