@@ -226,7 +226,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 
 ### 3.5 浏览器 E2E（L4）
 
-配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 21 个 spec：
+配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 22 个 spec：
 
 > ⚠ 后台用例**必须**用 `playwright.admin.config.ts`（带 `storageState` 与
 > `admin-auth` setup 依赖）。`playwright.local.config.ts` 没有这两项，后台页会全部
@@ -252,6 +252,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `sidebar.spec.ts` | 侧栏顺序、几何、1366/1367 断点、折叠、工单预填、移动抽屉 |
 | `state-contract.spec.ts` | 全站 loading / empty / error 状态契约 |
 | `workspace-pages.spec.ts` | 工作台 12 卡顺序、guest 不请求统计、素材库双路径、390 无溢出 |
+| `layout-responsive.spec.ts` | 布局与响应式契约：8 条路由 × 4 档视口（1366 / 900 / 899 / 390）的**无横向滚动**与**每页唯一 h1 / 页头字号**；**`.app-content` 内边距阶梯**另跑 8 档（在 4 档外补 641 / 640 / 481 / 480）。三条分界线（900 / 640 / 480）都在「整点」与「整点 −1」各测一次，专抓 Tailwind 开区间 `max-[Npx]:`（`width < Npx`）与手写闭区间 `max-width` 相差的 1px |
 | `example.spec.ts` | Playwright 脚手架示例（不覆盖本项目功能） |
 
 运行：`cd frontend && npm run e2e`（默认 `playwright.admin.config.ts`，`ADMIN_UI` 可覆盖 baseURL）。后台套件先用 `admin-auth.setup.ts` 登录一次并落盘 `playwright/.auth/admin.json`，其余用例复用 `storageState`；这样不会因每条用例重复登录而撞上认证限流。需要验证访客或普通用户的用例会主动清空会话。
@@ -283,6 +284,7 @@ node scripts/verify-deps.js --quiet   # 仅结论，有致命问题 exit 1
 | 中转与运营（P6） | proxy-runtime（含 B 段自起服务） | 暂无 L3 冒烟（见 5.6） | 暂无 |
 | 合规与基础设施 | probe-environments、channel-signatures | aigc、signed-url、health-tracing、notifications | state-contract |
 | 工作台 / 素材库 | — | — | workspace-pages、sidebar |
+| 布局与响应式 | — | — | layout-responsive（依赖 `responsive-layout.md` §1 断点刻度、§2.1 内边距阶梯、§3 页头三级；§4 网格降列与 §6 移动端可访问性未覆盖） |
 | 局部重绘遮罩（`42205`） | tool-contracts | 暂无自动化闸口（见 5.1） | — |
 | AI 带货图文（`shoppable_carousel`） | capability-bootstrap、tool-contracts、credit-deduction | `frontend/e2e/audit/verify-shoppable-generation.mjs`（真接口 + 仿真网关：一次提交 → outputPlan 拆 6 张 → 逐张计费 → 余额核对） | `frontend/e2e/audit/{probe-local-shoppable,probe-local-shoppable-interact,verify-local-shoppable-browser}.mjs`（布局实测 / 交互态 / 浏览器内完整生成） |
 | 写真模板（`template`） | capability-bootstrap、`template.spec.ts`（模板数据 / 提示词 / 模板 id 校验）、`template-catalog.service.spec.ts`（标签归一） | 暂无自动化闸口（需后台配置图像线路后走真实生成） | 后台 `/admin/templates` 三层 CRUD 已手工验证（分类 / 分组 / 模板 + 图片上传） |
