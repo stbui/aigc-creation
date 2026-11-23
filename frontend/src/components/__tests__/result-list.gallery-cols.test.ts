@@ -90,3 +90,39 @@ describe('result-list 画廊窄屏列数', () => {
     expect(block?.start).toBeGreaterThan(lastColsRule?.index ?? 0);
   });
 });
+
+describe('result-list 画廊极窄档（§4.1：≤480 → 1 列）', () => {
+  const css = stripComments(CSS);
+  const blocks = findMediaBlocks(css);
+  const narrow480 = blocks.filter((block) => block.params === '(max-width: 480px)');
+
+  it('≤480 用闭区间只声明一次 1 列', () => {
+    const withCols = narrow480.filter((block) => /--fc-cols\s*:/.test(block.body));
+    expect(withCols).toHaveLength(1);
+    expect(withCols[0].params).toBe('(max-width: 480px)');
+    expect(css).not.toContain('width < 480px');
+  });
+
+  it('遵守优先级策略：两段类、无 !important、排在 640 档之后', () => {
+    const block = narrow480.find((item) => /--fc-cols\s*:/.test(item.body));
+    const rules = [...(block?.body ?? '').matchAll(RULE)].filter((rule) =>
+      /--fc-cols\s*:/.test(rule[2]),
+    );
+    expect(rules).toHaveLength(1);
+
+    const selector = rules[0][1].replace(/\s+/g, ' ').trim();
+    expect(classCount(selector)).toBeGreaterThanOrEqual(2);
+    expect(rules[0][2]).not.toContain('!important');
+    expect(rules[0][2].match(/--fc-cols\s*:\s*(\d+)/)?.[1]).toBe('1');
+
+    // 与 640 档同特异性（0,2,0），后置才赢；640 档也必须仍在 .fc-cols-N 之后
+    const narrow640 = blocks.find(
+      (item) => item.params === '(max-width: 640px)' && /--fc-cols\s*:/.test(item.body),
+    );
+    expect(narrow640).toBeDefined();
+    expect(block?.start).toBeGreaterThan(narrow640?.start ?? 0);
+    expect(narrow640?.start).toBeGreaterThan(
+      [...css.matchAll(/\.fc-result-gallery\.fc-cols-\d+\s*\{/g)].pop()?.index ?? 0,
+    );
+  });
+});
