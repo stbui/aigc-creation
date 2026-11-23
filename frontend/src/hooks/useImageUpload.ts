@@ -78,10 +78,14 @@ export function useImageUpload({ max, noun = '商品图片', initial = [] }: Opt
         message.info('正在上传上一批图片，请稍候');
         return;
       }
-      const list = Array.from(files).filter(isSupportedImageFile);
+      const all = Array.from(files);
+      const list = all.filter(isSupportedImageFile);
       if (list.length === 0) {
         message.warning(`请选择 ${allowedLabel} 格式的图片`);
         return;
+      }
+      if (list.length !== all.length) {
+        message.warning(`已忽略不支持的文件，仅支持 ${allowedLabel}`);
       }
       // 用同步镜像计算剩余额度：连续触发两次时 state 还是旧值
       const room = max - imagesRef.current.length;
