@@ -83,7 +83,7 @@ export function LocalRedrawCanvasFooter({
         </button>
       </div>
       {/* 提示相对画布舞台定位；嵌在绝对定位的操作条内会以操作条为包含块而压住按钮 */}
-      <p className="redraw-shortcut-hint absolute bottom-2 left-1/2 z-4 m-0 leading-4! whitespace-nowrap text-[color:var(--text-9)]! -translate-x-1/2 max-[1180px]:hidden">{SHORTCUT_HINT}</p>
+      <p className="redraw-shortcut-hint absolute bottom-2 left-1/2 z-4 m-0 leading-4! whitespace-nowrap text-[color:var(--text-9)]! -translate-x-1/2 max-[1200px]:hidden">{SHORTCUT_HINT}</p>
     </>
   );
 }

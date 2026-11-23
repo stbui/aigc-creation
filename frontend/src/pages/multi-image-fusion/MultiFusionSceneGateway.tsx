@@ -21,7 +21,9 @@ export function MultiFusionSceneGateway({ onSelect }: { onSelect: (scene: string
           <h2 className="mb-2.5 ml-0.5 text-sm leading-5 font-bold text-foreground">
             {group.name}
           </h2>
-          <div className="grid grid-cols-6 gap-3 max-[1200px]:grid-cols-5 max-[899px]:grid-cols-3 max-[767px]:grid-cols-2 max-[520px]:grid-cols-2">
+          {/* 栅格四档用 max-[N+1px]，是 ≤N 的闭区间写法（§1.2）：内联 max-[Npx] 编译成 width < N，
+              900/640 整点会与手写 CSS 的 max-width 差 1px */}
+          <div className="grid grid-cols-6 gap-3 max-[1201px]:grid-cols-5 max-[901px]:grid-cols-3 max-[641px]:grid-cols-2">
             {group.scenes.map((scene) => (
               <Button
                 key={scene.value}

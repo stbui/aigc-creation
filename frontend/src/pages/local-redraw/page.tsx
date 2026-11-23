@@ -54,19 +54,22 @@ import { LocalRedrawUploadPreview } from './LocalRedrawUploadPreview';
  * 页面根栅格（挂在 ToolShell 根节点，不额外包一层 div）。
  *
  * 参考站三栏：输入 432 / 画布自适应（中栏有 560 的下限）/ 历史 192；
- * 收起历史时宽屏仍保留第三列，只隐藏列表，≤1180 才让历史栏彻底让位。
+ * 收起历史时宽屏仍保留第三列，只隐藏列表，≤1200 才让历史栏彻底让位。
+ * 超宽屏（>1366）用紧凑三栏 390/520/176：1367 起外壳恢复 176 侧栏，按 432/560 会挤掉画布；
+ * 1500 这个中间档没有对应刻度，已并入 1367 以上同一套数值。
  */
 const PAGE_BASE =
   'box-border min-h-0! p-4! gap-4! items-stretch! overflow-hidden! grid-rows-[minmax(0,1fr)]! bg-[var(--page-bg)] max-h-[calc(100vh_-_var(--workspace-topbar-height))]';
 
+// 栅格断点一律写 max-[N+1px]：这是 ≤N 的闭区间写法（§1.2），与手写 CSS 的 max-width: N 逐像素对齐。
 const PAGE_COLUMNS =
-  'grid-cols-[432px_minmax(560px,1fr)_192px]! min-[1367px]:max-[1500px]:grid-cols-[390px_minmax(520px,1fr)_176px]! min-[1181px]:max-[1366px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)_192px]! max-[1180px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
+  'grid-cols-[390px_minmax(520px,1fr)_176px]! max-[1367px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)_192px]! max-[1201px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
 
 const PAGE_COLUMNS_COLLAPSED =
-  'grid-cols-[432px_minmax(560px,1fr)_192px]! min-[1181px]:max-[1366px]:grid-cols-[216px_minmax(0,1fr)_192px]! max-[1180px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
+  'grid-cols-[432px_minmax(560px,1fr)_192px]! max-[1367px]:grid-cols-[216px_minmax(0,1fr)_192px]! max-[1201px]:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]!';
 
 const PAGE_MOBILE =
-  'max-[900px]:grid-cols-1! max-[900px]:-mx-2.5! max-[900px]:-mt-4! max-[900px]:-mb-6! max-[900px]:h-auto max-[900px]:max-h-none max-[900px]:gap-3! max-[900px]:grid-rows-[auto]! max-[900px]:content-start max-[900px]:overflow-visible! max-[900px]:p-4';
+  'max-[901px]:grid-cols-1! max-[901px]:-mx-2.5! max-[901px]:-mt-4! max-[901px]:-mb-6! max-[901px]:h-auto max-[901px]:max-h-none max-[901px]:gap-3! max-[901px]:grid-rows-[auto]! max-[901px]:content-start max-[901px]:overflow-visible! max-[901px]:p-4';
 
 /** 上传区参考站底色 #f6f7f9 / 虚线边 #d9dee8；已上传时收成 160px 的居中预览框 */
 const DROPZONE =

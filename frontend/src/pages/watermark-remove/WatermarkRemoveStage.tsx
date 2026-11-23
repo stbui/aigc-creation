@@ -57,7 +57,7 @@ export function WatermarkRemoveStage({
 }: WatermarkRemoveStageProps) {
   return (
     <main
-      className="local-redraw-stage relative flex h-full w-full min-w-0 min-h-0 items-center justify-center overflow-hidden rounded-[var(--radius-panel)] max-[1180px]:min-h-[720px]"
+      className="local-redraw-stage relative flex h-full w-full min-w-0 min-h-0 items-center justify-center overflow-hidden rounded-[var(--radius-panel)] max-[1200px]:min-h-[720px]"
       aria-busy={submitting}
     >
       <div className="redraw-stage-topbar absolute top-0 left-0 z-5 flex min-h-10 w-full items-center justify-center max-[900px]:left-0 max-[900px]:w-[calc(100%_-_24px)] max-[900px]:translate-none">

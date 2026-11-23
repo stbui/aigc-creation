@@ -26,7 +26,7 @@ export function LandingFeatures({ canUse }: LandingFeaturesProps) {
       </div>
 
       <div className="mt-8 text-left">
-        <Surface className="grid grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] items-center gap-8 rounded-2xl border-border px-7 py-7 max-[1080px]:grid-cols-1 max-[640px]:px-5">
+        <Surface className="grid grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] items-center gap-8 rounded-2xl border-border px-7 py-7 max-[1200px]:grid-cols-1 max-[640px]:px-5">
           <div>
             <h3 className="m-0 text-[21px] font-bold tracking-[-0.3px] text-foreground">
               一张商品图，搞定全套图

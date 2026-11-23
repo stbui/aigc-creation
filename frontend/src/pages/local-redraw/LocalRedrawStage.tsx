@@ -68,11 +68,11 @@ export function LocalRedrawStage({
 
   return (
     <div
-      className={`pk-source-pane redraw-stage relative flex items-center justify-center gap-0! overflow-hidden! rounded-[var(--radius-panel)] p-0! max-[860px]:min-h-[720px]`}
+      className={`pk-source-pane redraw-stage relative flex items-center justify-center gap-0! overflow-hidden! rounded-[var(--radius-panel)] p-0! max-[900px]:min-h-[720px]`}
       aria-busy={submitting}
     >
       <div
-        className={`redraw-stage-topbar absolute top-0 left-0 z-5 flex min-h-10 w-full items-center justify-center max-[1180px]:left-1/2 max-[1180px]:w-[calc(100%_-_32px)] max-[1180px]:-translate-x-1/2 max-[860px]:w-[calc(100%_-_24px)]${dimmed}`}
+        className={`redraw-stage-topbar absolute top-0 left-0 z-5 flex min-h-10 w-full items-center justify-center max-[1200px]:left-1/2 max-[1200px]:w-[calc(100%_-_32px)] max-[1200px]:-translate-x-1/2 max-[900px]:w-[calc(100%_-_24px)]${dimmed}`}
       >
         <LocalRedrawToolbar
           tool={tool}
@@ -83,7 +83,7 @@ export function LocalRedrawStage({
       </div>
       <div className="redraw-stage-main absolute inset-0 flex items-center justify-center">
         <div
-          className={`redraw-canvas-wrap relative flex-none! w-[var(--redraw-canvas-w)]! max-w-full max-h-full aspect-[var(--redraw-image-aspect)] flex items-center justify-center overflow-hidden max-[860px]:w-[600px] max-[860px]:max-w-[calc(100%_-_24px)]${dimmed}`}
+          className={`redraw-canvas-wrap relative flex-none! w-[var(--redraw-canvas-w)]! max-w-full max-h-full aspect-[var(--redraw-image-aspect)] flex items-center justify-center overflow-hidden max-[900px]:w-[600px] max-[900px]:max-w-[calc(100%_-_24px)]${dimmed}`}
           style={
             {
               '--redraw-image-aspect': aspect,

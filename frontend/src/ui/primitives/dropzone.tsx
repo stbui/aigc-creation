@@ -51,7 +51,7 @@ export function ImageDropzone({
         'text-muted-foreground hover:border-brand hover:bg-muted hover:text-muted-foreground',
         'focus-visible:border-brand focus-visible:ring-[3px] focus-visible:ring-brand/30',
         dragging && 'border-brand bg-brand-bg',
-        compact ? 'min-h-27 gap-1 px-2 py-2' : 'min-h-40 gap-1.5 px-4 py-4 max-[560px]:min-h-32',
+        compact ? 'min-h-27 gap-1 px-2 py-2' : 'min-h-40 gap-1.5 px-4 py-4 max-[480px]:min-h-32',
         className,
       )}
       onClick={onClick}

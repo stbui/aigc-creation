@@ -38,7 +38,7 @@ export function StatsTrendPanel({ days, summary }: StatsTrendPanelProps) {
       </header>
       {hasRecentOutput ? (
         <div
-          className="flex min-h-[200px] flex-1 items-end gap-2 pt-3 max-[760px]:min-h-[160px]"
+          className="flex min-h-[200px] flex-1 items-end gap-2 pt-3 max-[640px]:min-h-[160px]"
           role="img"
           aria-label={`近 7 天共创作 ${summary.total} 次，峰值 ${summary.peak} 次，活跃 ${summary.activeDays} 天`}
         >
@@ -65,7 +65,7 @@ export function StatsTrendPanel({ days, summary }: StatsTrendPanelProps) {
                   }`}
                 >
                   {weekdayOf(day.date)}
-                  <em className="text-xs not-italic tabular-nums text-[color:var(--text-desc)] max-[760px]:hidden">
+                  <em className="text-xs not-italic tabular-nums text-[color:var(--text-desc)] max-[640px]:hidden">
                     {day.date.slice(5)}
                   </em>
                 </span>

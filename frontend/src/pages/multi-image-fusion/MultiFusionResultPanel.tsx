@@ -74,8 +74,8 @@ export function MultiFusionResultPanel({
     status.state === 'failed' || status.state === 'submit_failed' ? 'alert' : 'status';
 
   return (
-    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-[linear-gradient(145deg,var(--card-bg),var(--brand-bg))] p-5.5 max-[600px]:p-3">
-      <div className="mb-4 flex items-start justify-between gap-4.5 max-[600px]:flex-col max-[600px]:items-stretch max-[600px]:gap-2.5">
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-[linear-gradient(145deg,var(--card-bg),var(--brand-bg))] p-5.5 max-[640px]:p-3">
+      <div className="mb-4 flex items-start justify-between gap-4.5 max-[640px]:flex-col max-[640px]:items-stretch max-[640px]:gap-2.5">
         <div className="min-w-0">
           <h2 className="m-0 mt-0.5 text-lg leading-6.25 font-bold text-foreground">生成结果</h2>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -95,13 +95,13 @@ export function MultiFusionResultPanel({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.75 max-[600px]:w-full">
+        <div className="flex items-center gap-1.75 max-[640px]:w-full">
           {status.state === 'timeout' && onRetryPoll && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 gap-1.25 px-2.5 text-xs max-[600px]:flex-1"
+              className="h-8 gap-1.25 px-2.5 text-xs max-[640px]:flex-1"
               onClick={onRetryPoll}
             >
               <RefreshCw aria-hidden />
@@ -112,7 +112,7 @@ export function MultiFusionResultPanel({
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 gap-1.25 px-2.5 text-xs max-[600px]:flex-1"
+            className="h-8 gap-1.25 px-2.5 text-xs max-[640px]:flex-1"
             disabled={!canRegenerate}
             onClick={onRegenerate}
           >
@@ -123,7 +123,7 @@ export function MultiFusionResultPanel({
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 gap-1.25 px-2.5 text-xs max-[600px]:flex-1"
+            className="h-8 gap-1.25 px-2.5 text-xs max-[640px]:flex-1"
             disabled={!activeResult?.url}
             onClick={onDownload}
           >

@@ -19,7 +19,7 @@ interface LandingAddonGridProps {
  */
 export function LandingAddonGrid({ addons, state }: LandingAddonGridProps) {
   return (
-    <div className="grid grid-cols-4 gap-4 max-[1080px]:grid-cols-2 max-[640px]:grid-cols-1">
+    <div className="grid grid-cols-4 gap-4 max-[1200px]:grid-cols-2 max-[640px]:grid-cols-1">
       {state === 'loading' && <LandingCatalogEmpty>积分包加载中…</LandingCatalogEmpty>}
       {state === 'error' && (
         <LandingCatalogEmpty>积分包暂时加载失败，请稍后刷新查看</LandingCatalogEmpty>

@@ -63,7 +63,7 @@ export function MobileUploadEditor({
         </p>
       )}
 
-      <div className="grid grid-cols-3 gap-2.5 max-[520px]:grid-cols-2">
+      <div className="grid grid-cols-3 gap-2.5 max-[480px]:grid-cols-2">
         {picked.map((item, index) => (
           <MobileUploadPreview
             key={item.url}

@@ -22,7 +22,7 @@ export function LandingPlanGrid({ plans, state }: LandingPlanGridProps) {
   const payablePlans = plans.filter((plan) => plan.durationDays > 0);
 
   return (
-    <div className="grid grid-cols-3 gap-4.5 max-[1080px]:grid-cols-2 max-[640px]:grid-cols-1">
+    <div className="grid grid-cols-3 gap-4.5 max-[1200px]:grid-cols-2 max-[640px]:grid-cols-1">
       {state === 'loading' && <LandingCatalogEmpty>套餐加载中…</LandingCatalogEmpty>}
       {state === 'error' && (
         <LandingCatalogEmpty>套餐暂时加载失败，请稍后刷新查看</LandingCatalogEmpty>

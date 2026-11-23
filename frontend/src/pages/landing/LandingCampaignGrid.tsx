@@ -16,7 +16,7 @@ interface LandingCampaignGridProps {
  */
 export function LandingCampaignGrid({ campaigns }: LandingCampaignGridProps) {
   return (
-    <div className="grid grid-cols-4 gap-4 max-[1080px]:grid-cols-2 max-[640px]:grid-cols-1">
+    <div className="grid grid-cols-4 gap-4 max-[1200px]:grid-cols-2 max-[640px]:grid-cols-1">
       {campaigns.map((campaign) => {
         const firstCapability = campaign.capabilityIds?.[0];
         const freeTarget = firstCapability ? toolPath(firstCapability) : '/workbench';

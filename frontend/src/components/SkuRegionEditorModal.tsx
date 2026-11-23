@@ -379,7 +379,7 @@ export function SkuRegionEditorModal({
           </DialogTitle>
           <DialogDescription
             id="product-sku-region-desc"
-            className="text-center text-xs leading-[18px] text-muted-foreground max-[560px]:mx-auto max-[560px]:max-w-[270px]"
+            className="text-center text-xs leading-[18px] text-muted-foreground max-[480px]:mx-auto max-[480px]:max-w-[270px]"
           >
             在模板图上框选需要跟随 SKU 变化的位置，最多 3 个区域；框外内容保持不变。
           </DialogDescription>
