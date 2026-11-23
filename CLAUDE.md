@@ -1,12 +1,14 @@
 # CLAUDE.md
 
-本文件是 Claude Code 在本仓库的常驻作业上下文。只保留**坐标、硬约束、踩坑**；实现细节沿文中的文档指针按需读取。
+本文件是仓库的常驻作业上下文，Claude Code 会自动读取，Codex / Cursor 等经根 `AGENTS.md` 指向阅读。只保留**坐标、硬约束、踩坑**；跨线分工见 `AGENTS.md`，阶段流程见 `docs/development-workflow.md`，文档索引见 `docs/README.md`。
 
 ## 0. 仓库不变量
 
 1. 模型调用只有 `backend/src/model/**` 一条链路。
 2. 能力清单只在 `backend/src/capabilities/definitions/` 定义。
 3. 组件只有 shadcn 一套：后台页面从 `admin-ui/radar` 取件，C 端页面从 `src/ui` 取件。
+
+指令优先级见根 `AGENTS.md` §0；本节只说明事实冲突时的取值顺序。
 
 ## 1. 先读这里
 
@@ -198,6 +200,7 @@ npx biome format --write <files>
 
 ## 9. 文档指针
 
+- Agent 协作入口：根 `AGENTS.md`（分工与交接）、`docs/development-workflow.md`（阶段与闸口）、`docs/README.md`（索引）。
 - 需求与产品边界：`docs/prd.md`、`docs/admin-prd.md`、`docs/admin-*-design.md`。
 - 环境、数据库、Docker 与部署：`docs/environments.md`、`docs/docker-deployment.md`。
 - 模型、选路、失败语义与计费：`docs/model-architecture.md`。

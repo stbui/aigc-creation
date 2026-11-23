@@ -8,6 +8,18 @@
 2. **只写现状**。文档里的数量、接口、脚本名必须能在仓库里核对到；尚未实现的内容标「规划中」，不写成现状。
 3. **不留过程记录**。交付批次、逐轮实施记录、一次性审计与取证日志不进入仓库文档；取舍理由随提交说明记录。
 
+## 0. Agent 协作入口
+
+| 文件 | 只写 | 什么时候读 |
+| --- | --- | --- |
+| 根 `README.md` | 对外产品介绍、能力概览、快速启动 | 首次了解项目或对外分享时 |
+| 根 `AGENTS.md` | 线路分工、文件归属、并行与交接 | 任何跨目录改动、开新线程前 |
+| `CLAUDE.md` | 仓库不变量、单一事实源、易腐化数量、环境踩坑 | 定位事实源、判断硬约束时 |
+| [`development-workflow.md`](development-workflow.md) | 阶段执行卡、闸口、证据、Git 工作流 | 从需求到交付的完整流程 |
+| 本文件 | 文档索引、命名与放置规则 | 新增、改名、查找文档时 |
+
+读法优先级：用户当轮指令 > 根 `AGENTS.md` > `CLAUDE.md` > `development-workflow.md` > 领域文档。同一事实只在上表对应位置维护一份。
+
 ## 1. 需求文档（Requirements）
 
 回答「做什么、为谁做、边界在哪」。
@@ -49,7 +61,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [`brand/brand-basics.md`](brand/brand-basics.md) | 品牌名称、技术标识（`huojue`）、技术命名约定与禁用旧称 |
+| [`brand/brand-basics.md`](brand/brand-basics.md) | 品牌名称、技术标识（`huojue`）、技术命名约定、上游引擎与历史引用边界 |
 
 ## 3. 技术文档（Technical）
 
@@ -84,6 +96,9 @@
 | [`analytics-events.md`](analytics-events.md) | 数据分析事件规范：事件目录、属性、指标口径、归因、采集门槛与已知缺口 |
 | [`media-assets.md`](media-assets.md) | 媒体资产规范：上传格式与上限、存储 key、缩略图、签名访问、AIGC 标识、视频与删除保留 |
 | [`mask-canvas-sdk.md`](mask-canvas-sdk.md) | 遮罩画布 SDK：标记 / 手势 / 遮罩 / 导出内核、两条通知通道、适配层职责与约束 |
+| [`model-channel-architecture.md`](model-channel-architecture.md) | 模型渠道与网关目标设计：领域语言、数据流、后台配置、追踪与审计缺口 |
+| [`credit-ledger-business-type-design.md`](credit-ledger-business-type-design.md) | 积分明细「业务类型」数据契约：枚举、落位、迁移与验收边界 |
+| [`non-upstream-extensions.md`](non-upstream-extensions.md) | 非上游扩展与契约偏差登记：逐项记录偏离点、动机、影响面与落点 |
 
 目录结构、能力清单、环境坑等与代码强相关的坐标速查表放在仓库根 `CLAUDE.md`；接口清单与错误码在 [`api-contract.md`](api-contract.md)。
 
@@ -91,7 +106,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [`testing.md`](testing.md) | 四层测试、闸口清单、Vitest / E2E 用例清单、覆盖矩阵、已知缺口、测试数据清理 |
+| [`testing.md`](testing.md) | L1–L4 分层测试（含 L1.5 / L1.6）、闸口清单、Vitest / E2E 用例清单、覆盖矩阵、已知缺口、测试数据清理 |
 
 `testing.md` 只维护清单、覆盖矩阵与已知缺口；单次运行的真实结果（通过 / 失败数、定性结论）随提交说明记录。
 
@@ -107,6 +122,8 @@
 | [`channel-model-automation-design.md`](channel-model-automation-design.md) | 模型渠道能力重构方案：删除前台模型三层，渠道模型直接售卖；能力 ↔ 商品绑定、模型分组只读聚合、能力级统一定价、按健康度分层与同能力跨模型跨渠道切线、配置自动化与迁移分期 | 已实施（2026-11-13） |
 | [`payment-refactor-design.md`](payment-refactor-design.md) | 支付域重构方案 v2（对齐 open-ai-canvas）：多渠道配置版本化与加密托管、查单/关单、回调收件箱与 15s worker、T+1 对账自动补发、`/admin/payments` 四标签页完整规格、迁移与验收标准 | 部分实施：后端主链路已落地；前端页面与开放差距见 §25 |
 | [`admin-workflow-design.md`](admin-workflow-design.md) | 后台角色化工作流：运营/财务/管理员三种首屏、统一待办、上下文直达、保存视图与命令面板、工单转交、批量动作与分期验收 | P0 已实施（对账保存视图未落地）；P1 / P2 规划中 |
+| [`mailbox-design.md`](mailbox-design.md) | 邮箱模块 `/mailbox` 设计：入口、数据、接口与实施边界 | 规划中，未实施 |
+| [`wardrobe-design.md`](wardrobe-design.md) | 衣帽间 AI 模特试衣：市场、技术选型、产品定义与 MVP 拆分 | 规划中（策划草案） |
 
 ## 6. 文档命名与放置规范
 
