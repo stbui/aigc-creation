@@ -53,6 +53,22 @@
   gap: var(--space-10);
 }
 
+/* 工具页 L3 页头（docs/responsive-layout.md §3.1：桌面 18 / ≤640 16）。
+   标题元素在 pages/creative-image 的 TSX 里带 Tailwind `text-base`（0,1,0），
+   样式层用 `.pk-input-pane h1`（0,1,1）覆盖，避免改页面 TSX。桌面由外壳
+   顶栏承担标题，这段标题头只在窄屏出现。 */
+.pk-input-pane h1 {
+  font-size: 18px;
+  line-height: 26px;
+}
+
+@media (max-width: 640px) {
+  .pk-input-pane h1 {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}
+
 .pk-form-card {
   display: flex;
   flex-direction: column;
