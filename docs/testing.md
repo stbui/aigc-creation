@@ -231,7 +231,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 
 ### 3.5 浏览器 E2E（L4）
 
-配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 22 个 spec：
+配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 23 个 spec：
 
 > ⚠ 后台用例**必须**用 `playwright.admin.config.ts`（带 `storageState` 与
 > `admin-auth` setup 依赖）。`playwright.local.config.ts` 没有这两项，后台页会全部
@@ -257,10 +257,11 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `sidebar.spec.ts` | 侧栏顺序、几何、1366/1367 断点、折叠、工单预填、移动抽屉 |
 | `state-contract.spec.ts` | 全站 loading / empty / error 状态契约 |
 | `workspace-pages.spec.ts` | 工作台 12 卡顺序、guest 不请求统计、素材库双路径、390 无溢出 |
+| `upload-runtime.spec.ts` | C 端图片上传的运行时契约（访客态）：拖拽高亮与清除、非法文件在客户端拦下且不发 POST、粘贴图片进入上传通道、粘贴纯文本不被抢占、390px 上传区无横向溢出。素材库回填与手机扫码回传显式 skip（需登录态 / 真机）。**需 dev server + 后端**，未接 CI |
 | `layout-responsive.spec.ts` | 布局与响应式契约：8 条路由 × 4 档视口（1366 / 900 / 899 / 390）的**无横向滚动**与**每页唯一 h1 / 页头字号**；**`.app-content` 内边距阶梯**另跑 8 档（在 4 档外补 641 / 640 / 481 / 480）。三条分界线（900 / 640 / 480）都在「整点」与「整点 −1」各测一次，专抓 Tailwind 开区间 `max-[Npx]:`（`width < Npx`）与手写闭区间 `max-width` 相差的 1px |
 | `example.spec.ts` | Playwright 脚手架示例（不覆盖本项目功能） |
 
-运行：`cd frontend && npm run e2e`（默认 `playwright.admin.config.ts`，`ADMIN_UI` 可覆盖 baseURL）。后台套件先用 `admin-auth.setup.ts` 登录一次并落盘 `playwright/.auth/admin.json`，其余用例复用 `storageState`；这样不会因每条用例重复登录而撞上认证限流。需要验证访客或普通用户的用例会主动清空会话。
+运行：`cd frontend && npm run e2e`（默认 `playwright.admin.config.ts`，`ADMIN_UI` 可覆盖 baseURL）。`upload-runtime.spec.ts` 与 `layout-responsive.spec.ts` 不走后台套件，需先起 dev server 与后端：`cd frontend && ADMIN_UI=http://localhost:5100 npx playwright test --config playwright.config.ts --project=chromium tests/<文件>`（默认访客态，不带 `storageState`）。后台套件先用 `admin-auth.setup.ts` 登录一次并落盘 `playwright/.auth/admin.json`，其余用例复用 `storageState`；这样不会因每条用例重复登录而撞上认证限流。需要验证访客或普通用户的用例会主动清空会话。
 
 后台用例的选择器契约（2026-11-02 推倒重建后；组件底座 radix `new-york`）：共享控件与页面关键节点挂 `data-testid="admin-*"` —— `admin-filter` / `admin-filter-actions` / `admin-filter-chips` / `admin-filter-chip` / `admin-table` / `admin-table-scroll` / `admin-table-row` / `admin-table-expanded` / `admin-drawer` / `admin-modal` / `admin-confirm-action` / `admin-toast` / `admin-panel` / `admin-page-loading` / `admin-header` / `admin-sider` / `admin-nav-scroll` / `admin-bulk-bar` / `admin-asset-cell` / `admin-storage-card` / `admin-task-row` / `admin-role-save-bar`。表单控件没有 `id` 时用 `aria-label` 配 `getByLabel`；下拉（radix `Select`）要「点 `combobox` 触发器 → 点 `option`」，不能用 `selectOption`。**不要把 Tailwind 工具类或 `adm-*` 类写进断言** —— 前者随视觉调整变动，后者只剩外壳骨架。
 
@@ -290,6 +291,7 @@ node scripts/verify-deps.js --quiet   # 仅结论，有致命问题 exit 1
 | 合规与基础设施 | probe-environments、channel-signatures | aigc、signed-url、health-tracing、notifications | state-contract |
 | 工作台 / 素材库 | — | — | workspace-pages、sidebar |
 | 布局与响应式 | — | — | layout-responsive（依赖 `responsive-layout.md` §1 断点刻度、§2.1 内边距阶梯、§3 页头三级；§4 网格降列与 §6 移动端可访问性未覆盖） |
+| 图片上传（C 端） | `useToolUploadSlots.test.tsx`（互斥 / 额度 / 替换）、`image-upload-area.test.tsx`、`ToolImageDropzone.test.tsx`、`mobile-upload-hooks.test.ts`（objectURL） | — | upload-runtime（访客态运行时；素材库回填与手机回传见 5.7） |
 | 局部重绘遮罩（`42205`） | tool-contracts | 暂无自动化闸口（见 5.1） | — |
 | AI 带货图文（`shoppable_carousel`） | capability-bootstrap、tool-contracts、credit-deduction | `frontend/e2e/audit/verify-shoppable-generation.mjs`（真接口 + 仿真网关：一次提交 → outputPlan 拆 6 张 → 逐张计费 → 余额核对） | `frontend/e2e/audit/{probe-local-shoppable,probe-local-shoppable-interact,verify-local-shoppable-browser}.mjs`（布局实测 / 交互态 / 浏览器内完整生成） |
 | 写真模板（`template`） | capability-bootstrap、`template.spec.ts`（模板数据 / 提示词 / 模板 id 校验）、`template-catalog.service.spec.ts`（标签归一） | 暂无自动化闸口（需后台配置图像线路后走真实生成） | 后台 `/admin/templates` 三层 CRUD 已手工验证（分类 / 分组 / 模板 + 图片上传） |
@@ -429,3 +431,15 @@ P6 的判据由 `verify-proxy-runtime.ts` 钉住（`npm run verify:proxy-runtime
 4. 任何「预期通过」都不算验证：交付时只写真实运行输出里的通过 / 失败数。
 5. 纯逻辑（几何 / 解析 / 状态机）与共享 hooks、状态组件优先补 Vitest；断言用行为与返回值，不用快照比对样式。新增用例后须同时跑 `npm run typecheck` 与 `npm test`。
 6. 本文不记录逐轮修复过程；已知缺口按第 5 节维护，修复后移除对应条目。
+
+### 5.7 C 端图片上传：两条未自动化覆盖的路径
+
+`upload-runtime.spec.ts` 覆盖访客态的拖拽 / 粘贴 / 窄屏，但有两条路径显式 skip：
+
+| 路径 | 未覆盖原因 | 怎么补 |
+| --- | --- | --- |
+| 素材库回填 | 需要有效登录态与后端素材数据；在本机跑会写入共享开发库，CI 也没有固定素材 | 用测试库 + 预置素材 fixture，或在 L3 冒烟里入库后带 token 跑 |
+| 手机扫码回传 | 需要真实移动设备扫二维码并在手机端完成一次上传，桌面 Chromium 无法稳定复现 | 手工验收；或做一个可注入的回传接口在 L3 覆盖服务端语义 |
+
+单测层已覆盖的部分不算缺口：上传互斥、额度截断、单图替换、objectURL 回收都在
+`frontend/src/**/__tests__`（见 4 覆盖矩阵「图片上传（C 端）」行）。
