@@ -264,9 +264,15 @@
 }
 
 /* 窄屏一刀切 2 列: 432px 输入栏 + 结果栏在手机/小窗口下本来就挤,
-   再按用户选的 5~6 列, 单张只剩几十像素, 等于没法看。 */
+   再按用户选的 5~6 列, 单张只剩几十像素, 等于没法看。
+
+   选择器必须写成两个类（`.fc-result-gallery.fc-result-gallery`）:
+   组件恒定渲染 `fc-cols-${cols}`，`.fc-result-gallery.fc-cols-N`（0,2,0）
+   会压过单类的媒体规则（0,1,0），与源码顺序无关 —— 单类写法从未生效过。
+   两段选择器特异性相同（0,2,0）时由源码顺序定胜负，本块在后面，所以 2 列赢。
+   不使用 !important。 */
 @media (max-width: 640px) {
-  .fc-result-gallery {
+  .fc-result-gallery.fc-result-gallery {
     --fc-cols: 2;
   }
 }
