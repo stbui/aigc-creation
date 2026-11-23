@@ -86,8 +86,10 @@
   border-radius: 15px;
 }
 
-/* 901-1366px：控制列压到 216px，把宽度让给结果列 */
-@media (min-width: 901px) and (max-width: 1366px) {
+/* 901-1200px：中宽桌面（§1.2 四档的「小笔记本」档）控制列压到 216px，
+   把宽度让给结果列。原上限 1366 是外壳断点，内容层不使用 ——
+   1201–1366 改走基础栅格（minmax(360px, 432px) + 1fr）。 */
+@media (min-width: 901px) and (max-width: 1200px) {
   .multi-image-fusion-layout {
     grid-template-columns: 216px minmax(0, 1fr);
   }
