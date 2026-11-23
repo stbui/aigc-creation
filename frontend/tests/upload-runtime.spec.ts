@@ -13,7 +13,8 @@ import { expect, test, type Page } from '@playwright/test';
  * 命令行见 `docs/testing.md` §3.5。会话契约见 `docs/responsive-layout.md` §6
  * （390px 无横向滚动）与 `docs/frontend-component-language.md` 的上传区条目。
  *
- * 选择器用组件公开的 `data-slot` 与 role/text，不追 Tailwind 类名。
+ * 选择器用组件公开的 `data-slot`、role 与 toast 的 `data-testid`，不追 Tailwind
+ * 类名，也不断言用户可见文案的整句（T-051）。
  *
  * ## 范围
  *
@@ -37,6 +38,15 @@ const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 /** 工具页上传区最密集的一条路由（单图参考图 + 多图商品图） */
 const PAGE = '/viral-clone';
 const AREA = '[data-slot="image-upload-area"]';
+/*
+ * 反馈只断言**状态类型**，不断言整句文案（T-051）。
+ *
+ * 文案属产品可调内容，改词不该让门禁变红；而 toast 节点的契约是稳定的：
+ * `ToastProvider`（admin-ui/providers/ToastProvider.tsx）给每条 toast 挂
+ * `data-testid="admin-toast"`，并按语气给 role —— error 用 `alert`，
+ * info / warning / success 用 `status`。这里按 testid + role 断言。
+ */
+const TOAST = '[data-testid="admin-toast"]';
 
 async function openUploadPage(page: Page) {
   await page.goto(`${UI}${PAGE}`, { waitUntil: 'domcontentloaded' });
@@ -101,9 +111,10 @@ test.describe('图片上传运行时（T-033）', () => {
 
     await dispatchWithFile(page, 'drop', { name: 'note.txt', type: 'text/plain', body: 'x' });
 
-    await expect(page.getByText(/请选择图片文件|格式的图片|不支持/).first()).toBeVisible({
-      timeout: 5000,
-    });
+    // 客户端拦下 → 一条非 error 语气的提示（warning），且没有上传请求
+    const toast = page.locator(TOAST).first();
+    await expect(toast).toBeVisible({ timeout: 5000 });
+    await expect(toast).toHaveAttribute('role', 'status');
     expect(requests, `不应发起上传请求，实际：${requests.join(', ')}`).toHaveLength(0);
   });
 
@@ -113,9 +124,9 @@ test.describe('图片上传运行时（T-033）', () => {
     await dispatchWithFile(page, 'paste', { name: 'paste.png', type: 'image/png', body: 'x' });
 
     // `usePasteUpload` 只接剪贴板里的图片；贴文本应当放行给输入框，不抢事件。
-    await expect(page.getByText(/请先登录|上传中|上传失败/).first()).toBeVisible({
-      timeout: 15000,
-    });
+    // 访客态：文件进入上传通道后被鉴权拦下 → 出现一条 error 语气提示。
+    await expect(page.locator(TOAST).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator(TOAST).first()).toHaveAttribute('role', 'alert');
   });
 
   test('粘贴纯文本不触发上传（不抢输入框的粘贴）', async ({ page }) => {
@@ -131,7 +142,8 @@ test.describe('图片上传运行时（T-033）', () => {
     await page.waitForTimeout(800);
 
     expect(requests, `粘贴文本不应上传，实际：${requests.join(', ')}`).toHaveLength(0);
-    await expect(page.getByText(/请选择图片文件|请先登录/)).toHaveCount(0);
+    // 既不发起请求，也不产生任何反馈（文本粘贴应原样交给输入框）
+    await expect(page.locator(TOAST)).toHaveCount(0);
   });
 
   test('390px 窄屏：上传区无横向溢出，入口仍可点', async ({ page }) => {
@@ -176,9 +188,10 @@ test.describe('图片上传运行时（T-033）', () => {
 
     // 访客态：文件已过格式校验、进入上传流程，被鉴权挡下 —— 说明拖拽到上传的链路通了。
     // 已登录态会先出现上传中遮罩，再落库；那条路径见文件末尾的 skip。
-    await expect(page.getByText(/请先登录|上传中|上传失败/).first()).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.locator(TOAST).first()).toBeVisible({ timeout: 15000 });
+    // 访客被 401 挡下是 error 语气；若改成「先弹登录框」也该有可见反馈，
+    // 故这里只钉「有反馈且不是静默成功」，不锁死 tone。
+    await expect(page.locator('[data-slot="image-upload-thumb"]')).toHaveCount(0);
   });
 
   test.skip('素材库回填：需要登录态 + 后端素材数据', () => {
