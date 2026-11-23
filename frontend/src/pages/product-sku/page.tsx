@@ -207,6 +207,7 @@ export function ProductSkuPage() {
 
   return (
     <>
+      <h1 className="sr-only">商品SKU图</h1>
       <ProductSkuWorkspace
         template={template}
         regions={regions}

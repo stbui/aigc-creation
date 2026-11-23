@@ -51,7 +51,9 @@ export function ImageTranslatePage() {
   };
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">图片翻译</h1>
+      <ToolShell
       capability="image_translate"
       pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page image-translate-page`}
       title="图片翻译"
@@ -109,6 +111,7 @@ export function ImageTranslatePage() {
         </div>
         <ToolSwitch label="保护商品主体" checked={protect} onChange={setProtect} />
       </ToolCard>
-    </ToolShell>
+      </ToolShell>
+    </>
   );
 }

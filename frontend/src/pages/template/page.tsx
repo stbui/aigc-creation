@@ -245,6 +245,7 @@ export function TemplatePage() {
 
   return (
     <>
+      <h1 className="sr-only">婚纱写真</h1>
       {/*
         两列网格：432px 左配置栏 + 右模板区。
         桌面锁死工作区高度、两栏各自内部滚动；≤900 改为单列文档流自然滚动。

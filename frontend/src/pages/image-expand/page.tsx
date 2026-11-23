@@ -70,7 +70,9 @@ export function ImageExpandPage() {
   };
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">智能扩图</h1>
+      <ToolShell
       capability="expand"
       pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page smart-expand-page`}
       title="智能扩图"
@@ -194,6 +196,7 @@ export function ImageExpandPage() {
       >
         <PositionGrid value={position} onChange={setPosition} />
       </SectionCard>
-    </ToolShell>
+      </ToolShell>
+    </>
   );
 }

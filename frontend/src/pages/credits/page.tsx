@@ -70,7 +70,7 @@ export function CreditsPage() {
    */
   if (!token) {
     return (
-      <PersonalPage
+      <PersonalPage pageHeading="积分明细"
         title={CREDITS_PAGE_META.title}
         description={CREDITS_PAGE_META.guestDescription}
       >
@@ -84,7 +84,7 @@ export function CreditsPage() {
   }
 
   return (
-    <PersonalPage
+    <PersonalPage pageHeading="积分明细"
       title={CREDITS_PAGE_META.title}
       description={CREDITS_PAGE_META.description}
       extra={

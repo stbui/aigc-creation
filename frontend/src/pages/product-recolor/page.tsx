@@ -54,7 +54,9 @@ export function ProductRecolorPage() {
   };
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">商品换色</h1>
+      <ToolShell
       capability="recolor"
       pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page product-recolor-page max-[900px]:[&_.pk-result-pane]:min-h-[360px]!`}
       title="商品换色"
@@ -113,6 +115,7 @@ export function ProductRecolorPage() {
           ariaLabel="商品颜色"
         />
       </ToolCard>
-    </ToolShell>
+      </ToolShell>
+    </>
   );
 }

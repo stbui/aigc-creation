@@ -360,7 +360,9 @@ export function LocalRedrawPage() {
     painted && regions.length > 0 && filledCount === regions.length && !uploadBusy && !preparing;
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">局部重绘</h1>
+      <ToolShell
       capability="local_redraw"
       pageClass={`local-redraw-page${historyCollapsed ? ' history-collapsed' : ''} ${PAGE_BASE} ${
         historyCollapsed ? PAGE_COLUMNS_COLLAPSED : PAGE_COLUMNS
@@ -471,6 +473,7 @@ export function LocalRedrawPage() {
           />
         );
       }}
-    </ToolShell>
+      </ToolShell>
+    </>
   );
 }

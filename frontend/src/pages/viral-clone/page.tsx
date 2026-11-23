@@ -323,6 +323,7 @@ export function ViralClonePage() {
 
   return (
     <main className="pk-workspace">
+      <h1 className="sr-only">爆款复刻</h1>
       {/* ── 左: 输入栏 ── */}
       <ViralCloneInputPane
         images={images}

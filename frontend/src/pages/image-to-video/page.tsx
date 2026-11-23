@@ -53,7 +53,9 @@ export function ImageToVideoPage() {
   const unavailable = runtime && runtime.effective !== 'remote';
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">图生视频</h1>
+      <ToolShell
       capability={IMAGE_TO_VIDEO_CAPABILITY}
       pageClass="image-to-video-page"
       title="图生视频"
@@ -110,6 +112,7 @@ export function ImageToVideoPage() {
         onModelChange={(model) => setSelectedModelReady(Boolean(model?.available))}
         onQuoteChange={setQuoteCredits}
       />
-    </ToolShell>
+      </ToolShell>
+    </>
   );
 }

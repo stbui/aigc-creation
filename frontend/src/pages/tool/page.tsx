@@ -25,13 +25,16 @@ export function ToolPage() {
 
   if (!def) {
     return (
-      <ExceptionPage
-        kind="not-found"
-        title="工具不存在"
-        desc={`没有找到标识为 ${capability} 的能力，可能是链接已失效，或后端尚未下发该能力。`}
-        detail={`requested capability: ${capability}`}
-        action={{ to: '/workbench', label: '返回工作台' }}
-      />
+      <>
+        <h1 className="sr-only">工具不存在</h1>
+        <ExceptionPage
+          kind="not-found"
+          title="工具不存在"
+          desc={`没有找到标识为 ${capability} 的能力，可能是链接已失效，或后端尚未下发该能力。`}
+          detail={`requested capability: ${capability}`}
+          action={{ to: '/workbench', label: '返回工作台' }}
+        />
+      </>
     );
   }
 
@@ -50,12 +53,15 @@ export function ToolPage() {
 
   if (def.mode === 'planned') {
     return (
-      <ExceptionPage
-        kind="info"
-        title={`${def.name} 规划中`}
-        desc="该能力已在产品路线中占位，尚未接入实现。可以先回工作台看看其他已可用的工具。"
-        action={{ to: '/workbench', label: '返回工作台' }}
-      />
+      <>
+        <h1 className="sr-only">{`${def.name} 规划中`}</h1>
+        <ExceptionPage
+          kind="info"
+          title={`${def.name} 规划中`}
+          desc="该能力已在产品路线中占位，尚未接入实现。可以先回工作台看看其他已可用的工具。"
+          action={{ to: '/workbench', label: '返回工作台' }}
+        />
+      </>
     );
   }
 
@@ -70,18 +76,22 @@ export function ToolPage() {
   const runtime = runtimeOf(def);
   const blocked = runtime.effective === 'disabled' || runtime.effective === 'unavailable';
   if (blocked) {
+    const unavailableTitle = `${def.name}${runtime.effective === 'disabled' ? ' 已下线' : ' 暂不可用'}`;
     return (
-      <ExceptionPage
-        kind="info"
-        title={`${def.name}${runtime.effective === 'disabled' ? ' 已下线' : ' 暂不可用'}`}
-        desc={runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。'}
-        detail={
-          IS_PROD
-            ? undefined
-            : `runtime: ${runtime.effective} · remoteAvailable=${runtime.remoteAvailable}`
-        }
-        action={{ to: '/workbench', label: '返回工作台' }}
-      />
+      <>
+        <h1 className="sr-only">{unavailableTitle}</h1>
+        <ExceptionPage
+          kind="info"
+          title={unavailableTitle}
+          desc={runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。'}
+          detail={
+            IS_PROD
+              ? undefined
+              : `runtime: ${runtime.effective} · remoteAvailable=${runtime.remoteAvailable}`
+          }
+          action={{ to: '/workbench', label: '返回工作台' }}
+        />
+      </>
     );
   }
 
@@ -95,6 +105,7 @@ function ToolPageContent({ def }: { def: CapabilityDef }) {
 
   return (
     <div className="mx-auto max-w-[1100px]">
+      <h1 className="sr-only">{def.name}</h1>
       <Button asChild variant="ghost" className="-ml-2 mb-1 text-muted-foreground">
         <Link to="/workbench">
           <ArrowLeft size={15} aria-hidden />

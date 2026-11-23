@@ -253,6 +253,7 @@ export function ProductKitPage() {
 
   return (
     <div className="pk-workspace">
+      <h1 className="sr-only">商品主图</h1>
       {/* ── 左: 输入栏 ── */}
       <div className="h-full min-h-0 min-w-0">
         <ProductKitInputPane

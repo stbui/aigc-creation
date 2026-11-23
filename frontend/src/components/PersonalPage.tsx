@@ -13,6 +13,7 @@ import { Button } from '../ui';
  */
 export function PersonalPage({
   title,
+  pageHeading,
   description,
   extra,
   children,
@@ -22,6 +23,8 @@ export function PersonalPage({
   onBack,
 }: {
   title?: string;
+  /** 页面级 h1 文案；只在可见标题不是 h1 的目标页启用，避免与页内现有 h1 重复。 */
+  pageHeading?: string;
   description?: ReactNode;
   /** 标题右侧的主操作 */
   extra?: ReactNode;
@@ -40,6 +43,7 @@ export function PersonalPage({
   const navigate = useNavigate();
   return (
     <div className={`personal-page is-${width}${className ? ` ${className}` : ''}`}>
+      {pageHeading && <h1 className="sr-only">{pageHeading}</h1>}
       {showBack && (
         <Button
           variant="ghost"

@@ -209,7 +209,7 @@ export function OrdersPage() {
    */
   if (!token) {
     return (
-      <PersonalPage title="我的订单" description="查看订单、支付记录与开票进度。">
+      <PersonalPage pageHeading="我的订单" title="我的订单" description="查看订单、支付记录与开票进度。">
         <StateEmpty
           title="登录后查看订单"
           desc="订单与支付记录和账号绑定，登录后可以查看历史订单并继续支付未完成的订单。"
@@ -292,7 +292,7 @@ export function OrdersPage() {
   const pendingCount = orders.filter((o) => canPay(o)).length;
 
   return (
-    <PersonalPage
+    <PersonalPage pageHeading="我的订单"
       title="我的订单"
       description={
         pendingCount > 0
