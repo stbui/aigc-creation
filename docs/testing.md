@@ -257,7 +257,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `sidebar.spec.ts` | 侧栏顺序、几何、1366/1367 断点、折叠、工单预填、移动抽屉 |
 | `state-contract.spec.ts` | 全站 loading / empty / error 状态契约 |
 | `workspace-pages.spec.ts` | 工作台 12 卡顺序、guest 不请求统计、素材库双路径、390 无溢出 |
-| `upload-runtime.spec.ts` | C 端图片上传的运行时契约（访客态）：拖拽高亮与清除、非法文件在客户端拦下且不发 POST、粘贴图片进入上传通道、粘贴纯文本不被抢占、390px 上传区无横向溢出。素材库回填与手机扫码回传显式 skip（需登录态 / 真机）。**需 dev server + 后端**，未接 CI |
+| `upload-runtime.spec.ts` | C 端图片上传的运行时契约（访客态）：拖拽高亮与清除、非法文件在客户端拦下且不发 POST、粘贴图片进入上传通道、粘贴纯文本不被抢占、390px 上传区无横向溢出。素材库回填与手机扫码回传显式 skip（需登录态 / 真机）。断言按 toast 的 `data-testid` + `role` 判断**状态类型**，不锁用户文案（T-051）。**需 dev server + 后端**，未接 CI |
 | `layout-responsive.spec.ts` | 布局与响应式契约：8 条路由 × 4 档视口（1366 / 900 / 899 / 390）的**无横向滚动**与**每页唯一 h1 / 页头字号**；**`.app-content` 内边距阶梯**另跑 8 档（在 4 档外补 641 / 640 / 481 / 480）。三条分界线（900 / 640 / 480）都在「整点」与「整点 −1」各测一次，专抓 Tailwind 开区间 `max-[Npx]:`（`width < Npx`）与手写闭区间 `max-width` 相差的 1px |
 | `example.spec.ts` | Playwright 脚手架示例（不覆盖本项目功能） |
 
