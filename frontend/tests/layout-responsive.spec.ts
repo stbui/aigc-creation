@@ -42,6 +42,22 @@ const VIEWPORTS = [
   { name: '390×844', width: 390, height: 844 },
 ];
 
+/**
+ * 内边距阶梯（§2.1）专用档位。
+ *
+ * 与 `VIEWPORTS` 分开：路由 × 页头矩阵只跑四档，避免用例数翻倍；而内边距阶梯
+ * 有四条分界线（900 / 640 / 480 三条 + 桌面），每条分界线都要在「整点」和
+ * 「整点 −1」各测一次，才能抓住开区间（Tailwind `max-[Npx]:` → `width < Npx`）
+ * 与闭区间（手写 `max-width: Npx`）相差的 1px。多档只加在这一组里。
+ */
+const PADDING_VIEWPORTS = [
+  ...VIEWPORTS,
+  { name: '641×800', width: 641, height: 800 },
+  { name: '640×800', width: 640, height: 800 },
+  { name: '481×800', width: 481, height: 800 },
+  { name: '480×800', width: 480, height: 800 },
+];
+
 type HeadingLevel = 'L1' | 'L2' | 'L3';
 
 interface RouteCase {
@@ -220,7 +236,7 @@ for (const route of ROUTES) {
 }
 
 test.describe('外壳容器内边距阶梯（§2.1）', () => {
-  for (const viewport of VIEWPORTS) {
+  for (const viewport of PADDING_VIEWPORTS) {
     test(`.app-content 水平内边距 @${viewport.name}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await gotoAndSettle(page, '/library');
