@@ -2,6 +2,14 @@
  * result-list 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
  *
  * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ *
+ * ── 优先级策略（T-046 定）────────────────────────────────────────
+ * 1. 基础规则在前，断点覆盖紧跟其基础规则之后：覆盖只用单类选择器（与基础
+ *    同特异性），靠源码顺序取胜。覆盖写在基础规则之前会被静默压死。
+ * 2. 覆盖目标自带状态类时（`.fc-cols-${cols}`），覆盖选择器必须至少与状态类
+ *    规则同特异性（两段类），且仍排在其后 —— 单类（0,1,0）永远赢不了 0,2,0。
+ * 3. 不写 `!important`；同一个属性只由一处管辖（如列数只看 `--fc-cols`）。
+ * ─────────────────────────────────────────────────────────────
  */
 
 /* ── 自由创作: 右侧「全部生成图」(2026-10-21) ──────────────────────
@@ -14,14 +22,6 @@
   }
   100% {
     background-position: -100% 0;
-  }
-}
-
-@media (max-width: 640px) {
-
-  .fc-result-actions {
-    width: 100%;
-    justify-content: space-between;
   }
 }
 
@@ -40,6 +40,16 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--space-8);
+}
+
+/* 窄屏操作区独占一行：列数选择靠左、刷新靠右（≤640 时外壳工具栏已竖排，
+   见 tool-workspace.css 的 .pk-result-toolbar）。基础规则在上面，本条后置即胜；
+   写在基础规则之前会被 justify-content: flex-end 压掉 —— 这正是 T-046 的缺陷。 */
+@media (max-width: 640px) {
+  .fc-result-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 .fc-result-gallery {
