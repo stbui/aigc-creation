@@ -28,7 +28,6 @@ import {
   TextField,
   ToneBadge,
 } from './components';
-import '../../../styles/radar-admin.css';
 
 function ruleValue(value: unknown): string {
   return value === null || value === undefined ? '' : String(value);

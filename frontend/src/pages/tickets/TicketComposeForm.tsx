@@ -1,6 +1,16 @@
 import { PRIORITY_LABELS, PRIORITY_VALUES, TYPE_OPTIONS, type TicketFormState } from './constants';
 import type { TicketPriority, TicketType } from '../../types/api';
-import { Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, Textarea } from './components';
+import {
+  Button,
+  CharacterCountTextarea,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+} from './components';
 
 /**
  * 新建工单表单。
@@ -38,75 +48,71 @@ export function TicketComposeForm({
       {/* Select 不用 <label> 包裹：label 会把点击二次转发给触发按钮（打开即关闭） */}
       <div className={FIELD}>
         问题类型
-          <Select
-            value={form.type}
-            onValueChange={(value) => onChange({ type: value as TicketType })}
-          >
-            <SelectTrigger
-              aria-label={'问题类型'}
-              className="w-full"
-            >
-              <SelectValue placeholder={'请选择'} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {TYPE_OPTIONS.map((option) => (
-                  <SelectItem key={String(option.value)} value={String(option.value)}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+        <Select
+          value={form.type}
+          onValueChange={(value) => onChange({ type: value as TicketType })}
+        >
+          <SelectTrigger aria-label={'问题类型'} className="w-full">
+            <SelectValue placeholder={'请选择'} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {TYPE_OPTIONS.map((option) => (
+                <SelectItem key={String(option.value)} value={String(option.value)}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
       <div className={FIELD}>
         优先级
-          <Select
-            value={form.priority}
-            onValueChange={(value) => onChange({ priority: value as TicketPriority })}
-          >
-            <SelectTrigger
-              aria-label={'优先级'}
-              className="w-full"
-            >
-              <SelectValue placeholder={'请选择'} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {PRIORITY_VALUES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] })).map((option) => (
+        <Select
+          value={form.priority}
+          onValueChange={(value) => onChange({ priority: value as TicketPriority })}
+        >
+          <SelectTrigger aria-label={'优先级'} className="w-full">
+            <SelectValue placeholder={'请选择'} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {PRIORITY_VALUES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] })).map(
+                (option) => (
                   <SelectItem key={String(option.value)} value={String(option.value)}>
                     {option.label}
                   </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+                ),
+              )}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
-      <label className={`${FIELD} col-span-full max-[900px]:col-auto`}>
+      <label htmlFor="ticket-subject" className={`${FIELD} col-span-full max-[900px]:col-auto`}>
         标题
         <Input
+          id="ticket-subject"
           maxLength={80}
           value={form.subject}
           onChange={(e) => onChange({ subject: e.target.value })}
           placeholder="一句话说明问题，如：生成的主图保存后是空白"
         />
       </label>
-      <label className={`${FIELD} col-span-full max-[900px]:col-auto`}>
+      <label htmlFor="ticket-description" className={`${FIELD} col-span-full max-[900px]:col-auto`}>
         详细描述
-        <div className="login-textarea-wrap">
-          <Textarea
-            className="login-textarea field-sizing-fixed"
-            rows={5}
-            maxLength={2000}
-            value={form.content}
-            onChange={(e) => onChange({ content: e.target.value })}
-            placeholder="复现步骤、涉及的能力名称或订单号；有报错截图可一并描述。"
-          />
-          <span className="login-textarea-count is-block">{form.content.length}/2000</span>
-        </div>
+        <CharacterCountTextarea
+          id="ticket-description"
+          rows={5}
+          maxLength={2000}
+          value={form.content}
+          onChange={(e) => onChange({ content: e.target.value })}
+          placeholder="复现步骤、涉及的能力名称或订单号；有报错截图可一并描述。"
+        />
       </label>
       {formError && (
-        <p className="col-span-full max-[900px]:col-auto m-2 mb-0 text-[13px] text-[color:var(--danger-soft-text)]">{formError}</p>
+        <p className="col-span-full max-[900px]:col-auto m-2 mb-0 text-[13px] text-[color:var(--danger-soft-text)]">
+          {formError}
+        </p>
       )}
       <div className="col-span-full flex items-center justify-end gap-2 max-[900px]:col-auto max-[900px]:flex-wrap max-[900px]:[&_[data-slot=button]]:flex-[1_1_auto]">
         <Button onClick={onCancel}>取消</Button>

@@ -10,37 +10,3 @@
 @import './base.css';
 @import './tool-workspace.css';
 @import './ui.css';
-
-.status-succeeded {
-  color: var(--wb-status-completed);
-}
-
-.status-failed {
-  color: var(--wb-status-failed);
-}
-
-.status-running,
-  .status-pending {
-  color: var(--wb-brand);
-}
-
-/* 图片请求失败 (404 / 签名过期 / 文件被清理): 保留原尺寸的灰底,
-   不显示浏览器默认破图图标。尺寸由调用方的 class 决定, 这里只补底色。 */
-
-img[data-broken='1'] {
-  background: var(--surface);
-}
-
-/* ── 全局无障碍: 尊重系统"减少动态效果"设置 ──
-   已有规则只覆盖多图融合页; 这里统一兜底, 让全站过渡/动画在用户选择减少动态时立即完成。 */
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}

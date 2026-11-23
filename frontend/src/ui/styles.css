@@ -3,7 +3,7 @@
  *
  * 后台的 `styles/admin.css` 只扫描 `admin-ui` / `pages/admin` / `components/admin`，
  * C 端组件不在它的 source 白名单里，因此这里单独生成 utilities。扫描范围 =
- * C 端目录 + `admin-ui/components/ui` + `admin-ui/providers`（ui 兼容层组合了它们）。
+ * C 端目录 + `admin-ui/components/ui` + `admin-ui/providers`（ui 取用层组合了它们）。
  * 主题映射与后台共用 `styles/tailwind-theme.css`，本文件不再单独声明 `@theme`。
  */
 @layer theme, base, components, utilities;
@@ -17,7 +17,7 @@
 @source '../layout';
 @source '../pages';
 /*
- * C 端 ui 兼容层直接组合 admin-ui 的 shadcn 原子件与 toast 实现，
+ * C 端 ui 取用层直接组合 admin-ui 的 shadcn 原子件与 toast 实现，
  * 这些文件里用到的工具类（fixed / inset-y-0 / bg-popover …）必须一并扫描，
  * 否则会被当成"页面没用到"而裁掉：抽屉会退回文档流、toast 会失去定位。
  */
@@ -74,7 +74,7 @@
 }
 
 /* ───────── C 端 shadcn 适配层 ─────────
-   只新增 ui-* / login-input-* 选择器与 data-slot，不改原有页面类。
+   只保留 ui-* 选择器与 data-slot，不再维护旧输入壳或文本域皮肤。
    颜色、圆角、字号全部消费 :root 令牌，保持与迁移前一致。
 
    【选择器与 DOM 的对应关系】页面样式只能命中真实存在的节点。C 端页面现在
@@ -84,140 +84,12 @@
      [data-slot="form-field"] / [data-slot="form-message"]
      [data-slot="attachment"] / [data-slot="attachment-media"]
      [data-slot="badge"]
-     .login-field / .login-input-wrap / .login-input-inner
-     .login-input-prefix / .login-textarea-wrap / .login-textarea
-     .login-textarea-count
+     .login-field
    写页面样式时按这份清单取类名；Tabs / 表格 / 分页直接用 shadcn 的
    `[data-slot="tabs-list"]` / `[data-slot="table-head"]` 等槽位，
    次要文字用 shadcn 的 `text-muted-foreground`。
    Tag / Card / Row / Col 已直连 shadcn（.credits-status / Surface 等走
    `[data-slot]` 选择器），不再输出 .ui-tag / .ui-card / .ui-row / .ui-col。 */
-
-.login-input-wrap {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 48px;
-  padding: 0 20px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--color-border-soft);
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.login-input-wrap:focus-within {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(98, 93, 245, 0.1);
-}
-
-.login-input-prefix {
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-desc);
-  margin-right: 10px;
-  flex: 0 0 auto;
-}
-
-.login-input-inner {
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  font-size: 14px;
-  color: var(--text-1);
-}
-
-.login-input-inner:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-.login-field .login-input-wrap {
-  height: 48px;
-  padding: 0 20px;
-  border-radius: 8px;
-  background: var(--color-border-soft);
-  border: 1px solid var(--border);
-  box-shadow: none;
-  font-size: 14px;
-  line-height: 22px;
-}
-
-.login-field .login-input-wrap:hover {
-  border-color: var(--login-border-brand);
-}
-
-.login-field .login-input-wrap:focus-within {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgb(98 93 245 / 0.1);
-}
-
-.login-field .login-input-inner {
-  background: transparent;
-  font-size: 14px;
-  color: var(--text-1);
-}
-
-.login-field .login-input-prefix {
-  color: var(--text-desc);
-  margin-right: 10px;
-}
-
-.login-input-suffix {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 8px;
-  flex: 0 0 auto;
-}
-
-.login-textarea-wrap {
-  position: relative;
-  display: block;
-  width: 100%;
-}
-
-.login-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card-bg);
-  color: var(--text-1);
-  font: inherit;
-  font-size: 14px;
-  line-height: 1.5;
-  resize: vertical;
-}
-
-.login-textarea:focus-visible {
-  outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(98, 93, 245, 0.1);
-}
-
-.login-textarea-count {
-  position: absolute;
-  right: 4px;
-  bottom: -18px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* 常规流内的字数统计：默认绝对定位会压到下方的按钮行 (工单表单 / 回复框) */
-.login-textarea-count.is-block {
-  position: static;
-  display: block;
-  padding: 2px 2px 0;
-  text-align: right;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.login-code-row > .login-input-wrap {
-  flex: 1 1 auto;
-  min-width: 0;
-}
 
 /* 「N 个生成中」的呼吸点：Tailwind 只能引用动画名，关键帧必须落在 CSS 里 */
 @keyframes brand-pulse {

@@ -27,7 +27,7 @@
 2. 后台业务页面只从 `~/admin-ui/radar` 取件；实现全部在 `radar/` 内并由其 barrel 公开。
 3. 后台页面禁止直连 `admin-ui/components/ui/*`。外壳不可用时的 `AdminLoadError`、`AdminLoading`、`NoAdminAccess` 是既有例外，不向业务页扩散。
 4. 页面不得为了少写一层包装，直接使用第三方组件库重新实现已有按钮、字段、弹层、表格和反馈状态。
-5. C 端页面样式改造的顺序是**先换组件、再收样式**：能落到 shadcn 原子件的直接组合；原子件没有对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（如 `TextAction`、`SegmentedControl`、`ImageDropzone`），再由页面取用；不得在页面里手写 class 拼出按钮、分段控件或拖拽区的外观。只有画布几何体这类没有交互语义的图形才留在工具类里。
+5. C 端页面样式改造的顺序是**先换组件、再收样式**：能落到 shadcn 原子件的直接组合；原子件没有对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（如 `TextAction`、`SegmentedControl`、`ImageDropzone`、`IconInput`、`CharacterCountTextarea`），再由页面取用；不得在页面里手写 class 拼出按钮、分段控件、图标输入框、字符计数文本域或拖拽区的外观。只有画布几何体这类没有交互语义的图形才留在工具类里。
 5. shadcn 已有的组件必须直接组合：C 端 `~/ui` 对 `Dialog` / `Sheet` / `Popover` / `ToggleGroup` / `FormField` / `Attachment` 等只做转出，不再保留 `Modal` / `Drawer` / `CountBadge` 一类同名自造封装。
 
 ## 2. 组件语言的五个原则

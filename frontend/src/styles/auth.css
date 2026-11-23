@@ -11,42 +11,6 @@
    submit 340x48 渐变 90deg #8064f6→#5546d8 14px/600; 协议行 12px #86909c。
    诚实差异: 扫码/短信 tab 置灰 (无通道), 左栏插画为自绘内联 SVG (不引参考站位图)。 */
 
-/* * 生成设置的紧凑控件：参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
- *
- * shadcn Input 的 DOM 带 `data-slot="input"`，Select 的触发器带
- * `data-slot="select-trigger"`（尺寸见文件末尾「表单控件」适配层）；
- * 此处只覆盖 Input，原生控件（若再引入）走下面的通用规则。 */
-
-.pk-field .login-input-inner {
-  height: 32px;
-  padding: 5px 12px;
-  border-color: var(--border);
-  border-radius: var(--radius-tag);
-  font-size: 14px;
-  color: var(--wb-text);
-}
-
-.pk-field input:not(.ui-input):not(.login-input-inner)::placeholder {
-  color: var(--placeholder-text);
-}
-
-.pk-field input:not(.ui-input):not(.login-input-inner) {
-  width: 100%;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tag);
-  padding: 5px 12px;
-  font-size: 14px;
-  font-family: inherit;
-  color: var(--wb-text);
-  background: var(--card-bg);
-  outline: none;
-}
-
-.pk-field input:not(.ui-input):not(.login-input-inner):focus {
-  border-color: var(--brand-light);
-}
-
 .login-page {
   position: relative;
   min-height: 100vh;
@@ -282,8 +246,8 @@
   margin-top: 12px;
 }
 
-/* 参考站 .auth-field 340x48, 无 label 行 (只有 placeholder), 两框间距 18px (350→416)
-   输入框的形态规则见文件末尾「登录 / 认证卡片」小节（.login-input-* 系列）。 */
+/* 参考站 .auth-field 340x48, 无 label 行 (只有 placeholder), 两框间距 18px (350→416)。
+   输入框形态由 shadcn Input 与文件末尾的 `.login-field` 适配规则共同承担。 */
 .login-field {
   margin-bottom: 18px;
 }
@@ -615,10 +579,6 @@
   color: var(--text-body);
   font-size: 13px;
   line-height: 20px;
-}
-
-.login-field {
-  margin-bottom: 18px;
 }
 
 /* 登录卡片只有 placeholder，不显示 label 行；找回/重置页是独立卡片，需要 label */

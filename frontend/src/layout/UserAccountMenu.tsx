@@ -124,7 +124,7 @@ export function UserAccountMenu() {
           <ChevronDown size={14} className="app-user-chevron" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="app-user-dropdown ui-dropdown-content">
+      <DropdownMenuContent align="end" className="app-user-dropdown">
         <DropdownMenuGroup>
           <div className="app-user-menu-head">
             <div className="app-user-menu-identity">

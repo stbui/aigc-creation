@@ -87,7 +87,7 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 
 | 元素 | 值 |
 | --- | --- |
-| 容器 | `.app-topnav-dropdown.ui-dropdown-content`，`min-width: 137px`，`padding: 10px 8px`，radius 12，`border: 1px solid var(--border-2)`，`box-shadow: 0 18px 42px rgba(31,41,55,.14)` |
+| 容器 | `.app-topnav-dropdown[data-slot='dropdown-menu-content']`，`min-width: 137px`，`padding: 10px 8px`，radius 12，`border: 1px solid var(--border-2)`，`box-shadow: 0 18px 42px rgba(31,41,55,.14)` |
 | 条目 | 高 36，radius 9，`padding: 0 12px`；图标 20×20 |
 | 文字 | 13px / 600 / `#475467` |
 | 条目 hover | 底 `#f2efff`，字 `#5b4df5` |

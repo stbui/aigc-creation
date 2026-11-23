@@ -45,8 +45,6 @@ import type { AdminAlertSeverity } from '../../../types/api';
  * 版面顺序不变：态势（统计卡）→ 清单（级别筛选 + 待处理列表）→ 明细（可处理
  * 队列）→ 口径。这是后台从品牌紫逐步迁到中性风格的试点页之一。
  */
-import '../../../styles/radar-admin.css';
-
 export function AdminAlertsPage() {
   const { data, loading, error, reload } = useAdminAlerts();
   const {

@@ -29,24 +29,6 @@
   align-items: stretch;
 }
 
-.sc-page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-  height: 54px;
-  padding: 0 var(--space-24);
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border);
-}
-
-.sc-page-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
 @media (max-width: 900px) {
   .sc-workspace {
     margin: 0;
@@ -66,21 +48,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-10);
-}
-
-.sc-new-task {
-  font-size: 13px;
-  color: var(--text-body);
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  padding: 5px var(--space-12);
-  cursor: pointer;
-}
-
-.sc-new-task:hover {
-  color: var(--brand);
-  border-color: var(--border-brand);
 }
 
 /*
@@ -105,8 +72,7 @@
 }
 
 /* 区块标题 (参考站 15px / #0f172a / margin-bottom 12px) */
-.sc-sections .pk-section-title,
-  .sc-sections .sc-section-title {
+.sc-sections .pk-section-title {
   display: block;
   font-size: 15px;
   font-weight: 700;

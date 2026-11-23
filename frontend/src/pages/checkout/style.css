@@ -239,40 +239,6 @@
   color: var(--text-body);
 }
 
-/* 旧版 dl 明细表保留规则, 避免其他调用方贴用这些类名时样式丢失 */
-.co-rows {
-  margin: 0;
-}
-
-.co-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-16);
-  padding: var(--space-12) 0;
-  border-top: 1px solid var(--co-line-soft);
-}
-
-.co-row:first-child {
-  border-top: 0;
-}
-
-.co-row dt {
-  flex: none;
-  font-size: 13px;
-  color: var(--co-muted);
-}
-
-.co-row dd {
-  margin: 0;
-  min-width: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--co-text);
-  text-align: right;
-  word-break: break-word;
-}
-
 .co-perks {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -331,11 +297,6 @@
 .co-pay-option.is-selectable.is-active {
   border-color: var(--brand);
   background: var(--brand-bg);
-}
-
-.co-pay-option.is-muted {
-  border-color: var(--border);
-  background: var(--surface);
 }
 
 .co-pay-empty {

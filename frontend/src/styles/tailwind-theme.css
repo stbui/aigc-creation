@@ -51,9 +51,9 @@
    * shadcn 组件只认固定的一套变量名（`--background` / `--primary` / `--border` …）。
    * 这里**只做映射，不引入新颜色**，改品牌色仍然只改 tokens.css 一处。
    *
-   * 必须用 `inline`：tokens.css 已在 `:root` 定义 `--color-primary` / `--color-card` /
-   * `--color-border` 三枚同名变量，普通 `@theme` 会把本文件的值写进 `:root`，
-   * 覆盖全站同名值，C 端跟着变色。
+   * 必须用 `inline`：tokens.css 已在 `:root` 定义 `--color-card` / `--color-border`
+   * 两枚同名变量，普通 `@theme` 会把本文件的值写进 `:root`，覆盖全站同名值，
+   * C 端跟着变色。
    */
   --color-background: var(--card-bg);
   --color-foreground: var(--text-strong);

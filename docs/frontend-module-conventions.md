@@ -96,9 +96,10 @@ pages/admin/channels/
   列表 / 空态各自换成对应 shadcn 组合件（`Surface` / `Button` / `Dialog` / `Sheet` /
   `Item` / `EmptyState` / `InlineAlert` 等，统一从 `frontend/src/ui` 取）。shadcn 没有
   对应角色时，先在 `frontend/src/ui/primitives/` 封装语义组件（`TextAction` /
-  `SegmentedControl` / `ImageDropzone`），组件内部组合 shadcn 原子件，页面只使用语义组件，
-  不在页里手写 class 拼控件外观。参照 `pages/product-sku/`：其 `style.css` 只剩三栏列宽、
-  窄屏折叠等**共享骨架覆盖**，组件相关的 `.sku-*` 选择器与 `--sku-*` 令牌已全部删除。
+  `SegmentedControl` / `ImageDropzone` / `IconInput` / `CharacterCountTextarea`），
+  组件内部组合 shadcn 原子件，页面只使用语义组件，不在页里手写 class 拼控件外观。
+  参照 `pages/product-sku/`：其 `style.css` 只剩三栏列宽、窄屏折叠等**共享骨架覆盖**，
+  组件相关的 `.sku-*` 选择器与 `--sku-*` 令牌已全部删除。
   营销首页 `pages/landing/` 是第二个参照：`style.css` 由 1594 行收到约 40 行，只保留
   `.app-content` 的内边距逃逸与 `#packages` 的 `scroll-margin-top`；`.lp-*` / `.landing-*`
   控件皮肤与 `--lp-*` 令牌组整体删除，导航下拉 / 移动抽屉 / 页签 / 卡片 / CTA 分别换成

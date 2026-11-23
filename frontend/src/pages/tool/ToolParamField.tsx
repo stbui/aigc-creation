@@ -1,4 +1,3 @@
-import type { ChangeEventHandler } from 'react';
 import type { CapabilityParam } from '../../types/api';
 import {
   FormControl,
@@ -12,40 +11,12 @@ import {
   RadioGroupItem,
   Slider,
   Switch,
-  Textarea,
+  CharacterCountTextarea,
 } from './components';
 import { PARAM_TEXT_MAX_LENGTH, PARAM_TEXT_ROWS } from './constants';
 
 interface ToolParamFieldProps {
   param: CapabilityParam;
-}
-
-/** 文本参数：value/onChange 由 FormField 提供，计数直接读当前值。 */
-function ParamTextArea({
-  maxLength,
-  placeholder,
-  value,
-  onChange,
-}: {
-  maxLength: number;
-  placeholder?: string;
-  value?: string;
-  onChange?: ChangeEventHandler<HTMLTextAreaElement>;
-}) {
-  const length = value?.length ?? 0;
-  return (
-    <div className="login-textarea-wrap">
-      <Textarea
-        className="login-textarea field-sizing-fixed"
-        rows={PARAM_TEXT_ROWS}
-        maxLength={maxLength}
-        value={value ?? ''}
-        onChange={onChange}
-        placeholder={placeholder}
-      />
-      <span className="login-textarea-count is-block">{length}/{maxLength}</span>
-    </div>
-  );
 }
 
 /** 按后端参数声明渲染单个表单项（enum / number / boolean / text）。 */
@@ -70,6 +41,7 @@ export function ToolParamField({ param }: ToolParamFieldProps) {
                     return (
                       <label
                         key={value}
+                        htmlFor={`${param.key}-${value}`}
                         className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm"
                       >
                         <RadioGroupItem value={value} id={`${param.key}-${value}`} />
@@ -143,7 +115,6 @@ export function ToolParamField({ param }: ToolParamFieldProps) {
           )}
         />
       );
-    case 'text':
     default:
       return (
         <FormField
@@ -158,11 +129,11 @@ export function ToolParamField({ param }: ToolParamFieldProps) {
             <FormItem>
               <FormLabel>{param.label}</FormLabel>
               <FormControl>
-                <ParamTextArea
+                <CharacterCountTextarea
+                  {...field}
                   maxLength={param.maxLength ?? PARAM_TEXT_MAX_LENGTH}
                   placeholder={param.placeholder}
-                  value={field.value as string | undefined}
-                  onChange={field.onChange}
+                  rows={PARAM_TEXT_ROWS}
                 />
               </FormControl>
               {param.help && <FormDescription>{param.help}</FormDescription>}

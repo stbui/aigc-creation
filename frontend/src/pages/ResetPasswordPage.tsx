@@ -8,9 +8,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
+  IconInput,
   useApp,
   useForm,
 } from '../ui';
@@ -102,16 +100,14 @@ export function ResetPasswordPage() {
                     <FormItem className="login-field">
                       <FormLabel>新密码</FormLabel>
                       <FormControl>
-                        <InputGroup>
-                          <InputGroupAddon>{<Lock size={15} />}</InputGroupAddon>
-                          <InputGroupInput
-                            {...field}
-                            type="password"
-                            placeholder="至少 6 位"
-                            autoComplete="new-password"
-                            autoFocus
-                          />
-                        </InputGroup>
+                        <IconInput
+                          {...field}
+                          icon={<Lock size={15} />}
+                          type="password"
+                          placeholder="至少 6 位"
+                          autoComplete="new-password"
+                          autoFocus
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -131,21 +127,20 @@ export function ResetPasswordPage() {
                     <FormItem className="login-field">
                       <FormLabel>确认新密码</FormLabel>
                       <FormControl>
-                        <InputGroup>
-                          <InputGroupAddon>{<Lock size={15} />}</InputGroupAddon>
-                          <InputGroupInput
-                            {...field}
-                            type="password"
-                            placeholder="再次输入"
-                            autoComplete="new-password"
-                          />
-                        </InputGroup>
+                        <IconInput
+                          {...field}
+                          icon={<Lock size={15} />}
+                          type="password"
+                          placeholder="再次输入"
+                          autoComplete="new-password"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button disabled={submitting}
+                <Button
+                  disabled={submitting}
                   variant="default"
                   type="submit"
                   className="w-full login-submit"

@@ -6,21 +6,29 @@
 
 /* * 生成设置的紧凑控件：参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
  *
- * shadcn Input 的 DOM 带 `data-slot="input"`，Select 的触发器带
- * `data-slot="select-trigger"`（尺寸见文件末尾「表单控件」适配层）；
- * 此处只覆盖 Input，原生控件（若再引入）走下面的通用规则。 */
+ * 直接命中 shadcn 槽位，避免依赖认证页懒加载的 `auth.css` 或旧 `.ui-input` 类。 */
 
-.pk-field .ui-input {
+.pk-field [data-slot='input'],
+  .pk-field [data-slot='select-trigger'] {
+  width: 100%;
   height: 32px;
   padding: 5px 12px;
-  border-color: var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-tag);
   font-size: 14px;
+  font-family: inherit;
   color: var(--wb-text);
+  background: var(--card-bg);
+  outline: none;
 }
 
-.pk-field .ui-input::placeholder {
+.pk-field [data-slot='input']::placeholder {
   color: var(--placeholder-text);
+}
+
+.pk-field [data-slot='input']:focus,
+  .pk-field [data-slot='select-trigger']:focus {
+  border-color: var(--brand-light);
 }
 
 @media (max-width: 760px) {
@@ -36,19 +44,6 @@
 .ui-upload.is-disabled {
   opacity: 0.6;
   pointer-events: none;
-}
-
-/* 表单控件：Select 触发器和 Input 仍沿用业务字段的 32px 小尺寸 */
-
-.pk-field > .ui-select-trigger,
-  .pk-field .ui-select-trigger {
-  width: 100%;
-  height: 32px;
-  padding: 5px 12px;
-  border-color: var(--border);
-  border-radius: var(--radius-tag);
-  font-size: 14px;
-  color: var(--wb-text);
 }
 
 /* * shadcn Button 的默认 size 带 `h-9`（36px）。下列皮肤的高度由内容或

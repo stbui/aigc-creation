@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { Meter } from './components';
 import type { AdminOverview } from '../../../types/api';
 import { formatNumber, yuan } from './utils';
-import '../../../styles/radar-admin.css';
 
 /**
  * 概览页展示小节。

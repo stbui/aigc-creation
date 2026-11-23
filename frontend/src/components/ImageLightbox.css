@@ -158,17 +158,6 @@
   opacity: 1;
 }
 
-.img-viewer-stage video.img-viewer-video {
-  min-width: 0;
-  min-height: 0;
-  max-width: 100cqw;
-  max-height: 100cqh;
-  display: block;
-  border-radius: 0;
-  background: var(--mask-opaque);
-  object-fit: contain;
-}
-
 /* 横图转 90° 后视觉宽高互换；交换 max 约束，避免旋转后被舞台上下裁掉。 */
 .img-viewer-stage.is-quarter-turn img {
   max-width: 100cqh;
@@ -414,14 +403,6 @@
   background: var(--brand-hover);
 }
 
-.img-viewer-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding-left: var(--space-10);
-  border-left: 1px solid rgba(255, 255, 255, 0.16);
-}
-
 .img-viewer-action {
   display: inline-flex;
   align-items: center;
@@ -509,10 +490,6 @@
     width: 28px;
     padding: 0;
     justify-content: center;
-  }
-  .img-viewer-actions {
-    gap: var(--space-4);
-    padding-left: var(--space-8);
   }
   .img-viewer-prompt {
     bottom: 90px;

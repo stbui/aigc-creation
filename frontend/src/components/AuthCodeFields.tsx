@@ -1,15 +1,5 @@
 import { ShieldCheck } from 'lucide-react';
-import {
-  Button,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from '../ui';
+import { Button, FormControl, FormField, FormItem, FormLabel, FormMessage, IconInput } from '../ui';
 import type { SmsPurpose } from '../types/api';
 
 /**
@@ -38,18 +28,14 @@ export function SmsCodeField({
           <FormLabel>验证码</FormLabel>
           <div className="login-code-row">
             <FormControl>
-              <InputGroup>
-                <InputGroupAddon>
-                  {<ShieldCheck size={15} />}
-                </InputGroupAddon>
-                <InputGroupInput
-                  {...field}
-                  placeholder="6 位验证码"
-                  maxLength={6}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                />
-              </InputGroup>
+              <IconInput
+                {...field}
+                icon={<ShieldCheck size={15} />}
+                placeholder="6 位验证码"
+                maxLength={6}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+              />
             </FormControl>
             <Button
               type="button"
@@ -94,18 +80,14 @@ export function EmailCodeField({
           <FormLabel>邮箱验证码</FormLabel>
           <div className="login-code-row">
             <FormControl>
-              <InputGroup>
-                <InputGroupAddon>
-                  {<ShieldCheck size={15} />}
-                </InputGroupAddon>
-                <InputGroupInput
-                  {...field}
-                  placeholder="6 位验证码"
-                  maxLength={6}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                />
-              </InputGroup>
+              <IconInput
+                {...field}
+                icon={<ShieldCheck size={15} />}
+                placeholder="6 位验证码"
+                maxLength={6}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+              />
             </FormControl>
             <Button
               type="button"

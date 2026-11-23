@@ -16,6 +16,7 @@ export { StateButton, StateEmpty, StateError, StateSkeleton } from '../../compon
 /** C 端 UI 控件 */
 export {
   Button,
+  CharacterCountTextarea,
   Input,
   Select,
   SelectContent,
@@ -23,5 +24,4 @@ export {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Textarea,
 } from '../../ui';

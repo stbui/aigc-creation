@@ -8,6 +8,7 @@
 /** shadcn 表单与展示件 */
 export {
   Button,
+  CharacterCountTextarea,
   Form,
   FormControl,
   FormDescription,
@@ -26,7 +27,6 @@ export {
   SurfaceHeader,
   SurfaceTitle,
   Switch,
-  Textarea,
   Upload,
   useWatch,
   useForm,
