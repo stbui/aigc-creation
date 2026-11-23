@@ -67,7 +67,9 @@ export function RotateAnglePage() {
   };
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">旋转角度</h1>
+      <ToolShell
       capability="rotate"
       pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page rotate-angle-page [&_.pk-form-scroll>[data-slot=section-card]:first-child]:min-h-[226px]! max-[900px]:[&_.pk-form-scroll>[data-slot=section-card]:first-child]:p-4! max-[900px]:[&_.pk-form-scroll]:mb-3! max-[900px]:[&_.source-row]:gap-6! max-[900px]:[&_.pk-result-pane]:min-h-[360px]! max-[900px]:[&_.pk-result-pane]:h-auto! max-[900px]:[&_.pk-result-pane]:flex-none!`}
       title="旋转角度"
@@ -118,6 +120,7 @@ export function RotateAnglePage() {
           onReset={resetAngles}
         />
       )}
-    </ToolShell>
+      </ToolShell>
+    </>
   );
 }

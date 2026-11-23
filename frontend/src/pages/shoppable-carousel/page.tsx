@@ -374,6 +374,7 @@ export function ShoppableCarouselPage() {
 
   return (
     <>
+      <h1 className="sr-only">带货图文</h1>
       <div className="sc-workspace">
         {/* ── 左: 配置栏 ── */}
         <aside className="sc-input-pane">

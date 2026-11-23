@@ -44,7 +44,9 @@ export function ProductRetouchPage() {
   };
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">产品精修</h1>
+      <ToolShell
       capability="enhance"
       pageClass={`${PRODUCT_TOOL_PAGE} product-retouch-page product-retouch-main-page`}
       title="产品精修"
@@ -96,6 +98,7 @@ export function ProductRetouchPage() {
           onChange={(e) => setNote(e.target.value)}
         />
       </ToolCard>
-    </ToolShell>
+      </ToolShell>
+    </>
   );
 }

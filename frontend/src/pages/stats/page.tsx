@@ -30,7 +30,7 @@ export function StatsPage() {
 
   if (!token) {
     return (
-      <PersonalPage
+      <PersonalPage pageHeading="数据中心"
         title={STATS_PAGE_META.title}
         description={STATS_PAGE_META.description}
         showBack={false}
@@ -50,7 +50,7 @@ export function StatsPage() {
 
   if (loading) {
     return (
-      <PersonalPage
+      <PersonalPage pageHeading="数据中心"
         title={STATS_PAGE_META.title}
         description={STATS_PAGE_META.description}
         showBack={false}
@@ -61,7 +61,7 @@ export function StatsPage() {
   }
   if (error && !stats) {
     return (
-      <PersonalPage
+      <PersonalPage pageHeading="数据中心"
         title={STATS_PAGE_META.title}
         description={STATS_PAGE_META.description}
         showBack={false}
@@ -76,7 +76,7 @@ export function StatsPage() {
   }
   if (!stats) {
     return (
-      <PersonalPage
+      <PersonalPage pageHeading="数据中心"
         title={STATS_PAGE_META.title}
         description={STATS_PAGE_META.description}
         showBack={false}
@@ -92,7 +92,7 @@ export function StatsPage() {
   const refreshFailed = Boolean(error);
 
   return (
-    <PersonalPage
+    <PersonalPage pageHeading="数据中心"
       className="stats-page max-w-none"
       title={STATS_PAGE_META.title}
       description={

@@ -62,7 +62,9 @@ export function BackgroundRemovePage() {
   const colorLabel = colorLabelOf(selectedColor, customColor, customAlpha);
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">一键抠图</h1>
+      <ToolShell
       capability="matting"
       pageClass={`background-remove-page ${PAGE_TW}`}
       title="一键抠图"
@@ -148,6 +150,7 @@ export function BackgroundRemovePage() {
           ariaLabel="背景颜色"
         />
       </ToolCard>
-    </ToolShell>
+      </ToolShell>
+    </>
   );
 }

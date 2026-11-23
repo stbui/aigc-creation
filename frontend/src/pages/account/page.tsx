@@ -172,7 +172,7 @@ export function AccountPage() {
 
   if (!token) {
     return (
-      <PersonalPage
+      <PersonalPage pageHeading="账户设置"
         title="账户设置"
         description="管理你的资料、安全与数据。"
       >
@@ -188,7 +188,7 @@ export function AccountPage() {
 
   if (loading) {
     return (
-      <PersonalPage title="账户设置" description="管理你的资料、安全与数据。">
+      <PersonalPage pageHeading="账户设置" title="账户设置" description="管理你的资料、安全与数据。">
         <StateSkeleton variant="panel" count={4} />
       </PersonalPage>
     );
@@ -354,7 +354,7 @@ export function AccountPage() {
   const nameDirty = name.trim().length > 0 && name.trim() !== (profile?.name ?? '');
 
   return (
-    <PersonalPage
+    <PersonalPage pageHeading="账户设置"
       title="账户设置"
       description="管理资料、安全与数据；积分、订单与工单可从卡片直接进入。"
       extra={

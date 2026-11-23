@@ -118,6 +118,7 @@ export function MultiFusionPage() {
   if (step === 'gateway') {
     return (
       <div className="multi-image-fusion-page is-scene-selection">
+        <h1 className="sr-only">多图融合</h1>
         <MultiFusionSceneGateway
           onSelect={(value) => {
             setScene(value);

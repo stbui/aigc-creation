@@ -362,6 +362,7 @@ export function ProductDetailPage() {
 
   return (
     <div className="pk-workspace">
+      <h1 className="sr-only">商品详情图</h1>
       <div className="h-full min-h-0 min-w-0">
         <DetailInputPane
           images={images}

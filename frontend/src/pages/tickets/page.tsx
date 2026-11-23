@@ -237,7 +237,7 @@ export function TicketsPage() {
 
   if (!token) {
     return (
-      <PersonalPage title="我的工单" description="提交问题反馈并跟踪客服处理进度。">
+      <PersonalPage pageHeading="我的工单" title="我的工单" description="提交问题反馈并跟踪客服处理进度。">
         <StateEmpty
           title="登录后查看工单"
           desc="工单与你的账号绑定；登录后可以提交问题、查看客服回复并继续追问。"
@@ -249,7 +249,7 @@ export function TicketsPage() {
 
   if (detail) {
     return (
-      <PersonalPage
+      <PersonalPage pageHeading="我的工单"
         title={detail.subject}
         description={
           <>
@@ -279,7 +279,7 @@ export function TicketsPage() {
   }
 
   return (
-    <PersonalPage
+    <PersonalPage pageHeading="我的工单"
       title="我的工单"
       description="提交问题、投诉或咨询，客服回复会出现在这里，也会推送站内消息。"
       extra={

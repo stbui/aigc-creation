@@ -204,7 +204,9 @@ export function WatermarkRemovePage() {
   const zoomOut = () => setZoom((value) => clampZoom(value, -ZOOM_STEP));
 
   return (
-    <ToolShell
+    <>
+      <h1 className="sr-only">去除水印</h1>
+      <ToolShell
       capability="remove_watermark"
       pageClass={`watermark-removal-page local-redraw-page ${PAGE_BASE} ${PAGE_COLUMNS} ${PAGE_MOBILE}`}
       title="去除水印"
@@ -290,6 +292,7 @@ export function WatermarkRemovePage() {
           />
         );
       }}
-    />
+      />
+    </>
   );
 }
