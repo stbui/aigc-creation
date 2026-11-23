@@ -323,6 +323,38 @@ export function findAdminMenuItem(path: string): AdminMenuItem | undefined {
     .find((item) => isAdminMenuPathActive(item.path, path));
 }
 
+/**
+ * 按路径查找菜单项，供「页面级权限守卫」这类不依赖侧栏渲染的调用方使用。
+ *
+ * 分两轮：
+ *   1. 精确语义，与 `findAdminMenuItem` 完全一致（`pathname` + `search` 全部命中）；
+ *   2. 精确未命中时，退化为**只比对 `pathname`**（忽略查询参数），返回该路径下的全部菜单项。
+ *
+ * 为什么需要第二轮：以查询参数区分入口的菜单项（`/admin/payments?tab=providers` 等三条）
+ * 在 URL 尚未规范化时查不到——裸链 `/admin/payments` 与 `?tab=unknown` 都属此列。页面挂载
+ * 之后才会用 `setSearchParams` 补上默认页签，守卫若只做精确匹配，就会在挂载前放行。
+ *
+ * 返回值语义：
+ *   - `[]`  该路径不属于任何菜单项（重定向中间路由、打错的地址）；调用方应放行。
+ *   - 单项  精确命中，或兜底时该路径只有一个菜单项。
+ *   - 多项  仅兜底命中了多个候选。**调用方必须取这些项权限的并集（OR），不能取第一项**：
+ *           页面随后会自行把 URL 规范成某个页签，按第一项判定既可能拦下一个其实可访问的
+ *           页签，也可能放行后落到另一个页签再吃 403；并集配合「URL 变化后重新判定」是
+ *           唯一不会漏判的组合。
+ *
+ * 兜底只做 `pathname` **相等**，不做前缀匹配：子路由（`/admin/settings/generate`）本来
+ * 就会被第一轮的 `isAdminMenuPathActive` 命中，前缀兜底只会把不存在的深层路径也算进来。
+ */
+export function findAdminMenuItemsByPath(path: string): AdminMenuItem[] {
+  const exact = findAdminMenuItem(path);
+  if (exact) return [exact];
+
+  const { pathname } = splitAdminPath(path);
+  return ADMIN_MENU.flatMap((group) => group.items).filter(
+    (item) => splitAdminPath(item.path).pathname === pathname,
+  );
+}
+
 export function findAdminMenuGroup(path: string): AdminMenuGroup | undefined {
   const item = findAdminMenuItem(path);
   if (!item) return undefined;

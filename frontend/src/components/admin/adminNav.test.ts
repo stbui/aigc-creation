@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ADMIN_MENU, findAdminMenuGroup, findAdminMenuItem } from './adminNav';
+import {
+  ADMIN_MENU,
+  findAdminMenuGroup,
+  findAdminMenuItem,
+  findAdminMenuItemsByPath,
+} from './adminNav';
 
 describe('后台导航分组', () => {
   it('按日常运营到资金、系统与安全的顺序排列', () => {
@@ -39,5 +44,51 @@ describe('后台支付菜单', () => {
   it('筛选参数不改变菜单归属', () => {
     const path = '/admin/payments?tab=reconciliation&status=failed&runId=run_1';
     expect(findAdminMenuItem(path)?.label).toBe('交易核对');
+  });
+});
+
+describe('后台菜单的 pathname 兜底查找', () => {
+  it('精确命中时只返回一项', () => {
+    const items = findAdminMenuItemsByPath('/admin/payments?tab=exceptions');
+    expect(items.map((item) => item.label)).toEqual(['异常处理']);
+  });
+
+  it('裸路径按 pathname 返回三个候选，权限一致', () => {
+    const items = findAdminMenuItemsByPath('/admin/payments');
+    expect(items.map((item) => item.label)).toEqual(['收款设置', '交易核对', '异常处理']);
+    expect(items.every((item) => item.permission === 'payment.read')).toBe(true);
+  });
+
+  it('未知页签同样走 pathname 兜底', () => {
+    const items = findAdminMenuItemsByPath('/admin/payments?tab=unknown');
+    expect(items.map((item) => item.label)).toEqual(['收款设置', '交易核对', '异常处理']);
+  });
+
+  it('已知页签仍走精确匹配，不被兜底放大', () => {
+    expect(findAdminMenuItemsByPath('/admin/payments?tab=reconciliation').length).toBe(1);
+  });
+
+  it('兜底不改变精确查找的既有行为', () => {
+    expect(findAdminMenuItem('/admin/payments')).toBeUndefined();
+    expect(findAdminMenuItem('/admin/payments?tab=exceptions')?.label).toBe('异常处理');
+  });
+
+  it('子路由由精确语义命中，不进入兜底', () => {
+    expect(
+      findAdminMenuItemsByPath('/admin/settings/generate').map((item) => item.label),
+    ).toEqual(['系统设置']);
+  });
+
+  it('不属于菜单的路径返回空数组', () => {
+    expect(findAdminMenuItemsByPath('/admin/credit-prices')).toEqual([]);
+    expect(findAdminMenuItemsByPath('/admin/not-a-page')).toEqual([]);
+  });
+
+  it('末尾斜杠与额外筛选参数不影响精确命中', () => {
+    expect(
+      findAdminMenuItemsByPath('/admin/payments/?tab=reconciliation&status=failed').map(
+        (item) => item.label,
+      ),
+    ).toEqual(['交易核对']);
   });
 });
