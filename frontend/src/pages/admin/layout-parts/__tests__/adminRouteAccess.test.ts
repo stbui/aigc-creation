@@ -23,7 +23,7 @@ import {
  * 另加一条组件测试（adminRouteGuard.test.tsx）断言渲染 NoPageAccess 而非错误页。
  */
 
-const { admin, operator, finance } = ROLE_PERMISSIONS_FOR_TEST;
+const { admin, operator, finance, financeLegacy } = ROLE_PERMISSIONS_FOR_TEST;
 
 const has = (granted: string[]) => (permission: string) => granted.includes(permission);
 
@@ -44,6 +44,20 @@ describe('后台路由授权：四条指定场景', () => {
     );
     // 旧深链重定向壳也必须拦住，否则等于绕过
     expect(verdict(finance, '/admin/credit-prices')).toBe(
+      'capability.read|logical_model.read',
+    );
+  });
+
+  it('①b 旧授权残留（financeLegacy 仍带 product.price）也进不了能力页', () => {
+    // 生产库角色权限是持久化数据：T-054 改的是代码默认值，财务角色在角色页保存前
+    // 可能还留着旧授权。nav 收紧后入口已关，守卫按菜单权限判定，与角色数据无关。
+    expect(verdict(financeLegacy, '/admin/capabilities')).toBe(
+      'capability.read|logical_model.read',
+    );
+    expect(verdict(financeLegacy, '/admin/capabilities?tab=pricing')).toBe(
+      'capability.read|logical_model.read',
+    );
+    expect(verdict(financeLegacy, '/admin/credit-prices')).toBe(
       'capability.read|logical_model.read',
     );
   });
