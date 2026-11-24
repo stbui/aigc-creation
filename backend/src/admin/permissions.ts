@@ -236,7 +236,6 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.platformDashboard,
     PERMISSIONS.productRead,
     PERMISSIONS.productWrite,
-    PERMISSIONS.productPrice,
     PERMISSIONS.productPublish,
     PERMISSIONS.productDelete,
     PERMISSIONS.orderRead,
