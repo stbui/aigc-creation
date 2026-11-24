@@ -25,7 +25,7 @@ import {
   ToolBatchOutputPane,
   ToolWorkflowSteps,
 } from './components';
-import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
+import { MAX_DESC_LEN, MAX_IMAGES } from './constants';
 import { DetailExamplePanel } from './DetailExamplePanel';
 import { DetailInputPane } from './DetailInputPane';
 import {
@@ -97,7 +97,6 @@ export function ProductDetailPage() {
     mobile,
   } = useImageUpload({
     max: maxImages,
-    maxMb: MAX_IMAGE_MB,
   });
   const imageLimitError = selectedModel ? imageInputCountError(selectedModel, images.length) : null;
   const resolutionValues = selectedModel?.capabilitySpec?.options?.imageResolution?.values ?? null;

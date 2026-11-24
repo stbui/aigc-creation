@@ -6,7 +6,6 @@ import {
   DEFAULT_LANGUAGE,
   DEFAULT_MARKET,
   DEFAULT_PLATFORM,
-  MAX_IMAGE_MB,
   MAX_IMAGES,
 } from './constants';
 import { AssetLibraryModal, MobileUploadModal, type OutputTab } from './components';
@@ -67,7 +66,6 @@ export function ShoppableCarouselPage() {
   // ── 上传 ──
   const { images, uploading, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
-    maxMb: MAX_IMAGE_MB,
   });
   const {
     open: libraryOpen,

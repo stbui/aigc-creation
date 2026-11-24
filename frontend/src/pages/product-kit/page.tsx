@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   MAX_DESC_LEN,
-  MAX_IMAGE_MB,
   MAX_IMAGES,
   PRODUCT_KIT_CAPABILITY,
   VARIANT_FIELDS,
@@ -77,7 +76,6 @@ export function ProductKitPage() {
   // 上传 (三重校验 / 素材库回填 / 粘贴) 统一由 useImageUpload 处理
   const { images, uploading, uploadFiles, removeImage, replaceImage, replaceImages, library, mobile } = useImageUpload({
     max: maxImages,
-    maxMb: MAX_IMAGE_MB,
   });
   const imageLimitError = selectedModel ? imageInputCountError(selectedModel, images.length) : null;
   const {

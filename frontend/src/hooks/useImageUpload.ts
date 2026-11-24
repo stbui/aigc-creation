@@ -23,8 +23,6 @@ export interface UploadedImage {
 interface Options {
   /** 数量上限 */
   max: number;
-  /** @deprecated 上传限制由系统设置统一下发；保留字段仅为兼容旧调用。 */
-  maxMb?: number;
   /** 提示文案里的名词, 如「商品图片」/「参考图片」 */
   noun?: string;
   /** 初始已有素材 (从历史记录恢复时用) */

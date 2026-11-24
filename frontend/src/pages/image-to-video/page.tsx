@@ -5,6 +5,7 @@ import type { ToolAsset } from './components';
 import { ToolShell } from './components';
 import { IMAGE_TO_VIDEO_CAPABILITY } from './constants';
 import { runtimeOf } from '../../lib/constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { useCapabilities, useToolTask } from './hooks';
 import { VideoResultPane } from './VideoResultPane';
 import { VideoSettingsCard } from './VideoSettingsCard';
@@ -24,6 +25,7 @@ const DROPZONE =
   '[&[data-filled]]:block! [&[data-filled]]:p-0! [&[data-filled]]:border-0! [&[data-filled]]:bg-transparent! [&[data-filled]]:shadow-none! [&[data-filled]]:cursor-default! [&[data-filled]]:hover:border-0! [&[data-filled]]:hover:bg-transparent! [&[data-filled]]:hover:ring-0!';
 
 export function ImageToVideoPage() {
+  const { allowedLabel } = useUploadLimits();
   const { data: capabilities, loading, error } = useCapabilities();
   const definition = capabilities?.items.find((item) => item.id === IMAGE_TO_VIDEO_CAPABILITY) ?? null;
   const params = definition?.params ?? [];
@@ -64,7 +66,7 @@ export function ImageToVideoPage() {
         title: '上传首帧图片',
         required: true,
         max: 1,
-        hint: '点击、拖拽或粘贴图片上传，支持 JPG、PNG、WebP，最多 1 张',
+        hint: `点击、拖拽或粘贴图片上传，支持 ${allowedLabel}，最多 1 张`,
         prompt: '点击或拖拽图片到此处，作为视频首帧',
         promptIcon: <Plus size={22} />,
         dropzoneClassName: DROPZONE,
