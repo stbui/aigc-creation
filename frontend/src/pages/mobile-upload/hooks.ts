@@ -60,7 +60,8 @@ export function useMobileUpload(sessionId: string, token: string) {
   /** 选择图片 (可多选) */
   const addFiles = useCallback(async (list: FileList | File[] | null) => {
     if (!list) return;
-    const files = Array.from(list).filter(isSupportedImageFile);
+    const picked = Array.from(list);
+    const files = picked.filter(isSupportedImageFile);
     if (!files.length) {
       setError(`请选择图片文件（${allowedLabel}）`);
       return;
@@ -76,6 +77,9 @@ export function useMobileUpload(sessionId: string, token: string) {
     }
     setError(null);
     setNotice(null);
+    if (files.length < picked.length) {
+      setNotice(`已忽略 ${picked.length - files.length} 个非图片文件`);
+    }
 
     // 逐张压缩 (参考站: 「图片已自动压缩，压缩到 X」)
     const results: Picked[] = [];

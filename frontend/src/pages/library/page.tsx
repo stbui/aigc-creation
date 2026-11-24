@@ -20,7 +20,6 @@ import {
   assetExtension,
   buildEmptyStateCopy,
   capabilityName,
-  isSupportedImageFile,
 } from './utils';
 import { useLibraryAssets } from './useLibraryAssets';
 import { useLibraryProjects } from './useLibraryProjects';
@@ -187,7 +186,7 @@ export function LibraryPage() {
     for (const file of list) {
       const error = await validateImageFile(file);
       if (error) {
-        message.warning(error);
+        message.error(error);
         return;
       }
     }

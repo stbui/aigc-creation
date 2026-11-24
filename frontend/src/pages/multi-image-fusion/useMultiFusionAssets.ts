@@ -30,7 +30,7 @@ import { useApp } from '../../ui';
  */
 export function useMultiFusionAssets() {
   const { message } = useApp();
-  const { validateImageFile } = useUploadLimits();
+  const { allowedLabel, isSupportedImageFile, validateImageFile } = useUploadLimits();
   const { token, openLogin } = useAuth();
   const { ensureProject } = useProject();
 
@@ -54,13 +54,20 @@ export function useMultiFusionAssets() {
 
   const uploadTo = useCallback(
     async (files: FileList | File[], target: MultiFusionSlot) => {
-      const list = Array.from(files);
-      if (list.length === 0) return;
+      const picked = Array.from(files);
+      const list = picked.filter(isSupportedImageFile);
+      if (list.length === 0) {
+        message.warning(`请选择图片文件（${allowedLabel}）`);
+        return;
+      }
+      if (list.length < picked.length) {
+        message.warning(`已忽略 ${picked.length - list.length} 个非图片文件`);
+      }
 
       for (const file of list) {
         const error = await validateImageFile(file);
         if (error) {
-          message.warning(error);
+          message.error(error);
           return;
         }
       }
@@ -105,7 +112,7 @@ export function useMultiFusionAssets() {
         setUploading(false);
       }
     },
-    [commitAccents, ensureProject, message, validateImageFile],
+    [allowedLabel, commitAccents, ensureProject, isSupportedImageFile, message, validateImageFile],
   );
 
   /** 粘贴上传: 主体位为空时进主体位，否则按顺序补搭配位。 */

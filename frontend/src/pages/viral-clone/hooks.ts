@@ -78,7 +78,7 @@ interface ViralCloneAssetsOptions {
  */
 export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAssetsOptions) {
   const { message } = useApp();
-  const { validateImageFile } = useUploadLimits();
+  const { allowedLabel, isSupportedImageFile, validateImageFile } = useUploadLimits();
   const { ensureProject } = useProject();
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [reference, setReference] = useState<UploadedImage | null>(null);
@@ -90,13 +90,20 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
   // ── 上传: 商品图 (点击/拖拽/粘贴, 按模型总图片数预留参考图位) ──
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files);
-      if (list.length === 0) return;
+      const picked = Array.from(files);
+      const list = picked.filter(isSupportedImageFile);
+      if (list.length === 0) {
+        message.warning(`请选择图片文件（${allowedLabel}）`);
+        return;
+      }
+      if (list.length < picked.length) {
+        message.warning(`已忽略 ${picked.length - list.length} 个非图片文件`);
+      }
 
       for (const file of list) {
         const error = await validateImageFile(file);
         if (error) {
-          message.warning(error);
+          message.error(error);
           return;
         }
       }
@@ -124,18 +131,20 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
         setUploading(false);
       }
     },
-    [imageMax, images.length, modelImageMax, ensureProject, message, validateImageFile],
+    [allowedLabel, imageMax, images.length, isSupportedImageFile, modelImageMax, ensureProject, message, validateImageFile],
   );
 
   // ── 上传: 参考图 (单张, 超出即替换) ──
   const uploadReference = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files);
-      if (list.length === 0) return;
-      const file = list[0];
+      const file = Array.from(files).find(isSupportedImageFile);
+      if (!file) {
+        message.warning(`请选择图片文件（${allowedLabel}）`);
+        return;
+      }
       const error = await validateImageFile(file);
       if (error) {
-        message.warning(error);
+        message.error(error);
         return;
       }
       setUploading(true);
@@ -150,7 +159,7 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
         setUploading(false);
       }
     },
-    [ensureProject, message, validateImageFile],
+    [allowedLabel, ensureProject, isSupportedImageFile, message, validateImageFile],
   );
 
   const removeImage = useCallback((id: string) => setImages((prev) => prev.filter((x) => x.id !== id)), []);

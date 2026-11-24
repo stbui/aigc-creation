@@ -78,7 +78,7 @@ const DROPZONE =
 
 export function LocalRedrawPage() {
   const { message } = useApp();
-  const { validateImageFile } = useUploadLimits();
+  const { allowedLabel, isSupportedImageFile, validateImageFile } = useUploadLimits();
   const { ensureProject } = useProject();
   const { submitting, result, setResult, run } = useToolTask({
     capability: 'local_redraw',
@@ -138,9 +138,13 @@ export function LocalRedrawPage() {
 
   const uploadReference = async (id: number, file: File | undefined) => {
     if (!file) return;
+    if (!isSupportedImageFile(file)) {
+      message.warning(`请选择图片文件（${allowedLabel}）`);
+      return;
+    }
     const error = await validateImageFile(file);
     if (error) {
-      message.warning(error);
+      message.error(error);
       return;
     }
     try {
