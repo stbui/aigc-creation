@@ -23,7 +23,7 @@
     "test:backend": "npm --prefix backend test",
     "test:frontend": "npm --prefix frontend test",
     "test:agent": "npm --prefix agent test",
-    "test:gateway": "npm --prefix test test",
+    "test:gateway": "npm --prefix mock-model-gateway test",
     "test:e2e:smoke": "npm --prefix frontend run e2e:smoke",
     "verify:deps": "npm --prefix backend run verify:deps:critical",
     "verify:conventions": "node scripts/verify-conventions.mjs",
