@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PERMISSION_LABELS, MODULE_LABELS, ROLE_COL } from './constants';
+import {
+  PERMISSION_LABELS,
+  MODULE_LABELS,
+  PLANNED_PERMISSION_SET,
+  ROLE_COL,
+} from './constants';
 import { useAdmin, useConfirm, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from './api';
 
@@ -318,6 +323,16 @@ export function AdminRolesPage() {
           ))}
         </div>
 
+        {allPermissions.some((code) => PLANNED_PERMISSION_SET.has(code)) && (
+          <p
+            data-testid="admin-planned-permissions-note"
+            className="mb-3 text-[13px] leading-5 text-muted-foreground"
+          >
+            标有「未上线」的权限点：后端已登记，但暂无页面或接口消费，勾选暂不生效。
+            它们保持可勾选，是为了能让管理员取消历史上已授予的旧授权。
+          </p>
+        )}
+
         <div className="max-h-[calc(100svh-300px)] overflow-auto rounded-md border border-border">
           <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-3 py-2">
             <span className="min-w-0 flex-1 text-[13px] font-semibold text-foreground">权限点</span>
@@ -400,6 +415,14 @@ export function AdminRolesPage() {
                         <ToneBadge tone="warn">
                           高危
                         </ToneBadge>
+                      )}
+                      {PLANNED_PERMISSION_SET.has(code) && (
+                        <span
+                          data-testid={`admin-perm-planned-${code}`}
+                          className="inline-flex shrink-0"
+                        >
+                          <ToneBadge tone="neutral">未上线</ToneBadge>
+                        </span>
                       )}
                       <code className="truncate font-mono text-[12px] text-muted-foreground/60">{code}</code>
                     </div>
