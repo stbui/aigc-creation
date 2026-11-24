@@ -1,6 +1,6 @@
 import { Upload } from 'lucide-react';
 
-import { SUPPORTED_IMAGE_ACCEPT } from './constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { ImageUploadTrigger } from './components';
 
 interface ProductSkuReferenceUploadButtonProps {
@@ -19,10 +19,12 @@ export function ProductSkuReferenceUploadButton({
   busy,
   onPick,
 }: ProductSkuReferenceUploadButtonProps) {
+  const { accept } = useUploadLimits();
+
   return (
     <ImageUploadTrigger
       icon={<Upload size={12} aria-hidden />}
-      accept={SUPPORTED_IMAGE_ACCEPT}
+      accept={accept}
       disabled={busy}
       onFiles={(files) => onPick(Array.from(files)[0])}
     >

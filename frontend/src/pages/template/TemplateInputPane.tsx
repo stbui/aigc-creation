@@ -1,6 +1,7 @@
 import { Lightbulb } from 'lucide-react';
 
-import { CAPABILITY_ID, MAX_IMAGE_MB, MAX_IMAGES } from './constants';
+import { CAPABILITY_ID, MAX_IMAGES } from './constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { SectionCard, ToolGenerationSubmitBar, ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
 import type { TemplateEntry } from './utils';
@@ -54,6 +55,8 @@ export function TemplateInputPane({
   hint,
   onSubmit,
 }: TemplateInputPaneProps) {
+  const { maxMb } = useUploadLimits();
+
   return (
     <aside className="pk-input-pane min-[901px]:h-full! min-[901px]:min-h-0!">
       <div className="pk-form-scroll min-[901px]:overflow-y-auto!">
@@ -69,7 +72,7 @@ export function TemplateInputPane({
             onRemove={onRemove}
             onOpenLibrary={onOpenLibrary}
             onOpenMobile={onOpenMobile}
-            emptyHint={`至少上传 1 张清晰人像；最多 ${MAX_IMAGES} 张，单张不超过 ${MAX_IMAGE_MB}MB`}
+            emptyHint={`至少上传 1 张清晰人像；最多 ${MAX_IMAGES} 张，单张不超过 ${maxMb}MB`}
           />
         </SectionCard>
 

@@ -4,14 +4,6 @@
 
 import { MAX_EDGE, QUALITY } from './constants';
 
-/** 图片格式 / 体积校验（与全站上传同源） */
-export {
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_ACCEPT,
-  SUPPORTED_IMAGE_LABEL,
-  isSupportedImageFile,
-} from '../../lib/constants';
-
 /**
  * 压缩图片 —— canvas 重绘, 输出 JPEG。
  *

@@ -78,8 +78,6 @@ export const ANNOTATION_LABEL =
 
 export const ANNOTATION_TEXTAREA = '[grid-area:2/1]';
 
-export { SUPPORTED_IMAGE_ACCEPT } from '../../lib/constants';
-
 /** 参考图上传位：空态虚线框，有图时实线并铺满缩略图 */
 export const ANNOTATION_REFERENCE =
   '[grid-area:1/2/3/3] flex! size-16 flex-col! items-center! justify-center gap-[3px]! self-center m-0! cursor-pointer overflow-hidden rounded-[var(--radius-control)] border border-dashed border-border bg-[var(--surface)] p-0 text-xs leading-4 text-[color:var(--text-body)]';

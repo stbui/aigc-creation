@@ -7,8 +7,8 @@ import {
   DEFAULT_RATIO,
   DEFAULT_SIZE,
   MAX_IMAGES,
-  MAX_IMAGE_MB,
 } from './constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import {
   AssetLibraryModal,
   MobileUploadModal,
@@ -62,6 +62,7 @@ export function TemplatePage() {
   useDocumentMeta('婚纱写真模板 · 货觉AI', '上传人物照片，选择模板，生成同款婚纱写真');
 
   const { message, modal } = useApp();
+  const { maxMb } = useUploadLimits();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token } = useAuth();
@@ -80,7 +81,6 @@ export function TemplatePage() {
   // ── 上传 ──
   const { images, uploading, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
-    maxMb: MAX_IMAGE_MB,
     noun: '人像照片',
   });
   const {

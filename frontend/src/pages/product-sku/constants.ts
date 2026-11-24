@@ -8,14 +8,6 @@ import type { SkuRegion, SkuResultItem, ToolAsset, ToolSettings } from './compon
  * 目录内新增共享常量时在这里补一行 re-export。
  */
 
-/** 单张图片体积上限与支持格式, 全站上传校验共用 */
-export {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_ACCEPT,
-  SUPPORTED_IMAGE_LABEL,
-} from '../../lib/constants';
-
 // ───────────────── SKU 数量与字段长度 ─────────────────
 
 /** 模板图最多可框选的变体区域数 */

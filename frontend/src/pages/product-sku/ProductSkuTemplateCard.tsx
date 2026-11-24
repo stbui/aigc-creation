@@ -1,6 +1,6 @@
 import { ImagePlus } from 'lucide-react';
 
-import { SUPPORTED_IMAGE_ACCEPT } from './constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import {
   ImageDropzone,
   ImageUploadArea,
@@ -36,6 +36,8 @@ export function ProductSkuTemplateCard({
   onEditRegions,
   onPreview,
 }: ProductSkuTemplateCardProps) {
+  const { accept } = useUploadLimits();
+
   return (
     <SectionCard
       title="SKU模板图"
@@ -56,7 +58,7 @@ export function ProductSkuTemplateCard({
         max={1}
         single
         uploading={uploading}
-        accept={SUPPORTED_IMAGE_ACCEPT}
+        accept={accept}
         ariaLabel="上传SKU模板图"
         emptyContent={(controls) => (
           <ImageDropzone

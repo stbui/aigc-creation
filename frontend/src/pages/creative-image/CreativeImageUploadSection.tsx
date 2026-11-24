@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react';
 
-import { MAX_IMAGE_MB, SUPPORTED_IMAGE_ACCEPT } from './constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { ImageUploadArea, type ImageUploadControls, type ToolAsset } from './components';
 import { CreativeImageReferenceThumb } from './CreativeImageReferenceThumb';
 
@@ -33,6 +33,8 @@ export function CreativeImageUploadSection({
   onOpenLibrary,
   onOpenMobile,
 }: CreativeImageUploadSectionProps) {
+  const { accept, maxMb } = useUploadLimits();
+
   const renderGrid = (items: ToolAsset[], controls: ImageUploadControls) => {
     const hasRoom = items.length < maxImages;
     return (
@@ -74,7 +76,7 @@ export function CreativeImageUploadSection({
       images={images}
       max={maxImages}
       uploading={uploading}
-      accept={SUPPORTED_IMAGE_ACCEPT}
+      accept={accept}
       className={
         images.length > 0
           ? 'min-h-0! cursor-default border-0! bg-transparent! p-0! block! hover:border-0! hover:bg-transparent! hover:ring-0!'
@@ -82,7 +84,7 @@ export function CreativeImageUploadSection({
       }
       ariaLabel="上传参考图"
       emptyTitle="点击、拖拽或粘贴参考图片到此处上传"
-      emptyHint={`最多可上传 ${maxImages} 张参考图片，单张不超过 ${MAX_IMAGE_MB}MB`}
+      emptyHint={`最多可上传 ${maxImages} 张参考图片，单张不超过 ${maxMb}MB`}
       emptyClassName="max-w-none! rounded-md p-2 text-xs! leading-5!"
       emptyIconClassName="mb-5"
       renderPreview={renderGrid}

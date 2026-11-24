@@ -1,7 +1,7 @@
 import { ImagePlus, Upload } from 'lucide-react';
 
 import { MAX_FILES, type Phase, type Picked } from './constants';
-import { SUPPORTED_IMAGE_ACCEPT } from './utils';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { MobileUploadPreview } from './MobileUploadPreview';
 import { ImageUploadAddTile, ImageUploadInput } from './components';
 import { useImageUploadArea } from './hooks';
@@ -33,6 +33,7 @@ export function MobileUploadEditor({
   onMove,
   onSubmit,
 }: MobileUploadEditorProps) {
+  const { accept } = useUploadLimits();
   const { inputRef, open, onInputChange } = useImageUploadArea({
     disabled: phase === 'uploading',
     room: picked.length < MAX_FILES,
@@ -98,7 +99,7 @@ export function MobileUploadEditor({
 
       <ImageUploadInput
         inputRef={inputRef}
-        accept={SUPPORTED_IMAGE_ACCEPT}
+        accept={accept}
         multiple
         disabled={phase === 'uploading'}
         onChange={onInputChange}
