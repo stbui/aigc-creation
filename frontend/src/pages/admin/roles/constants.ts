@@ -62,6 +62,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   "billing_order.read": "查看生成账单",
   "billing_order.resolve": "处置挂账单",
   "model.analytics_read": "查看模型财务分析",
+  "marketing.read": "查看营销活动",
   "marketing.write": "管理营销活动",
   "message.write": "发送站内信与公告",
   "ticket.read": "查看工单",

@@ -50,13 +50,14 @@ class CheckinListQueryDto extends PageQueryDto {
 /**
  * 营销中心 · 优惠券 (B-64)。
  *
- * 权限: marketing.write —— 运营可写(发券是运营日常), 财务不可。
+ * 权限: 读用 marketing.read, 写用 marketing.write —— 财务要能只读对账,
+ * 但不能改券; 运营发券是日常动作。
  * 分权依据 docs/admin-prd.md §2.2: 财务能改钱, 运营能发券, 两者不可合并。
  * 发券直接减少收入, 但与退款不同 —— 退款是"退已有钱", 发券是"决定卖给谁多少钱",
  * 后者属运营定价决策。
  */
 @Controller("admin/coupons")
-@RequirePermission(PERMISSIONS.marketingWrite)
+@RequirePermission(PERMISSIONS.marketingRead)
 export class AdminCouponsController {
   constructor(private readonly marketing: MarketingService) {}
 
@@ -79,7 +80,7 @@ export class AdminCouponsController {
    * CSV 文件流直接写响应，不能走统一信封（否则会被包成 JSON 字符串）。
    */
   @Get("export")
-  @RequireAllPermissions(PERMISSIONS.marketingWrite, PERMISSIONS.dataExport)
+  @RequireAllPermissions(PERMISSIONS.marketingRead, PERMISSIONS.dataExport)
   async export(@Query() query: CouponListQueryDto, @Res() res: Response) {
     const csv = await this.marketing.exportCoupons(query);
     sendCsv(res, "coupons", csv);
@@ -91,6 +92,7 @@ export class AdminCouponsController {
   }
 
   @Post()
+  @RequirePermission(PERMISSIONS.marketingWrite)
   create(@Body() dto: UpsertCouponDto) {
     // DTO → 领域入参显式映射: DTO 实例不流入 service
     return this.marketing.createCoupon({
@@ -110,6 +112,7 @@ export class AdminCouponsController {
   }
 
   @Patch(":id")
+  @RequirePermission(PERMISSIONS.marketingWrite)
   update(@Param("id") id: string, @Body() dto: UpsertCouponDto) {
     return this.marketing.updateCoupon(id, {
       code: dto.code,
@@ -129,12 +132,14 @@ export class AdminCouponsController {
 
   /** 启停切换。停用不影响已核销订单 */
   @Patch(":id/toggle")
+  @RequirePermission(PERMISSIONS.marketingWrite)
   toggle(@Param("id") id: string) {
     return this.marketing.disableCoupon(id);
   }
 
   /** 只允许删除没有关联订单的券；有订单时改为停用 */
   @Delete(":id")
+  @RequirePermission(PERMISSIONS.marketingWrite)
   remove(@Param("id") id: string) {
     return this.marketing.deleteCoupon(id);
   }
@@ -144,7 +149,7 @@ export class AdminCouponsController {
  * 营销中心 · 限时活动 (B-65)。
  */
 @Controller("admin/campaigns")
-@RequirePermission(PERMISSIONS.marketingWrite)
+@RequirePermission(PERMISSIONS.marketingRead)
 export class AdminCampaignsController {
   constructor(private readonly marketing: MarketingService) {}
 
@@ -165,18 +170,20 @@ export class AdminCampaignsController {
    * 文件流直接写响应，不能走统一信封。
    */
   @Get("export")
-  @RequireAllPermissions(PERMISSIONS.marketingWrite, PERMISSIONS.dataExport)
+  @RequireAllPermissions(PERMISSIONS.marketingRead, PERMISSIONS.dataExport)
   async export(@Query() query: CampaignListQueryDto, @Res() res: Response) {
     const csv = await this.marketing.exportCampaigns(query);
     sendCsv(res, "campaigns", csv);
   }
 
   @Post()
+  @RequirePermission(PERMISSIONS.marketingWrite)
   create(@Body() dto: UpsertCampaignDto) {
     return this.marketing.createCampaign(this.campaignInput(dto));
   }
 
   @Patch(":id")
+  @RequirePermission(PERMISSIONS.marketingWrite)
   update(@Param("id") id: string, @Body() dto: UpsertCampaignDto) {
     return this.marketing.updateCampaign(id, this.campaignInput(dto));
   }
@@ -205,11 +212,13 @@ export class AdminCampaignsController {
   }
 
   @Patch(":id/toggle")
+  @RequirePermission(PERMISSIONS.marketingWrite)
   toggle(@Param("id") id: string) {
     return this.marketing.toggleCampaign(id);
   }
 
   @Delete(":id")
+  @RequirePermission(PERMISSIONS.marketingWrite)
   remove(@Param("id") id: string) {
     return this.marketing.deleteCampaign(id);
   }
@@ -225,7 +234,7 @@ export class AdminCampaignsController {
  * 与后台调整积分同性质, 走财务的权限点而非运营的营销权限点。
  */
 @Controller("admin/invites")
-@RequirePermission(PERMISSIONS.marketingWrite)
+@RequirePermission(PERMISSIONS.marketingRead)
 export class AdminInvitesController {
   constructor(private readonly marketing: MarketingService) {}
 
@@ -235,6 +244,7 @@ export class AdminInvitesController {
   }
 
   @Put("rules")
+  @RequirePermission(PERMISSIONS.marketingWrite)
   updateRules(@Body() dto: UpdateInviteRuleDto) {
     return this.marketing.updateInviteRule({
       inviterCredits: dto.inviterCredits,
@@ -267,7 +277,7 @@ export class AdminInvitesController {
 }
 
 @Controller("admin/checkin")
-@RequirePermission(PERMISSIONS.marketingWrite)
+@RequirePermission(PERMISSIONS.marketingRead)
 export class AdminCheckinController {
   constructor(private readonly marketing: MarketingService) {}
 
@@ -277,6 +287,7 @@ export class AdminCheckinController {
   }
 
   @Put("rules")
+  @RequirePermission(PERMISSIONS.marketingWrite)
   updateRules(@Body() dto: UpdateCheckinRuleDto) {
     return this.marketing.updateCheckinRule({
       baseCredits: dto.baseCredits,

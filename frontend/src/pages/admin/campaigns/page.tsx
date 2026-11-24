@@ -43,6 +43,7 @@ export function AdminCampaignsPage() {
   const toast = useToast();
   const { can } = useAdmin();
   const writable = can('marketing.write');
+  const readable = can('marketing.read');
 
   // 深链/刷新后保留筛选。初始值同时喂给 useAdminList, 首次请求即带筛选。
   const [searchParams] = useSearchParams();
@@ -268,16 +269,15 @@ export function AdminCampaignsPage() {
   };
 
   /*
-   * 后端把 marketing.write 声明在 controller 类上，列表 GET 同样要求该权限。
-   * 没有它的账号连列表都拉不到，不能渲染一个写着「仅可查看」却 403 的表格。
-   * 是否拆出 marketing.read 让财务/只读角色可查看，属权限模型决策，未在本批改动。
+   * 列表 GET 要求 marketing.read；没有它的账号连列表都拉不到，
+   * 不能渲染一个写着「仅可查看」却 403 的表格。
    */
-  if (!writable) {
+  if (!readable) {
     return (
       <AdminPage title="限时活动" description="限时价 / 限时免费 / 弹窗位。">
         <Panel title="活动列表">
           <Notice tone="warn" className="mb-0">
-            当前账号没有 marketing.write 权限，无法查看活动列表。如需只读访问，请联系管理员调整角色权限。
+            当前账号没有 marketing.read 权限，无法查看活动列表。如需只读访问，请联系管理员调整角色权限。
           </Notice>
         </Panel>
       </AdminPage>

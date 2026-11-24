@@ -93,7 +93,7 @@
 | 前台模型与分组 | `logical_model.read` / `logical_model.write` / `user_group.read` / `user_group.write` |
 | 插件 | `plugin.read` / `plugin.write` |
 | 账单与台账 | `billing_order.read` / `billing_order.resolve` / `model.call_read` / `model.analytics_read` |
-| 增长与服务 | `marketing.write` / `message.write` / `ticket.read` / `ticket.handle` |
+| 增长与服务 | `marketing.read` / `marketing.write` / `message.write` / `ticket.read` / `ticket.handle` |
 | 系统 | `setting.read` / `setting.write` / `role.read` / `role.write` |
 | 数据工具 | `data.export` / `data.search` / `backup.read` / `backup.run` |
 

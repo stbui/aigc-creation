@@ -131,6 +131,8 @@ export const PERMISSIONS = {
   modelAnalyticsRead: "model.analytics_read",
 
   // 增长
+  /** 只读查看券 / 活动 / 邀请与签到流水。财务可只读对账，不能改规则 */
+  marketingRead: "marketing.read",
   marketingWrite: "marketing.write",
   messageWrite: "message.write",
   ticketHandle: "ticket.handle",
@@ -157,6 +159,26 @@ export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
 
 export function isKnownPermission(p: string): p is Permission {
   return (ALL_PERMISSIONS as string[]).includes(p);
+}
+
+/**
+ * 权限点隐含关系（单向）。
+ *
+ * 新增 `marketing.read` 后，历史角色数据里只有 `marketing.write`。若不做隐含，
+ * 升级瞬间运营会因为类级守卫从 write 改成 read 而失去营销页入口。
+ * 写权限本身就包含读的能力，这里只做扩展，不反向推导。
+ */
+export const PERMISSION_IMPLIES: Record<string, readonly string[]> = {
+  [PERMISSIONS.marketingWrite]: [PERMISSIONS.marketingRead],
+};
+
+/** 展开隐含权限并去重；读取与保存都走这一处，避免两端口径不一致 */
+export function expandImpliedPermissions(list: string[]): string[] {
+  const out = new Set(list);
+  for (const permission of list) {
+    for (const implied of PERMISSION_IMPLIES[permission] ?? []) out.add(implied);
+  }
+  return Array.from(out);
 }
 
 /**
@@ -199,6 +221,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.modelAnalyticsRead,
     // 只读排障：允许发起连通性测试（只探测，不写配置、不改健康状态）
     PERMISSIONS.channelTest,
+    PERMISSIONS.marketingRead,
     PERMISSIONS.marketingWrite,
     PERMISSIONS.messageWrite,
     PERMISSIONS.ticketRead,
@@ -234,6 +257,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.billingOrderRead,
     PERMISSIONS.billingOrderResolve,
     PERMISSIONS.modelAnalyticsRead,
+    PERMISSIONS.marketingRead,
     PERMISSIONS.ticketRead,
     PERMISSIONS.ticketHandle,
     PERMISSIONS.roleRead,

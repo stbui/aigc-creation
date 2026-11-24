@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import {
+  expandImpliedPermissions,
   isAdminRole,
   isKnownPermission,
   ROLE_PERMISSIONS,
@@ -24,12 +25,22 @@ export interface RolePermissionChange {
 /**
  * 后台角色的读取与判定。
  *
- * 每次判定都实时读库而非信任 JWT 载荷: JWT TTL 默认 7 天 (common/jwt.service.ts),
- * 只信 token 里的 role 会让「降权 / 禁用」在最多 7 天内不生效。
- * SQLite 本地单文件、后台接口低频, 查库开销可忽略, 换来的是权限即时正确。
+ * 身份 (role / status) 每次请求实时读库而非信任 JWT 载荷: JWT TTL 默认 7 天
+ * (common/jwt.service.ts), 只信 token 里的 role 会让「降权 / 禁用」在最多
+ * 7 天内不生效。
+ *
+ * 角色权限点单独做 30 秒缓存: 每个后台请求都会经过 PermissionGuard,
+ * 而角色权限几乎只在「角色页保存」时变化。缓存以短 TTL 兜底, 并在
+ * `updatePermissions` 成功后精确失效, 不必为一次权限校验多打一次库。
  */
 @Injectable()
 export class AdminRoleService {
+  private static readonly PERMISSION_CACHE_TTL_MS = 30_000;
+  private readonly permissionCache = new Map<
+    string,
+    { expiresAt: number; permissions: string[] }
+  >();
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -58,23 +69,22 @@ export class AdminRoleService {
    * 回写属于管理动作, 应由角色页显式保存时完成。
    */
   async getPermissions(role: string): Promise<string[]> {
+    const cached = this.permissionCache.get(role);
+    if (cached && cached.expiresAt > Date.now()) return cached.permissions;
+
     const record = await this.prisma.adminRole.findUnique({ where: { code: role } });
-    if (!record) return [];
-    return this.parsePermissions(record.permissions);
+    const permissions = record ? this.parsePermissions(record.permissions) : [];
+    this.permissionCache.set(role, {
+      expiresAt: Date.now() + AdminRoleService.PERMISSION_CACHE_TTL_MS,
+      permissions,
+    });
+    return permissions;
   }
 
-  /** 后台身份校验: 无后台角色或账号非 active 时抛错 */
-  assertAdminAccess(userId: string): Promise<void> {
-    return (async () => {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true, status: true },
-      });
-      if (!user) throw new AppError(40101, '未认证', 401);
-      if (user.status === 'disabled') throw new AppError(40302, '账号已被禁用', 403);
-      if (user.status === 'deleted') throw new AppError(40302, '账号已注销', 403);
-      if (!isAdminRole(user.role)) throw new AppError(40301, '需要管理员权限', 403);
-    })();
+  /** 角色权限变更后立即失效; 不传 role 时清空全部 (供脚本 / 测试使用) */
+  invalidatePermissions(role?: string): void {
+    if (role) this.permissionCache.delete(role);
+    else this.permissionCache.clear();
   }
 
   /**
@@ -106,7 +116,7 @@ export class AdminRoleService {
      * 若逐条 update，第二条失败会留下「页面显示保存失败，但部分权限已收紧」。
      * 读取也放进事务，确保返回的 before/after 对应同一次写入。
      */
-    return this.prisma.$transaction(async (tx) => {
+    const changes = await this.prisma.$transaction(async (tx) => {
       const records = await tx.adminRole.findMany({
         where: { code: { in: updates.map((update) => update.code) } },
       });
@@ -122,7 +132,9 @@ export class AdminRoleService {
       for (const update of updates) {
         const record = byCode.get(update.code)!;
         const before = this.parsePermissions(record.permissions);
-        const after = [...update.permissions];
+        // 保存时展开隐含权限：只授了 marketing.write 的角色也会落上 marketing.read，
+        // 下次读取不必再依赖隐含规则。
+        const after = expandImpliedPermissions([...update.permissions]);
         const beforeSet = new Set(before);
         const afterSet = new Set(after);
         const change: RolePermissionChange = {
@@ -141,6 +153,10 @@ export class AdminRoleService {
       }
       return changes;
     });
+
+    // 写入口只有这一处; 保存成功后精确失效, 不必等 TTL
+    for (const change of changes) this.invalidatePermissions(change.code);
+    return changes;
   }
 
   /** 库里是 JSON 字符串；损坏或旧权限点一律按无权处理。 */
@@ -152,7 +168,10 @@ export class AdminRoleService {
       return [];
     }
     if (!Array.isArray(list)) return [];
-    return list.filter((p): p is string => typeof p === 'string' && isKnownPermission(p));
+    const known = list.filter(
+      (p): p is string => typeof p === 'string' && isKnownPermission(p),
+    );
+    return expandImpliedPermissions(known);
   }
 
   /** 内置角色的默认权限 (供 seed 使用) */
