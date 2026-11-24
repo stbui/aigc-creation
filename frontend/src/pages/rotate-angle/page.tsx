@@ -13,12 +13,13 @@ import { useToolTask } from './hooks';
 import { resultTagOf, rotatePayload } from './utils';
 import { RotateAngleSettingsCard } from './RotateAngleSettingsCard';
 import { useApp } from '../../ui';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 
 /**
  * 旋转角度 —— 1:1 复刻参考站 https://ijihua.cn/rotate-angle。
  *
  * 实拍结构 (rotate-angle-page):
- *   上传卡: * 上传图片 (提示语 "支持 JPG、PNG、WebP，最多 1 张")
+ *   上传卡: * 上传图片 (提示语 "支持 {运行时格式}，最多 1 张")
  *   旋转角度卡 (rotate-angle-settings):
  *     卡头: h2 + 重置参数按钮 (rotate-ccw 16px)
  *     tabs (role=tablist): 主体(默认) / 摄像头
@@ -43,6 +44,7 @@ import { useApp } from '../../ui';
  */
 export function RotateAnglePage() {
   const { message } = useApp();
+  const { allowedLabel } = useUploadLimits();
   const { submitting, result, setResult, run } = useToolTask({
     capability: 'rotate',
     successMessage: '旋转结果已生成',
@@ -78,7 +80,7 @@ export function RotateAnglePage() {
         title: '上传图片',
         required: true,
         max: 1,
-        hint: '支持 JPG、PNG、WebP，最多 1 张',
+        hint: `支持 ${allowedLabel}，最多 1 张`,
         dropzoneClassName: PRODUCT_TOOL_DROPZONE,
       }}
       replaceUpload

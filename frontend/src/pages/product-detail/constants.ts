@@ -6,9 +6,8 @@
  * 目录内新增共享常量时在这里补一行 re-export。
  */
 
-/** 单张图片体积上限 (MB) 与字段长度, 全站上传校验共用 */
+/** 字段长度上限, 全站共用 */
 export {
-  MAX_IMAGE_MB,
   MAX_PRODUCT_DESCRIPTION_LEN as MAX_DESC_LEN,
   MAX_PRODUCT_NAME_LEN as MAX_NAME_LEN,
 } from '../../lib/constants';
