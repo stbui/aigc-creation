@@ -260,10 +260,13 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
           {currentGroup && currentItem && (
             <Breadcrumb data-testid="admin-breadcrumb" className="min-w-0">
               <BreadcrumbList className="flex-nowrap">
-                <BreadcrumbItem className="hidden shrink-0 md:block">
+                {/* 后台最低支持宽度 1280（docs/admin-ui-design.md §5.3）：
+                    `md:`（≥768）在支持区间内恒生效 ⇒ 不写断点，直接给终值。
+                    `BreadcrumbItem` 基类是 inline-flex，故显式 `block` 保像素不变。 */}
+                <BreadcrumbItem className="shrink-0 block">
                   <span className="text-muted-foreground">{currentGroup.name}</span>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbSeparator className="block" />
                 <BreadcrumbItem className="min-w-0">
                   <BreadcrumbPage className="truncate font-medium">
                     {currentItem.label}
