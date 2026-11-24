@@ -178,7 +178,7 @@ function check(name, ok, detail = '') {
   check('非法 status 被拒', badStatus.status === 400, badStatus.message);
 
   console.log('\n【路径穿越防护】');
-  const { assertSafeKey } = require('../dist/storage/storage.provider');
+  const { assertSafeKey } = require('../dist/storage/storage.utils');
   check('拒绝 .. 穿越', (() => { try { assertSafeKey('../../etc/passwd'); return false; } catch { return true; } })());
   check('拒绝绝对路径', (() => { try { assertSafeKey('/etc/passwd'); return false; } catch { return true; } })());
   check('拒绝反斜杠', (() => { try { assertSafeKey('a\\b'); return false; } catch { return true; } })());

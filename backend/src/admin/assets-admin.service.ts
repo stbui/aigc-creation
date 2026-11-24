@@ -6,7 +6,7 @@ import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { StorageService } from '../storage/storage.service';
 import { SignedUrlService } from '../common/signed-url.service';
 import { buildPage, paginate, type PageQueryInput, type PageResult } from './dto/page-query.dto';
-import type { StorageBackend } from '../storage/storage.provider';
+import type { StorageBackend } from '../storage/storage.contract';
 
 /** 素材列表查询入参（HTTP 层传 AssetListQueryInput，结构兼容） */
 export interface AssetListQueryInput extends PageQueryInput {

@@ -5,16 +5,11 @@ import { resolve } from 'path';
 import { AppError } from '../common/app.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import { SecretCipher } from '../model/infra/secret-cipher';
-import {
-  LocalStorageProvider,
-  OssStorageProvider,
-  MinioStorageProvider,
-  STORAGE_BACKENDS,
-  isSdkInstalled,
-  maskSecret,
-  type StorageBackend,
-  type StorageProvider,
-} from './storage.provider';
+import { STORAGE_BACKENDS, type StorageBackend, type StorageProvider } from './storage.contract';
+import { LocalStorageProvider } from './local-storage.provider';
+import { MinioStorageProvider } from './minio-storage.provider';
+import { OssStorageProvider } from './oss-storage.provider';
+import { isSdkInstalled, maskSecret } from './storage.utils';
 
 /** 可编辑的配置字段定义（与支付渠道 PaymentConfigField 同构，驱动后台表单）。 */
 export interface StorageConfigField {
@@ -72,7 +67,7 @@ export interface BackendStatus {
 }
 
 /**
- * 各后端的可编辑字段定义 —— 与 storage.provider 的构造参数逐项对齐。
+ * 各后端的可编辑字段定义 —— 与各 provider 的构造参数逐项对齐。
  * secret 字段永不回传明文，界面留空表示沿用旧值。
  *
  * 分组（group）只影响抽屉内的排版顺序：连接位置 → 读取出口 → 凭据 → 高级。

@@ -29,7 +29,7 @@
 import { promises as fsp } from 'fs';
 import { join, resolve } from 'path';
 import type { NextFunction, Request, Response } from 'express';
-import { assertSafeKey } from '../storage/storage.provider';
+import { assertSafeKey } from '../storage/storage.utils';
 import { renderThumbsFromBuffer, saveThumbCache, thumbCacheFile, type ThumbSpec } from './thumb-render';
 
 const MIN_SIZE = 32;

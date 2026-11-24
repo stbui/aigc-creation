@@ -9,7 +9,7 @@ import { runBatch } from "../common/batch";
 import { CSV_EXPORT_MAX_ROWS, toCsv } from "../common/csv";
 import { SignedUrlService } from "../common/signed-url.service";
 import { StorageService } from "../storage/storage.service";
-import type { StorageBackend } from "../storage/storage.provider";
+import type { StorageBackend } from "../storage/storage.contract";
 import { getCapability } from "../capabilities/capability.registry";
 import { MembershipService } from "../membership/membership.service";
 import { CreditService } from "../credits/credit.service";

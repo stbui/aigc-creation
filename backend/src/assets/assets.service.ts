@@ -7,7 +7,7 @@ import { StorageService } from '../storage/storage.service';
 import { resolveUploadsDir } from '../config/env-files';
 import { SignedUrlService } from '../common/signed-url.service';
 import { SettingsService } from '../common/settings.service';
-import type { StorageBackend } from '../storage/storage.provider';
+import type { StorageBackend } from '../storage/storage.contract';
 import { inspectUploadedImage, decodeVerifiedImage } from './image-validation';
 import { warmThumbnails } from './thumb-render';
 import { detachAssetFromTasks } from './task-output-links';

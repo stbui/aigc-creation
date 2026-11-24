@@ -24,7 +24,7 @@ import { TaskAdmissionService } from '../model/tasks/task-admission.service';
 import { TASK_ERROR, TaskLifecycleService } from '../model/tasks/task-lifecycle.service';
 import { TaskWorkerService } from '../model/tasks/task-worker.service';
 import { PrismaService } from '../prisma/prisma.service';
-import type { StorageBackend } from '../storage/storage.provider';
+import type { StorageBackend } from '../storage/storage.contract';
 import { StorageService } from '../storage/storage.service';
 import type { CreateGenerationInput } from './dto/create-generation.dto';
 

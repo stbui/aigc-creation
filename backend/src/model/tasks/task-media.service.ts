@@ -31,7 +31,7 @@ import {
 import { detectImageFormat } from '../media/image-format';
 import { multiFusionOutputDimensions } from '../../capabilities/definitions/multi_fusion';
 import { orderedOutputIds, taskOutputReferenceWhere } from '../../assets/task-output-links';
-import type { StorageBackend } from '../../storage/storage.provider';
+import type { StorageBackend } from '../../storage/storage.contract';
 import type { MediaReference } from '../protocol/runtime';
 
 /** 一条待落盘的产出（尚未套标识） */

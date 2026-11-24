@@ -4,7 +4,7 @@ import { StorageService } from '../storage/storage.service';
 import { AppError } from '../common/app.exception';
 import { TextToolService } from '../model/text/text-tool.service';
 import { detectImageFormat } from '../model/media/image-format';
-import type { StorageBackend } from '../storage/storage.provider';
+import type { StorageBackend } from '../storage/storage.contract';
 
 /**
  * 提示词工具服务 —— AI 润色 / 图片转提示词。

@@ -42,5 +42,6 @@
 ### 测试
 
 - `backend/src/storage/storage.service.spec.ts`：仅 DB 读取、拒绝环境变量、密钥留空沿用、加密落库、脱敏、必填校验、字段分组、Endpoint / 端口校验、前缀归一、key 前缀、审计信息、草稿测试不落库。
-- `backend/src/storage/storage.provider.spec.ts`：字节口径、只读 / 写探针、CDN 直读、STS 透传、自动建桶、失败诊断。
+- `backend/src/storage/oss-storage.provider.spec.ts` / `minio-storage.provider.spec.ts`：字节口径、只读 / 写探针、CDN 直读、STS 透传、自动建桶、失败诊断。
+- `backend/src/storage/storage.utils.spec.ts`：key 校验与凭据脱敏。
 - `backend/src/admin/storage.controller.spec.ts`：`status.editable`、`saveConfig` 审计透传、非法后端拒绝、草稿探测。

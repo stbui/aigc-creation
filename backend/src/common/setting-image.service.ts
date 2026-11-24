@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service';
-import {
-  assertSafeKey,
-  isStorageBackend,
-  type StorageBackend,
-} from '../storage/storage.provider';
+import { isStorageBackend, type StorageBackend } from '../storage/storage.contract';
+import { assertSafeKey } from '../storage/storage.utils';
 import { SignedUrlService } from './signed-url.service';
 
 const STORAGE_REF_PREFIX = 'storage://';

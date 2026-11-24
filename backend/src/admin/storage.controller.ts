@@ -3,7 +3,7 @@ import { RequirePermission, AdminUser, type AdminUser as AdminUserType } from '.
 import { AppError } from '../common/app.exception';
 import { StorageService, type StorageConfigValues } from '../storage/storage.service';
 import { PERMISSIONS } from './permissions';
-import { isStorageBackend, type StorageBackend } from '../storage/storage.provider';
+import { isStorageBackend, type StorageBackend } from '../storage/storage.contract';
 import { SaveStorageConfigDto, TestStorageDraftDto } from './dto/storage-admin.dto';
 
 /**

@@ -2405,7 +2405,7 @@ model TemplateItem {
 /// 每个后端一行；凭据字段随整个配置 JSON 一起加密落库，界面永不接触明文之外的传输。
 /// local 后端内建，不在此表存行。
 model StorageConfig {
-  /// 后端标识：oss | minio（白名单见 storage.provider.ts）
+  /// 后端标识：oss | minio（白名单见 storage.contract.ts）
   backend      String   @id
   /// 完整配置的密文 JSON（SecretCipher, enc:v1:...）；空串 = 未配置
   configCipher String   @default("")

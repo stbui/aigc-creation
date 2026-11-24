@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import type { StorageBackend } from '../storage/storage.provider';
+import type { StorageBackend } from '../storage/storage.contract';
 import { lockAndAssertActiveAdminMutable } from './last-admin.guard';
 
 /**

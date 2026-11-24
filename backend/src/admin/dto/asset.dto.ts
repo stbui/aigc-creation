@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-import { STORAGE_BACKENDS, type StorageBackend } from '../../storage/storage.provider';
+import { STORAGE_BACKENDS, type StorageBackend } from '../../storage/storage.contract';
 import { PageQueryDto } from './page-query.dto';
 
 /**

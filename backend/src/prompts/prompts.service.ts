@@ -9,7 +9,7 @@ import { parseSettingImageReference, SettingImageService } from '../common/setti
 import { SettingsService } from '../common/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import type { StorageBackend } from '../storage/storage.provider';
+import type { StorageBackend } from '../storage/storage.contract';
 import { PROMPT_IMAGES_MAX, type PromptModality } from './dto';
 
 /** 提示词列表查询入参（HTTP 层传 PromptListQueryInput，结构兼容） */
