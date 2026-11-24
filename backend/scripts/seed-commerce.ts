@@ -4,13 +4,13 @@
  * 幂等: 按 sku upsert, 重复执行只更新不重复插入。
  * 商品价格用**整数分** —— 与 PRD §5 口径一致, 浮点会产生分位误差。
  */
-import { PrismaClient } from '@prisma/client';
-import { NodeSQLiteDriverAdapterFactory } from '../dist/prisma/node-sqlite-adapter';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 // 库路径与后端服务同源 (按 NODE_ENV 读 DATABASE_URL), 否则 seed 会写错库
 const { resolveDbUrl } = require('./db-url');
 
 const prisma = new PrismaClient({
-  adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
 });
 
 interface Seed {

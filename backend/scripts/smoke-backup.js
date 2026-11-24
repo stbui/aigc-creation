@@ -150,10 +150,10 @@ function check(name, ok, detail = '') {
 
   console.log('\n【越权: operator 无 backup 权限】');
   const bcrypt = require('bcryptjs');
-  const { PrismaClient } = require('@prisma/client');
-  const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+  const { PrismaClient } = require('./prisma-client');
+  const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
   const { resolveDbUrl } = require('./db-url');
-  const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+  const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
   const email = `bk-op-${Date.now()}@test.com`;
   await prisma.user.create({
     data: { email, passwordHash: await bcrypt.hash('test123456', 10), name: '备份运营', role: 'operator' },

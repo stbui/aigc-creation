@@ -12,7 +12,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import type { BillingOrder, Prisma } from '@prisma/client';
+import type { BillingOrder, Prisma } from '../../generated/prisma/client';
 import { AppError } from '../../common/app.exception';
 import { CSV_EXPORT_MAX_ROWS, toCsv } from '../../common/csv';
 import { PrismaService } from '../../prisma/prisma.service';

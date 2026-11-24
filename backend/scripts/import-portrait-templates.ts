@@ -14,13 +14,13 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { PrismaClient } from '@prisma/client';
-import { NodeSQLiteDriverAdapterFactory } from '../dist/prisma/node-sqlite-adapter';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { PORTRAIT_TEMPLATE_IMPORT } from '../src/capabilities/definitions/portrait-templates.import';
 const { resolveDbUrl } = require('./db-url');
 
 const prisma = new PrismaClient({
-  adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
 });
 
 const PUBLIC_ROOT = path.resolve(__dirname, '../../frontend/public');

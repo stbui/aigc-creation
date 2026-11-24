@@ -1,8 +1,8 @@
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
-import { PrismaClient } from '@prisma/client';
-import { NodeSQLiteDriverAdapterFactory } from '../src/prisma/node-sqlite-adapter';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 const { resolveDbUrl } = require('./db-url');
-const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
 async function main() {
   for (const name of ['扣费验证渠道-1793433544477', 'probe-1793433752947']) {
     const ch = await prisma.modelChannel.findFirst({ where: { name } });

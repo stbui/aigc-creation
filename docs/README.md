@@ -90,7 +90,7 @@
 | [`backend-nestjs-conventions.md`](backend-nestjs-conventions.md) | 后端 NestJS 结构规范：模块分层、Controller / Service 边界、DTO、异常、鉴权、事务、日志与测试 |
 | [`accessibility.md`](accessibility.md) | 可访问性规范：键盘与焦点、语义结构、表单、图像与媒体、动态反馈、对比度、验证清单与已知缺口 |
 | [`security.md`](security.md) | 安全与权限规范：鉴权链、令牌与密钥、SSRF、上传、支付回调、注入、限流、日志脱敏与检查清单 |
-| [`database.md`](database.md) | 数据库规范：Prisma / SQLite 约束、命名、主键与时间、关系级联、索引、金额精度、状态、JSON、事务、迁移与种子 |
+| [`database.md`](database.md) | 数据库规范：Prisma 配置与生成器、命名、主键与时间、关系级联、索引、类型精度、Prisma Client 用法、Prisma Migrate、种子与备份 |
 | [`prompt-engineering.md`](prompt-engineering.md) | 生成提示词规范：buildPrompt / outputPlan、事实闭集、参数槽位、文本工具、协议边界、测试与已知缺口 |
 | [`observability.md`](observability.md) | 可观测性规范：日志、请求追踪、调用记录、指标、健康检查、告警、定时任务与排障路径 |
 | [`release.md`](release.md) | 发布与版本规范：版本号、发布单元、发布记录、兼容性、回滚、热修与 CI/CD 缺口 |

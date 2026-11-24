@@ -142,9 +142,9 @@ function waitPort(port, timeoutMs = 20000) {
 async function signedServer() {
   console.log(`\n【真实服务 · 端口 ${PORT}（带密钥实例）】`);
   loadEnvOnce();
-  const { PrismaClient } = require('@prisma/client');
-  const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
-  const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+  const { PrismaClient } = require('./prisma-client');
+  const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
+  const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
 
   const logFile = path.join(require('os').tmpdir(), `smoke-signed-${Date.now()}.log`);
   const fd = fs.openSync(logFile, 'w');

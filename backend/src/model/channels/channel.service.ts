@@ -10,7 +10,7 @@
  */
 
 import { HttpStatus, Injectable } from '@nestjs/common';
-import type { ModelChannel, Prisma } from '@prisma/client';
+import type { ModelChannel, Prisma } from '../../generated/prisma/client';
 import { AppError } from '../../common/app.exception';
 import { PrismaService } from '../../prisma/prisma.service';
 import { badRequest, uniqueNonEmpty } from '../domain/json';

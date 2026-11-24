@@ -12,8 +12,8 @@
  * 运行: npm run seed          (角色与权限点)
  *      npm run seed:admin     (管理员账号, 可重复运行)
  */
-import { PrismaClient } from '@prisma/client';
-import { NodeSQLiteDriverAdapterFactory } from '../src/prisma/node-sqlite-adapter';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 // 库路径与后端服务同源 (按 NODE_ENV 读 DATABASE_URL), 否则 seed 会写错库
 const { resolveDbUrl } = require('./db-url');
 import {
@@ -23,7 +23,7 @@ import {
 } from '../src/admin/permissions';
 
 const prisma = new PrismaClient({
-  adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
 });
 
 async function seedRoles(): Promise<void> {

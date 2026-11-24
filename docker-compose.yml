@@ -14,7 +14,7 @@
 #
 # 两档默认都占用宿主机 4100 / 5100，因此**不能同时运行**；确需并行时显式
 # 覆盖测试档的 BACKEND_TEST_HOST_PORT / FRONTEND_TEST_HOST_PORT（库/目录本就不同）。
-# 每次 up 先跑一次幂等的 Prisma db push；全新卷也能直接启动，而不是空库健康。
+# 每次 up 先跑一次幂等的 Prisma migrate deploy；全新卷也能直接启动，而不是空库健康。
 #
 # ⚠ 生产部署**不要**用这个文件。生产形态与生产注意事项见
 #   docs/environments.md「生产部署」一节；那份编排涉及 TLS、域名、

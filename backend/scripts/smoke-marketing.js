@@ -12,11 +12,11 @@
  * 运行: npm run smoke:marketing
  */
 const BASE = process.env.MARKETING_API_BASE || 'http://localhost:4100/api/v1';
-const { PrismaClient } = require('@prisma/client');
-const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+const { PrismaClient } = require('./prisma-client');
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl } = require('./db-url');
 const { clearCredits } = require('./credit-fixture');
-const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
 
 const DAY = 24 * 3600 * 1000;
 
@@ -54,7 +54,7 @@ async function db(fn, label = 'db') {
     try {
       return await fn();
     } catch (e) {
-      if (e?.code !== 'P2039' && !/database is locked/i.test(e?.message ?? '')) throw e;
+      if (!['P2039', 'P1008'].includes(e?.code) && !/database is locked/i.test(e?.message ?? '')) throw e;
       lastErr = e;
       await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
     }
@@ -531,8 +531,8 @@ async function seedPriorDays(userId, n) {
     check('连签天数回读为 1', st1.data?.streak === 1);
 
     // 唯一约束: 直接插同一天应被拒
-    // 判据放宽到「被拒」而不只看 P2002: 自研 sqlite adapter 的错误码映射
-    // 历史上曾漏掉约束分支(全落 P2039), 断言写死 P2002 会在映射回归时误报
+    // 判据放宽到「被拒」而不只看 P2002: 保留 SQLite 文案兜底，
+    // 避免 adapter / 版本差异导致错误码映射变化时误报
     const dupInsert = await db(() =>  prisma.checkinRecord.create({
       data: { userId: u.id, day: st1.data.today, credits: 999, streak: 99 },
     })).then(() => null).catch((e) => e);

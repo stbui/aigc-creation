@@ -9,7 +9,7 @@
  * 投影层不替它做选择。
  */
 
-import type { ChannelModel, ChannelModelPriceTier } from '@prisma/client';
+import type { ChannelModel, ChannelModelPriceTier } from '../../generated/prisma/client';
 import { decodeCapabilityConfig, type ModelCapabilityConfig } from '../domain/capability-config';
 import { decodeSkuSelector } from '../domain/selector';
 import { capabilitySpecFromModelCapabilityConfig } from '../intent/capability-spec';

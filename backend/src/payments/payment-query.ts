@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../generated/prisma/client';
 import { AppError } from '../common/app.exception';
 import { PAYMENT_PROVIDER_IDS, type PaymentProviderId } from './adapters/types';
 

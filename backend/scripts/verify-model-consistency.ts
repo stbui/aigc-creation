@@ -17,8 +17,8 @@
  */
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-import { PrismaClient } from '@prisma/client';
-import { NodeSQLiteDriverAdapterFactory } from '../src/prisma/node-sqlite-adapter';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import {
   applyChannelModelPriceTierSummary,
   canonicalSkuSelector,
@@ -30,7 +30,7 @@ import { decodeCapabilityConfig } from '../src/model/domain/capability-config';
 const { resolveDbUrl } = require('./db-url');
 
 const prisma = new PrismaClient({
-  adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
 });
 
 let pass = 0;

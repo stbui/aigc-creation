@@ -139,6 +139,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 npm run check
 npm run lint:ci
 npm run verify:conventions
+npm run verify:prisma
 
 # 后端
 cd backend
@@ -163,7 +164,9 @@ npx biome format --write <files>
 
 ## 6. 约定
 
-- 优先复用成熟依赖和现有组件；先查再写。后台文件按 `index / page / components / api / hooks / utils / constants` 分层，目录外只从入口文件取件。
+- **通用能力优先使用第三方优秀开源库，不重复造轮子**。解析、格式化、加密、签名、队列、文件、图像、日期、CSV 等先查成熟实现；优先选择维护活跃、许可证兼容、安全记录清晰、与当前 Node / CommonJS / 部署环境兼容的库。业务规则、计费、权限、审计与状态机仍在本仓库事实源内实现。
+- 只有在许可证或安全要求不满足、运行环境不兼容、维护成本明显更高，或现有库无法通过适配层表达业务语义时才自研；自研必须在技术评审中写明备选库、放弃原因、风险与回滚方式。
+- 后台文件按 `index / page / components / api / hooks / utils / constants` 分层，目录外只从入口文件取件。
 - 后端与前端 TS 配置刻意不同，不要统一：后端 CommonJS / ES2021，`strict` 与 `strictNullChecks` 为 false；前端 ESNext / bundler，`strict` 为 true。
 - 依赖精确锁定，不手工添加 `^` / `~`。安装依赖后运行 `npm run verify:deps:critical`。
 - 全站只有一套浅色主题。颜色、圆角、阴影与语义字号只引用 `frontend/src/styles/tokens.css` 的 token，不写裸 hex。
@@ -176,7 +179,7 @@ npx biome format --write <files>
 
 ## 7. 环境踩坑
 
-1. **Node ≥ 22.12**。SQLite 使用内置 `node:sqlite`；`@nestjs/config` 是纯 ESM 而项目为 CommonJS，依赖 Node 的 `require(esm)`。低于该版本会 `ERR_REQUIRE_ESM`。
+1. **Node ≥ 22.12**。SQLite 使用 Prisma 官方 `@prisma/adapter-better-sqlite3`；`@nestjs/config` 是纯 ESM 而项目为 CommonJS，依赖 Node 的 `require(esm)`。低于该版本会 `ERR_REQUIRE_ESM`。
 2. **不要用 `nest start`**。安全守卫会拒绝清空 `dist`；使用 `npm run build` + `node dist/main.js`。
 3. **端口固定后端 4100、前端 5100**。开发 / 测试 / 生产同端口；开发 / 测试启动时若占用则先停占用进程，不回退端口。
 4. **CORS 默认只放行 `http://localhost:5100`**。`localhost` 与 `127.0.0.1` 是不同来源；排障先看启动日志的 `CORS origins:`。`CORS_ORIGINS` 给定时覆盖默认规则，`CORS_ALLOW_PRIVATE_LAN=1` 供手机调试。

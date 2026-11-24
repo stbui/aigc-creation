@@ -27,7 +27,7 @@ import { randomBytes } from 'node:crypto';
 import { hostname } from 'node:os';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { GenerationTask, RouteAttempt } from '@prisma/client';
+import type { GenerationTask, RouteAttempt } from '../../generated/prisma/client';
 import { getCapability } from '../../capabilities/capability.registry';
 import { AppError } from '../../common/app.exception';
 import { CreditPriceService } from '../../credits/credit-price.service';

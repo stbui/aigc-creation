@@ -13,7 +13,8 @@
       "frontend/src/**/*.tsx",
       "agent/src/**/*.mjs",
       "scripts/**/*.mjs",
-      "extension/**/*.js"
+      "extension/**/*.js",
+      "!backend/src/generated/**"
     ]
   },
   "formatter": {

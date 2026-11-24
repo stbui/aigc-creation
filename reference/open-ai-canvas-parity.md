@@ -76,7 +76,7 @@
 | P2 | 前端 | 用户分组倍率上限 100%（1 倍），上游支持 0.0001–100（最高 100 倍） | 上游 `user-group-editor.tsx:136-137`；本仓 `AdminUserGroupsPage.tsx:197-201` | 无法配置溢价倍率 |
 | P2 | 前端 | 渠道/模型列表筛选不写 URL，未选中渠道不回退首条 | 上游 `channels-page.tsx`、`channel-workspace-state.ts:11`；本仓 `page.tsx:101-148` | 排障视图无法分享；首屏右侧空白 |
 | P2 | 插件 | 缺插件包 registry/SHA256/状态/下载/覆盖升级/不可用占位/用户级启停 | 上游 `protocol_plugins.go`、`handler/plugin.go`；本仓目录扫描 + DB 启停 | 无法核验运行包；升级需先卸载；排障信息少 |
-| P2 | 数据模型 | 无迁移版本账本与旧数据回填；部分索引缺失 | 上游 `database/migrations.go`；本仓 `prisma db push` | 携带旧数据升级时价格档 selector/线路外键/成本列不会自动补齐 |
+| P2 | 数据模型 | 历史数据回填缺等价脚本；部分索引缺失（迁移账本已于 2026-11-24 补齐 baseline + `migrate deploy`） | 上游 `database/migrations.go`；本仓 `prisma/migrations/` | 携带旧数据升级时价格档 selector/线路外键/成本列仍需一次性脚本补齐 |
 
 ### 0.4 有意差异（不应按缺陷计）
 
@@ -942,7 +942,7 @@
 | `kernel/error_codes.go` | `src/common/app.exception.ts` + `src/model/proxy/*` 字面量错误码 | ⚠️有意差异 | 上游 code 默认等于 HTTP 状态，需要细分时用 `status*100+n`、`42901` 限流（error_codes.go:5-24）；本仓全站是 5 位业务码（`AppError(code,message,status)`，app.exception.ts:3-9），中转发 `40001/40301/40401/42901/50201/50303`（system-proxy.service.ts:91-98,145,169,343）。语义等价、协议不兼容，属本仓 API 约定。 |
 | `model/models_channel.go`（凭证字段） | `prisma/schema.prisma` `ModelChannel/ChannelModel/ApiCallLog` | 🔀重构 | 凭证字段 `apiKey`/`secretKey`/`headersJson` 均在（schema.prisma:1507-1524）；上游只加密 `APIKey/SecretKey`（admin_channels.go:252-275），本仓额外把 `headersJson` 加密（channel.service.ts:689-716），更强。上游保留历史列 `PublicAlias`（models_channel.go:15-16），本仓无。上游 `ApiCallLog` 无 `ChannelModelID`，本仓新增并建索引（schema.prisma:1948-1950）；上游有 `CreatedAtEpoch`（SQLite 性能列），本仓无。详见 D 表。 |
 | `database/schema.go`（模型域） | `prisma/schema.prisma` | ⚠️有意差异（GORM→Prisma），含索引/唯一键缺口 | 表集合基本一致：ModelChannel/ChannelModel/ChannelModelPriceTier/LogicalModel(+Revision/Route/RouteAttempt)/UserGroup(+Channel)/BillingOrder/CreditAccount/CreditLedgerEntry/ApiCallLog 均有（schema.go:35-62 ↔ schema.prisma:1495-2017）。差异集中在索引、唯一约束与历史列，见 D 表。 |
-| `database/migrations.go` + `schema.go` 的数据迁移函数（模型域） | `prisma db push`（package.json:23-25），无 migrations 目录 | ⚠️有意差异 + 真实升级缺口 | 上游有版本账本、迁移锁与显式数据回填：`migrateChannelCreditCost`（migrations.go:432-456）、`migrateChannelModelProtocolLength`（:389-395）、`migrateSchemaV56` 回填 `api_call_logs.created_at_epoch`（:766-779）、`migrateChannelModelPriceTierSelectors`/`backfillChannelModelPriceTiers`/`migrateLogicalRoutesToChannelModels`（schema.go:156-171,239-333）。本仓以 `prisma db push` 同步最终结构，**没有等价的数据回填/重放保护**；携带旧数据的库升级时，价格档 selector、逻辑线路外键、成本列等不会自动补齐。 |
+| `database/migrations.go` + `schema.go` 的数据迁移函数（模型域） | `prisma/migrations/`（baseline + `migrate deploy`） | ⚠️有意差异 + 真实升级缺口 | 上游有版本账本、迁移锁与显式数据回填：`migrateChannelCreditCost`（migrations.go:432-456）、`migrateChannelModelProtocolLength`（:389-395）、`migrateSchemaV56` 回填 `api_call_logs.created_at_epoch`（:766-779）、`migrateChannelModelPriceTierSelectors`/`backfillChannelModelPriceTiers`/`migrateLogicalRoutesToChannelModels`（schema.go:156-171,239-333）。本仓自 2026-11-24 起有 Prisma Migrate 版本账本，但迁移只同步结构，**没有等价的数据回填**；携带旧数据的库升级时，价格档 selector、逻辑线路外键、成本列等仍需 `scripts/migrate-*.js` 一次性补齐。 |
 | 密钥加密：`app/settings.go`（`encryptSettingSecret`/`decryptSettingSecret`/`settingsEncryptionKey`）+ `app/admin_channels.go` + `app/auth_bridge.go` | `src/model/infra/secret-cipher.ts` + `channels/channel.service.ts` + `channels/channel-runtime.service.ts` | 🔀重构 | 算法一致：AES-256-GCM、`enc:v1:` 前缀、nonce||ciphertext||tag、无前缀视为历史明文（settings.go:361-413 ↔ secret-cipher.ts:35-63）。差异：上游 base64 RawStd（settings.go:382），本仓 base64url 无填充（secret-cipher.ts:44），能解上游密文、上游不能解本仓密文（跨语言不互通但本仓自洽）。密钥来源：上游固定 `<dataDir>/.settings-key` 且用 `os.Link` 原子发布 + 等待并发写入（settings.go:415-469）；本仓优先 `MODEL_SECRET_KEY`，否则写 `<uploads>/../data/.model-secret-key`（secret-cipher.ts:78-110），**并发首启没有原子发布/等待**：两个进程同时首启可能各生成一把钥匙并各自缓存，导致对方写的凭证解不开。 |
 | 微积分算术：`app/credit_policy.go:168-184`、`app/user_groups.go:347-383`、`kernel/token_billing.go:19-40`、`repository/finance_billing.go:506-516,704-737` | `src/model/infra/microcredits.ts` | ✅对齐（含少量增强） | `creditAmount = ceil(unit×qty×bps/10000)`（credit_policy.go:168-184 ↔ microcredits.ts:78-90）；`tokenAmount = ceil(Σtokens×price×bps/1e10)`（token_billing.go:19-40 ↔ :109-123）；货币换算 `ceil(price×rate/1e6)`（user_groups.go:347-362 ↔ :144-151）；倍率连乘逐级 ceil、下限 1、上限 1<<40（user_groups.go:365-383 ↔ :126-136）。结算口径也一致：输入 token 先减缓存再分别计价（finance_billing.go:704-737 ↔ billing.service.ts:831-841）。本仓额外提供 `toSafeNumber/formatCredits/parseCredits`（microcredits.ts:57-62,154-175）。唯一差异：上游对 int64 溢出显式报错，本仓用 BigInt 计算后再由 Prisma BigInt 落库兜底（microcredits.ts:56-62），错误信息更晚。 |
 
@@ -990,7 +990,7 @@
 
 ### 表 D · 数据模型差异（只列差异）
 
-> 上游为 GORM `AutoMigrate`，本仓为 Prisma `db push`（SQLite）；下列“索引差异”只影响查询性能/约束强度，不改变列语义。
+> 上游为 GORM `AutoMigrate`，本仓为 Prisma Migrate（SQLite，`prisma/migrations/`）；下列“索引差异”只影响查询性能/约束强度，不改变列语义。
 
 | 域 | 上游表/字段/索引 | Prisma 表/字段/索引 | 差异与影响 |
 |---|---|---|---|
@@ -1004,7 +1004,7 @@
 | 调用日志 | `api_call_logs`：`created_at_epoch`（SQLite 索引，models_channel.go:161）；索引 `trace_id`、`request_id`、`task_id`、`billing_order_id`、`source`、`capability`、`model+created`、`status+created`、`kind+status+created`、`error_code`、`billable`、`providerRequestId`（:107-162） | `ApiCallLog`（schema.prisma:1940-2017）：无 `createdAtEpoch`；索引 `[userId,createdAt]`、`[channelId,createdAt]`、`[channelModelId,createdAt]`、`[model,createdAt]`、`taskId`、`[status,createdAt]`、`[createdAt]`、`[requestKind,status,createdAt]` | **索引缺口**：`traceId`、`requestId`、`billingOrderId`、`errorCode`、`billable`、`source`、`capability`、`providerRequestId` 无索引；本仓多出 `channelModelId` 索引（C7）。上游的 `created_at_epoch` 是 SQLite 排序优化，本仓直接用 `createdAt`（可接受但大数据量分页更慢）。 |
 | 上游独有表 | `model_pricing`（美元口径上游成本，models_finance.go:123-137，`ApiCallLog.EstimatedCostMicros` 由它 enrich）；`id_sequence`（可读前缀 ID）；`logical_model_price_skus`（已定义未纳入 `Models()`，models_logical_model.go:84-105） | 无对应 | `model_pricing` 是上游历史成本估算表；本仓成本来自价格档 `cost*` 快照，`ApiCallLog.estimatedCost*` 三列保留但恒 0（schema.prisma:1979-1995 注释），属有意替代。`id_sequence` 被 `cuid()` 取代（ID 格式差异）。`logical_model_price_skus` 上游本身未启用，不算缺口。 |
 | 本仓独有表 | 无 `route_catalog_version`、`credit_lots`、`credit_reservation_items` 等（本仓 schema.prisma:411-487,1928-1936,2041-2047） | — | 目录版本、批次积分、支付对账等由本仓自建；不属于代理/出站安全缺口，但会影响“从上游数据库直接迁移”的可行性。 |
-| 迁移体系 | 版本账本 + 锁 + 逐版本数据回填（database/migrations.go:766-800+；schema.go:156-171） | `prisma db push`，无 migrations 目录 | 有意差异（无 MySQL 迁移体系）。真实风险：旧库升级没有等价回填脚本（价格档 selector、逻辑线路外键、`created_at_epoch`、成本列），只能重建/手工修数。 |
+| 迁移体系 | 版本账本 + 锁 + 逐版本数据回填（database/migrations.go:766-800+；schema.go:156-171） | Prisma Migrate（`prisma/migrations/`，2026-11-24 起 baseline + `migrate deploy`） | 有意差异（无 MySQL 迁移体系）。版本账本与锁已具备；真实风险仍是数据回填：旧库升级没有等价回填脚本（价格档 selector、逻辑线路外键、`created_at_epoch`、成本列），只能手工修数或另写迁移脚本。 |
 
 ---
 

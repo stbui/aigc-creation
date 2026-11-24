@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import type { PaymentExceptionCase, Prisma, Refund } from '@prisma/client';
+import type { PaymentExceptionCase, Prisma, Refund } from '../generated/prisma/client';
 import { AppError } from '../common/app.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentGateway } from './payment-gateway';

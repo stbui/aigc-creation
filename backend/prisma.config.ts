@@ -10,7 +10,7 @@ import { defineConfig } from 'prisma/config';
 //
 // ⚠ 本文件由 jiti 直接加载, **不经过 Nest**, 故拿不到 ConfigService。
 // 这里直接调用与 Nest 侧同一份 env-files 模块, 保证两边读到的档位逐字一致 ——
-// 若各写一套选择逻辑, 就会出现「Nest 连test.db、prisma db push 打dev.db」
+// 若各写一套选择逻辑, 就会出现「Nest 连test.db、prisma migrate deploy 打dev.db」
 // 这种最难查的库错位。
 import { loadEnvFiles } from './src/config/env-files';
 

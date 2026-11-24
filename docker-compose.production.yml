@@ -59,7 +59,7 @@ services:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
         NODE_IMAGE: ${NODE_IMAGE:-node:24-slim}
     image: ${HUOJUE_IMAGE_PREFIX:-}huojue-backend-tools:${HUOJUE_IMAGE_TAG:-production}
-    command: ["npx", "prisma", "db", "push"]
+    command: ["npx", "prisma", "migrate", "deploy"]
 
   backend:
     <<: *backend-base

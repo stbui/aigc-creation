@@ -20,7 +20,7 @@ function toMicrocredits(credits) {
 /**
  * 发放积分：建批次 + 加账户可用余额 + 写一条流水。
  *
- * @param {import('@prisma/client').PrismaClient} prisma
+ * @param {import('../src/generated/prisma/client').PrismaClient} prisma
  * @param {{ userId: string, credits: number, source?: string, type?: string, expireAt?: Date | null, reason?: string }} input
  */
 async function grantCredits(prisma, input) {
@@ -60,7 +60,7 @@ async function grantCredits(prisma, input) {
  *
  * 顺序不可颠倒：预留明细以批次为主键的一部分，账单是流水的业务来源。
  *
- * @param {import('@prisma/client').PrismaClient} prisma
+ * @param {import('../src/generated/prisma/client').PrismaClient} prisma
  * @param {string | { in: string[] }} userId 单个 id 或 `{ in: [...] }`
  */
 async function clearCredits(prisma, userId) {

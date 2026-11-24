@@ -20,12 +20,12 @@
 const { resolve } = require('path');
 const { readFileSync } = require('fs');
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
-const { PrismaClient } = require('@prisma/client');
-const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+const { PrismaClient } = require('./prisma-client');
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl, loadEnvOnce } = require('./db-url');
 const { clearCredits } = require('./credit-fixture');
 loadEnvOnce();
-const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
 
 const LOG_DIR = process.env.LOG_DIR || (process.env.NODE_ENV === 'test' ? 'logs/test' : 'logs');
 const OUTBOX_DIR = resolve(__dirname, '..', LOG_DIR, 'outbox');

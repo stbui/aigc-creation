@@ -10,8 +10,8 @@
 
 | 事项 | 当前仓库事实 | 画布所需 | 落点 |
 | --- | --- | --- | --- |
-| 主库 | `provider = "sqlite"`，自研 `node:sqlite` driver adapter | PostgreSQL 16，行锁 / advisory lock / `@db.Text` | `backend/prisma/schema.prisma`、`backend/src/prisma/prisma.service.ts` |
-| 迁移 | 无 `prisma/migrations/`，用 `db push` | `prisma migrate deploy` + baseline | `backend/prisma/migrations/**` |
+| 主库 | `provider = "sqlite"`，官方 `@prisma/adapter-better-sqlite3` driver adapter | PostgreSQL 16，行锁 / advisory lock / `@db.Text` | `backend/prisma/schema.prisma`、`backend/src/prisma/prisma.service.ts` |
+| 迁移 | baseline 已建立，SQLite 走 `prisma migrate deploy` | 切 Postgres 后重新生成 baseline，继续 `migrate deploy` | `backend/prisma/migrations/**` |
 | 事务锁 | SQLite 单写者，无 `FOR UPDATE` | `SELECT ... FOR UPDATE` 或 `pg_advisory_xact_lock` | `backend/src/canvas/infra/canvas.repository.ts` |
 | 实时 | 无 WS 依赖，无 Redis 依赖 | `ws` / `@nestjs/platform-ws` + Redis pub/sub | `backend/src/canvas/canvas-realtime.gateway.ts` |
 | 备份 | `VACUUM INTO` + SQLite 文件扫描 | `pg_dump --format=custom` + `pg_restore --list` | `backend/src/admin/backup.service.ts` |
@@ -31,7 +31,7 @@
 | 包 | 用途 | 备注 |
 | --- | --- | --- |
 | `pg` | PostgreSQL 驱动 | Prisma driver adapter 的底座 |
-| `@prisma/adapter-pg` | Prisma 7 PostgreSQL adapter | 替换 `node-sqlite-adapter.ts` |
+| `@prisma/adapter-pg` | Prisma 7 PostgreSQL adapter | 替换当前 SQLite adapter |
 | `ioredis` | Redis 客户端、pub/sub、Lua | 也可用官方 `redis`；本项目选 `ioredis` 是因为 `defineCommand` 与集群/重连语义更直接 |
 | `@nestjs/websockets` | Nest WS 生命周期 | 仅在采用 Nest Gateway 包装时需要；当前方案直接用原生 `ws`，可不装 |
 | `@nestjs/platform-ws` | 原生 `ws` 适配器 | 同上，可选；不引入 socket.io |
@@ -55,7 +55,7 @@
 ### 3.1 Prisma 切 PostgreSQL
 
 1. `backend/prisma/schema.prisma`：`datasource db { provider = "postgresql" }`；删除 SQLite 专属注释与 `@db.*` 之外的兼容说明。
-2. 删除 `backend/src/prisma/node-sqlite-adapter.ts`，`PrismaService` 改为：
+2. `PrismaService` 从 `PrismaBetterSqlite3` 改为：
 
 ```ts
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -66,7 +66,7 @@ super({
 ```
 
 3. `backend/prisma.config.ts` 的 `datasource.url` 改为 `process.env.DATABASE_URL`，不再有 `file:` 形态。
-4. 生成 baseline：
+4. 重新生成 baseline（现有 baseline 是 SQLite 的，不能直接用于 Postgres）：
 
 ```bash
 cd backend
@@ -74,7 +74,7 @@ npx prisma migrate dev --name baseline   # 仅首次，在空库上
 npx prisma migrate deploy                # 之后所有环境
 ```
 
-5. 现有 `db push` 流程全部改为 `migrate deploy`：`backend/Dockerfile`、`docker-compose.yml`、`docker-compose.production.yml`、`start.sh`、`scripts/db-reset*`。
+5. 迁移执行流程已在 SQLite 阶段完成：`backend/Dockerfile`、`docker-compose.yml`、`docker-compose.production.yml`、`start.sh`、`scripts/db-reset*` 统一走 `migrate deploy`；切 Postgres 时只替换连接与 baseline。
 
 **JSON 字段口径**：现有业务表的 JSON 都是 `String`，画布表继续用 `String @db.Text`，不引入 `Json` 类型。理由是：本仓的读写路径与迁移脚本都按字符串处理；混用 `Json` 会让 `Prisma.JsonValue` 与字符串解析在两套类型间来回转换。
 
@@ -178,7 +178,7 @@ redis:
     test: ["CMD", "redis-cli", "ping"]
 ```
 
-- `backend-migrate` 从 `prisma db push` 改为 `npx prisma migrate deploy`，`depends_on` postgres healthy。
+- `backend-migrate` 执行 `npx prisma migrate deploy`（SQLite 阶段已完成；切 Postgres 后命令不变），`depends_on` postgres healthy。
 - `frontend/vite.config.ts` 的 `/api` 代理加 `ws: true`。
 - `frontend/nginx.conf.template` 的 `/api/` 增加：
 

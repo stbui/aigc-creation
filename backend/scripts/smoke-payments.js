@@ -19,15 +19,15 @@
  *   · 后台动作使用脚本新建的 admin 夹具账号（不依赖 seed:admin 的一次性密码）。
  */
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
-const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+const { PrismaClient } = require('./prisma-client');
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { loadEnvOnce, resolveDbUrl } = require('./db-url');
 
 loadEnvOnce();
 
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
 const prisma = new PrismaClient({
-  adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
 });
 const RUN = `${Date.now()}`;
 

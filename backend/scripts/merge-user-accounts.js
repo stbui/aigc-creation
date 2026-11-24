@@ -21,8 +21,8 @@
  *   - 旧账号的登录令牌与扫码会话直接删除，不继承登录态。
  *   - 会员、订单幂等键、任务幂等键、签到日、被邀请关系存在冲突时拒绝执行。
  */
-const { PrismaClient } = require('@prisma/client');
-const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+const { PrismaClient } = require('./prisma-client');
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl, resolveDbPath } = require('./db-url');
 
 const args = process.argv.slice(2);
@@ -89,7 +89,7 @@ async function collectMoveCounts(db, ids) {
 
 async function main() {
   const prisma = new PrismaClient({
-    adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+    adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
   });
 
   try {

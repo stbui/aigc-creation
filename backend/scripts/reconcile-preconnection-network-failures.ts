@@ -19,8 +19,8 @@
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-import { PrismaClient } from '@prisma/client';
-import { NodeSQLiteDriverAdapterFactory } from '../src/prisma/node-sqlite-adapter';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { BillingService } from '../src/model/billing/billing.service';
 import { CreditWalletService } from '../src/model/billing/credit-wallet.service';
 import {
@@ -37,7 +37,7 @@ const TASK_FAILURE_MESSAGE = '建连前网络失败且无可用线路，积分�
 const MICROCREDITS_PER_CREDIT = 1_000_000n;
 
 const prisma = new PrismaClient({
-  adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
 });
 const billing = new BillingService(prisma as never, new CreditWalletService());
 

@@ -5,7 +5,7 @@ import { CreditService } from '../credits/credit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CatalogVersionService } from '../model/infra/catalog-version.service';
 import { UserGroupService } from '../model/user-groups/user-group.service';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../generated/prisma/client';
 
 /**
  * 会员体系 (落地页订阅卡兑现)。

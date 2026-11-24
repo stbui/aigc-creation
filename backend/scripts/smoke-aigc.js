@@ -204,9 +204,9 @@ async function offline() {
 
 async function api() {
   loadEnvOnce();
-  const { PrismaClient } = require('@prisma/client');
-  const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
-  const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+  const { PrismaClient } = require('./prisma-client');
+  const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
+  const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
   const { resolveUploadsDir } = require('../dist/config/env-files');
   const run = `${Date.now()}`;
   const email = `aigc-${run}@test.com`;

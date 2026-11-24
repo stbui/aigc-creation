@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { Prisma, Refund } from '@prisma/client';
+import type { Prisma, Refund } from '../generated/prisma/client';
 import { AppError } from '../common/app.exception';
 import { CreditService } from '../credits/credit.service';
 import { MembershipService } from '../membership/membership.service';

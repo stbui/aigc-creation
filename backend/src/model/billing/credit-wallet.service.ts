@@ -14,7 +14,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { AppError } from '../../common/app.exception';
 
 /** 钱包可用的数据库客户端：事务内外都可以，但调用方负责事务边界 */

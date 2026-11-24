@@ -10,7 +10,7 @@
  * 并发正确性靠唯一键与 `expectedIds` 比对。
  */
 
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
 
 /** 事务客户端（Prisma 交互式事务里的 tx） */

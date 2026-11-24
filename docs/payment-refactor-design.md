@@ -295,7 +295,7 @@ interface PaymentAdapter {
 
 ## 5. 数据模型（Prisma）
 
-> SQLite；不新增 enum，状态继续 `String` + service 白名单。新增字段一律可空或有默认值，`prisma db push` 可直接升级。
+> SQLite；不新增 enum，状态继续 `String` + service 白名单。新增字段一律可空或有默认值，可直接随一次 Prisma 迁移升级（当时为 `db push`，现已改为 `prisma migrate deploy`，见 §10.1）。
 
 ### 5.1 新增 `PaymentProviderConfig`
 
@@ -777,7 +777,7 @@ model PaymentReconciliationItem {
 
 ### 10.1 数据库
 
-- 使用 `prisma db push`（仓库现有流程），不写迁移脚本。
+- 结构变更走 Prisma Migrate：schema 改动后生成 `prisma/migrations/<ts>_<name>`，各环境 `prisma migrate deploy`。本方案初稿写于 `db push` 时期，2026-11-24 起仓库已建立 baseline 迁移，旧库按 [`docker-deployment.md`](docker-deployment.md) §4 标记基线后 deploy。
 - 新表与新增字段全部可空/有默认值；旧数据无需回填。
 - 旧 `ReconciliationBatch/Item` 保留只读，Phase 3 完成后标注 deprecated，下一轮再删除。
 - 旧 `Order.channel` 值保持 `sandbox / alipay / wechat`；不新增 `providerId`。
@@ -1881,7 +1881,7 @@ model PaymentReconciliationItem {
 
 ### 19.8 升级顺序与旧数据兼容
 
-本仓库以 `prisma db push` 管理 SQLite，不生成 migration 文件。上线按以下顺序，任一步失败都停在原地，不继续：
+本仓库以 Prisma Migrate 管理 SQLite（2026-11-24 起；此前为 `db push`）。上线按以下顺序，任一步失败都停在原地，不继续：
 
 ```bash
 # 1. 备份（生产必须先做；开发库也建议）
@@ -1891,8 +1891,9 @@ cp backend/dev.db "backend/backups/dev-$(date +%Y%m%d-%H%M%S).db"
 # 3. 校验 schema 可解析并生成 client
 cd backend && npx prisma validate && npm run prisma:generate
 
-# 4. 推送结构（只新增表/可空列/带默认值列，不应提示删列）
-npm run db:push:dev
+# 4. 应用迁移（只新增表/可空列/带默认值列；已应用的迁移不会重跑）
+npm run db:migrate:dev        # 开发库：生成并应用新迁移
+npm run db:migrate:deploy     # 测试 / 生产：只应用已有迁移
 
 # 5. 核对新增表与关键索引
 sqlite3 dev.db ".schema PaymentProviderConfig"
@@ -3387,7 +3388,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 2. 再接 `GET /orders` 与 `count`，用手工 fixture 对比列表 id 与 `paymentStatusOf`；此时不接导出。
 3. 详情投影单独实现，确认 `payments` 只取最近 50 条且不含 `rawPayload`。
 4. 最后接导出，复用同一 builder；补 10001 行截断测试与导出断言。
-5. 上线前跑 `PRAGMA index_list('Order')` 与 `EXPLAIN QUERY PLAN`，确认新索引真实生效；SQLite 不会因为 Prisma schema 写了索引就自动重建，必须实际执行 `db push`。
+5. 上线前跑 `PRAGMA index_list('Order')` 与 `EXPLAIN QUERY PLAN`，确认新索引真实生效；SQLite 不会因为 Prisma schema 写了索引就自动重建，必须实际应用迁移（`npm run db:migrate:deploy`）。
 
 ## 24. 页面复刻对照与偏差登记
 

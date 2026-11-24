@@ -61,7 +61,7 @@ Product (SKU) ──下单──> Order ──支付──> Payment ──回调
 
 - **FEFO**：先到期先扣，`expireAt` 为 `NULL` 视为最晚到期。
 - 跨批次扣减，余额不足**整体回滚**并报 `40002`（前端按 402 语义处理）。
-- 并发用条件更新 `updateMany({ where: { availableMicrocredits: { gte: amount } } })`，不引入行锁：自研 adapter 只支持 SERIALIZABLE，SQLite 本身单写者。
+- 并发用条件更新 `updateMany({ where: { availableMicrocredits: { gte: amount } } })`，不引入行锁：SQLite adapter 只支持 SERIALIZABLE，SQLite 本身单写者。
 - 每次变动写 `availableAfter` / `reservedAfter`，流水可独立还原任意时刻余额。
 - 人工增减**备注可选**（填写时落进流水 `note`，留空时写系统说明），落 `admin_adjust`。
 - 批量调整 / CSV 导入**必须带幂等键**，键内包含行号：同一批重试不会二次发放。

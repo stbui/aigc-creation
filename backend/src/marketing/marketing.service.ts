@@ -4,7 +4,7 @@ import { AppError } from '../common/app.exception';
 import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { CreditService } from '../credits/credit.service';
 import { MembershipService } from '../membership/membership.service';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { lockUserRow } from '../account/user-row-lock';
 import { getCapability } from '../capabilities/capability.registry';
 
@@ -2445,10 +2445,9 @@ function checksumOf(base: string): string {
 /**
  * 判断错误是否为唯一约束冲突。
  *
- * ⚠ **必须同时判 P2002 与底层 SQLite 错误**: 本项目用自研 node-sqlite driver
- * adapter, 它把驱动原始错误透传为 `P2039`(Prisma 的通用事务/执行失败码),
- * **不会**映射成 Prisma 官方的 `P2002`。只判 P2002 的话, 并发签到的分支
- * 永远走不到 —— 用户双击签到直接 500, 幂等形同虚设。
+ * ⚠ **必须同时判 P2002 与底层 SQLite 错误**: 官方 SQLite adapter 正常会
+ * 映射为 `P2002`，但保留底层文案兜底，避免 adapter / 版本差异把并发签到
+ * 变成 500，让幂等分支失效。
  *
  * 错误消息里 SQLite 的原文是 "UNIQUE constraint failed", 以此兜底。
  */

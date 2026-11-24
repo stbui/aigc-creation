@@ -3,19 +3,17 @@
 ARG NODE_IMAGE=node:24-slim
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 后端镜像（NestJS + node:sqlite）
+# 后端镜像（NestJS + Prisma SQLite）
 #
 # 为什么用 node:24-slim
 # ---------------------
-# 项目依赖 Node **内置**的 node:sqlite（自研 Prisma driver adapter
-# 见 src/prisma/node-sqlite-adapter.ts），Node >= 22.5 才有；
-# 本项目还要求 >= 22.12 以支持 @nestjs/config 的 require(esm)。
-# 选 24 是因为 22.x/23.x 的 node:sqlite 仍带实验性警告，24 起转正。
+# SQLite 使用 Prisma 官方 @prisma/adapter-better-sqlite3（底层 better-sqlite3）。
+# 本项目要求 Node >= 22.12，以支持 @nestjs/config 的 require(esm)。
 #
 # 为什么不用 alpine
 # ---------------
-# node:sqlite 是内置模块（不需编译），理论上 alpine 可用；但 alpine 的
-# musl 与部分 Prisma/Jimp 传递依赖的 prebuilt 二进制不兼容，
+# better-sqlite3 含原生二进制；alpine 的 musl 与 Prisma/Jimp 的
+# prebuilt 二进制不兼容，
 # 排查成本高于省下的几十 MB。本项目**部署优先于体积**，用 slim。
 #
 # 多阶段构建
@@ -80,7 +78,7 @@ COPY --chown=node:node plugins ./plugins
 
 USER node
 
-CMD ["npx", "prisma", "db", "push"]
+CMD ["npx", "prisma", "migrate", "deploy"]
 
 # ── 阶段 3: 运行时 ───────────────────────────────────────────────────────────
 FROM ${NODE_IMAGE} AS prod
@@ -103,8 +101,7 @@ RUN --mount=type=cache,target=/root/.npm \
       --fetch-retry-maxtimeout=20000 \
       --fetch-timeout=600000
 
-# Prisma client 产物在 build 阶段生成，拷过来即可（不含 CLI）
-COPY --chown=node:node --from=build /app/node_modules/.prisma ./node_modules/.prisma
+# Prisma client 源码在 build 阶段生成并编译进 dist；运行镜像只需 @prisma/client 运行时。
 COPY --chown=node:node --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY --chown=node:node --from=build /app/dist ./dist
 COPY --chown=node:node prisma ./prisma

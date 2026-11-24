@@ -305,8 +305,8 @@ production : .env.production.local  > .env.production
 
 ```bash
 cd backend
-npm run db:push:dev           # 建开发库表
-npm run db:push:test          # 建测试库表
+npm run db:migrate:dev        # 生成并应用迁移（开发库）
+npm run db:migrate:test       # 应用未执行迁移（测试库）
 npm run db:reset:test         # ★ 删库+删目录+重建+重灌种子（带安全门禁）
 npm run seed:test             # 只灌测试库种子
 npm run start:test            # NODE_ENV=test node dist/main.js
@@ -384,7 +384,7 @@ docker compose down -v       # 连数据卷一起删（库/上传图/备份/日�
 两档默认不能同时运行；确需并行时覆盖 `BACKEND_TEST_HOST_PORT` / `FRONTEND_TEST_HOST_PORT`。
 
 每次 `up` 会先运行一次 `backend-migrate` / `backend-migrate-test`
-（幂等的 `prisma db push`），成功退出后后端才启动；全新数据卷也能直接启动。
+（`prisma migrate deploy`），成功退出后后端才启动；全新数据卷也能直接启动。
 这两个一次性任务显示为 `Exited (0)` 属正常，不是崩溃。
 
 两个 profile 用**不同的具名卷**（`huojue-data` / `huojue-test-data`），

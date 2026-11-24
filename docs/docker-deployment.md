@@ -21,7 +21,8 @@
 
 契约：
 
-- `migrate` 先执行幂等的 `prisma db push`，成功退出后 `backend` 才启动。
+- `migrate` 先执行 `prisma migrate deploy`，成功退出后 `backend` 才启动。
+- 已有数据卷（此前由 `db push` 建表、没有 `_prisma_migrations`）首次升级前，先执行一次 `npx prisma migrate resolve --applied 20261124061501_baseline` 标记基线；全新卷直接 deploy。
 - 后端就绪探针请求 `/api/v1/health/ready`，会真实查询数据库；空库或库故障不算健康。
 - 前端通过 Docker 内置 DNS 动态解析后端，后端容器重建换 IP 后不需要重启 Nginx。
 - SQLite、上传图、备份、日志统一落在具名卷；容器重建不丢数据。
@@ -243,8 +244,8 @@ HUOJUE_IMAGE_TAG=2026-10-28-1 \
 curl -fsS http://127.0.0.1:5100/api/v1/health/ready
 ```
 
-回滚镜像只回滚应用代码，**不会回滚已经执行的表结构变更**。SQLite 使用
-`prisma db push`，项目没有自动 down migration；涉及不可逆结构变更时必须先备份，
+回滚镜像只回滚应用代码，**不会回滚已经执行的表结构变更**。结构变更由
+`prisma/migrations` 管理，项目没有自动 down migration；涉及不可逆结构变更时必须先备份，
 并在维护窗口内验证恢复路径。
 
 ## 6. 日常运维

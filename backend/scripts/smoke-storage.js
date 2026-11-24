@@ -14,11 +14,11 @@ if (!ADMIN_PASSWORD) {
   console.error('缺少 ADMIN_PASSWORD: production 环境请先 npm run seed:admin，再传入打印的一次性密码。');
   process.exit(1);
 }
-const { PrismaClient } = require('@prisma/client');
-const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+const { PrismaClient } = require('./prisma-client');
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl } = require('./db-url');
 const { ensureTestUser } = require('./lib/test-user');
-const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
 
 /**
  * 自建一个「有素材的 C 端账号」。

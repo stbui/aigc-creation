@@ -219,7 +219,7 @@ PostgreSQL + Prisma。所有表带 `ownerId`，所有查询必须带 `ownerId` �
 
 ### P0 基础设施迁移（20–35 人日）
 
-- Prisma provider 改为 `postgresql`，删除自研 `node-sqlite-adapter.ts`，接入 Prisma PostgreSQL adapter。
+- Prisma provider 改为 `postgresql`，把当前 SQLite adapter 替换为 Prisma PostgreSQL adapter，并同步改写备份/迁移脚本。
 - 建立 baseline migration，改用 `prisma migrate deploy`；更新 `scripts/db-url.js`、seed/smoke/reset 脚本。
 - 本地与生产 compose 增加 postgres / redis 服务、健康检查、持久卷。
 - 重写备份服务：`pg_dump --format=custom` + `pg_restore --list` 校验；Docker 镜像加入 postgresql-client。

@@ -90,7 +90,7 @@
 - 契约内容：方法、路径、鉴权、权限点、请求 / 响应信封、错误码、分页、幂等键、状态机
 - 冻结卡片与变更规则：`docs/api-contract.md` §5
 - 合并顺序：契约 → 数据 → 后端 → 前端 → 测试 → 文档 → 基础设施
-- 验证：`npm run verify:deps`、`npm run verify:conventions`、`npm run verify:env-sync`
+- 验证：`npm run verify:deps`、`npm run verify:conventions`、`npm run verify:env-sync`、`npm run verify:prisma`
 
 功能线不要直接改共享入口；需要时向集成线提交变更说明，由集成线串行合并。
 
@@ -99,7 +99,7 @@
 主责：Prisma schema、迁移、种子、测试库重置与库路径。
 
 - 可改：`backend/prisma/**`、`backend/scripts/migrate-*.js`、`backend/scripts/seed-*.ts`、`backend/scripts/reset-test-env.js`、`backend/scripts/db-url.js`
-- 规则：计费字段一律快照；`db push` 不可回滚；改 schema 同批更新 `docs/database.md` 与相关测试
+- 规则：计费字段一律快照；迁移无自动 down migration、不可回滚；改 schema 同批生成 `prisma/migrations` 并更新 `docs/database.md` 与相关测试
 - 验证：`cd backend && node -e "console.log(require('./scripts/db-url').resolveDbPath())"`；`NODE_ENV=test npm run db:reset:test`；`npm run prisma:generate`
 
 其他线不得直接改 `schema.prisma`。需要新字段时先由数据线落 schema 与迁移，再通知后端 / 前端消费。
@@ -177,7 +177,7 @@ npm ci                 # 根工具链
 npm run setup          # 四个包依赖 + Prisma Client
 npm run dev            # 开发档
 npm run dev:test       # 测试档
-npm run check          # 版本、依赖、约定、环境同步、lint、build、单测
+npm run check          # 版本、依赖、约定、Prisma schema、环境同步、lint、build、单测
 ```
 
 按线补充：
@@ -233,5 +233,5 @@ PR 描述按 `.github/pull_request_template.md`，不要另写一套。提交与
 - 后台页面直连 `admin-ui` 原子件、C 端页面直连后台组件，都会破坏组件边界。
 - 小于 12px 的字号、C 端 `StateError` 传 `detail`、四包版本不一致，都会被 `verify:conventions` 拦下。
 - 能力、插件、provider、后台菜单、壳内路由的数量写进 `CLAUDE.md` 后必须同批更新；脚本会按代码实际数量校验。
-- `db push` 不能靠 git 回滚；数据库结构变更必须先备份并在副本演练。
+- Prisma 迁移不能靠 git 回滚；数据库结构变更必须先备份并在副本演练。
 - 没有可用模型线路时，必须失败并退款；不要用占位图、假成功或本地生成补缺。

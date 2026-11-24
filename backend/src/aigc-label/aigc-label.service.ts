@@ -136,10 +136,10 @@ export class AigcLabelService {
         update: data,
       });
     } catch (e) {
-      // 最常见的原因是老库还没 `prisma db push`：把 Prisma 的原始报错翻译成可执行的提示
+      // 最常见的原因是老库还没执行 `prisma migrate deploy`：把 Prisma 的原始报错翻译成可执行的提示
       throw new AppError(
         50001,
-        `AIGC 标识配置写入失败（若为老库升级，请先执行 prisma db push）: ${(e as Error).message}`,
+        `AIGC 标识配置写入失败（若为老库升级，请先执行 prisma migrate deploy）: ${(e as Error).message}`,
         500,
       );
     }

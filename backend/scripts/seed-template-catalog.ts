@@ -7,10 +7,10 @@
  * **幂等且不覆盖后台修改**：分类/分组按 slug 查，模板按固定 id 查；
  * 已存在就跳过。后台改名、调序、停用后再次执行 seed 不会把它们冲掉。
  *
- * 运行: npm run seed:templates（需先执行 prisma db push 建表）
+ * 运行: npm run seed:templates（需先执行 prisma migrate deploy 建表）
  */
-import { PrismaClient } from '@prisma/client';
-import { NodeSQLiteDriverAdapterFactory } from '../dist/prisma/node-sqlite-adapter';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import {
   PORTRAIT_TEMPLATES,
   type PortraitTemplate,
@@ -18,7 +18,7 @@ import {
 const { resolveDbUrl } = require('./db-url');
 
 const prisma = new PrismaClient({
-  adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
 });
 
 const TAG_KEYWORDS = [

@@ -31,7 +31,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-only-secret-do-not-reus
 process.env.PAYMENT_NOTIFY_BASE = 'http://127.0.0.1:4100';
 
 let app: INestApplication;
-// Prisma 的真实类型由 @prisma/client 生成；集成测试里只用到少数方法，避免拉全量类型
+// Prisma 的真实类型由 src/generated/prisma 生成；集成测试里只用到少数方法，避免拉全量类型
 let prisma: any;
 let baseUrl = '';
 let userToken = '';

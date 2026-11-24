@@ -1,9 +1,14 @@
 // Prisma schema for huojue backend.
-// 说明: SQLite provider 不支持 Prisma enum 类型, 因此 capability / status / kind
-// 使用 String 存储, 取值范围在 DTO / service 层通过白名单强制约束。
+// 说明: capability / status / kind 一律用 String 存储, 取值范围由 DTO / service 层
+// 白名单强制约束。Prisma 7 虽允许在 SQLite schema 声明 enum, 但落库只有 TEXT、
+// 没有 CHECK, 数据库层仍不校验取值; 本仓统一用 String + 白名单。
 
 generator client {
-  provider = "prisma-client-js"
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "cjs"
+  generatedFileExtension = "ts"
+  importFileExtension    = ""
 }
 
 datasource db {
@@ -901,16 +906,16 @@ model GenerationTask {
   // 都不影响已建任务。能力 id 存 `capability`，模型分组存 `modelKey`。
   /// C 端所选模型分组键（`ChannelModel.modelGroupKey`，空则 modelKey）。
   /// 故障切换只更新 channelModelId / channelId，不改 modelKey。
-  modelKey String?
+  modelKey       String?
   /// 命中的渠道模型 id（`ChannelModel.id`）
   channelModelId String?
   /// 命中的渠道 id（`Channel.id`）
   channelId      String?
   /// 尝试轮次：用户手动重试 +1，故障切换不变
-  routeRun       Int    @default(1)
+  routeRun       Int     @default(1)
 
   /// 账单 id（`BillingOrder.id`）。故障切换会替换账单，故这里存**当前**账单。
-  billingOrderId    String?
+  billingOrderId String?
 
   /// 建任务时的客户端地址（`req.ip`，已规范化）。
   ///
@@ -1481,8 +1486,8 @@ model MessageTemplate {
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 
-  @@index([channel, enabled])
   @@unique([code, channel])
+  @@index([channel, enabled])
 }
 
 /// 能力上下线管控（后台可关停单项能力）。
@@ -1643,13 +1648,13 @@ model ModelChannel {
   proxyUrl         String @default("")
 
   /// 上游模型名清单（JSON 字符串数组），用于初始化渠道模型
-  modelsJson        String @default("[]")
+  modelsJson             String @default("[]")
   /// 已被模型家族吸收的上游 SKU（JSON 字符串数组），目录拉取时不再重复建行
-  retiredModelsJson String @default("[]")
+  retiredModelsJson      String @default("[]")
   /// 自定义请求头（密文 JSON，可能含鉴权值）
-  headersJson       String @default("")
+  headersJson            String @default("")
   /// 由哪个服务商目录一键接入；空 = 自定义渠道。仅用于来源展示
-  catalogProviderId String @default("")
+  catalogProviderId      String @default("")
   /// 供应商默认商品配置（JSON）：类型 / 接入方式 / 计费与售价。
   /// 新建商品与从上游同步时自动套用，免去逐条配置；空 = 不套用
   defaultModelConfigJson String @default("")
@@ -1809,10 +1814,10 @@ model RouteAttempt {
   routeRun      Int
   attemptNumber Int
 
-  capabilityId           String @default("")
-  modelKey               String @default("")
-  channelModelId         String @default("")
-  channelId              String @default("")
+  capabilityId   String @default("")
+  modelKey       String @default("")
+  channelModelId String @default("")
+  channelId      String @default("")
 
   /// 'selected' | 'dispatching' | 'succeeded' | 'failed'
   status            String @default("selected")
@@ -2119,17 +2124,17 @@ model ApiCallLog {
   /// worker 所在主机的地址 —— 后者永远是本机回环，排障时毫无信息量。
   ///
   /// 空串 = 未知（历史数据、脚本 / 定时任务触发）。不做回填猜测。
-  clientIp           String @default("")
+  clientIp      String @default("")
   /// 实际写出的请求体字节数（含 multipart 边界与内联媒体）。
   ///
   /// 与 `requestBody` 的长度**不是**一回事：报文预览在入库前被折叠内联媒体
   /// 并截断到 256K 字符，按它反推体积会系统性偏小。这里记的是真实发出的字节。
-  requestBytes       Int    @default(0)
+  requestBytes  Int    @default(0)
   /// 上游响应体字节数（流式响应记实际收到的字节）。
   ///
   /// 与 `responseBody` 的关系同上：预览会被截断，不能当体积用。0 = 未收到响应
   /// （建连前失败 / 超时前无数据），不从预览长度反推。
-  responseBytes      Int    @default(0)
+  responseBytes Int    @default(0)
 
   startedAt DateTime
   createdAt DateTime @default(now())

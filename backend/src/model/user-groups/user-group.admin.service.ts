@@ -14,7 +14,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client';
 import { AppError } from '../../common/app.exception';
 import { PrismaService } from '../../prisma/prisma.service';
 import { toSafeAmount, uniqueNonEmpty } from '../domain/json';

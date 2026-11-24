@@ -101,11 +101,11 @@ function check(name, ok, detail = '') {
   // 造一个 operator 账号, 让它尝试把别人提成 admin
   const opEmail = `smoke-op-${Date.now()}@test.com`;
   const bcrypt = require('bcryptjs');
-  const { PrismaClient } = require('@prisma/client');
-  const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+  const { PrismaClient } = require('./prisma-client');
+  const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl } = require('./db-url');
   const prisma = new PrismaClient({
-    adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+    adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
   });
   const hash = await bcrypt.hash('test123456', 10);
   const op = await prisma.user.create({
@@ -245,8 +245,8 @@ const { resolveDbUrl } = require('./db-url');
   check('新密码可登录', newLogin.status === 200 || newLogin.data?.accessToken !== undefined);
 
   // 清理
-  const { PrismaClient: P2 } = require('@prisma/client');
-  const { NodeSQLiteDriverAdapterFactory: F2 } = require('../dist/prisma/node-sqlite-adapter');
+  const { PrismaClient: P2 } = require('./prisma-client');
+  const { PrismaBetterSqlite3: F2 } = require('@prisma/adapter-better-sqlite3');
   const p2 = new P2({ adapter: new F2({ url: resolveDbUrl() }) });
   await p2.user.delete({ where: { email: opEmail } }).catch(() => {});
   await p2.$disconnect();

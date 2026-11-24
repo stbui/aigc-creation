@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Prisma 7 新生成器产物：构建 / 测试前由 prisma generate 生成，不入库
+src/generated/
 # 构建验证产物 (tsc --outDir dist-verify): 是构建快照, 不是任何脚本的输入
 dist-verify
 *.log

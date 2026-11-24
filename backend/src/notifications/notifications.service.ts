@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { MessageTemplate } from '@prisma/client';
+import type { MessageTemplate } from '../generated/prisma/client';
 import { EmailService } from '../channels/email/email.service';
 import { maskEmail } from '../channels/channel.types';
 import { PrismaService } from '../prisma/prisma.service';

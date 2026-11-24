@@ -12,7 +12,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 import { AppError } from '../common/app.exception';

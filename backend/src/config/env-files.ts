@@ -7,7 +7,7 @@
  *   1. Nest 应用 —— `config.module.ts` 交给 @nestjs/config 的 `envFilePath`
  *   2. Prisma CLI —— `prisma.config.ts` 由 jiti 加载，**不经过 Nest**
  * 两边必须给出**逐字一致**的文件顺序，否则会出现「Nest 连的是 test.db、
- * prisma db push 打的是 dev.db」这种最难查的错位。故抽成唯一事实源。
+ * prisma migrate deploy 打的是 dev.db」这种最难查的错位。故抽成唯一事实源。
  *
  * 分档规则（优先级从高到低）
  * -------------------------
@@ -160,8 +160,8 @@ export function resolveUploadsDir(
  * 只处理 `file:` 前缀（当前 provider 固定为 sqlite，无第二种形态）。
  * 其余前缀原样返回并交给上层报错 —— 静默拼一个错路径比报错更糟。
  *
- * 与 node-sqlite-adapter.ts 的 createClient 保持同一套语义：那边是
- * `url.replace(/^file:/, '')` 交给 node:sqlite 自行按 cwd 解析，
+ * 与 Prisma 官方 SQLite adapter 保持同一套语义：那边是
+ * `url.replace(/^file:/, '')` 交给 better-sqlite3 自行按 cwd 解析，
  * 这边需要绝对路径是因为备份服务要 `VACUUM INTO` 到备份目录。
  */
 export function sqliteUrlToPath(url: string, cwd: string): string {

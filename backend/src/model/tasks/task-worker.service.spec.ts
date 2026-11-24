@@ -1,4 +1,4 @@
-import type { GenerationTask, RouteAttempt } from '@prisma/client';
+import type { GenerationTask, RouteAttempt } from '../../generated/prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TaskWorkerService } from './task-worker.service';

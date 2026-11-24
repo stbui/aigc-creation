@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "../generated/prisma/client";
 import { AppError } from "../common/app.exception";
 import { CSV_EXPORT_MAX_ROWS, centsToYuan, toCsv } from "../common/csv";
 import { PrismaService } from "../prisma/prisma.service";

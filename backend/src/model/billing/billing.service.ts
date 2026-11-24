@@ -15,7 +15,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import type { BillingOrder, Prisma } from '@prisma/client';
+import type { BillingOrder, Prisma } from '../../generated/prisma/client';
 import { AppError } from '../../common/app.exception';
 import { PrismaService } from '../../prisma/prisma.service';
 import { estimateTextTokens, requestedBillingQuantity } from '../catalog/quote.service';

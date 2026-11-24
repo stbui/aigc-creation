@@ -1,5 +1,5 @@
 /**
- * 重置测试环境：删库 + 删上传目录 + 删备份目录，然后重建表与种子。
+ * 重置测试环境：删库 + 删上传目录 + 删备份目录，然后应用迁移与种子。
  *
  * ⚠ 安全门禁：只允许删**测试环境**的产物。
  *   脚本读 .env.test 解析出UPLOAD_DIR / BACKUP_DIR / DATABASE_URL，
@@ -92,8 +92,8 @@ function main() {
   rmIfExists(backupsDir, '备份目录');
   rmIfExists(logDir, '日志目录');
 
-  console.log('\n[rebuild] 重建表结构…');
-  execFileSync('npm', ['run', '--silent', 'prisma:push'], {
+  console.log('\n[rebuild] 应用迁移…');
+  execFileSync('npm', ['run', '--silent', 'db:migrate:deploy'], {
     cwd: BACKEND_ROOT,
     stdio: 'inherit',
     env: { ...process.env, NODE_ENV: TARGET_ENV },

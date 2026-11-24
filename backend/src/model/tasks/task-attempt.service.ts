@@ -17,7 +17,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { Prisma, RouteAttempt } from '@prisma/client';
+import type { Prisma, RouteAttempt } from '../../generated/prisma/client';
 import { safeRouteFailure } from './task-failure-policy';
 
 /** 尝试状态 */

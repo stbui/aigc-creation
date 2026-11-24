@@ -1,6 +1,6 @@
 # 发布与版本规范
 
-本文件规定**版本号、发布单元、发布记录与兼容性边界**。执行动作（备份、发布、回滚判定）以 [`development-workflow.md`](development-workflow.md) §2.13 为准，运维命令以 [`docker-deployment.md`](docker-deployment.md) §5 为准，数据库变更约束见 [`database.md`](database.md) §10。三处不重复描述同一件事。
+本文件规定**版本号、发布单元、发布记录与兼容性边界**。执行动作（备份、发布、回滚判定）以 [`development-workflow.md`](development-workflow.md) §2.13 为准，运维命令以 [`docker-deployment.md`](docker-deployment.md) §5 为准，数据库变更约束见 [`database.md`](database.md) §9。三处不重复描述同一件事。
 
 ## 1. 发布单元与版本号
 
@@ -38,7 +38,7 @@
 按 [`docker-deployment.md`](docker-deployment.md) §5：
 
 ```bash
-# 固定 tag 拉取并启动；migrate 先执行 prisma db push
+# 固定 tag 拉取并启动；migrate 先执行 prisma migrate deploy
 HUOJUE_IMAGE_TAG=<YYYY-MM-DD-N> \
   docker compose -f docker-compose.production.yml pull
 
@@ -65,7 +65,7 @@ HUOJUE_IMAGE_TAG=<YYYY-MM-DD-N> \
 ## 5. 兼容性边界
 
 - **API**：全局前缀 `/api/v1`，当前没有并行版本。破坏性接口变更必须评估客户端发布节奏，不能假设前后端同时上线。
-- **数据库**：`prisma db push` 直接改结构，**没有 down migration**；删列、改类型、收紧唯一约束属于不可逆变更，必须先备份、先回填、再切换。
+- **数据库**：结构变更由 Prisma Migrate 管理（`prisma/migrations`），**没有自动 down migration**；删列、改类型、收紧唯一约束属于不可逆变更，必须按 expand → migrate → contract 分批，先备份、先回填、再切换。
 - **环境变量**：新增必填变量必须先注入环境再发镜像；缺失时生产启动门禁会拒绝启动。
 - **前端与后端**：同 tag 构建、同 tag 部署；回滚时一起回滚，避免旧前端打新后端。
 - **模型与协议**：渠道模型 `protocol` 存 provider id；协议插件升级必须验证历史渠道模型仍能派发。
@@ -87,7 +87,7 @@ HUOJUE_IMAGE_TAG=<YYYY-MM-DD-N> \
 3. 数据库已变更且旧代码不兼容：停止写入，按备份恢复库，再回滚镜像；恢复属于停机操作，必须由运维执行并记录。
 4. 回滚后 24 小时内复盘，更新发布记录与告警。
 
-禁止：用 `git revert` 代替数据库恢复；在未备份时执行 `db push`；只回滚前端或后端一侧。
+禁止：用 `git revert` 代替数据库恢复；在未备份时执行不可逆迁移；只回滚前端或后端一侧。
 
 ## 7. 热修
 

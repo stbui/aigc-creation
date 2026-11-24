@@ -309,7 +309,7 @@ businessType: CreditBusinessType;
 
 | 层 | 文件 | 实际改动 |
 |---|---|---|
-| Schema | `prisma/schema.prisma` | `businessType String @default("")` + `@@index([userId, businessType])`；已执行 `prisma generate`，**未执行 `db push`**（数据库未变更） |
+| Schema | `prisma/schema.prisma` | `businessType String @default("")` + `@@index([userId, businessType])`；已执行 `prisma generate`，**当时未落库**（记录写于 `db push` 时期） |
 | 钱包 | `credit-wallet.service.ts` | `WalletEntryMeta.businessType`；`writeEntry` 落库；`expireLot` 固定 `credit_expire`；`settle` 的 refund / expire 流水**强制覆盖**为 `refund` / `credit_expire`（防止消费侧类型透传导致退标记成生图扣费） |
 | 服务 | `credit.service.ts` | 新增 `CREDIT_BUSINESS_TYPES`、`fallbackBusinessType`、`resolveBusinessType`；`grant`/`consume` 增加 `businessType` 入参并校验绑定与方向；`ledgerOf` 增加筛选与白名单；`projectEntry` 投影 + 兜底；`reclaimOrder` 记 `refund` |
 | 扣费 | `billing.service.ts` | 新增 `creativeBusinessTypeOf(modality)`；`settle`/`reserve` 的 meta 写入业务类型（image/video → `creative_image`，其余 → `other`） |
@@ -324,11 +324,11 @@ businessType: CreditBusinessType;
 1. **`LEDGER_LABEL.consume` 不改成「创意生图扣费」**（见 §3.2 R1 修正）。
 2. **历史流水不参与 `businessType` 筛选**：查询严格按落库值过滤，不按 `type` 反推。历史 `consume` 无法区分图片/视频与文本/音频，猜成生图会把代理计费算进去。历史行在「全部流水」中按兜底文案正常展示。
 3. **后台 UI 未改**（筛选器、列展示仍按动作类型），留第 2 批与 C 端第二个筛选一并做。
-4. **未执行 `db push`**：表结构尚未落到数据库，运行期还需 `npm run db:push:dev`（或对应环境）。
+4. **当时未落库**：表结构记录写于 `db push` 时期；2026-11-24 起由 Prisma Migrate 管理，该列已随 baseline 迁移落库，运行期只需 `npm run db:migrate:deploy`。
 
 **待办**
 
-- [ ] `db:push`（dev/test/prod 各自执行一次）
+- [ ] 数据库迁移：`npm run db:migrate:deploy`（dev/test/prod 各自执行一次；baseline 已在库中则跳过）
 - [ ] 门禁：`test:typecheck` → `vitest` → `build` → `smoke` → `route-baseline` → `e2e` → `mutation`
 - [ ] 第 2 批：C 端第二个筛选 `Select` + 后台展示同步
 - [ ] 第 3 批：新用户赠送发放点（100 积分 / 永久）

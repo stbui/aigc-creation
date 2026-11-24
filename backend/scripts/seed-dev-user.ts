@@ -17,10 +17,10 @@
  * 密码策略与 seed-admin.ts 一致：20 位随机、含大小写与数字、不含易混淆字符，
  * 明文只在本次运行输出一次，不写库、不落盘、不入前端。
  */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
-import { NodeSQLiteDriverAdapterFactory } from '../src/prisma/node-sqlite-adapter';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 // 库路径与后端服务同源 (按 NODE_ENV 读 DATABASE_URL), 否则 seed 会写错库
 const { resolveDbUrl } = require('./db-url');
 
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   }
 
   const prisma = new PrismaClient({
-    adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+    adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
   });
 
   try {

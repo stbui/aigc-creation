@@ -522,7 +522,7 @@ model: {
 | 期 | 内容 | 验收 |
 | --- | --- | --- |
 | P0 | 依赖与地基：microcredits、`CreditAccount/CreditLedgerEntry`、`outbound`（SSRF/代理/自定义头）、`secret-cipher`、插件包入库、协议 registry 骨架 | 单测：金额算术、SSRF、密文往返、110 个清单全部可解析 |
-| P1 | 渠道与模型数据层：全部新表、仓库、渠道 CRUD/复制/导入导出/排序、模型 CRUD/价格档/批量 | `prisma:push` 通过；后台渠道页完成一次完整配置；`verify` 脚本校验模型/价格档一致性 |
+| P1 | 渠道与模型数据层：全部新表、仓库、渠道 CRUD/复制/导入导出/排序、模型 CRUD/价格档/批量 | `db:migrate:dev` 通过；后台渠道页完成一次完整配置；`verify` 脚本校验模型/价格档一致性 |
 | P2 | 协议与执行：manifest 适配器、表达式 DSL、内置协议、测试调用、上游拉取 | 用真实密钥对至少 1 家 image + 1 家 video 完成连通性测试；`api-logs` 有记录 |
 | P3 ✅ 已交付 | 能力目录与路由：目录快照、意图匹配、选路、报价。落地 `src/model/{intent,routing,catalog,user-groups}`，公开 `/models`、`/models/available`、`/models/quote` 与后台 `POST /admin/capabilities/:id/simulate`；`/model-catalog*`（原始渠道模型目录）按 P5 与 C 端选型一起交付，避免半成品接口 | `npm run verify:route-catalog`：priority 分层与下沉、同层加权分布、SKU 选择（精确/通配/1.5K 相邻/停用档）、冷却三键、`simulate` 与 `resolve` 选中同一线路与价格档、目录投影的渠道可见性与换算顺序；后半段起 Nest 打真实 HTTP 校验四个端点的接线与守卫 |
 | P4 ✅ 已交付 | 任务与计费：准入改造、worker/租约/轮询、attempt 状态机、预留/结算/退款。落地 `src/model/billing/{billing,credit-wallet}.service`（含 `CreditLedgerEntry.lotId`）与 `src/model/tasks/*`（准入 / 执行 / 尝试 / 生命周期 / 轮询 / 并发槽） | `npm run verify:billing`：预留幂等、固定价结算、Token 差额退回 / 超预授权补扣 / 授权上限截断、按秒重算、失败退款幂等、已结算拒绝自动退款、`uncertain` 转人工、余额不足 `40002`，每步校验 `available == Σ remaining`。`npm run verify:task-runtime`：本机 HTTP mock 上游跑端到端——同步成功（产物落盘 + `settled` + 按目录价扣费）、401 切线（旧账单退回、新账单按新线路价结算、`task.creditCost` 同步）、轮询超时（`42206`、`uncertain`、**不切线**、上游零调用）、唯一线路 429（`42204`、全额退款、余额回正），并校验「可用余额 == Σ 批次剩余」 |

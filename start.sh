@@ -6,7 +6,7 @@
 #   1. 端口固定不变（4100 / 5100）：被占用时直接停掉占用进程，绝不回退到 4101/5101
 #   2. 前端必须落在后端 CORS 放行的来源上 → 显式覆盖 FRONTEND_PORT 时自动注入 CORS_ORIGINS
 #   3. 不能用 `nest start`（会触发安全守卫拒绝清空 dist）→ 只跑 node dist/main.js
-#   4. 首次运行自动建表 (prisma db push) 并 provision 演示账号 (seed，幂等)
+#   4. 首次运行自动应用 Prisma 迁移 (prisma migrate deploy) 并 provision 演示账号 (seed，幂等)
 #   5. Node 需 >= 22.12（node:sqlite + @nestjs/config 的 require(esm)）
 #
 # 三环境（2026-10-20 起）
@@ -374,10 +374,10 @@ c_ok "后端端口: $BACKEND_PORT"
 #   漏传就会用兜底的 dev.db —— 这正是「以为在测、实际改了开发库」的成因。
 if [ "$RUN_BACKEND" -eq 1 ] && [ "$SKIP_DB" -eq 0 ]; then
   step '初始化数据库（建表 + 账号 + 商品/会员/营销，幂等）'
-  # Prisma 7 的 db push 不再自动重新生成 client；schema 改动后不 generate，
+  # Prisma 7 的 migrate deploy 不会重新生成 client；schema 改动后不 generate，
   # 种子与构建都会按旧类型工作（表现为 nest build 报字段不存在）。先单独生成一次。
   ( cd "$BACKEND_DIR" && npm run --silent prisma:generate )
-  ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent prisma:push )
+  ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent db:migrate:deploy )
   # 只跑 seed 会得到一个「有账号但没有任何在售商品」的库：积分商城空、首页
   # 套餐空、会员买不到。购买链路的种子是 commerce/membership/marketing 三份。
   ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent seed \

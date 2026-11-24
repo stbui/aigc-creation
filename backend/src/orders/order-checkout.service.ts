@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../generated/prisma/client';
 import { AppError } from '../common/app.exception';
 import { SettingsService } from '../common/settings.service';
 import { MarketingService } from '../marketing/marketing.service';

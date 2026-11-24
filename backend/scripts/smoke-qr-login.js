@@ -11,8 +11,8 @@
  *   NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-qr-login.js
  */
 const { createHash } = require('node:crypto');
-const { PrismaClient } = require('@prisma/client');
-const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+const { PrismaClient } = require('./prisma-client');
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { loadEnvOnce, resolveDbUrl } = require('./db-url');
 
 /** 与服务端同口径的票据摘要, 用于断言/清理时定位会话行 */
@@ -27,7 +27,7 @@ const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, ''
  * 与 smoke-marketing.js 同一处理。报 SQLITE_BUSY 时语句未提交, 重试安全。
  */
 const base = new PrismaClient({
-  adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }),
+  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
 });
 const prisma = base.$extends({
   query: {
@@ -38,7 +38,7 @@ const prisma = base.$extends({
           try {
             return await query(args);
           } catch (e) {
-            if (e?.code !== 'P2039' && !/database is locked/i.test(e?.message ?? '')) throw e;
+            if (!['P2039', 'P1008'].includes(e?.code) && !/database is locked/i.test(e?.message ?? '')) throw e;
             lastErr = e;
             await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
           }

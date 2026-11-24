@@ -10,13 +10,13 @@
  * 用法（测试档, 禁止指向开发库）:
  *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-notifications.js
  */
-const { PrismaClient } = require('@prisma/client');
-const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
+const { PrismaClient } = require('./prisma-client');
+const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl } = require('./db-url');
 const { clearCredits } = require('./credit-fixture');
 
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
-const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
 
 let pass = 0;
 let fail = 0;
