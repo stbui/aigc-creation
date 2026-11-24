@@ -48,7 +48,7 @@
 | 模块 | 至少 1 个，最多 10 个；页面默认选择前 6 个 |
 | 模块提示词（仅 API） | 选填；单模块最多 1000 字符。当前页面不提供编辑入口，也不发送该参数 |
 | 画面比例 | 由能力参数枚举约束 |
-| 画质 | `1k` / `2k` / `4k`；实际可选值还要受前台模型能力限制 |
+| 画质 | `1k` / `2k` / `4k`；实际可选值还要受所选商品的能力合同限制 |
 
 能力定义声明 `inputs: 1`、`maxInputs: 5`，与页面上限一致；页面还会读取所选模型 `capabilitySpec.inputs.image.max` 继续收窄，超限时展示原因并禁止提交。
 
@@ -199,7 +199,7 @@ Content-Type: application/json
 6. 解析会员权益，把 `maxConcurrent` 写入任务快照；提交阶段不因并发上限拒绝。
 7. 校验项目和素材归属。
 8. 校验遮罩、标注等能力特有输入。
-9. 校验所选前台模型存在、未归档、启用且支持当前能力。
+9. 校验所选模型分组存在、其商品启用且支持当前能力。
 10. 校验模型输入图片范围。
 11. 解析生成意图并解析路由；无可用线路时在扣费前失败。
 12. 解析后台覆盖价、线路价和限时免费活动。
@@ -251,10 +251,9 @@ Content-Type: application/json
 - `ownerId`
 - `capability`
 - `inputAssetIds`
-- `logicalModelId`
-- `logicalModelRevisionId`
-- `routeId`
+- `modelKey`
 - `channelModelId`
+- `channelId`
 - `routeRun`
 - 批次创建时间
 
@@ -456,7 +455,7 @@ GET /api/v1/tasks/page?capability=detail_image&limit=100&offset=0
 - 每次上游请求写入线路尝试和调用日志。
 - 调用日志与线路尝试必须保留失败阶段和归一失败码；建连前 errno 不允许被宽泛的
   `submission_unknown` 覆盖。
-- 任务快照固定 `logicalModelId`、`routeId` 和 `channelModelId`，下游不得静默替换。
+- 任务快照固定 `modelKey`、`channelModelId` 和 `channelId`，下游不得静默替换。
 - 仅在 `rejected_no_job`（明确未派发或上游明确拒绝）上切线；建连后异常不得作为切线依据。
 - `42206/uncertain` 只用于建连后可能已产生上游任务的情况；建连前网络失败必须自动换线或退款。
 - 产出图片必须通过 AIGC 标识；标识失败不得交付。
@@ -477,11 +476,11 @@ GET /api/v1/tasks/page?capability=detail_image&limit=100&offset=0
 9. 删除父任务必须连带删除子任务和输出文件。
 10. 前端不得自行推算最终扣费金额。
 
-## 14. 已修复的实现偏差
+## 14. 批次失败语义（易回退点）
 
-以下行为曾与部分注释或产品文案不一致，已在对应变更中修正，保留记录避免回退。
+以下行为容易被注释或文案带偏，修改链路时先核对。
 
-### 14.1 模块失败互不连坐（已修复）
+### 14.1 模块失败互不连坐
 
 `TaskLifecycleService.fail()` 只处理失败任务自己的账单，不再取消同批兄弟任务；
 只有后台显式终止 / 整批取消（`cancel()`）才会中止尚未结束的子任务并逐张处理账单。

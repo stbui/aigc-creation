@@ -210,7 +210,7 @@
 | 身份安全 | `AccountToken`（一次性令牌：重置密码等）/ `LoginLog` / `LoginSession`（扫码登录票据，**只存 SHA-256 哈希**，`confirmed → consumed` 一次性兑换）/ `OAuthIdentity`（第三方绑定：`provider` + `subject` 联合唯一，`lastLoginAt` 记录最近登录） |
 | 内容与合规 | `Notification` / `MessageTemplate` / `AigcLabelConfig`（单行 `id='default'`：`specJson` 样式 + `pngBase64` 浏览器渲染位图 + `specKey` 过期判定） |
 | 服务 | `Ticket`（`ticketNo @unique`，状态机见 `tickets.service.ts` 的 `TRANSITIONS`）/ `TicketReply` |
-| 模型层 | `ModelChannel` / `ChannelModel` / `ChannelModelPriceTier` / `LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute` / `RouteAttempt` / `UserGroup` / `UserGroupChannel` / `BillingOrder` / `ApiCallLog` / `CapabilityControl`（能力上下线，**无行 = 启用**） |
+| 模型层 | `ModelChannel` / `ChannelModel` / `ChannelModelPriceTier` / `CapabilityModelBinding` / `CapabilityPricing` / `RouteAttempt` / `UserGroup` / `UserGroupChannel` / `BillingOrder` / `ApiCallLog` / `CapabilityControl`（能力上下线，**无行 = 启用**） |
 | 运维 | `BackupRecord` / `CleanupLog` / `PluginPlatformState` / `UserPluginState` / `RouteCatalogVersion` |
 
 SQLite 不支持 Prisma enum，状态类字段一律 String + DTO 白名单。`Asset.kind` = `original` | `generated`；`Asset.outputOfTask` 是 1:1 反向关系。计费相关字段以快照为准（`GenerationTask.creditCost`、`OrderItem.priceCentsSnapshot` / `creditsSnapshot`），不按当前价重算。

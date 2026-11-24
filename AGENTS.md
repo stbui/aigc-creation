@@ -7,7 +7,7 @@
 1. 用户当轮指令。
 2. 本文件：跨线协作、目录归属、交接规则。
 3. `CLAUDE.md`：仓库不变量、单一事实源表、易腐化数量。
-4. `docs/development-workflow.md`：十三阶段流程、授权边界、Git 工作流。
+4. 开发流程四件套：`docs/development-workflow.md`（十三阶段流程）、`docs/agent-execution.md`（授权边界）、`docs/quality-gates.md`（闸口与证据）、`docs/git-workflow.md`（Git 工作流）。
 5. `docs/README.md` 指向的领域文档。
 
 文档分工（同一事实只维护一处）：
@@ -17,7 +17,10 @@
 | `README.md` | 对外产品介绍、能力概览、快速启动 |
 | 本文件 | 线路分工、文件归属、并行与交接 |
 | `CLAUDE.md` | 仓库不变量、单一事实源、易腐化数量、环境踩坑 |
-| `docs/development-workflow.md` | 阶段执行卡、闸口、证据标准、Git 工作流 |
+| `docs/development-workflow.md` | 13 阶段执行卡与裁剪规则 |
+| `docs/agent-execution.md` | 指令映射、默认禁令、自主边界 |
+| `docs/quality-gates.md` | 闸口矩阵、证据标准、完成定义 |
+| `docs/git-workflow.md` | 分支、提交、PR、回滚 |
 | `docs/README.md` | 文档索引、命名与放置规则 |
 
 - 实现与现行文档冲突时，以代码为准，并在本次改动范围内同步文档。
@@ -35,7 +38,7 @@
 | 浏览器扩展 | Chrome MV3 | `extension/` |
 | 基础设施 | Docker Compose + CI | `start.sh`、`docker-compose*.yml`、`.github/workflows/` |
 
-目录级细则：`backend/AGENTS.md`、`frontend/AGENTS.md`、`test/AGENTS.md`。它们只补充各自目录，跨线规则仍以本文件为准。
+目录级细则：`backend/AGENTS.md`、`frontend/AGENTS.md`、`mock-model-gateway/AGENTS.md`。它们只补充各自目录，跨线规则仍以本文件为准。
 
 先读 `CLAUDE.md` 的「单一事实源」表，再按任务域读 `docs/README.md` 指向的文档。不要从记忆里猜路径、数量或状态名。
 

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-本文件是仓库的常驻作业上下文，Claude Code 会自动读取，Codex / Cursor 等经根 `AGENTS.md` 指向阅读。只保留**坐标、硬约束、踩坑**；跨线分工见 `AGENTS.md`，阶段流程见 `docs/development-workflow.md`，文档索引见 `docs/README.md`。
+本文件是仓库的常驻作业上下文，Claude Code 会自动读取，Codex / Cursor 等经根 `AGENTS.md` 指向阅读。只保留**坐标、硬约束、踩坑**；跨线分工见 `AGENTS.md`，阶段流程见 `docs/development-workflow.md`，执行边界、闸口与 Git 分别见 `docs/agent-execution.md`、`docs/quality-gates.md`、`docs/git-workflow.md`，文档索引见 `docs/README.md`。
 
 ## 0. 仓库不变量
 
@@ -17,7 +17,7 @@
 | 内容 | 唯一事实源 |
 | --- | --- |
 | 能力清单 / 字段 / 默认积分价 | `backend/src/capabilities/definitions/<id>.ts`，由同目录 `index.ts` 聚合 |
-| 运行期生效积分价 | `CreditPriceService.resolve()`；业务代码不直接读 `creditCost` |
+| 运行期生效积分价 | `CapabilityPricing`（后台「能力与模型 → 售价」）；运行时经 `CapabilityCatalogService` 快照读取，业务代码不直接读 `creditCost` |
 | 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`；Provider 目录见 `src/model/plugins/provider-catalog.service.ts` |
 | 渠道 / 能力绑定 / 能力售价 | 数据库与后台配置；代码里没有默认线路表 |
 | 权限点 | `backend/src/admin/permissions.ts` |
@@ -122,7 +122,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 | 新增后台页面 | `permissions.ts` → controller 权限 → `adminNav.ts` → `pages/admin/<域>` → 路由 → `lib/api.ts` | 后端再次校验动作权限 |
 | 新增后台 UI 组件 | 查 `components/ui` → `shadcn add` → `post-shadcn.mjs` → 需要时落入 `radar/*` | 页面只从 radar 取件 |
 | 新增环境变量 | `ENV_SPECS`、`backend/.env.example`、三档 env | 影响库路径时同步 `scripts/db-url.js`；跑环境探针 |
-| 调整积分价 / 退款规则 | 能力定义 `creditCost` / `common/setting-defs.ts` | 运行时走 `resolve()` 与设置读取 |
+| 调整积分价 / 退款规则 | 能力售价 `CapabilityPricing`（初始值来自能力定义 `creditCost`）/ `common/setting-defs.ts` | 后台「能力与模型 → 售价」写入；退款规则走设置读取 |
 | 新增前端功能目录 | `pages/<域>/` 分层入口 | `docs/frontend-module-conventions.md` 与模块导入测试 |
 
 ## 5. 命令
@@ -197,13 +197,13 @@ npx biome format --write <files>
 - 用户明确说“跑 / 验证 / 检查”后才执行相应的 build、tsc 或 test；未授权时不自作主张跑闸口。
 - 获授权后，先让目标用例或复现步骤呈红，再做最小修复，最后提供真实命令与输出证据；不以 checklist 自评替代运行结果。
 - “改”只修复当前问题，“继续”只推进下一批；不借单字指令扩大改动范围。
-- 不主动 commit、push 或 tag。用户明确要求才提交；提交信息与分支规则见 `docs/development-workflow.md`。
+- 不主动 commit、push 或 tag。用户明确要求才提交；提交信息与分支规则见 `docs/git-workflow.md`。
 - 用户保留现有未提交改动。只修改任务相关文件，不清理或覆盖无关 diff。
 - 交付使用中文、结论优先、精炼结构化；引用 `file:line` 与校验结果，不使用 emoji。
 
 ## 9. 文档指针
 
-- Agent 协作入口：根 `AGENTS.md`（分工与交接）、`docs/development-workflow.md`（阶段与闸口）、`docs/README.md`（索引）。
+- Agent 协作入口：根 `AGENTS.md`（分工与交接）、开发流程四件套（`docs/development-workflow.md` / `agent-execution.md` / `quality-gates.md` / `git-workflow.md`）、`docs/README.md`（索引）。
 - 需求与产品边界：`docs/prd.md`、`docs/admin-prd.md`、`docs/admin-*-design.md`。
 - 环境、数据库、Docker 与部署：`docs/environments.md`、`docs/docker-deployment.md`。
 - 模型、选路、失败语义与计费：`docs/model-architecture.md`。
@@ -211,7 +211,10 @@ npx biome format --write <files>
 - 后台界面与页面规格：`docs/admin-ui-design.md`、`docs/admin-console-design.md`、`docs/admin-detailed-design.md`。
 - 商品、订单、支付、退款、积分与会员：`docs/commerce-design.md`。
 - 测试闸口、覆盖矩阵与已知缺口：`docs/testing.md`。
-- Agent 执行卡、证据标准与交人边界：`docs/development-workflow.md`。
+- Agent 执行卡与阶段裁剪：`docs/development-workflow.md`。
+- Agent 指令映射、禁令、自主边界与失败模式：`docs/agent-execution.md`。
+- 闸口命令、证据标准与完成定义：`docs/quality-gates.md`。
+- 分支、提交、PR、回滚与 git 权限边界：`docs/git-workflow.md`。
 - 后端 NestJS 结构、DTO、异常、鉴权与事务：`docs/backend-nestjs-conventions.md`。
 - 前端模块分层：`docs/frontend-module-conventions.md`。
 - 前端组件角色、Props 与状态契约：`docs/frontend-component-language.md`。

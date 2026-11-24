@@ -251,14 +251,18 @@ PaymentsService（编排）
 
 `/capabilities` 下发给用户看的价与实际扣费的价**必须是同一个数**，否则就是「后台显示已保存，用户仍按旧价扣费」。
 
+能力售价的唯一事实源是 `CapabilityPricing`（后台「能力与模型 → 售价」维护）。求值顺序：
+
 | 顺序 | 来源 | 生效条件 |
 | --- | --- | --- |
-| 1 | 限时免费活动（`campaign.type = limited_free`） | 活动期内，金额直接置 0 并记 `promotionId` |
-| 2 | 后台能力覆盖价 `SystemSetting['creditPrice.<capabilityId>']` | 仅 `fixed_request` + `unified` 价格策略 |
-| 3 | 线路价格档（`pricePolicy = channel`）/ 前台模型标量价（`unified`） | 兜底 |
-| 4 | `CapabilityPlugin.creditCost` | 仅在后台展示「代码默认值」用，不作扣费依据 |
+| 1 | 限时免费活动（`campaign.type = limited_free`） | 活动期内，金额直接置 0 并记 `promotionId`（`CreditPriceService.freeCampaignIdOf`） |
+| 2 | `CapabilityPricing`（能力售价：`billingMode` + 单价 / token 单价） | 该能力存在售价行 |
+| 3 | `CapabilityPlugin.creditCost` | 仅作代码默认值，并在首次绑定商品时回填 `CapabilityPricing` 的初始价；**不直接参与扣费** |
 
-按量计价（`per_second` / `token`）**不接受能力覆盖价** ——「一次多少钱」无法换算成每秒 / 每 token 单价；`channel` 策略同理，绕过渠道价会让渠道结算与账单脱钩。这两种情况后台改价页的 `source` 会显示 `registry`，运营据此判断改价不生效的原因。
+- 能力未配置售价（非 text 能力缺 `CapabilityPricing`）时报「当前能力尚未配置售价」，报价与建任务直接失败，不回落代码默认价扣费。
+- 不再读取 `SystemSetting['creditPrice.*']`：该键只在历史库里残留，写入与读取路径都已删除。
+- `billingMode` 取 `fixed_request` / `per_second` / `token`，都只认 `CapabilityPricing` 这一行。
+- 分组倍率（`UserGroup.ratioBasisPoints`）与货币换算叠加在售价之上；渠道价格档（`ChannelModelPriceTier`）只表达上游成本与毛利，不参与向用户的扣费。
 
 ## 11. 接口清单
 

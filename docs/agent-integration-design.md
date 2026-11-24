@@ -3,7 +3,7 @@
 > 版本：v2.1
 > 日期：2026-11-05
 > 状态：方案设计，未实施
-> 变更：补充前台模型选型与报价、`outputPlan` 多任务建模、步骤幂等、状态机边界；能力口径校正为 17 项（16 image + 1 video）
+> 变更：补充模型分组选型与报价、`outputPlan` 多任务建模、步骤幂等、状态机边界；能力口径校正为 17 项（16 image + 1 video）
 > 关联：`docs/agent-prd.md`、`docs/model-architecture.md`、`CLAUDE.md`
 
 ---
@@ -17,7 +17,7 @@
 1. **Agent 只做规划，不直接执行任意工具。** LLM 输出声明式计划，服务端校验后由 `StepExecutor` 调用既有服务。
 2. **能力清单仍以 `capabilities/definitions/<id>.ts` 为唯一事实源**（`capability.registry.ts` 只是聚合门面）。新能力自动进入 Agent 可规划范围，不维护第二份能力表。
 3. **生成必须复用 `GenerateService.createTask`。** 扣积分、建任务、路由、回落、退款、AIGC 标识、产出入库全部沿用现有链路。
-4. **LLM 走现有文本链路。** 不新增 LangChain、OpenAI SDK 或第二套模型客户端：规划调用走 `src/model/text` 的 `TextToolService`（直接遍历启用的 text 模态渠道模型，不经过前台模型与用户分组），每次调用写 `ApiCallLog`（`source='agent'`、`billable=false`）。现有 `TextToolService` 固定写 `source='tool'`，需扩展 `TextToolCall` 的可选 `source / agentRunId` 字段。
+4. **LLM 走现有文本链路。** 不新增 LangChain、OpenAI SDK 或第二套模型客户端：规划调用走 `src/model/text` 的 `TextToolService`（直接遍历启用的 text 模态渠道模型，不经过模型分组与用户分组），每次调用写 `ApiCallLog`（`source='agent'`、`billable=false`）。现有 `TextToolService` 固定写 `source='tool'`，需扩展 `TextToolCall` 的可选 `source / agentRunId` 字段。
 
 `agent/` 目录中的 Codex Web 是**本机研发工具**：它允许受控沙箱内的文件与命令操作，只有单进程内存会话和可选静态 Token，没有货觉账号、项目、积分、素材归属与审计体系。它可以作为交互与 SSE 的实现参考，但不应部署为面向用户的 Agent 服务。
 
@@ -53,8 +53,8 @@
 
 | 基础 | 现状 | 对 Agent 的价值 |
 | --- | --- | --- |
-| 能力注册表 | `backend/src/capabilities/capability.registry.ts` 聚合 17 项能力（16 image + 1 video），参数、提示词、模态、积分价均自包含 | 直接派生**能力**目录与校验规则；前台模型目录另由 `CatalogService` 提供 |
-| 前台模型目录 | `CatalogService.publicModels()` / `POST /models/available` / `POST /models/:id/quote`：按能力、意图、用户分组返回可承接的 `LogicalModel` 与报价 | Agent 必须从这里选 `logicalModelId` 并生成预估积分 |
+| 能力注册表 | `backend/src/capabilities/capability.registry.ts` 聚合 17 项能力（16 image + 1 video），参数、提示词、模态、积分价均自包含 | 直接派生**能力**目录与校验规则；模型分组目录另由 `CatalogService` 提供 |
+| 模型分组目录 | `CatalogService.publicGroups()` / `POST /models/available` / `POST /models/quote`：按能力、意图、用户分组返回可承接的模型分组与报价 | Agent 必须从这里选 `modelKey` 并生成预估积分 |
 | 文生文通道 | `src/model/text` 的 `TextToolService` 走 text 模态渠道模型（OpenAI 兼容 `chat/completions` 等协议），多候选依次尝试并写 `ApiCallLog` | 规划不需要新建 LLM 基础设施 |
 | 生成任务 | `GenerateService.createTask` 已统一校验、扣费、建任务、路由、回落、退款与入库 | Agent 不再造平行任务体系 |
 | 异步执行 | `GenerationTask` 有心跳、孤儿恢复、失败退款 | Agent 步骤可围绕任务状态做恢复 |
@@ -126,7 +126,7 @@ Agent 是**新增入口，不是替代入口**。现有工作台、工具页、�
 
 | 现有产品能力 | Agent P0 关系 | 说明 |
 | --- | --- | --- |
-| 17 项生成能力（`CAPABILITIES`） | **全部可进入 Agent 计划（需有可用前台模型）** | 能直接执行的走 `GenerateService`；需要画布精确输入的走 handoff；无线路的能力不进入规划 |
+| 17 项生成能力（`CAPABILITIES`） | **全部可进入 Agent 计划（需有可用模型分组）** | 能直接执行的走 `GenerateService`；需要画布精确输入的走 handoff；无线路的能力不进入规划 |
 | `local_redraw` 局部重绘 | 可直接规划；精确涂抹时 handoff | 无遮罩时可用声明中的 `region + prompt` 执行；需要遮罩时转交 `/local-redraw` 画布 |
 | `sku_image` 商品 SKU 图 | 可直接规划；精确框选时 handoff | 无框选时可用区域枚举执行；需要多区域框选时转交 `/product-sku` |
 | `image_to_video` 图生视频 | 可直接规划执行 | 与图片能力使用同一任务、积分、作品体系 |
@@ -181,7 +181,7 @@ Agent 的职责只有三件事：
 
 它不拥有新的模型通道、新的任务表或新的积分体系。这样即使 Agent 功能整体下线，原有工作台与工具页也不受影响。
 
-图中的两条前端路径最终都落到同一个 `GenerateService.createTask`：Agent 只是把自然语言翻译成任务，现有页面仍然直接提交任务。任何一边产生的 `GenerationTask`、`Asset`、积分流水，另一边都能看到并继续使用。**但 Agent 多了一层选型责任**：`CreateGenerationDto.logicalModelId` 是必填字段，Agent 必须在规划阶段从 `CatalogService` 的可用前台模型中选定，并在计划卡上如实展示；这项工作不能交给 LLM。
+图中的两条前端路径最终都落到同一个 `GenerateService.createTask`：Agent 只是把自然语言翻译成任务，现有页面仍然直接提交任务。任何一边产生的 `GenerationTask`、`Asset`、积分流水，另一边都能看到并继续使用。**但 Agent 多了一层选型责任**：`CreateGenerationDto.modelKey` 是必填字段，Agent 必须在规划阶段从 `CatalogService` 的可用模型分组中选定，并在计划卡上如实展示；这项工作不能交给 LLM。
 
 ---
 
@@ -196,7 +196,7 @@ Agent 的职责只有三件事：
 PlannerService
   ├─ 读取最近 N 条消息
   ├─ 读取 CatalogService 的可用能力目录（仅 effective='remote'）
-  ├─ 读取 CatalogService.publicModels(access, intent) 得到可承接的前台模型
+  ├─ 读取 CatalogService.publicGroups(access, capability, intent) 得到可承接的模型分组
   ├─ 调 TextToolService.generate({ operation: 'agent_plan', source: 'agent', ... })
   └─ 解析为 PlanDraft（LLM 只产出能力与参数，不选模型）
         │
@@ -206,7 +206,7 @@ PlanValidator
   │          仍不合法 → 返回 clarify / 降级手动模式
   ├─ 信息不足或有假设 → clarify
   ├─ 需要画布/框选等人工输入 → handoff
-  ├─ 为每步绑定 logicalModelId（服务端选定），并按 QuoteService 报价
+  ├─ 为每步绑定 modelKey（服务端选定），并按 QuoteService 报价
   └─ 可执行 → 冻结计划，落 AgentRun(status='awaiting_confirm')
 ```
 
@@ -242,7 +242,7 @@ type PlanDraft =
 interface PlanStep {
   ref: string;                    // s1 / s2，仅用于本计划内引用
   capability: string;             // 必须来自 CatalogService
-  logicalModelId: string;         // 服务端从可用前台模型中选定；LLM 不得填写
+  modelKey: string;         // 服务端从可用模型分组中选定；LLM 不得填写
   title: string;
   inputRefs: string[];            // asset:A1 / step:s1.output
   dependsOn: string[];            // 必须指向前序 step
@@ -263,8 +263,8 @@ interface StyleLockDraft {
 - 每步只能引用已选素材或更早步骤的产出。
 - 参数只允许能力声明中非 `hidden` 的 key；`hidden` 字段由服务端按上下文代填。
 - 能力必须存在、非 `planned`、当前 `runtime.effective === 'remote'`。
-- `logicalModelId` 必须是 `CatalogService` 中可承接该能力与意图、且对当前用户分组可见的前台模型。
-- 输入素材数量必须满足 `CapabilityPlugin.inputs` 与所选前台模型的 `productSpec.inputs`。
+- `modelKey` 必须是 `CatalogService` 中可承接该能力与意图、且对当前用户分组可见的模型分组。
+- 输入素材数量必须满足 `CapabilityPlugin.inputs` 与所选模型分组的 `productSpec.inputs`。
 - 计划 JSON 最大 32 KB；超出直接判失败，不写入数据库。
 
 `kind='handoff'` 时只返回能力 id 与服务端校验过的 `prefill`，**不返回 URL**：路由由前端用现有 `toolPath()` 映射（该函数只存在于 `frontend/src/lib/capabilities.ts`，后端不复刻第二份路由表）；`prefill` 只包含非 `hidden` 参数且必须通过 `validateCapabilityParams`，素材仍以服务端解析后的归属为准。
@@ -306,7 +306,7 @@ running ──► step 1 running ──► succeeded ──► step 2 running ..
 每个步骤调用一次 `GenerateService.createTask(ownerId, dto)`：
 
 - `projectId` 来自会话，服务端再次校验归属且 `Project.deletedAt === null`。
-- `capability`、`logicalModelId`、`inputAssetIds`、`params` 已由 `PlanValidator` 规范化；`logicalModelId` 来自服务端选定的前台模型，不接受模型输出。
+- `capability`、`modelKey`、`inputAssetIds`、`params` 已由 `PlanValidator` 规范化；`modelKey` 来自服务端选定的模型分组，不接受模型输出。
 - 真实扣费、任务创建、模型路由、失败退款全部沿用既有实现。
 - **一步可能产生多个任务**：`detail_image` / `shoppable_carousel` 声明了 `outputPlan`，准入层会按返回值拆成 N 个 `GenerationTask`，各自建账单、共享 `batchId`。`AgentStep` 必须保存 `taskIds / batchId / outputAssetIds`，不能只保存单个 `taskId`。
 - 拿到 `taskIds` 后，Agent 通过 `GenerateService.getTask` 在服务端轮询，直到该批全部 `succeeded | failed | cancelled`。
@@ -383,9 +383,9 @@ interface AgentCapabilitySpec {
     max?: number;
     maxLength?: number;
   }>;
-  /** 可承接该能力的前台模型；由 CatalogService 按用户分组与意图过滤 */
+  /** 可承接该能力的模型分组；由 CatalogService 按用户分组与意图过滤 */
   models: Array<{
-    logicalModelId: string;
+    modelKey: string;
     name: string;
     priceLabel: string;
   }>;
@@ -397,10 +397,10 @@ interface AgentCapabilitySpec {
 - `mode='planned'` 不进入目录。
 - `runtime.effective !== 'remote'` 不进入目录（`disabled` 已下线，`unavailable` 没有可用线路）。只看 `runtime.enabled` 会把「没有配模型」的能力也放进来，提交时才 `40005`。
 - `param.hidden=true` 不进入模型可见的参数 schema；需要页面代填的技术参数由服务端从上下文补齐。
-- 预估积分**不使用** `CreditPriceService.resolve()` 的能力价：实际账单由 `BillingService.buildDraft` 按线路价/统一价叠分组倍率生成。必须用 `QuoteService.quoteLogicalModel(access, logicalModelId, intent)` 报价，并按 `outputPlan(params).length` 求和。
+- 预估积分**不使用** `CreditPriceService.resolve()` 的能力价：实际账单由 `BillingService.buildDraft` 按线路价/统一价叠分组倍率生成。必须用 `QuoteService.quoteCapability(access, capability, modelKey, intent)` 报价，并按 `outputPlan(params).length` 求和。
 - **不得因为存在 `hidden` 参数就把能力排除出目录。** 若缺少的 `hidden` 参数是可选/有安全默认值，正常规划；若它必须由用户交互产生，则生成 `handoff`，而不是静默删掉该能力。
 
-这样新增能力只需改 `definitions/`，Agent 的能力目录自动更新；但前台模型仍需在后台配置，否则该能力落到 `unavailable`，不会进入规划。能力下线后模型也无法再规划它。`local_redraw` 的遮罩、`sku_image` 的精确框选都按「可执行则执行，不可执行则 handoff」处理；handoff 的判定优先由服务端规则给出（如遮罩/框选缺失），模型只能建议，不能把本可执行的任务改成 handoff 来逃避执行。
+这样新增能力只需改 `definitions/`，Agent 的能力目录自动更新；但模型分组仍需在后台配置，否则该能力落到 `unavailable`，不会进入规划。能力下线后模型也无法再规划它。`local_redraw` 的遮罩、`sku_image` 的精确框选都按「可执行则执行，不可执行则 handoff」处理；handoff 的判定优先由服务端规则给出（如遮罩/框选缺失），模型只能建议，不能把本可执行的任务改成 handoff 来逃避执行。
 
 ### 6.2 素材引用不直接暴露真实 ID
 
@@ -425,11 +425,11 @@ LLM 只能引用 `asset:A1`。服务端再把符号解析为真实 `assetId`，�
 
 1. 能力存在、`mode !== 'planned'`、目录项 `effective === 'remote'`。
 2. 步骤引用无环，`dependsOn` 只能指向前序步骤。
-3. 为步骤选定 `logicalModelId`：从 `CatalogService.publicModels(access, intent)` 中选第一个可承接该能力与意图的模型；没有候选则整步判失败，不进入计划。
+3. 为步骤选定 `modelKey`：从 `CatalogService.publicGroups(access, capability, intent)` 中选第一个可承接该能力与意图的模型；没有候选则整步判失败，不进入计划。
 4. `inputRefs` 数量满足能力 `inputs` 与步骤 3 选定模型的输入约束，来源属于当前用户。
 5. 参数 key 属于能力声明，`hidden` 参数禁止模型填写（现有 `validateCapabilityParams` 不会拒绝 hidden key，这一步必须由 Agent 自己执行）。
 6. enum 值必须命中声明选项；number 收敛到 `min/max`；text 按 `maxLength` 截断。
-7. 用 `QuoteService.quoteLogicalModel(access, logicalModelId, intent)` 报价，再按 `outputPlan(params).length` 求和得到步骤预估；不接受模型给出的价格。
+7. 用 `QuoteService.quoteCapability(access, capability, modelKey, intent)` 报价，再按 `outputPlan(params).length` 求和得到步骤预估；不接受模型给出的价格。
 8. 尝试调用 `sanitizeParams` 做最后一层收敛，并比对是否有静默丢参。
 
 校验失败时允许一次「带错误原因重新规划」，避免一次 JSON 小错就整轮失败；第二次仍失败则返回澄清或降级手动模式。
@@ -550,7 +550,7 @@ Content-Type: application/json
 
 幂等键口径同 §8.3：走请求体 `idempotencyKey`，不依赖 `Idempotency-Key` 头。
 
-`stepOverrides` 只允许修改目录中非 `hidden` 的参数，以及把 `logicalModelId` 切换到 `CatalogService` 中可承接该步骤的其他前台模型；服务端必须重新执行完整 `PlanValidator`、重新选型并用 `QuoteService` 重算预估积分，再把覆盖后的计划写回 `AgentRun.plan`。不允许借覆盖绕过能力、素材、模型或积分校验。
+`stepOverrides` 只允许修改目录中非 `hidden` 的参数，以及把 `modelKey` 切换到 `CatalogService` 中可承接该步骤的其他模型分组；服务端必须重新执行完整 `PlanValidator`、重新选型并用 `QuoteService` 重算预估积分，再把覆盖后的计划写回 `AgentRun.plan`。不允许借覆盖绕过能力、素材、模型或积分校验。
 
 确认动作必须用条件更新抢占：
 
@@ -688,8 +688,8 @@ model AgentStep {
   ref             String
   title           String
   capability      String
-  /** 服务端选定的前台模型；不来自 LLM */
-  logicalModelId  String
+  /** 服务端选定的模型分组；不来自 LLM */
+  modelKey  String
   inputRefs       String   @default("[]") // JSON，计划阶段冻结：asset:A1 / step:s1.output
   inputAssetIds   String   @default("[]") // JSON，执行到该步时解析并回填的真实资产
   dependsOn       String   @default("[]") // JSON
@@ -739,7 +739,7 @@ model ApiCallLog {
 ### 10.1 用户计费
 
 - 规划阶段不收费、不创建任务。
-- 计划卡展示的 `estimateCredits` 必须与真实账单同源：对每步调用 `QuoteService.quoteLogicalModel(access, logicalModelId, intent)`，再按 `outputPlan(params).length` 求和。**不要**用 `CreditPriceService.resolve()` 的能力价或 `def.creditCost` 估算——实际账单由线路价/统一价叠用户分组倍率生成，两者默认不相等。
+- 计划卡展示的 `estimateCredits` 必须与真实账单同源：对每步调用 `QuoteService.quoteCapability(access, capability, modelKey, intent)`，再按 `outputPlan(params).length` 求和。**不要**用 `CreditPriceService.resolve()` 的能力价或 `def.creditCost` 估算——实际账单由线路价/统一价叠用户分组倍率生成，两者默认不相等。
 - 展示时同时给出每步的模型名、输出张数、小计与当前余额，避免用户只看到一个总数。
 - 确认后每一步由 `GenerateService.createTask` 真实扣费；实际金额以任务快照 `creditCost` / 账单为准。
 - 失败由既有 `GenerateService` 自动退款，Agent 不二次退款。
@@ -777,7 +777,7 @@ interface TextToolCall {
 - 规划耗时、修复重试次数、clarify 比例。
 - 每个运行的步数、预估/实扣积分、成功率、失败错误码。
 - 每次生成任务命中的线路（`routeId` / `channelModelId`）与耗时。
-- 每个步骤的 `logicalModelId`、预估/实扣积分，以及 `taskIds` / `batchId`，便于把 Agent 步骤与多任务批次对应起来。
+- 每个步骤的 `modelKey`、预估/实扣积分，以及 `taskIds` / `batchId`，便于把 Agent 步骤与多任务批次对应起来。
 - LLM token 用量与模型名。
 
 日志必须带 `sessionId`、`runId`、`stepId`、`ownerId`，便于串联请求、模型调用与生成任务。
@@ -834,7 +834,7 @@ interface TextToolCall {
 | --- | --- |
 | 越权读取素材/项目 | `ownerId` 只从 JWT 注入；素材符号在服务端解析并二次校验归属 |
 | LLM 编造能力或参数 | 能力目录由注册表派生；计划只接受目录内 id 与声明参数；`hidden` 参数由 `PlanValidator` 显式拒绝，不能依赖 `validateCapabilityParams` |
-| LLM 选错/编造前台模型 | `logicalModelId` 只由服务端从 `CatalogService` 选定，不接受模型输出 |
+| LLM 选错/编造模型分组 | `modelKey` 只由服务端从 `CatalogService` 选定，不接受模型输出 |
 | LLM 发起任意操作 | 模型只产出 JSON，不拥有工具调用权；服务端只暴露白名单动作 |
 | 重复确认导致重复扣费 | `clientMessageId` 唯一索引 + 条件更新抢占运行 |
 | SSE 泄露 Token | 使用 Bearer 头 + fetch 流，不把 token 放 query |
@@ -858,7 +858,7 @@ interface TextToolCall {
 | 故障 | 用户看到 | 系统行为 |
 | --- | --- | --- |
 | 文本通道未配置 | 手动模式，不显示 5xx | `/agent/status` 返回不可用原因；不调用 LLM |
-| 能力无可用线路 / 无可用前台模型 | 目录中不出现，或计划卡说明原因 | 规划阶段过滤 `effective !== 'remote'`；不进入执行 |
+| 能力无可用线路 / 无可用模型分组 | 目录中不出现，或计划卡说明原因 | 规划阶段过滤 `effective !== 'remote'`；不进入执行 |
 | 规划超时/失败 | 「暂时无法生成计划」+ 重试/手动入口 | 运行落 `failed`，不扣积分 |
 | 计划 JSON 非法 | 一次自动修复；仍失败则手动入口 | 校验器拒绝落库 |
 | 某步生成失败 | 步骤红色 + 错误码 + 重试 | 既有退款；同批其它任务不受影响；运行 `partial` |
@@ -890,16 +890,16 @@ interface TextToolCall {
 | AG-12 | 规划调用 | `ApiCallLog` 可按 `agentRunId` 查到模型、耗时、token |
 | AG-13 | 能力覆盖矩阵 | 遍历 `SUBMITTABLE_CAPABILITY_IDS`（当前 17 项），每项都能生成可校验的最小计划或显式 handoff |
 | AG-14 | 局部重绘精确涂抹 | 返回 handoff，前端 `toolPath()` 映射为 `/local-redraw`，不创建任务、不扣积分 |
-| AG-15 | 新增能力 | 只改 `definitions/` 后，能力目录自动更新；未配前台模型时该能力落到 `unavailable`，不进入规划 |
+| AG-15 | 新增能力 | 只改 `definitions/` 后，能力目录自动更新；未配模型分组时该能力落到 `unavailable`，不进入规划 |
 | AG-16 | 双入口回归 | Agent 上线后现有 `/capabilities`、`/generate`、`/tasks`、`/works` 行为不变 |
 | AG-17 | 预估与实扣一致 | 计划卡 `estimateCredits` 与执行后账单合计一致（含分组倍率与多产出张数） |
 | AG-18 | 多产出步骤 | `detail_image` 勾 6 个模块 / `shoppable_carousel` 8 张：一步跟踪 6 / 8 个任务与账单，部分失败可单独退款 |
-| AG-19 | 无可用模型 | 能力存在但无可用前台模型 / 线路时，不进入 Agent 目录，提交不产生任务 |
+| AG-19 | 无可用模型 | 能力存在但无可用模型分组 / 线路时，不进入 Agent 目录，提交不产生任务 |
 | AG-20 | hidden 参数 | 模型输出 `maskAssetId` 等 hidden key 时被 `PlanValidator` 拒绝，不进入建任务 |
 
 ### 14.2 测试层
 
-- 单元测试：`PlanValidator`、`CatalogService`（含前台模型选型）、`QuoteService` 预估算路、状态机与条件更新。
+- 单元测试：`PlanValidator`、`CatalogService`（含模型分组选型）、`QuoteService` 预估算路、状态机与条件更新。
 - 覆盖测试：以 `SUBMITTABLE_CAPABILITY_IDS` 为输入逐个生成最小合法计划；任何能力只能在「可执行」或「可 handoff」中二选一，不允许从 Agent 视野消失；同时断言 `effective !== 'remote'` 的能力不出现。
 - 集成测试：假文本上游 + 假生成任务，覆盖规划、确认、失败、重试、恢复。
 - HTTP 冒烟：`smoke-agent.js`，验证鉴权、幂等、归属与响应形状。
@@ -924,7 +924,7 @@ interface TextToolCall {
 | LLM 不直接调用工具 | 计划可审计、可校验；模型故障不会直接产生资损动作 |
 | P0 不做 token 流式 | 结构化 JSON 流式展示价值低；事件流已提供即时反馈 |
 | 不做积分预占 | 复用现有逐步扣费最稳；预占需要新的账本语义与失败回滚 |
-| LLM 不选前台模型 | 模型选择由服务端从 `CatalogService` 确定，避免模型编造不可用模型或跨分组模型；用户可在计划卡切换候选模型 |
+| LLM 不选模型分组 | 模型选择由服务端从 `CatalogService` 确定，避免模型编造不可用模型或跨分组模型；用户可在计划卡切换候选模型 |
 | 不做事件重放表 | 运行/步骤快照已能恢复 UI；避免多一张高速增长的表 |
 | 不自动恢复执行 | 避免进程重启后重复扣费或重复产出 |
 
@@ -936,4 +936,4 @@ interface TextToolCall {
 4. Agent 会话与运行记录的留存期是否沿用 90 天？
 5. 是否允许用户手动编辑计划中的参数后再确认（建议允许，但只开放非 hidden 参数）？
 
-在以上问题确认前，推荐按本文默认值推进：**P0 覆盖全部 17 项生成能力、Prompt 工具与查数保留现有入口、允许部分执行、会话绑定项目、留存 90 天、允许编辑非 hidden 参数与切换候选前台模型**。
+在以上问题确认前，推荐按本文默认值推进：**P0 覆盖全部 17 项生成能力、Prompt 工具与查数保留现有入口、允许部分执行、会话绑定项目、留存 90 天、允许编辑非 hidden 参数与切换候选模型分组**。

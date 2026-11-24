@@ -1,17 +1,8 @@
-# 开发流程（Agent 执行手册）
+# 开发流程（阶段执行卡）
 
-本文是给本仓库各 **agent（Claude Code / Codex / Cursor 等）** 执行开发任务的操作手册：每一阶段写清「谁执行、跑什么命令、产出写到哪、怎样算完成、什么时候必须停下来交人」。
+本文是给本仓库各 **agent（Claude Code / Codex / Cursor 等）** 执行开发任务的操作手册中的**阶段部分**：13 阶段总览、每阶段执行卡、按变更类型裁剪。阶段之外的三件事各有专文——指令映射与授权边界见 [`agent-execution.md`](agent-execution.md)，闸口与证据见 [`quality-gates.md`](quality-gates.md)，提交 / 分支 / PR 见 [`git-workflow.md`](git-workflow.md)。四份文档的分工与索引见 [`README.md`](README.md) §0。
 
-优先级：**用户当轮指令 > 根 `AGENTS.md` > `CLAUDE.md` > 本文 > 历史文档**。所有命令、脚本名、端口都能在仓库里核对到；与代码冲突时以代码为准，并顺手改本文与 `CLAUDE.md` 索引。文档分工见 [`docs/README.md`](README.md) §0。
-
-| 我现在要做什么 | 先看 |
-| --- | --- |
-| 判断 agent 能自主做什么 | §0 |
-| 走完整需求到发布流程 | §1–§2 |
-| 只修一个缺陷或做小改动 | §3 |
-| 找验证命令 | §4 |
-| 写交付说明或缺陷卡 | §5–§6 |
-| 处理提交、分支、PR | §9 |
+优先级：**用户当轮指令 > 根 `AGENTS.md` > `CLAUDE.md` > 本文 > 历史文档**。所有命令、脚本名、端口都能在仓库里核对到；与代码冲突时以代码为准，并同批修正本文与 `CLAUDE.md` 索引。
 
 主链路十三阶段，缺陷在其中形成回路：
 
@@ -21,60 +12,6 @@
                       ↑          │
                       └── 新缺陷 / 未修完 ──┘
 ```
-
-## 0. Agent 读这一段
-
-### 0.1 指令映射（用户说什么，就做什么）
-
-| 用户说 | Agent 动作 | 明确不做 |
-| --- | --- | --- |
-| 「跑」/「跑闸口」/「测试」 | 只执行闸口与测试，输出通过/失败数与证据 | 不改代码、不改脚本、不放宽断言 |
-| 「改」/「修复」 | 只按缺陷卡或指定问题做最小修订 | 不扩范围、不顺手重构 |
-| 「继续」 | 推进下一批（通常是下一阶段或下一组缺陷卡） | 不回头重开已关闭的段 |
-| 「按流程走」+ 阶段名 | 从该阶段进入，按 §2 对应执行卡推进 | 不跳过该卡的退出检查 |
-| 只给需求、没指定阶段 | 从阶段 1 开始登记，再逐段推进 | 不直接写实现 |
-| 给一段代码/报错问原因 | 只分析并定位（只读） | 不顺势改文件 |
-| 「提交」/「commit」 | 按 §9 开分支并提交，提交说明按 §9.2 格式 | 不推送、不打 tag、不改写已推送历史 |
-| 「推送」/「开 PR」 | 推分支并写 PR 描述（模板见 §9.4） | 不合并 PR、不删分支 |
-
-未明确授权时，**不 build、不跑测试**（`CLAUDE.md` 工作纪律）；只做只读检查（读文件、grep、`node -e` 打印库路径）。需要跑的时候把命令列出来，说明「需授权执行」。
-
-### 0.2 每次开工的固定三步
-
-1. **确认档位与库路径**（只读，任何阶段都先做）：
-
-   ```bash
-   cd backend && node -e "console.log(require('./scripts/db-url').resolveDbPath())"
-   ```
-
-   后端启动日志第一屏也会回显环境名 / 库路径 / 上传目录，两者必须一致。
-
-2. **定位单一事实源**：按 `CLAUDE.md` 的单一事实源表找到「这件事只应该定义在哪」，不要靠记忆。
-3. **写出验证命令**：开工前先写清「用哪条命令证明做完了」。写不出验证命令的，说明还没想清楚，停在阶段 4 补齐。
-
-### 0.3 默认禁令
-
-1. **默认不代为 commit、不推送、不打 tag**；只有用户当轮明确说「提交」/「推送」/「开 PR」时执行对应动作，提交权在仓库所有者。
-2. **不在生产档做任何写入**；生产只做只读冒烟。
-3. **测试轮不改代码、不改脚本、不放宽断言**；修复轮不顺手重构。
-4. **不编造结果**：没跑就写「未验」，跑失败就贴真实输出。
-5. **不为让用例变绿而改断言**；断言恒真等于没测。
-6. **不静默降级**：无通道的能力必须失败退款，不交占位图；支付凭据缺失返回 503，不回落沙箱。
-7. **不跨阶段扩修**：新发现的问题登记为新缺陷卡，不当场修。
-8. **不把「脚本全绿」当链路走通**：脚本连错库、断言被跳过时，全绿比红灯更危险。
-9. **git 写操作需授权**：不 `git add .`、不 `reset --hard`、不 force push 共享分支、不改写已推送历史；规则见 §9。
-
-### 0.4 Agent 自主边界
-
-| 环节 | Agent 可自主 | 必须交人 |
-| --- | --- | --- |
-| 需求 / 产品 | 起草条目、规格、评审材料 | 范围冻结、优先级、验收标准拍板 |
-| 技术方案 | 起草分层、事实源、风险、验证命令 | 方案通过与否 |
-| 实现 / 修复 | 按卡改代码（用户授权「改」时） | 提交、发布 |
-| 测试 | 设计用例、执行（用户授权「跑」时）、出证据 | `deferred` 缺陷的接受 |
-| 交付 | 写交付摘要、同步文档、清理现场 | git 提交（用户当轮明确授权除外） |
-| 产品确认 | 准备 8 项确认单与证据 | 签字（不代签） |
-| 发布 | 准备发布检查单与回滚判定 | 备份执行、发布、回滚决定 |
 
 ## 1. 阶段总览
 
@@ -155,7 +92,7 @@
 3. **数据模型**：新增字段 / 表 / 索引、是否需要迁移存量数据；计费字段一律快照。
 4. **配置同步**：环境变量四处（`ENV_SPECS`、`backend/.env.example`、三档 env、`docs/environments.md`）；模型层变量统一 `MODEL_*`，渠道与价格在后台配置，不改代码。
 5. **风险分级**：涉及钱 / 权限 / 合规 / 后台高危配置的，写明权限校验、二次确认、拒绝路径用例；确有业务依据要求时再补原因填写。
-6. **验证命令**：用哪层闸口、哪条专项冒烟、需要什么前置数据。
+6. **验证命令**：用哪层闸口、哪条专项冒烟、需要什么前置数据（矩阵见 [`quality-gates.md`](quality-gates.md)）。
 7. **复用优先**：按 `CLAUDE.md` §6 先列成熟第三方开源库及选型依据；确需自研时写清备选库、放弃原因（许可证 / 安全 / 运行环境 / 维护成本）与风险回滚。
 
 非功能项（受影响才写）：并发与幂等（重复回调 / 并发轮询 / SQLite 单写者）、性能（图 120s / 视频 600s 超时预算、全表 `LIKE` 入口）、容量（上传目录、备份份数、日志轮转）、失败可见性（`[rid=]`、`RouteAttempt.failureCode` / `ApiCallLog` 错误摘要）、安全合规（签名 URL、限流、越权 404、AIGC 标识）、回滚可行性（Prisma 迁移无自动 down migration）。
@@ -204,7 +141,7 @@
 
 ### 2.7 测试
 
-前置：用户明确授权执行；一律在测试档，从干净库开始。
+前置：用户明确授权执行（授权边界见 [`agent-execution.md`](agent-execution.md) §1）；一律在测试档，从干净库开始。
 
 ```bash
 ./start.sh --env test
@@ -213,11 +150,11 @@ NODE_ENV=test npm run db:reset:test
 
 **动作**
 
-1. 确认档位与库路径（见 §0.2），与后端启动日志一致。
+1. 确认档位与库路径（见 [`agent-execution.md`](agent-execution.md) §2），与后端启动日志一致。
 2. 真实起服务、真实调接口、真实查库；不读代码推断行为。
 3. 每条链路五类用例 + 三身份，直接拿请求打后端（前端隐藏按钮不算校验）。
 4. 跑测试档脚本必须给对基址：多数 `API_BASE=http://127.0.0.1:4100`（测试档与开发档同端口，先 `./start.sh --env test` 起测试档）；`smoke-marketing.js` 用 `MARKETING_API_BASE`；`verify-asset-filters.js` / `verify-prompt-tools.js` 用 `VERIFY_BASE`。
-5. 每条结论带三件套：命令、关键输出、库或磁盘记录。
+5. 每条结论带三件套：命令、关键输出、库或磁盘记录（格式见 [`quality-gates.md`](quality-gates.md) §3）。
 6. 一轮结束清理现场（`clear-ops-data.js`，或按 `docs/testing.md` 的外键顺序），避免残留把下一轮伪造成通过。
 
 **产出**：测试报告——环境事实（档位 / 库路径 / 构建时间 / 种子状态 / 后端地址）、覆盖矩阵（通过 / 失败 / 未验）、失败项证据。
@@ -235,7 +172,7 @@ NODE_ENV=test npm run db:reset:test
 3. 去重：重复项并卡并指向主卡编号。
 4. 假阳性单列：连错库、断言恒真、种子残留——先修测试再信结论。
 
-**产出**：缺陷卡，编号 `BUG-<轮次>-<序号>`（如 `BUG-R3-07`），标题行带状态。
+**产出**：缺陷卡，编号 `BUG-<轮次>-<序号>`（如 `BUG-R3-07`），标题行带状态；卡片格式见 §4。
 
 ```
 open → fixed → verified → closed
@@ -283,10 +220,10 @@ duplicate：并入主卡，指向主卡编号
 
 **动作**
 
-1. 按 §5 模板写交付摘要（中文、结论优先、无 emoji）；失败贴关键输出，不贴整段日志。
+1. 按 [`quality-gates.md`](quality-gates.md) §3 的交付摘要模板写交付摘要（中文、结论优先、无 emoji）；失败贴关键输出，不贴整段日志。
 2. 同步 `CLAUDE.md` 与 `docs/` 现行文档；新增功能补一条冒烟，或说明为何只能人工验。
 3. 清理测试账号、订单、素材（`clear-ops-data.js` 或 `docs/testing.md` 的外键顺序）。
-4. 写出提交说明草稿（改了什么、为什么这样取舍、真实验证结果、未验边界），格式按 §9.2，**不执行提交**。
+4. 写出提交说明草稿（改了什么、为什么这样取舍、真实验证结果、未验边界），格式按 [`git-workflow.md`](git-workflow.md) §2，**不执行提交**。
 
 **退出检查**：文档与代码一致；三件套证据可复查；未验边界已写；现场已清理。
 
@@ -353,66 +290,11 @@ duplicate：并入主卡，指向主卡编号
 3. 回归至少覆盖原故障用例、同链路上下游、三身份；没跑全量就写「本轮未跑」，不得写「已通过」。
 4. 发布按 §2.13 走，**备份不能省**；数据库变更仍不可回滚。
 5. 产品确认 24 小时内补走；交付摘要与文档同步随发布同批完成。
-6. 阻断级事故必须复盘，结论回写本文或闸口。
+6. 阻断级事故必须复盘，结论回写本文或 [`quality-gates.md`](quality-gates.md)。
 
-## 4. 闸口矩阵（命令级）
+## 4. 产出模板（需求条目 / 缺陷卡）
 
-「全量」指按 `docs/testing.md` 第 3 节清单逐组执行；仓库**没有**一键全量业务冒烟（无 `smoke:all` / `gate:all`），不得在交付摘要里声称「全量通过」而不附逐组结果。根目录 `npm run check` 只覆盖 Node 版本、依赖审计、仓库约定、Prisma schema 校验、构建、后端 / 前端 / agent 单测与仿真网关测试。
-
-| 层 | 命令 | 何时跑 | 备注 |
-| --- | --- | --- | --- |
-| 工程门禁 | `npm run check` | 阶段 6、9、10 | 根目录执行；静态（含 Prisma schema）、构建、单测（L1 / L1.5 / L1.6）+ 仿真网关，不含业务冒烟 |
-| L1 后端 | `cd backend && npm run build` | 阶段 6、9、10 | 需授权；不用 `nest start` |
-| L1 前端 | `cd frontend && npm run typecheck` / `npm run build:prod` | 阶段 6、9、10 | 需授权 |
-| L2 架构 | `cd backend && npx ts-node -T scripts/verify-*.ts` | 阶段 6、7、10 | 按改动域挑；`probe-environments.ts` 不连库 |
-| L3 冒烟 | `cd backend && NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-*.js` | 阶段 7、10 | 先起测试档（同端口，会停开发档）；其他变量见 §2.7 |
-| L4 E2E | `cd frontend && npm run e2e` | 阶段 7、10 | 生产不跑 |
-| 依赖 | `cd backend && npm run verify:deps:critical` | 依赖变动时 | 新增依赖后必跑 |
-| 生产 | 只读接口 + `probe-environments.ts` | 阶段 13 | 不跑写入用例、不跑 E2E |
-
-按改动域选专项（完整清单与覆盖矩阵见 `docs/testing.md` 第 3、4 节）：
-
-| 改动域 | 必跑 |
-| --- | --- |
-| 能力 / 生成 | `smoke-capability-runtime`、相关页面冒烟、`verify-credit-deduction`、`verify-route-catalog`、`verify-task-runtime` |
-| 模型层 | `verify-plugin-manifests`、`verify-model-consistency`、`verify-channel-flow`、`verify-protocol-runtime`、`verify-billing`、`verify-task-runtime`，以及 `frontend npm run e2e -- admin-model-suite` |
-| 中转 / 插件 / 财务 | `verify-proxy-runtime`（`VERIFY_HTTP=0` 只跑纯逻辑段）；改 `src/model/proxy/**`、`src/model/plugins/**`、`finance-analytics`、`billing-sweeper` 时必跑 |
-| 交易与权益 | `smoke-commerce`、`smoke-payments`、`smoke-membership*`、`smoke-refund-rules` |
-| 账户与合规 | `smoke-auth`、`smoke-account`、`smoke-qr-login`、`smoke-aigc`、`smoke-signed-url` |
-| 后台与运维 | `smoke-admin`、`smoke-backup`、`smoke-scheduler`、`smoke-storage`、`smoke-tickets-search` |
-| 依赖变动 | `npm run verify:deps:critical` |
-| 环境体系 | `npx ts-node -T scripts/probe-environments.ts`（74 项，不连库） |
-
-## 5. 证据与上报
-
-任何结论必须能复查，三件套缺一不算：
-
-1. **命令**：可直接照抄，含环境变量与端口。
-2. **关键输出**：状态码、错误码、金额、`routeId` / `channelModelId`、通过 / 失败数。
-3. **落库或落盘记录**：库里的 `status`、流水条数、文件魔数与扩展名。
-
-截图只作补充；「我点了没问题」「应该可以」不算证据。没跑的写「未验」，不写「已通过」。生产证据只允许来自只读操作。
-
-**交付摘要模板**（阶段 11 直接套用）：
-
-```
-结论
-<一句话：做什么、成没成>
-
-改动
-- <file:line> — <对应 REQ/BUG 编号>
-
-验证
-- `<命令>` → <通过/失败数>；失败项：<关键输出>
-
-未验
-- <项> — 原因与所需条件
-
-未修 / 降级
-- <项> — 原因与后续轮次
-```
-
-## 6. 缺陷卡与需求条目模板
+阶段 1 与阶段 8 的产物按固定格式写，便于跨轮复用与检索。
 
 **需求条目**
 
@@ -439,115 +321,4 @@ BUG-<轮次>-<序号> [open|fixed|verified|closed|reopened|deferred] <标题>
 关联：REQ-xxx
 ```
 
-## 7. 常见失败模式
-
-| 失败模式 | 表现 | 防线 |
-| --- | --- | --- |
-| 连错库 | 以为在测试档，实际写 `dev.db` | 开测前打印库路径；`verify-*` 走项目自己的 `ConfigModule` |
-| 断言恒真 | 元素没渲染，`toBeHidden` 永远通过 | 修好后补正向用例；断言要能因真实缺陷变红 |
-| 观测竞态 | 同步链路在往返内完成，拿不到中间态 | 断言持久证据（流水条数、快照字段），余额只作附注 |
-| 脚本漂移 | 实现改了、断言没跟，红灯指向脚本 | 按 `docs/testing.md` 第 5 节定性后修脚本，不迁就断言改产品 |
-| 空串覆盖 | `CORS_ORIGINS=""` 让 env 值静默失效 | 按需注入变量，不无脑导出空串 |
-| 静默失败 | HTTP 200 但业务失败；失败不退款；无 `[rid=]` | 断言业务字段；看 `task.state` / `errorCode` 与 `ApiCallLog` 的错误摘要 |
-| 跨阶段夹带 | 修复轮顺手重构，回归结果无法归因 | 每轮一个主题；重构单独成批 |
-| 文档先行 | 文档写了代码没做，下轮按文档验证得出错误结论 | 文档与代码同批；冲突以代码为准 |
-| 产品确认走过场 | 只看功能存在，不按验收标准判定 | 阶段 12 逐项勾选，不过签 |
-| 跳过备份 | 直接执行不可逆迁移改生产库 | 发布第 1、3 条：备份校验 + 副本演练 |
-| hotfix 不补账 | 紧急上线后卡片 / 文档 / 确认一直没补 | 24 小时时限写进交付摘要，未补进复盘 |
-| 缺陷状态不更新 | 修了没标 `fixed`，验了没标 `verified` | 标题行强制带状态；每轮结束按状态汇总 |
-
-## 8. 完成定义
-
-一件事算完成，需同时满足：
-
-1. 阶段 1 的验收标准逐条通过，产品确认单已签。
-2. 每条需求 / 缺陷都有对应用例，脚本或 E2E 留在仓库里。
-3. 受影响域闸口全绿；失败项已在 `docs/testing.md` §5「已知缺口与验证边界」登记并有结论。
-4. 单一事实源没有产生第二份实现；文档与代码一致。
-5. 交付摘要三件套可复查；未验边界已写明。
-6. 缺陷全部 `closed`，或有原因、风险、轮次的 `deferred`。
-7. 测试数据已清理，没有残留把下一轮伪造成通过。
-8. 涉及部署的变更已完成发布与观察，或写明「未发布」及原因。
-
-## 9. Git 工作流
-
-分支、提交、PR 与合并规则。与 `CLAUDE.md`「仓库约定」一致；冲突时以本节为准，并同步改 `CLAUDE.md`。§0.1 的「提交 / 推送」指令映射落到本节。
-
-### 9.1 分支
-
-- `main` 是集成分支，始终可构建；**不在 `main` 上直接改代码**。
-- 从最新 `main` 切分支：`git switch main && git pull --ff-only && git switch -c <type>/<kebab-主题>`。
-- 前缀取提交 type 的常用子集：`feat/` `fix/` `refactor/` `perf/` `test/` `docs/` `chore/`；`hotfix/` 是分支专用前缀，提交 type 仍用 `fix`。
-- 主题用英文 kebab-case，2–5 个词，例：`fix/credit-issuance-consumption`、`feat/admin-order-deletion`。
-- 一个分支只做一件事；跨主题改动拆分支（对应 §7「跨阶段夹带」）。
-- `hotfix/` 只从 `main` 切，按 §3.1 紧急修复通道执行。
-- 合并后删除远端与本地分支。
-
-### 9.2 提交信息
-
-```
-<type>(<scope>): <中文 subject>
-
-<body：为什么这样取舍、影响面；必要时列关键改动，不逐文件复述>
-
-<footer：Refs REQ-xxx / BUG-<轮次>-<序号>>
-```
-
-- **type 英文**，取值：`feat` / `fix` / `refactor` / `perf` / `test` / `style` / `docs` / `chore` / `build` / `ci` / `revert`。
-- **scope 英文小写**，取域而非文件名：`admin` / `credit` / `model` / `billing` / `payments` / `auth` / `tasks` / `frontend` / `docs` / `deps` 等。
-- **subject 中文**，一句话说结果不说过程，50 字内，句末不加句号。例：`fix(credit): 修正积分账实核对与到期回填不一致`。
-- **body 写取舍理由**：为什么选这个方案、放弃了什么、影响哪些链路；必要时列关键改动，但不逐文件复述 diff。对应缺陷卡 / 需求条目写 `Refs BUG-R3-07` / `Refs REQ-PAY-003`。
-- **破坏性变更**：type 后加 `!`（`feat(model)!: ...`），footer 写 `BREAKING CHANGE: <影响与迁移方式>`。
-- 由 agent 起草的提交说明，footer 按实际执行 agent 的约定署名；Claude Code 使用 `Co-Authored-By: Claude Code <noreply@anthropic.com>`。
-- 禁止：`wip` / `update` / `fix bug` / 无 type 的裸句子；已推送的提交不改写、不 amend。
-
-| 好 | 差 |
-| --- | --- |
-| `fix(credit): 修正积分账实核对与到期回填不一致` | `wip` / `fix: wip` |
-| `feat(admin): 新增订单安全删除` | `更新` / `fix bug` |
-| `refactor(model): 收敛路由快照读取入口` | `改了 model` |
-
-### 9.3 提交粒度与内容
-
-- 一个提交一个可回滚主题；重构与功能分开提交。
-- 用 `git add -p` 逐块审阅，**不用 `git add .`** 把无关文件带进来。
-- 提交前 `git diff --staged` 复核：无调试代码、无临时日志、无密钥。
-- **不提交**：密钥 / `.env` / `*.db` / `uploads/` / `logs/` / `dist/` / `node_modules`（`.gitignore` 已覆盖，仍需 `git status` 复核）。
-- `.env.development` / `.env.test` / `*.example` 是入库配置；改动前确认没有写入真实凭据。
-
-### 9.4 PR 与合并
-
-1. 推分支：`git push -u origin <branch>`。
-2. 开 PR，描述按 `.github/pull_request_template.md`；标题与提交信息同格式。
-3. **CI 必须绿**：`quality`（Static checks and tests，根目录 `npm run check`）、`e2e-smoke`（后台 E2E 冒烟）、`docker-build`（生产镜像与 compose 校验）。红灯不得合并；确认为已知缺口时，须附 `docs/testing.md` §5 的定性结论与缺陷卡编号。
-4. 自查：改动只落单一事实源、文档同批、证据三件套齐全、未验边界已写、未夹带重构。
-5. 合并策略：默认 **squash merge**，一个分支一条提交，`main` 历史线性可读；分支内提交需保留独立语义时用 merge commit。合并信息用 PR 标题 + 正文摘要。
-6. 合并后删分支，本地 `git switch main && git pull --ff-only`。
-7. 分支保护目标：在 GitHub 对 `main` 开启保护（禁止直接 push、要求 CI 绿、要求走 PR）。未开启前直接 push `main` 属例外，推送前必须补跑 `npm run check`，并在提交说明里写明例外原因。
-
-### 9.5 同步与冲突
-
-- 分支落后时：未推送用 `git rebase main`，已推送或有协作者用 `git merge main`。
-- 解决冲突后**必须重跑受影响闸口**（§4 按改动域选专项）。
-- 已推送的个人分支只允许 `git push --force-with-lease`；共享分支不 force。
-- 不 rebase、不改写 `main` 历史。
-
-### 9.6 回滚
-
-- 已合并的提交用 `git revert <sha>` 生成反向提交，保留变更轨迹。
-- 不 `git reset --hard` 已推送的 `main`，不在共享分支上删提交。
-- 回滚同样走分支 + PR + CI；线上阻断按 §3.1 走，备份不可省。
-- 数据库结构变更（Prisma Migrate）**不能用 git 回滚**，按 §2.13 第 3 条备份与副本演练处理。
-
-### 9.7 Agent 边界
-
-| 操作 | 是否可自主 |
-| --- | --- |
-| `git status` / `log` / `diff` / `show` / `branch --list`（只读） | 可 |
-| 起草提交说明、PR 描述 | 可（阶段 11 交付内容） |
-| `git add` / `commit` / `push` / `tag` / `branch -D` / `reset` / `rebase` / `merge` | **需明确授权**，默认不做 |
-| 解决冲突 | 需授权；解决后重跑受影响闸口 |
-
-## 10. 文档维护
-
-发现本文与代码冲突时以代码为准，修正本文，并在交付摘要里写明改了哪条规则。文档职责与读法见 [`README.md`](README.md) §0；新增或改名文档必须同批更新索引与全仓引用。
+文档职责与放置规则见 [`README.md`](README.md) §6；发现本文与代码冲突时以代码为准，修正本文，并在交付摘要里写明改了哪条规则。

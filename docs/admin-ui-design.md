@@ -16,7 +16,7 @@
 | 项 | 事实源 |
 | --- | --- |
 | 外壳组件 | `frontend/src/admin-ui/shell/AdminBoardLayout.tsx:59` |
-| 菜单数据 | `frontend/src/components/admin/adminNav.ts`（7 组 / 35 条） |
+| 菜单数据 | `frontend/src/components/admin/adminNav.ts`（7 组 / 36 条） |
 | 页面组件入口 | `frontend/src/admin-ui/radar/index.ts:1` |
 | Radar 令牌与动效 | `frontend/src/styles/radar-admin.css:16` |
 | 页面骨架 | `frontend/src/admin-ui/radar/page.tsx:8` |

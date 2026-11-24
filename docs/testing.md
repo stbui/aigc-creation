@@ -219,12 +219,12 @@ development / test 的管理员凭据统一为 `admin@admin.com / 123456789`，�
 
 #### 仿真模型网关
 
-零依赖的仿真模型网关在 `test/`：提供 OpenAI 标准协议的文生文 / 文生图 / 文生视频端点与 MiniMax 兼容视频端点，无真实凭据也能跑通「渠道工作台 → 连通性测试 → 生成 → 下载」全链路，并支持 `[[fail]]` / `[[401]]` / `[[429]]` 失败注入。
+零依赖的仿真模型网关在 `mock-model-gateway/`：提供 OpenAI 标准协议的文生文 / 文生图 / 文生视频端点与 MiniMax 兼容视频端点，无真实凭据也能跑通「渠道工作台 → 连通性测试 → 生成 → 下载」全链路，并支持 `[[fail]]` / `[[401]]` / `[[429]]` 失败注入。
 
 ```bash
-cd test && node server.js       # http://127.0.0.1:3900
-cd test && npm test             # 网关自测
-cd test && npm run smoke:spawn  # 起网关跑联网冒烟
+cd mock-model-gateway && npm start          # http://127.0.0.1:3900
+cd mock-model-gateway && npm test           # 网关自测
+cd mock-model-gateway && npm run smoke:spawn # 起网关跑联网冒烟
 ```
 
 后台「渠道工作台」新建渠道并把基址指到 `http://127.0.0.1:3900`（只填根域，不要带 `/v1`），协议按能力选 `openai-image` / `chat-completion` / `minimax-video`，再到「能力与模型」把商品绑定到能力并设置售价。`smoke-aigc` 需要可用的 image 线路；没有线路时它会如实报 `42204`，不能当产品缺陷。
@@ -322,12 +322,12 @@ L1.5 / L1.6 不按功能域铺矩阵：前端覆盖清单见 3.2，后端纯逻�
 
 | 脚本 / 用例 | 外部条件 |
 | --- | --- |
-| `smoke-aigc.js` | 可用的 image 线路（可用 `test/` 仿真网关 + 后台渠道工作台配一条） |
+| `smoke-aigc.js` | 可用的 image 线路（可用 `mock-model-gateway/` 仿真网关 + 后台渠道工作台配一条） |
 | 真实厂商连通性 | 各家 API key；`POST /admin/channels/:id/models/test` 实跑一次才算证据 |
-| `admin-model-suite.spec.ts` 的「生成 → 账单核对」段 | 后台存在一条启用且有价格的 image 线路（`cd test && node server.js` 指到 `http://127.0.0.1:3900`）；无线路时该段跳过，其余断言照常执行 |
+| `admin-model-suite.spec.ts` 的「生成 → 账单核对」段 | 后台存在一条启用且有价格的 image 线路（`cd mock-model-gateway && npm start` 指到 `http://127.0.0.1:3900`）；无线路时该段跳过，其余断言照常执行 |
 | 真实支付宝 / 微信回调与退款 | 商户号与可公网访问的回调地址 |
 | 第三方登录（OAuth2 / OIDC） | 真实 provider 的 `clientId` / `clientSecret` 与可公网访问的回调地址；离线只能验「未配置时 `/auth/oauth/providers` 返回空、登录页不渲染按钮」 |
-| `product-parameters` / `product-capabilities` / `state-contract` 等 C 端提交类用例 | 前台模型目录里该能力**有一条 `available=true` 的线路**。`resolveModelKey()` 在没有可用线路时抛错，提交在 `/generate` 之前就中止 —— 页面上按钮可点，但请求发不出去，用例表现为「提交后等不到结果」 |
+| `product-parameters` / `product-capabilities` / `state-contract` 等 C 端提交类用例 | 能力目录里该能力**有一条 `available=true` 的线路**。`resolveModelKey()` 在没有可用线路时抛错，提交在 `/generate` 之前就中止 —— 页面上按钮可点，但请求发不出去，用例表现为「提交后等不到结果」 |
 
 ### 5.3.1 「提交后等不到结果」怎么定性
 C 端提交类用例挂住时，先分清是**环境缺线路**还是**代码回归**：打开该能力在
@@ -342,57 +342,15 @@ C 端提交类用例挂住时，先分清是**环境缺线路**还是**代码回
 > `GET /api/v1/tasks/page` 这类新路由就不会注册，前端分页列表会拿到
 > 「任务不存在或无权限」的 400，表现为整页列表空掉。
 
-### 5.3.2 两个后台页面的接口路径对不上（已修，2026-11-02）
+### 5.3.2 两条历史误判（已修）
 
-**现象**：`frontend/e2e/audit/sweep-admin.mjs` 全路由巡检报出 `/admin/payment-channels`
-与 `/admin/reconciliation` 两条 403。
+- **后台 403「未声明权限点」**：先怀疑**路由不存在**，再怀疑角色权限。守卫对未声明权限点的端点一律 403，两者表现相同。支付域旧路径已改为重定向。
+- **断言「列表为空」**：先问这个列表会不会被后台自己写入。定时任务、worker、自动对账会把空列表填上；断言要与数据无关，或跑在不触发 worker 的库上。
 
-**根因**：不是权限问题，是**前端调的路径后端没有**。支付域重构（`505319c`）删掉了后端
-`payment-channels.controller.ts` 与 `reconciliation.controller.ts`，前端却还在打旧路径：
-
-| 旧页面 | 旧前端调用 | 后端现状 |
-| --- | --- | --- |
-| 支付渠道 | `GET /admin/payment-channels` | 控制器已删除，新接口是 `GET /admin/payments/providers` |
-| 渠道对账 | `GET /admin/reconciliation/batches` | 新接口是 `GET /admin/payments/reconciliations` |
-
-两条都返回 `40301 该端点未声明权限点, 已拒绝访问` —— 守卫对**未声明权限点的端点**
-一律拒绝，所以看起来像权限不足，实际是路由不存在。
-
-**修法**：按 `docs/payment-refactor-design.md` §8 / §10.3 / §21 落地统一页面
-`/admin/payments`（支付渠道 / 充值商品 / 支付订单 / 支付对账 / 支付异常五标签），旧路由改为
-重定向。落地后 `sweep-admin.mjs` 的 35 条路由全部渲染、控制台零错误，
-`tests/admin-payments.spec.ts` 8 条用例覆盖标签切换、深链、旧路由重定向与筛选回显。
-
-**留下的通用判据**：后台 403 报「未声明权限点」时，先怀疑**路由根本不存在**，
-再怀疑角色权限 —— 前者返回的也是 403，容易被误判成权限不足。
-
-### 5.3.3 对账用例依赖「开发库恰好没有对账记录」（2026-11-02）
-
-**现象**：`tests/admin-payments.spec.ts` 的「对账标签给出执行区与运行列表」失败，
-断言 `还没有对账记录`（空态）不可见 —— 实际渲染出 4 行对账记录。
-
-**根因**：与本次改动无关，是**数据前提失效**。该用例假定开发库没有对账记录，
-但后端的 `PaymentWorkerService` 每天 10:15 后会自动跑一次对账
-（`payment-worker.service.ts` 的 `autoReconcile`），在 `dev.db` 里落下了
-`PaymentReconciliationRun` 记录。断言一旦遇上当天跑过自动对账的库就必失败。
-
-**定性**：把本次改动 stash 后重跑，用例**同样失败** —— 属于环境/数据前提问题，
-不是回归。
-
-**两种修法**（择一，尚未实施）：
-
-- 让用例不依赖空态 —— 断言「表格存在」或「空态与表格二者必居其一」，不写死
-  「没有记录」；
-- 或让该用例连测试档库（`NODE_ENV=test`）跑 —— 测试库不启动 worker，没有
-  自动对账记录。
-
-**留下的通用判据**：断言「列表为空」之前先问一句**这个列表会不会被后台自己写入**。
-定时任务、worker、自动对账这类东西会把空列表填上，断言就得改成与数据无关的
-形式，或者干脆跑在不会触发 worker 的库上。
 
 ### 5.4 模型层的覆盖边界
 
-`verify-billing.ts` 钉住**账本本身**（状态机 + 资金变动 + 不变量）。前台模型层删除后，`verify-route-catalog.ts` / `verify-task-runtime.ts` / `verify-credit-price.ts` / `verify-credit-deduction.ts` 与 smoke 脚本均已切到「能力绑定 + 能力定价」口径。本次重构的验证证据是：后端 76 个 spec（672 用例）、前端 121 个 spec（606 用例）、根 `npm run check` 全绿，`verify-route-catalog`（10 项）、`verify-task-runtime`（66 项）、`verify-credit-price`（15 项）、`verify-credit-deduction`（75 项）全过，以及真实后端 + 仿真网关跑通「导入商品 → 绑定能力 → 目录/报价 → 生成成功 → 断线自动切线 → 账单金额不变」。
+`verify-billing.ts` 钉住**账本本身**（状态机 + 资金变动 + 不变量）。删除前台模型层后，`verify-route-catalog.ts` / `verify-task-runtime.ts` / `verify-credit-price.ts` / `verify-credit-deduction.ts` 与 smoke 脚本均已切到「能力绑定 + 能力定价」口径；这些脚本的覆盖项见 §3.3 与 §4。
 
 - **L3 没有模型层的 HTTP 冒烟**：渠道工作台 / 能力与模型 / 用户分组 / 插件 / 生成账单 / 调用记录五个后台页面只有 Playwright 用例（`admin-model-suite.spec.ts`）与 `verify-channel-flow.ts` 的接口级断言，没有 `smoke-*.js`；
 - **准入的失败分支**原本由待重写的 `verify-route-catalog` / `verify-task-runtime` 覆盖，参数白名单与非 JSON 选项的拒绝路径依赖 `verify-tool-contracts`；
@@ -416,6 +374,18 @@ P6 的判据由 `verify-proxy-runtime.ts` 钉住（`npm run verify:proxy-runtime
 - **仍未覆盖**：① **后台插件的 HTTP 端点**（脚本直接调 `PluginAdminService`，控制器层的权限点 / 上传字段由 `admin-model-suite.spec.ts` 的插件页用例兜底）；② **财务页面的 HTTP 接口**（脚本调 `FinanceAnalyticsService.summary()`，与页面同样的聚合函数，但少了 DTO 与权限链）；③ **服务商目录**（`MODEL_PROVIDER_CATALOG_URL` 远端 JSON 的拉取与容错）无断言；④ **真实厂商差异**——SSE 分块边界、`Retry-After`、超长响应截断、各家错误体形状只由本机 mock 模拟，接真实线路时须再跑一次；⑤ 冷却、并发槽与目录版本是**进程内存**，多实例下每台各自判定，无法在单进程断言。
 - 该脚本会改开发/测试库：`NODE_ENV=test` 时连 `test.db`，否则连 `dev.db`。它只清理自己建的夹具（用户 / 渠道 / 渠道模型 / 分组 / 套餐 / 账单 / 调用记录），插件装在 `mkdtemp` 临时目录并在结束时删除。
 
+### 5.7 C 端图片上传：两条未自动化覆盖的路径
+
+`upload-runtime.spec.ts` 覆盖访客态的拖拽 / 粘贴 / 窄屏，但有两条路径显式 skip：
+
+| 路径 | 未覆盖原因 | 怎么补 |
+| --- | --- | --- |
+| 素材库回填 | 需要有效登录态与后端素材数据；在本机跑会写入共享开发库，CI 也没有固定素材 | 用测试库 + 预置素材 fixture，或在 L3 冒烟里入库后带 token 跑 |
+| 手机扫码回传 | 需要真实移动设备扫二维码并在手机端完成一次上传，桌面 Chromium 无法稳定复现 | 手工验收；或做一个可注入的回传接口在 L3 覆盖服务端语义 |
+
+单测层已覆盖的部分不算缺口：上传互斥、额度截断、单图替换、objectURL 回收都在
+`frontend/src/**/__tests__`（见 4 覆盖矩阵「图片上传（C 端）」行）。
+
 ## 6. 测试数据与清理
 
 - 冒烟脚本自建账号 / 商品 / 订单，并在 `finally` 或结尾清理；失败中断时可能留残留，需手工按外键顺序清理。
@@ -431,15 +401,3 @@ P6 的判据由 `verify-proxy-runtime.ts` 钉住（`npm run verify:proxy-runtime
 4. 任何「预期通过」都不算验证：交付时只写真实运行输出里的通过 / 失败数。
 5. 纯逻辑（几何 / 解析 / 状态机）与共享 hooks、状态组件优先补 Vitest；断言用行为与返回值，不用快照比对样式。新增用例后须同时跑 `npm run typecheck` 与 `npm test`。
 6. 本文不记录逐轮修复过程；已知缺口按第 5 节维护，修复后移除对应条目。
-
-### 5.7 C 端图片上传：两条未自动化覆盖的路径
-
-`upload-runtime.spec.ts` 覆盖访客态的拖拽 / 粘贴 / 窄屏，但有两条路径显式 skip：
-
-| 路径 | 未覆盖原因 | 怎么补 |
-| --- | --- | --- |
-| 素材库回填 | 需要有效登录态与后端素材数据；在本机跑会写入共享开发库，CI 也没有固定素材 | 用测试库 + 预置素材 fixture，或在 L3 冒烟里入库后带 token 跑 |
-| 手机扫码回传 | 需要真实移动设备扫二维码并在手机端完成一次上传，桌面 Chromium 无法稳定复现 | 手工验收；或做一个可注入的回传接口在 L3 覆盖服务端语义 |
-
-单测层已覆盖的部分不算缺口：上传互斥、额度截断、单图替换、objectURL 回收都在
-`frontend/src/**/__tests__`（见 4 覆盖矩阵「图片上传（C 端）」行）。

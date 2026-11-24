@@ -114,7 +114,7 @@
 首屏结构：
 
 1. **服务健康**：渠道冷却、协议未注册、能力 `unavailable`、定时任务最近失败、备份未验证/过期、存储水位。
-2. **配置漂移**：前台模型无线路、线路指向未注册协议、能力无可用模型、渠道模型权重全为 0。每项给「去修复」深链。
+2. **配置漂移**：能力无可用商品、绑定指向停用商品、线路协议未注册、渠道模型权重全为 0。每项给「去修复」深链。
 3. **角色工作台预览**：管理员可切换查看运营/财务首屏，用同一套数据检查队列是否为空。
 
 其中「服务健康」的渠道冷却与协议注册状态来自模型层接口，不在工作台端点里重复查询；工作台只负责工单、任务、退款、对账、发票、账单、备份这七类可落 SQL 的待办。
@@ -167,7 +167,7 @@
 │ 系统控制塔                     [视角：管理员/运营/财务]      │
 ├──────────────────────────────────────────────────────────────┤
 │ 服务健康：1 条渠道冷却 / 1 个能力不可用 / 备份未验证         │
-│ 配置漂移：2 个前台模型无线路 / 1 条线路协议未注册            │
+│ 配置漂移：2 个能力无可用商品 / 1 条线路协议未注册            │
 │ 今日风险：高危动作 7 次（退款 3 / 积分调整 2 / 渠道写入 2）  │
 ├──────────────────────────────────────────────────────────────┤
 │ 待办队列：工单 / 任务 / 退款 / 对账 / 发票 / 账单 / 备份     │
@@ -422,7 +422,7 @@ interface AdminWorkGroup {
 
 | 改动 | 说明 | 优先级 |
 | --- | --- | --- |
-| 影响面预览 | 停用/删除渠道前展示：受影响渠道模型、前台模型/线路、能力、近 24h 调用量 | P1 |
+| 影响面预览 | 停用/删除渠道前展示：受影响渠道模型、能力绑定、近 24h 调用量 | P1 |
 | 健康直达 | 冷却/协议未注册/能力不可用的摘要点击直达具体渠道模型或线路编辑 | P1 |
 | 变更后核对 | 保存成功后就地显示「受影响能力及当前 `effective`」，不用再跳能力页 | P1 |
 | 测试全部冷却线路 | 只探测、不写配置，`channel.test` 权限；避免逐条点 | P2 |
@@ -456,8 +456,8 @@ interface AdminWorkGroup {
 | `POST /admin/tickets/batch` | `ticket.handle` + 处理器内动作权限 | 批量指派/流转，`ids ≤ 100`，串行、逐条返回结果 |
 | `POST /admin/invoices/batch` | `invoice.write` | 批量开具/驳回，洁净单才执行 |
 | `POST /admin/payments/reconciliations/items/batch` | `finance.reconcile` | 批量处置差异，原因必填 |
-| `GET /admin/channels/:id/impact` | `channel.read` | 渠道停用/删除的影响面 |
-| `GET /admin/logical-models/:id/impact` | `logical_model.read` | 模型下线/停用的影响面 |
+| `GET /admin/channels/:id/impact` | `channel.read` | 渠道停用/删除的影响面（P1，未实施；当前无此端点） |
+| `GET /admin/capabilities/:id/models` + `/pricing` | `logical_model.read` / `product.price` | 能力下线 / 改绑的影响面（P1，由既有只读接口组合，不新增独立 impact 端点） |
 | `GET /admin/search` | `data.search` | 增加发票号、生成账单 ID 两组；仍按各域读权限裁剪 |
 
 所有新写接口遵循现有约定：`{ code, data, message }` 信封、`AppError`、批量串行不包事务、逐条返回 `{ id, ok, message?, data? }`。
@@ -585,7 +585,7 @@ interface AdminWorkGroup {
 | `backend/src/admin/search.service.ts` | 增加发票、生成账单组；仍按各域读权限裁剪 |
 | `backend/src/admin/tickets-admin.controller.ts` / `backend/src/tickets/*` | 回复 `visibility`、指派候选、批量指派/流转 |
 | `backend/src/admin/invoices-admin.controller.ts` / `payments/*` | 批量开具、批量对账处置 |
-| `backend/src/admin/channels*` / `logical-models*` | `impact` 只读接口 |
+| `backend/src/model/channels/*` / `model/catalog/*` | `impact` 只读接口（P1，未实施） |
 | `backend/prisma/schema.prisma` | `TicketReply.visibility`、`Refund` 索引；P1 `TicketReplyTemplate` |
 
 ### 前端

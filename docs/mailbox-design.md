@@ -54,7 +54,7 @@
 | C7 | 前端多文件目录严格分层：`index/page/components/api/hooks/utils/constants/style.css` + `PascalCase.tsx`，`./X` 单向导入 | `docs/frontend-module-conventions.md:45-123` |
 | C8 | 页面 CSS 不写裸 hex、不新增 `:root`，色值只进 `styles/tokens.css` | `docs/design-tokens.md:33,54,61` |
 | C9 | 文档命名 kebab-case + `-design` 后缀；规划文档首行标「规划中」；新建文档须同批更新索引与全仓引用 | `docs/README.md:96-124` |
-| C10 | 「跑」= 执行闸口/构建/测试且需授权；「改」须获批；未授权不 build、不跑测试 | `CLAUDE.md:406-410`、`docs/development-workflow.md:22-31` |
+| C10 | 「跑」= 执行闸口/构建/测试且需授权；「改」须获批；未授权不 build、不跑测试 | `CLAUDE.md` §8、`docs/agent-execution.md` §1 |
 
 ---
 
@@ -518,7 +518,7 @@ cd frontend && npm run e2e                     # L4（生产不跑）
 cd backend && npm run verify:deps:critical     # 仅当依赖变动；本设计零新增依赖，可跳过
 ```
 
-依据 `docs/development-workflow.md:348-373`、`CLAUDE.md:406`。仓库**没有** `smoke:all` / `gate:all`，交付摘要不得声称「全量通过」而不附逐组结果。
+依据 `docs/quality-gates.md` §1、`CLAUDE.md` §8。仓库**没有** `smoke:all` / `gate:all`，交付摘要不得声称「全量通过」而不附逐组结果。
 
 ---
 

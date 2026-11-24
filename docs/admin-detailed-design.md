@@ -107,7 +107,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 0.6 高危操作确认
 
-`ConfirmDialog`（由 `admin-ui/radar` 公开的 shadcn `AlertDialog` 组合壳）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写原因。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
+`ConfirmDialog`（由 `admin-ui/radar` 公开的 shadcn `AlertDialog` 组合壳）用于删除、退款、重置密码、手动调整积分、渠道 / 能力绑定写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写原因。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 
@@ -465,7 +465,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ## 17. 模型层后台
 
-模型层后台共 7 页，按「供应侧 → 协议 → 能力与模型 → 人群 → 排障」排列：`/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` · `/admin/billing-orders` · `/admin/finance`。能力与模型页同时承载能力上下线与模型商品消费配置，旧地址 `/admin/logical-models` 重定向到 `/admin/capabilities`。接口实现分布在 `backend/src/model/**` 与 `backend/src/admin/capability.controller.ts`。
+模型层后台共 7 页，按「供应侧 → 协议 → 能力与模型 → 人群 → 排障」排列：`/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` · `/admin/billing-orders` · `/admin/finance`。能力与模型页同时承载能力上下线与绑定 / 售价配置。接口实现分布在 `backend/src/model/catalog/capability-model.admin.controller.ts` 与 `backend/src/admin/capability.controller.ts`。
 
 ### 17.1 模型商品（原渠道工作台） `/admin/channels`
 
@@ -503,21 +503,25 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ### 17.2 能力与模型中的消费配置 `/admin/capabilities`
 
-页面语言以「能力消费模型商品」为主：能力卡片下直接列它消费的模型商品、用户实付与售卖状态。底层仍是 C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+ 线路（`LogicalModelRoute`），运营不需要理解这三层；新建售卖配置时可从商品台账选择可用商品，自动带入名称、编号与服务来源。
+页面语言以「能力消费模型商品」为主：能力卡片下直接列它绑定的模型商品、用户实付与售卖状态。数据只有两层——`CapabilityModelBinding`（某能力可用的候选商品池，含 `priority` / `weight` / 失效标记）与 `CapabilityPricing`（能力级售价）；前台模型三层（`LogicalModel` / `Revision` / `Route`）已于 2026-11-13 删除，C 端按「能力 + `modelKey`」选择。
 
-页面入口统一为 `/admin/capabilities`；旧地址 `/admin/logical-models` 重定向并保留 query/hash。能力上下线与模型 CRUD 共用同一个卡片工作台，但写操作分别受 `capability.write` / `logical_model.write` 控制。
+页面入口统一为 `/admin/capabilities`；页签为概览 / 商品绑定 / 售价 / 影响面。写操作分别受 `capability.write`（上下线）、`logical_model.write`（绑定，权限点沿用旧名、语义已是「能力绑定」）与 `product.price`（售价）控制。
 
 | 能力 | 接口 | 权限点 |
 | --- | --- | --- |
-| 列表 / 详情 | `GET /admin/logical-models`、`/:id`（`includeArchived` 可选） | `logical_model.read` |
-| 创建 / 更新 / 归档 | `POST /admin/logical-models`、`PATCH /:id`、`DELETE /:id` | `logical_model.write` |
-| 选路模拟 | `POST /admin/logical-models/:id/simulate` | `logical_model.read` |
+| 能力列表 / 上下线 | `GET /admin/capabilities`、`PUT /admin/capabilities/:id` | `capability.read` / `capability.write` |
+| 候选商品池读取 / 替换 | `GET /admin/capabilities/:id/models`、`PUT /admin/capabilities/:id/models` | `logical_model.read` / `logical_model.write` |
+| 清理失效绑定 | `POST /admin/capabilities/:id/models/prune-invalid`、`POST /admin/capability-models/prune-invalid` | `logical_model.write` |
+| 能力售价读取 / 更新 | `GET /admin/capabilities/:id/pricing`、`PUT /admin/capabilities/:id/pricing` | `product.price` |
+| 选路模拟（只读） | `POST /admin/capabilities/:id/simulate` | `logical_model.read` |
+| 商品兼容预览 / 发布绑定 | `GET /admin/channel-models/:id/capabilities`、`POST /admin/channel-models/:id/publish` | `channel.model_read` / `logical_model.write` |
 
 规则：
 
-- 保存即发布一条 revision；任务建单时快照该 revision 的线路与价格，事后改配置不会改已建任务。
+- 候选池按 `priority` 升序、同优先级按权重分配；任务建单时快照命中的 `channelModelId` / `channelId` / `modelKey` 与能力售价，事后改配置不改已建任务。
 - 图像能力的遮罩支持声明在 `capabilityConfig.maskSupported`，下发为 `inputs.mask`；未声明的模型收到遮罩请求返回 `42205`。
-- `simulate` 用系统分组身份跑一遍真实选路，返回命中线路与原因，不建任务、不扣费。
+- `simulate` 用系统分组身份跑一遍真实选路，返回命中商品与原因，不建任务、不扣费。
+- 旧地址 `/admin/credit-prices` 重定向到 `/admin/capabilities?tab=pricing`；不存在 `/admin/logical-models` 路由。
 
 ### 17.3 用户分组 `/admin/user-groups`
 

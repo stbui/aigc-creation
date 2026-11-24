@@ -140,7 +140,7 @@
 | POST | `/api/v1/admin/payments/exceptions/:id/confirm-refund` | 人工核销自动退款，请求体 `{ outcome: 'succeeded' \| 'failed', providerRefundId?, reason }`。仅允许 `cancelled_but_paid` 异常单；只更新退款与异常单，不改订单状态、不回收/恢复积分，`finance.reconcile` |
 | POST | `/api/v1/admin/payments/exceptions/:id/close` | 人工结案，请求体 `{ resolution }`；只关闭异常单，不改订单与积分，`finance.reconcile` |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；渠道写入可带 `defaultModel`（类型 / 接入方式 / 计费与售价 / `enabled`，仅 `image` / `text`），新建商品与上游导入自动套用。写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。渠道与渠道模型删除（含单删、批量删除）保留业务确认，但不要求原因 |
-| GET | `/api/v1/admin/channel-models?channelId=&includeDisabled=` | 跨渠道模型视图（一行 = 一条渠道模型，条目带 `channelName` / `channelEnabled`）。`includeDisabled=1` 含已停用线路 —— 后台「全部模型」视图要用；不传时只给启用线路（前台模型的线路选择器用，停用线路进了下拉会让人以为选了就能用），`channel.model_read` |
+| GET | `/api/v1/admin/channel-models?channelId=&includeDisabled=` | 跨渠道模型视图（一行 = 一条渠道模型，条目带 `channelName` / `channelEnabled`）。`includeDisabled=1` 含已停用线路 —— 后台「全部模型」视图要用；不传时只给启用线路（能力绑定的商品选择器用，停用线路进了下拉会让人以为选了就能用），`channel.model_read` |
 | GET/PUT | `/api/v1/admin/channels/order`、`/api/v1/admin/channels/:id/models/order` | 渠道排序 / 渠道内模型排序。`GET` 返回当前顺序的 id 数组；`PUT` 请求体 `{ ids, expectedIds }` —— `expectedIds` 是**读取时看到的顺序**，与库中不一致说明期间有人改过，整单拒绝 **409**（`code 40900`，「排序列表已变化，请重新加载后再保存」），不做部分落库。权限 `channel.write` / `channel.model_write`， |
 | GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；同时下发清单声明的 `baseUrl`、鉴权字段与配置字段，供渠道表单做服务商预设；`channel.model_read` |
 | GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），`channel.read` |

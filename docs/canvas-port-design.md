@@ -114,7 +114,7 @@ frontend/src/
 
 - 新增 4 个画布能力：`canvas_image` / `canvas_text` / `canvas_video` / `canvas_audio`，`inWorkbench: false`，`mode: 'real'`，走现有 `/generate` 与 `GenerationTask`。
 - 节点类型到能力 id 的映射在 `capability.registry.ts` 单一维护。
-- 画布任务复用现有渠道 / 前台模型 / 路由 / 账单 / 退款 / worker，不另建 provider 链路。
+- 画布任务复用现有渠道 / 能力绑定 / 选路 / 账单 / 退款 / worker，不另建 provider 链路。
 - 普通用户生成结果由前端通过 operations 写回；服务端只允许 Agent、创作会话、修复等受信任路径写回。
 
 ## 4. 数据模型

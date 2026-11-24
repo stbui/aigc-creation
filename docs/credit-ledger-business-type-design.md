@@ -1,6 +1,6 @@
 # 积分明细「业务类型」数据契约与枚举设计
 
-> **状态：第 1 批已实施 · 待验收**（A–J 全部裁定；第 1 批已改码，**尚未跑门禁**，实施记录见 §9）
+> **状态：第 1 批已实施 · 待验收**（A–J 全部裁定；第 1 批已改码，待办见 §9）
 > 日期：2026-11-14 · 适用范围：C 端 `/credits` 积分明细、后台 `/admin/credits` 流水明细
 > 事实源：`backend/prisma/schema.prisma`、`backend/src/credits/credit.service.ts`、`backend/src/model/billing/credit-wallet.service.ts`、`backend/src/capabilities/capability.registry.ts`、`frontend/src/pages/credits/*`
 
@@ -303,32 +303,17 @@ businessType: CreditBusinessType;
 
 ---
 
-## 9. 实施记录 · 第 1 批（2026-11-14）
+## 9. 实施状态与待办
 
-**已完成（已改码，未跑门禁）**
-
-| 层 | 文件 | 实际改动 |
-|---|---|---|
-| Schema | `prisma/schema.prisma` | `businessType String @default("")` + `@@index([userId, businessType])`；已执行 `prisma generate`，**当时未落库**（记录写于 `db push` 时期） |
-| 钱包 | `credit-wallet.service.ts` | `WalletEntryMeta.businessType`；`writeEntry` 落库；`expireLot` 固定 `credit_expire`；`settle` 的 refund / expire 流水**强制覆盖**为 `refund` / `credit_expire`（防止消费侧类型透传导致退标记成生图扣费） |
-| 服务 | `credit.service.ts` | 新增 `CREDIT_BUSINESS_TYPES`、`fallbackBusinessType`、`resolveBusinessType`；`grant`/`consume` 增加 `businessType` 入参并校验绑定与方向；`ledgerOf` 增加筛选与白名单；`projectEntry` 投影 + 兜底；`reclaimOrder` 记 `refund` |
-| 扣费 | `billing.service.ts` | 新增 `creativeBusinessTypeOf(modality)`；`settle`/`reserve` 的 meta 写入业务类型（image/video → `creative_image`，其余 → `other`） |
-| 触发点 | `marketing`(签到/邀请)、`membership`(首期/月度)、`orders`(购买)、`task-lifecycle`(补偿退款)、`credit.adminAdjust` | 分别记 `checkin_streak` / `invite_reward` / `membership_grant` / `purchase` / `refund` / `admin_adjust` |
-| 控制器 | `credits.controller.ts`、`admin/commerce.controller.ts` + `admin/commerce/credit-admin.service.ts` | C 端与后台均支持 `businessType` 查询参数，非法值 400 |
-| 前端 | `types/admin-console.ts`、`types/api.d.ts`、`lib/api.ts`、`credits/constants.ts`、`credits/utils.ts`、`CreditsLedgerPanel.tsx`、`CreditsLedgerList.tsx` | 类型与参数；`BUSINESS_TYPE_LABEL`；`ledgerTypeLabel()`（业务类型优先）；表格与窄屏列表改用该函数；筛选器 `expire` 文案改「积分过期」 |
-| 后台文案 | `admin/credits/constants.ts` | `expire` 同步改「积分过期」 |
-| 测试 | `credit.service.spec.ts`、`billing.service.spec.ts` | 绑定/方向校验、兜底映射、脏值处理、text/audio 例外 |
+**已落地**：`CreditLedgerEntry.businessType`（默认空串，`@@index([userId, businessType])`）；钱包写入与 `expireLot` / `settle` 的退款、过期流水强制覆盖；`CREDIT_BUSINESS_TYPES`、`resolveBusinessType` 与绑定 / 方向校验；`ledgerOf` 的业务类型筛选与白名单；各触发点（签到 / 邀请 / 会员 / 购买 / 退款 / 管理调整）写入业务类型；C 端与后台查询参数；前端类型、文案与筛选器。迁移已随 baseline 纳入 Prisma Migrate，运行期执行 `npm run db:migrate:deploy`。
 
 **刻意的取舍（非遗漏）**
 
 1. **`LEDGER_LABEL.consume` 不改成「创意生图扣费」**（见 §3.2 R1 修正）。
-2. **历史流水不参与 `businessType` 筛选**：查询严格按落库值过滤，不按 `type` 反推。历史 `consume` 无法区分图片/视频与文本/音频，猜成生图会把代理计费算进去。历史行在「全部流水」中按兜底文案正常展示。
-3. **后台 UI 未改**（筛选器、列展示仍按动作类型），留第 2 批与 C 端第二个筛选一并做。
-4. **当时未落库**：表结构记录写于 `db push` 时期；2026-11-24 起由 Prisma Migrate 管理，该列已随 baseline 迁移落库，运行期只需 `npm run db:migrate:deploy`。
+2. **历史流水不参与 `businessType` 筛选**：查询严格按落库值过滤，不按 `type` 反推；历史 `consume` 无法区分图片 / 视频与文本 / 音频，猜成生图会把代理计费算进去。历史行在「全部流水」中按兜底文案正常展示。
+3. **后台 UI 暂按动作类型展示**，与 C 端第二个筛选一并排期。
 
 **待办**
 
-- [ ] 数据库迁移：`npm run db:migrate:deploy`（dev/test/prod 各自执行一次；baseline 已在库中则跳过）
-- [ ] 门禁：`test:typecheck` → `vitest` → `build` → `smoke` → `route-baseline` → `e2e` → `mutation`
-- [ ] 第 2 批：C 端第二个筛选 `Select` + 后台展示同步
-- [ ] 第 3 批：新用户赠送发放点（100 积分 / 永久）
+- [ ] 第 2 批：C 端第二个筛选 `Select` + 后台展示同步。
+- [ ] 第 3 批：新用户赠送发放点（100 积分 / 永久）。

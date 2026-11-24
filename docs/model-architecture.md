@@ -2,13 +2,13 @@
 
 > 范围：`backend/src/model/**` 与它对外暴露的 `/models`、`/admin/channels`、`/admin/capabilities`、
 > `/admin/api-logs`、`/admin/billing-orders`、`/admin/finance`、`/ai/*` 中转。
-> 本文只写**当前实际实现**，每条约束都能在代码里核对；设计动机见
-> `docs/channel-model-automation-design.md`（本轮重构）与 `docs/channel-model-design.md`（上一轮移植）。
+> 本文只写**当前实际实现**，每条约束都能在代码里核对；设计动机、移植记录与未实施的增量设计见
+> [`docs/channel-model-design.md`](./channel-model-design.md)。
 >
 > 前台模型层（`LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute`）已于 2026-11-13 删除：
 > 渠道模型直接作为售卖供给，按能力绑定后由运行时自动切换线路。
 >
-> 详细实施规格见 [`docs/model-channel-architecture.md`](./model-channel-architecture.md)，包括接口契约、追踪字段、发布检查、状态机和开发任务拆分。
+> 尚未实施的追踪闭环、发布检查与供应商维度见本文 §15。
 
 ## 1. 一句话
 
@@ -328,8 +328,7 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 
 ## 14. 相关文档
 
-- 本轮重构方案：`docs/channel-model-automation-design.md`
-- 上一轮移植记录：`docs/channel-model-design.md`
+- 设计动机、移植记录与增量设计：`docs/channel-model-design.md`
 - 三环境与变量矩阵：`docs/environments.md`
 - 接口清单与错误码：`docs/api-contract.md`
 - 积分扣费与退款口径：`docs/commerce-design.md`
@@ -337,7 +336,7 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 
 ## 15. 追踪闭环与配置发布（待实施）
 
-这部分是当前实现的增量设计，与前文“当前实际实现”分开记录。
+这部分是当前实现的增量设计，与前文「当前实际实现」分开记录；未落地前不得当作现状。
 
 ### 15.1 追踪字段
 
@@ -345,12 +344,14 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 | --- | --- | --- |
 | `GenerationTask` | `traceId` | 一次提交或批次跨 HTTP、worker、轮询持续存在的链路标识 |
 | `GenerationTask` | `admissionRequestId` | 创建任务的入口 HTTP 请求标识 |
+| `GenerationTask` | `modelDisplayName`、`protocol`、`providerModelKey`、`catalogVersion` | 建任务时的展示名、协议、上游键与目录版本快照 |
 | `RouteAttempt` | `traceId` | 与任务直接关联，支持链路查询 |
 | `RouteAttempt` | `selectionSnapshotJson` | 候选数、健康层、priority、weight、目录版本等非敏感选路摘要 |
 | `RouteAttempt` | `channelSnapshotJson` | 渠道、渠道模型、协议和上游键快照，不含密钥 |
+| `RouteAttempt` | `failurePhase`、`switchedFromAttemptId` | 失败阶段（admission / prepare / create / poll / result / settle）与切线来源 |
 | `ApiCallLog` | `routeAttemptId` | 精确关联 create / poll / result 等物理调用 |
 | `ApiCallLog` | `phase` | `upload` / `create` / `poll` / `result` / `cancel` / `agent` / `proxy` |
-| `ApiCallLog` | `routeRun`、`attemptNumber` | 直接按重试轮次和线路尝试排序 |
+| `ApiCallLog` | `routeRun`、`attemptNumber`、`requestSent`、`safeToRetry` | 按重试轮次与线路尝试排序，并记录是否已出站 |
 
 worker 不得依赖入口请求的 `AsyncLocalStorage` 获取这些值；必须从任务和尝试快照传递。
 
@@ -361,12 +362,45 @@ GET /admin/model-traces/:traceId
 GET /admin/model-traces?taskId=&providerRequestId=&billingOrderId=&status=&from=&to=
 ```
 
-返回任务、账单、路由尝试、物理调用、上游任务号、产物和人工处置的只读聚合视图。详情可以返回脱敏报文预览，但永不返回鉴权头、API Key、Secret Key 或解密后的自定义头。
+返回任务、账单、路由尝试、物理调用、上游任务号、产物和人工处置的只读聚合视图。列表只返回摘要与分页游标；详情可返回脱敏报文预览，但永不返回鉴权头、API Key、Secret Key 或解密后的自定义头。查询条件优先用 `traceId` / `taskId` / `providerRequestId` / `billingOrderId`，不允许用任意上游 URL 做模糊全文搜索。
 
 ### 15.3 配置发布检查
 
-保存配置与发布配置分离。发布前统一检查协议注册和能力、渠道启停与 Base URL、凭证完整性、能力合同、有效价格档、能力绑定和用户可见性。检查接口一次返回全部 `blocking` / `warnings`，发布成功后才递增 `RouteCatalogVersion`。
+保存配置与发布配置分离：保存可以保留未完成配置，只有发布检查通过的配置才能进入前台目录。发布前统一返回全部 `blocking` / `warnings`，不要只返回第一条错误。
 
-### 15.4 MVP
+| 检查 | 阻断条件 | 错误码 |
+| --- | --- | --- |
+| 协议 | 未注册、已停用或不支持该能力 | `protocol_unavailable` |
+| 渠道 | 删除、停用、Base URL 无效 | `channel_unavailable` |
+| 凭证 | 声明必填字段未配置 | `credential_missing` |
+| 模型合同 | capability / operation / 参数声明非法 | `capability_contract_invalid` |
+| 成本档 | 没有启用且完整的有效档位 | `price_tier_missing` |
+| 能力绑定 | 绑定能力不存在或已下线 | `capability_unavailable` |
+| 用户可见性 | 所有分组均不可见 | `visibility_empty` |
+| 健康 | 最近连续失败且无可用备用线路 | warning，不默认阻断 |
 
-第一期只实施：任务链路 `traceId`、尝试与调用精确关联、trace 详情、渠道模型发布检查、后台明确区分 `modelKey` / `modelGroupKey` / `providerModelKey`，以及一条 OpenAI 主线路和备用线路的端到端测试。
+发布成功后才递增 `RouteCatalogVersion`；草稿编辑不影响正在运行的任务。
+
+### 15.4 供应商维度（P3）
+
+当前 `ModelChannel` 更接近「供应商连接实例」，但产品文案常把它叫供应商。建议后续引入轻量主数据：
+
+```text
+ModelSupplier  id / code / displayName / icon / enabled
+ModelChannel   supplierId / name / accountLabel / baseUrl / credentials / proxy / concurrency
+ChannelModel   channelId / providerModelKey / modelGroupKey / capability / protocol
+```
+
+插件的 `vendor` 只表示协议或插件作者，不替代 `ModelSupplier`。P3 之前不强制新增表，可先在 `ModelChannel` 增加 `supplierCode` / `accountLabel` 展示字段；不能把插件 `vendor` 或渠道 `name` 当成稳定供应商主键。
+
+### 15.5 开发顺序与 MVP
+
+| 批次 | 内容 |
+| --- | --- |
+| M1 | 任务 `traceId` / `admissionRequestId`；建任务时快照入口请求标识，批次子任务继承同一 `traceId`；trace 查询聚合接口 |
+| M2 | `RouteAttempt.traceId` 与快照字段；`ApiCallLog` 补 `routeAttemptId` / `phase` / 轮次 / 尝试号；中转调用 phase 固定 `proxy` |
+| M3 | 提取 `PublishCheckService`，后台发布与真实路由共用检查函数；发布成功才递增目录版本 |
+| M4 | 后台渠道页补供应商 / 连接 / 发布状态；能力页补发布前检查；调用记录、账单、任务详情互相深链 |
+| M5 | 同步生图、异步轮询、401 / 429 切线、5xx uncertain、媒体回收失败的端到端测试 |
+
+MVP 只做：任务 `traceId`、尝试与调用精确关联、trace 详情、渠道模型发布检查、后台明确区分 `modelKey` / `modelGroupKey` / `providerModelKey`，以及一条 [OI] 主线路与备用线路的端到端验证。供应商主数据、跨供应商成本中心、复杂灰度与配置版本回滚不在 MVP。

@@ -789,7 +789,7 @@ admission.admit({
   dto: {
     projectId: hiddenProjectId,
     capability: NODE_CAPABILITY[node.type],
-    logicalModelId: node.metadata.generationSpec.modelId,
+    modelKey: node.metadata.generationSpec.modelId,
     inputAssetIds: collectInputAssets(node),
     params: buildCanvasParams(node),
     idempotencyKey: `canvas:${canvasId}:${node.id}:${taskAttempt}`,
@@ -797,7 +797,7 @@ admission.admit({
 });
 ```
 
-- `logicalModelId` 必填。画布节点没有选模型时，前端必须在提交前让用户选；服务端返回 `40005`，不要猜默认模型。
+- `modelKey` 必填。画布节点没有选模型时，前端必须在提交前让用户选；服务端返回 `40005`，不要猜默认模型。
 - 批量：一次提交 N 个节点 → N 个独立任务、各自账单；`outputPlan` 不适用于画布（画布层已经按节点拆开）。
 - 重试：复用现有 `retryTask` 语义，但画布重试要生成新的 `taskAttempt`，且只允许在该节点的 `metadata.taskId` 仍是失败任务时执行。
 - 取消 / 失败退款沿用现有账单状态机；画布不直接改积分。

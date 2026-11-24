@@ -70,7 +70,7 @@
 
 **为什么必须拆**：财务能退款 = 能改钱，运营能删用户 = 能毁数据。两种权限绑在一个布尔位上，出了事无法区分是谁做的，责任边界也失去意义。
 
-`operator` 的模型侧只有读权限（`channel.read` / `channel.model_read` / `logical_model.read` / `user_group.read` / `plugin.read` / `billing_order.read` / `model.analytics_read`）与调用记录 `model.call_read`；写渠道、渠道模型（含凭证与价格档）、前台模型、分组与插件一律拒绝。`channel.test` 同时覆盖存储 / 通知探测与模型渠道连通性测试，只探测、不写配置；渠道模型本身的编辑仍受 `channel.model_write` 管控。`finance` 额外持有 `billing_order.resolve`，可对 `uncertain` 账单人工结算或退款。
+`operator` 的模型侧只有读权限（`channel.read` / `channel.model_read` / `logical_model.read` / `user_group.read` / `plugin.read` / `billing_order.read` / `model.analytics_read`）与调用记录 `model.call_read`；写渠道、渠道模型（含凭证与价格档）、能力绑定、分组与插件一律拒绝。`channel.test` 同时覆盖存储 / 通知探测与模型渠道连通性测试，只探测、不写配置；渠道模型本身的编辑仍受 `channel.model_write` 管控。`finance` 额外持有 `billing_order.resolve`，可对 `uncertain` 账单人工结算或退款。
 
 ### 2.2 权限点
 
@@ -90,7 +90,7 @@
 | 提示词库 | `prompt.read` / `prompt.write` |
 | 能力 | `capability.read` / `capability.write` |
 | 渠道与线路 | `channel.read` / `channel.write` / `channel.test` / `channel.model_read` / `channel.model_write` |
-| 前台模型与分组 | `logical_model.read` / `logical_model.write` / `user_group.read` / `user_group.write` |
+| 能力绑定与分组 | `logical_model.read` / `logical_model.write` / `user_group.read` / `user_group.write` |
 | 插件 | `plugin.read` / `plugin.write` |
 | 账单与台账 | `billing_order.read` / `billing_order.resolve` / `model.call_read` / `model.analytics_read` |
 | 增长与服务 | `marketing.read` / `marketing.write` / `message.write` / `ticket.read` / `ticket.handle` |
@@ -137,7 +137,7 @@
 | 身份安全 | `AccountToken` / `LoginLog` / `LoginSession` |
 | 内容与合规 | `Notification` / `MessageTemplate` / `AigcLabelConfig` |
 | 服务 | `Ticket` / `TicketReply` |
-| 模型层 | `ModelChannel` / `ChannelModel` / `ChannelModelPriceTier` / `LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute` / `RouteAttempt` / `UserGroup` / `UserGroupChannel` / `BillingOrder` / `ApiCallLog` / `CapabilityControl` |
+| 模型层 | `ModelChannel` / `ChannelModel` / `ChannelModelPriceTier` / `CapabilityModelBinding` / `CapabilityPricing` / `RouteAttempt` / `UserGroup` / `UserGroupChannel` / `BillingOrder` / `ApiCallLog` / `CapabilityControl` |
 | 运维 | `BackupRecord` / `CleanupLog` / `PluginPlatformState` / `UserPluginState` / `RouteCatalogVersion` |
 
 SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String 存储，取值范围由 DTO 白名单强制约束。计费相关字段以**快照**为准（`GenerationTask.creditCost`、`OrderItem.priceCentsSnapshot`），不事后按当前价重算。
@@ -163,7 +163,7 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 发票 `/admin/invoices*` | `invoices-admin.controller.ts` |
 | 支付域 `/admin/payments*`（渠道 / 商品 / 订单 / 对账） | `admin/payments/payment-admin.controller.ts` |
 | 渠道 `/admin/channels*`、`/admin/channel-models*` | `model/channels/channel.controller.ts` |
-| 能力与模型 · 前台模型接口 `/admin/logical-models*` | `model/catalog/admin-logical-model.controller.ts` |
+| 能力与模型 · 绑定与售价 `/admin/capabilities/:id/models*`、`/admin/capabilities/:id/pricing`、`/admin/capability-models*`、`/admin/channel-models/:id/*` | `model/catalog/capability-model.admin.controller.ts` |
 | 用户分组 `/admin/user-groups*` | `model/user-groups/user-group.controller.ts` |
 | 插件 `/admin/plugins*` | `model/plugins/plugin.controller.ts` |
 | 调用记录 `/admin/api-logs*` | `model/billing/billing-admin.controller.ts`（`admin/api-logs`） |
