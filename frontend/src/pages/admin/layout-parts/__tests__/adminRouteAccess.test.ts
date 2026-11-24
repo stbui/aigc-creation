@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ROLE_PERMISSIONS_FOR_TEST } from './adminRouteAccessTestFixtures';
 import {
@@ -122,6 +125,44 @@ describe('后台路由授权：边界', () => {
  * `ROUTE_ONLY_PERMISSIONS` / 菜单都必须覆盖到这里列出的每个真实路径 ——
  * 新增路由而忘了给权限映射时，本表会红。
  */
+const LAYOUT_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../layout.tsx');
+
+/**
+ * 从 `layout.tsx` 源码解析真实注册的后台路由。
+ *
+ * 手写清单只能证明「我列的那些有判定」，证明不了「新加的页面也有判定」——
+ * 新增 `<Route>` 而忘了配 nav 时，守卫对未知路径是放行的（交给
+ * `NotImplementedPage`），手写清单不会红。这里直接读源码，让漏配必然失败。
+ *
+ * 解析规则：
+ *   - 只取 `<Routes>` 与 `</Routes>` 之间的内容；
+ *   - 按 `<Route` 切段，每段取第一个 `path="..."`（本文件里 path 总在 element 之前）；
+ *   - 没有 path 的是 index 路由，即概览 `/admin`；
+ *   - `path="*"` 原样保留为 `*`，它是 catch-all，不属于具体页面。
+ */
+function parseAdminRoutesFromLayout(source: string): string[] {
+  const start = source.indexOf('<Routes>');
+  const end = source.indexOf('</Routes>');
+  if (start === -1 || end === -1) {
+    throw new Error('layout.tsx 里找不到 <Routes> 块，解析器需要同步更新');
+  }
+  const block = source.slice(start + '<Routes>'.length, end);
+  return block
+    .split('<Route')
+    .slice(1)
+    .map((segment) => {
+      const matched = segment.match(/path="([^"]+)"/);
+      if (!matched) return '/admin';
+      const routePath = matched[1];
+      return routePath === '*' ? '*' : `/admin/${routePath}`;
+    });
+}
+
+const REGISTERED_ROUTES = parseAdminRoutesFromLayout(readFileSync(LAYOUT_PATH, 'utf8'));
+/** 去掉 catch-all 后的真实页面路由 */
+const REGISTERED_PAGES = REGISTERED_ROUTES.filter((path) => path !== '*');
+
+/** 手写期望表：只用来对账「源码里到底有哪些路由」，不作为判定依据 */
 const ALL_ADMIN_ROUTES: string[] = [
   '/admin',
   '/admin/alerts',
@@ -167,35 +208,52 @@ const ALL_ADMIN_ROUTES: string[] = [
   '/admin/aigc-label',
 ];
 
-describe('后台路由解析表', () => {
-  it('42 条路由全部有确定判定（无 undefined）', () => {
-    expect(ALL_ADMIN_ROUTES).toHaveLength(42);
-    for (const path of ALL_ADMIN_ROUTES) {
-      const decision = resolveAdminRouteAccess(path, has(admin));
-      expect(['allow', 'deny']).toContain(decision.kind);
-    }
+describe('后台路由解析表（对账 layout.tsx 源码）', () => {
+  it('源码解析出 42 条页面路由 + 1 条 catch-all', () => {
+    expect(REGISTERED_PAGES).toHaveLength(42);
+    expect(REGISTERED_ROUTES).toContain('*');
   });
 
-  it('除公共页与重定向壳外，每条路由都能解析到具体权限点', () => {
+  it('解析结果与手写期望表完全相等（多、少都红）', () => {
+    expect([...REGISTERED_PAGES].sort()).toEqual([...ALL_ADMIN_ROUTES].sort());
+  });
+
+  it('每条真实路由都能解析到权限门槛，没有一条落进「未知路径放行」', () => {
     const unmapped: string[] = [];
-    for (const path of ALL_ADMIN_ROUTES) {
-      const denied = resolveAdminRouteAccess(path, () => false);
-      if (denied.kind === 'allow') {
-        // 放行只能是两类：菜单里 permission 为 null 的公共页，或 catch-all 之外的壳表遗漏
-        const isPublic = PUBLIC_ADMIN_ROUTES.includes(path);
-        if (!isPublic) unmapped.push(path);
+    for (const path of REGISTERED_PAGES) {
+      const decision = resolveAdminRouteAccess(path, () => false);
+      if (decision.kind === 'allow') {
+        // 允许放行的只有：菜单里 permission 为 null 的公共页（PUBLIC_ADMIN_ROUTES）
+        if (!PUBLIC_ADMIN_ROUTES.includes(path)) unmapped.push(path);
       }
     }
     expect(unmapped).toEqual([]);
   });
 
-  it('重定向壳表与真实路由一致，无多余项', () => {
+  it('公共页与 catch-all 的放行是显式的，不靠遗漏', () => {
+    for (const path of PUBLIC_ADMIN_ROUTES) {
+      expect(REGISTERED_PAGES, `${path} 在豁免表里但路由已不存在`).toContain(path);
+      expect(resolveAdminRouteAccess(path, () => false).kind).toBe('allow');
+    }
+    // catch-all 不参与页面判定：未知路径放行只为了交给 NotImplementedPage 显示 404
+    expect(resolveAdminRouteAccess('/admin/not-a-page', () => false).kind).toBe('allow');
+  });
+
+  it('重定向壳表的每个键都是真实路由，且都有权限门槛', () => {
     const shells = Object.keys(ROUTE_ONLY_PERMISSIONS);
     expect(shells.sort()).toEqual(
       ['/admin/credit-prices', '/admin/payment-channels', '/admin/reconciliation'].sort(),
     );
     for (const shell of shells) {
-      expect(ALL_ADMIN_ROUTES, `${shell} 不在路由表里`).toContain(shell);
+      expect(REGISTERED_PAGES, `${shell} 在壳表里但路由已不存在`).toContain(shell);
+      expect(resolveAdminRouteAccess(shell, () => false).kind).toBe('deny');
+    }
+  });
+
+  it('每条路由对 admin 都有确定判定', () => {
+    for (const path of ALL_ADMIN_ROUTES) {
+      const decision = resolveAdminRouteAccess(path, has(admin));
+      expect(['allow', 'deny']).toContain(decision.kind);
     }
   });
 });
