@@ -19,7 +19,7 @@ import { OptionalJwtAuthGuard } from '../../common/optional-jwt-auth.guard';
 import { buildModelRequestIntent } from '../intent/model-intent';
 import type { ModelRequestIntent } from '../intent/spec-types';
 import { UserGroupService } from '../user-groups/user-group.service';
-import { ModelIntentBodyDto } from './models.controller';
+import { ModelIntentBodyDto } from './dto';
 import { PublicModelCatalogService } from './public-model-catalog.service';
 
 /**

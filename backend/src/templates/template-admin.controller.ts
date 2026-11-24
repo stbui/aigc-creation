@@ -46,13 +46,28 @@ export class TemplateAdminController {
   @Post('categories')
   @RequirePermission(PERMISSIONS.templateWrite)
   createCategory(@Body() dto: CreateTemplateCategoryDto) {
-    return this.catalog.createCategory(dto);
+    // DTO → 领域入参显式映射: DTO 实例不流入 service
+    return this.catalog.createCategory({
+      slug: dto.slug,
+      name: dto.name,
+      sourceUrl: dto.sourceUrl,
+      description: dto.description,
+      sortOrder: dto.sortOrder,
+      enabled: dto.enabled,
+    });
   }
 
   @Patch('categories/:id')
   @RequirePermission(PERMISSIONS.templateWrite)
   updateCategory(@Param('id') id: string, @Body() dto: UpdateTemplateCategoryDto) {
-    return this.catalog.updateCategory(id, dto);
+    return this.catalog.updateCategory(id, {
+      slug: dto.slug,
+      name: dto.name,
+      sourceUrl: dto.sourceUrl,
+      description: dto.description,
+      sortOrder: dto.sortOrder,
+      enabled: dto.enabled,
+    });
   }
 
   @Delete('categories/:id')
@@ -66,13 +81,24 @@ export class TemplateAdminController {
   @Post('groups')
   @RequirePermission(PERMISSIONS.templateWrite)
   createGroup(@Body() dto: CreateTemplateGroupDto) {
-    return this.catalog.createGroup(dto);
+    return this.catalog.createGroup({
+      categoryId: dto.categoryId,
+      slug: dto.slug,
+      name: dto.name,
+      sortOrder: dto.sortOrder,
+      enabled: dto.enabled,
+    });
   }
 
   @Patch('groups/:id')
   @RequirePermission(PERMISSIONS.templateWrite)
   updateGroup(@Param('id') id: string, @Body() dto: UpdateTemplateGroupDto) {
-    return this.catalog.updateGroup(id, dto);
+    return this.catalog.updateGroup(id, {
+      slug: dto.slug,
+      name: dto.name,
+      sortOrder: dto.sortOrder,
+      enabled: dto.enabled,
+    });
   }
 
   @Delete('groups/:id')
@@ -86,13 +112,28 @@ export class TemplateAdminController {
   @Post('items')
   @RequirePermission(PERMISSIONS.templateWrite)
   createItem(@Body() dto: CreateTemplateItemDto) {
-    return this.catalog.createItem(dto);
+    return this.catalog.createItem({
+      groupId: dto.groupId,
+      name: dto.name,
+      prompt: dto.prompt,
+      imageUrl: dto.imageUrl,
+      tags: dto.tags,
+      sortOrder: dto.sortOrder,
+      enabled: dto.enabled,
+    });
   }
 
   @Patch('items/:id')
   @RequirePermission(PERMISSIONS.templateWrite)
   updateItem(@Param('id') id: string, @Body() dto: UpdateTemplateItemDto) {
-    return this.catalog.updateItem(id, dto);
+    return this.catalog.updateItem(id, {
+      name: dto.name,
+      prompt: dto.prompt,
+      imageUrl: dto.imageUrl,
+      tags: dto.tags,
+      sortOrder: dto.sortOrder,
+      enabled: dto.enabled,
+    });
   }
 
   @Delete('items/:id')

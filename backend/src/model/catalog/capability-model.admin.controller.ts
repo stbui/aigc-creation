@@ -105,7 +105,18 @@ export class AdminCapabilityModelsController {
     @Body() dto: CapabilityPricingDto,
     @AdminUser() user: { id: string; email: string },
   ) {
-    return this.service.setPricing(id, dto, user.email);
+    // DTO → PricingInput 显式映射, service 不感知 class-validator
+    return this.service.setPricing(
+      id,
+      {
+        billingMode: dto.billingMode,
+        unitPriceMicrocredits: dto.unitPriceMicrocredits,
+        inputTokenPriceMicrocredits: dto.inputTokenPriceMicrocredits,
+        outputTokenPriceMicrocredits: dto.outputTokenPriceMicrocredits,
+        cachedTokenPriceMicrocredits: dto.cachedTokenPriceMicrocredits,
+      },
+      user.email,
+    );
   }
 
   @Post('capabilities/:id/simulate')
@@ -116,7 +127,11 @@ export class AdminCapabilityModelsController {
     @AdminUser() user: { id: string },
   ) {
     const access = await this.groups.accessForUser(user.id);
-    return this.service.simulate(access, id, dto);
+    return this.service.simulate(access, id, {
+      modelKey: dto.modelKey,
+      inputs: dto.inputs,
+      options: dto.options,
+    });
   }
 
   @Get('channel-models/:id/capabilities')

@@ -3,9 +3,11 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppError } from '../../common/app.exception';
 import { SettingsService } from '../../common/settings.service';
+import { toCsv } from '../../common/csv';
 import { PaymentConfigService } from '../../payments/payment-config.service';
 import {
   buildAdminPaymentOrderWhere,
+  formatShanghai,
   orderByOf,
   paymentStatusOf,
   PaymentDisplayStatus,
@@ -193,7 +195,8 @@ export class AdminPaymentsService {
     };
   }
 
-  async ordersForExport(query: Parameters<AdminPaymentsService['orders']>[0]) {
+  /** 支付订单导出。CSV 组表在 service: 列定义属于报表口径, 不属于 HTTP 适配 */
+  async exportOrdersCsv(query: Parameters<AdminPaymentsService['orders']>[0]): Promise<string> {
     const where = buildAdminPaymentOrderWhere(query, new Date());
     /*
      * 导出是财务的正式交付物，超过上限**必须报错**，不能静默截断。
@@ -214,7 +217,36 @@ export class AdminPaymentsService {
       select: ORDER_LIST_SELECT,
     });
     const now = new Date();
-    return rows.map((row) => this.toOrderRow(row, now));
+    return toCsv(
+      [
+        { label: '订单号', value: (r) => r.orderNo },
+        { label: '用户ID', value: (r) => r.userId },
+        { label: '用户名', value: (r) => r.user?.name ?? '' },
+        { label: '用户邮箱', value: (r) => r.user?.email ?? '' },
+        { label: '商品', value: (r) => r.productName },
+        { label: '渠道', value: (r) => r.providerId },
+        { label: '金额(分)', value: (r) => r.amountCents },
+        { label: '币种', value: (r) => r.currency },
+        { label: '权益(积分)', value: (r) => r.credits },
+        { label: '状态', value: (r) => r.status },
+        { label: '渠道交易号', value: (r) => r.providerTradeNo ?? '' },
+        { label: '创建时间', value: (r) => formatShanghai(new Date(r.createdAt)) },
+        {
+          label: '支付时间',
+          value: (r) =>
+            formatShanghai(r.providerPaidAt ? new Date(r.providerPaidAt) : null),
+        },
+        {
+          label: '入账时间',
+          value: (r) => formatShanghai(r.creditedAt ? new Date(r.creditedAt) : null),
+        },
+        {
+          label: '关闭时间',
+          value: (r) => formatShanghai(r.closedAt ? new Date(r.closedAt) : null),
+        },
+      ],
+      rows.map((row) => this.toOrderRow(row, now)),
+    );
   }
 
   // ── 内部 ────────────────────────────────────────────────────────

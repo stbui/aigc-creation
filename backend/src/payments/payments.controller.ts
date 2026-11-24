@@ -15,19 +15,12 @@ import { isIP } from 'node:net';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
-import { AppError } from '../common/app.exception';
 import { SettingsService } from '../common/settings.service';
 import { SettingImageService } from '../common/setting-image.service';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentNotificationService } from './payment-notification.service';
-import { getAdapter } from './adapters';
-import {
-  PAYMENT_CURRENCIES,
-  PaymentCurrency,
-  PaymentProviderId,
-  VISIBLE_PAYMENT_METHODS,
-} from './adapters/types';
+import { PaymentProviderId, VISIBLE_PAYMENT_METHODS } from './adapters/types';
 
 export class CreateIntentDto {
   /** C 端可见支付方式。多个可用方式时必传 */
@@ -65,7 +58,7 @@ export class PaymentsController {
   async settingsView() {
     const rules = await this.settings.paymentRules();
     const currency = await this.settings.get<string>('payment.defaultCurrency');
-    const target = this.normalizeCurrency(String(currency || 'CNY'));
+    const target = this.configs.normalizeCurrency(String(currency || 'CNY'));
     const providers = rules.enabled
       ? await this.configs.availableVisible(target)
       : [];
@@ -82,7 +75,7 @@ export class PaymentsController {
   @Get('providers')
   @UseGuards(JwtAuthGuard)
   async providers(@Query('currency') currency?: string) {
-    const target = this.normalizeCurrency(currency);
+    const target = this.configs.normalizeCurrency(currency);
     const rules = await this.settings.paymentRules();
     const items = rules.enabled
       ? await this.configs.availableVisible(target)
@@ -185,10 +178,8 @@ export class PaymentsController {
     body: Record<string, unknown>,
     res: Response,
   ): Promise<void> {
-    if (!getAdapter(providerId)) {
-      throw new AppError(40400, `未知支付渠道: ${providerId}`, 404);
-    }
-
+    // 未知渠道的拒绝语义在 PaymentNotificationService.ingest 内: 以渠道格式
+    // (纯文本/JSON ack) 回复 404, 比统一异常信封更符合回调协议。
     const ack = await this.notifications.ingest({
       providerId: providerId as PaymentProviderId,
       configId,
@@ -200,14 +191,6 @@ export class PaymentsController {
     res.status(ack.status);
     res.setHeader('Content-Type', ack.contentType);
     res.send(ack.body);
-  }
-
-  private normalizeCurrency(currency?: string): PaymentCurrency {
-    if (!currency) return 'CNY';
-    if (!(PAYMENT_CURRENCIES as string[]).includes(currency)) {
-      throw new AppError(40001, `不支持的币种: ${currency}`, 400);
-    }
-    return currency as PaymentCurrency;
   }
 }
 

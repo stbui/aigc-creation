@@ -26,7 +26,7 @@ export class AccountController {
 
   @Patch()
   async update(@CurrentUser() user: AuthUser, @Body() dto: UpdateProfileDto) {
-    return this.account.updateProfile(user.id, dto);
+    return this.account.updateProfile(user.id, { name: dto.name });
   }
 
   /** 改密成功后旧 token 全部失效（含当前这把），前端需跳登录 */

@@ -38,7 +38,15 @@ export class TicketsController {
   @Post()
   @RateLimit(RL_TICKET_CREATE)
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateTicketDto) {
-    return this.tickets.create(user.id, dto);
+    // DTO → 领域入参显式映射: service 不感知 class-validator
+    return this.tickets.create(user.id, {
+      type: dto.type,
+      subject: dto.subject,
+      content: dto.content,
+      priority: dto.priority,
+      orderId: dto.orderId,
+      assetId: dto.assetId,
+    });
   }
 
   @Get(':id')

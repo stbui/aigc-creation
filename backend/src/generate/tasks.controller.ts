@@ -1,7 +1,38 @@
 import { Controller, Delete, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { GenerateService } from './generate.service';
+
+/** 任务分页列表查询参数。上限 100 与 service 端收敛值一致 */
+export class TaskPageQueryDto {
+  @IsOptional()
+  @IsString()
+  projectId?: string;
+
+  @IsOptional()
+  @IsString()
+  capability?: string;
+
+  /** '1' / 'true' 时过滤失败与已取消任务 */
+  @IsOptional()
+  @IsString()
+  excludeFailed?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: 'limit 必须是整数' })
+  @Min(1, { message: 'limit 最小为 1' })
+  @Max(100, { message: 'limit 最大为 100' })
+  limit?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: 'offset 必须是整数' })
+  @Min(0, { message: 'offset 不能为负' })
+  offset?: number;
+}
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard)
@@ -14,22 +45,13 @@ export class TasksController {
    * ⚠ 必须注册在 `:id` 之前，否则 `/tasks/page` 会被当成 id='page'。
    */
   @Get('page')
-  listPage(
-    @CurrentUser() user: AuthUser,
-    @Query('projectId') projectId?: string,
-    @Query('capability') capability?: string,
-    @Query('excludeFailed') excludeFailed?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    const n = Number(limit ?? 50);
-    const skip = Number(offset ?? 0);
+  listPage(@CurrentUser() user: AuthUser, @Query() query: TaskPageQueryDto) {
     return this.generateService.listTasksPage(user.id, {
-      projectId,
-      capability,
-      excludeFailed: excludeFailed === '1' || excludeFailed === 'true',
-      limit: Number.isFinite(n) ? n : 50,
-      offset: Number.isFinite(skip) ? skip : 0,
+      projectId: query.projectId,
+      capability: query.capability,
+      excludeFailed: query.excludeFailed === '1' || query.excludeFailed === 'true',
+      limit: query.limit,
+      offset: query.offset,
     });
   }
 

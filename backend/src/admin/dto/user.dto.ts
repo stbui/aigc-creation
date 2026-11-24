@@ -1,6 +1,17 @@
-import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
+import { Transform } from "class-transformer";
 import { USER_ROLES, type UserRole } from "../permissions";
 import { PageQueryDto } from "./page-query.dto";
+
+/** 最近登录条数。上限 200 与 service 端收敛值一致 */
+export class RecentLoginsQueryDto {
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: "limit 必须是整数" })
+  @Min(1, { message: "limit 最小为 1" })
+  @Max(200, { message: "limit 最大为 200" })
+  limit?: number;
+}
 
 /** 用户列表查询 */
 export class UserListQueryDto extends PageQueryDto {

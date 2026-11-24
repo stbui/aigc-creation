@@ -76,7 +76,7 @@ export class AdminRetentionService {
   }
 
   /** 清理历史记录的分页查询，上限由服务端兜住 */
-  async logs(pageSize?: string) {
+  async logs(pageSize?: number | string) {
     const raw = Number(pageSize ?? 50);
     const take = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 200) : 50;
     return this.prisma.cleanupLog.findMany({

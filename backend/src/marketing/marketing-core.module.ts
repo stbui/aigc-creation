@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CreditsModule } from '../credits/credits.module';
+import { MembershipModule } from '../membership/membership.module';
 import { MarketingService } from './marketing.service';
 
 /**
@@ -18,9 +19,11 @@ import { MarketingService } from './marketing.service';
  * 单独抽出后依赖是单向的:
  *   AdminModule ──> MarketingCoreModule ──> CreditsModule
  *   OrdersModule ──> MarketingCoreModule
+ *   MarketingCoreModule ──> MembershipModule (结算试算需要会员折扣,
+ *   MembershipModule 不反向依赖本模块, 无环)
  */
 @Module({
-  imports: [CreditsModule],
+  imports: [CreditsModule, MembershipModule],
   providers: [MarketingService],
   exports: [MarketingService],
 })

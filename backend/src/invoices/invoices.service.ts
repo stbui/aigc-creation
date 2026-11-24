@@ -8,6 +8,21 @@ import { EmailService } from "../channels/email/email.service";
 import { escapeHtml } from "../channels/template";
 
 /**
+ * 开票申请的领域入参。
+ *
+ * 独立于 HTTP 的 `CreateInvoiceDto`: controller 负责把 DTO 映射进来,
+ * service 与单测都不依赖 class-validator。
+ */
+export interface CreateInvoiceInput {
+  orderId: string;
+  kind: "personal" | "company";
+  title: string;
+  taxNo?: string;
+  email?: string;
+  content?: string;
+}
+
+/**
  * 发票 (B3)。
  *
  * 规则:
@@ -34,17 +49,7 @@ export class InvoicesService {
 
   // ── C 端 ──────────────────────────────────────────────────────────
 
-  async create(
-    userId: string,
-    dto: {
-      orderId: string;
-      kind: "personal" | "company";
-      title: string;
-      taxNo?: string;
-      email?: string;
-      content?: string;
-    },
-  ) {
+  async create(userId: string, dto: CreateInvoiceInput) {
     const title = (dto.title ?? "").trim();
     if (!title) throw new AppError(40001, "请填写发票抬头", 400);
     if (dto.kind === "company" && !(dto.taxNo ?? "").trim()) {

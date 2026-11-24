@@ -143,8 +143,17 @@ npm test
 
 以下现状与本文不一致，属于存量债务；新增代码不得继续扩散：
 
-- 部分 Controller 内联了较多业务判断，后续改动应下沉到 Service。
-- 部分查询参数仍用字符串 + 手工 `Number()`，新接口统一用 DTO。
+- Controller 内联业务判断：结算试算、下单互斥 / 空单校验、支付币种白名单已分别下沉到
+  `MarketingService.quoteSettlement`、`OrderService.create`、`PaymentConfigService.normalizeCurrency`；
+  其余存量按改动触达继续下沉，新代码不再写入 Controller。
+- 查询参数手工 `Number()`：后台账单 / 商业 / 营销 / 渠道 / 留存与 C 端订单 / 任务 / 积分 / 发票 /
+  素材列表已改为 DTO + `@Transform` 数字化；存量单标量 `@Query('x')` 按改动触达收敛。
+- 分页上限存在存量差异（100 / 200 / 5000 等），以各 service 的实际 clamp 为准；新接口默认
+  20、上限 100，确需更大上限时在 DTO 注释中说明场景。
 - 部分模块仍显式导入 `PrismaModule`；因它是 `@Global()`，重复导入不报错，但新模块无需再写。
   （2026-11-24 已清理全部冗余导入，仅 AppModule 保留作为注册点。）
 - 少量文件使用双引号或超长行；以本次改动文件为目标逐步收敛，不单独制造全仓格式化 diff。
+- 中转链路把 `ServerResponse` 传进 Service（`src/model/proxy/system-proxy.service.ts`、
+  `src/model/proxy/custom-relay.service.ts`）：上游 SSE / 流式 body 必须边读边写，
+  控制器无法先拿到完整响应再返回，这是 §1「Service 不接收 Request / Response」的唯一例外。
+  新增非中转代码不得照搬；普通接口仍由 Controller 持有响应对象。

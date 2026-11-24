@@ -59,13 +59,34 @@ export class PromptsController {
   @Post()
   @RequirePermission(PERMISSIONS.promptWrite)
   create(@Body() dto: CreatePromptDto) {
-    return this.prompts.create(dto);
+    // DTO → 领域入参显式映射: images 逐字段投影, 避免装饰器字段流入 service
+    return this.prompts.create({
+      title: dto.title,
+      category: dto.category,
+      content: dto.content,
+      negativePrompt: dto.negativePrompt,
+      modality: dto.modality,
+      tags: dto.tags,
+      images: dto.images?.map((i) => ({ ref: i.ref, assetId: i.assetId, name: i.name })),
+      sortOrder: dto.sortOrder,
+      enabled: dto.enabled,
+    });
   }
 
   @Patch(':id')
   @RequirePermission(PERMISSIONS.promptWrite)
   update(@Param('id') id: string, @Body() dto: UpdatePromptDto) {
-    return this.prompts.update(id, dto);
+    return this.prompts.update(id, {
+      title: dto.title,
+      category: dto.category,
+      content: dto.content,
+      negativePrompt: dto.negativePrompt,
+      modality: dto.modality,
+      tags: dto.tags,
+      images: dto.images?.map((i) => ({ ref: i.ref, assetId: i.assetId, name: i.name })),
+      sortOrder: dto.sortOrder,
+      enabled: dto.enabled,
+    });
   }
 
   @Delete(':id')

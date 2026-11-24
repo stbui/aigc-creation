@@ -38,8 +38,6 @@ import {
 import { PaymentExceptionService } from "../../payments/payment-exception.service";
 import { AppError } from "../../common/app.exception";
 import { sendCsv } from "../../common/csv-response";
-import { toCsv } from "../../common/csv";
-import { formatShanghai } from "../../payments/payment-query";
 
 /**
  * 后台「支付充值」—— 渠道配置、站点币种、充值商品。
@@ -213,7 +211,7 @@ export class AdminPaymentOrdersController {
   @Get("export.csv")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
   async export(@Query() query: PaymentOrderListQueryDto, @Res() res: Response) {
-    const rows = await this.admin.ordersForExport({
+    const csv = await this.admin.exportOrdersCsv({
       status: query.status,
       keyword: query.keyword,
       providerId: query.providerId,
@@ -222,43 +220,6 @@ export class AdminPaymentOrdersController {
       to: query.to,
       sort: query.sort,
     });
-    const csv = toCsv(
-      [
-        { label: "订单号", value: (r) => r.orderNo },
-        { label: "用户ID", value: (r) => r.userId },
-        { label: "用户名", value: (r) => r.user?.name ?? "" },
-        { label: "用户邮箱", value: (r) => r.user?.email ?? "" },
-        { label: "商品", value: (r) => r.productName },
-        { label: "渠道", value: (r) => r.providerId },
-        { label: "金额(分)", value: (r) => r.amountCents },
-        { label: "币种", value: (r) => r.currency },
-        { label: "权益(积分)", value: (r) => r.credits },
-        { label: "状态", value: (r) => r.status },
-        { label: "渠道交易号", value: (r) => r.providerTradeNo ?? "" },
-        {
-          label: "创建时间",
-          value: (r) => formatShanghai(new Date(r.createdAt)),
-        },
-        {
-          label: "支付时间",
-          value: (r) =>
-            formatShanghai(
-              r.providerPaidAt ? new Date(r.providerPaidAt) : null,
-            ),
-        },
-        {
-          label: "入账时间",
-          value: (r) =>
-            formatShanghai(r.creditedAt ? new Date(r.creditedAt) : null),
-        },
-        {
-          label: "关闭时间",
-          value: (r) =>
-            formatShanghai(r.closedAt ? new Date(r.closedAt) : null),
-        },
-      ],
-      rows,
-    );
     sendCsv(res, "支付订单", csv);
   }
 
@@ -338,30 +299,13 @@ export class AdminPaymentReconciliationController {
     @Query() query: ReconciliationListQueryDto,
     @Res() res: Response,
   ) {
-    const rows = await this.reconciliation.runsForExport({
+    const csv = await this.reconciliation.exportRunsCsv({
       providerId: query.providerId,
       providerInstanceId: query.providerInstanceId,
       status: query.status,
       from: query.from,
       to: query.to,
     });
-    const csv = toCsv(
-      [
-        { label: "账单日期", value: (r) => r.billDate },
-        { label: "渠道", value: (r) => r.providerId },
-        { label: "服务商实例", value: (r) => r.providerInstanceId },
-        { label: "执行次数", value: (r) => r.attempt },
-        { label: "状态", value: (r) => r.status },
-        { label: "总笔数", value: (r) => r.totalItems },
-        { label: "一致", value: (r) => r.matchItems },
-        { label: "自动补发", value: (r) => r.recoveredItems },
-        { label: "异常", value: (r) => r.errorItems },
-        { label: "错误", value: (r) => r.error ?? "" },
-        { label: "开始时间", value: (r) => formatShanghai(r.startedAt) },
-        { label: "完成时间", value: (r) => formatShanghai(r.completedAt) },
-      ],
-      rows,
-    );
     sendCsv(res, "支付对账", csv);
   }
 
@@ -370,21 +314,10 @@ export class AdminPaymentReconciliationController {
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
   async exportItems(
     @Param("id") id: string,
-    @Query("result") result: string | undefined,
+    @Query() query: ReconciliationItemsQueryDto,
     @Res() res: Response,
   ) {
-    const rows = await this.reconciliation.itemsForExport(id, result);
-    const csv = toCsv(
-      [
-        { label: "结果", value: (r) => r.result },
-        { label: "商户订单号", value: (r) => r.merchantOrderNo },
-        { label: "渠道交易号", value: (r) => r.providerTradeNo ?? "" },
-        { label: "金额(分)", value: (r) => r.amountCents },
-        { label: "币种", value: (r) => r.currency },
-        { label: "说明", value: (r) => r.detail ?? "" },
-      ],
-      rows,
-    );
+    const csv = await this.reconciliation.exportItemsCsv(id, query.result);
     sendCsv(res, "支付对账明细", csv);
   }
 

@@ -119,6 +119,12 @@ export class AdminNotificationsController {
   @Post('templates')
   @RequirePermission(PERMISSIONS.messageWrite)
   upsertTemplate(@Body() dto: UpsertTemplateDto) {
-    return this.notifications.upsertTemplate(dto);
+    return this.notifications.upsertTemplate({
+      code: dto.code,
+      channel: dto.channel,
+      subject: dto.subject,
+      body: dto.body,
+      enabled: dto.enabled,
+    });
   }
 }

@@ -1,6 +1,7 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
-import { AuthService, type RequestContext } from './auth.service';
+import { AuthService } from './auth.service';
+import { contextOf } from './request-source';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -32,20 +33,6 @@ const RL_SMS_SEND: RateLimitOptions = {
 const RL_SMS_LOGIN: RateLimitOptions = { name: 'auth-sms-login', limit: 10, windowSec: 60, limitEnv: 'RATE_LIMIT_AUTH_PER_MIN' };
 const RL_EMAIL_SEND: RateLimitOptions = { name: 'auth-email-send', limit: 3, windowSec: 3600 };
 
-/**
- * 请求来源提取。
- *
- * `req.ip` 默认是 socket 地址；本项目**默认不信任** `x-forwarded-for`
- * （见 B5 的 `RATE_LIMIT_TRUST_PROXY` 说明）—— 直接读该头等于让任何人
- * 伪造来源 IP，会污染登录记录与安全排障证据。
- */
-export function contextOf(req: Request): RequestContext {
-  return {
-    ip: req.ip,
-    ua: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
-  };
-}
-
 // 认证接口 (公开, 无 JWT 守卫): /api/v1/auth/*
 @Controller('auth')
 export class AuthController {
@@ -54,13 +41,24 @@ export class AuthController {
   @RateLimit(RL_REGISTER)
   @Post('register')
   async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+    // Controller 只做 DTO → 领域入参映射, Service 不感知 class-validator
+    return this.authService.register({
+      email: dto.email,
+      password: dto.password,
+      emailCode: dto.emailCode,
+      name: dto.name,
+      phone: dto.phone,
+      smsCode: dto.smsCode,
+    });
   }
 
   @RateLimit(RL_LOGIN)
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: Request) {
-    return this.authService.login(dto, contextOf(req));
+    return this.authService.login(
+      { email: dto.email, password: dto.password },
+      contextOf(req),
+    );
   }
 
   /**
@@ -72,32 +70,35 @@ export class AuthController {
   @RateLimit(RL_FORGOT)
   @Post('password/forgot')
   async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
-    return this.authService.forgotPassword(dto, contextOf(req));
+    return this.authService.forgotPassword({ email: dto.email }, contextOf(req));
   }
 
   @RateLimit(RL_RESET)
   @Post('password/reset')
   async resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+    return this.authService.resetPassword({ token: dto.token, password: dto.password });
   }
 
   /** 发送短信验证码（用途：登录 / 注册时验证手机号） */
   @RateLimit(RL_SMS_SEND)
   @Post('sms/send')
   async sendSms(@Body() dto: SmsSendDto, @Req() req: Request) {
-    return this.authService.sendSmsCode(dto, contextOf(req));
+    return this.authService.sendSmsCode(
+      { phone: dto.phone, purpose: dto.purpose },
+      contextOf(req),
+    );
   }
 
   /** 发送注册邮箱验证码；对未注册与已注册邮箱返回一致响应 */
   @RateLimit(RL_EMAIL_SEND)
   @Post('email/send')
   async sendEmail(@Body() dto: EmailSendDto, @Req() req: Request) {
-    return this.authService.sendEmailCode(dto, contextOf(req));
+    return this.authService.sendEmailCode({ email: dto.email }, contextOf(req));
   }
 
   @RateLimit(RL_SMS_LOGIN)
   @Post('sms/login')
   async smsLogin(@Body() dto: SmsLoginDto, @Req() req: Request) {
-    return this.authService.smsLogin(dto, contextOf(req));
+    return this.authService.smsLogin({ phone: dto.phone, code: dto.code }, contextOf(req));
   }
 }

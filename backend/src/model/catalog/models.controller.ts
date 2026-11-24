@@ -11,7 +11,6 @@
  */
 
 import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { Allow, IsOptional, IsString } from 'class-validator';
 import { OptionalJwtAuthGuard } from '../../common/optional-jwt-auth.guard';
 import { buildModelRequestIntent } from '../intent/model-intent';
 import { getCapability } from '../../capabilities/capability.registry';
@@ -19,15 +18,7 @@ import type { ModelRequestIntent } from '../intent/spec-types';
 import { UserGroupService } from '../user-groups/user-group.service';
 import { CatalogService } from './catalog.service';
 import { QuoteService } from './quote.service';
-
-/** 模型意图入参：能力 + 可选的参考素材数量与模型参数 */
-export class ModelIntentBodyDto {
-  @IsOptional() @IsString() capability?: string;
-  @IsOptional() @IsString() modelKey?: string;
-  @IsOptional() @IsString() operation?: string;
-  @IsOptional() @Allow() inputs?: unknown;
-  @IsOptional() @Allow() options?: unknown;
-}
+import { ModelIntentBodyDto } from './dto';
 
 function toIntent(body: ModelIntentBodyDto | undefined, abilityId?: string): ModelRequestIntent {
   // 入参 `capability` 对目录接口是产品能力 id；能力合同匹配要用产出模态

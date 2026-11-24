@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
-import { contextOf } from './auth.controller';
+import { contextOf } from './request-source';
 import { QrLoginService } from './qr-login.service';
 import { QrConfirmDto, QrStatusQueryDto, QrTicketDto } from './dto/qr.dto';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';

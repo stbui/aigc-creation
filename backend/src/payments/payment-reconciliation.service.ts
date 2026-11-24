@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { AppError } from "../common/app.exception";
-import { decodeCsvBuffer, parseCsv } from "../common/csv";
+import { decodeCsvBuffer, parseCsv, toCsv } from "../common/csv";
 import { readFirstCsvFromZip } from "../common/archive/zip-reader";
 import { PaymentConfigService } from "./payment-config.service";
 import { PaymentOrderService } from "./payment-order.service";
@@ -395,7 +395,8 @@ export class PaymentReconciliationService {
     return ids;
   }
 
-  async runsForExport(query: ReconciliationListQuery) {
+  /** 对账批次日志导出。CSV 组表在 service: 列定义属于报表口径 */
+  async exportRunsCsv(query: ReconciliationListQuery): Promise<string> {
     const where: Record<string, unknown> = {};
     if (query.providerId) where.providerId = query.providerId;
     if (query.providerInstanceId) {
@@ -417,14 +418,32 @@ export class PaymentReconciliationService {
         400,
       );
     }
-    return this.prisma.paymentReconciliationRun.findMany({
+    const rows = await this.prisma.paymentReconciliationRun.findMany({
       where,
       orderBy: [{ billDate: "desc" }, { attempt: "desc" }],
       take: RECONCILIATION_EXPORT_LIMIT,
     });
+    return toCsv(
+      [
+        { label: "账单日期", value: (r) => r.billDate },
+        { label: "渠道", value: (r) => r.providerId },
+        { label: "服务商实例", value: (r) => r.providerInstanceId },
+        { label: "执行次数", value: (r) => r.attempt },
+        { label: "状态", value: (r) => r.status },
+        { label: "总笔数", value: (r) => r.totalItems },
+        { label: "一致", value: (r) => r.matchItems },
+        { label: "自动补发", value: (r) => r.recoveredItems },
+        { label: "异常", value: (r) => r.errorItems },
+        { label: "错误", value: (r) => r.error ?? "" },
+        { label: "开始时间", value: (r) => formatShanghai(r.startedAt) },
+        { label: "完成时间", value: (r) => formatShanghai(r.completedAt) },
+      ],
+      rows,
+    );
   }
 
-  async itemsForExport(runId: string, result?: string) {
+  /** 对账明细导出。CSV 组表在 service: 列定义属于报表口径 */
+  async exportItemsCsv(runId: string, result?: string): Promise<string> {
     const run = await this.prisma.paymentReconciliationRun.findUnique({
       where: { id: runId },
     });
@@ -446,11 +465,22 @@ export class PaymentReconciliationService {
         400,
       );
     }
-    return this.prisma.paymentReconciliationItem.findMany({
+    const rows = await this.prisma.paymentReconciliationItem.findMany({
       where,
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: RECONCILIATION_EXPORT_LIMIT,
     });
+    return toCsv(
+      [
+        { label: "结果", value: (r) => r.result },
+        { label: "商户订单号", value: (r) => r.merchantOrderNo },
+        { label: "渠道交易号", value: (r) => r.providerTradeNo ?? "" },
+        { label: "金额(分)", value: (r) => r.amountCents },
+        { label: "币种", value: (r) => r.currency },
+        { label: "说明", value: (r) => r.detail ?? "" },
+      ],
+      rows,
+    );
   }
 
   // ── 比对 ────────────────────────────────────────────────────────

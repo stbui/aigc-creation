@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { CreditService } from '../credits/credit.service';
+import { MembershipService } from '../membership/membership.service';
 import { Prisma } from '@prisma/client';
 import { lockUserRow } from '../account/user-row-lock';
 import { getCapability } from '../capabilities/capability.registry';
@@ -29,8 +30,101 @@ import { getCapability } from '../capabilities/capability.registry';
 
 export type CouponType = 'full_cut' | 'discount' | 'fixed';
 export type CouponScope = 'all' | 'product' | 'new_user';
+export type CouponStatus = 'on' | 'off';
 export type CampaignType = 'limited_price' | 'limited_free' | 'popup';
 export type CampaignStatus = 'draft' | 'active' | 'ended' | 'off';
+export type InviteTrigger = 'first_pay' | 'register';
+
+/*
+ * 后台写入入参。
+ *
+ * 与 HTTP DTO 分开: DTO 负责格式与取值白名单, 这里只描述领域字段。
+ * 更新路径允许缺省, 缺省字段由 service 与库内现值合并成完整规则后再校验 ——
+ * 只改面额也必须按"改后的完整规则"判断, 否则跨字段约束会被部分更新绕过。
+ */
+
+/** 券写入入参 */
+export interface CouponInput {
+  /** 券码。创建必填; 更新留空表示不改 */
+  code?: string;
+  name?: string;
+  type?: CouponType;
+  /** 面额: full_cut / fixed 为减免金额(分), discount 为折扣万分比 */
+  value?: number;
+  thresholdCents?: number;
+  scope?: CouponScope;
+  productIds?: string[];
+  totalCount?: number;
+  perUserLimit?: number;
+  /** ISO8601 */
+  validFrom?: string;
+  validTo?: string;
+  status?: CouponStatus;
+}
+
+/** 合并后的券完整规则 (更新时由入参与库内现值合并)。校验函数按字段读取, 缺省字段自行兜底 */
+interface CouponRuleInput {
+  code?: string;
+  type?: string;
+  value?: number;
+  thresholdCents?: number;
+  productIds?: string[];
+  scope?: string;
+  validFrom?: string;
+  validTo?: string;
+}
+
+/** 活动 payload。字段语义随活动类型而定, 见 `validateCampaign` */
+export interface CampaignPayloadInput {
+  /** limited_price: 目标商品 */
+  productId?: string;
+  /** limited_price: 活动价(分) */
+  priceCents?: number;
+  /** limited_free: 免费能力 id */
+  capabilityIds?: string[];
+  /** popup: 标题 / 正文 / 按钮文案 / 站内跳转 */
+  title?: string;
+  body?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+}
+
+/** 活动写入入参 */
+export interface CampaignInput {
+  name?: string;
+  type?: CampaignType;
+  payload?: CampaignPayloadInput;
+  /** ISO8601 */
+  startAt?: string;
+  endAt?: string;
+  status?: CampaignStatus;
+  onlyNewUsers?: boolean;
+}
+
+/** 合并后的活动完整规则。库内历史值可能是任意字符串, 校验函数按实际值判断 */
+interface CampaignRuleInput {
+  type?: string;
+  startAt?: string;
+  endAt?: string;
+  payload?: CampaignPayloadInput;
+}
+
+/** 邀请规则写入入参 */
+export interface InviteRuleInput {
+  inviterCredits: number;
+  inviteeCredits: number;
+  triggerOn: InviteTrigger;
+  valid?: boolean;
+}
+
+/** 签到规则写入入参 */
+export interface CheckinRuleInput {
+  baseCredits: number;
+  bonusRules: Array<{ day: number; bonus: number }>;
+  maxStreak?: number;
+  dailyCap?: number;
+  enabled?: boolean;
+}
 
 /** 券列表中文名 */
 export const COUPON_TYPE_LABELS: Record<CouponType, string> = {
@@ -103,7 +197,102 @@ export class MarketingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly credit: CreditService,
+    private readonly membership: MembershipService,
   ) {}
+
+  /**
+   * C 端结算试算（幂等、不落库）。
+   *
+   * 从 controller 下沉到这里的原因: 金额累加、会员折扣叠加、券/活动「取更优」
+   * 的取舍都是业务判断, 与下单链路 (OrdersService.create) 必须保持同一顺序 ——
+   * 试算如果只算券, 会员看到的"应付金额"会比实际扣款高, 下单后金额突然变小。
+   * 放在 service 层才能保证两条链路共用同一份叠加逻辑, 不各自漂移。
+   *
+   * 商品价格从服务端读取, 不接受客户端传入的价格 (原 controller 同款约束)。
+   */
+  async quoteSettlement(input: {
+    userId: string;
+    productIds: string[];
+    quantities: number[];
+    couponCode?: string | null;
+    campaignIds?: string[];
+  }) {
+    const { userId, productIds, quantities } = input;
+    if (!productIds.length) {
+      return {
+        subtotalCents: 0,
+        memberDiscountCents: 0,
+        discountCents: 0,
+        payableCents: 0,
+        appliedSource: null,
+        appliedCouponCode: null,
+        appliedCampaignId: null,
+        notStackedNotice: null,
+        coupons: [],
+        items: [],
+      };
+    }
+
+    const snapshot = await this.quoteItems(productIds);
+    const items = productIds.map((id, i) => {
+      const p = snapshot.get(id);
+      return {
+        productId: id,
+        name: p?.name ?? '',
+        priceCents: p?.priceCents ?? 0,
+        credits: p?.credits ?? 0,
+        quantity: quantities?.[i] ?? 1,
+        available: Boolean(p) && p.status === 'active',
+      };
+    });
+
+    const validItems = items
+      .filter((i) => i.available)
+      .map(({ productId, priceCents, quantity }) => ({ productId, priceCents, quantity }));
+
+    const subtotalCents = validItems.reduce((s, i) => s + i.priceCents * i.quantity, 0);
+
+    /*
+     * 会员加油包折扣必须进入试算。
+     *
+     * 下单链路先执行 membership.quoteOrder, 再叠加券/活动; 这里与下单保持
+     * 同一顺序, 并单独返回会员优惠金额, 让前端能逐行解释
+     * "原价 - 会员优惠 - 券优惠 = 应付"。
+     */
+    const memberQuote = await this.membership.quoteOrder(userId, subtotalCents, {
+      isSubscription: false,
+    });
+    const memberDiscountCents = Math.max(0, subtotalCents - memberQuote.finalCents);
+    const afterMemberCents = memberQuote.finalCents;
+
+    const discount = await this.settleDiscount({
+      userId,
+      items: validItems,
+      couponCode: input.couponCode ?? null,
+      campaignIds: input.campaignIds,
+    });
+
+    const couponDiscountCents = Math.min(discount.discountCents, afterMemberCents);
+    const coupons = await this.previewCoupons({ userId, items: validItems });
+
+    return {
+      subtotalCents,
+      /** 会员加油包折扣（非会员为 0） */
+      memberDiscountCents,
+      /** 券 / 限时活动优惠（不含会员折扣） */
+      discountCents: couponDiscountCents,
+      payableCents: Math.max(0, afterMemberCents - couponDiscountCents),
+      // 明确告知取的是哪一个优惠, 以及另一个被放弃了 —— 用户自己能核对
+      appliedSource: discount.source,
+      appliedCouponCode: discount.couponCode,
+      appliedCampaignId: discount.campaignId,
+      notStackedNotice: (discount.snapshot as { notStacked?: boolean })?.notStacked
+        ? '优惠券与限时活动不叠加, 已自动取优惠金额更高的一项'
+        : null,
+      coupons,
+      items,
+    };
+  }
 
   /**
    * 结算试算所需的商品快照。
@@ -245,7 +434,7 @@ export class MarketingService {
   }
 
   /** 创建券 */
-  async createCoupon(dto: any) {
+  async createCoupon(dto: CouponInput) {
     this.validateCoupon(dto, true);
     const code = dto.code.trim().toUpperCase();
 
@@ -273,7 +462,7 @@ export class MarketingService {
   }
 
   /** 更新券。券码不可改, 规则改动不追溯已核销订单 (§12.6) */
-  async updateCoupon(id: string, dto: any) {
+  async updateCoupon(id: string, dto: CouponInput) {
     const existing = await this.prisma.coupon.findUnique({ where: { id } });
     if (!existing) throw new AppError(40400, '优惠券不存在', 404);
 
@@ -377,8 +566,14 @@ export class MarketingService {
    * 跨字段约束 (门槛与面额的关系、折扣区间、时间顺序) 只能在 service 做——
    * DTO 的 class-validator 无法访问其他字段的值。
    */
-  private validateCoupon(dto: any, creating: boolean) {
+  private validateCoupon(dto: CouponRuleInput, creating: boolean) {
     const errors: string[] = [];
+
+    // 创建必须带券码: DTO 允许缺省(更新时不改码), service 兜底,
+    // 否则 createCoupon 里的 code.trim() 会抛 TypeError 变成 500。
+    if (creating && !dto.code) {
+      errors.push('券码为必填');
+    }
 
     const validFrom = dto.validFrom ? new Date(dto.validFrom) : null;
     const validTo = dto.validTo ? new Date(dto.validTo) : null;
@@ -785,7 +980,7 @@ export class MarketingService {
     };
   }
 
-  async createCampaign(dto: any) {
+  async createCampaign(dto: CampaignInput) {
     this.validateCampaign(dto);
     // 直接以 active 落库等同于立即投放，配置不可执行时不能静默上线
     if ((dto.status ?? 'draft') === 'active') await this.assertCampaignExecutable(dto);
@@ -803,7 +998,7 @@ export class MarketingService {
     return this.toCampaignView(created, new Date());
   }
 
-  async updateCampaign(id: string, dto: any) {
+  async updateCampaign(id: string, dto: CampaignInput) {
     const existing = await this.prisma.campaign.findUnique({ where: { id } });
     if (!existing) throw new AppError(40400, '活动不存在', 404);
 
@@ -811,7 +1006,7 @@ export class MarketingService {
       type: dto.type ?? existing.type,
       startAt: dto.startAt ?? existing.startAt.toISOString(),
       endAt: dto.endAt ?? existing.endAt.toISOString(),
-      payload: dto.payload ?? this.parseJson<Record<string, unknown>>(existing.payload, {}),
+      payload: dto.payload ?? this.parseJson<CampaignPayloadInput>(existing.payload, {}),
     };
     this.validateCampaign(merged);
     if ((dto.status ?? existing.status) === 'active') {
@@ -853,7 +1048,7 @@ export class MarketingService {
       }
       await this.assertCampaignExecutable({
         type: existing.type,
-        payload: this.parseJson<Record<string, unknown>>(existing.payload, {}),
+        payload: this.parseJson<CampaignPayloadInput>(existing.payload, {}),
       });
     }
 
@@ -914,7 +1109,7 @@ export class MarketingService {
     return { id, name: existing.name };
   }
 
-  private validateCampaign(dto: any) {
+  private validateCampaign(dto: CampaignRuleInput) {
     const errors: string[] = [];
     const start = new Date(dto.startAt);
     const end = new Date(dto.endAt);
@@ -926,7 +1121,7 @@ export class MarketingService {
 
     // payload 必须与 type 匹配: 建一个没有 productId 的限时价活动,
     // 上线后结算时才发现没价格可覆盖, 此时已对外投放
-    const payload = dto.payload ?? {};
+    const payload: CampaignPayloadInput = dto.payload ?? {};
     if (dto.type === 'limited_price') {
       if (!payload.productId) errors.push('限时价活动必须指定商品');
       if (!Number.isInteger(payload.priceCents) || payload.priceCents < 0) {
@@ -957,10 +1152,10 @@ export class MarketingService {
    * 免得运营连修正历史配置都保存不了。
    */
   private async assertCampaignExecutable(dto: {
-    type: string;
-    payload?: Record<string, unknown>;
+    type?: string;
+    payload?: CampaignPayloadInput;
   }): Promise<void> {
-    const payload = dto.payload ?? {};
+    const payload: CampaignPayloadInput = dto.payload ?? {};
     if (dto.type === 'limited_price') {
       const productId = String(payload.productId ?? '');
       const product = await this.prisma.product.findUnique({
@@ -986,9 +1181,7 @@ export class MarketingService {
         );
       }
     } else if (dto.type === 'limited_free') {
-      const ids = Array.isArray(payload.capabilityIds)
-        ? (payload.capabilityIds as unknown[]).map(String)
-        : [];
+      const ids = Array.isArray(payload.capabilityIds) ? payload.capabilityIds.map(String) : [];
       const unknown = ids.filter((id) => !getCapability(id));
       if (unknown.length > 0) {
         throw new AppError(40001, `未知能力 ID：${unknown.join(', ')}`, 400);
@@ -1557,7 +1750,7 @@ export class MarketingService {
     };
   }
 
-  async updateInviteRule(dto: any) {
+  async updateInviteRule(dto: InviteRuleInput) {
     const row = await this.prisma.inviteRewardRule.upsert({
       where: { id: 'default' },
       create: {
@@ -1922,7 +2115,7 @@ export class MarketingService {
     };
   }
 
-  async updateCheckinRule(dto: any) {
+  async updateCheckinRule(dto: CheckinRuleInput) {
     this.validateCheckinRule(dto);
 
     // 同一 day 不允许配置多次。静默取最大值会让后台看到的规则与实际发分不一致。
@@ -1959,7 +2152,7 @@ export class MarketingService {
   }
 
   /** service 层兜底校验：即使绕过 DTO（脚本/内部调用）也不能写入非法规则。 */
-  private validateCheckinRule(dto: any): void {
+  private validateCheckinRule(dto: CheckinRuleInput): void {
     if (!dto || typeof dto !== 'object') {
       throw new AppError(40001, '签到规则格式不正确', 400);
     }

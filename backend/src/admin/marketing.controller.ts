@@ -12,11 +12,11 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 import { IsOptional, IsString, MaxLength } from "class-validator";
-import { AdminUser, RequireAllPermissions, RequirePermission } from "./admin.decorator";
-import { AppError } from "../common/app.exception";
+import { RequireAllPermissions, RequirePermission } from "./admin.decorator";
 import { sendCsv } from "../common/csv-response";
 import { MarketingService } from "../marketing/marketing.service";
 import { PERMISSIONS } from "./permissions";
+import { PageQueryDto } from "./dto/page-query.dto";
 import {
   CouponListQueryDto,
   CampaignListQueryDto,
@@ -27,17 +27,7 @@ import {
 } from "./dto/marketing.dto";
 
 /** 邀请关系列表查询 */
-class InviteListQueryDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(16)
-  page?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(16)
-  pageSize?: string;
-
+class InviteListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(16)
@@ -50,26 +40,11 @@ class InviteListQueryDto {
 }
 
 /** 签到记录列表查询 */
-class CheckinListQueryDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(16)
-  page?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(16)
-  pageSize?: string;
-
+class CheckinListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(64)
   userId?: string;
-}
-
-function toInt(v: string | undefined, fallback: number): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
 }
 
 /**
@@ -117,12 +92,39 @@ export class AdminCouponsController {
 
   @Post()
   create(@Body() dto: UpsertCouponDto) {
-    return this.marketing.createCoupon(dto);
+    // DTO → 领域入参显式映射: DTO 实例不流入 service
+    return this.marketing.createCoupon({
+      code: dto.code,
+      name: dto.name,
+      type: dto.type,
+      value: dto.value,
+      thresholdCents: dto.thresholdCents,
+      scope: dto.scope,
+      productIds: dto.productIds,
+      totalCount: dto.totalCount,
+      perUserLimit: dto.perUserLimit,
+      validFrom: dto.validFrom,
+      validTo: dto.validTo,
+      status: dto.status,
+    });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpsertCouponDto) {
-    return this.marketing.updateCoupon(id, dto);
+    return this.marketing.updateCoupon(id, {
+      code: dto.code,
+      name: dto.name,
+      type: dto.type,
+      value: dto.value,
+      thresholdCents: dto.thresholdCents,
+      scope: dto.scope,
+      productIds: dto.productIds,
+      totalCount: dto.totalCount,
+      perUserLimit: dto.perUserLimit,
+      validFrom: dto.validFrom,
+      validTo: dto.validTo,
+      status: dto.status,
+    });
   }
 
   /** 启停切换。停用不影响已核销订单 */
@@ -171,12 +173,35 @@ export class AdminCampaignsController {
 
   @Post()
   create(@Body() dto: UpsertCampaignDto) {
-    return this.marketing.createCampaign(dto);
+    return this.marketing.createCampaign(this.campaignInput(dto));
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpsertCampaignDto) {
-    return this.marketing.updateCampaign(id, dto);
+    return this.marketing.updateCampaign(id, this.campaignInput(dto));
+  }
+
+  /** payload 逐字段投影: 嵌套 DTO 实例不流入 service */
+  private campaignInput(dto: UpsertCampaignDto) {
+    return {
+      name: dto.name,
+      type: dto.type,
+      payload: dto.payload
+        ? {
+            productId: dto.payload.productId,
+            priceCents: dto.payload.priceCents,
+            capabilityIds: dto.payload.capabilityIds,
+            title: dto.payload.title,
+            body: dto.payload.body,
+            ctaText: dto.payload.ctaText,
+            ctaUrl: dto.payload.ctaUrl,
+          }
+        : undefined,
+      startAt: dto.startAt,
+      endAt: dto.endAt,
+      status: dto.status,
+      onlyNewUsers: dto.onlyNewUsers,
+    };
   }
 
   @Patch(":id/toggle")
@@ -211,14 +236,19 @@ export class AdminInvitesController {
 
   @Put("rules")
   updateRules(@Body() dto: UpdateInviteRuleDto) {
-    return this.marketing.updateInviteRule(dto);
+    return this.marketing.updateInviteRule({
+      inviterCredits: dto.inviterCredits,
+      inviteeCredits: dto.inviteeCredits,
+      triggerOn: dto.triggerOn,
+      valid: dto.valid,
+    });
   }
 
   @Get()
   list(@Query() query: InviteListQueryDto) {
     return this.marketing.listInvites({
-      page: toInt(query.page, 1),
-      pageSize: toInt(query.pageSize, 20),
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 20,
       rewardStatus: query.rewardStatus,
       keyword: query.keyword,
     });
@@ -232,7 +262,6 @@ export class AdminInvitesController {
   @Post(":id/grant")
   @RequirePermission(PERMISSIONS.creditAdjust)
   grant(@Param("id") id: string) {
-    if (!id) throw new AppError(40001, "缺少关系 id", 400);
     return this.marketing.grantInviteRewardById(id);
   }
 }
@@ -249,14 +278,20 @@ export class AdminCheckinController {
 
   @Put("rules")
   updateRules(@Body() dto: UpdateCheckinRuleDto) {
-    return this.marketing.updateCheckinRule(dto);
+    return this.marketing.updateCheckinRule({
+      baseCredits: dto.baseCredits,
+      bonusRules: dto.bonusRules.map((b) => ({ day: b.day, bonus: b.bonus })),
+      maxStreak: dto.maxStreak,
+      dailyCap: dto.dailyCap,
+      enabled: dto.enabled,
+    });
   }
 
   @Get()
   list(@Query() query: CheckinListQueryDto) {
     return this.marketing.listCheckins({
-      page: toInt(query.page, 1),
-      pageSize: toInt(query.pageSize, 20),
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 20,
       userId: query.userId,
     });
   }

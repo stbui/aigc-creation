@@ -1,9 +1,19 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { UseGuards } from '@nestjs/common';
-import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
-import { AppError } from '../common/app.exception';
 import { OrderService } from './order.service';
 
 /**
@@ -62,6 +72,22 @@ export class SandboxPayDto {
   scenario!: 'success' | 'failed' | 'timeout';
 }
 
+/** 订单列表分页参数。上限 100 与 service 端收敛值一致 */
+export class OrderListQueryDto {
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: 'limit 必须是整数' })
+  @Min(1, { message: 'limit 最小为 1' })
+  @Max(100, { message: 'limit 最大为 100' })
+  limit?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: 'offset 必须是整数' })
+  @Min(0, { message: 'offset 不能为负' })
+  offset?: number;
+}
+
 /**
  * C 端订单接口。
  *
@@ -75,13 +101,7 @@ export class OrdersController {
   /** 幂等下单。券与活动不叠加, 取更优者 (admin-detailed-design.md §12.6) */
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
-    if (!dto.productId && !dto.membershipPlanId) {
-      throw new AppError(40001, '请选择积分商品或会员套餐', 400);
-    }
-    // 二选一必须是真互斥: 否则会员单会静默丢掉 productId, 用户以为两样都买了
-    if (dto.productId && dto.membershipPlanId) {
-      throw new AppError(40001, '会员套餐与积分商品不能混在同一订单中购买', 400);
-    }
+    // 互斥与空单校验在 OrderService.create 内: 判断是业务规则, controller 只做 DTO 映射
     return this.orders.create({
       userId: user.id,
       idempotencyKey: dto.idempotencyKey,
@@ -95,18 +115,8 @@ export class OrdersController {
 
   /** 我的订单（limit/offset 分页，返回 total 与各状态计数） */
   @Get()
-  list(
-    @CurrentUser() user: AuthUser,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    const n = Number(limit ?? 20);
-    const skip = Number(offset ?? 0);
-    return this.orders.listByUser(
-      user.id,
-      Number.isFinite(n) ? Math.min(n, 100) : 20,
-      Number.isFinite(skip) ? Math.max(skip, 0) : 0,
-    );
+  list(@CurrentUser() user: AuthUser, @Query() query: OrderListQueryDto) {
+    return this.orders.listByUser(user.id, query.limit ?? 20, query.offset ?? 0);
   }
 
   @Get(':id')

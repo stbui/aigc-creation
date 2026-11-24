@@ -165,19 +165,51 @@ export class AdminMembershipPlansController {
   @Post()
   @RequirePermission(PERMISSIONS.productWrite)
   create(@Body() dto: CreateMembershipPlanDto) {
-    return this.plans.create(dto);
+    return this.plans.create({
+      code: dto.code,
+      name: dto.name,
+      description: dto.description,
+      priceCents: dto.priceCents,
+      durationDays: dto.durationDays,
+      monthlyCredits: dto.monthlyCredits,
+      perks: dto.perks
+        ? {
+            fastChannel: dto.perks.fastChannel,
+            maxConcurrent: dto.perks.maxConcurrent,
+            addonDiscountBps: dto.perks.addonDiscountBps,
+          }
+        : undefined,
+      status: dto.status,
+      sortOrder: dto.sortOrder,
+      userGroupCode: dto.userGroupCode,
+    });
   }
 
   @Patch(':id')
   @RequirePermission(PERMISSIONS.productWrite)
   update(@Param('id') id: string, @Body() dto: UpdateMembershipPlanDto) {
-    return this.plans.update(id, dto);
+    return this.plans.update(id, {
+      name: dto.name,
+      description: dto.description,
+      priceCents: dto.priceCents,
+      durationDays: dto.durationDays,
+      monthlyCredits: dto.monthlyCredits,
+      perks: dto.perks
+        ? {
+            fastChannel: dto.perks.fastChannel,
+            maxConcurrent: dto.perks.maxConcurrent,
+            addonDiscountBps: dto.perks.addonDiscountBps,
+          }
+        : undefined,
+      sortOrder: dto.sortOrder,
+      userGroupCode: dto.userGroupCode,
+    });
   }
 
   @Patch(':id/status')
   @RequirePermission(PERMISSIONS.productWrite)
   setStatus(@Param('id') id: string, @Body() dto: PlanStatusDto) {
-    return this.plans.setStatus(id, dto);
+    return this.plans.setStatus(id, { status: dto.status });
   }
 
   @Delete(':id')

@@ -31,6 +31,7 @@ import {
   Max,
   Min,
 } from "class-validator";
+import { Type } from "class-transformer";
 import { AdminUser, RequireAllPermissions, RequirePermission } from "../../admin/admin.decorator";
 import { AppError } from "../../common/app.exception";
 import {
@@ -203,6 +204,25 @@ const RL_CHANNEL_TEST: RateLimitOptions = {
   scope: "user",
 };
 
+/** 渠道列表查询。page/limit 在 DTO 层数字化, service 仍保留白名单兜底 */
+export class ChannelListQueryDto {
+  @IsOptional() @IsString() keyword?: string;
+  @IsOptional() @IsString() status?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: "page 必须是整数" })
+  @Min(1, { message: "page 最小为 1" })
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: "limit 必须是整数" })
+  @Min(1, { message: "limit 最小为 1" })
+  @Max(100, { message: "limit 最大为 100" })
+  limit?: number;
+}
+
 /** 导入文件即导出文件本身 */
 export class ChannelImportBodyDto {
   @IsOptional() @IsString() format?: string;
@@ -228,18 +248,8 @@ export class AdminChannelsController {
 
   @Get()
   @RequirePermission(PERMISSIONS.channelRead)
-  list(
-    @Query("keyword") keyword?: string,
-    @Query("status") status?: string,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-  ) {
-    return this.channels.list({
-      keyword,
-      status,
-      page: page ? Number(page) : undefined,
-      limit: limit ? Number(limit) : undefined,
-    });
+  list(@Query() query: ChannelListQueryDto) {
+    return this.channels.list(query);
   }
 
   /** 静态路由必须排在 `:id` 之前 */

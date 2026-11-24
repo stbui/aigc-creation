@@ -21,7 +21,7 @@ export interface CreateTemplateCategoryInput extends TemplateCategoryInput {
   name: string;
 }
 
-/** 模板分组入参（HTTP 层传 Create/UpdateTemplateGroupDto，结构兼容） */
+/** 模板分组入参（controller 从 DTO 显式映射） */
 export interface TemplateGroupInput {
   slug?: string;
   name?: string;
@@ -35,7 +35,7 @@ export interface CreateTemplateGroupInput extends TemplateGroupInput {
   name: string;
 }
 
-/** 模板条目入参（HTTP 层传 Create/UpdateTemplateItemDto，结构兼容） */
+/** 模板条目入参（controller 从 DTO 显式映射） */
 export interface TemplateItemInput {
   name?: string;
   prompt?: string;

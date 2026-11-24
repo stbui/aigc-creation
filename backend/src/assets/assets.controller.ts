@@ -24,6 +24,7 @@ import { AppError } from '../common/app.exception';
 import { deploymentUploadMaxBytes } from '../common/image-formats';
 import { UploadAssetDto } from './dto/upload-asset.dto';
 import { MoveAssetsDto } from './dto/move-asset.dto';
+import { AssetListQueryDto } from './dto/list-asset.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('assets')
@@ -90,25 +91,8 @@ export class AssetsController {
 
   /** 素材库列表: 支持 kind / capability 筛选与分页 */
   @Get()
-  list(
-    @CurrentUser() user: AuthUser,
-    @Query('kind') kind?: string,
-    @Query('capability') capability?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-    @Query('keyword') keyword?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.assetsService.list(user.id, {
-      kind,
-      capability,
-      limit: Number(limit),
-      offset: Number(offset),
-      keyword,
-      from,
-      to,
-    });
+  list(@CurrentUser() user: AuthUser, @Query() query: AssetListQueryDto) {
+    return this.assetsService.list(user.id, query);
   }
 
   /** 单个素材详情: 用户端历史恢复按 id 找回模板与参考图 */

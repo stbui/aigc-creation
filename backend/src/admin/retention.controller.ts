@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { RequirePermission } from './admin.decorator';
 import { PERMISSIONS } from './permissions';
 import { AdminRetentionService, RETENTION_TABLE_NAMES } from './retention.service';
@@ -29,6 +29,16 @@ export class RetentionPreviewQueryDto {
   retentionDays!: number;
 }
 
+/** 清理历史记录分页。上限 200 与 service 端收敛值一致 */
+export class RetentionLogsQueryDto {
+  @Type(() => Number)
+  @IsInt({ message: 'pageSize 必须是整数' })
+  @Min(1, { message: 'pageSize 最小为 1' })
+  @Max(200, { message: 'pageSize 最大为 200' })
+  @IsOptional()
+  pageSize?: number;
+}
+
 /** 保留期清理：目标枚举与清理动作都在 AdminRetentionService */
 @Controller('admin/retention')
 export class AdminRetentionController {
@@ -51,8 +61,8 @@ export class AdminRetentionController {
   /** 清理历史记录 */
   @Get('logs')
   @RequirePermission(PERMISSIONS.backupRead)
-  logs(@Query('pageSize') pageSize?: string) {
-    return this.retention.logs(pageSize);
+  logs(@Query() query: RetentionLogsQueryDto) {
+    return this.retention.logs(query.pageSize);
   }
 
   /** 触发清理 */

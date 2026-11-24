@@ -35,6 +35,7 @@ import { CreditService } from "../credits/credit.service";
 import { AdminCommerceService } from "./commerce-admin.service";
 import { AdminSettingsService } from "./settings.service";
 import { PERMISSIONS } from "./permissions";
+import { PageQueryDto } from "./dto/page-query.dto";
 import { sendCsv } from "../common/csv-response";
 
 /** 商品上/下架 */
@@ -215,11 +216,78 @@ export class CreditImportDto {
   importKey?: string;
 }
 
-/** 把 query 里的数字安全转成 number; 非法值给 undefined 让 service 用默认值 */
-function num(raw: string | undefined): number | undefined {
-  if (raw === undefined || raw === "") return undefined;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : undefined;
+/** 订单列表 / 导出查询。列表与导出共用筛选, 分页字段在导出时被忽略 */
+export class AdminOrderListQueryDto extends PageQueryDto {
+  @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsString() orderNo?: string;
+  @IsOptional() @IsString() email?: string;
+  @IsOptional() @IsString() channel?: string;
+  @IsOptional() @IsString() refundState?: string;
+  @IsOptional() @IsString() productId?: string;
+  @IsOptional() @IsString() from?: string;
+  @IsOptional() @IsString() to?: string;
+  @IsOptional() @IsString() userId?: string;
+}
+
+/** 支付流水列表 / 导出查询 */
+export class AdminPaymentListQueryDto extends PageQueryDto {
+  @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsString() from?: string;
+  @IsOptional() @IsString() to?: string;
+}
+
+/** 用户积分总览 / 导出查询 */
+export class AdminCreditListQueryDto extends PageQueryDto {
+  @IsOptional() @IsString() userId?: string;
+  @IsOptional() @IsString() email?: string;
+}
+
+/** 积分对账扫描条数。上限 5000 属对账场景的存量豁免 (远大于分页上限):
+ *  逐批扫描全量账户才能发现等式破裂, 不是面向用户的分页列表 */
+export class CreditAuditQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: "limit 必须是整数" })
+  @Min(1, { message: "limit 最小为 1" })
+  @Max(5000, { message: "limit 最大为 5000" })
+  limit?: number;
+}
+
+/** 积分流水查询。limit 上限 200 与 service 端收敛值一致 */
+export class AdminCreditLedgerQueryDto {
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @IsOptional()
+  @IsString()
+  businessType?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: "limit 必须是整数" })
+  @Min(1, { message: "limit 最小为 1" })
+  @Max(200, { message: "limit 最大为 200" })
+  limit?: number;
+}
+
+/** 积分批次明细查询 (时间范围) */
+export class CreditLotsQueryDto {
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
 }
 
 /**
@@ -257,7 +325,27 @@ export class AdminCommerceController {
   @Post("products")
   @RequirePermission(PERMISSIONS.productWrite)
   createProduct(@Body() dto: ProductCreateDto) {
-    return this.commerce.createProduct(dto);
+    // DTO → 领域入参显式映射: service 不感知 class-validator
+    return this.commerce.createProduct({
+      sku: dto.sku,
+      name: dto.name,
+      description: dto.description,
+      type: dto.type,
+      priceCents: dto.priceCents,
+      originalPriceCents: dto.originalPriceCents,
+      credits: dto.credits,
+      creditsValidDays: dto.creditsValidDays,
+      grantType: dto.grantType,
+      status: dto.status,
+      sortOrder: dto.sortOrder,
+      currency: dto.currency,
+      saleStrategy: dto.saleStrategy,
+      periodDays: dto.periodDays,
+      periodPurchaseLimit: dto.periodPurchaseLimit,
+      stockTotal: dto.stockTotal,
+      saleStartAt: dto.saleStartAt,
+      saleEndAt: dto.saleEndAt,
+    });
   }
 
   /**
@@ -268,7 +356,24 @@ export class AdminCommerceController {
   @Patch("products/:id")
   @RequirePermission(PERMISSIONS.productWrite)
   updateProduct(@Param("id") id: string, @Body() dto: ProductUpdateDto) {
-    return this.commerce.updateProduct(id, dto);
+    return this.commerce.updateProduct(id, {
+      name: dto.name,
+      description: dto.description,
+      priceCents: dto.priceCents,
+      originalPriceCents: dto.originalPriceCents,
+      credits: dto.credits,
+      creditsValidDays: dto.creditsValidDays,
+      grantType: dto.grantType,
+      status: dto.status,
+      sortOrder: dto.sortOrder,
+      currency: dto.currency,
+      saleStrategy: dto.saleStrategy,
+      periodDays: dto.periodDays,
+      periodPurchaseLimit: dto.periodPurchaseLimit,
+      stockTotal: dto.stockTotal,
+      saleStartAt: dto.saleStartAt,
+      saleEndAt: dto.saleEndAt,
+    });
   }
 
   /** 上架/ 下架 (B-36)。下架不影响历史订单 */
@@ -306,33 +411,8 @@ export class AdminCommerceController {
    */
   @Get("orders")
   @RequirePermission(PERMISSIONS.orderRead)
-  orderList(
-    @Query("status") status?: string,
-    @Query("orderNo") orderNo?: string,
-    @Query("email") email?: string,
-    @Query("channel") channel?: string,
-    @Query("refundState") refundState?: string,
-    @Query("productId") productId?: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
-    @Query("userId") userId?: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
-    @Query("sort") sort?: string,
-  ) {
-    return this.commerce.listOrders({
-      status,
-      orderNo,
-      email,
-      channel,
-      refundState,
-      productId,
-      from,
-      to,
-      page: num(page),
-      pageSize: num(pageSize),
-      sort,
-    });
+  orderList(@Query() query: AdminOrderListQueryDto) {
+    return this.commerce.listOrders(query);
   }
 
   /**
@@ -343,26 +423,16 @@ export class AdminCommerceController {
    */
   @Get("orders/export")
   @RequireAllPermissions(PERMISSIONS.orderRead, PERMISSIONS.dataExport)
-  async exportOrders(
-    @Res() res: Response,
-    @Query("status") status?: string,
-    @Query("orderNo") orderNo?: string,
-    @Query("email") email?: string,
-    @Query("channel") channel?: string,
-    @Query("refundState") refundState?: string,
-    @Query("productId") productId?: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
-  ) {
+  async exportOrders(@Res() res: Response, @Query() query: AdminOrderListQueryDto) {
     const csv = await this.commerce.exportOrders({
-      status,
-      orderNo,
-      email,
-      channel,
-      refundState,
-      productId,
-      from,
-      to,
+      status: query.status,
+      orderNo: query.orderNo,
+      email: query.email,
+      channel: query.channel,
+      refundState: query.refundState,
+      productId: query.productId,
+      from: query.from,
+      to: query.to,
     });
     sendCsv(res, "orders", csv);
   }
@@ -467,30 +537,24 @@ export class AdminCommerceController {
 
   @Get("payments")
   @RequirePermission(PERMISSIONS.paymentRead)
-  payments(
-    @Query("status") status?: string,
-    @Query("pageSize") pageSize?: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
-  ) {
+  payments(@Query() query: AdminPaymentListQueryDto) {
     return this.commerce.listPayments({
-      status,
-      pageSize: num(pageSize),
-      from,
-      to,
+      status: query.status,
+      pageSize: query.pageSize,
+      from: query.from,
+      to: query.to,
     });
   }
 
   /** 支付流水导出 (CSV)。同订单导出：必须直接写文件流，不能走统一信封 */
   @Get("payments/export")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
-  async exportPayments(
-    @Res() res: Response,
-    @Query("status") status?: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
-  ) {
-    const csv = await this.commerce.exportPayments({ status, from, to });
+  async exportPayments(@Res() res: Response, @Query() query: AdminPaymentListQueryDto) {
+    const csv = await this.commerce.exportPayments({
+      status: query.status,
+      from: query.from,
+      to: query.to,
+    });
     sendCsv(res, "payments", csv);
   }
 
@@ -499,29 +563,23 @@ export class AdminCommerceController {
   /** 用户积分总览 (B-49) */
   @Get("credits")
   @RequirePermission(PERMISSIONS.creditRead)
-  credits(
-    @Query("userId") userId?: string,
-    @Query("email") email?: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
-  ) {
+  credits(@Query() query: AdminCreditListQueryDto) {
     return this.commerce.listCredits({
-      userId,
-      email,
-      page: num(page),
-      pageSize: num(pageSize),
+      userId: query.userId,
+      email: query.email,
+      page: query.page,
+      pageSize: query.pageSize,
     });
   }
 
   /** 积分总览导出 (CSV)。同订单导出：必须直接写文件流，不能走统一信封 */
   @Get("credits/export")
   @RequireAllPermissions(PERMISSIONS.creditRead, PERMISSIONS.dataExport)
-  async exportCredits(
-    @Res() res: Response,
-    @Query("userId") userId?: string,
-    @Query("email") email?: string,
-  ) {
-    const csv = await this.commerce.exportCredits({ userId, email });
+  async exportCredits(@Res() res: Response, @Query() query: AdminCreditListQueryDto) {
+    const csv = await this.commerce.exportCredits({
+      userId: query.userId,
+      email: query.email,
+    });
     sendCsv(res, "credits", csv);
   }
 
@@ -537,40 +595,27 @@ export class AdminCommerceController {
    */
   @Get("credits/audit")
   @RequirePermission(PERMISSIONS.creditRead)
-  auditCredits(@Query("limit") limit?: string) {
-    const n = num(limit);
-    const pageSize = n !== undefined ? Math.min(Math.max(Math.floor(n), 1), 5000) : 500;
-    return this.credit.auditConsistency(pageSize);
+  auditCredits(@Query() query: CreditAuditQueryDto) {
+    return this.credit.auditConsistency(query.limit ?? 500);
   }
 
   /** 某用户的批次明细 (B-50) */
   @Get("credits/:userId/lots")
   @RequirePermission(PERMISSIONS.creditRead)
-  lots(
-    @Param("userId") userId: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
-  ) {
-    return this.commerce.creditLots(userId, { from, to });
+  lots(@Param("userId") userId: string, @Query() query: CreditLotsQueryDto) {
+    return this.commerce.creditLots(userId, { from: query.from, to: query.to });
   }
 
   /** 某用户的流水 (B-51), 可按类型与时间过滤 */
   @Get("credits/:userId/ledger")
   @RequirePermission(PERMISSIONS.creditRead)
-  ledger(
-    @Param("userId") userId: string,
-    @Query("type") type?: string,
-    @Query("businessType") businessType?: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
-    @Query("limit") limit?: string,
-  ) {
+  ledger(@Param("userId") userId: string, @Query() query: AdminCreditLedgerQueryDto) {
     return this.commerce.creditLedger(userId, {
-      type,
-      businessType,
-      from,
-      to,
-      limit: num(limit),
+      type: query.type,
+      businessType: query.businessType,
+      from: query.from,
+      to: query.to,
+      limit: query.limit,
     });
   }
 

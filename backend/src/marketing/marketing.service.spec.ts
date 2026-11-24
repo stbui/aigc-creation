@@ -7,6 +7,7 @@ describe('MarketingService 邀请绑定与奖励幂等', () => {
   let tx: Record<string, any>;
   let prisma: Record<string, any>;
   let credit: { grant: ReturnType<typeof vi.fn> };
+  let membership: { quoteOrder: ReturnType<typeof vi.fn> };
   let service: MarketingService;
 
   beforeEach(() => {
@@ -27,7 +28,8 @@ describe('MarketingService 邀请绑定与奖励幂等', () => {
       $transaction: vi.fn(async (work: (client: Record<string, any>) => unknown) => work(tx)),
     };
     credit = { grant: vi.fn().mockResolvedValue({}) };
-    service = new MarketingService(prisma as never, credit as never);
+    membership = { quoteOrder: vi.fn() };
+    service = new MarketingService(prisma as never, credit as never, membership as never);
   });
 
   it('用户行锁先于邀请人和付费记录读取', async () => {
@@ -190,6 +192,7 @@ describe('MarketingService 签到幂等与封顶', () => {
   let tx: Record<string, any>;
   let prisma: Record<string, any>;
   let credit: { grant: ReturnType<typeof vi.fn> };
+  let membership: { quoteOrder: ReturnType<typeof vi.fn> };
   let service: MarketingService;
 
   beforeEach(() => {
@@ -216,7 +219,8 @@ describe('MarketingService 签到幂等与封顶', () => {
       $transaction: vi.fn(async (work: (client: Record<string, any>) => unknown) => work(tx)),
     };
     credit = { grant: vi.fn().mockResolvedValue({}) };
-    service = new MarketingService(prisma as never, credit as never);
+    membership = { quoteOrder: vi.fn() };
+    service = new MarketingService(prisma as never, credit as never, membership as never);
   });
 
   it('当天已签到时不再次发放积分', async () => {
@@ -279,7 +283,6 @@ describe('MarketingService 签到幂等与封顶', () => {
   });
 });
 
-
 describe('MarketingService 优惠券与活动删除', () => {
   let prisma: Record<string, any>;
   let service: MarketingService;
@@ -297,7 +300,12 @@ describe('MarketingService 优惠券与活动删除', () => {
       // 删除预检还要数限时免费账单（BillingOrder.promotionId）
       billingOrder: { count: vi.fn().mockResolvedValue(0) },
     };
-    service = new MarketingService(prisma as never, { grant: vi.fn() } as never);
+    // 删除用例不触及结算试算, membership 传空桩即可
+    service = new MarketingService(
+      prisma as never,
+      { grant: vi.fn() } as never,
+      { quoteOrder: vi.fn() } as never,
+    );
   });
 
   it('优惠券没有关联订单时物理删除', async () => {

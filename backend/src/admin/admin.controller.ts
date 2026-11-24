@@ -1,4 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { IsIn, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
 import { AdminIdentityOnly, AdminUser, RequirePermission } from './admin.decorator';
 import { AdminRoleService } from './admin-role.service';
 import { AdminOverviewService } from './overview.service';
@@ -9,6 +11,14 @@ import {
   ROLE_LABELS,
   ROLE_PERMISSIONS,
 } from './permissions';
+
+/** 平台概览时间窗。白名单化, 避免任意大值拖垮聚合 */
+class OverviewQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn([7, 30, 90], { message: 'days 只支持 7 / 30 / 90' })
+  days?: number;
+}
 
 /**
  * 后台骨架端点。
@@ -50,10 +60,8 @@ export class AdminController {
   /** 平台概览。days 白名单化, 避免任意大值拖垮聚合 */
   @Get('overview')
   @RequirePermission(PERMISSIONS.platformDashboard)
-  async overview(@Query('days') days?: string) {
-    const allowed = [7, 30, 90];
-    const n = Number(days);
-    return this.overviewService.overview(allowed.includes(n) ? n : 7);
+  async overview(@Query() query: OverviewQueryDto) {
+    return this.overviewService.overview(query.days ?? 7);
   }
 
   /**

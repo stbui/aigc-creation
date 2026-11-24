@@ -6,7 +6,7 @@ type RuntimeValue = string | number;
 
 class FakeSettingsService extends SettingsService {
   constructor(private readonly values: Record<string, RuntimeValue>) {
-    super({} as never, {} as never);
+    super({} as never, {} as never, {} as never);
   }
 
   override async getNumber(key: string): Promise<number> {

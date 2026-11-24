@@ -21,6 +21,7 @@ import {
   ChangeUserRoleDto,
   ChangeUserStatusDto,
   DeleteUserDto,
+  RecentLoginsQueryDto,
   UserListQueryDto,
 } from "./dto/user.dto";
 
@@ -143,8 +144,8 @@ export class AdminUsersController {
    */
   @Get(":id/logins")
   @RequirePermission(PERMISSIONS.userRead)
-  logins(@Param("id") id: string, @Query("limit") limit?: string) {
-    return this.users.recentLogins(id, Number(limit) || 50);
+  logins(@Param("id") id: string, @Query() query: RecentLoginsQueryDto) {
+    return this.users.recentLogins(id, query.limit);
   }
 
   /** 删除前的连带影响预览, 供确认弹窗展示具体数量 */

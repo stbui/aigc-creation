@@ -21,6 +21,18 @@ export class GenerateController {
     @Body() dto: CreateGenerationDto,
     @Headers('idempotency-key') idempotencyHeader?: string,
   ) {
-    return this.generateService.createTask(user.id, dto, idempotencyHeader);
+    // DTO → 领域入参显式映射: admission 只认 CreateGenerationInput, 不感知 class-validator
+    return this.generateService.createTask(
+      user.id,
+      {
+        projectId: dto.projectId,
+        capability: dto.capability,
+        modelKey: dto.modelKey,
+        inputAssetIds: dto.inputAssetIds,
+        params: dto.params,
+        idempotencyKey: dto.idempotencyKey,
+      },
+      idempotencyHeader,
+    );
   }
 }

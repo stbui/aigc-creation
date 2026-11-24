@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -14,7 +14,6 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { PageQueryDto } from './page-query.dto';
 
 /**
@@ -42,6 +41,17 @@ export const CAMPAIGN_STATUSES = ['draft', 'active', 'ended', 'off'] as const;
 export const CAMPAIGN_EFFECTIVES = ['draft', 'live', 'scheduled', 'ended', 'off'] as const;
 /** 邀请奖励触发时机 */
 export const INVITE_TRIGGERS = ['first_pay', 'register'] as const;
+
+/*
+ * 写入字段直接从白名单派生联合类型: 写入 DTO 与 service 入参的联合类型
+ * 由编译器对齐, 白名单增删时漏改一侧会直接编译失败, 而不是运行期才发现。
+ */
+type CouponTypeValue = (typeof COUPON_TYPES)[number];
+type CouponScopeValue = (typeof COUPON_SCOPES)[number];
+type CouponStatusValue = (typeof COUPON_STATUSES)[number];
+type CampaignTypeValue = (typeof CAMPAIGN_TYPES)[number];
+type CampaignStatusValue = (typeof CAMPAIGN_STATUSES)[number];
+type InviteTriggerValue = (typeof INVITE_TRIGGERS)[number];
 
 /** 券码: 4~24 位大写字母数字, 去掉容易混淆的 0/O/1/I */
 const CODE_PATTERN = /^[A-Z0-9]{4,24}$/;
@@ -79,7 +89,7 @@ export class UpsertCouponDto {
   name!: string;
 
   @IsIn(COUPON_TYPES, { message: 'type 取值非法' })
-  type!: string;
+  type!: CouponTypeValue;
 
   /**
    * 面额。语义随 type:
@@ -98,7 +108,7 @@ export class UpsertCouponDto {
 
   @IsOptional()
   @IsIn(COUPON_SCOPES, { message: 'scope 取值非法' })
-  scope?: string;
+  scope?: CouponScopeValue;
 
   @IsOptional()
   @IsArray()
@@ -126,7 +136,7 @@ export class UpsertCouponDto {
 
   @IsOptional()
   @IsIn(COUPON_STATUSES, { message: 'status 取值非法' })
-  status?: string;
+  status?: CouponStatusValue;
 }
 
 /** 活动列表查询 */
@@ -203,7 +213,7 @@ export class UpsertCampaignDto {
   name!: string;
 
   @IsIn(CAMPAIGN_TYPES, { message: 'type 取值非法' })
-  type!: string;
+  type!: CampaignTypeValue;
 
   @IsOptional()
   @ValidateNested()
@@ -218,7 +228,7 @@ export class UpsertCampaignDto {
 
   @IsOptional()
   @IsIn(CAMPAIGN_STATUSES, { message: 'status 取值非法' })
-  status?: string;
+  status?: CampaignStatusValue;
 
   /** 投放人群。{ onlyNewUsers?: boolean } */
   @IsOptional()
@@ -239,7 +249,7 @@ export class UpdateInviteRuleDto {
   inviteeCredits!: number;
 
   @IsIn(INVITE_TRIGGERS, { message: 'triggerOn 取值非法' })
-  triggerOn!: string;
+  triggerOn!: InviteTriggerValue;
 
   @IsOptional()
   @IsBoolean()

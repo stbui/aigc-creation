@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { OAuthService } from './oauth.service';
 import { OAuthAuthorizeQueryDto, OAuthCompleteDto } from './oauth.dto';
-import { contextOf } from '../auth.controller';
+import { contextOf } from '../request-source';
 import { RateLimit, type RateLimitOptions } from '../../common/rate-limit.guard';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
 import { CurrentUser, type AuthUser } from '../../common/current-user.decorator';

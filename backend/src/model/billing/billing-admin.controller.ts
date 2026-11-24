@@ -15,36 +15,17 @@
 
 import { Body, Controller, Get, Param, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
-import { IsNotEmpty, IsString, MaxLength } from "class-validator";
 import { AdminUser, RequireAllPermissions, RequirePermission } from "../../admin/admin.decorator";
 import type { AdminUser as AdminUserContext } from "../../admin/admin.decorator";
 import { PERMISSIONS } from "../../admin/permissions";
 import { sendCsv } from "../../common/csv-response";
+import { BillingAdminService } from "./billing-admin.service";
 import {
-  BillingAdminService,
-  type ApiLogQuery,
-  type BillingOrderQuery,
-} from "./billing-admin.service";
-
-/** 人工核对入参：动作只允许 settle / refund（语义校验在 service） */
-export class BillingResolveBodyDto {
-  @IsString() action: string;
-  @IsString()
-  @IsNotEmpty({ message: "请填写核对依据" })
-  @MaxLength(500)
-  reason: string;
-}
-
-/** 批量核对入参：单条失败不影响其它条目 */
-export class BillingBatchResolveBodyDto {
-  /** 单次最多核对的条数（与前端批量上限一致） */
-  @IsString() ids?: string;
-  @IsString() action?: string;
-  @IsString()
-  @IsNotEmpty({ message: "请填写核对依据" })
-  @MaxLength(500)
-  reason: string;
-}
+  ApiLogListQueryDto,
+  BillingBatchResolveBodyDto,
+  BillingOrderListQueryDto,
+  BillingResolveBodyDto,
+} from "./dto/billing-admin.dto";
 
 @Controller("admin/billing-orders")
 export class AdminBillingOrdersController {
@@ -52,32 +33,7 @@ export class AdminBillingOrdersController {
 
   @Get()
   @RequirePermission(PERMISSIONS.billingOrderRead)
-  list(
-    @Query("status") status?: string,
-    @Query("userId") userId?: string,
-    @Query("taskId") taskId?: string,
-    @Query("model") model?: string,
-    @Query("channelId") channelId?: string,
-    @Query("billingMode") billingMode?: string,
-    @Query("group") group?: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
-  ) {
-    const query: BillingOrderQuery = {
-      status,
-      userId,
-      taskId,
-      model,
-      channelId,
-      billingMode,
-      group,
-      from,
-      to,
-      page: numberOrUndefined(page),
-      pageSize: numberOrUndefined(pageSize),
-    };
+  list(@Query() query: BillingOrderListQueryDto) {
     return this.billing.listOrders(query);
   }
 
@@ -137,24 +93,24 @@ export class AdminApiLogsController {
 
   @Get()
   @RequirePermission(PERMISSIONS.modelCallRead)
-  list(@Query() raw: Record<string, string | undefined>) {
-    return this.billing.listApiLogs(apiLogQueryOf(raw));
+  list(@Query() query: ApiLogListQueryDto) {
+    return this.billing.listApiLogs(query);
   }
 
   /**
    * 导出调用记录（CSV）。
    *
    * 导出把用户数据带出系统，使用独立的 `data.export` 权限点 —— 与任务
-   * 导出同一口径。筛选与列表共用 `apiLogQueryOf`，不会出现两个口径。
+   * 导出同一口径。筛选与列表共用同一份 DTO，不会出现两个口径。
    * CSV 文件流直接写响应，不能走统一信封。
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.modelCallRead, PERMISSIONS.dataExport)
   async export(
-    @Query() raw: Record<string, string | undefined>,
+    @Query() query: ApiLogListQueryDto,
     @Res() res: Response,
   ) {
-    const csv = await this.billing.exportApiLogsCsv(apiLogQueryOf(raw));
+    const csv = await this.billing.exportApiLogsCsv(query);
     sendCsv(res, "api-logs", csv);
   }
 
@@ -169,28 +125,4 @@ export class AdminApiLogsController {
   detail(@Param("id") id: string) {
     return this.billing.getApiLog(id);
   }
-}
-
-/** 列表与导出共用的查询构造：两个入口必须解析出同一份筛选条件 */
-function apiLogQueryOf(raw: Record<string, string | undefined>): ApiLogQuery {
-  return {
-    status: raw.status,
-    requestKind: raw.requestKind,
-    source: raw.source,
-    operation: raw.operation,
-    channelId: raw.channelId,
-    taskId: raw.taskId,
-    userId: raw.userId,
-    model: raw.model,
-    billable: raw.billable,
-    from: raw.from,
-    to: raw.to,
-    page: numberOrUndefined(raw.page),
-    pageSize: numberOrUndefined(raw.pageSize),
-  };
-}
-
-function numberOrUndefined(value: string | undefined): number | undefined {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : undefined;
 }

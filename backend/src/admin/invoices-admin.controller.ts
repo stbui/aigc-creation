@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
-import { IsNotEmpty, IsString, MaxLength } from "class-validator";
+import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
+import { Transform } from "class-transformer";
 import { AdminUser, RequireAllPermissions, RequirePermission, type AdminUser as AdminUserType } from "./admin.decorator";
 import { PERMISSIONS } from "./permissions";
 import { sendCsv } from "../common/csv-response";
@@ -20,6 +21,25 @@ export class RedFlushInvoiceDto {
   reason!: string;
 }
 
+/** 发票列表查询。列表与导出共用 status/keyword 两个筛选, 口径一致 */
+export class AdminInvoiceListQueryDto {
+  @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsString() keyword?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: "limit 必须是整数" })
+  @Min(1, { message: "limit 最小为 1" })
+  @Max(200, { message: "limit 最大为 200" })
+  limit?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: "offset 必须是整数" })
+  @Min(0, { message: "offset 不能为负" })
+  offset?: number;
+}
+
 /**
  * 后台发票审核。
  *
@@ -32,17 +52,12 @@ export class AdminInvoicesController {
 
   @Get()
   @RequirePermission(PERMISSIONS.invoiceWrite)
-  list(
-    @Query("status") status?: string,
-    @Query("keyword") keyword?: string,
-    @Query("limit") limit?: string,
-    @Query("offset") offset?: string,
-  ) {
+  list(@Query() query: AdminInvoiceListQueryDto) {
     return this.invoices.listForAdmin({
-      status: status || undefined,
-      keyword: keyword || undefined,
-      limit: Number(limit) || 20,
-      offset: Number(offset) || 0,
+      status: query.status || undefined,
+      keyword: query.keyword || undefined,
+      limit: query.limit,
+      offset: query.offset,
     });
   }
 
@@ -81,14 +96,10 @@ export class AdminInvoicesController {
    */
   @Get("export")
   @RequireAllPermissions(PERMISSIONS.invoiceWrite, PERMISSIONS.dataExport)
-  async export(
-    @Res() res: Response,
-    @Query("status") status?: string,
-    @Query("keyword") keyword?: string,
-  ) {
+  async export(@Res() res: Response, @Query() query: AdminInvoiceListQueryDto) {
     const csv = await this.invoices.exportCsvForAdmin({
-      status: status || undefined,
-      keyword: keyword || undefined,
+      status: query.status || undefined,
+      keyword: query.keyword || undefined,
     });
     sendCsv(res, "invoices", csv);
   }

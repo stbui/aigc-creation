@@ -1,11 +1,19 @@
-import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
-import { UseGuards } from '@nestjs/common';
-import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/optional-jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { MarketingService } from './marketing.service';
-import { MembershipService } from '../membership/membership.service';
 
 /** 邀请链接带参: /?inv=CODE */
 class InviteBindDto {
@@ -76,29 +84,36 @@ export class MarketingPublicController {
   }
 }
 
+/** 邀请列表分页参数。上限与 service 端收敛值一致 (take 最大 100) */
+class InviteListQueryDto {
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: 'limit 必须是整数' })
+  @Min(1, { message: 'limit 最小为 1' })
+  @Max(100, { message: 'limit 最大为 100' })
+  limit?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt({ message: 'offset 必须是整数' })
+  @Min(0, { message: 'offset 不能为负' })
+  offset?: number;
+}
+
 /**
  * 需要登录的 C 端营销接口。
  */
 @Controller('marketing')
 @UseGuards(JwtAuthGuard)
 export class MarketingMeController {
-  constructor(
-    private readonly marketing: MarketingService,
-    private readonly membership: MembershipService,
-  ) {}
+  constructor(private readonly marketing: MarketingService) {}
 
   /** 我的邀请码与邀请数据（limit/offset 分页） */
   @Get('invites')
-  myInvites(
-    @CurrentUser() user: AuthUser,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    const n = Number(limit ?? 20);
-    const skip = Number(offset ?? 0);
+  myInvites(@CurrentUser() user: AuthUser, @Query() query: InviteListQueryDto) {
     return this.marketing.myInvites(user.id, {
-      limit: Number.isFinite(n) ? n : 20,
-      offset: Number.isFinite(skip) ? skip : 0,
+      limit: query.limit,
+      offset: query.offset,
     });
   }
 
@@ -130,87 +145,17 @@ export class MarketingMeController {
    *
    * 独立于下单接口的原因: 用户在结算页需要**先看优惠再决定是否下单**,
    * 而下单会创建订单 (占用幂等键且 30 分钟后超时关闭)。
-   * 试算不落库, 幂等, 可反复调。
-   *
-   * ⚠ 商品价格**从服务端读取**, 不接受客户端传入的价格:
-   * 接受客户端价格等于把定价权交给前端, 改个请求就能 1 分钱买走全站商品。
+   * 试算不落库, 幂等, 可反复调。金额计算与优惠叠加在 MarketingService
+   * (quoteSettlement), 与下单链路共用同一份逻辑。
    */
   @Post('quote')
-  async quote(@CurrentUser() user: AuthUser, @Body() dto: QuoteDto) {
-    if (!dto.productIds?.length) {
-      return {
-        subtotalCents: 0,
-        memberDiscountCents: 0,
-        discountCents: 0,
-        payableCents: 0,
-        appliedSource: null,
-        appliedCouponCode: null,
-        appliedCampaignId: null,
-        notStackedNotice: null,
-        coupons: [],
-        items: [],
-      };
-    }
-
-    const snapshot = await this.marketing.quoteItems(dto.productIds);
-    const items = dto.productIds.map((id, i) => {
-      const p = snapshot.get(id);
-      return {
-        productId: id,
-        name: p?.name ?? '',
-        priceCents: p?.priceCents ?? 0,
-        credits: p?.credits ?? 0,
-        quantity: dto.quantities?.[i] ?? 1,
-        available: Boolean(p) && p.status === 'active',
-      };
-    });
-
-    const validItems = items
-      .filter((i) => i.available)
-      .map(({ productId, priceCents, quantity }) => ({ productId, priceCents, quantity }));
-
-    const subtotalCents = validItems.reduce((s, i) => s + i.priceCents * i.quantity, 0);
-
-    /*
-     * 会员加油包折扣必须进入试算。
-     *
-     * 下单链路 (OrdersService.create) 先执行 membership.quoteOrder, 再叠加
-     * 券/活动; 试算如果只算券, 会员看到的"应付金额"会比实际扣款高,
-     * 下单后金额突然变小。这里与下单保持同一顺序, 并单独返回会员优惠金额,
-     * 让前端能逐行解释"原价 - 会员优惠 - 券优惠 = 应付"。
-     */
-    const memberQuote = await this.membership.quoteOrder(user.id, subtotalCents, {
-      isSubscription: false,
-    });
-    const memberDiscountCents = Math.max(0, subtotalCents - memberQuote.finalCents);
-    const afterMemberCents = memberQuote.finalCents;
-
-    const discount = await this.marketing.settleDiscount({
+  quote(@CurrentUser() user: AuthUser, @Body() dto: QuoteDto) {
+    return this.marketing.quoteSettlement({
       userId: user.id,
-      items: validItems,
+      productIds: dto.productIds ?? [],
+      quantities: dto.quantities ?? [],
       couponCode: dto.couponCode ?? null,
       campaignIds: dto.campaignIds,
     });
-
-    const couponDiscountCents = Math.min(discount.discountCents, afterMemberCents);
-    const coupons = await this.marketing.previewCoupons({ userId: user.id, items: validItems });
-
-    return {
-      subtotalCents,
-      /** 会员加油包折扣（非会员为 0） */
-      memberDiscountCents,
-      /** 券 / 限时活动优惠（不含会员折扣） */
-      discountCents: couponDiscountCents,
-      payableCents: Math.max(0, afterMemberCents - couponDiscountCents),
-      // 明确告知取的是哪一个优惠, 以及另一个被放弃了 —— 用户自己能核对
-      appliedSource: discount.source,
-      appliedCouponCode: discount.couponCode,
-      appliedCampaignId: discount.campaignId,
-      notStackedNotice: (discount.snapshot as any)?.notStacked
-        ? '优惠券与限时活动不叠加, 已自动取优惠金额更高的一项'
-        : null,
-      coupons,
-      items,
-    };
   }
 }

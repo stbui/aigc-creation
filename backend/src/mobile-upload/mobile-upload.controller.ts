@@ -21,7 +21,6 @@ import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { MobileUploadService } from './mobile-upload.service';
 import { AppError } from '../common/app.exception';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { IsOptional } from 'class-validator';
 import { deploymentUploadMaxBytes } from '../common/image-formats';
 
 const MOBILE_UPLOAD_TMP_DIR = join(tmpdir(), 'huojue-mobile-upload');
@@ -33,6 +32,14 @@ class ReceiveUploadDto {
   @IsNotEmpty({ message: '上传令牌不能为空' })
   @MaxLength(128)
   token: string;
+}
+
+/** 电脑端创建会话入参 */
+class CreateSessionDto {
+  @IsString()
+  @IsNotEmpty({ message: 'projectId 必传' })
+  @MaxLength(64)
+  projectId!: string;
 }
 
 /**
@@ -52,11 +59,8 @@ export class MobileUploadController {
   /** 电脑端: 创建会话 (返回二维码内容与令牌) */
   @Post('sessions')
   @UseGuards(JwtAuthGuard)
-  async create(@CurrentUser() user: AuthUser, @Body('projectId') projectId: string) {
-    if (!projectId) {
-      throw new AppError(40001, 'projectId 必传', 400);
-    }
-    const s = await this.service.create(user.id, projectId);
+  async create(@CurrentUser() user: AuthUser, @Body() dto: CreateSessionDto) {
+    const s = await this.service.create(user.id, dto.projectId);
     return {
       sessionId: s.id,
       token: s.token,

@@ -12,6 +12,7 @@ import {
   PaymentConfigField,
   PaymentCurrency,
   PaymentProviderId,
+  PAYMENT_CURRENCIES,
   PAYMENT_PROVIDER_IDS,
   PaymentSource,
   VisiblePaymentMethod,
@@ -281,6 +282,20 @@ export class PaymentConfigService implements OnModuleInit {
   ): Promise<VisiblePaymentProviderView[]> {
     const options = await this.resolveVisibleOptions(currency, amountCents);
     return options.map((option) => option.view);
+  }
+
+  /**
+   * 币种白名单校验与归一化。
+   *
+   * 放在本 service 而非 controller: 白名单是支付域规则, 且「默认币种配置
+   * 被改坏」与「用户传了非法币种」都应在这里给出一致的拒绝语义。
+   */
+  normalizeCurrency(currency?: string | null): PaymentCurrency {
+    if (!currency) return 'CNY';
+    if (!(PAYMENT_CURRENCIES as string[]).includes(currency)) {
+      throw new AppError(40001, `不支持的币种: ${currency}`, 400);
+    }
+    return currency as PaymentCurrency;
   }
 
   /**

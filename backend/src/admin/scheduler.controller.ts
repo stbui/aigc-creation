@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
+import { IsIn } from 'class-validator';
 import { RequirePermission } from './admin.decorator';
-import { AppError } from '../common/app.exception';
 import { SchedulerService } from './scheduler.service';
 import { PERMISSIONS } from './permissions';
 
@@ -11,6 +11,14 @@ import { PERMISSIONS } from './permissions';
  * 两条路径都以条件更新抢占, 重复触发不会重复退款, 排在人工排障时的第一选择。
  */
 const MANUALLY_RUNNABLE = ['order-expire', 'credit-expire', 'membership', 'task-recover'];
+
+/** 手动触发入参。白名单校验放 DTO, controller 不再内联判断 */
+class RunSchedulerQueryDto {
+  @IsIn(MANUALLY_RUNNABLE, {
+    message: `不支持手动触发: task 只支持 ${MANUALLY_RUNNABLE.join(' / ')}`,
+  })
+  task!: string;
+}
 
 /**
  * 调度器可观测 (admin-prd.md §3.18 B-90 / M9.5)。
@@ -46,14 +54,7 @@ export class AdminSchedulerController {
    */
   @Post('run')
   @RequirePermission(PERMISSIONS.settingWrite)
-  run(@Query('task') task: string) {
-    if (!MANUALLY_RUNNABLE.includes(task)) {
-      throw new AppError(
-        40001,
-        `不支持手动触发: ${task} (可触发: ${MANUALLY_RUNNABLE.join(', ')})`,
-        400,
-      );
-    }
-    return this.scheduler.runNow(task);
+  run(@Query() query: RunSchedulerQueryDto) {
+    return this.scheduler.runNow(query.task);
   }
 }
