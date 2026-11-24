@@ -11,19 +11,15 @@ import { assetsApi, assetSrc, projectsApi } from './api';
 import { useApp, useAuth, useCapabilities, useDocumentMeta, useImageUploadArea, useLightboxIndex, useProject } from './hooks';
 import {
   DEFAULT_ASSET_KIND,
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
   PAGE_SIZE,
-  SUPPORTED_IMAGE_ACCEPT,
-  SUPPORTED_IMAGE_LABEL,
   type GroupBy,
   type AssetKind,
 } from './constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import {
   assetExtension,
   buildEmptyStateCopy,
   capabilityName,
-  isSupportedImageFile,
 } from './utils';
 import { useLibraryAssets } from './useLibraryAssets';
 import { useLibraryProjects } from './useLibraryProjects';
@@ -51,6 +47,7 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
 export function LibraryPage() {
   useDocumentMeta('素材库 · 货觉AI', '管理上传的原图与生成图，支持分组、下载与删除。');
   const { message } = useApp();
+  const { accept, allowedLabel, isSupportedImageFile, validateImageFile } = useUploadLimits();
   const { token, openLogin } = useAuth();
   const { ensureProject } = useProject();
   const { data: caps } = useCapabilities();
@@ -180,16 +177,18 @@ export function LibraryPage() {
     const picked = Array.from(files);
     const list = picked.filter(isSupportedImageFile);
     if (list.length === 0) {
-      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+      message.warning(`请选择图片文件（${allowedLabel}）`);
       return;
     }
     if (list.length < picked.length) {
       message.warning(`已忽略 ${picked.length - list.length} 个非图片文件`);
     }
-    const oversize = list.filter((file) => file.size > MAX_IMAGE_BYTES);
-    if (oversize.length > 0) {
-      message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((file) => file.name).join('、')}`);
-      return;
+    for (const file of list) {
+      const error = await validateImageFile(file);
+      if (error) {
+        message.error(error);
+        return;
+      }
     }
     const undecodable: string[] = [];
     for (const file of list) {
@@ -338,7 +337,7 @@ export function LibraryPage() {
 
         <ImageUploadInput
           inputRef={uploadPicker.inputRef}
-          accept={SUPPORTED_IMAGE_ACCEPT}
+          accept={accept}
           multiple
           disabled={uploading}
           onChange={uploadPicker.onInputChange}

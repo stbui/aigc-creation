@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../../context/AuthContext';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import type { UploadedImage } from '../../hooks/useImageUpload';
 import { usePasteUpload } from '../../hooks/usePasteUpload';
@@ -20,13 +21,9 @@ import { useTargetedAssetPicker } from '../../hooks/useTargetedAssetPicker';
 import { runtimeOf } from '../../lib/constants';
 import { assetsApi, assetSrc, toAbsoluteUrl } from './api';
 import {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
   MAX_IMAGES,
-  SUPPORTED_IMAGE_LABEL,
   type AssetSlot,
 } from './constants';
-import { isSupportedImageFile } from './utils';
 import { useApp } from '../../ui';
 
 /** 上传区素材条目 (商品图 / 参考图共用) */
@@ -81,6 +78,7 @@ interface ViralCloneAssetsOptions {
  */
 export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAssetsOptions) {
   const { message } = useApp();
+  const { allowedLabel, isSupportedImageFile, validateImageFile } = useUploadLimits();
   const { ensureProject } = useProject();
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [reference, setReference] = useState<UploadedImage | null>(null);
@@ -92,10 +90,22 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
   // ── 上传: 商品图 (点击/拖拽/粘贴, 按模型总图片数预留参考图位) ──
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files).filter(isSupportedImageFile);
+      const picked = Array.from(files);
+      const list = picked.filter(isSupportedImageFile);
       if (list.length === 0) {
-        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+        message.warning(`请选择图片文件（${allowedLabel}）`);
         return;
+      }
+      if (list.length < picked.length) {
+        message.warning(`已忽略 ${picked.length - list.length} 个非图片文件`);
+      }
+
+      for (const file of list) {
+        const error = await validateImageFile(file);
+        if (error) {
+          message.error(error);
+          return;
+        }
       }
       const room = imageMax - images.length;
       if (room <= 0) {
@@ -104,11 +114,6 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
       }
       const accepted = list.slice(0, room);
       if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
-      const oversize = accepted.filter((f) => f.size > MAX_IMAGE_BYTES);
-      if (oversize.length > 0) {
-        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
-        return;
-      }
 
       setUploading(true);
       try {
@@ -126,20 +131,20 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
         setUploading(false);
       }
     },
-    [imageMax, images.length, modelImageMax, ensureProject, message],
+    [allowedLabel, imageMax, images.length, isSupportedImageFile, modelImageMax, ensureProject, message, validateImageFile],
   );
 
   // ── 上传: 参考图 (单张, 超出即替换) ──
   const uploadReference = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files).filter(isSupportedImageFile);
-      if (list.length === 0) {
-        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+      const file = Array.from(files).find(isSupportedImageFile);
+      if (!file) {
+        message.warning(`请选择图片文件（${allowedLabel}）`);
         return;
       }
-      const file = list[0];
-      if (file.size > MAX_IMAGE_BYTES) {
-        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${file.name}`);
+      const error = await validateImageFile(file);
+      if (error) {
+        message.error(error);
         return;
       }
       setUploading(true);
@@ -154,7 +159,7 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
         setUploading(false);
       }
     },
-    [ensureProject, message],
+    [allowedLabel, ensureProject, isSupportedImageFile, message, validateImageFile],
   );
 
   const removeImage = useCallback((id: string) => setImages((prev) => prev.filter((x) => x.id !== id)), []);
