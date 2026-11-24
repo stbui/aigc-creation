@@ -9,7 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { mobileUploadApi } from './api';
 import { MAX_EDGE, MAX_FILES, MAX_TOTAL_BYTES, MAX_TOTAL_MB, type Phase, type Picked } from './constants';
-import { MAX_IMAGE_MB, SUPPORTED_IMAGE_LABEL, compressImage, isSupportedImageFile } from './utils';
+import { compressImage } from './utils';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 
 /** 路由级 SEO 元信息 */
 export { useDocumentMeta } from '../../hooks/useDocumentMeta';
@@ -30,6 +31,7 @@ function revokePickedUrls(items: Picked[]): void {
  * 引用的预览撤销成破图）。
  */
 export function useMobileUpload(sessionId: string, token: string) {
+  const { allowedLabel, isSupportedImageFile, validateImageFile } = useUploadLimits();
   const [picked, setPicked] = useState<Picked[]>([]);
   const [phase, setPhase] = useState<Phase>('pick');
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,7 @@ export function useMobileUpload(sessionId: string, token: string) {
     if (!list) return;
     const files = Array.from(list).filter(isSupportedImageFile);
     if (!files.length) {
-      setError(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+      setError(`请选择图片文件（${allowedLabel}）`);
       return;
     }
     const remaining = MAX_FILES - pickedRef.current.length;
@@ -81,12 +83,13 @@ export function useMobileUpload(sessionId: string, token: string) {
     let minEdge = Infinity;
     try {
       for (const file of files) {
-        if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+        const compressed = await compressImage(file);
+        const error = await validateImageFile(compressed.file);
+        if (error) {
           revokePickedUrls(results);
-          setError(`单张不超过 ${MAX_IMAGE_MB}MB`);
+          setError(error);
           return;
         }
-        const compressed = await compressImage(file);
         if (compressed.compressed) {
           compressedCount++;
           minEdge = Math.min(minEdge, compressed.edge ?? 0);
@@ -118,7 +121,7 @@ export function useMobileUpload(sessionId: string, token: string) {
           (compressedCount < results.length ? `（${compressedCount} 张被压缩）` : ''),
       );
     }
-  }, []);
+  }, [allowedLabel, isSupportedImageFile, validateImageFile]);
 
   /** 移除某张 */
   const removeAt = (index: number) => {

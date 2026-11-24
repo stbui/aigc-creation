@@ -15,6 +15,7 @@ import {
 import { ToolShell, type ToolAsset } from './components';
 import { useApp, useProject, useToolHistory, useToolTask } from './hooks';
 import { assetsApi, assetSrc } from './api';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { LocalRedrawAnnotationPanel } from './LocalRedrawAnnotationPanel';
 import { LocalRedrawHistoryPane } from './LocalRedrawHistoryPane';
 import { LocalRedrawIntro } from './LocalRedrawIntro';
@@ -77,6 +78,7 @@ const DROPZONE =
 
 export function LocalRedrawPage() {
   const { message } = useApp();
+  const { validateImageFile } = useUploadLimits();
   const { ensureProject } = useProject();
   const { submitting, result, setResult, run } = useToolTask({
     capability: 'local_redraw',
@@ -136,6 +138,11 @@ export function LocalRedrawPage() {
 
   const uploadReference = async (id: number, file: File | undefined) => {
     if (!file) return;
+    const error = await validateImageFile(file);
+    if (error) {
+      message.error(error);
+      return;
+    }
     try {
       setReferenceUploading((prev) => new Set(prev).add(id));
       const projectId = await ensureProject();

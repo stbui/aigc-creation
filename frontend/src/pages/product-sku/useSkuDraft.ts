@@ -3,17 +3,16 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   MAX_SKU_NAME,
   MAX_SKUS,
-  SUPPORTED_IMAGE_LABEL,
   type SkuItem,
 } from './constants';
 import type { SkuRegion, ToolAsset } from './components';
 import { assetsApi, toToolAsset } from './api';
 import { useProject } from '../../hooks/useProject';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { useGenerateError } from '../../hooks/useGenerateError';
 import {
   cloneSkuItem,
   createSkuItem,
-  isSupportedImageFile,
   patchSkuVariant,
   syncVariants,
   type RestoredSkuDraft,
@@ -33,6 +32,7 @@ interface UseSkuDraftOptions {
  */
 export function useSkuDraft({ onResetBatch }: UseSkuDraftOptions) {
   const { message } = useApp();
+  const { validateImageFile } = useUploadLimits();
   const { ensureProject } = useProject();
   const reportError = useGenerateError();
 
@@ -56,9 +56,14 @@ export function useSkuDraft({ onResetBatch }: UseSkuDraftOptions) {
   }, [onResetBatch]);
 
   const uploadTemplate = useCallback(async (files: FileList | File[]) => {
-    const file = Array.from(files).find(isSupportedImageFile);
+    const file = Array.from(files)[0];
     if (!file) {
-      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+      message.warning('请选择图片文件');
+      return;
+    }
+    const error = await validateImageFile(file);
+    if (error) {
+      message.error(error);
       return;
     }
     setUploading(true);
@@ -72,7 +77,7 @@ export function useSkuDraft({ onResetBatch }: UseSkuDraftOptions) {
     } finally {
       setUploading(false);
     }
-  }, [applyTemplate, ensureProject, message, reportError]);
+  }, [applyTemplate, ensureProject, message, reportError, validateImageFile]);
 
   const setVariantReference = useCallback((itemKey: number, regionId: string, reference: ToolAsset | undefined) => {
     setItems((current) => patchSkuVariant(current, itemKey, regionId, { reference }));
@@ -84,8 +89,9 @@ export function useSkuDraft({ onResetBatch }: UseSkuDraftOptions) {
     regionId: string,
   ) => {
     if (!file) return;
-    if (!isSupportedImageFile(file)) {
-      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+    const error = await validateImageFile(file);
+    if (error) {
+      message.error(error);
       return;
     }
     const busyKey = `${itemKey}:${regionId}`;
@@ -100,7 +106,7 @@ export function useSkuDraft({ onResetBatch }: UseSkuDraftOptions) {
     } finally {
       setReferenceBusy((current) => (current === busyKey ? null : current));
     }
-  }, [ensureProject, message, reportError, setVariantReference]);
+  }, [ensureProject, message, reportError, setVariantReference, validateImageFile]);
 
   const confirmRegions = useCallback((next: SkuRegion[]) => {
     setRegions(next);

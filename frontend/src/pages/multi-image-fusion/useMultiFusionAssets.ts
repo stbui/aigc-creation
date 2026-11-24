@@ -2,15 +2,12 @@ import { useCallback, useRef, useState } from 'react';
 
 import {
   MAX_ACCENTS,
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_LABEL,
   type MultiFusionSlot,
 } from './constants';
 import type { ToolAsset } from './components';
 import { assetsApi, assetSrc, toAbsoluteUrl } from './api';
-import { isSupportedImageFile } from './utils';
 import { useAuth } from '../../context/AuthContext';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { useProject } from '../../hooks/useProject';
 import { usePasteUpload } from '../../hooks/usePasteUpload';
 import { useTargetedAssetPicker } from '../../hooks/useTargetedAssetPicker';
@@ -33,6 +30,7 @@ import { useApp } from '../../ui';
  */
 export function useMultiFusionAssets() {
   const { message } = useApp();
+  const { validateImageFile } = useUploadLimits();
   const { token, openLogin } = useAuth();
   const { ensureProject } = useProject();
 
@@ -56,16 +54,15 @@ export function useMultiFusionAssets() {
 
   const uploadTo = useCallback(
     async (files: FileList | File[], target: MultiFusionSlot) => {
-      const list = Array.from(files).filter(isSupportedImageFile);
-      if (list.length === 0) {
-        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
-        return;
-      }
-      // 体积校验此前缺失: 素材库尤其会收下一个改了后缀的非图片, 页面只当"上传成功"
-      const oversize = list.filter((f) => f.size > MAX_IMAGE_BYTES);
-      if (oversize.length > 0) {
-        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
-        return;
+      const list = Array.from(files);
+      if (list.length === 0) return;
+
+      for (const file of list) {
+        const error = await validateImageFile(file);
+        if (error) {
+          message.error(error);
+          return;
+        }
       }
 
       if (target === 'accent') {
@@ -108,7 +105,7 @@ export function useMultiFusionAssets() {
         setUploading(false);
       }
     },
-    [commitAccents, ensureProject, message],
+    [commitAccents, ensureProject, message, validateImageFile],
   );
 
   /** 粘贴上传: 主体位为空时进主体位，否则按顺序补搭配位。 */
