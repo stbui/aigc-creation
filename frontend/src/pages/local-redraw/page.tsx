@@ -140,7 +140,7 @@ export function LocalRedrawPage() {
     if (!file) return;
     const error = await validateImageFile(file);
     if (error) {
-      message.error(error);
+      message.warning(error);
       return;
     }
     try {

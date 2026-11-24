@@ -96,7 +96,7 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
       for (const file of list) {
         const error = await validateImageFile(file);
         if (error) {
-          message.error(error);
+          message.warning(error);
           return;
         }
       }
@@ -135,7 +135,7 @@ export function useViralCloneAssets({ imageMax, modelImageMax }: ViralCloneAsset
       const file = list[0];
       const error = await validateImageFile(file);
       if (error) {
-        message.error(error);
+        message.warning(error);
         return;
       }
       setUploading(true);

@@ -76,7 +76,7 @@ describe('多图融合上传运行时限制', () => {
 
     expect(mocks.ensureProject).not.toHaveBeenCalled();
     expect(mocks.upload).not.toHaveBeenCalled();
-    expect(mocks.message.error).toHaveBeenCalledWith('单张图片不能超过 8MB');
+    expect(mocks.message.warning).toHaveBeenCalledWith('单张图片不能超过 8MB');
     expect(result.current.uploading).toBe(false);
     expect(result.current.accents).toEqual([]);
   });

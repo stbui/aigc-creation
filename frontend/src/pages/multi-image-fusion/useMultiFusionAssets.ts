@@ -60,7 +60,7 @@ export function useMultiFusionAssets() {
       for (const file of list) {
         const error = await validateImageFile(file);
         if (error) {
-          message.error(error);
+          message.warning(error);
           return;
         }
       }

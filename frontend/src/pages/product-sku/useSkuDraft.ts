@@ -63,7 +63,7 @@ export function useSkuDraft({ onResetBatch }: UseSkuDraftOptions) {
     }
     const error = await validateImageFile(file);
     if (error) {
-      message.error(error);
+      message.warning(error);
       return;
     }
     setUploading(true);
@@ -91,7 +91,7 @@ export function useSkuDraft({ onResetBatch }: UseSkuDraftOptions) {
     if (!file) return;
     const error = await validateImageFile(file);
     if (error) {
-      message.error(error);
+      message.warning(error);
       return;
     }
     const busyKey = `${itemKey}:${regionId}`;
