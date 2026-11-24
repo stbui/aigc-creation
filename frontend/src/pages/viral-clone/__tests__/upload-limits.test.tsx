@@ -92,4 +92,36 @@ describe('爆款复刻上传运行时限制', () => {
     expect(result.current.uploading).toBe(false);
     expect(result.current.images).toEqual([]);
   });
+
+  it('参考图像素超限时在建项目和上传请求前被拦截', async () => {
+    mocks.validateImageFile.mockResolvedValueOnce('图片像素总数不能超过 1,000,000');
+    const { result } = renderHook(() => useViralCloneAssets({ imageMax: 2, modelImageMax: 3 }));
+
+    await act(async () => {
+      await result.current.uploadReference([imageFile('huge.png', 1024)]);
+    });
+
+    expect(mocks.ensureProject).not.toHaveBeenCalled();
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.message.error).toHaveBeenCalledWith('图片像素总数不能超过 1,000,000');
+    expect(result.current.reference).toBeNull();
+  });
+
+  it('商品图混选非图片时只上传合法项，不整批拒绝', async () => {
+    mocks.upload.mockResolvedValueOnce({ id: 'asset-1', signedUrl: '/uploads/valid.png' });
+    const { result } = renderHook(() => useViralCloneAssets({ imageMax: 2, modelImageMax: 3 }));
+
+    await act(async () => {
+      await result.current.uploadFiles([
+        new File(['x'], 'notes.txt', { type: 'text/plain' }),
+        imageFile('valid.png', 1024),
+      ]);
+    });
+
+    expect(mocks.message.warning).toHaveBeenCalledWith('已忽略 1 个非图片文件');
+    expect(mocks.message.error).not.toHaveBeenCalled();
+    expect(mocks.upload).toHaveBeenCalledTimes(1);
+    expect(mocks.upload.mock.calls[0][0]).toMatchObject({ name: 'valid.png' });
+    expect(result.current.images).toHaveLength(1);
+  });
 });

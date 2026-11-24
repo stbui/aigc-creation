@@ -82,4 +82,36 @@ describe('多图融合上传运行时限制', () => {
     expect(result.current.uploading).toBe(false);
     expect(result.current.accents).toEqual([]);
   });
+
+  it('像素超限在创建项目和上传请求前被拦截', async () => {
+    mocks.validateImageFile.mockResolvedValueOnce('图片像素总数不能超过 1,000,000');
+    const { result } = renderHook(() => useMultiFusionAssets());
+
+    await act(async () => {
+      await result.current.uploadTo([imageFile('huge.png', 1024)], 'accent');
+    });
+
+    expect(mocks.ensureProject).not.toHaveBeenCalled();
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.message.error).toHaveBeenCalledWith('图片像素总数不能超过 1,000,000');
+    expect(result.current.accents).toEqual([]);
+  });
+
+  it('混选非图片时只上传合法项，不整批拒绝', async () => {
+    mocks.upload.mockResolvedValueOnce({ id: 'asset-1', signedUrl: '/uploads/valid.png' });
+    const { result } = renderHook(() => useMultiFusionAssets());
+
+    await act(async () => {
+      await result.current.uploadTo(
+        [new File(['x'], 'notes.txt', { type: 'text/plain' }), imageFile('valid.png', 1024)],
+        'accent',
+      );
+    });
+
+    expect(mocks.message.warning).toHaveBeenCalledWith('已忽略 1 个非图片文件');
+    expect(mocks.message.error).not.toHaveBeenCalled();
+    expect(mocks.upload).toHaveBeenCalledTimes(1);
+    expect(mocks.upload.mock.calls[0][0]).toMatchObject({ name: 'valid.png' });
+    expect(result.current.accents).toHaveLength(1);
+  });
 });

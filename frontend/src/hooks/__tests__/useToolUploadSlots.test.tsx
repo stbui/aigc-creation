@@ -224,3 +224,43 @@ describe('useToolUploadSlots 上传互斥', () => {
     ]);
   });
 });
+
+describe('useToolUploadSlots 运行时限制', () => {
+  it('像素超限在创建项目与上传请求前被拦截', async () => {
+    validateImageFileMock.mockResolvedValueOnce('图片像素总数不能超过 1,000,000');
+    const { result } = renderSlots({ max: 3 });
+
+    await act(async () => {
+      await result.current.uploadFiles([imageFile('huge.png')]);
+    });
+
+    expect(ensureProjectMock).not.toHaveBeenCalled();
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(message.error).toHaveBeenCalledWith('huge.png：图片像素总数不能超过 1,000,000');
+    expect(result.current.images).toEqual([]);
+  });
+
+  it('混选不支持类型时只上传合法文件，不整批拒绝也不弹 error', async () => {
+    isSupportedImageFileMock.mockImplementation((file: File) => file.type === 'image/png');
+    uploadMock.mockResolvedValueOnce({ id: 'asset-1', signedUrl: '/uploads/valid.png' });
+    const { result } = renderSlots({ max: 3 });
+
+    await act(async () => {
+      await result.current.uploadFiles([
+        new File(['x'], 'notes.txt', { type: 'text/plain' }),
+        imageFile('valid.png'),
+      ]);
+    });
+
+    expect(message.warning).toHaveBeenCalledWith('已忽略不支持的文件，仅支持 PNG');
+    expect(message.error).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock.mock.calls[0][0]).toMatchObject({ name: 'valid.png' });
+    expect(result.current.images).toHaveLength(1);
+  });
+
+  it('accept 取自运行时上下文而非硬编码', () => {
+    const { result } = renderSlots();
+    expect(result.current.allowedAccept).toBe('image/png');
+  });
+});
