@@ -51,6 +51,7 @@ import { NoAdminLayoutLoading } from './layout-parts/NoAdminLayoutLoading';
 import { AdminLoadError } from './layout-parts/AdminLoadError';
 import { NoAdminAccess } from './layout-parts/NoAdminAccess';
 import { NotImplementedPage } from './layout-parts/NotImplementedPage';
+import { AdminRouteGuard } from './layout-parts/AdminRouteGuard';
 
 /**
  * 后台布局：路由守卫 + 布局 + 子路由挂载。
@@ -68,6 +69,7 @@ import { NotImplementedPage } from './layout-parts/NotImplementedPage';
  *   无 token        → /login
  *   身份加载中      → 骨架（不发请求）
  *   非后台角色      → 拒绝页（前端可绕过，后端仍会拦）
+ *   单页权限不足    → NoPageAccess（`AdminRouteGuard`，渲染在布局壳之内）
  *   通过            → AdminBoardLayout + 子路由
  *
  * 不用 Navigate 静默弹回：C 端用户访问 /admin 时静默跳 /workbench，用户只会
@@ -101,6 +103,8 @@ export function AdminLayout() {
       <AdminWorkbenchProvider>
         <AdminBoardLayout>
           <ErrorBoundary resetKeys={[`${location.pathname}${location.search}`]}>
+          {/* 页面级授权：按 pathname + search 判定，拒绝页渲染在布局壳之内 */}
+          <AdminRouteGuard>
           <Suspense fallback={<AdminLoading tip="加载页面…" />}>
             <Routes>
               <Route index element={<AdminDashboardContent />} />
@@ -175,6 +179,7 @@ export function AdminLayout() {
               <Route path="*" element={<NotImplementedPage />} />
             </Routes>
           </Suspense>
+          </AdminRouteGuard>
         </ErrorBoundary>
         </AdminBoardLayout>
       </AdminWorkbenchProvider>
