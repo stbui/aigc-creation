@@ -27,7 +27,12 @@
 | --- | --- | --- |
 | `≤900px` | C 端侧栏收进抽屉、顶栏 64 → 54（`--workspace-topbar-height`）、`.app-content` 内边距切换、工具页单列 | `layout/AppLayout.css`、`layout/AppSidebar.css`、`layout/AppHeader.css` |
 | `≤1366px` | C 端侧栏由 176px 横排列表收成 100px 垂直轨、`.app-content` 左负边距 −16px | `layout/AppSidebar.css:226`、`layout/AppLayout.css:77` |
-| `≤1280px` | 后台侧栏 232px → 60px 折叠 | `styles/admin.css`（见 [`admin-ui-design.md`](admin-ui-design.md) §5.3） |
+| `≤1280px` | 后台侧栏 232px → 60px 折叠 | `shell/AdminBoardLayout.tsx`（`matchMedia('(max-width: 1280px)')`，见 [`admin-ui-design.md`](admin-ui-design.md) §5.3） |
+
+后台另有一条硬口径：**最低支持宽度 1280px**。`admin-ui/**` 不写 `max-*` 变体；
+`sm:`/`md:`/`lg:`/`xl:` 的阈值都不超过 1280，在支持区间内恒生效，因此自研件
+直接落成基类、上游 shadcn 件保留原样。判定与逐文件处置见
+[`admin-ui-design.md`](admin-ui-design.md) §5.3。
 
 **内容断点**（页面布局降档，只有四档）
 
