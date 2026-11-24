@@ -77,6 +77,28 @@ export const PERMISSION_LABELS: Record<string, string> = {
   "backup.run": "执行备份",
 };
 
+/**
+ * 后端已登记、但暂无页面或接口消费的权限点（T-045）。
+ *
+ * 勾选这些键不会产生任何效果：仓库里没有任何页面或接口按它们判定。口径是
+ * **保留定义、标注「未上线」、不删除** —— 权限存在 `AdminRole.permissions`
+ * 里，已存在的旧授权需要管理员能在角色页取消；禁用勾选框会让旧授权无法清理。
+ *
+ * 不在名单里的 `data.search` 是真实在用的：全局搜索由
+ * `backend/src/admin/search.controller.ts` 消费。
+ */
+export const PLANNED_PERMISSIONS = [
+  'finance.dashboard',
+  'product.publish',
+  'compliance.read',
+  'compliance.gate',
+  'compliance.takedown',
+  'content.read',
+] as const;
+
+/** `PLANNED_PERMISSIONS` 的集合形态，供渲染路径按 key 判定 */
+export const PLANNED_PERMISSION_SET: ReadonlySet<string> = new Set(PLANNED_PERMISSIONS);
+
 export const MODULE_LABELS: Record<string, string> = {
   platform: "平台",
   user: "用户",
