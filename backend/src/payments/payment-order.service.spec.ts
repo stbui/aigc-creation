@@ -168,14 +168,6 @@ function makeHarness(order = makeOrder()) {
       makeVisibleOption('alipay'),
       makeVisibleOption('wechat'),
     ]),
-    latest: vi.fn().mockResolvedValue({
-      id: CONFIG_ID,
-      providerId: 'sandbox',
-      version: 1,
-      enabled: true,
-      closeAfterMinutes: 30,
-      values: {},
-    }),
     resolveForOrder: vi.fn(async ({ providerConfigId }: { providerConfigId: string | null }) => ({
       id: providerConfigId ?? CONFIG_ID,
       providerId: 'sandbox',
@@ -1219,21 +1211,15 @@ describe('PaymentOrderService.query', () => {
 
 describe('PaymentOrderService.notifyUrl', () => {
   const previous = process.env.PAYMENT_NOTIFY_BASE;
-  const previousHost = process.env.HOST;
-  const previousPort = process.env.PORT;
   afterEach(() => {
     if (previous === undefined) delete process.env.PAYMENT_NOTIFY_BASE;
     else process.env.PAYMENT_NOTIFY_BASE = previous;
-    if (previousHost === undefined) delete process.env.HOST;
-    else process.env.HOST = previousHost;
-    if (previousPort === undefined) delete process.env.PORT;
-    else process.env.PORT = previousPort;
   });
 
   it('渠道 publicBaseUrl 优先于全局 PAYMENT_NOTIFY_BASE', () => {
     process.env.PAYMENT_NOTIFY_BASE = 'https://global.example.com';
     const { service } = makeHarness();
-    expect(service.notifyUrl('alipay', 'cfg_1', 'https://pay.example.com/')).toBe(
+    expect(service.notifyUrl('alipay', 'https://pay.example.com/')).toBe(
       'https://pay.example.com/api/v1/payment/webhook/alipay',
     );
   });
@@ -1241,44 +1227,34 @@ describe('PaymentOrderService.notifyUrl', () => {
   it('未配置渠道地址时回落全局基址', () => {
     process.env.PAYMENT_NOTIFY_BASE = 'https://global.example.com';
     const { service } = makeHarness();
-    expect(service.notifyUrl('wechat', 'cfg_2')).toBe(
+    expect(service.notifyUrl('wechat')).toBe(
       'https://global.example.com/api/v1/payment/webhook/wxpay',
     );
   });
 
-  it('EasyPay / Stripe 使用规范路径，历史 configId 不进入 URL', () => {
+  it('EasyPay / Stripe 使用规范路径，URL 不携带 configId', () => {
     process.env.PAYMENT_NOTIFY_BASE = 'https://global.example.com';
     const { service } = makeHarness();
-    expect(service.notifyUrl('epay', 'cfg_epay')).toBe(
+    expect(service.notifyUrl('epay')).toBe(
       'https://global.example.com/api/v1/payment/webhook/easypay',
     );
-    expect(service.notifyUrl('stripe', 'cfg_stripe')).toBe(
+    expect(service.notifyUrl('stripe')).toBe(
       'https://global.example.com/api/v1/payment/webhook/stripe',
     );
   });
 
-  it('尚未迁移的渠道继续使用带 configId 的旧路径', () => {
+  it('没有规范回调地址的渠道拒绝发起支付', () => {
     process.env.PAYMENT_NOTIFY_BASE = 'https://global.example.com';
     const { service } = makeHarness();
-    expect(service.notifyUrl('zpay', 'cfg_zpay')).toBe(
-      'https://global.example.com/api/v1/payments/callback/zpay/cfg_zpay',
-    );
-  });
-
-  it('两者都没有时回落到本机地址', () => {
-    delete process.env.PAYMENT_NOTIFY_BASE;
-    const { service } = makeHarness();
-    process.env.HOST = '127.0.0.1';
-    process.env.PORT = '4100';
-    expect(service.notifyUrl('sandbox', 'cfg_3')).toBe(
-      'http://127.0.0.1:4100/api/v1/payments/callback/sandbox/cfg_3',
-    );
+    expect(() => service.notifyUrl('zpay')).toThrow(/没有规范回调地址/);
+    expect(() => service.notifyUrl('paypal')).toThrow(/没有规范回调地址/);
+    expect(() => service.notifyUrl('sandbox')).toThrow(/没有规范回调地址/);
   });
 
   it('真实渠道没有回调公网地址时拒绝发起支付', () => {
     delete process.env.PAYMENT_NOTIFY_BASE;
     const { service } = makeHarness();
-    expect(() => service.notifyUrl('alipay', 'cfg_1')).toThrow(
+    expect(() => service.notifyUrl('alipay')).toThrow(
       /真实支付渠道缺少回调公网地址/,
     );
   });

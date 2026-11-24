@@ -256,7 +256,7 @@ PaymentsService（编排）
 | 1 | 限时免费活动（`campaign.type = limited_free`） | 活动期内，金额直接置 0 并记 `promotionId` |
 | 2 | 后台能力覆盖价 `SystemSetting['creditPrice.<capabilityId>']` | 仅 `fixed_request` + `unified` 价格策略 |
 | 3 | 线路价格档（`pricePolicy = channel`）/ 前台模型标量价（`unified`） | 兜底 |
-| 4 | `CapabilityDef.creditCost` | 仅在后台展示「代码默认值」用，不作扣费依据 |
+| 4 | `CapabilityPlugin.creditCost` | 仅在后台展示「代码默认值」用，不作扣费依据 |
 
 按量计价（`per_second` / `token`）**不接受能力覆盖价** ——「一次多少钱」无法换算成每秒 / 每 token 单价；`channel` 策略同理，绕过渠道价会让渠道结算与账单脱钩。这两种情况后台改价页的 `source` 会显示 `registry`，运营据此判断改价不生效的原因。
 
@@ -275,7 +275,6 @@ PaymentsService（编排）
 | POST | `/payments/:orderId/intent` | 发起真实渠道支付，返回 `redirect` 或 `qrcode` |
 | GET/POST | `/payment/webhook/easypay` | 易支付固定回调（公开、无信封、`@Res()` 直写；按历史 Payment 反查配置） |
 | POST | `/payment/webhook/{alipay,wxpay,stripe}` | 支付宝 / 微信 / Stripe 固定回调（公开、无信封；验签后先落通知收件箱） |
-| GET/POST | `/payments/callback/:providerId/:configId` | 历史兼容回调（PayPal / ZPay 及已下发的旧 URL；公开、无信封） |
 | GET | `/payments/:orderId/status` | 支付状态轮询 |
 | GET/POST | `/invoices`、`/invoices/:id/file` | 申请开票 / 列表 / 可打印 HTML |
 | GET | `/marketing/popup`、`/marketing/invites`、`/marketing/checkin`、`/marketing/campaigns` | 营销 |

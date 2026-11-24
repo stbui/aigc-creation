@@ -171,13 +171,17 @@ function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
   return { service, prisma, configs, orders, exceptions, notificationRow };
 }
 
-async function ingest(service: PaymentNotificationService) {
-  return service.ingest({
+async function ingest(service: PaymentNotificationService, providerRef = 'cs_old') {
+  const body = {
+    id: 'evt_1',
+    type: 'checkout.session.completed',
+    data: { object: { id: providerRef, client_reference_id: ORDER_NO } },
+  };
+  return service.ingestCanonical({
     providerId: 'stripe',
-    configId: CONFIG_ID,
     headers: { 'stripe-signature': 'signed' },
-    rawBody: Buffer.from('{"id":"evt_1"}'),
-    body: { id: 'evt_1' },
+    rawBody: Buffer.from(JSON.stringify(body)),
+    body,
   });
 }
 
@@ -190,19 +194,20 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
   it('带 providerRef 的回调只绑定对应 Payment，并把渠道单据号传给入账', async () => {
     const { service, prisma, orders } = makeHarness(paidResult('cs_old'));
 
-    await ingest(service);
+    await ingest(service, 'cs_old');
 
     const query = prisma.payment.findMany.mock.calls[0][0] as {
       where: Record<string, unknown>;
-      orderBy?: unknown;
     };
     expect(query.where).toMatchObject({
       orderId: 'order_1',
       channel: 'stripe',
-      OR: [{ providerConfigId: CONFIG_ID }, { providerConfigId: null }],
-      providerRef: 'cs_old',
     });
-    expect(query.orderBy).toEqual({ createdAt: 'desc' });
+    // providerRef 由验签报文精确比对，不进入数据库查询条件
+    expect(query.where).not.toHaveProperty('providerRef');
+    expect(prisma.payment.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'pay_old' } }),
+    );
     expect(orders.applyPaymentResult).toHaveBeenCalledWith(
       expect.objectContaining({ paymentId: 'pay_old', providerRef: 'cs_old' }),
     );
@@ -213,48 +218,34 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
     expect(JSON.parse(created.data.normalizedJson)).toMatchObject({ providerRef: 'cs_old' });
   });
 
-  it('providerRef 找不到 Payment 时永久失败并记录差异，绝不回落到最新尝试', async () => {
-    const { service, prisma, orders } = makeHarness(paidResult('cs_missing'));
-    prisma.payment.findMany.mockResolvedValue([]);
+  it('回调的 providerRef 匹配不到 Payment 时拒绝，绝不回落到最新尝试', async () => {
+    const { service, prisma, orders } = makeHarness(paidResult('cs_old'));
 
-    await ingest(service);
+    const ack = await ingest(service, 'cs_missing');
 
-    const query = prisma.payment.findMany.mock.calls[0][0] as {
-      where: Record<string, unknown>;
-      orderBy?: unknown;
-    };
-    expect(query.where).toMatchObject({ providerRef: 'cs_missing' });
-    expect(query.orderBy).toEqual({ createdAt: 'desc' });
+    expect(ack).toMatchObject({ status: 400 });
+    expect(adapterMock.verifyNotification).not.toHaveBeenCalled();
     expect(orders.applyPaymentResult).not.toHaveBeenCalled();
-    expect(prisma.paymentReconciliationItem.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({
-          result: 'credit_failed',
-          detail: expect.stringContaining('cs_missing'),
-        }),
-      }),
-    );
-    expect(prisma.paymentNotification.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ status: 'failed' }),
-      }),
-    );
+    expect(prisma.paymentNotification.create).not.toHaveBeenCalled();
   });
 
-  it('无 providerRef 的历史回调只按订单、渠道和配置唯一匹配 Payment', async () => {
-    const { service, prisma, orders } = makeHarness(paidResult());
-
-    await ingest(service);
-
-    const query = prisma.payment.findMany.mock.calls[0][0] as {
-      where: Record<string, unknown>;
-      orderBy?: unknown;
+  it('缺少渠道单据号的 Stripe 回调直接拒绝', async () => {
+    const { service, prisma } = makeHarness(paidResult('cs_old'));
+    const body = {
+      id: 'evt_1',
+      type: 'checkout.session.completed',
+      data: { object: { client_reference_id: ORDER_NO } },
     };
-    expect(query.where).not.toHaveProperty('providerRef');
-    expect(query.orderBy).toEqual({ createdAt: 'desc' });
-    expect(orders.applyPaymentResult).toHaveBeenCalledWith(
-      expect.objectContaining({ paymentId: 'pay_old' }),
-    );
+
+    const ack = await service.ingestCanonical({
+      providerId: 'stripe',
+      headers: {},
+      rawBody: Buffer.from(JSON.stringify(body)),
+      body,
+    });
+
+    expect(ack).toMatchObject({ status: 400 });
+    expect(prisma.paymentNotification.create).not.toHaveBeenCalled();
   });
 
   it('同一配置存在多个待支付尝试时不按创建时间猜测归属', async () => {
@@ -344,11 +335,9 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
     orders.applyPaymentResult.mockRejectedValue(
       new AppError(40901, '订单当前状态不可支付: cancelled', 409),
     );
-    prisma.order.findUnique
-      .mockResolvedValueOnce({ id: 'order_1' })
-      .mockResolvedValueOnce({ status: 'cancelled' });
+    prisma.order.findUnique.mockResolvedValue({ id: 'order_1', status: 'cancelled' });
 
-    const ack = await ingest(service);
+    const ack = await ingest(service, 'cs_old');
 
     expect(ack).toMatchObject({ status: 200 });
     expect(exceptions.autoRefundCancelledPayment).toHaveBeenCalledWith(
@@ -366,12 +355,10 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
     orders.applyPaymentResult.mockRejectedValue(
       new AppError(40901, '订单当前状态不可支付: cancelled', 409),
     );
-    prisma.order.findUnique
-      .mockResolvedValueOnce({ id: 'order_1' })
-      .mockResolvedValueOnce({ status: 'cancelled' });
+    prisma.order.findUnique.mockResolvedValue({ id: 'order_1', status: 'cancelled' });
     exceptions.autoRefundCancelledPayment.mockRejectedValue(new Error('refund db down'));
 
-    const ack = await ingest(service);
+    const ack = await ingest(service, 'cs_old');
 
     expect(ack).toMatchObject({ status: 400 });
     expect(prisma.paymentNotification.update).toHaveBeenCalledWith(
@@ -451,7 +438,6 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
         findUnique: vi.fn().mockResolvedValue({ id: 'order_epay_1' }),
       },
       payment: {
-        findFirst: vi.fn().mockResolvedValue(payment),
         findMany: vi.fn().mockResolvedValue([payment]),
         findUnique: vi.fn().mockResolvedValue(payment),
         update: vi.fn().mockResolvedValue({}),
@@ -495,7 +481,7 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
       orders as never,
       exceptions as never,
     );
-    return { service, prisma, orders };
+    return { service, prisma, configs, orders };
   }
 
   function ingestEpay(service: PaymentNotificationService) {
@@ -508,9 +494,8 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
       reallyPrice: '10.05',
       sign: 'signed',
     };
-    return service.ingest({
+    return service.ingestCanonical({
       providerId: 'epay',
-      configId: EPAY_CONFIG_ID,
       headers: {},
       rawBody: Buffer.from(new URLSearchParams(body).toString()),
       body,
@@ -591,8 +576,32 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
     },
   );
 
-  it('回调带云端 orderId 时按 providerRef 精确定位历史支付尝试', async () => {
-    const { service, prisma } = makeEpayHarness();
+  it('回调按渠道单据号精确筛选候选支付尝试', async () => {
+    const { service, prisma, configs } = makeEpayHarness();
+    const paymentRow = (id: string, providerConfigId: string, providerRef: string) => ({
+      id,
+      orderId: 'order_epay_1',
+      channel: 'epay',
+      providerConfigId,
+      providerConfigVersion: 1,
+      providerInstanceId: 'default',
+      providerMethod: 'alipay',
+      providerRef,
+      payTransactionId: null,
+      status: 'pending',
+      createdAt: new Date(),
+    });
+    prisma.payment.findMany.mockResolvedValue([
+      paymentRow('pay_other', 'cfg_epay_other', 'epay-trade-other'),
+      paymentRow('pay_epay_1', EPAY_CONFIG_ID, EPAY_PROVIDER_REF),
+    ]);
+    configs.byId.mockImplementation(async (id: string) => ({
+      id,
+      providerId: 'epay',
+      version: 1,
+      instanceId: 'default',
+      values: { mchId: 'epay-merchant', key: 'epay-secret' },
+    }));
     adapterMock.verifyNotification.mockResolvedValue({
       ok: false,
       ackSuccess: false,
@@ -602,15 +611,21 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
 
     await ingestEpay(service);
 
-    const query = prisma.payment.findFirst.mock.calls[0][0] as {
+    const query = prisma.payment.findMany.mock.calls[0][0] as {
       where: Record<string, unknown>;
     };
     expect(query.where).toMatchObject({
       orderId: 'order_epay_1',
       channel: 'epay',
-      providerConfigId: EPAY_CONFIG_ID,
-      providerRef: EPAY_PROVIDER_REF,
     });
+    expect(configs.byId).toHaveBeenCalledTimes(1);
+    expect(configs.byId).toHaveBeenCalledWith(EPAY_CONFIG_ID);
+    expect(adapterMock.verifyNotification).toHaveBeenCalledTimes(1);
+    expect(adapterMock.verifyNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ configId: EPAY_CONFIG_ID }),
+      }),
+    );
   });
 });
 
@@ -668,8 +683,8 @@ describe('PaymentNotificationService 收件箱并发闸', () => {
   });
 
   it('处理过程抛异常时把行退回可重试状态，而不是留在 processing', async () => {
-    const { service, prisma } = makeHarness();
-    prisma.order.findUnique.mockRejectedValue(new Error('db down'));
+    const { service, prisma, orders } = makeHarness();
+    orders.applyPaymentResult.mockRejectedValue(new Error('db down'));
 
     const ack = await ingest(service);
 

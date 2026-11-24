@@ -62,31 +62,6 @@ export class AdminPaymentConfigController {
     return { items, total: items.length, page: 1, pageSize: items.length };
   }
 
-  /** 兼容旧后台路径：保存默认实例。 */
-  @Put("providers/:providerId/config")
-  @RequirePermission(PERMISSIONS.paymentWrite)
-  saveProvider(
-    @Param("providerId") providerId: string,
-    @Body() dto: PaymentProviderConfigUpdateDto,
-    @AdminUser() admin: AdminUserType,
-  ) {
-    return this.configs.saveVersion(
-      providerId,
-      {
-        enabled: dto.enabled,
-        closeAfterMinutes: dto.closeAfterMinutes,
-        values: dto.values,
-        name: dto.name,
-        minAmountCents: dto.minAmountCents,
-        maxAmountCents: dto.maxAmountCents,
-        dailyLimitCents: dto.dailyLimitCents,
-        refundEnabled: dto.refundEnabled,
-        paymentMethods: dto.paymentMethods,
-      },
-      admin.id,
-    );
-  }
-
   @Post("providers/:providerId/instances")
   @RequirePermission(PERMISSIONS.paymentWrite)
   async createInstance(

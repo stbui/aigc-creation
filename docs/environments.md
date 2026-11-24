@@ -49,7 +49,7 @@ PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付配置 → �
 |---|---|---|---|---|
 | `PAYMENT_SECRET_KEY` | 空 | 空 | **必填** | base64 编码的 32 字节密钥，AES-256-GCM 加密渠道凭据。开发留空会在 `data/.payment-secret-key` 生成持久化密钥；生产留空会拒绝加解密 |
 | `PAYMENT_WORKER_ENABLED` | `true` | `true` | `true` | 支付后台任务开关；仅测试/排障时设 `false` |
-| `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址。支付宝 / 微信 / 易支付 / Stripe 拼成固定地址 `{base}/api/v1/payment/webhook/{channel}`；PayPal / ZPay 仍拼成 `{base}/api/v1/payments/callback/{channel}/{configId}`。也可在单个渠道配置 `publicBaseUrl`；真实渠道两者都为空时发起支付返回 503 |
+| `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址。支付宝 / 微信 / 易支付 / Stripe 拼成固定地址 `{base}/api/v1/payment/webhook/{channel}`；没有规范回调地址的 PayPal / ZPay 拒绝发起支付并返回 503。也可在单个渠道配置 `publicBaseUrl`；真实渠道两者都为空时发起支付返回 503 |
 | `ALIPAY_APP_ID` / `ALIPAY_PRIVATE_KEY` / `ALIPAY_PUBLIC_KEY` | 空 | 空 | 按需 | RSA2。私钥是**应用私钥**，公钥是**支付宝公钥**（不是应用公钥，填反表现为回调一律验签失败） |
 | `ALIPAY_GATEWAY` | 空 | 空 | 按需 | 空则用正式网关；沙箱联调用 `https://openapi-sandbox.dl.alipaydev.com/gateway.do` |
 | `ALIPAY_SELLER_ID` | 空 | 空 | 可选 | 支付宝收款账号 PID（`seller_id`） |
@@ -121,16 +121,10 @@ https://域名/api/v1/payment/webhook/wxpay
 https://域名/api/v1/payment/webhook/stripe
 ```
 
-PayPal / ZPay 继续使用带配置版本 id 的历史地址：
-
-```text
-https://域名/api/v1/payments/callback/paypal/{configId}
-https://域名/api/v1/payments/callback/zpay/{configId}
-```
+PayPal / ZPay 没有规范回调地址，当前不会被选路到；接入前必须先补 `/payment/webhook/{channel}` 路由与订单号解析。
 
 - 规范地址无需随配置轮换而修改；历史订单按 Payment 引用的配置版本验签。多个历史配置同时验签通过时必须由渠道交易号唯一消歧，否则拒绝处理。
-- `{configId}` 是 PayPal / ZPay 的渠道配置版本 id。轮换凭据会生成新的 `configId`，这两个渠道后台的 Webhook 地址仍须同步切换；旧版本与旧地址至少保留到历史订单全部结束。
-- 规范回调中 EasyPay 同时接受 GET 与 POST；支付宝 / 微信 / Stripe 使用 POST。历史回调路由继续兼容 GET 与 POST。
+- 规范回调中 EasyPay 同时接受 GET 与 POST；支付宝 / 微信 / Stripe 使用 POST。
 - Stripe Webhook 至少订阅：`payment_intent.succeeded`、`payment_intent.payment_failed`、`payment_intent.canceled`。`checkout.session.*` 仅用于兼容历史 Checkout Session 订单。
 - PayPal 使用 Orders v2 `CAPTURE`：买家批准后订单只会到 `APPROVED`，结算页回跳或状态轮询会由服务端调用 capture 真正扣款；Webhook 至少订阅订单完成/作废与 capture 完成/失败事件，`PAYPAL_WEBHOOK_ID` 必须对应同一个 Webhook 配置。
 - 易支付采用 `epay.jylt.cc` 的 `createOrder` / `getOrder` 协议：异步通知是 **GET**，回调签名覆盖 `orderId + param + type + price + reallyPrice + key`；查单已支持，文档未提供关单和退款 API。
@@ -138,7 +132,6 @@ https://域名/api/v1/payments/callback/zpay/{configId}
 - ZPay 下单响应按 `payurl` / `qrcode` / `img` 依次降级为跳转、扫码内容、二维码图片（`checkoutMode=qrcode-image`）；三者都没有则下单失败。
 - ZPay 文档的 `/mapi.php` **不支持 `return_url`**，支付完成不会自动回跳结算页；结果以异步通知与状态轮询为准。`submit.php` 页面跳转接口未启用 —— 它拿不到下单即返回的 `trade_no`，会丢掉「按渠道单据号匹配支付尝试」的对账依据。
 - ZPay 文档未提供关单接口，本地会明确返回不支持；退款按请求金额提交，但部分支付通道可能只支持全额退款，真实退款规则以商户后台和实际通道为准。
-- 旧变量 `EPAY_PID` / `EPAY_PAY_TYPE` 仅保留兼容读取，新部署请使用 `EPAY_MCH_ID` / `EPAY_TYPE`。
 - PayPal 不支持关闭未授权 Checkout Order；Stripe 通过取消 PaymentIntent 关单，历史 Checkout Session 订单仍保留 expire 兼容路径。PayPal、Stripe、易支付与 ZPay 当前都**不参与自动渠道账单对账**。
 
 支付宝 / 微信的签名与解密实现有离线交叉校验脚本：
@@ -322,13 +315,6 @@ npm run seed:commerce         # 商品（积分包）
 npm run seed:membership       # 会员套餐
 npm run seed:marketing        # 优惠券 / 活动 / 邀请签到规则
 npm run seed:messages         # 五条站内消息模板（只补缺失，不覆盖已改文案）
-```
-
-一次性数据迁移（幂等，存量库专用）：
-
-```bash
-npm run db:migrate:project-lifecycle  # 补项目软删 deletedAt 与任务重试 retryKey（非破坏、可重复）
-npm run db:migrate:tool-idempotency  # 补幂等字段/索引（非破坏、可重复；不要用 accept-data-loss）
 ```
 
 `db:reset:test` 会逐项校验删除目标路径**必须含 `test` 字样**且**不得越出 `backend/`**，

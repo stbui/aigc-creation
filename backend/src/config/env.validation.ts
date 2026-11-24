@@ -216,12 +216,8 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'payment.epay.apiBase', env: 'EPAY_API_BASE', type: 'string', def: 'https://epay.jylt.cc' },
   { key: 'payment.epay.mchId', env: 'EPAY_MCH_ID', type: 'string', def: '' },
   { key: 'payment.epay.key', env: 'EPAY_KEY', type: 'string', def: '' },
-  // 默认留空：bootstrapFromEnv 按「EPAY_TYPE → EPAY_PAY_TYPE → '2'」取值，
-  // 这里若给默认值会把旧变量名彻底遮住。
+  // 默认留空：bootstrapFromEnv 取 EPAY_TYPE，空值时回落到 '2'。
   { key: 'payment.epay.type', env: 'EPAY_TYPE', type: 'string', def: '' },
-  // 兼容旧变量名；bootstrapFromEnv 会优先读取上面的新变量
-  { key: 'payment.epay.pid', env: 'EPAY_PID', type: 'string', def: '' },
-  { key: 'payment.epay.payType', env: 'EPAY_PAY_TYPE', type: 'string', def: '' },
   // ZPay：支付宝 type=alipay、微信 type=wxpay；下单还要求服务端注入用户 IP
   { key: 'payment.zpay.apiBase', env: 'ZPAY_API_BASE', type: 'string', def: 'https://zpayz.cn' },
   { key: 'payment.zpay.pid', env: 'ZPAY_PID', type: 'string', def: '' },

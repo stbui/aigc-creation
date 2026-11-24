@@ -43,7 +43,7 @@ function createInput(): CreateOrderInput {
     currency: 'CNY',
     subject: '积分 100',
     returnUrl: 'https://app.example.com/checkout',
-    notifyUrl: 'https://api.example.com/api/v1/payments/callback/epay/cfg_epay_1',
+    notifyUrl: 'https://api.example.com/api/v1/payment/webhook/easypay',
     expiresAt: new Date(Date.now() + 30 * 60_000),
   };
 }
@@ -150,7 +150,7 @@ describe('EpayAdapter.createOrder', () => {
       goodsName: '积分 100',
       param: ORDER_NO,
       isHtml: '1',
-      notifyUrl: 'https://api.example.com/api/v1/payments/callback/epay/cfg_epay_1',
+      notifyUrl: 'https://api.example.com/api/v1/payment/webhook/easypay',
       returnUrl: 'https://app.example.com/checkout',
     });
     expect(url.searchParams.get('sign')).toBe(
@@ -428,10 +428,10 @@ describe('EpayAdapter.queryOrder', () => {
   });
 });
 
-describe('EpayAdapter 配置兼容与不支持的能力', () => {
+describe('EpayAdapter 配置校验与不支持的能力', () => {
   const adapter = new EpayAdapter();
 
-  it('兼容旧 pid / payType 配置字段', () => {
+  it('旧 pid / payType 字段不再被接受', () => {
     expect(
       adapter.validateConfig({
         apiBase: 'https://epay.jylt.cc',
@@ -439,7 +439,7 @@ describe('EpayAdapter 配置兼容与不支持的能力', () => {
         key: KEY,
         payType: 'alipay',
       }),
-    ).toEqual([]);
+    ).toEqual(['mchId']);
   });
 
   it('关单、退款明确 failed，不伪造成功', async () => {

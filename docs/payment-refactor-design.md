@@ -240,7 +240,7 @@ interface PaymentAdapter {
 
 ### 4.5 回调收件箱与 worker
 
-规范回调路径为 `GET/POST /api/v1/payment/webhook/easypay`、`POST /api/v1/payment/webhook/{alipay,wxpay,stripe}`。URL **不携带 `configId`**；PayPal / ZPay 及历史已下发地址继续使用 `GET/POST /api/v1/payments/callback/:channel/:configId`。
+规范回调路径为 `GET/POST /api/v1/payment/webhook/easypay`、`POST /api/v1/payment/webhook/{alipay,wxpay,stripe}`。URL **不携带 `configId`**。PayPal / ZPay 没有规范回调入口，`notifyUrl()` 直接拒绝发起支付；接入前需先补对应 webhook 路由。
 
 1. EasyPay / 支付宝 / Stripe 从明文商户订单号定位订单；Stripe 以 PaymentIntent id 为主（历史 Checkout Session id 仅兼容旧单），EasyPay 用渠道订单号定位历史 Payment。微信通知正文加密，先用所有历史配置的 APIv3 密钥尝试解密，唯一得到商户订单号后再按历史配置验签。
 2. 从这些 Payment 收集 `providerConfigId`，逐个加载下单时的配置版本；订单不存在或没有任何历史支付尝试 → 失败响应，验签前拒绝。
@@ -813,7 +813,7 @@ model PaymentReconciliationItem {
 ### Phase 1：渠道配置 + 支付渠道标签
 
 - 支付宝/微信适配器改接收 `values`，不再读 env；补 `queryOrder / closeOrder / verifyNotification(config)`。
-- 回调迁移到固定 `/api/v1/payment/webhook/:channel`（EasyPay / 支付宝 / 微信 / Stripe），保留旧 `/api/v1/payments/callback/:channel/:configId` 用于 PayPal / ZPay 与在途订单。
+- 回调迁移到固定 `/api/v1/payment/webhook/:channel`（EasyPay / 支付宝 / 微信 / Stripe）；当时的 `/api/v1/payments/callback/:channel/:configId` 兼容入口已于 2026-11-24 删除。
 - 后台 `/admin/payments/providers`、`/settings`。
 - 前端 `AdminPaymentsPage` 骨架 + 支付渠道标签 + 配置抽屉 + 风险提示。
 - 闸口：`smoke-payments.js`（渠道状态、配置保存/掩码、回调）。
@@ -2095,11 +2095,10 @@ URL 与请求体不变，实现迁到 `OrderCancelController`。返回 C 端订�
 | POST | `/api/v1/payment/webhook/alipay` | 支付宝官方固定入口；按商户订单号反查历史配置 |
 | POST | `/api/v1/payment/webhook/wxpay` | 微信支付固定入口；先解密，再按历史配置验签 |
 | POST | `/api/v1/payment/webhook/stripe` | Stripe 固定入口；以 PaymentIntent id 为主精确匹配历史 Payment，历史 Checkout Session 仅兼容旧单 |
-| GET/POST | `/api/v1/payments/callback/:providerId/:configId` | PayPal / ZPay 与历史旧 URL 兼容入口 |
 
-EasyPay / 支付宝 / 微信 / Stripe 的通知 URL 由 `createOrder()` 传入固定地址，不随配置版本轮换；PayPal / ZPay 仍使用 `${PAYMENT_NOTIFY_BASE}/api/v1/payments/callback/${providerId}/${configId}`。`configId` 是随机 cuid，不含密钥，但新渠道不再把它暴露在 URL 中。
+EasyPay / 支付宝 / 微信 / Stripe 的通知 URL 由 `createOrder()` 传入固定地址，不随配置版本轮换。PayPal / ZPay / 沙箱没有规范入口，`notifyUrl()` 抛出 `50301`，不会生成没有接收方的地址。
 
-`PaymentNotificationService.ingest()` 的响应必须由适配器的 `ack()` 生成：支付宝纯文本 `success/fail`，微信 JSON `{code,message}`，不能套统一信封。
+`PaymentNotificationService.ingestCanonical()` 的响应必须由适配器的 `ack()` 生成：支付宝纯文本 `success/fail`，微信 JSON `{code,message}`，不能套统一信封。
 
 ### 20.3 后台渠道与设置
 
@@ -2119,7 +2118,7 @@ interface AdminPaymentProviderView {
 
 `values` 只含非 secret 字段；secret 字段只返回 `secretConfigured[name]=true`。`missing` 是当前版本缺失的必填项；`warnings` 用于「渠道已启用但缺密钥」「网关非官方域名」「生产仍启用沙箱」。
 
-#### `PUT /admin/payments/providers/:providerId/config`
+#### `PUT /admin/payments/providers/:providerId/instances/:instanceId/config`
 
 权限 `payment.write`，高危操作，但不要求填写原因。请求体见 §18.5。响应：
 

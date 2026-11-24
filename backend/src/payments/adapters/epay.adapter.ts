@@ -77,7 +77,7 @@ export class EpayAdapter implements PaymentAdapter {
       },
       {
         name: 'type',
-        label: '默认支付类型（兼容旧配置）',
+        label: '默认支付类型',
         type: 'select',
         required: false,
         default: '',
@@ -85,7 +85,7 @@ export class EpayAdapter implements PaymentAdapter {
           { value: '1', label: '微信支付' },
           { value: '2', label: '支付宝' },
         ],
-        description: '新版前台按所选支付方式自动传入；仅未固化支付方式的历史订单使用此默认值',
+        description: '前台按所选支付方式自动传入；仅未固化支付方式的订单使用此默认值',
       },
       {
         name: 'publicBaseUrl',
@@ -102,7 +102,7 @@ export class EpayAdapter implements PaymentAdapter {
     const invalid: string[] = [];
     if (!configMchId(values)) invalid.push('mchId');
     if (!values.key?.trim()) invalid.push('key');
-    const rawType = (values.type || values.payType || '').trim();
+    const rawType = (values.type || '').trim();
     if (rawType && !configType(values)) invalid.push('type');
     const apiBase = values.apiBase?.trim();
     if (apiBase && !isAllowedPublicBase(apiBase)) invalid.push('apiBase');
@@ -402,11 +402,11 @@ function md5(value: string): string {
 }
 
 function configMchId(values: Readonly<Record<string, string>>): string {
-  return (values.mchId || values.pid || '').trim();
+  return (values.mchId || '').trim();
 }
 
 function configType(values: Readonly<Record<string, string>>): EpayType | '' {
-  return normalizeEpayType(values.type || values.payType || '');
+  return normalizeEpayType(values.type || '');
 }
 
 function epayTypeForMethod(method: 'alipay' | 'wechat'): EpayType {

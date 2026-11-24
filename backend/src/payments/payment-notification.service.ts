@@ -22,10 +22,6 @@ import type { ResolvedPaymentConfig } from './payment-config.service';
 const BACKOFF_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000];
 const MAX_ATTEMPTS = 8;
 
-export interface IngestResult {
-  ack: PaymentAck;
-}
-
 export interface CanonicalNotificationInput {
   providerId: PaymentProviderId;
   headers: Record<string, string | string[] | undefined>;
@@ -81,8 +77,6 @@ interface VerifiedCandidate extends ResolvedCanonicalCallback {
   payments: HistoricalPaymentRef[];
 }
 
-const CANONICAL_PROVIDER_IDS: PaymentProviderId[] = ['epay', 'alipay', 'wechat', 'stripe'];
-
 /**
  * 回调收件箱。
  *
@@ -106,139 +100,11 @@ export class PaymentNotificationService {
   ) {}
 
   /**
-   * 旧版带 configId 的回调入口。
-   *
-   * 历史订单、PayPal/ZPay 等尚未规范化的渠道，以及已写入渠道后台的旧 URL
-   * 都继续走这里。前置定位（byId + providerId 匹配）与规范入口不同，定位完成后
-   * 委托给 `ingestCanonical()` 的 legacy 分支，共用同一条验签 / 落库 / ack 链路。
-   */
-  async ingest(input: {
-    providerId: PaymentProviderId;
-    configId: string;
-    headers: Record<string, string | string[] | undefined>;
-    rawBody: Buffer;
-    body: Record<string, unknown>;
-  }): Promise<PaymentAck> {
-    const adapter = getAdapter(input.providerId);
-    if (!adapter) {
-      return {
-        status: 404,
-        body: JSON.stringify({ code: 'FAIL', message: '未知支付渠道' }),
-        contentType: 'application/json; charset=utf-8',
-      };
-    }
-
-    let config: ResolvedPaymentConfig;
-    try {
-      config = await this.configs.byId(input.configId);
-    } catch {
-      return adapter.ack({
-        ok: false,
-        ackSuccess: false,
-        reason: '支付配置不存在',
-        rawPayload: '',
-      });
-    }
-    if (config.providerId !== input.providerId) {
-      return adapter.ack({
-        ok: false,
-        ackSuccess: false,
-        reason: '回调渠道与配置不匹配',
-        rawPayload: '',
-      });
-    }
-
-    // 传 config 走 legacy 分支：这些渠道不在规范白名单里，且 configId 已经是
-    // 精确定位结果，再走历史反查反而可能把同一订单串到另一个配置实例。
-    return this.ingestCanonical(
-      {
-        providerId: input.providerId,
-        headers: input.headers,
-        rawBody: input.rawBody,
-        body: input.body,
-      },
-      config,
-    );
-  }
-
-  /**
-   * EasyPay 旧版入口。
-   *
-   * 商户订单号 + 固定配置 + 渠道单据号必须先精确定位到历史上的 Payment。
-   * 历史行的 providerMethod 可能为空，此时仅用 alipay/wechat 分别验签，
-   * 由参与 MD5 的 type 决定哪个成功；绝不直接信任回调 body.type。
-   */
-  private async acceptEpayWithConfig(
-    adapter: PaymentAdapter,
-    config: ResolvedPaymentConfig,
-    input: CanonicalNotificationInput,
-  ): Promise<PaymentAck> {
-    const payment = await this.historicalEpayPaymentFor(input.body, config.id);
-    if (!payment) {
-      this.logger.warn('易支付回调未精确匹配到历史支付尝试，拒绝落库');
-      return adapter.ack({
-        ok: false,
-        ackSuccess: false,
-        reason: '易支付回调未匹配到支付尝试',
-        rawPayload: '',
-      });
-    }
-
-    const methods: VisiblePaymentMethod[] =
-      payment.providerMethod && isVisiblePaymentMethod(payment.providerMethod)
-        ? [payment.providerMethod]
-        : ['alipay', 'wechat'];
-    let lastFailure: NotificationResult | undefined;
-    for (const expectedPaymentMethod of methods) {
-      let result: NotificationResult;
-      try {
-        result = await adapter.verifyNotification({
-          config: this.contextOf(config),
-          headers: input.headers,
-          rawBody: input.rawBody,
-          body: input.body,
-          expectedPaymentMethod,
-        });
-      } catch (e) {
-        this.logger.error(
-          `易支付回调处理异常 (${config.id}/${expectedPaymentMethod}): ${(e as Error).message}`,
-        );
-        continue;
-      }
-      if (!result.ok) {
-        lastFailure = result;
-        continue;
-      }
-      return this.persistVerified(
-        adapter,
-        { config, result, payment, expectedPaymentMethod },
-        input,
-      );
-    }
-
-    this.logger.warn(`易支付回调未通过验签 (${config.id})`);
-    return adapter.ack(
-      lastFailure ?? {
-        ok: false,
-        ackSuccess: false,
-        reason: '易支付回调验签失败',
-        rawPayload: '',
-      },
-    );
-  }
-
-  /**
    * 规范回调入口：URL 不携带 configId，必须从订单引用的历史 Payment 反查
    * 当时的配置版本并逐个验签。绝不能回落到“该渠道最新配置”，否则轮换密钥后
    * 历史订单会验签失败，甚至可能把同一订单串到另一个实例。
-   *
-   * `legacyConfig` 由旧版 `ingest()` 传入：配置已按 configId 精确定位，跳过
-   * 白名单与反查，直接沿用旧渠道的验签方式，最终仍汇入 `persistVerified()`。
    */
-  async ingestCanonical(
-    input: CanonicalNotificationInput,
-    legacyConfig?: ResolvedPaymentConfig,
-  ): Promise<PaymentAck> {
+  async ingestCanonical(input: CanonicalNotificationInput): Promise<PaymentAck> {
     const adapter = getAdapter(input.providerId);
     if (!adapter) {
       return {
@@ -246,21 +112,6 @@ export class PaymentNotificationService {
         body: JSON.stringify({ code: 'FAIL', message: '未知支付渠道' }),
         contentType: 'application/json; charset=utf-8',
       };
-    }
-
-    if (legacyConfig) {
-      return input.providerId === 'epay'
-        ? this.acceptEpayWithConfig(adapter, legacyConfig, input)
-        : this.acceptWithConfig(adapter, legacyConfig, input);
-    }
-
-    if (!CANONICAL_PROVIDER_IDS.includes(input.providerId)) {
-      return adapter.ack({
-        ok: false,
-        ackSuccess: false,
-        reason: '该渠道不支持规范回调地址',
-        rawPayload: '',
-      });
     }
 
     let resolved: ResolvedCanonicalCallback;
@@ -281,48 +132,6 @@ export class PaymentNotificationService {
     }
 
     return this.persistVerified(adapter, resolved, input);
-  }
-
-  private async acceptWithConfig(
-    adapter: PaymentAdapter,
-    config: ResolvedPaymentConfig,
-    input: CanonicalNotificationInput,
-    expectedPaymentMethod?: VisiblePaymentMethod,
-  ): Promise<PaymentAck> {
-    let result: NotificationResult;
-    try {
-      result = await adapter.verifyNotification({
-        config: this.contextOf(config),
-        headers: input.headers,
-        rawBody: input.rawBody,
-        body: input.body,
-        ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
-      });
-    } catch (e) {
-      // 验签过程中的异常（解密失败等）同样不能落库，也不能 ack 成功
-      this.logger.error(`回调处理异常 (${input.providerId}): ${(e as Error).message}`);
-      return adapter.ack({
-        ok: false,
-        ackSuccess: false,
-        reason: '回调处理异常',
-        rawPayload: '',
-      });
-    }
-
-    if (!result.ok) {
-      this.logger.warn(`回调未通过 (${input.providerId}): ${result.reason}`);
-      return adapter.ack(result);
-    }
-
-    return this.persistVerified(
-      adapter,
-      {
-        config,
-        result,
-        ...(expectedPaymentMethod ? { expectedPaymentMethod } : {}),
-      },
-      input,
-    );
   }
 
   /** 验签通过后的唯一落库与同步处理路径。 */
@@ -742,24 +551,6 @@ export class PaymentNotificationService {
     return out;
   }
 
-  private async loadConfigs(
-    providerId: PaymentProviderId,
-    configIds: string[],
-  ): Promise<ResolvedPaymentConfig[]> {
-    const configs: ResolvedPaymentConfig[] = [];
-    for (const configId of configIds) {
-      try {
-        const config = await this.configs.byId(configId);
-        if (config.providerId === providerId) configs.push(config);
-      } catch (e) {
-        this.logger.warn(
-          `历史支付配置无法读取 (${providerId}/${configId}): ${(e as Error).message}`,
-        );
-      }
-    }
-    return configs;
-  }
-
   private chooseUniqueCandidate(
     providerId: PaymentProviderId,
     successes: VerifiedCandidate[],
@@ -897,44 +688,6 @@ export class PaymentNotificationService {
   }
 
   // ── 内部 ────────────────────────────────────────────────────────
-
-  /** 易支付旧入口的先验定位：订单号 + 固定配置 + 渠道单据号 → 历史 Payment。 */
-  private async historicalEpayPaymentFor(
-    body: Record<string, unknown>,
-    configId: string,
-  ): Promise<HistoricalPaymentRef | null> {
-    const merchantOrderNo =
-      typeof body.param === 'string' ? body.param.trim() : '';
-    if (!merchantOrderNo) return null;
-
-    const order = await this.prisma.order.findUnique({
-      where: { orderNo: merchantOrderNo },
-      select: { id: true },
-    });
-    if (!order) return null;
-
-    const providerRef =
-      typeof body.orderId === 'string' ? body.orderId.trim() : '';
-    if (!providerRef) return null;
-    return this.prisma.payment.findFirst({
-      where: {
-        orderId: order.id,
-        channel: 'epay',
-        providerConfigId: configId,
-        providerRef,
-      },
-      select: {
-        id: true,
-        providerConfigId: true,
-        providerInstanceId: true,
-        providerMethod: true,
-        providerRef: true,
-        payTransactionId: true,
-        status: true,
-        createdAt: true,
-      },
-    });
-  }
 
   private notificationMetadata(normalizedJson: string): NotificationMetadata {
     const raw = safeJson(normalizedJson);

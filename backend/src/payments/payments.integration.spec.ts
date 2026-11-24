@@ -136,18 +136,6 @@ async function callback(
 ) {
   const { order, payment, providerRef } = await paymentAttempt(orderNo, configId);
   const type = payment.providerMethod === 'wechat' ? '1' : '2';
-  return api('post', `/api/v1/payments/callback/epay/${configId}`).send(
-    epayCallbackBody(orderNo, providerRef, type, order.paidCents, amountCents),
-  );
-}
-
-async function canonicalCallback(
-  orderNo: string,
-  configId: string,
-  amountCents: number,
-) {
-  const { order, payment, providerRef } = await paymentAttempt(orderNo, configId);
-  const type = payment.providerMethod === 'wechat' ? '1' : '2';
   return api('post', '/api/v1/payment/webhook/easypay').send(
     epayCallbackBody(orderNo, providerRef, type, order.paidCents, amountCents),
   );
@@ -161,15 +149,15 @@ async function callbackGet(
 ) {
   const { order, payment, providerRef } = await paymentAttempt(orderNo, configId);
   const type = payment.providerMethod === 'wechat' ? '1' : '2';
-  return api('get', `/api/v1/payments/callback/epay/${configId}`).query(
+  return api('get', '/api/v1/payment/webhook/easypay').query(
     epayCallbackBody(orderNo, providerRef, type, order.paidCents, amountCents),
   );
 }
 
 /** 没有历史 Payment 的易支付回调：验签前就应被拒绝。 */
-function unknownCallback(orderNo: string, configId: string) {
+function unknownCallback(orderNo: string, _configId: string) {
   const providerRef = `UNKNOWN-${orderNo}`;
-  return api('post', `/api/v1/payments/callback/epay/${configId}`).send(
+  return api('post', '/api/v1/payment/webhook/easypay').send(
     epayCallbackBody(orderNo, providerRef, '2', 100, 100),
   );
 }
@@ -372,7 +360,7 @@ beforeAll(async () => {
 
   const provider = await api(
     'put',
-    '/api/v1/admin/payments/providers/epay/config',
+    '/api/v1/admin/payments/providers/epay/instances/default/config',
     adminToken,
   ).send({
     enabled: true,
@@ -470,7 +458,12 @@ describe('支付 HTTP 集成', () => {
     const order = await createOrder('canonical-webhook');
     const intent = await intend(order.id);
 
-    const res = await canonicalCallback(order.orderNo, intent.configId, order.paidCents);
+    const res = await callback(
+      order.orderNo,
+      intent.configId,
+      `IT-CANONICAL-${run}`,
+      order.paidCents,
+    );
     expect(res.status).toBe(200);
     expect(res.text).toBe('success');
 

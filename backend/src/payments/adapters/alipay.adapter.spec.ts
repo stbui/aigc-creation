@@ -48,7 +48,7 @@ function createInput(
     currency: 'CNY',
     subject: '积分 100',
     returnUrl: 'https://app.example.com/checkout?paymentReturn=1',
-    notifyUrl: 'https://api.example.com/api/v1/payments/callback/alipay/cfg_alipay_1',
+    notifyUrl: 'https://api.example.com/api/v1/payment/webhook/alipay',
     clientUserAgent:
       'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
     expiresAt: new Date(Date.now() + 30 * 60_000),

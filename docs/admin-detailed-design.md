@@ -340,7 +340,7 @@ partial_refunded → refunded | partial_refunded
 
 | 标签 | 接口 | 规则 |
 | --- | --- | --- |
-| 支付渠道 | `GET /admin/payments/providers`、`GET/PUT /admin/payments/settings`、`POST /admin/payments/providers/:providerId/instances`、`PUT /admin/payments/providers/:providerId/instances/:instanceId/config`、`PATCH /admin/payments/providers/:providerId/instances/order`、旧兼容入口 `PUT /admin/payments/providers/:id/config` | 每个服务商实例一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。支付设置包含 `defaultCurrency` / `alipaySource` / `wechatSource`，字段均可选，PUT 只更新实际提交项。保存不要求填写原因 |
+| 支付渠道 | `GET /admin/payments/providers`、`GET/PUT /admin/payments/settings`、`POST /admin/payments/providers/:providerId/instances`、`PUT /admin/payments/providers/:providerId/instances/:instanceId/config`、`PATCH /admin/payments/providers/:providerId/instances/order` | 每个服务商实例一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。支付设置包含 `defaultCurrency` / `alipaySource` / `wechatSource`，字段均可选，PUT 只更新实际提交项。保存不要求填写原因 |
 | 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分八类（含同一商户单多交易号的 `duplicate_charge`），已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |
 | 支付异常 | `GET/POST /admin/payments/exceptions*` | 真资金差异的认领、重试原路退款、人工核销与结案，`finance.reconcile` |
 

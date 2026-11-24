@@ -171,30 +171,16 @@ function shanghaiDate(offsetDays) {
     return r.data;
   }
 
-  async function intend(order, providerId = 'sandbox') {
-    const r = await call('POST', `/payments/${order.id}/intent`, TA, { providerId });
-    if (r.code !== 0) throw new Error(`发起支付失败 (${order.orderNo}): ${r.message}`);
+  function sandboxPay(order, scenario = 'success') {
+    return call('POST', `/orders/${order.id}/pay`, TA, { scenario });
+  }
+
+  async function payAndAssert(order) {
+    const r = await sandboxPay(order);
+    if (r.code !== 0 || r.data?.order?.status !== 'paid') {
+      throw new Error(`沙箱支付失败 (${order.orderNo}): ${r.message}`);
+    }
     return r.data;
-  }
-
-  function callback(order, intent, tradeTag) {
-    const tradeNo = `SMOKE-${tradeTag}-${RUN}`;
-    return {
-      tradeNo,
-      request: call('POST', `/payments/callback/sandbox/${intent.configId}`, null, {
-        orderNo: order.orderNo,
-        tradeNo,
-        amountCents: order.paidCents,
-      }),
-    };
-  }
-
-  function callbackBody(order, intent, tradeNo, amountCents) {
-    return call('POST', `/payments/callback/sandbox/${intent.configId}`, null, {
-      orderNo: order.orderNo,
-      tradeNo,
-      amountCents: amountCents ?? order.paidCents,
-    });
   }
 
   // ── 1. 渠道列表 ──────────────────────────────────────────────────
@@ -215,22 +201,20 @@ function shanghaiDate(offsetDays) {
     cSettings.message,
   );
 
-  // ── 2. 下单 + intent + 沙箱回调入账 ─────────────────────────────
-  console.log('\n【intent / 回调 / 入账】');
-  const order1 = await newOrder('intent');
-  const intent1 = await intend(order1);
-  check('intent 返回 sandbox 模式', intent1.mode === 'sandbox' && intent1.sandbox === true, intent1.mode);
-  check('intent 固定了配置版本', typeof intent1.configId === 'string' && intent1.configVersion >= 1);
-
-  const cb1 = callback(order1, intent1, 'MATCH');
-  const cb1Res = await cb1.request;
-  check('沙箱回调被接受', cb1Res.httpStatus === 200 && cb1Res.success === true, JSON.stringify(cb1Res).slice(0, 160));
+  // ── 2. 下单 + 沙箱支付入账 ───────────────────────────────────────
+  console.log('\n【沙箱支付 / 入账】');
+  const order1 = await newOrder('pay');
+  const pay1 = await sandboxPay(order1);
+  check('沙箱支付成功', pay1.code === 0 && pay1.data?.order?.status === 'paid', pay1.message);
+  check('首次支付不是幂等命中', pay1.data?.idempotentHit === false);
 
   const st1 = await call('GET', `/payments/${order1.id}/status`, TA);
   check('订单状态为 paid', st1.data?.status === 'paid', st1.data?.status);
   check(
-    '支付流水记录渠道交易号',
-    (st1.data?.payments ?? []).some((p) => p.providerTradeNo === cb1.tradeNo),
+    '支付流水记录沙箱交易号',
+    (st1.data?.payments ?? []).some(
+      (p) => p.providerId === 'sandbox' && /^SBX-/.test(String(p.providerTradeNo ?? '')),
+    ),
   );
   check('支付流水记录实际渠道', (st1.data?.payments ?? []).some((p) => p.providerId === 'sandbox'));
 
@@ -240,66 +224,43 @@ function shanghaiDate(offsetDays) {
   const bal1 = await call('GET', '/credits/balance', TA);
   check('积分到账', bal1.data?.balance === product.credits, `${bal1.data?.balance}`);
 
-  const rawPayment = await prisma.payment.findFirst({ where: { orderId: order1.id, status: 'succeeded' } });
-  check('回调原始报文已留档', !!rawPayment?.rawPayload && rawPayment.rawPayload.includes(cb1.tradeNo));
-  const notification = await prisma.paymentNotification.findFirst({
-    where: { merchantOrderNo: order1.orderNo, status: 'processed' },
+  const succeededPayment = await prisma.payment.findFirst({
+    where: { orderId: order1.id, status: 'succeeded' },
   });
-  check('回调收件箱标记 processed', !!notification?.id);
+  check('支付流水落库', !!succeededPayment?.payTransactionId, succeededPayment?.payTransactionId);
 
-  const dup = await callbackBody(order1, intent1, cb1.tradeNo);
-  check('重复回调 ack 成功', dup.httpStatus === 200 && dup.success === true, JSON.stringify(dup).slice(0, 120));
+  const dup = await sandboxPay(order1);
+  check('重复支付幂等返回', dup.code === 0 && dup.data?.idempotentHit === true, dup.message);
   const bal1b = await call('GET', '/credits/balance', TA);
-  check('重复回调不重复发积分', bal1b.data?.balance === bal1.data?.balance, `${bal1b.data?.balance}`);
+  check('重复支付不重复发积分', bal1b.data?.balance === bal1.data?.balance, `${bal1b.data?.balance}`);
 
-  // ── 3. 异常回调 ──────────────────────────────────────────────────
-  console.log('\n【回调异常】');
-  const order2 = await newOrder('mismatch');
-  const intent2 = await intend(order2);
-  const badTrade = `SMOKE-MISMATCH-${RUN}`;
-  const cbBad = await callbackBody(order2, intent2, badTrade, order2.paidCents + 100);
-  check(
-    '金额不符按业务终态 ack 成功（停止重试）',
-    cbBad.httpStatus === 200 && cbBad.success === true,
-    JSON.stringify(cbBad).slice(0, 160),
-  );
-  const st2 = await call('GET', `/payments/${order2.id}/status`, TA);
-  check('金额不符时订单保持 pending', st2.data?.status === 'pending', st2.data?.status);
-  const itemBad = await prisma.paymentReconciliationItem.findFirst({
-    where: { merchantOrderNo: order2.orderNo, result: 'amount_mismatch' },
+  // ── 3. 支付失败 / 超时 ───────────────────────────────────────────
+  console.log('\n【支付失败 / 超时】');
+  const order2 = await newOrder('failed');
+  const failedPay = await sandboxPay(order2, 'failed');
+  check('支付失败订单保持 pending', failedPay.code === 0 && failedPay.data?.order?.status === 'pending', failedPay.message);
+  const failedPayment = await prisma.payment.findFirst({
+    where: { orderId: order2.id, status: 'failed', sandboxScenario: 'failed' },
   });
-  check('金额不符落对账差异', !!itemBad?.id, itemBad?.detail);
+  check('支付失败流水落库', !!failedPayment?.id);
 
-  const ghostOrderNo = `GHOST-${RUN}`;
-  const cbGhost = await call('POST', `/payments/callback/sandbox/${intent2.configId}`, null, {
-    orderNo: ghostOrderNo,
-    tradeNo: `SMOKE-GHOST-${RUN}`,
-    amountCents: 100,
+  const order2b = await newOrder('timeout');
+  const timeoutPay = await sandboxPay(order2b, 'timeout');
+  check('支付超时订单转 cancelled', timeoutPay.code === 0 && timeoutPay.data?.order?.status === 'cancelled', timeoutPay.message);
+  const timeoutPayment = await prisma.payment.findFirst({
+    where: { orderId: order2b.id, status: 'failed', sandboxScenario: 'timeout' },
   });
-  check('未知订单 ack 成功且不留垃圾重试', cbGhost.httpStatus === 200 && cbGhost.success === true);
-  const itemGhost = await prisma.paymentReconciliationItem.findFirst({
-    where: { merchantOrderNo: ghostOrderNo, result: 'local_order_not_found' },
-  });
-  check('未知订单落对账差异', !!itemGhost?.id);
-
-  const cbNoTrade = await call('POST', `/payments/callback/sandbox/${intent2.configId}`, null, {
-    orderNo: order2.orderNo,
-    amountCents: order2.paidCents,
-  });
-  check('缺少交易号被拒 (400)', cbNoTrade.httpStatus === 400 && cbNoTrade.success === false);
+  check('支付超时流水落库', !!timeoutPayment?.id);
 
   // ── 4. 关单 ──────────────────────────────────────────────────────
   console.log('\n【关单】');
   const order3 = await newOrder('cancel-user');
-  const intent3 = await intend(order3);
   const cancelled = await call('POST', `/orders/${order3.id}/cancel`, TA);
   check('用户取消订单成功', cancelled.code === 0 && cancelled.data?.status === 'cancelled', cancelled.message);
   const o3 = await call('GET', `/orders/${order3.id}`, TA);
   check('取消后订单为 cancelled', o3.data?.status === 'cancelled', o3.data?.status);
-  check('取消后支付尝试收尾', (o3.data?.payments ?? []).every((p) => p.status !== 'pending'));
 
   const order4 = await newOrder('cancel-admin');
-  await intend(order4);
   const adminClose = await call('POST', `/admin/payments/orders/${order4.id}/close`, TADMIN, {});
   check('管理员关单成功', adminClose.code === 0 && adminClose.data?.view?.status === 'cancelled', adminClose.message);
 
@@ -310,10 +271,7 @@ function shanghaiDate(offsetDays) {
   console.log('\n【退款】');
   async function paidOrder(tag) {
     const o = await newOrder(tag);
-    const it = await intend(o);
-    const cb = callback(o, it, `REFUND-${tag.toUpperCase()}`);
-    const res = await cb.request;
-    if (res.httpStatus !== 200 || res.success !== true) throw new Error(`入账失败 (${tag})`);
+    await payAndAssert(o);
     return o;
   }
 
@@ -380,33 +338,36 @@ function shanghaiDate(offsetDays) {
   const oP2 = await call('GET', `/orders/${partialOrder.id}`, TA);
   check('退完后订单为 refunded', oP2.data?.status === 'refunded', oP2.data?.status);
 
-  // ── 5.5 并发回调：两个不同交易号只允许一笔入账 ───────────────────
+  // ── 5.5 并发支付：同一订单只允许一笔入账 ─────────────────────────
   console.log('\n【并发入账】');
   const raceOrder = await newOrder('race-pay');
-  const raceIntent = await intend(raceOrder);
   const balBeforeRace = await call('GET', '/credits/balance', TA);
   const [raceA, raceB] = await Promise.all([
-    callbackBody(raceOrder, raceIntent, `SMOKE-RACE-A-${RUN}`),
-    callbackBody(raceOrder, raceIntent, `SMOKE-RACE-B-${RUN}`),
+    sandboxPay(raceOrder),
+    sandboxPay(raceOrder),
   ]);
-  check('并发回调都被 ack', raceA.httpStatus === 200 && raceB.httpStatus === 200, `${raceA.httpStatus}/${raceB.httpStatus}`);
-  const raceOrderView = await call('GET', `/orders/${raceOrder.id}`, TA);
-  check('并发回调后订单为 paid', raceOrderView.data?.status === 'paid', raceOrderView.data?.status);
   check(
-    '并发回调只发放一次积分',
+    '并发支付至少一笔成功',
+    raceA.code === 0 || raceB.code === 0,
+    `${raceA.code}/${raceB.code}`,
+  );
+  const raceOrderView = await call('GET', `/orders/${raceOrder.id}`, TA);
+  check('并发支付后订单为 paid', raceOrderView.data?.status === 'paid', raceOrderView.data?.status);
+  check(
+    '并发支付只发放一次积分',
     raceOrderView.data?.grantedCredits === product.credits,
     `${raceOrderView.data?.grantedCredits} / 商品 ${product.credits}`,
   );
   const balAfterRace = await call('GET', '/credits/balance', TA);
   check(
-    '并发回调余额只增加一份',
+    '并发支付余额只增加一份',
     balAfterRace.data?.balance - balBeforeRace.data?.balance === product.credits,
     `${balBeforeRace.data?.balance} → ${balAfterRace.data?.balance}`,
   );
   const succeededRows = await prisma.payment.count({
     where: { orderId: raceOrder.id, status: 'succeeded' },
   });
-  check('并发回调只落一条成功流水', succeededRows === 1, `${succeededRows}`);
+  check('并发支付只落一条成功流水', succeededRows === 1, `${succeededRows}`);
 
   // ── 5.6 周期限购 / 库存并发 ──────────────────────────────────────
   console.log('\n【周期限购 / 库存并发】');
@@ -505,7 +466,7 @@ function shanghaiDate(offsetDays) {
     });
     check('0 元单创建成功', freeOrderRes.code === 0, freeOrderRes.message);
     const freeOrder = freeOrderRes.data;
-    const freeIntent = await call('POST', `/payments/${freeOrder.id}/intent`, TA, { providerId: 'sandbox' });
+    const freeIntent = await call('POST', `/payments/${freeOrder.id}/intent`, TA, {});
     check('0 元单直接完成', freeIntent.code === 0 && freeIntent.data?.mode === 'free', freeIntent.message);
     const freeRefund = await call('POST', `/admin/orders/${freeOrder.id}/refund`, TADMIN, {
       amountCents: 100,

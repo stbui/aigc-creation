@@ -13,7 +13,6 @@ import {
   PaymentCurrency,
   PaymentProviderId,
   PAYMENT_CURRENCIES,
-  PAYMENT_PROVIDER_IDS,
   PaymentSource,
   VisiblePaymentMethod,
   VISIBLE_PAYMENT_METHODS,
@@ -200,11 +199,6 @@ export class PaymentConfigService implements OnModuleInit {
       .map((row) => this.toResolved(row));
   }
 
-  /** 最新默认实例；未配置返回 null。保留旧 API 兼容。 */
-  async latest(providerId: PaymentProviderId): Promise<ResolvedPaymentConfig | null> {
-    return this.latestInstance(providerId, 'default');
-  }
-
   /** 指定实例的最新版本。 */
   async latestInstance(
     providerId: PaymentProviderId,
@@ -215,7 +209,7 @@ export class PaymentConfigService implements OnModuleInit {
     return this.toResolved(row);
   }
 
-  /** 按回调 URL 的 configId 精确解析。 */
+  /** 按 Payment 引用的 configId 精确解析。 */
   async byId(configId: string): Promise<ResolvedPaymentConfig> {
     const row = await this.prisma.paymentProviderConfig.findUnique({ where: { id: configId } });
     if (!row) throw new AppError(40400, '支付配置不存在', 404);
@@ -246,7 +240,7 @@ export class PaymentConfigService implements OnModuleInit {
     );
   }
 
-  /** 兼容旧调用：任一实例已启用、字段齐全且支持目标币种。 */
+  /** 任一实例已启用、字段齐全且支持目标币种。 */
   async available(currency: PaymentCurrency): Promise<AvailableProviderView[]> {
     const out: AvailableProviderView[] = [];
     for (const adapter of allAdapters()) {
@@ -257,7 +251,7 @@ export class PaymentConfigService implements OnModuleInit {
       const usable = rows.some((row) => {
         if (!row.enabled) return false;
         try {
-          return adapter.validateConfig(this.valuesFor(d.id, row)).length === 0;
+          return adapter.validateConfig(this.valuesFor(row)).length === 0;
         } catch {
           return false;
         }
@@ -357,7 +351,7 @@ export class PaymentConfigService implements OnModuleInit {
       }
       let values: Record<string, string>;
       try {
-        values = this.valuesFor(providerId, row);
+        values = this.valuesFor(row);
       } catch (e) {
         this.logger.error(
           `C 端支付实例不可用 (${method} -> ${providerId}/${row.instanceId}) 解密失败: ${(e as Error).message}`,
@@ -484,7 +478,7 @@ export class PaymentConfigService implements OnModuleInit {
         if (row.maxAmountCents != null && input.amountCents > row.maxAmountCents) continue;
         let values: Record<string, string>;
         try {
-          values = this.valuesFor(providerId, row);
+          values = this.valuesFor(row);
         } catch {
           continue;
         }
@@ -651,25 +645,6 @@ export class PaymentConfigService implements OnModuleInit {
 
   // ── 写入 ────────────────────────────────────────────────────────
 
-  /** 兼容旧路径：默认实例保存新版本。 */
-  async saveVersion(
-    providerId: string,
-    input: {
-      enabled: boolean;
-      closeAfterMinutes: number;
-      values: Record<string, string>;
-      name?: string | null;
-      minAmountCents?: number | null;
-      maxAmountCents?: number | null;
-      dailyLimitCents?: number | null;
-      refundEnabled?: boolean;
-      paymentMethods?: VisiblePaymentMethod[];
-    },
-    actorId: string,
-  ): Promise<{ provider: AdminPaymentProviderView; unchanged: boolean }> {
-    return this.saveInstanceVersion(providerId, 'default', input, actorId);
-  }
-
   /** 新建实例；instanceId 只能由服务端生成。 */
   async createInstance(
     providerId: string,
@@ -690,7 +665,7 @@ export class PaymentConfigService implements OnModuleInit {
     const values = input.values ?? {};
     const enabled = Boolean(input.enabled);
     if (enabled) {
-      const missing = adapter.validateConfig(this.normalizeValues(adapter.descriptor.id, values));
+      const missing = adapter.validateConfig(values);
       if (missing.length > 0) {
         throw new AppError(40001, `实例启用前必须补齐字段: ${missing.join(', ')}`, 400);
       }
@@ -702,7 +677,6 @@ export class PaymentConfigService implements OnModuleInit {
       dailyLimitCents: input.dailyLimitCents ?? null,
     });
 
-    const normalized = this.normalizeValues(adapter.descriptor.id, values);
     const row = await this.prisma.paymentProviderConfig.create({
       data: {
         providerId: adapter.descriptor.id,
@@ -717,7 +691,7 @@ export class PaymentConfigService implements OnModuleInit {
         dailyLimitCents: input.dailyLimitCents ?? null,
         refundEnabled: input.refundEnabled ?? true,
         paymentMethods: JSON.stringify(paymentMethods),
-        configCipher: this.cipher.encrypt(JSON.stringify(normalized)),
+        configCipher: this.cipher.encrypt(JSON.stringify(values)),
         configDigest: digestOfConfig(
           adapter.descriptor.id,
           instanceId,
@@ -730,7 +704,7 @@ export class PaymentConfigService implements OnModuleInit {
           paymentMethods,
           normalizeName(input.name),
           sortOrder,
-          normalized,
+          values,
         ),
         createdBy: actorId,
       },
@@ -762,7 +736,7 @@ export class PaymentConfigService implements OnModuleInit {
     if (!current && instanceId !== 'default') {
       throw new AppError(40400, `支付实例不存在: ${instanceId}`, 404);
     }
-    const previous = current ? this.valuesFor(adapter.descriptor.id, current) : {};
+    const previous = current ? this.valuesFor(current) : {};
 
     // 未提交的 secret 沿用上一版；显式空串同样视为沿用。
     const merged: Record<string, string> = { ...previous };
@@ -809,7 +783,7 @@ export class PaymentConfigService implements OnModuleInit {
       adapter.descriptor.id,
       input.paymentMethods ??
         (current
-          ? paymentMethodsOf(current)
+          ? paymentMethodsOf(current, adapter.descriptor.id)
           : defaultPaymentMethods(adapter.descriptor.id)),
     );
 
@@ -894,10 +868,7 @@ export class PaymentConfigService implements OnModuleInit {
   /** env → v1；仅当库内完全没有该渠道配置时生效。 */
   async bootstrapFromEnv(): Promise<void> {
     const get = (key: string): string => this.config.get<string>(key) ?? '';
-    const epayMchId = get('payment.epay.mchId') || get('payment.epay.pid');
-    const epayType = normalizeEpayType(
-      get('payment.epay.type') || get('payment.epay.payType') || '2',
-    );
+    const epayType = get('payment.epay.type') || '2';
     const seeds: Array<{ id: PaymentProviderId; values: Record<string, string> }> = [
       { id: 'sandbox', values: {} },
       {
@@ -945,7 +916,7 @@ export class PaymentConfigService implements OnModuleInit {
         id: 'epay',
         values: {
           apiBase: get('payment.epay.apiBase') || 'https://epay.jylt.cc',
-          mchId: epayMchId,
+          mchId: get('payment.epay.mchId'),
           key: get('payment.epay.key'),
           type: epayType,
         },
@@ -1056,15 +1027,8 @@ export class PaymentConfigService implements OnModuleInit {
     }
   }
 
-  private valuesFor(
-    providerId: string,
-    row: { configCipher: string },
-  ): Record<string, string> {
-    return normalizeProviderValues(providerId, this.decode(row));
-  }
-
-  private normalizeValues(providerId: string, values: Record<string, string>): Record<string, string> {
-    return normalizeProviderValues(providerId, values);
+  private valuesFor(row: { configCipher: string }): Record<string, string> {
+    return this.decode(row);
   }
 
   private toResolved(
@@ -1100,7 +1064,7 @@ export class PaymentConfigService implements OnModuleInit {
       dailyLimitCents: row.dailyLimitCents,
       refundEnabled: row.refundEnabled,
       paymentMethods: paymentMethodsOf(row, row.providerId),
-      values: values ?? this.valuesFor(row.providerId, row),
+      values: values ?? this.valuesFor(row),
     };
   }
 
@@ -1111,11 +1075,11 @@ export class PaymentConfigService implements OnModuleInit {
     const instances = await Promise.all(
       rows.map((row) => this.toAdminInstanceView(descriptor, row)),
     );
-    const legacy = instances[0] ?? null;
-    const legacyRow = rows[0] ?? null;
+    const primary = instances[0] ?? null;
+    const primaryRow = rows[0] ?? null;
     const adapter = requireAdapter(descriptor.id);
-    const legacyMissing = legacyRow
-      ? adapter.validateConfig(this.valuesFor(descriptor.id, legacyRow))
+    const primaryMissing = primaryRow
+      ? adapter.validateConfig(this.valuesFor(primaryRow))
       : adapter.validateConfig({});
     return {
       id: descriptor.id,
@@ -1124,20 +1088,20 @@ export class PaymentConfigService implements OnModuleInit {
       checkoutMode: descriptor.checkoutMode,
       enabled: instances.some((instance) => instance.enabled),
       configured: instances.some((instance) => instance.configured),
-      closeAfterMinutes: legacy?.closeAfterMinutes ?? 30,
-      version: legacy?.version ?? null,
-      configId: legacy?.configId ?? null,
-      configEnabled: legacy?.enabled ?? false,
-      values: legacy?.values ?? {},
-      secretConfigured: legacy?.secretConfigured ?? {},
+      closeAfterMinutes: primary?.closeAfterMinutes ?? 30,
+      version: primary?.version ?? null,
+      configId: primary?.configId ?? null,
+      configEnabled: primary?.enabled ?? false,
+      values: primary?.values ?? {},
+      secretConfigured: primary?.secretConfigured ?? {},
       configFields: descriptor.configFields,
       supportedCurrencies: descriptor.supportedCurrencies,
       supportsReconciliation: descriptor.supportsReconciliation,
-      missing: legacyMissing,
-      identityLockedFields: legacy?.identityLockedFields ?? [],
+      missing: primaryMissing,
+      identityLockedFields: primary?.identityLockedFields ?? [],
       hasOpenOrders: instances.some((instance) => instance.hasOpenOrders),
-      updatedAt: legacy?.updatedAt ?? null,
-      warnings: legacy?.warnings ?? [],
+      updatedAt: primary?.updatedAt ?? null,
+      warnings: primary?.warnings ?? [],
       instances,
     };
   }
@@ -1162,7 +1126,7 @@ export class PaymentConfigService implements OnModuleInit {
     },
   ): Promise<AdminPaymentProviderInstanceView> {
     const adapter = requireAdapter(descriptor.id);
-    const values = this.valuesFor(descriptor.id, row);
+    const values = this.valuesFor(row);
     const missing = adapter.validateConfig(values);
     const locked = await this.identityLockedFields(descriptor, row.instanceId);
     const hasOpenOrders = await this.hasOpenOrders(descriptor.id, row.instanceId);
@@ -1458,28 +1422,21 @@ function defaultPaymentMethods(providerId: string): VisiblePaymentMethod[] {
   return ['alipay', 'wechat'];
 }
 
-/**
- * 兼容实例字段上线前的旧行：缺少 paymentMethods 时按渠道能力兜底。
- * 已有值必须是该渠道允许的子集；旧默认值里的跨渠道项会被过滤掉。
- */
+/** 实例支持的支付方式必须是该渠道允许集合的子集。 */
 function paymentMethodsOf(
-  row: { paymentMethods?: string | null; providerId?: string },
-  providerId?: string,
+  row: { paymentMethods: string },
+  providerId: string,
 ): VisiblePaymentMethod[] {
-  const resolvedProviderId = providerId ?? row.providerId ?? '';
-  const allowed = defaultPaymentMethods(resolvedProviderId);
-  if (row.paymentMethods == null || row.paymentMethods.trim() === '') {
-    return allowed;
-  }
+  const allowed = defaultPaymentMethods(providerId);
   try {
     const parsed = JSON.parse(row.paymentMethods);
-    if (!Array.isArray(parsed)) return allowed;
+    if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (value): value is VisiblePaymentMethod =>
         (value === 'alipay' || value === 'wechat') && allowed.includes(value),
     );
   } catch {
-    return allowed;
+    return [];
   }
 }
 
@@ -1532,27 +1489,3 @@ function digestOfConfig(
     )
     .digest('hex');
 }
-
-/** 兼容 2026-11 新版易支付字段上线前落库的 pid / payType 配置。 */
-function normalizeProviderValues(
-  providerId: string,
-  values: Record<string, string>,
-): Record<string, string> {
-  if (providerId !== 'epay') return values;
-  const normalized = { ...values };
-  if (!normalized.mchId?.trim() && normalized.pid?.trim()) {
-    normalized.mchId = normalized.pid.trim();
-  }
-  const type = normalizeEpayType(normalized.type || '') || normalizeEpayType(normalized.payType || '');
-  if (type) normalized.type = type;
-  return normalized;
-}
-
-function normalizeEpayType(value: string): string {
-  const normalized = value.trim().toLowerCase();
-  if (['1', 'wx', 'wxpay', 'wechat', 'weixin'].includes(normalized)) return '1';
-  if (['2', 'ali', 'alipay'].includes(normalized)) return '2';
-  return '';
-}
-
-export const PAYMENT_PROVIDER_ID_LIST = PAYMENT_PROVIDER_IDS;

@@ -51,7 +51,7 @@ function createOrderInput(overrides: Partial<CreateOrderInput> = {}): CreateOrde
     currency: 'CNY',
     subject: 'Testing credits',
     returnUrl: 'https://example.com/checkout/complete',
-    notifyUrl: 'https://example.com/api/v1/payments/callback/stripe/cfg_stripe_1',
+    notifyUrl: 'https://example.com/api/v1/payment/webhook/stripe',
     expiresAt: new Date(Date.now() + 45 * 60_000),
     ...overrides,
   };

@@ -14,7 +14,7 @@
 | 场景 | 原因 |
 | --- | --- |
 | CSV 导出 `GET /admin/*/export` | 返回文件流；前端 `downloadCsv()` 独立于 `request()` |
-| 渠道回调 `/payment/webhook/*`、`/payments/callback/:providerId/:configId` | 用 `@Res()` 直写渠道要求的回执格式，不能套 `{ code, data }`；规范入口见下方支付路由说明 |
+| 渠道回调 `/payment/webhook/*` | 用 `@Res()` 直写渠道要求的回执格式，不能套 `{ code, data }`；规范入口见下方支付路由说明 |
 
 ## 2. 跨模块错误码
 
@@ -84,7 +84,6 @@
 | POST | `/api/v1/payment/webhook/alipay` | 支付宝官方固定回调入口（公开，无信封）；按历史 Payment 反查配置版本 |
 | POST | `/api/v1/payment/webhook/wxpay` | 微信支付固定回调入口（公开，无信封）；先用历史 APIv3 密钥解密，再按历史配置验签 |
 | POST | `/api/v1/payment/webhook/stripe` | Stripe 固定回调入口（公开，无信封）；以 PaymentIntent 为主反查配置版本，历史 Checkout Session 仅兼容旧单 |
-| GET/POST | `/api/v1/payments/callback/:providerId/:configId` | **历史回调入口（公开，无信封，`@Res()` 直写）**；PayPal / ZPay 及已写入渠道后台的旧 URL 继续使用 |
 | GET | `/api/v1/payments/:orderId/status` | 支付状态轮询 |
 | POST/GET | `/api/v1/invoices`、`/invoices/:id/file` | 申请开票 / 列表 / 取可打印 HTML。同一订单保留完整申请历史；同一时刻最多一张有效票（服务层校验 + 数据库唯一占用键兜底），只有 `rejected` 可重新申请，`red_flushed` 不可重提 |
 | GET | `/api/v1/marketing/{popup,invites,checkin}` | 营销弹窗 / 邀请 / 签到 |
@@ -117,9 +116,8 @@
 | GET/PUT/POST/DELETE | `/api/v1/admin/{coupons,campaigns,marketing-rules}*` | 营销管理。券/活动删除只允许没有关联订单的记录；已有订单返回 **409**，券提示改为停用、活动提示改为下线 |
 | GET/POST | `/api/v1/admin/invoices*` | 发票列表 / 开具 / 驳回；`POST /:id/red-flush` 登记已开具发票冲红，请求体 `{ reason }`（必填）。读 / 写统一使用 `invoice.write`，冲红保留历史 |
 | GET | `/api/v1/admin/payments/providers` | 支付适配器视图列表（沙箱 / 支付宝 / 微信）：启用状态、是否配置齐、缺哪几项、checkoutMode、关单分钟、配置版本、字段元数据、风险告警。**只回配置状态不回密钥明文**（`secretConfigured` 只给布尔），`payment.read` |
-| PUT | `/api/v1/admin/payments/providers/:id/config` | 保存支付适配器配置（版本化 + 加密 + 追加写）。请求体 `{ enabled, closeAfterMinutes, values }`，保存不要求填写原因；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
 | POST | `/api/v1/admin/payments/providers/:providerId/instances` | 新建服务商实例；可选名称、凭据、关单分钟、实例限额、退款开关与支付方式子集，`payment.write` |
-| PUT | `/api/v1/admin/payments/providers/:providerId/instances/:instanceId/config` | 保存指定实例的新版本配置；字段同旧版配置保存接口，`payment.write` |
+| PUT | `/api/v1/admin/payments/providers/:providerId/instances/:instanceId/config` | 保存指定实例的新版本配置；请求体 `{ enabled, closeAfterMinutes, values }`，保存不要求填写原因；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
 | PATCH | `/api/v1/admin/payments/providers/:providerId/instances/order` | 按 `{ instanceIds }` 调整实例排序，`payment.write` |
 | GET | `/api/v1/admin/system-performance` | 系统性能只读快照：运行时（内存 / CPU 累计时间 / 事件循环延迟）、数据库探活与库文件大小、存储探活（30 秒缓存）、近 24 小时任务与上游调用 P95、线路冷却与调度器状态；`setting.read` |
 | POST | `/api/v1/admin/settings/upload` | 上传设置图片（multipart 字段 `file`），返回 `{ value, previewUrl, width, height, sizeBytes }`；`setting.write` |

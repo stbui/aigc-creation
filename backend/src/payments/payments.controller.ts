@@ -34,16 +34,14 @@ export class CreateIntentDto {
 /**
  * C 端支付接口。
  *
- * `/payments/callback/:providerId/:configId` 是**公开**路由 —— 渠道服务器不带
- * 我们的 JWT，身份靠验签证明。它绝不能挂 JwtAuthGuard，也不能依赖「谁能调通」
- * 判断请求是否可信。
+ * 渠道回调不在此控制器：统一走 `PaymentWebhookController` 的
+ * `/payment/webhook/*` 规范地址，URL 不携带 configId。
  */
 @Controller('payments')
 export class PaymentsController {
   constructor(
     private readonly orders: PaymentOrderService,
     private readonly configs: PaymentConfigService,
-    private readonly notifications: PaymentNotificationService,
     private readonly settings: SettingsService,
     private readonly settingImages: SettingImageService,
   ) {}
@@ -119,89 +117,15 @@ export class PaymentsController {
       force: true,
     });
   }
-
-  /**
-   * 渠道异步回调。
-   *
-   * 必须用**原始报文**验签（微信签名覆盖 body 字节；支付宝表单参数经 URL
-   * 解码后拼串），故 main.ts 建应用时开启了 `rawBody: true`。
-   *
-   * 响应格式由通道决定（支付宝纯文本 / 微信 JSON），用 @Res 直接写，
-   * 不经过统一响应信封 —— 渠道不认识 `{code,data,message}`。
-   */
-  @Get('callback/:providerId/:configId')
-  async callbackGet(
-    @Param('providerId') providerId: string,
-    @Param('configId') configId: string,
-    @Query() query: Record<string, unknown>,
-    @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
-    const body = query ?? {};
-    await this.handleCallback(
-      providerId,
-      configId,
-      req.headers as Record<string, string | string[] | undefined>,
-      Buffer.from(JSON.stringify(body)),
-      body,
-      res,
-    );
-  }
-
-  @Post('callback/:providerId/:configId')
-  async callbackPost(
-    @Param('providerId') providerId: string,
-    @Param('configId') configId: string,
-    @Req() req: RawBodyRequest<Request>,
-    @Body() body: Record<string, unknown>,
-    @Res() res: Response,
-  ): Promise<void> {
-    const rawBody = req.rawBody
-      ? req.rawBody
-      : Buffer.from(typeof body === 'object' && body !== null ? JSON.stringify(body) : '');
-
-    await this.handleCallback(
-      providerId,
-      configId,
-      req.headers as Record<string, string | string[] | undefined>,
-      rawBody,
-      body ?? {},
-      res,
-    );
-  }
-
-  private async handleCallback(
-    providerId: string,
-    configId: string,
-    headers: Record<string, string | string[] | undefined>,
-    rawBody: Buffer,
-    body: Record<string, unknown>,
-    res: Response,
-  ): Promise<void> {
-    // 未知渠道的拒绝语义在 PaymentNotificationService.ingest 内: 以渠道格式
-    // (纯文本/JSON ack) 回复 404, 比统一异常信封更符合回调协议。
-    const ack = await this.notifications.ingest({
-      providerId: providerId as PaymentProviderId,
-      configId,
-      headers,
-      rawBody,
-      body,
-    });
-
-    res.status(ack.status);
-    res.setHeader('Content-Type', ack.contentType);
-    res.send(ack.body);
-  }
 }
 
 /**
  * 支付渠道规范回调路由。
  *
  * URL 刻意不携带 configId：服务端会按明文订单号（微信则先解密）反查该订单
- * 历史 Payment 引用的配置版本。旧 `/payments/callback/:provider/:configId`
- * 保留在 PaymentsController，兼容历史渠道配置和尚未规范化的支付渠道。
+ * 历史 Payment 引用的配置版本。
  *
- * 响应同样由渠道协议决定（纯文本 / JSON），用 @Res 直接写，不走统一信封。
+ * 响应由渠道协议决定（纯文本 / JSON），用 @Res 直接写，不走统一信封。
  */
 @Controller('payment')
 export class PaymentWebhookController {

@@ -379,7 +379,7 @@
 | `User` | `lastLoginAt` | 用户列表展示 |
 | `Asset` | `status`（visible/hidden） | 素材下架 |
 | `GenerationTask` | `creditCost` | 扣费快照与后台展示 |
-| `CapabilityDef` | `creditCost` | 消耗价代码兜底默认值 |
+| `CapabilityPlugin` | `creditCost` | 消耗价代码兜底默认值 |
 
 ### 5.4 核心规则
 

@@ -56,14 +56,6 @@ export type {
   ParamType,
 };
 
-/**
- * 兼容旧类型名。
- *
- * ⚠️ 这是**改名而非语义变更**: 能力定义从 CapabilityDef 抽到 CapabilityPlugin,
- * 两者是同一个类型。保留别名是为了不打断既有引用, 新代码用 CapabilityPlugin。
- */
-export type CapabilityDef = CapabilityPlugin;
-
 /** 能力清单 (顺序即侧栏与工作台展示顺序, 与参考站一致) */
 export const CAPABILITIES: CapabilityPlugin[] = CAPABILITY_PLUGINS;
 

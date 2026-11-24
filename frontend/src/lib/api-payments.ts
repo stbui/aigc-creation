@@ -86,15 +86,6 @@ export const adminPaymentProvidersApi = {
       pageSize: number;
     }>("/admin/payments/providers"),
 
-  /**
-   * 保存渠道配置（追加新版本，历史订单继续用旧版本）。
-   */
-  saveConfig: (providerId: string, body: PaymentProviderConfigUpdate) =>
-    request<{ provider: AdminPaymentProviderView; unchanged: boolean }>(
-      `/admin/payments/providers/${providerId}/config`,
-      { method: "PUT", body },
-    ),
-
   /** 新建实例；instanceId 由服务端生成，默认停用。 */
   createInstance: (
     providerId: string,

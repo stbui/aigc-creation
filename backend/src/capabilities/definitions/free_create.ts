@@ -2,8 +2,7 @@
  * 自由创作 —— 参考站 free-creation。参考图(选填) + 提示词驱动, 已接优云智算 qwen-image-3.0。
  *
  * 2026-11-14: 原「创意生图」(creative_image / /creative-image) 与本页面合并，
- * 全站只保留 free_create 一个能力、/free-creation 一个入口。存量 creative_image
- * 任务与模型绑定由 `scripts/migrate-merge-creative-image.js` 归并到本能力。
+ * 全站只保留 free_create 一个能力、/free-creation 一个入口。
  *
  * 2026-10-20 从 capability.registry.ts 抽离为独立文件。
  * 抽离的意义: 能力定义此前散在 registry / gateway-prompt / mock provider /

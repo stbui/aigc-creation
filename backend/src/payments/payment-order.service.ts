@@ -104,7 +104,7 @@ export interface PaymentOrderView {
 /** 查单节流窗口：2 秒内重复查询直接返回本地视图 */
 const QUERY_THROTTLE_MS = 2_000;
 
-/** 规范回调入口；未列出的渠道继续使用带 configId 的旧回调地址。 */
+/** 规范回调入口；未列出的渠道没有可用的回调地址，不能发起支付。 */
 const CANONICAL_NOTIFY_PATHS: Partial<Record<PaymentProviderId, string>> = {
   epay: "easypay",
   alipay: "alipay",
@@ -153,35 +153,34 @@ export class PaymentOrderService {
   /**
    * 渠道异步通知地址。
    *
-   * EasyPay / 支付宝 / 微信 / Stripe 使用固定公开入口，回调服务会按订单
-   * 引用的历史 Payment 反查下单时的配置版本；PayPal / ZPay / 沙箱仍保留
-   * 带 configId 的旧入口，兼容尚未迁移的适配器与已写入渠道后台的旧地址。
+   * 只提供规范公开入口，URL 不携带 configId：回调服务会按订单引用的历史
+   * Payment 反查下单时的配置版本。没有规范入口的渠道（PayPal / ZPay / 沙箱）
+   * 直接拒绝发起支付，不生成一个没有接收方的地址。
    *
    * 优先使用渠道配置里保存的 `publicBaseUrl`；没配才回落到全局
-   * `PAYMENT_NOTIFY_BASE`，最后才是本机地址。这样多域名/反代部署时，
-   * 每个渠道可以指向自己的公网入口，不必重启改环境变量。
+   * `PAYMENT_NOTIFY_BASE`。这样多域名/反代部署时，每个渠道可以指向自己的
+   * 公网入口，不必重启改环境变量。
    */
-  notifyUrl(
-    providerId: PaymentProviderId,
-    configId: string,
-    publicBaseUrl?: string,
-  ): string {
+  notifyUrl(providerId: PaymentProviderId, publicBaseUrl?: string): string {
+    const canonicalPath = CANONICAL_NOTIFY_PATHS[providerId];
+    if (!canonicalPath) {
+      throw new AppError(
+        50301,
+        `支付渠道 ${providerId} 没有规范回调地址，暂不支持发起支付`,
+        503,
+      );
+    }
     const configuredBase =
       publicBaseUrl?.trim() || (this.config.get<string>("payment.notifyBase") ?? "").trim();
-    if (providerId !== "sandbox" && !configuredBase) {
+    if (!configuredBase) {
       throw new AppError(
         50301,
         "真实支付渠道缺少回调公网地址，请配置渠道 publicBaseUrl 或 PAYMENT_NOTIFY_BASE",
         503,
       );
     }
-    const host = this.config.get<string>("app.host") || "127.0.0.1";
-    const port = this.config.get<number>("app.port") || 4100;
-    const base = (configuredBase || `http://${host}:${port}`).replace(/\/$/, "");
-    const canonicalPath = CANONICAL_NOTIFY_PATHS[providerId];
-    return canonicalPath
-      ? `${base}/api/v1/payment/webhook/${canonicalPath}`
-      : `${base}/api/v1/payments/callback/${providerId}/${configId}`;
+    const base = configuredBase.replace(/\/$/, "");
+    return `${base}/api/v1/payment/webhook/${canonicalPath}`;
   }
 
   // ── 发起支付 ────────────────────────────────────────────────────
@@ -407,11 +406,7 @@ export class PaymentOrderService {
           currency,
           subject: buildPaymentSubject(order, paymentRules.productNamePrefix, paymentRules.productNameSuffix),
           returnUrl: this.checkoutReturnUrl(order),
-          notifyUrl: this.notifyUrl(
-            config.providerId,
-            config.id,
-            config.values.publicBaseUrl,
-          ),
+          notifyUrl: this.notifyUrl(config.providerId, config.values.publicBaseUrl),
           clientIp: input.clientIp,
           clientUserAgent: input.clientUserAgent,
           alipayMobilePrecreateDeepLink:

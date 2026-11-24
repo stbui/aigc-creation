@@ -31,7 +31,7 @@ function createInput(): CreateOrderInput {
     currency: 'USD',
     subject: '积分 100',
     returnUrl: 'https://app.example.com/checkout?paymentReturn=1',
-    notifyUrl: 'https://api.example.com/api/v1/payments/callback/paypal/cfg_paypal_1',
+    notifyUrl: 'https://api.example.com/notify/paypal',
     expiresAt: new Date(Date.now() + 30 * 60_000),
   };
 }
