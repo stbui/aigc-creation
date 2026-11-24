@@ -5,14 +5,6 @@
  * 一律经由本文件 —— 分页节奏、筛选档位与分组结构集中可见, 调整只改一处。
  */
 
-/** 单张图片体积上限与格式白名单, 与全站上传校验共用 */
-export {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_ACCEPT,
-  SUPPORTED_IMAGE_LABEL,
-} from '../../lib/constants';
-
 /** 首屏与滚动加载每次追加的素材数（默认一次加载 50 张，向下滚动自动续加） */
 export const PAGE_SIZE = 50;
 

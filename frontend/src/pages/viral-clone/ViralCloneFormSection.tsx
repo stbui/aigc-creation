@@ -1,4 +1,5 @@
-import { MAX_IMAGE_MB, type AssetSlot } from './constants';
+import type { AssetSlot } from './constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { ProductFieldsGrid, SectionCard, ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
 
@@ -50,6 +51,8 @@ export function ViralCloneFormSection({
   onPlatformChange: (value: string) => void;
   onLanguageChange: (value: string) => void;
 }) {
+  const { maxMb } = useUploadLimits();
+
   return (
     <>
       <SectionCard>
@@ -81,7 +84,7 @@ export function ViralCloneFormSection({
           dropzoneClassName="[&_[data-slot=image-upload-prompt]_svg]:mb-5"
           single
           showCount={false}
-          emptyHint={`上传要复刻风格的参考图，最多 1 张，单张不超过${MAX_IMAGE_MB}MB`}
+          emptyHint={`上传要复刻风格的参考图，最多 1 张，单张不超过 ${maxMb}MB`}
         />
       </SectionCard>
 

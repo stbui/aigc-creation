@@ -8,8 +8,8 @@ import {
   ANNOTATION_REFERENCE_FILLED,
   ANNOTATION_REFERENCE_REMOVE,
   ANNOTATION_TEXTAREA,
-  SUPPORTED_IMAGE_ACCEPT,
 } from './constants';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { assetThumbUrl } from './api';
 import { ImageUploadArea } from './components';
 
@@ -39,6 +39,7 @@ export function LocalRedrawAnnotationItem({
   onDraftChange,
   onUploadReference,
 }: LocalRedrawAnnotationItemProps) {
+  const { accept } = useUploadLimits();
   const label = `标注${index + 1}`;
   const reference = draft?.reference ?? null;
 
@@ -72,7 +73,7 @@ export function LocalRedrawAnnotationItem({
         single
         uploading={uploading}
         disabled={uploading}
-        accept={SUPPORTED_IMAGE_ACCEPT}
+        accept={accept}
         replaceOnClick
         className={`redraw-prompt-tools ${ANNOTATION_REFERENCE}${
           reference ? ` ${ANNOTATION_REFERENCE_FILLED}` : ''

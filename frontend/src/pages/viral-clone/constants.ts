@@ -6,9 +6,6 @@
  * 目录内新增共享常量时在这里补一行 re-export。
  */
 
-/** 单张图片体积上限 (字节 / MB) 与支持格式说明, 全站上传校验共用 */
-export { MAX_IMAGE_BYTES, MAX_IMAGE_MB, SUPPORTED_IMAGE_LABEL } from '../../lib/constants';
-
 // ───────────────── 上传与字段长度 (参考站实拍) ─────────────────
 
 /** 一次提交最多上传的商品图张数 */

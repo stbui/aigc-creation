@@ -1,5 +1,3 @@
-import { MAX_IMAGE_MB } from '../../lib/constants';
-
 /**
  * 多图融合页面的常量与类型 —— 目录内文件的唯一常量入口。
  *
@@ -11,14 +9,6 @@ import { MAX_IMAGE_MB } from '../../lib/constants';
  * 一律经由本文件 (上传限制) 或 `./utils` (校验函数) —— 目录内新增共享常量时
  * 在这里补一行。
  */
-
-/** 单张图片体积上限与支持格式, 全站上传校验共用 */
-export {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_ACCEPT,
-  SUPPORTED_IMAGE_LABEL,
-} from '../../lib/constants';
 
 /** 场景卡定义 */
 export interface SceneDef {
@@ -73,6 +63,3 @@ export const MAX_ACCENTS = 5;
 /** 结果空态文案 */
 export const EMPTY_TITLE = '等待你的第一组融合创意';
 export const EMPTY_HINT = '上传图片并提交生成，预览会出现在这里';
-
-/** 主体图上上传区文案 */
-export const UPLOAD_SUBJECT_HINT = `支持 JPG、PNG，单张不超过 ${MAX_IMAGE_MB}MB，可直接粘贴`;

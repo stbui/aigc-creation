@@ -5,7 +5,6 @@ import {
   CREATION_CAPABILITY_LABEL,
   CREATION_DOWNLOAD_PREFIX,
   CREATION_PROMPT_PLACEHOLDER,
-  MAX_IMAGE_MB,
   MAX_PROMPT_LEN,
   MAX_REF_IMAGES,
 } from './constants';
@@ -90,7 +89,7 @@ export function CreativeImagePage() {
   // ── 表单状态 ──
   // 上传 (三重校验 / 素材库回填 / 粘贴 / 排序) 统一由 useImageUpload 处理
   const { images, uploading, uploadFiles, removeImage, moveImage, replaceImages, library, mobile } =
-    useImageUpload({ max: MAX_REF_IMAGES, maxMb: MAX_IMAGE_MB, noun: '参考图片' });
+    useImageUpload({ max: MAX_REF_IMAGES, noun: '参考图片' });
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('1:1');
   const [resolution, setResolution] = useState('1k');

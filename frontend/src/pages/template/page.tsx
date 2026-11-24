@@ -7,7 +7,6 @@ import {
   DEFAULT_RATIO,
   DEFAULT_SIZE,
   MAX_IMAGES,
-  MAX_IMAGE_MB,
 } from './constants';
 import {
   AssetLibraryModal,
@@ -80,7 +79,6 @@ export function TemplatePage() {
   // ── 上传 ──
   const { images, uploading, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
-    maxMb: MAX_IMAGE_MB,
     noun: '人像照片',
   });
   const {

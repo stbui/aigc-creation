@@ -5,9 +5,6 @@
  * 一律经由本文件 —— 上传上限与默认值集中可见，调整只改一处。
  */
 
-/** 单张图片体积上限 (MB)，全站上传校验共用 */
-export { MAX_IMAGE_MB } from '../../lib/constants';
-
 /** 一次最多上传的人像参考照片数（与后端 `maxInputs` 一致）。 */
 export const MAX_IMAGES = 5;
 

@@ -3,8 +3,6 @@ import { ImagePlus } from 'lucide-react';
 import {
   MAX_ACCENTS,
   MAX_TOTAL,
-  SUPPORTED_IMAGE_ACCEPT,
-  UPLOAD_SUBJECT_HINT,
   type MultiFusionSlot,
 } from './constants';
 import {
@@ -18,6 +16,7 @@ import {
   type ImageUploadControls,
   type ToolAsset,
 } from './components';
+import { useUploadLimits } from '../../context/UploadLimitsContext';
 import { MultiFusionImageThumb } from './MultiFusionImageThumb';
 import { MultiFusionSlotActions } from './MultiFusionSlotActions';
 
@@ -55,6 +54,9 @@ export function MultiFusionUploadCard({
   onOpenLibrary: (target: MultiFusionSlot) => void;
   onOpenMobile: (target: MultiFusionSlot) => void;
 }) {
+  const { accept, allowedLabel, maxMb } = useUploadLimits();
+  const subjectHint = `支持 ${allowedLabel}，单张不超过 ${maxMb}MB，可直接粘贴`;
+
   /**
    * 参考站搭配图只有一个添加入口，槽内文案明确剩余额度。
    * 已满 5 张时不再渲染添加入口。
@@ -115,13 +117,13 @@ export function MultiFusionUploadCard({
           single
           variant="plain"
           uploading={uploading}
-          accept={SUPPORTED_IMAGE_ACCEPT}
+          accept={accept}
           ariaLabel="上传主体图"
           replaceOnClick={Boolean(subject)}
           emptyContent={(controls) => (
             <ImageDropzone
               title="上传主体图"
-              hint={UPLOAD_SUBJECT_HINT}
+              hint={subjectHint}
               icon={<ImagePlus aria-hidden />}
               onClick={controls.open}
             />
@@ -174,7 +176,7 @@ export function MultiFusionUploadCard({
           max={MAX_ACCENTS}
           variant="plain"
           uploading={uploading}
-          accept={SUPPORTED_IMAGE_ACCEPT}
+          accept={accept}
           ariaLabel="上传搭配图"
           emptyContent={(controls) => renderAccentGrid([], controls)}
           renderPreview={renderAccentGrid}
