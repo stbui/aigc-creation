@@ -49,8 +49,12 @@ export class AdminOverviewService {
    * 概览数据。
    *
    * days 控制两个窗口: 趋势与"新增"。任务状态分布不受窗口影响 (全量)。
+   *
+   * 公开是为了让 `OverviewPayload` 能从它的返回类型推导：别名若指向 overview，
+   * overview 的返回类型又取自缓存值，两者会互相引用（TS2456）。除缓存类型外
+   * 不应有其他调用方，取数入口一律走 `overview`。
    */
-  private async buildOverview(days: number) {
+  async buildOverview(days: number) {
     const since = new Date(Date.now() - days * 24 * 3600 * 1000);
     /** 上一窗口的起点。用于环比，而不是拿「近 7 天」和「累计」比 */
     const prevSince = new Date(since.getTime() - days * 24 * 3600 * 1000);
@@ -452,7 +456,7 @@ export class AdminOverviewService {
   }
 }
 
-type OverviewPayload = Awaited<ReturnType<AdminOverviewService['overview']>>;
+type OverviewPayload = Awaited<ReturnType<AdminOverviewService['buildOverview']>>;
 
 interface TaskTrendRow {
   day: string;

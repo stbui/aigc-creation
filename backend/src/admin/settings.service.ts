@@ -270,14 +270,21 @@ export class AdminSettingsService {
       });
     });
 
-    const clears = clearList.map((key) => {
+    const clearOps = clearList.map((key) => {
       const def = findSettingDef(key)!;
       const prev = beforeByKey.get(key);
       // 本来就是默认值 —— 无事可做，但要在变更摘要里如实体现
+      const beforeValue = prev
+        ? def.sensitive
+          ? "已配置"
+          : this.parseValue(prev.value, def)
+        : def.sensitive
+          ? "未配置"
+          : def.default;
       changes.push({
         key,
         label: def.label,
-        before: prev ? (def.sensitive ? "已配置" : this.parseValue(prev.value, def)) : def.sensitive ? "未配置" : def.default,
+        before: beforeValue,
         after: def.sensitive ? "已清除" : def.default,
         action: "clear",
       });
@@ -285,7 +292,7 @@ export class AdminSettingsService {
       return this.prisma.systemSetting.deleteMany({ where: { key } });
     });
 
-    await this.prisma.$transaction([...writes, ...clears]);
+    await this.prisma.$transaction([...writes, ...clearOps]);
 
     // 写入即失效缓存，让新值立刻生效（不等 3s TTL）
     this.settings.invalidate();

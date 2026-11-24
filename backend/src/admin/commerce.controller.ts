@@ -310,7 +310,7 @@ export class CreditLotsQueryDto {
 export class AdminCommerceController {
   constructor(
     private readonly orders: OrderService,
-    private readonly products: AdminCommerceProductService,
+    private readonly productAdmin: AdminCommerceProductService,
     private readonly orderAdmin: AdminCommerceOrderService,
     private readonly paymentAdmin: AdminCommercePaymentService,
     private readonly creditAdmin: AdminCommerceCreditService,
@@ -324,7 +324,7 @@ export class AdminCommerceController {
   @Get("products")
   @RequirePermission(PERMISSIONS.productRead)
   products(@Query("status") status?: string) {
-    return this.products.listProducts(status);
+    return this.productAdmin.listProducts(status);
   }
 
   /** 新建商品。默认下架, 确认无误后再上架 */
@@ -332,7 +332,7 @@ export class AdminCommerceController {
   @RequirePermission(PERMISSIONS.productWrite)
   createProduct(@Body() dto: ProductCreateDto) {
     // DTO → 领域入参显式映射: service 不感知 class-validator
-    return this.products.createProduct({
+    return this.productAdmin.createProduct({
       sku: dto.sku,
       name: dto.name,
       description: dto.description,
@@ -362,7 +362,7 @@ export class AdminCommerceController {
   @Patch("products/:id")
   @RequirePermission(PERMISSIONS.productWrite)
   updateProduct(@Param("id") id: string, @Body() dto: ProductUpdateDto) {
-    return this.products.updateProduct(id, {
+    return this.productAdmin.updateProduct(id, {
       name: dto.name,
       description: dto.description,
       priceCents: dto.priceCents,
@@ -389,7 +389,7 @@ export class AdminCommerceController {
     @Param("id") id: string,
     @Body() dto: ProductStatusDto,
   ) {
-    const product = await this.products.updateProduct(id, {
+    const product = await this.productAdmin.updateProduct(id, {
       status: dto.status,
     });
     return { id: product.id, status: product.status };
@@ -404,7 +404,7 @@ export class AdminCommerceController {
   @Delete("products/:id")
   @RequirePermission(PERMISSIONS.productDelete)
   deleteProduct(@Param("id") id: string) {
-    return this.products.deleteProduct(id);
+    return this.productAdmin.deleteProduct(id);
   }
 
   // ── 订单 (B-39~B-44) ─────────────────────────────────────────────
