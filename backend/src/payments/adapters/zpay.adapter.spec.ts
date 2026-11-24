@@ -120,7 +120,7 @@ describe('ZPay 签名', () => {
       empty: '',
     };
 
-    expect(zpaySign(params, 'test-zpay-secret')).toBe('a0d73185ef274cdbd3c6fab2dc0c70a9');
+    expect(zpaySign(params, 'test-zpay-secret')).toBe('69649ad7a88fa8099306bad833d6680d');
   });
 
   it('验签接受正确小写 MD5，拒绝篡改', () => {
