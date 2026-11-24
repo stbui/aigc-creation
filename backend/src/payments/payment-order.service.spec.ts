@@ -13,8 +13,14 @@ vi.mock('./adapters', () => ({
   getAdapter: () => adapterMock,
 }));
 
-import { PaymentOrderService } from './payment-order.service';
+import { PaymentAttemptService } from './payment-attempt.service';
+import { PaymentCloseService } from './payment-close.service';
 import type { VisiblePaymentOption } from './payment-config.service';
+import { PaymentIntentService } from './payment-intent.service';
+import { PaymentOrderService } from './payment-order.service';
+import { PaymentOrderLifecycleService } from './payment-order-lifecycle.service';
+import { PaymentQueryService } from './payment-query.service';
+import { PaymentSettlementService } from './payment-settlement.service';
 
 const ORDER_ID = 'order_1';
 const CONFIG_ID = 'cfg_1';
@@ -132,9 +138,7 @@ function makeVisibleOption(method: 'alipay' | 'wechat'): VisiblePaymentOption {
 
 function makeHarness(order = makeOrder()) {
   const prisma = {
-    $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
-      callback(prisma),
-    ),
+    $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
     $executeRaw: vi.fn().mockResolvedValue(0),
     order: {
       findUnique: vi.fn().mockResolvedValue(order),
@@ -160,14 +164,12 @@ function makeHarness(order = makeOrder()) {
     releaseReservation: vi.fn().mockResolvedValue(undefined),
   };
   const configs = {
-    availableVisible: vi.fn().mockResolvedValue([
-      makeVisibleOption('alipay').view,
-      makeVisibleOption('wechat').view,
-    ]),
-    resolveVisibleOptions: vi.fn().mockResolvedValue([
-      makeVisibleOption('alipay'),
-      makeVisibleOption('wechat'),
-    ]),
+    availableVisible: vi
+      .fn()
+      .mockResolvedValue([makeVisibleOption('alipay').view, makeVisibleOption('wechat').view]),
+    resolveVisibleOptions: vi
+      .fn()
+      .mockResolvedValue([makeVisibleOption('alipay'), makeVisibleOption('wechat')]),
     resolveForOrder: vi.fn(async ({ providerConfigId }: { providerConfigId: string | null }) => ({
       id: providerConfigId ?? CONFIG_ID,
       providerId: 'sandbox',
@@ -209,13 +211,29 @@ function makeHarness(order = makeOrder()) {
   const settings = {
     paymentRules: vi.fn().mockResolvedValue(makePaymentRules()),
   };
-  const service = new PaymentOrderService(
+  const lifecycle = new PaymentOrderLifecycleService(
+    prisma as never,
+    orders as never,
+    settings as never,
+  );
+  const settlement = new PaymentSettlementService(prisma as never, orders as never);
+  const attempts = new PaymentAttemptService(
+    prisma as never,
+    configs as never,
+    lifecycle,
+    settlement,
+  );
+  const intent = new PaymentIntentService(
     prisma as never,
     orders as never,
     configs as never,
     settings as never,
     envConfig as never,
+    attempts,
   );
+  const query = new PaymentQueryService(prisma as never, attempts, settlement, lifecycle);
+  const close = new PaymentCloseService(prisma as never, attempts, lifecycle);
+  const service = new PaymentOrderService(intent, query, close, settlement);
   return { service, prisma, orders, configs, settings };
 }
 
@@ -227,7 +245,8 @@ function expectNoLocalClose(prisma: ReturnType<typeof makeHarness>['prisma']) {
   expect(cancelled).toBe(false);
 }
 
-describe('PaymentOrderService.close', () => {  beforeEach(() => {
+describe('PaymentOrderService.close', () => {
+  beforeEach(() => {
     adapterMock.validateConfig.mockReset().mockReturnValue([]);
     adapterMock.createOrder.mockReset();
     adapterMock.queryOrder.mockReset();
@@ -255,9 +274,7 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
   });
 
   it('另一请求正在发起支付时不抢关单租约', async () => {
-    const { service, prisma } = makeHarness(
-      makeOrder({ intentStartedAt: new Date() }),
-    );
+    const { service, prisma } = makeHarness(makeOrder({ intentStartedAt: new Date() }));
     prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
 
     await service.close({ orderId: ORDER_ID, actor: { kind: 'worker' } });
@@ -301,9 +318,9 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
       rawPayload: '{"ok":true}',
     });
 
-    await expect(
-      service.close({ orderId: ORDER_ID, actor: { kind: 'worker' } }),
-    ).rejects.toThrow(/lock timeout/);
+    await expect(service.close({ orderId: ORDER_ID, actor: { kind: 'worker' } })).rejects.toThrow(
+      /lock timeout/,
+    );
 
     expect(prisma.order.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -505,9 +522,7 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
 
   it('取消失败时释放额度，保留订单待支付', async () => {
     const { service, prisma, settings } = makeHarness();
-    settings.paymentRules.mockResolvedValue(
-      makePaymentRules({ cancelLimitEnabled: true }),
-    );
+    settings.paymentRules.mockResolvedValue(makePaymentRules({ cancelLimitEnabled: true }));
     adapterMock.queryOrder.mockRejectedValue(new Error('network down'));
 
     await expect(
@@ -528,9 +543,7 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
     const { service, prisma, settings } = makeHarness(
       makeOrder({ payments: [], providerConfigId: null, checkoutMode: null }),
     );
-    settings.paymentRules.mockResolvedValue(
-      makePaymentRules({ cancelLimitEnabled: true }),
-    );
+    settings.paymentRules.mockResolvedValue(makePaymentRules({ cancelLimitEnabled: true }));
 
     await service.close({ orderId: ORDER_ID, actor: { kind: 'worker' } });
 
@@ -543,9 +556,7 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
     const { service, prisma, settings } = makeHarness(
       makeOrder({ payments: [], providerConfigId: null, checkoutMode: null }),
     );
-    settings.paymentRules.mockResolvedValue(
-      makePaymentRules({ cancelLimitEnabled: true }),
-    );
+    settings.paymentRules.mockResolvedValue(makePaymentRules({ cancelLimitEnabled: true }));
     prisma.orderCancelEvent.findUnique.mockResolvedValue({
       id: 'cancel_existing',
       status: 'consumed',
@@ -588,9 +599,7 @@ describe('PaymentOrderService.applyPaymentResult', () => {
 
   it('只有一条待支付尝试时才允许自动归属', async () => {
     const { service, prisma, orders } = makeHarness();
-    prisma.payment.findMany.mockResolvedValue([
-      { id: 'pay_only', providerInstanceId: 'default' },
-    ]);
+    prisma.payment.findMany.mockResolvedValue([{ id: 'pay_only', providerInstanceId: 'default' }]);
 
     await expect(
       service.applyPaymentResult({
@@ -766,12 +775,8 @@ describe('PaymentOrderService.createIntent', () => {
   });
 
   it('订单写回因租约失效失败时归还负载均衡槽位', async () => {
-    const { service, prisma, configs } = makeHarness(
-      makeOrder({ payments: [] }),
-    );
-    prisma.order.updateMany
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
+    const { service, prisma, configs } = makeHarness(makeOrder({ payments: [] }));
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
     adapterMock.createOrder.mockResolvedValue({
       mode: 'qrcode',
       codeUrl: 'https://qr.example.com/order_1',
@@ -807,9 +812,7 @@ describe('PaymentOrderService.createIntent', () => {
   });
 
   it('订单正在关闭时拒绝发起支付', async () => {
-    const { service, prisma, configs } = makeHarness(
-      makeOrder({ closeStartedAt: new Date() }),
-    );
+    const { service, prisma, configs } = makeHarness(makeOrder({ closeStartedAt: new Date() }));
     prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
 
     await expect(
@@ -825,12 +828,8 @@ describe('PaymentOrderService.createIntent', () => {
   });
 
   it('租约过期被接管后，旧请求不会覆盖新 checkout', async () => {
-    const { service, prisma } = makeHarness(
-      makeOrder({ payments: [] }),
-    );
-    prisma.order.updateMany
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
+    const { service, prisma } = makeHarness(makeOrder({ payments: [] }));
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
     adapterMock.createOrder.mockResolvedValue({
       mode: 'qrcode',
       codeUrl: 'https://qr.example.com/order_1',
@@ -883,8 +882,7 @@ describe('PaymentOrderService.createIntent', () => {
 
     expect(adapterMock.createOrder).toHaveBeenCalledWith(
       expect.objectContaining({
-        returnUrl:
-          'https://app.example.com/checkout/credits-100?orderId=order_1&paymentReturn=1',
+        returnUrl: 'https://app.example.com/checkout/credits-100?orderId=order_1&paymentReturn=1',
       }),
     );
   });
@@ -964,15 +962,13 @@ describe('PaymentOrderService.createIntent', () => {
       orderId: ORDER_ID,
       userId: 'user_1',
       providerId: 'alipay',
-      clientUserAgent:
-        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148',
+      clientUserAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148',
     });
 
     expect(adapterMock.createOrder).toHaveBeenCalledWith(
       expect.objectContaining({
         alipayMobilePrecreateDeepLink: true,
-        clientUserAgent:
-          'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148',
+        clientUserAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148',
       }),
     );
     expect(intent).toMatchObject({
@@ -1033,8 +1029,7 @@ describe('PaymentOrderService.createIntent', () => {
 
     expect(adapterMock.createOrder).toHaveBeenCalledWith(
       expect.objectContaining({
-        returnUrl:
-          'https://app.example.com/checkout/membership?orderId=order_1&paymentReturn=1',
+        returnUrl: 'https://app.example.com/checkout/membership?orderId=order_1&paymentReturn=1',
       }),
     );
   });
@@ -1254,8 +1249,6 @@ describe('PaymentOrderService.notifyUrl', () => {
   it('真实渠道没有回调公网地址时拒绝发起支付', () => {
     delete process.env.PAYMENT_NOTIFY_BASE;
     const { service } = makeHarness();
-    expect(() => service.notifyUrl('alipay')).toThrow(
-      /真实支付渠道缺少回调公网地址/,
-    );
+    expect(() => service.notifyUrl('alipay')).toThrow(/真实支付渠道缺少回调公网地址/);
   });
 });

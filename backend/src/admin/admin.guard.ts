@@ -4,6 +4,7 @@ import { JwtPayload, JwtService } from '../common/jwt.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminRoleService } from './admin-role.service';
 import { isAdminRole } from './permissions';
+import { isAdminRequestPath } from './admin-path';
 
 /**
  * 后台第一道守卫: 身份与账号状态。
@@ -33,7 +34,7 @@ export class AdminGuard implements CanActivate {
     // 全局守卫: 非后台路径直接放行, 不解析 token。
     // C 端请求不应因后台鉴权链路而失败, 两者职责必须隔离。
     const url: string = request.originalUrl ?? request.url ?? '';
-    if (!url.split('?')[0].includes('/admin')) return true;
+    if (!isAdminRequestPath(url)) return true;
 
     const authHeader: string | undefined = request.headers['authorization'];
 

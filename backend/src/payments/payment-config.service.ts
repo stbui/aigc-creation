@@ -1,162 +1,36 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createHash, randomUUID } from 'node:crypto';
-import type { Payment, Prisma } from '../generated/prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { AppError } from '../common/app.exception';
-import { SettingsService } from '../common/settings.service';
-import { PaymentCipher } from './payment-cipher';
-import { allAdapters, getAdapter, requireAdapter } from './adapters';
-import {
-  PaymentAdapterDescriptor,
-  PaymentConfigField,
-  PaymentCurrency,
-  PaymentProviderId,
-  PAYMENT_CURRENCIES,
-  PaymentSource,
-  VisiblePaymentMethod,
-  VISIBLE_PAYMENT_METHODS,
-} from './adapters/types';
-import { startOfShanghaiDay } from './payment-query';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import type { PaymentCurrency, PaymentProviderId, VisiblePaymentMethod } from './adapters/types';
+import { PaymentConfigAdminService } from './payment-config-admin.service';
+import { PaymentConfigStore } from './payment-config-store';
+import type {
+  AdminPaymentProviderInstanceView,
+  AdminPaymentProviderView,
+  AvailableProviderView,
+  ReserveVisiblePaymentAttemptInput,
+  ReservedVisiblePaymentAttempt,
+  ResolvedPaymentConfig,
+  ResolvedVisiblePayment,
+  SavePaymentInstanceInput,
+  VisiblePaymentOption,
+  VisiblePaymentProviderView,
+} from './payment-config.types';
+import { PaymentRoutingService } from './payment-routing.service';
 
-/** 解密后的实例配置（适配器唯一可用的凭据来源） */
-export interface ResolvedPaymentConfig {
-  id: string;
-  providerId: PaymentProviderId;
-  instanceId: string;
-  name: string | null;
-  sortOrder: number;
-  version: number;
-  enabled: boolean;
-  closeAfterMinutes: number;
-  minAmountCents: number | null;
-  maxAmountCents: number | null;
-  dailyLimitCents: number | null;
-  refundEnabled: boolean;
-  paymentMethods: VisiblePaymentMethod[];
-  values: Record<string, string>;
-}
-
-export interface AdminPaymentProviderInstanceView {
-  instanceId: string;
-  providerId: PaymentProviderId;
-  name: string | null;
-  sortOrder: number;
-  enabled: boolean;
-  configured: boolean;
-  closeAfterMinutes: number;
-  version: number | null;
-  configId: string | null;
-  values: Record<string, string>;
-  secretConfigured: Record<string, boolean>;
-  minAmountCents: number | null;
-  maxAmountCents: number | null;
-  dailyLimitCents: number | null;
-  refundEnabled: boolean;
-  paymentMethods: VisiblePaymentMethod[];
-  identityLockedFields: string[];
-  hasOpenOrders: boolean;
-  updatedAt: string | null;
-  warnings: Array<{ level: 'danger' | 'warn'; message: string }>;
-}
-
-export interface AdminPaymentProviderView {
-  id: PaymentProviderId;
-  name: string;
-  icon: string;
-  checkoutMode: string;
-  /** 任一实例启用；保留给旧前端/旧调用方 */
-  enabled: boolean;
-  /** 任一实例配置完整；保留给旧前端/旧调用方 */
-  configured: boolean;
-  closeAfterMinutes: number;
-  version: number | null;
-  configId: string | null;
-  configEnabled: boolean;
-  values: Record<string, string>;
-  secretConfigured: Record<string, boolean>;
-  configFields: PaymentConfigField[];
-  supportedCurrencies: PaymentCurrency[];
-  supportsReconciliation: boolean;
-  missing: string[];
-  identityLockedFields: string[];
-  hasOpenOrders: boolean;
-  updatedAt: string | null;
-  warnings: Array<{ level: 'danger' | 'warn'; message: string }>;
-  instances: AdminPaymentProviderInstanceView[];
-}
-
-export interface AvailableProviderView {
-  id: PaymentProviderId;
-  name: string;
-  icon: string;
-  checkoutMode: string;
-  supportedCurrencies: PaymentCurrency[];
-  sandbox: boolean;
-}
-
-/** C 端唯一可见的支付方式视图；不暴露真实渠道与来源。 */
-export interface VisiblePaymentProviderView {
-  id: VisiblePaymentMethod;
-  name: string;
-  icon: 'alipay' | 'wechat';
-  checkoutMode: string;
-  supportedCurrencies: PaymentCurrency[];
-  sandbox: false;
-}
-
-export interface ResolvedVisiblePayment {
-  method: VisiblePaymentMethod;
-  providerId: PaymentProviderId;
-  config: ResolvedPaymentConfig;
-  /** EasyPay 需要按 C 端支付方式下单与验签；官方渠道不填。 */
-  providerMethod?: VisiblePaymentMethod;
-  /** 轮询下单快照；创建渠道订单前必须原子领取游标。 */
-  roundRobin?: {
-    providerId: PaymentProviderId;
-    method: VisiblePaymentMethod;
-    cursor: number;
-    eligibleInstances: Array<{
-      instanceId: string;
-      config: ResolvedPaymentConfig;
-    }>;
-  };
-}
-
-export interface ReserveVisiblePaymentAttemptInput {
-  method: VisiblePaymentMethod;
-  currency: PaymentCurrency;
-  amountCents: number;
-  orderId: string;
-  userId: string;
-  /** 展示阶段已解析的路由；仅用于发现来源切换，最终实例与版本会在事务内重读。 */
-  resolved?: ResolvedVisiblePayment;
-}
-
-export interface ReservedVisiblePaymentAttempt {
-  payment: Payment;
-  resolved: ResolvedVisiblePayment;
-}
-
-export interface VisiblePaymentOption {
-  view: VisiblePaymentProviderView;
-  resolved: ResolvedVisiblePayment;
-}
-
-export interface SavePaymentInstanceInput {
-  enabled: boolean;
-  closeAfterMinutes: number;
-  values: Record<string, string>;
-  name?: string | null;
-  minAmountCents?: number | null;
-  maxAmountCents?: number | null;
-  dailyLimitCents?: number | null;
-  refundEnabled?: boolean;
-  paymentMethods?: VisiblePaymentMethod[];
-}
+export type {
+  AdminPaymentProviderInstanceView,
+  AdminPaymentProviderView,
+  AvailableProviderView,
+  ReserveVisiblePaymentAttemptInput,
+  ReservedVisiblePaymentAttempt,
+  ResolvedPaymentConfig,
+  ResolvedVisiblePayment,
+  SavePaymentInstanceInput,
+  VisiblePaymentOption,
+  VisiblePaymentProviderView,
+} from './payment-config.types';
 
 /**
- * 支付渠道配置服务。
+ * 支付渠道配置服务的门面。
  *
  * 不可动摇的规则：
  *   1. 追加写：实例配置修改产生新版本；订单/Payment 固定 configId，历史回调
@@ -164,556 +38,133 @@ export interface SavePaymentInstanceInput {
  *   2. 密钥只进密文：响应只回 secretConfigured。
  *   3. 前台只认来源选择：官方/易支付不可自动回退；来源下无可用实例即隐藏。
  *   4. 实例停用只摘流：不物理删除，历史订单继续依赖 providerConfigId。
+ *
+ * 实现按平面拆开，门面只做委托，调用方（网关、订单、worker、后台）不随内部
+ * 拆分而改动：
+ *
+ *   store    版本链读取、解密、按订单解析、身份字段锁定
+ *   console  后台视图、版本化保存、排序、env 首启引导
+ *   routing  C 端可见方式选路、负载均衡、支付尝试预占
  */
 @Injectable()
 export class PaymentConfigService implements OnModuleInit {
-  private readonly logger = new Logger(PaymentConfigService.name);
-
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly cipher: PaymentCipher,
-    private readonly settings: SettingsService,
-    private readonly config: ConfigService,
+    private readonly store: PaymentConfigStore,
+    private readonly admin: PaymentConfigAdminService,
+    private readonly routing: PaymentRoutingService,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.bootstrapFromEnv();
+    await this.admin.bootstrapFromEnv();
   }
 
   // ── 读取 ────────────────────────────────────────────────────────
 
   /** 后台列表：每个渠道一张卡，卡内包含全部实例。 */
-  async listAdmin(): Promise<AdminPaymentProviderView[]> {
-    const views: AdminPaymentProviderView[] = [];
-    for (const adapter of allAdapters()) {
-      views.push(await this.toAdminProviderView(adapter.descriptor));
-    }
-    return views;
+  listAdmin(): Promise<AdminPaymentProviderView[]> {
+    return this.admin.listAdmin();
   }
 
   /** 某渠道的全部最新实例，按后台排序返回。 */
-  async listInstances(providerId: PaymentProviderId): Promise<ResolvedPaymentConfig[]> {
-    const rows = await this.latestRowsByInstance(providerId);
-    return rows
-      .sort(compareInstanceRows)
-      .map((row) => this.toResolved(row));
+  listInstances(providerId: PaymentProviderId): Promise<ResolvedPaymentConfig[]> {
+    return this.store.listInstances(providerId);
   }
 
   /** 指定实例的最新版本。 */
-  async latestInstance(
+  latestInstance(
     providerId: PaymentProviderId,
     instanceId: string,
   ): Promise<ResolvedPaymentConfig | null> {
-    const row = await this.latestRow(providerId, instanceId);
-    if (!row) return null;
-    return this.toResolved(row);
+    return this.store.latestInstance(providerId, instanceId);
   }
 
   /** 按 Payment 引用的 configId 精确解析。 */
-  async byId(configId: string): Promise<ResolvedPaymentConfig> {
-    const row = await this.prisma.paymentProviderConfig.findUnique({ where: { id: configId } });
-    if (!row) throw new AppError(40400, '支付配置不存在', 404);
-    return this.toResolved(row);
+  byId(configId: string): Promise<ResolvedPaymentConfig> {
+    return this.store.byId(configId);
   }
 
   /**
    * 订单固定版本；历史单无 configId 时只回落到它自己的实例（或旧默认实例），
    * 绝不跨实例、跨渠道。
    */
-  async resolveForOrder(order: {
+  resolveForOrder(order: {
     channel: string;
     providerConfigId: string | null;
     providerInstanceId?: string | null;
   }): Promise<ResolvedPaymentConfig | null> {
-    if (order.providerConfigId) {
-      const row = await this.prisma.paymentProviderConfig.findUnique({
-        where: { id: order.providerConfigId },
-      });
-      if (row && row.providerId === order.channel) return this.toResolved(row);
-      return null;
-    }
-    const adapter = getAdapter(order.channel);
-    if (!adapter) return null;
-    return this.latestInstance(
-      adapter.descriptor.id,
-      order.providerInstanceId || 'default',
-    );
+    return this.store.resolveForOrder(order);
   }
 
   /** 任一实例已启用、字段齐全且支持目标币种。 */
-  async available(currency: PaymentCurrency): Promise<AvailableProviderView[]> {
-    const out: AvailableProviderView[] = [];
-    for (const adapter of allAdapters()) {
-      const d = adapter.descriptor;
-      if (!d.supportedCurrencies.includes(currency)) continue;
-      if (d.id === 'sandbox' && this.config.get<string>('app.env') === 'production') continue;
-      const rows = await this.latestRowsByInstance(d.id);
-      const usable = rows.some((row) => {
-        if (!row.enabled) return false;
-        try {
-          return adapter.validateConfig(this.valuesFor(row)).length === 0;
-        } catch {
-          return false;
-        }
-      });
-      if (!usable) continue;
-      out.push({
-        id: d.id,
-        name: d.name,
-        icon: d.icon,
-        checkoutMode: d.checkoutMode,
-        supportedCurrencies: d.supportedCurrencies,
-        sandbox: d.id === 'sandbox',
-      });
-    }
-    return out;
+  available(currency: PaymentCurrency): Promise<AvailableProviderView[]> {
+    return this.routing.available(currency);
   }
 
   /** C 端固定可见支付方式；不推进轮询游标。 */
-  async availableVisible(
+  availableVisible(
     currency: PaymentCurrency,
     amountCents?: number,
   ): Promise<VisiblePaymentProviderView[]> {
-    const options = await this.resolveVisibleOptions(currency, amountCents);
-    return options.map((option) => option.view);
+    return this.routing.availableVisible(currency, amountCents);
   }
 
-  /**
-   * 币种白名单校验与归一化。
-   *
-   * 放在本 service 而非 controller: 白名单是支付域规则, 且「默认币种配置
-   * 被改坏」与「用户传了非法币种」都应在这里给出一致的拒绝语义。
-   */
+  /** 币种白名单校验与归一化。 */
   normalizeCurrency(currency?: string | null): PaymentCurrency {
-    if (!currency) return 'CNY';
-    if (!(PAYMENT_CURRENCIES as string[]).includes(currency)) {
-      throw new AppError(40001, `不支持的币种: ${currency}`, 400);
-    }
-    return currency as PaymentCurrency;
+    return this.routing.normalizeCurrency(currency);
   }
 
   /**
    * 一次解析两个按钮及其真实实例。创建订单必须直接消费这里的结果，
    * 不能再次 resolveVisible，否则轮询/最少金额可能在下单前漂移。
    */
-  async resolveVisibleOptions(
+  resolveVisibleOptions(
     currency: PaymentCurrency,
     amountCents?: number,
     options?: { includeDailyLimitExceeded?: boolean },
   ): Promise<VisiblePaymentOption[]> {
-    const out: VisiblePaymentOption[] = [];
-    for (const method of VISIBLE_PAYMENT_METHODS) {
-      const resolved = await this.resolveVisible(
-        method,
-        currency,
-        amountCents,
-        options,
-      );
-      if (!resolved) continue;
-      const descriptor = requireAdapter(resolved.providerId).descriptor;
-      out.push({
-        view: {
-          id: method,
-          name: method === 'alipay' ? '支付宝' : '微信支付',
-          icon: method,
-          checkoutMode: descriptor.checkoutMode,
-          supportedCurrencies: descriptor.supportedCurrencies,
-          sandbox: false,
-        },
-        resolved,
-      });
-    }
-    return out;
+    return this.routing.resolveVisibleOptions(currency, amountCents, options);
   }
 
   /** 解析某个可见支付方式当前应走的唯一真实实例。 */
-  async resolveVisible(
+  resolveVisible(
     method: VisiblePaymentMethod,
     currency: PaymentCurrency,
     amountCents?: number,
     options?: { includeDailyLimitExceeded?: boolean },
   ): Promise<ResolvedVisiblePayment | null> {
-    const source = await this.sourceOf(method);
-    if (source === 'unset') return null;
-
-    const providerId: PaymentProviderId = source === 'official' ? method : 'epay';
-    const adapter = getAdapter(providerId);
-    if (!adapter || !adapter.descriptor.supportedCurrencies.includes(currency)) return null;
-
-    const rows = (await this.latestRowsByInstance(providerId)).sort(compareInstanceRows);
-    const eligible: Array<{ row: (typeof rows)[number]; config: ResolvedPaymentConfig }> = [];
-    for (const row of rows) {
-      if (!row.enabled) continue;
-      if (!paymentMethodsOf(row, row.providerId).includes(method)) continue;
-      if (amountCents !== undefined) {
-        if (row.minAmountCents != null && amountCents < row.minAmountCents) continue;
-        if (row.maxAmountCents != null && amountCents > row.maxAmountCents) continue;
-      }
-      let values: Record<string, string>;
-      try {
-        values = this.valuesFor(row);
-      } catch (e) {
-        this.logger.error(
-          `C 端支付实例不可用 (${method} -> ${providerId}/${row.instanceId}) 解密失败: ${(e as Error).message}`,
-        );
-        continue;
-      }
-      const missing = adapter.validateConfig(values);
-      if (missing.length > 0) continue;
-      if (
-        this.providerWarnings(adapter.descriptor, row, values, missing).some(
-          (warning) => warning.level === 'danger',
-        )
-      ) {
-        continue;
-      }
-      eligible.push({ row, config: this.toResolved(row, values) });
-    }
-    if (eligible.length === 0) return null;
-
-    const usage = await this.dailyInstanceUsage(
-      providerId,
-      eligible.map((item) => item.row.instanceId),
-    );
-    const withinDailyLimit = options?.includeDailyLimitExceeded
-      ? eligible
-      : eligible.filter(({ row }) => {
-          if (row.dailyLimitCents == null) return true;
-          const used = usage.get(row.instanceId) ?? 0;
-          if (amountCents === undefined) return used < row.dailyLimitCents;
-          return used + Math.max(0, amountCents) <= row.dailyLimitCents;
-        });
-    if (withinDailyLimit.length === 0) return null;
-
-    const strategy = await this.settings.get<string>('payment.loadBalancingStrategy');
-    let selected: { row: { instanceId: string }; config: ResolvedPaymentConfig };
-    let roundRobin: ResolvedVisiblePayment['roundRobin'];
-    if (strategy === 'least-amount') {
-      selected = this.leastAmountInstance(withinDailyLimit, usage);
-    } else {
-      const rotation = await this.roundRobinInstance(
-        providerId,
-        method,
-        withinDailyLimit,
-      );
-      selected = rotation.selected;
-      roundRobin = rotation.snapshot;
-    }
-
-    return {
-      method,
-      providerId,
-      config: selected.config,
-      ...(providerId === 'epay' ? { providerMethod: method } : {}),
-      ...(roundRobin ? { roundRobin } : {}),
-    };
+    return this.routing.resolveVisible(method, currency, amountCents, options);
   }
 
-  /**
-   * 原子预占一笔支付尝试。
-   *
-   * 只在 resolveVisible() 里看日限额不够：展示与发起支付之间可能已有并发订单
-   * 占用额度。这里在一个事务内重新读取来源和实例最新版本、锁定候选配置行、
-   * 汇总当日用量，并在同一事务写入 pending Payment。后到事务会等待前一笔
-   * 提交后再读取用量，因此两个并发请求不能同时越过同一实例的日限额。
-   */
-  async reserveVisiblePaymentAttempt(
+  /** 原子预占一笔支付尝试（事务内锁定实例、重读用量、写 pending Payment）。 */
+  reserveVisiblePaymentAttempt(
     input: ReserveVisiblePaymentAttemptInput,
   ): Promise<ReservedVisiblePaymentAttempt> {
-    if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
-      throw new AppError(40001, '支付金额必须为正整数（分）', 400);
-    }
-
-    return this.prisma.$transaction(async (tx) => {
-      const source = await this.sourceOf(input.method);
-      if (source === 'unset') {
-        throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
-      }
-      const providerId: PaymentProviderId = source === 'official' ? input.method : 'epay';
-      if (input.resolved && input.resolved.providerId !== providerId) {
-        throw new AppError(50301, '支付来源已变更，请刷新页面后重试', 503);
-      }
-      const adapter = getAdapter(providerId);
-      if (!adapter || !adapter.descriptor.supportedCurrencies.includes(input.currency)) {
-        throw new AppError(50301, '当前支付方式不支持该币种', 503);
-      }
-
-      const preliminary = (await this.latestRowsByInstance(
-        providerId,
-        tx.paymentProviderConfig,
-      )).sort(compareInstanceRows);
-      if (preliminary.length === 0) {
-        throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
-      }
-
-      /*
-       * SQLite 的交互式事务是 deferred，先读后写仍可能让两个事务读到同一份
-       * 用量。no-op UPDATE 会先取得实例配置行写锁；锁按 instanceId 固定排序，
-       * 避免多实例并发时形成反向加锁。锁后再重读最新版本，防止用旧配置建单。
-       */
-      const instanceIds = preliminary
-        .map((row) => row.instanceId)
-        .sort((a, b) => a.localeCompare(b));
-      for (const instanceId of instanceIds) {
-        await tx.$executeRaw`
-          UPDATE "PaymentProviderConfig"
-          SET "version" = "version"
-          WHERE "providerId" = ${providerId}
-            AND "instanceId" = ${instanceId}
-        `;
-      }
-
-      const rows = (await this.latestRowsByInstance(
-        providerId,
-        tx.paymentProviderConfig,
-      )).sort(compareInstanceRows);
-      const eligible: Array<{
-        row: (typeof rows)[number];
-        config: ResolvedPaymentConfig;
-      }> = [];
-      for (const row of rows) {
-        if (!row.enabled) continue;
-        if (!paymentMethodsOf(row, row.providerId).includes(input.method)) continue;
-        if (row.minAmountCents != null && input.amountCents < row.minAmountCents) continue;
-        if (row.maxAmountCents != null && input.amountCents > row.maxAmountCents) continue;
-        let values: Record<string, string>;
-        try {
-          values = this.valuesFor(row);
-        } catch {
-          continue;
-        }
-        const missing = adapter.validateConfig(values);
-        if (missing.length > 0) continue;
-        if (
-          this.providerWarnings(adapter.descriptor, row, values, missing).some(
-            (warning) => warning.level === 'danger',
-          )
-        ) {
-          continue;
-        }
-        eligible.push({ row, config: this.toResolved(row, values) });
-      }
-      if (eligible.length === 0) {
-        throw new AppError(50301, '支付渠道未完成配置或当前金额不在可支付范围内', 503);
-      }
-
-      const strategy = await this.settings.get<string>('payment.loadBalancingStrategy');
-      let claimedCursor: number | null = null;
-      if (strategy !== 'least-amount') {
-        const cursor = await tx.paymentRoundRobinCursor.upsert({
-          where: { providerId_method: { providerId, method: input.method } },
-          create: { providerId, method: input.method, cursor: 1 },
-          update: { cursor: { increment: 1 } },
-          select: { cursor: true },
-        });
-        claimedCursor = Math.max(1, cursor.cursor);
-      }
-
-      const usage = await this.dailyInstanceUsage(
-        providerId,
-        eligible.map((item) => item.row.instanceId),
-        tx.payment,
-      );
-      const withinDailyLimit = eligible.filter(({ row }) => {
-        if (row.dailyLimitCents == null) return true;
-        return (usage.get(row.instanceId) ?? 0) + input.amountCents <= row.dailyLimitCents;
-      });
-      if (withinDailyLimit.length === 0) {
-        throw new AppError(50301, '支付实例已达每日限额，请稍后重试或更换支付方式', 503);
-      }
-
-      const selected = strategy === 'least-amount'
-        ? this.leastAmountInstance(withinDailyLimit, usage)
-        : withinDailyLimit[
-            claimedCursor == null
-              ? 0
-              : (claimedCursor - 1) % withinDailyLimit.length
-          ];
-      if (!selected) {
-        throw new AppError(50301, '支付负载均衡暂不可用，请稍后重试', 503);
-      }
-
-      const payment = await tx.payment.create({
-        data: {
-          orderId: input.orderId,
-          userId: input.userId,
-          channel: providerId,
-          providerMethod: input.method,
-          amountCents: input.amountCents,
-          currency: input.currency,
-          status: 'pending',
-          providerConfigId: selected.config.id,
-          providerConfigVersion: selected.config.version,
-          providerInstanceId: selected.config.instanceId,
-        },
-      });
-
-      return {
-        payment,
-        resolved: {
-          method: input.method,
-          providerId,
-          config: selected.config,
-          ...(providerId === 'epay' ? { providerMethod: input.method } : {}),
-          ...(claimedCursor == null
-            ? {}
-            : {
-                roundRobin: {
-                  providerId,
-                  method: input.method,
-                  cursor: claimedCursor,
-                  eligibleInstances: eligible.map((item) => ({
-                    instanceId: item.row.instanceId,
-                    config: item.config,
-                  })),
-                },
-              }),
-        },
-      };
-    });
+    return this.routing.reserveVisiblePaymentAttempt(input);
   }
 
-  /**
-   * 创建渠道订单前原子领取轮询槽位。
-   *
-   * 先读 cursor 再在下单后提交会让并发请求读到同一个值并命中同一实例。
-   * 这里用单条 upsert 完成「读取并递增」，再按领取到的序号确定实例；
-   * 渠道失败时通过 releaseVisibleSelection() 做条件回滚，只有没有后续
-   * 领取者时才归还槽位，绝不会把游标减到已分配序号之前。
-   */
-  async claimVisibleSelection(
-    resolved: ResolvedVisiblePayment,
-  ): Promise<ResolvedVisiblePayment> {
-    const snapshot = resolved.roundRobin;
-    if (!snapshot || snapshot.eligibleInstances.length === 0) return resolved;
-    const delegate = (this.prisma as unknown as {
-      paymentRoundRobinCursor?: {
-        upsert(args: unknown): Promise<{ cursor: number }>;
-      };
-    }).paymentRoundRobinCursor;
-    if (!delegate) return resolved;
-
-    try {
-      const claimed = await delegate.upsert({
-        where: {
-          providerId_method: {
-            providerId: snapshot.providerId,
-            method: snapshot.method,
-          },
-        },
-        create: { providerId: snapshot.providerId, method: snapshot.method, cursor: 1 },
-        update: { cursor: { increment: 1 } },
-        select: { cursor: true },
-      });
-      const selected = snapshot.eligibleInstances[
-        (Math.max(1, claimed.cursor) - 1) % snapshot.eligibleInstances.length
-      ];
-      return {
-        ...resolved,
-        config: selected.config,
-        roundRobin: { ...snapshot, cursor: claimed.cursor },
-      };
-    } catch (e) {
-      this.logger.error(`支付轮询游标领取失败: ${(e as Error).message}`);
-      throw new AppError(50301, '支付负载均衡暂不可用，请稍后重试', 503);
-    }
+  /** 创建渠道订单前原子领取轮询槽位。 */
+  claimVisibleSelection(resolved: ResolvedVisiblePayment): Promise<ResolvedVisiblePayment> {
+    return this.routing.claimVisibleSelection(resolved);
   }
 
   /** 本次领取尚未产生渠道订单时归还槽位；已被后续请求越过则保持不回滚。 */
-  async releaseVisibleSelection(resolved: ResolvedVisiblePayment): Promise<void> {
-    const snapshot = resolved.roundRobin;
-    if (!snapshot) return;
-    const delegate = (this.prisma as unknown as {
-      paymentRoundRobinCursor?: {
-        updateMany(args: unknown): Promise<{ count: number }>;
-      };
-    }).paymentRoundRobinCursor;
-    if (!delegate) return;
-    try {
-      await delegate.updateMany({
-        where: {
-          providerId: snapshot.providerId,
-          method: snapshot.method,
-          cursor: snapshot.cursor,
-        },
-        data: { cursor: { decrement: 1 } },
-      });
-    } catch (e) {
-      this.logger.warn(`支付轮询游标回滚失败: ${(e as Error).message}`);
-    }
+  releaseVisibleSelection(resolved: ResolvedVisiblePayment): Promise<void> {
+    return this.routing.releaseVisibleSelection(resolved);
   }
 
   // ── 写入 ────────────────────────────────────────────────────────
 
   /** 新建实例；instanceId 只能由服务端生成。 */
-  async createInstance(
+  createInstance(
     providerId: string,
     input: Partial<SavePaymentInstanceInput>,
     actorId: string,
   ): Promise<AdminPaymentProviderInstanceView> {
-    const adapter = getAdapter(providerId);
-    if (!adapter) throw new AppError(40400, `未知支付渠道: ${providerId}`, 404);
-
-    const rows = await this.latestRowsByInstance(adapter.descriptor.id);
-    const instanceId = `pi_${randomUUID().replace(/-/g, '').slice(0, 20)}`;
-    const sortOrder = rows.reduce((max, row) => Math.max(max, row.sortOrder), -10) + 10;
-    const defaults = defaultPaymentMethods(adapter.descriptor.id);
-    const paymentMethods = this.normalizePaymentMethods(
-      adapter.descriptor.id,
-      input.paymentMethods ?? defaults,
-    );
-    const values = input.values ?? {};
-    const enabled = Boolean(input.enabled);
-    if (enabled) {
-      const missing = adapter.validateConfig(values);
-      if (missing.length > 0) {
-        throw new AppError(40001, `实例启用前必须补齐字段: ${missing.join(', ')}`, 400);
-      }
-    }
-    this.validateInstanceInput({
-      closeAfterMinutes: input.closeAfterMinutes ?? 30,
-      minAmountCents: input.minAmountCents ?? null,
-      maxAmountCents: input.maxAmountCents ?? null,
-      dailyLimitCents: input.dailyLimitCents ?? null,
-    });
-
-    const row = await this.prisma.paymentProviderConfig.create({
-      data: {
-        providerId: adapter.descriptor.id,
-        instanceId,
-        name: normalizeName(input.name),
-        sortOrder,
-        version: 1,
-        enabled,
-        closeAfterMinutes: input.closeAfterMinutes ?? 30,
-        minAmountCents: input.minAmountCents ?? null,
-        maxAmountCents: input.maxAmountCents ?? null,
-        dailyLimitCents: input.dailyLimitCents ?? null,
-        refundEnabled: input.refundEnabled ?? true,
-        paymentMethods: JSON.stringify(paymentMethods),
-        configCipher: this.cipher.encrypt(JSON.stringify(values)),
-        configDigest: digestOfConfig(
-          adapter.descriptor.id,
-          instanceId,
-          enabled,
-          input.closeAfterMinutes ?? 30,
-          input.minAmountCents ?? null,
-          input.maxAmountCents ?? null,
-          input.dailyLimitCents ?? null,
-          input.refundEnabled ?? true,
-          paymentMethods,
-          normalizeName(input.name),
-          sortOrder,
-          values,
-        ),
-        createdBy: actorId,
-      },
-    });
-    return this.toAdminInstanceView(adapter.descriptor, row);
+    return this.admin.createInstance(providerId, input, actorId);
   }
 
   /** 指定实例保存新版本。 */
-  async saveInstanceVersion(
+  saveInstanceVersion(
     providerId: string,
     instanceId: string,
     input: {
@@ -729,763 +180,20 @@ export class PaymentConfigService implements OnModuleInit {
     },
     actorId: string,
   ): Promise<{ provider: AdminPaymentProviderView; unchanged: boolean }> {
-    const adapter = getAdapter(providerId);
-    if (!adapter) throw new AppError(40400, `未知支付渠道: ${providerId}`, 404);
-
-    const current = await this.latestRow(adapter.descriptor.id, instanceId);
-    if (!current && instanceId !== 'default') {
-      throw new AppError(40400, `支付实例不存在: ${instanceId}`, 404);
-    }
-    const previous = current ? this.valuesFor(current) : {};
-
-    // 未提交的 secret 沿用上一版；显式空串同样视为沿用。
-    const merged: Record<string, string> = { ...previous };
-    for (const field of adapter.descriptor.configFields) {
-      const raw = input.values[field.name];
-      if (raw === undefined) continue;
-      if (field.secret && raw.trim() === '') continue;
-      merged[field.name] = String(raw);
-    }
-
-    const locked = await this.identityLockedFields(adapter.descriptor, instanceId);
-    for (const name of locked) {
-      if (merged[name] !== previous[name]) {
-        throw new AppError(40001, `字段 ${name} 已有订单绑定，不能修改`, 400);
-      }
-    }
-
-    const missing = adapter.validateConfig(merged);
-    if (input.enabled && missing.length > 0) {
-      throw new AppError(40001, `实例启用前必须补齐字段: ${missing.join(', ')}`, 400);
-    }
-    this.validateInstanceInput({
-      closeAfterMinutes: input.closeAfterMinutes,
-      minAmountCents: input.minAmountCents ?? null,
-      maxAmountCents: input.maxAmountCents ?? null,
-      dailyLimitCents: input.dailyLimitCents ?? null,
-    });
-
-    const name = input.name === undefined
-      ? (current?.name ?? null)
-      : normalizeName(input.name);
-    const sortOrder = current?.sortOrder ?? 0;
-    const minAmountCents = input.minAmountCents === undefined
-      ? (current?.minAmountCents ?? null)
-      : input.minAmountCents;
-    const maxAmountCents = input.maxAmountCents === undefined
-      ? (current?.maxAmountCents ?? null)
-      : input.maxAmountCents;
-    const dailyLimitCents = input.dailyLimitCents === undefined
-      ? (current?.dailyLimitCents ?? null)
-      : input.dailyLimitCents;
-    const refundEnabled = input.refundEnabled ?? current?.refundEnabled ?? true;
-    const paymentMethods = this.normalizePaymentMethods(
-      adapter.descriptor.id,
-      input.paymentMethods ??
-        (current
-          ? paymentMethodsOf(current, adapter.descriptor.id)
-          : defaultPaymentMethods(adapter.descriptor.id)),
-    );
-
-    const digest = digestOfConfig(
-      adapter.descriptor.id,
-      instanceId,
-      input.enabled,
-      input.closeAfterMinutes,
-      minAmountCents,
-      maxAmountCents,
-      dailyLimitCents,
-      refundEnabled,
-      paymentMethods,
-      name,
-      sortOrder,
-      merged,
-    );
-    if (current && current.configDigest === digest) {
-      return {
-        provider: await this.toAdminProviderView(adapter.descriptor),
-        unchanged: true,
-      };
-    }
-
-    const version = (current?.version ?? 0) + 1;
-    await this.prisma.paymentProviderConfig.create({
-      data: {
-        providerId: adapter.descriptor.id,
-        instanceId,
-        name,
-        sortOrder,
-        version,
-        enabled: input.enabled,
-        closeAfterMinutes: input.closeAfterMinutes,
-        minAmountCents,
-        maxAmountCents,
-        dailyLimitCents,
-        refundEnabled,
-        paymentMethods: JSON.stringify(paymentMethods),
-        configCipher: this.cipher.encrypt(JSON.stringify(merged)),
-        configDigest: digest,
-        createdBy: actorId,
-      },
-    });
-    this.logger.log(
-      `支付实例配置新版本: ${adapter.descriptor.id}/${instanceId} v${version} by ${actorId}`,
-    );
-    return {
-      provider: await this.toAdminProviderView(adapter.descriptor),
-      unchanged: false,
-    };
+    return this.admin.saveInstanceVersion(providerId, instanceId, input, actorId);
   }
 
   /** 拖拽排序只改最新行的展示顺序，不改凭据/版本链。 */
-  async reorderInstances(
+  reorderInstances(
     providerId: string,
     instanceIds: string[],
-    _actorId: string,
+    actorId: string,
   ): Promise<AdminPaymentProviderView> {
-    const adapter = getAdapter(providerId);
-    if (!adapter) throw new AppError(40400, `未知支付渠道: ${providerId}`, 404);
-    const current = await this.latestRowsByInstance(adapter.descriptor.id);
-    const known = new Set(current.map((row) => row.instanceId));
-    if (
-      instanceIds.length !== known.size ||
-      new Set(instanceIds).size !== instanceIds.length ||
-      instanceIds.some((id) => !known.has(id))
-    ) {
-      throw new AppError(40001, '实例排序列表必须恰好包含当前渠道全部实例', 400);
-    }
-    await this.prisma.$transaction(
-      instanceIds.map((instanceId, index) =>
-        this.prisma.paymentProviderConfig.updateMany({
-          where: { providerId: adapter.descriptor.id, instanceId },
-          data: { sortOrder: (index + 1) * 10 },
-        }),
-      ),
-    );
-    return this.toAdminProviderView(adapter.descriptor);
+    return this.admin.reorderInstances(providerId, instanceIds, actorId);
   }
 
   /** env → v1；仅当库内完全没有该渠道配置时生效。 */
-  async bootstrapFromEnv(): Promise<void> {
-    const get = (key: string): string => this.config.get<string>(key) ?? '';
-    const epayType = get('payment.epay.type') || '2';
-    const seeds: Array<{ id: PaymentProviderId; values: Record<string, string> }> = [
-      { id: 'sandbox', values: {} },
-      {
-        id: 'alipay',
-        values: {
-          appId: get('payment.alipay.appId'),
-          sellerId: get('payment.alipay.sellerId'),
-          merchantPrivateKey: get('payment.alipay.privateKey'),
-          alipayPublicKey: get('payment.alipay.publicKey'),
-          gateway: get('payment.alipay.gateway'),
-        },
-      },
-      {
-        id: 'wechat',
-        values: {
-          appId: get('payment.wechat.appId'),
-          mchId: get('payment.wechat.mchId'),
-          merchantSerialNo: get('payment.wechat.serialNo'),
-          merchantPrivateKey: get('payment.wechat.privateKey'),
-          apiV3Key: get('payment.wechat.apiV3Key'),
-          wechatPayPublicKey: get('payment.wechat.platformPublicKey'),
-          wechatPayPublicKeyId: get('payment.wechat.platformPublicKeyId'),
-          apiBase: get('payment.wechat.apiBase'),
-        },
-      },
-      {
-        id: 'paypal',
-        values: {
-          clientId: get('payment.paypal.clientId'),
-          clientSecret: get('payment.paypal.clientSecret'),
-          webhookId: get('payment.paypal.webhookId'),
-          apiBase: get('payment.paypal.apiBase'),
-        },
-      },
-      {
-        id: 'stripe',
-        values: {
-          secretKey: get('payment.stripe.secretKey'),
-          publishableKey: get('payment.stripe.publishableKey'),
-          webhookSecret: get('payment.stripe.webhookSecret'),
-          apiBase: get('payment.stripe.apiBase'),
-        },
-      },
-      {
-        id: 'epay',
-        values: {
-          apiBase: get('payment.epay.apiBase') || 'https://epay.jylt.cc',
-          mchId: get('payment.epay.mchId'),
-          key: get('payment.epay.key'),
-          type: epayType,
-        },
-      },
-      {
-        id: 'zpay',
-        values: {
-          apiBase: get('payment.zpay.apiBase') || 'https://zpayz.cn',
-          pid: get('payment.zpay.pid'),
-          key: get('payment.zpay.key'),
-          type: get('payment.zpay.type') || 'alipay',
-          cid: get('payment.zpay.cid'),
-        },
-      },
-    ];
-
-    for (const seed of seeds) {
-      const exists = await this.prisma.paymentProviderConfig.findFirst({
-        where: { providerId: seed.id },
-        select: { id: true },
-      });
-      if (exists) continue;
-
-      const adapter = requireAdapter(seed.id);
-      const values = Object.fromEntries(Object.entries(seed.values).filter(([, v]) => v !== ''));
-      const complete = adapter.validateConfig(values).length === 0;
-      const enabled =
-        seed.id === 'sandbox' ? this.config.get<string>('app.env') !== 'production' : complete;
-      const paymentMethods = defaultPaymentMethods(seed.id);
-      await this.prisma.paymentProviderConfig.create({
-        data: {
-          providerId: seed.id,
-          instanceId: 'default',
-          name: null,
-          sortOrder: 0,
-          version: 1,
-          enabled,
-          closeAfterMinutes: 30,
-          minAmountCents: null,
-          maxAmountCents: null,
-          dailyLimitCents: null,
-          refundEnabled: true,
-          paymentMethods: JSON.stringify(paymentMethods),
-          configCipher: this.cipher.encrypt(JSON.stringify(values)),
-          configDigest: digestOfConfig(
-            seed.id,
-            'default',
-            enabled,
-            30,
-            null,
-            null,
-            null,
-            true,
-            paymentMethods,
-            null,
-            0,
-            values,
-          ),
-          createdBy: 'bootstrap',
-        },
-      });
-      this.logger.log(`支付渠道配置初始化: ${seed.id}/default v1 (enabled=${enabled})`);
-    }
+  bootstrapFromEnv(): Promise<void> {
+    return this.admin.bootstrapFromEnv();
   }
-
-  // ── 内部 ────────────────────────────────────────────────────────
-
-  private async latestRowsByInstance(
-    providerId: string,
-    delegate: Prisma.TransactionClient['paymentProviderConfig'] =
-      this.prisma.paymentProviderConfig,
-  ) {
-    if (typeof delegate.findMany !== 'function') {
-      const row = await this.latestRow(providerId, 'default');
-      return row ? [row] : [];
-    }
-    const rows = await delegate.findMany({
-      where: { providerId },
-      orderBy: [{ instanceId: 'asc' }, { version: 'desc' }],
-    });
-    const latest = new Map<string, (typeof rows)[number]>();
-    for (const row of rows) {
-      if (!latest.has(row.instanceId)) latest.set(row.instanceId, row);
-    }
-    return [...latest.values()];
-  }
-
-  private async latestRow(providerId: string, instanceId: string) {
-    return this.prisma.paymentProviderConfig.findFirst({
-      where: { providerId, instanceId },
-      orderBy: { version: 'desc' },
-    });
-  }
-
-  private async sourceOf(method: VisiblePaymentMethod): Promise<PaymentSource> {
-    const raw = await this.settings.get<string>(`payment.${method}Source`);
-    return raw === 'official' || raw === 'epay' ? raw : 'unset';
-  }
-
-  private decode(row: { configCipher: string }): Record<string, string> {
-    if (!row.configCipher) return {};
-    try {
-      const parsed = JSON.parse(this.cipher.decrypt(row.configCipher)) as Record<string, string>;
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (e) {
-      this.logger.error(`支付配置解密失败: ${(e as Error).message}`);
-      throw new AppError(50302, '支付配置解密失败，请检查 PAYMENT_SECRET_KEY', 503);
-    }
-  }
-
-  private valuesFor(row: { configCipher: string }): Record<string, string> {
-    return this.decode(row);
-  }
-
-  private toResolved(
-    row: {
-      id: string;
-      providerId: string;
-      instanceId: string;
-      name: string | null;
-      sortOrder: number;
-      version: number;
-      enabled: boolean;
-      closeAfterMinutes: number;
-      minAmountCents: number | null;
-      maxAmountCents: number | null;
-      dailyLimitCents: number | null;
-      refundEnabled: boolean;
-      paymentMethods: string;
-      configCipher: string;
-    },
-    values?: Record<string, string>,
-  ): ResolvedPaymentConfig {
-    return {
-      id: row.id,
-      providerId: row.providerId as PaymentProviderId,
-      instanceId: row.instanceId,
-      name: row.name,
-      sortOrder: row.sortOrder,
-      version: row.version,
-      enabled: row.enabled,
-      closeAfterMinutes: row.closeAfterMinutes,
-      minAmountCents: row.minAmountCents,
-      maxAmountCents: row.maxAmountCents,
-      dailyLimitCents: row.dailyLimitCents,
-      refundEnabled: row.refundEnabled,
-      paymentMethods: paymentMethodsOf(row, row.providerId),
-      values: values ?? this.valuesFor(row),
-    };
-  }
-
-  private async toAdminProviderView(
-    descriptor: PaymentAdapterDescriptor,
-  ): Promise<AdminPaymentProviderView> {
-    const rows = (await this.latestRowsByInstance(descriptor.id)).sort(compareInstanceRows);
-    const instances = await Promise.all(
-      rows.map((row) => this.toAdminInstanceView(descriptor, row)),
-    );
-    const primary = instances[0] ?? null;
-    const primaryRow = rows[0] ?? null;
-    const adapter = requireAdapter(descriptor.id);
-    const primaryMissing = primaryRow
-      ? adapter.validateConfig(this.valuesFor(primaryRow))
-      : adapter.validateConfig({});
-    return {
-      id: descriptor.id,
-      name: descriptor.name,
-      icon: descriptor.icon,
-      checkoutMode: descriptor.checkoutMode,
-      enabled: instances.some((instance) => instance.enabled),
-      configured: instances.some((instance) => instance.configured),
-      closeAfterMinutes: primary?.closeAfterMinutes ?? 30,
-      version: primary?.version ?? null,
-      configId: primary?.configId ?? null,
-      configEnabled: primary?.enabled ?? false,
-      values: primary?.values ?? {},
-      secretConfigured: primary?.secretConfigured ?? {},
-      configFields: descriptor.configFields,
-      supportedCurrencies: descriptor.supportedCurrencies,
-      supportsReconciliation: descriptor.supportsReconciliation,
-      missing: primaryMissing,
-      identityLockedFields: primary?.identityLockedFields ?? [],
-      hasOpenOrders: instances.some((instance) => instance.hasOpenOrders),
-      updatedAt: primary?.updatedAt ?? null,
-      warnings: primary?.warnings ?? [],
-      instances,
-    };
-  }
-
-  private async toAdminInstanceView(
-    descriptor: PaymentAdapterDescriptor,
-    row: {
-      id: string;
-      instanceId: string;
-      name: string | null;
-      sortOrder: number;
-      version: number;
-      enabled: boolean;
-      closeAfterMinutes: number;
-      minAmountCents: number | null;
-      maxAmountCents: number | null;
-      dailyLimitCents: number | null;
-      refundEnabled: boolean;
-      paymentMethods: string;
-      configCipher: string;
-      createdAt: Date;
-    },
-  ): Promise<AdminPaymentProviderInstanceView> {
-    const adapter = requireAdapter(descriptor.id);
-    const values = this.valuesFor(row);
-    const missing = adapter.validateConfig(values);
-    const locked = await this.identityLockedFields(descriptor, row.instanceId);
-    const hasOpenOrders = await this.hasOpenOrders(descriptor.id, row.instanceId);
-    const publicValues: Record<string, string> = {};
-    const secretConfigured: Record<string, boolean> = {};
-    for (const field of descriptor.configFields) {
-      if (field.secret) {
-        secretConfigured[field.name] = Boolean(values[field.name]);
-      } else {
-        publicValues[field.name] = values[field.name] ?? field.default ?? '';
-      }
-    }
-    return {
-      instanceId: row.instanceId,
-      providerId: descriptor.id,
-      name: row.name,
-      sortOrder: row.sortOrder,
-      enabled: row.enabled,
-      configured: missing.length === 0,
-      closeAfterMinutes: row.closeAfterMinutes,
-      version: row.version,
-      configId: row.id,
-      values: publicValues,
-      secretConfigured,
-      minAmountCents: row.minAmountCents,
-      maxAmountCents: row.maxAmountCents,
-      dailyLimitCents: row.dailyLimitCents,
-      refundEnabled: row.refundEnabled,
-      paymentMethods: paymentMethodsOf(row, descriptor.id),
-      identityLockedFields: locked,
-      hasOpenOrders,
-      updatedAt: row.createdAt.toISOString(),
-      warnings: this.providerWarnings(descriptor, row, values, missing, hasOpenOrders),
-    };
-  }
-
-  /** 渠道可用性告警的唯一来源。 */
-  private providerWarnings(
-    descriptor: PaymentAdapterDescriptor,
-    row: { enabled: boolean } | null,
-    values: Record<string, string>,
-    missing: string[],
-    hasOpenOrders = false,
-  ): Array<{ level: 'danger' | 'warn'; message: string }> {
-    const warnings: Array<{ level: 'danger' | 'warn'; message: string }> = [];
-    if (row?.enabled && missing.length > 0) {
-      warnings.push({
-        level: 'danger',
-        message: `实例已启用但缺少必填项：${missing.join(', ')}。发起支付会返回 503。`,
-      });
-    }
-    if (
-      row?.enabled &&
-      descriptor.id !== 'sandbox' &&
-      missing.length === 0 &&
-      !values.publicBaseUrl?.trim() &&
-      !this.config.get<string>('payment.notifyBase')?.trim()
-    ) {
-      warnings.push({
-        level: 'danger',
-        message:
-          '实例已启用但未配置回调公网地址：请在实例配置填写 publicBaseUrl，或设置 PAYMENT_NOTIFY_BASE；否则发起支付会返回 503。',
-      });
-    }
-    if (
-      row?.enabled &&
-      descriptor.id !== 'sandbox' &&
-      this.config.get<string>('app.env') === 'production' &&
-      !this.config.get<string>('payment.secretKey')?.trim()
-    ) {
-      warnings.push({
-        level: 'danger',
-        message: '生产环境未配置 PAYMENT_SECRET_KEY，支付实例凭据无法安全加密/解密。',
-      });
-    }
-    if (descriptor.id === 'sandbox' && this.config.get<string>('app.env') === 'production') {
-      warnings.push({
-        level: 'danger',
-        message: '生产环境仍启用沙箱渠道：不会产生真实资金流转，上线前必须停用。',
-      });
-    }
-    if (row?.enabled && hasOpenOrders) {
-      warnings.push({
-        level: 'warn',
-        message: '存在未完成订单引用当前实例，保存新版本不会影响这些订单的验签与查单。',
-      });
-    }
-    return warnings;
-  }
-
-  private async identityLockedFields(
-    descriptor: PaymentAdapterDescriptor,
-    instanceId: string,
-  ): Promise<string[]> {
-    const identityFields = descriptor.configFields.filter((f) => f.identity).map((f) => f.name);
-    if (identityFields.length === 0) return [];
-    const configIds = await this.configIdsOfInstance(descriptor.id, instanceId);
-    const bound = await this.prisma.order.count({
-      where: {
-        channel: descriptor.id,
-        status: { in: ['paid', 'refunded', 'partial_refunded'] },
-        OR: [
-          { providerInstanceId: instanceId },
-          ...(configIds.length > 0 ? [{ providerConfigId: { in: configIds } }] : []),
-        ],
-      },
-    });
-    return bound > 0 ? identityFields : [];
-  }
-
-  private async hasOpenOrders(providerId: string, instanceId: string): Promise<boolean> {
-    const configIds = await this.configIdsOfInstance(providerId, instanceId);
-    const count = await this.prisma.order.count({
-      where: {
-        channel: providerId,
-        status: 'pending',
-        OR: [
-          { providerInstanceId: instanceId },
-          ...(configIds.length > 0 ? [{ providerConfigId: { in: configIds } }] : []),
-        ],
-      },
-    });
-    return count > 0;
-  }
-
-  private async configIdsOfInstance(providerId: string, instanceId: string): Promise<string[]> {
-    const delegate = this.prisma.paymentProviderConfig as typeof this.prisma.paymentProviderConfig & {
-      findMany?: typeof this.prisma.paymentProviderConfig.findMany;
-    };
-    if (typeof delegate.findMany !== 'function') return [];
-    const rows = await delegate.findMany({
-      where: { providerId, instanceId },
-      select: { id: true },
-    });
-    return rows.map((row) => row.id);
-  }
-
-  private async dailyInstanceUsage(
-    providerId: string,
-    instanceIds: string[],
-    delegate: Prisma.TransactionClient['payment'] = this.prisma.payment,
-  ): Promise<Map<string, number>> {
-    const usage = new Map<string, number>();
-    if (instanceIds.length === 0) return usage;
-    if (typeof delegate?.findMany !== 'function') return usage;
-    const today = shanghaiDateKey(new Date());
-    const rows = await delegate.findMany({
-      where: {
-        channel: providerId,
-        providerInstanceId: { in: instanceIds },
-        status: { in: ['pending', 'succeeded'] },
-        createdAt: { gte: startOfShanghaiDay(today) },
-      },
-      select: {
-        id: true,
-        orderId: true,
-        providerInstanceId: true,
-        amountCents: true,
-        status: true,
-        createdAt: true,
-      },
-    });
-    const byOrder = new Map<string, typeof rows>();
-    for (const row of rows) {
-      const group = byOrder.get(row.orderId) ?? [];
-      group.push(row);
-      byOrder.set(row.orderId, group);
-    }
-    for (const orderRows of byOrder.values()) {
-      const succeeded = orderRows
-        .filter((row) => row.status === 'succeeded')
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-      const pending = orderRows
-        .filter((row) => row.status === 'pending')
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-      const row = succeeded ?? pending;
-      if (!row) continue;
-      if (!row.providerInstanceId) continue;
-      usage.set(
-        row.providerInstanceId,
-        (usage.get(row.providerInstanceId) ?? 0) + row.amountCents,
-      );
-    }
-    return usage;
-  }
-
-  private leastAmountInstance(
-    eligible: Array<{ row: { instanceId: string }; config: ResolvedPaymentConfig }>,
-    usage: Map<string, number>,
-  ): { row: { instanceId: string }; config: ResolvedPaymentConfig } {
-    return [...eligible].sort((a, b) => {
-      const amountDiff =
-        (usage.get(a.row.instanceId) ?? 0) - (usage.get(b.row.instanceId) ?? 0);
-      if (amountDiff !== 0) return amountDiff;
-      return compareInstanceRows(a.config, b.config);
-    })[0];
-  }
-
-  private async roundRobinInstance(
-    providerId: string,
-    method: VisiblePaymentMethod,
-    eligible: Array<{ row: { instanceId: string }; config: ResolvedPaymentConfig }>,
-  ): Promise<{
-    selected: { row: { instanceId: string }; config: ResolvedPaymentConfig };
-    snapshot?: ResolvedVisiblePayment['roundRobin'];
-  }> {
-    const delegate = (this.prisma as unknown as {
-      paymentRoundRobinCursor?: {
-        upsert(args: unknown): Promise<{ cursor: number }>;
-        updateMany(args: unknown): Promise<{ count: number }>;
-      };
-    }).paymentRoundRobinCursor;
-    if (!delegate) return { selected: eligible[0] };
-    let cursor = 0;
-    try {
-      const row = await delegate.upsert({
-        where: { providerId_method: { providerId, method } },
-        create: { providerId, method, cursor: 0 },
-        update: {},
-        select: { cursor: true },
-      });
-      cursor = row.cursor;
-      const selected = eligible[cursor % eligible.length];
-      return {
-        selected,
-        snapshot: {
-          providerId: providerId as PaymentProviderId,
-          method,
-          cursor,
-          eligibleInstances: eligible.map((item) => ({
-            instanceId: item.row.instanceId,
-            config: item.config,
-          })),
-        },
-      };
-    } catch (e) {
-      this.logger.error(`支付轮询游标读取失败: ${(e as Error).message}`);
-      throw new AppError(50301, '支付负载均衡暂不可用，请稍后重试', 503);
-    }
-  }
-
-  private validateInstanceInput(input: {
-    closeAfterMinutes: number;
-    minAmountCents: number | null;
-    maxAmountCents: number | null;
-    dailyLimitCents: number | null;
-  }): void {
-    if (input.closeAfterMinutes < 5 || input.closeAfterMinutes > 1440) {
-      throw new AppError(40001, '自动关闭时间必须在 5-1440 分钟之间', 400);
-    }
-    for (const [label, value] of [
-      ['单笔最小金额', input.minAmountCents],
-      ['单笔最大金额', input.maxAmountCents],
-      ['每日限额', input.dailyLimitCents],
-    ] as const) {
-      if (value != null && (!Number.isInteger(value) || value < 0)) {
-        throw new AppError(40001, `${label}必须是非负整数（分）`, 400);
-      }
-    }
-    if (
-      input.minAmountCents != null &&
-      input.maxAmountCents != null &&
-      input.minAmountCents > input.maxAmountCents
-    ) {
-      throw new AppError(40001, '单笔最小金额不能大于单笔最大金额', 400);
-    }
-  }
-
-  private normalizePaymentMethods(
-    providerId: string,
-    methods: VisiblePaymentMethod[],
-  ): VisiblePaymentMethod[] {
-    const allowed = defaultPaymentMethods(providerId);
-    const unique = [...new Set(methods)].filter((method) => allowed.includes(method));
-    if (unique.length === 0 || unique.length !== new Set(methods).size) {
-      throw new AppError(40001, `该渠道支持的支付方式为: ${allowed.join(', ')}`, 400);
-    }
-    return VISIBLE_PAYMENT_METHODS.filter((method) => unique.includes(method));
-  }
-
-}
-
-function compareInstanceRows(
-  a: { sortOrder: number; instanceId: string },
-  b: { sortOrder: number; instanceId: string },
-): number {
-  return a.sortOrder - b.sortOrder || a.instanceId.localeCompare(b.instanceId);
-}
-
-function defaultPaymentMethods(providerId: string): VisiblePaymentMethod[] {
-  if (providerId === 'alipay') return ['alipay'];
-  if (providerId === 'wechat') return ['wechat'];
-  return ['alipay', 'wechat'];
-}
-
-/** 实例支持的支付方式必须是该渠道允许集合的子集。 */
-function paymentMethodsOf(
-  row: { paymentMethods: string },
-  providerId: string,
-): VisiblePaymentMethod[] {
-  const allowed = defaultPaymentMethods(providerId);
-  try {
-    const parsed = JSON.parse(row.paymentMethods);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (value): value is VisiblePaymentMethod =>
-        (value === 'alipay' || value === 'wechat') && allowed.includes(value),
-    );
-  } catch {
-    return [];
-  }
-}
-
-function normalizeName(name: string | null | undefined): string | null {
-  const value = String(name ?? '').trim();
-  return value ? value.slice(0, 80) : null;
-}
-
-function shanghaiDateKey(date: Date): string {
-  const shifted = new Date(date.getTime() + 8 * 3600 * 1000);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${shifted.getUTCFullYear()}-${p(shifted.getUTCMonth() + 1)}-${p(shifted.getUTCDate())}`;
-}
-
-function digestOfConfig(
-  providerId: string,
-  instanceId: string,
-  enabled: boolean,
-  closeAfterMinutes: number,
-  minAmountCents: number | null,
-  maxAmountCents: number | null,
-  dailyLimitCents: number | null,
-  refundEnabled: boolean,
-  paymentMethods: VisiblePaymentMethod[],
-  name: string | null,
-  sortOrder: number,
-  values: Record<string, string>,
-): string {
-  const normalized = Object.keys(values)
-    .filter((k) => values[k] !== undefined && values[k] !== '')
-    .sort()
-    .map((k) => `${k}=${values[k]}`)
-    .join('\n');
-  return createHash('sha256')
-    .update(
-      [
-        providerId,
-        instanceId,
-        enabled ? 1 : 0,
-        closeAfterMinutes,
-        minAmountCents ?? '',
-        maxAmountCents ?? '',
-        dailyLimitCents ?? '',
-        refundEnabled ? 1 : 0,
-        paymentMethods.join(','),
-        name ?? '',
-        sortOrder,
-        normalized,
-      ].join('\n'),
-    )
-    .digest('hex');
 }

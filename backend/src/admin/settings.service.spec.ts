@@ -3,19 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { AdminSettingsService } from './settings.service';
 
 function createService() {
-  const create = vi.fn().mockResolvedValue({});
-  const tx = {
-    systemSetting: {
-      update: vi.fn().mockResolvedValue({}),
-      create,
-      delete: vi.fn().mockResolvedValue({}),
-    },
-  };
+  const upsert = vi.fn().mockResolvedValue({});
   const prisma = {
     systemSetting: {
       findMany: vi.fn().mockResolvedValue([]),
+      upsert,
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi.fn(async (run: (client: typeof tx) => Promise<void>) => run(tx)),
+    $transaction: vi.fn(async (ops: Array<Promise<unknown>>) => Promise.all(ops)),
   };
   const settings = { invalidate: vi.fn() };
   const service = new AdminSettingsService(
@@ -25,7 +20,7 @@ function createService() {
     {} as never,
     {} as never,
   );
-  return { service, prisma, settings, create };
+  return { service, prisma, settings, upsert };
 }
 
 describe('AdminSettingsService.updateAll 上传格式白名单', () => {
@@ -48,7 +43,7 @@ describe('AdminSettingsService.updateAll 上传格式白名单', () => {
   });
 
   it('把格式别名与重复项归一为稳定落库值', async () => {
-    const { service, create, settings } = createService();
+    const { service, upsert, settings } = createService();
 
     const result = await service.updateAll(
       { 'upload.allowedTypes': 'webp,jpeg,jpg,png' },
@@ -56,9 +51,14 @@ describe('AdminSettingsService.updateAll 上传格式白名单', () => {
       'tester',
     );
 
-    expect(create).toHaveBeenCalledWith({
-      data: {
+    expect(upsert).toHaveBeenCalledWith({
+      where: { key: 'upload.allowedTypes' },
+      create: {
         key: 'upload.allowedTypes',
+        value: 'jpg,png,webp',
+        updatedBy: 'tester',
+      },
+      update: {
         value: 'jpg,png,webp',
         updatedBy: 'tester',
       },

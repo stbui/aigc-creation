@@ -141,53 +141,81 @@ export class SystemPerformanceService {
 
   private async traffic(): Promise<TrafficResult> {
     const since = new Date(Date.now() - 24 * 3_600_000);
-    const [taskStatuses, taskRows, logRows, assetAgg, cooling] = await Promise.all([
-      this.prisma.generationTask.groupBy({ by: ['status'], _count: { _all: true } }),
-      this.prisma.generationTask.findMany({
-        where: { createdAt: { gte: since } },
-        select: { createdAt: true, updatedAt: true, status: true },
-      }),
-      this.prisma.apiCallLog.findMany({
-        where: { createdAt: { gte: since } },
-        select: { status: true, durationMs: true, requestKind: true },
-      }),
-      this.prisma.asset.aggregate({ _sum: { sizeBytes: true }, _count: { _all: true } }),
-      Promise.resolve(this.routeHealth.snapshot()),
-    ]);
+    const [taskStatuses, windowTaskStatuses, callStatuses, callKinds, assetAgg, cooling] =
+      await Promise.all([
+        this.prisma.generationTask.groupBy({ by: ['status'], _count: { _all: true } }),
+        this.prisma.generationTask.groupBy({
+          by: ['status'],
+          where: { createdAt: { gte: since } },
+          _count: { _all: true },
+        }),
+        this.prisma.apiCallLog.groupBy({
+          by: ['status'],
+          where: { createdAt: { gte: since } },
+          _count: { _all: true },
+        }),
+        this.prisma.apiCallLog.groupBy({
+          by: ['requestKind'],
+          where: { createdAt: { gte: since } },
+          _count: { _all: true },
+        }),
+        this.prisma.asset.aggregate({ _sum: { sizeBytes: true }, _count: { _all: true } }),
+        Promise.resolve(this.routeHealth.snapshot()),
+      ]);
 
     const byStatus: Record<string, number> = {};
     for (const row of taskStatuses) byStatus[row.status] = row._count._all;
-    const succeeded = taskRows.filter((row) => row.status === 'succeeded');
-    const failed = taskRows.filter((row) => row.status === 'failed');
-    const taskDurations = succeeded
-      .map((row) => Math.max(0, row.updatedAt.getTime() - row.createdAt.getTime()))
-      .sort((a, b) => a - b);
-    const terminalLogs = logRows.filter(
-      (row) => row.status === 'success' || row.status === 'failed',
-    );
-    const logDurations = terminalLogs
-      .map((row) => Math.max(0, row.durationMs))
-      .sort((a, b) => a - b);
+
+    let taskTotal = 0;
+    let succeeded = 0;
+    let failed = 0;
+    for (const row of windowTaskStatuses) {
+      const count = row._count._all;
+      taskTotal += count;
+      if (row.status === 'succeeded') succeeded = count;
+      if (row.status === 'failed') failed = count;
+    }
+
+    let callTotal = 0;
+    let callFailed = 0;
+    let terminal = 0;
+    for (const row of callStatuses) {
+      callTotal += row._count._all;
+      if (row.status === 'success') terminal += row._count._all;
+      if (row.status === 'failed') {
+        terminal += row._count._all;
+        callFailed = row._count._all;
+      }
+    }
+
+    const byKind: Record<string, number> = {};
+    for (const row of callKinds) {
+      const kind = row.requestKind || 'unknown';
+      byKind[kind] = (byKind[kind] ?? 0) + row._count._all;
+    }
+
+    const [taskP95, logP95] = await Promise.all([
+      this.taskDurationP95(since, succeeded),
+      this.callDurationP95(since, terminal),
+    ]);
 
     return {
       windowHours: 24,
       tasks: {
-        total: taskRows.length,
-        succeeded: succeeded.length,
-        failed: failed.length,
+        total: taskTotal,
+        succeeded,
+        failed,
         successRate:
-          succeeded.length + failed.length > 0
-            ? succeeded.length / (succeeded.length + failed.length)
-            : null,
-        p95DurationMs: percentile(taskDurations, 0.95),
+          succeeded + failed > 0 ? succeeded / (succeeded + failed) : null,
+        p95DurationMs: taskP95,
         byStatus,
       },
       calls: {
-        total: logRows.length,
-        terminal: terminalLogs.length,
-        failed: terminalLogs.filter((row) => row.status === 'failed').length,
-        p95DurationMs: percentile(logDurations, 0.95),
-        byKind: countBy(logRows, (row) => row.requestKind || 'unknown'),
+        total: callTotal,
+        terminal,
+        failed: callFailed,
+        p95DurationMs: logP95,
+        byKind,
       },
       storage: {
         assets: assetAgg._count._all,
@@ -201,6 +229,39 @@ export class SystemPerformanceService {
         })),
       },
     };
+  }
+
+  /**
+   * 任务耗时 P95（最近邻，不插值）。
+   *
+   * 只取排序后的那一行，而不是把 24 小时内的任务全部读进 Node 再排序。
+   * 耗时是 `updatedAt - createdAt`，SQL 侧用 julianday 换算成毫秒。
+   */
+  private async taskDurationP95(since: Date, count: number): Promise<number | null> {
+    if (count <= 0) return null;
+    const rows = await this.prisma.$queryRaw<Array<{ ms: number | bigint | null }>>`
+      SELECT (julianday("updatedAt") - julianday("createdAt")) * 86400000.0 AS ms
+      FROM "GenerationTask"
+      WHERE "status" = 'succeeded' AND "createdAt" >= ${toDbDateTime(since)}
+      ORDER BY ms ASC
+      LIMIT 1 OFFSET ${nearestRankOffset(count)}
+    `;
+    const value = rows[0]?.ms;
+    return value === null || value === undefined ? null : Math.max(0, Math.round(Number(value)));
+  }
+
+  /** 调用耗时 P95；终态样本与 ApiCallLog 的状态口径一致 */
+  private async callDurationP95(since: Date, count: number): Promise<number | null> {
+    if (count <= 0) return null;
+    const rows = await this.prisma.$queryRaw<Array<{ ms: number | bigint | null }>>`
+      SELECT MAX(0, "durationMs") AS ms
+      FROM "ApiCallLog"
+      WHERE "status" IN ('success', 'failed') AND "createdAt" >= ${toDbDateTime(since)}
+      ORDER BY ms ASC
+      LIMIT 1 OFFSET ${nearestRankOffset(count)}
+    `;
+    const value = rows[0]?.ms;
+    return value === null || value === undefined ? null : Math.max(0, Math.round(Number(value)));
   }
 
   private async schedulerCheck() {
@@ -291,23 +352,12 @@ function dbFileBytes(url: string): number | null {
   }
 }
 
-/**
- * 最近邻百分位（不做插值）。
- *
- * 与 `ChannelModelMetricsService` 同一实现：样本量小时，插值出来的
- * 「P95 耗时 1234ms」会让人误以为测过很多次。
- */
-function percentile(sorted: number[], ratio: number): number | null {
-  if (sorted.length === 0) return null;
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(ratio * sorted.length) - 1));
-  return sorted[index];
+/** 最近邻百分位对应的行偏移；样本量小时不插值 */
+function nearestRankOffset(count: number): number {
+  return Math.min(count - 1, Math.max(0, Math.ceil(0.95 * count) - 1));
 }
 
-function countBy<T>(rows: T[], keyOf: (row: T) => string): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const row of rows) {
-    const key = keyOf(row);
-    out[key] = (out[key] ?? 0) + 1;
-  }
-  return out;
+/** Prisma SQLite DateTime 存储格式：`YYYY-MM-DDTHH:mm:ss.SSS+00:00` */
+function toDbDateTime(date: Date): string {
+  return `${date.toISOString().slice(0, 23)}+00:00`;
 }

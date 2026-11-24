@@ -1,15 +1,21 @@
 import { Module } from '@nestjs/common';
 import { OrdersModule } from '../orders/orders.module';
+import { PaymentAttemptService } from './payment-attempt.service';
+import { PaymentCloseService } from './payment-close.service';
 import { PaymentCoreModule } from './payment-core.module';
+import { PaymentIntentService } from './payment-intent.service';
+import { PaymentNotificationService } from './payment-notification.service';
+import { PaymentOrderService } from './payment-order.service';
+import { PaymentOrderLifecycleService } from './payment-order-lifecycle.service';
+import { PaymentQueryService } from './payment-query.service';
+import { PaymentReconciliationService } from './payment-reconciliation.service';
+import { PaymentSettlementService } from './payment-settlement.service';
+import { PaymentWorkerService } from './payment-worker.service';
 import {
   OrderCancelController,
-  PaymentWebhookController,
   PaymentsController,
+  PaymentWebhookController,
 } from './payments.controller';
-import { PaymentOrderService } from './payment-order.service';
-import { PaymentNotificationService } from './payment-notification.service';
-import { PaymentReconciliationService } from './payment-reconciliation.service';
-import { PaymentWorkerService } from './payment-worker.service';
 
 /**
  * 支付模块。
@@ -23,13 +29,15 @@ import { PaymentWorkerService } from './payment-worker.service';
  */
 @Module({
   imports: [OrdersModule, PaymentCoreModule],
-  controllers: [
-    PaymentsController,
-    PaymentWebhookController,
-    OrderCancelController,
-  ],
+  controllers: [PaymentsController, PaymentWebhookController, OrderCancelController],
   providers: [
     PaymentOrderService,
+    PaymentOrderLifecycleService,
+    PaymentSettlementService,
+    PaymentAttemptService,
+    PaymentIntentService,
+    PaymentQueryService,
+    PaymentCloseService,
     PaymentNotificationService,
     PaymentReconciliationService,
     PaymentWorkerService,

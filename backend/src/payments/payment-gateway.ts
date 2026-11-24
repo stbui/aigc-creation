@@ -10,8 +10,8 @@ import { PaymentContext, RefundInput, RefundResult } from './adapters/types';
  * 但渠道凭据在支付域。直接让 `OrdersModule` import `PaymentsModule` 会形成
  * `PaymentsModule → OrdersModule → PaymentsModule` 的循环。
  *
- * 本类只依赖 `PaymentConfigService`（其依赖只有 Prisma + ConfigModule），
- * 因此可以随 `PaymentCoreModule` 一起被两边安全引用，依赖方向保持单向：
+ * 本类只依赖 `PaymentConfigService`（配置服务自带 Prisma / 配置读取 / 全局
+ * 设置服务，不依赖订单域），因此可以随 `PaymentCoreModule` 一起被两边安全引用，依赖方向保持单向：
  *
  *   PaymentsModule ─┐
  *                   ├─→ PaymentCoreModule (配置 + 适配器 + 本网关)

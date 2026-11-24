@@ -239,60 +239,53 @@ export class AdminSettingsService {
     const actorName = actor ?? "admin";
     const changes: SettingChange[] = [];
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const { key, def, value, storedValue } of normalized) {
-        const prev = beforeByKey.get(key);
-        // 敏感项只展示配置状态，绝不把明文放进响应或日志。
-        const prevValue = def.sensitive
-          ? prev
-            ? "已配置"
-            : "未配置"
-          : prev
-            ? this.parseValue(prev.value, def)
-            : def.default;
-
-        const data = { value: storedValue, updatedBy: actorName };
-        if (prev) {
-          await tx.systemSetting.update({ where: { key }, data });
-        } else {
-          await tx.systemSetting.create({ data: { key, ...data } });
-        }
-        changes.push({
-          key,
-          label: def.label,
-          before: prevValue,
-          after: def.sensitive ? "已更新" : value,
-          action: "update",
-        });
-      }
-
-      for (const key of clearList) {
-        const def = findSettingDef(key)!;
-        const prev = beforeByKey.get(key);
-        if (!prev) {
-          // 本来就是默认值 —— 无事可做，但要在变更摘要里如实体现
-          changes.push({
-            key,
-            label: def.label,
-            before: def.sensitive ? "未配置" : def.default,
-            after: def.sensitive ? "已清除" : def.default,
-            action: "clear",
-          });
-          continue;
-        }
-        const prevValue = def.sensitive
+    /*
+     * 数组事务一次提交：逐 key `await` 会让设置页保存产生 N 次串行往返，
+     * 且中途失败时事务会长时间占着 SQLite 的唯一写者。
+     * 变更摘要按输入顺序先算好，再交给 Prisma 批量执行。
+     */
+    const writes = normalized.map(({ key, def, value, storedValue }) => {
+      const prev = beforeByKey.get(key);
+      // 敏感项只展示配置状态，绝不把明文放进响应或日志。
+      const prevValue = def.sensitive
+        ? prev
           ? "已配置"
-          : this.parseValue(prev.value, def);
-        await tx.systemSetting.delete({ where: { key } });
-        changes.push({
-          key,
-          label: def.label,
-          before: prevValue,
-          after: def.sensitive ? "已清除" : def.default,
-          action: "clear",
-        });
-      }
+          : "未配置"
+        : prev
+          ? this.parseValue(prev.value, def)
+          : def.default;
+
+      const data = { value: storedValue, updatedBy: actorName };
+      changes.push({
+        key,
+        label: def.label,
+        before: prevValue,
+        after: def.sensitive ? "已更新" : value,
+        action: "update",
+      });
+      return this.prisma.systemSetting.upsert({
+        where: { key },
+        create: { key, ...data },
+        update: data,
+      });
     });
+
+    const clears = clearList.map((key) => {
+      const def = findSettingDef(key)!;
+      const prev = beforeByKey.get(key);
+      // 本来就是默认值 —— 无事可做，但要在变更摘要里如实体现
+      changes.push({
+        key,
+        label: def.label,
+        before: prev ? (def.sensitive ? "已配置" : this.parseValue(prev.value, def)) : def.sensitive ? "未配置" : def.default,
+        after: def.sensitive ? "已清除" : def.default,
+        action: "clear",
+      });
+      // deleteMany 对不存在的 key 也是空操作，不必先判断 prev
+      return this.prisma.systemSetting.deleteMany({ where: { key } });
+    });
+
+    await this.prisma.$transaction([...writes, ...clears]);
 
     // 写入即失效缓存，让新值立刻生效（不等 3s TTL）
     this.settings.invalidate();

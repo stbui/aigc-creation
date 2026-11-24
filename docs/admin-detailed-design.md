@@ -31,7 +31,7 @@ backend/src/admin/
 ├── tasks-admin.controller.ts / tasks-admin.service.ts
 ├── tickets-admin.controller.ts
 ├── notifications.controller.ts
-├── commerce.controller.ts / commerce-admin.service.ts     # 商品/订单/支付/积分
+├── commerce.controller.ts / commerce/{product,order,payment,credit}-admin.service.ts  # 商品/订单/支付/积分
 ├── marketing.controller.ts
 ├── invoices-admin.controller.ts
 ├── payments/payment-admin.controller.ts             # 支付域：渠道/商品/订单/对账
@@ -379,8 +379,8 @@ partial_refunded → refunded | partial_refunded
 
 | 页面 | 接口 | 规则 |
 | --- | --- | --- |
-| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；限量名额由 pending 订单预占、支付时核销、取消/超时释放，核销走 `Order.couponId`；无关联订单可删除，有订单只能停用；`GET /admin/coupons/export` 按同一筛选导出 CSV（`marketing.write + data.export`，路由在 `:id` 之前） |
-| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的限时免费活动让 `resolve()` 返回 0；到期由调度任务收尾；列表/筛选/导出统一按派生生效态 `effective`（`draft/live/scheduled/ended/off`），人工 `status` 参数保留兼容；上线前校验结束时间未过、商品在架、活动价低于原价、能力 ID 有效；无关联订单**与**免费账单（`BillingOrder.promotionId`）才可删除，有引用只能下线；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`marketing.write + data.export`） |
+| 优惠券 | `/admin/coupons*`（读 `marketing.read` / 写 `marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；限量名额由 pending 订单预占、支付时核销、取消/超时释放，核销走 `Order.couponId`；无关联订单可删除，有订单只能停用；`GET /admin/coupons/export` 按同一筛选导出 CSV（`marketing.read + data.export`，路由在 `:id` 之前） |
+| 限时活动 | `/admin/campaigns*`（读 `marketing.read` / 写 `marketing.write`） | 类型 `limited_price` / `limited_free` / `popup`；进行中的限时免费活动让 `resolve()` 返回 0；到期由调度任务收尾；列表/筛选/导出统一按派生生效态 `effective`（`draft/live/scheduled/ended/off`），人工 `status` 参数保留兼容；上线前校验结束时间未过、商品在架、活动价低于原价、能力 ID 有效；无关联订单**与**免费账单（`BillingOrder.promotionId`）才可删除，有引用只能下线；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`marketing.read + data.export`） |
 | 邀请与签到 | `/admin/invites*`、`/admin/checkin*` | 邀请奖励在被邀请人**首次付费**才触发；签到规则含基础积分与连签加成 |
 
 C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns` 只回真正更便宜且在售的活动）。

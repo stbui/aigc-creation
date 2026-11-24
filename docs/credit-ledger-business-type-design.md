@@ -314,7 +314,7 @@ businessType: CreditBusinessType;
 | 服务 | `credit.service.ts` | 新增 `CREDIT_BUSINESS_TYPES`、`fallbackBusinessType`、`resolveBusinessType`；`grant`/`consume` 增加 `businessType` 入参并校验绑定与方向；`ledgerOf` 增加筛选与白名单；`projectEntry` 投影 + 兜底；`reclaimOrder` 记 `refund` |
 | 扣费 | `billing.service.ts` | 新增 `creativeBusinessTypeOf(modality)`；`settle`/`reserve` 的 meta 写入业务类型（image/video → `creative_image`，其余 → `other`） |
 | 触发点 | `marketing`(签到/邀请)、`membership`(首期/月度)、`orders`(购买)、`task-lifecycle`(补偿退款)、`credit.adminAdjust` | 分别记 `checkin_streak` / `invite_reward` / `membership_grant` / `purchase` / `refund` / `admin_adjust` |
-| 控制器 | `credits.controller.ts`、`admin/commerce.controller.ts` + `commerce-admin.service.ts` | C 端与后台均支持 `businessType` 查询参数，非法值 400 |
+| 控制器 | `credits.controller.ts`、`admin/commerce.controller.ts` + `admin/commerce/credit-admin.service.ts` | C 端与后台均支持 `businessType` 查询参数，非法值 400 |
 | 前端 | `types/admin-console.ts`、`types/api.d.ts`、`lib/api.ts`、`credits/constants.ts`、`credits/utils.ts`、`CreditsLedgerPanel.tsx`、`CreditsLedgerList.tsx` | 类型与参数；`BUSINESS_TYPE_LABEL`；`ledgerTypeLabel()`（业务类型优先）；表格与窄屏列表改用该函数；筛选器 `expire` 文案改「积分过期」 |
 | 后台文案 | `admin/credits/constants.ts` | `expire` 同步改「积分过期」 |
 | 测试 | `credit.service.spec.ts`、`billing.service.spec.ts` | 绑定/方向校验、兜底映射、脏值处理、text/audio 例外 |

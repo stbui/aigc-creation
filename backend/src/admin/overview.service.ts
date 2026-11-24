@@ -27,7 +27,7 @@ export class AdminOverviewService {
    * 30 秒足以挡住重复点击「刷新」，又不会让运营看到明显过期的数字。
    * 响应里带 `generatedAt`，前端明确展示数据截至时间。
    */
-  private readonly cache = new Map<number, { at: number; data: any }>();
+  private readonly cache = new Map<number, { at: number; data: OverviewPayload }>();
   private static readonly CACHE_TTL_MS = 30_000;
 
   constructor(
@@ -65,7 +65,9 @@ export class AdminOverviewService {
       taskGroups,
       assetGroups,
       recentTasks,
-      weekTasks,
+      taskTrendRows,
+      windowTaskStatuses,
+      windowFailures,
       orderGroups,
       gmvAll,
       gmvWindow,
@@ -73,13 +75,14 @@ export class AdminOverviewService {
       refundAll,
       refundWindow,
       paymentGroups,
-      paidInWindow,
+      paidByChannel,
+      revenueTrendRows,
       activeMembers,
       newMembers,
       creditGranted,
       creditConsumed,
       prevUserNew,
-      prevTasks,
+      prevTaskStatuses,
       prevOrders,
       prevRefunds,
     ] = await Promise.all([
@@ -104,9 +107,16 @@ export class AdminOverviewService {
           outputAsset: { select: { id: true, sourceUrl: true } },
         },
       }),
-      this.prisma.generationTask.findMany({
+      this.dailyTaskTrend(since),
+      this.prisma.generationTask.groupBy({
+        by: ['status'],
         where: { createdAt: { gte: since } },
-        select: { createdAt: true, status: true, errorCode: true },
+        _count: { _all: true },
+      }),
+      this.prisma.generationTask.groupBy({
+        by: ['errorCode'],
+        where: { createdAt: { gte: since }, status: 'failed' },
+        _count: { _all: true },
       }),
 
       // ── 交易侧 ──
@@ -121,6 +131,7 @@ export class AdminOverviewService {
       this.prisma.order.aggregate({
         where: { status: { in: paidStatuses }, paidAt: { gte: since } },
         _sum: { paidCents: true },
+        _count: { _all: true },
       }),
       this.prisma.order.aggregate({
         where: { status: 'pending' },
@@ -132,11 +143,14 @@ export class AdminOverviewService {
         _sum: { amountCents: true },
       }),
       this.prisma.payment.groupBy({ by: ['status'], _count: { _all: true } }),
-      // 收入趋势按日聚合 —— 窗口内的已支付订单量可控, 在 Node 侧聚合即可
-      this.prisma.order.findMany({
+      // 渠道拆分在库里聚合，避免把窗口内订单明细整批读进 Node
+      this.prisma.order.groupBy({
+        by: ['channel'],
         where: { status: { in: paidStatuses }, paidAt: { gte: since } },
-        select: { paidAt: true, paidCents: true, channel: true },
+        _sum: { paidCents: true },
+        _count: { _all: true },
       }),
+      this.dailyRevenueTrend(since),
       this.prisma.membership.count({
         where: { status: { in: ['active', 'grace'] }, expiresAt: { gt: now } },
       }),
@@ -159,9 +173,10 @@ export class AdminOverviewService {
       // ── 上一窗口（环比）──
       // 与当前窗口等长且紧邻。用「累计」做分母会让任何窗口都显得在增长。
       this.prisma.user.count({ where: { createdAt: { gte: prevSince, lt: since } } }),
-      this.prisma.generationTask.findMany({
+      this.prisma.generationTask.groupBy({
+        by: ['status'],
         where: { createdAt: { gte: prevSince, lt: since } },
-        select: { status: true },
+        _count: { _all: true },
       }),
       this.prisma.order.aggregate({
         where: { status: { in: paidStatuses }, paidAt: { gte: prevSince, lt: since } },
@@ -225,35 +240,37 @@ export class AdminOverviewService {
     // 这里单独给窗口口径，并配上一窗口用于环比。
     const win = { tasks: 0, succeeded: 0, failed: 0 };
     const reasonMap = new Map<string, number>();
-    for (const r of weekTasks) {
-      win.tasks += 1;
-      if (r.status === 'succeeded') win.succeeded += 1;
-      if (r.status === 'failed') {
-        win.failed += 1;
-        const code = r.errorCode || 'unknown';
-        reasonMap.set(code, (reasonMap.get(code) ?? 0) + 1);
-      }
+    for (const row of windowTaskStatuses) {
+      const count = row._count._all;
+      win.tasks += count;
+      if (row.status === 'succeeded') win.succeeded += count;
+      if (row.status === 'failed') win.failed += count;
+    }
+    for (const row of windowFailures) {
+      const code = row.errorCode || 'unknown';
+      reasonMap.set(code, (reasonMap.get(code) ?? 0) + row._count._all);
     }
     const winFinished = win.succeeded + win.failed;
     const winSuccessRate =
       winFinished === 0 ? null : Math.round((win.succeeded / winFinished) * 1000) / 10;
 
     const prevWin = { tasks: 0, succeeded: 0, failed: 0 };
-    for (const r of prevTasks) {
-      prevWin.tasks += 1;
-      if (r.status === 'succeeded') prevWin.succeeded += 1;
-      if (r.status === 'failed') prevWin.failed += 1;
+    for (const row of prevTaskStatuses) {
+      const count = row._count._all;
+      prevWin.tasks += count;
+      if (row.status === 'succeeded') prevWin.succeeded += count;
+      if (row.status === 'failed') prevWin.failed += count;
     }
     const prevFinished = prevWin.succeeded + prevWin.failed;
     const prevSuccessRate =
       prevFinished === 0 ? null : Math.round((prevWin.succeeded / prevFinished) * 1000) / 10;
 
     const channelMap = new Map<string, { channel: string; gmvCents: number; orders: number }>();
-    for (const o of paidInWindow) {
-      const channel = o.channel || 'unknown';
+    for (const row of paidByChannel) {
+      const channel = row.channel || 'unknown';
       const cur = channelMap.get(channel) ?? { channel, gmvCents: 0, orders: 0 };
-      cur.gmvCents += o.paidCents;
-      cur.orders += 1;
+      cur.gmvCents += row._sum.paidCents ?? 0;
+      cur.orders += row._count._all;
       channelMap.set(channel, cur);
     }
     const channelMix = Array.from(channelMap.values()).sort((a, b) => b.gmvCents - a.gmvCents);
@@ -277,7 +294,7 @@ export class AdminOverviewService {
         originals: assets.original,
         generated: assets.generated,
       },
-      trend: this.buildTrend(weekTasks, days),
+      trend: this.buildTrend(taskTrendRows, days),
       /** 窗口口径（与 trend 同源），用于「最近表现」而不是累计数字 */
       window: {
         tasks: win.tasks,
@@ -290,7 +307,7 @@ export class AdminOverviewService {
           .slice(0, 6),
         revenue: {
           gmvCents: gmvWindow._sum.paidCents ?? 0,
-          paidOrders: paidInWindow.length,
+          paidOrders: gmvWindow._count._all,
           refundedCents: refundWindow._sum.amountCents ?? 0,
           usersNew: userNew,
         },
@@ -333,7 +350,7 @@ export class AdminOverviewService {
         },
         /** 窗口内收入按支付渠道拆分，用于看营收结构而不只是总额 */
         channelMix,
-        revenueTrend: this.buildRevenueTrend(paidInWindow, days),
+        revenueTrend: this.buildRevenueTrend(revenueTrendRows, days),
       },
       recentTasks: recentTasks.map((t) => {
         const def = getCapability(t.capability);
@@ -353,33 +370,60 @@ export class AdminOverviewService {
   }
 
   /**
-   * 趋势序列: 按日聚合并补齐无数据日。
+   * 任务趋势原始日桶。
    *
-   * 不用数据库日期分组: SQLite driver adapter 对日期函数支持有限,
-   * 改为取时间戳在 Node 侧聚合。7~30 天量级完全可接受。
+   * 按 Asia/Shanghai 的日界分组（`+8 hours`），而不是按服务器本地时区 ——
+   * 容器默认 UTC，按本地日期分组会让「今天」在跨时区部署时整体偏移。
    */
+  private dailyTaskTrend(since: Date) {
+    return this.prisma.$queryRaw<TaskTrendRow[]>`
+      SELECT strftime('%Y-%m-%d', "createdAt", '+8 hours') AS day,
+             COUNT(*) AS total,
+             SUM(CASE WHEN "status" = 'succeeded' THEN 1 ELSE 0 END) AS succeeded,
+             SUM(CASE WHEN "status" = 'failed' THEN 1 ELSE 0 END) AS failed
+      FROM "GenerationTask"
+      WHERE "createdAt" >= ${toDbDateTime(since)}
+      GROUP BY day
+    `;
+  }
+
+  /**
+   * 收入趋势原始日桶。
+   *
+   * 按**支付时间**而不是下单时间聚合；状态白名单与上方 `paidStatuses`
+   * 保持一致（paid / partial_refunded / refunded）。
+   */
+  private dailyRevenueTrend(since: Date) {
+    return this.prisma.$queryRaw<RevenueTrendRow[]>`
+      SELECT strftime('%Y-%m-%d', "paidAt", '+8 hours') AS day,
+             COUNT(*) AS orders,
+             SUM("paidCents") AS gmv
+      FROM "Order"
+      WHERE "status" IN ('paid', 'partial_refunded', 'refunded')
+        AND "paidAt" >= ${toDbDateTime(since)}
+      GROUP BY day
+    `;
+  }
+
+  /** 趋势序列: 把数据库日桶补齐成连续日期 */
   private buildTrend(
-    rows: Array<{ createdAt: Date; status: string }>,
+    rows: TaskTrendRow[],
     days: number,
   ): Array<{ date: string; total: number; succeeded: number; failed: number }> {
-    const key = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
     const map = new Map<string, { total: number; succeeded: number; failed: number }>();
     for (let i = days - 1; i >= 0; i -= 1) {
-      map.set(key(new Date(Date.now() - i * 24 * 3600 * 1000)), {
+      map.set(dayKey(new Date(Date.now() - i * DAY_MS)), {
         total: 0,
         succeeded: 0,
         failed: 0,
       });
     }
-    for (const r of rows) {
-      const k = key(r.createdAt);
-      const cur = map.get(k);
+    for (const row of rows) {
+      const cur = map.get(row.day);
       if (!cur) continue;
-      cur.total += 1;
-      if (r.status === 'succeeded') cur.succeeded += 1;
-      if (r.status === 'failed') cur.failed += 1;
+      cur.total += Number(row.total);
+      cur.succeeded += Number(row.succeeded);
+      cur.failed += Number(row.failed);
     }
     return Array.from(map.entries()).map(([date, v]) => ({ date, ...v }));
   }
@@ -391,25 +435,53 @@ export class AdminOverviewService {
    * 两者混用会让某天的营收在"前天下的单今天付款"时对不上账。
    */
   private buildRevenueTrend(
-    rows: Array<{ paidAt: Date | null; paidCents: number }>,
+    rows: RevenueTrendRow[],
     days: number,
   ): Array<{ date: string; gmvCents: number; orders: number }> {
-    const key = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
     const map = new Map<string, { gmvCents: number; orders: number }>();
     for (let i = days - 1; i >= 0; i -= 1) {
-      map.set(key(new Date(Date.now() - i * 24 * 3600 * 1000)), { gmvCents: 0, orders: 0 });
+      map.set(dayKey(new Date(Date.now() - i * DAY_MS)), { gmvCents: 0, orders: 0 });
     }
-    for (const r of rows) {
-      if (!r.paidAt) continue;
-      const cur = map.get(key(r.paidAt));
+    for (const row of rows) {
+      const cur = map.get(row.day);
       if (!cur) continue;
-      cur.gmvCents += r.paidCents;
-      cur.orders += 1;
+      cur.gmvCents += Number(row.gmv);
+      cur.orders += Number(row.orders);
     }
     return Array.from(map.entries()).map(([date, v]) => ({ date, ...v }));
   }
+}
+
+type OverviewPayload = Awaited<ReturnType<AdminOverviewService['overview']>>;
+
+interface TaskTrendRow {
+  day: string;
+  total: number | bigint;
+  succeeded: number | bigint;
+  failed: number | bigint;
+}
+
+interface RevenueTrendRow {
+  day: string;
+  orders: number | bigint;
+  gmv: number | bigint | null;
+}
+
+const DAY_MS = 24 * 3600 * 1000;
+/** 业务时区固定 Asia/Shanghai，与 dateRange / 导出口径一致 */
+const SHANGHAI_OFFSET_MS = 8 * 3600 * 1000;
+
+/** 统一按 +08:00 取日界；`toISOString` 再偏移避免受进程时区影响 */
+function dayKey(date: Date): string {
+  return new Date(date.getTime() + SHANGHAI_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Prisma SQLite 把 DateTime 存成 `YYYY-MM-DDTHH:mm:ss.SSS+00:00`。
+ * 原生 SQL 的字符串比较必须用同一种格式，否则 `Z` 与 `+00:00` 会排错序。
+ */
+function toDbDateTime(date: Date): string {
+  return `${date.toISOString().slice(0, 23)}+00:00`;
 }
 
 /** 微积分取绝对值：consume 流水金额为负数 */

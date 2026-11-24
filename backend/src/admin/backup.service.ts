@@ -330,14 +330,19 @@ export class BackupService {
       skip: keepCount,
     });
 
-    let removed = 0;
-    let freedBytes = 0;
-    for (const r of candidates) {
-      await fs.unlink(this.safePath(r.filename)).catch(() => undefined);
-      await this.prisma.backupRecord.delete({ where: { id: r.id } });
-      removed += 1;
-      freedBytes += r.sizeBytes;
-    }
+    if (candidates.length === 0) return { removed: 0, freedBytes: 0 };
+
+    // 文件删除与记录删除都不依赖单条顺序：先并发删文件，再一条 deleteMany
+    // 收掉记录，避免 500 份备份产生 1000 次串行往返。
+    const freedBytes = candidates.reduce((sum, row) => sum + row.sizeBytes, 0);
+    await Promise.all(
+      candidates.map((row) =>
+        fs.unlink(this.safePath(row.filename)).catch(() => undefined),
+      ),
+    );
+    const { count: removed } = await this.prisma.backupRecord.deleteMany({
+      where: { id: { in: candidates.map((row) => row.id) } },
+    });
 
     if (removed > 0) {
       this.logger.log(`保留份数清理: 删除 ${removed} 份, 释放 ${freedBytes} 字节`);

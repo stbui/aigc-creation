@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AppError } from '../common/app.exception';
-import { AdminCommerceService } from './commerce-admin.service';
+import { AppError } from '../../common/app.exception';
+import { AdminCommerceOrderService } from './order-admin.service';
+import { AdminCommerceProductService } from './product-admin.service';
 
 type MockPrisma = {
   product: {
@@ -15,13 +16,13 @@ type MockPrisma = {
   };
 };
 
-describe('AdminCommerceService 商品删除', () => {
+describe('AdminCommerceProductService 商品删除', () => {
   let prisma: MockPrisma;
   let paymentConfigs: {
     available: ReturnType<typeof vi.fn>;
     availableVisible: ReturnType<typeof vi.fn>;
   };
-  let service: AdminCommerceService;
+  let service: AdminCommerceProductService;
 
   beforeEach(() => {
     prisma = {
@@ -32,12 +33,7 @@ describe('AdminCommerceService 商品删除', () => {
       },
       order: { findMany: vi.fn(), count: vi.fn() },
     };
-    service = new AdminCommerceService(
-      prisma as never,
-      {} as never,
-      {} as never,
-      {} as never,
-    );
+    service = new AdminCommerceProductService(prisma as never, {} as never);
   });
 
   it('商品不存在返回 404', async () => {
@@ -120,13 +116,14 @@ describe('AdminCommerceService 商品删除', () => {
   });
 });
 
-describe('AdminCommerceService 按商品筛订单', () => {
+describe('AdminCommerce 按商品筛订单', () => {
   let prisma: MockPrisma;
   let paymentConfigs: {
     available: ReturnType<typeof vi.fn>;
     availableVisible: ReturnType<typeof vi.fn>;
   };
-  let service: AdminCommerceService;
+  let service: AdminCommerceProductService;
+  let orders: AdminCommerceOrderService;
 
   beforeEach(() => {
     prisma = {
@@ -144,12 +141,8 @@ describe('AdminCommerceService 按商品筛订单', () => {
       available: vi.fn(),
       availableVisible: vi.fn(),
     };
-    service = new AdminCommerceService(
-      prisma as never,
-      {} as never,
-      {} as never,
-      paymentConfigs as never,
-    );
+    service = new AdminCommerceProductService(prisma as never, paymentConfigs as never);
+    orders = new AdminCommerceOrderService(prisma as never, {} as never);
   });
 
   it('USD 商品按真实渠道能力判断能否上架', async () => {
@@ -169,14 +162,14 @@ describe('AdminCommerceService 按商品筛订单', () => {
   });
 
   it('productId 走明细行 some, 不是 SKU 快照字符串', async () => {
-    await service.listOrders({ productId: 'p-1' });
+    await orders.listOrders({ productId: 'p-1' });
 
     const where = prisma.order.findMany.mock.calls[0][0].where;
     expect(where.items).toEqual({ some: { productId: 'p-1' } });
   });
 
   it('未传 productId 时不加商品条件, 列表口径不变', async () => {
-    await service.listOrders({});
+    await orders.listOrders({});
 
     const where = prisma.order.findMany.mock.calls[0][0].where;
     expect(where.items).toBeUndefined();
@@ -206,7 +199,7 @@ describe('AdminCommerceService 按商品筛订单', () => {
     ]);
     prisma.order.count.mockResolvedValue(1);
 
-    const page = await service.listOrders({ productId: 'p-1' });
+    const page = await orders.listOrders({ productId: 'p-1' });
     expect(page.items[0].items).toEqual([{ name: '体验包', sku: 'PACK_TRIAL' }]);
   });
 
@@ -236,7 +229,7 @@ describe('AdminCommerceService 按商品筛订单', () => {
     ]);
     prisma.order.count.mockResolvedValue(1);
 
-    const page = await service.listOrders({ refundState: 'failed' });
+    const page = await orders.listOrders({ refundState: 'failed' });
     expect(page.items[0].refundState).toBe('failed');
   });
 
@@ -264,7 +257,7 @@ describe('AdminCommerceService 按商品筛订单', () => {
     ]);
     prisma.order.count.mockResolvedValue(1);
 
-    const page = await service.listOrders({});
+    const page = await orders.listOrders({});
     expect(page.items[0].refundState).toBeNull();
   });
 });
@@ -284,9 +277,9 @@ type DeleteOrderMockPrisma = {
   $transaction: ReturnType<typeof vi.fn>;
 };
 
-describe('AdminCommerceService 删除订单', () => {
+describe('AdminCommerceOrderService 删除订单', () => {
   let prisma: DeleteOrderMockPrisma;
-  let service: AdminCommerceService;
+  let service: AdminCommerceOrderService;
   let tx: {
     product: { updateMany: ReturnType<typeof vi.fn> };
     orderItem: { deleteMany: ReturnType<typeof vi.fn> };
@@ -339,12 +332,7 @@ describe('AdminCommerceService 删除订单', () => {
       ticket: { count: counted() },
       $transaction: vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
     };
-    service = new AdminCommerceService(
-      prisma as never,
-      {} as never,
-      {} as never,
-      {} as never,
-    );
+    service = new AdminCommerceOrderService(prisma as never, {} as never);
   });
 
   it('订单不存在返回 404', async () => {

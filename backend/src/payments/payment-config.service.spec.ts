@@ -4,6 +4,9 @@ import {
   type ResolvedPaymentConfig,
   type ResolvedVisiblePayment,
 } from './payment-config.service';
+import { PaymentConfigAdminService } from './payment-config-admin.service';
+import { PaymentConfigStore } from './payment-config-store';
+import { PaymentRoutingService } from './payment-routing.service';
 import type { PaymentProviderId } from './adapters/types';
 
 type ProviderRow = {
@@ -41,7 +44,8 @@ const WECHAT_VALUES = {
   merchantPrivateKey: '-----BEGIN PRIVATE KEY-----\nmerchant\n-----END PRIVATE KEY-----',
   apiV3Key: '12345678901234567890123456789012',
   wechatPayPublicKey: '-----BEGIN PUBLIC KEY-----\nwechat\n-----END PUBLIC KEY-----',
-  wechatPayPublicKeyId: 'PUB_KEY_ID_0000000000000000000000000000000000000000000000000000000000000000',
+  wechatPayPublicKeyId:
+    'PUB_KEY_ID_0000000000000000000000000000000000000000000000000000000000000000',
 };
 
 const EPAY_VALUES = {
@@ -70,11 +74,15 @@ const envConfig = {
   },
 };
 
+/**
+ * 实例级默认值：服务按实例判定支付方式、金额范围与限额，
+ * 只给渠道级字段会让所有可见方式被误判为「不支持该支付方式」。
+ */
 function row(
   providerId: PaymentProviderId,
   values: Record<string, string>,
-  overrides: Partial<ProviderRow> = {},
-): ProviderRow {
+  overrides: Partial<InstanceRow> = {},
+): InstanceRow {
   return {
     id: `cfg_${providerId}_v1`,
     providerId,
@@ -84,8 +92,23 @@ function row(
     configCipher: JSON.stringify(values),
     configDigest: `digest_${providerId}`,
     createdAt: new Date('2026-11-09T00:00:00.000Z'),
+    instanceId: 'default',
+    name: null,
+    sortOrder: 0,
+    minAmountCents: null,
+    maxAmountCents: null,
+    dailyLimitCents: null,
+    refundEnabled: true,
+    paymentMethods: JSON.stringify(defaultPaymentMethodsOf(providerId)),
     ...overrides,
   };
+}
+
+/** 与适配器注册表同一口径：官方渠道只有一个可见方式，其余两个都支持。 */
+function defaultPaymentMethodsOf(providerId: PaymentProviderId): string[] {
+  if (providerId === 'alipay') return ['alipay'];
+  if (providerId === 'wechat') return ['wechat'];
+  return ['alipay', 'wechat'];
 }
 
 function makeService(input: {
@@ -99,8 +122,9 @@ function makeService(input: {
 }) {
   const prisma = {
     paymentProviderConfig: {
-      findFirst: vi.fn(async ({ where }: { where: { providerId: PaymentProviderId } }) =>
-        input.rows?.[where.providerId] ?? null,
+      findFirst: vi.fn(
+        async ({ where }: { where: { providerId: PaymentProviderId } }) =>
+          input.rows?.[where.providerId] ?? null,
       ),
     },
     order: {
@@ -120,12 +144,7 @@ function makeService(input: {
       return null;
     }),
   };
-  const service = new PaymentConfigService(
-    prisma as never,
-    cipher as never,
-    settings as never,
-    envConfig as never,
-  );
+  const service = makeFacade(prisma, cipher, settings);
   return { service, prisma, cipher, settings };
 }
 
@@ -172,9 +191,7 @@ function makeReserveService(input: {
     },
     paymentRoundRobinCursor: cursor,
   };
-  prisma.$transaction = vi.fn(
-    async (work: (tx: Record<string, any>) => unknown) => work(prisma),
-  );
+  prisma.$transaction = vi.fn(async (work: (tx: Record<string, any>) => unknown) => work(prisma));
   const settings = {
     get: vi.fn(async (key: string) => {
       if (key === 'payment.alipaySource') return input.sources?.alipay ?? 'official';
@@ -184,13 +201,21 @@ function makeReserveService(input: {
     }),
   };
   const cipher = { decrypt: vi.fn((cipherText: string) => cipherText) };
-  const service = new PaymentConfigService(
+  const service = makeFacade(prisma, cipher, settings);
+  return { service, prisma, cursor, settings };
+}
+
+/** 门面只做委托；用例按真实装配顺序拼出三块子服务。 */
+function makeFacade(prisma: unknown, cipher: unknown, settings: unknown): PaymentConfigService {
+  const store = new PaymentConfigStore(prisma as never, cipher as never);
+  const routing = new PaymentRoutingService(
     prisma as never,
-    cipher as never,
     settings as never,
     envConfig as never,
+    store,
   );
-  return { service, prisma, cursor, settings };
+  const admin = new PaymentConfigAdminService(prisma as never, envConfig as never, store);
+  return new PaymentConfigService(store, admin, routing);
 }
 
 beforeEach(() => {

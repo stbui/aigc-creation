@@ -32,7 +32,10 @@ import { AdminUser, RequireAllPermissions, RequirePermission } from "./admin.dec
 import { AppError } from "../common/app.exception";
 import { OrderService } from "../orders/order.service";
 import { CreditService } from "../credits/credit.service";
-import { AdminCommerceService } from "./commerce-admin.service";
+import { AdminCommerceProductService } from "./commerce/product-admin.service";
+import { AdminCommerceOrderService } from "./commerce/order-admin.service";
+import { AdminCommercePaymentService } from "./commerce/payment-admin.service";
+import { AdminCommerceCreditService } from "./commerce/credit-admin.service";
 import { AdminSettingsService } from "./settings.service";
 import { PERMISSIONS } from "./permissions";
 import { PageQueryDto } from "./dto/page-query.dto";
@@ -301,13 +304,16 @@ export class CreditLotsQueryDto {
  *   data.export         任何 CSV 导出 (导出即把用户数据带出系统)
  *
  * 所有写操作都必须经过独立权限校验。
- * 查询与规则在 AdminCommerceService, 本控制器只做权限/参数/响应。
+ * 查询与规则在 commerce/ 下的四个领域服务, 本控制器只做权限/参数/响应。
  */
 @Controller("admin")
 export class AdminCommerceController {
   constructor(
     private readonly orders: OrderService,
-    private readonly commerce: AdminCommerceService,
+    private readonly products: AdminCommerceProductService,
+    private readonly orderAdmin: AdminCommerceOrderService,
+    private readonly paymentAdmin: AdminCommercePaymentService,
+    private readonly creditAdmin: AdminCommerceCreditService,
     private readonly credit: CreditService,
     private readonly settings: AdminSettingsService,
   ) {}
@@ -318,7 +324,7 @@ export class AdminCommerceController {
   @Get("products")
   @RequirePermission(PERMISSIONS.productRead)
   products(@Query("status") status?: string) {
-    return this.commerce.listProducts(status);
+    return this.products.listProducts(status);
   }
 
   /** 新建商品。默认下架, 确认无误后再上架 */
@@ -326,7 +332,7 @@ export class AdminCommerceController {
   @RequirePermission(PERMISSIONS.productWrite)
   createProduct(@Body() dto: ProductCreateDto) {
     // DTO → 领域入参显式映射: service 不感知 class-validator
-    return this.commerce.createProduct({
+    return this.products.createProduct({
       sku: dto.sku,
       name: dto.name,
       description: dto.description,
@@ -356,7 +362,7 @@ export class AdminCommerceController {
   @Patch("products/:id")
   @RequirePermission(PERMISSIONS.productWrite)
   updateProduct(@Param("id") id: string, @Body() dto: ProductUpdateDto) {
-    return this.commerce.updateProduct(id, {
+    return this.products.updateProduct(id, {
       name: dto.name,
       description: dto.description,
       priceCents: dto.priceCents,
@@ -383,7 +389,7 @@ export class AdminCommerceController {
     @Param("id") id: string,
     @Body() dto: ProductStatusDto,
   ) {
-    const product = await this.commerce.updateProduct(id, {
+    const product = await this.products.updateProduct(id, {
       status: dto.status,
     });
     return { id: product.id, status: product.status };
@@ -398,7 +404,7 @@ export class AdminCommerceController {
   @Delete("products/:id")
   @RequirePermission(PERMISSIONS.productDelete)
   deleteProduct(@Param("id") id: string) {
-    return this.commerce.deleteProduct(id);
+    return this.products.deleteProduct(id);
   }
 
   // ── 订单 (B-39~B-44) ─────────────────────────────────────────────
@@ -412,7 +418,7 @@ export class AdminCommerceController {
   @Get("orders")
   @RequirePermission(PERMISSIONS.orderRead)
   orderList(@Query() query: AdminOrderListQueryDto) {
-    return this.commerce.listOrders(query);
+    return this.orderAdmin.listOrders(query);
   }
 
   /**
@@ -424,7 +430,7 @@ export class AdminCommerceController {
   @Get("orders/export")
   @RequireAllPermissions(PERMISSIONS.orderRead, PERMISSIONS.dataExport)
   async exportOrders(@Res() res: Response, @Query() query: AdminOrderListQueryDto) {
-    const csv = await this.commerce.exportOrders({
+    const csv = await this.orderAdmin.exportOrders({
       status: query.status,
       orderNo: query.orderNo,
       email: query.email,
@@ -441,7 +447,7 @@ export class AdminCommerceController {
   @Get("orders/:id")
   @RequirePermission(PERMISSIONS.orderRead)
   orderDetail(@Param("id") id: string) {
-    return this.commerce.orderDetail(id);
+    return this.orderAdmin.orderDetail(id);
   }
 
   /**
@@ -451,7 +457,7 @@ export class AdminCommerceController {
   @Delete("orders/:id")
   @RequirePermission(PERMISSIONS.orderDelete)
   deleteOrder(@Param("id") id: string) {
-    return this.commerce.deleteOrder(id);
+    return this.orderAdmin.deleteOrder(id);
   }
 
   /** 手工核销 (B-42): 标记已支付 */
@@ -462,7 +468,7 @@ export class AdminCommerceController {
     @Body() dto: MarkPaidDto,
     @AdminUser() actor: AdminUser,
   ) {
-    const order = await this.commerce.orderDetail(id);
+    const order = await this.orderAdmin.orderDetail(id);
     return this.orders.markPaid({
       orderId: id,
       userId: order.userId,
@@ -482,7 +488,7 @@ export class AdminCommerceController {
   @Post("orders/batch")
   @RequirePermission(PERMISSIONS.orderMarkPaid)
   batchMarkPaid(@Body() dto: OrderBatchDto, @AdminUser() actor: AdminUser) {
-    return this.commerce.batchMarkPaid(dto.ids, actor.id);
+    return this.orderAdmin.batchMarkPaid(dto.ids, actor.id);
   }
 
   /**
@@ -538,7 +544,7 @@ export class AdminCommerceController {
   @Get("payments")
   @RequirePermission(PERMISSIONS.paymentRead)
   payments(@Query() query: AdminPaymentListQueryDto) {
-    return this.commerce.listPayments({
+    return this.paymentAdmin.listPayments({
       status: query.status,
       pageSize: query.pageSize,
       from: query.from,
@@ -550,7 +556,7 @@ export class AdminCommerceController {
   @Get("payments/export")
   @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
   async exportPayments(@Res() res: Response, @Query() query: AdminPaymentListQueryDto) {
-    const csv = await this.commerce.exportPayments({
+    const csv = await this.paymentAdmin.exportPayments({
       status: query.status,
       from: query.from,
       to: query.to,
@@ -564,7 +570,7 @@ export class AdminCommerceController {
   @Get("credits")
   @RequirePermission(PERMISSIONS.creditRead)
   credits(@Query() query: AdminCreditListQueryDto) {
-    return this.commerce.listCredits({
+    return this.creditAdmin.listCredits({
       userId: query.userId,
       email: query.email,
       page: query.page,
@@ -576,7 +582,7 @@ export class AdminCommerceController {
   @Get("credits/export")
   @RequireAllPermissions(PERMISSIONS.creditRead, PERMISSIONS.dataExport)
   async exportCredits(@Res() res: Response, @Query() query: AdminCreditListQueryDto) {
-    const csv = await this.commerce.exportCredits({
+    const csv = await this.creditAdmin.exportCredits({
       userId: query.userId,
       email: query.email,
     });
@@ -603,14 +609,14 @@ export class AdminCommerceController {
   @Get("credits/:userId/lots")
   @RequirePermission(PERMISSIONS.creditRead)
   lots(@Param("userId") userId: string, @Query() query: CreditLotsQueryDto) {
-    return this.commerce.creditLots(userId, { from: query.from, to: query.to });
+    return this.creditAdmin.creditLots(userId, { from: query.from, to: query.to });
   }
 
   /** 某用户的流水 (B-51), 可按类型与时间过滤 */
   @Get("credits/:userId/ledger")
   @RequirePermission(PERMISSIONS.creditRead)
   ledger(@Param("userId") userId: string, @Query() query: AdminCreditLedgerQueryDto) {
-    return this.commerce.creditLedger(userId, {
+    return this.creditAdmin.creditLedger(userId, {
       type: query.type,
       businessType: query.businessType,
       from: query.from,
@@ -643,7 +649,7 @@ export class AdminCommerceController {
   @Post("credits/batch-adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
   batchAdjust(@Body() dto: BatchAdjustDto, @AdminUser() actor: AdminUser) {
-    return this.commerce.batchAdjust(dto.items, {
+    return this.creditAdmin.batchAdjust(dto.items, {
       operatorId: actor.id,
       validDays: dto.validDays,
       reason: dto.reason,
@@ -682,7 +688,7 @@ export class AdminCommerceController {
     if (!file?.buffer?.length) {
       throw new AppError(40001, "请上传 CSV 文件（字段名 file）", 400);
     }
-    return this.commerce.importCreditsCsv(file.buffer.toString("utf8"), {
+    return this.creditAdmin.importCreditsCsv(file.buffer.toString("utf8"), {
       validDays: dto.validDays,
       operatorId: actor.id,
       importKey: dto.importKey,

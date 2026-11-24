@@ -12,6 +12,7 @@ import {
   PERMISSION_KEY,
 } from "./admin.decorator";
 import { AdminRoleService } from "./admin-role.service";
+import { isAdminRequestPath } from "./admin-path";
 
 /**
  * 后台第二道守卫: 权限点校验。
@@ -53,7 +54,7 @@ export class PermissionGuard implements CanActivate {
 
     // 全局守卫: 非后台路径直接放行 (与 AdminGuard 的判定保持一致)
     const url: string = request.originalUrl ?? request.url ?? "";
-    if (!url.split("?")[0].includes("/admin")) return true;
+    if (!isAdminRequestPath(url)) return true;
 
     const targets = [context.getHandler(), context.getClass()];
     const anyRequired = this.reflector.getAllAndOverride<

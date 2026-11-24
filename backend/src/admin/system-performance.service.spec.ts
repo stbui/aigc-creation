@@ -3,37 +3,31 @@ import { SystemPerformanceService } from './system-performance.service';
 
 function createService() {
   const prisma = {
-    $queryRaw: vi.fn().mockResolvedValue([{ 1: 1 }]),
+    $queryRaw: vi.fn(async (strings: TemplateStringsArray) => {
+      const sql = strings.join('?');
+      if (sql.includes('GenerationTask')) return [{ ms: 4000 }];
+      if (sql.includes('ApiCallLog')) return [{ ms: 300 }];
+      return [{ 1: 1 }];
+    }),
     generationTask: {
       groupBy: vi.fn().mockResolvedValue([
         { status: 'succeeded', _count: { _all: 2 } },
         { status: 'failed', _count: { _all: 1 } },
       ]),
-      findMany: vi.fn().mockResolvedValue([
-        {
-          createdAt: new Date('2026-11-19T00:00:00Z'),
-          updatedAt: new Date('2026-11-19T00:00:02Z'),
-          status: 'succeeded',
-        },
-        {
-          createdAt: new Date('2026-11-19T00:00:00Z'),
-          updatedAt: new Date('2026-11-19T00:00:04Z'),
-          status: 'succeeded',
-        },
-        {
-          createdAt: new Date('2026-11-19T00:00:00Z'),
-          updatedAt: new Date('2026-11-19T00:00:09Z'),
-          status: 'failed',
-        },
-      ]),
     },
     apiCallLog: {
-      findMany: vi.fn().mockResolvedValue([
-        { status: 'success', durationMs: 100, requestKind: 'create' },
-        { status: 'failed', durationMs: 300, requestKind: 'create' },
-        { status: 'success', durationMs: 200, requestKind: 'poll' },
-        { status: 'pending', durationMs: 0, requestKind: 'poll' },
-      ]),
+      groupBy: vi.fn(async ({ by }: { by: string[] }) =>
+        by[0] === 'status'
+          ? [
+              { status: 'success', _count: { _all: 2 } },
+              { status: 'failed', _count: { _all: 1 } },
+              { status: 'pending', _count: { _all: 1 } },
+            ]
+          : [
+              { requestKind: 'create', _count: { _all: 2 } },
+              { requestKind: 'poll', _count: { _all: 2 } },
+            ],
+      ),
     },
     asset: {
       aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 2048 }, _count: { _all: 3 } }),

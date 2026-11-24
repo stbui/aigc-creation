@@ -32,7 +32,10 @@ import { AdminTicketsController } from './tickets-admin.controller';
 import { AdminSearchController } from './search.controller';
 import { AdminSearchService } from './search.service';
 import { TicketsModule } from '../tickets/tickets.module';
-import { AdminCommerceService } from './commerce-admin.service';
+import { AdminCommerceProductService } from './commerce/product-admin.service';
+import { AdminCommerceOrderService } from './commerce/order-admin.service';
+import { AdminCommercePaymentService } from './commerce/payment-admin.service';
+import { AdminCommerceCreditService } from './commerce/credit-admin.service';
 import { AdminSchedulerController } from './scheduler.controller';
 import { AdminTasksController } from './tasks-admin.controller';
 import { AdminAlertsController } from './alerts.controller';
@@ -159,7 +162,10 @@ import { SchedulerService } from './scheduler.service';
     SystemPerformanceService,
     BackupService,
     AdminAssetsService,
-    AdminCommerceService,
+    AdminCommerceProductService,
+    AdminCommerceOrderService,
+    AdminCommercePaymentService,
+    AdminCommerceCreditService,
     AdminMembershipPlansService,
     AdminRetentionService,
     TasksAdminService,
