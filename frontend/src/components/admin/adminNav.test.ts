@@ -92,3 +92,30 @@ describe('后台菜单的 pathname 兜底查找', () => {
     ).toEqual(['交易核对']);
   });
 });
+
+describe('后台能力入口的可见性', () => {
+  // 与 AdminBoardLayout 的侧栏过滤同一口径：permission 为数组时拥有任一项即可见
+  const isVisible = (path: string, granted: string[]) => {
+    const item = findAdminMenuItem(path);
+    if (!item) throw new Error(`菜单项不存在：${path}`);
+    if (item.permission === null) return true;
+    const required = Array.isArray(item.permission) ? item.permission : [item.permission];
+    return required.some((permission) => granted.includes(permission));
+  };
+
+  const CAPABILITIES = '/admin/capabilities';
+
+  it('只持 product.price 的财务看不到能力入口', () => {
+    expect(isVisible(CAPABILITIES, ['product.price'])).toBe(false);
+  });
+
+  it('入口权限不再包含 product.price，回归时立即失败', () => {
+    const item = findAdminMenuItem(CAPABILITIES);
+    expect(item?.permission).toEqual(['capability.read', 'logical_model.read']);
+  });
+
+  it('持 capability.read 或 logical_model.read 的仍能看到', () => {
+    expect(isVisible(CAPABILITIES, ['capability.read'])).toBe(true);
+    expect(isVisible(CAPABILITIES, ['logical_model.read'])).toBe(true);
+  });
+});

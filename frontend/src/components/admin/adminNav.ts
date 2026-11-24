@@ -139,7 +139,9 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         path: "/admin/capabilities",
         label: "能力与模型",
         icon: Boxes,
-        permission: ["capability.read", "logical_model.read", "product.price"],
+        // 能力管控在 PRD 权限矩阵里财务列为「—」（docs/admin-prd.md §2.2），
+        // 故入口只认读取能力的两点；product.price 是定价接口的读写门槛，不能用来开入口。
+        permission: ["capability.read", "logical_model.read"],
       },
       {
         path: "/admin/plugins",
