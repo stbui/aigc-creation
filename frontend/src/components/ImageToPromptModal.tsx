@@ -26,8 +26,8 @@ import {
  *   │ 图片转提示词                            │
  *   ├────────────────────────────────────────┤
  *   │ ┌────┐  上传一张图片                    │  ← 左侧上传方块 + 右侧说明
- *   │ │ +  │  支持 PNG、JPG、WEBP,             │
- *   │ └────┘  单张不超过 10MB                 │
+ *   │ │ +  │  支持运行时允许的格式             │
+ *   │ └────┘  单张不超过运行时上限            │
  *   │ ┌────────────────────────────────────┐ │
  *   │ │ 上传图片解析提示词                 │ │  ← 输出区
  *   │ │                                    │ │
@@ -51,7 +51,7 @@ export interface ImageToPromptModalProps {
   onCancel: () => void;
 }
 
-/** 单张上限 —— 与参考站文案一致 (10MB) */
+/** accept / 格式标签 / 单张上限均由运行时 UploadLimits 提供。 */
 
 export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptModalProps) {
   const { message } = useApp();

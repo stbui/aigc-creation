@@ -119,6 +119,13 @@ async function readImagePixels(file: File): Promise<number | null> {
   });
 }
 
+/**
+ * 设置请求未返回或失败时使用的兜底值 —— 故意保留，不做「加载中禁止上传」。
+ *
+ * 公开设置只是前端预检的优化：请求超时/抖动时仍让用户按内置默认值上传，
+ * 后端 `assets.upload` 会按同一份运行时设置做最终闸门，超限返回明确错误。
+ * 若改成加载中禁用上传，一次网络抖动就会变成整站上传不可用。
+ */
 const fallbackValue: UploadLimitsValue = {
   ...FALLBACK_LIMITS,
   maxMb: FALLBACK_LIMITS.maxSizeMb,
