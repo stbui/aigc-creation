@@ -15,7 +15,6 @@
 
 import { Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaModule } from '../prisma/prisma.module';
 import { configureOutboundPolicy } from './infra/outbound';
 import { CatalogVersionService } from './infra/catalog-version.service';
 import { ProtocolRegistry } from './protocol/registry';
@@ -94,7 +93,7 @@ export class ModelBootstrapService implements OnModuleInit {
 }
 
 @Module({
-  imports: [PrismaModule, PricingModule],
+  imports: [PricingModule],
   controllers: [
     AdminChannelsController,
     AdminChannelModelsController,

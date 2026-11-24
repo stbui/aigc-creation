@@ -1,6 +1,6 @@
 import type { DeliveryResult, EmailMessage } from '../channel.types';
 import type { EmailProvider } from './email.provider';
-import { writeOutbox } from '../console-outbox';
+import { writeOutbox, type OutboxOptions } from '../console-outbox';
 
 /**
  * 控制台邮件实现 —— 不发网络请求，把正文写进 `logs/outbox/email-<日期>.log`。
@@ -12,17 +12,23 @@ export class ConsoleEmailProvider implements EmailProvider {
   readonly name = 'console';
   readonly delivers = false;
 
-  constructor(readonly from: string) {}
+  constructor(
+    readonly from: string,
+    private readonly outbox: OutboxOptions,
+  ) {}
 
   async send(message: EmailMessage): Promise<DeliveryResult> {
-    writeOutbox({
-      channel: 'email',
-      to: message.to,
-      subject: message.subject,
-      body: message.text,
-      provider: this.name,
-      at: new Date().toISOString(),
-    });
+    writeOutbox(
+      {
+        channel: 'email',
+        to: message.to,
+        subject: message.subject,
+        body: message.text,
+        provider: this.name,
+        at: new Date().toISOString(),
+      },
+      this.outbox,
+    );
     return { ok: true, provider: this.name, delivered: false };
   }
 }

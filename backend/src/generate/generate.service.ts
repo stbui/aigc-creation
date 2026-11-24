@@ -26,7 +26,7 @@ import { TaskWorkerService } from '../model/tasks/task-worker.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { StorageBackend } from '../storage/storage.provider';
 import { StorageService } from '../storage/storage.service';
-import { CreateGenerationDto } from './dto/create-generation.dto';
+import type { CreateGenerationInput } from './dto/create-generation.dto';
 
 /**
  * 任务读接口只取展示所需的列。
@@ -68,7 +68,7 @@ export class GenerateService {
   ) {}
 
   /** 建任务：准入 → 计价 → 预留 → 排队，随后由 worker 异步执行 */
-  async createTask(ownerId: string, dto: CreateGenerationDto, idempotencyHeader?: string) {
+  async createTask(ownerId: string, dto: CreateGenerationInput, idempotencyHeader?: string) {
     const result = await this.admission.admit({ ownerId, dto, idempotencyHeader });
     // 新任务立即调度一轮，省掉最多一个调度节拍的等待；幂等命中不重复调度
     if (!result.idempotentHit) this.worker.kick();

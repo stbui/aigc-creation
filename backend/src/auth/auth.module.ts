@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AccountTokenService } from './account-token.service';
@@ -18,7 +17,6 @@ import { OAuthStateService } from './oauth/oauth-state.service';
  * 注册的模块」可见，而 ChannelsModule 排在 AuthModule 之前。
  */
 @Module({
-  imports: [PrismaModule],
   controllers: [AuthController, QrLoginController, OAuthController],
   providers: [AuthService, AccountTokenService, QrLoginService, OAuthService, OAuthRegistryService, OAuthStateService],
   exports: [AuthService, AccountTokenService],

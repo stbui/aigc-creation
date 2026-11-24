@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { CreditsModule } from '../credits/credits.module';
 import { MarketingService } from './marketing.service';
 
@@ -21,7 +20,7 @@ import { MarketingService } from './marketing.service';
  *   OrdersModule ──> MarketingCoreModule
  */
 @Module({
-  imports: [PrismaModule, CreditsModule],
+  imports: [CreditsModule],
   providers: [MarketingService],
   exports: [MarketingService],
 })

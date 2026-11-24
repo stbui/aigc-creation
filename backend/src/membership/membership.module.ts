@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { CreditsModule } from '../credits/credits.module';
 import { ModelModule } from '../model/model.module';
 import { MembershipController } from './membership.controller';
@@ -12,7 +11,7 @@ import { MembershipService } from './membership.service';
  * 调度器(月度积分) 共用, 因此导出。
  */
 @Module({
-  imports: [PrismaModule, CreditsModule, ModelModule],
+  imports: [CreditsModule, ModelModule],
   controllers: [MembershipController],
   providers: [MembershipService],
   exports: [MembershipService],

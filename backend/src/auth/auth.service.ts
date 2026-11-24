@@ -8,17 +8,48 @@ import { JwtService } from '../common/jwt.service';
 import { EmailService } from '../channels/email/email.service';
 import { SmsService } from '../channels/sms/sms.service';
 import { maskEmail, maskPhone } from '../channels/channel.types';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { SmsSendDto } from './dto/sms-send.dto';
-import { EmailSendDto } from './dto/email-send.dto';
-import { SmsLoginDto } from './dto/sms-login.dto';
 import { AccountTokenService } from './account-token.service';
 import { normalizePhone } from './phone';
 import { normalizeEmail } from './email';
 import { NotificationsService } from '../notifications/notifications.service';
+
+/** 注册入参（HTTP 层传 RegisterDto，结构兼容） */
+export interface RegisterInput {
+  email: string;
+  password: string;
+  emailCode?: string;
+  name: string;
+  phone?: string;
+  smsCode?: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  password: string;
+}
+
+export interface EmailSendInput {
+  email: string;
+}
+
+export interface SmsSendInput {
+  phone: string;
+  purpose: 'login' | 'verify';
+}
+
+export interface SmsLoginInput {
+  phone: string;
+  code: string;
+}
 
 export interface PublicUser {
   id: string;
@@ -61,7 +92,7 @@ export class AuthService {
   ) {}
 
   // 注册后直接签发 token (前端 LoginPage 注册模式同样消费 accessToken 自动登录)
-  async register(dto: RegisterDto): Promise<{ accessToken: string; user: PublicUser }> {
+  async register(dto: RegisterInput): Promise<{ accessToken: string; user: PublicUser }> {
     const email = normalizeEmail(dto.email);
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -160,7 +191,7 @@ export class AuthService {
     }
   }
 
-  async login(dto: LoginDto, ctx: RequestContext = {}): Promise<{ accessToken: string; user: PublicUser }> {
+  async login(dto: LoginInput, ctx: RequestContext = {}): Promise<{ accessToken: string; user: PublicUser }> {
     const email = normalizeEmail(dto.email);
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -251,7 +282,7 @@ export class AuthService {
    * 邮件是否真的投递成功 —— 任何一个分支返回不同结果，这个接口就变成了
    * 「账号批量探测工具」。真实投递情况只进服务端日志。
    */
-  async forgotPassword(dto: ForgotPasswordDto, ctx: RequestContext = {}): Promise<{ requested: true }> {
+  async forgotPassword(dto: ForgotPasswordInput, ctx: RequestContext = {}): Promise<{ requested: true }> {
     const email = normalizeEmail(dto.email);
 
     try {
@@ -295,7 +326,7 @@ export class AuthService {
    * 成功后 `tokenVersion + 1`：**该账号此前签发的所有 token 立即失效**
    * （包括攻击者可能已经拿到的会话），这是改密后必须成立的语义。
    */
-  async resetPassword(dto: ResetPasswordDto): Promise<{ ok: true }> {
+  async resetPassword(dto: ResetPasswordInput): Promise<{ ok: true }> {
     const consumed = await this.tokens.consume({
       type: AccountTokenService.TYPE.PASSWORD_RESET,
       raw: dto.token,
@@ -348,7 +379,7 @@ export class AuthService {
    * 变成账号枚举工具。真实投递结果只写日志并放在 delivered 调试字段中。
    */
   async sendEmailCode(
-    dto: EmailSendDto,
+    dto: EmailSendInput,
     ctx: RequestContext = {},
   ): Promise<{ sent: true; delivered: boolean }> {
     const email = normalizeEmail(dto.email);
@@ -392,7 +423,7 @@ export class AuthService {
    * 真实发送结果只进日志与 `delivered` 字段（仅用于开发态提示，不区分存在性）。
    */
   async sendSmsCode(
-    dto: SmsSendDto,
+    dto: SmsSendInput,
     ctx: RequestContext = {},
   ): Promise<{ sent: true; delivered: boolean }> {
     const phone = normalizePhone(dto.phone);
@@ -443,7 +474,7 @@ export class AuthService {
 
   /** 短信验证码登录。验证码一次性，成功后顺手把号码标记为已验证 */
   async smsLogin(
-    dto: SmsLoginDto,
+    dto: SmsLoginInput,
     ctx: RequestContext = {},
   ): Promise<{ accessToken: string; user: PublicUser }> {
     const phone = normalizePhone(dto.phone);

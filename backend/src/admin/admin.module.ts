@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { OrdersModule } from '../orders/orders.module';
 import { CreditsModule } from '../credits/credits.module';
@@ -84,7 +83,6 @@ import { SchedulerService } from './scheduler.service';
  */
 @Module({
   imports: [
-    PrismaModule,
     StorageModule,
     CreditsModule,
     PricingModule,

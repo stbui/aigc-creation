@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { EmailService } from './email.service';
 
+/** ConfigService 替身：本 spec 只覆盖「后台设置优先」路径，env 键保持未配置 */
+const configStub = { get: () => undefined };
+
 function createService(template: Record<string, unknown> | null = null) {
   const prisma = {
     messageTemplate: {
@@ -12,7 +15,7 @@ function createService(template: Record<string, unknown> | null = null) {
     getAll: vi.fn(),
     getSecret: vi.fn(),
   };
-  const service = new EmailService(settings as never, prisma as never);
+  const service = new EmailService(settings as never, prisma as never, configStub as never);
   const send = vi.spyOn(service, 'send').mockResolvedValue({
     ok: true,
     provider: 'console',
@@ -106,7 +109,7 @@ describe('EmailService SMTP configuration', () => {
       getSecret: vi.fn().mockResolvedValue(password),
     };
     const prisma = { messageTemplate: { findFirst: vi.fn() } };
-    return new EmailService(settings as never, prisma as never);
+    return new EmailService(settings as never, prisma as never, configStub as never);
   }
 
   it('reports a complete 163 SMTP channel and falls back to the SMTP account as sender', async () => {

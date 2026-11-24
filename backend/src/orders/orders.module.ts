@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { CreditsModule } from '../credits/credits.module';
 import { MembershipModule } from '../membership/membership.module';
 import { MarketingCoreModule } from '../marketing/marketing-core.module';
@@ -15,7 +14,7 @@ import { OrderService } from './order.service';
  * 直接反向依赖会形成循环。PaymentCoreModule 只含无依赖的通道工厂, 是叶子。
  */
 @Module({
-  imports: [PrismaModule, CreditsModule, MarketingCoreModule, MembershipModule, PaymentCoreModule],
+  imports: [CreditsModule, MarketingCoreModule, MembershipModule, PaymentCoreModule],
   controllers: [OrdersController],
   providers: [OrderService],
   exports: [OrderService],

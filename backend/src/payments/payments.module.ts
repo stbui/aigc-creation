@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from '../prisma/prisma.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentCoreModule } from './payment-core.module';
 import {
@@ -24,7 +22,7 @@ import { PaymentWorkerService } from './payment-worker.service';
  * `import PaymentsModule` 后注入配置服务的, 不能因为模块拆分就让它们一起改。
  */
 @Module({
-  imports: [ConfigModule, PrismaModule, OrdersModule, PaymentCoreModule],
+  imports: [OrdersModule, PaymentCoreModule],
   controllers: [
     PaymentsController,
     PaymentWebhookController,

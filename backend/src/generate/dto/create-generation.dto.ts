@@ -2,6 +2,21 @@ import { IsArray, IsIn, IsObject, IsOptional, IsString, Length, Matches } from '
 import { SUBMITTABLE_CAPABILITY_IDS } from '../../capabilities/capability.registry';
 
 /**
+ * 建任务入参（Service / 准入层只认此接口）。
+ *
+ * HTTP 层传 `CreateGenerationDto` 实例（结构兼容）；六个字段全是领域概念，
+ * 没有仅属于 HTTP 传输的字段，因此不设第二份形状。
+ */
+export interface CreateGenerationInput {
+  projectId: string;
+  capability: string;
+  modelKey: string;
+  inputAssetIds: string[];
+  params?: Record<string, any>;
+  idempotencyKey?: string;
+}
+
+/**
  * 白名单来自 capability.registry (SUBMITTABLE_CAPABILITY_IDS = mode 为 real 的能力),
  * planned 能力不在其中, 前端即使硬传也会被 400 拦下。
  */

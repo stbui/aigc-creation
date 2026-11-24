@@ -37,7 +37,7 @@ import {
 import { AppError } from '../../common/app.exception';
 import { currentClientIp } from '../../common/request-context';
 import { CreditPriceService } from '../../credits/credit-price.service';
-import { CreateGenerationDto } from '../../generate/dto/create-generation.dto';
+import type { CreateGenerationInput } from '../../generate/dto/create-generation.dto';
 import { MembershipService } from '../../membership/membership.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PromptToolsService } from '../../prompt-tools/prompt-tools.service';
@@ -50,7 +50,7 @@ import { scaleMultiFusionDraft } from './task-billing-scale';
 /** 一次准入的输入 */
 export interface AdmissionInput {
   ownerId: string;
-  dto: CreateGenerationDto;
+  dto: CreateGenerationInput;
   idempotencyHeader?: string;
 }
 
@@ -441,7 +441,7 @@ export class TaskAdmissionService {
    */
   private async validateMask(
     ownerId: string,
-    dto: CreateGenerationDto,
+    dto: CreateGenerationInput,
     assets: Array<{ id: string; width: number | null; height: number | null }>,
   ): Promise<void> {
     const maskAssetId = this.maskAssetId(dto.params);
@@ -479,7 +479,7 @@ export class TaskAdmissionService {
   /** 局部重绘标注：1–3 项、每项有区域描述、多区域带合法坐标、参考图属于本人 */
   private async validateAnnotations(
     ownerId: string,
-    dto: CreateGenerationDto,
+    dto: CreateGenerationInput,
     sourceAsset?: { width: number | null; height: number | null },
   ): Promise<void> {
     if (dto.capability !== 'local_redraw') return;
@@ -539,7 +539,7 @@ export class TaskAdmissionService {
 
   /** 局部重绘至少需要遮罩、文字描述或标注之一；空白字符串不算输入。 */
   private assertLocalRedrawHasInput(
-    dto: CreateGenerationDto,
+    dto: CreateGenerationInput,
     sanitized: Record<string, any>,
   ): void {
     if (dto.capability !== 'local_redraw') return;
@@ -649,7 +649,7 @@ function toIdempotentResult(
  */
 export function generationRequestFingerprint(
   dto: Pick<
-    CreateGenerationDto,
+    CreateGenerationInput,
     'projectId' | 'capability' | 'modelKey' | 'inputAssetIds' | 'params'
   >,
 ): string {

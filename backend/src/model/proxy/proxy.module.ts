@@ -15,7 +15,6 @@
  */
 
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
 import { ModelModule } from '../model.module';
 import { ModelTaskModule } from '../tasks/model-task.module';
 import { ProxyChannelService } from './proxy-channel.service';
@@ -28,7 +27,7 @@ import { ShortProxyController, SystemProxyController } from './system-proxy.cont
 import { CustomRelayController } from './custom-relay.controller';
 
 @Module({
-  imports: [PrismaModule, ModelModule, ModelTaskModule],
+  imports: [ModelModule, ModelTaskModule],
   controllers: [SystemProxyController, CustomRelayController, ShortProxyController],
   providers: [
     ProxyChannelService,

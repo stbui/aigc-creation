@@ -5,14 +5,52 @@ import { SettingImageService } from '../common/setting-image.service';
 import { StorageService } from '../storage/storage.service';
 import { SettingsService } from '../common/settings.service';
 import { inspectUploadedImage, verifyDecodableImage } from '../assets/image-validation';
-import type {
-  CreateTemplateCategoryDto,
-  CreateTemplateGroupDto,
-  CreateTemplateItemDto,
-  UpdateTemplateCategoryDto,
-  UpdateTemplateGroupDto,
-  UpdateTemplateItemDto,
-} from './dto';
+
+/** 模板分类入参（HTTP 层传 Create/UpdateTemplateCategoryDto，结构兼容） */
+export interface TemplateCategoryInput {
+  slug?: string;
+  name?: string;
+  sourceUrl?: string;
+  description?: string;
+  sortOrder?: number;
+  enabled?: boolean;
+}
+
+export interface CreateTemplateCategoryInput extends TemplateCategoryInput {
+  slug: string;
+  name: string;
+}
+
+/** 模板分组入参（HTTP 层传 Create/UpdateTemplateGroupDto，结构兼容） */
+export interface TemplateGroupInput {
+  slug?: string;
+  name?: string;
+  sortOrder?: number;
+  enabled?: boolean;
+}
+
+export interface CreateTemplateGroupInput extends TemplateGroupInput {
+  categoryId: string;
+  slug: string;
+  name: string;
+}
+
+/** 模板条目入参（HTTP 层传 Create/UpdateTemplateItemDto，结构兼容） */
+export interface TemplateItemInput {
+  name?: string;
+  prompt?: string;
+  imageUrl?: string;
+  tags?: string[];
+  sortOrder?: number;
+  enabled?: boolean;
+}
+
+export interface CreateTemplateItemInput extends TemplateItemInput {
+  groupId: string;
+  name: string;
+  prompt: string;
+  imageUrl: string;
+}
 
 /** JSON 标签数组 → 字符串数组；坏数据按空数组处理，不阻断整页。 */
 export function parseTemplateTags(raw: string | null | undefined): string[] {
@@ -152,7 +190,7 @@ export class TemplateCatalogService {
 
   // ── 一级分类 ──
 
-  async createCategory(dto: CreateTemplateCategoryDto) {
+  async createCategory(dto: CreateTemplateCategoryInput) {
     const data = {
       slug: dto.slug,
       name: dto.name,
@@ -166,7 +204,7 @@ export class TemplateCatalogService {
     );
   }
 
-  async updateCategory(id: string, dto: UpdateTemplateCategoryDto) {
+  async updateCategory(id: string, dto: TemplateCategoryInput) {
     await this.requireCategory(id);
     const data: Record<string, unknown> = {};
     for (const key of ['slug', 'name', 'sourceUrl', 'description', 'sortOrder', 'enabled'] as const) {
@@ -197,7 +235,7 @@ export class TemplateCatalogService {
 
   // ── 二级分类 ──
 
-  async createGroup(dto: CreateTemplateGroupDto) {
+  async createGroup(dto: CreateTemplateGroupInput) {
     await this.requireCategory(dto.categoryId);
     return this.withUniqueGroupSlug(() =>
       this.prisma.templateGroup.create({
@@ -212,7 +250,7 @@ export class TemplateCatalogService {
     );
   }
 
-  async updateGroup(id: string, dto: UpdateTemplateGroupDto) {
+  async updateGroup(id: string, dto: TemplateGroupInput) {
     const existing = await this.requireGroup(id);
     const data: Record<string, unknown> = {};
     for (const key of ['slug', 'name', 'sortOrder', 'enabled'] as const) {
@@ -235,7 +273,7 @@ export class TemplateCatalogService {
 
   // ── 模板条目 ──
 
-  async createItem(dto: CreateTemplateItemDto) {
+  async createItem(dto: CreateTemplateItemInput) {
     await this.requireGroup(dto.groupId);
     const imageUrl = this.assertImageUrl(dto.imageUrl);
     return this.prisma.templateItem.create({
@@ -251,7 +289,7 @@ export class TemplateCatalogService {
     });
   }
 
-  async updateItem(id: string, dto: UpdateTemplateItemDto) {
+  async updateItem(id: string, dto: TemplateItemInput) {
     await this.requireItem(id);
     const data: Record<string, unknown> = {};
     for (const key of ['name', 'prompt', 'sortOrder', 'enabled'] as const) {

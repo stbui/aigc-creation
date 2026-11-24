@@ -15,13 +15,27 @@ import { MembershipService } from "../membership/membership.service";
 import { CreditService } from "../credits/credit.service";
 import { UserGroupService } from "../model/user-groups/user-group.service";
 import { NotificationsService } from "../notifications/notifications.service";
-import { ROLE_LABELS, USER_STATUS_LABELS } from "./permissions";
-import { buildPage, paginate, type PageResult } from "./dto/page-query.dto";
-import type {
-  ChangeUserRoleDto,
-  ChangeUserStatusDto,
-  UserListQueryDto,
-} from "./dto/user.dto";
+import { ROLE_LABELS, USER_STATUS_LABELS, type UserRole } from "./permissions";
+import { buildPage, paginate, type PageQueryInput, type PageResult } from "./dto/page-query.dto";
+
+/** 用户列表查询入参（HTTP 层传 UserListQueryDto，结构兼容） */
+export interface UserListQueryInput extends PageQueryInput {
+  keyword?: string;
+  role?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  segment?: "never_login" | "inactive_30d" | "no_tasks";
+  membership?: "member" | "non_member";
+}
+
+export interface ChangeUserStatusInput {
+  status: "active" | "disabled";
+}
+
+export interface ChangeUserRoleInput {
+  role: UserRole;
+}
 
 /** 用户列表可排序的列 */
 const SORTABLE = ["createdAt", "lastLoginAt", "email", "name"] as const;
@@ -112,7 +126,7 @@ export class AdminUsersService {
    * 已注销用户 (status='deleted') 默认不在列表里 —— 运营要找的是活跃账号;
    * 需要查历史时可显式传 status=deleted。
    */
-  async list(query: UserListQueryDto): Promise<PageResult<unknown>> {
+  async list(query: UserListQueryInput): Promise<PageResult<unknown>> {
     const page = buildPage(query, [...SORTABLE], "createdAt:desc");
     const where = this.listWhere(query);
 
@@ -168,7 +182,7 @@ export class AdminUsersService {
    * 不导出密码哈希、tokenVersion 这类内部字段 —— 导出文件会被转存、
    * 用邮件发走，只放运营真正需要的列。
    */
-  async exportCsv(query: UserListQueryDto): Promise<{
+  async exportCsv(query: UserListQueryInput): Promise<{
     csv: string;
     total: number;
     limit: number;
@@ -227,7 +241,7 @@ export class AdminUsersService {
    * 列表顶部的「正常 / 受限 / 管理身份」如果按当前页计算，翻页就会变，
    * 运营很容易把它当成全站数字。这里用与列表完全相同的 where 做聚合。
    */
-  async stats(query: UserListQueryDto) {
+  async stats(query: UserListQueryInput) {
     const where = this.listWhere(query);
     const [total, byRoleRows, byStatusRows] = await Promise.all([
       this.prisma.user.count({ where }),
@@ -635,7 +649,7 @@ export class AdminUsersService {
    * 由于 AdminGuard 每次请求查库校验 status, 被禁用用户的旧 token
    * 在下一次请求即失效, 无需额外的 token 黑名单。
    */
-  async changeStatus(id: string, dto: ChangeUserStatusDto, actorId: string) {
+  async changeStatus(id: string, dto: ChangeUserStatusInput, actorId: string) {
     const user = await this.findUser(id);
 
     if (id === actorId) {
@@ -678,7 +692,7 @@ export class AdminUsersService {
    */
   async changeRole(
     id: string,
-    dto: ChangeUserRoleDto,
+    dto: ChangeUserRoleInput,
     actor: { id: string; role: string },
   ) {
     const user = await this.findUser(id);
@@ -1038,7 +1052,7 @@ export class AdminUsersService {
    * 关键词与分群都可能产生 OR，因此统一收进 `AND` 数组；直接把两个 `OR`
    * 挂在 where 顶层会互相覆盖，表现为「输入关键词后分群条件静默失效」。
    */
-  private listWhere(query: UserListQueryDto): Record<string, unknown> {
+  private listWhere(query: UserListQueryInput): Record<string, unknown> {
     const where: Record<string, unknown> = {};
     const and: Array<Record<string, unknown>> = [];
 

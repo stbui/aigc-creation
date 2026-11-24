@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { CreditPriceService } from './credit-price.service';
 
 /**
@@ -15,7 +14,6 @@ import { CreditPriceService } from './credit-price.service';
  * 只有一个实例，活动变更后的 `invalidate()` 才能同时命中所有调用方。
  */
 @Module({
-  imports: [PrismaModule],
   providers: [CreditPriceService],
   exports: [CreditPriceService],
 })

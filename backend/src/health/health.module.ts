@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
-import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { ModelModule } from '../model/model.module';
 
@@ -14,7 +13,7 @@ import { ModelModule } from '../model/model.module';
  * 暴露的信息全是「有几条线路、是否在冷却」，不含地址与凭据。
  */
 @Module({
-  imports: [PrismaModule, StorageModule, ModelModule],
+  imports: [StorageModule, ModelModule],
   controllers: [HealthController],
   providers: [HealthService],
 })

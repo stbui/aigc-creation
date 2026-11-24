@@ -681,7 +681,7 @@ export class StorageService implements OnModuleInit {
   }
 
   private resolveUploadsDir(): string {
-    const raw = this.config.get<string>('path.uploads') ?? process.env.UPLOAD_DIR ?? 'uploads';
+    const raw = this.config.get<string>('path.uploads') ?? 'uploads';
     return resolve(process.cwd(), raw);
   }
 

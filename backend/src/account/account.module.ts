@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { AccountController } from './account.controller';
 import { AccountLifecycleService } from './account-lifecycle.service';
 import { AccountService } from './account.service';
@@ -11,7 +10,6 @@ import { AccountService } from './account.service';
  * 避免两条链路各删各的子表。
  */
 @Module({
-  imports: [PrismaModule],
   controllers: [AccountController],
   providers: [AccountService, AccountLifecycleService],
   exports: [AccountService, AccountLifecycleService],

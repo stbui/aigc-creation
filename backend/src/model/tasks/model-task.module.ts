@@ -15,7 +15,6 @@
  */
 
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
 import { ModelModule } from '../model.module';
 import { CapabilitiesModule } from '../../capabilities/capabilities.module';
 import { CreditsModule } from '../../credits/credits.module';
@@ -35,7 +34,6 @@ import { TaskWorkerService } from './task-worker.service';
 
 @Module({
   imports: [
-    PrismaModule,
     ModelModule,
     // 准入要在扣费之前查后台上下线：`CapabilityAvailabilityService` 由能力模块导出
     CapabilitiesModule,

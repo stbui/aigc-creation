@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { ModelModule } from '../model/model.module';
 import { CreditsController } from './credits.controller';
 import { CreditService } from './credit.service';
@@ -16,7 +15,7 @@ import { PricingModule } from './pricing.module';
  * 本模块不再直接写 `CreditLot` / `CreditLedgerEntry`。
  */
 @Module({
-  imports: [PrismaModule, ModelModule, PricingModule],
+  imports: [ModelModule, PricingModule],
   controllers: [CreditsController],
   providers: [CreditService],
   // 转出 PricingModule：既有调用方（后台调价、能力下发）仍只依赖 CreditsModule

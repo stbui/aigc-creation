@@ -27,6 +27,18 @@ export class PageQueryDto {
   sort?: string;
 }
 
+/**
+ * 分页查询的服务层入参。
+ *
+ * HTTP 层传 `PageQueryDto` 实例（结构兼容）；Service 只认这份接口，
+ * 不感知 class-validator，便于单测直接传字面量。
+ */
+export interface PageQueryInput {
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+}
+
 export interface PageResult<T> {
   items: T[];
   total: number;
@@ -50,7 +62,7 @@ export interface NormalizedPage {
  * orderBy 会被拒绝或产生意外行为, 白名单是必要的。
  */
 export function buildPage(
-  query: PageQueryDto,
+  query: PageQueryInput,
   sortableFields: string[],
   defaultSort = 'createdAt:desc',
 ): NormalizedPage {

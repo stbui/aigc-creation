@@ -10,9 +10,8 @@ import { PrismaService } from './prisma.service';
  * 必须在每个模块可见 —— 漏掉一个模块就表现为运行时 `Cannot read properties
  * of undefined`, 而不是编译错误。
  *
- * 改成全局后, 新增模块无需再显式 import PrismaModule; 已显式 import 的模块
- * 保持原样也能工作 (重复导入同一个 provider 不产生新实例, 全局模块的导出
- * 优先)。
+ * 改成全局后, 只有 AppModule 显式 import 它（作为全局注册点）; 业务模块
+ * 无需再写 imports —— 写了也不报错，但属于冗余样板。
  */
 @Global()
 @Module({

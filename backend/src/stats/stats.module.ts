@@ -1,7 +1,6 @@
 import { Controller, Get, Module, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
-import { PrismaModule } from '../prisma/prisma.module';
 import { StatsService } from './stats.service';
 
 @Controller('stats')
@@ -17,7 +16,6 @@ export class StatsController {
 }
 
 @Module({
-  imports: [PrismaModule],
   controllers: [StatsController],
   providers: [StatsService],
 })

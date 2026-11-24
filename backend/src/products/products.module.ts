@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
 
@@ -10,7 +9,6 @@ import { ProductsService } from './products.service';
  * 少一个入口就少一条「谁能改价」的排查路径。
  */
 @Module({
-  imports: [PrismaModule],
   controllers: [ProductsController],
   providers: [ProductsService],
 })

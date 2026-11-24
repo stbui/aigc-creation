@@ -1,4 +1,5 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { DeliveryResult, EmailMessage } from '../channel.types';
 import { maskEmail } from '../channel.types';
 import type { EmailProvider } from './email.provider';
@@ -7,6 +8,7 @@ import { HttpEmailProvider } from './http-email.provider';
 import { AliyunEmailProvider } from './aliyun-email.provider';
 import { SmtpEmailProvider } from './smtp-email.provider';
 import { escapeHtml, renderTemplate } from '../template';
+import type { OutboxOptions } from '../console-outbox';
 import { SettingsService } from '../../common/settings.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -82,6 +84,7 @@ export class EmailService implements OnModuleInit {
   constructor(
     private readonly settings: SettingsService,
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -134,7 +137,7 @@ export class EmailService implements OnModuleInit {
       }
 
       // 生产环境不允许把写本地 outbox 当成用户已收到邮件。
-      if (process.env.NODE_ENV === 'production' && !config.provider.delivers) {
+      if (this.config.get<string>('app.env') === 'production' && !config.provider.delivers) {
         const error = '生产环境尚未配置可实际发送的邮件通道，邮件未投递。';
         this.logger.error(`邮件未投递 ${maskEmail(message.to)}: ${error}`);
         return {
@@ -260,47 +263,61 @@ export class EmailService implements OnModuleInit {
     const enabled = all['email.enabled'] === true;
     const mode = textSetting(all['email.provider']) || 'env';
     const envMode = mode === 'env';
-    const wanted = (envMode ? process.env.EMAIL_PROVIDER || 'console' : mode).toLowerCase();
+    const wanted = (envMode ? this.config.get<string>('channel.email.provider') || 'console' : mode).toLowerCase();
 
     const settingFrom = textSetting(all['email.from']);
-    const fromAlias = textSetting(all['email.fromAlias']) || textSetting(process.env.ALIYUN_DM_FROM_ALIAS);
-    const apiUrl = textSetting(all['email.httpApiUrl']) || textSetting(process.env.EMAIL_API_URL);
-    const apiKey = (await this.settings.getSecret('email.httpApiKey')) || textSetting(process.env.EMAIL_API_KEY);
+    const fromAlias =
+      textSetting(all['email.fromAlias']) ||
+      textSetting(this.config.get<string>('channel.aliyun.dmFromAlias'));
+    const apiUrl =
+      textSetting(all['email.httpApiUrl']) || textSetting(this.config.get<string>('channel.email.apiUrl'));
+    const apiKey =
+      (await this.settings.getSecret('email.httpApiKey')) ||
+      textSetting(this.config.get<string>('channel.email.apiKey'));
     const accessKeyId =
       (await this.settings.getSecret('email.aliyunAccessKeyId')) ||
-      textSetting(process.env.ALIYUN_ACCESS_KEY_ID);
+      textSetting(this.config.get<string>('channel.aliyun.accessKeyId'));
     const accessKeySecret =
       (await this.settings.getSecret('email.aliyunAccessKeySecret')) ||
-      textSetting(process.env.ALIYUN_ACCESS_KEY_SECRET);
+      textSetting(this.config.get<string>('channel.aliyun.accessKeySecret'));
     const accountName =
-      textSetting(all['email.aliyunDmAccountName']) || textSetting(process.env.ALIYUN_DM_ACCOUNT_NAME);
+      textSetting(all['email.aliyunDmAccountName']) ||
+      textSetting(this.config.get<string>('channel.aliyun.dmAccountName'));
     const addressType =
-      textSetting(all['email.aliyunDmAddressType']) || textSetting(process.env.ALIYUN_DM_ADDRESS_TYPE) || '1';
+      textSetting(all['email.aliyunDmAddressType']) ||
+      textSetting(this.config.get<string>('channel.aliyun.dmAddressType')) ||
+      '1';
 
     const smtpHost = envMode
-      ? textSetting(process.env.EMAIL_SMTP_HOST)
-      : textSetting(all['email.smtpHost']) || textSetting(process.env.EMAIL_SMTP_HOST);
+      ? textSetting(this.config.get<string>('channel.email.smtpHost'))
+      : textSetting(all['email.smtpHost']) ||
+        textSetting(this.config.get<string>('channel.email.smtpHost'));
     const smtpPort = envMode
-      ? Number(process.env.EMAIL_SMTP_PORT || 465)
-      : Number(all['email.smtpPort'] ?? process.env.EMAIL_SMTP_PORT ?? 465);
+      ? Number(this.config.get<number>('channel.email.smtpPort') || 465)
+      : Number(all['email.smtpPort'] ?? this.config.get<number>('channel.email.smtpPort') ?? 465);
     const smtpSecure = envMode
-      ? booleanSetting(process.env.EMAIL_SMTP_SECURE, true)
-      : booleanSetting(all['email.smtpSecure'], booleanSetting(process.env.EMAIL_SMTP_SECURE, true));
+      ? booleanSetting(this.config.get<boolean>('channel.email.smtpSecure'), true)
+      : booleanSetting(
+          all['email.smtpSecure'],
+          booleanSetting(this.config.get<boolean>('channel.email.smtpSecure'), true),
+        );
     const smtpUser = envMode
-      ? textSetting(process.env.EMAIL_SMTP_USER)
-      : textSetting(all['email.smtpUser']) || textSetting(process.env.EMAIL_SMTP_USER);
+      ? textSetting(this.config.get<string>('channel.email.smtpUser'))
+      : textSetting(all['email.smtpUser']) ||
+        textSetting(this.config.get<string>('channel.email.smtpUser'));
     const smtpPassword = envMode
-      ? textSetting(process.env.EMAIL_SMTP_PASSWORD)
+      ? textSetting(this.config.get<string>('channel.email.smtpPassword'))
       : (await this.settings.getSecret('email.smtpPassword')) ||
-        textSetting(process.env.EMAIL_SMTP_PASSWORD);
-    const from = settingFrom || textSetting(process.env.EMAIL_FROM) || smtpUser || DEFAULT_FROM;
+        textSetting(this.config.get<string>('channel.email.smtpPassword'));
+    const from =
+      settingFrom || textSetting(this.config.get<string>('channel.email.from')) || smtpUser || DEFAULT_FROM;
 
     if (wanted === 'smtp') {
       const validPort = Number.isInteger(smtpPort) && smtpPort >= 1 && smtpPort <= 65535;
       if (!smtpHost || !smtpUser || !smtpPassword || !validPort) {
         return {
           enabled,
-          provider: new ConsoleEmailProvider(from),
+          provider: new ConsoleEmailProvider(from, this.outboxOptions()),
           providerName: 'console',
           from,
           configured: false,
@@ -329,7 +346,7 @@ export class EmailService implements OnModuleInit {
       if (!apiUrl) {
         return {
           enabled,
-          provider: new ConsoleEmailProvider(from),
+          provider: new ConsoleEmailProvider(from, this.outboxOptions()),
           providerName: 'console',
           from,
           configured: false,
@@ -350,7 +367,7 @@ export class EmailService implements OnModuleInit {
       if (!accessKeyId || !accessKeySecret || !accountName) {
         return {
           enabled,
-          provider: new ConsoleEmailProvider(from),
+          provider: new ConsoleEmailProvider(from, this.outboxOptions()),
           providerName: 'console',
           from,
           configured: false,
@@ -369,11 +386,19 @@ export class EmailService implements OnModuleInit {
 
     return {
       enabled,
-      provider: new ConsoleEmailProvider(from),
+      provider: new ConsoleEmailProvider(from, this.outboxOptions()),
       providerName: 'console',
       from,
       configured: true,
       message: enabled ? '当前为本地记录模式，邮件不会实际发送。' : '邮件通知已关闭。',
+    };
+  }
+
+  /** 控制台实现的落盘参数：生产不落盘（见 console-outbox.ts 顶部说明） */
+  private outboxOptions(): OutboxOptions {
+    return {
+      isProduction: this.config.get<string>('app.env') === 'production',
+      logDir: this.config.get<string>('log.dir') || 'logs',
     };
   }
 

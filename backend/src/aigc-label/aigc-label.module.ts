@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { AigcLabelService } from './aigc-label.service';
 import { AdminAigcLabelController, AigcLabelController } from './aigc-label.controller';
 
@@ -10,7 +9,6 @@ import { AdminAigcLabelController, AigcLabelController } from './aigc-label.cont
  * 全局模块会让「谁依赖了标识配置」变得不可见。
  */
 @Module({
-  imports: [PrismaModule],
   controllers: [AigcLabelController, AdminAigcLabelController],
   providers: [AigcLabelService],
   exports: [AigcLabelService],

@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { InvoicesController } from './invoices.controller';
 import { InvoicesService } from './invoices.service';
@@ -11,7 +10,7 @@ import { InvoicesService } from './invoices.service';
  * AdminModule 复用本模块导出的 InvoicesService 做审核/开具。
  */
 @Module({
-  imports: [PrismaModule, StorageModule],
+  imports: [StorageModule],
   controllers: [InvoicesController],
   providers: [InvoicesService],
   exports: [InvoicesService],

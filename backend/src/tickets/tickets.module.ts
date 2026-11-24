@@ -6,12 +6,10 @@
  * 两套实现最先漂移的正是「谁能回复已关闭的工单」这类规则。
  */
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { TicketsController } from './tickets.controller';
 import { TicketsService } from './tickets.service';
 
 @Module({
-  imports: [PrismaModule],
   controllers: [TicketsController],
   providers: [TicketsService],
   exports: [TicketsService],

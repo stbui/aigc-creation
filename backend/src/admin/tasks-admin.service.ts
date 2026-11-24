@@ -5,9 +5,19 @@ import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
 import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { CAPABILITIES, getCapability } from '../capabilities/capability.registry';
-import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
-import type { TaskListQueryDto } from './dto/task.dto';
+import { buildPage, paginate, type PageQueryInput, type PageResult } from './dto/page-query.dto';
 import { SignedUrlService } from '../common/signed-url.service';
+
+/** 任务列表查询入参（HTTP 层传 TaskListQueryInput，结构兼容） */
+export interface TaskListQueryInput extends PageQueryInput {
+  status?: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  capability?: string;
+  userId?: string;
+  projectId?: string;
+  errorCode?: string;
+  from?: string;
+  to?: string;
+}
 
 /** 可排序列白名单: status/createdAt/updatedAt 都是 SQLite 上的真实列 */
 const SORTABLE = ['createdAt', 'updatedAt', 'status', 'capability'] as const;
@@ -68,7 +78,7 @@ export class TasksAdminService {
   } | null = null;
   private static readonly FACET_TTL_MS = 60_000;
 
-  async list(query: TaskListQueryDto): Promise<{
+  async list(query: TaskListQueryInput): Promise<{
     result: PageResult<unknown>;
     congestion: {
       queued: number;
@@ -195,7 +205,7 @@ export class TasksAdminService {
    * 列表筛选条件。列表、导出与后续统计共用同一份构造器 ——
    * 分开写会出现「列表筛出 32 条、导出 400 条」的口径漂移。
    */
-  private listWhere(query: TaskListQueryDto): Record<string, unknown> {
+  private listWhere(query: TaskListQueryInput): Record<string, unknown> {
     const where: Record<string, unknown> = {};
     if (query.status) where['status'] = query.status;
     if (query.capability) where['capability'] = query.capability;
@@ -220,7 +230,7 @@ export class TasksAdminService {
    * 不是导全库。超过上限时宁可在文件里少几行，也不把 SQLite 拖到无法响应。
    * 与列表共用 `listWhere`，筛什么就导出什么。
    */
-  async exportCsv(query: TaskListQueryDto): Promise<string> {
+  async exportCsv(query: TaskListQueryInput): Promise<string> {
     const rows = await this.prisma.generationTask.findMany({
       where: this.listWhere(query),
       orderBy: { createdAt: 'desc' },

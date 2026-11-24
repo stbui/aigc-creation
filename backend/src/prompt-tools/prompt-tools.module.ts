@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { ModelModule } from '../model/model.module';
 import { PromptToolsService } from './prompt-tools.service';
@@ -12,7 +11,7 @@ import { PromptToolsController } from './prompt-tools.controller';
  * ModelModule 只依赖 Prisma, 不反向依赖本模块, 无循环。
  */
 @Module({
-  imports: [PrismaModule, StorageModule, ModelModule],
+  imports: [StorageModule, ModelModule],
   controllers: [PromptToolsController],
   providers: [PromptToolsService],
   exports: [PromptToolsService],

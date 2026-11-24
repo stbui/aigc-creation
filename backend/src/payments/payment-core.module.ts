@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentCipher } from './payment-cipher';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentGateway } from './payment-gateway';
@@ -20,7 +18,6 @@ import { PaymentExceptionService } from './payment-exception.service';
  *   OrdersModule ───┘
  */
 @Module({
-  imports: [ConfigModule, PrismaModule],
   providers: [
     PaymentCipher,
     PaymentConfigService,

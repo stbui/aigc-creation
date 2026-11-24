@@ -10,7 +10,7 @@ import {
 import { OrderService } from "../orders/order.service";
 import { AppError } from "../common/app.exception";
 import { runBatch } from "../common/batch";
-import { buildPage, paginate, type PageQueryDto } from "./dto/page-query.dto";
+import { buildPage, paginate } from "./dto/page-query.dto";
 import { centsToYuan, parseCsv, toCsv, type CsvColumn } from "../common/csv";
 import { PaymentConfigService } from "../payments/payment-config.service";
 
@@ -630,7 +630,7 @@ export class AdminCommerceService {
 
   async listOrders(q: OrderListQuery) {
     const page = buildPage(
-      { page: q.page, pageSize: q.pageSize, sort: q.sort } as PageQueryDto,
+      { page: q.page, pageSize: q.pageSize, sort: q.sort },
       ["createdAt", "paidAt", "totalCents"],
       "createdAt:desc",
     );
@@ -1053,7 +1053,7 @@ export class AdminCommerceService {
     pageSize?: number;
   }) {
     const page = buildPage(
-      query as PageQueryDto,
+      query,
       ["createdAt"],
       "createdAt:desc",
     );

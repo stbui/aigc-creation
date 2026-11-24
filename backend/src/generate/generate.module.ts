@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { ModelTaskModule } from '../model/tasks/model-task.module';
 import { GenerateService } from './generate.service';
@@ -14,7 +13,7 @@ import { TasksController } from './tasks.controller';
  * 单向依赖，`ModelTaskModule` 不知道 HTTP 的存在。
  */
 @Module({
-  imports: [PrismaModule, StorageModule, ModelTaskModule],
+  imports: [StorageModule, ModelTaskModule],
   controllers: [GenerateController, TasksController],
   providers: [GenerateService],
   // 导出供 AdminModule 的任务重试 / 终止复用（重试与终止的语义收在一处）

@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 
-import { PrismaModule } from '../prisma/prisma.module';
 import { TemplateAdminController } from './template-admin.controller';
 import { TemplateCatalogController } from './template-catalog.controller';
 import { TemplateCatalogService } from './template-catalog.service';
@@ -12,7 +11,6 @@ import { TemplateCatalogService } from './template-catalog.service';
  * 由全局的 StorageModule / CommonModule 提供，无需重复 import。
  */
 @Module({
-  imports: [PrismaModule],
   controllers: [TemplateCatalogController, TemplateAdminController],
   providers: [TemplateCatalogService],
   exports: [TemplateCatalogService],

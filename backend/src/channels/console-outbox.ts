@@ -23,16 +23,24 @@ export interface OutboxEntry {
   at: string;
 }
 
-export function writeOutbox(entry: OutboxEntry): string | undefined {
+/** 落盘环境参数。由注入了 ConfigService 的门面计算后传入 */
+export interface OutboxOptions {
+  /** 生产环境不落盘（见下方说明） */
+  isProduction: boolean;
+  /** outbox 根目录（配置层 `log.dir`） */
+  logDir: string;
+}
+
+export function writeOutbox(entry: OutboxEntry, options: OutboxOptions): string | undefined {
   /*
    * 生产环境**不落盘**。outbox 里是明文验证码与密码重置链接，
    * 生产上出现它只说明「通道没配好」；此时把凭据写进服务器磁盘，
    * 等于给任何能读日志目录的人开了一扇后门。缺通道的告警由
    * EmailService / SmsService 的启动 WARN 负责，不靠落盘补救。
    */
-  if (process.env.NODE_ENV === 'production') return undefined;
+  if (options.isProduction) return undefined;
   try {
-    const dir = resolve(process.env.LOG_DIR || 'logs', 'outbox');
+    const dir = resolve(options.logDir || 'logs', 'outbox');
     mkdirSync(dir, { recursive: true });
     const day = new Date().toISOString().slice(0, 10);
     const file = resolve(dir, `${entry.channel}-${day}.log`);

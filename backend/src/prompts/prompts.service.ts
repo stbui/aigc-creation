@@ -2,7 +2,7 @@ import { readFile } from 'fs/promises';
 
 import { Injectable } from '@nestjs/common';
 
-import { buildPage, paginate } from '../admin/dto/page-query.dto';
+import { buildPage, paginate, type PageQueryInput } from '../admin/dto/page-query.dto';
 import { inspectUploadedImage, verifyDecodableImage } from '../assets/image-validation';
 import { AppError } from '../common/app.exception';
 import { parseSettingImageReference, SettingImageService } from '../common/setting-image.service';
@@ -10,13 +10,46 @@ import { SettingsService } from '../common/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import type { StorageBackend } from '../storage/storage.provider';
-import {
-  PROMPT_IMAGES_MAX,
-  type CreatePromptDto,
-  type PromptImageDto,
-  type PromptListQueryDto,
-  type UpdatePromptDto,
-} from './dto';
+import { PROMPT_IMAGES_MAX, type PromptModality } from './dto';
+
+/** 提示词列表查询入参（HTTP 层传 PromptListQueryInput，结构兼容） */
+export interface PromptListQueryInput extends PageQueryInput {
+  keyword?: string;
+  category?: string;
+  modality?: PromptModality;
+  enabled?: boolean;
+}
+
+/** 配图引用的领域形状；HTTP 层的 PromptImageDto 实例结构兼容 */
+export interface PromptImageInput {
+  ref: string;
+  assetId?: string;
+  name?: string;
+}
+
+export interface CreatePromptInput {
+  title?: string;
+  category?: string;
+  content: string;
+  negativePrompt?: string;
+  modality?: PromptModality;
+  tags?: string[];
+  images?: PromptImageInput[];
+  sortOrder?: number;
+  enabled?: boolean;
+}
+
+export interface UpdatePromptInput {
+  title?: string;
+  category?: string;
+  content?: string;
+  negativePrompt?: string;
+  modality?: PromptModality;
+  tags?: string[];
+  images?: PromptImageInput[];
+  sortOrder?: number;
+  enabled?: boolean;
+}
 
 /** JSON 标签数组 → 字符串数组；坏数据按空数组处理，不阻断整页。 */
 export function parsePromptTags(raw: string | null | undefined): string[] {
@@ -48,7 +81,7 @@ export function normalizePromptTags(tags: string[] | undefined): string {
  *
  * 只保留带非空 `ref` 的项：手工改库留下的空壳会让前端渲染一个永远加载不出来的占位。
  */
-export function parsePromptImages(raw: string | null | undefined): PromptImageDto[] {
+export function parsePromptImages(raw: string | null | undefined): PromptImageInput[] {
   try {
     const value = JSON.parse(String(raw ?? '[]'));
     if (!Array.isArray(value)) return [];
@@ -72,9 +105,9 @@ export function parsePromptImages(raw: string | null | undefined): PromptImageDt
  * 去重按 `ref` 而非 `assetId` —— 同一张素材可能先被上传、后从素材库选入，
  * 此时只有 ref 相同。重复配图在 C 端只会重复占位，没有业务价值。
  */
-export function normalizePromptImages(images: PromptImageDto[] | undefined): string {
+export function normalizePromptImages(images: PromptImageInput[] | undefined): string {
   const seen = new Set<string>();
-  const result: PromptImageDto[] = [];
+  const result: PromptImageInput[] = [];
   for (const raw of images ?? []) {
     const ref = String(raw?.ref ?? '').trim();
     if (!ref || seen.has(ref)) continue;
@@ -120,7 +153,7 @@ export class PromptsService {
     private readonly settings: SettingsService,
   ) {}
 
-  async list(query: PromptListQueryDto) {
+  async list(query: PromptListQueryInput) {
     const page = buildPage(query, SORTABLE_FIELDS, 'sortOrder:asc');
     const where = this.buildWhere(query);
 
@@ -152,7 +185,7 @@ export class PromptsService {
     return this.toView(prompt);
   }
 
-  async create(dto: CreatePromptDto) {
+  async create(dto: CreatePromptInput) {
     const content = String(dto.content ?? '').trim();
     if (!content) throw new AppError(40001, '请填写提示词内容', 400);
 
@@ -172,7 +205,7 @@ export class PromptsService {
     return this.toView(row);
   }
 
-  async update(id: string, dto: UpdatePromptDto) {
+  async update(id: string, dto: UpdatePromptInput) {
     const before = await this.requirePrompt(id);
 
     const data: Record<string, unknown> = {};
@@ -312,7 +345,7 @@ export class PromptsService {
     }
   }
 
-  private buildWhere(query: PromptListQueryDto): Record<string, unknown> {
+  private buildWhere(query: PromptListQueryInput): Record<string, unknown> {
     const where: Record<string, unknown> = {};
     if (query.category) where.category = query.category;
     if (query.modality) where.modality = query.modality;

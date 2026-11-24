@@ -5,6 +5,7 @@ import type { SmsProvider } from './sms.provider';
 import { ConsoleSmsProvider } from './console-sms.provider';
 import { HttpSmsProvider } from './http-sms.provider';
 import { AliyunSmsProvider } from './aliyun-sms.provider';
+import type { OutboxOptions } from '../console-outbox';
 
 export interface SmsChannelStatus {
   provider: string;
@@ -42,24 +43,31 @@ function aliyunSmsEndpoint(region: string): string {
 export class SmsService implements OnModuleInit {
   private readonly logger = new Logger(SmsService.name);
   private readonly provider: SmsProvider;
+  private readonly outboxOptions: OutboxOptions;
   private misconfigured = false;
 
   constructor(private readonly config: ConfigService) {
-    const sign = process.env.SMS_SIGN || '货觉AI';
-    const wanted = (process.env.SMS_PROVIDER || 'console').toLowerCase();
-    const apiUrl = (process.env.SMS_API_URL || '').trim();
-    const apiKey = (process.env.SMS_API_KEY || '').trim();
-    const template = (process.env.SMS_TEMPLATE || '').trim();
+    this.outboxOptions = {
+      isProduction: this.config.get<string>('app.env') === 'production',
+      logDir: this.config.get<string>('log.dir') || 'logs',
+    };
+    const cfg = (key: string, fallback = ''): string =>
+      (this.config.get<string>(key) || fallback).trim();
+    const sign = cfg('channel.sms.sign', '货觉AI');
+    const wanted = (this.config.get<string>('channel.sms.provider') || 'console').toLowerCase();
+    const apiUrl = cfg('channel.sms.apiUrl');
+    const apiKey = cfg('channel.sms.apiKey');
+    const template = cfg('channel.sms.template');
 
     if (wanted === 'http' && apiUrl) {
       this.provider = new HttpSmsProvider(apiUrl, apiKey, sign, template);
       if (!apiKey) this.logger.warn('SMS_PROVIDER=http 但 SMS_API_KEY 为空：请求将不带鉴权头');
     } else if (wanted === 'aliyun') {
-      const accessKeyId = (process.env.ALIYUN_ACCESS_KEY_ID || '').trim();
-      const accessKeySecret = (process.env.ALIYUN_ACCESS_KEY_SECRET || '').trim();
-      const signName = (process.env.ALIYUN_SMS_SIGN_NAME || '').trim();
-      const templateCode = (process.env.ALIYUN_SMS_TEMPLATE_CODE || '').trim();
-      const region = (process.env.ALIYUN_SMS_REGION || '').trim();
+      const accessKeyId = cfg('channel.aliyun.accessKeyId');
+      const accessKeySecret = cfg('channel.aliyun.accessKeySecret');
+      const signName = cfg('channel.aliyun.smsSignName');
+      const templateCode = cfg('channel.aliyun.smsTemplateCode');
+      const region = cfg('channel.aliyun.smsRegion');
       if (accessKeyId && accessKeySecret && templateCode) {
         this.provider = new AliyunSmsProvider(
           accessKeyId,
@@ -71,7 +79,11 @@ export class SmsService implements OnModuleInit {
         );
         if (!signName) this.logger.warn('SMS_PROVIDER=aliyun 但 ALIYUN_SMS_SIGN_NAME 为空：使用默认签名「' + sign + '」');
       } else {
-        this.provider = new ConsoleSmsProvider(sign);
+        this.provider = new ConsoleSmsProvider(
+          sign,
+          this.outboxOptions,
+          !this.outboxOptions.isProduction,
+        );
         this.misconfigured = true;
         this.logger.warn(
           'SMS_PROVIDER=aliyun 但缺少 ALIYUN_ACCESS_KEY_ID / ALIYUN_ACCESS_KEY_SECRET / ALIYUN_SMS_TEMPLATE_CODE，' +
@@ -79,7 +91,11 @@ export class SmsService implements OnModuleInit {
         );
       }
     } else {
-      this.provider = new ConsoleSmsProvider(sign);
+      this.provider = new ConsoleSmsProvider(
+        sign,
+        this.outboxOptions,
+        !this.outboxOptions.isProduction,
+      );
       if (wanted === 'http') {
         this.misconfigured = true;
         this.logger.warn('SMS_PROVIDER=http 但 SMS_API_URL 为空，已回落控制台通道（不会真实投递）');
@@ -114,7 +130,7 @@ export class SmsService implements OnModuleInit {
      * 填了真实通道但凭据不全时构造函数会回落 console —— 开发档保留这层便利
      * (验证码落 logs/outbox 可查), 生产档则直接判投递失败, 让调用方如实报错。
      */
-    if (this.misconfigured && process.env.NODE_ENV === 'production') {
+    if (this.misconfigured && this.config.get<string>('app.env') === 'production') {
       const error = '短信通道配置不完整（已回落 console），生产环境拒绝假装投递';
       this.logger.error(`${error}: ${message.to.slice(0, 3)}****`);
       return { ok: false, provider: this.provider.name, delivered: false, error };

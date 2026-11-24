@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import type { DeliveryResult, SmsMessage } from '../channel.types';
 import type { SmsProvider } from './sms.provider';
 import { maskPhone } from '../channel.types';
-import { writeOutbox } from '../console-outbox';
+import { writeOutbox, type OutboxOptions } from '../console-outbox';
 
 /**
  * 控制台短信实现 —— 把验证码写进 `logs/outbox/sms-<日期>.log` 并打一条日志。
@@ -16,25 +16,32 @@ export class ConsoleSmsProvider implements SmsProvider {
   readonly delivers = false;
   private readonly logger = new Logger(ConsoleSmsProvider.name);
 
-  constructor(readonly sign: string) {}
+  constructor(
+    readonly sign: string,
+    private readonly outbox: OutboxOptions,
+    /** 开发/测试打印验证码以便自测；生产恒为 false */
+    private readonly showCode: boolean,
+  ) {}
 
   async send(message: SmsMessage): Promise<DeliveryResult> {
-    writeOutbox({
-      channel: 'sms',
-      to: message.to,
-      subject: this.sign,
-      body: message.text,
-      provider: this.name,
-      at: new Date().toISOString(),
-    });
+    writeOutbox(
+      {
+        channel: 'sms',
+        to: message.to,
+        subject: this.sign,
+        body: message.text,
+        provider: this.name,
+        at: new Date().toISOString(),
+      },
+      this.outbox,
+    );
     /*
      * 生产环境**不打印验证码**：控制台通道意味着「没配短信服务商」，
      * 此时把验证码写进日志等于让任何能读日志的人登录任意手机号。
      * 开发/测试打印是为了能自测短信登录。
      */
-    const showCode = process.env.NODE_ENV !== 'production';
     this.logger.warn(
-      `[控制台短信] ${maskPhone(message.to)} ${showCode ? `验证码 ${message.code}` : '验证码已生成(不打印)'}` +
+      `[控制台短信] ${maskPhone(message.to)} ${this.showCode ? `验证码 ${message.code}` : '验证码已生成(不打印)'}` +
         '（未真实投递，见 logs/outbox/sms-*.log）',
     );
     return { ok: true, provider: this.name, delivered: false };

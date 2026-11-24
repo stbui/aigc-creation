@@ -5,9 +5,26 @@ import { runBatch } from '../common/batch';
 import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { StorageService } from '../storage/storage.service';
 import { SignedUrlService } from '../common/signed-url.service';
-import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
-import type { AssetListQueryDto, ProjectListQueryDto } from './dto/asset.dto';
+import { buildPage, paginate, type PageQueryInput, type PageResult } from './dto/page-query.dto';
 import type { StorageBackend } from '../storage/storage.provider';
+
+/** 素材列表查询入参（HTTP 层传 AssetListQueryInput，结构兼容） */
+export interface AssetListQueryInput extends PageQueryInput {
+  keyword?: string;
+  kind?: string;
+  capability?: string;
+  status?: string;
+  ownerId?: string;
+  projectId?: string;
+  backend?: StorageBackend;
+  from?: Date;
+  to?: Date;
+}
+
+export interface ProjectListQueryInput extends PageQueryInput {
+  keyword?: string;
+  ownerId?: string;
+}
 import {
   detachAssetFromTasks,
   orderedOutputIds,
@@ -32,7 +49,7 @@ export class AdminAssetsService {
   // ── 项目 (B-21/B-22) ────────────────────────────────────────────────
 
   /** 项目列表: 名称、所属用户、素材数、任务数、创建时间 */
-  async listProjects(query: ProjectListQueryDto) {
+  async listProjects(query: ProjectListQueryInput) {
     const page = buildPage(query, ['createdAt', 'name'], 'createdAt:desc');
 
     const where: Record<string, unknown> = { deletedAt: null };
@@ -180,7 +197,7 @@ export class AdminAssetsService {
    * 与用户端不同: **不过滤 status** —— 管理端必须能看到已下架素材,
    * 否则运营找不到"我下架过的东西在哪"。
    */
-  async list(query: AssetListQueryDto): Promise<PageResult<unknown>> {
+  async list(query: AssetListQueryInput): Promise<PageResult<unknown>> {
     const page = buildPage(query, ['createdAt', 'sizeBytes'], 'createdAt:desc');
     const where = this.listWhere(query);
 
@@ -302,7 +319,7 @@ export class AdminAssetsService {
    * sourceUrl 用 displayUrl（签名开启时带签）—— 导出的表格里如果只有
    * 裸路径，打开就是 403，运营会以为"素材丢了"。
    */
-  async exportCsv(query: AssetListQueryDto): Promise<string> {
+  async exportCsv(query: AssetListQueryInput): Promise<string> {
     const rows = await this.prisma.asset.findMany({
       where: this.listWhere(query),
       orderBy: { createdAt: 'desc' },
@@ -348,7 +365,7 @@ export class AdminAssetsService {
   }
 
   /** 列表 / 导出共用的素材筛选条件 */
-  private listWhere(query: AssetListQueryDto): Record<string, unknown> {
+  private listWhere(query: AssetListQueryInput): Record<string, unknown> {
     const where: Record<string, unknown> = {};
     if (query.keyword) {
       where['OR'] = [{ id: { contains: query.keyword } }, { capability: { contains: query.keyword } }];

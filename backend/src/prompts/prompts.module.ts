@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 
-import { PrismaModule } from '../prisma/prisma.module';
 import { PromptsController } from './prompts.controller';
 import { PromptsService } from './prompts.service';
 
@@ -12,7 +11,6 @@ import { PromptsService } from './prompts.service';
  * StorageModule / CommonModule 提供，无需在此重复 imports。
  */
 @Module({
-  imports: [PrismaModule],
   controllers: [PromptsController],
   providers: [PromptsService],
   exports: [PromptsService],

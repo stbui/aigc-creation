@@ -7,13 +7,11 @@
  * 依赖任何业务模块。
  */
 import { Global, Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
 import { EmailService } from './email/email.service';
 import { SmsService } from './sms/sms.service';
 
 @Global()
 @Module({
-  imports: [PrismaModule],
   providers: [EmailService, SmsService],
   exports: [EmailService, SmsService],
 })
