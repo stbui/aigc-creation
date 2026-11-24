@@ -68,4 +68,32 @@ describe('SKU 上传运行时限制', () => {
     expect(result.current.uploading).toBe(false);
     expect(result.current.template).toBeNull();
   });
+
+  it('参考图超像素时在建项目和上传请求前被拦截', async () => {
+    mocks.validateImageFile.mockResolvedValueOnce('图片像素总数不能超过 1,000,000');
+    const { result } = renderHook(() => useSkuDraft({ onResetBatch: vi.fn() }));
+
+    await act(async () => {
+      await result.current.uploadReferenceFile(imageFile('huge.png', 1024), 0, 'region-1');
+    });
+
+    expect(mocks.ensureProject).not.toHaveBeenCalled();
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.message.error).toHaveBeenCalledWith('图片像素总数不能超过 1,000,000');
+    expect(result.current.referenceBusy).toBeNull();
+  });
+
+  it('模板图混选非图片时只取第一张合法图片上传', async () => {
+    mocks.upload.mockResolvedValueOnce({ id: 'asset-1', signedUrl: '/uploads/template.png' });
+    const { result } = renderHook(() => useSkuDraft({ onResetBatch: vi.fn() }));
+    const invalid = new File(['x'], 'notes.txt', { type: 'text/plain' });
+
+    await act(async () => {
+      await result.current.uploadTemplate([invalid, imageFile('template.png', 1024)]);
+    });
+
+    expect(mocks.message.error).not.toHaveBeenCalled();
+    expect(mocks.upload).toHaveBeenCalledTimes(1);
+    expect(mocks.upload.mock.calls[0][0]).toMatchObject({ name: 'template.png' });
+  });
 });
