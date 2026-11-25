@@ -11,8 +11,8 @@
  *
  * 本文件的三条硬约束
  * ------------------
- * 1. **绝不改写 process.env。** validate 只产出配置树，现有直接读
- *    `process.env.X` 的代码（jwt.service / storage.service / main.ts）行为保持
+ * 1. **绝不改写 process.env。** validate 只产出配置树，绕过配置层直接读
+ *    `process.env` 的代码（请求期 / 导入期两类，见下方例外清单）行为保持
  *    1:1 不变，不因引入配置层被改语义。
  * 2. **类型错误即启动失败。** `PORT=abc` 这类值在旧代码里会变成 NaN 传给
  *    app.listen()，静默绑到随机端口且极难排查；这里直接抛错并指名变量。
@@ -58,6 +58,11 @@ interface Spec {
  *
  * 上述例外在各 env 文件里仍有键位；新增同类「请求期读取」变量时，
  * 请同时更新本例外清单与 `docs/environments.md`。
+ *
+ * 另有一类不经过 `ConfigService` 的静态读取：它们仍在本表内，值同源，
+ * 只是调用点拿不到 DI —— `UPLOAD_DIR`（assets.controller 的 multer destination，
+ * 装饰器参数在类定义期求值）、`ASSET_THUMBNAIL_ENABLED`（assets/thumb-render.ts
+ * 的纯函数）、支付适配器里的 `NODE_ENV`。
  */
 export const ENV_SPECS: readonly Spec[] = [
   // ── 应用 ──────────────────────────────────────────────────────────────

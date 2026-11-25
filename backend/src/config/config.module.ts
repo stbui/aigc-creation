@@ -35,6 +35,5 @@ import { validateEnv } from './env.validation';
       validate: validateEnv,
     }),
   ],
-  exports: [NestConfigModule],
 })
 export class ConfigModule {}

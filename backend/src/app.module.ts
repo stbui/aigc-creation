@@ -32,7 +32,6 @@ import { AccountModule } from './account/account.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { HealthModule } from './health/health.module';
-import { AigcLabelModule } from './aigc-label/aigc-label.module';
 import { ModelModule } from './model/model.module';
 import { TemplateCatalogModule } from './templates/template-catalog.module';
 import { PromptsModule } from './prompts/prompts.module';
@@ -86,10 +85,6 @@ import { ProxyModule } from './model/proxy/proxy.module';
     TicketsModule,
     // 健康检查 (B5): /health 诊断 + /health/ready 就绪探针（无需鉴权）
     HealthModule,
-    // AIGC 可见标识样式 (2026-10-21): 公开读展示参数 + 后台配置。
-    // 非全局模块，已由 ModelTaskModule 导入；模块只要在图中就会挂载控制器，
-    // 这行只为在根模块显式列出该域。重复导入不会重复实例化。
-    AigcLabelModule,
     // 渠道与模型子系统（移植自 open-ai-canvas）。P0 只装无状态地基：
     // 凭证加密 / 协议注册表 / 内置插件清单 / 出站策略。
     ModelModule,
