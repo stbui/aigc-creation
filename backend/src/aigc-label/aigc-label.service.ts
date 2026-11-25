@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { AIGC_LABEL_PNG_BASE64 } from '../common/aigc-label-badge';
@@ -40,15 +41,19 @@ const MAX_BADGE_DIM = 4096;
 @Injectable()
 export class AigcLabelService {
   private readonly logger = new Logger(AigcLabelService.name);
-  private cache: { at: number; value: AigcLabelRuntime } | null = null;
+  private static readonly CACHE_KEY = 'aigc-label:runtime';
   private readonly ttlMs = 3000;
   private defaultSize: { width: number; height: number } | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+  ) {}
 
   /** 运行时素材（生成链路调用） */
   async runtime(): Promise<AigcLabelRuntime> {
-    if (this.cache && Date.now() - this.cache.at < this.ttlMs) return this.cache.value;
+    const cached = await this.cache.get<AigcLabelRuntime>(AigcLabelService.CACHE_KEY);
+    if (cached !== undefined) return cached;
 
     let value: AigcLabelRuntime;
     try {
@@ -60,7 +65,7 @@ export class AigcLabelService {
       value = this.fromRow(null);
     }
 
-    this.cache = { at: Date.now(), value };
+    await this.cache.set(AigcLabelService.CACHE_KEY, value, this.ttlMs);
     return value;
   }
 
@@ -144,12 +149,12 @@ export class AigcLabelService {
       );
     }
 
-    this.invalidate();
+    await this.invalidate();
     return this.fromRow(row);
   }
 
-  invalidate(): void {
-    this.cache = null;
+  async invalidate(): Promise<void> {
+    await this.cache.del(AigcLabelService.CACHE_KEY);
   }
 
   /** 表可能尚未 push（老库升级），读不到时当作「没有配置」，不要 500 */

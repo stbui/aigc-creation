@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ConfigModule } from './config/config.module';
 import { LoggerModule } from './common/logger/logger.module';
+import { CacheModule } from './cache/cache.module';
 import { CommonModule } from './common/common.module';
 import { RateLimitGuard } from './common/rate-limit.guard';
 import { TestSupportController } from './common/test-support.controller';
@@ -43,6 +44,9 @@ import { ProxyModule } from './model/proxy/proxy.module';
     // 在此完成注册后 ConfigService 才对后面的模块可见 (见 config.module.ts)
     ConfigModule,
     LoggerModule,
+    // 全局缓存（isGlobal）：统一 CACHE_MANAGER 注入点与默认 TTL，
+    // 业务模块不再各自手写 TTL Map。存储为内存，多实例下只影响新鲜度。
+    CacheModule,
     // 横切服务（B5）：素材签名 URL。@Global, 必须排在业务模块之前
     CommonModule,
     // 外部消息通道 (邮件/短信) —— 全局模块, 必须排在 AuthModule 之前

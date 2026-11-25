@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import {
+  ADMIN_ROLE_CODES,
   expandImpliedPermissions,
   isAdminRole,
   isKnownPermission,
@@ -36,12 +38,14 @@ export interface RolePermissionChange {
 @Injectable()
 export class AdminRoleService {
   private static readonly PERMISSION_CACHE_TTL_MS = 30_000;
-  private readonly permissionCache = new Map<
-    string,
-    { expiresAt: number; permissions: string[] }
-  >();
+  private static permissionCacheKey(role: string): string {
+    return `admin:permissions:${role}`;
+  }
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+  ) {}
 
   /**
    * 判定用户是否有指定权限点。
@@ -69,22 +73,22 @@ export class AdminRoleService {
    * 回写属于管理动作, 应由角色页显式保存时完成。
    */
   async getPermissions(role: string): Promise<string[]> {
-    const cached = this.permissionCache.get(role);
-    if (cached && cached.expiresAt > Date.now()) return cached.permissions;
+    const key = AdminRoleService.permissionCacheKey(role);
+    const cached = await this.cache.get<string[]>(key);
+    if (cached !== undefined) return cached;
 
     const record = await this.prisma.adminRole.findUnique({ where: { code: role } });
     const permissions = record ? this.parsePermissions(record.permissions) : [];
-    this.permissionCache.set(role, {
-      expiresAt: Date.now() + AdminRoleService.PERMISSION_CACHE_TTL_MS,
-      permissions,
-    });
+    await this.cache.set(key, permissions, AdminRoleService.PERMISSION_CACHE_TTL_MS);
     return permissions;
   }
 
-  /** 角色权限变更后立即失效; 不传 role 时清空全部 (供脚本 / 测试使用) */
-  invalidatePermissions(role?: string): void {
-    if (role) this.permissionCache.delete(role);
-    else this.permissionCache.clear();
+  /** 角色权限变更后立即失效; 不传 role 时清空全部内置角色 (供脚本 / 测试使用) */
+  async invalidatePermissions(role?: string): Promise<void> {
+    const roles = role ? [role] : [...ADMIN_ROLE_CODES];
+    await Promise.all(
+      roles.map((code) => this.cache.del(AdminRoleService.permissionCacheKey(code))),
+    );
   }
 
   /**
@@ -155,7 +159,7 @@ export class AdminRoleService {
     });
 
     // 写入口只有这一处; 保存成功后精确失效, 不必等 TTL
-    for (const change of changes) this.invalidatePermissions(change.code);
+    await Promise.all(changes.map((change) => this.invalidatePermissions(change.code)));
     return changes;
   }
 

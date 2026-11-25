@@ -4,7 +4,8 @@
  * Controller 只保留路由；数据库、存储与线路探测全部在这里完成。
  * 两个入口的语义差异见 health.controller.ts 顶部说明。
  */
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { AppError } from '../common/app.exception';
 import { currentRequestId } from '../common/request-context';
@@ -47,7 +48,7 @@ function pkgVersion(): string {
 
 @Injectable()
 export class HealthService {
-  private storageCache: { at: number; value: CheckResult } | null = null;
+  private static readonly STORAGE_PROBE_CACHE_KEY = 'health:storage-probe';
   private readonly startedAt = Date.now();
 
   constructor(
@@ -56,6 +57,7 @@ export class HealthService {
     private readonly routeHealth: RouteHealthService,
     private readonly config: ConfigService,
     private readonly logger: AppFileLogger,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   /** 诊断面板：永远返回 200，部分降级时 `status='degraded'` */
@@ -112,8 +114,9 @@ export class HealthService {
       // latencyMs 用 0: 这里没真的探测存储, 是配置/依赖缺失直接判死
       return { ok: false, latencyMs: 0, message: (e as Error).message };
     }
-    if (this.storageCache && Date.now() - this.storageCache.at < STORAGE_PROBE_TTL_MS) {
-      return { ...this.storageCache.value, backend, cached: true };
+    const cached = await this.cache.get<CheckResult>(HealthService.STORAGE_PROBE_CACHE_KEY);
+    if (cached !== undefined) {
+      return { ...cached, backend, cached: true };
     }
     const start = Date.now();
     let value: CheckResult;
@@ -127,7 +130,7 @@ export class HealthService {
     } catch (e) {
       value = { ok: false, latencyMs: Date.now() - start, message: (e as Error).message };
     }
-    this.storageCache = { at: Date.now(), value };
+    await this.cache.set(HealthService.STORAGE_PROBE_CACHE_KEY, value, STORAGE_PROBE_TTL_MS);
     return { ...value, backend, cached: false };
   }
 

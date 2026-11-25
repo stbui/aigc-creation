@@ -26,6 +26,7 @@
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
 | 三环境档位 / 库与目录 | `backend/src/config/env-files.ts`、`backend/scripts/db-url.js`、`docs/environments.md` |
 | 数据库表结构 | `backend/prisma/schema.prisma` |
+| 跨请求缓存 / 默认 TTL | `backend/src/cache/cache.module.ts` 的 `CacheModule`；业务侧注入 `CACHE_MANAGER` |
 | 后台菜单与分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 设计令牌 | `frontend/src/styles/tokens.css` 的 `:root`；`admin.css` 的 `@theme inline` 只做语义桥接 |
 | 错误码与响应信封 | `docs/api-contract.md`；用户文案见 `docs/error-copy.md` |
@@ -54,6 +55,7 @@ backend/src/
   generate/         生成任务入口；执行实现位于 model/tasks
   admin/            后台接口、权限、调度、备份
   config/ common/   环境校验、错误、日志、限流、追踪、CSV
+  cache/            全局缓存模块（CACHE_MANAGER，内存 store）
   payments/ credits/ orders/ membership/ marketing/ products/
   account/ auth/ assets/ projects/ storage/ tickets/ notifications/
 backend/plugins/    内置协议插件清单；后台上传包另存 plugins-installed
@@ -125,6 +127,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 | 新增环境变量 | `ENV_SPECS`、`backend/.env.example`、三档 env | 影响库路径时同步 `scripts/db-url.js`；跑环境探针 |
 | 调整积分价 / 退款规则 | 能力售价 `CapabilityPricing`（初始值来自能力定义 `creditCost`）/ `common/setting-defs.ts` | 后台「能力与模型 → 售价」写入；退款规则走设置读取 |
 | 新增前端功能目录 | `pages/<域>/` 分层入口 | `docs/design/standards/frontend-module-conventions.md` 与模块导入测试 |
+| 新增进程内缓存 | 注入 `CACHE_MANAGER`（`cache/cache.module.ts`） | key 带域前缀、显式 TTL；写操作必须 `del` 对应 key，只缓存可重建的读投影 |
 
 ## 5. 命令
 

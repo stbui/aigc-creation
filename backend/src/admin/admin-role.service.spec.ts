@@ -8,13 +8,20 @@ describe('AdminRoleService.updatePermissions', () => {
     $transaction: ReturnType<typeof vi.fn>;
   };
   let service: AdminRoleService;
+  /** 本组只验证写事务；缓存只需满足 invalidatePermissions 的 del 调用 */
+  const cache = {
+    get: vi.fn(),
+    set: vi.fn(),
+    del: vi.fn().mockResolvedValue(true),
+    clear: vi.fn().mockResolvedValue(true),
+  };
 
   beforeEach(() => {
     prisma = {
       adminRole: { findUnique: vi.fn() },
       $transaction: vi.fn(),
     };
-    service = new AdminRoleService(prisma as never);
+    service = new AdminRoleService(prisma as never, cache as never);
   });
 
   it('同一事务内更新全部角色并返回准确的权限差异', async () => {
