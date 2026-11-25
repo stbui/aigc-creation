@@ -63,6 +63,7 @@ function createService() {
       get: (key: string) =>
         key === 'app.env' ? 'test' : key === 'db.url' ? 'file:./test.db' : undefined,
     } as never,
+    { get: vi.fn(), set: vi.fn() } as never,
   );
   return { service, prisma };
 }

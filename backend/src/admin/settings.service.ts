@@ -295,7 +295,7 @@ export class AdminSettingsService {
     await this.prisma.$transaction([...writes, ...clearOps]);
 
     // 写入即失效缓存，让新值立刻生效（不等 3s TTL）
-    this.settings.invalidate();
+    await this.settings.invalidate();
 
     this.logger.log(
       `设置变更 by ${actorName}: ${changes

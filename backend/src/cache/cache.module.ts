@@ -18,8 +18,9 @@ const DEFAULT_CACHE_TTL_MS = 30_000;
  *      `set` 时显式传 TTL，不要依赖默认值表达业务语义。
  *   3. 单实例语义：多实例部署时各进程独立，缓存只影响新鲜度。写操作必须
  *      **显式 del** 对应 key，不能只等 TTL 过期。
- *   4. 存储只为当前的内存实现；切换 Redis（见 docs/canvas-detailed-design.md）
- *      时改这里的 stores 即可，业务调用点不动。
+ *   4. 当前是内存 store，可直接保存 Map / Date / Buffer 等引用类型。切换 Redis
+ *      （见 docs/canvas-detailed-design.md）时除了改 stores，还要把缓存值改成
+ *      可序列化结构，否则取回的是普通对象而不是 Map / Buffer。
  */
 @Module({
   imports: [

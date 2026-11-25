@@ -37,7 +37,12 @@ describe('TasksAdminService 删除任务', () => {
     };
     generate = { removeTask: vi.fn() };
     signedUrl = { displayUrl: vi.fn((url: string) => url) };
-    service = new TasksAdminService(prisma as never, generate as never, signedUrl as never);
+    service = new TasksAdminService(
+      prisma as never,
+      generate as never,
+      signedUrl as never,
+      { get: vi.fn(), set: vi.fn() } as never,
+    );
   });
 
   it('已结束任务复用用户端清理逻辑', async () => {
@@ -105,7 +110,12 @@ describe('TasksAdminService 任务详情全链路', () => {
       routeAttempt: { findMany: vi.fn().mockResolvedValue([]) },
     };
     signedUrl = { displayUrl: vi.fn((url: string) => `signed:${url}`) };
-    service = new TasksAdminService(prisma as never, {} as never, signedUrl as never);
+    service = new TasksAdminService(
+      prisma as never,
+      {} as never,
+      signedUrl as never,
+      { get: vi.fn(), set: vi.fn() } as never,
+    );
   });
 
   it('按 routeRun / attemptNumber 返回线路尝试，并保持 task.read 与账单权限边界', async () => {

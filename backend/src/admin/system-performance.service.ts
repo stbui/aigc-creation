@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { statSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { resolve } from 'node:path';
@@ -24,7 +25,7 @@ import { SchedulerService } from './scheduler.service';
 export class SystemPerformanceService {
   /** 存储探活 TTL：与 /health 一致，避免页面刷新把云存储变成探针压力源 */
   private static readonly STORAGE_PROBE_TTL_MS = 30_000;
-  private storageCache: { at: number; value: StorageResult } | null = null;
+  private static readonly STORAGE_PROBE_CACHE_KEY = 'admin:system-performance:storage';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -32,6 +33,7 @@ export class SystemPerformanceService {
     private readonly routeHealth: RouteHealthService,
     private readonly scheduler: SchedulerService,
     private readonly config: ConfigService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   async snapshot() {
@@ -109,11 +111,11 @@ export class SystemPerformanceService {
 
   private async storageCheck(): Promise<StorageResult> {
     const backend = this.storage.activeBackend;
-    if (
-      this.storageCache &&
-      Date.now() - this.storageCache.at < SystemPerformanceService.STORAGE_PROBE_TTL_MS
-    ) {
-      return { ...this.storageCache.value, backend, cached: true };
+    const cached = await this.cache.get<StorageResult>(
+      SystemPerformanceService.STORAGE_PROBE_CACHE_KEY,
+    );
+    if (cached !== undefined) {
+      return { ...cached, backend, cached: true };
     }
     const start = Date.now();
     let value: StorageResult;
@@ -135,7 +137,11 @@ export class SystemPerformanceService {
         cached: false,
       };
     }
-    this.storageCache = { at: Date.now(), value };
+    await this.cache.set(
+      SystemPerformanceService.STORAGE_PROBE_CACHE_KEY,
+      value,
+      SystemPerformanceService.STORAGE_PROBE_TTL_MS,
+    );
     return value;
   }
 

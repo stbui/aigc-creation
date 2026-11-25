@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { CreditPriceService } from './credit-price.service';
 
+/** 单测只验证活动解析；缓存未命中即重建，用空实现即可 */
+function fakeCache() {
+  return { get: vi.fn(), set: vi.fn(), del: vi.fn().mockResolvedValue(true) } as never;
+}
+
 describe('CreditPriceService 限时免费活动容错', () => {
   it('payload 合法但 audience 损坏时按全站免费处理', async () => {
     const prisma = {
@@ -16,7 +21,7 @@ describe('CreditPriceService 限时免费活动容错', () => {
       },
       order: { count: vi.fn().mockResolvedValue(1) },
     };
-    const service = new CreditPriceService(prisma as never);
+    const service = new CreditPriceService(prisma as never, fakeCache());
 
     await expect(service.freeCampaignIdOf('free_create', 'paid-user')).resolves.toBe(
       'campaign-broken-audience',
@@ -38,7 +43,7 @@ describe('CreditPriceService 限时免费活动容错', () => {
       },
       order: { count: vi.fn() },
     };
-    const service = new CreditPriceService(prisma as never);
+    const service = new CreditPriceService(prisma as never, fakeCache());
 
     await expect(service.freeCampaignIdOf('free_create')).resolves.toBe('campaign-valid');
     await expect(service.freeCampaignIdOf('detail_image')).resolves.toBe('');

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import type { AdminUser } from './admin.decorator';
 import { AdminRoleService } from './admin-role.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -81,20 +82,23 @@ export interface AdminWorkbench {
  */
 @Injectable()
 export class AdminWorkbenchService {
-  private readonly cache = new Map<string, { at: number; data: AdminWorkbench }>();
+  private static cacheKey(role: string, actorId: string, roleView: string): string {
+    return `admin:workbench:${role}:${actorId}:${roleView}`;
+  }
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly roles: AdminRoleService,
     private readonly reconciliations: PaymentReconciliationService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   async get(actor: Pick<AdminUser, 'id' | 'role'>, requestedView?: string): Promise<AdminWorkbench> {
     const roleView = this.resolveView(actor.role, requestedView);
     // 财务工单组按「指派给我」过滤，缓存必须带 actorId，否则同角色不同账号会串数据
-    const cacheKey = `${actor.role}:${actor.id}:${roleView}`;
-    const cached = this.cache.get(cacheKey);
-    if (cached && Date.now() - cached.at < ALERT_CACHE_TTL_MS) return cached.data;
+    const cacheKey = AdminWorkbenchService.cacheKey(actor.role, actor.id, roleView);
+    const cached = await this.cache.get<AdminWorkbench>(cacheKey);
+    if (cached !== undefined) return cached;
 
     const permissions = await this.roles.getPermissions(actor.role);
     const can = (permission: string) => permissions.includes(permission);
@@ -128,7 +132,7 @@ export class AdminWorkbenchService {
       roleView,
       groups,
     };
-    this.cache.set(cacheKey, { at: Date.now(), data });
+    await this.cache.set(cacheKey, data, ALERT_CACHE_TTL_MS);
     return data;
   }
 

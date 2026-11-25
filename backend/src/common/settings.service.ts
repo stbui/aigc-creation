@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SecretCipher } from '../model/infra/secret-cipher';
@@ -31,31 +32,33 @@ import {
  * **为什么有缓存**: 上传校验在每次上传时都要读上限，生成任务创建也要读，
  * 每读一次就查一次库不可接受。缓存 3s 意味着「后台改完最多 3 秒生效」，
  * 这个延迟对运营完全可接受；后台写入后调 `invalidate()` 立即失效。
- * 参照物是 `credit-price.service.ts` 的同一套模式。
+ * 与 `credit-price.service.ts` 一样走 `CacheModule` 的 `CACHE_MANAGER`。
  */
 const CACHE_TTL_MS = 3000;
+/** 整份设置的缓存键；值同时含原始值与修改人，读一次库覆盖全部键 */
+const SETTINGS_CACHE_KEY = 'settings:snapshot';
+
+interface SettingsSnapshot {
+  /** key → 数据库原始值。敏感项必须保留密文，不能在这里提前解密或归一化。 */
+  values: Map<string, string>;
+  /** key → 上次修改的操作人，供设置页显示「上次由 X 改」 */
+  actors: Map<string, { updatedBy: string | null; updatedAt: Date | null }>;
+}
 
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
 
-  /** key → 数据库原始值。敏感项必须保留密文，不能在这里提前解密或归一化。 */
-  private cache = new Map<string, string>();
-  /** key → 上次修改的操作人，供设置页显示「上次由 X 改」 */
-  private actorCache = new Map<string, { updatedBy: string | null; updatedAt: Date | null }>();
-  private cacheAt = 0;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly cipher: SecretCipher,
     private readonly config: ConfigService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   /** 后台改设置后立即失效缓存。不调也能等 TTL，但改设置应即时生效 */
-  invalidate(): void {
-    this.cache.clear();
-    this.actorCache.clear();
-    this.cacheAt = 0;
+  async invalidate(): Promise<void> {
+    await this.cache.del(SETTINGS_CACHE_KEY);
   }
 
   /**
@@ -69,8 +72,8 @@ export class SettingsService {
     if (!def) throw new AppError(40400, `未知设置项: ${key}`, 404);
     if (def.sensitive) return '' as T;
 
-    await this.ensureFresh();
-    const raw = this.cache.get(key);
+    const { values } = await this.snapshot();
+    const raw = values.get(key);
     return (raw === undefined ? def.default : parseSettingValue(raw, def)) as T;
   }
 
@@ -86,8 +89,8 @@ export class SettingsService {
     if (!def) throw new AppError(40400, `未知设置项: ${key}`, 404);
     if (!def.sensitive) throw new AppError(40001, `设置项不是敏感配置: ${key}`, 400);
 
-    await this.ensureFresh();
-    const raw = this.cache.get(key);
+    const { values } = await this.snapshot();
+    const raw = values.get(key);
     if (!raw) return '';
     try {
       return this.cipher.decrypt(raw);
@@ -140,14 +143,14 @@ export class SettingsService {
 
   /** 一次性读全部设置项的生效值（含缓存） */
   async getAll(): Promise<Record<string, SettingValue>> {
-    await this.ensureFresh();
+    const { values } = await this.snapshot();
     const out: Record<string, SettingValue> = {};
     for (const def of SETTING_DEFS) {
       if (def.sensitive) {
         out[def.key] = '';
         continue;
       }
-      const raw = this.cache.get(def.key);
+      const raw = values.get(def.key);
       out[def.key] = raw === undefined ? def.default : parseSettingValue(raw, def);
     }
     return out;
@@ -185,8 +188,8 @@ export class SettingsService {
 
   /** 某项的最后修改人 / 修改时间 */
   async getMeta(key: string): Promise<{ updatedBy: string | null; updatedAt: Date | null }> {
-    await this.ensureFresh();
-    return this.actorCache.get(key) ?? { updatedBy: null, updatedAt: null };
+    const { actors } = await this.snapshot();
+    return actors.get(key) ?? { updatedBy: null, updatedAt: null };
   }
 
   /**
@@ -280,37 +283,37 @@ export class SettingsService {
     };
   }
 
+  /** 读取缓存快照；未命中时从库重建并写回 3 秒 TTL */
+  private async snapshot(): Promise<SettingsSnapshot> {
+    const cached = await this.cache.get<SettingsSnapshot>(SETTINGS_CACHE_KEY);
+    if (cached !== undefined) return cached;
+    return this.refresh();
+  }
+
   /**
    * 刷新缓存：一次 findMany 覆盖全部设置项。
    *
    * 只取本模块定义的键 —— SystemSetting 表里还混着 `creditPrice.*`
    * （积分价有自己的缓存与键空间），全表扫进来再丢弃是白读。
    */
-  private async ensureFresh(): Promise<void> {
-    if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
-      await this.refresh();
-    }
-  }
-
-  private async refresh(): Promise<void> {
+  private async refresh(): Promise<SettingsSnapshot> {
     const known = new Set(SETTING_DEFS.map((d) => d.key));
     const rows = await this.prisma.systemSetting.findMany();
-    const cache = new Map<string, string>();
+    const values = new Map<string, string>();
     const actors = new Map<string, { updatedBy: string | null; updatedAt: Date | null }>();
 
     for (const row of rows) {
       if (!known.has(row.key)) continue;
       const def = findSettingDef(row.key);
       if (!def) continue;
-      cache.set(row.key, row.value);
+      values.set(row.key, row.value);
       actors.set(row.key, { updatedBy: row.updatedBy, updatedAt: row.updatedAt });
     }
 
-    this.cache = cache;
-    this.actorCache = actors;
-    this.cacheAt = Date.now();
+    const snapshot: SettingsSnapshot = { values, actors };
+    await this.cache.set(SETTINGS_CACHE_KEY, snapshot, CACHE_TTL_MS);
+    return snapshot;
   }
-
 }
 
 export interface UploadLimits {

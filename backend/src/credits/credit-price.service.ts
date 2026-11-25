@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -11,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
  * 缓存 3 秒：活动到点后最多 3 秒恢复原价，不需要补偿任务把价格改回来。
  */
 const CACHE_TTL_MS = 3000;
+const CAMPAIGNS_CACHE_KEY = 'credits:free-campaigns';
 
 interface FreeCampaign {
   id: string;
@@ -19,22 +21,20 @@ interface FreeCampaign {
 
 @Injectable()
 export class CreditPriceService {
-  /** 能力 id → 进行中的免费活动。 */
-  private freeCampaigns = new Map<string, FreeCampaign[]>();
-  private cacheAt = 0;
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+  ) {}
 
   /** 活动配置变更后立即失效；不调最多等 3 秒 TTL。 */
-  invalidate(): void {
-    this.freeCampaigns.clear();
-    this.cacheAt = 0;
+  async invalidate(): Promise<void> {
+    await this.cache.del(CAMPAIGNS_CACHE_KEY);
   }
 
   /** 该能力命中的限时免费活动 id；未命中返回空串（账单 `promotionId` 用）。 */
   async freeCampaignIdOf(capabilityId: string, userId?: string): Promise<string> {
-    if (Date.now() - this.cacheAt > CACHE_TTL_MS) await this.refresh();
-    const campaigns = this.freeCampaigns.get(String(capabilityId ?? '')) ?? [];
+    const campaignsByCapability = await this.campaigns();
+    const campaigns = campaignsByCapability.get(String(capabilityId ?? '')) ?? [];
     const global = campaigns.find((campaign) => !campaign.onlyNewUsers);
     if (global) return global.id;
 
@@ -43,7 +43,16 @@ export class CreditPriceService {
     return (await this.isNewUser(userId)) ? targeted.id : '';
   }
 
-  private async refresh(): Promise<void> {
+  /** 进行中的免费活动；命中缓存时直接复用，未命中重建并写回 3 秒 TTL */
+  private async campaigns(): Promise<Map<string, FreeCampaign[]>> {
+    const cached = await this.cache.get<Map<string, FreeCampaign[]>>(CAMPAIGNS_CACHE_KEY);
+    if (cached !== undefined) return cached;
+    const campaigns = await this.buildCampaigns();
+    await this.cache.set(CAMPAIGNS_CACHE_KEY, campaigns, CACHE_TTL_MS);
+    return campaigns;
+  }
+
+  private async buildCampaigns(): Promise<Map<string, FreeCampaign[]>> {
     const now = new Date();
     const campaigns = await this.prisma.campaign.findMany({
       where: { type: 'limited_free', status: 'active', startAt: { lte: now }, endAt: { gte: now } },
@@ -71,8 +80,7 @@ export class CreditPriceService {
         free.set(id, entries);
       }
     }
-    this.freeCampaigns = free;
-    this.cacheAt = Date.now();
+    return free;
   }
 
   private async isNewUser(userId: string): Promise<boolean> {

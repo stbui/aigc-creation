@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateService } from '../generate/generate.service';
 import { AppError } from '../common/app.exception';
@@ -55,6 +56,7 @@ export class TasksAdminService {
     private readonly prisma: PrismaService,
     private readonly generate: GenerateService,
     private readonly signedUrl: SignedUrlService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   /**
@@ -71,11 +73,7 @@ export class TasksAdminService {
    * 每翻一页都扫两遍全表在 SQLite 上会随着任务量增长越来越慢，而筛选项
    * 的计数并不需要秒级准确 —— 一分钟足够。拥堵指标仍实时查询。
    */
-  private facetCache: {
-    at: number;
-    capabilities: Array<{ capability: string; count: number }>;
-    failureGroups: Array<{ errorCode: string; count: number }>;
-  } | null = null;
+  private static readonly FACET_CACHE_KEY = 'admin:task-facets';
   private static readonly FACET_TTL_MS = 60_000;
 
   async list(query: TaskListQueryInput): Promise<{
@@ -166,13 +164,11 @@ export class TasksAdminService {
     capabilities: Array<{ capability: string; count: number }>;
     failureGroups: Array<{ errorCode: string; count: number }>;
   }> {
-    const cached = this.facetCache;
-    if (cached && Date.now() - cached.at < TasksAdminService.FACET_TTL_MS) {
-      return {
-        capabilities: cached.capabilities,
-        failureGroups: cached.failureGroups,
-      };
-    }
+    const cached = await this.cache.get<{
+      capabilities: Array<{ capability: string; count: number }>;
+      failureGroups: Array<{ errorCode: string; count: number }>;
+    }>(TasksAdminService.FACET_CACHE_KEY);
+    if (cached !== undefined) return cached;
 
     const since = new Date(Date.now() - 24 * 3_600_000);
     const [capGroups, failureGroups] = await Promise.all([
@@ -197,7 +193,7 @@ export class TasksAdminService {
         .map((g) => ({ errorCode: g.errorCode ?? '', count: g._count._all }))
         .filter((g) => g.errorCode),
     };
-    this.facetCache = { at: Date.now(), ...facets };
+    await this.cache.set(TasksAdminService.FACET_CACHE_KEY, facets, TasksAdminService.FACET_TTL_MS);
     return facets;
   }
 

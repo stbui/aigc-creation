@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { RouterService } from '../model/routing/router.service';
 import { CAPABILITIES, CAPABILITY_GROUPS, getCapability } from './capability.registry';
@@ -79,14 +80,17 @@ interface ControlRow {
 @Injectable()
 export class CapabilityAvailabilityService {
   private readonly log = new Logger(CapabilityAvailabilityService.name);
-  private cache: { at: number; rows: Map<string, ControlRow> } | null = null;
+  private static readonly CONTROLS_CACHE_KEY = 'capabilities:controls';
 
-  /** 每项能力的线路可用性缓存（能力 id → 结论） */
-  private readonly remoteCache = new Map<string, { at: number; info: RemoteInfo }>();
+  /** 每项能力的线路可用性缓存键（能力 id 数量有限，失效时逐项删除） */
+  private static remoteCacheKey(capabilityId: string): string {
+    return `capabilities:remote:${capabilityId}`;
+  }
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly router: RouterService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   /**
@@ -96,8 +100,9 @@ export class CapabilityAvailabilityService {
    * 与 `RouterService` 选路用的是同一份快照，不会出现口径分歧。
    */
   private async remoteOf(capabilityId: string): Promise<RemoteInfo> {
-    const hit = this.remoteCache.get(capabilityId);
-    if (hit && Date.now() - hit.at < REMOTE_TTL_MS) return hit.info;
+    const key = CapabilityAvailabilityService.remoteCacheKey(capabilityId);
+    const hit = await this.cache.get<RemoteInfo>(key);
+    if (hit !== undefined) return hit;
 
     let info: RemoteInfo = { available: false, label: '' };
     try {
@@ -110,23 +115,31 @@ export class CapabilityAvailabilityService {
       // 目录读失败只影响「预期徽标」，不能让 /capabilities 整个 500
       this.log.warn(`读取能力目录失败, ${capabilityId} 按无可用线路处理 — ${(e as Error).message}`);
     }
-    this.remoteCache.set(capabilityId, { at: Date.now(), info });
+    await this.cache.set(key, info, REMOTE_TTL_MS);
     return info;
   }
 
   /** 清空缓存（后台写入后调用，避免「刚下线还能提交」的 3 秒空窗） */
-  invalidate(): void {
-    this.cache = null;
-    this.remoteCache.clear();
+  async invalidate(): Promise<void> {
+    await Promise.all([
+      this.cache.del(CapabilityAvailabilityService.CONTROLS_CACHE_KEY),
+      ...CAPABILITIES.map((def) =>
+        this.cache.del(CapabilityAvailabilityService.remoteCacheKey(def.id)),
+      ),
+    ]);
   }
 
   private async controls(): Promise<Map<string, ControlRow>> {
-    if (this.cache && Date.now() - this.cache.at < CONTROL_TTL_MS) return this.cache.rows;
+    const cached = await this.cache.get<Map<string, ControlRow>>(
+      CapabilityAvailabilityService.CONTROLS_CACHE_KEY,
+    );
+    if (cached !== undefined) return cached;
+
     const rows = await this.prisma.capabilityControl.findMany();
     const map = new Map<string, ControlRow>(
       rows.map((r) => [r.capabilityId, { capabilityId: r.capabilityId, enabled: r.enabled, reason: r.reason }]),
     );
-    this.cache = { at: Date.now(), rows: map };
+    await this.cache.set(CapabilityAvailabilityService.CONTROLS_CACHE_KEY, map, CONTROL_TTL_MS);
     return map;
   }
 
@@ -225,7 +238,7 @@ export class CapabilityAvailabilityService {
       create: { capabilityId, enabled, reason: enabled ? null : trimmed, updatedBy: actor },
       update: { enabled, reason: enabled ? null : trimmed, updatedBy: actor },
     });
-    this.invalidate();
+    await this.invalidate();
     this.log.log(`能力 ${capabilityId} ${enabled ? '上线' : '下线'}（${actor}）`);
     return row;
   }

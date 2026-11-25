@@ -7,7 +7,11 @@ function createService(upsert = vi.fn()) {
   const prisma = {
     capabilityControl: { upsert },
   };
-  return new CapabilityAvailabilityService(prisma as never, { hasHealthyLine: async () => false } as never);
+  return new CapabilityAvailabilityService(
+    prisma as never,
+    { hasHealthyLine: async () => false } as never,
+    { get: vi.fn(), set: vi.fn(), del: vi.fn().mockResolvedValue(true) } as never,
+  );
 }
 
 describe('CapabilityAvailabilityService.setEnabled', () => {

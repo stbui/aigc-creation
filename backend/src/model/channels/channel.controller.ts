@@ -304,7 +304,7 @@ export class AdminChannelsController {
   async resetHealth() {
     const cleared = this.health.resetCooling();
     // 指标列表缓存 30s，里面带着冷却快照；不失效的话刚解除完页面还会显示「冷却中」
-    this.metrics.invalidate();
+    await this.metrics.invalidate();
     return { cleared };
   }
 

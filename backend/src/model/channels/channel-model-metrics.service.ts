@@ -40,7 +40,8 @@
  * 成功率当成全窗口成功率。
  */
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ChannelHealthService, type ChannelHealthRow } from './channel-health.service';
 
@@ -103,17 +104,18 @@ export class ChannelModelMetricsService {
    * 每请求都扫一遍 7 天日志会拖垮公开入口。30s 足够让运营改完配置看到变化，
    * 又不会让匿名流量反复打日志表。
    */
-  private cache: { at: number; rows: ChannelModelHealthRow[] } | null = null;
+  private static readonly CACHE_KEY = 'model:channel-metrics';
   private static readonly CACHE_TTL_MS = 30_000;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly health: ChannelHealthService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   /** 外部写入（启停 / 改价）后主动失效，避免后台看到旧指标 */
-  invalidate(): void {
-    this.cache = null;
+  async invalidate(): Promise<void> {
+    await this.cache.del(ChannelModelMetricsService.CACHE_KEY);
   }
 
   /**
@@ -124,12 +126,16 @@ export class ChannelModelMetricsService {
    * 一次取回更省。
    */
   async list(channelId?: string): Promise<ChannelModelHealthRow[]> {
-    const now = Date.now();
-    if (!this.cache || now - this.cache.at > ChannelModelMetricsService.CACHE_TTL_MS) {
-      this.cache = { at: now, rows: await this.buildList() };
+    let rows = await this.cache.get<ChannelModelHealthRow[]>(ChannelModelMetricsService.CACHE_KEY);
+    if (rows === undefined) {
+      rows = await this.buildList();
+      await this.cache.set(
+        ChannelModelMetricsService.CACHE_KEY,
+        rows,
+        ChannelModelMetricsService.CACHE_TTL_MS,
+      );
     }
-    const base = this.cache.rows;
-    return channelId ? base.filter((row) => row.channelId === channelId) : base;
+    return channelId ? rows.filter((row) => row.channelId === channelId) : rows;
   }
 
   /** 真实计算（未缓存）：一次取回全部线路 + 窗口内日志，在内存里分组 */

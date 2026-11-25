@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { getCapability } from '../capabilities/capability.registry';
@@ -27,21 +28,23 @@ export class AdminOverviewService {
    * 30 秒足以挡住重复点击「刷新」，又不会让运营看到明显过期的数字。
    * 响应里带 `generatedAt`，前端明确展示数据截至时间。
    */
-  private readonly cache = new Map<number, { at: number; data: OverviewPayload }>();
   private static readonly CACHE_TTL_MS = 30_000;
+  private static cacheKey(days: number): string {
+    return `admin:overview:${days}`;
+  }
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly signedUrl: SignedUrlService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
   async overview(days: number) {
-    const cached = this.cache.get(days);
-    if (cached && Date.now() - cached.at < AdminOverviewService.CACHE_TTL_MS) {
-      return cached.data;
-    }
+    const key = AdminOverviewService.cacheKey(days);
+    const cached = await this.cache.get<OverviewPayload>(key);
+    if (cached !== undefined) return cached;
     const data = await this.buildOverview(days);
-    this.cache.set(days, { at: Date.now(), data });
+    await this.cache.set(key, data, AdminOverviewService.CACHE_TTL_MS);
     return data;
   }
 

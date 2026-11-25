@@ -104,6 +104,8 @@
 - 跨请求缓存统一注入 `CACHE_MANAGER`（`src/cache/cache.module.ts` 的 `CacheModule`），
   不再新增手写 TTL Map；key 带域前缀并显式传 TTL，写操作必须 `del` 对应 key。
   缓存只承载可重建、丢失无副作用的读投影；任务 / 账单 / 积分等事实仍以数据库为准。
+  例外：带 stale-while-revalidate、同步读或远端拉取语义的快照（`CapabilityCatalogService`、
+  `ProtocolCatalogService`、`ProviderCatalogService`）保留自身实现。
 
 ## 8. 命名与代码风格
 
