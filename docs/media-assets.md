@@ -1,6 +1,6 @@
 # 媒体资产规范
 
-本文件规定上传、生成产出、存储 key、缩略图、签名访问、AIGC 标识与删除保留。安全边界见 [`security.md`](security.md) §5，图片 `alt` 与播放器可访问性见 [`accessibility.md`](accessibility.md) §4，AIGC 标识的运行时行为见 [`runtime-infrastructure.md`](runtime-infrastructure.md) §1。
+本文件规定上传、生成产出、存储 key、缩略图、签名访问、AIGC 标识与删除保留。安全边界见 [`security.md`](security.md) §5，图片 `alt` 与播放器可访问性见 [`accessibility.md`](design/standards/accessibility.md) §4，AIGC 标识的运行时行为见 [`runtime-infrastructure.md`](runtime-infrastructure.md) §1。
 
 ## 1. 资产类型与事实源
 

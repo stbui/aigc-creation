@@ -1,7 +1,7 @@
 # 支付域页面与前端设计
 
 > 状态：后台 `/admin/payments` 与 C 端结算页的实现规格。页面已落地；与代码冲突时以代码为准。
-> 设计目标与决策见 [`payment-refactor-design.md`](payment-refactor-design.md)，后端契约见 [`payment-detailed-design.md`](payment-detailed-design.md)。
+> 设计目标与决策见 [`payment-refactor-design.md`](../../payment-refactor-design.md)，后端契约见 [`payment-detailed-design.md`](../../payment-detailed-design.md)。
 > 章节号已按本文重排；拆分前的原始编号不再保留。
 
 ## 1. 后台页面规格：`/admin/payments`
@@ -220,7 +220,7 @@ export function paymentOrderWhere(
 注意：
 
 - Prisma 同一对象同时出现顶层 `OR` 与 `AND` 是合法且为「AND 合并」；代码评审时优先写 `AND: [...]` 数组，保持可读。
-- `lastError: { not: null }` 在 SQLite 仍会命中空串。写入层已把空串归一化为 `null`（见 §3.6），但迁移期旧数据可能残留空串。**必须先跑 [`payment-detailed-design.md`](payment-detailed-design.md) §6.8 第 6 步清洗**；若不能清洗，`create_failed / created / pending` 三个分支都要把 `lastError` 条件改成「null 或空串」，只改 `create_failed` 会让订单从三个状态里同时消失。
+- `lastError: { not: null }` 在 SQLite 仍会命中空串。写入层已把空串归一化为 `null`（见 §3.6），但迁移期旧数据可能残留空串。**必须先跑 [`payment-detailed-design.md`](../../payment-detailed-design.md) §6.8 第 6 步清洗**；若不能清洗，`create_failed / created / pending` 三个分支都要把 `lastError` 条件改成「null 或空串」，只改 `create_failed` 会让订单从三个状态里同时消失。
 - `closing` 与 `create_failed` 的边界用 `gt` / `lte` 严格互补，恰好 5 分钟的订单归入「失败/普通 pending」，不会两边都不命中。
 
 ### 3.3 关键字、渠道与时间映射
@@ -254,7 +254,7 @@ const timeWhere = (() => {
 边界规则：
 
 - `from` 缺省且 `to` 有值：从 `to` 当天 00:00 起算不合理，按「不限制开始」处理；`to` 缺省则「不限制结束」。两者都有时要求 `from <= to`。
-- `providerPaidAt` 对历史空值不 fallback 到 `paidAt`；否则「支付时间」与「入账时间」筛选结果相同，失去区分意义。旧数据回填见 [`payment-detailed-design.md`](payment-detailed-design.md) §6.8。
+- `providerPaidAt` 对历史空值不 fallback 到 `paidAt`；否则「支付时间」与「入账时间」筛选结果相同，失去区分意义。旧数据回填见 [`payment-detailed-design.md`](../../payment-detailed-design.md) §6.8。
 - `keyword` 上限 120；只通过 Prisma `contains` 交给参数化 LIKE，不拼 SQL。用户输入里的 `%` / `_` 仍会被 SQLite LIKE 当通配符解释 —— 不是注入，但会扩大匹配面；要么在 DTO 层拒绝这两个字符，要么在搜索框提示「支持部分匹配」，不要为此手写 `$queryRaw`。SQLite 默认 ASCII 大小写不敏感；中文按原样匹配，Prisma SQLite 也不支持 `mode: 'insensitive'`。
 - `sort` 白名单：`createdAt / providerPaidAt / paidAt / amountCents`；方向缺省 `desc`。其它值返回 `40001`，不能把字段名原样拼进 SQL。
 
@@ -425,7 +425,7 @@ export function orderByOf(sort?: string): Prisma.OrderOrderByWithRelationInput[]
 
 规则：
 
-- 默认 `createdAt:desc`；金额排序按 `paidCents`，依赖 [`payment-detailed-design.md`](payment-detailed-design.md) §6.8 的历史回填，否则旧支付单会全部按 0 排在最后。
+- 默认 `createdAt:desc`；金额排序按 `paidCents`，依赖 [`payment-detailed-design.md`](../../payment-detailed-design.md) §6.8 的历史回填，否则旧支付单会全部按 0 排在最后。
 - `nulls: 'last'` 只对可空列（`providerPaidAt / paidAt`）使用；`createdAt`、`paidCents` 非空，传 `SortOrderInput` 会过不了 Prisma 类型，必须走普通 `SortOrder` 分支。
 - 必须带次排序 `id`。仅按 `createdAt` 排序时，同一毫秒创建的多笔订单在 `LIMIT/OFFSET` 下可能跨页重复或漏掉。
 - `sort` 只接受 `field:asc|desc`；不接受空方向、额外冒号、SQL 片段。方向缺省按 `desc` 只用于兼容旧链接，新前端始终显式传。
@@ -509,7 +509,7 @@ return { items: rows.map(toAdminPaymentOrderRow), total, page, pageSize };
 
 ### 4.6 索引落地
 
-[`payment-detailed-design.md`](payment-detailed-design.md) §6.2 需要补齐以下索引（已有项不重复加）：
+[`payment-detailed-design.md`](../../payment-detailed-design.md) §6.2 需要补齐以下索引（已有项不重复加）：
 
 ```prisma
   @@index([providerPaidAt])
@@ -577,7 +577,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - 导出与列表共用 `where` 和 `orderBy`，只忽略分页；不允许导出接口单独实现一套筛选。
 - 多取 1 行判断截断，响应头 `X-Export-Truncated: true`；前端可在 toast 提示「已导出前 10000 行」。不要往 CSV 里插说明行，否则列数会错。
 - `sendCsv` 内部已处理 UTF-8 BOM、公式注入与文件名；不要再手写 `Content-Disposition`。
-- 导出列按 [`payment-detailed-design.md`](payment-detailed-design.md) §7.6；金额用 `effectiveAmountCents`，状态用展示状态文案，时间按 `Asia/Shanghai` 格式化。
+- 导出列按 [`payment-detailed-design.md`](../../payment-detailed-design.md) §7.6；金额用 `effectiveAmountCents`，状态用展示状态文案，时间按 `Asia/Shanghai` 格式化。
 - 必须挂 `@RequireAllPermissions('payment.read', 'data.export')`；导出日志记录筛选条件摘要，不记录密钥、checkout URL、完整用户邮箱列表。
 - 前端在「草稿与应用值不同」时禁用导出，后端仍以实际 query 为准，不能信任前端。
 

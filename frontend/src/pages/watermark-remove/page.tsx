@@ -24,7 +24,7 @@ import { WatermarkRemoveUploadPreview } from './WatermarkRemoveUploadPreview';
  * 仅有抓手 / 对比（未出结果时禁用）/ 框选；默认框选。
  * 可见标注是 DOM（.mask-layer > .mask-mark），提交时才生成透明遮罩 PNG。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：画布舞台 `WatermarkRemoveStage`
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：画布舞台 `WatermarkRemoveStage`
  * （工具栏 `WatermarkRemoveToolbar` / 底部操作条 `WatermarkRemoveCanvasFooter`）、
  * 水印标记面板 `WatermarkRemoveAnnotationPanel`（逐条 `WatermarkRemoveAnnotationRow`）、
  * 上传预览 `WatermarkRemoveUploadPreview` 与空态 `WatermarkRemoveIntro`；

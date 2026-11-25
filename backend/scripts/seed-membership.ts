@@ -1,7 +1,7 @@
 /**
  * 会员套餐种子。
  *
- * 档位、月配额与价格对齐参考站 SeeAny `/vip`（见 docs/packages-design.md）：
+ * 档位、月配额与价格对齐参考站 SeeAny `/vip`（见 docs/design/web/packages-design.md）：
  * 免费 + 标准 / 进阶 / 专业 / 尊享 / 旗舰 / 至尊六档付费，月配额 2,000–100,000。
  *
  * 代码位（code）沿用既有值：basic / pro / studio 是历史档位，改名而非改码，

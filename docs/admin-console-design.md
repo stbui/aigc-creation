@@ -1,6 +1,6 @@
 # 后台管理端 · 功能设计
 
-后台各页面的职责、可用动作与数据口径。信息架构与角色权限见 `docs/admin-suite-design.md`，字段级细节见 `docs/admin-detailed-design.md`，界面规格见 `docs/admin-ui-design.md`。
+后台各页面的职责、可用动作与数据口径。信息架构与角色权限见 `docs/admin-suite-design.md`，字段级细节见 `docs/admin-detailed-design.md`，界面规格见 `docs/design/admin/admin-ui-design.md`。
 
 | 项 | 事实源 |
 | --- | --- |

@@ -1,5 +1,5 @@
 /**
- * 用户管理模块的外部控件唯一入口（按 `docs/frontend-module-conventions.md` §2）。
+ * 用户管理模块的外部控件唯一入口（按 `docs/design/standards/frontend-module-conventions.md` §2）。
  *
  * 统一 re-export 本目录用到的外部 UI 控件（`~/admin-ui/radar`）、共享组件
  * （`~/components/admin`）及其配套类型。目录内文件一律从 `./components` 取控件，

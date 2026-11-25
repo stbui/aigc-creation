@@ -1,7 +1,7 @@
 /**
  * AI 带货图文 —— 参考站 shoppable-carousel。上传商品图, 选模板 + 卖点文案, 批量出图文套图。
  *
- * 2026-11-03 新增。参考站实拍见 `docs/shoppable-carousel-design.md`,
+ * 2026-11-03 新增。参考站实拍见 `docs/design/web/shoppable-carousel-design.md`,
  * 模板数据与来源见 `docs/shoppable-carousel-template-sources.md`。
  *
  * ## 与其它能力的差别：一次提交出 N 张「图文」

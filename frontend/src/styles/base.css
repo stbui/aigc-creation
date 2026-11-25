@@ -77,7 +77,7 @@ body {
 }
 
 /**
- * 全局键盘焦点环（WCAG 2.2 AA，见 `docs/accessibility.md` §1「焦点必须可见」）。
+ * 全局键盘焦点环（WCAG 2.2 AA，见 `docs/design/standards/accessibility.md` §1「焦点必须可见」）。
  *
  * 此前焦点样式是 12 处零散覆盖（auth / tool-workspace / redraw / product-detail-kit /
  * AppSidebar / ui.css），没被覆盖到的裸 `<button>` 与 `<a onClick>` 在 Tab 遍历时

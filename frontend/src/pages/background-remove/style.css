@@ -574,7 +574,7 @@
    原先 5 个 @media (max-width: 900px) 分散在基础规则之间，而
    `.pk-workspace.background-remove-page` 的基础规则写在它们之后：两者特异性相同，
    后置的基础规则（432px + minmax(560px,1fr)）压掉了媒体块里的单列声明，
-   390 宽因此横向溢出。这里按 docs/responsive-layout.md §4.2 重排：
+   390 宽因此横向溢出。这里按 docs/design/standards/responsive-layout.md §4.2 重排：
    基础规则在前、媒体块在后（901–1366 → ≤900 → ≤640），数值一律未改。 ── */
 
 @media (min-width: 901px) and (max-width: 1366px) {

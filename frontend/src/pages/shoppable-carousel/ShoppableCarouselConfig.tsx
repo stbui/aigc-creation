@@ -18,7 +18,7 @@ import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, 
 /**
  * 左栏配置区。
  *
- * 五个区块的顺序与文案严格对齐参考站实拍（`docs/shoppable-carousel-design.md` §3）：
+ * 五个区块的顺序与文案严格对齐参考站实拍（`docs/design/web/shoppable-carousel-design.md` §3）：
  *   上传图片 → 生成设置 → 商品卖点&生成要求 → 生成模式 → 附加功能。
  *
  * 控件类型按本站体系落地：参考站用旧的 Select/Switch，本站用 `ui` 层的

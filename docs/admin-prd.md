@@ -449,7 +449,7 @@
 | 文档 | 内容 |
 |---|---|
 | `docs/admin-detailed-design.md` | 功能详细设计（实现级） |
-| `docs/admin-ui-design.md` | 界面设计（页面视角） |
+| `docs/design/admin/admin-ui-design.md` | 界面设计（页面视角） |
 | `docs/admin-suite-design.md` | 全域模块地图、RBAC 矩阵、设计规范 |
 | `docs/admin-console-design.md` | 运营域模块与端点明细 |
 | `docs/commerce-design.md` | 交易域表结构、状态机、支付抽象 |

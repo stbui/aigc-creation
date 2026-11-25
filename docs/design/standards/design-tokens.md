@@ -1,6 +1,6 @@
 # 设计令牌标准
 
-全站颜色、圆角、阴影与组件几何值的令牌体系以 [`frontend/src/styles/tokens.css`](../frontend/src/styles/tokens.css) 的 `:root` 为主；后台业务内容层的 Radar 令牌由 [`frontend/src/styles/radar-admin.css`](../frontend/src/styles/radar-admin.css) 独立定义。本文件规定令牌怎么分层、怎么命名、加在哪里、谁能引用。
+全站颜色、圆角、阴影与组件几何值的令牌体系以 [`frontend/src/styles/tokens.css`](../../../frontend/src/styles/tokens.css) 的 `:root` 为主；后台业务内容层的 Radar 令牌由 [`frontend/src/styles/radar-admin.css`](../../../frontend/src/styles/radar-admin.css) 独立定义。本文件规定令牌怎么分层、怎么命名、加在哪里、谁能引用。
 
 与 [`typography.md`](typography.md) 的分工：本文件管「令牌体系」，`typography.md` 管字体栈、字号与组件微规格。
 
@@ -73,7 +73,7 @@
 1. 先判断用途：跨页面语义 → 通用层；单页面/组件 → 组件层；纯几何原子 → 基础层。
 2. 在对应令牌文件追加：全站 / 后台外壳写 `tokens.css`，后台业务内容层写 `radar-admin.css`；带上用途注释与必要的对比度说明（状态色、弱文字需要给出 AA 依据）。
 3. 同步检查 `admin.css` / `radar-admin.css` / `ui/styles.css` 的 `@theme inline` 是否需要桥接（仅 shadcn 语义变量需要）。
-4. 若新增的是组件前缀，在 `docs/frontend-module-conventions.md` 的页面 CSS 归属段落里补一行归属。
+4. 若新增的是组件前缀，在 `docs/design/standards/frontend-module-conventions.md` 的页面 CSS 归属段落里补一行归属。
 5. 跑审计：确认令牌无重复、页面无裸 hex、无 12px 以下字号。
 
 ## 5. 审计命令

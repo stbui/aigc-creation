@@ -1,5 +1,5 @@
 /**
- * 消息通知模块的外部控件唯一入口（按 `docs/frontend-module-conventions.md` §2）。
+ * 消息通知模块的外部控件唯一入口（按 `docs/design/standards/frontend-module-conventions.md` §2）。
  *
  * 统一 re-export 本目录用到的 `~/admin-ui/radar` 控件；目录内文件一律从
  * `./components` 取控件，不直连 `~/admin-ui`。模块自有业务组件

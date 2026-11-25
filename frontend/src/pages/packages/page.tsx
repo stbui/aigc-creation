@@ -20,7 +20,7 @@ import { PackagesProductSection } from './PackagesProductSection';
  * 金额一律整数分由后端下发, 本页只做 `¥ + 分/100` 的格式化 ——
  * 边界转换只在一处发生, 避免各处四舍五入不一致。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：页头 `PackagesHero`、
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：页头 `PackagesHero`、
  * 会员 `PackagesPlanSection`、积分包 `PackagesProductSection`；价目与会员状态
  * 取数落 `hooks.ts` 的 `usePackagesCatalog`，按钮文案 / 单价与筛选落 `utils.ts`。
  */

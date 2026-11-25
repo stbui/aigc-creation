@@ -10,8 +10,8 @@ import { expect, test, type Page } from '@playwright/test';
  * - **必须以访客身份运行**：默认 `playwright.config.ts` 不带 `storageState`。
  *   若带登录态，上传会真落库，本文件里「访客态停在请先登录」的断言不成立。
  *
- * 命令行见 `docs/testing.md` §3.5。会话契约见 `docs/responsive-layout.md` §6
- * （390px 无横向滚动）与 `docs/frontend-component-language.md` 的上传区条目。
+ * 命令行见 `docs/testing.md` §3.5。会话契约见 `docs/design/standards/responsive-layout.md` §6
+ * （390px 无横向滚动）与 `docs/design/standards/frontend-component-language.md` 的上传区条目。
  *
  * 选择器用组件公开的 `data-slot`、role 与 toast 的 `data-testid`，不追 Tailwind
  * 类名，也不断言用户可见文案的整句（T-051）。

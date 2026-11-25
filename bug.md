@@ -40,7 +40,7 @@ todo：
 支持：android
 tailwind-merge
 
-描述语：见 [`docs/copywriting.md`](docs/copywriting.md)
+描述语：见 [`docs/design/standards/copywriting.md`](docs/design/standards/copywriting.md)
 
 
 API 定价目录

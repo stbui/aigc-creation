@@ -35,7 +35,7 @@ export const DEFAULT_COUNT = 6;
  *
  * 与 `param-options.ts` 的 `PLATFORMS`(9 项电商上架平台) / `LANGUAGES`(10 项)
  * **不是同一组** —— 参考站带货图文页的「平台」指社媒发布去向, 不是上架平台。
- * 详见 `docs/shoppable-carousel-design.md` §3.2。
+ * 详见 `docs/design/web/shoppable-carousel-design.md` §3.2。
  */
 export const PLATFORM_OPTIONS = [
   { value: 'tiktok', label: 'TikTok' },

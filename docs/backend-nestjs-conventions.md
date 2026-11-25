@@ -4,7 +4,7 @@
 存量实现与本文不一致时，以「本次改动不扩大偏差」为准，不要求为规范单独重构。
 
 本文件只规定 **NestJS 结构、边界与实现方式**。机器可检查的格式与 lint 规则见
-[`code-style.md`](code-style.md)，仓库不变量见根 `CLAUDE.md`，鉴权 / 支付 / 上传等安全细节见
+[`code-style.md`](design/standards/code-style.md)，仓库不变量见根 `CLAUDE.md`，鉴权 / 支付 / 上传等安全细节见
 [`security.md`](security.md)，数据库约束见 [`database.md`](database.md)。
 
 ## 1. 分层与目录

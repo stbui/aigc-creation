@@ -1,5 +1,5 @@
 /**
- * 系统设置目录的对外出口（按 `docs/frontend-module-conventions.md`）。
+ * 系统设置目录的对外出口（按 `docs/design/standards/frontend-module-conventions.md`）。
  *
  * 外部（后台路由、测试）只从 `./settings` 取 `AdminSettingsPage`（页面唯一出口）。
  * 目录内共享控件经 `components.ts`、接口经 `api.ts`、hook 经 `hooks.ts`、

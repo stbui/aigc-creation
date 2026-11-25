@@ -36,7 +36,7 @@ interface ShoppableCarouselShowcaseProps {
  * `OutputTabsPane`，胶囊页签样式不另写一套。
  *
  * 原右栏底部常驻的「最近生成」历史条已删除，不再与模板区并存 ——
- * 与 `docs/shoppable-carousel-design.md` §14.1 记录的「模板区常驻」决策相反，
+ * 与 `docs/design/web/shoppable-carousel-design.md` §14.1 记录的「模板区常驻」决策相反，
  * 属产品决策变更。
  */
 export function ShoppableCarouselShowcase({

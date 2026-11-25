@@ -8,7 +8,7 @@
 | 页面组件 | `frontend/src/pages/library/page.tsx` |
 | 样式 | `frontend/src/pages/library/style.css` |
 | 组件来源 | `frontend/src/ui`；底层使用 shadcn / Radix 组合件 |
-| 全站字体与令牌 | `docs/typography.md`、`frontend/src/styles/tokens.css` 的 `:root` |
+| 全站字体与令牌 | `docs/design/standards/typography.md`、`frontend/src/styles/tokens.css` 的 `:root` |
 | 数据接口 | `GET /assets`、`POST /assets/upload`、`DELETE /assets/:id` |
 
 ## 1. 设计原则
@@ -282,7 +282,7 @@
 | ≤640 | 网格 3 → 2 列；头部改纵向排列；标题 24/34；页面内边距改为 `14px 12px 20px` |
 | ≤480 | 网格 2 → 1 列；页面内边距改为 `12px 10px 16px` |
 
-网格 gap 全档 8px。断点刻度与列数阶梯见 [`responsive-layout.md`](responsive-layout.md) §1、§4。
+网格 gap 全档 8px。断点刻度与列数阶梯见 [`responsive-layout.md`](../standards/responsive-layout.md) §1、§4。
 
 移动端额外规则：
 

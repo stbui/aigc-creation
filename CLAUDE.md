@@ -65,6 +65,7 @@ frontend/src/
   components/ layout/ lib/ context/ hooks/ styles/
 extension/          Chrome MV3 图片采集扩展
 docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/README.md
+  design/           前端设计：admin/ 后台、web/ C 端页面、standards/ 跨端规范
 ```
 
 运行期产物 `backend/uploads`、`backend/logs`、`backend/backups` 不入库。`backend/src/channels/` 是短信 / 邮件通知出口，不是模型渠道。
@@ -123,7 +124,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 | 新增后台 UI 组件 | 查 `components/ui` → `shadcn add` → `post-shadcn.mjs` → 需要时落入 `radar/*` | 页面只从 radar 取件 |
 | 新增环境变量 | `ENV_SPECS`、`backend/.env.example`、三档 env | 影响库路径时同步 `scripts/db-url.js`；跑环境探针 |
 | 调整积分价 / 退款规则 | 能力售价 `CapabilityPricing`（初始值来自能力定义 `creditCost`）/ `common/setting-defs.ts` | 后台「能力与模型 → 售价」写入；退款规则走设置读取 |
-| 新增前端功能目录 | `pages/<域>/` 分层入口 | `docs/frontend-module-conventions.md` 与模块导入测试 |
+| 新增前端功能目录 | `pages/<域>/` 分层入口 | `docs/design/standards/frontend-module-conventions.md` 与模块导入测试 |
 
 ## 5. 命令
 
@@ -172,10 +173,10 @@ npx biome format --write <files>
 - 全站只有一套浅色主题。颜色、圆角、阴影与语义字号只引用 `frontend/src/styles/tokens.css` 的 token，不写裸 hex。
 - 后台页面使用 shadcn 语义类（`bg-card` / `text-muted-foreground` / `border-border` 等）。Tailwind 没有 preflight，裸 `border` 会退回 `currentColor`；基础兜底放 `admin.css` 的 `@layer base`。
 - 页面不新增 `adm-*` 类；`.adm-*` 仅保留外壳骨架契约。
-- 全站最小字号 12px。任何页面、组件、图表刻度或内联样式都不得更小；细则见 `docs/typography.md`。
+- 全站最小字号 12px。任何页面、组件、图表刻度或内联样式都不得更小；细则见 `docs/design/standards/typography.md`。
 - 状态到文案 / 色调的唯一映射是 `components/admin/statusMeta.ts` 的 `STATUS_META`。
 - 开发阶段不保留兼容层或并存实现；数据结构、权限和状态机只在上述事实源维护一份。
-- 用户可见文案遵循 `docs/copywriting.md`，接口与错误码遵循 `docs/api-contract.md` 与 `docs/error-copy.md`。
+- 用户可见文案遵循 `docs/design/standards/copywriting.md`，接口与错误码遵循 `docs/api-contract.md` 与 `docs/error-copy.md`。
 
 ## 7. 环境踩坑
 
@@ -208,7 +209,7 @@ npx biome format --write <files>
 - 环境、数据库、Docker 与部署：`docs/environments.md`、`docs/docker-deployment.md`。
 - 模型、选路、失败语义与计费：`docs/model-architecture.md`。
 - 接口、统一响应与错误码：`docs/api-contract.md`、`docs/error-copy.md`。
-- 后台界面与页面规格：`docs/admin-ui-design.md`、`docs/admin-console-design.md`、`docs/admin-detailed-design.md`。
+- 后台界面与页面规格：`docs/design/admin/admin-ui-design.md`、`docs/admin-console-design.md`、`docs/admin-detailed-design.md`。
 - 商品、订单、支付、退款、积分与会员：`docs/commerce-design.md`。
 - 测试闸口、覆盖矩阵与已知缺口：`docs/testing.md`。
 - Agent 执行卡与阶段裁剪：`docs/development-workflow.md`。
@@ -216,9 +217,9 @@ npx biome format --write <files>
 - 闸口命令、证据标准与完成定义：`docs/quality-gates.md`。
 - 分支、提交、PR、回滚与 git 权限边界：`docs/git-workflow.md`。
 - 后端 NestJS 结构、DTO、异常、鉴权与事务：`docs/backend-nestjs-conventions.md`。
-- 前端模块分层：`docs/frontend-module-conventions.md`。
-- 前端组件角色、Props 与状态契约：`docs/frontend-component-language.md`。
-- 文案、状态反馈、可访问性与代码风格：`docs/copywriting.md`、`docs/feedback-states.md`、`docs/accessibility.md`、`docs/code-style.md`。
-- 设计令牌、字号与响应式：`docs/design-tokens.md`、`docs/typography.md`、`docs/responsive-layout.md`。
+- 前端模块分层：`docs/design/standards/frontend-module-conventions.md`。
+- 前端组件角色、Props 与状态契约：`docs/design/standards/frontend-component-language.md`。
+- 文案、状态反馈、可访问性与代码风格：`docs/design/standards/copywriting.md`、`docs/design/standards/feedback-states.md`、`docs/design/standards/accessibility.md`、`docs/design/standards/code-style.md`。
+- 设计令牌、字号与响应式：`docs/design/standards/design-tokens.md`、`docs/design/standards/typography.md`、`docs/design/standards/responsive-layout.md`。
 - 安全、可观测性与发布：`docs/security.md`、`docs/observability.md`、`docs/release.md`。
 - 其他文档的类别与放置规则：`docs/README.md`。

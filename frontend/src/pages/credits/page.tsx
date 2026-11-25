@@ -29,7 +29,7 @@ import { CreditsStatsGrid } from './CreditsStatsGrid';
  * ⚠ 「即将过期」必须单独成列: 积分是**有有效期的批次**而非一坨总额。
  * 只显示总余额会让用户以为积分不会过期, 到期后发现少了会当成系统 bug。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：余额 `CreditsHero`、汇总
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：余额 `CreditsHero`、汇总
  * `CreditsStatsGrid`、两个页签 `CreditsLedgerPanel` / `CreditsLotPanel`
  * （窄屏列表 `CreditsLedgerList` / `CreditsLotList`）；账本取数与筛选分页落
  * `hooks.ts` 的 `useCreditsData`。

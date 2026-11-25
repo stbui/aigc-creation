@@ -14,7 +14,7 @@ import {
 /**
  * 模板网格（右栏主内容）。
  *
- * 结构对齐参考站实拍（`docs/shoppable-carousel-design.md` §6）：
+ * 结构对齐参考站实拍（`docs/design/web/shoppable-carousel-design.md` §6）：
  *   卡片 = 三张连续预览图并排（沟槽底）+ 标题 + 三拍文案副标题；
  *   hover 时浮出「预览」与「选用」按钮；选中态用品牌紫描边。
  *

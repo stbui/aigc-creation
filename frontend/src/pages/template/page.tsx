@@ -51,7 +51,7 @@ import {
  * 查回提示词，与上传照片一起组成模型请求。模板清单由后端下发，前端不存副本；
  * 提示词不下发到 C 端，页面也不展示。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：左栏 `TemplateInputPane`
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：左栏 `TemplateInputPane`
  * （已选模板回显 `TemplateSelectedCard`），右栏 `TemplateShowcase`
  * （一级分类 `TemplateCategoryNav` / 二级分组 `TemplateGroupNav` / 网格
  * `TemplateGallery` / 历史 `TemplateHistory`）；模板取数落 `hooks.ts` 的

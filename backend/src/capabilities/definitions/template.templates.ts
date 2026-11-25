@@ -10,7 +10,7 @@
  *   · `flower-*`（10）：花海婚纱；
  *   · `campus-*`（10）：校园操场情侣。
  *
- * 来源记录见 `docs/template-design.md` §5。
+ * 来源记录见 `docs/design/web/template-design.md` §5。
  *
  * 2026-11-11 扩充：`portrait-templates.import.ts` 另有 516 套按分类整理的模板。
  * 初始 30 套保持原样（种子脚本与既有测试依赖它），扩充模板只并入下方

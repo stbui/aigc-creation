@@ -6,7 +6,7 @@
  * 谁都不会觉得有问题。
  *
  * 规则：
- *   - 单文件 > 500 行：告警（提示该按 `docs/frontend-module-conventions.md` 分层）
+ *   - 单文件 > 500 行：告警（提示该按 `docs/design/standards/frontend-module-conventions.md` 分层）
  *   - 单文件 > 800 行：报错（未登记基线的文件直接失败）
  *
  * 棘轮：已存在且尚未拆分的大文件登记在 `BASELINE` 里，**只许变短**。
@@ -103,7 +103,7 @@ for (const path of walk(SRC_DIR)) {
 
   if (lines > ERROR_LINES) {
     errors.push(
-      `${rel}: ${lines} 行，超过 ${ERROR_LINES} 行上限。按 docs/frontend-module-conventions.md 拆成 page + 业务组件`,
+      `${rel}: ${lines} 行，超过 ${ERROR_LINES} 行上限。按 docs/design/standards/frontend-module-conventions.md 拆成 page + 业务组件`,
     );
   } else if (lines > WARN_LINES) {
     warnings.push(`${rel}: ${lines} 行`);

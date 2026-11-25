@@ -5,7 +5,7 @@ import { NumberStepper } from '../../ui';
  *
  * 位置对齐参考站实拍：步进器在左栏**最底部、主按钮的正上方**，
  * 而不是配置卡片里的一项 —— 参考站的「张数 热门图文多为 6 张 − 6 +」
- * 与「生成带货图文」按钮同属提交区（`docs/shoppable-carousel-design.md` §4）。
+ * 与「生成带货图文」按钮同属提交区（`docs/design/web/shoppable-carousel-design.md` §4）。
  *
  * 区间由页面按后端 `GET /shoppable-carousel/templates` 的 `countRange`
  * 下发（参考站实测 6–10：减号在下界禁用、加号在上界禁用），

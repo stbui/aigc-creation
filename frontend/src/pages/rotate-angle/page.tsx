@@ -37,7 +37,7 @@ import { useUploadLimits } from '../../context/UploadLimitsContext';
  * 诚实披露: rotate 为 real 能力 —— yaw 平面旋转 + pitch 逐行剪切 + zoom 缩放的
  * 2D 近似 (真实 3D 重建需 AI 模型, 页面与结果图均有标注)。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：设置卡 `RotateAngleSettingsCard`
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：设置卡 `RotateAngleSettingsCard`
  * 内含模式页签 `RotateAngleModeTabs`、可拖拽预览 `RotateAnglePreview`
  * （主体舞台 `RotateAngleSubjectStage` / 摄像头舞台 `RotateAngleCameraStage`）；
  * 角度状态与提交仍只留在本文件。

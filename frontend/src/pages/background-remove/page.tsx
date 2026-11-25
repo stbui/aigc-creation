@@ -24,7 +24,7 @@ import { colorLabelOf, isValidHexColor, normalizeHexColor } from './utils';
  * 诚实披露: matting 由真实图像模型完成主体分割与背景替换；
  * 抠图边缘质量取决于当前模型通道能力。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：上传预览
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：上传预览
  * `BackgroundRemoveUploadPreview`、空态 `BackgroundRemoveIntro`、结果面板
  * `BackgroundResultPane`；颜色状态与提交仍留在 `page.tsx`。
  */

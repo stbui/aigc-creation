@@ -1,6 +1,6 @@
 /**
  * 渠道工作台的共享控件入口 —— 目录内文件的唯一外部控件来源
- * （按 `docs/frontend-module-conventions.md` §2）。
+ * （按 `docs/design/standards/frontend-module-conventions.md` §2）。
  *
  * 两件事收在这里：
  *   1. `~/admin-ui/radar` 的控件与配套类型 —— 目录内文件不直连 `~/admin-ui`；

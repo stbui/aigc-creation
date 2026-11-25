@@ -1,5 +1,5 @@
 /**
- * prompts 的外部控件唯一入口（按 `docs/frontend-module-conventions.md` §2）。
+ * prompts 的外部控件唯一入口（按 `docs/design/standards/frontend-module-conventions.md` §2）。
  *
  * 目录内文件一律从 `./components` 取，不直连 `~/admin-ui`。
  */

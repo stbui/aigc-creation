@@ -32,7 +32,7 @@ import { LandingTools } from './LandingTools';
  * 仍来自 `frontend/public/landing/` 自托管资源; 价目、能力清单、活动一律读后端接口,
  * 页面不写死任何价格或能力数量。品牌标识保留本项目自有 (货觉AI)。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：`LandingHero` / `LandingScenes` /
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：`LandingHero` / `LandingScenes` /
  * `LandingTools` / `LandingFlow` / `LandingCases` / `LandingPackages`（三个页签分别
  * `LandingPlanGrid` / `LandingAddonGrid` / `LandingCampaignGrid`）/ `LandingFeatures` /
  * `LandingCta` / `LandingFooter`；价目与活动取数落 `hooks.ts` 的 `useLandingCatalog`，

@@ -22,7 +22,7 @@ import { SitemapTopbar } from './SitemapTopbar';
  *   条目: 名称 + 路径，整行可点，悬停底色
  *   页脚: © 2026
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：顶部条 `SitemapTopbar`、
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：顶部条 `SitemapTopbar`、
  * 页头 `SitemapHero`、分组卡 `SitemapSectionCard`、页脚 `SitemapFooter`；
  * 静态路由清单落 `constants.ts`，能力可见性过滤落 `utils.ts`。
  */

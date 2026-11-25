@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 /**
  * 布局与响应式守门用例。
  *
- * 守的是 `docs/responsive-layout.md`（PR #9 落地）的三节契约：
+ * 守的是 `docs/design/standards/responsive-layout.md`（PR #9 落地）的三节契约：
  *   - §1 断点刻度：900 是外壳与内容的共用断点，899 必须与 900 落在同一档；
  *   - §2.1 内边距阶梯：`.app-content` 水平内边距 >900 → 24、≤900 → 16、≤640 → 12、≤480 → 10；
  *   - §3 页头三级：每页唯一 `h1`；L2 28 → ≤640 24，L3 18 → ≤640 16。

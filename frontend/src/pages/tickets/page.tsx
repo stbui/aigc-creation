@@ -34,7 +34,7 @@ import { TicketThread } from './TicketThread';
  * 工单量少（单个用户通常个位数）, 用列表切片切换详情比抽屉更适合移动端:
  * 桌面端与手机走同一套布局, 不必为后台抽屉那套交互再写一份移动适配。
  *
- * 分层（见 `docs/frontend-module-conventions.md`）:
+ * 分层（见 `docs/design/standards/frontend-module-conventions.md`）:
  * 路由级状态与写操作留在本文件，列表卡 / 筛选条 / 新建表单 / 对话线各自成组件，
  * 常量、接口、hook、纯函数分别走 `constants` / `api` / `hooks` / `utils`。
  */

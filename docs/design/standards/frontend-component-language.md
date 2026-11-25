@@ -2,7 +2,7 @@
 
 状态：现行（2026-11-18）。
 
-本规范面向 `frontend/src` 的全部页面与组件，统一 C 端和后台的组件角色、公开接口、状态语义、组合方式与评审规则。视觉值不在本文件重复定义：颜色、圆角、阴影以 [`design-tokens.md`](design-tokens.md) 为准，字号与微规格以 [`typography.md`](typography.md) 为准，后台双层视觉边界以 [`admin-ui-design.md`](admin-ui-design.md) 为准。
+本规范面向 `frontend/src` 的全部页面与组件，统一 C 端和后台的组件角色、公开接口、状态语义、组合方式与评审规则。视觉值不在本文件重复定义：颜色、圆角、阴影以 [`design-tokens.md`](design-tokens.md) 为准，字号与微规格以 [`typography.md`](typography.md) 为准，后台双层视觉边界以 [`admin-ui-design.md`](../admin/admin-ui-design.md) 为准。
 
 一句话标准：**同一个用户意图必须对应同一种组件角色、同一种属性语言和同一种状态语义；两端可以换视觉皮肤，不能换交互语法。**
 
@@ -17,7 +17,7 @@
 | 后台状态反馈组件 | `frontend/src/admin-ui/radar/feedback.tsx`、`frontend/src/admin-ui/radar/states.tsx`、`frontend/src/admin-ui/radar/skeleton.tsx` |
 | 后台跨域状态到中文与色调的映射 | `frontend/src/components/admin/statusMeta.ts` 的 `STATUS_META` |
 | C 端任务失败状态文案 | `frontend/src/lib/constants.ts` 的 `taskErrorText()` 与 `TASK_ERROR_TEXT` |
-| 用户可见文案 | [`copywriting.md`](copywriting.md)、[`error-copy.md`](error-copy.md) |
+| 用户可见文案 | [`copywriting.md`](copywriting.md)、[`error-copy.md`](../../error-copy.md) |
 | 加载、空、失败与结果不明 | [`feedback-states.md`](feedback-states.md) |
 | 键盘、焦点、语义与读屏 | [`accessibility.md`](accessibility.md) |
 

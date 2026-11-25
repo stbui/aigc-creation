@@ -855,7 +855,7 @@ frontend/src/
 └── pages/admin/canvas/**         # 后台画布设置
 ```
 
-本仓现有前端没有 `services/` 与 `stores/` 顶层目录。画布域体量大，按上游结构落位是可接受的偏差；同批更新 `docs/frontend-module-conventions.md`，说明「画布域使用 lib/services/stores/pages 四层，其余域仍按 `pages/<域>` 分层」。
+本仓现有前端没有 `services/` 与 `stores/` 顶层目录。画布域体量大，按上游结构落位是可接受的偏差；同批更新 `docs/design/standards/frontend-module-conventions.md`，说明「画布域使用 lib/services/stores/pages 四层，其余域仍按 `pages/<域>` 分层」。
 
 ### 12.2 引擎移植顺序
 

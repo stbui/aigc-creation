@@ -36,7 +36,7 @@ import { WorkbenchDashboard } from './WorkbenchDashboard';
  * 卡片数据全部来自后端能力清单 (workbenchIds + registry items) 与真实产出
  * (byCapability.thumbnailUrl 取每项能力最近一次成功结果), 前端不硬编码任何能力。
  *
- * 分层（见 `docs/frontend-module-conventions.md`）:
+ * 分层（见 `docs/design/standards/frontend-module-conventions.md`）:
  * 取数与登录态留在本文件，工具网格 / 账号面板 / 最近任务 / 数据看板各自成组件，
  * 常量、接口、hook、纯函数分别走 `constants` / `api` / `hooks` / `utils`。
  */

@@ -6,6 +6,6 @@
  *
  * 目录内文件按类别从入口取: 共享控件 `./components`、hook `./hooks`、
  * 纯函数 `./utils`、常量与静态数据 `./constants`。
- * 分层约定见 `docs/frontend-module-conventions.md`。
+ * 分层约定见 `docs/design/standards/frontend-module-conventions.md`。
  */
 export { SitemapPage } from './page';

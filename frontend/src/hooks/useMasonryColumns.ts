@@ -12,7 +12,7 @@ import { useMediaQuery } from './useMediaQuery';
  *
  * 列高只用调用方给的**相对值**（同一列宽下的高/宽比即可）比较，不测量 DOM；
  * 懒加载与滚动追加都不会引起重排。列数与设计断点一致：5 / 4 / 3 / 2 / 1
- * （1200 / 900 / 640 / 480，见 docs/responsive-layout.md §4.1）。
+ * （1200 / 900 / 640 / 480，见 docs/design/standards/responsive-layout.md §4.1）。
  */
 
 const DEFAULT_COLUMNS = 5;

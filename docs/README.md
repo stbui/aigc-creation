@@ -1,6 +1,6 @@
 # 文档地图
 
-本目录按类型分为五类：需求文档、产品文档、技术文档、测试文档、规划文档。
+本目录按类型分为六类：需求文档、产品文档、前端设计（`docs/design/`）、技术文档、测试文档、规划文档。
 
 三条判定原则：
 
@@ -43,23 +43,15 @@
 | [`admin-suite-design.md`](admin-suite-design.md) | 后台总体设计：全域地图、RBAC、信息架构 |
 | [`admin-console-design.md`](admin-console-design.md) | 后台运营域功能设计 |
 | [`admin-detailed-design.md`](admin-detailed-design.md) | 后台详细设计：页面结构、组件、数据流、接口、边界 |
-| [`admin-ui-design.md`](admin-ui-design.md) | 后台前端设计语言：双层视觉边界、令牌、布局、组件、状态与交付检查 |
 | [`commerce-design.md`](commerce-design.md) | 支付 / 积分 / 订单 / 商品 / 会员 / 营销设计 |
-| [`payment-ui-design.md`](payment-ui-design.md) | 支付域页面与前端设计：`/admin/payments` 三标签页、C 端结算支付方式、状态派生、列表查询与导出 |
 
-### 2.2 C 端页面规格
+### 2.2 C 端页面资产
+
+页面规格已按端归入 [`docs/design/web/`](design/web/)，本表只留页面资产来源记录。
 
 | 文档 | 对应页面 |
 | --- | --- |
-| [`landing-design.md`](landing-design.md) | `/` 营销首页：首屏、场景与工具入口、使用流程、套餐、案例、底部行动区 |
-| [`workbench-design.md`](workbench-design.md) | `/workbench`、应用外壳、侧栏与响应式 |
-| [`topnav-design.md`](topnav-design.md) | 全站顶部导航与移动端抽屉 |
-| [`login-design.md`](login-design.md) | `/login`、登录弹窗、扫码登录入口 |
-| [`library-design.md`](library-design.md) | `/library`（别名 `/asset-library`） |
-| [`packages-design.md`](packages-design.md) | `/packages` 积分商城：参考站 SeeAny `/vip` 的套餐与积分策略基准 + 本站现状对照（档位与积分包已对齐，充值赠送 / 子账号 / 滚存为待立项功能） |
-| [`shoppable-carousel-design.md`](shoppable-carousel-design.md) | `/shoppable-carousel` AI 带货图文：参考站实拍拆解、模板三拍口径、一次生成 6–10 张的拆分与计费、页面结构 |
-| [`shoppable-carousel-template-sources.md`](shoppable-carousel-template-sources.md) | 上述模板资产（分类 / 三拍文案 / 缩略图）的来源与抓取记录 |
-| [`template-design.md`](template-design.md) | `/template` 写真模板：页面结构、模板提示词、生成规则与图片资产来源 |
+| [`shoppable-carousel-template-sources.md`](shoppable-carousel-template-sources.md) | AI 带货图文模板资产（分类 / 三拍文案 / 缩略图）的来源与抓取记录 |
 
 ### 2.3 品牌规范
 
@@ -67,7 +59,46 @@
 | --- | --- |
 | [`brand/brand-basics.md`](brand/brand-basics.md) | 品牌名称、技术标识（`huojue`）、技术命名约定、上游引擎与历史引用边界 |
 
-## 3. 技术文档（Technical）
+## 3. 前端设计（`docs/design/`）
+
+回答「页面长什么样、前端怎么落地」。按端分三个目录：`admin/` 后台前端、`web/` C 端页面、`standards/` 跨端规范。
+
+### 3.1 后台前端
+
+| 文档 | 内容 |
+| --- | --- |
+| [`admin/admin-ui-design.md`](design/admin/admin-ui-design.md) | 后台前端设计语言：双层视觉边界、令牌、布局、组件、状态与交付检查 |
+| [`admin/payment-ui-design.md`](design/admin/payment-ui-design.md) | 支付域页面与前端设计：`/admin/payments` 三标签页、C 端结算支付方式、状态派生、列表查询与导出 |
+
+### 3.2 C 端页面
+
+| 文档 | 对应页面 |
+| --- | --- |
+| [`web/landing-design.md`](design/web/landing-design.md) | `/` 营销首页：首屏、场景与工具入口、使用流程、套餐、案例、底部行动区 |
+| [`web/workbench-design.md`](design/web/workbench-design.md) | `/workbench`、应用外壳、侧栏与响应式 |
+| [`web/topnav-design.md`](design/web/topnav-design.md) | 全站顶部导航与移动端抽屉 |
+| [`web/login-design.md`](design/web/login-design.md) | `/login`、登录弹窗、扫码登录入口 |
+| [`web/library-design.md`](design/web/library-design.md) | `/library`（别名 `/asset-library`） |
+| [`web/packages-design.md`](design/web/packages-design.md) | `/packages` 积分商城：参考站 SeeAny `/vip` 的套餐与积分策略基准 + 本站现状对照（档位与积分包已对齐，充值赠送 / 子账号 / 滚存为待立项功能） |
+| [`web/shoppable-carousel-design.md`](design/web/shoppable-carousel-design.md) | `/shoppable-carousel` AI 带货图文：参考站实拍拆解、模板三拍口径、一次生成 6–10 张的拆分与计费、页面结构 |
+| [`web/template-design.md`](design/web/template-design.md) | `/template` 写真模板：页面结构、模板提示词、生成规则与图片资产来源 |
+| [`web/wardrobe-design.md`](design/web/wardrobe-design.md) | 衣帽间 AI 模特试衣：市场、技术选型、产品定义与 MVP 拆分（规划中，策划草案） |
+
+### 3.3 跨端规范
+
+| 文档 | 内容 |
+| --- | --- |
+| [`standards/frontend-module-conventions.md`](design/standards/frontend-module-conventions.md) | 前端多文件功能目录的分层、入口文件、导入方向与新增文件落位 |
+| [`standards/frontend-component-language.md`](design/standards/frontend-component-language.md) | 前端组件语言：跨 C 端 / 后台的组件角色、Props 契约、状态、组合方式与评审规则 |
+| [`standards/design-tokens.md`](design/standards/design-tokens.md) | 设计令牌标准：基础 / 通用 / 组件三层、命名、引用规则、新增流程与审计命令 |
+| [`standards/typography.md`](design/standards/typography.md) | 字体、主题桥接、圆角阴影与组件微规格 |
+| [`standards/responsive-layout.md`](design/standards/responsive-layout.md) | 布局与响应式规范：断点四档刻度、页面容器与内边距、页头三级体系、网格降列、工具页骨架、移动端规则与迁移纪律 |
+| [`standards/copywriting.md`](design/standards/copywriting.md) | 用户可见文案规范：任务边界、写作基准、禁止项、分场景写法、语言规范、执行与自检 |
+| [`standards/feedback-states.md`](design/standards/feedback-states.md) | 状态与反馈规范：加载 / 空 / 失败 / 进行中 / 成功 / 结果不明的判定顺序、组件取用与文案 |
+| [`standards/code-style.md`](design/standards/code-style.md) | 代码风格与静态检查：Biome 工具链、规则基线、CI 门禁、格式化策略与收紧流程 |
+| [`standards/accessibility.md`](design/standards/accessibility.md) | 可访问性规范：键盘与焦点、语义结构、表单、图像与媒体、动态反馈、对比度、验证清单与已知缺口 |
+
+## 4. 技术文档（Technical）
 
 回答「怎么实现、怎么部署、怎么扩展」。
 
@@ -84,19 +115,10 @@
 | [`agent-execution.md`](agent-execution.md) | Agent 执行边界：指令映射、开工固定三步、默认禁令、自主边界、常见失败模式 |
 | [`quality-gates.md`](quality-gates.md) | 闸口与证据标准：闸口矩阵、按改动域选专项、证据三件套与交付摘要模板、完成定义 |
 | [`git-workflow.md`](git-workflow.md) | Git 工作流：分支、提交信息、提交粒度、PR 与合并、同步与冲突、回滚、git 权限边界 |
-| [`frontend-module-conventions.md`](frontend-module-conventions.md) | 前端多文件功能目录的分层、入口文件、导入方向与新增文件落位 |
-| [`frontend-component-language.md`](frontend-component-language.md) | 前端组件语言：跨 C 端 / 后台的组件角色、Props 契约、状态、组合方式与评审规则 |
 | [`main-image-generation.md`](main-image-generation.md) | `/product-kit` 商品主图：变体互斥、字段到提示词的映射、文案闭集与禁字、按变体拆批与计费、结果聚合、删除与回填 |
 | [`product-detail-generation.md`](product-detail-generation.md) | `/product-detail` 商品详情图：模块拆批、任务与账单、提示词、执行状态机、轮询聚合、删除与失败边界 |
 | [`gen-prompt.md`](gen-prompt.md) | 生图链路与提示词：主图 / 详情图字段映射、变体与模块拆批、提示词结构、并发生图与配额、可见性与效果评估现状 |
-| [`typography.md`](typography.md) | 字体、主题桥接、圆角阴影与组件微规格 |
-| [`design-tokens.md`](design-tokens.md) | 设计令牌标准：基础 / 通用 / 组件三层、命名、引用规则、新增流程与审计命令 |
-| [`responsive-layout.md`](responsive-layout.md) | 布局与响应式规范：断点四档刻度、页面容器与内边距、页头三级体系、网格降列、工具页骨架、移动端规则与迁移纪律 |
-| [`copywriting.md`](copywriting.md) | 用户可见文案规范：任务边界、写作基准、禁止项、分场景写法、语言规范、执行与自检 |
-| [`feedback-states.md`](feedback-states.md) | 状态与反馈规范：加载 / 空 / 失败 / 进行中 / 成功 / 结果不明的判定顺序、组件取用与文案 |
-| [`code-style.md`](code-style.md) | 代码风格与静态检查：Biome 工具链、规则基线、CI 门禁、格式化策略与收紧流程 |
 | [`backend-nestjs-conventions.md`](backend-nestjs-conventions.md) | 后端 NestJS 结构规范：模块分层、Controller / Service 边界、DTO、异常、鉴权、事务、日志与测试 |
-| [`accessibility.md`](accessibility.md) | 可访问性规范：键盘与焦点、语义结构、表单、图像与媒体、动态反馈、对比度、验证清单与已知缺口 |
 | [`security.md`](security.md) | 安全与权限规范：鉴权链、令牌与密钥、SSRF、上传、支付回调、注入、限流、日志脱敏与检查清单 |
 | [`database.md`](database.md) | 数据库规范：Prisma 配置与生成器、命名、主键与时间、关系级联、索引、类型精度、Prisma Client 用法、Prisma Migrate、种子与备份 |
 | [`prompt-engineering.md`](prompt-engineering.md) | 生成提示词规范：buildPrompt / outputPlan、事实闭集、参数槽位、文本工具、协议边界、测试与已知缺口 |
@@ -110,7 +132,7 @@
 
 目录结构、能力清单、环境坑等与代码强相关的坐标速查表放在仓库根 `CLAUDE.md`；接口清单与错误码在 [`api-contract.md`](api-contract.md)。
 
-## 4. 测试文档（Testing）
+## 5. 测试文档（Testing）
 
 | 文档 | 内容 |
 | --- | --- |
@@ -118,7 +140,7 @@
 
 `testing.md` 只维护清单、覆盖矩阵与已知缺口；单次运行的真实结果（通过 / 失败数、定性结论）随提交说明记录。
 
-## 5. 设计与规划
+## 6. 设计与规划
 
 | 文档 | 内容 | 状态 |
 | --- | --- | --- |
@@ -130,11 +152,10 @@
 | [`payment-refactor-design.md`](payment-refactor-design.md) | 支付域重构设计：多渠道配置版本化与加密托管、查单/关单、回调收件箱与 15s worker、T+1 对账自动补发、决策与开放差距 | 主体已实施，见 §13 |
 | [`admin-workflow-design.md`](admin-workflow-design.md) | 后台角色化工作流：运营/财务/管理员三种首屏、统一待办、上下文直达、保存视图与命令面板、工单转交、批量动作与分期验收 | P0 已实施（对账保存视图未落地）；P1 / P2 规划中 |
 | [`mailbox-design.md`](mailbox-design.md) | 邮箱模块 `/mailbox` 设计：入口、数据、接口与实施边界 | 规划中，未实施 |
-| [`wardrobe-design.md`](wardrobe-design.md) | 衣帽间 AI 模特试衣：市场、技术选型、产品定义与 MVP 拆分 | 规划中（策划草案） |
 
-## 6. 文档命名与放置规范
+## 7. 文档命名与放置规范
 
-### 6.1 命名格式
+### 7.1 命名格式
 
 - 一律小写 ASCII kebab-case，匹配 `^[a-z0-9]+(-[a-z0-9]+)*\.md$`。禁止中文、下划线、空格、驼峰、大写。
 - 文件名 = `前缀（域）` + `粒度/主题` + `类型后缀`，缺哪段省哪段。
@@ -142,24 +163,25 @@
 - 域前缀：整站文档不带前缀（`prd.md`）；子系统带前缀（`admin-` / `agent-` / `commerce-` / `workbench-` / `login-` …）。
 - 一个域内有多份文档时用「域-粒度-类型」，粒度由总到细固定为 `suite` → `console` → `detailed` → `ui`；跨页流程与角色动线用 `workflow`。新增粒度词须先改本节。
 
-### 6.2 禁止事项
+### 7.2 禁止事项
 
 - 文件名不带版本号、日期、状态词：`-v2` / `-2026-10-28` / `-final` / `-new` / `-wip` / `-draft` 一律不出现。状态写在正文首行。
 - 过程产物不建文件：审计报告、取证日志、逐轮实施记录、单次运行结果随提交说明或仓库外的临时目录，不进 `docs/`（对应本文件开头第 3 条原则）。
 - 不按人名、批次号、需求单号命名。
 
-### 6.3 放置约定
+### 7.3 放置约定
 
 | 文档类型 | 位置与命名 | 要求 |
 | --- | --- | --- |
 | 需求文档 | `docs/<域>-prd.md` | 写目标、范围、不做什么；实现后补状态 |
-| 产品文档 | 页面规格 `docs/<页面>-design.md`；域设计 `docs/<域>-design.md` | 页面名取主路由（`library-design.md` 对应 `/library`），别名只写在正文；规格写现值与状态，不写与外部站点的对比 |
+| 产品文档（域设计） | `docs/<域>-design.md` | 域前缀取子系统名；页面级规格不放这里 |
+| 前端设计 | 页面规格 `docs/design/<端>/<页面>-design.md`；跨端规范 `docs/design/standards/<领域>.md` | 端只有 `admin`（后台）与 `web`（C 端）；页面名取主路由（`library-design.md` 对应 `/library`），别名只写在正文；规格写现值与状态，不写与外部站点的对比 |
 | 技术文档 | `docs/<领域>.md`，跨域事实源可直接用领域名 | 与代码同批更新，不做事后补写 |
 | 测试文档 | 统一进 `docs/testing.md` | 只写真实存在、可执行的脚本与用例 |
 | 规划文档 | 与对应类型同位置 | 正文首行标「规划中」，实现前不得写成现状 |
 | 索引 | `docs/README.md` | 只做分类索引，不承载正文 |
 
-### 6.4 新增与改名
+### 7.4 新增与改名
 
 - 新建或改名必须同批完成三件事：文件落位、本文件分类表更新、全仓引用更新（`grep -rn '<文件名>'` 除 `docs/` 外还须覆盖 `CLAUDE.md` 与代码注释）。
 - 一个文件只写一个主题；内容跨两个域时拆分，不要用「综合」「杂项」这类名字兜底。

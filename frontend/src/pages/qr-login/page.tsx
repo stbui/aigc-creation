@@ -20,7 +20,7 @@ import { QrResultState } from './QrResultState';
  * 不展示就等于让用户凭空白点确认 —— 攻击者把自己的二维码发给受害者，受害者
  * 一点确认，攻击者的电脑就登进了受害者的账号。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：页壳 `QrConfirmCard`，
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：页壳 `QrConfirmCard`，
  * 无效 / 待登录 / 待确认 / 已处理四态分别是 `QrInvalidState` /
  * `QrLoginRequiredState` / `QrConfirmState` / `QrResultState`；scan / confirm
  * 与忙碌态落 `hooks.ts` 的 `useQrLogin`。

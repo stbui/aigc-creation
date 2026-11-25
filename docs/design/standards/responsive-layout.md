@@ -8,10 +8,10 @@
 | --- | --- |
 | [`design-tokens.md`](design-tokens.md) | 令牌体系：颜色、圆角、间距、阴影的值与分层 |
 | [`typography.md`](typography.md) | 字体栈、字号、字重、行高、过渡与描边微规格 |
-| [`admin-ui-design.md`](admin-ui-design.md) §5–6 | 后台外壳断点、后台页头与表格滚动 |
+| [`admin-ui-design.md`](../admin/admin-ui-design.md) §5–6 | 后台外壳断点、后台页头与表格滚动 |
 | **本文件** | 断点刻度、容器宽度与内边距、页头三级体系、网格降列、工具页骨架、移动端规则 |
 
-代码优先于本文件，冲突时以 `frontend/src` 为准并顺手改掉本文件的过时描述（[`README.md`](README.md) 原则 1）。
+代码优先于本文件，冲突时以 `frontend/src` 为准并顺手改掉本文件的过时描述（[`README.md`](../../README.md) 原则 1）。
 
 ---
 
@@ -27,12 +27,12 @@
 | --- | --- | --- |
 | `≤900px` | C 端侧栏收进抽屉、顶栏 64 → 54（`--workspace-topbar-height`）、`.app-content` 内边距切换、工具页单列 | `layout/AppLayout.css`、`layout/AppSidebar.css`、`layout/AppHeader.css` |
 | `≤1366px` | C 端侧栏由 176px 横排列表收成 100px 垂直轨、`.app-content` 左负边距 −16px | `layout/AppSidebar.css:226`、`layout/AppLayout.css:77` |
-| `≤1280px` | 后台侧栏 232px → 60px 折叠 | `shell/AdminBoardLayout.tsx`（`matchMedia('(max-width: 1280px)')`，见 [`admin-ui-design.md`](admin-ui-design.md) §5.3） |
+| `≤1280px` | 后台侧栏 232px → 60px 折叠 | `shell/AdminBoardLayout.tsx`（`matchMedia('(max-width: 1280px)')`，见 [`admin-ui-design.md`](../admin/admin-ui-design.md) §5.3） |
 
 后台另有一条硬口径：**最低支持宽度 1280px**。`admin-ui/**` 不写 `max-*` 变体；
 `sm:`/`md:`/`lg:`/`xl:` 的阈值都不超过 1280，在支持区间内恒生效，因此自研件
 直接落成基类、上游 shadcn 件保留原样。判定与逐文件处置见
-[`admin-ui-design.md`](admin-ui-design.md) §5.3。
+[`admin-ui-design.md`](../admin/admin-ui-design.md) §5.3。
 
 **内容断点**（页面布局降档，只有四档）
 
@@ -141,7 +141,7 @@ C 端页面**铺满** `.app-content`，不使用页面级 `max-width` 居中。�
 - **L1 只属于营销页**，且必须成组声明（桌面 → `≤900` 降一档 → `≤640` 降一档），不允许只给一个中间档。参照 `pages/landing/LandingHero.tsx:32`（50 → 42 → 38 → 32）、`pages/sitemap/SitemapHero.tsx:8`（68 → 40）。
 - **L2 是页面唯一 `h1` 的默认值**。参照 `pages/library/LibraryToolbar.tsx:46`（28/700 → 24/700）、`pages/works/WorksHeader.tsx`。
 - **L3 不得使用 `h1`**。工具页的页面标题已由顶栏与侧栏承担，区块标题用 `h2`/`strong`。参照 `pages/multi-image-fusion/MultiFusionEditorHeader.tsx:28`。
-- 后台页头固定 22px/600 且不随视口降档（后台不做移动端），详见 [`admin-ui-design.md`](admin-ui-design.md) §6.1。
+- 后台页头固定 22px/600 且不随视口降档（后台不做移动端），详见 [`admin-ui-design.md`](../admin/admin-ui-design.md) §6.1。
 
 ### 3.2 页头结构
 
@@ -189,12 +189,12 @@ C 端页面**铺满** `.app-content`，不使用页面级 `max-width` 居中。�
 
 参照实现：
 
-- 素材库 5 → 4 → 3 → 2 → 1（`docs/library-design.md` §10，现用 1200/980/700/640/380，按本表并入四档）。
+- 素材库 5 → 4 → 3 → 2 → 1（`docs/design/web/library-design.md` §10，现用 1200/980/700/640/380，按本表并入四档）。
 - 工作台 6 → 4 → 3 → 2（`pages/workbench/style.css` 的 `.wb-tools`，现用 1100/760/520）。
 
 ### 4.2 列数只声明一次
 
-`grid-template-columns` 由**一处**规则管辖。后段的覆盖层（主题、状态、hover）只覆盖值，**不得重复声明结构属性**，否则会把前面的断点静默压死（`docs/workbench-design.md` §3.1 记录过这个坑）。
+`grid-template-columns` 由**一处**规则管辖。后段的覆盖层（主题、状态、hover）只覆盖值，**不得重复声明结构属性**，否则会把前面的断点静默压死（`docs/design/web/workbench-design.md` §3.1 记录过这个坑）。
 
 ### 4.3 卡片容器的三个必备属性
 
@@ -250,7 +250,7 @@ C 端页面**铺满** `.app-content`，不使用页面级 `max-width` 居中。�
 **现状差距**（2026-11-22）：
 
 - `focus-visible` 全站仅 29 处，自定义可点 `div`/`span` 73 处无 `role`，`tabIndex` 全站 4 处 —— 键盘可达性未达标。
-- 触控目标与 390px 无横向滚动目前只有素材库有明确断言（`docs/library-design.md` §10），其余页面缺自动化覆盖。
+- 触控目标与 390px 无横向滚动目前只有素材库有明确断言（`docs/design/web/library-design.md` §10），其余页面缺自动化覆盖。
 
 ---
 
@@ -285,7 +285,7 @@ for d in src/pages/*/; do
 done | sort -n | awk '$1 != 1'
 ```
 
-审计结果应记录在提交说明里，不写入本文件（[`README.md`](README.md) 原则 3：不留过程记录）。
+审计结果应记录在提交说明里，不写入本文件（[`README.md`](../../README.md) 原则 3：不留过程记录）。
 
 ---
 

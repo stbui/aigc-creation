@@ -34,7 +34,7 @@ import { InviteStepsBlock } from './InviteStepsBlock';
  *   commerce-design.md 已记录过同类缺陷: 营销页上收费展示但兑现不了的承诺
  *   构成虚假宣传 —— 本页的所有数字都必须来自真实数据, 不允许占位值。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：`InviteHero` / `InviteCheckinBlock` /
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：`InviteHero` / `InviteCheckinBlock` /
  * `InviteMetricsBlock` / `InviteStepsBlock` / `InviteRelationsBlock` / `InviteRulesBlock` /
  * `InvitePosterModal`，访客与失败态分别是 `InviteGuestState` / `InviteErrorState`；
  * 文案派生落 `utils.ts`，取数、绑定、签到与海报等写操作仍留在本文件。

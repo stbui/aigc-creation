@@ -18,7 +18,7 @@ import { StatsTrendPanel } from './StatsTrendPanel';
  * 近期趋势、最近作品和常用能力。成功率、失败数、模型模式等运营指标不进入
  * 用户侧页面，避免把创作中心做成后台监控面板。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：KPI `StatsKpiGrid`、
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：KPI `StatsKpiGrid`、
  * 趋势 `StatsTrendPanel`、最近创作 `StatsRecentPanel`、常用能力
  * `StatsCapabilityPanel` 与空态 `StatsEmptyPanel`；取数与自动刷新落 `hooks.ts`
  * 的 `useStatsOverview`，汇总与格式化落 `utils.ts`。

@@ -1,7 +1,7 @@
 # 支付域详细设计（后端契约）
 
 > 状态：2026-11 支付域重构的后端实现规格。主链路已落地；与代码冲突时以代码为准。
-> 设计目标与决策见 [`payment-refactor-design.md`](payment-refactor-design.md)，后台页面与前端实现见 [`payment-ui-design.md`](payment-ui-design.md)。
+> 设计目标与决策见 [`payment-refactor-design.md`](payment-refactor-design.md)，后台页面与前端实现见 [`payment-ui-design.md`](design/admin/payment-ui-design.md)。
 > 章节号已按本文重排；拆分前的原始编号不再保留。
 
 ## 1. 数据模型（Prisma）
@@ -1014,7 +1014,7 @@ model PaymentProviderConfig {
 
 口径：
 
-- `Order.status` 仍是 `pending | paid | cancelled | refunded | partial_refunded`。页面的 `created / closing / create_failed / credited` 是**派生展示状态**，不写库（见 [`payment-ui-design.md`](payment-ui-design.md) §3）。
+- `Order.status` 仍是 `pending | paid | cancelled | refunded | partial_refunded`。页面的 `created / closing / create_failed / credited` 是**派生展示状态**，不写库（见 [`payment-ui-design.md`](design/admin/payment-ui-design.md) §3）。
 - `providerTradeNo` 单独冗余在 Order 上，是为了支付页搜索和列表不必 join 最近一条 Payment；唯一约束也提供第二道重复交易号防线。
 - 旧订单 `providerConfigId=null`：查单/回调使用同渠道**当前最新版**配置，并在第一次成功解析后回填 `providerConfigId/version`；不得为了回填而改变 `channel`。
 - `checkoutValue` 在本地关闭、渠道关闭、支付成功、退款完成时置空；空串表示「没有可用支付动作」，`null` 只用于从未生成过 checkout 的历史数据。

@@ -1,6 +1,6 @@
 # 后台管理端 · 详细设计
 
-后台各模块的页面结构、接口、数据流与边界处理。本文只写**怎么做**，不重复**做什么**（功能与定位见 `docs/admin-console-design.md`，信息架构与 RBAC 见 `docs/admin-suite-design.md`，视觉规格见 `docs/admin-ui-design.md`）。
+后台各模块的页面结构、接口、数据流与边界处理。本文只写**怎么做**，不重复**做什么**（功能与定位见 `docs/admin-console-design.md`，信息架构与 RBAC 见 `docs/admin-suite-design.md`，视觉规格见 `docs/design/admin/admin-ui-design.md`）。
 
 | 项 | 事实源 |
 | --- | --- |

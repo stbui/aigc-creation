@@ -23,7 +23,7 @@
 | 表格 | `frontend/src/admin-ui/radar/table.tsx:129` |
 | 状态语义 | `frontend/src/components/admin/statusMeta.ts:19` |
 | 格式化 | `frontend/src/admin-ui/lib/format.ts:54` |
-| 全站字号下限 | `docs/typography.md` |
+| 全站字号下限 | `docs/design/standards/typography.md` |
 
 ---
 
@@ -130,7 +130,7 @@
 
 ## 4. 字体与排版
 
-字体栈与加载方式遵循 `docs/typography.md`：Noto Sans SC 优先，最小字号 12px。
+字体栈与加载方式遵循 `docs/design/standards/typography.md`：Noto Sans SC 优先，最小字号 12px。
 
 ### 4.1 后台字号阶梯
 

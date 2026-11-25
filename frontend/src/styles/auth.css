@@ -5,7 +5,7 @@
  */
 
 /* ───────── 登录页 (1:1 复刻参考站登录弹窗 auth-card-split, 2026-10-19 实拍 1280×900) ─────────
-   偏差与证据: docs/login-design.md。字面值全部来自参考站 computed styles 实拍:
+   偏差与证据: docs/design/web/login-design.md。字面值全部来自参考站 computed styles 实拍:
    卡 840x478 / radius 32 / shadow 0 20px 60px rgba(0,0,0,.18) / grid 420 420;
    右栏 padding 32px 40px / 内层 340; tab 81.3x63; input 340x48 radius 8 bg #f2f3f5;
    submit 340x48 渐变 90deg #8064f6→#5546d8 14px/600; 协议行 12px #86909c。

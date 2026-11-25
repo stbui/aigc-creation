@@ -1,6 +1,6 @@
 # 错误文案映射规范
 
-错误码的**语义**在 [`api-contract.md`](api-contract.md) §2 与各 service 就近定义；用户可见文案的**写法**在 [`copywriting.md`](copywriting.md)。本文件规定两者的接缝：哪个码由哪一层出文案、按什么结构写、未知码怎么兜底、新增时改哪里。
+错误码的**语义**在 [`api-contract.md`](api-contract.md) §2 与各 service 就近定义；用户可见文案的**写法**在 [`copywriting.md`](design/standards/copywriting.md)。本文件规定两者的接缝：哪个码由哪一层出文案、按什么结构写、未知码怎么兜底、新增时改哪里。
 
 ## 1. 职责分层
 

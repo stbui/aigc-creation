@@ -39,7 +39,7 @@ import type { ShoppableCarouselTemplate } from '../../types/api';
  * 生成链路与站内其它能力同源：一次提交由后端 `outputPlan` 拆成 N 个任务，
  * 每张各计一次价、共享 batchId；页面只负责收集输入与展示。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：左栏配置 `ShoppableCarouselConfig`
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：左栏配置 `ShoppableCarouselConfig`
  * 与底栏 `ShoppableCarouselFooter`（张数步进 `ShoppableCarouselStepper`），右栏
  * `ShoppableCarouselShowcase`（页签外壳 `OutputTabsPane` + 模板网格 `TemplateGrid`
  * + 批次列表 `ShoppableCarouselResultList`）；模板取数落 `hooks.ts` 的

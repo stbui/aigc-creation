@@ -12,7 +12,7 @@ import { MobileUploadEditor } from './MobileUploadEditor';
  * 与参考站的差异（如实说明）：参考站有「认领」环节，本项目一步到位 ——
  * 手机端上传即入用户素材库，电脑端轮询到即回填参考图位。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：选图态 `MobileUploadEditor`
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：选图态 `MobileUploadEditor`
  * （单张 `MobileUploadPreview`），压缩与 objectURL 生命周期落 `utils.ts` /
  * `hooks.ts` 的 `useMobileUpload`；成功 / 失败 / 参数缺失三个终态留在本文件。
  */

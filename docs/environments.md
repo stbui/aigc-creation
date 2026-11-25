@@ -221,7 +221,7 @@ PayPal / ZPay 没有规范回调地址，当前不会被选路到；接入前必
 
 **启用判定**：`clientId` + `clientSecret` + `authorizationEndpoint` + `tokenEndpoint` 四项非空（`redirectUri` 有自动拼接的缺省值），且未被 `OAUTH_ENABLED` 排除。未启用时 `GET /auth/oauth/providers` 返回空数组，登录页整块不渲染——**不要在前端维护 provider 名单**。
 
-只有 provider 明确确权（`emailVerified`）的邮箱才会自动绑定同邮箱的既有账号；`accessToken` 不进回调 URL，只下发 60 秒票据由前端 `POST /auth/oauth/complete` 换取。详见 `docs/login-design.md` §3。
+只有 provider 明确确权（`emailVerified`）的邮箱才会自动绑定同邮箱的既有账号；`accessToken` 不进回调 URL，只下发 60 秒票据由前端 `POST /auth/oauth/complete` 换取。详见 `docs/design/web/login-design.md` §3。
 
 ## 安全与合规（签名 / 限流 / 追踪）
 

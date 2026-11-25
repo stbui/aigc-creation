@@ -44,7 +44,7 @@ import { LocalRedrawUploadPreview } from './LocalRedrawUploadPreview';
  * 诚实披露: local_redraw 必须由真实 inpainting 模型完成, 本地没有实现；
  * 没有可用通道时后端判 failed/42204 并退款，本页据 runtime 提前禁用提交。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：画布舞台 `LocalRedrawStage`
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：画布舞台 `LocalRedrawStage`
  * （工具栏 `LocalRedrawToolbar` / 底部操作条 `LocalRedrawCanvasFooter`）、
  * 标注面板 `LocalRedrawAnnotationPanel`（逐条 `LocalRedrawAnnotationItem`）、
  * 历史栏 `LocalRedrawHistoryPane`、上传预览 `LocalRedrawUploadPreview`、

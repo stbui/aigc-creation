@@ -28,7 +28,7 @@ import { OrdersFilterBar } from './OrdersFilterBar';
  * 「加载更多」会继续取下一页；筛选标签上的数量来自后端 statusCounts，
  * 不再是“已加载这 20 条里有多少”的误导性数字。
  *
- * 分层（见 `docs/frontend-module-conventions.md`）:
+ * 分层（见 `docs/design/standards/frontend-module-conventions.md`）:
  * 路由级状态与写操作留在本文件，卡片 / 筛选条 / 开票表单与状态各自成组件，
  * 常量、接口、hook、纯函数分别走 `constants` / `api` / `hooks` / `utils`。
  */

@@ -109,7 +109,7 @@ Biome 无法表达部分产品与设计硬约束，由 `scripts/verify-conventio
 | --- | --- | --- |
 | 最小字号 | 禁止 `text-[10px]` / `text-[11px]`、`font-size < 12px`、`fontSize < 12` | `CLAUDE.md` 样式规范 |
 | C 端错误详情 | `frontend/src` 非后台区域禁止 `<StateError detail=...>` | [`feedback-states.md`](feedback-states.md) §5 |
-| 版本一致 | 根 / backend / frontend / agent 的 `package.json` 版本必须相同 | [`release.md`](release.md) §1 |
+| 版本一致 | 根 / backend / frontend / agent 的 `package.json` 版本必须相同 | [`release.md`](../../release.md) §1 |
 
 新增仓库级规则时优先扩展该脚本，不要把规则只写在文档里；扫描范围与排除项（`__tests__`、后台目录）必须在脚本中显式声明。
 
@@ -146,7 +146,7 @@ Biome formatter 已配置，但**暂不进入门禁**：
 1. 根目录 `npm ci` 安装 Biome；
 2. `npm run check` → `check:node` → `verify:deps` → **`verify:conventions`** → **`lint:ci`** → `build` → `test`。
 
-`e2e-smoke` 与 `docker-build` 不依赖 Biome。本地提交前至少跑 `npm run lint:ci`；改动涉及类型或运行时行为时按 [`testing.md`](testing.md) 的闸口清单执行。
+`e2e-smoke` 与 `docker-build` 不依赖 Biome。本地提交前至少跑 `npm run lint:ci`；改动涉及类型或运行时行为时按 [`testing.md`](../../testing.md) 的闸口清单执行。
 
 ## 9. 版本与升级
 

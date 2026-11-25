@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { Descriptions } from '../radar/feedback';
 
 /**
- * 键值描述的多列落成基类（T-040，docs/admin-ui-design.md §5.3）。
+ * 键值描述的多列落成基类（T-040，docs/design/admin/admin-ui-design.md §5.3）。
  *
  * 原实现是 `grid-cols-1` + `sm:grid-cols-2|3`。后台最低支持宽度 1280，
  * `sm:`（≥640）在支持区间内恒生效，等价基类，所以直接写列数。

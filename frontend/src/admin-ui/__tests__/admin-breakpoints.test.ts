@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * 后台断点口径守卫（T-040，docs/admin-ui-design.md §5.3）。
+ * 后台断点口径守卫（T-040，docs/design/admin/admin-ui-design.md §5.3）。
  *
  * 后台最低支持宽度 = **1280px**（依据外壳 `AdminBoardLayout` 的
  * `matchMedia('(max-width: 1280px)')` 侧栏折叠）。由此得出两条不变量：

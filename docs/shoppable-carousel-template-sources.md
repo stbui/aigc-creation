@@ -16,7 +16,7 @@
 | 抓取时间 | **2026-10-26T07:09:48.232Z**（首轮，见 `manifest.json` 的 `capturedAt`） |
 | 抓取工具 | Playwright + 本机 Chromium 1134（`--no-proxy-server`，locale `zh-CN`） |
 | 抓取脚本 | `frontend/e2e/audit/extract-shoppable-carousel.mjs`（本仓库内，可复跑） |
-| 布局/交互取证 | 2026-11-03，四支探针（`probe-shoppable-{layout,interact,final,history}.mjs`），结果记入 `docs/shoppable-carousel-design.md` |
+| 布局/交互取证 | 2026-11-03，四支探针（`probe-shoppable-{layout,interact,final,history}.mjs`），结果记入 `docs/design/web/shoppable-carousel-design.md` |
 
 抓取脚本做的事（逐条可核）：
 

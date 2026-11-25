@@ -51,9 +51,9 @@
 | C4 | 分页沿用 `limit / offset + total`，不引入 cursor 新范式 | `orders/order.service.ts:568`、`payment-reconciliation.service.ts:290-320`、`notifications.service.ts:98-107` |
 | C5 | C 端接口 `JwtAuthGuard` + service 层按 `userId` 过滤，越权在 SQL 层不可能发生 | `notifications.controller.ts:22-27` |
 | C6 | 副作用（通知/归档）失败**不得阻断主流程**，吞异常只记日志 | `notifications.service.ts:11-15,67-95`、`invoices.service.ts:408` |
-| C7 | 前端多文件目录严格分层：`index/page/components/api/hooks/utils/constants/style.css` + `PascalCase.tsx`，`./X` 单向导入 | `docs/frontend-module-conventions.md:45-123` |
-| C8 | 页面 CSS 不写裸 hex、不新增 `:root`，色值只进 `styles/tokens.css` | `docs/design-tokens.md:33,54,61` |
-| C9 | 文档命名 kebab-case + `-design` 后缀；规划文档首行标「规划中」；新建文档须同批更新索引与全仓引用 | `docs/README.md:96-124` |
+| C7 | 前端多文件目录严格分层：`index/page/components/api/hooks/utils/constants/style.css` + `PascalCase.tsx`，`./X` 单向导入 | `docs/design/standards/frontend-module-conventions.md:45-123` |
+| C8 | 页面 CSS 不写裸 hex、不新增 `:root`，色值只进 `styles/tokens.css` | `docs/design/standards/design-tokens.md:33,54,61` |
+| C9 | 文档命名 kebab-case + `-design` 后缀；规划文档首行标「规划中」；新建文档须同批更新索引与全仓引用 | `docs/README.md` §7 |
 | C10 | 「跑」= 执行闸口/构建/测试且需授权；「改」须获批；未授权不 build、不跑测试 | `CLAUDE.md` §8、`docs/agent-execution.md` §1 |
 
 ---
@@ -197,7 +197,7 @@
 ### 4.5 视觉规范
 
 - 只用 `styles/tokens.css` 已有语义令牌；新增页面专属类统一前缀 `mailbox-*`，写入 `pages/mailbox/style.css`（C7/C8）。
-- 状态色（未读 / 投递失败 / 已归档）若需新增，按 `docs/design-tokens.md:61` 走「先申请前缀 → 追加到 `tokens.css` 3.x 段 → 附 AA 对比度说明」，不在页面 CSS 写裸 hex。
+- 状态色（未读 / 投递失败 / 已归档）若需新增，按 `docs/design/standards/design-tokens.md:61` 走「先申请前缀 → 追加到 `tokens.css` 3.x 段 → 附 AA 对比度说明」，不在页面 CSS 写裸 hex。
 - 图标沿用 `lucide-react`（C 端已在用，`tickets/page.tsx:3`），不新增图标库。
 
 ---
@@ -474,7 +474,7 @@ frontend/src/pages/mailbox/
 | `frontend/src/layout/NotificationBell.tsx` | 「查看全部」深链（P1） |
 | `frontend/src/pages/account/page.tsx` | `AccountMessagesCard` 增加深链（P1） |
 | `frontend/src/test/namedImportAudit.ts` 相关用例 | 新增 `mailbox` 目录对账（§7.3 已含用例文件） |
-| `docs/README.md:82-92` | 本文件进「规划文档」分类表（**实施获批后同批**，见 C9） |
+| `docs/README.md` §6 | 本文件进「规划文档」分类表（**实施获批后同批**，见 C9） |
 | `docs/api-contract.md:97` | §3.1 增加 `/mailbox/*` 接口行 |
 | `docs/testing.md` | 覆盖矩阵增加邮箱模块用例 |
 | `docs/prd.md:152` | 顺手修正 S-08 状态滞后（D8） |

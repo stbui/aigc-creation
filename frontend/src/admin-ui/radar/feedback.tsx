@@ -149,7 +149,7 @@ export function Descriptions({
   columns?: 1 | 2 | 3;
   inline?: boolean;
 }) {
-  /* 后台最低支持宽度 1280（docs/admin-ui-design.md §5.3）：`sm:`（≥640）
+  /* 后台最低支持宽度 1280（docs/design/admin/admin-ui-design.md §5.3）：`sm:`（≥640）
      在支持区间内恒生效 ⇒ 直接落成列数，不保留断点前缀。 */
   const colClass =
     columns === 3 ? 'grid-cols-3' : columns === 2 ? 'grid-cols-2' : '';

@@ -2,7 +2,7 @@
 
 > 状态：**主体已实施**。后端支付域主链路、后台 `/admin/payments` 三标签页（收款设置 / 交易核对 / 异常处理）与 C 端支付方式选择均已落地；存储扩容商品、支付插件运行时与部分可靠性项仍未实施，见 §13。
 > 参考实现：`open-ai-canvas/backend/internal/app/payment*.go`、`backend/internal/repository/payment.go`、`open-ai-canvas/web/src/pages/admin/payments/payments-page.tsx`。
-> 拆分后的配套文档：后端实现规格见 [`payment-detailed-design.md`](payment-detailed-design.md)，后台与 C 端实现规格见 [`payment-ui-design.md`](payment-ui-design.md)。
+> 拆分后的配套文档：后端实现规格见 [`payment-detailed-design.md`](payment-detailed-design.md)，后台与 C 端实现规格见 [`payment-ui-design.md`](design/admin/payment-ui-design.md)。
 > 本文只写目标、决策、规则与现状差距；与代码冲突时以代码为准。
 
 ## 0. 结论与已定决策
@@ -53,7 +53,7 @@
 
 立项时（2026-10-31）的支付域只有：单一启用通道（`PAYMENT_PROVIDER` + 环境变量）、回调同步入账、超时直接本地取消、对账靠人工上传 CSV、商品只有价格与积分、后台仅「只读渠道状态 + 人工对账」两页。凭据改动必须改环境变量并重启，同一时间只能有一个通道，C 端无法选择支付方式。
 
-以上已按本方案改造：渠道配置改为加密版本化配置、回调先落收件箱再异步入账、关单前先查单、对账支持账单下载与自动补发、商品补币种与销售策略、后台收口为支付工作台。当前实现见 [`payment-detailed-design.md`](payment-detailed-design.md) 与 [`payment-ui-design.md`](payment-ui-design.md)。
+以上已按本方案改造：渠道配置改为加密版本化配置、回调先落收件箱再异步入账、关单前先查单、对账支持账单下载与自动补发、商品补币种与销售策略、后台收口为支付工作台。当前实现见 [`payment-detailed-design.md`](payment-detailed-design.md) 与 [`payment-ui-design.md`](design/admin/payment-ui-design.md)。
 
 ---
 
@@ -377,7 +377,7 @@ interface PaymentAdapter {
 - 对账：`matched / recovered / amount_mismatch / trade_no_mismatch / credit_failed / local_order_not_found / provider_record_missing`。
 - 对账补发必须经过签名查单；查单未确认不补发。
 - 回调 configId 不匹配、验签失败、金额不符、订单不存在。
-- 展示状态派生与 Prisma where 映射、排序白名单、分页越界、导出截断与关键字匹配（见 [`payment-ui-design.md`](payment-ui-design.md) §4.9）。
+- 展示状态派生与 Prisma where 映射、排序白名单、分页越界、导出截断与关键字匹配（见 [`payment-ui-design.md`](design/admin/payment-ui-design.md) §4.9）。
 
 ### 9.2 集成
 
@@ -460,7 +460,7 @@ npm run check
 
 ## 13. 当前状态与开放差距
 
-> 与代码冲突时以代码为准；后端契约见 [`payment-detailed-design.md`](payment-detailed-design.md)，后台与 C 端实现见 [`payment-ui-design.md`](payment-ui-design.md)。
+> 与代码冲突时以代码为准；后端契约见 [`payment-detailed-design.md`](payment-detailed-design.md)，后台与 C 端实现见 [`payment-ui-design.md`](design/admin/payment-ui-design.md)。
 
 ### 13.1 已落地
 

@@ -24,7 +24,7 @@ interface AuthForm {
 
 /**
  * 登录卡本体 —— 1:1 复刻参考站 ijihua.cn 的登录弹窗 `auth-card-split`
- * (2026-10-19 实拍 1280×900, 全部字面值见 `docs/login-design.md` §2)。
+ * (2026-10-19 实拍 1280×900, 全部字面值见 `docs/design/web/login-design.md` §2)。
  *
  * 2026-10-19 拆成组件: 「路由对外开放 + 登录挂在顶栏按钮」后, 同一张卡有两个宿主 ——
  *   - `LoginModal`: 顶栏「登录/注册」唤起 (主路径, 与参考站同构)

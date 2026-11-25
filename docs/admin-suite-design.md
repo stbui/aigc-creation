@@ -7,7 +7,7 @@
 | 侧栏分组与页面清单 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 权限点与内置角色 | `backend/src/admin/permissions.ts` |
 | 高危动作清单 | 同上 `HIGH_RISK_PERMISSIONS` |
-| 功能与页面细节 | `docs/admin-console-design.md` / `docs/admin-detailed-design.md` / `docs/admin-ui-design.md` |
+| 功能与页面细节 | `docs/admin-console-design.md` / `docs/admin-detailed-design.md` / `docs/design/admin/admin-ui-design.md` |
 | 交易域 | `docs/commerce-design.md` |
 | 后台需求 | `docs/admin-prd.md` |
 

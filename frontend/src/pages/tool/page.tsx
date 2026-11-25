@@ -15,7 +15,7 @@ import { ToolUploadCard } from './ToolUploadCard';
  * 表单按后端下发的 params 声明自动渲染 (enum→Select / number→Slider+InputNumber /
  * text→TextArea / boolean→Switch), 因此新增能力不需要在这里加任何分支。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：页头 `ToolPageHeader`、
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：页头 `ToolPageHeader`、
  * 上传与参数 `ToolUploadCard`（单项 `ToolParamField`）、结果 `ToolResultCard`；
  * 上传 / 建任务 / 轮询状态落 `hooks.ts` 的 `useToolPageTask`。
  */

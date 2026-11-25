@@ -10,7 +10,7 @@
  *
  * 命名：基础 `--<类别>-<刻度>`；通用 `--<语义>-<角色>`；组件 `--<缩写>-<语义>`。
  * 组件层仍在 :root 声明，保证 portal 弹层可继承；隔离靠前缀约定，不靠作用域。
- * 规则与新增流程见 docs/design-tokens.md。
+ * 规则与新增流程见 docs/design/standards/design-tokens.md。
  */
 
 :root {

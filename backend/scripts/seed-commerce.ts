@@ -25,7 +25,7 @@ interface Seed {
 }
 
 /**
- * 积分加油包：三段结构与价格对齐参考站 SeeAny `/vip`（见 docs/packages-design.md）。
+ * 积分加油包：三段结构与价格对齐参考站 SeeAny `/vip`（见 docs/design/web/packages-design.md）。
  *
  *   - 限时抢购包：永久积分，活动价（原价划线）
  *   - 短期高能包：31 天有效，单价最低，适合当月高频生成

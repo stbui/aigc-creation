@@ -42,7 +42,7 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
  * `useLibraryAssets.ts` / `useLibraryProjects.ts`，分组状态与可见集合在
  * `useLibraryGroups.ts`，滚动加载在 `useInfiniteScroll.ts`，
  * 页头 / 分组面板 / 批量条 / 状态视图 / 网格各自一个展示组件。
- * 分层约定见 `docs/frontend-module-conventions.md`。
+ * 分层约定见 `docs/design/standards/frontend-module-conventions.md`。
  */
 export function LibraryPage() {
   useDocumentMeta('素材库 · 货觉AI', '管理上传的原图与生成图，支持分组、下载与删除。');

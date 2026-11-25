@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * 页头字号分级（T-038，docs/responsive-layout.md §3.1）。
+ * 页头字号分级（T-038，docs/design/standards/responsive-layout.md §3.1）。
  *
  * L2 页面标题：桌面 28 / ≤640 24。
  * L3 工作台标题：桌面 18 / ≤640 16。

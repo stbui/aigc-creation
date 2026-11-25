@@ -41,7 +41,7 @@ import type { Task } from '../../types/api';
  * 页面只保留编排与写操作（下载 / 删除 / 重试）；取数与分页在
  * `useWorksTasks.ts`，筛选状态与可见列表在 `useWorksFilters.ts`，
  * 页头 / 工具栏 / 批量条 / 计数行 / 网格 / 空态各自一个展示组件。
- * 分层约定见 `docs/frontend-module-conventions.md`。
+ * 分层约定见 `docs/design/standards/frontend-module-conventions.md`。
  *
  * 卡片: 方形画布 + contain (产出比例不一, 统一裁切会切掉商品主体),
  * 能力名与时间放在白底脚注里, 不再压深色渐变在图片上。

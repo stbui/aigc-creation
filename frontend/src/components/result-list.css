@@ -287,7 +287,7 @@
   }
 }
 
-/* 极窄 ≤480 → 1 列（docs/responsive-layout.md §4.1 阶梯的下一档）。
+/* 极窄 ≤480 → 1 列（docs/design/standards/responsive-layout.md §4.1 阶梯的下一档）。
    与上面 640 块同为两段类（0,2,0），必须排在它之后才会赢；单类连
    `.fc-cols-N` 都赢不了（策略第 2 条）。640/641 仍是 2 列，互不影响。 */
 @media (max-width: 480px) {

@@ -7,7 +7,7 @@
 
 /* ───────── AI 带货图文工作台 (sc-*) ─────────
    内容与交互对齐参考站 designkit.cn/shoppable-carousel（见
-   docs/shoppable-carousel-design.md）；外框与商品主图 / 商品详情 / 写真模板
+   docs/design/web/shoppable-carousel-design.md）；外框与商品主图 / 商品详情 / 写真模板
    统一：432px 左栏 + 16px 间距，左栏为白卡配置 + 独立提交卡；
    右栏是「创作灵感 / 创作结果」两个页签，灵感页的模板网格铺在页面底色上。
 
@@ -548,7 +548,7 @@
 }
 
 /*
- * 带货图文: 左栏逐项对齐参考站实测 (docs/shoppable-carousel-design.md §3 / §12)。
+ * 带货图文: 左栏逐项对齐参考站实测 (docs/design/web/shoppable-carousel-design.md §3 / §12)。
  *
  * 1. 上传区尺寸与提示字号由 `ShoppableCarouselConfig` 的 `UPLOAD_ZONE` 负责。
  * 2. 底栏: 参考站 sidebarFooter 白底 + 上边框 1px #f1f5f9 + 内边距 16px 24px 20px,

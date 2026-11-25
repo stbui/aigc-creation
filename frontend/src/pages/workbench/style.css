@@ -1343,7 +1343,7 @@
   text-align: center;
 }
 
-/* ── 内容断点四档：1200 / 900 / 640 / 480（docs/responsive-layout.md §1.1）
+/* ── 内容断点四档：1200 / 900 / 640 / 480（docs/design/standards/responsive-layout.md §1.1）
    降序书写，同属性后档覆盖前档；结构属性（grid-template-columns）只在
    每个断点声明一次，覆盖层不重复声明。列数按 §4.1 标准阶梯：
    N=6 → 5 / 3 / 2 / 1；N=3 → 3 / 2 / 2 / 1；间距 16 / 12 / 8 / 8。 ── */

@@ -1,5 +1,5 @@
 /**
- * 工单模块的共享控件入口（按 `docs/frontend-module-conventions.md`）。
+ * 工单模块的共享控件入口（按 `docs/design/standards/frontend-module-conventions.md`）。
  *
  * 只 re-export 来自 `~/components/admin` 的共享类型；内部文件统一从本文件取，
  * 不直接连 `~/components`。`constants.ts` 经本文件取 `TagTone`（符合 §3

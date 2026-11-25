@@ -68,7 +68,7 @@ import { useApp } from '../../ui';
  *   已登录 → 主文案「立即生成」+ 角标「本次消耗 10 积分」(10 积分/张 与 AuthCard 文案同口径);
  *   提示词为空时按钮 disabled 且视觉置灰 (opacity .55 + not-allowed)。
  *
- * 板块拆分见 `docs/frontend-module-conventions.md`：输入栏 `CreativeImageInputPane`
+ * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：输入栏 `CreativeImageInputPane`
  * （上传 `CreativeImageUploadSection` / 缩略图 `CreativeImageReferenceThumb`）、
  * 结果栏 `CreativeImageOutputPane`。上传 / 素材库 / 手机回填 / 排序统一走共享
  * `useImageUpload`；提示词放大走共享 `ExpandTextModal`。状态与写操作只留在本文件。

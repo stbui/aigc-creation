@@ -1,6 +1,6 @@
 # 可观测性规范
 
-目标是让一次故障能沿同一条线索回答三件事：**发生了什么、影响了谁、下一步查哪里**。当前实现由四条线组成：请求日志、调用记录、健康检查与业务告警；没有接入 APM / Prometheus。日志轮转、追踪中间件、健康端点字段与异常外发的实现细节见 [`runtime-infrastructure.md`](runtime-infrastructure.md) §4–6；日志安全边界见 [`security.md`](security.md) §9，状态文案见 [`feedback-states.md`](feedback-states.md)，产品与经营分析口径见 [`analytics-events.md`](analytics-events.md)。
+目标是让一次故障能沿同一条线索回答三件事：**发生了什么、影响了谁、下一步查哪里**。当前实现由四条线组成：请求日志、调用记录、健康检查与业务告警；没有接入 APM / Prometheus。日志轮转、追踪中间件、健康端点字段与异常外发的实现细节见 [`runtime-infrastructure.md`](runtime-infrastructure.md) §4–6；日志安全边界见 [`security.md`](security.md) §9，状态文案见 [`feedback-states.md`](design/standards/feedback-states.md)，产品与经营分析口径见 [`analytics-events.md`](analytics-events.md)。
 
 ## 1. 四条主线与关联键
 

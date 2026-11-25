@@ -13,11 +13,11 @@
 
 ## 2. 先读
 
-1. `docs/frontend-module-conventions.md`：多文件功能目录、8 个入口、导入方向、CSS 归属
-2. `docs/frontend-component-language.md`：组件角色、Props、状态、跨端一致性与禁止模式
-3. `docs/design-tokens.md`：令牌三层结构、命名与引用
-4. `docs/feedback-states.md`：五态判定、加载 / 空 / 失败 / 成功 / 确认
-5. `docs/accessibility.md`：键盘、焦点、表单、图像、动态反馈、对比度
+1. `docs/design/standards/frontend-module-conventions.md`：多文件功能目录、8 个入口、导入方向、CSS 归属
+2. `docs/design/standards/frontend-component-language.md`：组件角色、Props、状态、跨端一致性与禁止模式
+3. `docs/design/standards/design-tokens.md`：令牌三层结构、命名与引用
+4. `docs/design/standards/feedback-states.md`：五态判定、加载 / 空 / 失败 / 成功 / 确认
+5. `docs/design/standards/accessibility.md`：键盘、焦点、表单、图像、动态反馈、对比度
 6. `docs/testing.md`：L1.5 与 L4 的用例边界
 
 ## 3. 目录与分层
@@ -41,7 +41,7 @@
 ## 4. 硬约束
 
 - 后台页面不得直连 `admin-ui/components/ui`；C 端页面不得直连后台组件。需要新角色时先在对应组件层封装语义组件。
-- 颜色只引 `var(--token)`，不写裸 hex；新增令牌走 `docs/design-tokens.md` 的流程。最小字号 12px。
+- 颜色只引 `var(--token)`，不写裸 hex；新增令牌走 `docs/design/standards/design-tokens.md` 的流程。最小字号 12px。
 - 页面 CSS 只放本页独占选择器；共享骨架与全局令牌不搬进页面；全局工具类必须带 `u-` 前缀。
 - 单文件 500 行告警、800 行报错；`scripts/check-file-size.mjs` 的基线只许变短，不能当豁免。
 - shadcn 原子件不得使用官方默认 `cn`，不得保留 `dark:` 变体；`SelectItem` / `DropdownMenuItem` / `CommandItem` 必须分别放在对应的 `Group` 内。
