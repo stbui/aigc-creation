@@ -40,16 +40,17 @@ import { ProxyModule } from './model/proxy/proxy.module';
 
 @Module({
   imports: [
-    // 顺序敏感: ConfigModule 必须最先 import —— 它 isGlobal,
-    // 在此完成注册后 ConfigService 才对后面的模块可见 (见 config.module.ts)
+    // 保持最先 import: 不是为了 DI (模块图先于实例化), 而是让 env 文件在
+    // 其它模块的类定义期就读进 process.env (见 config.module.ts)
     ConfigModule,
     LoggerModule,
     // 全局缓存（isGlobal）：统一 CACHE_MANAGER 注入点与默认 TTL，
     // 业务模块不再各自手写 TTL Map。存储为内存，多实例下只影响新鲜度。
     CacheModule,
-    // 横切服务（B5）：素材签名 URL。@Global, 必须排在业务模块之前
+    // 横切服务（B5）：素材签名 URL。@Global 注册后全站可注入，位置不影响依赖关系；
+    // 放在前部只为把横切基础设施归拢在一起
     CommonModule,
-    // 外部消息通道 (邮件/短信) —— 全局模块, 必须排在 AuthModule 之前
+    // 外部消息通道 (邮件/短信) —— @Global: 注册后全站可注入, 与 AuthModule 的先后无关
     ChannelsModule,
     // 站内消息 (B4) —— 全局模块: 支付/任务/调度都要发通知, 逐个 import 只会制造循环依赖
     NotificationsModule,
@@ -86,8 +87,8 @@ import { ProxyModule } from './model/proxy/proxy.module';
     // 健康检查 (B5): /health 诊断 + /health/ready 就绪探针（无需鉴权）
     HealthModule,
     // AIGC 可见标识样式 (2026-10-21): 公开读展示参数 + 后台配置。
-    // GenerateModule 依赖它取运行时素材，故必须排在 GenerateModule 之后亦可
-    // （Nest 的模块图与 import 顺序无关），此处放在末尾更易读。
+    // 非全局模块，已由 ModelTaskModule 导入；模块只要在图中就会挂载控制器，
+    // 这行只为在根模块显式列出该域。重复导入不会重复实例化。
     AigcLabelModule,
     // 渠道与模型子系统（移植自 open-ai-canvas）。P0 只装无状态地基：
     // 凭证加密 / 协议注册表 / 内置插件清单 / 出站策略。
@@ -101,8 +102,8 @@ import { ProxyModule } from './model/proxy/proxy.module';
     ProxyModule,
   ],
   // 测试辅助接口（NODE_ENV=test 之外一律 404）：冒烟脚本用它重置限流计数。
-  // 放在 AppModule 而不是 CommonModule —— 它要注入 RateLimitGuard 的**同一个实例**，
-  // 而那个实例由下面的 APP_GUARD 注册产生（useExisting 复用）。
+  // 放在 AppModule 而不是 CommonModule：provider 是模块作用域的，只有本模块声明的
+  // 控制器才能注入下面 providers 里那份 RateLimitGuard 实例，重置的才是真正在用的计数
   controllers: [TestSupportController],
   providers: [
     // 全局管道与拦截器使用 Nest 的 APP_* 令牌注册，和请求生命周期共享同一套

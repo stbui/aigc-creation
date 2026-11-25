@@ -12,9 +12,9 @@ import { OAuthStateService } from './oauth/oauth-state.service';
 /**
  * 认证模块。
  *
- * 依赖 `EmailService` / `SmsService` 来自全局的 `ChannelsModule`（在
- * AppModule 里注册），本模块不需要 import 它 —— 全局模块只对「在其之后
- * 注册的模块」可见，而 ChannelsModule 排在 AuthModule 之前。
+ * 依赖 `EmailService` / `SmsService`，由全局模块 `ChannelsModule` 提供（在
+ * AppModule 里注册一次）。全局模块在模块图解析后对全站可见，与 imports 中的
+ * 相对位置无关，本模块不需要 import 它。
  */
 @Module({
   controllers: [AuthController, QrLoginController, OAuthController],
