@@ -17,20 +17,18 @@ import { cn } from '../lib/cn';
 /* ────────────────────────── 全幅画布容器 ────────────────────────── */
 
 /**
- * 中性风格页面容器：用 `radar-canvas` 灰底铺满后台内容区（抵消外壳的 26/18 内边距），
- * 内部白底细线面板浮在上面 —— freebie-radar 的标志性「灰底 + 白卡」层次。
+ * 中性风格页面容器：灰底与 26/18 内边距统一由外壳 `.adm-content` 提供
+ * （`bg-page` + `px-[26px] pt-[18px] pb-14`，阶段 1 起 page-bg 与 radar-canvas
+ * 同为 #f6f7f9），内部白底细线面板浮在上面 ——「灰底 + 白卡」层次不变。
  *
- * 负值外边距与 `AdminBoardLayout` 内容区的 `px-[26px] pt-[18px]` 对齐；
- * 外壳该值改动时这里需同步。
+ * 2026-11-25：移除此处的负边距抵消与重复 padding。旧实现用负外边距把灰底铺到
+ * 内容区边缘再自己加回内边距，是「外壳 padding + 页面负边距」双重契约，
+ * 改一处必须同步另一处。现灰底由外壳同色提供，页面只保留中性作用域标记与
+ * 最小高度，几何契约单一落在 AdminBoardLayout。
  */
 export function RadarPage({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div
-      className={cn(
-        'radar-scope bg-radar-canvas -mx-[26px] -mt-[18px] min-h-full px-[26px] pb-14 pt-[18px]',
-        className,
-      )}
-    >
+    <div className={cn('radar-scope min-h-full', className)}>
       {children}
     </div>
   );

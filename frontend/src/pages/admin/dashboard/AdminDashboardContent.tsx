@@ -185,26 +185,11 @@ export function AdminDashboardContent() {
       {/* 换指标窗口失败时保留上一窗口的数字，但要明说这是旧的 */}
       {error && <StaleError error={error} onRetry={() => void reload()} />}
 
-      <WorkQueue
-        groups={workbench?.groups ?? []}
-        loading={workbenchLoading}
-        error={workbenchError}
-        emptyTitle={`${workbenchTitle}已清空`}
-        emptyDescription="当前没有需要处理的事项。"
-      />
-
-      {/* 财务视角没有任务口径：交易概况用 overview 的订单数据单独成块 */}
-      {isFinance && (
-        <Panel title="交易概况" note={`近 ${days} 天汇总`}>
-          <FinanceGrid commerce={c} days={days} />
-        </Panel>
-      )}
-
       {/*
-       * 经营概况：窗口读数与累计存量合成一块。
-       * 两者都是一排数字，拆成两张面板只会多一层标题与留白；用两条小节标题
-       * 把「近 N 天」与「累计」隔开，避免两套口径被读成同一组数字。
-       * 财务没有 task.read：窗口带里不出现任务口径，累计带里换成累计实收。
+       * 2026-11-25 信息层级重排：KPI 指标带前置到首屏，待办明细下沉并折叠。
+       * 旧版把 4 组待办（含 37 条对账差异）整列铺在页头下方，几十行订单号
+       * 把营收/成功率/新增用户这些结论挤到折叠线以下 —— 用户第一眼看到的是
+       * 日志而不是经营状况。现按「先结论、后明细」：指标带置顶，待办按需展开。
        */}
       <Panel title="经营概况">
         <Subhead title={`近 ${days} 天`} note={`对比上一个 ${days} 天`} />
@@ -214,6 +199,26 @@ export function AdminDashboardContent() {
           <TotalsStrip data={data} finance={isFinance} />
         </div>
       </Panel>
+
+      {/* 财务视角没有任务口径：交易概况用 overview 的订单数据单独成块 */}
+      {isFinance && (
+        <Panel title="交易概况" note={`近 ${days} 天汇总`}>
+          <FinanceGrid commerce={c} days={days} />
+        </Panel>
+      )}
+
+      {/*
+       * compact：概览页只展示每组一行摘要，点开才看实体行。告警页里的
+       * WorkQueue 不传此 prop，保持明细常显（那边是按来源逐条排障的场景）。
+       */}
+      <WorkQueue
+        groups={workbench?.groups ?? []}
+        loading={workbenchLoading}
+        error={workbenchError}
+        emptyTitle={`${workbenchTitle}已清空`}
+        emptyDescription="当前没有需要处理的事项。"
+        compact
+      />
 
       {/*
        * 任务质量：趋势与失败原因同属「任务在变好还是变坏」，并排放，

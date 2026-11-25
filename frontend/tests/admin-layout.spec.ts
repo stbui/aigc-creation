@@ -210,14 +210,33 @@ test.describe('后台布局', () => {
     expect(Math.min(...sizes.map((size) => size.minHeight))).toBeGreaterThanOrEqual(32);
   });
 
-  test('顶栏不提供全局搜索入口', async ({ page }) => {
+  test('顶栏全局搜索：点击与 Ctrl+K 均唤起，可搜索并跳转', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${UI}/admin/users`);
     await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
 
-    await expect(page.getByTestId('admin-global-search-trigger')).toHaveCount(0);
+    const trigger = page.getByTestId('admin-global-search-trigger');
+    const dialog = page.getByRole('dialog', { name: '全局搜索' });
+
+    await expect(trigger).toHaveCount(1);
+    await expect(dialog).toHaveCount(0);
+
+    // 点击唤起
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+
+    // Ctrl+K 唤起（数据源为侧栏同一份权限过滤菜单）
     await page.keyboard.press('Control+K');
-    await expect(page.getByRole('dialog', { name: '全局搜索' })).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    await page.getByTestId('admin-global-search-input').fill('角色权限');
+    await expect(dialog.getByText('角色权限')).toBeVisible();
+
+    // 选中后关闭对话框并跳转
+    await dialog.getByText('角色权限').click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page).toHaveURL(/\/admin\/roles/);
   });
 
   test('点击用户卡片打开详情', async ({ page }) => {

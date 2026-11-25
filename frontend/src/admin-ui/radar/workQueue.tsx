@@ -5,7 +5,7 @@
  * 拼装，和页头 / 面板那类纯骨架不是一类东西。页面仍从 `./index` 取件。
  */
 import { Link, useLocation } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, CheckCircle2, LoaderCircle } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, LoaderCircle } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { RadarBadge } from './Badge';
 import type {
@@ -42,6 +42,7 @@ export function WorkQueue({
   emptyTitle = '当前没有待处理事项',
   emptyDescription = '告警、退款、对账与备份都在正常范围内。',
   hideEmptyGroups = false,
+  compact = false,
   className,
 }: {
   groups: AdminWorkbenchGroup[];
@@ -50,6 +51,12 @@ export function WorkQueue({
   emptyTitle?: string;
   emptyDescription?: string;
   hideEmptyGroups?: boolean;
+  /**
+   * 紧凑模式（2026-11-25）：每组明细默认收起，只留「标签 + 计数 + 查看全部」
+   * 一行摘要，点击整行展开。概览页用它避免几十条实体行把 KPI 指标挤出首屏；
+   * 告警页按来源排障需要明细常显，不传此 prop（默认 false）保持原样。
+   */
+  compact?: boolean;
   className?: string;
 }) {
   const location = useLocation();
@@ -109,45 +116,53 @@ export function WorkQueue({
         const style = WB_SEVERITY_STYLE[group.severity];
         const amount = group.amountCents !== undefined ? `¥${(group.amountCents / 100).toFixed(2)}` : null;
         return (
-          <section
-            key={group.key}
-            className="panel overflow-hidden"
-            aria-labelledby={`workbench-group-${group.key}`}
-          >
-            <div className="flex flex-wrap items-center gap-2 border-b border-radar-ink-100 px-5 py-3">
-              <RadarBadge className={style.badge}>{style.label}</RadarBadge>
-              <h3
-                id={`workbench-group-${group.key}`}
-                className="text-[13px] font-semibold text-radar-ink-900"
+          <section key={group.key} className="panel overflow-hidden">
+            <details open={!compact} className="group">
+              {/*
+               * 紧凑模式把整行做成 summary：默认收起时首屏只占一行，KPI 指标
+               * 得以先于明细出现（数据结论优先，明细按需展开）。非紧凑模式
+               * 用 open 恒定展开，summary 仍可点但视觉上是普通标题行。
+               */}
+              <summary
+                className="flex cursor-pointer flex-wrap items-center gap-2 border-b border-radar-ink-100 px-5 py-3 outline-none transition-colors hover:bg-radar-surface-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-radar-brand [&::-webkit-details-marker]:hidden"
+                aria-label={`${group.label}，${group.count} 项，点击${compact ? '展开' : '收起'}明细`}
               >
-                {group.label}
-              </h3>
-              <span className="text-[14px] font-semibold tabular-nums text-radar-ink-950">
-                {group.count}
-              </span>
-              {amount && (
-                <span className="text-[12px] tabular-nums text-radar-ink-400">涉及 {amount}</span>
-              )}
-              <Link
-                to={group.link}
-                className="ml-auto inline-flex items-center gap-1 text-[13px] font-medium text-radar-brand hover:underline"
-              >
-                查看全部
-                <ArrowRight className="size-3.5" aria-hidden />
-              </Link>
-            </div>
+                <RadarBadge className={style.badge}>{style.label}</RadarBadge>
+                <h3 className="text-[13px] font-semibold text-radar-ink-900">{group.label}</h3>
+                <span className="text-[14px] font-semibold tabular-nums text-radar-ink-950">
+                  {group.count}
+                </span>
+                {amount && (
+                  <span className="text-[12px] tabular-nums text-radar-ink-400">涉及 {amount}</span>
+                )}
+                {compact && (
+                  <ChevronDown
+                    className="size-3.5 text-radar-ink-400 transition-transform group-open:rotate-180"
+                    aria-hidden
+                  />
+                )}
+                <Link
+                  to={group.link}
+                  onClick={(event) => event.stopPropagation()}
+                  className="ml-auto inline-flex items-center gap-1 text-[13px] font-medium text-radar-brand hover:underline"
+                >
+                  查看全部
+                  <ArrowRight className="size-3.5" aria-hidden />
+                </Link>
+              </summary>
 
-            {group.items.length === 0 ? (
-              <div className="px-5 py-3 text-[13px] text-radar-ink-400">
-                该类没有可展开的实体行，点击「查看全部」处理。
-              </div>
-            ) : (
-              <ul className="divide-y divide-radar-ink-100">
-                {group.items.map((item) => (
-                  <WorkQueueRow key={item.id} item={item} severity={group.severity} returnTo={returnTo} />
-                ))}
-              </ul>
-            )}
+              {group.items.length === 0 ? (
+                <div className="px-5 py-3 text-[13px] text-radar-ink-400">
+                  该类没有可展开的实体行，点击「查看全部」处理。
+                </div>
+              ) : (
+                <ul className="divide-y divide-radar-ink-100">
+                  {group.items.map((item) => (
+                    <WorkQueueRow key={item.id} item={item} severity={group.severity} returnTo={returnTo} />
+                  ))}
+                </ul>
+              )}
+            </details>
           </section>
         );
       })}

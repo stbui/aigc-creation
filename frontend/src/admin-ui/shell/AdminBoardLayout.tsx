@@ -22,6 +22,7 @@ import {
   SidebarTrigger,
 } from '../components/ui/sidebar';
 import { AdminSidebar } from './AdminSidebar';
+import { AdminCommandPalette } from './AdminCommandPalette';
 import { useAdmin } from '../../context/AdminContext';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -277,6 +278,14 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
           )}
 
           <div className="ml-auto flex items-center gap-3">
+            {/*
+             * 命令面板：触发按钮在顶栏，对话框 portal 到 body。数据源是上面
+             * 已按权限过滤的 permissionGroups；跳转复用 leave() 以保留未保存拦截。
+             */}
+            <AdminCommandPalette
+              groups={permissionGroups}
+              onNavigate={(path) => void leave(path)}
+            />
             <AdminAlertBell onNavigate={(path) => void leave(path)} />
             <EnvironmentTag />
           </div>

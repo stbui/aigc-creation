@@ -185,6 +185,104 @@
   }
 
   /*
+   * 后台全域中性令牌映射（2026-11-25 单一事实源）。
+   *
+   * 此前这份映射只挂在 .radar-scope（内容区），外壳（侧栏 / 顶栏）继续吃
+   * :root 的品牌紫，形成「紫外壳 + 墨黑内容区」的视觉割裂。现将同一份声明
+   * 提到后台根 .admin-root 与浮层 .admin-portal，让外壳 / 内容区 / portal
+   * 消费同一套语义；内容区是 .admin-root 后代，自动继承，不再单独声明。
+   *
+   * 必须落在 admin.css（后台唯一必载入口，layout.tsx 同步 import）：
+   * radar-admin.css 由各页面 chunk 懒加载，首帧外壳拿不到映射会闪紫。
+   * 变量自身声明覆盖 :root 继承，与此块所处的 @layer 无关。
+   */
+  .admin-root,
+  .admin-portal {
+    /* shadcn 语义令牌（@theme inline 编译后工具类直接引用原语变量，
+       故下面两组必须同时改，缺一组会出现「文字变了底色没变」） */
+    --color-background: #f6f7f9;
+    --color-foreground: #1b1e26;
+    --color-card: #ffffff;
+    --color-card-foreground: #1b1e26;
+    --color-popover: #ffffff;
+    --color-popover-foreground: #1b1e26;
+    --color-primary: #111318;
+    --color-primary-foreground: #ffffff;
+    --color-secondary: #f1f3f6;
+    --color-secondary-foreground: #1b1e26;
+    --color-muted: #f1f3f6;
+    --color-muted-foreground: #646f80;
+    --color-accent: #f1f3f6;
+    --color-accent-foreground: #111318;
+    --color-destructive: #dc2626;
+    --color-destructive-foreground: #ffffff;
+    --color-border: #e6e8ec;
+    --color-input: #e6e8ec;
+    --color-ring: #272b36;
+    --color-success-soft: #ecfdf5;
+    --color-success-text: #047857;
+    --color-warn-soft: #fef3c7;
+    --color-warn-text: #92400e;
+    --color-warn-border: #fde68a;
+    --color-danger-soft: #fef2f2;
+    --color-danger-text: #dc2626;
+    --color-brand: #111318;
+    --color-brand-hover: #272b36;
+    --color-brand-bg: #f1f3f6;
+    --color-brand-light: #f1f3f6;
+
+    /* 外壳原语变量（admin.css @theme inline 内联引用） */
+    --border: #e6e8ec;
+    --border-soft: #e6e8ec;
+    --border-row: #f1f3f6;
+    --border-hover: #d1d5de;
+    --border-dot: #d1d5de;
+    --surface: #f1f3f6;
+    --surface-soft: #f7f8fb;
+    --surface-tint: #f7f8fb;
+    --card-bg: #ffffff;
+    --page-bg: #f6f7f9;
+    --text-strong: #1b1e26;
+    --text-body: #646f80;
+    --text-muted: #646f80;
+    --text-desc: #646f80;
+    --placeholder-text: #646f80;
+    --popover: #ffffff;
+    --popover-foreground: #1b1e26;
+    --foreground: #1b1e26;
+    --primary: #111318;
+    --secondary: #f1f3f6;
+    --muted: #f1f3f6;
+    --on-brand: #ffffff;
+    --color-bg: #f6f7f9;
+
+    /* 业务语义色（@theme inline 内联引用 --*-bg / --*-text） */
+    --success-soft-bg: #ecfdf5;
+    --success-text: #047857;
+    --success-border: #a7f3d0;
+    --warn-bg: #fef3c7;
+    --warn-border: #fde68a;
+    --warn-text: #92400e;
+    --danger-soft-bg: #fef2f2;
+    --danger-text: #dc2626;
+
+    /* 链接 / 焦点环消费的 --brand 系列（不重映射则 portal 里仍是紫） */
+    --brand: #111318;
+    --brand-hover: #272b36;
+    --brand-bg: #f1f3f6;
+    --brand-light: #f1f3f6;
+    --shadow-card: none;
+
+    /* 圆角：控件 / 面板 / 菜单项 8px，页签内部 6px，弹窗 12px */
+    --radius-control: 8px;
+    --radius-card: 8px;
+    --radius-panel: 12px;
+    --radius-lg: 8px;
+    --radius-md: 8px;
+    --radius-sm: 6px;
+  }
+
+  /*
    * 链接排版默认值：后台链接统一为品牌紫 + 500 字重；默认不显示下划线，
    * 悬停或键盘聚焦时显示，并加宽下划线距离。
    *
@@ -246,4 +344,23 @@
   --sidebar-accent-foreground: var(--brand-hover);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--brand);
+}
+
+/*
+ * 唯一的裸 `var(--sidebar-*)` 消费者是 SidebarRail 的 hover 阴影
+ * （sidebar.tsx:483）。上面 `:root` 里的 `--sidebar-border/accent` 用
+ * `var()` 链在根计算时已锁定为品牌色，后代重映射 --brand 影响不到它。
+ * 这里在后台根用字面值直接覆盖，让 rail 与中性外壳一致；不改 :root，
+ * C 端不受影响。
+ */
+.admin-root,
+.admin-portal {
+  --sidebar: #f1f3f6;
+  --sidebar-foreground: #1b1e26;
+  --sidebar-primary: #111318;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f3f6;
+  --sidebar-accent-foreground: #111318;
+  --sidebar-border: #e6e8ec;
+  --sidebar-ring: #272b36;
 }

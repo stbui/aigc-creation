@@ -2,8 +2,9 @@
  * freebie-radar 风格后台设计层（命名空间 radar-*）—— 纯 CSS 部分。
  *
  * 设计语言：中性灰 + 墨黑品牌 + 零面板阴影 + 1px 细线 + 颜色编码语义。
- * 双层视觉体系：品牌紫外壳（styles/admin.css、tokens.css）保持产品识别，
- * 页面内容区通过 `.radar-scope` 重映射为 Radar 中性语义。
+ * 单一视觉体系（2026-11-25）：外壳与内容区共用同一套中性语义令牌，
+ * 映射单一事实源在 styles/admin.css 的 `.admin-root, .admin-portal` 作用域，
+ * 首帧即生效。本文件不再做内容区令牌重映射。
  *
  * ## 为什么这里没有 `@theme` / `@utility`
  *
@@ -14,8 +15,9 @@
  * 一个工具类都不存在（实心按钮成白字透明底），**构建却完全不报错**。
  *
  * 所以令牌登记与 `panel` / `radar-drawer-shadow` 两个 `@utility` 一律写在
- * `styles/admin.css`（唯一的 Tailwind 入口）。本文件只保留纯 CSS：
- * 关键帧、动画类、`.radar-scope` 令牌重映射。
+ * `styles/admin.css`（唯一的 Tailwind 入口）。中性令牌映射也已上移到那里，
+ * 由 `.admin-root, .admin-portal` 承载（单一事实源）。本文件只保留纯 CSS：
+ * 关键帧、动画类与零阴影规则。
  */
 
 /* ── 动效关键帧（命名空间 radar-*，避免与全站 .drawer-enter 等冲突） ── */
@@ -45,112 +47,13 @@
   }
 }
 
-/* ── 中性化作用域 ──
- * 后台页内容区套上 `.radar-scope` 后，把品牌紫后台的语义令牌整体重映射为
- * freebie-radar 中性值：灰底 / 近黑品牌 / 零阴影 / 1px 细线 / 颜色编码语义。
- *
- * 作用：后台 chunk 里既有的 shadcn 原子件（Input / Select / Switch / Card /
- * Dialog / 表格等）只要落在页面内容区内，就自动采用 Radar 语义；
- * 这也是浮层门户不泄漏品牌紫的边界保障。
- *
- * 仅作用于内容区（RadarPage 容器），不污染外壳（侧栏 / 顶栏）的品牌紫令牌，
- * 与「命名空间隔离」目标一致。
- */
-.radar-scope {
-  --color-background: #f6f7f9;
-  --color-foreground: #1b1e26;
-  --color-card: #ffffff;
-  --color-card-foreground: #1b1e26;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #1b1e26;
-  --color-primary: #111318;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #f1f3f6;
-  --color-secondary-foreground: #1b1e26;
-  --color-muted: #f1f3f6;
-  --color-muted-foreground: #646f80;
-  --color-accent: #f1f3f6;
-  --color-accent-foreground: #111318;
-  --color-destructive: #dc2626;
-  --color-destructive-foreground: #ffffff;
-  --color-border: #e6e8ec;
-  --color-input: #e6e8ec;
-  --color-ring: #272b36;
-  --color-success-soft: #ecfdf5;
-  --color-success-text: #047857;
-  --color-warn-soft: #fef3c7;
-  --color-warn-text: #92400e;
-  --color-warn-border: #fde68a;
-  --color-danger-soft: #fef2f2;
-  --color-danger-text: #dc2626;
-  --color-brand: #111318;
-  --color-brand-hover: #272b36;
-  --color-brand-bg: #f1f3f6;
-  --color-brand-light: #f1f3f6;
-  /* ── 外壳原语变量：@theme inline 的内联兜底 ─────────────────────────
-   * admin.css 的 `@theme inline` 把 `bg-*` / `text-*` / `border-*` 直接编译成
-   * `var(--card-bg)` / `var(--text-body)` / `var(--border)` 这类**外壳原语变量**，
-   * 而不是 `var(--color-*)`。所以只重映射上面的 `--color-*` 对既有 shadcn
-   * 原子件无效——`.text-muted-foreground` 仍是 #4e5969、`.border-input` 仍是
-   * #e5e7ef。这里必须把真正被工具类引用的原语变量一并重映射。
-   *
-   * 只写在作用域选择器上（不进 `:root`），外壳与 C 端不受影响。
-   */
-  --border: #e6e8ec;
-  --border-soft: #e6e8ec;
-  --border-row: #f1f3f6;
-  --border-hover: #d1d5de;
-  --border-dot: #d1d5de;
-  --surface: #f1f3f6;
-  --surface-soft: #f7f8fb;
-  --surface-tint: #f7f8fb;
-  --card-bg: #ffffff;
-  --page-bg: #f6f7f9;
-  --text-strong: #1b1e26;
-  --text-body: #646f80;
-  --text-muted: #646f80;
-  --text-desc: #646f80;
-  --placeholder-text: #646f80;
-  --popover: #ffffff;
-  --popover-foreground: #1b1e26;
-  --foreground: #1b1e26;
-  --primary: #111318;
-  --secondary: #f1f3f6;
-  --muted: #f1f3f6;
-  --on-brand: #ffffff;
-  --color-bg: #f6f7f9;
-  /* 语义色同样被内联引用（`bg-success-soft` → `var(--success-soft-bg)`） */
-  --success-soft-bg: #ecfdf5;
-  --success-text: #047857;
-  --success-border: #a7f3d0;
-  --warn-bg: #fef3c7;
-  --warn-border: #fde68a;
-  --warn-text: #92400e;
-  --danger-soft-bg: #fef2f2;
-  --danger-text: #dc2626;
-  /* admin.css 的链接 / 默认焦点环直接消费 --brand 系列（不是 --color-brand）。
-   * 不重映射的话，门户里的链接与 shadcn 原子件焦点环仍是品牌紫。 */
-  --brand: #111318;
-  --brand-hover: #272b36;
-  --brand-bg: #f1f3f6;
-  --brand-light: #f1f3f6;
-  --shadow-card: none;
-  /* 圆角同样被 `@theme inline` 内联：`rounded-md` → var(--radius-control)，
-   * `rounded-lg` → var(--radius-card)。只写 --radius-md 之类不生效。
-   * 规范：控件 / 面板 / 菜单项 8px，页签内部 6px，弹窗 12px。 */
-  --radius-control: 8px;
-  --radius-card: 8px;
-  --radius-panel: 12px;
-  /* 兼容仍直接消费酱色名的少量规则 */
-  --radius-lg: 8px;
-  --radius-md: 8px;
-  --radius-sm: 6px;
-}
-
-/* ── 内容层零阴影 ──
+/* ── 全后台零阴影 ──
  * shadcn 原子件自带 `shadow-xs` / `shadow-sm` / `shadow-md`（输入框、outline
  * 按钮、复选框、页签激活态、分页、下拉菜单）。Radar 语言规定面板与浮层零阴影，
  * 抽屉是唯一例外。
+ *
+ * 2026-11-25 起作用域从内容区扩到整个后台：外壳与内容区同一套视觉语言，
+ * 侧栏 / 顶栏里的 shadcn 原子件也不再残留系统阴影。
  *
  * 只把 `--tw-shadow` 归零，不写 `box-shadow: none`：shadcn v4 的焦点环与
  * `ring-*` 也走 box-shadow 的组合变量，整条抹掉会连键盘焦点一起丢失。
@@ -160,7 +63,7 @@
  * `group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm`，
  * 变体前缀让类名不等于 `shadow-sm`，精确类选择器匹配不到。
  */
-.radar-scope :where(
+:is(.admin-root, .admin-portal, .radar-scope) :where(
     [class*='shadow-xs'],
     [class*='shadow-sm'],
     [class*='shadow-md'],
