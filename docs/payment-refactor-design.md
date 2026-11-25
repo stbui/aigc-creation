@@ -251,7 +251,7 @@ interface PaymentAdapter {
 
 1. 加载可用渠道：`GET /payments/providers`。
 2. 多渠道时渲染支付方式卡片（品牌图标 + 名称 + 扫码/跳转标识）；单渠道自动选中。
-3. 沙箱保留显式声明「不产生真实扣款」；生产环境不返回沙箱。
+3. 沙箱保留显式声明「不产生真实扣款」；生产环境不返回沙箱。开发/测试在沙箱实例启用时额外展示为独立选项，不与官方/易支付来源混用。
 4. 发起支付传 `providerId`：
    - `redirect` → `window.location.href = payUrl`；
    - `qrcode` → 用现有 `qrcode` 库渲染二维码；

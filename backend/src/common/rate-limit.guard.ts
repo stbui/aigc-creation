@@ -29,7 +29,9 @@
  *   不设防时任何人都能用伪造的 XFF 头绕开所有限流。
  */
 import { CanActivate, ExecutionContext, Injectable, SetMetadata } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 import { AppError } from './app.exception';
@@ -81,14 +83,11 @@ export class RateLimitGuard implements CanActivate {
 
   constructor(
     private readonly reflector: Reflector,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly logger: AppFileLogger,
     private readonly jwt: JwtService,
   ) {
     this.enabled = this.config.get<boolean>('rateLimit.enabled') ?? true;
-    // 定期清过期桶：不清理的话 key 数会随 IP 基数无限增长，长期运行必然吃内存
-    const timer = setInterval(() => this.sweep(), 60_000);
-    (timer as any).unref?.();
     if (!this.enabled) {
       this.logger.warn(
         'RATE_LIMIT_ENABLED=false：全站限流已关闭（仅限本地压测，生产禁用）',
@@ -176,6 +175,16 @@ export class RateLimitGuard implements CanActivate {
       }
     }
     return `anon:${this.ipOf(req)}`;
+  }
+
+  /**
+   * 定期清过期桶：不清理的话 key 数会随 IP 基数无限增长，长期运行必然吃内存。
+   *
+   * 由 `@nestjs/schedule` 挂载；守卫实例在 app bootstrap 后已就绪。
+   */
+  @Interval('rate-limit:sweep', 60_000)
+  private scheduledSweep(): void {
+    this.sweep();
   }
 
   private sweep(): void {

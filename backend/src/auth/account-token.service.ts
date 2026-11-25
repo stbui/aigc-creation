@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -63,7 +64,7 @@ export class AccountTokenService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
   ) {}
 
   /** 32 字节随机串，base64url（可直接放进 URL，无需再编码） */

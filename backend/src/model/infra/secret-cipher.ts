@@ -15,6 +15,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -29,7 +30,7 @@ export class SecretCipher {
   private readonly log = new Logger(SecretCipher.name);
   private key: Buffer | null = null;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService<AppConfigValues, true>) {}
 
   /** 加密。空串原样返回 —— 「未设置」与「密文」必须可区分 */
   encrypt(plain: string): string {

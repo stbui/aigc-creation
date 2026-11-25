@@ -146,6 +146,8 @@ export interface AdminOrderRow {
   itemCount: number;
   items: Array<{ name: string; sku: string }>; // 下单时的名称与 SKU 快照
   paymentCount: number;
+  /** 最近一次下单/发起支付失败原因；成功发起后会被清空 */
+  lastError: string | null;
   membershipPlanCode: string | null;
   membershipPlanName: string | null;
   createdAt: string;
@@ -165,6 +167,8 @@ export interface AdminOrderPayment {
   payTransactionId: string;
   amountCents: number;
   status: string;
+  /** 单次支付尝试的失败原因（服务端已截断 200 字） */
+  lastError: string | null;
   message: string | null;
   sandboxScenario: string | null;
   paidAt: string | null;
@@ -193,6 +197,8 @@ export interface AdminOrderDetail {
   refundedCents: number;
   grantedCredits: number;
   couponSnapshot: string | null;
+  /** 最近一次下单/发起支付失败原因；成功发起支付后为 null */
+  lastError: string | null;
   membershipPlanId: string | null; membershipAppliedAt: string | null;
   membershipPeriodStartAt: string | null; membershipPeriodEndAt: string | null; membershipPeriodRevokedAt: string | null;
   paidAt: string | null;

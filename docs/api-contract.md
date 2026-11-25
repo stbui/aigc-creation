@@ -5,7 +5,7 @@
 ## 1. 统一响应信封
 
 - 所有成功响应由 `ResponseInterceptor` 包成 `{ code: 0, data, message: '' }`；前端 `lib/api.ts` 的 `request()` 负责剥离。
-- 异常走 `AllExceptionsFilter` + `AppError(code, message, httpStatus)`，信封同样携带 `requestId`（见 `docs/runtime-infrastructure.md`）。
+- 异常走 `AllExceptionsFilter` + `AppError(code, message, httpStatus)`，信封同样携带 `requestId`（追踪口径见 `docs/observability.md` §3）。
 - 全局 `ValidationPipe({ whitelist: true, transform: true })`，DTO 校验错误由 `main.ts` 的 `flattenValidationErrors` 压平成**单条中文消息**。
 - **前端必须能拿到业务码**：HTTP 状态码只能分「400 参数错」与「409 冲突」，分不出是哪条规则（例如退款金额超上限 `40001` 与超出可配退款规则 `40905`/`40906`/`40907`）。前端 `ApiError` 因此带 `code` 字段（取响应体的 `code`，无则 `null`），页面据此给出可执行的下一步。信封里的 `code` 是错误分类的唯一事实源，**不要为了省事在文案里拼码**。
 
@@ -32,6 +32,7 @@
 | `40905` / `40906` / `40907` | 退款：超时间窗 / 超可退比例 / 积分已消耗且扣不回 | `orders/order.service.ts` |
 | `40908` | 该订单有退款仍在渠道处理中（`Refund.status='processing'`），不接受新的退款 | 同上 |
 | `40900` | 排序列表已变化：`expectedIds` 与库中不一致，整单拒绝，需重新加载后再保存 | `model/channels/channel.service.ts` |
+| `41301` | **所有 multipart 上传端点**的文件超过单次上限（HTTP 413）。multer 在业务代码之前截断并删除临时分片，文件未入库、不计费；文案由全局过滤器统一改写，不透出 multer 内置英文。各端点上限不同，生效值由前端按 `GET /settings` 的 `upload.maxBytes` 提示 | `common/all-exceptions.filter.ts` |
 | `42201` | 有线路但全部失败（任务失败，退款） | `model/tasks/task-lifecycle.service.ts` |
 | `42202` / `42203` | 任务中断回收失败 / AIGC 显式角标失败（均退款） | 同上 |
 | `42204` | 无可用线路：所有线路都明确未接单（含 DNS / 代理 / TCP 建连前网络失败），或存量 `route=local`（任务失败，退款，不交付任何产出） | `model/tasks/task-worker.service.ts` |
@@ -288,6 +289,6 @@ JWT TTL 默认 7 天（`JWT_TTL` 可覆盖；本地 MVP 无 refresh，生产应�
 
 ## 6. 相关文档
 
-- 错误码背后的业务规则：`docs/commerce-design.md`（退款 / 支付）、`docs/model-architecture.md`（`42204` / `42205`）
-- 限流、追踪、签名 URL：`docs/runtime-infrastructure.md`
+- 错误码背后的业务规则：`docs/payment-detailed-design.md`（退款 / 支付）、`docs/model-architecture.md`（`42204` / `42205`）
+- 限流与日志脱敏：`docs/security.md` §8–§9；追踪与健康检查：`docs/observability.md` §3、§6；签名 URL 与 AIGC 标识：`docs/media-assets.md` §6、§9
 - 后台接口的权限点与页面归属：`docs/admin-console-design.md`

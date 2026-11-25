@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
@@ -38,7 +39,7 @@ export class PaymentConfigAdminService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly store: PaymentConfigStore,
   ) {}
 
@@ -267,7 +268,7 @@ export class PaymentConfigAdminService {
 
   /** env → v1；仅当库内完全没有该渠道配置时生效。 */
   async bootstrapFromEnv(): Promise<void> {
-    const get = (key: string): string => this.config.get<string>(key) ?? '';
+    const get = (key: keyof AppConfigValues): string => this.config.get<string>(key) ?? '';
     const epayType = get('payment.epay.type') || '2';
     const seeds: Array<{ id: PaymentProviderId; values: Record<string, string> }> = [
       { id: 'sandbox', values: {} },

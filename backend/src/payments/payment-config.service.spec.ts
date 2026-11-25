@@ -363,6 +363,50 @@ describe('PaymentConfigService.availableVisible', () => {
 
     expect(visible.map((item) => item.id)).toEqual(['wechat']);
   });
+
+  it('非生产环境在固定两项之后追加已启用的沙箱', async () => {
+    const { service } = makeService({
+      sources: { alipay: 'official', wechat: 'official' },
+      rows: {
+        alipay: row('alipay', ALIPAY_VALUES),
+        wechat: row('wechat', WECHAT_VALUES),
+        sandbox: row('sandbox', {}),
+      },
+    });
+
+    const visible = await service.availableVisible('CNY');
+
+    expect(visible.map((item) => item.id)).toEqual(['alipay', 'wechat', 'sandbox']);
+    expect(visible[visible.length - 1]).toMatchObject({
+      name: '沙箱（站内模拟）',
+      checkoutMode: 'sandbox',
+      sandbox: true,
+    });
+  });
+
+  it('沙箱实例停用时不追加', async () => {
+    const { service } = makeService({
+      rows: { sandbox: row('sandbox', {}, { enabled: false }) },
+    });
+
+    await expect(service.availableVisible('CNY')).resolves.toEqual([]);
+  });
+
+  it('生产环境即使沙箱实例启用也不返回', async () => {
+    const previousEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const { service } = makeService({ rows: { sandbox: row('sandbox', {}) } });
+
+      const visible = await service.availableVisible('CNY');
+
+      expect(visible).toEqual([]);
+      await expect(service.resolveVisible('sandbox', 'CNY', 1000)).resolves.toBeNull();
+    } finally {
+      if (previousEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousEnv;
+    }
+  });
 });
 
 describe('PaymentConfigService.claimVisibleSelection', () => {
@@ -529,6 +573,48 @@ describe('PaymentConfigService.reserveVisiblePaymentAttempt', () => {
         providerConfigVersion: 2,
       }),
     });
+  });
+
+  it('非生产环境沙箱预占不读取来源、不推进轮询游标', async () => {
+    const { service, prisma, cursor } = makeReserveService({
+      rows: [instanceRow('sandbox', {})],
+    });
+
+    const reserved = await service.reserveVisiblePaymentAttempt({
+      method: 'sandbox',
+      currency: 'CNY',
+      amountCents: 100,
+      orderId: 'order-new',
+      userId: 'user-new',
+    });
+
+    expect(reserved.resolved.providerId).toBe('sandbox');
+    expect(prisma.payment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ channel: 'sandbox', providerMethod: 'sandbox' }),
+    });
+    expect(cursor.upsert).not.toHaveBeenCalled();
+  });
+
+  it('生产环境拒绝沙箱预占', async () => {
+    const previousEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const { service, prisma } = makeReserveService({ rows: [instanceRow('sandbox', {})] });
+
+      await expect(
+        service.reserveVisiblePaymentAttempt({
+          method: 'sandbox',
+          currency: 'CNY',
+          amountCents: 100,
+          orderId: 'order-new',
+          userId: 'user-new',
+        }),
+      ).rejects.toMatchObject({ code: 40400 });
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    } finally {
+      if (previousEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousEnv;
+    }
   });
 
   it('展示后支付来源被切换时拒绝旧路由并提示刷新', async () => {

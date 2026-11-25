@@ -87,6 +87,15 @@ export function CheckoutPage() {
    */
   const autoQueriedOrderRef = useRef<string | null>(null);
 
+  /**
+   * 未建单前的应付金额（分）。
+   *
+   * 券/活动试算会改变实付，试算未回时退到商品原价；一旦建单，页面内一律以
+   * 订单快照为准。它只用于「支付已关闭/无渠道」时的下单前拦截。
+   */
+  const preOrderPayableCents =
+    quotePreview?.payableCents ?? product?.priceCents ?? plan?.priceCents ?? 0;
+
   /*
    * 支付状态机（下单 / 发起渠道支付 / 轮询到账 / 主动查单 / 收尾切结果页）在
    * `useCheckoutPayment` 里 —— 页面只拿结果来渲染，不再持有那 8 个支付态与
@@ -111,12 +120,19 @@ export function CheckoutPage() {
     setSelectedProviderId,
     providersLoading,
     providersError,
+    paymentEnabled,
     helpImage,
     helpText,
     stopPolling,
     refreshPaymentStatus,
     payOnline,
-  } = useCheckoutPayment({ product, plan, couponCode, token });
+  } = useCheckoutPayment({
+    product,
+    plan,
+    payableCents: preOrderPayableCents,
+    couponCode,
+    token,
+  });
 
   useEffect(() => {
     let alive = true;
@@ -333,6 +349,22 @@ export function CheckoutPage() {
    */
   const payBlockedReason = order ? blockedReasonOf(order) : null;
 
+  /*
+   * 付费单在「没开支付 / 没有可用渠道」时直接禁用支付按钮并说明原因，
+   * 不再等用户点下去才吃一个后端 503。0 元单不受影响。
+   *
+   * 渠道读取失败只说「暂时无法获取」，不回显 `providersError` 原文 —— 它是
+   * 后端 message（5xx 时含请求号），属于后台与日志的内容（docs/error-copy.md §1 规则 4）。
+   */
+  const payDisabledReason =
+    payAmount > 0 && paymentEnabled === false
+      ? '支付功能已关闭，暂时无法下单，请联系管理员'
+      : payAmount > 0 && token && !providersLoading && providers.length === 0
+        ? providersError
+          ? '暂时无法获取支付方式，请稍后重试；仍未恢复请联系管理员'
+          : '暂无可用支付方式，请联系管理员'
+        : null;
+
   return (
     <div className="pkg-checkout-page">
       <div className="co-head-top">
@@ -365,6 +397,7 @@ export function CheckoutPage() {
             onSelectProvider={setSelectedProviderId}
             providersLoading={providersLoading}
             providersError={providersError}
+            paymentDisabled={paymentEnabled === false}
           />
           <CheckoutHelpCard helpImage={helpImage} helpText={helpText} />
         </div>
@@ -386,6 +419,7 @@ export function CheckoutPage() {
           error={error}
           paymentStatusNotice={paymentStatusNotice}
           payBlockedReason={payBlockedReason}
+          payDisabledReason={payDisabledReason}
           onlineIntent={onlineIntent}
           onPayOnline={() => void payOnline()}
           onCancelQr={() => {

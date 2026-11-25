@@ -1,5 +1,6 @@
 import { Controller, Headers, Post } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { AppError } from './app.exception';
 import { RateLimitGuard } from './rate-limit.guard';
 
@@ -29,7 +30,7 @@ import { RateLimitGuard } from './rate-limit.guard';
 export class TestSupportController {
   constructor(
     private readonly rateLimit: RateLimitGuard,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
   ) {}
 
   @Post('rate-limit/reset')

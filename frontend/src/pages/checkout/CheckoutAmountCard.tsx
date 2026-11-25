@@ -32,6 +32,7 @@ export function CheckoutAmountCard({
   error,
   paymentStatusNotice,
   payBlockedReason,
+  payDisabledReason,
   onlineIntent,
   onPayOnline,
   onCancelQr,
@@ -57,6 +58,11 @@ export function CheckoutAmountCard({
   paymentStatusNotice: string | null;
   /** 非空表示当前订单不可支付（已支付 / 已取消 / 已过期） */
   payBlockedReason: string | null;
+  /**
+   * 非空表示「现在不能发起支付」（支付开关关闭 / 没有可用渠道）。
+   * 与 `payBlockedReason` 分开：后者是订单本身失效，前者是平台暂时不可收款。
+   */
+  payDisabledReason: string | null;
   onlineIntent: PaymentIntent | null;
   onPayOnline: () => void;
   onCancelQr: () => void;
@@ -195,9 +201,25 @@ export function CheckoutAmountCard({
           />
         ) : (
           <>
-            <button type="button" className="co-pay-btn" disabled={paying} onClick={onPayOnline}>
-              {paying ? '处理中…' : payAmount <= 0 ? '免费领取' : `确认支付 ${formatYuan(payAmount)}`}
+            <button
+              type="button"
+              className="co-pay-btn"
+              disabled={paying || Boolean(payDisabledReason)}
+              onClick={onPayOnline}
+            >
+              {paying
+                ? '处理中…'
+                : payAmount <= 0
+                  ? '免费领取'
+                  : payDisabledReason
+                    ? '暂不可支付'
+                    : `确认支付 ${formatYuan(payAmount)}`}
             </button>
+            {payDisabledReason && !error && (
+              <p className="co-hint is-error" role="status">
+                {payDisabledReason}
+              </p>
+            )}
             {order && (
               <button
                 type="button"

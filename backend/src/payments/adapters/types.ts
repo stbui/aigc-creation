@@ -39,6 +39,26 @@ export function isVisiblePaymentMethod(value: unknown): value is VisiblePaymentM
   return value === 'alipay' || value === 'wechat';
 }
 
+/**
+ * C 端真正可选的方式：生产只有支付宝/微信；开发/测试额外允许沙箱。
+ *
+ * 沙箱不是「来源」，不受 `payment.*Source` 控制，也永远不会出现在生产：
+ * 它只在非生产环境、且后台显式启用了沙箱实例时作为独立选项展示。它不是
+ * 「真实渠道失败后的静默降级」—— 用户点选的就是标注了「不产生真实扣款」
+ * 的模拟方式；真实渠道缺凭据仍然返回 503。任何把沙箱当真实渠道兜底的写法
+ * 都会让付费订单「免费成功」，因此解析、预占两处都各自校验环境。
+ */
+export type CheckoutPaymentMethod = VisiblePaymentMethod | 'sandbox';
+export const CHECKOUT_PAYMENT_METHODS: CheckoutPaymentMethod[] = [
+  'alipay',
+  'wechat',
+  'sandbox',
+];
+
+export function isCheckoutPaymentMethod(value: unknown): value is CheckoutPaymentMethod {
+  return value === 'alipay' || value === 'wechat' || value === 'sandbox';
+}
+
 /** 管理员为每个可见支付方式选择的唯一来源。 */
 export type PaymentSource = 'unset' | 'official' | 'epay';
 export const PAYMENT_SOURCES: PaymentSource[] = ['unset', 'official', 'epay'];

@@ -16,6 +16,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { AppError } from '../../common/app.exception';
 import { createHash } from 'node:crypto';
 import { outboundRequest } from '../infra/outbound';
@@ -61,7 +62,7 @@ export class ProviderCatalogService {
   private cache: { fetchedAt: string; entries: ProviderCatalogEntry[] } | null = null;
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly plugins: PluginAdminService,
   ) {}
 

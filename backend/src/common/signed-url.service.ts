@@ -26,6 +26,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 
 const DEFAULT_TTL_SEC = 6 * 60 * 60;
 
@@ -103,7 +104,7 @@ export function verifyAssetUrl(
 export class SignedUrlService {
   private readonly secret: string;
 
-  constructor(config: ConfigService) {
+  constructor(config: ConfigService<AppConfigValues, true>) {
     this.secret = (config.get<string>('asset.signingSecret') ?? '').trim();
   }
 

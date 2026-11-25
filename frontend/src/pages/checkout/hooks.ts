@@ -40,6 +40,12 @@ export interface UseCheckoutPaymentArgs {
   product: Product | null;
   /** 会员套餐；积分单为 null */
   plan: MembershipPlan | null;
+  /**
+   * 未建单前的应付金额（分）：商品原价套用券/活动试算后的结果。
+   * 用于在「支付已关闭 / 无可用支付方式」时先拦住下单，避免建出一笔
+   * 注定无法支付的订单并把后端 503 原文抛给用户。
+   */
+  payableCents: number;
   /** 未建单前试算与下单都要带上的券码 */
   couponCode: string;
   /** 支付渠道接口需鉴权，未登录不请求 */
@@ -49,6 +55,7 @@ export interface UseCheckoutPaymentArgs {
 export function useCheckoutPayment({
   product,
   plan,
+  payableCents,
   couponCode,
   token,
 }: UseCheckoutPaymentArgs) {
@@ -73,8 +80,16 @@ export function useCheckoutPayment({
    */
   const [providers, setProviders] = useState<PaymentProviderInfo[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState('');
-  const [providersLoading, setProvidersLoading] = useState(false);
+  // 已登录时首帧就按“加载中”处理，避免渠道列表到达前闪一下“暂无可用支付方式”
+  const [providersLoading, setProvidersLoading] = useState(Boolean(token));
   const [providersError, setProvidersError] = useState<string | null>(null);
+  /**
+   * 平台支付开关（公开设置）。null 表示尚未读到，不能据此拦截。
+   *
+   * 关闭时 `/payments/providers` 也会返回空列表，但两者语义不同：
+   * 「支付功能已关闭」是平台级停用，「暂无可用支付方式」是渠道未配置。
+   */
+  const [paymentEnabled, setPaymentEnabled] = useState<boolean | null>(null);
   const [helpImage, setHelpImage] = useState('');
   const [helpText, setHelpText] = useState('');
 
@@ -217,6 +232,7 @@ export function useCheckoutPayment({
       setProviders([]);
       setSelectedProviderId('');
       setProvidersError(null);
+      setProvidersLoading(false);
       return;
     }
     let alive = true;
@@ -236,6 +252,8 @@ export function useCheckoutPayment({
         if (!alive) return;
         setProviders([]);
         setSelectedProviderId('');
+        // 原始报错只在捕获处落一次日志：展示处有两处且在渲染路径上，会随重渲染重复输出
+        console.warn('[checkout] 支付渠道加载失败', e);
         setProvidersError((e as Error).message || '支付渠道加载失败');
       })
       .finally(() => {
@@ -253,11 +271,13 @@ export function useCheckoutPayment({
       .settings()
       .then((settings) => {
         if (!alive) return;
+        setPaymentEnabled(settings.enabled);
         setHelpImage(settings.helpImage || '');
         setHelpText(settings.helpText || '');
       })
       .catch(() => {
         if (!alive) return;
+        setPaymentEnabled(null);
         setHelpImage('');
         setHelpText('');
       });
@@ -360,19 +380,60 @@ export function useCheckoutPayment({
     setPaying(true);
     setError(null);
     try {
+      /*
+       * 建单前先判定「这笔付费单现在能不能付」。
+       *
+       * 后端在建单与发起支付两处都会拒绝关闭/无渠道的付费订单；但等到建单
+       * 才拒绝，用户已经拿到一条 503 原文，而且库里会多出一笔永远付不掉的
+       * pending 单。免费单（应付 0）不受支付开关影响，继续走 0 元领取。
+       */
+      const payable = order?.paidCents ?? payableCents;
+      if (payable > 0) {
+        if (paymentEnabled === false) {
+          setError('支付功能已关闭，暂时无法下单，请联系管理员');
+          return;
+        }
+        if (providersLoading) {
+          setError('正在读取支付方式，请稍候再试');
+          return;
+        }
+        // 未登录时不拿渠道列表做判断：/payments/providers 需鉴权，空列表
+        // 只代表「还没登录」，交给下单接口给出 401。
+        if (token && providers.length === 0) {
+          /*
+           * 不回显 providersError 原文：它取的是 `(e as Error).message`，服务端
+           * 5xx 时还带着请求号。docs/error-copy.md §1 规则 4 —— C 端只给兜底话术
+           * 与下一步，原始报错进日志（见上方 catch）。两类原因仍要分开：
+           * 「读不到」可以重试，「确实没有渠道」重试也没用。
+           */
+          setError(
+            providersError
+              ? '暂时无法获取支付方式，请稍后重试；仍未恢复请联系管理员'
+              : '暂无可用支付方式，请联系管理员',
+          );
+          return;
+        }
+      }
+
       const o = order ?? (await placeOrder());
       const blocked = blockedReasonOf(o);
       if (blocked) {
         setError(blocked);
         return;
       }
-      if (providersLoading) {
-        setError('正在读取支付渠道，请稍候再试');
-        return;
-      }
-      if (providers.length > 1 && !selectedProviderId) {
-        setError('请先选择支付方式');
-        return;
+      /*
+       * 渠道选择只对付费单成立：0 元单由后端直接入账，不读渠道列表，
+       * 否则首屏渠道还没加载完时点「免费领取」会被无谓地挡下。
+       */
+      if (o.paidCents > 0) {
+        if (providersLoading) {
+          setError('正在读取支付渠道，请稍候再试');
+          return;
+        }
+        if (providers.length > 1 && !selectedProviderId) {
+          setError('请先选择支付方式');
+          return;
+        }
       }
       // 多通道路由：providers 已在进页面时加载；单渠道可留空由后端兜底，
       // 多渠道必须显式传，否则后端 400。
@@ -408,7 +469,9 @@ export function useCheckoutPayment({
       }
 
       if (intent.mode === 'sandbox') {
-        await pay('success');
+        // 必须带上刚创建的订单: 此处 state 里的 order 还是上一帧的值,
+        // 让 pay() 再走一次 placeOrder() 会多打一次建单接口。
+        await pay('success', o);
         return;
       }
       if (intent.mode === 'redirect' && intent.payUrl) {
@@ -468,11 +531,11 @@ export function useCheckoutPayment({
    * ⚠ `failed` 场景订单仍为 pending (可重试), 因此**不能**转结果页终态 ——
    * 用户要能直接再点一次成功。timeout 才是终态 (订单已 cancelled)。
    */
-  const pay = async (scenario: 'success' | 'failed' | 'timeout') => {
+  const pay = async (scenario: 'success' | 'failed' | 'timeout', target?: Order) => {
     setPaying(true);
     setError(null);
     try {
-      const o = order ?? (await placeOrder());
+      const o = target ?? order ?? (await placeOrder());
       const blocked = blockedReasonOf(o);
       if (blocked) {
         setError(blocked);
@@ -541,6 +604,7 @@ export function useCheckoutPayment({
     setSelectedProviderId,
     providersLoading,
     providersError,
+    paymentEnabled,
     helpImage,
     helpText,
     stopPolling,

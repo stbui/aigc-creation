@@ -87,7 +87,7 @@ class CreateMembershipPlanDto {
   /**
    * 会员等级映射的用户分组。
    *
-   * 分组决定该等级用户可见的渠道与价格倍率（`docs/channel-model-design.md` §6.4）。
+   * 分组决定该等级用户可见的渠道与价格倍率（`docs/model-architecture.md` §6）。
    * 留空 = 落 `default` 分组。**运营必须显式配**：不配的话所有等级都落默认组，
    * 分组倍率与模型级覆盖在真实数据下永不生效 —— 界面上却看不出任何异常。
    */

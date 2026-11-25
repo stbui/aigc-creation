@@ -1,4 +1,5 @@
 import type { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import type { PaymentAdapterDescriptor } from './adapters/types';
 
 export type PaymentConfigWarning = { level: 'danger' | 'warn'; message: string };
@@ -14,7 +15,7 @@ export function paymentConfigWarnings(
   row: { enabled: boolean } | null,
   values: Record<string, string>,
   missing: string[],
-  config: ConfigService,
+  config: ConfigService<AppConfigValues, true>,
   hasOpenOrders = false,
 ): PaymentConfigWarning[] {
   const warnings: PaymentConfigWarning[] = [];

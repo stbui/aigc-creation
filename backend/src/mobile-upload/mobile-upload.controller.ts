@@ -11,7 +11,6 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { randomUUID } from 'crypto';
-import { mkdirSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -24,7 +23,6 @@ import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { deploymentUploadMaxBytes } from '../common/image-formats';
 
 const MOBILE_UPLOAD_TMP_DIR = join(tmpdir(), 'huojue-mobile-upload');
-mkdirSync(MOBILE_UPLOAD_TMP_DIR, { recursive: true });
 
 /** 手机端上传的请求体 (令牌) */
 class ReceiveUploadDto {
@@ -115,7 +113,7 @@ export class MobileUploadController {
   async receive(
     @Param('id') id: string,
     @Body() dto: ReceiveUploadDto,
-    @UploadedFiles() files: any[],
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
     if (!files?.length) {
       throw new AppError(40001, '缺少图片文件', 400);

@@ -1,6 +1,6 @@
 # 开发流程（阶段执行卡）
 
-本文是给本仓库各 **agent（Claude Code / Codex / Cursor 等）** 执行开发任务的操作手册中的**阶段部分**：13 阶段总览、每阶段执行卡、按变更类型裁剪。阶段之外的三件事各有专文——指令映射与授权边界见 [`agent-execution.md`](agent-execution.md)，闸口与证据见 [`quality-gates.md`](quality-gates.md)，提交 / 分支 / PR 见 [`git-workflow.md`](git-workflow.md)。四份文档的分工与索引见 [`README.md`](README.md) §0。
+本文是给本仓库各 **agent（Claude Code / Codex / Cursor 等）** 执行开发任务的操作手册中的**阶段部分**：13 阶段总览、每阶段执行卡、按变更类型裁剪。阶段之外的三件事各有专文——指令映射与授权边界见 [`agent-execution.md`](agent-execution.md)，闸口命令与覆盖矩阵见 [`testing.md`](testing.md) §3–§4，提交 / 分支 / PR 见 [`git-workflow.md`](git-workflow.md)。证据三件套与完成定义见根 `AGENTS.md` §7–§8。三份文档的分工与索引见 [`README.md`](README.md) §0。
 
 优先级：**用户当轮指令 > 根 `AGENTS.md` > `CLAUDE.md` > 本文 > 历史文档**。所有命令、脚本名、端口都能在仓库里核对到；与代码冲突时以代码为准，并同批修正本文与 `CLAUDE.md` 索引。
 
@@ -58,7 +58,7 @@
 1. 规格落到 `docs/<页面>*-design.md` 或 `docs/admin-*.md`，必须覆盖五态：首次空态 / loading / 有数据 / 加载失败 / 未登录或无权限。
 2. 写清每个按钮点下去发生什么，成功与失败分别怎么反馈；不可逆操作（删除 / 退款 / 注销）的二次确认与后果。
 3. 权限点对照 `backend/src/admin/permissions.ts` 的真实权限名，不自己起名。
-4. 商业规则（价格 / 退款 / 会员 / 优惠）指向唯一事实源：`definitions/<id>.ts`、`common/setting-defs.ts` 的 `SETTING_DEFS`、`docs/commerce-design.md`。
+4. 商业规则（价格 / 退款 / 会员 / 优惠）指向唯一事实源：`definitions/<id>.ts`、`common/setting-defs.ts` 的 `SETTING_DEFS`、`docs/payment-detailed-design.md`。
 5. 样式只引 `var(--token)`，不写裸 hex；新颜色先查 `frontend/src/styles/global.css` 是否已有语义合适的令牌。
 
 **产出**：页面规格；变更单（冻结后新增需求时：改什么 / 为什么现在改 / 影响哪几段 / 是否顺延）。
@@ -92,7 +92,7 @@
 3. **数据模型**：新增字段 / 表 / 索引、是否需要迁移存量数据；计费字段一律快照。
 4. **配置同步**：环境变量四处（`ENV_SPECS`、`backend/.env.example`、三档 env、`docs/environments.md`）；模型层变量统一 `MODEL_*`，渠道与价格在后台配置，不改代码。
 5. **风险分级**：涉及钱 / 权限 / 合规 / 后台高危配置的，写明权限校验、二次确认、拒绝路径用例；确有业务依据要求时再补原因填写。
-6. **验证命令**：用哪层闸口、哪条专项冒烟、需要什么前置数据（矩阵见 [`quality-gates.md`](quality-gates.md)）。
+6. **验证命令**：用哪层闸口、哪条专项冒烟、需要什么前置数据（分层见 [`testing.md`](testing.md) §1，按域矩阵见 §4）。
 7. **复用优先**：按 `CLAUDE.md` §6 先列成熟第三方开源库及选型依据；确需自研时写清备选库、放弃原因（许可证 / 安全 / 运行环境 / 维护成本）与风险回滚。
 
 非功能项（受影响才写）：并发与幂等（重复回调 / 并发轮询 / SQLite 单写者）、性能（图 120s / 视频 600s 超时预算、全表 `LIKE` 入口）、容量（上传目录、备份份数、日志轮转）、失败可见性（`[rid=]`、`RouteAttempt.failureCode` / `ApiCallLog` 错误摘要）、安全合规（签名 URL、限流、越权 404、AIGC 标识）、回滚可行性（Prisma 迁移无自动 down migration）。
@@ -154,7 +154,7 @@ NODE_ENV=test npm run db:reset:test
 2. 真实起服务、真实调接口、真实查库；不读代码推断行为。
 3. 每条链路五类用例 + 三身份，直接拿请求打后端（前端隐藏按钮不算校验）。
 4. 跑测试档脚本必须给对基址：多数 `API_BASE=http://127.0.0.1:4100`（测试档与开发档同端口，先 `./start.sh --env test` 起测试档）；`smoke-marketing.js` 用 `MARKETING_API_BASE`；`verify-asset-filters.js` / `verify-prompt-tools.js` 用 `VERIFY_BASE`。
-5. 每条结论带三件套：命令、关键输出、库或磁盘记录（格式见 [`quality-gates.md`](quality-gates.md) §3）。
+5. 每条结论带三件套：命令、关键输出、库或磁盘记录（见根 `AGENTS.md` §7）。
 6. 一轮结束清理现场（`clear-ops-data.js`，或按 `docs/testing.md` 的外键顺序），避免残留把下一轮伪造成通过。
 
 **产出**：测试报告——环境事实（档位 / 库路径 / 构建时间 / 种子状态 / 后端地址）、覆盖矩阵（通过 / 失败 / 未验）、失败项证据。
@@ -220,7 +220,7 @@ duplicate：并入主卡，指向主卡编号
 
 **动作**
 
-1. 按 [`quality-gates.md`](quality-gates.md) §3 的交付摘要模板写交付摘要（中文、结论优先、无 emoji）；失败贴关键输出，不贴整段日志。
+1. 按 `.github/pull_request_template.md` 的分节写交付摘要（结论 / 改动 / 验证 / 未验 / 风险与回滚，中文、结论优先、无 emoji）；失败贴关键输出，不贴整段日志。
 2. 同步 `CLAUDE.md` 与 `docs/` 现行文档；新增功能补一条冒烟，或说明为何只能人工验。
 3. 清理测试账号、订单、素材（`clear-ops-data.js` 或 `docs/testing.md` 的外键顺序）。
 4. 写出提交说明草稿（改了什么、为什么这样取舍、真实验证结果、未验边界），格式按 [`git-workflow.md`](git-workflow.md) §2，**不执行提交**。
@@ -290,7 +290,7 @@ duplicate：并入主卡，指向主卡编号
 3. 回归至少覆盖原故障用例、同链路上下游、三身份；没跑全量就写「本轮未跑」，不得写「已通过」。
 4. 发布按 §2.13 走，**备份不能省**；数据库变更仍不可回滚。
 5. 产品确认 24 小时内补走；交付摘要与文档同步随发布同批完成。
-6. 阻断级事故必须复盘，结论回写本文或 [`quality-gates.md`](quality-gates.md)。
+6. 阻断级事故必须复盘，结论回写本文或 [`testing.md`](testing.md) §5「已知缺口与验证边界」。
 
 ## 4. 产出模板（需求条目 / 缺陷卡）
 

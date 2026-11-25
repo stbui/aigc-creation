@@ -19,6 +19,7 @@
 
 import { All, Body, Controller, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { Allow, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
@@ -52,7 +53,7 @@ export class CustomCatalogDto {
 @UseGuards(JwtAuthGuard)
 export class CustomRelayController {
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly relay: CustomRelayService,
   ) {}
 

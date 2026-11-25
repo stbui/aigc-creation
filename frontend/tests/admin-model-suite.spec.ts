@@ -8,7 +8,7 @@ import {
 } from './support/model-fixtures';
 
 /**
- * 渠道与模型子系统 P5 验收（`docs/channel-model-design.md` §10）。
+ * 渠道与模型子系统 P5 验收（口径见 `docs/model-architecture.md` §9 / §11）。
  *
  * 覆盖「配置 → 选型 → 报价 → 生成 → 账单核对」整条链路：
  *

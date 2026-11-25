@@ -7,17 +7,18 @@
  */
 
 import type { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { PROXY_LIMIT_DEFAULTS, type ProxyLimits } from './proxy.constants';
 
 const MB = 1024 * 1024;
 
 /** 从配置树读取中转上限；缺失或非法时回落默认值（`ENV_SPECS` 已做类型校验） */
-export function readProxyLimits(config: ConfigService): ProxyLimits {
-  const bool = (key: string, fallback: boolean): boolean => {
+export function readProxyLimits(config: ConfigService<AppConfigValues, true>): ProxyLimits {
+  const bool = (key: keyof AppConfigValues, fallback: boolean): boolean => {
     const value = config.get<boolean>(key);
     return typeof value === 'boolean' ? value : fallback;
   };
-  const num = (key: string, fallback: number): number => {
+  const num = (key: keyof AppConfigValues, fallback: number): number => {
     const value = config.get<number>(key);
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
   };

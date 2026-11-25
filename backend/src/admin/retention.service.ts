@@ -35,6 +35,16 @@ export const RETENTION_TARGETS: RetentionTarget[] = [
 
 export const RETENTION_TABLE_NAMES = RETENTION_TARGETS.map((target) => target.table);
 
+/** 自动清理的最小间隔：一天最多一轮 */
+const SCHEDULED_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+export interface ScheduledCleanupResult {
+  /** 最近一轮仍在 24 小时内，本轮未执行 */
+  skipped: boolean;
+  /** 每个目标的结果；单目标失败不阻断其它目标 */
+  results: Array<{ table: string; deleted: number; error?: string }>;
+}
+
 /**
  * 保留期清理 (B-96)。
  *
@@ -96,6 +106,37 @@ export class AdminRetentionService {
       throw new AppError(40001, `不支持清理该目标: ${target}`, 400);
     }
     return this.backup.cleanupExpired(target, retentionDays, 'manual');
+  }
+
+  /**
+   * 调度器入口：按各目标默认保留天数执行到期清理 (B-100)。
+   *
+   * ⚠ 「今天是否已跑过」以 `CleanupLog` 的 `trigger='scheduled'` 记录判定，
+   * 不能用进程内状态：重启会清空内存，多实例也会各自重复删除。
+   *
+   * 单目标失败只记录并继续下一个 —— 删除 ApiCallLog 失败不该阻断清理日志。
+   * 失败同样由 `cleanupExpired` 落 `success=false`，人工可在清理日志里看到。
+   */
+  async runScheduled(now = new Date()): Promise<ScheduledCleanupResult> {
+    const last = await this.prisma.cleanupLog.findFirst({
+      where: { trigger: 'scheduled' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    if (last && now.getTime() - last.createdAt.getTime() < SCHEDULED_CLEANUP_INTERVAL_MS) {
+      return { skipped: true, results: [] };
+    }
+
+    const results: ScheduledCleanupResult['results'] = [];
+    for (const target of RETENTION_TARGETS) {
+      try {
+        const res = await this.backup.cleanupExpired(target.table, target.defaultDays, 'scheduled');
+        results.push({ table: target.table, deleted: res.deleted });
+      } catch (e) {
+        results.push({ table: target.table, deleted: 0, error: (e as Error).message });
+      }
+    }
+    return { skipped: false, results };
   }
 
   private async previewTarget(t: RetentionTarget, days: number) {

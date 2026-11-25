@@ -68,6 +68,7 @@ function rowFromDetail(detail: AdminOrderDetail): AdminOrderRow {
       sku: item.skuSnapshot,
     })),
     paymentCount: detail.payments.length,
+    lastError: detail.lastError,
     /*
      * 退款状态与列表列同源：命中任意一笔退款单即取最需要人管的那个。
      * 详情里带了完整退款单列表，这里直接聚合。
@@ -238,6 +239,20 @@ export function OrderDetailDrawer({
               canRefund={canRefund}
               onAction={onAction}
             />
+          )}
+          {/*
+           * 下单/发起支付失败原因（Order.lastError）。这是运营判断「为什么这笔单
+           * 停在待支付」的第一手信息：支付开关关闭、渠道未配置、渠道下单报错
+           * 都会落在这里，成功发起后清空。
+           */}
+          {d.lastError && (
+            <div
+              className="rounded-lg border border-danger-soft bg-danger-soft/10 px-3 py-2 text-[12px] leading-5 text-danger-text"
+              role="status"
+            >
+              <span className="font-medium">最近一次支付异常：</span>
+              {d.lastError}
+            </div>
           )}
           <DetailSection title="订单概要" note="金额以「分」存储，展示按「元」">
             <Descriptions
@@ -418,7 +433,8 @@ export function OrderDetailDrawer({
                       <>
                         <code className="font-mono">{p.payTransactionId}</code>
                         {p.sandboxScenario ? ` · 沙箱/${p.sandboxScenario}` : ''}
-                        {p.message ? ` · ${p.message}` : ''} ·{' '}
+                        {/* 失败原因优先取 lastError；历史数据可能只有 message */}
+                        {p.lastError ?? p.message ? ` · ${p.lastError ?? p.message}` : ''} ·{' '}
                         {fmtTime(p.createdAt)}
                       </>
                     }

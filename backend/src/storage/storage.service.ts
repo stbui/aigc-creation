@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { createHash } from 'node:crypto';
 import { resolve } from 'path';
 import { AppError } from '../common/app.exception';
@@ -371,7 +372,7 @@ export class StorageService implements OnModuleInit {
   private localRoot = '';
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly prisma: PrismaService,
     private readonly cipher: SecretCipher,
   ) {

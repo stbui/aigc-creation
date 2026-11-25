@@ -1,7 +1,7 @@
 /**
  * 系统渠道中转：客户端拿本系统的令牌，用服务端配置的渠道与密钥调上游模型。
  *
- * 单请求顺序**不可调整**（与 `docs/channel-model-design.md` §4.3 一致）：
+ * 单请求顺序**不可调整**（与 `docs/api-contract.md`、`docs/model-architecture.md` §10 一致）：
  *   身份 → 分组渠道访问 → 限流（守卫层）→ body 上限 → 提取 model → 协议授权
  *   → SSRF 校验 → 剥离客户端密钥 → 附加渠道头 → 并发槽 → 仅 POST 预留计费
  *   → 上游请求 → 状态码 / 日志 / 流式透传 → 结算或 uncertain 或退款。
@@ -20,6 +20,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { AppError } from '../../common/app.exception';
 import { UserGroupService } from '../user-groups/user-group.service';
@@ -74,7 +75,7 @@ export class SystemProxyService {
   private readonly log = new Logger(SystemProxyService.name);
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly channels: ProxyChannelService,
     private readonly groups: UserGroupService,
     private readonly channelSlots: ChannelSlotService,

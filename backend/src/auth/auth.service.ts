@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { Prisma } from '../generated/prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -87,7 +88,7 @@ export class AuthService {
     private readonly email: EmailService,
     private readonly sms: SmsService,
     private readonly notifications: NotificationsService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly jwt: JwtService,
   ) {}
 

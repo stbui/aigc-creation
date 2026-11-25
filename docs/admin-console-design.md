@@ -108,7 +108,7 @@
 | 积分账本 | 用户余额总览、批次与流水、人工增减（`credit.adjust`）、CSV 导入导出（导入走 `credit.adjust`，导出走 `credit.read + data.export`，按邮箱匹配逐行报结果）；行内勾选后可按 `user.delete` 批量删除账号（固定软注销，≤20 条，弹窗摊开影响面后一键确认，与用户管理页同一个弹框与接口） |
 | 能力与模型 · 能力消耗价页签 | 读写运行时积分价，生效来源显示 `override` / `campaign`；限时免活动命中时显示活动来源，运营据此判断「改了价没生效」是活动在起作用 |
 
-计费口径详见 `docs/commerce-design.md`。
+计费口径详见 `docs/payment-detailed-design.md` 与 `docs/model-architecture.md` §8。
 
 ### 3.10 支付与财务
 

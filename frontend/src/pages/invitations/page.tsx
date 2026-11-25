@@ -31,7 +31,7 @@ import { InviteStepsBlock } from './InviteStepsBlock';
  * ⚠ 诚实性约束 (admin-suite-design.md §3.2):
  *   后台未配置奖励规则时 (rule.configured=false 或两项奖励都为 0), 页面必须
  *   **如实说明不发放积分**, 不得展示「立赚 200 积分」这类空头承诺。
- *   commerce-design.md 已记录过同类缺陷: 营销页上收费展示但兑现不了的承诺
+ *   已记录过同类缺陷: 营销页上收费展示但兑现不了的承诺
  *   构成虚假宣传 —— 本页的所有数字都必须来自真实数据, 不允许占位值。
  *
  * 板块拆分见 `docs/design/standards/frontend-module-conventions.md`：`InviteHero` / `InviteCheckinBlock` /

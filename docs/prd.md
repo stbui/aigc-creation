@@ -5,7 +5,7 @@
 | 文档范围 | 整站产品：C 端创作站 + 后台管理端 + 商业运营域 + 账户合规/服务域 |
 | 产品阶段 | MVP，代码与文档同步维护 |
 | 客群策略 | 个人电商从业者（单轨） |
-| 关联文档 | [`admin-prd.md`](admin-prd.md)（后台需求）· [`commerce-design.md`](commerce-design.md)（交易域设计）· [`testing.md`](testing.md)（测试与闸口） |
+| 关联文档 | [`admin-prd.md`](admin-prd.md)（后台需求）· [`payment-detailed-design.md`](payment-detailed-design.md)（支付域契约）· [`testing.md`](testing.md)（测试与闸口） |
 
 ## 1. 产品定位
 
@@ -245,6 +245,6 @@ Jimp 仅用于上传校验、尺寸探测和 AIGC 角标合成，不参与生成
 | 文档 | 内容 |
 | --- | --- |
 | [`admin-prd.md`](admin-prd.md) | 后台角色、模块、接口与数据要求 |
-| [`commerce-design.md`](commerce-design.md) | 交易域表结构、状态机、支付抽象 |
+| [`payment-detailed-design.md`](payment-detailed-design.md) | 支付域数据模型、接口契约与状态机 |
 | [`admin-suite-design.md`](admin-suite-design.md) | 后台总体设计与信息架构 |
 | [`testing.md`](testing.md) | 测试分层、闸口与覆盖矩阵 |

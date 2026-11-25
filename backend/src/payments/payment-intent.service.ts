@@ -1,24 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { AppError } from '../common/app.exception';
 import { SettingsService } from '../common/settings.service';
 import { OrderService } from '../orders/order.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getAdapter } from './adapters';
 import {
-  isVisiblePaymentMethod,
+  type CheckoutPaymentMethod,
+  isCheckoutPaymentMethod,
   PaymentAdapter,
   PaymentContext,
   PaymentCurrency,
   PaymentProviderId,
-  VisiblePaymentMethod,
 } from './adapters/types';
 import { PaymentAttemptService } from './payment-attempt.service';
 import { PaymentConfigService, type ResolvedVisiblePayment } from './payment-config.service';
 import type { PaymentIntentView } from './payment-order.types';
 import { truncate } from './payment-order.util';
 
-/** 规范回调入口；未列出的渠道没有可用的回调地址，不能发起支付。 */
+/**
+ * 真实渠道的规范回调入口；未列出的真实渠道没有可用的回调地址，不能发起支付。
+ * 沙箱不在表内是有意的：它不经过 notifyUrl()，由站内模拟端点确认结果。
+ */
 const CANONICAL_NOTIFY_PATHS: Partial<Record<PaymentProviderId, string>> = {
   epay: 'easypay',
   alipay: 'alipay',
@@ -53,7 +57,7 @@ export class PaymentIntentService {
     private readonly orders: OrderService,
     private readonly configs: PaymentConfigService,
     private readonly settings: SettingsService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly attempts: PaymentAttemptService,
   ) {}
 
@@ -61,8 +65,9 @@ export class PaymentIntentService {
    * 渠道异步通知地址。
    *
    * 只提供规范公开入口，URL 不携带 configId：回调服务会按订单引用的历史
-   * Payment 反查下单时的配置版本。没有规范入口的渠道（PayPal / ZPay / 沙箱）
-   * 直接拒绝发起支付，不生成一个没有接收方的地址。
+   * Payment 反查下单时的配置版本。没有规范入口的真实渠道（PayPal / ZPay）
+   * 直接拒绝发起支付，不生成一个没有接收方的地址。沙箱同样不在表内，
+   * 但发起支付时根本不会调用本方法（它没有渠道回调，由站内模拟端点确认）。
    *
    * 优先使用渠道配置里保存的 `publicBaseUrl`；没配才回落到全局
    * `PAYMENT_NOTIFY_BASE`。这样多域名/反代部署时，每个渠道可以指向自己的
@@ -133,44 +138,56 @@ export class PaymentIntentService {
 
     const paymentRules = await this.settings.paymentRules();
     if (!paymentRules.enabled) {
-      throw new AppError(50301, '支付功能已关闭', 503);
+      const error = new AppError(50301, '支付功能已关闭', 503);
+      await this.recordAttemptFailure(order, error);
+      throw error;
     }
 
     /*
      * 只解析一次。availableVisible() 再 resolveVisible() 会让轮询/最少金额
      * 在“展示可用”和“真正下单”之间切换实例，甚至把订单写到未展示的实例。
+     *
+     * 解析/校验阶段就失败时还没有 Payment 行承接原因，这里统一落
+     * Order.lastError —— 否则运营只看到一笔停在待支付的订单，不知道是
+     * 支付开关、来源还是实例配置的问题。
      */
-    const options = await this.configs.resolveVisibleOptions(currency, order.paidCents, {
-      includeDailyLimitExceeded: true,
-    });
-    if (options.length === 0) {
-      throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
-    }
-    let method: VisiblePaymentMethod;
-    if (!input.providerId) {
-      if (options.length > 1) {
-        throw new AppError(40001, '存在多个可用支付方式，请指定 providerId', 400);
+    let method: CheckoutPaymentMethod;
+    let resolved: ResolvedVisiblePayment;
+    try {
+      const options = await this.configs.resolveVisibleOptions(currency, order.paidCents, {
+        includeDailyLimitExceeded: true,
+      });
+      if (options.length === 0) {
+        throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
       }
-      method = options[0].view.id;
-    } else if (!isVisiblePaymentMethod(input.providerId)) {
-      throw new AppError(40001, `支付方式不可用: ${input.providerId}`, 400);
-    } else {
-      method = input.providerId;
-    }
-    const selectedOption = options.find((option) => option.view.id === method);
-    if (!selectedOption) {
-      throw new AppError(40001, `支付方式不可用: ${method}`, 400);
-    }
-    const resolved = selectedOption.resolved;
-    const { config: initialConfig, providerId: initialProviderId } = resolved;
-    const initialAdapter = getAdapter(initialProviderId);
-    if (!initialAdapter) {
-      throw new AppError(40001, `未知支付渠道: ${initialProviderId}`, 400);
-    }
-    if (!initialConfig.enabled) throw new AppError(50301, '支付渠道已停用', 503);
-    const missing = initialAdapter.validateConfig(initialConfig.values);
-    if (missing.length > 0) {
-      throw new AppError(50301, `支付渠道未完成配置（缺少 ${missing.join(', ')}）`, 503);
+      if (!input.providerId) {
+        if (options.length > 1) {
+          throw new AppError(40001, '存在多个可用支付方式，请指定 providerId', 400);
+        }
+        method = options[0].view.id;
+      } else if (!isCheckoutPaymentMethod(input.providerId)) {
+        throw new AppError(40001, `支付方式不可用: ${input.providerId}`, 400);
+      } else {
+        method = input.providerId;
+      }
+      const selectedOption = options.find((option) => option.view.id === method);
+      if (!selectedOption) {
+        throw new AppError(40001, `支付方式不可用: ${method}`, 400);
+      }
+      resolved = selectedOption.resolved;
+      const { config: initialConfig, providerId: initialProviderId } = resolved;
+      const initialAdapter = getAdapter(initialProviderId);
+      if (!initialAdapter) {
+        throw new AppError(40001, `未知支付渠道: ${initialProviderId}`, 400);
+      }
+      if (!initialConfig.enabled) throw new AppError(50301, '支付渠道已停用', 503);
+      const missing = initialAdapter.validateConfig(initialConfig.values);
+      if (missing.length > 0) {
+        throw new AppError(50301, `支付渠道未完成配置（缺少 ${missing.join(', ')}）`, 503);
+      }
+    } catch (error) {
+      await this.recordAttemptFailure(order, error);
+      throw error;
     }
 
     /*
@@ -241,14 +258,20 @@ export class PaymentIntentService {
        * 事务内完成。仅在这里 claim 轮询槽位仍不够：两个订单可能选中同一实例，
        * 各自在事务外读到相同用量，随后同时越过实例日限额。
        */
-      const reserved = await this.configs.reserveVisiblePaymentAttempt({
-        method: resolved.method,
-        currency,
-        amountCents: order.paidCents,
-        orderId: order.id,
-        userId: input.userId,
-        resolved,
-      });
+      const reserved = await this.configs
+        .reserveVisiblePaymentAttempt({
+          method: resolved.method,
+          currency,
+          amountCents: order.paidCents,
+          orderId: order.id,
+          userId: input.userId,
+          resolved,
+        })
+        .catch(async (error: unknown) => {
+          // 来源/实例在展示之后被改坏或达到限额：预占失败同样要让后台看得到原因
+          await this.recordAttemptFailure(order, error, resolved.providerId);
+          throw error;
+        });
       claimedSelection = reserved.resolved;
       const providerId = claimedSelection.providerId;
       const config = claimedSelection.config;
@@ -284,7 +307,11 @@ export class PaymentIntentService {
             paymentRules.productNameSuffix,
           ),
           returnUrl: this.checkoutReturnUrl(order),
-          notifyUrl: this.notifyUrl(config.providerId, config.values.publicBaseUrl),
+          // 沙箱没有渠道回调：它不调 notifyUrl()，否则会被「无规范入口」拒绝
+          notifyUrl:
+            config.providerId === 'sandbox'
+              ? ''
+              : this.notifyUrl(config.providerId, config.values.publicBaseUrl),
           clientIp: input.clientIp,
           clientUserAgent: input.clientUserAgent,
           alipayMobilePrecreateDeepLink: paymentRules.alipayMobilePrecreateDeepLink,
@@ -386,7 +413,7 @@ export class PaymentIntentService {
         returnUrl: this.checkoutReturnUrl(order),
         checkoutValue,
         expiresAt: checkout.expiresAt.toISOString(),
-        sandbox: false,
+        sandbox: checkout.mode === 'sandbox',
         hint: checkout.hint ?? null,
       };
     } finally {
@@ -403,6 +430,35 @@ export class PaymentIntentService {
         .catch((e) => {
           this.logger.warn(`释放发起支付租约失败 订单 ${order.orderNo}: ${(e as Error).message}`);
         });
+    }
+  }
+
+  /**
+   * 记录「还没写到 Payment 行就失败」的发起支付错误。
+   *
+   * 只记服务端支付不可用（5xx）：4xx 是用户输入/状态冲突，落成「下单失败」
+   * 会让后台把一笔仍在正常重试的订单误判成故障。渠道下单失败由内层 catch
+   * 写 Payment + Order，不重复走这里。
+   *
+   * 日志由 AppFileLogger 自动带 `[rid=...]`，用户截图里的请求号可直接检索。
+   */
+  private async recordAttemptFailure(
+    order: { id: string; orderNo: string },
+    error: unknown,
+    providerId?: string,
+  ): Promise<void> {
+    if (!(error instanceof AppError) || error.getStatus() < 500) return;
+    const message = truncate(error.message, 200);
+    this.logger.warn(
+      `发起支付失败 (${providerId ?? '未选择渠道'}) 订单 ${order.orderNo}: ${message}`,
+    );
+    try {
+      await this.prisma.order.updateMany({
+        where: { id: order.id, status: 'pending' },
+        data: { lastError: message },
+      });
+    } catch (e) {
+      this.logger.warn(`写入支付失败原因失败 订单 ${order.orderNo}: ${(e as Error).message}`);
     }
   }
 

@@ -16,6 +16,7 @@
 
 import { All, Controller, Param, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
 import { RateLimit } from '../../common/rate-limit.guard';
@@ -32,7 +33,7 @@ const SYSTEM_RATE_LIMIT = { limit: 120, windowSec: 60 };
 @UseGuards(JwtAuthGuard)
 export class SystemProxyController {
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly proxy: SystemProxyService,
   ) {}
 
@@ -64,7 +65,7 @@ export class SystemProxyController {
 @UseGuards(JwtAuthGuard)
 export class ShortProxyController {
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly proxy: SystemProxyService,
   ) {}
 
@@ -96,7 +97,7 @@ export class ShortProxyController {
  * 否则修好一个入口的 bug 会漏掉另一个。
  */
 async function relaySystem(
-  config: ConfigService,
+  config: ConfigService<AppConfigValues, true>,
   proxy: SystemProxyService,
   req: Request & { user?: { id: string } },
   res: Response,

@@ -19,6 +19,9 @@ export interface TextActionProps extends ComponentProps<typeof Button> {
  * 需要改变路由时传 `asChild` 并把 `<Link>` 作为唯一子元素 —— 外观留在本组件、
  * 语义交给链接，读屏识别为链接，也支持新标签页打开。
  *
+ * 按钮的 UA 灰底由 C 端加载的 Tailwind preflight 统一清掉（见
+ * `ui/styles.css`）；`cursor-pointer` 仍需显式声明 —— preflight 不设置指针样式。
+ *
  * 业务组件不得再手写 `variant="link" size="xs" className="h-auto …"` 的组合。
  */
 export function TextAction({
@@ -35,7 +38,7 @@ export function TextAction({
       variant="link"
       size="xs"
       className={cn(
-        'h-auto gap-1 p-0 text-xs font-normal text-muted-foreground no-underline underline-offset-4',
+        'h-auto gap-1 cursor-pointer p-0 text-xs font-normal text-muted-foreground no-underline underline-offset-4',
         'hover:text-brand hover:underline disabled:pointer-events-none disabled:opacity-45',
         className,
       )}

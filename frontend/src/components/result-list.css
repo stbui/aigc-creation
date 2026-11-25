@@ -61,7 +61,11 @@
      minmax(0, 1fr) 保证窄容器下图片能收缩, 不会被内容撑出横向滚动。 */
   --fc-cols: 4;
   grid-template-columns: repeat(var(--fc-cols), minmax(0, 1fr));
-  gap: var(--space-12);
+  /* 行高按内容（方形缩略图）定，不被剩余空间均分。
+     缺省 auto 在内容超出容器时会把所有行压成「容器高 / 行数」——
+     60 张时每张只剩 37px 高，图片被裁成横条；max-content 让溢出交给滚动。 */
+  grid-auto-rows: max-content;
+  gap: var(--space-8);
   align-content: start;
   padding: 0 var(--space-4) var(--space-4);
 }
@@ -126,6 +130,49 @@
 .fc-grid-size-btn:focus-visible {
   outline: 2px solid var(--brand-light);
   outline-offset: 0;
+}
+
+/* ── 分页条（每页固定 24 张，与「每行张数」无关）────────────────────
+   固定在结果白卡片底部、不随网格滚动；按钮高度与「刷新」一致（28px）。 */
+.fc-result-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-10);
+  padding-top: var(--space-4);
+}
+
+.fc-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 28px;
+  padding: 0 var(--space-10);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fc-pager-btn:hover:not(:disabled) {
+  border-color: var(--brand-light);
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.fc-pager-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fc-pager-status {
+  min-width: 84px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
 }
 
 /* 结果画廊 (ResultGalleryPane) 在自由创作与爆款复刻共用：卡片样式留在全局。 */

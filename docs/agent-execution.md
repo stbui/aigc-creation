@@ -4,7 +4,7 @@
 
 > 术语提醒：本文的「agent」指编码 agent。`docs/agent-*.md` 与 `agent/` 目录指另一条产品线（AI 智能体），与本文无关。
 
-阶段流程与执行卡见 [`development-workflow.md`](development-workflow.md)，闸口命令见 [`quality-gates.md`](quality-gates.md)，提交 / 分支 / PR 见 [`git-workflow.md`](git-workflow.md)。四份文档的分工与索引见 [`README.md`](README.md) §0。
+阶段流程与执行卡见 [`development-workflow.md`](development-workflow.md)，闸口命令与专项见 [`testing.md`](testing.md) §3–§4，提交 / 分支 / PR 见 [`git-workflow.md`](git-workflow.md)。三份文档的分工与索引见 [`README.md`](README.md) §0。
 
 优先级：**用户当轮指令 > 根 `AGENTS.md` > `CLAUDE.md` > 本文 > 历史文档**。
 

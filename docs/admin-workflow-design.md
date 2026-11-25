@@ -626,5 +626,5 @@ interface AdminWorkGroup {
 | `admin-console-design.md` | 本文是 §3.14 全局能力与各页面动作的改进方案；落地后回写 |
 | `admin-detailed-design.md` | 接口与组件细节落地后回写；本文不重复字段级设计 |
 | `admin-ui-design.md` | 新组件遵循品牌紫外壳 + Radar 中性内容层规范；不新增 `adm-*` 类 |
-| `commerce-design.md` | 资金规则不变；本文只改财务角色的入口与批量，不改退款/对账/账单规则 |
+| `payment-detailed-design.md` | 资金规则不变；本文只改财务角色的入口与批量，不改退款/对账/账单规则 |
 | `testing.md` | 新增工作台聚合、上下文链接、内部备注、保存视图的测试项 |

@@ -17,11 +17,11 @@
 | `CLAUDE.md` | 仓库不变量、单一事实源、易腐化数量、环境踩坑 | 定位事实源、判断硬约束时 |
 | [`development-workflow.md`](development-workflow.md) | 13 阶段总览、阶段执行卡、按变更类型裁剪 | 走从需求到交付的完整流程时 |
 | [`agent-execution.md`](agent-execution.md) | 指令映射、默认禁令、自主边界、常见失败模式 | 判断 agent 能自主做什么时 |
-| [`quality-gates.md`](quality-gates.md) | 闸口矩阵、按域专项、证据三件套、完成定义 | 找验证命令、写交付摘要时 |
+| [`testing.md`](testing.md) | 闸口矩阵、按域专项、覆盖矩阵与已知缺口 | 找验证命令时 |
 | [`git-workflow.md`](git-workflow.md) | 分支、提交、PR、回滚、git 权限边界 | 提交、开 PR、处理冲突时 |
 | 本文件 | 文档索引、命名与放置规则 | 新增、改名、查找文档时 |
 
-后四份构成**开发流程四件套**（阶段 / 边界 / 闸口 / Git），同一事实只在其中一份维护。读法优先级：用户当轮指令 > 根 `AGENTS.md` > `CLAUDE.md` > 开发流程四件套 > 领域文档。
+后三份构成**开发流程三件套**（阶段 / 边界 / Git），同一事实只在其中一份维护；闸口与证据标准分别由 `testing.md` §3–§4 与根 `AGENTS.md` §7–§8 承担。读法优先级：用户当轮指令 > 根 `AGENTS.md` > `CLAUDE.md` > 开发流程三件套 > 领域文档。
 
 ## 1. 需求文档（Requirements）
 
@@ -43,7 +43,6 @@
 | [`admin-suite-design.md`](admin-suite-design.md) | 后台总体设计：全域地图、RBAC、信息架构 |
 | [`admin-console-design.md`](admin-console-design.md) | 后台运营域功能设计 |
 | [`admin-detailed-design.md`](admin-detailed-design.md) | 后台详细设计：页面结构、组件、数据流、接口、边界 |
-| [`commerce-design.md`](commerce-design.md) | 支付 / 积分 / 订单 / 商品 / 会员 / 营销设计 |
 
 ### 2.2 C 端页面资产
 
@@ -110,12 +109,9 @@
 | [`api-contract.md`](api-contract.md) | 统一响应信封、跨模块错误码、主要接口清单、令牌时长 |
 | [`error-copy.md`](error-copy.md) | 错误文案映射：分层归属、码段、生成任务码表、码复用清单、新增流程与已知缺口 |
 | [`payment-detailed-design.md`](payment-detailed-design.md) | 支付域详细设计（后端契约）：数据模型、接口契约、文件职责、类型与服务签名、Prisma 模型 |
-| [`runtime-infrastructure.md`](runtime-infrastructure.md) | AIGC 标识、签名 URL、限流、健康检查、请求追踪、日志落盘 |
 | [`development-workflow.md`](development-workflow.md) | 开发流程（阶段篇）：13 阶段总览、阶段执行卡、按变更类型裁剪、紧急修复通道、需求条目与缺陷卡模板 |
 | [`agent-execution.md`](agent-execution.md) | Agent 执行边界：指令映射、开工固定三步、默认禁令、自主边界、常见失败模式 |
-| [`quality-gates.md`](quality-gates.md) | 闸口与证据标准：闸口矩阵、按改动域选专项、证据三件套与交付摘要模板、完成定义 |
 | [`git-workflow.md`](git-workflow.md) | Git 工作流：分支、提交信息、提交粒度、PR 与合并、同步与冲突、回滚、git 权限边界 |
-| [`main-image-generation.md`](main-image-generation.md) | `/product-kit` 商品主图：变体互斥、字段到提示词的映射、文案闭集与禁字、按变体拆批与计费、结果聚合、删除与回填 |
 | [`product-detail-generation.md`](product-detail-generation.md) | `/product-detail` 商品详情图：模块拆批、任务与账单、提示词、执行状态机、轮询聚合、删除与失败边界 |
 | [`gen-prompt.md`](gen-prompt.md) | 生图链路与提示词：主图 / 详情图字段映射、变体与模块拆批、提示词结构、并发生图与配额、可见性与效果评估现状 |
 | [`backend-nestjs-conventions.md`](backend-nestjs-conventions.md) | 后端 NestJS 结构规范：模块分层、Controller / Service 边界、DTO、异常、鉴权、事务、日志与测试 |
@@ -127,7 +123,6 @@
 | [`analytics-events.md`](analytics-events.md) | 数据分析事件规范：事件目录、属性、指标口径、归因、采集门槛与已知缺口 |
 | [`media-assets.md`](media-assets.md) | 媒体资产规范：上传格式与上限、存储 key、缩略图、签名访问、AIGC 标识、视频与删除保留 |
 | [`mask-canvas-sdk.md`](mask-canvas-sdk.md) | 遮罩画布 SDK：标记 / 手势 / 遮罩 / 导出内核、两条通知通道、适配层职责与约束 |
-| [`credit-ledger-business-type-design.md`](credit-ledger-business-type-design.md) | 积分明细「业务类型」数据契约：枚举、落位、迁移与验收边界 |
 | [`non-upstream-extensions.md`](non-upstream-extensions.md) | 非上游扩展与契约偏差登记：逐项记录偏离点、动机、影响面与落点 |
 
 目录结构、能力清单、环境坑等与代码强相关的坐标速查表放在仓库根 `CLAUDE.md`；接口清单与错误码在 [`api-contract.md`](api-contract.md)。
@@ -148,7 +143,6 @@
 | [`agent-integration-design.md`](agent-integration-design.md) | AI 智能体集成方案 v2：双入口、API、SSE、数据模型、安全边界 | 规划中，未实施 |
 | [`canvas-port-design.md`](canvas-port-design.md) | 无限画布全量移植方案（对齐 open-ai-canvas）：Postgres + Redis 前置、文档 operations 协议、协作与实时、快照/分享、四模态生成、Agent/3D 末排、工作分解与验收 | 规划中，未实施 |
 | [`canvas-detailed-design.md`](canvas-detailed-design.md) | 无限画布实现详细设计：仓库现状差距、P0 基础设施改造、7 张表与 Prisma 定义、operations 写入算法与错误码、租约/实时/快照/分享、四模态生成回填、前端引擎与编辑器拆分、后台管理与验收闸口 | 规划中，未实施 |
-| [`channel-model-design.md`](channel-model-design.md) | 渠道与模型子系统设计依据：2026-10-31 移植记录（渠道 / 渠道模型 / 价格档 / 路由 / 微积分计费 / 分组 / 协议插件 / 代理）+ 2026-11-13 删除前台模型层、改用能力绑定的取舍 | 已实施 |
 | [`payment-refactor-design.md`](payment-refactor-design.md) | 支付域重构设计：多渠道配置版本化与加密托管、查单/关单、回调收件箱与 15s worker、T+1 对账自动补发、决策与开放差距 | 主体已实施，见 §13 |
 | [`admin-workflow-design.md`](admin-workflow-design.md) | 后台角色化工作流：运营/财务/管理员三种首屏、统一待办、上下文直达、保存视图与命令面板、工单转交、批量动作与分期验收 | P0 已实施（对账保存视图未落地）；P1 / P2 规划中 |
 | [`mailbox-design.md`](mailbox-design.md) | 邮箱模块 `/mailbox` 设计：入口、数据、接口与实施边界 | 规划中，未实施 |

@@ -32,7 +32,7 @@ export interface CreateMembershipPlanInput {
   /**
    * 会员等级映射的用户分组。
    *
-   * 分组决定该等级用户可见的渠道与价格倍率（`docs/channel-model-design.md` §6.4）。
+   * 分组决定该等级用户可见的渠道与价格倍率（`docs/model-architecture.md` §6）。
    * 留空 = 落 `default` 分组；运营不配的话分组倍率永不生效，界面却看不出异常。
    */
   userGroupCode?: string;

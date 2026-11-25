@@ -5,7 +5,7 @@
  * `CreateUserGroup` / `UpdateUserGroup` / `DeleteUserGroup`。
  *
  * 本仓没有 `users.user_group` 列：分组由「会员套餐 → `MembershipPlan.userGroupCode`」
- * 映射得到（`docs/channel-model-design.md` §14.2）。因此「分组下的用户数」按
+ * 映射得到（`docs/admin-detailed-design.md` 用户分组一节）。因此「分组下的用户数」按
  * 有效会员（active / grace）的计划映射统计，没有有效会员的用户计入默认分组。
  *
  * 写入后必须同时做两件事：`UserGroupService.invalidate()` 清进程内缓存，

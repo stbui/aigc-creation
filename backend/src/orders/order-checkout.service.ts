@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client';
 import { AppError } from '../common/app.exception';
 import { SettingsService } from '../common/settings.service';
@@ -18,6 +18,8 @@ const DAILY_LIMIT_PAID_STATUSES = ['paid', 'partial_refunded', 'refunded'];
  */
 @Injectable()
 export class OrderCheckoutService {
+  private readonly logger = new Logger(OrderCheckoutService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly marketing: MarketingService,
@@ -326,6 +328,14 @@ export class OrderCheckoutService {
          */
         if (paidCents > 0) {
           if (!paymentRules.enabled) {
+            /*
+             * 这条拒绝发生在订单落库之前，没有 Order 行可以承接原因。
+             * 必须留一条带请求号（AppFileLogger 自动加 `[rid=...]`）的日志，
+             * 否则用户截图里的请求号在后台与日志里都查不到任何线索。
+             */
+            this.logger.warn(
+              `支付功能已关闭，拒绝创建付费订单 userId=${params.userId} 金额=${paidCents} 分`,
+            );
             throw new AppError(50301, '支付功能已关闭', 503);
           }
           if (paidCents < paymentRules.minAmountCents) {

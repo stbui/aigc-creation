@@ -422,7 +422,7 @@ test.describe('后台高频动线', () => {
     const panel = page.getByRole('dialog', { name: '任务详情' });
     await expect(panel).toBeVisible({ timeout: 15000 });
 
-    // 后台不加载 preflight，必须显式清掉 dl / dd 的浏览器默认边距，避免值整体右缩。
+    // preflight 已统一加载；仍守住 dl / dd 的零边距，避免值整体右缩。
     const descriptions = panel.getByTestId('admin-desc').first();
     await expect(descriptions).toHaveCSS('margin-top', '0px');
     await expect(descriptions.locator('dd').first()).toHaveCSS('margin-left', '0px');

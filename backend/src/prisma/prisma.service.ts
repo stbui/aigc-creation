@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '../generated/prisma/client';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 // Prisma 7 breaking change: datasource url 不再写在 schema.prisma,
@@ -16,7 +17,7 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  constructor(config: ConfigService) {
+  constructor(config: ConfigService<AppConfigValues, true>) {
     super({
       adapter: new PrismaBetterSqlite3({ url: config.get<string>('db.url') ?? 'file:./dev.db' }),
     });

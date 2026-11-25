@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from './config/env.validation';
 import type { NextFunction, Request, Response } from 'express';
 import * as express from 'express';
 import { join, resolve } from 'path';
@@ -30,7 +31,7 @@ async function bootstrap(): Promise<void> {
     bufferLogs: true,
     bodyParser: false,
   });
-  const config = app.get(ConfigService);
+  const config = app.get<ConfigService<AppConfigValues, true>>(ConfigService);
   const logger = app.get(AppFileLogger);
   app.useLogger(logger);
   const apiPrefix = config.get<string>('app.prefix') ?? 'api/v1';

@@ -1,6 +1,6 @@
 # 数据分析事件规范
 
-本文件定义**产品与经营分析**的事件、属性、指标口径与埋点边界。它不负责运行时监控（日志、trace、告警见 [`observability.md`](observability.md)），也不重复财务口径的实现细节（见 `FinanceAnalyticsService` 与 [`commerce-design.md`](commerce-design.md)）。
+本文件定义**产品与经营分析**的事件、属性、指标口径与埋点边界。它不负责运行时监控（日志、trace、告警见 [`observability.md`](observability.md)），也不重复财务口径的实现细节（见 `FinanceAnalyticsService` 与 [`payment-detailed-design.md`](payment-detailed-design.md)）。
 
 ## 1. 现状与边界
 

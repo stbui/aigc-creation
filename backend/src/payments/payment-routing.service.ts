@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
@@ -8,6 +9,7 @@ import { allAdapters, getAdapter, requireAdapter } from './adapters';
 import {
   PAYMENT_CURRENCIES,
   VISIBLE_PAYMENT_METHODS,
+  type CheckoutPaymentMethod,
   type PaymentAdapter,
   type PaymentCurrency,
   type PaymentProviderId,
@@ -47,7 +49,7 @@ export class PaymentRoutingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly store: PaymentConfigStore,
   ) {}
 
@@ -57,7 +59,7 @@ export class PaymentRoutingService {
     for (const adapter of allAdapters()) {
       const d = adapter.descriptor;
       if (!d.supportedCurrencies.includes(currency)) continue;
-      if (d.id === 'sandbox' && this.config.get<string>('app.env') === 'production') continue;
+      if (d.id === 'sandbox' && !this.sandboxAllowed()) continue;
       const rows = await this.store.latestRowsByInstance(d.id);
       const usable = rows.some((row) => {
         if (!row.enabled) return false;
@@ -80,7 +82,7 @@ export class PaymentRoutingService {
     return out;
   }
 
-  /** C 端固定可见支付方式；不推进轮询游标。 */
+  /** C 端可见支付方式（生产固定两项；非生产无真实方式时沙箱兜底）；不推进轮询游标。 */
   async availableVisible(
     currency: PaymentCurrency,
     amountCents?: number,
@@ -104,7 +106,8 @@ export class PaymentRoutingService {
   }
 
   /**
-   * 一次解析两个按钮及其真实实例。创建订单必须直接消费这里的结果，
+   * 一次解析全部可见方式（生产两个，非生产可能加沙箱）及其真实实例。
+   * 创建订单必须直接消费这里的结果，
    * 不能再次 resolveVisible，否则轮询/最少金额可能在下单前漂移。
    */
   async resolveVisibleOptions(
@@ -129,16 +132,43 @@ export class PaymentRoutingService {
         resolved,
       });
     }
+    /*
+     * 沙箱是**独立的第三项**，不是来源、也不参与官方/易支付选择。
+     *
+     * 它只在非生产、且后台显式启用了沙箱实例时出现（生产与停用后都不返回），
+     * 因此不是「真实渠道失败后偷偷降级」：用户看到并点选的就是标注了
+     * 「站内模拟、不产生真实扣款」的独立方式。开发/测试没有商户号时，
+     * 它是唯一能走通「下单 → pending 尝试 → 模拟支付 → 入账发积分」全链路的路径。
+     */
+    if (this.sandboxAllowed()) {
+      const resolved = await this.resolveVisible('sandbox', currency, amountCents, options);
+      if (resolved) {
+        const descriptor = requireAdapter(resolved.providerId).descriptor;
+        out.push({
+          view: {
+            id: 'sandbox',
+            name: '沙箱（站内模拟）',
+            icon: 'sandbox',
+            checkoutMode: descriptor.checkoutMode,
+            supportedCurrencies: descriptor.supportedCurrencies,
+            sandbox: true,
+          },
+          resolved,
+        });
+      }
+    }
     return out;
   }
 
   /** 解析某个可见支付方式当前应走的唯一真实实例。 */
   async resolveVisible(
-    method: VisiblePaymentMethod,
+    method: CheckoutPaymentMethod,
     currency: PaymentCurrency,
     amountCents?: number,
     options?: { includeDailyLimitExceeded?: boolean },
   ): Promise<ResolvedVisiblePayment | null> {
+    if (method === 'sandbox') return this.resolveSandbox(currency, amountCents, options);
+
     const source = await this.sourceOf(method);
     if (source === 'unset') return null;
 
@@ -154,14 +184,12 @@ export class PaymentRoutingService {
       providerId,
       eligible.map((item) => item.row.instanceId),
     );
-    const withinDailyLimit = options?.includeDailyLimitExceeded
-      ? eligible
-      : eligible.filter(({ row }) => {
-          if (row.dailyLimitCents == null) return true;
-          const used = usage.get(row.instanceId) ?? 0;
-          if (amountCents === undefined) return used < row.dailyLimitCents;
-          return used + Math.max(0, amountCents) <= row.dailyLimitCents;
-        });
+    const withinDailyLimit = this.filterWithinDailyLimit(
+      eligible,
+      usage,
+      amountCents,
+      options?.includeDailyLimitExceeded,
+    );
     if (withinDailyLimit.length === 0) return null;
 
     const strategy = await this.settings.get<string>('payment.loadBalancingStrategy');
@@ -185,6 +213,43 @@ export class PaymentRoutingService {
   }
 
   /**
+   * 沙箱实例解析。
+   *
+   * 与真实方式的三处差异都是刻意的：不读 `payment.*Source`（沙箱不是来源，
+   * 也不该与官方/易支付争夺选择）、不按支付方式过滤实例（沙箱没有
+   * alipay/wechat 之分）、不推进轮询游标（只有一个模拟通道，无需负载均衡）。
+   */
+  private async resolveSandbox(
+    currency: PaymentCurrency,
+    amountCents?: number,
+    options?: { includeDailyLimitExceeded?: boolean },
+  ): Promise<ResolvedVisiblePayment | null> {
+    if (!this.sandboxAllowed()) return null;
+    const providerId: PaymentProviderId = 'sandbox';
+    const adapter = getAdapter(providerId);
+    if (!adapter || !adapter.descriptor.supportedCurrencies.includes(currency)) return null;
+
+    const rows = (await this.store.latestRowsByInstance(providerId)).sort(compareInstanceRows);
+    const eligible = this.eligibleInstances(adapter, rows, null, amountCents);
+    if (eligible.length === 0) return null;
+
+    const usage = await this.dailyInstanceUsage(
+      providerId,
+      eligible.map((item) => item.row.instanceId),
+    );
+    const withinDailyLimit = this.filterWithinDailyLimit(
+      eligible,
+      usage,
+      amountCents,
+      options?.includeDailyLimitExceeded,
+    );
+    if (withinDailyLimit.length === 0) return null;
+
+    const selected = this.leastAmountInstance(withinDailyLimit, usage);
+    return { method: 'sandbox', providerId, config: selected.config };
+  }
+
+  /**
    * 原子预占一笔支付尝试。
    *
    * 只在 resolveVisible() 里看日限额不够：展示与发起支付之间可能已有并发订单
@@ -200,13 +265,28 @@ export class PaymentRoutingService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const source = await this.sourceOf(input.method);
-      if (source === 'unset') {
-        throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
-      }
-      const providerId: PaymentProviderId = source === 'official' ? input.method : 'epay';
-      if (input.resolved && input.resolved.providerId !== providerId) {
-        throw new AppError(50301, '支付来源已变更，请刷新页面后重试', 503);
+      let providerId: PaymentProviderId;
+      if (input.method === 'sandbox') {
+        /*
+         * 这里是最后一道非生产闸门：即使有人绕过展示层直接 POST
+         * providerId=sandbox，生产也必须按「不存在」处理。
+         */
+        if (!this.sandboxAllowed()) {
+          throw new AppError(40400, '支付方式不可用', 404);
+        }
+        providerId = 'sandbox';
+        if (input.resolved && input.resolved.providerId !== providerId) {
+          throw new AppError(50301, '支付来源已变更，请刷新页面后重试', 503);
+        }
+      } else {
+        const source = await this.sourceOf(input.method);
+        if (source === 'unset') {
+          throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
+        }
+        providerId = source === 'official' ? input.method : 'epay';
+        if (input.resolved && input.resolved.providerId !== providerId) {
+          throw new AppError(50301, '支付来源已变更，请刷新页面后重试', 503);
+        }
       }
       const adapter = getAdapter(providerId);
       if (!adapter || !adapter.descriptor.supportedCurrencies.includes(input.currency)) {
@@ -217,7 +297,13 @@ export class PaymentRoutingService {
         await this.store.latestRowsByInstance(providerId, tx.paymentProviderConfig)
       ).sort(compareInstanceRows);
       if (preliminary.length === 0) {
-        throw new AppError(50301, '管理员尚未选择可用支付来源，请联系管理员配置', 503);
+        throw new AppError(
+          50301,
+          input.method === 'sandbox'
+            ? '沙箱支付通道未配置或已停用'
+            : '管理员尚未选择可用支付来源，请联系管理员配置',
+          503,
+        );
       }
 
       /*
@@ -240,14 +326,26 @@ export class PaymentRoutingService {
       const rows = (
         await this.store.latestRowsByInstance(providerId, tx.paymentProviderConfig)
       ).sort(compareInstanceRows);
-      const eligible = this.eligibleInstances(adapter, rows, input.method, input.amountCents);
+      const eligible = this.eligibleInstances(
+        adapter,
+        rows,
+        input.method === 'sandbox' ? null : input.method,
+        input.amountCents,
+      );
       if (eligible.length === 0) {
-        throw new AppError(50301, '支付渠道未完成配置或当前金额不在可支付范围内', 503);
+        throw new AppError(
+          50301,
+          input.method === 'sandbox'
+            ? '沙箱支付通道未完成配置或当前金额不在可支付范围内'
+            : '支付渠道未完成配置或当前金额不在可支付范围内',
+          503,
+        );
       }
 
       const strategy = await this.settings.get<string>('payment.loadBalancingStrategy');
       let claimedCursor: number | null = null;
-      if (strategy !== 'least-amount') {
+      // 沙箱只有一个模拟通道，不参与真实渠道的轮询负载均衡，也不该写游标
+      if (input.method !== 'sandbox' && strategy !== 'least-amount') {
         const cursor = await tx.paymentRoundRobinCursor.upsert({
           where: { providerId_method: { providerId, method: input.method } },
           create: { providerId, method: input.method, cursor: 1 },
@@ -262,16 +360,13 @@ export class PaymentRoutingService {
         eligible.map((item) => item.row.instanceId),
         tx.payment,
       );
-      const withinDailyLimit = eligible.filter(({ row }) => {
-        if (row.dailyLimitCents == null) return true;
-        return (usage.get(row.instanceId) ?? 0) + input.amountCents <= row.dailyLimitCents;
-      });
+      const withinDailyLimit = this.filterWithinDailyLimit(eligible, usage, input.amountCents);
       if (withinDailyLimit.length === 0) {
         throw new AppError(50301, '支付实例已达每日限额，请稍后重试或更换支付方式', 503);
       }
 
       const selected =
-        strategy === 'least-amount'
+        input.method === 'sandbox' || strategy === 'least-amount'
           ? this.leastAmountInstance(withinDailyLimit, usage)
           : withinDailyLimit[
               claimedCursor == null ? 0 : (claimedCursor - 1) % withinDailyLimit.length
@@ -301,7 +396,9 @@ export class PaymentRoutingService {
           method: input.method,
           providerId,
           config: selected.config,
-          ...(providerId === 'epay' ? { providerMethod: input.method } : {}),
+          ...(providerId === 'epay' && input.method !== 'sandbox'
+            ? { providerMethod: input.method }
+            : {}),
           ...(claimedCursor == null
             ? {}
             : {
@@ -402,13 +499,14 @@ export class PaymentRoutingService {
   private eligibleInstances(
     adapter: PaymentAdapter,
     rows: ConfigRow[],
-    method: VisiblePaymentMethod,
+    /** null 表示不按 C 端支付方式过滤（沙箱没有 alipay/wechat 之分）。 */
+    method: VisiblePaymentMethod | null,
     amountCents?: number,
   ): Array<{ row: ConfigRow; config: ResolvedPaymentConfig }> {
     const eligible: Array<{ row: ConfigRow; config: ResolvedPaymentConfig }> = [];
     for (const row of rows) {
       if (!row.enabled) continue;
-      if (!paymentMethodsOf(row, adapter.descriptor.id).includes(method)) continue;
+      if (method && !paymentMethodsOf(row, adapter.descriptor.id).includes(method)) continue;
       if (amountCents !== undefined) {
         if (row.minAmountCents != null && amountCents < row.minAmountCents) continue;
         if (row.maxAmountCents != null && amountCents > row.maxAmountCents) continue;
@@ -418,7 +516,7 @@ export class PaymentRoutingService {
         values = this.store.valuesFor(row);
       } catch (e) {
         this.logger.error(
-          `C 端支付实例不可用 (${method} -> ${adapter.descriptor.id}/${row.instanceId}) 解密失败: ${(e as Error).message}`,
+          `C 端支付实例不可用 (${method ?? 'sandbox'} -> ${adapter.descriptor.id}/${row.instanceId}) 解密失败: ${(e as Error).message}`,
         );
         continue;
       }
@@ -439,6 +537,27 @@ export class PaymentRoutingService {
   private async sourceOf(method: VisiblePaymentMethod): Promise<PaymentSource> {
     const raw = await this.settings.get<string>(`payment.${method}Source`);
     return raw === 'official' || raw === 'epay' ? raw : 'unset';
+  }
+
+  /** 沙箱只属于开发/测试；生产无论配置如何都不可见、不可用。 */
+  private sandboxAllowed(): boolean {
+    return this.config.get<string>('app.env') !== 'production';
+  }
+
+  /** 展示与预占共用同一套日限额口径，避免「看得到、点下去却超限」。 */
+  private filterWithinDailyLimit(
+    eligible: Array<{ row: ConfigRow; config: ResolvedPaymentConfig }>,
+    usage: Map<string, number>,
+    amountCents?: number,
+    includeDailyLimitExceeded?: boolean,
+  ): Array<{ row: ConfigRow; config: ResolvedPaymentConfig }> {
+    if (includeDailyLimitExceeded) return eligible;
+    return eligible.filter(({ row }) => {
+      if (row.dailyLimitCents == null) return true;
+      const used = usage.get(row.instanceId) ?? 0;
+      if (amountCents === undefined) return used < row.dailyLimitCents;
+      return used + Math.max(0, amountCents) <= row.dailyLimitCents;
+    });
   }
 
   private async dailyInstanceUsage(

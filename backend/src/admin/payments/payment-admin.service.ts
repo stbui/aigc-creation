@@ -184,6 +184,9 @@ export class AdminPaymentsService {
           providerRef: p.providerRef,
           payTransactionId: p.payTransactionId,
           amountCents: p.amountCents,
+          /* 单次支付尝试的失败原因与成功/沙箱说明；排障时不用再查库 */
+          lastError: p.lastError,
+          message: p.message,
           createdAt: p.createdAt.toISOString(),
           paidAt: p.paidAt ? p.paidAt.toISOString() : null,
         })),

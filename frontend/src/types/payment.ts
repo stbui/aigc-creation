@@ -34,6 +34,12 @@ export type PaymentCurrency = "CNY" | "USD";
 /** C 端固定展示的两种支付方式，与真实渠道解耦。 */
 export type VisiblePaymentMethod = "alipay" | "wechat";
 
+/**
+ * C 端实际可选择的方式。`sandbox` 只会在非生产环境由后端返回，
+ * 用于没有商户号时走通下单与发积分链路；文案必须声明不产生真实扣款。
+ */
+export type CheckoutPaymentMethod = VisiblePaymentMethod | "sandbox";
+
 /** 管理员为某个可见支付按钮选择的唯一来源。 */
 export type PaymentSource = "unset" | "official" | "epay";
 
@@ -48,7 +54,7 @@ export interface PaymentIntent {
   orderNo: string;
   amountCents: number;
   currency: string;
-  providerId: VisiblePaymentMethod | "free";
+  providerId: CheckoutPaymentMethod | "free";
   configId: string | null;
   configVersion: number | null;
   mode:
@@ -86,9 +92,9 @@ export interface PaymentSettingsView {
 
 /** `GET /payments/providers` 的可用支付方式。 */
 export interface PaymentProviderInfo {
-  id: VisiblePaymentMethod;
+  id: CheckoutPaymentMethod;
   name: string;
-  icon: VisiblePaymentMethod;
+  icon: CheckoutPaymentMethod;
   checkoutMode:
     | "redirect"
     | "qrcode"
@@ -96,7 +102,7 @@ export interface PaymentProviderInfo {
     | "payment-element"
     | "sandbox";
   supportedCurrencies: string[];
-  sandbox: false;
+  sandbox: boolean;
 }
 
 /** 支付状态轮询（`GET /payments/:orderId/status` / `POST /payments/:orderId/query`）。 */
@@ -107,7 +113,7 @@ export interface PaymentStatusResult {
   displayStatus: string;
   amountCents: number;
   currency: string;
-  providerId: VisiblePaymentMethod | "free" | "unknown";
+  providerId: CheckoutPaymentMethod | "free" | "unknown";
   checkoutMode: string | null;
   checkoutValue: string | null;
   expiresAt: string;
@@ -118,7 +124,7 @@ export interface PaymentStatusResult {
   payments: Array<{
     id: string;
     status: string;
-    providerId: VisiblePaymentMethod | "free" | "unknown";
+    providerId: CheckoutPaymentMethod | "free" | "unknown";
     providerRef: string | null;
     providerTradeNo: string | null;
     amountCents: number;

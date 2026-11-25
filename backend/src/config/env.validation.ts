@@ -59,12 +59,19 @@ interface Spec {
  * 上述例外在各 env 文件里仍有键位；新增同类「请求期读取」变量时，
  * 请同时更新本例外清单与 `docs/environments.md`。
  *
- * 另有一类不经过 `ConfigService` 的静态读取：它们仍在本表内，值同源，
- * 只是调用点拿不到 DI —— `UPLOAD_DIR`（assets.controller 的 multer destination，
- * 装饰器参数在类定义期求值）、`ASSET_THUMBNAIL_ENABLED`（assets/thumb-render.ts
- * 的纯函数）、支付适配器里的 `NODE_ENV`。
+ * 另有一类不经过 `ConfigService` 的读取：键仍在本表内、值同源，只是调用点不在
+ * DI 上下文里 —— `UPLOAD_DIR`（`env-files.ts` 的 `resolveUploadsDir()`，被
+ * `assets.module` 的 multer destination 与 `assets.service` / `task-media.service`
+ * / `generate.service` 重建路径共用）、`ASSET_THUMBNAIL_ENABLED`
+ * （assets/thumb-render.ts 的纯函数）、支付适配器里的 `NODE_ENV`。
+ *
+ * `UPLOAD_DIR` 刻意不改成注入 ConfigService：落盘目录（multer）与读取目录
+ * （service 重建临时路径、thumb-render 定位缓存）必须是同一个函数的同一个结果，
+ * 一边读注入值、一边读 env，切目录时就会「写到 A、去 B 读」而静默丢图。
+ * 它也不再于类定义期求值 —— 现在在 `MulterModule.registerAsync` 的工厂里，
+ * 实例化阶段执行，env 已加载完，不再有 import 顺序前提。
  */
-export const ENV_SPECS: readonly Spec[] = [
+export const ENV_SPECS = [
   // ── 应用 ──────────────────────────────────────────────────────────────
   { key: 'app.port', env: 'PORT', type: 'number', def: 4100, min: 1, max: 65535 },
   { key: 'app.host', env: 'HOST', type: 'string', def: '127.0.0.1' },
@@ -75,6 +82,11 @@ export const ENV_SPECS: readonly Spec[] = [
   // 形如 file:./dev.db，相对路径相对进程 cwd（backend/）。默认值与迁移前
   // PrismaService / prisma.config.ts 里硬编码的 'file:./dev.db' 逐字一致。
   { key: 'db.url', env: 'DATABASE_URL', type: 'string', def: 'file:./dev.db' },
+
+  // ── 任务队列（BullMQ）──────────────────────────────────────────────
+  // 任务调度已交给官方 @nestjs/bullmq；Redis 是队列的唯一运行期依赖。
+  // 数据库仍是任务状态与账单的事实源，Redis 丢失可由启动对账补投。
+  { key: 'redis.url', env: 'REDIS_URL', type: 'string', def: 'redis://127.0.0.1:6379' },
 
   // ── 运行期目录（相对路径相对进程 cwd，绝对路径原样使用）───────────────
   { key: 'path.uploads', env: 'UPLOAD_DIR', type: 'string', def: 'uploads' },
@@ -277,9 +289,6 @@ export const ENV_SPECS: readonly Spec[] = [
   // 上游请求默认超时与产物下载超时
   { key: 'model.httpTimeoutMs', env: 'MODEL_HTTP_TIMEOUT_MS', type: 'number', def: 120000, min: 1000 },
   { key: 'model.mediaTimeoutMs', env: 'MODEL_MEDIA_TIMEOUT_MS', type: 'number', def: 180000, min: 1000 },
-  // worker 轮询间隔与单次租约时长
-  { key: 'model.workerIntervalMs', env: 'MODEL_WORKER_INTERVAL_MS', type: 'number', def: 1000, min: 100 },
-  { key: 'model.leaseMs', env: 'MODEL_LEASE_MS', type: 'number', def: 120000, min: 10000 },
   // 渠道并发槽等槽上限：超过即按「渠道忙」切线（任务侧）或 429（中转侧），不无限排队。
   // 默认 60s；验收脚本压到百毫秒级，否则一次断言要等满一分钟。
   { key: 'model.slotWaitMs', env: 'MODEL_SLOT_WAIT_MS', type: 'number', def: 60000, min: 100, max: 600000 },
@@ -301,15 +310,104 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'model.proxy.customConcurrency', env: 'MODEL_PROXY_CUSTOM_CONCURRENCY', type: 'number', def: 2, min: 0, max: 64 },
   // 代理账单兜底清扫：开启后 reserved 超时自动退款、running 超时转人工核对
   { key: 'model.billingSweepEnabled', env: 'MODEL_BILLING_SWEEP_ENABLED', type: 'boolean', def: true },
-];
+] as const satisfies readonly Spec[];
 
-/** 配置树（ConfigService.get('app.port') 等的载体） */
+/**
+ * 运行时配置树的形状（`validateEnv` 的返回值）。
+ *
+ * 必须与 `ENV_SPECS` 一一对应；ConfigService 的键约束不依赖它，而是从
+ * `ENV_SPECS` 派生的扁平键（见下方 `AppConfigValues`）。
+ */
 export interface AppConfigTree {
-  app: { port: number; host: string; prefix: string; env: string };
+  app: { port: number; host: string; prefix: string; env: string; webBase: string };
   db: { url: string };
+  redis: { url: string };
   path: { uploads: string; backups: string };
   cors: { origins: string[]; allowPrivateLan: boolean };
   jwt: { secret: string; ttl: string };
+  auth: { emailVerificationBypass: boolean };
+  oauth: {
+    enabled: string[];
+    callbackBase: string;
+    google: {
+      clientId: string;
+      clientSecret: string;
+      redirectUri: string;
+      authorizationEndpoint: string;
+      tokenEndpoint: string;
+      userinfoEndpoint: string;
+      scopes: string[];
+    };
+    github: {
+      clientId: string;
+      clientSecret: string;
+      redirectUri: string;
+      authorizationEndpoint: string;
+      tokenEndpoint: string;
+      scopes: string[];
+    };
+    generic: {
+      name: string;
+      clientId: string;
+      clientSecret: string;
+      redirectUri: string;
+      authorizationEndpoint: string;
+      tokenEndpoint: string;
+      userinfoEndpoint: string;
+      scopes: string[];
+    };
+  };
+  channel: {
+    email: {
+      provider: string;
+      apiUrl: string;
+      apiKey: string;
+      from: string;
+      smtpHost: string;
+      smtpPort: number;
+      smtpSecure: boolean;
+      smtpUser: string;
+      smtpPassword: string;
+    };
+    sms: { provider: string; apiUrl: string; apiKey: string; sign: string; template: string };
+    aliyun: {
+      accessKeyId: string;
+      accessKeySecret: string;
+      smsSignName: string;
+      smsTemplateCode: string;
+      smsRegion: string;
+      dmAccountName: string;
+      dmFromAlias: string;
+      dmAddressType: string;
+    };
+  };
+  payment: {
+    secretKey: string;
+    notifyBase: string;
+    workerEnabled: boolean;
+    alipay: {
+      appId: string;
+      sellerId: string;
+      privateKey: string;
+      publicKey: string;
+      gateway: string;
+      mobilePrecreateDeepLink: string;
+    };
+    wechat: {
+      mchId: string;
+      appId: string;
+      apiV3Key: string;
+      serialNo: string;
+      privateKey: string;
+      apiBase: string;
+      platformPublicKey: string;
+      platformPublicKeyId: string;
+    };
+    paypal: { clientId: string; clientSecret: string; webhookId: string; apiBase: string };
+    stripe: { secretKey: string; publishableKey: string; webhookSecret: string; apiBase: string };
+    epay: { apiBase: string; mchId: string; key: string; type: string };
+    zpay: { apiBase: string; pid: string; key: string; type: string; cid: string };
+  };
   log: {
     level: LogLevel;
     dir: string;
@@ -322,20 +420,6 @@ export interface AppConfigTree {
   asset: { publicBase: string; signingSecret: string; thumbnailEnabled: boolean };
   rateLimit: { enabled: boolean; trustProxy: boolean };
   observability: { errorWebhookUrl: string };
-  storage: {
-    backend: string;
-    ossRegion: string;
-    ossBucket: string;
-    ossAccessKeyId: string;
-    ossAccessKeySecret: string;
-    ossEndpoint: string;
-    minioEndpoint: string;
-    minioPort: number;
-    minioUseSsl: boolean;
-    minioAccessKey: string;
-    minioSecretKey: string;
-    minioBucket: string;
-  };
   model: {
     secretKey: string;
     pluginDir: string;
@@ -344,10 +428,7 @@ export interface AppConfigTree {
     activeTaskLimit: number;
     httpTimeoutMs: number;
     mediaTimeoutMs: number;
-    workerIntervalMs: number;
-    leaseMs: number;
     slotWaitMs: number;
-    redisUrl: string;
     allowPrivateUpstreams: boolean;
     allowedPrivateUpstreamHosts: string[];
     proxy: {
@@ -363,6 +444,30 @@ export interface AppConfigTree {
     billingSweepEnabled: boolean;
   };
 }
+
+type EnvSpecEntry = (typeof ENV_SPECS)[number];
+type EnvSpecValue<T extends EnvSpecEntry['type']> = T extends 'number'
+  ? number
+  : T extends 'boolean'
+    ? boolean
+    : T extends 'csv'
+      ? string[]
+      : string;
+
+/**
+ * 注入 `ConfigService` 时使用的键约束。
+ *
+ * 为什么用扁平点号键而不是上面的嵌套树：
+ *   1. 键直接从 `ENV_SPECS` 派生（`as const`），新增变量只需改一处，不会出现
+ *      「配置树忘了同步」的漂移；
+ *   2. `ConfigService` 的第一个重载以 `keyof K` 约束键，扁平键能继续支持现有的
+ *      `config.get<T>('a.b')` 写法，不必给 80 余处调用补 `{ infer: true }`。
+ * 运行时仍是嵌套对象，lodash 的路径查找与点号键一一对应；值类型仍由调用处的
+ * 泛型标注决定（与改造前一致）。
+ */
+export type AppConfigValues = {
+  [S in EnvSpecEntry as S['key']]: EnvSpecValue<S['type']>;
+};
 
 /** 真值判定：`1/true/yes/on` 为真，其余为假 */
 function parseBool(raw: string): boolean {

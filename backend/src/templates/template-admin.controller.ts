@@ -151,7 +151,7 @@ export class TemplateAdminController {
       limits: { fileSize: deploymentUploadMaxBytes(), files: 1 },
     }),
   )
-  upload(@UploadedFile() file: { buffer?: Buffer; originalname?: string } | undefined) {
+  upload(@UploadedFile() file: Express.Multer.File | undefined) {
     return this.catalog.uploadImage(file);
   }
 }

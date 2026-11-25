@@ -144,7 +144,7 @@ export interface CapabilityOutput {
 }
 
 /**
- * 能力 → 模型请求的映射声明（`docs/channel-model-design.md` §8.1）。
+ * 能力 → 模型请求的映射声明（换算口径见 `model-mapping.ts` 与 `docs/model-architecture.md` §5.1）。
  *
  * 生成链路不再按能力 id 猜参数：准入时用这里的 `intent` 把**用户参数**
  * 转成模型请求意图（操作 / 参考素材 / 尺寸与画质），再用它去匹配前台模型

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import type { Request, Response } from 'express';
 import { OAuthService } from './oauth.service';
 import { OAuthAuthorizeQueryDto, OAuthCompleteDto } from './oauth.dto';
@@ -38,7 +39,7 @@ const RL_OAUTH_COMPLETE: RateLimitOptions = {
 export class OAuthController {
   constructor(
     private readonly oauth: OAuthService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
   ) {}
 
   /** 前端「第三方登录」按钮只渲染这里列出的 provider */

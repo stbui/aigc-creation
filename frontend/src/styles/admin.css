@@ -10,8 +10,10 @@
  *
  * ## 为什么不是 `@import "tailwindcss"`
  *
- * 完整入口会带 preflight —— 它会重置全站的 border / box-sizing / 标题字号，
- * 直接打断 `global.css` 与 C 端页面。这里只取 theme + utilities。
+ * 完整入口会按默认 source 扫描全站并生成全部 utilities；这里要的是同一套
+ * theme / preflight / utilities 三层，但 utilities 只扫后台目录，所以按层拆开导入。
+ * preflight 与 C 端 `ui/styles.css` 共用同一个上游文件，后台不再手写
+ * margin / list-style / 控件灰底 / border-style 的替代复位。
  *
  * ## 作用域
  *
@@ -19,12 +21,13 @@
  *   C 端类名不进产物。`utilities.css` 用了 `source(none)` 关掉自动探测 ——
  *   漏列一个目录，该目录里的工具类（`tabular-nums` / `w-32` / `border-t` 之类）
  *   就不会生成，页面看着「样式丢了一半」但构建不报错。
- * - base 规则限定 `.admin-root`，不写全局元素选择器。
+ * - preflight 是全局元素规则（与 C 端同一份），后台业务与外壳样式仍限定 `.admin-root`。
  */
 
 @layer theme, base, components, utilities;
 
 @import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
 @import 'tailwindcss/utilities.css' layer(utilities) source(none);
 @import 'tw-animate-css';
 /* 主题映射与 C 端共用一份，见 styles/tailwind-theme.css */
@@ -158,25 +161,7 @@
   }
 
   /*
-   * ② border-style 兜底 —— 必须是**全局**规则。
-   *
-   * Tailwind 的 `border` / `border-b` 只写宽度，样式靠 preflight 给的 `solid`；
-   * 本项目刻意不导 preflight，没有这条，所有卡片、输入框、表头的边线都不显示。
-   *
-   * 不能只写在 `.admin-root` 下：抽屉、弹层、Toast 都渲染在 `document.body` 的
-   * portal 里，不在作用域内 —— 浮层会独自丢掉全部边线，而这种问题只在打开弹层
-   * 时才看得见。
-   *
-   * global.css 是未分层样式，优先级高于本层，冲突时仍以它为准。
-   */
-  *,
-  ::before,
-  ::after {
-    border: 0 solid;
-  }
-
-  /*
-   * ③ 描边颜色兜底：只作用于 shadcn 组件（`components/ui/*` 都带 `data-slot`）。
+   * ② 描边颜色兜底：只作用于 shadcn 组件（`components/ui/*` 都带 `data-slot`）。
    *
    * `border` 单独出现时颜色会退回 `currentColor`（近黑），在浅色卡片上像描了黑边。
    * 放进 base 层，utilities 层的显式颜色类（`border-input` / `border-transparent`）
@@ -186,7 +171,7 @@
     border-color: var(--border);
   }
 
-  /* ④ 后台作用域：字体与底色。`.admin-portal` 供 portal 浮层复用（不带底色） */
+  /* ③ 后台作用域：字体与底色。`.admin-portal` 供 portal 浮层复用（不带底色） */
   .admin-root,
   .admin-portal {
     font-family: var(--font-sans);
@@ -197,30 +182,6 @@
 
   .admin-root {
     background: var(--page-bg);
-  }
-
-  /*
-   * ⑤ 排版复位（preflight 子集）：后台不加载 preflight，浏览器会给标题、
-   * 段落、列表保留默认外边距 —— 面板标题因此多出一行空白（h2 上下各 ~11px），
-   * 列表还会多出 16px 上下 margin 与 40px 缩进。shadcn 组件按 preflight 的
-   * 零外边距假设编写，所以这里只补排版相关的四项：margin / list-style /
-   * padding / dd 缩进。utilities 层（`list-disc` / `pl-4` / `m-0`）仍可覆盖。
-   *
-   * 作用域限定 `.admin-root` 与 `.admin-portal`：C 端内容页依赖自己的段距，
-   * 不能被这条规则波及；弹层渲染在 body 下，靠 `admin-portal` 一并覆盖。
-   */
-  :where(.admin-root, .admin-portal)
-    :where(h1, h2, h3, h4, h5, h6, p, ul, ol, dl, dd, figure, blockquote) {
-    margin-block: 0;
-  }
-
-  :where(.admin-root, .admin-portal) :where(ul, ol) {
-    padding-inline-start: 0;
-    list-style: none;
-  }
-
-  :where(.admin-root, .admin-portal) dd {
-    margin-inline-start: 0;
   }
 
   /*
@@ -246,18 +207,6 @@
 
   :is(.admin-root, .admin-portal) a[href]:not(.adm-skip-link):focus-visible {
     text-decoration: underline;
-  }
-
-  /* 控件重置：按钮/输入框不能带系统灰底与默认边框 */
-  :is(.admin-root, .admin-portal) :where(button, input, select, textarea) {
-    font: inherit;
-    color: inherit;
-    background: transparent;
-  }
-
-  :is(.admin-root, .admin-portal) :where(img, svg, video) {
-    display: block;
-    vertical-align: middle;
   }
 
   :is(.admin-root, .admin-portal) :focus-visible {

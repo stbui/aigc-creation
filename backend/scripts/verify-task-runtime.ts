@@ -1,7 +1,7 @@
 /**
  * 任务运行时验收（P4-b）：准入 → 派发 → 切线 → 轮询 → 收尾。
  *
- * 验收口径（`docs/channel-model-design.md` §10 P4）：
+ * 验收口径（`docs/model-architecture.md` §5.2 / §7，P4 阶段）：
  *   端到端跑通「成功 / 上游拒绝切线 / 超时不切换 / 失败退款」四条路径。
  *
  * 为什么用真实 HTTP mock 上游而不是桩掉执行器：
@@ -38,6 +38,7 @@ const { PrismaService } = require('../src/prisma/prisma.service');
 const { TaskAdmissionService } = require('../src/model/tasks/task-admission.service');
 const { TaskLifecycleService } = require('../src/model/tasks/task-lifecycle.service');
 const { TaskWorkerService } = require('../src/model/tasks/task-worker.service');
+const { TaskProcessor } = require('../src/model/tasks/task.processor');
 const { CapabilityCatalogService } = require('../src/model/catalog/capability-catalog.service');
 const { RouterService } = require('../src/model/routing/router.service');
 const { RouteHealthService } = require('../src/model/routing/route-health.service');
@@ -159,22 +160,35 @@ async function main() {
   const admission = app.get(TaskAdmissionService);
   const lifecycle = app.get(TaskLifecycleService);
   const worker = app.get(TaskWorkerService);
+  const processor = app.get(TaskProcessor);
   const catalog = app.get(CapabilityCatalogService);
   const router = app.get(RouterService);
   const groups = app.get(UserGroupService);
   const billing = app.get(BillingService);
   const finance = app.get(FinanceAnalyticsService);
   const health = app.get(RouteHealthService);
-  // 本脚本自行推进调度节拍，避免后台 interval 在「取消 / 租约接管」断言之间
-  // 抢先认领任务，造成测试看起来偶发。每次场景仍调用 worker 的公开 kick()。
-  worker.onModuleDestroy();
+  // 暂停 BullMQ Worker 的自动取件，由脚本按场景调用公开的 processJob()。
+  // 这样「取消 / 接管」断言不会被后台并发抢先推进。
+  await processor.worker.pause();
   await sleep(10);
   async function kickWorkerOnce() {
-    const runtime = worker as any;
-    runtime.stopped = false;
-    worker.kick();
-    await sleep(0);
-    runtime.stopped = true;
+    const now = new Date();
+    const tasks = await prisma.generationTask.findMany({
+      where: {
+        OR: [
+          { status: 'queued' },
+          { status: 'running', OR: [{ nextPollAt: { lte: now } }, { leaseOwner: '' }] },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    for (const item of tasks) {
+      const outcome = await worker.processJob(item.id);
+      if (outcome.action === 'delay' && outcome.delayMs === 0) {
+        await worker.processJob(item.id);
+      }
+    }
   }
   // 上一次运行（或其它脚本）留下的冷却不应影响本次判定
   health.clear();

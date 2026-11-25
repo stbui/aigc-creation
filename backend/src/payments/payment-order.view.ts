@@ -31,6 +31,7 @@ export async function loadPaymentOrder(
  *
  * 易支付是一套凭据承载支付宝/微信，只能在 Payment.providerMethod 已固化时
  * 投影成对应按钮；没有历史支付方式的旧单一律 unknown，不能把 epay 暴露给 C 端。
+ * 沙箱是独立通道（仅开发/测试），其 channel 本身就是 C 端可见值。
  */
 function visibleProviderId(
   channel: string,
@@ -38,6 +39,7 @@ function visibleProviderId(
 ): PaymentOrderView['providerId'] {
   if (isVisiblePaymentMethod(providerMethod)) return providerMethod;
   if (isVisiblePaymentMethod(channel)) return channel;
+  if (channel === 'sandbox') return 'sandbox';
   if (channel === 'free') return 'free';
   return 'unknown';
 }

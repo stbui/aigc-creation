@@ -7,7 +7,7 @@
 1. 用户当轮指令。
 2. 本文件：跨线协作、目录归属、交接规则。
 3. `CLAUDE.md`：仓库不变量、单一事实源表、易腐化数量。
-4. 开发流程四件套：`docs/development-workflow.md`（十三阶段流程）、`docs/agent-execution.md`（授权边界）、`docs/quality-gates.md`（闸口与证据）、`docs/git-workflow.md`（Git 工作流）。
+4. 开发流程三件套：`docs/development-workflow.md`（十三阶段流程）、`docs/agent-execution.md`（授权边界）、`docs/git-workflow.md`（Git 工作流）；闸口命令与覆盖矩阵见 `docs/testing.md` §3–§4，证据标准与完成定义见本文 §7。
 5. `docs/README.md` 指向的领域文档。
 
 文档分工（同一事实只维护一处）：
@@ -19,7 +19,8 @@
 | `CLAUDE.md` | 仓库不变量、单一事实源、易腐化数量、环境踩坑 |
 | `docs/development-workflow.md` | 13 阶段执行卡与裁剪规则 |
 | `docs/agent-execution.md` | 指令映射、默认禁令、自主边界 |
-| `docs/quality-gates.md` | 闸口矩阵、证据标准、完成定义 |
+| `docs/testing.md` | 测试分层、闸口清单、覆盖矩阵与已知缺口 |
+| 本文 §7–§8 | 证据三件套、完成定义与交接格式 |
 | `docs/git-workflow.md` | 分支、提交、PR、回滚 |
 | `docs/README.md` | 文档索引、命名与放置规则 |
 

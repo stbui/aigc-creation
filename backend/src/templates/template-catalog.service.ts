@@ -318,7 +318,7 @@ export class TemplateCatalogService {
    * 与系统设置图片共用存储链路：先落存储后端，返回稳定引用
    * `storage://<backend>/<key>`；模板记录只存引用，预览地址每次读取时生成。
    */
-  async uploadImage(file?: { buffer?: Buffer; originalname?: string }) {
+  async uploadImage(file?: Pick<Express.Multer.File, 'buffer' | 'originalname'>) {
     const buffer = file?.buffer;
     if (!buffer?.length) throw new AppError(40001, '请选择要上传的图片', 400);
 

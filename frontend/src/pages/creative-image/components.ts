@@ -28,3 +28,5 @@ export { ImageToPromptModal } from '../../components/ImageToPromptModal';
 export type { ToolAsset, ToolResult } from '../../components/ToolShell';
 /** 通用图片上传区（隐藏 input / 拖拽命中 / loading / 缩略图网格） */
 export { ImageUploadArea, SectionCard, type ImageUploadControls } from '../../ui';
+/** 上传区标题行（标题 / 必填星号 + 素材库 / 手机上传入口 + 计数器） */
+export { ImageUploadHeader } from '../../ui';

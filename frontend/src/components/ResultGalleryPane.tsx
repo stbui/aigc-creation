@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Download,
   ExternalLink,
@@ -46,6 +48,13 @@ import { useApp, Spinner } from '../ui';
 /** 每行张数 (用户要求"一行显示图片数量可调") */
 const GRID_COL_OPTIONS = [3, 4, 5, 6] as const;
 const DEFAULT_GRID_COLS = 4;
+/**
+ * 分页：每页固定 24 张。
+ *
+ * 与「每行张数」解耦 —— 换列只改变一屏能看几张，不改变每页的数据量。
+ * 历史图再多也只翻页，不会把几十张图压成一条条横带。
+ */
+const PAGE_SIZE = 24;
 /**
  * 首屏优先加载的缩略图张数。
  *
@@ -223,6 +232,8 @@ export function ResultGalleryPane({
 }: ResultGalleryPaneProps) {
   const { message, modal } = useApp();
   const [cols, setCols] = useState<number>(readGridCols);
+  /** 当前页码（1 起）；页大小随列数变化，页码在渲染时夹回有效范围 */
+  const [page, setPage] = useState(1);
   /*
    * 大图预览与右键菜单都按**素材/任务 id** 保存，而不是索引。
    *
@@ -241,6 +252,17 @@ export function ResultGalleryPane({
   const previewIndex = previewId
     ? readyItems.findIndex((item) => item.id === previewId)
     : -1;
+  /**
+   * 分页切片。页码用 `currentPage`（夹回范围内）而不是原始 state：
+   * 删图让页数变少的那一帧也不会渲染出空白页。
+   */
+  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = items.slice(pageStart, pageStart + PAGE_SIZE);
+  /** 首位图变化 = 有新图插到最前（提交 / 轮询回填），回到第一页展示最新结果 */
+  const firstItemId = items[0]?.id;
+  const prevFirstItemIdRef = useRef<string | undefined>(firstItemId);
 
   const changeCols = useCallback((next: number) => {
     setCols(next);
@@ -256,6 +278,22 @@ export function ResultGalleryPane({
     if (menu && !items.some((item) => item.id === menu.itemId)) setMenu(null);
     if (previewId && !readyItems.some((item) => item.id === previewId)) setPreviewId(null);
   }, [items, readyItems, menu, previewId]);
+
+  // 删图后页数变少：把页码夹回范围内，不停在空白页
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  // 首位换人 = 有新图插到最前（提交后的 prepend / 服务端回填）：回到第一页
+  useEffect(() => {
+    if (firstItemId !== prevFirstItemIdRef.current) setPage(1);
+    prevFirstItemIdRef.current = firstItemId;
+  }, [firstItemId]);
+
+  // 生成中的占位卡只排在首页；提交瞬间把视图拉回首屏
+  useEffect(() => {
+    if (pending.length > 0) setPage(1);
+  }, [pending.length]);
 
   const openMenu = useCallback((x: number, y: number, itemId: string) => {
     setMenu({ itemId, x, y });
@@ -361,8 +399,9 @@ export function ResultGalleryPane({
           {noticeNode}
           <div className={`fc-result-gallery fc-cols-${cols}`}>
             {/* 生成中占位: 提交后立刻出现在网格首位, 与真实图同尺寸,
-                出图后由调用方 prepend 的新图顶替 —— 不让「已提交 → 出图」之间出现空窗。 */}
-            {pending.length > 0 && activeCount === 0 && pending.map((p) => (
+                出图后由调用方 prepend 的新图顶替 —— 不让「已提交 → 出图」之间出现空窗。
+                占位卡只属于首页: 翻到历史页时不该再看到「正在生成」。 */}
+            {pending.length > 0 && activeCount === 0 && currentPage === 1 && pending.map((p) => (
               <div
                 key={p.key}
                 className="fc-result-item fc-result-item-loading"
@@ -373,7 +412,7 @@ export function ResultGalleryPane({
                 <span className="fc-result-item-loading-tip">{p.label ? `正在生成${p.label}…` : '正在生成…'}</span>
               </div>
             ))}
-            {items.map((item, i) =>
+            {pageItems.map((item, i) =>
               item.url ? (
                 <GalleryThumb
                   key={item.id}
@@ -397,6 +436,33 @@ export function ResultGalleryPane({
               ),
             )}
           </div>
+          {/* 历史图分页：每页 24 张，与「每行张数」无关。
+              只有一页时整条不渲染，避免给空列表或单页列表加无意义的翻页条。 */}
+          {pageCount > 1 && (
+            <nav className="fc-result-pager" aria-label="生成图分页">
+              <button
+                type="button"
+                className="fc-pager-btn"
+                disabled={currentPage <= 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                <ChevronLeft size={13} aria-hidden />
+                上一页
+              </button>
+              <span className="fc-pager-status" aria-live="polite">
+                第 {currentPage} / {pageCount} 页
+              </span>
+              <button
+                type="button"
+                className="fc-pager-btn"
+                disabled={currentPage >= pageCount}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                下一页
+                <ChevronRight size={13} aria-hidden />
+              </button>
+            </nav>
+          )}
         </div>
       )}
 

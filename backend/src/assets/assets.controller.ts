@@ -13,15 +13,10 @@ import {
 } from '@nestjs/common';
 import { RateLimit } from '../common/rate-limit.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { randomUUID } from 'crypto';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
-import { resolveUploadsDir } from '../config/env-files';
 import { AssetsService } from './assets.service';
 import { AppError } from '../common/app.exception';
-import { deploymentUploadMaxBytes } from '../common/image-formats';
 import { UploadAssetDto } from './dto/upload-asset.dto';
 import { MoveAssetsDto } from './dto/move-asset.dto';
 import { AssetListQueryDto } from './dto/list-asset.dto';
@@ -35,28 +30,12 @@ export class AssetsController {
   // 批量拖拽 20 张是正常场景，留足余量
   @RateLimit({ name: 'asset-upload', limit: 30, windowSec: 60, scope: 'user' })
   @Post('upload')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        // multer 的 destination 必须在**模块加载期**就确定（它是装饰器参数，
-        // 拿不到 DI 的 ConfigService），故直接读 process.env.UPLOAD_DIR。
-        // @nestjs/config 在 NestFactory.create 里就把 .env 读进了 process.env，
-        // 而 AppModule 的 import 发生在那之后，故此处能读到正确的值。
-        destination: `${resolveUploadsDir()}/original`,
-        filename: (_req, file, cb) => {
-          const unique = randomUUID();
-          const ext = extname(file.originalname) || '.bin';
-          cb(null, `${unique}${ext}`);
-        },
-      }),
-      // Multer 只负责挡在部署硬上限之外；运营配置的动态上限由 service 在
-      // 读取文件后按真实生效值校验，避免临时目录先收下超大文件。
-      limits: { fileSize: deploymentUploadMaxBytes(), files: 1 },
-    }),
-  )
+  // storage / limits 由 `AssetsModule` 的 MulterModule 提供：装饰器参数在类定义期
+  // 求值，只能直读 process.env，故不在这里写。见该文件的说明。
+  @UseInterceptors(FileInterceptor('file'))
   upload(
     @CurrentUser() user: AuthUser,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
     @Body() dto: UploadAssetDto,
   ) {
     if (!file) throw new AppError(40001, '请选择要上传的图片', 400);

@@ -31,11 +31,16 @@ function setup() {
     generationTask: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
       groupBy: vi.fn(),
       update: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    modelChannel: { findMany: vi.fn().mockResolvedValue([]) },
+    billingOrder: { findFirst: vi.fn().mockResolvedValue(null) },
+    modelChannel: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue({ concurrencyLimit: 0 }),
+    },
     apiCallLog: { count: vi.fn().mockResolvedValue(0) },
   };
   const attempts = {
@@ -57,7 +62,11 @@ function setup() {
     reconcileCancelledTask: vi.fn().mockResolvedValue(false),
   };
   const health = { recordFailure: vi.fn() };
-  const config = { get: vi.fn().mockReturnValue(64) };
+  const queue = {
+    enqueue: vi.fn().mockResolvedValue(undefined),
+    scheduledTaskIds: vi.fn().mockResolvedValue(new Set()),
+    lastReadFailure: null as string | null,
+  };
   const worker = new TaskWorkerService(
     prisma as never,
     {} as never,
@@ -73,9 +82,9 @@ function setup() {
     media as never,
     {} as never,
     lifecycle as never,
-    config as never,
+    queue as never,
   );
-  return { worker, prisma, attempts, channels, slots, executor, media, lifecycle, health, config };
+  return { worker, prisma, attempts, channels, slots, executor, media, lifecycle, health, queue };
 }
 
 function task(): GenerationTask {
@@ -103,38 +112,55 @@ const routed = {
 } as never;
 
 describe('TaskWorkerService 派发状态机', () => {
-  it('租约恢复的精确 CAS 失败时不计为已回收，避免误清刚续租的执行者', async () => {
-    const { worker, prisma, attempts, lifecycle } = setup();
-    prisma.generationTask.findMany.mockResolvedValue([
+  it('队列里已有作业时不重复投递', async () => {
+    const { worker, prisma, queue, lifecycle } = setup();
+    prisma.generationTask.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
       {
         id: 'task-1',
+        status: 'running',
         routeRun: 1,
         leaseOwner: 'worker-old',
-        leaseUntil: new Date(1),
-        pendingResult: null,
+        nextPollAt: null,
+      },
+    ]);
+    queue.scheduledTaskIds.mockResolvedValue(new Set(['task-1']));
+
+    await expect(worker.recoverStaleTasks()).resolves.toBe(0);
+    expect(queue.enqueue).not.toHaveBeenCalled();
+    expect(lifecycle.uncertain).not.toHaveBeenCalled();
+  });
+
+  it('队列作业丢失但请求未发出时清掉旧 fencing token 并补投', async () => {
+    const { worker, prisma, attempts, queue } = setup();
+    prisma.generationTask.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        id: 'task-1',
+        status: 'running',
+        routeRun: 1,
+        leaseOwner: 'worker-old',
+        nextPollAt: null,
       },
     ]);
     attempts.latest.mockResolvedValue(attempt({ status: 'selected', dispatchState: 'not_sent' }));
-    prisma.generationTask.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(worker.recoverStaleTasks()).resolves.toBe(0);
-    expect(lifecycle.uncertain).not.toHaveBeenCalled();
+    await expect(worker.recoverStaleTasks()).resolves.toBe(1);
     expect(prisma.generationTask.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: 'task-1',
-        status: 'running',
-        leaseOwner: 'worker-old',
-        leaseUntil: new Date(1),
-      },
+      where: { id: 'task-1', status: 'running', leaseOwner: 'worker-old' },
       data: { leaseOwner: '', leaseUntil: null, nextPollAt: expect.any(Date) },
     });
+    expect(queue.enqueue).toHaveBeenCalledWith('task-1', 0);
   });
 
-  it('结果不明的过期租约也必须按旧租约 CAS 后才能转人工核对', async () => {
-    const { worker, prisma, attempts, lifecycle } = setup();
-    const leaseUntil = new Date(1);
-    prisma.generationTask.findMany.mockResolvedValue([
-      { id: 'task-1', routeRun: 1, leaseOwner: 'worker-old', leaseUntil, pendingResult: null },
+  it('结果不明的队列作业丢失后按旧 fencing token 转人工核对', async () => {
+    const { worker, prisma, attempts, lifecycle, queue } = setup();
+    prisma.generationTask.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        id: 'task-1',
+        status: 'running',
+        routeRun: 1,
+        leaseOwner: 'worker-old',
+        nextPollAt: null,
+      },
     ]);
     attempts.latest.mockResolvedValue(
       attempt({ status: 'dispatching', dispatchState: 'submission_unknown' }),
@@ -145,8 +171,81 @@ describe('TaskWorkerService 派发状态机', () => {
     expect(lifecycle.uncertain).toHaveBeenCalledWith(
       'task-1',
       expect.stringContaining('可能已经发出'),
-      { leaseOwner: 'worker-old', leaseUntil },
+      { leaseOwner: 'worker-old' },
     );
+    expect(queue.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('已受理的队列作业丢失时保留原回查时间，不提前轮询', async () => {
+    const { worker, prisma, attempts, queue } = setup();
+    const nextPollAt = new Date(Date.now() + 30_000);
+    prisma.generationTask.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        id: 'task-1',
+        status: 'running',
+        routeRun: 1,
+        leaseOwner: 'worker-old',
+        nextPollAt,
+      },
+    ]);
+    attempts.latest.mockResolvedValue(
+      attempt({ status: 'dispatching', dispatchState: 'accepted' }),
+    );
+
+    await expect(worker.recoverStaleTasks()).resolves.toBe(1);
+    expect(prisma.generationTask.updateMany).toHaveBeenCalledWith({
+      where: { id: 'task-1', status: 'running', leaseOwner: 'worker-old' },
+      data: { leaseOwner: '', leaseUntil: null, nextPollAt },
+    });
+    const [, delay] = queue.enqueue.mock.calls[0];
+    expect(delay).toBeGreaterThan(20_000);
+  });
+
+  it('队列作业列表读不到时本轮不补投，并报成失败而非静默成功', async () => {
+    const { worker, prisma, queue } = setup();
+    prisma.generationTask.findMany.mockResolvedValue([]);
+    queue.scheduledTaskIds.mockResolvedValue(null);
+    queue.lastReadFailure = '读取队列作业列表 超过 5000ms 未返回（Redis 不可达？）';
+
+    // 读不到队列 ≠ 无事可做：静默返回 0 会让调度器记成一次成功，Redis 停摆无人察觉
+    await expect(worker.recoverStaleTasks()).rejects.toThrow(/队列作业列表不可读/);
+    expect(queue.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('队列不可读的失败原因随错误上抛，供后台直接看出是 Redis 停摆', async () => {
+    const { worker, prisma, queue } = setup();
+    prisma.generationTask.findMany.mockResolvedValue([]);
+    queue.scheduledTaskIds.mockResolvedValue(null);
+    queue.lastReadFailure = 'connect ECONNREFUSED 127.0.0.1:6379';
+
+    await expect(worker.recoverStaleTasks()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('恢复对账按 id 分页扫描，超过一页的排队任务都能补投', async () => {
+    const { worker, prisma, queue } = setup();
+    const page = (ids: string[]) =>
+      ids.map((id) => ({
+        id,
+        status: 'queued',
+        routeRun: 1,
+        leaseOwner: '',
+        nextPollAt: null,
+      }));
+    const firstPage = Array.from({ length: 500 }, (_, index) => `task-${index + 1}`);
+    prisma.generationTask.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(page(firstPage))
+      .mockResolvedValueOnce(page(['task-501']));
+    queue.scheduledTaskIds.mockResolvedValue(new Set());
+
+    await expect(worker.recoverStaleTasks()).resolves.toBe(501);
+    expect(prisma.generationTask.findMany).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        where: { status: { in: ['queued', 'running'] }, id: { gt: 'task-500' } },
+      }),
+    );
+    expect(queue.enqueue).toHaveBeenCalledTimes(501);
   });
 
   it('新建 attempt 后回到主循环，先做 begin CAS 再派发', async () => {
@@ -470,55 +569,48 @@ describe('TaskWorkerService 派发状态机', () => {
   });
 });
 
-describe('TaskWorkerService 并发生图调度', () => {
-  const queue = (count: number, concurrency: number) =>
-    Array.from({ length: count }, (_, index) => ({
-      id: `task-${index + 1}`,
-      ownerId: 'user-1',
-      channelId: 'channel-1',
-      params: JSON.stringify({ __memberConcurrency: concurrency }),
-    }));
-
-  function runningCounts(owner: number, channel: number) {
-    return async (args: { by: string[] }) =>
-      args.by.includes('ownerId')
-        ? [{ ownerId: 'user-1', _count: { _all: owner } }]
-        : [{ channelId: 'channel-1', _count: { _all: channel } }];
-  }
-
-  it('当前 6 个执行中、套餐并发 10 时，5 张只领取 4 张', async () => {
+describe('TaskWorkerService 业务并发闸门', () => {
+  it('用户当前执行数达到套餐并发时，新任务回到 delayed 而不是占住 Worker', async () => {
     const { worker, prisma } = setup();
-    prisma.generationTask.findMany.mockResolvedValue(queue(5, 10));
-    prisma.generationTask.groupBy.mockImplementation(runningCounts(6, 0));
-    prisma.modelChannel.findMany.mockResolvedValue([{ id: 'channel-1', concurrencyLimit: 0 }]);
-    const launch = vi.spyOn(worker as any, 'launch').mockImplementation(() => {});
+    const queued = task();
+    (queued as any).status = 'queued';
+    (queued as any).params = JSON.stringify({ __memberConcurrency: 10 });
+    (queued as any).billingOrderId = 'order-1';
+    prisma.generationTask.findUnique.mockResolvedValue(queued);
+    prisma.generationTask.count.mockResolvedValue(10);
 
-    await (worker as any).claimQueued();
-
-    expect(launch).toHaveBeenCalledTimes(4);
+    await expect(worker.processJob('task-1')).resolves.toEqual({
+      action: 'delay',
+      delayMs: 1_000,
+    });
+    expect(prisma.generationTask.updateMany).not.toHaveBeenCalled();
   });
 
-  it('渠道并发上限 8、当前 6 个执行中时，5 张只再领取 2 张', async () => {
+  it('渠道并发未满时允许领取任务', async () => {
     const { worker, prisma } = setup();
-    prisma.generationTask.findMany.mockResolvedValue(queue(5, 10));
-    prisma.generationTask.groupBy.mockImplementation(runningCounts(6, 6));
-    prisma.modelChannel.findMany.mockResolvedValue([{ id: 'channel-1', concurrencyLimit: 8 }]);
-    const launch = vi.spyOn(worker as any, 'launch').mockImplementation(() => {});
+    const queued = task();
+    (queued as any).status = 'queued';
+    (queued as any).params = JSON.stringify({ __memberConcurrency: 10 });
+    (queued as any).billingOrderId = 'order-1';
+    prisma.generationTask.findUnique
+      .mockResolvedValueOnce(queued)
+      .mockResolvedValueOnce({ status: 'succeeded', nextPollAt: null });
+    prisma.generationTask.count.mockImplementation(
+      async (args: { where?: { ownerId?: string } }) => (args.where?.ownerId ? 6 : 0),
+    );
+    prisma.modelChannel.findUnique.mockResolvedValue({ concurrencyLimit: 8 });
+    const runClaimed = vi.spyOn(worker as any, 'runClaimed').mockResolvedValue(undefined);
 
-    await (worker as any).claimQueued();
-
-    expect(launch).toHaveBeenCalledTimes(2);
-  });
-
-  it('20 张、套餐并发 10 且渠道不限时，首批领取 10 张', async () => {
-    const { worker, prisma } = setup();
-    prisma.generationTask.findMany.mockResolvedValue(queue(20, 10));
-    prisma.generationTask.groupBy.mockImplementation(runningCounts(0, 0));
-    prisma.modelChannel.findMany.mockResolvedValue([{ id: 'channel-1', concurrencyLimit: 0 }]);
-    const launch = vi.spyOn(worker as any, 'launch').mockImplementation(() => {});
-
-    await (worker as any).claimQueued();
-
-    expect(launch).toHaveBeenCalledTimes(10);
+    await expect(worker.processJob('task-1')).resolves.toEqual({ action: 'done' });
+    expect(runClaimed).toHaveBeenCalledOnce();
+    expect(prisma.generationTask.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'task-1', status: { in: ['queued', 'running'] } },
+        data: expect.objectContaining({
+          status: 'running',
+          leaseOwner: expect.stringMatching(/^.+:[0-9a-f]{8}$/),
+        }),
+      }),
+    );
   });
 });

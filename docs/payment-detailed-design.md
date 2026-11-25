@@ -1751,12 +1751,16 @@ export class PaymentReconciliationService {
 const TICK_MS = 15_000;
 
 @Injectable()
-export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
-  onModuleInit(): void;     // 启动后 15s 起跑，不阻塞 Nest 启动
-  onModuleDestroy(): void;  // clearTimeout
-  tick(): Promise<void>;    // 测试直接调用
+export class PaymentWorkerService implements OnModuleInit {
+  onModuleInit(): void;          // 读取 PAYMENT_WORKER_ENABLED；禁用时周期触发直接返回
+  @Interval('payment-worker:tick', TICK_MS)
+  private scheduledTick(): void; // 由 @nestjs/schedule 挂载，关闭应用时统一清理
+  tick(): Promise<void>;         // 测试直接调用
 }
 ```
+
+定时器不再由服务自己 `setTimeout` / `onModuleDestroy` 维护：`@nestjs/schedule`
+在应用 bootstrap 后挂载、`beforeApplicationShutdown` 时清除全部周期任务。
 
 `tick()` 串行执行，任一步失败只记日志，不中断后续：
 

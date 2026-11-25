@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
 import { SecretCipher } from '../model/infra/secret-cipher';
 import { AppError } from './app.exception';
@@ -52,7 +53,7 @@ export class SettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cipher: SecretCipher,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 

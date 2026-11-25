@@ -5,6 +5,7 @@ import { promises as fs } from 'fs';
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { sqliteUrlToPath } from '../config/env-files';
@@ -53,7 +54,7 @@ export class BackupService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
   ) {}
 
   /**

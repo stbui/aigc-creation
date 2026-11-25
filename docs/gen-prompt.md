@@ -2,7 +2,7 @@
 
 状态：商品主图（`/product-kit`）与商品详情图（`/product-detail`）已实现；提示词效果评估（A/B）未实施。
 
-本文用产品视角说明：用户填的表单如何变成模型的画面要求，以及一次提交为什么会产出多张图。逐字段技术契约见 [`main-image-generation.md`](main-image-generation.md) 与 [`product-detail-generation.md`](product-detail-generation.md)，通用提示词规则见 [`prompt-engineering.md`](prompt-engineering.md)；代码与本文冲突时以代码为准，并在同一次变更中修正本文。
+本文用产品视角说明：用户填的表单如何变成模型的画面要求，以及一次提交为什么会产出多张图。逐字段技术契约见 `backend/src/capabilities/definitions/main_image.ts` 与 [`product-detail-generation.md`](product-detail-generation.md)，通用提示词规则见 [`prompt-engineering.md`](prompt-engineering.md)；代码与本文冲突时以代码为准，并在同一次变更中修正本文。
 
 ## 1. 一次提交，多张图
 

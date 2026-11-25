@@ -649,7 +649,7 @@ describe('PaymentOrderService.createIntent', () => {
     else process.env.PAYMENT_NOTIFY_BASE = previousNotifyBase;
   });
 
-  it('管理员未选择来源时不接受发起支付', async () => {
+  it('管理员未选择来源时不接受发起支付，并把原因写回订单', async () => {
     const { service, configs, prisma } = makeHarness();
     configs.resolveVisibleOptions.mockResolvedValue([]);
 
@@ -659,6 +659,25 @@ describe('PaymentOrderService.createIntent', () => {
 
     expect(adapterMock.createOrder).not.toHaveBeenCalled();
     expect(prisma.payment.create).not.toHaveBeenCalled();
+    // 失败发生在写 Payment 行之前：后台只能靠 Order.lastError 看到原因
+    expect(prisma.order.updateMany).toHaveBeenLastCalledWith({
+      where: { id: ORDER_ID, status: 'pending' },
+      data: { lastError: expect.stringContaining('管理员尚未选择可用支付来源') },
+    });
+  });
+
+  it('支付功能关闭时拒绝发起并记录失败原因', async () => {
+    const { service, settings, prisma } = makeHarness();
+    settings.paymentRules.mockResolvedValueOnce(makePaymentRules({ enabled: false }));
+
+    await expect(
+      service.createIntent({ orderId: ORDER_ID, userId: 'user_1', providerId: 'alipay' }),
+    ).rejects.toThrow(/支付功能已关闭/);
+
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { id: ORDER_ID, status: 'pending' },
+      data: { lastError: expect.stringContaining('支付功能已关闭') },
+    });
   });
 
   it('存在多个可见支付方式时要求显式选择', async () => {

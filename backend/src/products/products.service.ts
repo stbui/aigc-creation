@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 
 /**
- * C 端商品 (SKU) 查询 (commerce-design.md §8.1 / C2)。
+ * C 端商品 (SKU) 查询：接口契约见 docs/api-contract.md（/products/:sku）。
  *
  * **只读** —— 商品的增删改只在后台 (`admin/products`)。
  * 前端落地页与积分商城的价目一律从这里读, 不再各自硬编码。

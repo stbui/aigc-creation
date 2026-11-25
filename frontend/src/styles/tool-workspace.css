@@ -18,10 +18,9 @@
       上下原为 24 会整体下移 8px —— free-creation 对拍 2026-10-21) */
   margin: -24px -24px -32px;
   padding: var(--space-16) var(--space-24) var(--space-16) var(--space-16);
-  /* 本项目没有 preflight 的 `* { box-sizing: border-box }`。height 是「视口减顶栏」的
-     定值，若按内容盒计，上下 28~32px padding 会追加在高度之外，页面凭空多出一截
-     纵向滚动，提交卡底部被视口裁掉（局部重绘 / 去水印早就单独立了 border-box，
-     正是同一个原因）。统一在这里收口。 */
+  /* height 是「视口减顶栏」的定值，必须按 border-box 计算，否则上下 28~32px
+     padding 会追加在高度之外，页面凭空多出一截纵向滚动，提交卡底部被视口裁掉。
+     C 端 preflight / base.css 已全局兜底，这里显式声明骨架自身的不变量。 */
   box-sizing: border-box;
   /* 顶栏高度只走 --workspace-topbar-height（桌面 64px / ≤900px 54px），
      页面不再另写 calc(100vh - 64px)。 */
@@ -424,7 +423,9 @@
 
 .pk-ratio-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0, 1fr)：1fr 的自动最小尺寸是 min-content，长模型名会把
+     400px 浮层里的三/四列撑出面板（右列被裁切）。显式允许收缩。 */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-10);
 }
 
@@ -470,12 +471,16 @@
 
 .pk-resolution-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* 同上：模型名（gpt-image-2.5-sunburst 等）作为网格项时 1fr 的自动最小尺寸
+     会把整块面板撑宽；minmax(0, 1fr) 让列先收缩，文本再换行。 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-10);
 }
 
 .pk-resolution-option {
-  height: 62px;
+  /* 62px 是单行名称 + 价格的基准高度；长模型名换行后允许长高，不能裁切 */
+  min-height: 62px;
+  height: auto;
   border-radius: var(--radius-control);
   border: 1px solid var(--border);
   background: var(--card-bg);
@@ -483,6 +488,11 @@
   gap: var(--space-4);
   align-content: center;
   justify-items: center;
+  /* 网格项默认 min-width:auto；不归零时长模型名会顶宽整列 */
+  min-width: 0;
+  /* shadcn Button 底座带 whitespace-nowrap，长模型名会顶出卡片，这里恢复换行 */
+  white-space: normal;
+  padding: 0 var(--space-6);
   cursor: pointer;
   color: var(--text-body);
 }
@@ -498,6 +508,14 @@
   /* 参考站 .image-output-resolution-option span: rgb(124,132,147)
      (此前继承 strong 的 --text-body, 副文与主文同色, 卡片看起来是一整块) @2026-10-21 */
   color: var(--tool-resolution-sub);
+}
+
+/* 卡片收窄后长模型名换行而不是顶出边框；价格副文同样限制在卡片内 */
+.pk-resolution-option strong,
+.pk-resolution-option span {
+  max-width: 100%;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .pk-resolution-option:hover:not(:disabled) {
@@ -1231,6 +1249,11 @@
     padding-inline: var(--space-12);
     max-height: calc(100dvh - 140px);
     overflow-y: auto;
+  }
+
+  /* 窄屏三列只剩 ~70px，模型名会换成 3~4 行；补纵向内边距，价格不贴边框 */
+  .pk-resolution-option {
+    padding-block: var(--space-6);
   }
 }
 

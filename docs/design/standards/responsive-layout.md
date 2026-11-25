@@ -227,7 +227,7 @@ C 端页面**铺满** `.app-content`，不使用页面级 `max-width` 居中。�
 硬约束：
 
 - 根高度只走 `--workspace-topbar-height`，页面不另写 `calc(100vh - 64px)`。
-- 根必须 `box-sizing: border-box`（本项目没有 preflight 的全局 `border-box`）。
+- 根必须 `box-sizing: border-box`（C 端 preflight / `base.css` 已全局兜底，页面不要改写盒模型）。
 - `≤900px` 时外壳 `.app-layout` 收敛为 `100vh` 且 `overflow: hidden`，滚动交给 `.app-content`；页面不得再产生第二层滚动。
 
 ---

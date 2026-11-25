@@ -1,5 +1,10 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import type { PaymentCurrency, PaymentProviderId, VisiblePaymentMethod } from './adapters/types';
+import type {
+  CheckoutPaymentMethod,
+  PaymentCurrency,
+  PaymentProviderId,
+  VisiblePaymentMethod,
+} from './adapters/types';
 import { PaymentConfigAdminService } from './payment-config-admin.service';
 import { PaymentConfigStore } from './payment-config-store';
 import type {
@@ -100,7 +105,7 @@ export class PaymentConfigService implements OnModuleInit {
     return this.routing.available(currency);
   }
 
-  /** C 端固定可见支付方式；不推进轮询游标。 */
+  /** C 端可见支付方式（生产固定两项；非生产无真实方式时沙箱兜底）；不推进轮询游标。 */
   availableVisible(
     currency: PaymentCurrency,
     amountCents?: number,
@@ -114,7 +119,8 @@ export class PaymentConfigService implements OnModuleInit {
   }
 
   /**
-   * 一次解析两个按钮及其真实实例。创建订单必须直接消费这里的结果，
+   * 一次解析全部可见方式（生产两个，非生产可能加沙箱）及其真实实例。
+   * 创建订单必须直接消费这里的结果，
    * 不能再次 resolveVisible，否则轮询/最少金额可能在下单前漂移。
    */
   resolveVisibleOptions(
@@ -127,7 +133,7 @@ export class PaymentConfigService implements OnModuleInit {
 
   /** 解析某个可见支付方式当前应走的唯一真实实例。 */
   resolveVisible(
-    method: VisiblePaymentMethod,
+    method: CheckoutPaymentMethod,
     currency: PaymentCurrency,
     amountCents?: number,
     options?: { includeDailyLimitExceeded?: boolean },

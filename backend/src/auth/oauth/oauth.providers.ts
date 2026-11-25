@@ -1,4 +1,5 @@
 import type { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { OAuthProvider, OAuthProfile, OAuthTokenSet } from './oauth.types';
 import { getJson, postForm } from './oauth-http';
 
@@ -148,16 +149,20 @@ class GenericOAuthProvider extends StandardOAuth2Provider {
   }
 }
 
-function str(config: ConfigService, key: string): string {
+function str(config: ConfigService<AppConfigValues, true>, key: keyof AppConfigValues): string {
   return (config.get<string>(key) ?? '').trim();
 }
 
-function list(config: ConfigService, key: string, fallback: string[]): string[] {
+function list(
+  config: ConfigService<AppConfigValues, true>,
+  key: keyof AppConfigValues,
+  fallback: string[],
+): string[] {
   const value = config.get<string[]>(key);
   return Array.isArray(value) && value.length > 0 ? value : fallback;
 }
 
-function callbackBase(config: ConfigService): string {
+function callbackBase(config: ConfigService<AppConfigValues, true>): string {
   const explicit = str(config, 'oauth.callbackBase');
   if (explicit) return explicit.replace(/\/+$/, '');
   return `${str(config, 'app.webBase') || 'http://localhost:5100'}/api/v1`.replace(/\/+$/, '');
@@ -169,7 +174,7 @@ function callbackBase(config: ConfigService): string {
  * `enabled` 由三项凭据是否配齐决定，`OAUTH_ENABLED` 只做额外的显式开关：
  * 未配在 `OAUTH_ENABLED` 里的 provider 即使凭据齐全也不启用。
  */
-export function buildOAuthProviders(config: ConfigService): OAuthProvider[] {
+export function buildOAuthProviders(config: ConfigService<AppConfigValues, true>): OAuthProvider[] {
   const base = callbackBase(config);
   const google = new GoogleOAuthProvider({
     id: 'google',

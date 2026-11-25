@@ -1,6 +1,6 @@
 # 媒体资产规范
 
-本文件规定上传、生成产出、存储 key、缩略图、签名访问、AIGC 标识与删除保留。安全边界见 [`security.md`](security.md) §5，图片 `alt` 与播放器可访问性见 [`accessibility.md`](design/standards/accessibility.md) §4，AIGC 标识的运行时行为见 [`runtime-infrastructure.md`](runtime-infrastructure.md) §1。
+本文件规定上传、生成产出、存储 key、缩略图、签名访问、AIGC 标识与删除保留。安全边界见 [`security.md`](security.md) §5，图片 `alt` 与播放器可访问性见 [`accessibility.md`](design/standards/accessibility.md) §4，AIGC 标识的运行时行为见本文 §6 与 `backend/src/aigc-label/`。
 
 ## 1. 资产类型与事实源
 
@@ -160,7 +160,7 @@ npm --prefix backend install --no-save minio     # MinIO / S3 兼容
 
 - 图片：写入隐式元数据并叠加可见角标；可见角标样式由后台「AI 标识」页配置。
 - 视频：本机没有 ffmpeg，**不写内嵌标识**；`aigcMeta.method='api-only'`，只在接口字段与播放器角标体现。
-- 标识失败按运行时策略处理；生成任务不得交付无标识图片而不报错（见 `runtime-infrastructure.md` §1）。
+- 标识失败按运行时策略处理；生成任务不得交付无标识图片而不报错（见本文 §6 与 `backend/src/aigc-label/aigc-label.service.ts`）。
 - 标识处理会改变字节与格式，落库的 `format` / `sizeBytes` 必须取处理后的值。
 
 ## 7. 视频

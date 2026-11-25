@@ -29,7 +29,7 @@ import { Injectable, Optional, type LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { startupWarnings, type LogLevel } from '../../config/env.validation';
+import { startupWarnings, type LogLevel, type AppConfigValues } from '../../config/env.validation';
 import { currentRequestId } from '../request-context';
 
 /** 级别 → 数值。数值越小越严重，与 Nest 的过滤语义一致 */
@@ -136,7 +136,7 @@ private threshold: number;
    * @Optional()：允许脱离 DI 容器单独 new（脚本、单元测试里造一个写临时目录的实例），
    * 此时全部配置回落到本文件内的默认值，行为与配置过一样。
    */
-  constructor(@Optional() private readonly config?: ConfigService) {
+  constructor(@Optional() private readonly config?: ConfigService<AppConfigValues, true>) {
     this.threshold = LEVEL_RANK[this.readLevel()];
     this.retentionDays = this.config?.get<number>('log.retentionDays') ?? 14;
     this.maxBytes = Math.max(1, this.config?.get<number>('log.maxFileMb') ?? 20) * 1024 * 1024;

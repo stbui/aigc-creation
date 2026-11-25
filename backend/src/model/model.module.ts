@@ -15,6 +15,7 @@
 
 import { Injectable, Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { configureOutboundPolicy } from './infra/outbound';
 import { CatalogVersionService } from './infra/catalog-version.service';
 import { ProtocolRegistry } from './protocol/registry';
@@ -70,7 +71,7 @@ export class ModelBootstrapService implements OnModuleInit {
   private readonly log = new Logger(ModelBootstrapService.name);
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly groups: UserGroupService,
   ) {}
 

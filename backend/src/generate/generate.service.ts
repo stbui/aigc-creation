@@ -70,8 +70,9 @@ export class GenerateService {
   /** 建任务：准入 → 计价 → 预留 → 排队，随后由 worker 异步执行 */
   async createTask(ownerId: string, dto: CreateGenerationInput, idempotencyHeader?: string) {
     const result = await this.admission.admit({ ownerId, dto, idempotencyHeader });
-    // 新任务立即调度一轮，省掉最多一个调度节拍的等待；幂等命中不重复调度
-    if (!result.idempotentHit) this.worker.kick();
+    // 新任务立即入 BullMQ 队列；多图批次由 kick 一并投递子任务。
+    // 幂等命中不重复投递。
+    if (!result.idempotentHit) this.worker.kick(result.taskId);
     return result;
   }
 
@@ -82,8 +83,7 @@ export class GenerateService {
    * 收在一处，散落在两处迟早漂移。
    */
   enqueue(taskId: string): void {
-    void taskId;
-    this.worker.kick();
+    this.worker.kick(taskId);
   }
 
   /**
@@ -162,7 +162,7 @@ export class GenerateService {
         return { id: created.id, reused: false };
       });
 
-      this.worker.kick();
+      this.worker.kick(result.id);
       if (result.reused) {
         this.logger.log(`任务 ${id} 已有重试任务 ${result.id}，复用本次结果`);
       } else {
@@ -179,7 +179,7 @@ export class GenerateService {
       });
       if (!existing) throw error;
 
-      this.worker.kick();
+      this.worker.kick(existing.id);
       this.logger.log(`任务 ${id} 已有重试任务 ${existing.id}，复用本次结果`);
       return { taskId: existing.id, retriedFromId: origin.id };
     }
@@ -198,10 +198,10 @@ export class GenerateService {
   }
 
   /**
-   * 回收租约过期的任务（调度任务 `task-recover` 调用）。
+   * 对账数据库与 BullMQ（调度任务 `task-recover` 调用）。
    *
-   * 真正的判定在 worker：按 attempt 的 `dispatchState` 决定续跑 / 失败 /
-   * 待人工核对。这里只做转发，避免出现两套「孤儿任务」定义。
+   * 真正的判定在 worker：队列里没有作业的 running 任务按 `dispatchState`
+   * 决定续跑 / 失败 / 人工核对。这里只做转发，避免出现两套「孤儿任务」定义。
    */
   async recoverOrphanTasks(): Promise<number> {
     return this.worker.recoverStaleTasks();

@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from './config/config.module';
+import type { AppConfigValues } from './config/env.validation';
+import { redisConnectionFromUrl } from './config/redis-connection';
 import { LoggerModule } from './common/logger/logger.module';
 import { CacheModule } from './cache/cache.module';
 import { CommonModule } from './common/common.module';
@@ -46,6 +51,19 @@ import { ProxyModule } from './model/proxy/proxy.module';
     // 全局缓存（isGlobal）：统一 CACHE_MANAGER 注入点与默认 TTL，
     // 业务模块不再各自手写 TTL Map。存储为内存，多实例下只影响新鲜度。
     CacheModule,
+    // 官方调度库：@Interval / @Timeout 统一登记与清理周期任务。
+    // 定时器在 onApplicationBootstrap 挂载、beforeApplicationShutdown 全部清除，
+    // 业务服务不再各自维护 setInterval / onModuleDestroy。
+    ScheduleModule.forRoot(),
+    // 官方 BullMQ（Redis）：任务队列的连接、Worker 锁与延迟作业都在这里。
+    // 任务状态机仍在 model/tasks，BullMQ 只负责“什么时候执行”。
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppConfigValues, true>) => ({
+        connection: redisConnectionFromUrl(config.get('redis.url')),
+      }),
+    }),
     // 横切服务（B5）：素材签名 URL。@Global 注册后全站可注入，位置不影响依赖关系；
     // 放在前部只为把横切基础设施归拢在一起
     CommonModule,

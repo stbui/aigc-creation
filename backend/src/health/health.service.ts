@@ -7,6 +7,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { AppError } from '../common/app.exception';
 import { currentRequestId } from '../common/request-context';
 import { AppFileLogger } from '../common/logger/file-logger';
@@ -55,7 +56,7 @@ export class HealthService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly routeHealth: RouteHealthService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly logger: AppFileLogger,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}

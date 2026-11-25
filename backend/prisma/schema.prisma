@@ -615,7 +615,7 @@ model MembershipPlan {
   perks String @default("{}")
 
   /// 会员套餐映射的用户分组（UserGroup.code）。空串 = 默认分组。
-  /// 分组承载渠道可见性、倍率与货币兑换比例，见 docs/channel-model-design.md §14
+  /// 分组承载渠道可见性、倍率与货币兑换比例，见 docs/admin-detailed-design.md 用户分组一节
   userGroupCode String @default("")
 
   /// 'active' 上架 | 'offline' 下架。下架不影响存量会员

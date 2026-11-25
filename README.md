@@ -29,7 +29,7 @@
 
 ## 快速开始
 
-前置：Node.js ≥ 22.12、npm。
+前置：Node.js ≥ 22.12、npm、Redis（任务队列使用官方 `@nestjs/bullmq`；本机默认 `redis://127.0.0.1:6379`，也可用 `docker compose up -d redis`）。
 
 ```bash
 npm run setup
@@ -70,5 +70,5 @@ Docker 启动与生产部署见 [`docs/docker-deployment.md`](docs/docker-deploy
 - [后台需求](docs/admin-prd.md)
 - [API 契约](docs/api-contract.md)
 - [模型架构](docs/model-architecture.md)
-- [商业域设计](docs/commerce-design.md)
+- [支付域详细设计](docs/payment-detailed-design.md)
 - [完整文档索引](docs/README.md)

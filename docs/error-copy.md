@@ -47,6 +47,7 @@
 | `40400`–`40402` | 资源不存在 | 404 | |
 | `40900`–`40909` | 状态冲突 | 409 | 跨域复用最多的一段，见 §5 |
 | `41000` | 资源已过期 | 410 | 目前用于移动上传二维码 |
+| `41301` | 上传文件超过单次上限 | 413 | 由 `common/all-exceptions.filter.ts` 统一改写 multer 的英文 `File too large`；能进到过滤器的 413 只有这一个来源（模型中转的 413 用 `@Res()` 直写，见本节下方说明） |
 | `42201`–`42206` | 生成任务失败 | 任务内 | 唯一一组要求 C 端与后台分别维护文案的码 |
 | `42901` | 限流 | 429 | 必须带 `Retry-After` |
 | `50000`–`50002` | 服务端异常 | 500 | |
@@ -54,6 +55,15 @@
 | `50301`–`50303` | 依赖未就绪 | 503 / 502 | 支付通道、渠道退款、模型代理 |
 
 新增码按 HTTP 语义选段；同一功能内不得复用已有含义。`422xx` 为生成任务保留，其他模块不得占用。
+
+`41301` 只出现在「文件没有交付」的时刻：multer 按 `limits.fileSize` 截断后先中止请求，
+再经 `removeUploadedFiles` → `storage._removeFile` 删掉已写入的临时分片（`diskStorage`
+在写流建立前就登记 `file.path`，因此半成品一定可删）。业务代码拿不到该文件，也不涉及
+计费，所以文案只需说明「未上传」+ 一个动作。
+
+业务侧另有两类「请求体超限」与本码无关，各自就近给码：模型中转 `readProxyBody` 用
+`@Res()` 直写 413 + `40001`（不经过全局过滤器）；图片真实大小超限在读取后按运营配置
+抛 `40001`（见 `assets/image-validation.ts`）。
 
 ## 4. 生成任务码表（现行）
 
@@ -112,3 +122,4 @@ C 端文案在 `frontend/src/lib/constants.ts`，通过 `taskErrorText()` 使用
 - **无常量表**：错误码仍以数字字面量散落在各 service，没有可枚举的常量表。
 - **技术术语过滤不通用**：只有提示词工具有 `promptToolMessages.ts` 的过滤逻辑，通用请求层没有。
 - **后台配置类文案带标识**：如「未知支付渠道: xxx」「状态筛选值非法: xxx」会带内部标识，属于后台可接受范围，但不得复用到 C 端。
+- **multer 的 400 类错误仍是英文且带字段名**：`FilesInterceptor` 超张数得到 `Too many files`，字段名写错得到 `Unexpected file field - nope`（见 `all-exceptions.filter.ts` 的 413 处理为何只按状态码）。官方 `transformException` **不保留原始 `MulterError`**（`cause` 为 `undefined`，实测），过滤器因此无法在不按英文文案匹配的前提下把它与业务 `BadRequestException` 区分开 —— 违反 §7「字段名不得进 message」但暂不修。候选方案：按「请求是 multipart + 状态 400 + 非 `AppError`」判定（multipart 路由上的裸 `BadRequestException` 目前只来自 multer），代价是给全局过滤器加一条跨模块启发式，需 S4 复核后再落地。

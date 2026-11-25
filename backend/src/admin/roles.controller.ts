@@ -99,9 +99,7 @@ export class AdminSettingsController {
       limits: { fileSize: deploymentUploadMaxBytes(), files: 1 },
     }),
   )
-  async upload(
-    @UploadedFile() file: { buffer?: Buffer; originalname?: string } | undefined,
-  ) {
+  async upload(@UploadedFile() file: Express.Multer.File | undefined) {
     return this.settings.uploadImage(file);
   }
 

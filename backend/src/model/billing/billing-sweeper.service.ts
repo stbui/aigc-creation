@@ -19,8 +19,10 @@
  * 不是技术默认。开关打开后每轮重新读，关掉立即停。
  */
 
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../../common/settings.service';
 import { BillingService, REVIEW_RUNNING_STALE_MS } from './billing.service';
@@ -50,30 +52,35 @@ export interface BillingSweepOptions {
 }
 
 @Injectable()
-export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
+export class BillingSweeperService implements OnModuleInit {
   private readonly log = new Logger(BillingSweeperService.name);
-  private timer: NodeJS.Timeout | null = null;
   private running = false;
+  /** 配置开关；关闭时周期触发直接返回，`sweep()` 的显式调用仍可执行 */
+  private enabled = true;
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly prisma: PrismaService,
     private readonly billing: BillingService,
     private readonly settings: SettingsService,
   ) {}
 
   onModuleInit(): void {
-    if (!(this.config.get<boolean>('model.billingSweepEnabled') ?? true)) {
+    this.enabled = this.config.get<boolean>('model.billingSweepEnabled') ?? true;
+    if (!this.enabled) {
       this.log.warn('账单兜底清扫已关闭（MODEL_BILLING_SWEEP_ENABLED=false），挂账只能人工处理');
-      return;
     }
-    this.timer = setInterval(() => void this.sweep(), SWEEP_INTERVAL_MS);
-    this.timer.unref?.();
   }
 
-  onModuleDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
-    this.timer = null;
+  /** 周期清扫；由 `@nestjs/schedule` 挂载，关闭应用时统一清理 */
+  @Interval('billing-sweeper:sweep', SWEEP_INTERVAL_MS)
+  private async scheduledSweep(): Promise<void> {
+    if (!this.enabled) return;
+    try {
+      await this.sweep();
+    } catch (error) {
+      this.log.error(`账单兜底清扫失败：${messageOf(error)}`);
+    }
   }
 
   /**

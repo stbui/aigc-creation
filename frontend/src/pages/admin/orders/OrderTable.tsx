@@ -112,6 +112,15 @@ export function OrderTable({
           <span className="max-w-[110px] truncate text-muted-foreground">
             {row.channel ? CHANNEL_LABELS[row.channel] ?? row.channel : '—'}
           </span>
+          {/*
+           * 发起支付失败：不打开详情也要能看出「这笔单为什么一直没付」。
+           * 完整原因放 title 与详情抽屉，列表只占一行红字，避免撑高行高。
+           */}
+          {row.lastError && (
+            <span className="max-w-[110px] truncate text-danger-text" title={row.lastError}>
+              支付异常
+            </span>
+          )}
         </div>
       ),
     },

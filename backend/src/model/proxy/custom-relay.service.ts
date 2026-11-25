@@ -14,6 +14,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { OutboundError, outboundRequest, parseOutboundHeaders, validateCustomRelayUrl, type OutboundHeader } from '../infra/outbound';
 import { ModelCatalogClient } from '../catalog/model-catalog.client';
@@ -65,7 +66,7 @@ export class CustomRelayService {
   private readonly log = new Logger(CustomRelayService.name);
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly slots: CustomRelaySlotService,
     private readonly catalog: ModelCatalogClient,
   ) {}

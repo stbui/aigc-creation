@@ -210,6 +210,66 @@ ensure_port_free() {
   free_port "$port"
 }
 
+# 读取当前档位的 REDIS_URL：外部环境变量优先，其次 env 文件，最后本机默认。
+read_redis_url() {
+  local env_file="$BACKEND_DIR/.env.$APP_ENV" val=""
+  if [ "$APP_ENV" = production ]; then
+    env_file="$BACKEND_DIR/.env.production"
+  fi
+  if [ -n "${REDIS_URL:-}" ]; then
+    printf '%s' "$REDIS_URL"
+    return 0
+  fi
+  if [ -f "$env_file" ]; then
+    val="$(grep -E '^REDIS_URL=' "$env_file" | tail -n1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+  fi
+  printf '%s' "${val:-redis://127.0.0.1:6379}"
+}
+
+# BullMQ 的唯一外部依赖是 Redis。开发/测试档若本机 Docker 可用，缺 Redis 时
+# 自动拉起 compose 里的 redis 服务；生产档只检查，不擅自启动基础设施。
+ensure_redis() {
+  local url="$1"
+  if node -e '
+    const net = require("node:net");
+    const u = new URL(process.argv[1]);
+    const socket = net.connect({ host: u.hostname, port: Number(u.port || 6379) });
+    const done = (ok) => { socket.destroy(); process.exit(ok ? 0 : 1); };
+    socket.setTimeout(1000, () => done(false));
+    socket.on("connect", () => done(true));
+    socket.on("error", () => done(false));
+  ' "$url" 2>/dev/null; then
+    c_ok "Redis $url ✓"
+    return 0
+  fi
+
+  if [ "$APP_ENV" != production ] && command -v docker >/dev/null 2>&1; then
+    c_info "Redis 不可达，尝试启动 compose redis…"
+    ( cd "$ROOT" && docker compose up -d redis ) >/dev/null 2>&1 || true
+    for _ in $(seq 1 20); do
+      if node -e '
+        const net = require("node:net");
+        const u = new URL(process.argv[1]);
+        const socket = net.connect({ host: u.hostname, port: Number(u.port || 6379) });
+        const done = (ok) => { socket.destroy(); process.exit(ok ? 0 : 1); };
+        socket.setTimeout(500, () => done(false));
+        socket.on("connect", () => done(true));
+        socket.on("error", () => done(false));
+      ' "$url" 2>/dev/null; then
+        c_ok "Redis $url ✓"
+        return 0
+      fi
+      sleep 0.5
+    done
+  fi
+
+  c_err "Redis 不可达：$url"
+  c_err "任务队列使用 @nestjs/bullmq，启动前必须先启动 Redis。"
+  c_err "  本机：docker compose up -d redis   （或安装 redis-server 后 redis-server --daemonize yes）"
+  c_err "  生产：确保 REDIS_URL 指向可用的 Redis，且 backend 与 Redis 网络互通。"
+  return 1
+}
+
 # 只回收「工作目录属于本仓库」的监听进程 —— 4100 上可能跑着别人的服务，
 # 按端口无条件 kill -9 会误伤，所以必须再确认一次 cwd。
 # 注意：macOS 的 lsof -p 不一定能读到 cwd，读不到就一律跳过（宁可留进程，不可杀错）。
@@ -367,6 +427,11 @@ c_ok "环境: $APP_ENV  (NODE_ENV=$NODE_ENV · 前端 mode=$VITE_MODE)"
 c_ok "后端端口: $BACKEND_PORT"
 [ "$RUN_FRONTEND" -eq 1 ] && c_ok "前端端口: $FRONTEND_PORT"
 [ -n "$CORS_ORIGINS_VAL" ] && c_info "注入 CORS_ORIGINS=$CORS_ORIGINS_VAL"
+
+if [ "$RUN_BACKEND" -eq 1 ]; then
+  step '检查任务队列依赖（Redis / BullMQ）'
+  ensure_redis "$(read_redis_url)" || exit 1
+fi
 
 # ────────────────────────────── 后端：建表 + 种子 ──────────────────────────────
 # ⚠ NODE_ENV 必须随每条 npm 子命令一起传：prisma.config.ts 是靠它选

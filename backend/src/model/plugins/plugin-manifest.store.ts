@@ -10,6 +10,7 @@
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { decodeManifest } from '../protocol/manifest';
@@ -36,7 +37,7 @@ export class PluginManifestStore implements OnModuleInit {
   private readonly log = new Logger(PluginManifestStore.name);
   private readonly plugins = new Map<string, LoadedPlugin>();
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService<AppConfigValues, true>) {}
 
   onModuleInit(): void {
     this.scan();

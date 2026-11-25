@@ -82,7 +82,7 @@ export class AdminPluginsController {
     }),
   )
   install(
-    @UploadedFile() file: { buffer?: Buffer } | undefined,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @AdminUser() user: AdminUserContext,
   ) {
     if (!file?.buffer?.length)

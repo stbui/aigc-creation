@@ -29,6 +29,7 @@ x-backend-base: &backend-base
     API_PREFIX: api/v1
     TZ: ${TZ:-Asia/Shanghai}
     DATABASE_URL: file:/app/data/prod.db
+    REDIS_URL: redis://redis:6379/0
     UPLOAD_DIR: /app/data/uploads
     BACKUP_DIR: /app/data/backups
     LOG_DIR: /app/data/logs
@@ -47,6 +48,23 @@ x-backend-base: &backend-base
     - huojue
 
 services:
+  # BullMQ 队列。数据库仍是任务状态与账单事实源；Redis 仅保存可重建的作业。
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - huojue-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - huojue
+
   # 一次性建表任务。Prisma CLI 只存在于 tools 目标，不进入生产运行镜像。
   migrate:
     <<: *backend-base
@@ -75,6 +93,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "docker/healthcheck.js"]
       interval: 30s
@@ -149,3 +169,5 @@ networks:
 volumes:
   huojue-prod-data:
     name: ${HUOJUE_DATA_VOLUME:-huojue-prod-data}
+  huojue-redis-data:
+    name: ${HUOJUE_REDIS_VOLUME:-huojue-redis-data}

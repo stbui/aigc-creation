@@ -15,6 +15,7 @@
  */
 
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { ModelModule } from '../model.module';
 import { CapabilitiesModule } from '../../capabilities/capabilities.module';
 import { CreditsModule } from '../../credits/credits.module';
@@ -31,6 +32,9 @@ import { TaskRequestService } from './task-request.service';
 import { TaskLifecycleService } from './task-lifecycle.service';
 import { TaskAdmissionService } from './task-admission.service';
 import { TaskWorkerService } from './task-worker.service';
+import { GENERATION_QUEUE } from './task-queue.constants';
+import { TaskQueueService } from './task-queue.service';
+import { TaskProcessor } from './task.processor';
 
 @Module({
   imports: [
@@ -43,6 +47,7 @@ import { TaskWorkerService } from './task-worker.service';
     NotificationsModule,
     StorageModule,
     AigcLabelModule,
+    BullModule.registerQueue({ name: GENERATION_QUEUE }),
   ],
   providers: [
     ChannelSlotService,
@@ -52,7 +57,9 @@ import { TaskWorkerService } from './task-worker.service';
     TaskRequestService,
     TaskLifecycleService,
     TaskAdmissionService,
+    TaskQueueService,
     TaskWorkerService,
+    TaskProcessor,
   ],
   // `ChannelSlotService` 供中转复用：代理与任务必须共用同一份渠道并发计数，
   // 各建一份等于把「渠道并发上限」放大一倍

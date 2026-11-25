@@ -1,15 +1,13 @@
 /**
- * 任务执行器 —— 领取、派发、轮询、切换与收尾。
+ * 任务执行器 —— 派发、轮询、切换与收尾。
  *
- * 移植自 open-ai-canvas `internal/app/task_worker.go` + `task_execution.go`：
- * 事件驱动的单步执行模型，每一步做完就把执行位让出去，避免长轮询占住进程。
+ * 调度由官方 `@nestjs/bullmq` 负责：一个 taskId 对应一个 BullMQ 作业，
+ * Worker 的作业锁就是跨进程的执行位，轮询通过 `moveToDelayed` 延后同一个
+ * 作业。这里不再维护进程内 active 集合、1s tick、扫表领取或续租定时器。
  *
- * 执行模型
- * --------
- *   · `queued`  → 条件更新（CAS）领取为 `running`，写入租约；
- *   · `running` + 租约过期 → `recover` 按 attempt 的 `dispatchState` 分流；
- *   · `running` + `nextPollAt` 到期 → 重新领取执行位回查上游；
- *   · 每 15s 续租一次，租约 45s 过期 —— 进程被杀后最迟 45s 被接管。
+ * `leaseOwner` 保留为 fencing token：每次作业执行生成一个唯一值，终态与
+ * 换账单仍按它做 CAS。BullMQ 作业锁失效后，旧执行者的写入会被这个 token
+ * 拦住；新执行者可以直接接管，不需要等数据库租约到期。
  *
  * 关键边界（改动任何一条都是资损）
  * ------------------------------
@@ -23,10 +21,10 @@
  *   4. **所有终态都经过 `TaskLifecycleService`**：任务状态与账单状态同时落定。
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
 import { hostname } from 'node:os';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import type { GenerationTask, RouteAttempt } from '../../generated/prisma/client';
 import { getCapability } from '../../capabilities/capability.registry';
 import { AppError } from '../../common/app.exception';
@@ -53,17 +51,8 @@ import { TaskExecutorService } from './task-executor.service';
 import { TASK_ERROR, TaskLifecycleService } from './task-lifecycle.service';
 import { type PendingOutput, TaskMediaService } from './task-media.service';
 import { TaskRequestService } from './task-request.service';
+import { TaskQueueService } from './task-queue.service';
 
-/** 租约时长：进程被杀后最迟这么久被接管 */
-const TASK_LEASE_MS = 45_000;
-/** 续租间隔：必须显著小于租约时长，否则一次 GC 停顿就会丢租约 */
-const LEASE_RENEW_MS = 15_000;
-/** 调度节拍 */
-const WORKER_TICK_MS = 1_000;
-/** 本进程执行位兜底值；`MODEL_ACTIVE_TASK_LIMIT` 覆盖（1–64） */
-const DEFAULT_MAX_ACTIVE_TASKS = 64;
-/** 单轮最多扫描的排队任务数：一个用户的大量排队任务不应饿死同页其它用户 */
-const CLAIM_SCAN_LIMIT = 200;
 /** 单次调用内最多推进的步数（派发 + 切换 + 轮询的成功路径） */
 const MAX_STEPS = 8;
 /** 落盘重试上限；超过即判失败退款，并记录上游可能已计费的事实 */
@@ -87,15 +76,24 @@ const POLL_DEADLINE_MS: Record<string, number> = {
 /** 单步结果：告诉主循环下一步做什么 */
 type StepResult = 'continue' | 'wait' | 'stop';
 
+/** `processJob` 的返回值：done 结束作业，delay 让 BullMQ 延后同一个作业。 */
+type ProcessOutcome = { action: 'done' } | { action: 'delay'; delayMs: number };
+
+/** 排队任务没有账单时的处理结果。 */
+type BillingGate = 'ready' | 'wait' | 'terminal';
+
 @Injectable()
-export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
+export class TaskWorkerService implements OnApplicationBootstrap {
   private readonly log = new Logger(TaskWorkerService.name);
-  /** 租约持有者标识：host + pid + 随机后缀，重启后不会与旧租约混淆 */
-  private readonly owner = `${safeHostname()}:${process.pid}:${randomBytes(4).toString('hex')}`;
-  private readonly active = new Set<string>();
-  private timer: NodeJS.Timeout | null = null;
-  private ticking = false;
-  private stopped = false;
+  /** 进程标识，只用于拼每次作业执行的唯一 fencing token。 */
+  private readonly processOwner =
+    `${safeHostname()}:${process.pid}:${randomBytes(4).toString('hex')}`;
+  /** AsyncLocalStorage 让并发作业各自持有自己的 leaseOwner，互不覆盖。 */
+  private readonly execution = new AsyncLocalStorage<{ owner: string }>();
+
+  private get owner(): string {
+    return this.execution.getStore()?.owner ?? this.processOwner;
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -113,215 +111,133 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly media: TaskMediaService,
     private readonly requests: TaskRequestService,
     private readonly lifecycle: TaskLifecycleService,
-    private readonly config: ConfigService,
+    private readonly queue: TaskQueueService,
   ) {}
 
-  onModuleInit(): void {
-    this.timer = setInterval(() => void this.tick(), WORKER_TICK_MS);
-    (this.timer as any).unref?.();
-    // 启动即跑一轮：进程重启后遗留的任务不应等满一个节拍
-    setTimeout(() => void this.tick(), 0);
-  }
-
-  onModuleDestroy(): void {
-    this.stopped = true;
-    if (this.timer) clearInterval(this.timer);
-  }
-
-  /** 立即调度一轮（准入建任务后调用，省掉最多 1s 的等待） */
-  kick(): void {
-    void this.tick();
-  }
-
-  // ── 调度 ──────────────────────────────────────────────────────────
-
-  /** 本进程执行位上限：配置缺省时回落安全值，避免无界并发打满上游 */
-  private get maxActiveTasks(): number {
-    const value = this.config.get<number>('model.activeTaskLimit');
-    return typeof value === 'number' && Number.isFinite(value) && value > 0
-      ? Math.trunc(value)
-      : DEFAULT_MAX_ACTIVE_TASKS;
-  }
-
-  private async tick(): Promise<void> {
-    if (this.stopped || this.ticking) return;
-    this.ticking = true;
-    try {
-      await this.claimQueued();
-      await this.claimDuePolls();
-      await this.recoverExpiredLeases();
-      await this.recoverUnbilledQueued();
-    } catch (error) {
-      this.log.error(`任务调度异常: ${(error as Error).message}`);
-    } finally {
-      this.ticking = false;
-    }
-  }
-
-  private launch(taskId: string): void {
-    if (this.active.has(taskId)) return;
-    this.active.add(taskId);
-    void this.run(taskId).finally(() => this.active.delete(taskId));
-  }
-
-  /** 领取排队任务：按用户并发与渠道并发分批，CAS 成功才执行 */
-  private async claimQueued(): Promise<void> {
-    let free = this.maxActiveTasks - this.active.size;
-    if (free <= 0) return;
-    const candidates = await this.prisma.generationTask.findMany({
-      // 有账单的走预留；零价无账单的只有一种：后台重试（刻意不二次扣费）。
-      // 多图产出的每张图都有自己的账单，与单图任务走同一条预留链路。
-      where: {
-        status: 'queued',
-        OR: [{ billingOrderId: { not: null } }, { creditCost: 0, retriedFromId: { not: null } }],
-      },
-      orderBy: { createdAt: 'asc' },
-      // 扫描窗口大于本轮执行位：被用户 / 渠道并发挡住的候选要跳过，
-      // 不能因为它们占满前 N 条就饿死后面的任务。
-      take: Math.min(CLAIM_SCAN_LIMIT, Math.max(free * 4, 16)),
-      select: { id: true, ownerId: true, channelId: true, params: true },
-    });
-    if (candidates.length === 0) return;
-
-    const channelIds = [...new Set(candidates.map((item) => item.channelId))];
-    const [ownerRows, channelRows, channelConfigs] = await Promise.all([
-      this.prisma.generationTask.groupBy({
-        by: ['ownerId'],
-        where: { status: 'running' },
-        _count: { _all: true },
-      }),
-      this.prisma.generationTask.groupBy({
-        by: ['channelId'],
-        where: { status: 'running' },
-        _count: { _all: true },
-      }),
-      this.prisma.modelChannel.findMany({
-        where: { id: { in: channelIds } },
-        select: { id: true, concurrencyLimit: true },
-      }),
-    ]);
-
-    /*
-     * 并发口径：同一时间交给模型处理的任务数。
-     *   · 用户侧：会员套餐 maxConcurrent（任务快照），0 = 不限；
-     *   · 渠道侧：ModelChannel.concurrencyLimit，0 = 不限；
-     *   · 进程侧：maxActiveTasks 只是安全上限。
-     * 两个业务上限都在领取时判断，超出的任务留在 queued，等有任务结束
-     * 释放名额后由下一轮调度领取 —— 不在提交阶段拒绝。
-     */
-    const ownerUsed = new Map(ownerRows.map((row) => [row.ownerId, row._count._all]));
-    const channelUsed = new Map(channelRows.map((row) => [row.channelId, row._count._all]));
-    const channelLimit = new Map(
-      channelConfigs.map((row) => [row.id, Math.max(0, Math.trunc(row.concurrencyLimit ?? 0))]),
+  /**
+   * 启动时做一次对账：数据库里 queued/running 但队列中没有作业的任务
+   * （首次升级、Redis 丢数据、进程在 DB 提交后崩溃）补投一次。
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    await this.recoverStaleTasks().catch((error) =>
+      this.log.error(`启动任务对账失败: ${(error as Error).message}`),
     );
-
-    for (const candidate of candidates) {
-      if (free <= 0) break;
-      const ownerLimit = memberConcurrencyOf(candidate.params);
-      const ownerCurrent = ownerUsed.get(candidate.ownerId) ?? 0;
-      if (ownerLimit > 0 && ownerCurrent >= ownerLimit) continue;
-      const limit = channelLimit.get(candidate.channelId) ?? 0;
-      const channelCurrent = channelUsed.get(candidate.channelId) ?? 0;
-      if (limit > 0 && channelCurrent >= limit) continue;
-
-      const now = new Date();
-      const claimed = await this.prisma.generationTask.updateMany({
-        where: { id: candidate.id, status: 'queued' },
-        data: {
-          status: 'running',
-          leaseOwner: this.owner,
-          leaseUntil: new Date(now.getTime() + TASK_LEASE_MS),
-          heartbeatAt: now,
-          stage: 'dispatch',
-          progress: 5,
-        },
-      });
-      if (claimed.count === 1) {
-        ownerUsed.set(candidate.ownerId, ownerCurrent + 1);
-        channelUsed.set(candidate.channelId, channelCurrent + 1);
-        free -= 1;
-        this.launch(candidate.id);
-      }
-    }
   }
 
-  /** 领取到点的轮询任务：等待期间 `leaseOwner` 为空，领取时再写 */
-  private async claimDuePolls(): Promise<void> {
-    const free = this.maxActiveTasks - this.active.size;
-    if (free <= 0) return;
-    const now = new Date();
-    const due = await this.prisma.generationTask.findMany({
-      where: { status: 'running', leaseOwner: '', nextPollAt: { lte: now } },
-      orderBy: { nextPollAt: 'asc' },
-      take: free,
-      select: { id: true },
+  /** 投递任务；不传 taskId 时做一次全量对账（后台恢复入口）。 */
+  kick(taskId?: string): void {
+    void (taskId ? this.enqueueTask(taskId) : this.recoverStaleTasks()).catch((error) =>
+      this.log.error(`任务投递失败: ${(error as Error).message}`),
+    );
+  }
+
+  /** 把一张任务及其未执行的子任务投进 BullMQ。 */
+  private async enqueueTask(taskId: string): Promise<void> {
+    const tasks = await this.prisma.generationTask.findMany({
+      where: {
+        OR: [
+          { id: taskId, status: { in: ['queued', 'running'] } },
+          { parentTaskId: taskId, status: 'queued' },
+        ],
+      },
+      select: { id: true, status: true, nextPollAt: true },
     });
-    for (const item of due) {
-      const claimed = await this.prisma.generationTask.updateMany({
-        where: { id: item.id, status: 'running', leaseOwner: '', nextPollAt: { lte: now } },
-        data: {
-          leaseOwner: this.owner,
-          leaseUntil: new Date(Date.now() + TASK_LEASE_MS),
-          nextPollAt: null,
-          heartbeatAt: now,
-          stage: 'poll',
-        },
-      });
-      if (claimed.count === 1) this.launch(item.id);
+    for (const task of tasks) {
+      const delayMs =
+        task.status === 'running' && task.nextPollAt
+          ? Math.max(0, task.nextPollAt.getTime() - Date.now())
+          : 0;
+      await this.queue.enqueue(task.id, delayMs);
     }
   }
 
   /**
-   * 回收租约过期的运行中任务（调度任务与启动恢复共用）。
+   * 数据库与队列对账（启动、升级与 `task-recover` 共用）。
    *
-   * @returns 本轮处理的条数
+   * 只补投“数据库仍要求执行、BullMQ 里已经没有任何作业”的任务；
+   * 正常 active / delayed 作业不会重复投放。
+   *
+   * 队列作业 ID 一次批量读取，数据库按 id 分页扫描，避免旧实现的
+   * `take 500` 窗口被长期排队任务占满后，后续任务永远轮不到对账。
+   *
+   * @returns 本轮补投 / 转待核对的任务数
    */
   async recoverStaleTasks(): Promise<number> {
-    return this.recoverExpiredLeases();
-  }
+    await this.recoverUnbilledQueued();
+    const scheduled = await this.queue.scheduledTaskIds();
+    /*
+     * 读不到队列**不是**「本轮无事可做」。
+     *
+     * Redis 不可达时整库的 queued/running 任务都处在「可能没人执行」的状态，
+     * 静默返回 0 会让调度器把它记成一次成功，后台看不到任何异常 ——
+     * 正是「静默失败三周的定时任务比不设更危险」的那种。
+     * 抛出去，由调用方按失败登记连续失败次数并告警。
+     */
+    if (!scheduled) {
+      throw new Error(
+        `队列作业列表不可读，本轮跳过补投: ${this.queue.lastReadFailure ?? '未知原因'}`,
+      );
+    }
 
-  /** 租约过期的运行中任务：按 attempt 的派发状态决定续跑 / 失败 / 待核对 */
-  private async recoverExpiredLeases(): Promise<number> {
-    const now = new Date();
-    const expired = await this.prisma.generationTask.findMany({
-      where: { status: 'running', leaseOwner: { not: '' }, leaseUntil: { lt: now } },
-      take: 50,
-      select: { id: true, routeRun: true, leaseOwner: true, leaseUntil: true, pendingResult: true },
-    });
+    const pageSize = 500;
+    let cursor: string | undefined;
     let recovered = 0;
-    for (const task of expired) {
-      const attempt = await this.attempts.latest(task.id, task.routeRun);
-      const state = attempt?.dispatchState ?? 'not_sent';
-      if (state === 'submission_unknown') {
-        // 执行者可能在请求已发出后死掉：不能重发，交给人工核对
-        const claimed = await this.lifecycle.uncertain(
-          task.id,
-          '执行者租约过期，且请求可能已经发出',
-          {
-            leaseOwner: task.leaseOwner,
-            leaseUntil: task.leaseUntil,
-          },
-        );
-        if (claimed) recovered += 1;
-        continue;
-      }
-      /*
-       * 其余三态都可以立刻续跑：
-       *   · not_sent / rejected_no_job —— 请求没发出去，`advance` 会重新选路派发；
-       *   · accepted —— 上游已受理，`advance` 回到轮询；
-       * 租约清空 + `nextPollAt=now` 才会被 `claimDuePolls` 重新领取。
-       */
-      const claimed = await this.prisma.generationTask.updateMany({
+    for (;;) {
+      const tasks = await this.prisma.generationTask.findMany({
         where: {
-          id: task.id,
-          status: 'running',
-          leaseOwner: task.leaseOwner,
-          leaseUntil: task.leaseUntil,
+          status: { in: ['queued', 'running'] },
+          ...(cursor ? { id: { gt: cursor } } : {}),
         },
-        data: { leaseOwner: '', leaseUntil: null, nextPollAt: new Date() },
+        orderBy: { id: 'asc' },
+        take: pageSize,
+        select: {
+          id: true,
+          status: true,
+          routeRun: true,
+          leaseOwner: true,
+          nextPollAt: true,
+        },
       });
-      // 只有真正认领恢复权的调用计数；续租成功会让上面的精确 CAS 失败。
-      if (claimed.count === 1) recovered += 1;
+      cursor = tasks[tasks.length - 1]?.id;
+
+      for (const task of tasks) {
+        if (scheduled.has(task.id)) continue;
+
+        let nextPollAt = task.nextPollAt;
+        if (task.status === 'running') {
+          const attempt = await this.attempts.latest(task.id, task.routeRun);
+          const state = attempt?.dispatchState ?? 'not_sent';
+          if (state === 'submission_unknown') {
+            // 作业已经不在队列里，而请求可能已经发出：不能重发，转人工核对。
+            const claimed = await this.lifecycle.uncertain(
+              task.id,
+              '任务队列中没有执行中的作业，且请求可能已经发出',
+              task.leaseOwner ? { leaseOwner: task.leaseOwner } : undefined,
+            );
+            if (claimed) recovered += 1;
+            continue;
+          }
+          /*
+           * accepted 的任务保留原来的回查时间；not_sent / rejected_no_job
+           * 说明请求没发出去，应立即续跑。旧实现统一改成 now，会让一个未来
+           * 的轮询时间被提前消耗。
+           */
+          nextPollAt = state === 'accepted' && task.nextPollAt ? task.nextPollAt : new Date();
+          await this.prisma.generationTask.updateMany({
+            where: { id: task.id, status: 'running', leaseOwner: task.leaseOwner },
+            data: { leaseOwner: '', leaseUntil: null, nextPollAt },
+          });
+        }
+
+        const delayMs = nextPollAt ? Math.max(0, nextPollAt.getTime() - Date.now()) : 0;
+        try {
+          await this.queue.enqueue(task.id, delayMs);
+          recovered += 1;
+        } catch (error) {
+          this.log.error(`任务 ${task.id} 补投失败: ${(error as Error).message}`);
+        }
+      }
+      if (tasks.length < pageSize) break;
     }
     return recovered;
   }
@@ -373,11 +289,128 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
 
   // ── 单个任务 ──────────────────────────────────────────────────────
 
-  private async run(taskId: string): Promise<void> {
-    const renew = setInterval(() => {
-      void this.renewLease(taskId);
-    }, LEASE_RENEW_MS);
-    (renew as any).unref?.();
+  /**
+   * BullMQ Worker 的唯一业务入口。
+   *
+   * 作业锁保证同一 taskId 只有一个执行者；`leaseOwner` 每次执行都换新值，
+   * 用作终态 / 换账单的 fencing token。返回 delay 时由 processor 调用
+   * `moveToDelayed`，把同一个作业留到轮询或并发名额释放后继续。
+   */
+  async processJob(taskId: string): Promise<ProcessOutcome> {
+    const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
+    if (!task || (task.status !== 'queued' && task.status !== 'running')) {
+      return { action: 'done' };
+    }
+    if (task.status === 'running' && task.nextPollAt && task.nextPollAt.getTime() > Date.now()) {
+      return {
+        action: 'delay',
+        delayMs: Math.max(0, task.nextPollAt.getTime() - Date.now()),
+      };
+    }
+
+    if (task.status === 'queued') {
+      // 业务并发上限在真正执行前判断；不满足就把作业延迟回队列，避免一个
+      // 用户的满额任务占住 Worker 并发位、饿死同页其它用户。
+      const gate = await this.queueGate(task);
+      if (gate !== 'ready') {
+        if (gate === 'wait') return { action: 'delay', delayMs: 60_000 };
+        return { action: 'done' };
+      }
+      if (!(await this.hasCapacity(task))) {
+        return { action: 'delay', delayMs: 1_000 };
+      }
+    }
+
+    const owner = `${this.processOwner}:${randomBytes(4).toString('hex')}`;
+    const now = new Date();
+    const claimed = await this.prisma.generationTask.updateMany({
+      where: { id: taskId, status: { in: ['queued', 'running'] } },
+      data: {
+        status: 'running',
+        leaseOwner: owner,
+        leaseUntil: null,
+        nextPollAt: null,
+        heartbeatAt: now,
+        ...(task.status === 'queued' ? { stage: 'dispatch', progress: 5 } : {}),
+      },
+    });
+    if (claimed.count !== 1) return { action: 'done' };
+
+    try {
+      await this.execution.run({ owner }, () => this.runClaimed(taskId));
+    } catch (error) {
+      this.log.error(`任务 ${taskId} 执行异常: ${(error as Error).message}`);
+      await this.lifecycle.uncertain(taskId, `执行异常：${(error as Error).message}`, {
+        leaseOwner: owner,
+      });
+    }
+
+    const fresh = await this.prisma.generationTask.findUnique({
+      where: { id: taskId },
+      select: { status: true, nextPollAt: true },
+    });
+    if (fresh?.status !== 'running') return { action: 'done' };
+    return {
+      action: 'delay',
+      delayMs: fresh.nextPollAt ? Math.max(0, fresh.nextPollAt.getTime() - Date.now()) : 1_000,
+    };
+  }
+
+  private async queueGate(task: GenerationTask): Promise<BillingGate> {
+    if (task.billingOrderId || task.retriedFromId) return 'ready';
+    const order = await this.prisma.billingOrder.findFirst({
+      where: { taskId: task.id },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (order) {
+      await this.prisma.generationTask.updateMany({
+        where: { id: task.id, billingOrderId: null },
+        data: { billingOrderId: order.id },
+      });
+      return 'ready';
+    }
+    if (Date.now() - task.createdAt.getTime() < 10 * 60_000) return 'wait';
+    const claimed = await this.prisma.generationTask.updateMany({
+      where: { id: task.id, status: 'queued', billingOrderId: null },
+      data: { status: 'failed', errorCode: TASK_ERROR.interrupted, stage: 'failed' },
+    });
+    if (claimed.count > 0) this.log.warn(`任务 ${task.id} 未挂账单且超时，已判失败（未扣费）`);
+    return 'terminal';
+  }
+
+  /**
+   * 用户与渠道并发上限。
+   *
+   * 全局并发由 BullMQ Worker 的 concurrency 控制；这里是业务上限，与旧
+   * 领取逻辑保持同一口径：0 = 不限，超限的任务留在 queued 等下一轮。
+   */
+  private async hasCapacity(task: GenerationTask): Promise<boolean> {
+    const ownerLimit = memberConcurrencyOf(task.params);
+    if (ownerLimit > 0) {
+      const ownerRunning = await this.prisma.generationTask.count({
+        where: { ownerId: task.ownerId, status: 'running' },
+      });
+      if (ownerRunning >= ownerLimit) return false;
+    }
+
+    const channel = task.channelId
+      ? await this.prisma.modelChannel.findUnique({
+          where: { id: task.channelId },
+          select: { concurrencyLimit: true },
+        })
+      : null;
+    const channelLimit = Math.max(0, Math.trunc(channel?.concurrencyLimit ?? 0));
+    if (channelLimit > 0) {
+      const channelRunning = await this.prisma.generationTask.count({
+        where: { channelId: task.channelId, status: 'running' },
+      });
+      if (channelRunning >= channelLimit) return false;
+    }
+    return true;
+  }
+
+  private async runClaimed(taskId: string): Promise<void> {
     try {
       const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
       if (!task || task.status !== 'running' || task.leaseOwner !== this.owner) return;
@@ -399,18 +432,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.log.error(`任务 ${taskId} 执行异常: ${(error as Error).message}`);
       await this.uncertainOwned(taskId, `执行异常：${(error as Error).message}`);
-    } finally {
-      clearInterval(renew);
     }
-  }
-
-  private async renewLease(taskId: string): Promise<void> {
-    await this.prisma.generationTask
-      .updateMany({
-        where: { id: taskId, status: 'running', leaseOwner: this.owner },
-        data: { leaseUntil: new Date(Date.now() + TASK_LEASE_MS), heartbeatAt: new Date() },
-      })
-      .catch(() => undefined);
   }
 
   /** 主循环：派发 / 轮询 / 切换，直到需要等待或结束 */
@@ -925,7 +947,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     const now = new Date();
     const owned = await this.prisma.generationTask.updateMany({
       where: { id: taskId, status: 'running', leaseOwner: this.owner },
-      data: { heartbeatAt: now, leaseUntil: new Date(now.getTime() + TASK_LEASE_MS) },
+      data: { heartbeatAt: now },
     });
     return owned.count === 1;
   }

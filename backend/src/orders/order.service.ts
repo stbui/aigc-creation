@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import type { Prisma } from '../generated/prisma/client';
 import { AppError } from '../common/app.exception';
 import { PrismaService } from '../prisma/prisma.service';
@@ -41,7 +42,7 @@ export type { RefundRules } from './order-refund-policy.service';
 export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     private readonly checkout: OrderCheckoutService,
     private readonly payment: OrderPaymentService,
     private readonly refunds: OrderRefundService,
@@ -184,17 +185,44 @@ export class OrderService {
 
     const transactionId = `SBX-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    if (params.scenario === 'timeout') {
+    /*
+     * 经 /payments/intent 发起的沙箱订单，在创建渠道单据时已经落下一笔
+     * pending Payment。模拟结果必须原地更新它：另建一条记录会留下永不结束
+     * 的 pending，既污染后台支付流水，也会被实例日限额按 channel 统计进去。
+     */
+    const pendingAttempt = await this.prisma.payment.findFirst({
+      where: { orderId: order.id, status: 'pending', channel: 'sandbox' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    const recordSimulatedOutcome = async (data: {
+      status: 'failed';
+      message: string;
+      sandboxScenario: 'failed' | 'timeout';
+    }): Promise<void> => {
+      if (pendingAttempt) {
+        await this.prisma.payment.updateMany({
+          where: { id: pendingAttempt.id, status: 'pending' },
+          data: { ...data, payTransactionId: transactionId },
+        });
+        return;
+      }
       await this.prisma.payment.create({
         data: {
           orderId: order.id,
           userId: params.userId,
           payTransactionId: transactionId,
           amountCents: order.paidCents,
-          status: 'failed',
-          message: '沙箱模拟: 支付超时',
-          sandboxScenario: 'timeout',
+          ...data,
         },
+      });
+    };
+
+    if (params.scenario === 'timeout') {
+      await recordSimulatedOutcome({
+        status: 'failed',
+        message: '沙箱模拟: 支付超时',
+        sandboxScenario: 'timeout',
       });
       const outcome = await this.cancelSandboxOrder(order.id);
       if (outcome === 'paid') {
@@ -206,16 +234,10 @@ export class OrderService {
     }
 
     if (params.scenario === 'failed') {
-      await this.prisma.payment.create({
-        data: {
-          orderId: order.id,
-          userId: params.userId,
-          payTransactionId: transactionId,
-          amountCents: order.paidCents,
-          status: 'failed',
-          message: '沙箱模拟: 支付失败',
-          sandboxScenario: 'failed',
-        },
+      await recordSimulatedOutcome({
+        status: 'failed',
+        message: '沙箱模拟: 支付失败',
+        sandboxScenario: 'failed',
       });
       // 订单保持 pending —— 允许用户重新支付
       return {
@@ -231,6 +253,8 @@ export class OrderService {
       userId: params.userId,
       payTransactionId: transactionId,
       channel: 'sandbox',
+      // intent 留下的 pending 尝试原地提升为 succeeded，而不是再建一条
+      paymentId: pendingAttempt?.id,
       sandboxScenario: 'success',
     });
   }

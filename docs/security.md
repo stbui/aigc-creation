@@ -85,7 +85,7 @@
 - CSV 导出统一走 `common/csv.ts`：BOM + RFC4180 + 公式注入前导 `'`。
 - React 默认转义；`dangerouslySetInnerHTML` 仅允许在受控图表样式中使用，新增使用必须评审。
 - `returnTo` / 跳转参数只接受站内绝对路径，拒绝协议相对、反斜杠、控制字符与外链。
-- 请求体 JSON / urlencoded 限制 100KB；上传由 multer 与图片校验双层限制。
+- 请求体 JSON / urlencoded 限制 100KB；上传由 multer 与图片校验双层限制。multer 的超限错误（英文 `File too large`）由全局异常过滤器统一改写为 `41301` + 中文文案，不把库内置文案透出给用户。
 - 错误响应不得包含堆栈、文件路径、SQL、上游原始报错；按 [`error-copy.md`](error-copy.md) 转换。
 
 ## 8. 网络、限流与传输

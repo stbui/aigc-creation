@@ -24,6 +24,26 @@
 name: huojue
 
 services:
+  # ── BullMQ 队列（Redis）────────────────────────────────────────────────
+  # 任务状态与账单仍以 SQLite 为准；Redis 只保存可重建的队列作业。
+  # 开发/测试共用同一实例，用 0/1 号库隔离。
+  redis:
+    image: redis:7-alpine
+    container_name: huojue-redis-dev
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - huojue-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
   # ── 建表（一次性任务，成功后 backend 才启动）───────────────────────────────
   backend-migrate:
     build:
@@ -63,6 +83,7 @@ services:
       # ---- 数据库 ----
       # 开发：卷里的 dev.db；测试：卷里的 test.db。两者不同文件。
       DATABASE_URL: ${DATABASE_URL:-file:./data/dev.db}
+      REDIS_URL: redis://redis:6379/0
 
       # ---- 运行期目录（都在卷里，容器重建不丢）----
       UPLOAD_DIR: /app/data/uploads
@@ -97,6 +118,8 @@ services:
     depends_on:
       backend-migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "docker/healthcheck.js"]
       interval: 30s
@@ -165,6 +188,7 @@ services:
     environment:
       NODE_ENV: test
       DATABASE_URL: file:./data/test.db
+      REDIS_URL: redis://redis:6379/1
     volumes:
       - huojue-test-data:/app/data
 
@@ -206,6 +230,8 @@ services:
     depends_on:
       backend-migrate-test:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "docker/healthcheck.js"]
       interval: 30s
@@ -265,3 +291,5 @@ volumes:
   # 测试数据（test.db + uploads-test + ...），与开发完全隔离
   huojue-test-data:
     name: huojue-test-data
+  huojue-redis-data:
+    name: huojue-redis-data

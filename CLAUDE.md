@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-本文件是仓库的常驻作业上下文，Claude Code 会自动读取，Codex / Cursor 等经根 `AGENTS.md` 指向阅读。只保留**坐标、硬约束、踩坑**；跨线分工见 `AGENTS.md`，阶段流程见 `docs/development-workflow.md`，执行边界、闸口与 Git 分别见 `docs/agent-execution.md`、`docs/quality-gates.md`、`docs/git-workflow.md`，文档索引见 `docs/README.md`。
+本文件是仓库的常驻作业上下文，Claude Code 会自动读取，Codex / Cursor 等经根 `AGENTS.md` 指向阅读。只保留**坐标、硬约束、踩坑**；跨线分工与完成定义见 `AGENTS.md`，阶段流程见 `docs/development-workflow.md`，执行边界与 Git 见 `docs/agent-execution.md`、`docs/git-workflow.md`，闸口命令见 `docs/testing.md` §3，文档索引见 `docs/README.md`。
 
 ## 0. 仓库不变量
 
@@ -103,7 +103,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 - 退款先落 `Refund(status='processing')` 再调用渠道，渠道成功后才能改订单与本地账。渠道失败返回 `50302` 时，订单与积分保持不变。
 - 退款校验顺序不可反：先校验“金额 ≤ 实付 - 已退”，再执行时间窗、比例、已消费任务等可配规则。
 - 对账只改状态与备注，不改资金金额；发票金额取 `paidCents - refundedCents` 快照。
-- 商品、订单、优惠券、支付、退款、对账的完整规则见 `docs/commerce-design.md`。
+- 商品、订单、优惠券、支付、退款、对账的完整规则：状态机与字段见 `docs/database.md` §7 与 `backend/prisma/schema.prisma`，支付域见 `docs/payment-detailed-design.md`，接口与错误码见 `docs/api-contract.md` §2。
 
 ### 3.4 后台与前端
 
@@ -174,7 +174,7 @@ npx biome format --write <files>
 - 后端与前端 TS 配置刻意不同，不要统一：后端 CommonJS / ES2021，`strict` 与 `strictNullChecks` 为 false；前端 ESNext / bundler，`strict` 为 true。
 - 依赖精确锁定，不手工添加 `^` / `~`。安装依赖后运行 `npm run verify:deps:critical`。
 - 全站只有一套浅色主题。颜色、圆角、阴影与语义字号只引用 `frontend/src/styles/tokens.css` 的 token，不写裸 hex。
-- 后台页面使用 shadcn 语义类（`bg-card` / `text-muted-foreground` / `border-border` 等）。Tailwind 没有 preflight，裸 `border` 会退回 `currentColor`；基础兜底放 `admin.css` 的 `@layer base`。
+- 后台页面使用 shadcn 语义类（`bg-card` / `text-muted-foreground` / `border-border` 等）。C 端 `frontend/src/ui/styles.css` 与后台 `admin.css` 统一加载 Tailwind preflight；两端各自在 `@layer base` 保留 `[data-slot]` 的语义边框色兜底。
 - 页面不新增 `adm-*` 类；`.adm-*` 仅保留外壳骨架契约。
 - 全站最小字号 12px。任何页面、组件、图表刻度或内联样式都不得更小；细则见 `docs/design/standards/typography.md`。
 - 状态到文案 / 色调的唯一映射是 `components/admin/statusMeta.ts` 的 `STATUS_META`。
@@ -190,7 +190,7 @@ npx biome format --write <files>
 5. **`/uploads` 必须同时出现在前端代理中**。漏掉时 Vite 会返回 SPA 的 `index.html`：HTTP 200、`Content-Type: text/html`，图片静默破图。生产 Nginx 同样代理 `/api` 与 `/uploads`。
 6. **`test` / `production` 不回落 `.env` 与 `.env.local`**。避免继承 `DATABASE_URL=file:./dev.db` 造成无报错的数据污染。`env-files.ts` 与 `scripts/db-url.js` 的档位规则必须逐字一致。
 7. **空串不等于未设置**。例如 `CORS_ORIGINS=""` 会跳过覆盖并静默失效；不要批量导出空值。
-8. **`ConfigModule` 必须是 `AppModule.imports` 第一项**。顺序错误可能不立即报错，而是在运行期注入 `undefined`。
+8. **`ConfigModule` 必须是 `AppModule.imports` 第一项**。原因不是 DI —— `isGlobal` 在模块图解析阶段注册，顺序不会让谁注入 `undefined`；真正的前提是**导入期**：本模块被 require 时才会把 env 文件读进 `process.env`，所以任何在**类定义期**直读 `process.env` 的代码必须在它之后被 import。顺序错了不报错，只静默拿兜底值（表现为上传落到默认 `uploads/`）。需要读配置的装配写进 `MulterModule.registerAsync` 工厂，别放回装饰器参数——见 `docs/backend-nestjs-conventions.md`。
 9. **新增环境变量同步四处**：`ENV_SPECS`、`backend/.env.example`、三档 env；影响库路径时再加 `scripts/db-url.js`。随后运行环境探针。
 10. **嵌套依赖 pin 不可被“正常重装”覆盖**。关键是 `multer` 下的 `type-is@1.6.18` / `media-typer@0.3.0`；错误版本会让 multipart 静默不解析，接口收到 0 个文件。另有 `webpack` 的 `mime-types@2.1.35` 与 `@nestjs/config` 的 `dotenv@18.0.3`。依赖安装遇 5 分钟 broker 超时属已知环境限制。
 11. **云存储 SDK 当前不是依赖**。默认使用 local；OSS / MinIO 的连接参数和凭据只在后台存储配置页维护，切云端前需安装 `ali-oss` 或 `minio`。
@@ -207,17 +207,17 @@ npx biome format --write <files>
 
 ## 9. 文档指针
 
-- Agent 协作入口：根 `AGENTS.md`（分工与交接）、开发流程四件套（`docs/development-workflow.md` / `agent-execution.md` / `quality-gates.md` / `git-workflow.md`）、`docs/README.md`（索引）。
+- Agent 协作入口：根 `AGENTS.md`（分工、交接与完成定义）、开发流程三件套（`docs/development-workflow.md` / `agent-execution.md` / `git-workflow.md`）、`docs/testing.md`（闸口矩阵）、`docs/README.md`（索引）。
 - 需求与产品边界：`docs/prd.md`、`docs/admin-prd.md`、`docs/admin-*-design.md`。
 - 环境、数据库、Docker 与部署：`docs/environments.md`、`docs/docker-deployment.md`。
 - 模型、选路、失败语义与计费：`docs/model-architecture.md`。
 - 接口、统一响应与错误码：`docs/api-contract.md`、`docs/error-copy.md`。
 - 后台界面与页面规格：`docs/design/admin/admin-ui-design.md`、`docs/admin-console-design.md`、`docs/admin-detailed-design.md`。
-- 商品、订单、支付、退款、积分与会员：`docs/commerce-design.md`。
+- 商品、订单、支付、退款、积分与会员：`docs/payment-detailed-design.md`（支付域契约）+ 本文 §1 单一事实源表。
 - 测试闸口、覆盖矩阵与已知缺口：`docs/testing.md`。
 - Agent 执行卡与阶段裁剪：`docs/development-workflow.md`。
 - Agent 指令映射、禁令、自主边界与失败模式：`docs/agent-execution.md`。
-- 闸口命令、证据标准与完成定义：`docs/quality-gates.md`。
+- 闸口命令与覆盖矩阵：`docs/testing.md` §3–§4；证据标准与完成定义：`AGENTS.md` §7。
 - 分支、提交、PR、回滚与 git 权限边界：`docs/git-workflow.md`。
 - 后端 NestJS 结构、DTO、异常、鉴权与事务：`docs/backend-nestjs-conventions.md`。
 - 前端模块分层：`docs/design/standards/frontend-module-conventions.md`。

@@ -9,7 +9,7 @@
  *      否则「前台看到 10 积分、扣了 12 积分」就是资损级投诉。
  *
  * 本仓 `User` 表没有分组列：分组由「会员套餐 → `MembershipPlan.userGroupCode`」
- * 映射得到（`docs/channel-model-design.md` §14.2）。无有效会员时落默认分组。
+ * 映射得到（`docs/admin-detailed-design.md` 用户分组一节）。无有效会员时落默认分组。
  */
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';

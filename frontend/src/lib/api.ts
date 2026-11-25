@@ -450,7 +450,7 @@ export const ordersApi = {
    * 沙箱支付。
    *
    * ⚠ 沙箱**不产生真实资金流转**, 仅用于开发联调。真实通道接入后此端点废弃。
-   * 页面必须显式标注沙箱身份, 不做假支付 UI 蒙混 (commerce-design.md §6.2)。
+   * 页面必须显式标注沙箱身份, 不做假支付 UI 蒙混 (docs/payment-detailed-design.md)。
    */
   sandboxPay: (id: string, scenario: "success" | "failed" | "timeout") =>
     request<SandboxPayResult>(`/orders/${id}/pay`, {

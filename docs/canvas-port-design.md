@@ -344,7 +344,7 @@ Agent 与 3D 扩展按要求排在最后；此前里程碑不减少最终功能�
 实施时同批更新：
 
 - `docs/api-contract.md`：画布接口、错误码、WS 协议。
-- `docs/runtime-infrastructure.md`：Redis、WS、限流。
+- `docs/observability.md` / `docs/security.md`：Redis、WS、限流。
 - `docs/environments.md`、`docs/docker-deployment.md`：Postgres / Redis 变量与编排。
 - `docs/testing.md`：画布覆盖矩阵与 e2e 清单。
 - `README.md`、`CLAUDE.md`：技术栈、目录、数量口径。

@@ -9,6 +9,10 @@
 @layer theme, base, components, utilities;
 
 @import 'tailwindcss/theme.css' layer(theme);
+/* C 端统一加载 preflight：按钮 / 输入框的 UA 底色、链接蓝字与下划线、
+   img 的 inline 基线等由它复位。后台 `styles/admin.css` 使用同一份上游
+   preflight；未分层的页面 CSS 优先级仍高于本层。 */
+@import 'tailwindcss/preflight.css' layer(base);
 @import 'tailwindcss/utilities.css' layer(utilities) source(none);
 @import 'tw-animate-css';
 
@@ -30,15 +34,10 @@
 
 @layer base {
   /*
-   * 与 admin.css 同一套兜底：本项目不导 preflight，Tailwind 的 `border`
-   * 只写宽度，没有 `solid` 与颜色兜底时控件/弹层会丢边线或退回 near-black。
+   * preflight 已提供 `* { border: 0 solid }`；Tailwind 的 `border` / `border-b`
+   * 只写宽度，缺省颜色仍是 currentColor，shadcn 原子件统一落到语义边框色。
    * `[data-slot]` 只命中 shadcn 原子件；portal 里的弹层同样适用。
    */
-  *,
-  ::before,
-  ::after {
-    border: 0 solid;
-  }
   [data-slot] {
     border-color: var(--border);
   }
@@ -47,29 +46,6 @@
     font-family: var(--font-sans);
     color: var(--text-strong);
     -webkit-font-smoothing: antialiased;
-  }
-
-  /*
-   * 交互元素复位（preflight 子集）。
-   *
-   * shadcn 的 `ghost` 变体不写背景类，靠 preflight 把 `<button>` 的 UA 灰底
-   * （`buttonface`）清掉；本项目不导 preflight，于是每个 ghost 按钮都显示成
-   * 一块实心灰（顶导的能力分组下拉、移动端汉堡都是这个症状）。
-   * `asChild` 到 `<Link>` 时更明显：锚点保留 UA 的蓝字与下划线，
-   * 按钮文字变成「蓝色带下划线」。
-   *
-   * 用 `data-variant` 而不是 `data-slot='button'`：Slot 合并时
-   * `DropdownMenuTrigger` 会把槽位改成 `dropdown-menu-trigger`，
-   * 但变体标记会透传到触发器与锚点上。只命中 Button 渲染出的元素，
-   * 页面里的裸 `<a>` / `<button>` 不受影响；`@layer base` 优先级低于
-   * utilities，`bg-primary` / `text-brand` / `no-underline` 等类照常覆盖。
-   */
-  [data-variant='ghost'] {
-    background-color: transparent;
-  }
-  a[data-variant] {
-    color: inherit;
-    text-decoration: none;
   }
 }
 

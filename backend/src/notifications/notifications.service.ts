@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import type { MessageTemplate } from '../generated/prisma/client';
 import { EmailService } from '../channels/email/email.service';
 import { maskEmail } from '../channels/channel.types';
@@ -112,7 +113,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     private readonly settings: SettingsService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
   ) {}
 
   /**

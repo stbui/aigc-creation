@@ -18,6 +18,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { ChannelUnavailableError } from '../channels/channel-runtime.service';
 
 /** 等槽位的上限兜底值（`MODEL_SLOT_WAIT_MS` 覆盖）；超过即按「渠道忙」切线，不无限排队 */
@@ -30,7 +31,7 @@ export class ChannelSlotService {
   /** channelId → 已占用的槽位数 */
   private readonly used = new Map<string, number>();
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService<AppConfigValues, true>) {}
 
   /**
    * 等槽位上限。

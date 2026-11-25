@@ -57,7 +57,7 @@
 ## 5. 同步与冲突
 
 - 分支落后时：未推送用 `git rebase main`，已推送或有协作者用 `git merge main`。
-- 解决冲突后**必须重跑受影响闸口**（按改动域选专项见 [`quality-gates.md`](quality-gates.md) §2）。
+- 解决冲突后**必须重跑受影响闸口**（按改动域选专项见 [`testing.md`](testing.md) §4 覆盖矩阵）。
 - 已推送的个人分支只允许 `git push --force-with-lease`；共享分支不 force。
 - 不 rebase、不改写 `main` 历史。
 

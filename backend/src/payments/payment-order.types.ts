@@ -1,8 +1,8 @@
 import type {
+  CheckoutPaymentMethod,
   PaymentAdapter,
   PaymentContext,
   PaymentProviderId,
-  VisiblePaymentMethod,
 } from './adapters/types';
 
 export type PaymentActor =
@@ -41,7 +41,7 @@ export interface PaymentIntentView {
   orderNo: string;
   amountCents: number;
   currency: string;
-  providerId: VisiblePaymentMethod | 'free';
+  providerId: CheckoutPaymentMethod | 'free';
   configId: string | null;
   configVersion: number | null;
   mode: string;
@@ -64,8 +64,8 @@ export interface PaymentOrderView {
   displayStatus: string;
   amountCents: number;
   currency: string;
-  /** C 端只暴露支付宝 / 微信 / 免费单；真实渠道（如 epay）永不外泄。 */
-  providerId: VisiblePaymentMethod | 'free' | 'unknown';
+  /** C 端只暴露支付宝 / 微信 / 沙箱（仅开发测试）/ 免费单；真实渠道（如 epay）永不外泄。 */
+  providerId: CheckoutPaymentMethod | 'free' | 'unknown';
   checkoutMode: string | null;
   checkoutValue: string | null;
   expiresAt: string;
@@ -76,7 +76,7 @@ export interface PaymentOrderView {
   payments: Array<{
     id: string;
     status: string;
-    providerId: VisiblePaymentMethod | 'free' | 'unknown';
+    providerId: CheckoutPaymentMethod | 'free' | 'unknown';
     providerRef: string | null;
     providerTradeNo: string | null;
     amountCents: number;

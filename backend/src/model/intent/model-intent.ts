@@ -199,8 +199,8 @@ export function normalizeImageSizeIntent(spec: CapabilitySpec, intent: ModelRequ
  * 按前台模型的能力合同裁剪意图参数。
  *
  * 能力插件给出的是**平台的**参数口径（ratio / size / variantCount…），而每个
- * 前台模型只声明其中一部分（`docs/channel-model-design.md` §5.3：只有模型
- * 声明过的参数才能进入意图）。不先裁剪就会出现两处错误：
+ * 前台模型只声明其中一部分（`docs/model-architecture.md` §6：只有线路合同
+ * 启用的参数才能进入意图）。不先裁剪就会出现两处错误：
  *   · 模型关闭了某项参数（如不支持独立分辨率），请求里残留它会被报成
  *     「不支持参数」，用户看到的是模型缺陷而不是自己的输入问题；
  *   · 意图里多一个键，匹配失败原因指向一个平台内部字段，前端无法解释。

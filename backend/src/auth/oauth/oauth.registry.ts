@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import { buildOAuthProviders } from './oauth.providers';
 import { OAuthProvider, OAuthProviderInfo } from './oauth.types';
 
@@ -13,7 +14,7 @@ export class OAuthRegistryService {
   private readonly providers: OAuthProvider[];
   private readonly enabledIds: Set<string>;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(private readonly config: ConfigService<AppConfigValues, true>) {
     this.providers = buildOAuthProviders(this.config);
     this.enabledIds = new Set(this.config.get<string[]>('oauth.enabled') ?? []);
   }

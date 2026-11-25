@@ -4,6 +4,7 @@ import { statSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { resolve } from 'node:path';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { RouteHealthService } from '../model/routing/route-health.service';
@@ -32,7 +33,7 @@ export class SystemPerformanceService {
     private readonly storage: StorageService,
     private readonly routeHealth: RouteHealthService,
     private readonly scheduler: SchedulerService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 

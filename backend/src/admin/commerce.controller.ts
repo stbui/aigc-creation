@@ -681,7 +681,7 @@ export class AdminCommerceController {
   )
   async importCredits(
     @UploadedFile()
-    file: { buffer?: Buffer; originalname?: string } | undefined,
+    file: Express.Multer.File | undefined,
     @Body() dto: CreditImportDto,
     @AdminUser() actor: AdminUser,
   ) {

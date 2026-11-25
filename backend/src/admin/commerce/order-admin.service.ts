@@ -119,6 +119,11 @@ export class AdminCommerceOrderService {
         })),
         paymentCount: order.payments.length,
         /*
+         * 最近一次下单/发起支付失败原因。列表里直接给出，运营不必逐笔打开
+         * 详情才能判断「为什么这笔一直没付」；空串由写入层归一为空值。
+         */
+        lastError: order.lastError ?? null,
+        /*
          * 退款状态列：与筛选口径（`some` 命中任意一笔退款单）同源，
          * 收敛成一个值 —— processing / failed / succeeded 都可能同时存在，
          * 列上只显示最需要人管的那一个：处理中 > 失败 > 成功。

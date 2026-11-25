@@ -11,7 +11,6 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { mkdirSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -28,10 +27,9 @@ import { PromptsService } from './prompts.service';
  *
  * multer 的 `destination` 是装饰器参数，必须在模块加载期确定；这里与手机上传
  * 一样落到系统临时目录，而不是内存 —— 9 张 × 部署硬上限（100MB）同时留在内存
- * 会顶穿单进程。
+ * 会顶穿单进程。目录本身由 `diskStorage` 首次构造时递归创建，不在 import 期抢跑。
  */
 const PROMPT_UPLOAD_TMP_DIR = join(tmpdir(), 'huojue-prompt-upload');
-mkdirSync(PROMPT_UPLOAD_TMP_DIR, { recursive: true });
 
 /**
  * 后台提示词库。
@@ -112,9 +110,7 @@ export class PromptsController {
       limits: { fileSize: deploymentUploadMaxBytes(), files: PROMPT_IMAGES_MAX },
     }),
   )
-  async upload(
-    @UploadedFiles() files: Array<{ path?: string; originalname?: string }> | undefined,
-  ) {
+  async upload(@UploadedFiles() files: Express.Multer.File[] | undefined) {
     try {
       return await this.prompts.uploadImages(files);
     } finally {

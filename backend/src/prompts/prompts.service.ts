@@ -27,6 +27,16 @@ export interface PromptImageInput {
   name?: string;
 }
 
+/**
+ * 上传配图的文件形状 —— 字段从官方 `Express.Multer.File` 投影, 不手抄清单。
+ *
+ * 全部 `Partial`: `diskStorage` 只给 `path`、`memoryStorage` 只给 `buffer`,
+ * 直接调用与单测还可以只传其中之一 (见 `uploadImages`)。
+ */
+export type PromptUploadFile = Partial<
+  Pick<Express.Multer.File, 'path' | 'buffer' | 'originalname'>
+>;
+
 export interface CreatePromptInput {
   title?: string;
   category?: string;
@@ -254,9 +264,7 @@ export class PromptsService {
    * 文件由 multer 落到临时目录，这里逐张读回校验；任何一张不合格时**整批
    * 不落库**，已写入的对象在 catch 里逐个删除，避免留下无主文件。
    */
-  async uploadImages(
-    files: Array<{ path?: string; buffer?: Buffer; originalname?: string }> | undefined,
-  ) {
+  async uploadImages(files: PromptUploadFile[] | undefined) {
     // multer 现在落磁盘（`diskStorage`），内存 buffer 只在直接调用/测试时出现。
     const picked = (files ?? []).filter((file) => file?.path || file?.buffer?.length);
     if (picked.length === 0) throw new AppError(40001, '请选择要上传的图片', 400);

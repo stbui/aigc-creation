@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import type { DeliveryResult } from '../channel.types';
 import type { SmsProvider } from './sms.provider';
 import { ConsoleSmsProvider } from './console-sms.provider';
@@ -46,12 +47,12 @@ export class SmsService implements OnModuleInit {
   private readonly outboxOptions: OutboxOptions;
   private misconfigured = false;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(private readonly config: ConfigService<AppConfigValues, true>) {
     this.outboxOptions = {
       isProduction: this.config.get<string>('app.env') === 'production',
       logDir: this.config.get<string>('log.dir') || 'logs',
     };
-    const cfg = (key: string, fallback = ''): string =>
+    const cfg = (key: keyof AppConfigValues, fallback = ''): string =>
       (this.config.get<string>(key) || fallback).trim();
     const sign = cfg('channel.sms.sign', '货觉AI');
     const wanted = (this.config.get<string>('channel.sms.provider') || 'console').toLowerCase();

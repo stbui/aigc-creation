@@ -1,5 +1,6 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../../config/env.validation';
 import type { DeliveryResult, EmailMessage } from '../channel.types';
 import { maskEmail } from '../channel.types';
 import type { EmailProvider } from './email.provider';
@@ -84,7 +85,7 @@ export class EmailService implements OnModuleInit {
   constructor(
     private readonly settings: SettingsService,
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
   ) {}
 
   async onModuleInit(): Promise<void> {

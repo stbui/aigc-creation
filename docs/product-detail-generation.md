@@ -328,11 +328,10 @@ queued ──CAS 领取──> running ──成功──> succeeded
 
 Worker 行为：
 
-- 调度节拍 1 秒。
-- 单进程最多同时执行 8 个任务。
-- 按创建时间升序领取 `queued` 任务。
-- 通过 CAS 从 `queued` 转为 `running`，避免重复执行。
-- 运行租约 45 秒，执行期间续租。
+- 使用官方 `@nestjs/bullmq`；一个任务对应一个作业，BullMQ Worker 锁避免重复执行。
+- 单进程并发取 `MODEL_ACTIVE_TASK_LIMIT`（默认 64，范围 1–64），用户与渠道并发在执行前另判。
+- 排队任务按创建时间入队；轮询用 `moveToDelayed` 延后同一个作业。
+- 每次作业执行写入唯一 `leaseOwner` 作为 fencing token，终态与换账单按它做 CAS。
 - 请求派发、结果轮询、线路切换和产出落盘都在任务内完成。
 - DNS、代理、网络不可达、TCP 连接被拒等建连前失败视为 `rejected_no_job`，可以安全切换线路；
   没有下一线路时以 `42204` 失败并自动退款，不得转人工核对。

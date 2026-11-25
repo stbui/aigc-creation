@@ -1,5 +1,7 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentNotificationService } from './payment-notification.service';
@@ -30,11 +32,12 @@ const AUTO_RECONCILE_MAX_ATTEMPTS = 3;
  * `PAYMENT_WORKER_ENABLED=false` 仅用于测试/排障，不改变接口行为。
  */
 @Injectable()
-export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
+export class PaymentWorkerService implements OnModuleInit {
   private readonly logger = new Logger(PaymentWorkerService.name);
-  private timer: NodeJS.Timeout | null = null;
   private running = false;
   private lastCloseExpiredCheckAt = 0;
+  /** 配置开关；关闭时周期触发直接返回，`tick()` 的显式调用仍可执行 */
+  private enabled = true;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -43,31 +46,26 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly reconciliation: PaymentReconciliationService,
     private readonly configs: PaymentConfigService,
     private readonly exceptions: PaymentExceptionService,
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<AppConfigValues, true>,
   ) {}
 
   onModuleInit(): void {
-    if (this.config.get<boolean>('payment.workerEnabled') === false) {
+    this.enabled = this.config.get<boolean>('payment.workerEnabled') !== false;
+    if (!this.enabled) {
       this.logger.warn('支付后台任务已禁用 (PAYMENT_WORKER_ENABLED=false)');
       return;
     }
-    // 启动后 15 秒起跑，不阻塞 Nest 启动
-    this.timer = setTimeout(() => void this.loop(), TICK_MS);
     this.logger.log(`支付后台任务已启动（每 ${TICK_MS / 1000}s 一次）`);
   }
 
-  onModuleDestroy(): void {
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = null;
-  }
-
-  private async loop(): Promise<void> {
+  /** 周期任务；`@Interval` 首次触发同样在 TICK_MS 之后 */
+  @Interval('payment-worker:tick', TICK_MS)
+  private async scheduledTick(): Promise<void> {
+    if (!this.enabled) return;
     try {
       await this.tick();
     } catch (e) {
       this.logger.error(`支付后台任务异常: ${(e as Error).message}`);
-    } finally {
-      this.timer = setTimeout(() => void this.loop(), TICK_MS);
     }
   }
 

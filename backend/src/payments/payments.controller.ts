@@ -20,15 +20,19 @@ import { SettingImageService } from '../common/setting-image.service';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentNotificationService } from './payment-notification.service';
-import { PaymentProviderId, VISIBLE_PAYMENT_METHODS } from './adapters/types';
+import {
+  CHECKOUT_PAYMENT_METHODS,
+  type CheckoutPaymentMethod,
+  type PaymentProviderId,
+} from './adapters/types';
 
 export class CreateIntentDto {
-  /** C 端可见支付方式。多个可用方式时必传 */
+  /** C 端可选支付方式（沙箱仅开发/测试；生产由服务层拒绝）。多个可用方式时必传 */
   @IsOptional()
   @IsString()
-  @IsIn(VISIBLE_PAYMENT_METHODS, { message: '支付方式只支持 alipay / wechat' })
+  @IsIn(CHECKOUT_PAYMENT_METHODS, { message: '支付方式只支持 alipay / wechat / sandbox' })
   @MaxLength(32)
-  providerId?: string;
+  providerId?: CheckoutPaymentMethod;
 }
 
 /**

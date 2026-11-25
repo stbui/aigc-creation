@@ -25,6 +25,7 @@
 | 后端 env 文件 | `backend/.env.development` | `backend/.env.test` | `backend/.env.production`（**不入库**，由 `.example` 复制） |
 | 前端 env 文件 | `frontend/.env.development` | `frontend/.env.test` | `frontend/.env.production`（**不入库**） |
 | 数据库 | `file:./dev.db` | `file:./test.db` | `file:./data/prod.db`（必须 ≠ dev.db） |
+| Redis（BullMQ） | `redis://127.0.0.1:6379`（0 号库） | `redis://127.0.0.1:6379/1`（**与开发分库**） | `redis://redis:6379/0`（生产编排内置） |
 | 上传目录 | `uploads` | `uploads-test` | `/app/data/uploads`（绝对路径 + 卷） |
 | 备份目录 | `backups` | `backups-test` | `/app/data/backups` |
 | 日志目录 | `logs` | `logs/test` | `/app/data/logs` |
@@ -151,7 +152,6 @@ PayPal / ZPay 没有规范回调地址，当前不会被选路到；接入前必
 | `MODEL_PROVIDER_CATALOG_URL` | 空 | 空 | 空 | 服务商目录远端 JSON；留空 = 后台目录为空态，不内置任何厂商条目 |
 | `MODEL_ACTIVE_TASK_LIMIT` | `64` | `64` | 按实例配额调 | 本进程同时执行的任务数上限（1–64）；用户并发与渠道并发另由会员套餐与渠道配置限制 |
 | `MODEL_HTTP_TIMEOUT_MS` / `MODEL_MEDIA_TIMEOUT_MS` | `120000` / `180000` | `30000` / `60000` | 按上游调 | 单次上游请求 / 产物下载超时 |
-| `MODEL_WORKER_INTERVAL_MS` / `MODEL_LEASE_MS` | `1000` / `120000` | `200` / `30000` | 同开发 | 调度节拍与任务租约（租约另有 45s 代码下限） |
 | `MODEL_SLOT_WAIT_MS` | `60000` | `60000` | `60000` | 渠道并发槽等槽上限；超时即切线（任务）或 `429`（中转），验收脚本会压到百毫秒级 |
 | `MODEL_ALLOW_PRIVATE_UPSTREAMS` / `MODEL_ALLOWED_PRIVATE_UPSTREAM_HOSTS` | `false` / 空 | `false` / 空 | `false` / 按需 | SSRF 逃生开关，**自定义渠道不受其影响**（必须逐个点名主机） |
 | `MODEL_PROXY_ENABLED` | `true` | `true` | 按需 | 中转总开关，`false` 时系统 / 自定义中转一律 503 |
@@ -164,6 +164,12 @@ PayPal / ZPay 没有规范回调地址，当前不会被选路到；接入前必
 1. **零配置 = 没有可用线路**：能力 `runtime.effective` 为 `unavailable`，提交被 `40005` 拦下，不会生成任何伪结果。
 2. **冷却 / 并发槽 / 目录版本都是进程内存**，多实例部署时各台独立判定，上游配额按实例数放大。
 3. 中转限流（`MODEL_PROXY_SYSTEM_RATE_LIMIT` / `MODEL_PROXY_CUSTOM_RATE_LIMIT`）由限流守卫在请求期读取，**不经过配置树**。
+
+任务队列使用官方 `@nestjs/bullmq`，`REDIS_URL` 是启动前置条件（队列不可达的行为见
+[`model-architecture.md`](model-architecture.md) §12）。Redis 里只有可重建的
+队列作业；任务状态、账单与 `nextPollAt` 仍以数据库为准。Redis 丢数据或进程在
+“数据库提交后、入队前”崩溃时，启动对账会把仍为 `queued/running` 且队列中没有作业的
+任务补投一次。生产编排已内置 `redis` 服务；本机直跑 `./start.sh` 前需先启动 Redis。
 
 ## 邮件 / 短信通道（`EMAIL_PROVIDER` / `SMS_PROVIDER`）
 

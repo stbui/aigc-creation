@@ -402,7 +402,11 @@ describe('支付 HTTP 集成', () => {
     const settings = await api('get', '/api/v1/payments/settings');
     expect(settings.status).toBe(200);
     expect(settings.body.data.defaultCurrency).toBe('CNY');
-    expect(settings.body.data.providers.map((p: { id: string }) => p.id)).toEqual(['alipay']);
+    // 测试环境额外返回已启用的沙箱（站内模拟）；真实来源仍只投影成 alipay
+    expect(settings.body.data.providers.map((p: { id: string }) => p.id)).toEqual([
+      'alipay',
+      'sandbox',
+    ]);
 
     const anon = await api('get', '/api/v1/payments/providers');
     expect(anon.status).toBe(401);

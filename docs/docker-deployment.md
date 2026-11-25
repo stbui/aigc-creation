@@ -26,6 +26,7 @@
 - 后端就绪探针请求 `/api/v1/health/ready`，会真实查询数据库；空库或库故障不算健康。
 - 前端通过 Docker 内置 DNS 动态解析后端，后端容器重建换 IP 后不需要重启 Nginx。
 - SQLite、上传图、备份、日志统一落在具名卷；容器重建不丢数据。
+- 任务队列使用 `redis` 服务（`redis:7-alpine`，AOF 持久化）。Redis 只保存可重建的 BullMQ 作业；任务、账单与 `nextPollAt` 仍以 SQLite 为准，Redis 丢数据时后端启动对账会补投。
 - 后端以 `node` 非 root 用户运行；所有服务启用 `no-new-privileges` 与日志轮转。
 - 停止时 `docker stop` / `docker compose stop` 给后端 30 秒优雅退出窗口。
 
@@ -193,6 +194,7 @@ proxy_set_header X-Forwarded-Port  $server_port;
 ## 4. 数据、备份与恢复
 
 生产数据卷默认名为 `huojue-prod-data`，可用 `HUOJUE_DATA_VOLUME` 改名。
+Redis 数据卷默认名为 `huojue-redis-data`，可用 `HUOJUE_REDIS_VOLUME` 改名。
 备份必须复制到宿主机或对象存储，**只放在同一个卷里无法抵御卷损坏**。
 
 推荐优先使用后台「数据备份」功能；冷备份可在短暂停机窗口执行：

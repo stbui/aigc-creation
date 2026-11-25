@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Interval, Timeout } from '@nestjs/schedule';
 import { BackupService } from './backup.service';
 import { AdminSettingsService } from './settings.service';
 import { MarketingService } from '../marketing/marketing.service';
@@ -7,9 +8,12 @@ import { CreditService } from '../credits/credit.service';
 import { MembershipService } from '../membership/membership.service';
 import { GenerateService } from '../generate/generate.service';
 import { PaymentOrderService } from '../payments/payment-order.service';
+import { AdminRetentionService } from './retention.service';
 
 /** 调度检查间隔: 10 分钟 */
 const TICK_MS = 10 * 60 * 1000;
+/** 首轮延迟: 等所有模块完成初始化, 避免与数据库首次连接竞争 */
+const FIRST_TICK_DELAY_MS = 5_000;
 
 /** 允许的备份频次 */
 const ALLOWED_FREQUENCIES = [1, 7, 30] as const;
@@ -20,9 +24,10 @@ const SETTING_BACKUP_KEEP = 'backup.keepCount';
 /**
  * 备份与清理调度器。
  *
- * ⚠ **本地 MVP 不做真实定时器**, 改为「启动时 + 每 10 分钟轮询检查」:
+ * 触发由 `@nestjs/schedule` 负责（`@Timeout` 首轮 + `@Interval` 周期检查），
+ * 任务本身仍按「轮询 + 到期判定」执行，而不是为每个任务各挂一个 cron：
  *   1. 本项目部署形态是本地单机 (backend + SQLite 文件), 没有常驻进程保证;
- *   2. node-cron 定时器在进程休眠/重启后会错过当次执行, 补跑逻辑反而更复杂;
+ *   2. 固定时刻的 cron 在进程休眠/重启后会错过当次执行, 补跑逻辑反而更复杂;
  *   3. 轮询式实现的行为可预测, 且便于测试时手动触发。
  *
  * 判定"今天是否已备份": 比对当天已有 succeeded 记录, 已有则跳过 ——
@@ -57,9 +62,8 @@ interface TaskState {
  * 但运行时所有注入都会是 undefined —— 表现为 `Cannot read properties of undefined`。
  */
 @Injectable()
-export class SchedulerService implements OnModuleInit, OnModuleDestroy {
+export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
-  private timer: NodeJS.Timeout | null = null;
   private running = false;
   /**
    * 任务执行状态。
@@ -79,31 +83,31 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly membership: MembershipService,
     private readonly generate: GenerateService,
     private readonly payments: PaymentOrderService,
+    private readonly retention: AdminRetentionService,
   ) {}
 
-  onModuleInit(): void {
-    // 延迟首轮: 等所有模块完成初始化, 避免与数据库首次连接竞争
-    setTimeout(() => {
-      void this.tick().catch((e) => this.logger.warn(`首轮调度检查失败: ${e.message}`));
-    }, 5_000);
-
-    this.timer = setInterval(() => {
-      void this.tick().catch((e) => this.logger.warn(`调度检查失败: ${e.message}`));
-    }, TICK_MS);
-
-    // 不阻止进程退出
-    this.timer.unref?.();
-
+  /**
+   * 首轮检查。
+   *
+   * `@Timeout` 在应用 bootstrap 之后才开始计时，此时各模块已完成初始化，
+   * 不会再与数据库首次连接竞争。
+   */
+  @Timeout('admin-scheduler:first-tick', FIRST_TICK_DELAY_MS)
+  private async firstTick(): Promise<void> {
     this.logger.log(
       `调度器已启动 (每 ${TICK_MS / 60000} 分钟检查一次;频次/保留份数见系统设置)`,
     );
+    await this.tick().catch((e) =>
+      this.logger.warn(`首轮调度检查失败: ${(e as Error).message}`),
+    );
   }
 
-  onModuleDestroy(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
+  /** 周期检查；重入保护在 `tick()` 内，上一轮未结束不会叠加。 */
+  @Interval('admin-scheduler:tick', TICK_MS)
+  private async scheduledTick(): Promise<void> {
+    await this.tick().catch((e) =>
+      this.logger.warn(`调度检查失败: ${(e as Error).message}`),
+    );
   }
 
   /**
@@ -125,6 +129,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       await this.runTask('campaign-expire', () => this.maybeExpireCampaigns());
       await this.runTask('membership', () => this.maybeRunMembership());
       await this.runTask('task-recover', () => this.maybeRecoverInterrupted());
+      // 清理放最后：删除可能很慢，不能拖住订单关闭与中断恢复
+      await this.runTask('cleanup', () => this.maybeCleanup());
     } finally {
       this.running = false;
     }
@@ -134,10 +140,14 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
    * 执行单个任务并记录结果。
    *
    * 记录四件事: 最近执行时间、耗时、是否成功、连续失败次数。
-   * 连续失败要能看到 —— 一个静默失败三周的定时任务比不设更危险,
+   * 连续失败要能看到 —— 一个静默失败三周的任务比不设更危险,
    * 因为所有人都会以为它在跑。
+   *
+   * ⚠ 任务体返回 `false` 表示「本轮没到执行时间」(节流 / 落库判定跳过)：
+   * 既不算一次执行，也不能刷新 `lastRunAt`。否则 10 分钟一次的 tick 会把
+   * `lastRunAt` 一直推到当前，24 小时级的任务永远等不到下一次。
    */
-  private async runTask(name: string, fn: () => Promise<void>): Promise<void> {
+  private async runTask(name: string, fn: () => Promise<boolean | void>): Promise<void> {
     const rec = this.taskStates.get(name) ?? {
       name,
       lastRunAt: null,
@@ -150,7 +160,11 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
     const startedAt = Date.now();
     try {
-      await fn();
+      if ((await fn()) === false) {
+        // 跳过也要登记：后台任务列表要能看到「本轮未到执行时间」的任务
+        this.taskStates.set(name, rec);
+        return;
+      }
       rec.lastRunAt = new Date();
       rec.lastDurationMs = Date.now() - startedAt;
       rec.lastSuccess = true;
@@ -165,10 +179,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       rec.consecutiveFailures += 1;
       // 连续失败要打 ERROR 而非 WARN —— 需要有人真的看到
       this.logger.error(`任务 ${name} 第 ${rec.consecutiveFailures} 次连续失败: ${message}`);
-    } finally {
-      rec.totalRuns += 1;
-      this.taskStates.set(name, rec);
     }
+    rec.totalRuns += 1;
+    this.taskStates.set(name, rec);
   }
 
   /** 各任务最近执行状态, 供后台 B-90 可观测 */
@@ -208,7 +221,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
           await this.runTask(name, () => this.doAuditCredits());
           break;
         case 'membership':
-          // runSchedulerTasks 返回统计对象, 但 runTask 的契约是「任务自身不返回值」,
+          // runSchedulerTasks 返回统计对象, 但 runTask 只关心「是否执行」,
           // 统计结果已由 MembershipService 落日志, 这里显式丢弃以保持契约一致
           await this.runTask(name, async () => {
             await this.membership.runSchedulerTasks();
@@ -237,9 +250,10 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
    *
    * 节流: 每 5 分钟最多一次。订单超时是 30 分钟粒度, 5 分钟足够及时。
    */
-  private async maybeCancelExpiredOrders(): Promise<void> {
-    if (!this.shouldRun('order-expire', 5 * 60 * 1000)) return;
+  private async maybeCancelExpiredOrders(): Promise<boolean> {
+    if (!this.shouldRun('order-expire', 5 * 60 * 1000)) return false;
     await this.doCancelExpiredOrders();
+    return true;
   }
 
   private async doCancelExpiredOrders(): Promise<void> {
@@ -257,9 +271,10 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
    * 节流: 每 10 分钟一次。积分过期按天计算, 10 分钟粒度足够,
    * 且回收涉及多次写, 不必过于频繁。
    */
-  private async maybeExpireCredits(): Promise<void> {
-    if (!this.shouldRun('credit-expire', 10 * 60 * 1000)) return;
+  private async maybeExpireCredits(): Promise<boolean> {
+    if (!this.shouldRun('credit-expire', 10 * 60 * 1000)) return false;
     await this.doExpireCredits();
+    return true;
   }
 
   private async doExpireCredits(): Promise<void> {
@@ -272,9 +287,10 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   // ── 每日积分账实核对 ─────────────────────────────────────────────
 
   /** 每日全量核对账户可用余额与批次剩余；发现差额只告警，不自动修数。 */
-  private async maybeAuditCredits(): Promise<void> {
-    if (!this.shouldRun('credit-audit', 24 * 60 * 60 * 1000)) return;
+  private async maybeAuditCredits(): Promise<boolean> {
+    if (!this.shouldRun('credit-audit', 24 * 60 * 60 * 1000)) return false;
     await this.doAuditCredits();
+    return true;
   }
 
   private async doAuditCredits(): Promise<void> {
@@ -297,9 +313,10 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
    * 节流: 每 30 分钟。积分按月发, 到期按天判 —— 30 分钟粒度足够,
    * 会员数放大后这个频率也不会成为瓶颈。
    */
-  private async maybeRunMembership(): Promise<void> {
-    if (!this.shouldRun('membership', 30 * 60 * 1000)) return;
+  private async maybeRunMembership(): Promise<boolean> {
+    if (!this.shouldRun('membership', 30 * 60 * 1000)) return false;
     await this.membership.runSchedulerTasks();
+    return true;
   }
 
   // ── 中断补偿: 孤儿任务 + 会员未发放 ───────────────────────────────
@@ -316,11 +333,40 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
    *
    * @param force 手动触发时跳过节流 —— 运维点「立即执行」就是想马上看到结果
    */
-  private async maybeRecoverInterrupted(force = false): Promise<void> {
-    if (!force && !this.shouldRun('task-recover', 5 * 60 * 1000)) return;
-    await this.generate.recoverOrphanTasks();
-    await this.orders.retryPendingMembershipActivation();
-    await this.marketing.retryPendingRegisterRewards(100);
+  private async maybeRecoverInterrupted(force = false): Promise<boolean> {
+    if (!force && !this.shouldRun('task-recover', 5 * 60 * 1000)) return false;
+    /*
+     * 三项补偿各自独立：队列对账在 Redis 不可达时会抛错，而会员补发与邀请奖励
+     * 重试只依赖数据库 —— 串起来写会让一次队列故障连带跳过两项本来能完成的补偿。
+     * 逐条兜住后汇总抛出，既保住「失败可见」，也不让一项失败掩盖其它项。
+     */
+    await this.runSettled([
+      ['任务队列对账', () => this.generate.recoverOrphanTasks()],
+      ['会员激活补发', () => this.orders.retryPendingMembershipActivation()],
+      ['邀请奖励补发', () => this.marketing.retryPendingRegisterRewards(100)],
+    ]);
+    return true;
+  }
+
+  /**
+   * 依次执行同类补偿动作：单项失败不阻断后续，最后汇总抛出一个错误。
+   *
+   * 与 `tick()` 里「每个任务独立 try/catch」同一条理由 —— 这里独立的是同一个任务内的
+   * 各个动作。汇总抛错是有意的：`runTask` 要把它登记成一次连续失败。
+   */
+  private async runSettled(
+    steps: ReadonlyArray<readonly [string, () => Promise<unknown>]>,
+  ): Promise<void> {
+    const failures: string[] = [];
+    for (const [label, step] of steps) {
+      try {
+        await step();
+      } catch (error) {
+        this.logger.warn(`补偿动作失败 (${label}): ${(error as Error).message}`);
+        failures.push(`${label}: ${(error as Error).message}`);
+      }
+    }
+    if (failures.length > 0) throw new Error(failures.join('; '));
   }
 
   /** 节流判定: 距上次执行是否已超过最小间隔 */
@@ -341,21 +387,50 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     await this.marketing.expireCampaigns();
   }
 
+  /**
+   * 到期数据自动清理 (B-100)。
+   *
+   * 一天最多一轮；「今天是否已跑过」由 `CleanupLog` 的 scheduled 记录判定
+   * （见 `AdminRetentionService.runScheduled`），重启不会重复删除。
+   * 保留天数取各目标默认值，与后台清理页的默认口径同源。
+   */
+  private async maybeCleanup(): Promise<boolean> {
+    const result = await this.retention.runScheduled();
+    if (result.skipped) return false;
+
+    for (const item of result.results) {
+      if (item.error) {
+        this.logger.warn(`保留期清理失败 (${item.table}): ${item.error}`);
+      } else if (item.deleted > 0) {
+        this.logger.log(`保留期清理 ${item.table}: 删除 ${item.deleted} 条`);
+      }
+    }
+
+    // 单目标失败已在 runScheduled 内隔离；这里汇总抛出，让后台看到连续失败
+    const failed = result.results.filter((item) => item.error);
+    if (failed.length > 0) {
+      const detail = failed.map((item) => `${item.table}(${item.error})`).join('; ');
+      throw new Error(`${failed.length}/${result.results.length} 个清理目标失败: ${detail}`);
+    }
+    return true;
+  }
+
   /** 到期则执行备份 */
-  private async maybeBackup(): Promise<void> {
+  private async maybeBackup(): Promise<boolean> {
     const frequencyDays = await this.readNumber(SETTING_BACKUP_FREQUENCY, 1);
     if (!ALLOWED_FREQUENCIES.includes(frequencyDays as 1)) {
       this.logger.warn(`备份频次配置非法(${frequencyDays}), 跳过`);
-      return;
+      return false;
     }
 
     const lastSuccess = await this.lastSuccessAt();
     if (lastSuccess && Date.now() - lastSuccess.getTime() < frequencyDays * 24 * 3600 * 1000) {
-      return;
+      return false;
     }
 
     this.logger.log(`到达备份周期 (${frequencyDays} 天), 开始执行`);
     await this.backup.run('scheduled');
+    return true;
   }
 
   /** 读数值型设置, 失败回落默认值 */

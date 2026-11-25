@@ -22,6 +22,7 @@
 - 冒烟与 seed 脚本按当前 `NODE_ENV` 选库（`backend/scripts/db-url.js`），默认是开发库。跑测试必须显式 `NODE_ENV=test`，否则会写脏 `dev.db`。
 - 重建测试环境：`NODE_ENV=test npm run db:reset:test`（删库 + 重建 + 重灌种子，带安全门禁）。
 - 启动测试后端：`./start.sh --env test`（端口固定 4100，占用即停）；手工启动用 `NODE_ENV=test node dist/main.js`，不要用 `nest start`。
+- 任务队列使用 BullMQ，启动后端与跑 `verify-task-runtime` 前必须有可用 Redis。测试档用 `backend/.env.test` 的 `redis://127.0.0.1:6379/1`（**1 号库**，与开发档的 0 号库分开，理由同 `test.db` ≠ `dev.db`：共用一个库会让测试补投吃到开发环境的作业）；容器编排内为 `redis://redis:6379/1`。Redis 只保存可重建的作业，数据库仍是任务与账单事实源。
 - 脚本基址：多数支持 `API_BASE`；`smoke-marketing.js` 用 `MARKETING_API_BASE`（含 `/api/v1`）；L2 的 `.js` 验证脚本用 `VERIFY_BASE`。
 - SQLite 单写者：脚本直连库时后端同时写库会撞 `database is locked`（P2039），脚本内已做退避重试。
 
@@ -145,6 +146,8 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | `payments/adapters/paypal.adapter.spec.ts` | PayPal 下单/查单/回调；退款 `FAILED`/`CANCELLED`/`DENIED` 为 `definitive`，网络异常为 `unknown` |
 | `payments/payments.integration.spec.ts` | 临时 SQLite + 真实 Nest HTTP：C 端设置/登录、intent、GET/POST 公开回调、幂等、并发回调只入账一次、金额不符、关单、全额退款、并发退款最多一笔、0 元单、库存并发不超卖、周期限购、订单上限、权限/DTO、CSV 导出 |
 | `common/csv.spec.ts` | UTF-8 / GB18030 解码、BOM、引号内逗号与换行、公式注入防护 |
+| `assets/assets-upload.spec.ts` | 真实 Nest HTTP 起 `AssetsModule`：模块级 `MulterModule.registerAsync` 的 storage 是否真进到拦截器（回落 memoryStorage 会静默让 `filename` 变 undefined）、落盘目录取自 `UPLOAD_DIR`、文件名按 UUID 重命名不沿用客户端原始名、一次只收一张（依据是 multer `single()` 的 maxCount，不是 `limits.files`） |
+| `common/all-exceptions.filter.spec.ts` | 全局过滤器的信封转换：multer 413 → `41301` 且改写为中文文案（不透出 `File too large`）、非 413 的 HttpException 文案原样透出、`AppError` 保留自身码与文案、未知异常固定 `50001` 不外泄细节且落盘一次；另有**真实 multer 链路**两条 —— 直接实例化官方 `FileInterceptor` 喂真 multipart 流，断言超限返回 41301 中文信封、未超限的正常上传不被映射误伤 |
 | `common/archive/zip-reader.spec.ts` | stored/deflate、路径穿越、符号链接/不支持压缩、ZIP 内无 CSV、条目数上限 |
 | `common/setting-image.service.spec.ts` | 设置帮助图片的稳定存储引用解析、未知后端 / 目录穿越拒绝、本地与云存储预览地址生成、历史外链兼容 |
 | `model/proxy/proxy.payload.spec.ts` | 流式 Chat Completions 的 `stream_options.include_usage` 注入：非流式原样返回、缺失时补上、保留已有字段、非法 JSON / 非对象报文 / 非对象 `stream_options` 一律拒绝 |
@@ -174,7 +177,7 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | `verify-protocol-runtime.ts` | 协议运行时：115 个已注册 provider 的 `buildCreate` 冒烟、成功 / 异步 / 失败三类响应归一化；本地假上游走真实接口跑通 `POST /admin/channels/:id/models/test`（image 同步 + video 轮询）与 `POST /admin/channels/:id/models/{fetch,import}`，校验 `ApiCallLog`（`billable=false` / 无明文凭证）、导入默认停用未定价、重复导入不新增；假上游只在回环地址，脚本内临时打开 `MODEL_ALLOW_PRIVATE_UPSTREAMS` |
 | `verify-billing.ts` | 计费账本：预留（含幂等）、固定价结算、Token 差额退回 / 超预授权补扣 / 授权上限截断、按秒计费按实际时长重算、失败全额退款（幂等）、已结算拒绝自动退款、`uncertain` 保留冻结后人工核对、余额不足 `40002`、**「待核对」队列口径（uncertain ∪ running 超 40 分钟 ∪ reserved 但任务已失败/取消，普通预留单不入队）**、**批量核对（逐条独立处置、成功与失败条数分别计数、失败条目带原因、核对人与系统生成原因落库、空列表被拒）**、**冻结积分自动退回开关（默认关闭不退、开启后退 uncertain 单、正在补交付的订单排除、退款归类 `auto_sweep`、操作人记 `system:auto-refund`）**；每一步后校验 `CreditAccount.available == Σ CreditLot.remaining` |
 | `verify-route-catalog.ts` | 能力选路：分组优先、跨分组兜底、健康分层、手工优先级只在同健康层内生效、冷却剔除、加权分布、`simulate` 与 `resolve` 同选、停用绑定不参与 |
-| `verify-task-runtime.ts` | 任务运行时端到端：起本机 HTTP mock 上游，经真实 `ProtocolExecutor` / 出站层跑同步成功、401 切线、超时 `42206`、唯一线路 429、余额不足回滚、未派发 / 已派发取消、租约恢复与钱包不变量；夹具按「能力绑定 + 能力定价」自建并清理 |
+| `verify-task-runtime.ts` | 任务运行时端到端：起本机 HTTP mock 上游，经真实 `ProtocolExecutor` / 出站层跑同步成功、401 切线、超时 `42206`、唯一线路 429、余额不足回滚、未派发 / 已派发取消、队列/租约对账恢复与钱包不变量；夹具按「能力绑定 + 能力定价」自建并清理 |
 | `verify-proxy-runtime.ts` | 中转与运营（P6）：**A 段纯逻辑**（`validateCustomRelayUrl` 的 SSRF 判定 / `resolveOutboundHost` 的 IPv6 与 localhost 拦截 / 路径白名单与密钥查询参数 / 并发槽 / 插件包解析拒绝分支）、**B 段同进程起 Nest + 本机 mock 上游**（`GET /models` 不计费、密钥查询参数剥离、渠道自定义头、服务端凭证注入；`POST` 的 `reserved → settled` 与调用记录；SSE 透传；500 退款；524 `uncertain` 不退款；渠道并发槽 `429`；自定义中转成功 / JSON 与 SSE 脱敏 / 不计费、401 `40101`、SSRF `40301`、上游错误原样透传、用户并发槽 `429`；系统中转限流 `42901`；分组可见性 `40301` 且不建账单；清扫 `reserved → refunded` / `running → uncertain` 且不碰任务账单；钱包恒等式；财务口径与 `BillingOrder` 聚合逐项一致；插件安装 / 重复 `40909` / 被引用拒卸 `40909` / 内置 `40001` / 卸载成功）。`VERIFY_HTTP=0` 只跑 A 段 |
 | `probe-environments.ts` | 三环境解析：档位顺序、不回落 `.env`、空串语义等（不连数据库） |
 

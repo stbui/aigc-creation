@@ -34,6 +34,18 @@
 - 只有文件流（CSV / 发票 HTML）和支付回调这类必须直写协议响应的入口才使用 `@Res()`；
   使用处必须有注释说明为什么不能走统一信封。
 - `@Body()` / `@Query()` 使用 DTO 或明确的原始类型；禁止 `@Body() body: any` 后在 Service 里猜字段。
+  上传同理：`@UploadedFile()` / `@UploadedFiles()` 的参数类型只用官方的
+  `Express.Multer.File`（类型来自 `@types/multer`），不手写 `{ buffer?: Buffer; originalname?: string }`
+  这类影子结构；Service 只需要其中几个字段时用 `Pick<Express.Multer.File, …>` 投影，
+  这样 multer 换版或改字段名时编译期就报错，而不是静默漂移。
+  临时目录不自己 `mkdirSync`：官方 `diskStorage({ destination })` 构造时已递归创建。
+- 上传的 `storage` / `limits` 需要读配置值时，写在**该控制器所在模块**的
+  `MulterModule.registerAsync({ useFactory })` 里，不写在 `@UseInterceptors` 的参数上：
+  装饰器参数在类定义期求值，只能直读 `process.env`，于是 import 顺序成了隐式前提。
+  两个坑必须知道：`register()` 同样是导入期求值（只有 `registerAsync` 的工厂被推迟）；
+  注册在**根模块**的 multer 选项对 feature 模块的拦截器无效（实测），而拦截器拿不到
+  `storage` 时会静默回落 memoryStorage —— 装配要连同这条一起被用例锁住
+  （参考 `assets/assets.module.ts` 与 `assets/assets-upload.spec.ts`）。
 - 当前用户统一用 `@CurrentUser()`；不要从 `req.user` 反复取值，也不要把整个 `Request` 传进 Service。
 
 参考实现：[`orders.controller.ts`](../backend/src/orders/orders.controller.ts)、
@@ -101,11 +113,18 @@
 - 外部渠道适配器必须区分「确定失败」「结果不明」「可重试」；不得把超时一律当失败重发。
 - 后台任务、定时任务和异步副作用必须可追踪；禁止无错误处理的 fire-and-forget Promise。
   必须脱离请求生命周期时显式 `void task.catch(...)` 或交给调度器。
+- 周期任务统一用 `@nestjs/schedule` 的 `@Interval` / `@Timeout` / `@Cron`，在 `AppModule`
+  引入一次 `ScheduleModule.forRoot()`；不再手写 `setInterval` 与 `onModuleInit` /
+  `onModuleDestroy` 配对清理。定时器由调度模块在 bootstrap 挂载、关闭时统一清除，
+  任务自身只负责重入保护与错误处理。
 - 跨请求缓存统一注入 `CACHE_MANAGER`（`src/cache/cache.module.ts` 的 `CacheModule`），
   不再新增手写 TTL Map；key 带域前缀并显式传 TTL，写操作必须 `del` 对应 key。
   缓存只承载可重建、丢失无副作用的读投影；任务 / 账单 / 积分等事实仍以数据库为准。
   例外：带 stale-while-revalidate、同步读或远端拉取语义的快照（`CapabilityCatalogService`、
   `ProtocolCatalogService`、`ProviderCatalogService`）保留自身实现。
+- 注入 `ConfigService` 时使用 `ConfigService<AppConfigValues, true>`（`AppConfigValues`
+  由 `ENV_SPECS` 的 `as const` 派生，扁平点号键）；键拼错在编译期报错。值类型仍由
+  调用处的泛型标注决定，运行时配置树见 `AppConfigTree`。
 
 ## 8. 命名与代码风格
 

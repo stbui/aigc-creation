@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfigValues } from '../config/env.validation';
 import * as jwt from 'jsonwebtoken';
 
 // JWT 工具: 使用 HS256。
@@ -20,7 +21,7 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtService {
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService<AppConfigValues, true>) {}
 
   sign(payload: JwtPayload): string {
     return jwt.sign(

@@ -518,7 +518,7 @@ cd frontend && npm run e2e                     # L4（生产不跑）
 cd backend && npm run verify:deps:critical     # 仅当依赖变动；本设计零新增依赖，可跳过
 ```
 
-依据 `docs/quality-gates.md` §1、`CLAUDE.md` §8。仓库**没有** `smoke:all` / `gate:all`，交付摘要不得声称「全量通过」而不附逐组结果。
+依据 `docs/testing.md` §3、`CLAUDE.md` §8。仓库**没有** `smoke:all` / `gate:all`，交付摘要不得声称「全量通过」而不附逐组结果。
 
 ---
 

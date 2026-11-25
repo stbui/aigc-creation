@@ -315,7 +315,7 @@ export class AdminPaymentReconciliationController {
     }),
   )
   async import(
-    @UploadedFile() file: { buffer?: Buffer; originalname?: string },
+    @UploadedFile() file: Express.Multer.File,
     @Body() dto: ReconciliationImportDto,
     @AdminUser() admin: AdminUserType,
   ) {

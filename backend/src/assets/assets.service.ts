@@ -12,12 +12,16 @@ import { inspectUploadedImage, decodeVerifiedImage } from './image-validation';
 import { warmThumbnails } from './thumb-render';
 import { detachAssetFromTasks } from './task-output-links';
 
-export interface UploadedFileMeta {
-  filename: string;
-  originalname: string;
-  size: number;
-  mimetype: string;
-}
+/**
+ * `createOriginal` 只需要 multer 落盘后的四个字段。
+ *
+ * 类型从官方 `Express.Multer.File` 投影 (`@types/multer`), 不再手抄一份字段清单 ——
+ * multer 换版本或改字段名时这里会跟着报错, 而不是静默漂移。
+ */
+export type UploadedFileMeta = Pick<
+  Express.Multer.File,
+  'filename' | 'originalname' | 'size' | 'mimetype'
+>;
 
 /**
  * 采集来源元数据 (浏览器扩展提交, 人类用户上传时省略)。

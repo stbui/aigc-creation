@@ -1,5 +1,6 @@
 import type { Payment } from '../generated/prisma/client';
 import type {
+  CheckoutPaymentMethod,
   PaymentConfigField,
   PaymentCurrency,
   PaymentProviderId,
@@ -91,24 +92,25 @@ export interface AvailableProviderView {
 
 /** C 端唯一可见的支付方式视图；不暴露真实渠道与来源。 */
 export interface VisiblePaymentProviderView {
-  id: VisiblePaymentMethod;
+  id: CheckoutPaymentMethod;
   name: string;
-  icon: 'alipay' | 'wechat';
+  icon: CheckoutPaymentMethod;
   checkoutMode: string;
   supportedCurrencies: PaymentCurrency[];
-  sandbox: false;
+  /** 仅开发/测试的站内模拟；生产恒为 false */
+  sandbox: boolean;
 }
 
 export interface ResolvedVisiblePayment {
-  method: VisiblePaymentMethod;
+  method: CheckoutPaymentMethod;
   providerId: PaymentProviderId;
   config: ResolvedPaymentConfig;
-  /** EasyPay 需要按 C 端支付方式下单与验签；官方渠道不填。 */
+  /** EasyPay 需要按 C 端支付方式下单与验签；官方渠道与沙箱不填。 */
   providerMethod?: VisiblePaymentMethod;
   /** 轮询下单快照；创建渠道订单前必须原子领取游标。 */
   roundRobin?: {
     providerId: PaymentProviderId;
-    method: VisiblePaymentMethod;
+    method: CheckoutPaymentMethod;
     cursor: number;
     eligibleInstances: Array<{
       instanceId: string;
@@ -118,7 +120,7 @@ export interface ResolvedVisiblePayment {
 }
 
 export interface ReserveVisiblePaymentAttemptInput {
-  method: VisiblePaymentMethod;
+  method: CheckoutPaymentMethod;
   currency: PaymentCurrency;
   amountCents: number;
   orderId: string;

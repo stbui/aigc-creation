@@ -123,7 +123,7 @@ export class AdminSettingsService {
    * 上传只负责把对象写入当前存储后端；运营仍需在设置页保存，才会把引用写入
    * SystemSetting。先写对象再保存是刻意的：取消设置不会留下指向不存在的对象。
    */
-  async uploadImage(file?: { buffer?: Buffer; originalname?: string }) {
+  async uploadImage(file?: Pick<Express.Multer.File, 'buffer' | 'originalname'>) {
     const buffer = file?.buffer;
     if (!buffer?.length) {
       throw new AppError(40001, "请选择要上传的图片", 400);

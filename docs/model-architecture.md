@@ -2,8 +2,8 @@
 
 > 范围：`backend/src/model/**` 与它对外暴露的 `/models`、`/admin/channels`、`/admin/capabilities`、
 > `/admin/api-logs`、`/admin/billing-orders`、`/admin/finance`、`/ai/*` 中转。
-> 本文只写**当前实际实现**，每条约束都能在代码里核对；设计动机、移植记录与未实施的增量设计见
-> [`docs/channel-model-design.md`](./channel-model-design.md)。
+> 本文只写**当前实际实现**，每条约束都能在代码里核对；移植记录与历史取舍已随 `docs/` 收敛删除，
+> 需要时查 `git log -- docs/channel-model-design.md`。未实施的增量设计见本文 §15。
 >
 > 前台模型层（`LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute`）已于 2026-11-13 删除：
 > 渠道模型直接作为售卖供给，按能力绑定后由运行时自动切换线路。
@@ -128,17 +128,18 @@ traceId → GenerationTask → RouteAttempt → ApiCallLog → providerRequestId
 `creditCost`；其余任务 `parentTaskId` 指向父任务，共享 `batchId / batchIndex / batchSize`。
 某张切线只换它自己的账单；模块失败互不连坐，只有后台显式终止 / 整批取消才会中止未派发的兄弟任务并各自退款。
 
-### 5.2 执行（`task-worker.service.ts`）
+### 5.2 执行（`task-worker.service.ts` + `task.processor.ts`）
 
 ```
-queued ──CAS 领取──► running（写租约）
-running ──租约过期──► recover（按 attempt.dispatchState 分流）
-running ──nextPollAt 到期──► 回查上游
-每 15s 续租，租约 45s；进程被杀后最迟 45s 被接管
+queued ──BullMQ Worker 锁──► running（写 fencing token）
+running ──moveToDelayed──► 同一个作业在 nextPollAt 到期后回查上游
+进程/Worker 崩溃 ──BullMQ stalled 重试──► 重新领取并接管
+数据库有任务但队列无作业 ──启动/task-recover 对账──► 补投
 ```
 
-- 每步只做一件事就把执行位让出去，长轮询不占进程。
-- 本进程执行位上限来自 `MODEL_ACTIVE_TASK_LIMIT`（默认 64，范围 1–64）。领取排队任务时同时检查用户 `maxConcurrent` 与渠道 `concurrencyLimit`；任一已满就跳过该任务，留在队列等下一轮，不判失败。例如 20 张、套餐并发 10、渠道并发 8 → 8 / 8 / 4 三批。
+- 调度使用官方 `@nestjs/bullmq`：一个 `taskId` 对应一个作业，`jobId` 去重；轮询用 `moveToDelayed` 延后同一个作业，不再有 1s tick、进程内 active 集合或数据库租约续期。
+- `leaseOwner` 保留为 fencing token：每次作业执行生成唯一值，终态与换账单按它做 CAS；BullMQ 作业锁失效后旧执行者无法覆盖新执行者。
+- 本进程 Worker 并发来自 `MODEL_ACTIVE_TASK_LIMIT`（默认 64，范围 1–64）。执行前同时检查用户 `maxConcurrent` 与渠道 `concurrencyLimit`；任一已满就把作业 delayed 1s 后重试，留在 `queued`，不判失败。例如 20 张、套餐并发 10、渠道并发 8 → 8 / 8 / 4 三批。
 - 轮询间隔与总时限按能力模态固定：图像 3s / 15min，视频 5s / 60min，文本 1s / 10min，音频 2s / 20min。
 
 ### 5.3 一次尝试（`task-executor.service.ts`）
@@ -304,8 +305,6 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 | `MODEL_ACTIVE_TASK_LIMIT` | 64 | 本进程同时执行的任务数上限（1–64） |
 | `MODEL_HTTP_TIMEOUT_MS` | 120000 | 单次上游请求超时 |
 | `MODEL_MEDIA_TIMEOUT_MS` | 180000 | 媒体下载超时 |
-| `MODEL_WORKER_INTERVAL_MS` | 1000 | 调度节拍 |
-| `MODEL_LEASE_MS` | 120000 | 任务租约（代码内含 45s 下限保护） |
 | `MODEL_SLOT_WAIT_MS` | 60000 | 渠道并发槽等槽上限；超时即切线 / `429` |
 | `MODEL_ALLOW_PRIVATE_UPSTREAMS` / `MODEL_ALLOWED_PRIVATE_UPSTREAM_HOSTS` | false / 空 | 是否允许私网上游（本地联调才开） |
 | `MODEL_PROXY_*` | 见 env.validation | 中转的开关、体积、超时、并发 |
@@ -313,6 +312,16 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 
 **生成通道没有 `GATEWAY_*`**：渠道、商品、绑定、售价全部在后台配置。零绑定 = 能力
 `unavailable`，提交直接被拦（`40005`）。
+
+任务队列另需 `REDIS_URL`（默认 `redis://127.0.0.1:6379`）。Redis 只保存可重建的
+队列状态；任务、账单与 `nextPollAt` 仍以数据库为准，Redis 丢数据时由启动对账补投。
+
+队列命令有 5 秒硬截止：BullMQ 要求 `maxRetriesPerRequest: null`、ioredis 的
+`enableOfflineQueue` 又默认开启，Redis 不可达时命令既不 resolve 也不 reject，
+因此截止只能加在生产者调用侧（`task-queue.service.ts`）。读不到作业列表时
+恢复对账**报成失败**（登记 `task-recover` 连续失败）而不是静默返回 0 ——
+否则调度器每轮都「成功」，Redis 停摆无人察觉；同一任务内只依赖数据库的
+会员补发与邀请奖励重试不受影响。
 
 ## 13. 运行期约束与排障
 
@@ -328,10 +337,10 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 
 ## 14. 相关文档
 
-- 设计动机、移植记录与增量设计：`docs/channel-model-design.md`
+- 移植记录与历史设计动机：已删除，查 `git log -- docs/channel-model-design.md`；待实施增量设计见本文 §15
 - 三环境与变量矩阵：`docs/environments.md`
 - 接口清单与错误码：`docs/api-contract.md`
-- 积分扣费与退款口径：`docs/commerce-design.md`
+- 积分扣费与退款口径：本文 §8、`docs/payment-detailed-design.md`
 - 测试闸口与已知缺口：`docs/testing.md`
 
 ## 15. 追踪闭环与配置发布（待实施）
