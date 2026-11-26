@@ -153,7 +153,7 @@ function RuntimeSection({ runtime }: { runtime: AdminSystemPerformance['runtime'
   return (
     <Panel
       title="运行时"
-      note="只统计本应用进程；常驻内存（RSS）是进程实际占用的物理内存，堆内存是其中 JS 引擎管理、可回收的部分"
+      note="仅本应用进程；常驻内存（RSS）是进程实际占用的物理内存，堆内存是其中由 JS 引擎管理、可回收的部分"
     >
       <Rows
         items={[
@@ -162,7 +162,7 @@ function RuntimeSection({ runtime }: { runtime: AdminSystemPerformance['runtime'
           { label: 'Node 版本', value: runtime.node },
           { label: '进程号', value: String(runtime.pid) },
           { label: '已运行', value: formatDuration(runtime.uptimeSec * 1000) },
-          { label: '常驻内存', value: formatBytes(runtime.memory.rssBytes) },
+          { label: '常驻内存（RSS）', value: formatBytes(runtime.memory.rssBytes) },
           {
             label: '堆内存',
             value: `${formatBytes(runtime.memory.heapUsedBytes)} / ${formatBytes(runtime.memory.heapTotalBytes)}（已用 / 已分配）`,

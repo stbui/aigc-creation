@@ -15,7 +15,7 @@ https://thai.quantv.com/image-creation
 https://mp.weixin.qq.com/s/oH1ce7uivmn3pZQyLy9LAw
 
 todo：
-- 将后端功能迁移到本项目
+
 - 模型能力
 - 积分系统
 - 支付系统
@@ -26,7 +26,7 @@ todo：
 
 - 提示词稳定性
 系统升级、数据备份、数据迁移
-系统设置
+
 
 
 内容替换
