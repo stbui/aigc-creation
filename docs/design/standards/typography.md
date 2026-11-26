@@ -14,15 +14,19 @@
 
 ### 1.1 加载
 
-`frontend/index.html` 引入 Google Fonts：
+`frontend/index.html` 引入 Google Fonts，用**可变字体轴**覆盖 400–800 全档：
 
 ```
-Inter          400;500;600;700;800
-Noto Sans SC   400;500;600;700;800
+Inter          400..800
+Noto Sans SC   400..800
 display=swap
 ```
 
 600 与 800 两个字重是必需的：全站大量使用 600 作强调、800 作数字与主按钮。缺失时浏览器会走合成伪粗体，字缘发糊，且字宽与真实字重不同，会连带影响布局。
+
+**为什么是可变量而不是 5 个静态字重**：静态写法要 540 个 `@font-face` / 577 KB CSS（gzip 156 KB）；可变轴只要 108 个 face / 116 KB（gzip 31.5 KB），字形与 400–800 全部字重不变。800 仍可真实渲染，不会退化成合成伪粗体。中文按 `unicode-range` 分 101 个分片懒加载，只下当前页面用到的部分。
+
+**必须非阻塞加载**：字体 CSS 用 `media="print"` + `onload="this.media='all'"` 引入，`<noscript>` 里保留普通 `<link>` 兜底。裸的 `<link rel="stylesheet">` 会阻塞首屏渲染；577 KB 的字体 CSS 在弱网下能拖住整页。`display=swap` 保证字体切换前文字已用系统字体可见。
 
 `display=swap` 下 `document.fonts` 里显示 `unloaded` 是正常态（按需加载）。验证字重是否可用，看 face 是否**注册**，不看 `status`。
 

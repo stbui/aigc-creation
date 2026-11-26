@@ -88,6 +88,11 @@ export class PaymentConfigService implements OnModuleInit {
     return this.store.byId(configId);
   }
 
+  /** 批量按 Payment 引用的 configId 精确解析；缺失项由调用方处理。 */
+  byIds(configIds: readonly string[]): Promise<Map<string, ResolvedPaymentConfig>> {
+    return this.store.byIds(configIds);
+  }
+
   /**
    * 订单固定版本；历史单无 configId 时只回落到它自己的实例（或旧默认实例），
    * 绝不跨实例、跨渠道。

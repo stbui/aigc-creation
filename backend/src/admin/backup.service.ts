@@ -1,19 +1,29 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomBytes } from 'crypto';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfigValues } from '../config/env.validation';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService, isSqliteUrl } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { sqliteUrlToPath } from '../config/env-files';
 import { BACKUP_STALE_HOURS } from './alert-thresholds';
 
-/** 备份文件名前缀, 便于人工识别 */
-const FILE_PREFIX = 'huojue-dev';
-const FILE_SUFFIX = '.db';
+const execFileAsync = promisify(execFile);
+
+/**
+ * 备份文件名。按方言区分后缀, 便于人工辨认恢复方式:
+ *   · SQLite —— `huojue-dev-*.db`, 是可直接 `rm 库 + cp` 或 sqlite3 打开的快照;
+ *   · PostgreSQL —— `huojue-prod-*.sql`, 是 pg_dump 的纯文本逻辑备份。
+ */
+const SQLITE_FILE_PREFIX = 'huojue-dev';
+const SQLITE_FILE_SUFFIX = '.db';
+const PG_FILE_PREFIX = 'huojue-prod';
+const PG_FILE_SUFFIX = '.sql';
 
 /**
  * 允许被清理的业务表。
@@ -69,25 +79,42 @@ export class BackupService {
   }
 
   /**
-   * 生产库路径: 与 PrismaService 的 adapter 保持一致。
+   * 数据库连接串: 与 PrismaService 的 adapter 读同一个 DATABASE_URL。
+   * PostgreSQL 是网络服务, 没有本地库文件可 stat —— pg_dump 直接用连接串导出。
+   */
+  private get databaseUrl(): string {
+    return this.config.get<string>('db.url') ?? 'file:./dev.db';
+  }
+
+  /** 当前连接是否为 SQLite（`file:` 协议） */
+  private isSqlite(): boolean {
+    return isSqliteUrl(this.databaseUrl);
+  }
+
+  /**
+   * SQLite 库文件路径: 与 PrismaService 的 adapter 保持一致。
    *
    * 两者读同一个 DATABASE_URL, 故这里用 sqliteUrlToPath 而非写死 dev.db ——
    * 写死的话 test/production 会去备份开发库, 备份记录指向一个永远不变的库,
    * 表面成功实际无效。
    */
   private get dbPath(): string {
-    return sqliteUrlToPath(this.config.get<string>('db.url') ?? 'file:./dev.db', process.cwd());
+    return sqliteUrlToPath(this.databaseUrl, process.cwd());
   }
 
   /**
    * 执行一次备份。
    *
-   * 用 `VACUUM INTO` 而非 `cp`: VACUUM INTO 是 SQLite 官方的一致性快照方式,
-   * 在线完成且不会拷贝到写事务中间状态; cp 可能在 WAL 模式下拿到撕裂的库。
-   *
-   * 快照期间会短暂持有写锁, 但不阻塞读 —— 对本地 SQLite 场景足够。
+   * 按方言走两条真实导出路径:
+   *   · SQLite —— `VACUUM INTO`。它是 SQLite 官方的一致性快照方式, 在线完成且
+   *     不会拷贝到写事务中间状态; cp 可能在 WAL 模式下拿到撕裂的库。快照期间
+   *     短暂持有写锁但不阻塞读, 对本地单文件场景足够。
+   *   · PostgreSQL —— 官方 `pg_dump` 在线逻辑备份: 单一事务内取一致性快照,
+   *     不阻塞读写, 导出为可移植纯 SQL 文本。用 execFile 传参数数组而非 shell
+   *     拼接, 连接串里的密码/特殊字符不会被 shell 解释。
    */
   async run(trigger: 'manual' | 'scheduled' = 'manual'): Promise<BackupRow> {
+    const sqlite = this.isSqlite();
     const now = new Date();
     const stamp = [
       now.getFullYear(),
@@ -101,14 +128,16 @@ export class BackupService {
     // 时间戳只到秒；追加随机后缀，避免同一秒内的手动/定时备份撞上
     // BackupRecord.filename 的唯一约束（相同内容也不影响文件可读性）。
     const suffix = randomBytes(3).toString('hex');
-    const filename = `${FILE_PREFIX}-${stamp}-${suffix}${FILE_SUFFIX}`;
+    const filename = sqlite
+      ? `${SQLITE_FILE_PREFIX}-${stamp}-${suffix}${SQLITE_FILE_SUFFIX}`
+      : `${PG_FILE_PREFIX}-${stamp}-${suffix}${PG_FILE_SUFFIX}`;
     const target = join(this.backupDir, filename);
 
-    if (!existsSync(this.dbPath)) {
+    if (sqlite && !existsSync(this.dbPath)) {
       throw new AppError(50000, '数据库文件不存在，请检查备份配置', 500);
     }
-
-    const sourceSize = await this.fileSize(this.dbPath);
+    // SQLite 可记录源文件体积；PG 是网络服务，体积不可从连接串推出。
+    const sourceSize = sqlite ? await this.fileSize(this.dbPath) : null;
 
     // 先落记录再执行: 失败时也要留下失败痕迹, 否则"没记录"与"失败"无法区分
     const record = await this.prisma.backupRecord.create({
@@ -125,14 +154,23 @@ export class BackupService {
     try {
       await fs.mkdir(this.backupDir, { recursive: true });
 
-      // 若目标已存在(VACUUM INTO 不覆盖), 先移除 —— 同秒重试的场景
-      if (existsSync(target)) await fs.unlink(target);
-
-      const db = new DatabaseSync(this.dbPath, { readOnly: true });
-      try {
-        db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
-      } finally {
-        db.close();
+      if (sqlite) {
+        // 若目标已存在(VACUUM INTO 不覆盖), 先移除 —— 同秒重试的场景
+        if (existsSync(target)) await fs.unlink(target);
+        const db = new DatabaseSync(this.dbPath, { readOnly: true });
+        try {
+          db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
+        } finally {
+          db.close();
+        }
+      } else {
+        // pg_dump 用 -f 写目标文件（覆盖已有）。--no-password 避免交互式等待：
+        // 凭据来自连接串, 拿不到就立即失败, 不挂起后台定时器。
+        await execFileAsync(
+          'pg_dump',
+          ['--no-password', '--format=plain', '--file', target, this.databaseUrl],
+          { maxBuffer: 10 * 1024 * 1024 },
+        );
       }
 
       const sizeBytes = await this.fileSize(target);
@@ -161,13 +199,12 @@ export class BackupService {
   /**
    * 恢复验证 (B-97)。
    *
-   * 在**独立打开**备份文件的前提下检查三件事:
-   *   1. `PRAGMA integrity_check` —— 文件未损坏
-   *   2. 表结构完整 —— schema 与预期表名齐全
-   *   3. 业务表可读且计数合理 —— 能真正用于恢复
+   * 在**独立打开**备份文件的前提下检查三件事, 具体手段按方言分支:
+   *   · SQLite —— `PRAGMA integrity_check` / sqlite_master 表名 / COUNT 计数;
+   *   · PostgreSQL —— pg_dump 文本头尾标记 / CREATE TABLE 语句 / COPY 块行数。
    *
-   * ⚠ 绝不覆盖生产库: 只读打开备份文件, 验证逻辑里没有任何写操作指向 dev.db。
-   * 这是不可逆操作前唯一的保险, 验证本身必须零副作用。
+   * ⚠ 绝不连接生产库: 纯文本备份与只读快照的验证都是只读分析, 没有任何
+   * 写操作指向数据库。这是不可逆操作前唯一的保险, 验证本身必须零副作用。
    */
   async verify(id: string): Promise<BackupRow> {
     const record = await this.prisma.backupRecord.findUnique({ where: { id } });
@@ -196,26 +233,22 @@ export class BackupService {
     const report: string[] = [];
     let integrityOk = true;
 
-    const db = new DatabaseSync(filePath, { readOnly: true });
-    try {
-      // 1. 完整性
-      const integrity = db.prepare('PRAGMA integrity_check').all() as Array<{ integrity_check: string }>;
-      const integrityResult = integrity[0]?.integrity_check ?? 'unknown';
-      if (integrityResult !== 'ok') {
+    if (this.isSqlite()) {
+      integrityOk = this.verifySqlite(filePath, report);
+    } else {
+      const sql = await fs.readFile(filePath, 'utf8');
+
+      // 1. 文本头/尾完整: pg_dump 以固定标记开头, 以 \restrict 撤销 + COMMIT 结束
+      if (!sql.startsWith('--\n-- PostgreSQL database dump') || !/\\unrestrict\s*;?\s*$/m.test(sql)) {
         integrityOk = false;
-        report.push(`integrity_check=${integrityResult}`);
+        report.push('pg_dump 头尾标记缺失, 备份可能被截断');
       } else {
-        report.push('integrity_check=ok');
+        report.push('pg_dump 文本头尾完整');
       }
 
-      // 2. 表结构
-      const tables = new Set(
-        (db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as Array<{ name: string }>).map(
-          (r) => r.name,
-        ),
-      );
+      // 2. 表结构: pg_dump 输出 `CREATE TABLE public."User" (...)`
       const REQUIRED = ['User', 'Project', 'Asset', 'GenerationTask', 'AdminRole'];
-      const missing = REQUIRED.filter((t) => !tables.has(t));
+      const missing = REQUIRED.filter((t) => !sql.includes(`CREATE TABLE public."${t}"`));
       if (missing.length > 0) {
         integrityOk = false;
         report.push(`缺失表: ${missing.join(', ')}`);
@@ -223,19 +256,16 @@ export class BackupService {
         report.push(`表结构完整(${REQUIRED.length} 张关键表)`);
       }
 
-      // 3. 业务表可读且计数合理
+      // 3. 业务表行数: 数 COPY 块内的数据行（COPY ... FROM stdin; 至 \.）
       for (const t of ['User', 'Project', 'Asset', 'GenerationTask']) {
-        if (!tables.has(t)) continue;
-        try {
-          const rows = db.prepare(`SELECT COUNT(*) AS c FROM "${t}"`).get() as { c: number } | undefined;
-          report.push(`${t}=${rows?.c ?? 0} 行`);
-        } catch (e) {
-          integrityOk = false;
-          report.push(`${t} 不可读: ${(e as Error).message}`);
+        const m = sql.match(new RegExp(`COPY public\\."${t}"[^\\n]*\\n([\\s\\S]*?)\\n\\\\\\.`, 'm'));
+        if (!m) {
+          report.push(`${t}=0 行(无 COPY 块)`);
+          continue;
         }
+        const lines = m[1].split('\n').filter(Boolean).length;
+        report.push(`${t}=${lines} 行`);
       }
-    } finally {
-      db.close();
     }
 
     const updated = await this.prisma.backupRecord.update({
@@ -477,6 +507,62 @@ export class BackupService {
       throw new AppError(40001, '非法文件名', 400);
     }
     return full;
+  }
+
+  /**
+   * SQLite 备份文件验证: 只读打开快照, 检查完整性 / 表结构 / 业务表可读性。
+   * `report` 收集人类可读的结论; 返回 false 表示文件不可用于恢复。
+   */
+  private verifySqlite(filePath: string, report: string[]): boolean {
+    let ok = true;
+    const db = new DatabaseSync(filePath, { readOnly: true });
+    try {
+      // 1. 完整性
+      const integrity = db.prepare('PRAGMA integrity_check').all() as Array<{
+        integrity_check: string;
+      }>;
+      const integrityResult = integrity[0]?.integrity_check ?? 'unknown';
+      if (integrityResult !== 'ok') {
+        ok = false;
+        report.push(`integrity_check=${integrityResult}`);
+      } else {
+        report.push('integrity_check=ok');
+      }
+
+      // 2. 表结构
+      const tables = new Set(
+        (
+          db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as Array<{
+            name: string;
+          }>
+        ).map((r) => r.name),
+      );
+      const REQUIRED = ['User', 'Project', 'Asset', 'GenerationTask', 'AdminRole'];
+      const missing = REQUIRED.filter((t) => !tables.has(t));
+      if (missing.length > 0) {
+        ok = false;
+        report.push(`缺失表: ${missing.join(', ')}`);
+      } else {
+        report.push(`表结构完整(${REQUIRED.length} 张关键表)`);
+      }
+
+      // 3. 业务表可读且计数合理
+      for (const t of ['User', 'Project', 'Asset', 'GenerationTask']) {
+        if (!tables.has(t)) continue;
+        try {
+          const rows = db.prepare(`SELECT COUNT(*) AS c FROM "${t}"`).get() as
+            | { c: number }
+            | undefined;
+          report.push(`${t}=${rows?.c ?? 0} 行`);
+        } catch (e) {
+          ok = false;
+          report.push(`${t} 不可读: ${(e as Error).message}`);
+        }
+      }
+    } finally {
+      db.close();
+    }
+    return ok;
   }
 
   private async fileSize(path: string): Promise<number> {

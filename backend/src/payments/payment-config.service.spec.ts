@@ -672,3 +672,34 @@ describe('PaymentConfigService.reserveVisiblePaymentAttempt', () => {
     expect(prisma.payment.create).not.toHaveBeenCalled();
   });
 });
+
+describe('PaymentConfigStore.byIds', () => {
+  it('按唯一 id 批量解析，并跳过单条解密失败的配置', async () => {
+    const good = instanceRow('alipay', ALIPAY_VALUES, { id: 'cfg_good' });
+    const bad = instanceRow(
+      'alipay',
+      { ...ALIPAY_VALUES, appId: 'bad-app' },
+      { id: 'cfg_bad' },
+    );
+    const prisma = {
+      paymentProviderConfig: {
+        findMany: vi.fn().mockResolvedValue([good, bad]),
+      },
+    };
+    const cipher = {
+      decrypt: vi.fn((cipherText: string) => {
+        if (cipherText === bad.configCipher) throw new Error('bad key');
+        return cipherText;
+      }),
+    };
+    const store = new PaymentConfigStore(prisma as never, cipher as never);
+
+    const resolved = await store.byIds(['cfg_good', 'cfg_bad', 'cfg_good', '']);
+
+    expect(prisma.paymentProviderConfig.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['cfg_good', 'cfg_bad'] } },
+    });
+    expect([...resolved.keys()]).toEqual(['cfg_good']);
+    expect(resolved.get('cfg_good')?.values).toEqual(ALIPAY_VALUES);
+  });
+});

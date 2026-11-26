@@ -5,6 +5,7 @@ import { SettingImageService } from './setting-image.service';
 import { SecretCipher } from '../model/infra/secret-cipher';
 import { SettingsController } from './settings.controller';
 import { JwtService } from './jwt.service';
+import { AuthUserCacheService } from './auth-user-cache.service';
 
 /**
  * 横切关注点模块（B5）。
@@ -22,7 +23,7 @@ import { JwtService } from './jwt.service';
 @Global()
 @Module({
   controllers: [SettingsController],
-  providers: [SignedUrlService, SettingsService, SettingImageService, SecretCipher, JwtService],
-  exports: [SignedUrlService, SettingsService, SettingImageService, SecretCipher, JwtService],
+  providers: [SignedUrlService, SettingsService, SettingImageService, SecretCipher, JwtService, AuthUserCacheService],
+  exports: [SignedUrlService, SettingsService, SettingImageService, SecretCipher, JwtService, AuthUserCacheService],
 })
 export class CommonModule {}

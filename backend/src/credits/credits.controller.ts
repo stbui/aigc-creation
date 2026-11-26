@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { UseGuards } from '@nestjs/common';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
@@ -34,6 +34,20 @@ export class CreditLedgerQueryDto {
   businessType?: string;
 }
 
+/**
+ * 批次查询参数。
+ *
+ * 保持原 `include !== 'false'` 的宽松语义：只有字面量 'false' 才排除过期批次，
+ * 其余（缺省 / 'true' / 任意值）都包含。这里用 @Transform 把容错收敛在 DTO 层，
+ * Controller 不再内联解析字符串；service 仍只收 boolean，签名与行为都不变。
+ */
+export class CreditLotsQueryDto {
+  @IsOptional()
+  @Transform(({ value }) => value !== 'false')
+  @IsBoolean()
+  includeExpired?: boolean;
+}
+
 /** C 端积分接口: 用户查自己的余额、批次与流水 */
 @Controller('credits')
 @UseGuards(JwtAuthGuard)
@@ -48,8 +62,8 @@ export class CreditsController {
 
   /** 批次明细 (B-50) */
   @Get('lots')
-  lots(@CurrentUser() user: AuthUser, @Query('includeExpired') include?: string) {
-    return this.credit.lotsOf(user.id, include !== 'false');
+  lots(@CurrentUser() user: AuthUser, @Query() query: CreditLotsQueryDto) {
+    return this.credit.lotsOf(user.id, query.includeExpired ?? true);
   }
 
   /** 流水查询 (B-51，支持 limit/offset 分页与 type/direction/businessType 筛选) */

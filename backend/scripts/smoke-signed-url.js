@@ -143,8 +143,7 @@ async function signedServer() {
   console.log(`\n【真实服务 · 端口 ${PORT}（带密钥实例）】`);
   loadEnvOnce();
   const { PrismaClient } = require('./prisma-client');
-  const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
-  const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
+  const prisma = new PrismaClient();
 
   const logFile = path.join(require('os').tmpdir(), `smoke-signed-${Date.now()}.log`);
   const fd = fs.openSync(logFile, 'w');

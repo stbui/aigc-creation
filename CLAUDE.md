@@ -25,7 +25,7 @@
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
 | 三环境档位 / 库与目录 | `backend/src/config/env-files.ts`、`backend/scripts/db-url.js`、`docs/environments.md` |
-| 数据库表结构 | `backend/prisma/schema.prisma` |
+| 数据库表结构 | `backend/prisma/schema.prisma`（PostgreSQL 主源）；SQLite 派生件 `schema.sqlite.prisma` 由 `npm run prisma:sync-sqlite` 生成，不手改 |
 | 跨请求缓存 / 默认 TTL | `backend/src/cache/cache.module.ts` 的 `CacheModule`；业务侧注入 `CACHE_MANAGER` |
 | 后台菜单与分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 设计令牌 | `frontend/src/styles/tokens.css` 的 `:root`；`admin.css` 的 `@theme inline` 只做语义桥接 |
@@ -39,7 +39,7 @@
 | --- | --- | --- |
 | 107 个插件包 / 115 个 provider | `backend/plugins/*/manifest.json` | 3 个 `src-*` 镜像目录（`src-a6api` / `src-antigravity-proxy` / `src-metaso-h3`）不参与运行 |
 | 17 项能力 / 16 image + 1 video / 14 项进工作台 | `definitions/index.ts` 的 `CAPABILITY_PLUGINS` | `*.spec.ts`、`*-options.ts`、`*.templates.ts` 不是能力定义 |
-| 36 个后台菜单入口 / 7 个分组 | `adminNav.ts` 的 `ADMIN_MENU` | 外壳、概览内容组件与测试目录不是菜单页 |
+| 37 个后台菜单入口 / 7 个分组 | `adminNav.ts` 的 `ADMIN_MENU` | 外壳、概览内容组件与测试目录不是菜单页 |
 | 35 条壳内路由 | `frontend/src/App.tsx` 的 `Shell()` 内全部 `<Route>`（含裸外壳 2 页 + catch-all 2 条，业务路由 31 条） | `/login` 等 6 条独立页与 `/admin/*` 在 `App()` 层、不在 Shell 内，不属本口径 |
 
 本地账号：development / test 的后台预设为 `admin@admin.com` / `123456789`；普通账号由 `seed` 创建，不能获得 admin 角色。production 不设默认密码，必须显式提供 `ADMIN_PASSWORD` 或使用一次性随机密码。
@@ -183,7 +183,7 @@ npx biome format --write <files>
 
 ## 7. 环境踩坑
 
-1. **Node ≥ 22.12**。SQLite 使用 Prisma 官方 `@prisma/adapter-better-sqlite3`；`@nestjs/config` 是纯 ESM 而项目为 CommonJS，依赖 Node 的 `require(esm)`。低于该版本会 `ERR_REQUIRE_ESM`。
+1. **Node ≥ 22.12**。双方言：本地 development / test 用 SQLite（`@prisma/adapter-better-sqlite3` + `src/generated/prisma-sqlite`），production 用 PostgreSQL（`@prisma/adapter-pg` + `src/generated/prisma`），按 `DATABASE_URL` 的 `file:` 协议选择（`src/prisma/create-prisma-client.ts`）。`@nestjs/config` 是纯 ESM 而项目为 CommonJS，依赖 Node 的 `require(esm)`。低于该版本会 `ERR_REQUIRE_ESM`。
 2. **不要用 `nest start`**。安全守卫会拒绝清空 `dist`；使用 `npm run build` + `node dist/main.js`。
 3. **端口固定后端 4100、前端 5100**。开发 / 测试 / 生产同端口；开发 / 测试启动时若占用则先停占用进程，不回退端口。
 4. **CORS 默认只放行 `http://localhost:5100`**。`localhost` 与 `127.0.0.1` 是不同来源；排障先看启动日志的 `CORS origins:`。`CORS_ORIGINS` 给定时覆盖默认规则，`CORS_ALLOW_PRIVATE_LAN=1` 供手机调试。

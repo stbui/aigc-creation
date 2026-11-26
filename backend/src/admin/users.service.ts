@@ -15,6 +15,7 @@ import { MembershipService } from "../membership/membership.service";
 import { CreditService } from "../credits/credit.service";
 import { UserGroupService } from "../model/user-groups/user-group.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { AuthUserCacheService } from "../common/auth-user-cache.service";
 import { ROLE_LABELS, USER_STATUS_LABELS, type UserRole } from "./permissions";
 import { buildPage, paginate, type PageQueryInput, type PageResult } from "./dto/page-query.dto";
 
@@ -117,6 +118,7 @@ export class AdminUsersService {
     private readonly groups: UserGroupService,
     // 重置密码 / 禁用后通知本人；notify() 永不抛异常，不阻断主流程。
     private readonly notifications: NotificationsService,
+    private readonly authUsers: AuthUserCacheService,
   ) {}
 
   /**
@@ -646,8 +648,8 @@ export class AdminUsersService {
   /**
    * 禁用/启用。
    *
-   * 由于 AdminGuard 每次请求查库校验 status, 被禁用用户的旧 token
-   * 在下一次请求即失效, 无需额外的 token 黑名单。
+   * 由于 AdminGuard 每次请求校验账号快照, 且本方法写入后会主动失效缓存,
+   * 被禁用用户的旧 token 在下一次请求即失效, 无需额外的 token 黑名单。
    */
   async changeStatus(id: string, dto: ChangeUserStatusInput, actorId: string) {
     const user = await this.findUser(id);
@@ -668,6 +670,7 @@ export class AdminUsersService {
         data: { status: dto.status },
       });
     });
+    await this.authUsers.invalidate(id);
 
     // 通知失败不影响处置结果；notify() 自身永不抛异常。
     await this.notifications.notify({
@@ -719,6 +722,7 @@ export class AdminUsersService {
       }
       await tx.user.update({ where: { id }, data: { role: dto.role } });
     });
+    await this.authUsers.invalidate(id);
     return { id, role: dto.role, roleLabel: ROLE_LABELS[dto.role] ?? dto.role };
   }
 
@@ -752,6 +756,7 @@ export class AdminUsersService {
         tempPasswordExpiresAt: expiresAt,
       },
     });
+    await this.authUsers.invalidate(id);
 
     await this.notifications.notify({
       userId: id,
@@ -794,6 +799,7 @@ export class AdminUsersService {
       // 扫码登录票据也一并作废；未确认的扫码请求不应在下次打开时继续有效。
       this.prisma.loginSession.deleteMany({ where: { userId: id } }),
     ]);
+    await this.authUsers.invalidate(id);
     return { id, revoked: true };
   }
 

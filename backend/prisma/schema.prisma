@@ -1,4 +1,11 @@
-// Prisma schema for huojue backend.
+// Prisma schema for huojue backend — PostgreSQL 主源。
+//
+// 本仓库支持双方言: 本地 development / test 用 SQLite, 生产用 PostgreSQL。
+// 运行期由 DATABASE_URL 协议选择 adapter 与生成物（src/prisma/create-prisma-client.ts）。
+// SQLite 方言的 schema 是本文件的派生（prisma/schema.sqlite.prisma, 只换 provider
+// 与 generator.output）—— 改本文件后运行 `npm run prisma:sync-sqlite` 同步,
+// verify:prisma 校验两份不漂移。
+//
 // 说明: capability / status / kind 一律用 String 存储, 取值范围由 DTO / service 层
 // 白名单强制约束。Prisma 7 虽允许在 SQLite schema 声明 enum, 但落库只有 TEXT、
 // 没有 CHECK, 数据库层仍不校验取值; 本仓统一用 String + 白名单。
@@ -12,7 +19,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model User {

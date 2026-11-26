@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
-import { PrismaService } from '../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
+import { Prisma } from '../generated/prisma/client';
+import { isSqliteUrl, PrismaService } from '../prisma/prisma.service';
+import type { AppConfigValues } from '../config/env.validation';
 import { AppError } from '../common/app.exception';
 import { getCapability } from '../capabilities/capability.registry';
 import { ALL_PERMISSIONS, ROLE_LABELS, ROLE_PERMISSIONS } from './permissions';
@@ -36,8 +39,14 @@ export class AdminOverviewService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly signedUrl: SignedUrlService,
+    private readonly config: ConfigService<AppConfigValues, true>,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
+
+  /** 当前连接是否为 SQLite（`file:` 协议）；raw SQL 的方言分支据此取值 */
+  private isSqlite(): boolean {
+    return isSqliteUrl(this.config.get<string>('db.url'));
+  }
 
   async overview(days: number) {
     const key = AdminOverviewService.cacheKey(days);
@@ -379,18 +388,25 @@ export class AdminOverviewService {
   /**
    * 任务趋势原始日桶。
    *
-   * 按 Asia/Shanghai 的日界分组（`+8 hours`），而不是按服务器本地时区 ——
-   * 容器默认 UTC，按本地日期分组会让「今天」在跨时区部署时整体偏移。
+   * 按 Asia/Shanghai 的日界分组（SQLite 用 `+8 hours`，PG 用 AT TIME ZONE），
+   * 而不是按服务器本地时区 —— 容器默认 UTC，按本地日期分组会让「今天」在
+   * 跨时区部署时整体偏移。
+   *
+   * 两方言的日期截断语法不同，故表达式按方言分支；`GROUP BY 1` 用输出列序位
+   * 而不是别名 —— PostgreSQL 的 GROUP BY 不接受输出别名（SQLite 接受）。
    */
   private dailyTaskTrend(since: Date) {
+    const day = this.isSqlite()
+      ? Prisma.sql`strftime('%Y-%m-%d', "createdAt", '+8 hours')`
+      : Prisma.sql`to_char(date_trunc('day', "createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Shanghai'), 'YYYY-MM-DD')`;
     return this.prisma.$queryRaw<TaskTrendRow[]>`
-      SELECT strftime('%Y-%m-%d', "createdAt", '+8 hours') AS day,
+      SELECT ${day} AS day,
              COUNT(*) AS total,
              SUM(CASE WHEN "status" = 'succeeded' THEN 1 ELSE 0 END) AS succeeded,
              SUM(CASE WHEN "status" = 'failed' THEN 1 ELSE 0 END) AS failed
       FROM "GenerationTask"
       WHERE "createdAt" >= ${toDbDateTime(since)}
-      GROUP BY day
+      GROUP BY 1
     `;
   }
 
@@ -398,17 +414,20 @@ export class AdminOverviewService {
    * 收入趋势原始日桶。
    *
    * 按**支付时间**而不是下单时间聚合；状态白名单与上方 `paidStatuses`
-   * 保持一致（paid / partial_refunded / refunded）。
+   * 保持一致（paid / partial_refunded / refunded）。日期截断同样按方言分支。
    */
   private dailyRevenueTrend(since: Date) {
+    const day = this.isSqlite()
+      ? Prisma.sql`strftime('%Y-%m-%d', "paidAt", '+8 hours')`
+      : Prisma.sql`to_char(date_trunc('day', "paidAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Shanghai'), 'YYYY-MM-DD')`;
     return this.prisma.$queryRaw<RevenueTrendRow[]>`
-      SELECT strftime('%Y-%m-%d', "paidAt", '+8 hours') AS day,
+      SELECT ${day} AS day,
              COUNT(*) AS orders,
              SUM("paidCents") AS gmv
       FROM "Order"
       WHERE "status" IN ('paid', 'partial_refunded', 'refunded')
         AND "paidAt" >= ${toDbDateTime(since)}
-      GROUP BY day
+      GROUP BY 1
     `;
   }
 
@@ -484,8 +503,9 @@ function dayKey(date: Date): string {
 }
 
 /**
- * Prisma SQLite 把 DateTime 存成 `YYYY-MM-DDTHH:mm:ss.SSS+00:00`。
- * 原生 SQL 的字符串比较必须用同一种格式，否则 `Z` 与 `+00:00` 会排错序。
+ * 原生 SQL 的 UTC 时间字面量：`YYYY-MM-DDTHH:mm:ss.SSS+00:00`。
+ * SQLite 按此格式存 DateTime 字符串；PostgreSQL 的 timestamp 列也能解析
+ * 带 +00:00 的 ISO 字面量。保持纯字符串参数，避免依赖各驱动的 Date 编码差异。
  */
 function toDbDateTime(date: Date): string {
   return `${date.toISOString().slice(0, 23)}+00:00`;

@@ -31,10 +31,30 @@
     <meta name="twitter:image" content="/brand/og-1200x630.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      字体用**可变字体轴**(400..800) 而不是 5 个静态字重:
+      静态写法要 540 个 @font-face / 577 KB CSS(gzip 156 KB); 可变轴只要
+      108 个 face / 116 KB(gzip 31.5 KB), 字形覆盖与 400-800 全部字重不变 ——
+      800 仍可真实渲染 (`pk-primary-btn` 在用), 不会退化成合成伪粗体。
+      中文 101 个分片按 unicode-range 懒加载, 只下当前页面用到的部分。
+
+      用 media="print" → onload 切 media 做**非阻塞**加载: 字体 CSS 不再挡住
+      首屏渲染。JS 执行前字体栈先落到系统字体, 切换时只看得到一次重排;
+      比渲染阻塞 577 KB 的 CSS 明显更快。`display=swap` 已保证文字先用
+      系统字体可见。
+    -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=Noto+Sans+SC:wght@400..800&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=Noto+Sans+SC:wght@400..800&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

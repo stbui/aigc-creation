@@ -347,15 +347,15 @@ export class AdminAlertsService {
       this.prisma.$queryRaw<Array<{ count: number | bigint }>>`
         SELECT COUNT(*) AS count
         FROM "Invoice" AS i
-        JOIN "Order" AS o ON o.id = i.orderId
+        JOIN "Order" AS o ON o.id = i."orderId"
         WHERE i.status = 'pending'
           AND (
             o.status NOT IN ('paid', 'partial_refunded')
-            OR i.amountCents > (o.paidCents - o.refundedCents)
+            OR i."amountCents" > (o."paidCents" - o."refundedCents")
             OR EXISTS (
               SELECT 1
               FROM "Refund" AS r
-              WHERE r.orderId = o.id AND r.status = 'processing'
+              WHERE r."orderId" = o.id AND r.status = 'processing'
             )
           )
       `,

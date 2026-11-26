@@ -1,9 +1,23 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BackupService } from './backup.service';
+
+// 备份改用 pg_dump 子进程；本用例只关心「同秒文件名唯一」，mock 掉外部进程，
+// 让它按 pg_dump 的 --file 参数写一个占位 SQL 文件即可，无需真实 PG 实例。
+vi.mock('child_process', () => ({
+  execFile: (
+    _cmd: string,
+    args: string[],
+    _opts: unknown,
+    cb: (err: Error | null, stdout: string, stderr: string) => void,
+  ) => {
+    const target = args[args.indexOf('--file') + 1];
+    writeFileSync(target, '-- PostgreSQL database dump\n\\unrestrict xyz\n');
+    cb(null, '', '');
+  },
+}));
 
 describe('BackupService', () => {
   let dir: string;
@@ -12,11 +26,6 @@ describe('BackupService', () => {
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'huojue-backup-'));
-    const source = join(dir, 'source.db');
-    const db = new DatabaseSync(source);
-    db.exec('CREATE TABLE Probe (id INTEGER PRIMARY KEY)');
-    db.close();
-
     const rows = new Map<string, Record<string, unknown>>();
     let sequence = 0;
     create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -51,7 +60,7 @@ describe('BackupService', () => {
     const config = {
       get: (key: string) => {
         if (key === 'path.backups') return join(dir, 'backups');
-        if (key === 'db.url') return `file:${source}`;
+        if (key === 'db.url') return 'postgresql://huojue:huojue@127.0.0.1:5432/huojue_test?schema=public';
         return undefined;
       },
     };

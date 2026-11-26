@@ -401,7 +401,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 | 运行与生成 | `/admin/settings/generate` | `generate.billingAutoRefund`：账单清扫任务每 5 分钟读取一次；关闭时任务账单保留在待核对队列 |
 | 上传限制 | `/admin/settings/upload` | `upload.maxSizeMb` / `upload.maxPixels` / `upload.allowedTypes`：下一次上传请求起生效，后端与网页端使用同一份快照 |
 | 备份 | `/admin/settings/backup` | `backup.frequencyDays`：调度器每 10 分钟检查一次，按最近一次成功备份判断是否到期 |
-| 系统性能 | `/admin/settings/performance` | 只读运行时快照（`GET /admin/system-performance`，`setting.read`）：进程内存 / CPU 累计时间 / 事件循环延迟、数据库 `SELECT 1` 与库文件大小、存储探活、近 24 小时任务与调用 P95、线路冷却、调度器连续失败；无写接口 |
+| 系统信息 | `/admin/performance`（总览组独立页；旧地址 `/admin/settings/performance` 重定向） | 只读系统快照（`GET /admin/system-performance`，`setting.read`），全部平铺不分页签，每条「标签：值」独占一行：宿主机（主机名 / 操作系统 / 内核版本 / 架构 / CPU 型号与核数 / 内存总量 / 负载均值）、运行时（运行环境 / 版本 / 已运行 / 常驻内存 RSS / 堆内存与堆使用率 / 堆外内存 / 事件循环延迟 / CPU 累计）、数据库（引擎 / 版本 / 库位置 / 库体积 / 表数量 / 迁移进度 / 查询延迟）、存储（后端 / 连通 / 检查结果 / 结果来源）、近 24 小时任务与调用（成功率 / P95 / 状态与类型分布 / 线路冷却与解封时间）；枚举取值（环境、平台、架构、存储后端、任务状态、调用类型、冷却键）在页面统一映射为中文，缺项回退原值；阈值类读数（事件循环延迟、堆使用率、任务成功率）同时给文字结论，不单靠颜色；没有样本时显示「—」并说明原因（如「窗口内没有任务」），不写 0；打开时采集一次、不轮询，新数据靠「刷新」；定时任务改由 `/admin/scheduler` 承载；无写接口 |
 | 安全 | `/admin/settings/security` | 只读策略说明：令牌有效期由 `JWT_TTL` 控制，密码最小长度由发布版本中的后端 DTO 校验；本页不提供运行时编辑 |
 
 上传限制的部署硬上限为 100 MB、200,000,000 像素，后台配置只能在此范围内收紧；大小与像素总量必须填写整数。格式白名单只接受 JPG / PNG / WebP，`jpeg` 归一为 `jpg`，不允许保存空白名单或后端无法识别的格式。

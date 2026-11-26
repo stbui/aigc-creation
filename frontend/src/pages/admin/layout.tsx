@@ -29,6 +29,7 @@ import {
   AdminOrdersPage,
   AdminPaymentsPage,
   AdminPaymentRulesPage,
+  AdminPerformancePage,
   AdminPluginsPage,
   AdminProductsPage,
   AdminPromptsPage,
@@ -117,8 +118,17 @@ export function AdminLayout() {
               <Route path="settings/generate" element={<AdminSettingsPage group="generate" />} />
               <Route path="settings/upload" element={<AdminSettingsPage group="upload" />} />
               <Route path="settings/backup" element={<AdminSettingsPage group="backup" />} />
-              <Route path="settings/performance" element={<AdminSettingsPage group="performance" />} />
               <Route path="settings/security" element={<AdminSettingsPage group="security" />} />
+              {/*
+               * 系统信息已拆为独立页。旧地址重定向到 /admin/performance。它仍作为
+               * /admin/settings 的子路径命中「系统设置」菜单项，守卫照常按 setting.read 判定。
+               */}
+              <Route
+                path="settings/performance"
+                element={<Navigate to="/admin/performance" replace />}
+              />
+              {/* 系统信息：总览组下的独立只读页 */}
+              <Route path="performance" element={<AdminPerformancePage />} />
               <Route path="backups" element={<AdminBackupPage />} />
               <Route path="assets" element={<AdminAssetsPage />} />
               <Route path="storage" element={<AdminStoragePage />} />

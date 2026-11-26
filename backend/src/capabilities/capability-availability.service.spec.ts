@@ -51,3 +51,40 @@ describe('CapabilityAvailabilityService.setEnabled', () => {
     ).rejects.toBe(dbError);
   });
 });
+
+describe('CapabilityAvailabilityService.runtimeAll', () => {
+  it('一次返回全部能力，并保留每项能力的运行时结论', async () => {
+    const prisma = {
+      capabilityControl: {
+        findMany: vi.fn().mockResolvedValue([
+          { capabilityId: CAPABILITIES[0].id, enabled: false, reason: '维护中' },
+        ]),
+      },
+    };
+    const cache = {
+      get: vi.fn().mockResolvedValue(undefined),
+      set: vi.fn().mockResolvedValue(undefined),
+      del: vi.fn().mockResolvedValue(true),
+    };
+    const router = { hasHealthyLine: vi.fn().mockResolvedValue(true) };
+    const service = new CapabilityAvailabilityService(
+      prisma as never,
+      router as never,
+      cache as never,
+    );
+
+    const runtime = await service.runtimeAll();
+
+    expect(Object.keys(runtime)).toEqual(CAPABILITIES.map((capability) => capability.id));
+    expect(runtime[CAPABILITIES[0].id]).toMatchObject({
+      enabled: false,
+      effective: 'disabled',
+      reason: '维护中',
+    });
+    expect(runtime[CAPABILITIES[1].id]).toMatchObject({
+      enabled: true,
+      remoteAvailable: true,
+      effective: 'remote',
+    });
+  });
+});

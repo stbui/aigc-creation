@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { JwtPayload, JwtService } from './jwt.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthUserCacheService } from './auth-user-cache.service';
 
 /**
  * **可选**鉴权守卫。
@@ -20,6 +21,7 @@ export class OptionalJwtAuthGuard implements CanActivate {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly authUsers: AuthUserCacheService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -44,13 +46,10 @@ export class OptionalJwtAuthGuard implements CanActivate {
      * 按**未登录**处理。不能沿用签名有效就认身份的做法 —— 否则禁用账号
      * 仍能通过人群定向拿到"仅登录可见"的内容。
      *
-     * ⚠ 查库异常不在此 catch: 数据库故障时静默降级为"匿名"会把一个
-     * 基础设施故障伪装成"这个人没登录", 排障时无从发现。
+     * ⚠ 取用户快照异常不在此 catch: 基础设施故障时静默降级为"匿名"会把
+     * 故障伪装成"这个人没登录", 排障时无从发现。
      */
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, email: true, status: true, tokenVersion: true },
-    });
+    const user = await this.authUsers.get(payload.sub);
     request.user =
       user && user.status === 'active' && (payload.tv ?? 0) === user.tokenVersion
         ? { id: user.id, email: user.email }

@@ -2,27 +2,32 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { AppError } from './app.exception';
 import { JwtPayload, JwtService } from './jwt.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthUserCacheService } from './auth-user-cache.service';
 
 /**
  * Bearer Token 鉴权守卫: 校验 Authorization 头, 解析后将用户写入 request.user。
  *
- * ## 为什么每次请求都要查一次库 (2026-10-21)
+ * ## 为什么每请求都要校验账号状态 (2026-10-21, 2026-11-26 改为走缓存)
  *
  * 此前只验签名 —— token 有效期 7 天, 意味着后台禁用/注销一个账号后,
  * 该用户仍能凭旧 token 继续调 20+ 个接口, 直到 token 自然过期。
  * 「禁用立即生效」是账号体系的基本承诺, 不能靠 token 过期兜底。
  *
- * 代价是一次按主键的 SQLite 查询 (只取 status 一列), 与业务查询相比可忽略;
- * 不做内存缓存的理由: 缓存窗口内被禁用的账号仍可用, 正好把"立即生效"
- * 退化成"几秒后生效" —— 省下的这点开销不值得。
+ * 账号状态经 `AuthUserCacheService` 读取：进程内命中避免每请求一次 SQLite
+ * 查询（压测显示这是鉴权路径的吞吐瓶颈）。「立即生效」由两条保证:
+ *   1. 所有改 status / tokenVersion / role / mustChangePassword 的写入点
+ *      显式调用 `invalidate()`;
+ *   2. 2s 兜底 TTL —— 即便某处漏挂失效, 也只延迟 2 秒而非永久。
+ * 单实例语义；多实例部署需换共享 store（见 cache.module.ts）。
  *
- * 账号被**硬删除**时查不到记录, 同样按未认证处理。
+ * 账号被**硬删除/注销**时快照为 null, 同样按未认证处理。
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly authUsers: AuthUserCacheService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -41,17 +46,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new AppError(40101, '令牌无效或已过期', 401);
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        status: true,
-        tokenVersion: true,
-        mustChangePassword: true,
-        tempPasswordExpiresAt: true,
-      },
-    });
+    const user = await this.authUsers.get(payload.sub);
     if (!user) {
       // 账号已被硬删除: 签名仍然有效, 但主体已不存在
       throw new AppError(40101, '账号不存在或已注销', 401);

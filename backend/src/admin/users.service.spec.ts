@@ -202,6 +202,7 @@ describe("AdminUsersService 用户生命周期与角色", () => {
         }),
       } as never,
       { notify: vi.fn().mockResolvedValue(undefined) } as never,
+      { invalidate: vi.fn().mockResolvedValue(undefined) } as never,
     );
   });
 

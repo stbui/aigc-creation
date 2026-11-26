@@ -78,9 +78,9 @@ export const ENV_SPECS = [
   { key: 'app.prefix', env: 'API_PREFIX', type: 'string', def: 'api/v1' },
   { key: 'app.env', env: 'NODE_ENV', type: 'string', def: 'development', oneOf: ['development', 'production', 'test'] },
 
-  // ── 数据库（SQLite 文件路径，三环境必须各指各的库）────────────────────
-  // 形如 file:./dev.db，相对路径相对进程 cwd（backend/）。默认值与迁移前
-  // PrismaService / prisma.config.ts 里硬编码的 'file:./dev.db' 逐字一致。
+  // ── 数据库（双方言：dev/test 用 SQLite 文件，production 用 PostgreSQL）────
+  // `file:` 前缀 = SQLite（本地单文件）；其余（postgresql://…）= PostgreSQL。
+  // 默认值与 PrismaService / prisma.config.ts 里的开发兜底逐字一致。
   { key: 'db.url', env: 'DATABASE_URL', type: 'string', def: 'file:./dev.db' },
 
   // ── 任务队列（BullMQ）──────────────────────────────────────────────
@@ -573,11 +573,18 @@ export function validateEnv(env: NodeJS.ProcessEnv = process.env): AppConfigTree
     problems.push('JWT_SECRET 未设置：生产环境禁止使用内置开发默认密钥，请显式配置一个强随机值');
   }
 
-  // 生产环境连开发库 = 直接污染演示数据，且线上数据落到本地文件上无法备份。
-  // 这条同样做成启动失败：拼错一个路径的代价远大于启动多问一句。
-  if (tree.app.env === 'production' && tree.db.url === 'file:./dev.db') {
+  // 生产环境连 SQLite 本地文件 = 单机且不可共享，与容器部署的多副本 / 持久卷不符；
+  // 同时防止有人把开发默认 `file:./dev.db` 原样带到线上。这条做成启动失败。
+  if (tree.app.env === 'production' && tree.db.url.trim().toLowerCase().startsWith('file:')) {
     problems.push(
-      'DATABASE_URL 仍是开发库默认值 file:./dev.db：生产环境必须指向独立库文件（如 file:./data/prod.db 或挂载卷）',
+      'DATABASE_URL 指向 SQLite 文件：生产环境必须使用 PostgreSQL（如 postgresql://user:pass@host:5432/huojue_prod）',
+    );
+  }
+  // 生产环境连开发库 = 直接污染演示数据。这条同样做成启动失败：
+  // 拼错一个连接串的代价远大于启动多问一句。
+  if (tree.app.env === 'production' && tree.db.url.includes('/huojue_dev?')) {
+    problems.push(
+      'DATABASE_URL 仍是开发库 huojue_dev：生产环境必须指向独立的 PostgreSQL 库（如 postgresql://user:pass@host:5432/huojue_prod）',
     );
   }
 

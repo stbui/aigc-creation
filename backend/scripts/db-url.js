@@ -14,8 +14,8 @@
  *   2. 取 DATABASE_URL，兜底 'file:./dev.db'（与迁移前逐字一致）
  *
  * 调用方写法：
- *   const { resolveDbUrl } = require('./db-url');
- *   new PrismaClient({ adapter: new F({ url: resolveDbUrl() }) });
+ *   const { PrismaClient } = require('./prisma-client');
+ *   const prisma = new PrismaClient();   // 按 DATABASE_URL 协议自动选方言
  */
 const path = require('path');
 const fs = require('fs');
@@ -85,7 +85,13 @@ function resolveDbUrl() {
 
 /** 脚本可直接使用的绝对库路径（日志/错误信息里比相对路径清楚） */
 function resolveDbPath() {
-  return path.resolve(BACKEND_ROOT, resolveDbUrl().replace(/^file:/, ''));
+  const url = resolveDbUrl();
+  if (!url.startsWith('file:')) {
+    throw new Error(
+      `DATABASE_URL 不是 SQLite 文件（当前 ${url}）：该操作直接操作库文件，只能在 file: 协议下使用`,
+    );
+  }
+  return path.resolve(BACKEND_ROOT, url.replace(/^file:/, ''));
 }
 
 module.exports = { loadEnvOnce, resolveDbUrl, resolveDbPath, resolveEnvFiles, BACKEND_ROOT };

@@ -114,7 +114,7 @@ import { SchedulerService } from './scheduler.service';
     AdminUsersController,
     AdminRolesController,
     AdminSettingsController,
-    // 系统性能：只读运行时 / 数据面快照（settings 页的性能页签）
+    // 系统信息：只读快照（宿主机 / 运行时 / 数据库元信息 / 存储 / 近 24 小时任务）
     SystemPerformanceController,
     AdminBackupController,
     AdminAssetsController,

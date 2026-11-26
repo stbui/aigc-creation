@@ -17,10 +17,9 @@ if (!ADMIN_PASSWORD) {
   process.exit(1);
 }
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl } = require('./db-url');
 const { grantCredits, clearCredits } = require('./credit-fixture');
-const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient();
 
 async function call(method, path, token, body) {
   const res = await fetch(`${BASE}${path}`, {

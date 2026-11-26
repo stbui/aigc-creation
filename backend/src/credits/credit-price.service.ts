@@ -33,14 +33,36 @@ export class CreditPriceService {
 
   /** 该能力命中的限时免费活动 id；未命中返回空串（账单 `promotionId` 用）。 */
   async freeCampaignIdOf(capabilityId: string, userId?: string): Promise<string> {
-    const campaignsByCapability = await this.campaigns();
-    const campaigns = campaignsByCapability.get(String(capabilityId ?? '')) ?? [];
-    const global = campaigns.find((campaign) => !campaign.onlyNewUsers);
-    if (global) return global.id;
+    const campaignIds = await this.freeCampaignIdsOf([capabilityId], userId);
+    return campaignIds.get(String(capabilityId ?? '')) ?? '';
+  }
 
-    const targeted = campaigns.find((campaign) => campaign.onlyNewUsers);
-    if (!targeted || !userId) return '';
-    return (await this.isNewUser(userId)) ? targeted.id : '';
+  /** 批量解析能力命中的免费活动；新客身份整批判定一次。 */
+  async freeCampaignIdsOf(
+    capabilityIds: string[],
+    userId?: string,
+  ): Promise<Map<string, string>> {
+    const campaignsByCapability = await this.campaigns();
+    const result = new Map<string, string>();
+    const targeted = new Map<string, FreeCampaign>();
+    for (const capabilityId of new Set(capabilityIds.map((id) => String(id ?? '')))) {
+      const campaigns = campaignsByCapability.get(capabilityId) ?? [];
+      const global = campaigns.find((campaign) => !campaign.onlyNewUsers);
+      if (global) {
+        result.set(capabilityId, global.id);
+        continue;
+      }
+      const onlyNewUsers = campaigns.find((campaign) => campaign.onlyNewUsers);
+      if (onlyNewUsers) targeted.set(capabilityId, onlyNewUsers);
+    }
+
+    if (targeted.size === 0 || !userId) return result;
+    const isNewUser = await this.isNewUser(userId);
+    if (!isNewUser) return result;
+    for (const [capabilityId, campaign] of targeted) {
+      result.set(capabilityId, campaign.id);
+    }
+    return result;
   }
 
   /** 进行中的免费活动；命中缓存时直接复用，未命中重建并写回 3 秒 TTL */

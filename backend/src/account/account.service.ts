@@ -4,6 +4,7 @@ import { AppError } from '../common/app.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import { microcreditsToCredits, projectEntry } from '../credits/credit.service';
 import { AccountLifecycleService } from './account-lifecycle.service';
+import { AuthUserCacheService } from '../common/auth-user-cache.service';
 
 /** 与注册/重置保持一致的成本因子，否则同一账号的哈希强度会漂移 */
 const BCRYPT_ROUNDS = 10;
@@ -17,6 +18,7 @@ export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly lifecycle: AccountLifecycleService,
+    private readonly authUsers: AuthUserCacheService,
   ) {}
 
   async profile(userId: string) {
@@ -42,28 +44,48 @@ export class AccountService {
       },
     });
     if (!user) throw new AppError(40401, '账号不存在', 404);
-    const [projects, tasks, assets, orders, unread] = await Promise.all([
-      this.prisma.project.count({ where: { ownerId: userId, deletedAt: null } }),
-      /*
-       * 「作品」= 有可见产出的任务, 「素材」= 可见素材 —— 与「我的作品」计数行
-       * 和素材库「共 N 个素材」严格同口径。
-       *
-       * 此前两者都按不加条件计数: 失败任务让作品数虚高, 后台下架的素材让
-       * 素材数虚高, 同一个人在不同页面看到三个不同的数, 而又都不是错的页面。
-       */
-      this.prisma.generationTask.count({
-        where: {
-          ownerId: userId,
-          project: { deletedAt: null },
-          outputAsset: { is: { status: 'visible' } },
-        },
-      }),
-      this.prisma.asset.count({
-        where: { ownerId: userId, status: 'visible', project: { deletedAt: null } },
-      }),
-      this.prisma.order.count({ where: { userId } }),
-      this.prisma.notification.count({ where: { userId, readAt: null } }),
-    ]);
+    /*
+     * 五个计数合并为一次 SQLite 查询：此前 Promise.all 里是 5 次 count，
+     * 压测显示 /me 单请求要打 6 次库（含 user 查询），是鉴权路径的主要开销。
+     *
+     * 口径逐字对应原先的 count where：
+     *   · 「作品」= 有可见产出的任务,「素材」= 可见素材 —— 与「我的作品」
+     *     计数行和素材库「共 N 个素材」严格同口径（不加条件的版本会让失败
+     *     任务和后台下架的素材把数虚高）。
+     *   · outputAssetId 上有 @unique（1:1）且 project 为必填关系，JOIN 不改变计数。
+     *   · "Order" 是 SQL 保留字，必须加双引号（schema 无 @@map，表名即模型名）。
+     *   · 所有 camelCase 列名都加双引号：SQLite 未加引号也能匹配，但 PostgreSQL
+     *     会把未加引号的标识符折叠成小写（ownerId → ownerid）而报列不存在。
+     *   · COUNT(*) 在两方言都返回 bigint/bigint 字符串，必须 Number() 转换。
+     */
+    const [row] = await this.prisma.$queryRaw<Array<{
+      projects: bigint;
+      tasks: bigint;
+      assets: bigint;
+      orders: bigint;
+      unread: bigint;
+    }>>`
+      SELECT
+        (SELECT COUNT(*) FROM Project
+          WHERE "ownerId" = ${userId} AND "deletedAt" IS NULL) AS projects,
+        (SELECT COUNT(*) FROM GenerationTask t
+          JOIN Project p ON p.id = t."projectId"
+          JOIN Asset a ON a.id = t."outputAssetId"
+          WHERE t."ownerId" = ${userId} AND p."deletedAt" IS NULL
+            AND a.status = 'visible') AS tasks,
+        (SELECT COUNT(*) FROM Asset a
+          JOIN Project p ON p.id = a."projectId"
+          WHERE a."ownerId" = ${userId} AND a.status = 'visible'
+            AND p."deletedAt" IS NULL) AS assets,
+        (SELECT COUNT(*) FROM "Order" WHERE "userId" = ${userId}) AS orders,
+        (SELECT COUNT(*) FROM Notification
+          WHERE "userId" = ${userId} AND "readAt" IS NULL) AS unread
+    `;
+    const projects = Number(row.projects);
+    const tasks = Number(row.tasks);
+    const assets = Number(row.assets);
+    const orders = Number(row.orders);
+    const unread = Number(row.unread);
     const { passwordHash, oauthIdentities, ...profile } = user;
     return {
       ...profile,
@@ -131,6 +153,7 @@ export class AccountService {
         tempPasswordExpiresAt: null,
       },
     });
+    await this.authUsers.invalidate(userId);
     return { changed: true };
   }
 

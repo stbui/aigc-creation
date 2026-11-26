@@ -7,6 +7,10 @@ function createService() {
       const sql = strings.join('?');
       if (sql.includes('GenerationTask')) return [{ ms: 4000 }];
       if (sql.includes('ApiCallLog')) return [{ ms: 300 }];
+      if (sql.includes('sqlite_version')) return [{ v: '3.53.2' }];
+      // 表数量：排除内部表与迁移记录表
+      if (sql.includes('sqlite_master')) return [{ n: 68 }];
+      if (sql.includes('_prisma_migrations')) return [{ total: 3, applied: 3, last: 1_795_501_060_018 }];
       return [{ 1: 1 }];
     }),
     generationTask: {
@@ -42,23 +46,10 @@ function createService() {
   const routeHealth = {
     snapshot: () => [{ key: 'channel:abc', until: Date.now() + 60_000 }],
   };
-  const scheduler = {
-    taskStatus: () => [
-      {
-        name: 'backup',
-        label: '数据备份',
-        lastRunAt: new Date('2026-11-19T00:00:00Z'),
-        lastDurationMs: 42,
-        consecutiveFailures: 2,
-        totalRuns: 7,
-      },
-    ],
-  };
   const service = new SystemPerformanceService(
     prisma as never,
     storage as never,
     routeHealth as never,
-    scheduler as never,
     {
       get: (key: string) =>
         key === 'app.env' ? 'test' : key === 'db.url' ? 'file:./test.db' : undefined,
@@ -90,14 +81,56 @@ describe('SystemPerformanceService', () => {
     expect(snapshot.traffic.tasks.byStatus).toEqual({ succeeded: 2, failed: 1 });
   });
 
-  it('调度器失败与线路冷却如实上报', async () => {
+  it('线路冷却如实上报', async () => {
     const { service } = createService();
     const snapshot = await service.snapshot();
 
-    expect(snapshot.scheduler.failing).toEqual(['backup']);
     expect(snapshot.traffic.cooling.blocked).toBe(1);
     expect(snapshot.traffic.cooling.keys[0]?.key).toBe('channel:abc');
     expect(snapshot.storage.ok).toBe(true);
+  });
+
+  it('数据库给元信息而不是探活结果', async () => {
+    const { service } = createService();
+    const snapshot = await service.snapshot();
+
     expect(snapshot.database.ok).toBe(true);
+    expect(snapshot.database.engine).toBe('SQLite');
+    expect(snapshot.database.version).toBe('SQLite 3.53.2');
+    // 绝对路径的库文件，前端直接原样显示
+    expect(snapshot.database.location).toContain('test.db');
+    expect(snapshot.database.tables).toBe(68);
+    expect(snapshot.database.migrations).toEqual({
+      total: 3,
+      applied: 3,
+      lastAppliedAt: new Date(1_795_501_060_018).toISOString(),
+    });
+    expect(snapshot.database).not.toHaveProperty('fileBytes');
+  });
+
+  it('连不上库时保留元信息骨架并给出原因', async () => {
+    const { service, prisma } = createService();
+    prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      if (strings.join('?').includes('SELECT 1')) throw new Error('database is locked');
+      return [{ 1: 1 }];
+    });
+    const snapshot = await service.snapshot();
+
+    expect(snapshot.database.ok).toBe(false);
+    expect(snapshot.database.message).toBe('database is locked');
+    expect(snapshot.database.tables).toBeNull();
+    expect(snapshot.database.migrations).toBeNull();
+  });
+
+  it('宿主机信息如实上报：主机名 / 平台 / CPU 型号 / 总内存 / 负载', async () => {
+    const { service } = createService();
+    const snapshot = await service.snapshot();
+
+    expect(snapshot.system.hostname).toBeTruthy();
+    expect(['linux', 'darwin', 'win32']).toContain(snapshot.system.platform);
+    expect(snapshot.system.cpu.cores).toBeGreaterThan(0);
+    // 1 / 5 / 15 分钟三个负载值；Windows 下为空数组，非 Windows 下应为 3 个
+    expect(snapshot.system.loadavg.length).toBeLessThanOrEqual(3);
+    expect(snapshot.system.loadavg.length).toBeGreaterThanOrEqual(0);
   });
 });

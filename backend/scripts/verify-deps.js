@@ -33,6 +33,7 @@ const CRITICAL = new Set([
   'bytes', 'on-finished', 'http-errors', 'unpipe', 'iconv-lite', 'multer', 'busboy',
   'append-field', 'finalhandler', 'router', 'send', 'serve-static', 'statuses', 'vary',
   '@prisma/client', '@prisma/adapter-better-sqlite3', 'better-sqlite3',
+  '@prisma/adapter-pg', 'pg', 'pg-protocol', 'pg-types',
   '@prisma/driver-adapter-utils', '@prisma/get-platform',
   'jimp', '@jimp/core', 'bcryptjs', 'class-validator', 'class-transformer',
 ]);

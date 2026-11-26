@@ -13,6 +13,7 @@ import { AccountTokenService } from './account-token.service';
 import { normalizePhone } from './phone';
 import { normalizeEmail } from './email';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuthUserCacheService } from '../common/auth-user-cache.service';
 
 /** 注册入参（HTTP 层传 RegisterDto，结构兼容） */
 export interface RegisterInput {
@@ -90,6 +91,7 @@ export class AuthService {
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService<AppConfigValues, true>,
     private readonly jwt: JwtService,
+    private readonly authUsers: AuthUserCacheService,
   ) {}
 
   // 注册后直接签发 token (前端 LoginPage 注册模式同样消费 accessToken 自动登录)
@@ -358,6 +360,7 @@ export class AuthService {
         tempPasswordExpiresAt: null,
       },
     });
+    await this.authUsers.invalidate(user.id);
 
     // 同一用户的其它未使用令牌一并作废（多个重置链接同时生效没有意义）
     await this.prisma.accountToken

@@ -22,15 +22,12 @@
  * 例: NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-membership-order.js
  */
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { loadEnvOnce, resolveDbUrl, resolveDbPath } = require('./db-url');
 
 loadEnvOnce();
 
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-});
+const prisma = new PrismaClient();
 
 async function call(method, path, token, body) {
   const res = await fetch(`${BASE}${path}`, {

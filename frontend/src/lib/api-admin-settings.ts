@@ -20,10 +20,10 @@ export const adminSettingsApi = {
 };
 
 /**
- * 系统性能快照（只读）。
+ * 系统信息快照（只读）。
  *
- * 与系统设置同页展示，但走独立端点：设置接口的职责是读写运行时配置，
- * 把进程 / 数据库 / 调用耗时塞进去会让「保存设置」与「采集指标」互相拖累。
+ * 与系统设置分家走独立端点：设置接口的职责是读写运行时配置，把宿主机 /
+ * 数据库元信息 / 调用耗时塞进去会让「保存设置」与「采集指标」互相拖累。
  */
 export const adminSystemPerformanceApi = {
   read: () => request<AdminSystemPerformance>("/admin/system-performance"),

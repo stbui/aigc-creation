@@ -94,6 +94,43 @@ export default defineConfig(({ mode }) => {
             if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) {
               return 'vendor-icons';
             }
+            /*
+             * 重库按「谁用」拆开, 不能一律塞进 vendor。
+             *
+             * vendor 会被入口静态依赖 (`ui/index.ts` 组合 shadcn 原子件),
+             * 所以凡是掉进 vendor 的包 = 每个用户首屏都要下载。而下面这些
+             * 库只在特定路由出现:
+             *   recharts  → 仅后台概览图表 (`admin-ui/radar/chart.tsx`)
+             *   stripe    → 仅结算页
+             *   zod       → 仅后台渠道表单 schema
+             *   date-fns  → 仅后台日期字段 / 日期选择器
+             *   qrcode    → 仅邀请页与扫码登录
+             * 拆出去后它们各自成为独立 chunk, 只随对应路由加载。
+             *
+             * recharts 的独占依赖一并归入 charts: 只被打包一次, 且不会
+             * 因为散落在 vendor 而重新回到首屏。
+             * `immer` / `reselect` / `use-sync-external-store` 看似是 recharts
+             * 依赖, 但同时被 zustand / @base-ui 使用, 留在 vendor 避免重复。
+             */
+            if (
+              /[\\/]node_modules[\\/](recharts|react-redux|@reduxjs[\\/]toolkit|redux|redux-thunk|victory-vendor|decimal\.js-light|es-toolkit|eventemitter3|tiny-invariant)[\\/]/.test(
+                id,
+              )
+            ) {
+              return 'vendor-charts';
+            }
+            if (/[\\/]node_modules[\\/]@stripe[\\/]/.test(id)) {
+              return 'vendor-stripe';
+            }
+            if (/[\\/]node_modules[\\/](zod|@hookform[\\/]resolvers)[\\/]/.test(id)) {
+              return 'vendor-validation';
+            }
+            if (/[\\/]node_modules[\\/](date-fns|react-day-picker)[\\/]/.test(id)) {
+              return 'vendor-date';
+            }
+            if (/[\\/]node_modules[\\/]qrcode[\\/]/.test(id)) {
+              return 'vendor-qrcode';
+            }
             return 'vendor';
           },
         },

@@ -218,9 +218,8 @@ const VALID_EFFECTIVE = ['remote', 'disabled', 'unavailable'];
 
   // ── 清理 ──
   const { PrismaClient } = require('./prisma-client');
-  const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
   const { resolveDbUrl } = require('./db-url');
-  const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
+  const prisma = new PrismaClient();
   try {
     if (projectId) await prisma.project.delete({ where: { id: projectId } }).catch(() => undefined);
     if (reg.data?.user?.id) await prisma.user.delete({ where: { id: reg.data.user.id } }).catch(() => undefined);

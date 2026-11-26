@@ -137,14 +137,22 @@ function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
     encrypt: vi.fn().mockReturnValue('cipher'),
     decrypt: vi.fn().mockReturnValue('{}'),
   };
-  const configs = {
-    byId: vi.fn().mockResolvedValue({
-      id: CONFIG_ID,
-      providerId: 'stripe',
-      version: 1,
-      values: { webhookSecret: 'whsec_test' },
-    }),
+  const defaultConfig = {
+    id: CONFIG_ID,
+    providerId: 'stripe',
+    instanceId: 'default',
+    version: 1,
+    values: { webhookSecret: 'whsec_test' },
   };
+  const configs = {
+    byId: vi.fn(),
+    byIds: vi.fn(),
+  };
+  configs.byId.mockResolvedValue(defaultConfig);
+  configs.byIds.mockImplementation(
+    async (ids: string[]) =>
+      new Map(ids.map((id) => [id, { ...defaultConfig, id }] as const)),
+  );
   const orders = {
     applyPaymentResult: vi.fn().mockResolvedValue({ applied: true, idempotentHit: false }),
   };
@@ -218,6 +226,38 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
     expect(JSON.parse(created.data.normalizedJson)).toMatchObject({ providerRef: 'cs_old' });
   });
 
+  it('历史尝试缺少实例与版本时默认配置只解析一次', async () => {
+    const { service, prisma, configs, orders, notificationRow } = makeHarness(
+      paidResult('cs_old'),
+    );
+    prisma.paymentNotification.findUnique.mockResolvedValue(notificationRow);
+    prisma.payment.findMany.mockResolvedValue([
+      {
+        id: 'pay_old',
+        orderId: 'order_1',
+        channel: 'stripe',
+        providerConfigId: CONFIG_ID,
+        providerConfigVersion: null,
+        providerInstanceId: null,
+        providerMethod: 'alipay',
+        providerRef: 'cs_old',
+        payTransactionId: null,
+        status: 'pending',
+        createdAt: new Date(),
+      },
+    ]);
+
+    await ingest(service, 'cs_old');
+
+    expect(orders.applyPaymentResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerInstanceId: 'default',
+        providerConfigVersion: 1,
+      }),
+    );
+    expect(configs.byId).toHaveBeenCalledTimes(1);
+  });
+
   it('回调的 providerRef 匹配不到 Payment 时拒绝，绝不回落到最新尝试', async () => {
     const { service, prisma, orders } = makeHarness(paidResult('cs_old'));
 
@@ -250,13 +290,15 @@ describe('PaymentNotificationService providerRef 精确匹配', () => {
 
   it('同一配置存在多个待支付尝试时不按创建时间猜测归属', async () => {
     const { service, prisma, configs, orders, exceptions } = makeHarness(paidResult());
-    configs.byId.mockResolvedValue({
+    const alipayConfig = {
       id: CONFIG_ID,
       providerId: 'alipay',
-      version: 1,
       instanceId: 'default',
+      version: 1,
       values: {},
-    });
+    };
+    configs.byId.mockResolvedValue(alipayConfig);
+    configs.byIds.mockResolvedValue(new Map([[CONFIG_ID, alipayConfig]]));
     const attempts = [
       {
         id: 'pay_old',
@@ -457,14 +499,22 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
       encrypt: vi.fn().mockReturnValue('cipher'),
       decrypt: vi.fn().mockReturnValue('{}'),
     };
-    const configs = {
-      byId: vi.fn().mockResolvedValue({
-        id: EPAY_CONFIG_ID,
-        providerId: 'epay',
-        version: 1,
-        values: { mchId: 'epay-merchant', key: 'epay-secret' },
-      }),
+    const defaultConfig = {
+      id: EPAY_CONFIG_ID,
+      providerId: 'epay',
+      instanceId: 'default',
+      version: 1,
+      values: { mchId: 'epay-merchant', key: 'epay-secret' },
     };
+    const configs = {
+      byId: vi.fn(),
+      byIds: vi.fn(),
+    };
+    configs.byId.mockResolvedValue(defaultConfig);
+    configs.byIds.mockImplementation(
+      async (ids: string[]) =>
+        new Map(ids.map((id) => [id, { ...defaultConfig, id }] as const)),
+    );
     const orders = {
       applyPaymentResult: vi.fn().mockResolvedValue({ applied: true, idempotentHit: false }),
     };
@@ -595,13 +645,21 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
       paymentRow('pay_other', 'cfg_epay_other', 'epay-trade-other'),
       paymentRow('pay_epay_1', EPAY_CONFIG_ID, EPAY_PROVIDER_REF),
     ]);
-    configs.byId.mockImplementation(async (id: string) => ({
-      id,
-      providerId: 'epay',
-      version: 1,
-      instanceId: 'default',
-      values: { mchId: 'epay-merchant', key: 'epay-secret' },
-    }));
+    configs.byIds.mockImplementation(
+      async (ids: string[]) =>
+        new Map(
+          ids.map((id) => [
+            id,
+            {
+              id,
+              providerId: 'epay',
+              version: 1,
+              instanceId: 'default',
+              values: { mchId: 'epay-merchant', key: 'epay-secret' },
+            },
+          ] as const),
+        ),
+    );
     adapterMock.verifyNotification.mockResolvedValue({
       ok: false,
       ackSuccess: false,
@@ -618,8 +676,8 @@ describe('PaymentNotificationService 易支付固化支付方式', () => {
       orderId: 'order_epay_1',
       channel: 'epay',
     });
-    expect(configs.byId).toHaveBeenCalledTimes(1);
-    expect(configs.byId).toHaveBeenCalledWith(EPAY_CONFIG_ID);
+    expect(configs.byIds).toHaveBeenCalledTimes(1);
+    expect(configs.byIds).toHaveBeenCalledWith([EPAY_CONFIG_ID]);
     expect(adapterMock.verifyNotification).toHaveBeenCalledTimes(1);
     expect(adapterMock.verifyNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -848,6 +906,14 @@ describe('PaymentNotificationService 规范回调历史配置', () => {
         if (!found) throw new Error(`missing config ${id}`);
         return found;
       }),
+      byIds: vi.fn(async (ids: string[]) => {
+        const resolved = new Map<string, (typeof input.configs)[number]>();
+        for (const id of new Set(ids)) {
+          const found = byId.get(id);
+          if (found) resolved.set(id, found);
+        }
+        return resolved;
+      }),
     };
     const cipher = {
       encrypt: vi.fn().mockReturnValue('cipher'),
@@ -953,8 +1019,8 @@ describe('PaymentNotificationService 规范回调历史配置', () => {
     });
 
     expect(ack).toMatchObject({ status: 200, body: 'success' });
-    expect(configs.byId).toHaveBeenCalledTimes(1);
-    expect(configs.byId).toHaveBeenCalledWith(OLD_CONFIG_ID);
+    expect(configs.byIds).toHaveBeenCalledTimes(1);
+    expect(configs.byIds).toHaveBeenCalledWith([OLD_CONFIG_ID]);
     expect(adapterMock.verifyNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         config: expect.objectContaining({ configId: OLD_CONFIG_ID }),
@@ -1057,7 +1123,9 @@ describe('PaymentNotificationService 规范回调历史配置', () => {
     });
 
     expect(ack).toMatchObject({ status: 200, body: 'success' });
-    expect(configs.byId).toHaveBeenCalledTimes(3);
+    expect(configs.byIds).toHaveBeenCalledTimes(2);
+    expect(configs.byIds).toHaveBeenNthCalledWith(1, [OLD_CONFIG_ID, NEW_CONFIG_ID]);
+    expect(configs.byIds).toHaveBeenNthCalledWith(2, [OLD_CONFIG_ID]);
     expect(adapterMock.verifyNotification).toHaveBeenCalledTimes(1);
     expect(adapterMock.verifyNotification).toHaveBeenCalledWith(
       expect.objectContaining({

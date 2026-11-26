@@ -10,7 +10,8 @@
 # 设计约束：
 #   · backend 不映射宿主端口，只能经 frontend 的 Nginx 访问；
 #   · migrate 先建表，成功后才启动 backend；
-#   · SQLite / 上传图 / 备份 / 日志统一落 huojue-prod-data 卷；
+#   · 生产数据库为 PostgreSQL（compose 内置 postgres 服务），SQLite 只用于本地；
+#   · 上传图 / 备份 / 日志统一落 huojue-prod-data 卷；
 #   · 前端默认只绑 127.0.0.1:5100，TLS 由外层反代 / LB 终结；
 #   · seed 是显式 profile，不会随普通 up 自动跑。
 # ─────────────────────────────────────────────────────────────────────────────
@@ -28,7 +29,7 @@ x-backend-base: &backend-base
     PORT: 4100
     API_PREFIX: api/v1
     TZ: ${TZ:-Asia/Shanghai}
-    DATABASE_URL: file:/app/data/prod.db
+    DATABASE_URL: postgresql://${POSTGRES_USER:-huojue}:${POSTGRES_PASSWORD:?设置 POSTGRES_PASSWORD（生产库密码）}@postgres:5432/${POSTGRES_DB:-huojue_prod}?schema=public
     REDIS_URL: redis://redis:6379/0
     UPLOAD_DIR: /app/data/uploads
     BACKUP_DIR: /app/data/backups
@@ -48,6 +49,33 @@ x-backend-base: &backend-base
     - huojue
 
 services:
+  # PostgreSQL —— 生产数据库。凭据从 .env.production / 宿主机环境读取，
+  # 缺 POSTGRES_PASSWORD 时 compose 直接报错，不会起一个空密码库。
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-huojue}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?设置 POSTGRES_PASSWORD（生产库密码）}
+      POSTGRES_DB: ${POSTGRES_DB:-huojue_prod}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - huojue-prod-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - huojue
+
   # BullMQ 队列。数据库仍是任务状态与账单事实源；Redis 仅保存可重建的作业。
   redis:
     image: redis:7-alpine
@@ -78,6 +106,9 @@ services:
         NODE_IMAGE: ${NODE_IMAGE:-node:24-slim}
     image: ${HUOJUE_IMAGE_PREFIX:-}huojue-backend-tools:${HUOJUE_IMAGE_TAG:-production}
     command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   backend:
     <<: *backend-base
@@ -169,5 +200,7 @@ networks:
 volumes:
   huojue-prod-data:
     name: ${HUOJUE_DATA_VOLUME:-huojue-prod-data}
+  huojue-prod-pgdata:
+    name: ${HUOJUE_PG_VOLUME:-huojue-prod-pgdata}
   huojue-redis-data:
     name: ${HUOJUE_REDIS_VOLUME:-huojue-redis-data}

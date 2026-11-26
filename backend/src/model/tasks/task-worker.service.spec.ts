@@ -36,7 +36,7 @@ function setup() {
       update: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    billingOrder: { findFirst: vi.fn().mockResolvedValue(null) },
+    billingOrder: { findMany: vi.fn().mockResolvedValue([]) },
     modelChannel: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn().mockResolvedValue({ concurrencyLimit: 0 }),
@@ -246,6 +246,41 @@ describe('TaskWorkerService 派发状态机', () => {
       }),
     );
     expect(queue.enqueue).toHaveBeenCalledTimes(501);
+  });
+
+  it('未挂账单的排队任务一次批量取账单，并按任务取最新一笔', async () => {
+    const { worker, prisma, queue } = setup();
+    const createdAt = new Date(Date.now() - 2 * 60_000);
+    prisma.generationTask.findMany
+      .mockResolvedValueOnce([
+        { id: 'task-a', createdAt },
+        { id: 'task-b', createdAt },
+        { id: 'task-c', createdAt },
+      ])
+      .mockResolvedValueOnce([]);
+    prisma.billingOrder.findMany.mockResolvedValue([
+      { id: 'bill-a-new', taskId: 'task-a', createdAt: new Date() },
+      { id: 'bill-a-old', taskId: 'task-a', createdAt: new Date(Date.now() - 1_000) },
+      { id: 'bill-b', taskId: 'task-b', createdAt: new Date() },
+    ]);
+    queue.scheduledTaskIds.mockResolvedValue(new Set());
+
+    await worker.recoverStaleTasks();
+
+    expect(prisma.billingOrder.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.billingOrder.findMany).toHaveBeenCalledWith({
+      where: { taskId: { in: ['task-a', 'task-b', 'task-c'] } },
+      orderBy: [{ taskId: 'asc' }, { createdAt: 'desc' }],
+      select: { id: true, taskId: true },
+    });
+    expect(prisma.generationTask.updateMany).toHaveBeenCalledWith({
+      where: { id: 'task-a', billingOrderId: null },
+      data: { billingOrderId: 'bill-a-new' },
+    });
+    expect(prisma.generationTask.updateMany).toHaveBeenCalledWith({
+      where: { id: 'task-b', billingOrderId: null },
+      data: { billingOrderId: 'bill-b' },
+    });
   });
 
   it('新建 attempt 后回到主循环，先做 begin CAS 再派发', async () => {

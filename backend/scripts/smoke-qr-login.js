@@ -12,7 +12,6 @@
  */
 const { createHash } = require('node:crypto');
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { loadEnvOnce, resolveDbUrl } = require('./db-url');
 
 /** 与服务端同口径的票据摘要, 用于断言/清理时定位会话行 */
@@ -26,9 +25,7 @@ const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, ''
  * 读库重试: 脚本直连的同时后端在写库, SQLite 单写者必然撞 "database is locked"。
  * 与 smoke-marketing.js 同一处理。报 SQLITE_BUSY 时语句未提交, 重试安全。
  */
-const base = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-});
+const base = new PrismaClient();
 const prisma = base.$extends({
   query: {
     $allModels: {

@@ -22,7 +22,6 @@
  *   - 会员、订单幂等键、任务幂等键、签到日、被邀请关系存在冲突时拒绝执行。
  */
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl, resolveDbPath } = require('./db-url');
 
 const args = process.argv.slice(2);
@@ -88,9 +87,7 @@ async function collectMoveCounts(db, ids) {
 }
 
 async function main() {
-  const prisma = new PrismaClient({
-    adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-  });
+  const prisma = new PrismaClient();
 
   try {
     const emails = [targetEmail, ...sourceEmails];

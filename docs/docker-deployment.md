@@ -16,17 +16,18 @@
 | `docker-compose.production.yml` | 生产单机编排；TLS 由外层反代终结 | `127.0.0.1:5100` |
 
 生产编排固定使用 `NODE_ENV=production`、容器内 `PORT=4100`、
-`DATABASE_URL=file:/app/data/prod.db`。后端端口不映射到宿主机，
+数据库用编排内置的 `postgres` 服务（`DATABASE_URL` 由 `POSTGRES_*` 变量生成，
+指向 `postgres:5432/huojue_prod`）。后端端口不映射到宿主机，
 所有公网流量必须经过前端 Nginx。
 
 契约：
 
-- `migrate` 先执行 `prisma migrate deploy`，成功退出后 `backend` 才启动。
+- `postgres` 健康检查通过后，`migrate` 才执行 `prisma migrate deploy`，成功退出后 `backend` 才启动。
 - 已有数据卷（此前由 `db push` 建表、没有 `_prisma_migrations`）首次升级前，先执行一次 `npx prisma migrate resolve --applied 20261124061501_baseline` 标记基线；全新卷直接 deploy。
 - 后端就绪探针请求 `/api/v1/health/ready`，会真实查询数据库；空库或库故障不算健康。
 - 前端通过 Docker 内置 DNS 动态解析后端，后端容器重建换 IP 后不需要重启 Nginx。
-- SQLite、上传图、备份、日志统一落在具名卷；容器重建不丢数据。
-- 任务队列使用 `redis` 服务（`redis:7-alpine`，AOF 持久化）。Redis 只保存可重建的 BullMQ 作业；任务、账单与 `nextPollAt` 仍以 SQLite 为准，Redis 丢数据时后端启动对账会补投。
+- 数据库数据落 `huojue-prod-pgdata` 卷；上传图、备份、日志落 `huojue-prod-data` 卷；容器重建不丢数据。
+- 任务队列使用 `redis` 服务（`redis:7-alpine`，AOF 持久化）。Redis 只保存可重建的 BullMQ 作业；任务、账单与 `nextPollAt` 仍以 PostgreSQL 为准，Redis 丢数据时后端启动对账会补投。
 - 后端以 `node` 非 root 用户运行；所有服务启用 `no-new-privileges` 与日志轮转。
 - 停止时 `docker stop` / `docker compose stop` 给后端 30 秒优雅退出窗口。
 
@@ -292,7 +293,7 @@ npm run verify:compose
 
 ## 8. 已知边界
 
-- SQLite 是单写者模型，不适合多副本横向扩容；需要多实例时先迁移 PostgreSQL。
+- 生产 PostgreSQL 由编排内单实例提供；多副本横向扩容时需换成外部托管 PG 并调整 `DATABASE_URL`。
 - 本地卷不具备跨主机高可用能力；生产需依赖云盘快照或外部数据库。
 - 本编排不生成或续期 TLS 证书，证书与域名由外层反代 / LB 管理。
 - 密钥默认通过受控 env 文件注入；更高安全等级应改用 K8s Secret、云密钥管理或 Docker secret 挂载方案。

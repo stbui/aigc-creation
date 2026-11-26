@@ -10,13 +10,10 @@
  *
  * 运行: npm run seed:messages
  */
-import { PrismaClient } from '../src/generated/prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { createPrismaClient } from '../src/prisma/create-prisma-client';
 const { resolveDbUrl } = require('./db-url');
 
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-});
+const prisma = createPrismaClient(resolveDbUrl());
 
 const TEMPLATES = [
   {

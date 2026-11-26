@@ -163,18 +163,18 @@ export class BillingSweeperService implements OnModuleInit {
     // 用 EXISTS 在库里判断任务终态，避免把全部 failed/cancelled 任务 id
     // 搬进 Node 再拼 `IN (...)`。任务表增长后后者会成为明显的查询放大点。
     const candidates = await this.prisma.$queryRaw<Array<{ id: string; taskId: string }>>`
-      SELECT b.id, b.taskId
+      SELECT b.id, b."taskId"
       FROM "BillingOrder" AS b
-      WHERE b.taskId <> ''
+      WHERE b."taskId" <> ''
         AND (
           b.status = 'uncertain'
-          OR (b.status = 'running' AND b.updatedAt < ${staleBefore})
+          OR (b.status = 'running' AND b."updatedAt" < ${staleBefore})
           OR (
             b.status = 'reserved'
             AND EXISTS (
               SELECT 1
               FROM "GenerationTask" AS t
-              WHERE t.id = b.taskId
+              WHERE t.id = b."taskId"
                 AND t.status IN ('failed', 'cancelled')
             )
           )
@@ -182,14 +182,14 @@ export class BillingSweeperService implements OnModuleInit {
         AND NOT EXISTS (
           SELECT 1
           FROM "GenerationTask" AS t
-          WHERE t.id = b.taskId
+          WHERE t.id = b."taskId"
             AND (
-              t.outputAssetId IS NOT NULL
-              OR t.pendingResult IS NOT NULL
-              OR (t.mediaRecoveryError IS NOT NULL AND t.status = 'running')
+              t."outputAssetId" IS NOT NULL
+              OR t."pendingResult" IS NOT NULL
+              OR (t."mediaRecoveryError" IS NOT NULL AND t.status = 'running')
             )
         )
-      ORDER BY b.createdAt ASC
+      ORDER BY b."createdAt" ASC
       LIMIT ${batchSize}
     `;
     if (candidates.length === 0) return 0;

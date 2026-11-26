@@ -24,7 +24,7 @@
 |---|---|---|---|
 | 后端 env 文件 | `backend/.env.development` | `backend/.env.test` | `backend/.env.production`（**不入库**，由 `.example` 复制） |
 | 前端 env 文件 | `frontend/.env.development` | `frontend/.env.test` | `frontend/.env.production`（**不入库**） |
-| 数据库 | `file:./dev.db` | `file:./test.db` | `file:./data/prod.db`（必须 ≠ dev.db） |
+| 数据库 | SQLite `file:./dev.db` | SQLite `file:./test.db` | **PostgreSQL** `postgresql://…/huojue_prod`（compose 内置 `postgres` 服务；禁止 `file:`） |
 | Redis（BullMQ） | `redis://127.0.0.1:6379`（0 号库） | `redis://127.0.0.1:6379/1`（**与开发分库**） | `redis://redis:6379/0`（生产编排内置） |
 | 上传目录 | `uploads` | `uploads-test` | `/app/data/uploads`（绝对路径 + 卷） |
 | 备份目录 | `backups` | `backups-test` | `/app/data/backups` |
@@ -354,7 +354,7 @@ npx ts-node -T scripts/probe-environments.ts
 以下两条会让 `validateEnv` **直接抛错拒绝启动**，不是告警：
 
 1. `JWT_SECRET` 未设置 —— 内置开发密钥一旦上线路，任何人都能自签 token
-2. `DATABASE_URL` 仍是 `file:./dev.db` —— 生产连开发库等于污染演示数据，且线上数据落在本地文件上无法备份
+2. `DATABASE_URL` 为 SQLite 文件（`file:` 前缀）—— 生产必须是 PostgreSQL：单文件无法多实例共享，且容器重建即丢数据
 
 启动日志会**回显生效的环境名、库路径、上传目录**（第一屏），
 因为「以为在测、实际连着开发库」是这套体系最需要防的乌龙。
@@ -400,8 +400,9 @@ curl -fsS http://127.0.0.1:5100/healthz
 curl -fsS http://127.0.0.1:5100/api/v1/health/ready
 ```
 
-编排会先跑 `migrate`，成功后才启动后端；后端端口不映射到宿主机，
-SQLite / 上传图 / 备份 / 日志统一落 `huojue-prod-data` 卷。
+编排会先起 `postgres` 并等健康检查通过，再跑 `migrate`，成功后才启动后端；
+后端端口不映射到宿主机，上传图 / 备份 / 日志统一落 `huojue-prod-data` 卷，
+数据库数据落 `huojue-prod-pgdata` 卷。
 `seed` 是显式 profile，不会随普通 `up` 执行。
 
 完整的部署、TLS 反代示例、备份恢复、升级回滚与排障命令见

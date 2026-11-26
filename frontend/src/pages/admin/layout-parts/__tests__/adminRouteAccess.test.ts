@@ -189,6 +189,7 @@ const ALL_ADMIN_ROUTES: string[] = [
   '/admin/settings/backup',
   '/admin/settings/performance',
   '/admin/settings/security',
+  '/admin/performance',
   '/admin/backups',
   '/admin/assets',
   '/admin/storage',
@@ -223,8 +224,8 @@ const ALL_ADMIN_ROUTES: string[] = [
 ];
 
 describe('后台路由解析表（对账 layout.tsx 源码）', () => {
-  it('源码解析出 42 条页面路由 + 1 条 catch-all', () => {
-    expect(REGISTERED_PAGES).toHaveLength(42);
+  it('源码解析出 43 条页面路由 + 1 条 catch-all', () => {
+    expect(REGISTERED_PAGES).toHaveLength(43);
     expect(REGISTERED_ROUTES).toContain('*');
   });
 
@@ -242,6 +243,15 @@ describe('后台路由解析表（对账 layout.tsx 源码）', () => {
       }
     }
     expect(unmapped).toEqual([]);
+  });
+
+  it('系统信息独立页与旧深链都按 setting.read 判定', () => {
+    // 新页挂在总览，权限与系统设置一致；operator 持 setting.read，finance 不持
+    expect(verdict(operator, '/admin/performance')).toBe('allow');
+    expect(verdict(finance, '/admin/performance')).toBe('setting.read');
+    // 旧地址作为 settings 子路径命中「系统设置」菜单项，判定不变
+    expect(verdict(finance, '/admin/settings/performance')).toBe('setting.read');
+    expect(verdict(admin, '/admin/settings/performance')).toBe('allow');
   });
 
   it('公共页与 catch-all 的放行是显式的，不靠遗漏', () => {

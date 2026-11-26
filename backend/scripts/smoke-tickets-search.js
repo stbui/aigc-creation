@@ -13,12 +13,11 @@
  *   NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-tickets-search.js
  */
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl } = require('./db-url');
 const { clearCredits } = require('./credit-fixture');
 
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
-const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient();
 
 let pass = 0;
 let fail = 0;

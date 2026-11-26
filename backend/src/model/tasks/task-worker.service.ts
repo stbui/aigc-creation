@@ -266,15 +266,24 @@ export class TaskWorkerService implements OnApplicationBootstrap {
       take: 50,
       select: { id: true, createdAt: true },
     });
+    if (queued.length === 0) return;
+
+    const orders = await this.prisma.billingOrder.findMany({
+      where: { taskId: { in: queued.map((task) => task.id) } },
+      orderBy: [{ taskId: 'asc' }, { createdAt: 'desc' }],
+      select: { id: true, taskId: true },
+    });
+    const latestOrderByTask = new Map<string, string>();
+    for (const order of orders) {
+      if (!latestOrderByTask.has(order.taskId)) latestOrderByTask.set(order.taskId, order.id);
+    }
+
     for (const task of queued) {
-      const order = await this.prisma.billingOrder.findFirst({
-        where: { taskId: task.id },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (order) {
+      const billingOrderId = latestOrderByTask.get(task.id);
+      if (billingOrderId) {
         await this.prisma.generationTask.updateMany({
           where: { id: task.id, billingOrderId: null },
-          data: { billingOrderId: order.id },
+          data: { billingOrderId },
         });
         continue;
       }

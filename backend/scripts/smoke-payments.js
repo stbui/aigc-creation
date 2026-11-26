@@ -20,15 +20,12 @@
  */
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { loadEnvOnce, resolveDbUrl } = require('./db-url');
 
 loadEnvOnce();
 
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-});
+const prisma = new PrismaClient();
 const RUN = `${Date.now()}`;
 
 async function call(method, path, token, body) {

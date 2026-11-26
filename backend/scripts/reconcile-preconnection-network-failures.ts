@@ -19,8 +19,7 @@
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-import { PrismaClient } from '../src/generated/prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { createPrismaClient } from '../src/prisma/create-prisma-client';
 import { BillingService } from '../src/model/billing/billing.service';
 import { CreditWalletService } from '../src/model/billing/credit-wallet.service';
 import {
@@ -36,9 +35,7 @@ const AUDIT_NOTE = 'DNS/代理/TCP 建连前网络失败，确认上游未建立
 const TASK_FAILURE_MESSAGE = '建连前网络失败且无可用线路，积分已自动退回';
 const MICROCREDITS_PER_CREDIT = 1_000_000n;
 
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-});
+const prisma = createPrismaClient(resolveDbUrl());
 const billing = new BillingService(prisma as never, new CreditWalletService());
 
 function text(value: unknown): string {

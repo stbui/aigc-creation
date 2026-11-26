@@ -1,61 +1,71 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateTable
 CREATE TABLE "User" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "emailVerifiedAt" DATETIME,
+    "emailVerifiedAt" TIMESTAMP(3),
     "passwordHash" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "role" TEXT NOT NULL DEFAULT 'user',
     "status" TEXT NOT NULL DEFAULT 'active',
-    "lastLoginAt" DATETIME,
+    "lastLoginAt" TIMESTAMP(3),
     "inviteCode" TEXT,
     "tokenVersion" INTEGER NOT NULL DEFAULT 0,
     "mustChangePassword" BOOLEAN NOT NULL DEFAULT false,
-    "tempPasswordExpiresAt" DATETIME,
+    "tempPasswordExpiresAt" TIMESTAMP(3),
     "phone" TEXT,
-    "phoneVerifiedAt" DATETIME
+    "phoneVerifiedAt" TIMESTAMP(3),
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "OAuthIdentity" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "provider" TEXT NOT NULL,
     "subject" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastLoginAt" DATETIME,
-    CONSTRAINT "OAuthIdentity_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastLoginAt" TIMESTAMP(3),
+
+    CONSTRAINT "OAuthIdentity_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "OAuthChallenge" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "tokenHash" TEXT NOT NULL,
     "kind" TEXT NOT NULL,
     "provider" TEXT NOT NULL,
     "userId" TEXT,
     "linkUserId" TEXT,
     "returnTo" TEXT,
-    "expiresAt" DATETIME NOT NULL,
-    "usedAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "OAuthChallenge_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "AdminRole" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "permissions" TEXT NOT NULL DEFAULT '[]',
     "builtIn" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AdminRole_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Product" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "sku" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL DEFAULT '',
@@ -75,15 +85,17 @@ CREATE TABLE "Product" (
     "stockTotal" INTEGER NOT NULL DEFAULT 0,
     "stockReserved" INTEGER NOT NULL DEFAULT 0,
     "stockSold" INTEGER NOT NULL DEFAULT 0,
-    "saleStartAt" DATETIME,
-    "saleEndAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "saleStartAt" TIMESTAMP(3),
+    "saleEndAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Order" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "orderNo" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "idempotencyKey" TEXT NOT NULL,
@@ -97,10 +109,10 @@ CREATE TABLE "Order" (
     "couponSnapshot" TEXT NOT NULL DEFAULT '{}',
     "status" TEXT NOT NULL DEFAULT 'pending',
     "channel" TEXT NOT NULL DEFAULT 'sandbox',
-    "paidAt" DATETIME,
-    "expiresAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "paidAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'CNY',
     "providerConfigId" TEXT,
     "providerConfigVersion" INTEGER,
@@ -109,50 +121,48 @@ CREATE TABLE "Order" (
     "providerStatus" TEXT,
     "checkoutMode" TEXT,
     "checkoutValue" TEXT DEFAULT '',
-    "checkoutExpiresAt" DATETIME,
-    "lastQueriedAt" DATETIME,
+    "checkoutExpiresAt" TIMESTAMP(3),
+    "lastQueriedAt" TIMESTAMP(3),
     "lastError" TEXT,
-    "closeStartedAt" DATETIME,
-    "intentStartedAt" DATETIME,
-    "closedAt" DATETIME,
-    "providerPaidAt" DATETIME,
+    "closeStartedAt" TIMESTAMP(3),
+    "intentStartedAt" TIMESTAMP(3),
+    "closedAt" TIMESTAMP(3),
+    "providerPaidAt" TIMESTAMP(3),
     "stockReserved" BOOLEAN NOT NULL DEFAULT false,
     "membershipPlanId" TEXT,
-    "membershipAppliedAt" DATETIME,
-    "membershipPeriodStartAt" DATETIME,
-    "membershipPeriodEndAt" DATETIME,
+    "membershipAppliedAt" TIMESTAMP(3),
+    "membershipPeriodStartAt" TIMESTAMP(3),
+    "membershipPeriodEndAt" TIMESTAMP(3),
     "membershipPerksSnapshot" TEXT,
     "membershipMonthlyCreditsSnapshot" INTEGER,
     "membershipDurationDaysSnapshot" INTEGER,
     "membershipUserGroupCodeSnapshot" TEXT,
-    "membershipPeriodRevokedAt" DATETIME,
-    CONSTRAINT "Order_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Order_couponId_fkey" FOREIGN KEY ("couponId") REFERENCES "Coupon" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Order_campaignId_fkey" FOREIGN KEY ("campaignId") REFERENCES "Campaign" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Order_membershipPlanId_fkey" FOREIGN KEY ("membershipPlanId") REFERENCES "MembershipPlan" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "membershipPeriodRevokedAt" TIMESTAMP(3),
+
+    CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "OrderCancelEvent" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'reserved',
     "windowMode" TEXT NOT NULL,
-    "windowStart" DATETIME NOT NULL,
-    "windowEnd" DATETIME NOT NULL,
-    "reservedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "consumedAt" DATETIME,
-    "releasedAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "OrderCancelEvent_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "OrderCancelEvent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "windowStart" TIMESTAMP(3) NOT NULL,
+    "windowEnd" TIMESTAMP(3) NOT NULL,
+    "reservedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "consumedAt" TIMESTAMP(3),
+    "releasedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "OrderCancelEvent_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "OrderItem" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "skuSnapshot" TEXT NOT NULL,
@@ -163,13 +173,13 @@ CREATE TABLE "OrderItem" (
     "grantTypeSnapshot" TEXT,
     "stockReservedSnapshot" INTEGER,
     "quantity" INTEGER NOT NULL DEFAULT 1,
-    CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "OrderItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+
+    CONSTRAINT "OrderItem_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Payment" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "payTransactionId" TEXT,
@@ -180,9 +190,9 @@ CREATE TABLE "Payment" (
     "message" TEXT,
     "sandboxScenario" TEXT,
     "rawPayload" TEXT NOT NULL DEFAULT '',
-    "paidAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "paidAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'CNY',
     "providerConfigId" TEXT,
     "providerConfigVersion" INTEGER,
@@ -190,14 +200,14 @@ CREATE TABLE "Payment" (
     "providerRef" TEXT,
     "providerStatus" TEXT,
     "lastError" TEXT,
-    "closedAt" DATETIME,
-    CONSTRAINT "Payment_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Payment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "closedAt" TIMESTAMP(3),
+
+    CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Refund" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
     "paymentId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -210,29 +220,29 @@ CREATE TABLE "Refund" (
     "operatorId" TEXT NOT NULL,
     "providerRefundId" TEXT,
     "detail" TEXT NOT NULL DEFAULT '{}',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Refund_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Refund_paymentId_fkey" FOREIGN KEY ("paymentId") REFERENCES "Payment" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Refund_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Refund_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CreditLot" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "source" TEXT NOT NULL,
     "orderId" TEXT,
     "totalMicrocredits" BIGINT NOT NULL,
     "remainingMicrocredits" BIGINT NOT NULL,
-    "expireAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "CreditLot_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "expireAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CreditLot_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CreditLedger" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "amount" INTEGER NOT NULL,
@@ -243,14 +253,14 @@ CREATE TABLE "CreditLedger" (
     "idempotencyKey" TEXT,
     "reason" TEXT,
     "operatorId" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "CreditLedger_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "CreditLedger_lotId_fkey" FOREIGN KEY ("lotId") REFERENCES "CreditLot" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CreditLedger_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "MembershipPlan" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL DEFAULT '',
@@ -261,52 +271,55 @@ CREATE TABLE "MembershipPlan" (
     "userGroupCode" TEXT NOT NULL DEFAULT '',
     "status" TEXT NOT NULL DEFAULT 'active',
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "MembershipPlan_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Membership" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "planId" TEXT NOT NULL,
     "perksSnapshot" TEXT NOT NULL DEFAULT '{}',
     "monthlyCreditsSnapshot" INTEGER NOT NULL DEFAULT 0,
-    "startAt" DATETIME NOT NULL,
-    "expiresAt" DATETIME NOT NULL,
+    "startAt" TIMESTAMP(3) NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'active',
     "orderId" TEXT,
-    "nextCreditAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Membership_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Membership_planId_fkey" FOREIGN KEY ("planId") REFERENCES "MembershipPlan" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Membership_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "nextCreditAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Membership_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "MembershipUsage" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "orderId" TEXT,
     "savedCents" INTEGER NOT NULL DEFAULT 0,
     "planCode" TEXT NOT NULL DEFAULT '',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "MembershipUsage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "MembershipUsage_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "MembershipUsage_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "SystemSetting" (
-    "key" TEXT NOT NULL PRIMARY KEY,
+    "key" TEXT NOT NULL,
     "value" TEXT NOT NULL,
     "updatedBy" TEXT,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SystemSetting_pkey" PRIMARY KEY ("key")
 );
 
 -- CreateTable
 CREATE TABLE "BackupRecord" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
     "sizeBytes" INTEGER NOT NULL,
     "sha256" TEXT NOT NULL,
@@ -315,15 +328,17 @@ CREATE TABLE "BackupRecord" (
     "errorMessage" TEXT,
     "sourceSizeBytes" INTEGER,
     "verified" BOOLEAN NOT NULL DEFAULT false,
-    "verifiedAt" DATETIME,
+    "verifiedAt" TIMESTAMP(3),
     "verifyReport" TEXT,
     "verifyWarnings" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "BackupRecord_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CleanupLog" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "target" TEXT NOT NULL,
     "deletedCount" INTEGER NOT NULL,
     "retentionDays" INTEGER NOT NULL,
@@ -332,22 +347,25 @@ CREATE TABLE "CleanupLog" (
     "detail" TEXT NOT NULL DEFAULT '{}',
     "success" BOOLEAN NOT NULL DEFAULT true,
     "errorMessage" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CleanupLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Project" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "ownerId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "deletedAt" DATETIME,
-    CONSTRAINT "Project_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "Project_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Asset" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "ownerId" TEXT NOT NULL,
     "kind" TEXT NOT NULL,
@@ -358,7 +376,7 @@ CREATE TABLE "Asset" (
     "format" TEXT NOT NULL,
     "sizeBytes" INTEGER NOT NULL,
     "durationMs" INTEGER,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "status" TEXT NOT NULL DEFAULT 'visible',
     "storageBackend" TEXT NOT NULL DEFAULT 'local',
     "storageKey" TEXT,
@@ -366,14 +384,14 @@ CREATE TABLE "Asset" (
     "sourceTitle" TEXT,
     "sourcePageUrl" TEXT,
     "aigcMeta" TEXT NOT NULL DEFAULT '{}',
-    "aigcLabeledAt" DATETIME,
-    CONSTRAINT "Asset_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Asset_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "aigcLabeledAt" TIMESTAMP(3),
+
+    CONSTRAINT "Asset_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "GenerationTask" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "ownerId" TEXT NOT NULL,
     "capability" TEXT NOT NULL,
@@ -390,7 +408,7 @@ CREATE TABLE "GenerationTask" (
     "requestFingerprint" TEXT,
     "retriedFromId" TEXT,
     "retryKey" TEXT,
-    "heartbeatAt" DATETIME,
+    "heartbeatAt" TIMESTAMP(3),
     "modelKey" TEXT,
     "channelModelId" TEXT,
     "channelId" TEXT,
@@ -399,9 +417,9 @@ CREATE TABLE "GenerationTask" (
     "clientIp" TEXT NOT NULL DEFAULT '',
     "providerRequestId" TEXT,
     "pollStage" TEXT NOT NULL DEFAULT '',
-    "nextPollAt" DATETIME,
+    "nextPollAt" TIMESTAMP(3),
     "leaseOwner" TEXT NOT NULL DEFAULT '',
-    "leaseUntil" DATETIME,
+    "leaseUntil" TIMESTAMP(3),
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "stage" TEXT NOT NULL DEFAULT '',
     "progress" INTEGER NOT NULL DEFAULT 0,
@@ -409,16 +427,15 @@ CREATE TABLE "GenerationTask" (
     "mediaRecoveryError" TEXT,
     "pendingResult" TEXT,
     "aigcMeta" TEXT NOT NULL DEFAULT '{}',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "GenerationTask_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "GenerationTask_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "GenerationTask_outputAssetId_fkey" FOREIGN KEY ("outputAssetId") REFERENCES "Asset" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "GenerationTask_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Coupon" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -429,90 +446,100 @@ CREATE TABLE "Coupon" (
     "totalCount" INTEGER NOT NULL DEFAULT 0,
     "usedCount" INTEGER NOT NULL DEFAULT 0,
     "perUserLimit" INTEGER NOT NULL DEFAULT 1,
-    "validFrom" DATETIME NOT NULL,
-    "validTo" DATETIME NOT NULL,
+    "validFrom" TIMESTAMP(3) NOT NULL,
+    "validTo" TIMESTAMP(3) NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'on',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Coupon_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Campaign" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "payload" TEXT NOT NULL DEFAULT '{}',
-    "startAt" DATETIME NOT NULL,
-    "endAt" DATETIME NOT NULL,
+    "startAt" TIMESTAMP(3) NOT NULL,
+    "endAt" TIMESTAMP(3) NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'draft',
     "audience" TEXT NOT NULL DEFAULT '{}',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Campaign_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "InviteRelation" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "inviteCode" TEXT NOT NULL,
     "inviterId" TEXT NOT NULL,
     "inviteeId" TEXT NOT NULL,
-    "boundAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "boundAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "rewardStatus" TEXT NOT NULL DEFAULT 'pending',
-    CONSTRAINT "InviteRelation_inviterId_fkey" FOREIGN KEY ("inviterId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "InviteRelation_inviteeId_fkey" FOREIGN KEY ("inviteeId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+
+    CONSTRAINT "InviteRelation_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "InviteRewardRule" (
-    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
+    "id" TEXT NOT NULL DEFAULT 'default',
     "inviterCredits" INTEGER NOT NULL DEFAULT 0,
     "inviteeCredits" INTEGER NOT NULL DEFAULT 0,
     "triggerOn" TEXT NOT NULL DEFAULT 'first_pay',
     "valid" BOOLEAN NOT NULL DEFAULT true,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "InviteRewardRule_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CheckinRecord" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "day" TEXT NOT NULL,
     "credits" INTEGER NOT NULL,
     "streak" INTEGER NOT NULL DEFAULT 1,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "CheckinRecord_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CheckinRecord_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CheckinRule" (
-    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
+    "id" TEXT NOT NULL DEFAULT 'default',
     "baseCredits" INTEGER NOT NULL DEFAULT 5,
     "bonusRules" TEXT NOT NULL DEFAULT '[]',
     "maxStreak" INTEGER NOT NULL DEFAULT 0,
     "dailyCap" INTEGER NOT NULL DEFAULT 0,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CheckinRule_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "AccountToken" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT,
     "phone" TEXT,
     "email" TEXT,
     "type" TEXT NOT NULL,
     "tokenHash" TEXT NOT NULL,
-    "expiresAt" DATETIME NOT NULL,
-    "usedAt" DATETIME,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "requestedIp" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "AccountToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AccountToken_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "PaymentExceptionCase" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "fingerprint" TEXT NOT NULL,
     "providerId" TEXT NOT NULL,
     "orderId" TEXT,
@@ -524,61 +551,67 @@ CREATE TABLE "PaymentExceptionCase" (
     "status" TEXT NOT NULL DEFAULT 'open',
     "priority" TEXT NOT NULL DEFAULT 'urgent',
     "ownerId" TEXT,
-    "slaDueAt" DATETIME NOT NULL,
+    "slaDueAt" TIMESTAMP(3) NOT NULL,
     "refundId" TEXT,
     "resolution" TEXT,
     "lastError" TEXT,
-    "closedAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "closedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PaymentExceptionCase_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "PaymentAutoReconcileState" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "providerId" TEXT NOT NULL,
     "providerInstanceId" TEXT NOT NULL DEFAULT 'default',
     "billDate" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'pending',
     "attempts" INTEGER NOT NULL DEFAULT 0,
-    "nextAttemptAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastError" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PaymentAutoReconcileState_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "LoginLog" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT,
     "email" TEXT NOT NULL,
     "ip" TEXT,
     "ua" TEXT,
     "success" BOOLEAN NOT NULL DEFAULT true,
     "reason" TEXT NOT NULL DEFAULT 'password',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "LoginLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "LoginLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "LoginSession" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "tokenHash" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'pending',
     "userId" TEXT,
     "ip" TEXT,
     "ua" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "expiresAt" DATETIME NOT NULL,
-    "scannedAt" DATETIME,
-    "confirmedAt" DATETIME,
-    "consumedAt" DATETIME,
-    CONSTRAINT "LoginSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "scannedAt" TIMESTAMP(3),
+    "confirmedAt" TIMESTAMP(3),
+    "consumedAt" TIMESTAMP(3),
+
+    CONSTRAINT "LoginSession_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Invoice" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "invoiceNo" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
     "activeOrderId" TEXT,
@@ -592,20 +625,20 @@ CREATE TABLE "Invoice" (
     "status" TEXT NOT NULL DEFAULT 'pending',
     "rejectReason" TEXT,
     "fileKey" TEXT,
-    "issuedAt" DATETIME,
+    "issuedAt" TIMESTAMP(3),
     "issuedBy" TEXT,
-    "redFlushedAt" DATETIME,
+    "redFlushedAt" TIMESTAMP(3),
     "redFlushedBy" TEXT,
     "redFlushReason" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Invoice_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Invoice_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Invoice_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ReconciliationBatch" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "channel" TEXT NOT NULL,
     "billDate" TEXT NOT NULL,
     "fileName" TEXT,
@@ -617,12 +650,14 @@ CREATE TABLE "ReconciliationBatch" (
     "diffCount" INTEGER NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'imported',
     "operatorId" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ReconciliationBatch_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ReconciliationItem" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "batchId" TEXT NOT NULL,
     "tradeNo" TEXT NOT NULL,
     "paymentId" TEXT,
@@ -633,48 +668,54 @@ CREATE TABLE "ReconciliationItem" (
     "status" TEXT NOT NULL DEFAULT 'open',
     "note" TEXT,
     "resolvedBy" TEXT,
-    "resolvedAt" DATETIME,
-    CONSTRAINT "ReconciliationItem_batchId_fkey" FOREIGN KEY ("batchId") REFERENCES "ReconciliationBatch" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "resolvedAt" TIMESTAMP(3),
+
+    CONSTRAINT "ReconciliationItem_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Notification" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "body" TEXT,
     "link" TEXT,
-    "readAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "readAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "MessageTemplate" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "channel" TEXT NOT NULL,
     "subject" TEXT,
     "body" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "updatedAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "MessageTemplate_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CapabilityControl" (
-    "capabilityId" TEXT NOT NULL PRIMARY KEY,
+    "capabilityId" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "reason" TEXT,
     "updatedBy" TEXT,
-    "updatedAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CapabilityControl_pkey" PRIMARY KEY ("capabilityId")
 );
 
 -- CreateTable
 CREATE TABLE "Ticket" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "ticketNo" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -685,42 +726,46 @@ CREATE TABLE "Ticket" (
     "orderId" TEXT,
     "assetId" TEXT,
     "assigneeId" TEXT,
-    "resolvedAt" DATETIME,
-    "closedAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Ticket_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "resolvedAt" TIMESTAMP(3),
+    "closedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Ticket_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "TicketReply" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "ticketId" TEXT NOT NULL,
     "authorType" TEXT NOT NULL,
     "authorId" TEXT NOT NULL,
     "authorName" TEXT NOT NULL,
     "content" TEXT NOT NULL,
     "visibility" TEXT NOT NULL DEFAULT 'public',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "TicketReply_ticketId_fkey" FOREIGN KEY ("ticketId") REFERENCES "Ticket" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TicketReply_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "AigcLabelConfig" (
-    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
+    "id" TEXT NOT NULL DEFAULT 'default',
     "specJson" TEXT NOT NULL,
     "specKey" TEXT NOT NULL,
     "pngBase64" TEXT,
     "pngWidth" INTEGER,
     "pngHeight" INTEGER,
     "updatedBy" TEXT,
-    "updatedAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AigcLabelConfig_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ModelChannel" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL DEFAULT '',
     "scope" TEXT NOT NULL DEFAULT 'system',
     "enabled" BOOLEAN NOT NULL DEFAULT true,
@@ -737,14 +782,16 @@ CREATE TABLE "ModelChannel" (
     "headersJson" TEXT NOT NULL DEFAULT '',
     "catalogProviderId" TEXT NOT NULL DEFAULT '',
     "defaultModelConfigJson" TEXT NOT NULL DEFAULT '',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    "deletedAt" DATETIME
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "ModelChannel_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ChannelModel" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "channelId" TEXT NOT NULL,
     "modelKey" TEXT NOT NULL,
     "activeKey" TEXT,
@@ -770,14 +817,16 @@ CREATE TABLE "ChannelModel" (
     "capabilityVersion" INTEGER NOT NULL DEFAULT 0,
     "modelGroupKey" TEXT NOT NULL DEFAULT '',
     "catalogModelKey" TEXT NOT NULL DEFAULT '',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    "deletedAt" DATETIME
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "ChannelModel_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ChannelModelPriceTier" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "channelModelId" TEXT NOT NULL,
     "activeKey" TEXT,
     "selectorKey" TEXT NOT NULL DEFAULT '{}',
@@ -798,39 +847,45 @@ CREATE TABLE "ChannelModelPriceTier" (
     "priceConfigured" BOOLEAN NOT NULL DEFAULT false,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "priceVersion" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    "deletedAt" DATETIME
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "ChannelModelPriceTier_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CapabilityModelBinding" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "capabilityId" TEXT NOT NULL,
     "channelModelId" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "priority" INTEGER NOT NULL DEFAULT 0,
     "weight" INTEGER NOT NULL DEFAULT 100,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CapabilityModelBinding_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CapabilityPricing" (
-    "capabilityId" TEXT NOT NULL PRIMARY KEY,
+    "capabilityId" TEXT NOT NULL,
     "billingMode" TEXT NOT NULL DEFAULT 'fixed_request',
     "unitPriceMicrocredits" BIGINT NOT NULL DEFAULT 0,
     "inputTokenPriceMicrocredits" BIGINT NOT NULL DEFAULT 0,
     "outputTokenPriceMicrocredits" BIGINT NOT NULL DEFAULT 0,
     "cachedTokenPriceMicrocredits" BIGINT NOT NULL DEFAULT 0,
     "updatedBy" TEXT NOT NULL DEFAULT '',
-    "updatedAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CapabilityPricing_pkey" PRIMARY KEY ("capabilityId")
 );
 
 -- CreateTable
 CREATE TABLE "RouteAttempt" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "taskId" TEXT NOT NULL,
     "routeRun" INTEGER NOT NULL,
     "attemptNumber" INTEGER NOT NULL,
@@ -843,13 +898,15 @@ CREATE TABLE "RouteAttempt" (
     "providerRequestId" TEXT NOT NULL DEFAULT '',
     "failureCode" TEXT NOT NULL DEFAULT '',
     "failureMessage" TEXT NOT NULL DEFAULT '',
-    "startedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completedAt" DATETIME
+    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP(3),
+
+    CONSTRAINT "RouteAttempt_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "UserGroup" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "activeKey" TEXT,
     "name" TEXT NOT NULL DEFAULT '',
@@ -862,23 +919,25 @@ CREATE TABLE "UserGroup" (
     "pointsPerCny" BIGINT NOT NULL DEFAULT 0,
     "allChannels" BOOLEAN NOT NULL DEFAULT false,
     "modelOverridesJson" TEXT NOT NULL DEFAULT '[]',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    "deletedAt" DATETIME
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "UserGroup_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "UserGroupChannel" (
     "groupId" TEXT NOT NULL,
     "channelId" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    PRIMARY KEY ("groupId", "channelId")
+    CONSTRAINT "UserGroupChannel_pkey" PRIMARY KEY ("groupId","channelId")
 );
 
 -- CreateTable
 CREATE TABLE "BillingOrder" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "idempotencyKey" TEXT NOT NULL,
     "taskId" TEXT NOT NULL DEFAULT '',
@@ -928,27 +987,31 @@ CREATE TABLE "BillingOrder" (
     "resolvedBy" TEXT NOT NULL DEFAULT '',
     "resolutionNote" TEXT NOT NULL DEFAULT '',
     "reviewBatchId" TEXT NOT NULL DEFAULT '',
-    "startedAt" DATETIME,
-    "settledAt" DATETIME,
-    "refundedAt" DATETIME,
+    "startedAt" TIMESTAMP(3),
+    "settledAt" TIMESTAMP(3),
+    "refundedAt" TIMESTAMP(3),
     "refundReason" TEXT NOT NULL DEFAULT '',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "BillingOrder_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CreditAccount" (
-    "userId" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
     "availableMicrocredits" BIGINT NOT NULL DEFAULT 0,
     "reservedMicrocredits" BIGINT NOT NULL DEFAULT 0,
     "version" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CreditAccount_pkey" PRIMARY KEY ("userId")
 );
 
 -- CreateTable
 CREATE TABLE "CreditLedgerEntry" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "amountMicrocredits" BIGINT NOT NULL,
@@ -967,7 +1030,9 @@ CREATE TABLE "CreditLedgerEntry" (
     "businessType" TEXT NOT NULL DEFAULT '',
     "note" TEXT NOT NULL DEFAULT '',
     "referenceKey" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CreditLedgerEntry_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -976,12 +1041,12 @@ CREATE TABLE "CreditReservationItem" (
     "lotId" TEXT NOT NULL,
     "microcredits" BIGINT NOT NULL,
 
-    PRIMARY KEY ("billingOrderId", "lotId")
+    CONSTRAINT "CreditReservationItem_pkey" PRIMARY KEY ("billingOrderId","lotId")
 );
 
 -- CreateTable
 CREATE TABLE "ApiCallLog" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL DEFAULT '',
     "traceId" TEXT NOT NULL DEFAULT '',
     "requestId" TEXT NOT NULL DEFAULT '',
@@ -1024,18 +1089,22 @@ CREATE TABLE "ApiCallLog" (
     "clientIp" TEXT NOT NULL DEFAULT '',
     "requestBytes" INTEGER NOT NULL DEFAULT 0,
     "responseBytes" INTEGER NOT NULL DEFAULT 0,
-    "startedAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "startedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ApiCallLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "PluginPlatformState" (
-    "pluginId" TEXT NOT NULL PRIMARY KEY,
+    "pluginId" TEXT NOT NULL,
     "source" TEXT NOT NULL DEFAULT 'builtin',
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "verifyJson" TEXT NOT NULL DEFAULT '{}',
     "updatedBy" TEXT NOT NULL DEFAULT '',
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PluginPlatformState_pkey" PRIMARY KEY ("pluginId")
 );
 
 -- CreateTable
@@ -1044,19 +1113,21 @@ CREATE TABLE "UserPluginState" (
     "pluginId" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
 
-    PRIMARY KEY ("userId", "pluginId")
+    CONSTRAINT "UserPluginState_pkey" PRIMARY KEY ("userId","pluginId")
 );
 
 -- CreateTable
 CREATE TABLE "RouteCatalogVersion" (
-    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'catalog',
+    "id" TEXT NOT NULL DEFAULT 'catalog',
     "version" INTEGER NOT NULL DEFAULT 0,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RouteCatalogVersion_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "PaymentProviderConfig" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "providerId" TEXT NOT NULL,
     "instanceId" TEXT NOT NULL DEFAULT 'default',
     "name" TEXT,
@@ -1072,7 +1143,9 @@ CREATE TABLE "PaymentProviderConfig" (
     "configCipher" TEXT NOT NULL DEFAULT '',
     "configDigest" TEXT NOT NULL DEFAULT '',
     "createdBy" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PaymentProviderConfig_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1080,14 +1153,14 @@ CREATE TABLE "PaymentRoundRobinCursor" (
     "providerId" TEXT NOT NULL,
     "method" TEXT NOT NULL,
     "cursor" INTEGER NOT NULL DEFAULT 0,
-    "updatedAt" DATETIME NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    PRIMARY KEY ("providerId", "method")
+    CONSTRAINT "PaymentRoundRobinCursor_pkey" PRIMARY KEY ("providerId","method")
 );
 
 -- CreateTable
 CREATE TABLE "PaymentNotification" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "providerId" TEXT NOT NULL,
     "providerEventId" TEXT NOT NULL,
     "providerConfigId" TEXT NOT NULL,
@@ -1099,15 +1172,17 @@ CREATE TABLE "PaymentNotification" (
     "status" TEXT NOT NULL DEFAULT 'pending',
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "lastError" TEXT,
-    "nextAttemptAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "processedAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "processedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PaymentNotification_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "PaymentReconciliationRun" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "providerId" TEXT NOT NULL,
     "providerInstanceId" TEXT NOT NULL DEFAULT 'default',
     "configId" TEXT,
@@ -1122,15 +1197,17 @@ CREATE TABLE "PaymentReconciliationRun" (
     "errorItems" INTEGER NOT NULL DEFAULT 0,
     "error" TEXT,
     "startedBy" TEXT,
-    "startedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completedAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PaymentReconciliationRun_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "PaymentReconciliationItem" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "runId" TEXT NOT NULL,
     "providerId" TEXT NOT NULL,
     "orderId" TEXT,
@@ -1141,39 +1218,43 @@ CREATE TABLE "PaymentReconciliationItem" (
     "result" TEXT NOT NULL,
     "resolved" BOOLEAN NOT NULL DEFAULT false,
     "detail" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "PaymentReconciliationItem_runId_fkey" FOREIGN KEY ("runId") REFERENCES "PaymentReconciliationRun" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PaymentReconciliationItem_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "TemplateCategory" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "sourceUrl" TEXT NOT NULL DEFAULT '',
     "description" TEXT NOT NULL DEFAULT '',
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TemplateCategory_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "TemplateGroup" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "categoryId" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "TemplateGroup_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "TemplateCategory" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TemplateGroup_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Prompt" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "title" TEXT NOT NULL DEFAULT '',
     "category" TEXT NOT NULL DEFAULT '',
     "content" TEXT NOT NULL,
@@ -1183,13 +1264,15 @@ CREATE TABLE "Prompt" (
     "images" TEXT NOT NULL DEFAULT '[]',
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Prompt_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "TemplateItem" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "groupId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "prompt" TEXT NOT NULL,
@@ -1197,20 +1280,23 @@ CREATE TABLE "TemplateItem" (
     "tags" TEXT NOT NULL DEFAULT '[]',
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "TemplateItem_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "TemplateGroup" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TemplateItem_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "StorageConfig" (
-    "backend" TEXT NOT NULL PRIMARY KEY,
+    "backend" TEXT NOT NULL,
     "configCipher" TEXT NOT NULL DEFAULT '',
     "configDigest" TEXT NOT NULL DEFAULT '',
     "updatedBy" TEXT,
     "active" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StorageConfig_pkey" PRIMARY KEY ("backend")
 );
 
 -- CreateIndex
@@ -1556,7 +1642,7 @@ CREATE INDEX "PaymentExceptionCase_orderId_idx" ON "PaymentExceptionCase"("order
 CREATE INDEX "PaymentAutoReconcileState_status_nextAttemptAt_idx" ON "PaymentAutoReconcileState"("status", "nextAttemptAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PaymentAutoReconcileState_providerId_providerInstanceId_billDate_key" ON "PaymentAutoReconcileState"("providerId", "providerInstanceId", "billDate");
+CREATE UNIQUE INDEX "PaymentAutoReconcileState_providerId_providerInstanceId_bil_key" ON "PaymentAutoReconcileState"("providerId", "providerInstanceId", "billDate");
 
 -- CreateIndex
 CREATE INDEX "LoginLog_userId_createdAt_idx" ON "LoginLog"("userId", "createdAt");
@@ -1817,13 +1903,13 @@ CREATE INDEX "PaymentNotification_orderId_idx" ON "PaymentNotification"("orderId
 CREATE UNIQUE INDEX "PaymentNotification_providerId_providerEventId_key" ON "PaymentNotification"("providerId", "providerEventId");
 
 -- CreateIndex
-CREATE INDEX "PaymentReconciliationRun_providerId_providerInstanceId_billDate_status_idx" ON "PaymentReconciliationRun"("providerId", "providerInstanceId", "billDate", "status");
+CREATE INDEX "PaymentReconciliationRun_providerId_providerInstanceId_bill_idx" ON "PaymentReconciliationRun"("providerId", "providerInstanceId", "billDate", "status");
 
 -- CreateIndex
 CREATE INDEX "PaymentReconciliationRun_status_createdAt_idx" ON "PaymentReconciliationRun"("status", "createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PaymentReconciliationRun_providerId_providerInstanceId_billDate_attempt_key" ON "PaymentReconciliationRun"("providerId", "providerInstanceId", "billDate", "attempt");
+CREATE UNIQUE INDEX "PaymentReconciliationRun_providerId_providerInstanceId_bill_key" ON "PaymentReconciliationRun"("providerId", "providerInstanceId", "billDate", "attempt");
 
 -- CreateIndex
 CREATE INDEX "PaymentReconciliationItem_result_idx" ON "PaymentReconciliationItem"("result");
@@ -1832,7 +1918,7 @@ CREATE INDEX "PaymentReconciliationItem_result_idx" ON "PaymentReconciliationIte
 CREATE INDEX "PaymentReconciliationItem_providerId_merchantOrderNo_idx" ON "PaymentReconciliationItem"("providerId", "merchantOrderNo");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PaymentReconciliationItem_runId_merchantOrderNo_providerTradeNo_key" ON "PaymentReconciliationItem"("runId", "merchantOrderNo", "providerTradeNo");
+CREATE UNIQUE INDEX "PaymentReconciliationItem_runId_merchantOrderNo_providerTra_key" ON "PaymentReconciliationItem"("runId", "merchantOrderNo", "providerTradeNo");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "TemplateCategory_slug_key" ON "TemplateCategory"("slug");
@@ -1854,3 +1940,133 @@ CREATE INDEX "Prompt_category_idx" ON "Prompt"("category");
 
 -- CreateIndex
 CREATE INDEX "TemplateItem_groupId_enabled_sortOrder_idx" ON "TemplateItem"("groupId", "enabled", "sortOrder");
+
+-- AddForeignKey
+ALTER TABLE "OAuthIdentity" ADD CONSTRAINT "OAuthIdentity_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_couponId_fkey" FOREIGN KEY ("couponId") REFERENCES "Coupon"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_campaignId_fkey" FOREIGN KEY ("campaignId") REFERENCES "Campaign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_membershipPlanId_fkey" FOREIGN KEY ("membershipPlanId") REFERENCES "MembershipPlan"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderCancelEvent" ADD CONSTRAINT "OrderCancelEvent_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderCancelEvent" ADD CONSTRAINT "OrderCancelEvent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Payment" ADD CONSTRAINT "Payment_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Payment" ADD CONSTRAINT "Payment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Refund" ADD CONSTRAINT "Refund_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Refund" ADD CONSTRAINT "Refund_paymentId_fkey" FOREIGN KEY ("paymentId") REFERENCES "Payment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Refund" ADD CONSTRAINT "Refund_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CreditLot" ADD CONSTRAINT "CreditLot_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CreditLedger" ADD CONSTRAINT "CreditLedger_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CreditLedger" ADD CONSTRAINT "CreditLedger_lotId_fkey" FOREIGN KEY ("lotId") REFERENCES "CreditLot"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Membership" ADD CONSTRAINT "Membership_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Membership" ADD CONSTRAINT "Membership_planId_fkey" FOREIGN KEY ("planId") REFERENCES "MembershipPlan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Membership" ADD CONSTRAINT "Membership_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MembershipUsage" ADD CONSTRAINT "MembershipUsage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MembershipUsage" ADD CONSTRAINT "MembershipUsage_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Project" ADD CONSTRAINT "Project_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Asset" ADD CONSTRAINT "Asset_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Asset" ADD CONSTRAINT "Asset_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GenerationTask" ADD CONSTRAINT "GenerationTask_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GenerationTask" ADD CONSTRAINT "GenerationTask_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GenerationTask" ADD CONSTRAINT "GenerationTask_outputAssetId_fkey" FOREIGN KEY ("outputAssetId") REFERENCES "Asset"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InviteRelation" ADD CONSTRAINT "InviteRelation_inviterId_fkey" FOREIGN KEY ("inviterId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InviteRelation" ADD CONSTRAINT "InviteRelation_inviteeId_fkey" FOREIGN KEY ("inviteeId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CheckinRecord" ADD CONSTRAINT "CheckinRecord_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AccountToken" ADD CONSTRAINT "AccountToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "LoginLog" ADD CONSTRAINT "LoginLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "LoginSession" ADD CONSTRAINT "LoginSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ReconciliationItem" ADD CONSTRAINT "ReconciliationItem_batchId_fkey" FOREIGN KEY ("batchId") REFERENCES "ReconciliationBatch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Ticket" ADD CONSTRAINT "Ticket_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TicketReply" ADD CONSTRAINT "TicketReply_ticketId_fkey" FOREIGN KEY ("ticketId") REFERENCES "Ticket"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PaymentReconciliationItem" ADD CONSTRAINT "PaymentReconciliationItem_runId_fkey" FOREIGN KEY ("runId") REFERENCES "PaymentReconciliationRun"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateGroup" ADD CONSTRAINT "TemplateGroup_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "TemplateCategory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateItem" ADD CONSTRAINT "TemplateItem_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "TemplateGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

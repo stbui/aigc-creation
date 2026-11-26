@@ -5,10 +5,11 @@ import { AppError } from '../common/app.exception';
 /**
  * 在写事务内锁住目标用户，并阻止「最后一个启用管理员」被降级/禁用/删除。
  *
- * SQLite 的 `BEGIN DEFERRED` 不会在事务开始时加写锁；如果先 count 再 update，
- * 两个并发请求可以同时读到 2 个管理员，随后各自把对方停用。这里用一个不做
- * 实际变更的 UPDATE 作为第一条写语句：它会取得数据库写锁，并把「目标是否为
- * 唯一启用管理员」和写锁放在同一条语句里，后续事务只能看到前一个事务的结果。
+ * 如果先 count 再 update，两个并发请求可以同时读到 2 个管理员，随后各自把
+ * 对方停用。这里用一个不做实际变更的 UPDATE 作为第一条写语句：SQLite 下它
+ * 取得全库写锁，PostgreSQL 下它对目标行加 FOR UPDATE 行锁，并把「目标是否为
+ * 唯一启用管理员」的判定与加锁放在同一条语句里，后续事务只能看到前一个事务
+ * 的结果。
  */
 export async function lockAndAssertActiveAdminMutable(
   tx: Prisma.TransactionClient,

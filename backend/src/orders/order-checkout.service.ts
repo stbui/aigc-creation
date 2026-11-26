@@ -257,9 +257,9 @@ export class OrderCheckoutService {
          * 先锁用户行，再统计 pending 订单。
          *
          * 只在事务外 count 会被并发绕过：同一用户可以同时穿过检查，最终挂出
-         * 超过设置上限的未支付订单并占住库存。SQLite 的 BEGIN 是 deferred，仅把
-         * count 搬进事务仍不够，必须先做一次 no-op UPDATE 取得写锁，让同一
-         * 用户的建单串行化。
+         * 超过设置上限的未支付订单并占住库存。仅把 count 搬进事务仍不够，必须
+         * 先做一次 no-op UPDATE 取得锁（SQLite 全库写锁 / PG 目标行 FOR UPDATE），
+         * 让同一用户的建单串行化。
          */
         await tx.$executeRaw`
           UPDATE "User" SET "name" = "name" WHERE id = ${params.userId}`;
@@ -367,9 +367,9 @@ export class OrderCheckoutService {
         /*
          * 周期限购必须在建单事务内统计。
          *
-         * SQLite 的 BEGIN 是 deferred：若只把 count 放进事务，两个进程仍可能
-         * 同时读到旧值。先执行一次 no-op UPDATE 取得商品行写锁，再统计并建单，
-         * 后到的事务会等前一笔提交后重新读到最新订单数。
+         * 若只把 count 放进事务，两个进程仍可能同时读到旧值。先执行一次 no-op
+         * UPDATE 取得商品行锁（SQLite 全库写锁 / PG 目标行 FOR UPDATE），再统计
+         * 并建单，后到的事务会等前一笔提交后重新读到最新订单数。
          *
          * 计数口径保持「非 cancelled 订单数」，退款不返还周期额度。
          */

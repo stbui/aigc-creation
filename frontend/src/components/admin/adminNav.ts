@@ -17,6 +17,7 @@ import {
   DatabaseBackup,
   FileSpreadsheet,
   FileText,
+  Info,
   HandCoins,
   HardDrive,
   Images,
@@ -75,6 +76,13 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         icon: BellRing,
         // 所有后台角色都可进入；具体来源在接口内按权限过滤
         permission: null,
+      },
+      {
+        path: "/admin/performance",
+        label: "系统信息",
+        icon: Info,
+        // 只读系统快照（运行时 + 宿主机 + 数据面 + 任务），权限与系统设置一致
+        permission: "setting.read",
       },
     ],
   },

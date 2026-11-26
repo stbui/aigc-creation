@@ -48,4 +48,36 @@ describe('CreditPriceService 限时免费活动容错', () => {
     await expect(service.freeCampaignIdOf('free_create')).resolves.toBe('campaign-valid');
     await expect(service.freeCampaignIdOf('detail_image')).resolves.toBe('');
   });
+
+  it('多项定向活动只查一次新客订单', async () => {
+    const prisma = {
+      campaign: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: 'campaign-a',
+            payload: JSON.stringify({ capabilityIds: ['free_create'] }),
+            audience: JSON.stringify({ onlyNewUsers: true }),
+          },
+          {
+            id: 'campaign-b',
+            payload: JSON.stringify({ capabilityIds: ['detail_image'] }),
+            audience: JSON.stringify({ onlyNewUsers: true }),
+          },
+        ]),
+      },
+      order: { count: vi.fn().mockResolvedValue(0) },
+    };
+    const service = new CreditPriceService(prisma as never, fakeCache());
+
+    const campaignIds = await service.freeCampaignIdsOf(
+      ['free_create', 'detail_image', 'expand'],
+      'new-user',
+    );
+
+    expect([...campaignIds]).toEqual([
+      ['free_create', 'campaign-a'],
+      ['detail_image', 'campaign-b'],
+    ]);
+    expect(prisma.order.count).toHaveBeenCalledTimes(1);
+  });
 });

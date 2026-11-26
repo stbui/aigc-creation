@@ -746,12 +746,12 @@ async function orderWhere(
         OR (
           b.status = 'running'
           AND (
-            b.updatedAt < ${staleBefore}
+            b."updatedAt" < ${staleBefore}
             OR EXISTS (
               SELECT 1
               FROM "GenerationTask" AS t
-              WHERE t.id = b.taskId
-                AND t.outputAssetId IS NOT NULL
+              WHERE t.id = b."taskId"
+                AND t."outputAssetId" IS NOT NULL
             )
           )
         )
@@ -761,14 +761,14 @@ async function orderWhere(
             EXISTS (
               SELECT 1
               FROM "GenerationTask" AS t
-              WHERE t.id = b.taskId
+              WHERE t.id = b."taskId"
                 AND t.status IN ('failed', 'cancelled')
             )
             OR EXISTS (
               SELECT 1
               FROM "GenerationTask" AS t
-              WHERE t.id = b.taskId
-                AND t.outputAssetId IS NOT NULL
+              WHERE t.id = b."taskId"
+                AND t."outputAssetId" IS NOT NULL
             )
           )
         )

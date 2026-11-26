@@ -186,6 +186,34 @@ describe('MarketingService 邀请绑定与奖励幂等', () => {
     expect(prisma.inviteRelation.findMany).not.toHaveBeenCalled();
     expect(grant).not.toHaveBeenCalled();
   });
+
+  it('多个定向弹窗只查一次付费订单', async () => {
+    const now = new Date();
+    prisma.campaign = {
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: 'popup-1',
+          name: '新客弹窗 1',
+          audience: JSON.stringify({ onlyNewUsers: true }),
+          payload: JSON.stringify({ title: '新人礼' }),
+          startAt: now,
+          endAt: new Date(now.getTime() + 86_400_000),
+        },
+        {
+          id: 'popup-2',
+          name: '新客弹窗 2',
+          audience: JSON.stringify({ onlyNewUsers: true }),
+          payload: JSON.stringify({ title: '新人礼 2' }),
+          startAt: now,
+          endAt: new Date(now.getTime() + 86_400_000),
+        },
+      ]),
+    };
+    prisma.order = { count: vi.fn().mockResolvedValue(1) };
+
+    await expect(service.activePopupCampaign('paid-user')).resolves.toBeNull();
+    expect(prisma.order.count).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('MarketingService 签到幂等与封顶', () => {

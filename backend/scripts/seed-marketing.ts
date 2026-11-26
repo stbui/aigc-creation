@@ -7,14 +7,11 @@
  *
  * 运行: npm run seed:marketing  (需先 npm run build —— adapter 从 dist/ 导入)
  */
-import { PrismaClient } from '../src/generated/prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { createPrismaClient } from '../src/prisma/create-prisma-client';
 // 库路径与后端服务同源 (按 NODE_ENV 读 DATABASE_URL), 否则 seed 会写错库
 const { resolveDbUrl } = require('./db-url');
 
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-});
+const prisma = createPrismaClient(resolveDbUrl());
 
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;

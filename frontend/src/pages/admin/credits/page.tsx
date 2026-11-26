@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Upload } from 'lucide-react';
+import { Coins, Trash2, Upload } from 'lucide-react';
 import {
   AdminPage,
   ActionButton,
@@ -188,31 +188,74 @@ export function AdminCreditsPage() {
       key: 'user',
       title: '用户',
       width: 230,
-      render: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="flex items-center gap-1.5 text-foreground">
-            {row.name || row.email}
-            {/* 注销账号仍留在账本里（历史可查），但不能再被删除，标出来省得运营反复试 */}
-            {row.status === 'deleted' ? <StatusTag status="deleted" showDot /> : null}
-          </span>
-          <span className="text-muted-foreground">
-            <Link className="text-radar-ink-950 hover:underline" to={adminUserDetailHref(row.userId)}>
-              {row.email}
-            </Link>
-            {row.name ? '' : ' · 无昵称'}
-          </span>
-          <code className="text-muted-foreground" title={row.userId}>
-            {row.userId}
-          </code>
-        </div>
-      ),
+      render: (row) => {
+        /*
+         * 三种账号的「可读身份」不同，别硬凑成同一个写法：
+         * · 已注销：后端把 name 置成「已注销用户」（与状态徽标重复），邮箱是
+         *   `deleted_<id>@anonymized.local` —— 它不过是把下面那行完整 ID 再包
+         *   一层，纯噪声。所以主行给 ID 前缀做扫视锚点，次行只留完整 ID 供检索，
+         *   邮箱整段省掉；状态由徽标说一次。
+         * · 有昵称：主行昵称，次行邮箱。
+         * · 无昵称的活跃账号：邮箱本身才是主身份，做成主行链接，次行「无昵称」
+         *   占位，避免同一串邮箱印两遍。
+         * 完整 ID 恒为最后一行：它是客服检索与对账的稳定抓手。
+         */
+        const deleted = row.status === 'deleted';
+        const emailIsPrimary = !deleted && !row.name;
+        const primary = deleted ? `账号 ${row.userId.slice(0, 8)}` : row.name || row.email;
+
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="flex items-center gap-1.5 text-foreground">
+              {emailIsPrimary ? (
+                <Link className="truncate hover:underline" to={adminUserDetailHref(row.userId)}>
+                  {primary}
+                </Link>
+              ) : (
+                <span className="truncate">{primary}</span>
+              )}
+              {deleted ? <StatusTag status="deleted" showDot /> : null}
+            </span>
+            {!deleted && (
+              <span className="truncate text-muted-foreground">
+                {emailIsPrimary ? (
+                  '无昵称'
+                ) : (
+                  <Link className="text-radar-ink-950 hover:underline" to={adminUserDetailHref(row.userId)}>
+                    {row.email}
+                  </Link>
+                )}
+              </span>
+            )}
+            {deleted ? (
+              <Link
+                className="truncate text-muted-foreground hover:underline"
+                to={adminUserDetailHref(row.userId)}
+                title={row.userId}
+              >
+                {row.userId}
+              </Link>
+            ) : (
+              <code className="truncate text-muted-foreground" title={row.userId}>
+                {row.userId}
+              </code>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'balance',
       title: '当前余额',
       width: 110,
       align: 'right',
-      render: (row) => <b className="tabular-nums">{row.balance}</b>,
+      // 账本里大量账户余额为 0；0 压成次要色，真正有余额的账户才会跳出来
+      render: (row) =>
+        row.balance > 0 ? (
+          <b className="tabular-nums text-foreground">{row.balance}</b>
+        ) : (
+          <span className="tabular-nums text-muted-foreground">0</span>
+        ),
     },
     {
       key: 'expiringSoon',
@@ -221,7 +264,7 @@ export function AdminCreditsPage() {
       align: 'right',
       render: (row) =>
         row.expiringSoon > 0 ? (
-          <span className="tabular-nums text-warn-text">{row.expiringSoon}</span>
+          <span className="tabular-nums font-medium text-warn-text">{row.expiringSoon}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -231,21 +274,33 @@ export function AdminCreditsPage() {
       title: '累计获得',
       width: 100,
       align: 'right',
-      render: (row) => <span className="tabular-nums">{row.totalEarned}</span>,
+      render: (row) => (
+        <span className={row.totalEarned > 0 ? 'tabular-nums' : 'tabular-nums text-muted-foreground'}>
+          {row.totalEarned}
+        </span>
+      ),
     },
     {
       key: 'totalConsumed',
       title: '累计消耗',
       width: 100,
       align: 'right',
-      render: (row) => <span className="tabular-nums">{row.totalConsumed}</span>,
+      render: (row) => (
+        <span className={row.totalConsumed > 0 ? 'tabular-nums' : 'tabular-nums text-muted-foreground'}>
+          {row.totalConsumed}
+        </span>
+      ),
     },
     {
       key: 'activeLots',
       title: '有效批次',
       width: 90,
       align: 'right',
-      render: (row) => <span className="tabular-nums">{row.activeLots}</span>,
+      render: (row) => (
+        <span className={row.activeLots > 0 ? 'tabular-nums' : 'tabular-nums text-muted-foreground'}>
+          {row.activeLots}
+        </span>
+      ),
     },
     {
       key: 'nearestExpiry',
@@ -273,7 +328,7 @@ export function AdminCreditsPage() {
       actions={
         can('credit.adjust') ? (
           <>
-            <ActionButton variant="secondary" icon={Upload} onClick={() => setBatchOpen(true)}>
+            <ActionButton variant="secondary" icon={Coins} onClick={() => setBatchOpen(true)}>
               批量调整
             </ActionButton>
             {/* CSV 导入走邮箱而非用户 ID: 运营手里的补偿名单通常是邮箱表, 不是 cuid */}
@@ -350,7 +405,13 @@ export function AdminCreditsPage() {
          * 通过扣减流水调整（余额必须恒等于 Σ 批次剩余）。
          */}
         <BatchBar count={selectedRows.length} unit="个账户">
-          <span className="text-xs text-muted-foreground">
+          <span
+            className={
+              selectedRows.length > BATCH_DELETE_LIMIT
+                ? 'text-xs font-medium text-destructive'
+                : 'text-xs text-muted-foreground'
+            }
+          >
             {selectedRows.length > BATCH_DELETE_LIMIT
               ? `删除单次最多 ${BATCH_DELETE_LIMIT} 个账号，请分批处理`
               : '删除即注销：清空作品、任务、素材与积分批次，资金记录匿名保留'}
@@ -359,6 +420,7 @@ export function AdminCreditsPage() {
             <ActionButton
               variant="destructive"
               size="sm"
+              icon={Trash2}
               disabled={deleting || selectedRows.length > BATCH_DELETE_LIMIT}
               onClick={() => setDeleteTargets(selectedRows)}
             >

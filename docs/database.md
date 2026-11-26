@@ -1,6 +1,6 @@
 # 数据库规范
 
-数据库为 **SQLite**，访问层为 Prisma 7（当前 7.10）+ 官方 `@prisma/adapter-better-sqlite3`。本文件按 Prisma 官方约定与最佳实践编写，约束 schema 写法、Prisma Client 用法与迁移流程；`backend/prisma/schema.prisma` 是表结构唯一事实源。环境与库文件映射见 [`environments.md`](environments.md)，备份与恢复见 [`docker-deployment.md`](docker-deployment.md)，安全约束见 [`security.md`](security.md)。
+数据库为**双方言**：本地 development / test 用 **SQLite**（官方 `@prisma/adapter-better-sqlite3`），production 用 **PostgreSQL**（官方 `@prisma/adapter-pg`），按 `DATABASE_URL` 的 `file:` 协议选择；访问层为 Prisma 7（当前 7.10）。本文件按 Prisma 官方约定与最佳实践编写，约束 schema 写法、Prisma Client 用法与迁移流程；`backend/prisma/schema.prisma` 是表结构唯一事实源。环境与库文件映射见 [`environments.md`](environments.md)，备份与恢复见 [`docker-deployment.md`](docker-deployment.md)，安全约束见 [`security.md`](security.md)。
 
 现状基线（2026-11-24，以 schema 为准）：67 个 model、167 个 `@@index`、29 个字段级 `@unique` + 19 个 `@@unique`；53 个 model 用 `cuid()` 主键，14 个用业务键或复合主键。
 

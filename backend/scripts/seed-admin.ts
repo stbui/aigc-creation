@@ -16,10 +16,9 @@
  *      ADMIN_EMAIL=ops@company.com ADMIN_PASSWORD=... npm run seed:admin    指定邮箱与密码
  * 重复执行不会重置密码 (避免把运营正在用的账号锁掉), 如需改密码走后台用户管理。
  */
-import { PrismaClient } from '../src/generated/prisma/client';
+import { createPrismaClient } from '../src/prisma/create-prisma-client';
 import * as bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 // 库路径与后端服务同源 (按 NODE_ENV 读 DATABASE_URL), 否则 seed 会写错库
 const { resolveDbUrl } = require('./db-url');
 const { getAdminCredentials } = require('./admin-credentials');
@@ -49,9 +48,7 @@ async function main(): Promise<void> {
     throw new Error('ADMIN_EMAIL 不能为空');
   }
 
-  const prisma = new PrismaClient({
-    adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-  });
+  const prisma = createPrismaClient(resolveDbUrl());
 
   try {
     const existing = await prisma.user.findUnique({ where: { email } });

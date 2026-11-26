@@ -5,7 +5,6 @@ import {
   EmptyState,
   ListError,
   PageSkeleton,
-  SkeletonCards,
   SkeletonPanel,
   StaleError,
   TabsContent,
@@ -14,7 +13,6 @@ import {
 import { CONFIG_TAB_META, SETTINGS_TABS } from './constants';
 import { useAdmin } from './hooks';
 import { SettingsConfigTab } from './SettingsConfigTab';
-import { SettingsPerformanceTab } from './SettingsPerformanceTab';
 import { SettingsSaveDialog } from './SettingsSaveDialog';
 import { SettingsSecurityTab } from './SettingsSecurityTab';
 import type { SettingsTabKey } from './types';
@@ -24,9 +22,9 @@ import { useSettingsDraft } from './useSettingsDraft';
 /**
  * 系统设置。
  *
- * 页面只保留五个真实运营页签：运行与生成、上传限制、备份、系统性能、安全。
- * 邮箱、支付、退款与保留期分别使用独立工作台。页签只能由 AdminLayout 的五个
- * 显式路由传入，页面不识别路径参数或查询参数。
+ * 页面只保留四个真实运营页签：运行与生成、上传限制、备份、安全。
+ * 系统信息、邮箱、支付、退款与保留期分别使用独立工作台。页签只能由 AdminLayout
+ * 的四个显式路由传入，页面不识别路径参数或查询参数。
  *
  * 页面只做守卫与板块组合：取数、草稿、变更摘要与保存全部落在 `useSettingsDraft`，
  * 各板块由 `SettingsXxx` 组件承载。
@@ -48,27 +46,13 @@ export function AdminSettingsPage({ group: activeTab }: { group: SettingsTabKey 
             : '当前账号无 setting.write 权限，仅可查看。'
         }
         body={
-          activeTab === 'performance' ? (
-            <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-4">
-              <div className="min-w-0">
-                <SkeletonCards count={4} />
-                <SkeletonPanel rows={4} />
-                <SkeletonPanel rows={4} />
-              </div>
-              <div className="flex flex-col gap-4">
-                <SkeletonPanel rows={3} className="mb-0" />
-                <SkeletonPanel rows={4} className="mb-0" />
-              </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-4">
+            <SkeletonPanel rows={6} className="mb-0" />
+            <div className="flex flex-col gap-4">
+              <SkeletonPanel rows={4} className="mb-0" />
+              <SkeletonPanel rows={3} className="mb-0" />
             </div>
-          ) : (
-            <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-4">
-              <SkeletonPanel rows={6} className="mb-0" />
-              <div className="flex flex-col gap-4">
-                <SkeletonPanel rows={4} className="mb-0" />
-                <SkeletonPanel rows={3} className="mb-0" />
-              </div>
-            </div>
-          )
+          </div>
         }
       />
     );
@@ -76,8 +60,7 @@ export function AdminSettingsPage({ group: activeTab }: { group: SettingsTabKey 
   if (error && !settings) return <ListError error={error} onRetry={() => void reload()} />;
   if (!settings) return <EmptyState title="暂无配置项" />;
 
-  const activeMeta =
-    activeTab === 'security' || activeTab === 'performance' ? null : CONFIG_TAB_META[activeTab];
+  const activeMeta = activeTab === 'security' ? null : CONFIG_TAB_META[activeTab];
 
   return (
     <AdminPage
@@ -111,9 +94,6 @@ export function AdminSettingsPage({ group: activeTab }: { group: SettingsTabKey 
         <SettingsConfigTab tabKey="generate" model={model} editable={editable} />
         <SettingsConfigTab tabKey="upload" model={model} editable={editable} />
         <SettingsConfigTab tabKey="backup" model={model} editable={editable} />
-        <TabsContent value="performance" className="min-w-0">
-          <SettingsPerformanceTab />
-        </TabsContent>
         <TabsContent value="security" className="min-w-0">
           <SettingsSecurityTab />
         </TabsContent>

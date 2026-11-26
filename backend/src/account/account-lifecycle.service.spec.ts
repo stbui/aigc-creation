@@ -10,6 +10,7 @@ describe("AccountLifecycleService 软注销", () => {
     $transaction: ReturnType<typeof vi.fn>;
   };
   let service: AccountLifecycleService;
+  let authUsers: { invalidate: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     const table = () => ({
@@ -60,9 +61,11 @@ describe("AccountLifecycleService 软注销", () => {
       ),
     };
 
+    authUsers = { invalidate: vi.fn().mockResolvedValue(undefined) };
     service = new AccountLifecycleService(
       prisma as never,
       { get: vi.fn() } as never,
+      authUsers as never,
     );
   });
 
@@ -82,6 +85,7 @@ describe("AccountLifecycleService 软注销", () => {
       where: { id: "user-1" },
       data: expect.objectContaining({ status: "deleted" }),
     });
+    expect(authUsers.invalidate).toHaveBeenCalledWith("user-1");
   });
 
   it("拒绝注销最后一名启用管理员", async () => {
@@ -92,5 +96,6 @@ describe("AccountLifecycleService 软注销", () => {
     );
     expect(tx.generationTask.deleteMany).not.toHaveBeenCalled();
     expect(tx.user.update).not.toHaveBeenCalled();
+    expect(authUsers.invalidate).not.toHaveBeenCalled();
   });
 });

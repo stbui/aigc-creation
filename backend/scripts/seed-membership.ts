@@ -13,17 +13,14 @@
  * 参考站另有签到双倍、积分滚存、子账号等权益，当前数据模型（perks 仅
  * fastChannel / maxConcurrent / addonDiscountBps）无法表达，未在此落地。
  */
-import { PrismaClient } from '../src/generated/prisma/client';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { createPrismaClient } from '../src/prisma/create-prisma-client';
 // 库路径与后端服务同源 (按 NODE_ENV 读 DATABASE_URL)。
 // ⚠ 这里曾写死 'file:./dev.db', 于是 `NODE_ENV=test npm run seed:test`
 // 会把套餐灌进开发库, 而测试库始终为空 —— 症状是「测试环境套餐列表为空」,
 // 看起来像接口问题, 实则是种子写错了库。
 const { resolveDbUrl } = require('./db-url');
 
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-});
+const prisma = createPrismaClient(resolveDbUrl());
 
 interface PlanSeed {
   code: string;

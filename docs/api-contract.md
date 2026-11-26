@@ -120,7 +120,7 @@
 | POST | `/api/v1/admin/payments/providers/:providerId/instances` | 新建服务商实例；可选名称、凭据、关单分钟、实例限额、退款开关与支付方式子集，`payment.write` |
 | PUT | `/api/v1/admin/payments/providers/:providerId/instances/:instanceId/config` | 保存指定实例的新版本配置；请求体 `{ enabled, closeAfterMinutes, values }`，保存不要求填写原因；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
 | PATCH | `/api/v1/admin/payments/providers/:providerId/instances/order` | 按 `{ instanceIds }` 调整实例排序，`payment.write` |
-| GET | `/api/v1/admin/system-performance` | 系统性能只读快照：运行时（内存 / CPU 累计时间 / 事件循环延迟）、数据库探活与库文件大小、存储探活（30 秒缓存）、近 24 小时任务与上游调用 P95、线路冷却与调度器状态；`setting.read` |
+| GET | `/api/v1/admin/system-performance` | 系统信息只读快照：宿主机（主机名 / 平台 / 内核 / 架构 / CPU 型号与核数 / 总内存 / 负载均值）、运行时（进程内存 / CPU 累计时间 / 事件循环延迟）、数据库元信息（引擎 / 版本 / 脱敏位置 / 库体积 / 表数量 / 迁移进度，不含凭据）、存储探活（30 秒缓存）、近 24 小时任务与上游调用 P95、线路冷却；`setting.read` |
 | POST | `/api/v1/admin/settings/upload` | 上传设置图片（multipart 字段 `file`），返回 `{ value, previewUrl, width, height, sizeBytes }`；`setting.write` |
 | GET | `/api/v1/admin/storage/status` | 存储后端状态：各后端 `available`/`configured`/`active`/`config`（可编辑字段定义 + 非密钥明文 + 密钥是否配置与脱敏，明文密钥不出服务端）+ `editable=true`；`setting.read` |
 | PUT | `/api/v1/admin/storage/config/:backend` | 保存 OSS / MinIO 配置（`{ values: Record<string,string> }`），凭据加密落库并即时生效免重启；密钥留空沿用旧值，`updatedBy` 记管理员 id；`setting.write`。契约反转见 `docs/non-upstream-extensions.md` EXT-2026-11-20-01 |

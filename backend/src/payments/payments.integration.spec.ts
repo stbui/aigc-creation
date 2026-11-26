@@ -209,12 +209,24 @@ async function paidMembershipOrder(
 
 beforeAll(async () => {
   run = `${Date.now()}`;
-  // 用 Prisma CLI 建一份独立 schema；--url 显式覆盖 config 里的库路径
-  execFileSync(join(BACKEND_ROOT, 'node_modules', '.bin', 'prisma'), ['db', 'push', '--url', DB_URL], {
-    cwd: BACKEND_ROOT,
-    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: DB_URL },
-    stdio: 'pipe',
-  });
+  // 用 Prisma CLI 把 SQLite schema 推到临时库；显式指定方言 schema,
+  // 连接串由 prisma.config.ts 从 DATABASE_URL（上面已置为 file:临时路径）读取。
+  // 临时库由 mkdtemp 新建、保证为空, 不加 --force-reset / --accept-data-loss
+  // （既是多余的危险动作, 也会触发 Prisma 对 AI 代理的破坏性操作拦截）。
+  execFileSync(
+    join(BACKEND_ROOT, 'node_modules', '.bin', 'prisma'),
+    [
+      'db',
+      'push',
+      '--schema',
+      join(BACKEND_ROOT, 'prisma', 'schema.sqlite.prisma'),
+    ],
+    {
+      cwd: BACKEND_ROOT,
+      env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: DB_URL },
+      stdio: 'pipe',
+    },
+  );
 
   const { AppModule } = await import('../app.module');
   const { PrismaService } = await import('../prisma/prisma.service');

@@ -55,7 +55,7 @@ export class AdminRolesController {
   /**
    * 更新角色权限点。
    *
-   * 立即生效: AdminGuard/PermissionGuard 每次请求查库, 无需重启或重新登录。
+   * 立即生效: AdminGuard/PermissionGuard 每次请求校验账号快照, 无需重启或重新登录。
    * 保护: 操作者自身的权限收窄也会立即生效 —— 这是刻意的,
    * "改完自己就锁在门外"是可接受的 (有其他 admin 可救), 换取的是权限确实收紧。
    */

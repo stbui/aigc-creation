@@ -158,7 +158,7 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 
 ### 3.3 架构与纯逻辑断言（L2）
 
-`backend/scripts/` 下共 19 个验证脚本：15 个 `verify-*.ts` + 1 个 `probe-environments.ts`，以及 3 个需要后端已启动的 `verify-*.js`。
+`backend/scripts/` 下共 20 个验证脚本：16 个 `verify-*.ts` + 1 个 `probe-environments.ts`，以及 3 个需要后端已启动的 `verify-*.js`。
 
 #### 3.3.1 纯逻辑 / 自起服务
 
@@ -179,6 +179,7 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | `verify-route-catalog.ts` | 能力选路：分组优先、跨分组兜底、健康分层、手工优先级只在同健康层内生效、冷却剔除、加权分布、`simulate` 与 `resolve` 同选、停用绑定不参与 |
 | `verify-task-runtime.ts` | 任务运行时端到端：起本机 HTTP mock 上游，经真实 `ProtocolExecutor` / 出站层跑同步成功、401 切线、超时 `42206`、唯一线路 429、余额不足回滚、未派发 / 已派发取消、队列/租约对账恢复与钱包不变量；夹具按「能力绑定 + 能力定价」自建并清理 |
 | `verify-proxy-runtime.ts` | 中转与运营（P6）：**A 段纯逻辑**（`validateCustomRelayUrl` 的 SSRF 判定 / `resolveOutboundHost` 的 IPv6 与 localhost 拦截 / 路径白名单与密钥查询参数 / 并发槽 / 插件包解析拒绝分支）、**B 段同进程起 Nest + 本机 mock 上游**（`GET /models` 不计费、密钥查询参数剥离、渠道自定义头、服务端凭证注入；`POST` 的 `reserved → settled` 与调用记录；SSE 透传；500 退款；524 `uncertain` 不退款；渠道并发槽 `429`；自定义中转成功 / JSON 与 SSE 脱敏 / 不计费、401 `40101`、SSRF `40301`、上游错误原样透传、用户并发槽 `429`；系统中转限流 `42901`；分组可见性 `40301` 且不建账单；清扫 `reserved → refunded` / `running → uncertain` 且不碰任务账单；钱包恒等式；财务口径与 `BillingOrder` 聚合逐项一致；插件安装 / 重复 `40909` / 被引用拒卸 `40909` / 内置 `40001` / 卸载成功）。`VERIFY_HTTP=0` 只跑 A 段 |
+| `verify-redis.ts` | 任务队列地基（Redis）三段：**纯逻辑** `redisConnectionFromUrl` 的 URL → ioredis 选项（端口 / 库号含 `/0` 不被当空值丢掉 / `rediss://` 启 TLS / 百分号编码凭证还原 / 省略端口回落 6379 / `maxRetriesPerRequest: null`，以及非 redis 协议与非法库号必须拒绝）；**队列语义**（需可达 Redis，经生产 `TaskQueueService.enqueue()` / `scheduledTaskIds()` 而非另写一份 BullMQ 调用）同一 `taskId` 连投 3 次只留一份作业、`delay` 落 delayed 且不被提前派发、重试恰好按 `attempts=3` 执行且间隔指数（1s→2s）、`removeOnComplete` / `removeOnFail` 不留残留作业、Worker 经阻塞连接取到作业；**故障注入** 连接指向确定无人监听的端口，`enqueue()` 必须在 5s 截止后抛错返回、`scheduledTaskIds()` 返回 null 并把原因记进 `lastReadFailure`（`QUEUE_COMMAND_TIMEOUT_MS` 的存在理由：ioredis 离线队列在断连期间既不 resolve 也不 reject）。作业投独立队列 `verify-redis-probe` 并在收尾 obliterate，不碰 `generation-tasks`；固定队列名 ⇒ 同一时刻只跑一个实例。`aof_enabled` / `maxmemory` 只报读数不设门禁（队列丢失由启动对账补投）。运行 `npx ts-node -T scripts/verify-redis.ts`（约 15s；未登记为 `verify:<name>`，`backend/package.json` 归 S1 集成线） |
 | `probe-environments.ts` | 三环境解析：档位顺序、不回落 `.env`、空串语义等（不连数据库） |
 
 #### 3.3.2 需先起服务的 HTTP 验证
@@ -249,6 +250,7 @@ cd mock-model-gateway && npm run smoke:spawn # 起网关跑联网冒烟
 | `admin-layout.spec.ts` | 后台布局回归 |
 | `admin-marketing.spec.ts` | 营销中心三条约束 |
 | `admin-payments.spec.ts` | 支付配置三标签：切换只改 URL 不重载、深链直达指定标签、非法标签回落、旧路由重定向不 404、七渠道适配器渲染、无退款入口、对账执行区与状态深链回显 |
+| `admin-performance.spec.ts` | 系统信息页：侧栏与页头改名、五个区块平铺（无页签、无定时任务）、每条「标签：值」独占一行、数据库给引擎/版本/库位置/表数量/迁移进度而非探活、打开只采集一次且点「刷新」才取新快照、旧深链重定向 |
 | `admin-payment-rules.spec.ts` | 支付与退费独立运营工作台：左侧支付分组双入口、旧设置深链重定向、系统设置隐藏支付/退款分组、未保存离页保护、保存只提交本页白名单且不接管渠道来源字段 |
 | `admin-model-suite.spec.ts` | 渠道 / 模型 P5 五页与 C 端选型：渠道工作台的主从布局（左列渠道导航 `admin-channel-item`、`aria-pressed` 标记选中、右侧 `#admin-channel-detail` 内联模型清单，不出现抽屉）、**新建渠道的三道必填前置（名称 → Base URL → API Key，留空逐级调用人话原因）与结构化请求头（`authorization` 这类系统托管的头在提交前拦下并指出是哪一行）**、**渠道详情头部的完整动作集（编辑 / 复制 / 导出 / 停用|启用 / 删除），停用先出确认弹窗并说明「退出路由目录但保留在列表」、取消不落库**、**模型清单的检索、筛选与稳定性列（关键字无命中给空态文案；状态筛选后的页脚总数与接口数据一致；重置恢复；清单带「稳定性（24h）」列，与「全部模型」同源）、复制模型（弹窗预填 `-copy` 标识且默认停用，取消不落库）、停用前确认（点击行内「停用」先出影响范围，不直接断电）**、**上游目录导入弹窗（已存在的模型带标记且默认不勾选、导入按钮只数新模型、搜索后「全选匹配的 / 取消选中匹配的」只作用于匹配项）**、**统一调价（勾选模型 → 按成本重算 → 保存 → 回读断言新售价 = 成本 × 1.1，不要求填写变更原因）**、**渠道排序（弹窗可开合；顺序没变时保存按钮禁用，移动后启用）**、**排序的并发保护（`expectedIds` 与库中不一致 → HTTP 409 / `40900`，一致才 `{ ok: true }`）**、**模型详情区的批量删除入口（未勾选时禁用；勾选后可用，删除确认展示影响范围但不要求填写原因）**、**全部模型视图（跨渠道行数与 `GET /admin/channel-models?includeDisabled=1` 一致、渠道列可解析、按模型状态筛选、工具条计数形如「N 个模型 · M 个可用」、排序与参考实现同序（显示名 → 模型标识 → 渠道名，按同一比较器在测试里重算期望首行）、停用先出确认且取消不落库、「编辑」一步切回「按渠道」并弹出该模型的编辑器、点渠道名一步跳回「按渠道」并选中该渠道；行数按 `admin-all-models` 容器取）**、能力选路模拟、用户分组与插件页渲染、生成账单与调用记录的筛选和详情、工具页 `ModelPicker` 选型后报价随之变化；生成段需要可用 image 线路，无线路时该段跳过 |
 | `admin-scheduler.spec.ts` | 定时任务可观测（静默失败可见） |
@@ -284,7 +286,7 @@ node scripts/verify-deps.js --quiet   # 仅结论，有致命问题 exit 1
 | 功能域 | L2 | L3 | L4 |
 | --- | --- | --- | --- |
 | 能力注册表 / 生成链路 | capability-bootstrap、credit-*、tool-contracts | capability-runtime | product-capabilities、product-parameters、state-contract |
-| 模型层（渠道 / 能力绑定 / 选路 / 计费 / 任务） | plugin-manifests、model-consistency、channel-flow、protocol-runtime、route-catalog、billing、credit-price、credits、task-runtime | L3 暂无 `smoke-model-layer` | admin-model-suite |
+| 模型层（渠道 / 能力绑定 / 选路 / 计费 / 任务） | plugin-manifests、model-consistency、channel-flow、protocol-runtime、route-catalog、billing、credit-price、credits、task-runtime、redis（队列地基，需 Redis） | L3 暂无 `smoke-model-layer` | admin-model-suite |
 | 身份与账户 | — | auth、qr-login、account、rate-limit | admin、free-creation-submit |
 | 第三方登录（OAuth） | — | 暂无自动化闸口（见 5.3） | — |
 | 交易与权益 | credit-deduction、credit-price、payment-signatures | commerce、membership、membership-order、payments、refund-rules | admin、admin-marketing |
@@ -326,6 +328,7 @@ L1.5 / L1.6 不按功能域铺矩阵：前端覆盖清单见 3.2，后端纯逻�
 | 脚本 / 用例 | 外部条件 |
 | --- | --- |
 | `smoke-aigc.js` | 可用的 image 线路（可用 `mock-model-gateway/` 仿真网关 + 后台渠道工作台配一条） |
+| `verify-redis.ts` | 可达的 Redis。第 1 段纯逻辑恒执行；第 2 / 3 段不可达时各记一条 SKIP（退出码仍 0）。「Redis 没起」是环境事实，不是代码回归 —— 拉起由 `start.sh` 的 `ensure_redis()` 负责，CI 的 `quality` / `e2e-smoke` 均已挂 `redis:7-alpine` service |
 | 真实厂商连通性 | 各家 API key；`POST /admin/channels/:id/models/test` 实跑一次才算证据 |
 | `admin-model-suite.spec.ts` 的「生成 → 账单核对」段 | 后台存在一条启用且有价格的 image 线路（`cd mock-model-gateway && npm start` 指到 `http://127.0.0.1:3900`）；无线路时该段跳过，其余断言照常执行 |
 | 真实支付宝 / 微信回调与退款 | 商户号与可公网访问的回调地址 |

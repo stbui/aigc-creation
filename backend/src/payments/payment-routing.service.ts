@@ -307,8 +307,8 @@ export class PaymentRoutingService {
       }
 
       /*
-       * SQLite 的交互式事务是 deferred，先读后写仍可能让两个事务读到同一份
-       * 用量。no-op UPDATE 会先取得实例配置行写锁；锁按 instanceId 固定排序，
+       * 先读后写仍可能让两个事务读到同一份用量。no-op UPDATE 会先取得实例配置
+       * 行锁（SQLite 全库写锁 / PG 目标行 FOR UPDATE）；锁按 instanceId 固定排序，
        * 避免多实例并发时形成反向加锁。锁后再重读最新版本，防止用旧配置建单。
        */
       const instanceIds = preliminary

@@ -1,33 +1,45 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '../generated/prisma/client';
-import { ConfigService } from '@nestjs/config';
-import type { AppConfigValues } from '../config/env.validation';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import {
+  createPrismaClient,
+  DEV_DATABASE_URL,
+  isSqliteUrl,
+} from './create-prisma-client';
 
-// Prisma 7 breaking change: datasource url 不再写在 schema.prisma,
-// 必须通过 driver adapter 传给 PrismaClient 构造函数。
-// 使用 Prisma 官方 SQLite driver adapter（底层为 better-sqlite3）。
-// 详见 https://pris.ly/d/prisma7-client-config
-//
-// 库路径来自配置层的 DATABASE_URL (db.url), 不再硬编码 'file:./dev.db':
-// 「三环境各连各的库」是环境隔离的前提, 硬编码等于把开发库钉成唯一真相。
-// 兜底值 'file:./dev.db' 与迁移前逐字一致 —— 未配置 DATABASE_URL 时行为完全不变。
+/**
+ * 数据库服务 —— 类型面与注入令牌都是 Prisma client。
+ *
+ * 类与接口合并：`PrismaService` 的实例由 PrismaModule 的工厂按方言构造,
+ * 这里不提供构造函数（永远不要 new 它；脚本/集成测试请直接调
+ * `createPrismaClient`）。接口把生成 client 的完整 API 面（模型 delegate、
+ * `$transaction` / `$queryRaw` 等）赋给 PrismaService 类型, 业务代码在双方言
+ * 下都有真实类型。令牌值就是 PG PrismaClient 类对象, `@Injectable()` 类仅作
+ * 类型标注与 Nest 扫描锚点。
+ *
+ * 方言选择与 client 构造在 `create-prisma-client.ts`（零 Nest 依赖, 脚本共用）,
+ * 这里只负责把它接入 Nest 的依赖图。
+ */
+export type PrismaService = PrismaClient;
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PrismaService = PrismaClient;
+
+// 保持旧导入路径可用：业务代码与脚本历史上从 prisma.service 取这几个符号。
+export { createPrismaClient, DEV_DATABASE_URL, isSqliteUrl };
+
+/**
+ * 连接生命周期挂到 Nest 模块图：启动即连（库不可达要在装配期失败,
+ * 而不是第一个请求），关闭时释放连接池。
+ */
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
-  constructor(config: ConfigService<AppConfigValues, true>) {
-    super({
-      adapter: new PrismaBetterSqlite3({ url: config.get<string>('db.url') ?? 'file:./dev.db' }),
-    });
-  }
+export class PrismaLifecycle implements OnModuleInit, OnModuleDestroy {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async onModuleInit(): Promise<void> {
-    await this.$connect();
+    await this.prisma.$connect();
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.$disconnect();
+    await this.prisma.$disconnect();
   }
 }

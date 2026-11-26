@@ -72,7 +72,14 @@ function main() {
   }
 
   const vars = readTestEnvVars();
-  const dbFile = path.resolve(BACKEND_ROOT, (vars.DATABASE_URL || 'file:./test.db').replace(/^file:/, ''));
+  const testDbUrl = (vars.DATABASE_URL || 'file:./test.db').trim();
+  if (!testDbUrl.startsWith('file:')) {
+    throw new Error(
+      `DATABASE_URL 不是 SQLite 文件（当前 ${testDbUrl}）：本脚本通过删库文件重置测试库，` +
+        `PostgreSQL 测试库请改用 dropdb/createdb 或 prisma migrate reset`,
+    );
+  }
+  const dbFile = path.resolve(BACKEND_ROOT, testDbUrl.replace(/^file:/, ''));
   const uploadsDir = path.resolve(BACKEND_ROOT, vars.UPLOAD_DIR || 'uploads-test');
   const backupsDir = path.resolve(BACKEND_ROOT, vars.BACKUP_DIR || 'backups-test');
   const logDir = path.resolve(BACKEND_ROOT, vars.LOG_DIR || 'logs/test');

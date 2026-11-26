@@ -51,6 +51,31 @@ export class PaymentConfigStore {
   }
 
   /**
+   * 批量按 Payment 引用的 configId 精确解析。
+   *
+   * 历史回调可能同时引用多个配置版本；逐条查询会把一次回调放大成 N 次
+   * 数据库往返。缺失或单条解密失败的配置不进入结果，由调用方按候选不可用
+   * 处理，避免一条损坏配置拖垮其余仍可验签的历史候选。
+   */
+  async byIds(configIds: readonly string[]): Promise<Map<string, ResolvedPaymentConfig>> {
+    const ids = [...new Set(configIds.filter((id): id is string => Boolean(id)))];
+    if (ids.length === 0) return new Map();
+
+    const rows = await this.prisma.paymentProviderConfig.findMany({
+      where: { id: { in: ids } },
+    });
+    const resolved = new Map<string, ResolvedPaymentConfig>();
+    for (const row of rows) {
+      try {
+        resolved.set(row.id, this.toResolved(row));
+      } catch (e) {
+        this.logger.warn(`支付配置解密失败，已跳过 id=${row.id}: ${(e as Error).message}`);
+      }
+    }
+    return resolved;
+  }
+
+  /**
    * 订单固定版本；历史单无 configId 时只回落到它自己的实例（或旧默认实例），
    * 绝不跨实例、跨渠道。
    */

@@ -158,8 +158,8 @@ export class AdminUsersController {
   /**
    * 禁用 / 启用账号。
    *
-   * 由于 AdminGuard 每次请求查库校验 status, 禁用后该用户的旧 token
-   * 下一次请求即 403, 无需额外的 token 黑名单机制。
+   * 由于 AdminGuard 每次请求校验账号快照, 且禁用后会主动失效缓存,
+   * 该用户的旧 token 下一次请求即 403, 无需额外的 token 黑名单机制。
    */
   @Patch(":id/status")
   @RequirePermission(PERMISSIONS.userDisable)

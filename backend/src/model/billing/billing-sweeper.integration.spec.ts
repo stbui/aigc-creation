@@ -4,10 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { PrismaService } from '../../prisma/prisma.service';
+import { createPrismaClient, PrismaService } from '../../prisma/prisma.service';
 import { BillingSweeperService } from './billing-sweeper.service';
 
 const BACKEND_ROOT = process.cwd();
+// 自建临时 SQLite，不碰 dev.db / test.db；每次 npm test 都可重复运行。
 const DB_DIR = mkdtempSync(join(tmpdir(), 'huojue-billing-sweep-it-'));
 const DB_PATH = join(DB_DIR, 'billing-sweep.db');
 const DB_URL = `file:${DB_PATH}`;
@@ -19,7 +20,12 @@ let projectId = '';
 beforeAll(async () => {
   execFileSync(
     join(BACKEND_ROOT, 'node_modules', '.bin', 'prisma'),
-    ['db', 'push', '--url', DB_URL],
+    [
+      'db',
+      'push',
+      '--schema',
+      join(BACKEND_ROOT, 'prisma', 'schema.sqlite.prisma'),
+    ],
     {
       cwd: BACKEND_ROOT,
       env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: DB_URL },
@@ -27,9 +33,7 @@ beforeAll(async () => {
     },
   );
 
-  prisma = new PrismaService({
-    get: () => DB_URL,
-  } as never);
+  prisma = createPrismaClient(DB_URL);
   await prisma.$connect();
 
   const user = await prisma.user.create({

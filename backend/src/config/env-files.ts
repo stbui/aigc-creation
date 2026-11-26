@@ -6,8 +6,8 @@
  * 有两处需要「按 NODE_ENV 选 env 文件」，但走的是完全不同的加载器：
  *   1. Nest 应用 —— `config.module.ts` 交给 @nestjs/config 的 `envFilePath`
  *   2. Prisma CLI —— `prisma.config.ts` 由 jiti 加载，**不经过 Nest**
- * 两边必须给出**逐字一致**的文件顺序，否则会出现「Nest 连的是 test.db、
- * prisma migrate deploy 打的是 dev.db」这种最难查的错位。故抽成唯一事实源。
+ * 两边必须给出**逐字一致**的文件顺序，否则会出现「Nest 连的是 huojue_test、
+ * prisma migrate deploy 打的是 huojue_dev」这种最难查的错位。故抽成唯一事实源。
  *
  * 分档规则（优先级从高到低）
  * -------------------------
@@ -16,8 +16,8 @@
  *   production : .env.production.local  > .env.production    （**不回落 .env**）
  *
  * ⚠ test / production 刻意**不回落** `.env` 与 `.env.local`：
- * 开发库的 `DATABASE_URL=file:./dev.db` 写在共享 `.env` 里，一旦 test 继承它，
- * 测试就会往开发演示库里写脏数据；而 production 继承它等于把开发配置带上线。
+ * 开发库的 `DATABASE_URL=file:./dev.db` 写在共享 `.env` 里，一旦
+ * test 继承它，测试就会往开发库里写脏数据；production 继承等于把开发配置带上线。
  * 宁可「文件缺失 → 用代码默认值」，也不要「安静地连错库」。
  *
  * 零依赖：本项目依赖纪律是精确锁定 + 手工直装，不为一个 env 解析引入 dotenv
@@ -155,14 +155,12 @@ export function resolveUploadsDir(
 }
 
 /**
- * 把 SQLite URL 解析成文件系统绝对路径。
+ * SQLite 连接串 → 绝对文件路径。
  *
- * 只处理 `file:` 前缀（当前 provider 固定为 sqlite，无第二种形态）。
- * 其余前缀原样返回并交给上层报错 —— 静默拼一个错路径比报错更糟。
- *
- * 与 Prisma 官方 SQLite adapter 保持同一套语义：那边是
- * `url.replace(/^file:/, '')` 交给 better-sqlite3 自行按 cwd 解析，
- * 这边需要绝对路径是因为备份服务要 `VACUUM INTO` 到备份目录。
+ * `DATABASE_URL=file:./dev.db` 里的路径相对 **进程 cwd**（Prisma 语义）。
+ * 备份、环境探针等在 Node 层直接操作文件时必须解析成绝对路径, 否则换个
+ * 工作目录就会「写 A 读 B」。传非 file: 串（PostgreSQL）会原样当成路径 ——
+ * 调用方应先判断方言, 或接受这不是 SQLite 分支。
  */
 export function sqliteUrlToPath(url: string, cwd: string): string {
   const raw = url.startsWith('file:') ? url.slice('file:'.length) : url;

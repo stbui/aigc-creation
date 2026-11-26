@@ -31,6 +31,13 @@ describe('后台导航分组', () => {
     expect(findAdminMenuGroup('/admin/tasks')?.name).toBe('模型与能力');
     expect(items.slice(-2)).toEqual(['调用记录', '任务监控']);
   });
+
+  it('系统信息作为独立页归入总览，权限与系统设置一致', () => {
+    expect(findAdminMenuGroup('/admin/performance')?.name).toBe('总览');
+    const item = findAdminMenuItem('/admin/performance');
+    expect(item?.label).toBe('系统信息');
+    expect(item?.permission).toBe('setting.read');
+  });
 });
 
 describe('后台支付菜单', () => {

@@ -205,8 +205,7 @@ async function offline() {
 async function api() {
   loadEnvOnce();
   const { PrismaClient } = require('./prisma-client');
-  const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
-  const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
+  const prisma = new PrismaClient();
   const { resolveUploadsDir } = require('../dist/config/env-files');
   const run = `${Date.now()}`;
   const email = `aigc-${run}@test.com`;

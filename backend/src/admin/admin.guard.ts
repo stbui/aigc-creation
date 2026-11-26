@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminRoleService } from './admin-role.service';
 import { isAdminRole } from './permissions';
 import { isAdminRequestPath } from './admin-path';
+import { AuthUserCacheService } from '../common/auth-user-cache.service';
 
 /**
  * 后台第一道守卫: 身份与账号状态。
@@ -12,11 +13,13 @@ import { isAdminRequestPath } from './admin-path';
  * 职责:
  *   1. 仅对 /admin/* 生效 (本守卫全局注册, 非后台路径直接放行)
  *   2. 校验 Bearer token (与 C 端 JwtAuthGuard 同一套签发逻辑, 不重复实现)
- *   3. 实时查库取 role 与 status
+ *   3. 取 role 与 status（经 AuthUserCacheService，2s 兜底 TTL + 写入点主动失效）
  *   4. 非后台角色 / 账号非 active → 403
  *
- * 为什么实时查库: 见 admin-role.service.ts 顶部说明。
+ * 为什么不信任 JWT 载荷: 见 admin-role.service.ts 顶部说明。
  * JWT 载荷里不含 role, 也不写 status —— 两者都是可变状态。
+ * 缓存保持「变更即时生效」：所有改 role/status/tokenVersion 的写入点
+ * 都调用 AuthUserCacheService.invalidate()。
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -26,6 +29,7 @@ export class AdminGuard implements CanActivate {
     private readonly prisma: PrismaService,
     private readonly roles: AdminRoleService,
     private readonly jwt: JwtService,
+    private readonly authUsers: AuthUserCacheService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -50,18 +54,7 @@ export class AdminGuard implements CanActivate {
       throw new AppError(40101, '令牌无效或已过期', 401);
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        status: true,
-        tokenVersion: true,
-        mustChangePassword: true,
-        tempPasswordExpiresAt: true,
-      },
-    });
+    const user = await this.authUsers.get(payload.sub);
 
     if (!user) throw new AppError(40101, '令牌无效或已过期', 401);
     /*

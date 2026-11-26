@@ -626,7 +626,7 @@ export class MarketingService {
     const code = params.code.trim().toUpperCase();
     const db = (params.db ?? this.prisma) as Prisma.TransactionClient;
     if (params.lockForReservation) {
-      // SQLite 的 deferred BEGIN 不提供读锁升级保证；先 no-op UPDATE 取得写锁，
+      // 先 no-op UPDATE 取得行锁（SQLite 全库写锁 / PG 目标行 FOR UPDATE），
       // 让同一张券的建单事务串行化。支付核销也必须先锁同一行。
       await db.$executeRaw`
         UPDATE "Coupon" SET "updatedAt" = "updatedAt" WHERE code = ${code}`;
@@ -1248,13 +1248,12 @@ export class MarketingService {
       orderBy: { startAt: 'desc' },
     });
 
+    let newUser: boolean | null = null;
     for (const c of rows) {
       const audience = this.parseJson<{ onlyNewUsers?: boolean }>(c.audience, {});
       if (audience.onlyNewUsers && userId) {
-        const paidCount = await this.prisma.order.count({
-          where: { userId, status: { in: ['paid', 'partial_refunded', 'refunded'] } },
-        });
-        if (paidCount > 0) continue; // 已购用户不属新客, 跳过该活动
+        if (newUser === null) newUser = await this.isNewUser(userId, this.prisma);
+        if (!newUser) continue; // 已购用户不属新客, 跳过该活动
       }
       const payload = this.parseJson<{ title?: string; body?: string; ctaText?: string; ctaUrl?: string }>(
         c.payload,
@@ -2445,16 +2444,20 @@ function checksumOf(base: string): string {
 /**
  * 判断错误是否为唯一约束冲突。
  *
- * ⚠ **必须同时判 P2002 与底层 SQLite 错误**: 官方 SQLite adapter 正常会
- * 映射为 `P2002`，但保留底层文案兜底，避免 adapter / 版本差异把并发签到
- * 变成 500，让幂等分支失效。
+ * ⚠ **必须同时判 P2002 与底层驱动错误**: 官方 adapter 正常会映射为 `P2002`，
+ * 但保留底层文案兜底，避免 adapter / 版本差异把并发签到变成 500，让幂等分支失效。
  *
- * 错误消息里 SQLite 的原文是 "UNIQUE constraint failed", 以此兜底。
+ * 底层文案：SQLite 为 "UNIQUE constraint failed"，PostgreSQL 为
+ * "duplicate key value violates unique constraint"，两者都兜底。
  */
 function isUniqueViolation(e: any): boolean {
   if (e?.code === 'P2002') return true;
   const msg = String(e?.message ?? '');
-  return /UNIQUE constraint failed/i.test(msg) || /P2002/i.test(msg);
+  return (
+    /UNIQUE constraint failed/i.test(msg) ||
+    /duplicate key value violates unique constraint/i.test(msg) ||
+    /P2002/i.test(msg)
+  );
 }
 
 /** 邮箱打码: 邀请列表属敏感信息, 不在营销页明文展示 */

@@ -118,7 +118,8 @@ export class OrderRefundService {
      *
      * 并发/重试保护：
      *   · 事务第一句先 no-op UPDATE 锁订单行，再重读并复跑全部退款规则；
-     *     SQLite deferred transaction 只把 count 搬进事务仍会并发穿透；
+     *     只把 count 搬进事务仍会并发穿透，no-op UPDATE 在 SQLite 取全库写锁、
+     *     在 PG 取目标行 FOR UPDATE 锁，两者都能串行化；
      *   · 渠道调用失败、结果未知的退款单，同金额重试时**复用原 id/outRefundNo**，
      *     让渠道按退款单号幂等，而不是换一个新号再退一次；
      *   · 运营已在渠道后台确认「退款失败」的单是明确终态，重试必须新建退款单，

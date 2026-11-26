@@ -155,11 +155,13 @@ export class CapabilityAvailabilityService {
   /** 全量能力的运行时状态（`GET /capabilities` 用） */
   async runtimeAll(): Promise<Record<string, CapabilityRuntime>> {
     const map = await this.controls();
-    const out: Record<string, CapabilityRuntime> = {};
-    for (const def of CAPABILITIES) {
-      out[def.id] = this.compose(await this.remoteOf(def.id), map.get(def.id));
-    }
-    return out;
+    const entries = await Promise.all(
+      CAPABILITIES.map(async (def) => [
+        def.id,
+        this.compose(await this.remoteOf(def.id), map.get(def.id)),
+      ] as const),
+    );
+    return Object.fromEntries(entries);
   }
 
   /**

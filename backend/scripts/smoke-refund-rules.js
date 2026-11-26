@@ -14,7 +14,6 @@
  *   NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-refund-rules.js
  */
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { loadEnvOnce, resolveDbUrl } = require('./db-url');
 const { clearCredits } = require('./credit-fixture');
 
@@ -30,9 +29,7 @@ const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, ''
  *
  * 重试写操作是安全的: 报 SQLITE_BUSY 时语句没有提交。
  */
-const base = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }),
-});
+const base = new PrismaClient();
 const prisma = base.$extends({
   query: {
     $allModels: {

@@ -32,7 +32,7 @@
 
 | 区域 | 技术栈 | 主要入口 |
 | --- | --- | --- |
-| 后端 | NestJS + Prisma + SQLite | `backend/src/`、`backend/prisma/`、`backend/plugins/` |
+| 后端 | NestJS + Prisma（开发/测试 SQLite、生产 PostgreSQL） | `backend/src/`、`backend/prisma/`、`backend/plugins/` |
 | 前端 | React + Vite + shadcn | `frontend/src/`、`frontend/src/admin-ui/`、`frontend/src/ui/` |
 | 测试 | Vitest + Playwright + HTTP 冒烟 | `backend/scripts/`、`frontend/tests/`、`test/` |
 | Agent | Node + OpenAI Codex SDK | `agent/src/` |
@@ -103,7 +103,7 @@
 主责：Prisma schema、迁移、种子、测试库重置与库路径。
 
 - 可改：`backend/prisma/**`、`backend/scripts/migrate-*.js`、`backend/scripts/seed-*.ts`、`backend/scripts/reset-test-env.js`、`backend/scripts/db-url.js`
-- 规则：计费字段一律快照；迁移无自动 down migration、不可回滚；改 schema 同批生成 `prisma/migrations` 并更新 `docs/database.md` 与相关测试
+- 规则：计费字段一律快照；迁移无自动 down migration、不可回滚；改 schema 同批生成 `prisma/migrations`，再运行 `npm run prisma:sync-sqlite` 派生 SQLite schema 与迁移基线，并更新 `docs/database.md` 与相关测试
 - 验证：`cd backend && node -e "console.log(require('./scripts/db-url').resolveDbPath())"`；`NODE_ENV=test npm run db:reset:test`；`npm run prisma:generate`
 
 其他线不得直接改 `schema.prisma`。需要新字段时先由数据线落 schema 与迁移，再通知后端 / 前端消费。

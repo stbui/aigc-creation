@@ -429,16 +429,11 @@ export class PaymentNotificationService {
         order: { select: { providerInstanceId: true } },
       },
     })) as Array<HistoricalPaymentRef & { order?: { providerInstanceId: string | null } }>;
-    const referenceResolutions: ResolvedHistoricalPayment[] = [];
-    for (const payment of references) {
-      referenceResolutions.push(
-        ...(await this.resolveHistoricalPayments(
-          [payment],
-          'wechat',
-          payment.order?.providerInstanceId ?? null,
-        )),
-      );
-    }
+    const referenceResolutions = await this.resolveHistoricalPayments(
+      references,
+      'wechat',
+      null,
+    );
     const configs = uniqueResolvedConfigs(referenceResolutions);
     if (configs.length === 0) {
       throw new AppError(40001, '微信回调查不到历史支付配置，拒绝处理', 400);
@@ -525,21 +520,48 @@ export class PaymentNotificationService {
   }
 
   private async resolveHistoricalPayments(
-    payments: HistoricalPaymentRef[],
+    payments: Array<
+      HistoricalPaymentRef & { order?: { providerInstanceId: string | null } }
+    >,
     providerId: PaymentProviderId,
     orderProviderInstanceId: string | null,
   ): Promise<ResolvedHistoricalPayment[]> {
+    const configsById = await this.configs.byIds(
+      payments
+        .map((payment) => payment.providerConfigId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    const fallbackConfigs = new Map<string, ResolvedPaymentConfig | null>();
     const out: ResolvedHistoricalPayment[] = [];
     for (const payment of payments) {
       try {
-        const config = payment.providerConfigId
-          ? await this.configs.byId(payment.providerConfigId)
-          : await this.configs.resolveForOrder({
-              channel: providerId,
-              providerConfigId: null,
-              providerInstanceId:
-                payment.providerInstanceId ?? orderProviderInstanceId ?? 'default',
-            });
+        let config: ResolvedPaymentConfig | null | undefined;
+        if (payment.providerConfigId) {
+          config = configsById.get(payment.providerConfigId);
+          if (!config) {
+            this.logger.warn(
+              `历史支付配置不可用 payment=${payment.id} config=${payment.providerConfigId}`,
+            );
+            continue;
+          }
+        } else {
+          const instanceId =
+            payment.providerInstanceId ??
+            payment.order?.providerInstanceId ??
+            orderProviderInstanceId ??
+            'default';
+          if (!fallbackConfigs.has(instanceId)) {
+            fallbackConfigs.set(
+              instanceId,
+              await this.configs.resolveForOrder({
+                channel: providerId,
+                providerConfigId: null,
+                providerInstanceId: instanceId,
+              }),
+            );
+          }
+          config = fallbackConfigs.get(instanceId);
+        }
         if (!config || config.providerId !== providerId) continue;
         out.push({ payment, config });
       } catch (e) {
@@ -950,14 +972,19 @@ export class PaymentNotificationService {
       return { ok: false, permanent: true, reason: detail };
     }
     try {
+      let defaultConfig: ResolvedPaymentConfig | undefined;
+      const getDefaultConfig = async (): Promise<ResolvedPaymentConfig> => {
+        defaultConfig ??= await this.configs.byId(row.providerConfigId);
+        return defaultConfig;
+      };
       const providerInstanceId =
         attempt.providerInstanceId ??
         metadata.providerInstanceId ??
-        (await this.configs.byId(row.providerConfigId)).instanceId;
+        (await getDefaultConfig()).instanceId;
       const providerConfigVersion =
         metadata.providerConfigVersion ??
         attempt.providerConfigVersion ??
-        (await this.configs.byId(row.providerConfigId)).version;
+        (await getDefaultConfig()).version;
       const providerMethod =
         metadata.expectedPaymentMethod ??
         (attempt?.providerMethod && isVisiblePaymentMethod(attempt.providerMethod)

@@ -198,7 +198,7 @@ section('production 启动门禁');
 {
   const base: NodeJS.ProcessEnv = {
     NODE_ENV: 'production',
-    DATABASE_URL: 'file:./data/prod.db',
+    DATABASE_URL: 'postgresql://huojue:secret@db:5432/huojue_prod?schema=public',
     JWT_SECRET: 'a-strong-random-value-for-production',
   };
 
@@ -209,6 +209,19 @@ section('production 启动门禁');
     threw = e;
   }
   check('合规的生产配置能通过校验', threw === null, threw?.message);
+
+  // SQLite 文件不得进入生产
+  threw = null;
+  try {
+    validateEnv({ ...base, DATABASE_URL: 'file:./data/prod.db' });
+  } catch (e) {
+    threw = e;
+  }
+  check(
+    '生产库为 SQLite 文件 → 启动失败',
+    threw !== null && threw.problems?.some((p: string) => /SQLite/.test(p)),
+    threw?.message,
+  );
 
   // 缺 JWT_SECRET
   threw = null;

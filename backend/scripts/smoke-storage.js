@@ -15,10 +15,9 @@ if (!ADMIN_PASSWORD) {
   process.exit(1);
 }
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl } = require('./db-url');
 const { ensureTestUser } = require('./lib/test-user');
-const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient();
 
 /**
  * 自建一个「有素材的 C 端账号」。

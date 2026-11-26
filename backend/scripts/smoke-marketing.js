@@ -13,10 +13,9 @@
  */
 const BASE = process.env.MARKETING_API_BASE || 'http://localhost:4100/api/v1';
 const { PrismaClient } = require('./prisma-client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
 const { resolveDbUrl } = require('./db-url');
 const { clearCredits } = require('./credit-fixture');
-const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: resolveDbUrl() }) });
+const prisma = new PrismaClient();
 
 const DAY = 24 * 3600 * 1000;
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import type { StorageBackend } from '../storage/storage.contract';
 import { lockAndAssertActiveAdminMutable } from './last-admin.guard';
+import { AuthUserCacheService } from '../common/auth-user-cache.service';
 
 /**
  * 账号生命周期 —— 注销的**唯一实现**。
@@ -22,6 +23,7 @@ export class AccountLifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly authUsers: AuthUserCacheService,
   ) {}
 
   /** 注销前的影响面预览（前端必须展示给用户确认） */
@@ -118,6 +120,7 @@ export class AccountLifecycleService {
     });
 
     if (!result) return { id: userId, deleted: false };
+    await this.authUsers.invalidate(userId);
 
     /*
      * 文件在事务之后删：按**写入时的后端**逐个删，失败不阻塞注销。

@@ -142,10 +142,7 @@ export class ChannelService {
       }),
     ]);
 
-    const channels: PublicModelChannel[] = [];
-    for (const row of rows) {
-      channels.push(await this.project(row, true));
-    }
+    const channels = await this.projectMany(rows, true);
     return { channels, total, page, limit };
   }
 
@@ -160,9 +157,7 @@ export class ChannelService {
       where: { scope: CHANNEL_SCOPE_SYSTEM, enabled: true, deletedAt: null },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     });
-    const result: PublicModelChannel[] = [];
-    for (const row of rows) result.push(await this.project(row, false));
-    return result;
+    return this.projectMany(rows, false);
   }
 
   /**
@@ -176,9 +171,7 @@ export class ChannelService {
       where: { scope: CHANNEL_SCOPE_SYSTEM, enabled: true, deletedAt: null },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     });
-    const result: PublicModelChannel[] = [];
-    for (const row of rows) result.push(await this.project(row, true));
-    return result;
+    return this.projectMany(rows, true);
   }
 
   /* ───────────────────────── 写入 ───────────────────────── */
@@ -438,41 +431,59 @@ export class ChannelService {
   /** 导出不含任何凭证：API Key / Secret Key / 自定义头 / 代理地址 */
   async exportChannels(ids?: string[]): Promise<SystemChannelExport> {
     const wanted = new Set(uniqueNonEmpty(ids ?? []));
+    const where: Prisma.ModelChannelWhereInput = {
+      scope: CHANNEL_SCOPE_SYSTEM,
+      deletedAt: null,
+    };
+    if (wanted.size > 0) where.id = { in: [...wanted] };
     const rows = await this.prisma.modelChannel.findMany({
-      where: { scope: CHANNEL_SCOPE_SYSTEM, deletedAt: null },
+      where,
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     });
-    const channels: SystemChannelExportChannel[] = [];
-    for (const row of rows) {
-      if (wanted.size > 0 && !wanted.has(row.id)) continue;
-      const models = await this.prisma.channelModel.findMany({
-        where: { channelId: row.id, deletedAt: null },
-        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
-      });
-      const tiers =
-        models.length > 0
-          ? await this.prisma.channelModelPriceTier.findMany({
-              where: { channelModelId: { in: models.map((item) => item.id) }, deletedAt: null },
-            })
-          : [];
-      const exportedModels: SystemChannelExportModel[] = [];
-      for (const model of models) {
-        exportedModels.push({
-          ...this.modelToRequest(model, tiers.filter((tier) => tier.channelModelId === model.id)),
-          sortOrder: model.sortOrder,
-        });
-      }
-      channels.push({
-        name: row.name,
-        baseUrl: row.baseUrl,
-        sortOrder: row.sortOrder,
-        enabled: row.enabled,
-        concurrencyLimit: row.concurrencyLimit,
-        catalogProviderId: row.catalogProviderId || undefined,
-        defaultModel: decodeDefaultModelConfig(row.defaultModelConfigJson),
-        models: exportedModels,
-      });
+    const models =
+      rows.length > 0
+        ? await this.prisma.channelModel.findMany({
+            where: { channelId: { in: rows.map((row) => row.id) }, deletedAt: null },
+            orderBy: [
+              { channelId: 'asc' },
+              { sortOrder: 'asc' },
+              { createdAt: 'asc' },
+              { id: 'asc' },
+            ],
+          })
+        : [];
+    const tiers =
+      models.length > 0
+        ? await this.prisma.channelModelPriceTier.findMany({
+            where: { channelModelId: { in: models.map((model) => model.id) }, deletedAt: null },
+            orderBy: [{ channelModelId: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+          })
+        : [];
+    const modelsByChannel = new Map<string, typeof models>();
+    for (const model of models) {
+      const group = modelsByChannel.get(model.channelId);
+      if (group) group.push(model);
+      else modelsByChannel.set(model.channelId, [model]);
     }
+    const tiersByModel = new Map<string, typeof tiers>();
+    for (const tier of tiers) {
+      const group = tiersByModel.get(tier.channelModelId);
+      if (group) group.push(tier);
+      else tiersByModel.set(tier.channelModelId, [tier]);
+    }
+    const channels: SystemChannelExportChannel[] = rows.map((row) => ({
+      name: row.name,
+      baseUrl: row.baseUrl,
+      sortOrder: row.sortOrder,
+      enabled: row.enabled,
+      concurrencyLimit: row.concurrencyLimit,
+      catalogProviderId: row.catalogProviderId || undefined,
+      defaultModel: decodeDefaultModelConfig(row.defaultModelConfigJson),
+      models: (modelsByChannel.get(row.id) ?? []).map((model) => ({
+        ...this.modelToRequest(model, tiersByModel.get(model.id) ?? []),
+        sortOrder: model.sortOrder,
+      })),
+    }));
     return {
       format: SYSTEM_CHANNEL_EXPORT_FORMAT,
       version: SYSTEM_CHANNEL_EXPORT_VERSION,
@@ -797,6 +808,38 @@ export class ChannelService {
       admin,
       models,
       admin ? decodeDefaultModelConfig(row.defaultModelConfigJson) : null,
+    );
+  }
+
+  /** 列表投影一次取回整页模型，避免每个渠道各查一次。 */
+  private async projectMany(rows: ModelChannel[], admin: boolean): Promise<PublicModelChannel[]> {
+    if (rows.length === 0) return [];
+    const models = await this.prisma.channelModel.findMany({
+      where: {
+        channelId: { in: rows.map((row) => row.id) },
+        deletedAt: null,
+        ...(admin ? {} : { enabled: true }),
+      },
+      orderBy: [
+        { channelId: 'asc' },
+        { sortOrder: 'asc' },
+        { createdAt: 'asc' },
+        { id: 'asc' },
+      ],
+    });
+    const modelsByChannel = new Map<string, typeof models>();
+    for (const model of models) {
+      const group = modelsByChannel.get(model.channelId);
+      if (group) group.push(model);
+      else modelsByChannel.set(model.channelId, [model]);
+    }
+    return rows.map((row) =>
+      publicChannel(
+        row,
+        admin,
+        modelsByChannel.get(row.id) ?? [],
+        admin ? decodeDefaultModelConfig(row.defaultModelConfigJson) : null,
+      ),
     );
   }
 
