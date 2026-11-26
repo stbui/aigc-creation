@@ -397,7 +397,7 @@ interface AgentCapabilitySpec {
 - `mode='planned'` 不进入目录。
 - `runtime.effective !== 'remote'` 不进入目录（`disabled` 已下线，`unavailable` 没有可用线路）。只看 `runtime.enabled` 会把「没有配模型」的能力也放进来，提交时才 `40005`。
 - `param.hidden=true` 不进入模型可见的参数 schema；需要页面代填的技术参数由服务端从上下文补齐。
-- 预估积分**不使用** `CreditPriceService.resolve()` 的能力价：实际账单由 `BillingService.buildDraft` 按线路价/统一价叠分组倍率生成。必须用 `QuoteService.quoteCapability(access, capability, modelKey, intent)` 报价，并按 `outputPlan(params).length` 求和。
+- 预估积分**不使用** `GET /capabilities` 的 `creditCost`：那是能力级单值摘要，已叠分组基础倍率但没有模型上下文，也不含 `outputPlan` 的张数。实际账单由 `BillingService.buildDraft` 按能力售价叠分组倍率生成；必须用 `QuoteService.quoteCapability(access, capability, modelKey, intent)` 报价，并按 `outputPlan(params).length` 求和。
 - **不得因为存在 `hidden` 参数就把能力排除出目录。** 若缺少的 `hidden` 参数是可选/有安全默认值，正常规划；若它必须由用户交互产生，则生成 `handoff`，而不是静默删掉该能力。
 
 这样新增能力只需改 `definitions/`，Agent 的能力目录自动更新；但模型分组仍需在后台配置，否则该能力落到 `unavailable`，不会进入规划。能力下线后模型也无法再规划它。`local_redraw` 的遮罩、`sku_image` 的精确框选都按「可执行则执行，不可执行则 handoff」处理；handoff 的判定优先由服务端规则给出（如遮罩/框选缺失），模型只能建议，不能把本可执行的任务改成 handoff 来逃避执行。
@@ -739,7 +739,7 @@ model ApiCallLog {
 ### 10.1 用户计费
 
 - 规划阶段不收费、不创建任务。
-- 计划卡展示的 `estimateCredits` 必须与真实账单同源：对每步调用 `QuoteService.quoteCapability(access, capability, modelKey, intent)`，再按 `outputPlan(params).length` 求和。**不要**用 `CreditPriceService.resolve()` 的能力价或 `def.creditCost` 估算——实际账单由线路价/统一价叠用户分组倍率生成，两者默认不相等。
+- 计划卡展示的 `estimateCredits` 必须与真实账单同源：对每步调用 `QuoteService.quoteCapability(access, capability, modelKey, intent)`，再按 `outputPlan(params).length` 求和。**不要**用 `GET /capabilities` 的 `creditCost` 或定义里的 `creditCost` 估算——实扣按能力售价叠用户分组倍率（含按模型 key 的覆盖倍率），而能力清单的摘要不含模型上下文，两者默认不相等。
 - 展示时同时给出每步的模型名、输出张数、小计与当前余额，避免用户只看到一个总数。
 - 确认后每一步由 `GenerateService.createTask` 真实扣费；实际金额以任务快照 `creditCost` / 账单为准。
 - 失败由既有 `GenerateService` 自动退款，Agent 不二次退款。

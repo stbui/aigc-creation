@@ -44,6 +44,7 @@ export function BatchDeleteUsersDialog({
   loading,
   onCancel,
   onConfirm,
+  mode = 'soft',
 }: {
   targets: BatchDeleteTarget[];
   /** 没有计数时展示的「将清除」说明 */
@@ -51,7 +52,13 @@ export function BatchDeleteUsersDialog({
   loading: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  /**
+   * `soft`：注销（匿名化，不可恢复但资金记录保留）。
+   * `purge`：物理清除已注销账号；有资金记录的账号会被拒绝并原样保留。
+   */
+  mode?: 'soft' | 'purge';
 }) {
+  const purging = mode === 'purge';
   const hasCounts = targets.some(
     (target) => target.projectCount !== undefined && target.assetCount !== undefined,
   );
@@ -72,11 +79,23 @@ export function BatchDeleteUsersDialog({
   return (
     <DeleteUsersConfirmDialog
       testId="admin-batch-delete-dialog"
-      title={`删除 ${targets.length} 个用户`}
+      title={purging ? `清除 ${targets.length} 个已注销账号` : `删除 ${targets.length} 个用户`}
       description={
-        <p>将以「注销」方式删除选中账号：立即失效，作品与积分清零，操作不可撤销。</p>
+        purging ? (
+          <p>将物理删除选中账号及其残量数据，不可恢复；存在订单、支付、退款、发票或积分流水的账号会被拒绝并原样保留。</p>
+        ) : (
+          <p>将以「注销」方式删除选中账号：立即失效，作品与积分清零，操作不可撤销。</p>
+        )
       }
-      confirmText={loading ? '删除中…' : `确认删除 ${targets.length} 个`}
+      confirmText={
+        loading
+          ? purging
+            ? '清除中…'
+            : '删除中…'
+          : purging
+            ? `确认清除 ${targets.length} 个`
+            : `确认删除 ${targets.length} 个`
+      }
       loading={loading}
       confirmDisabled={overLimit}
       onCancel={onCancel}
@@ -88,17 +107,21 @@ export function BatchDeleteUsersDialog({
           <span className="ml-2 text-muted-foreground tabular-nums">
             {hasCounts
               ? `项目 ${cleared.projects} · 任务 ${cleared.tasks} · 素材 ${cleared.assets}`
-              : (clearedNote ?? '作品、任务、素材与全部积分批次')}
+              : (clearedNote ?? (purging ? '账号全部残量数据' : '作品、任务、素材与全部积分批次'))}
           </span>
         </div>
-        <div className="text-muted-foreground">资金记录按法务要求匿名保留</div>
+        {purging ? (
+          <div className="text-muted-foreground">有资金记录的账号会逐条拒绝，不会被删除</div>
+        ) : (
+          <div className="text-muted-foreground">资金记录按法务要求匿名保留</div>
+        )}
         <div className="truncate text-muted-foreground" title={allEmails}>
           目标账号：{listed.map((target) => target.email).join('、')}
           {rest > 0 && ` 等 ${targets.length} 个`}
         </div>
         {overLimit && (
           <p className="text-destructive">
-            单次最多删除 {BATCH_DELETE_LIMIT} 个账号，请分批处理。
+            单次最多{purging ? '清除' : '删除'} {BATCH_DELETE_LIMIT} 个账号，请分批处理。
           </p>
         )}
       </div>

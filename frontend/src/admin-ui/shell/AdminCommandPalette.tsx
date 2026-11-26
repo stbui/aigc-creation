@@ -69,7 +69,7 @@ export function AdminCommandPalette({
       >
         <Search className="size-4 shrink-0" aria-hidden />
         <span className="hidden lg:inline">搜索功能…</span>
-        <kbd className="ml-2 hidden rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[11px] leading-none lg:inline">
+        <kbd className="ml-2 hidden rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[12px] leading-none lg:inline">
           ⌘K
         </kbd>
       </button>

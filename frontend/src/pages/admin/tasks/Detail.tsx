@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Copy, ExternalLink, ImageOff } from 'lucide-react';
 import {
@@ -12,7 +12,7 @@ import {
 import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from './api';
 import { useToast } from './hooks';
 import { TaskFullChain } from './TaskFullChain';
-import { TaskTimeline } from './TaskTimeline';
+import { TaskTimeline, type StepState } from './TaskTimeline';
 import {
   adminAssetHref,
   adminChannelHref,
@@ -24,11 +24,63 @@ import {
   fmtBytes,
   formatDateTime,
   formatDuration,
+  isActiveStatus,
+  isTerminalStatus,
   taskErrorLabel,
 } from './utils';
-import type { AdminTask, AdminTaskDetail } from './types';
+import type { AdminTaskDetail, AdminTaskRow, TaskActionKind } from './types';
 
-type Row = AdminTask;
+/** 详情合成列表行：直链打开时任务未必在当前分页，动作仍需可用。 */
+function toRow(detail: AdminTaskDetail): AdminTaskRow {
+  return {
+    id: detail.id,
+    capability: detail.capability,
+    capabilityName: detail.capabilityName,
+    status: detail.status,
+    errorCode: detail.errorCode,
+    creditCost: detail.creditCost,
+    retriedFromId: detail.retriedFromId,
+    user: detail.user,
+    project: detail.project,
+    durationMs: detail.durationMs,
+    createdAt: detail.createdAt,
+    updatedAt: detail.updatedAt,
+    thumbnailUrl: null,
+  };
+}
+
+/** 状态流转节点 → 时间线项；把嵌套条件从 JSX 挪出来，分支顺序即优先级。 */
+function toTimelineItems(detail: AdminTaskDetail): Array<{
+  title: string;
+  state: StepState;
+  description: string;
+}> {
+  return detail.timeline.map((node) => {
+    const description = node.at
+      ? formatDateTime(node.at)
+      : node.done
+        ? '未记录具体时间'
+        : detail.status === 'queued'
+          ? '尚未开始'
+          : '进行中';
+
+    if (node.key !== 'finished') {
+      return { title: node.label, state: 'done', description };
+    }
+
+    const state: StepState = !node.done
+      ? detail.status === 'queued'
+        ? 'pending'
+        : 'active'
+      : detail.status === 'failed'
+        ? 'failed'
+        : detail.status === 'cancelled'
+          ? 'cancelled'
+          : 'done';
+
+    return { title: node.label, state, description };
+  });
+}
 
 /**
  * 任务详情弹窗。
@@ -39,7 +91,7 @@ type Row = AdminTask;
  * 用居中弹窗而不是抽屉：全链路要并排 5 段摘要、产出图要按原比例预览，
  * 760px 的抽屉会把每一段都挤成两行。
  */
-export function TaskDetailModal({
+export function Detail({
   detailId,
   rows,
   canRetry,
@@ -52,7 +104,7 @@ export function TaskDetailModal({
   onAction,
 }: {
   detailId: string | null;
-  rows: Row[];
+  rows: AdminTaskRow[];
   canRetry: boolean;
   canCancel: boolean;
   canDelete: boolean;
@@ -60,13 +112,16 @@ export function TaskDetailModal({
   canReadBilling: boolean;
   canReadChannels: boolean;
   onClose: () => void;
-  onAction: (kind: 'retry' | 'cancel' | 'delete', task: Row) => void;
+  onAction: (kind: TaskActionKind, task: AdminTaskRow) => void;
 }) {
   const toast = useToast();
   const detailFetcher = useCallback(async () => {
     if (!detailId) throw new Error('任务不存在');
     return adminTasksApi.detail(detailId);
   }, [detailId]);
+
+  /* 列表行按 id 建索引：页脚每次重渲染只查一次，不再逐行 find。 */
+  const rowById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
 
   const copyText = async (label: string, value: string) => {
     try {
@@ -77,6 +132,37 @@ export function TaskDetailModal({
     }
   };
 
+  const renderFooter = (d: AdminTaskDetail) => {
+    const row = rowById.get(d.id) ?? toRow(d);
+    return (
+      <div className="flex w-full flex-wrap items-center gap-2">
+        <ActionButton variant="ghost" size="sm" className="mr-auto" onClick={onClose}>
+          关闭
+        </ActionButton>
+        {d.status === 'failed' && canRetry && (
+          <ActionButton variant="default" size="sm" onClick={() => onAction('retry', row)}>
+            重试此任务
+          </ActionButton>
+        )}
+        {isActiveStatus(d.status) && canCancel && (
+          <ActionButton variant="destructive" size="sm" onClick={() => onAction('cancel', row)}>
+            终止此任务
+          </ActionButton>
+        )}
+        {isTerminalStatus(d.status) && canDelete && (
+          <ActionButton
+            variant="ghost"
+            size="sm"
+            className="text-danger-text hover:text-danger-text"
+            onClick={() => onAction('delete', row)}
+          >
+            删除此任务
+          </ActionButton>
+        )}
+      </div>
+    );
+  };
+
   return (
     <AdminModal<AdminTaskDetail>
       open={detailId !== null}
@@ -85,56 +171,7 @@ export function TaskDetailModal({
       size="xl"
       onClose={onClose}
       fetcher={detailFetcher}
-      footer={(d) => {
-        /*
-         * 直链打开时详情任务不一定在当前分页里。用详情字段合成一行摘要，
-         * 保证重试 / 终止 / 删除动作仍然可用；列表里有时优先复用列表行。
-         */
-        const row: Row =
-          rows.find((t) => t.id === d.id) ?? {
-            id: d.id,
-            capability: d.capability,
-            capabilityName: d.capabilityName,
-            status: d.status,
-            errorCode: d.errorCode,
-            creditCost: d.creditCost,
-            retriedFromId: d.retriedFromId,
-            user: d.user,
-            project: d.project,
-            durationMs: d.durationMs,
-            createdAt: d.createdAt,
-            updatedAt: d.updatedAt,
-            thumbnailUrl: null,
-          };
-        return (
-          <div className="flex w-full flex-wrap items-center gap-2">
-            <ActionButton variant="ghost" size="sm" className="mr-auto" onClick={onClose}>
-              关闭
-            </ActionButton>
-            {d.status === 'failed' && canRetry && (
-              <ActionButton variant="default" size="sm" onClick={() => onAction('retry', row)}>
-                重试此任务
-              </ActionButton>
-            )}
-            {(d.status === 'queued' || d.status === 'running') && canCancel && (
-              <ActionButton variant="destructive" size="sm" onClick={() => onAction('cancel', row)}>
-                终止此任务
-              </ActionButton>
-            )}
-            {(d.status === 'succeeded' || d.status === 'failed' || d.status === 'cancelled') &&
-              canDelete && (
-                <ActionButton
-                  variant="ghost"
-                  size="sm"
-                  className="text-danger-text hover:text-danger-text"
-                  onClick={() => onAction('delete', row)}
-                >
-                  删除此任务
-                </ActionButton>
-              )}
-          </div>
-        );
-      }}
+      footer={renderFooter}
     >
       {(d) => {
         const errorLabel = d.errorCode ? taskErrorLabel(d.errorCode) : null;
@@ -298,30 +335,7 @@ export function TaskDetailModal({
                     : `总耗时 ${formatDuration(d.durationMs)}`
               }
             >
-              <TaskTimeline
-                items={d.timeline.map((n) => ({
-                  title: n.label,
-                  state:
-                    n.key === 'finished'
-                      ? n.done
-                        ? d.status === 'failed'
-                          ? 'failed'
-                          : d.status === 'cancelled'
-                            ? 'cancelled'
-                            : 'done'
-                        : d.status === 'queued'
-                          ? 'pending'
-                          : 'active'
-                      : 'done',
-                  description: n.at
-                    ? formatDateTime(n.at)
-                    : n.done
-                      ? '未记录具体时间'
-                      : d.status === 'queued'
-                        ? '尚未开始'
-                        : '进行中',
-                }))}
-              />
+              <TaskTimeline items={toTimelineItems(d)} />
             </DetailSection>
 
             <TaskFullChain
@@ -362,7 +376,9 @@ export function TaskDetailModal({
                         { label: '格式', value: d.outputAsset.format },
                         {
                           label: '文件大小',
-                          value: <span className="tabular-nums">{fmtBytes(d.outputAsset.sizeBytes)}</span>,
+                          value: (
+                            <span className="tabular-nums">{fmtBytes(d.outputAsset.sizeBytes)}</span>
+                          ),
                         },
                       ]}
                     />

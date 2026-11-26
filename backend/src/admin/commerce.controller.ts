@@ -243,6 +243,13 @@ export class AdminPaymentListQueryDto extends PageQueryDto {
 export class AdminCreditListQueryDto extends PageQueryDto {
   @IsOptional() @IsString() userId?: string;
   @IsOptional() @IsString() email?: string;
+  /**
+   * 账号状态口径。
+   * - `normal`：未注销（active + disabled），运营日常操作的账号；
+   * - `deleted`：已注销账号，只能物理清除，不再走软注销。
+   * 缺省不过滤，保持旧行为。
+   */
+  @IsOptional() @IsIn(["normal", "deleted"]) status?: "normal" | "deleted";
 }
 
 /** 积分对账扫描条数。上限 5000 属对账场景的存量豁免 (远大于分页上限):
@@ -573,6 +580,7 @@ export class AdminCommerceController {
     return this.creditAdmin.listCredits({
       userId: query.userId,
       email: query.email,
+      status: query.status,
       page: query.page,
       pageSize: query.pageSize,
     });

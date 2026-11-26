@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { assetsApi } from '../lib/api';
 import type { Asset } from '../types/api';
@@ -36,6 +36,8 @@ export function useAssetLibrary(onPick: (asset: Asset) => void | boolean): UseAs
   const [error, setError] = useState<string | null>(null);
   const { message } = useApp();
   const { token, openLogin } = useAuth();
+  /** 后端单页上限内先展示首屏，随后继续补齐，避免素材超过 120 条后无法导入。 */
+  const loadSeq = useRef(0);
 
   const openLibrary = useCallback(() => {
     // 素材库是账号数据。未登录直接打开选择器只会拿到 401，并在弹窗里
@@ -48,17 +50,40 @@ export function useAssetLibrary(onPick: (asset: Asset) => void | boolean): UseAs
     setOpen(true);
     setLoading(true);
     setError(null);
+    const seq = ++loadSeq.current;
     // ⚠️ **不按 kind 过滤**: 选择器有「原始图片 / 生成图片」两个维度,
     // 若只拉 original, 切到「生成图片」永远是空的 —— 一个点不动的假入口。
-    // 故一次性拉全部 (原始 + 生成), 由侧栏维度在前端分流。
-    assetsApi
-      .list({ limit: 120 })
-      .then((res) => setItems(res.items ?? []))
-      .catch((e: unknown) => {
+    // 故按后端分页拉取全部 (原始 + 生成), 由侧栏维度在前端分流。
+    void (async () => {
+      let first: Awaited<ReturnType<typeof assetsApi.list>>;
+      try {
+        first = await assetsApi.list({ limit: 120, offset: 0 });
+      } catch (e: unknown) {
+        if (seq !== loadSeq.current) return;
         setError(e instanceof Error ? e.message : '素材库加载失败');
+        setLoading(false);
         message.error('素材库加载失败');
-      })
-      .finally(() => setLoading(false));
+        return;
+      }
+
+      if (seq !== loadSeq.current) return;
+      let all = first.items ?? [];
+      setItems(all);
+      setLoading(false);
+
+      // 首屏可用后继续按后端分页补齐，筛选与弹窗分页才能覆盖全部素材。
+      try {
+        while (all.length < first.total) {
+          const next = await assetsApi.list({ limit: 120, offset: all.length });
+          if (seq !== loadSeq.current) return;
+          if (next.items.length === 0) break;
+          all = all.concat(next.items);
+          setItems(all);
+        }
+      } catch {
+        // 首屏已经可用，后续补页失败不把已展示的内容替换成错误态。
+      }
+    })();
   }, [message, openLogin, token]);
 
   const closeLibrary = useCallback(() => setOpen(false), []);
@@ -74,6 +99,7 @@ export function useAssetLibrary(onPick: (asset: Asset) => void | boolean): UseAs
   // 弹窗关闭时释放列表，避免下次打开前渲染出上一次的旧数据
   useEffect(() => {
     if (!open) {
+      loadSeq.current += 1;
       setItems([]);
       setError(null);
     }

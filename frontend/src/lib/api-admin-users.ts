@@ -114,7 +114,7 @@ export const adminUsersApi = {
    */
   batch: (
     ids: string[],
-    action: "disable" | "enable" | "delete",
+    action: "disable" | "enable" | "delete" | "purge",
     confirm?: string,
   ) =>
     request<BatchSummary<{ id: string; status?: string; hard?: boolean }>>(

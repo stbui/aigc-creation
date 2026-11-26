@@ -39,12 +39,12 @@ export class UserBatchDto {
   @IsString({ each: true })
   ids!: string[];
 
-  @IsIn(["disable", "enable", "delete"], {
-    message: "action 只能是 disable、enable 或 delete",
+  @IsIn(["disable", "enable", "delete", "purge"], {
+    message: "action 只能是 disable、enable、delete 或 purge",
   })
-  action!: "disable" | "enable" | "delete";
+  action!: "disable" | "enable" | "delete" | "purge";
 
-  /** 仅 `action=delete` 必填：手工键入了「删除」才执行，防止全选后误点 */
+  /** `action=delete` / `purge` 必填：手工键入了「删除」才执行，防止全选后误点 */
   @IsOptional()
   @IsString()
   confirm?: string;
@@ -118,6 +118,12 @@ export class AdminUsersController {
         throw new AppError(40301, "没有批量注销账号的权限", 403);
       }
       return this.users.batchDelete(dto.ids, dto.confirm, actor.id);
+    }
+    if (dto.action === "purge") {
+      if (!(await this.roles.hasPermission(actor.id, PERMISSIONS.userDelete))) {
+        throw new AppError(40301, "没有批量清除账号的权限", 403);
+      }
+      return this.users.batchPurge(dto.ids, dto.confirm, actor.id);
     }
     if (!(await this.roles.hasPermission(actor.id, PERMISSIONS.userDisable))) {
       throw new AppError(40301, "没有批量启停账号的权限", 403);

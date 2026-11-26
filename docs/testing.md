@@ -153,6 +153,7 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | `model/proxy/proxy.payload.spec.ts` | 流式 Chat Completions 的 `stream_options.include_usage` 注入：非流式原样返回、缺失时补上、保留已有字段、非法 JSON / 非对象报文 / 非对象 `stream_options` 一律拒绝 |
 | `model/infra/outbound.spec.ts` | 自定义中转的 IPv6 保留网段拦截：`100::/64`（discard-only）、`2001:db8::/32`（文档网段）、IPv4-mapped loopback；普通出站不把保留网段当私网拦 |
 | `prompts/prompts.service.spec.ts` | 提示词库：标签解析与归一（去重 / 截断 / 最多 8 条）、配图解析（丢弃空 `ref`、保留 `assetId` / `name`）、配图按 `ref` 去重并限 9 张、列表 `enabled=false` 不丢、关键词同时匹配标题 / 正文 / 标签、正文必填而标题可空、创建补齐默认值、更新不存在返回 404 且不写库、空上传返回 400、multer 落盘后按 path 读文件上传、删除 / 更新后只回收 `prompts/` 前缀且仍被引用的对象不删、写库失败不删对象、回收查询失败不影响删除结果 |
+| `capabilities/capabilities.service.spec.ts` | C 端按钮价与实扣同源：`creditCost` 必须叠加当前用户分组倍率并**向上取整**（零头不向下截断成低于实扣的价）、不足 1 积分显示 1 而不是被读成「免费」的 0、后台售价优先于定义 `creditCost`、命中限时免费恒为 0、匿名身份按默认分组出价、分组配置损坏如实抛错（不回落默认分组冒充 1.0 倍率） |
 
 新增 service / 纯函数逻辑时优先补 L1.6；mock 成本过高或需要事务/真实 SQLite 的并发路径，再落到 L2/L3。
 
@@ -166,7 +167,7 @@ npm run test:coverage   # v8 覆盖率，产物在 backend/coverage（已 gitign
 | --- | --- |
 | `verify-capability-bootstrap.ts` | 能力定义能真实加载并通过 `assertCapabilityIntegrity`，且没有能力再声明本地图像实现；平台 / 语言必须换成展示名进入提示词（`main_image` / `detail_image` / `hot_remake`）；9 个平台都必须声明主图规格（比例 / 画质 / 最短边）与详情图规格（宽度 / 画质），主图与爆款复刻在比例、画质与平台常规一致时补规格、冲突时不硬拗，详情图同理；图片翻译的目标语言同理 |
 | `verify-credit-deduction.ts` | 生成扣费 / 失败退款 / 余额一致性（同进程起 Nest 打真实 HTTP）：建任务即预留并落账单、余额不足不产生任务、401 切线退款、5xx 转 `uncertain`、无通道 `42204` 退款、沙箱支付发积分（脚本内自行开启 `payment.enabled`） |
-| `verify-credit-price.ts` | 能力改价：后台覆盖价 → `/capabilities` 与生成扣费同步；夹具按「能力绑定 + `CapabilityPricing`」创建 |
+| `verify-credit-price.ts` | 能力改价：`CapabilityPricing` 售价 → `/capabilities` 下发与生成扣费同步（含改价回落后恢复定义 `creditCost`）；夹具按「能力绑定 + `CapabilityPricing`」创建 |
 | `verify-tool-contracts.ts` | 8 个修图工具的能力定义、默认值、hidden 字段、严格参数校验、标注解析、上传头与遮罩尺寸校验 |
 | `verify-payment-signatures.ts` | 支付宝 RSA2 / 微信 v3 AES-GCM 按公开规范独立复算，防「自己签自己验」 |
 | `verify-payment-bills.ts` | 支付宝账单解析：ZIP stored/deflate、直接 CSV、GB18030、表头前说明行、ZIP 路径穿越拒绝、ZIP 内缺少 CSV 的明确失败；离线运行 |

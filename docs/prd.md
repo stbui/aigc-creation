@@ -43,7 +43,7 @@
 | AI视频 | 自由创作 | image | 10 | 否 |
 | | 图生视频 | video | 20 | 否 |
 
-字段、提示词、默认积分价、参数与可见性只在 `backend/src/capabilities/definitions/<id>.ts` 声明。运行期价格一律经 `CreditPriceService.resolve()` 解析（后台覆盖价 / 限时免费优先于代码默认值）。
+字段、提示词、默认积分价、参数与可见性只在 `backend/src/capabilities/definitions/<id>.ts` 声明。运行期售价以 `CapabilityPricing` 为准（缺行时固定价能力回落定义 `creditCost`），再叠用户分组倍率折算实扣；`CreditPriceService` 只判定限时免费活动，命中时金额为 0。
 
 能力运行态：
 
@@ -129,7 +129,7 @@
 | T-10 | 优惠券、限时活动、邀请奖励、签到 | 已实现 |
 | T-11 | 发票申请、审核、开具、可打印 HTML | 已实现 |
 | T-12 | 渠道对账：CSV 导入、差异分类、处置只改状态与备注 | 已实现 |
-| T-13 | 限时免费活动优先于后台覆盖价，到点自动恢复 | 已实现 |
+| T-13 | 限时免费活动优先于能力售价，到点自动恢复（3 秒缓存 TTL，无需补偿任务） | 已实现 |
 
 **硬约束**：
 

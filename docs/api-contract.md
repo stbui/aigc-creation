@@ -47,7 +47,7 @@
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/v1/capabilities` | 能力清单（公开免登录），前端全部渲染依据 |
+| GET | `/api/v1/capabilities` | 能力清单（公开免登录），前端全部渲染依据。`items[].creditCost` 是**当前身份**的按钮价：`CapabilityPricing`（缺行回落定义 `creditCost`）叠加用户分组倍率后向上取整到积分，命中限时免费为 0；带 `Authorization` 时按会员分组出价，因此前端缓存必须区分登录态。分组按模型 key 配置的覆盖倍率不在本接口口径内，精确价走 `POST /models/quote` |
 | GET | `/api/v1/shoppable-carousel/templates` | AI 带货图文模板清单（公开免登录）：10 个业务分类 + 49 个模板（三拍文案 / 结构化提示词片段 / 静态缩略图路径）+ 张数区间 6–10 |
 | GET | `/api/v1/template/templates` | 写真模板目录（公开免登录）：8 个一级分类（婚纱摄影 / 情侣写真 / 女生写真 / 男生写真 / 职业形象 / 亲子写真 / 宝宝写真 / 精英人生）→ 4 个二级分类（龙凤褂 / 花海婚纱 / 草坪操场 / 看台）→ 30 个模板（预览图路径 / 名称 / 标签）；**不下发提示词**（商业资产，生成时由服务端按 `templateId` 查回）；数据由后台「写真模板」页维护，后台 `catalog` 接口仍返回完整提示词 |
 | POST | `/api/v1/auth/register` | 注册，**直接返回 `accessToken`**（注册即登录） |

@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
  * - 不支持 IntersectionObserver 时退化为立即挂载，功能不丢。
  *
  * 调用方：`/library` 网格（默认 600px）、素材库导入弹窗（300px，
- * 一次拉 120 条且卡片更小，预载距离必须更紧）。
+ * 首屏取数 120 条但每页只挂载 24 条，预载距离必须更紧）。
  * root 用默认视口 —— 弹窗的滚动容器是视口的后代，祖先 overflow 裁切会一并计入
  * 交叉矩形，无需显式传 root。
  */

@@ -4,7 +4,7 @@ import { ContextBanner, Notice, SavedViewBar } from './components';
 import { readAdminDone } from './utils';
 import { useAdmin, useAdminDetailParam, useSelectionPrune } from './hooks';
 import { TaskActionDialogs } from './TaskActionDialogs';
-import { TaskDetailModal } from './TaskDetailModal';
+import { Detail } from './Detail';
 import { TaskFailureGroups } from './TaskFailureGroups';
 import { TaskFilters } from './TaskFilters';
 import { TaskListSection } from './TaskListSection';
@@ -146,7 +146,7 @@ export function GenerationTasksTab() {
         onExport={() => void filters.exportTasks()}
       />
 
-      <TaskDetailModal
+      <Detail
         detailId={detailId}
         rows={list?.items ?? []}
         canRetry={can('task.retry')}

@@ -297,6 +297,26 @@ export class AdminUsersService {
   }
 
   /**
+   * 批量物理清除「已注销」账号。
+   *
+   * 与 {@link batchDelete} 的区别是走物理删除（`remove(id, true, ...)`）：
+   * 整行连带残量子表一起删，不可恢复。已注销账号不能再软注销，只能这样清掉。
+   *
+   * 两条硬约束沿用单条物理删除的口径：必须带确认词；有订单/支付/退款/发票/
+   * 积分流水的账号会被逐条拒绝并保留（法定留存），失败原因原样回传，绝不静默。
+   */
+  async batchPurge(ids: string[], confirm: string | undefined, actorId: string) {
+    if (confirm !== USER_BATCH_DELETE_CONFIRM) {
+      throw new AppError(40001, `批量清除需要确认词「${USER_BATCH_DELETE_CONFIRM}」`, 400);
+    }
+    return runBatch(
+      ids,
+      (id) => this.remove(id, true, confirm, actorId),
+      { limit: USER_BATCH_DELETE_LIMIT },
+    );
+  }
+
+  /**
    * 用户详情: 账号 + 会员 + 积分 + 消费 + 生成 + 最近任务 / 素材 / 订单。
    *
    * 列表只取最近若干条而非全量 —— 抽屉是概览用途, 全量会把响应体撑大;
@@ -863,7 +883,12 @@ export class AdminUsersService {
     if (id === actorId) {
       throw new AppError(40001, "不能删除自己的账号", 400);
     }
-    if (user.status === "deleted") {
+    /*
+     * 已注销账号不能再「软注销」，但允许**物理清除**：注销只是匿名化保留，
+     * 账本里会长期堆着这些无记录的空壳，运营需要能彻底清掉。物理清除仍要
+     * 过下面的资金记录检查 —— 有订单/流水/发票的账号照旧拒绝并保留。
+     */
+    if (user.status === "deleted" && !hard) {
       throw new AppError(40001, "该用户已注销，无需重复删除", 400);
     }
     if (hard) {

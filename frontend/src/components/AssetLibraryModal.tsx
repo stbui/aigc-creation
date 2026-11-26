@@ -1,9 +1,11 @@
 import './AssetLibraryModal.css';
-import { useEffect, useMemo, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { StateButton, StateEmpty, StateError, StateLoading } from './StateViews';
 import { AssetLibraryPickerCard } from './AssetLibraryPickerCard';
+import { FilterRadioGroup } from './FilterRadioGroup';
+import { Search } from './Search';
 import {
   buildCapabilityNames,
   buildCapabilityOptions,
@@ -11,6 +13,7 @@ import {
   DATE_LABELS,
   filterAssets,
   KIND_LABELS,
+  PICKER_PAGE_SIZE,
   type DateFilter,
   type PickerKind,
 } from './assetLibraryFilters';
@@ -19,12 +22,14 @@ import {
   useApp,
   Button,
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogDescription,
+  DialogHeader,
   DialogTitle,
-  Input,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
+  Pagination,
+  PaginationContent,
+  PaginationItem,
 } from '../ui';
 
 /**
@@ -36,7 +41,7 @@ import {
  *
  * ## 加载策略 (2026-11-14 性能修复)
  *
- * 列表一次拉 120 条, 但**只有接近视口的卡片才请求缩略图**（`PickerCard` 里的
+ * 列表按后端分页补齐，弹窗每页展示 24 条；**只有接近视口的卡片才请求缩略图**（`PickerCard` 里的
  * `useNearViewport`，预载距离 300px）。此前是把 120 个 `<img>` 一次性交给浏览器
  * 原生 `loading="lazy"` —— 它的预载距离宽达 1250–3000px，等于全部卡片立刻并发
  * 请求缩略图；后端每张要解码 1–2s 且占满主线程，于是「图一直加载不完」。
@@ -67,6 +72,9 @@ export interface AssetLibraryModalProps {
   maxSelectable?: number;
 }
 
+const PAGINATION_BUTTON_CLASS =
+  'inline-flex h-8 min-w-16 items-center justify-center gap-1 rounded-lg border border-[var(--border-soft)] bg-transparent px-[var(--space-10)] text-xs text-[var(--alp-text-7)] shadow-none transition-colors hover:border-[var(--border-brand)] hover:bg-transparent hover:text-[var(--brand)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50';
+
 export function AssetLibraryModal({
   open,
   loading,
@@ -88,6 +96,8 @@ export function AssetLibraryModal({
   const [keyword, setKeyword] = useState('');
   /** 已勾选的素材 id —— 参考站是多选语义 */
   const [selected, setSelected] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // 每次打开重置: 上一次的筛选与勾选不该带进新弹窗
   useEffect(() => {
@@ -97,6 +107,7 @@ export function AssetLibraryModal({
       setDateFilter('all');
       setKeyword('');
       setSelected([]);
+      setPage(1);
     }
   }, [open]);
 
@@ -119,6 +130,23 @@ export function AssetLibraryModal({
     () => filterAssets(items, { kind, capabilityFilter, dateFilter, keyword }, capabilityLabel),
     [items, kind, capabilityFilter, dateFilter, keyword, capabilityLabel],
   );
+  const pageCount = Math.max(1, Math.ceil(visible.length / PICKER_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageItems = visible.slice(
+    (currentPage - 1) * PICKER_PAGE_SIZE,
+    currentPage * PICKER_PAGE_SIZE,
+  );
+
+  // 筛选结果变少时把页码收回有效范围，避免停在空白页。
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage);
+  }, [currentPage, page]);
+
+  const goToPage = (nextPage: number) => {
+    const next = Math.min(Math.max(nextPage, 1), pageCount);
+    setPage(next);
+    contentRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  };
 
   /**
    * 是否已达选择上限。
@@ -177,14 +205,19 @@ export function AssetLibraryModal({
         className="alp-modal gap-0 p-0 sm:max-w-[min(1180px,calc(100vw-40px))]"
         showCloseButton={false}
       >
-        <div className="alp-header">
+        <DialogHeader className="alp-header flex-row gap-[var(--space-16)] text-left">
           <div className="alp-header-main">
             <DialogTitle className="alp-title">从素材库导入</DialogTitle>
+            <DialogDescription className="sr-only">
+              选择素材并导入到当前编辑区域。
+            </DialogDescription>
           </div>
-          <Button variant="ghost" className="alp-close" aria-label="关闭素材库" onClick={onCancel}>
-            <X size={19} className="size-[19px]" />
-          </Button>
-        </div>
+          <DialogClose asChild>
+            <Button variant="ghost" className="alp-close" aria-label="关闭素材库">
+              <X size={19} className="size-[19px]" />
+            </Button>
+          </DialogClose>
+        </DialogHeader>
         <div className="alp-body">
           {/* ── 工具栏: 来源胶囊 + 日期筛选 + 搜索 ── */}
           <div className="alp-toolbar">
@@ -203,49 +236,21 @@ export function AssetLibraryModal({
             </div>
 
             <div className="alp-toolbar-right">
-              <div className="alp-date-flat" role="group" aria-label="日期筛选">
-                <span className="alp-filter-label">日期</span>
-                {DATE_LABELS.map((d) => (
-                  <Button
-                    key={d.id}
-                    variant="ghost"
-                    className={`alp-date-option${dateFilter === d.id ? ' is-active' : ''}`}
-                    aria-pressed={dateFilter === d.id}
-                    onClick={() => setDateFilter(d.id)}
-                  >
-                    {d.label}
-                  </Button>
-                ))}
-              </div>
+              <FilterRadioGroup
+                options={DATE_LABELS}
+                value={dateFilter}
+                onChange={setDateFilter}
+                ariaLabel="日期筛选"
+                idPrefix="asset-library-date"
+              />
 
-              {/*
-                搜索框走 shadcn `InputGroup`, 不再手写
-                「div 包图标 + 裸 input + 条件清除键」。
-                清除键用共享 `Button` (variant=ghost) 而不是裸 button。
-              */}
-                <InputGroup>
-                  <InputGroupAddon>
-                    {<Search size={14} />}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    className="alp-search"
-                    value={keyword}
-                    placeholder="搜索素材名称 / 地址"
-                    onChange={(e) => setKeyword(e.target.value)}
-                  />
-                  <InputGroupAddon align="inline-end">
-                    {keyword ? (
-                    <Button
-                      variant="ghost"
-                      className="alp-search-clear"
-                      aria-label="清除搜索"
-                      onClick={() => setKeyword('')}
-                    >
-                      <X size={12} className="size-[12px]" />
-                    </Button>
-                  ) : null}
-                  </InputGroupAddon>
-                </InputGroup>
+              <Search
+                inputClassName="alp-search"
+                value={keyword}
+                placeholder="搜索素材名称 / 地址"
+                ariaLabel="搜索素材名称 / 地址"
+                onChange={setKeyword}
+              />
             </div>
           </div>
 
@@ -299,7 +304,7 @@ export function AssetLibraryModal({
             </aside>
 
             <div className="alp-main">
-              <div className="alp-content">
+              <div className="alp-content" ref={contentRef}>
                 {loading ? (
                   <div className="alp-state">
                     <StateLoading tip="正在加载素材库…" />
@@ -345,7 +350,7 @@ export function AssetLibraryModal({
                   </div>
                 ) : (
                   <div className="alp-grid">
-                    {visible.map((a, index) => (
+                    {pageItems.map((a, index) => (
                       <AssetLibraryPickerCard
                         key={a.id}
                         asset={a}
@@ -358,6 +363,46 @@ export function AssetLibraryModal({
                       />
                     ))}
                   </div>
+                )}
+                {visible.length > PICKER_PAGE_SIZE && (
+                  <Pagination
+                    className="mt-[var(--space-20)] w-full text-xs text-[var(--alp-text-9)]"
+                    aria-label="素材库分页"
+                  >
+                    <PaginationContent className="gap-[var(--space-12)]">
+                      <PaginationItem>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          aria-label="上一页"
+                          disabled={currentPage <= 1}
+                          className={PAGINATION_BUTTON_CLASS}
+                          onClick={() => goToPage(currentPage - 1)}
+                        >
+                          <ChevronLeft className="size-4" aria-hidden="true" />
+                          <span>上一页</span>
+                        </Button>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <span aria-live="polite">
+                          第 {currentPage} / {pageCount} 页 · 共 {visible.length} 个
+                        </span>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          aria-label="下一页"
+                          disabled={currentPage >= pageCount}
+                          className={PAGINATION_BUTTON_CLASS}
+                          onClick={() => goToPage(currentPage + 1)}
+                        >
+                          <span>下一页</span>
+                          <ChevronRight className="size-4" aria-hidden="true" />
+                        </Button>
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 )}
               </div>
             </div>

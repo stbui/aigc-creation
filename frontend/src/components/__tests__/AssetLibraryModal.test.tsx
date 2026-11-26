@@ -59,14 +59,14 @@ describe('AssetLibraryModal', () => {
     expect(screen.queryByText('我的素材库')).not.toBeInTheDocument();
     expect(screen.queryByText('1024×1024')).not.toBeInTheDocument();
 
-    const dateGroup = screen.getByRole('group', { name: '日期筛选' });
-    expect(within(dateGroup).getByRole('button', { name: '全部' })).toHaveAttribute(
-      'aria-pressed',
+    const dateGroup = screen.getByRole('radiogroup', { name: '日期筛选' });
+    expect(within(dateGroup).getByRole('radio', { name: '全部' })).toHaveAttribute(
+      'aria-checked',
       'true',
     );
-    fireEvent.click(within(dateGroup).getByRole('button', { name: '今天' }));
-    expect(within(dateGroup).getByRole('button', { name: '今天' })).toHaveAttribute(
-      'aria-pressed',
+    fireEvent.click(within(dateGroup).getByRole('radio', { name: '今天' }));
+    expect(within(dateGroup).getByRole('radio', { name: '今天' })).toHaveAttribute(
+      'aria-checked',
       'true',
     );
   });
@@ -98,5 +98,47 @@ describe('AssetLibraryModal', () => {
     expect(screen.getByAltText('/uploads/main.png')).toBeInTheDocument();
     expect(screen.queryByAltText('/uploads/detail.png')).not.toBeInTheDocument();
     expect(screen.queryByAltText('/uploads/original.png')).not.toBeInTheDocument();
+  });
+
+  it('素材超过一页时支持翻页且保留当前选择器状态', () => {
+    const items = Array.from({ length: 25 }, (_, index) =>
+      asset({
+        id: `asset-${index + 1}`,
+        kind: 'original',
+        sourceUrl: `/uploads/asset-${index + 1}.png`,
+      }),
+    );
+
+    render(
+      <UiProvider>
+        <AssetLibraryModal
+          open
+          loading={false}
+          items={items}
+          onCancel={vi.fn()}
+          onPick={vi.fn()}
+        />
+      </UiProvider>,
+    );
+
+    const pagination = screen.getByRole('navigation', { name: '素材库分页' });
+    expect(within(pagination).getByText('第 1 / 2 页 · 共 25 个')).toBeInTheDocument();
+    const firstImage = screen.getByAltText('/uploads/asset-1.png');
+    expect(firstImage).toBeInTheDocument();
+    expect(screen.queryByAltText('/uploads/asset-25.png')).not.toBeInTheDocument();
+    fireEvent.click(firstImage);
+    expect(firstImage.closest('button')).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(within(pagination).getByRole('button', { name: '下一页' }));
+
+    expect(within(pagination).getByText('第 2 / 2 页 · 共 25 个')).toBeInTheDocument();
+    expect(screen.queryByAltText('/uploads/asset-1.png')).not.toBeInTheDocument();
+    expect(screen.getByAltText('/uploads/asset-25.png')).toBeInTheDocument();
+
+    fireEvent.click(within(pagination).getByRole('button', { name: '上一页' }));
+    expect(screen.getByAltText('/uploads/asset-1.png').closest('button')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 });

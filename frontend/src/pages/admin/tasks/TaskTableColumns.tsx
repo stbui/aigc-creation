@@ -1,18 +1,14 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  ActionButton,
-  RowMenu,
-  StatusTag,
-  type AdminColumn,
-  type RowMenuItem,
-} from './components';
+import { ActionButton, StatusTag, type AdminColumn } from './components';
 import { assetThumbUrl } from './api';
 import {
   adminTasksHref,
   adminUserDetailHref,
   formatDateTime,
   formatDuration,
+  isActiveStatus,
+  isTerminalStatus,
   shortId,
   taskErrorLabel,
 } from './utils';
@@ -126,23 +122,11 @@ export function useTaskTableColumns({
       {
         key: 'ops',
         title: '操作',
-        width: 148,
+        width: 196,
         /* 固定在最右，保证滚动时主操作仍可见。 */
         fixed: 'right',
         render: (row) => {
-          const removable =
-            (row.status === 'succeeded' || row.status === 'failed' || row.status === 'cancelled') &&
-            can('task.delete');
-          const moreItems: RowMenuItem[] = removable
-            ? [
-                {
-                  key: 'delete',
-                  label: '删除任务',
-                  danger: true,
-                  onSelect: () => onAction('delete', row),
-                },
-              ]
-            : [];
+          const removable = isTerminalStatus(row.status) && can('task.delete');
           return (
             <div className="flex items-center gap-1 whitespace-nowrap">
               <ActionButton variant="ghost" size="sm" onClick={() => onOpenDetail(row.id)}>
@@ -151,15 +135,15 @@ export function useTaskTableColumns({
               {/*
                * 重试/终止按状态出现，而不是一律置灰：
                * 「仅失败任务可重试」是后端硬校验，给一个点不动的按钮只会让人反复试。
-               * 删除收进「更多」：它只在终态出现，平铺时会让失败任务那一行同时挤进
-               * 三颗按钮，而删除是这里唯一不可撤销的动作。
+               * 删除同样按状态与权限平铺，风险由确认弹窗承担；平铺态最多三颗
+               * （详情 + 重试 + 删除），列宽按此预留。
                */}
               {row.status === 'failed' && can('task.retry') && (
                 <ActionButton variant="ghost" size="sm" onClick={() => onAction('retry', row)}>
                   重试
                 </ActionButton>
               )}
-              {(row.status === 'queued' || row.status === 'running') && can('task.cancel') && (
+              {isActiveStatus(row.status) && can('task.cancel') && (
                 <ActionButton
                   variant="destructive"
                   size="sm"
@@ -168,7 +152,17 @@ export function useTaskTableColumns({
                   终止
                 </ActionButton>
               )}
-              <RowMenu label={`任务 ${shortId(row.id)} 更多操作`} items={moreItems} />
+              {removable && (
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  ariaLabel={`删除任务 ${shortId(row.id)}`}
+                  className="text-muted-foreground hover:bg-danger-soft hover:text-danger-text"
+                  onClick={() => onAction('delete', row)}
+                >
+                  删除
+                </ActionButton>
+              )}
             </div>
           );
         },

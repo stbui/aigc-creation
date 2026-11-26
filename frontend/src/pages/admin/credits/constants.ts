@@ -30,9 +30,6 @@ export const LEDGER_OPTIONS = Object.entries(LEDGER_LABELS).map(([value, label])
   label,
 }));
 
-/** CSV 导入结果每页行数。结果是一次性返回的, 分页只在客户端做。 */
-export const IMPORT_PAGE_SIZE = 10;
-
 /** 批量调整的一行输入 */
 export interface BatchAdjustItem {
   userId: string;

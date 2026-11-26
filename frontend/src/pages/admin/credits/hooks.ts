@@ -29,8 +29,11 @@ export { useDiscardConfirm, useUnsavedGuard } from '~/admin-ui/radar';
  * 初始化参数来自 URL，首次请求即带筛选；筛选变更由页面通过 `setQuery`
  * 触发，`useAdminList` 负责竞态、失败保留与页码重置。
  */
-export { useAdminExport } from '~/admin-ui/radar';
-export function useCreditDirectory(initialEmail: string, initialUserId: string) {
+export function useCreditDirectory(
+  initialEmail: string,
+  initialUserId: string,
+  initialStatus: 'normal' | 'deleted' = 'normal',
+) {
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
       adminCreditsApi.list({
@@ -38,6 +41,7 @@ export function useCreditDirectory(initialEmail: string, initialUserId: string) 
         pageSize: params.pageSize as number,
         email: params.email as string | undefined,
         userId: params.userId as string | undefined,
+        status: (params.status as 'normal' | 'deleted' | undefined) ?? 'normal',
       }),
     [],
   );
@@ -45,6 +49,7 @@ export function useCreditDirectory(initialEmail: string, initialUserId: string) 
   return useAdminList<AdminCreditListResult>(fetcher, {
     email: initialEmail || undefined,
     userId: initialUserId || undefined,
+    status: initialStatus,
   });
 }
 

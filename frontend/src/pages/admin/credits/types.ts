@@ -4,4 +4,4 @@
  * 外部类型在此统一 re-export，业务文件一律从 `./types` 取。
  */
 
-export type { AdminCreditLedgerRow, AdminCreditListResult, AdminCreditLotRow, AdminCreditRow, CreditImportResult } from '../../../types/api';
+export type { AdminCreditLedgerRow, AdminCreditListResult, AdminCreditLotRow, AdminCreditRow } from '../../../types/api';

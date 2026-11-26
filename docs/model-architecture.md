@@ -223,8 +223,14 @@ running ──moveToDelayed──► 同一个作业在 nextPollAt 到期后回�
 
 价格口径：
 
-- 生成链路售价来自 `CapabilityPricing`，`CreditPriceService` 负责后台覆盖价、分组倍率、
-  货币换算与限时免费；C 端按钮价、报价与账单同源。
+- 生成链路售价来自 `CapabilityPricing`（缺行时固定价能力回落定义 `creditCost`）；分组倍率与
+  货币换算由 `UserGroupAccess.pricing` 提供；`CreditPriceService` 只回答「此刻是否命中限时免费」，
+  不再读写 `SystemSetting['creditPrice.*']`。
+- C 端按钮价、模型报价与账单同源：`GET /capabilities` 的 `creditCost` 与 `POST /models/quote`
+  都按当前用户分组倍率折算并**向上取整**到积分，与 `BillingService.buildDraft` 同一口径 ——
+  标价只会等于或略高于实扣，不允许出现「标价 10、实扣 15」。
+- 按钮价的已知偏差：分组可按**模型 key** 配置覆盖倍率，而能力清单没有模型上下文，因此带覆盖的
+  分组仍按基础倍率标价，精确价以 `POST /models/quote` 为准（价签文案「本次约 N 积分（按所选模型）」）。
 - 渠道价格档的 `sale*` 不再参与生成计费；`cost*` 作为成本快照写入 `BillingOrder` 与
   `RouteAttempt`，用于毛利分析。成本缺失时 `costConfigured=false`，不按 0 记账。
 - 中转入口（`/ai/system/*`、`/ai/custom`）仍按渠道价格档计费，与生成链路分开。
@@ -292,7 +298,9 @@ C 端目录接口：`GET /models?capability=`（可选身份，登录后按分�
 
 1. `backend/src/capabilities/definitions/<id>.ts` 导出 `CapabilityPlugin`，在 `definitions/index.ts` 聚合。
 2. 装配期 `assertCapabilityIntegrity` 校验；不用改前端。
-3. 在后台把商品绑定到这项能力并设置售价，否则 `runtime.effective = unavailable`。
+3. 在后台把商品绑定到这项能力，否则 `runtime.effective = unavailable`，提交被 `40005` 拦下。
+4. 售价按需配置：固定价能力缺 `CapabilityPricing` 行时按定义 `creditCost` 扣费（售价页标「能力默认价」），
+   `billingMode = token` 缺行则在建单时拒绝（`40005` 当前能力尚未配置售价）。
 
 ## 12. 环境变量
 

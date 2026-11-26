@@ -17,7 +17,7 @@
 | 内容 | 唯一事实源 |
 | --- | --- |
 | 能力清单 / 字段 / 默认积分价 | `backend/src/capabilities/definitions/<id>.ts`，由同目录 `index.ts` 聚合 |
-| 运行期生效积分价 | `CapabilityPricing`（后台「能力与模型 → 售价」）；运行时经 `CapabilityCatalogService` 快照读取，业务代码不直接读 `creditCost` |
+| 运行期生效积分价 | `CapabilityPricing`（后台「能力与模型 → 售价」）；运行时经 `CapabilityCatalogService` 快照读取，业务代码不直接读 `creditCost`。缺行时固定价能力回落 `creditCost`，`billingMode = token` 无行则拒绝建单 |
 | 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`；Provider 目录见 `src/model/plugins/provider-catalog.service.ts` |
 | 渠道 / 能力绑定 / 能力售价 | 数据库与后台配置；代码里没有默认线路表 |
 | 权限点 | `backend/src/admin/permissions.ts` |
@@ -81,7 +81,7 @@ docs/               需求 / 产品 / 技术 / 测试 / 规划；入口见 docs/
 - `modality` 与 `mode` 正交；`text` 用于提示词工具等非能力项。
 - 界面可用性看 `GET /capabilities` 的 `runtime.effective`：`remote` 可用，`disabled` 已下线，`unavailable` 没有可用绑定且不可提交。没有 `CapabilityControl` 行视为启用。
 - 一次提交产出 N 张时声明 `outputPlan`。准入层按计划拆成 N 个独立任务，共享 `batchId / batchIndex / batchSize`；每张各建一张账单、各扣一份价、各自退款。要多样化版式就拆任务，不用提示词拼多图。
-- 新能力还要在后台绑定可用商品并配置售价；否则即使定义存在，运行时仍是 `unavailable`。
+- 新能力还要在后台绑定可用商品；零绑定时运行时仍是 `unavailable`，即使定义存在也不能提交。售价不是提交开关：缺行时固定价能力按定义 `creditCost` 扣费（售价页标「能力默认价」），只有 Token 计费必须显式配置。
 
 ### 3.2 模型链路
 

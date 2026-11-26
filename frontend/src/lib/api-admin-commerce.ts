@@ -1,5 +1,5 @@
 import { request, toQuery, downloadCsv, openHtmlDocument } from "./api";
-import type { AdminBatchAdjustResult, AdminCampaign, AdminCheckinListResult, AdminCleanupLog, AdminCoupon, AdminCreditLedgerRow, AdminCreditListResult, AdminCreditLotRow, AdminInviteListResult, AdminMembershipPlan, AdminMembershipPlanList, AdminMembershipPlanPayload, AdminOrderDetail, AdminOrderListResult, AdminProduct, AdminRetentionTarget, AdminSchedulerStatus, BatchSummary, CheckinRule, CheckinStatus, CreateAdminMembershipPlanPayload, CreateProductPayload, CreditImportResult, InviteRule, MarketingQuote, MyInvites, Order, PopupCampaign, PromoCampaign, UpdateProductPayload, UpsertCampaignPayload, UpsertCouponPayload } from "../types/api";
+import type { AdminBatchAdjustResult, AdminCampaign, AdminCheckinListResult, AdminCleanupLog, AdminCoupon, AdminCreditLedgerRow, AdminCreditListResult, AdminCreditLotRow, AdminInviteListResult, AdminMembershipPlan, AdminMembershipPlanList, AdminMembershipPlanPayload, AdminOrderDetail, AdminOrderListResult, AdminProduct, AdminRetentionTarget, AdminSchedulerStatus, BatchSummary, CheckinRule, CheckinStatus, CreateAdminMembershipPlanPayload, CreateProductPayload, InviteRule, MarketingQuote, MyInvites, Order, PopupCampaign, PromoCampaign, UpdateProductPayload, UpsertCampaignPayload, UpsertCouponPayload } from "../types/api";
 import type { AdminInvoice, InvoiceStatus } from "../types/payment";
 
 /** 营销中心 (admin-prd.md §3.12 B-64~B67 / M11)；历史订单/会员数据一律保留。 */
@@ -354,6 +354,7 @@ export const adminCreditsApi = {
     params: {
       userId?: string;
       email?: string;
+      status?: 'normal' | 'deleted';
       page?: number;
       pageSize?: number;
     } = {},
@@ -399,27 +400,6 @@ export const adminCreditsApi = {
       body: payload,
     }),
 
-  exportCsv: (params: { userId?: string; email?: string } = {}) =>
-    downloadCsv(`/admin/credits/export${toQuery(params)}`),
-
-  /**
-   * CSV 导入发放/扣减积分。列格式 `email,delta[,reason]`。
-   *
-   * multipart 上传: 走 FormData 而不是 JSON —— 运营手里的就是 Excel 导出的
-   * 文件, 让他们自己转成 JSON 等于逼人在本地写脚本。
-   */
-  importCsv: (file: File, opts: { validDays?: number; importKey?: string } = {}) => {
-    const form = new FormData();
-    form.append("file", file);
-    if (opts.validDays !== undefined)
-      form.append("validDays", String(opts.validDays));
-    // 导入幂等键：同一文件重试不二次发放
-    if (opts.importKey) form.append("importKey", opts.importKey);
-    return request<CreditImportResult>("/admin/credits/import", {
-      method: "POST",
-      body: form,
-    });
-  },
 };
 
 /** 保留期清理 (B-96)。所有清理入口统一走这里。 */

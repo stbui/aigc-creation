@@ -4,6 +4,8 @@
  * 目录内文件不从 `src/lib/*` / `src/admin-ui/lib/*` 直接取东西，一律经由本文件。
  */
 
+import type { AdminTaskRow } from './types';
+
 /* 外部工具转出：目录内文件不直接引 `src/lib/*` */
 export { cn } from '~/admin-ui/radar';
 export { formatDateTime, formatDuration } from '~/admin-ui/radar';
@@ -23,6 +25,16 @@ export {
 
 /* 跨模块上下文链接 helper */
 export { buildAdminContextLink, readAdminDone } from '../../../lib/admin-context-link';
+
+/** 终态：不再变化，可删除。 */
+export function isTerminalStatus(status: AdminTaskRow['status']): boolean {
+  return status === 'succeeded' || status === 'failed' || status === 'cancelled';
+}
+
+/** 进行中：仍在排队或执行，可终止。 */
+export function isActiveStatus(status: AdminTaskRow['status']): boolean {
+  return status === 'queued' || status === 'running';
+}
 
 /** 任务短 id: cuid 尾部 8 位。后台表格宽度有限, 全 id 会把列挤到换行 */
 export function shortId(id: string): string {

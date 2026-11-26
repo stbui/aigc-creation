@@ -35,6 +35,8 @@ export class AdminCommerceCreditService {
   async listCredits(query: {
     userId?: string;
     email?: string;
+    /** normal = active + disabled（未注销）；deleted = 已注销。缺省不过滤 */
+    status?: "normal" | "deleted";
     page?: number;
     pageSize?: number;
   }) {
@@ -42,6 +44,8 @@ export class AdminCommerceCreditService {
     const where: Prisma.UserWhereInput = {};
     if (query.userId) where.id = query.userId;
     if (query.email) where.email = { contains: query.email };
+    if (query.status === "normal") where.status = { in: ["active", "disabled"] };
+    else if (query.status === "deleted") where.status = "deleted";
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({

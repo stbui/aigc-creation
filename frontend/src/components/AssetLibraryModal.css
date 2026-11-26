@@ -140,69 +140,6 @@
   flex: none;
 }
 
-/* 日期筛选平铺展示, 不再藏进下拉菜单, 所有时间档位一眼可见。 */
-.alp-date-flat {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  height: 34px;
-  padding: var(--space-2);
-  background: var(--surface-4);
-  border: 1px solid var(--border-soft);
-  border-radius: 9px;
-}
-
-.alp-filter-label {
-  padding: 0 var(--space-6) 0 5px;
-  font-size: 12px;
-  line-height: 28px;
-  color: var(--alp-text-10);
-}
-
-.alp-date-option {
-  height: 28px;
-  padding: 0 var(--space-8);
-  border: 0;
-  border-radius: 7px;
-  font-size: 12px;
-  font-family: inherit;
-  color: var(--alp-text-7);
-  background: transparent;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.alp-date-option:hover {
-  color: var(--brand);
-}
-
-.alp-date-option.is-active {
-  color: var(--brand);
-  background: var(--card-bg);
-  font-weight: 600;
-  box-shadow: 0 1px 4px rgb(43 45 83 / 0.102);
-}
-
-.alp-search-clear[data-slot="button"] {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  min-width: 0;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--alp-text-10);
-  cursor: pointer;
-}
-
-.alp-search-clear[data-slot="button"]:hover {
-  background: none;
-  color: var(--alp-text-3);
-}
-
 /* 主体布局 */
 .alp-layout {
   flex: auto;
@@ -345,6 +282,7 @@
   grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
   gap: 14px;
 }
+
 
 .alp-card {
   position: relative;

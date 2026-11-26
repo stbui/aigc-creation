@@ -159,9 +159,8 @@
 | B-31 | 拥堵指标：pending / running 数量，超阈值标红 | P0 |
 | B-32 | 失败重试（用原参数与输入新建任务，不复用原 id） | P0 |
 | B-33 | 终止运行中任务 | P1 |
-| B-33a | AI 分析标签：查看 `tool / image_to_prompt` 真实上游调用（状态、用户、耗时、Token、错误、请求号），并深链完整调用记录 | P1 |
 
-**约束**：重试不原地复活任务。`GenerationTask.outputAssetId` 有 1:1唯一约束，原地复活会绕过该约束。AI 分析是同步文字调用，不创建 `GenerationTask`；只读留痕，不支持重试或取消。
+**约束**：重试不原地复活任务。`GenerationTask.outputAssetId` 有 1:1唯一约束，原地复活会绕过该约束。AI 分析等同步文字调用不创建 `GenerationTask`，只在「调用记录」页留痕，不进入任务监控。
 
 ### 3.6 商品管理
 

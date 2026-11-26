@@ -736,7 +736,7 @@ server.on('upgrade', (req, socket, head) => {
 | `canvas_video` | `video` | `video` | false | 20 |
 | `canvas_audio` | `audio` | `audio` | false | 10 |
 
-`creditCost` 只是代码默认值，运行时仍走 `CreditPriceService.resolve()`；后台可覆盖，限时免费活动优先。
+`creditCost` 只是代码默认值：运行期售价以 `CapabilityPricing` 为准（缺行时固定价能力回落本表默认值），实扣再叠用户分组倍率；限时免费活动命中时金额为 0。后台写入走 `PUT /admin/capabilities/:id/pricing`，与现有能力同一口径。
 
 **必须处理的声明细节**：
 

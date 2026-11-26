@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Coins, Trash2, Upload } from 'lucide-react';
+import { Coins, Trash2 } from 'lucide-react';
 import {
   AdminPage,
   ActionButton,
   BatchBar,
-  ExportCsvButton,
   AdminDataTable,
   AppliedFilters,
   ClearableField,
@@ -13,20 +12,19 @@ import {
   FilterBar,
   Panel,
   RefreshButton,
+  Segmented,
   StatCards,
   StatusTag,
   StaleError,
   type AdminColumn,
   type AppliedFilter,
 } from './components';
-import { useAdminExport } from './hooks';
 import { BATCH_DELETE_CONFIRM, BATCH_DELETE_LIMIT, BatchDeleteUsersDialog } from './components';
 import { adminCreditsApi, adminUsersApi } from './api';
 import { useAdmin, useAdminUrlFilterSync, useCreditDirectory, useToast } from './hooks';
 import { adminUserDetailHref, fmtTime } from './utils';
 import { CreditDetailDrawer } from './CreditDetailDrawer';
 import { BatchAdjustDrawer } from './BatchAdjustDrawer';
-import { CsvImportDrawer } from './CsvImportDrawer';
 import type { AdminCreditRow } from './types';
 
 /**
@@ -41,13 +39,14 @@ import type { AdminCreditRow } from './types';
  *
  * ## 人工调整保留业务依据
  *
- * 积分是可变现资产，单条调整、批量调整与导入都会写入积分流水，并保留调整备注。
+ * 积分是可变现资产，单条调整与批量调整都会写入积分流水，并保留调整备注。
  *
  * ## 模块划分
  *
  * - `api.ts` / `hooks.ts` / `utils.ts` / `constants.ts`：接口、数据 hook、
  *   纯函数与选项表；
- * - `CreditDetailDrawer` / `BatchAdjustDrawer` / `CsvImportDrawer`：三个写操作抽屉；
+ * - `CreditDetailDrawer` / `BatchAdjustDrawer`：两个写操作抽屉（CSV 导入 /
+ *   导出入口已从本页移除，避免把可变现资产的批量写入再开一条无确认的通道）；
  * - 批量删除账号复用 `components/admin/BatchDeleteUsersDialog` 与
  *   `POST /admin/users/batch`（`action=delete`）：这里删的是**用户**，不是积分
  *   记录 —— 积分只能通过扣减流水调整，余额必须恒等于 Σ 批次剩余；
@@ -61,18 +60,24 @@ export function AdminCreditsPage() {
   const [searchParams] = useSearchParams();
   const initialEmail = searchParams.get('email') ?? '';
   const initialUserId = searchParams.get('userId') ?? '';
+  const initialStatus = (searchParams.get('status') as 'normal' | 'deleted' | null) ?? 'normal';
 
   const [email, setEmail] = useState(initialEmail);
   const [userId, setUserId] = useState(initialUserId);
 
   const [detail, setDetail] = useState<AdminCreditRow | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const { exporting, runExport } = useAdminExport(toast);
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useCreditDirectory(initialEmail, initialUserId);
+  const { data, loading, error, params, setQuery, setPage, reload } = useCreditDirectory(
+    initialEmail,
+    initialUserId,
+    initialStatus,
+  );
 
   const rows = data?.items ?? [];
+  /** 当前视图：normal = 未注销（可软注销）；deleted = 已注销（只能物理清除） */
+  const status = (params.status as 'normal' | 'deleted' | undefined) ?? 'normal';
+  const purging = status === 'deleted';
 
   /**
    * 勾选的是账户（`userId`），用于批量注销用户。
@@ -95,14 +100,17 @@ export function AdminCreditsPage() {
   useAdminUrlFilterSync({
     email: params.email as string | undefined,
     userId: params.userId as string | undefined,
+    status,
   });
 
   const confirmDeleteUsers = async () => {
     if (!deleteTargets?.length) return;
     const ids = deleteTargets.map((row) => row.userId);
+    // 已注销视图下删除 = 物理清除；正常视图下删除 = 软注销
+    const action: 'delete' | 'purge' = purging ? 'purge' : 'delete';
     setDeleting(true);
     try {
-      const summary = await adminUsersApi.batch(ids, 'delete', BATCH_DELETE_CONFIRM);
+      const summary = await adminUsersApi.batch(ids, action, BATCH_DELETE_CONFIRM);
       setDeleteTargets(null);
       setSelected([]);
       // 抽屉里正开着某个被删账号时一起关掉，否则会停在已不存在的数据上
@@ -111,14 +119,16 @@ export function AdminCreditsPage() {
       if (summary.failed > 0) {
         const first = summary.results.find((item) => !item.ok)?.message;
         toast.error(
-          `批量删除完成：成功 ${summary.succeeded} 个，失败 ${summary.failed} 个${first ? `（${first}）` : ''}`,
+          `批量${purging ? '清除' : '删除'}完成：成功 ${summary.succeeded} 个，失败 ${summary.failed} 个${first ? `（${first}）` : ''}`,
         );
+      } else if (purging) {
+        toast.success(`已彻底清除 ${summary.succeeded} 个已注销账号`);
       } else {
         toast.success(`已注销 ${summary.succeeded} 个账号，资金记录已匿名保留`);
       }
     } catch (e) {
       // 失败时保留弹框与勾选，便于原样重试
-      toast.error(e instanceof Error ? e.message : '批量删除失败');
+      toast.error(e instanceof Error ? e.message : `批量${purging ? '清除' : '删除'}失败`);
     } finally {
       setDeleting(false);
     }
@@ -169,85 +179,61 @@ export function AdminCreditsPage() {
       : null,
   ].filter(Boolean) as AppliedFilter[];
 
-  /**
-   * 导出走**已生效**的筛选, 而不是输入框里的草稿 ——
-   * 用户输入后未点「查询」时, 导出的必须与屏幕上的列表同口径。
-   */
-  const exportCsv = () =>
-    runExport(
-      () =>
-        adminCreditsApi.exportCsv({
-          email: params.email as string | undefined,
-          userId: params.userId as string | undefined,
-        }),
-      '导出已开始下载',
-    );
-
   const columns: Array<AdminColumn<AdminCreditRow>> = [
+    /*
+     * 身份拆成「用户 / 邮箱 / 状态」三列，而不是把昵称、邮箱、cuid 叠进同一个
+     * 单元格：叠行会把行高撑到三行，六个数字列纵向留白，扫视时对不齐。
+     * · 已注销：后端把 name 写成「已注销用户」、邮箱是 `deleted_<id>@anonymized
+     *   .local`，两者都没有区分度也不该和「状态」列重复。用户列改用 ID 前缀做
+     *   扫视锚点，邮箱列留空，状态列统一说「已注销」。
+     * · 有昵称：用户列给昵称，邮箱列给邮箱。
+     * · 无昵称的活跃账号：用户列留空（破折号），邮箱列即身份。
+     * 完整 ID 不再占列，改挂邮箱链接的 title 与明细抽屉，需要时悬停或进详情看。
+     */
     {
       key: 'user',
       title: '用户',
-      width: 230,
-      render: (row) => {
-        /*
-         * 三种账号的「可读身份」不同，别硬凑成同一个写法：
-         * · 已注销：后端把 name 置成「已注销用户」（与状态徽标重复），邮箱是
-         *   `deleted_<id>@anonymized.local` —— 它不过是把下面那行完整 ID 再包
-         *   一层，纯噪声。所以主行给 ID 前缀做扫视锚点，次行只留完整 ID 供检索，
-         *   邮箱整段省掉；状态由徽标说一次。
-         * · 有昵称：主行昵称，次行邮箱。
-         * · 无昵称的活跃账号：邮箱本身才是主身份，做成主行链接，次行「无昵称」
-         *   占位，避免同一串邮箱印两遍。
-         * 完整 ID 恒为最后一行：它是客服检索与对账的稳定抓手。
-         */
-        const deleted = row.status === 'deleted';
-        const emailIsPrimary = !deleted && !row.name;
-        const primary = deleted ? `账号 ${row.userId.slice(0, 8)}` : row.name || row.email;
-
-        return (
-          <div className="flex flex-col gap-0.5">
-            <span className="flex items-center gap-1.5 text-foreground">
-              {emailIsPrimary ? (
-                <Link className="truncate hover:underline" to={adminUserDetailHref(row.userId)}>
-                  {primary}
-                </Link>
-              ) : (
-                <span className="truncate">{primary}</span>
-              )}
-              {deleted ? <StatusTag status="deleted" showDot /> : null}
-            </span>
-            {!deleted && (
-              <span className="truncate text-muted-foreground">
-                {emailIsPrimary ? (
-                  '无昵称'
-                ) : (
-                  <Link className="text-radar-ink-950 hover:underline" to={adminUserDetailHref(row.userId)}>
-                    {row.email}
-                  </Link>
-                )}
-              </span>
-            )}
-            {deleted ? (
-              <Link
-                className="truncate text-muted-foreground hover:underline"
-                to={adminUserDetailHref(row.userId)}
-                title={row.userId}
-              >
-                {row.userId}
-              </Link>
-            ) : (
-              <code className="truncate text-muted-foreground" title={row.userId}>
-                {row.userId}
-              </code>
-            )}
-          </div>
-        );
-      },
+      width: 130,
+      render: (row) =>
+        row.status === 'deleted' ? (
+          <span className="truncate font-mono text-muted-foreground" title={row.userId}>
+            账号 {row.userId.slice(0, 8)}
+          </span>
+        ) : row.name ? (
+          <span className="truncate text-foreground" title={row.name}>
+            {row.name}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      key: 'email',
+      title: '邮箱',
+      width: 200,
+      render: (row) =>
+        row.status === 'deleted' ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <Link
+            className="block max-w-[188px] truncate text-radar-ink-950 hover:underline"
+            to={adminUserDetailHref(row.userId)}
+            title={`${row.email} · ${row.userId}`}
+          >
+            {row.email}
+          </Link>
+        ),
+    },
+    {
+      key: 'status',
+      title: '状态',
+      width: 84,
+      render: (row) => <StatusTag status={row.status} showDot />,
     },
     {
       key: 'balance',
       title: '当前余额',
-      width: 110,
+      width: 100,
       align: 'right',
       // 账本里大量账户余额为 0；0 压成次要色，真正有余额的账户才会跳出来
       render: (row) =>
@@ -260,7 +246,7 @@ export function AdminCreditsPage() {
     {
       key: 'expiringSoon',
       title: '30 天内到期',
-      width: 120,
+      width: 104,
       align: 'right',
       render: (row) =>
         row.expiringSoon > 0 ? (
@@ -272,7 +258,7 @@ export function AdminCreditsPage() {
     {
       key: 'totalEarned',
       title: '累计获得',
-      width: 100,
+      width: 92,
       align: 'right',
       render: (row) => (
         <span className={row.totalEarned > 0 ? 'tabular-nums' : 'tabular-nums text-muted-foreground'}>
@@ -283,7 +269,7 @@ export function AdminCreditsPage() {
     {
       key: 'totalConsumed',
       title: '累计消耗',
-      width: 100,
+      width: 92,
       align: 'right',
       render: (row) => (
         <span className={row.totalConsumed > 0 ? 'tabular-nums' : 'tabular-nums text-muted-foreground'}>
@@ -294,7 +280,7 @@ export function AdminCreditsPage() {
     {
       key: 'activeLots',
       title: '有效批次',
-      width: 90,
+      width: 80,
       align: 'right',
       render: (row) => (
         <span className={row.activeLots > 0 ? 'tabular-nums' : 'tabular-nums text-muted-foreground'}>
@@ -305,7 +291,7 @@ export function AdminCreditsPage() {
     {
       key: 'nearestExpiry',
       title: '最近到期',
-      width: 160,
+      width: 140,
       render: (row) => <span className="text-muted-foreground">{fmtTime(row.nearestExpiry)}</span>,
     },
     {
@@ -327,18 +313,9 @@ export function AdminCreditsPage() {
       description="余额由批次推导，流水只追加不修改。人工调整会立即改变用户可用余额，并记录调整人、备注与变动。"
       actions={
         can('credit.adjust') ? (
-          <>
-            <ActionButton variant="secondary" icon={Coins} onClick={() => setBatchOpen(true)}>
-              批量调整
-            </ActionButton>
-            {/* CSV 导入走邮箱而非用户 ID: 运营手里的补偿名单通常是邮箱表, 不是 cuid */}
-            {/* 后端 /admin/credits/import 的权限点是 credit.adjust（导入会改余额，
-                与人工调整同一套规则）。权限跟动作走：导入属于给钱，统一要求
-                credit.adjust，不再使用无效的通用导入权限。 */}
-            <ActionButton variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>
-              导入 CSV
-            </ActionButton>
-          </>
+          <ActionButton variant="secondary" icon={Coins} onClick={() => setBatchOpen(true)}>
+            批量调整
+          </ActionButton>
         ) : undefined
       }
     >
@@ -359,6 +336,15 @@ export function AdminCreditsPage() {
       />
 
       <FilterBar>
+        <Segmented
+          ariaLabel="账号状态"
+          value={status}
+          onChange={(next) => setQuery({ status: next })}
+          options={[
+            { value: 'normal', label: '正常' },
+            { value: 'deleted', label: '已注销' },
+          ]}
+        />
         <ClearableField
           className="w-52"
           ariaLabel="按邮箱筛选"
@@ -388,13 +374,12 @@ export function AdminCreditsPage() {
 
       <Panel
         title="用户积分总览"
-        note="按注册时间倒序；点击整行查看批次与流水，勾选后可批量删除账号"
-        extra={
-          <>
-            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
-            <RefreshButton loading={loading} onRefresh={reload} />
-          </>
+        note={
+          purging
+            ? '已注销账号只能物理清除；有订单 / 流水 / 发票的账号会被拒绝并原样保留'
+            : '按注册时间倒序；点击整行查看批次与流水，勾选后可批量注销账号'
         }
+        extra={<RefreshButton loading={loading} onRefresh={reload} />}
       >
         {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
         {error && data && <StaleError error={error} onRetry={reload} />}
@@ -413,8 +398,10 @@ export function AdminCreditsPage() {
             }
           >
             {selectedRows.length > BATCH_DELETE_LIMIT
-              ? `删除单次最多 ${BATCH_DELETE_LIMIT} 个账号，请分批处理`
-              : '删除即注销：清空作品、任务、素材与积分批次，资金记录匿名保留'}
+              ? `${purging ? '清除' : '删除'}单次最多 ${BATCH_DELETE_LIMIT} 个账号，请分批处理`
+              : purging
+                ? '物理清除：删除账号及残量数据，不可恢复；有资金记录的账号会被拒绝'
+                : '删除即注销：清空作品、任务、素材与积分批次，资金记录匿名保留'}
           </span>
           <div className="ml-auto flex items-center gap-1.5">
             <ActionButton
@@ -424,7 +411,7 @@ export function AdminCreditsPage() {
               disabled={deleting || selectedRows.length > BATCH_DELETE_LIMIT}
               onClick={() => setDeleteTargets(selectedRows)}
             >
-              批量删除账号
+              {purging ? '批量清除账号' : '批量删除账号'}
             </ActionButton>
             <ActionButton variant="ghost" size="sm" onClick={() => setSelected([])}>
               清除选择
@@ -443,10 +430,19 @@ export function AdminCreditsPage() {
           selectable={canDeleteUsers}
           selected={selected}
           onSelectedChange={setSelected}
-          rowSelectable={(row) => row.status !== 'deleted' && row.userId !== me?.id}
+          // 勾选数已由上方 BatchBar 显示，表格底部不再重复一遍
+          hideSelectionSummary
+          // 正常视图勾选 = 注销；已注销视图勾选 = 物理清除。两种都可勾，只排除自己
+          rowSelectable={(row) => row.userId !== me?.id}
           rowSelectLabel={(row) => `选择账户 ${row.email}`}
           minWidth={1100}
-          emptyText={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}
+          emptyText={
+            hasFilter
+              ? '没有符合条件的用户。'
+              : purging
+                ? '没有已注销的账号。'
+                : '还没有可查看的用户。'
+          }
           emptyAction={
             hasFilter ? (
               <ActionButton variant="secondary" onClick={reset}>
@@ -492,22 +488,18 @@ export function AdminCreditsPage() {
         }}
       />
 
-      <CsvImportDrawer
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onDone={() => {
-          setImportOpen(false);
-          reload();
-        }}
-      />
-
       {deleteTargets && (
         <BatchDeleteUsersDialog
+          mode={purging ? 'purge' : 'soft'}
           targets={deleteTargets.map((row) => ({ id: row.userId, email: row.email }))}
-          clearedNote={`积分批次与余额（合计 ${deleteTargets.reduce(
-            (sum, row) => sum + row.balance,
-            0,
-          )} 积分）、作品、任务、素材`}
+          clearedNote={
+            purging
+              ? '这些已注销账号的残量数据'
+              : `积分批次与余额（合计 ${deleteTargets.reduce(
+                  (sum, row) => sum + row.balance,
+                  0,
+                )} 积分）、作品、任务、素材`
+          }
           loading={deleting}
           onCancel={() => setDeleteTargets(null)}
           onConfirm={() => void confirmDeleteUsers()}

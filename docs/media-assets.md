@@ -129,7 +129,7 @@ npm --prefix backend install --no-save minio     # MinIO / S3 兼容
 ### 4.1 写入侧预热（2026-11-14）
 
 按需生成的开销集中在**解码**：用 Jimp 解一张 9MP 手机照片实测 1.0–1.3s，且是同步
-占满 Node 主线程（裁切 + 编码再加 0.4–0.7s）。素材库一屏 20 多张、列表上限 120 条，
+占满 Node 主线程（裁切 + 编码再加 0.4–0.7s）。素材库一屏 20 多张、导入选择器首屏取 120 条，
 全部按需生成就是「格子一直灰着、图慢慢往外冒」，期间接口一起变慢。
 
 因此缩略图改为**写入侧预热**（`backend/src/assets/thumb-render.ts`）：
@@ -146,7 +146,7 @@ npm --prefix backend install --no-save minio     # MinIO / S3 兼容
 - 存量素材一次性回填：`npm --prefix backend run backfill:thumbs`（纯文件系统遍历，`--dir=` 指定目录，`--force` 强制重算）。新素材不再需要它。
 
 前端侧只请求**视口附近**的缩略图（`useNearViewport`，预载 300px）——浏览器原生
-`loading="lazy"` 的预载距离达 1250–3000px，120 张卡片等于全部立刻并发请求。
+`loading="lazy"` 的预载距离达 1250–3000px；导入选择器现在每页只挂载 24 张，仍需收紧预载距离。
 
 ## 5. 压缩与元数据
 

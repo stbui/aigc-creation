@@ -212,7 +212,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 `GET /admin/tasks`、`/admin/tasks/stats`、`/admin/tasks/capabilities`、`/admin/tasks/export`、`/admin/tasks/:id`、`POST /admin/tasks/:id/retry`、`POST /admin/tasks/:id/cancel`、`POST /admin/tasks/batch`。
 
-AI 分析标签查询 `GET /admin/api-logs?source=tool&operation=image_to_prompt`（`model.call_read`），不需要新增任务接口。
+任务监控只读 `GenerationTask`；同步文字调用（`source=tool&operation=image_to_prompt`）走调用记录页的 `GET /admin/api-logs`（`model.call_read`），不在本页新增接口。
 
 ### 4.2 规则
 
@@ -224,7 +224,7 @@ AI 分析标签查询 `GET /admin/api-logs?source=tool&operation=image_to_prompt
 - **导出** CSV 与列表共用 `listWhere`，筛什么导什么，上限 5000 行，需 `task.read + data.export`。
 - **性能**：能力筛选项的全表 `groupBy` 缓存 60 秒；拥堵指标仍实时查询。`GenerationTask` 增加 `[status, createdAt]` 与 `[ownerId, createdAt]` 组合索引，服务「状态 + 时间窗」和用户详情时间线。
 - 告警链接 `?status=failed|running` 会作为列表初始筛选；页面已打开时 URL 变化也会同步过去。
-- **AI 分析是同步调用，不是任务**：图片转提示词只写 `ApiCallLog`（`source=tool`、`operation=image_to_prompt`、`billable=false`），没有轮询、任务状态、重试或取消。`?tab=ai-analysis` 下按状态 / 用户 / 时间筛选真实上游调用，展示耗时、Token、错误与请求号；无 `model.call_read` 时不显示标签也不发请求，并深链 `/admin/model-calls?source=tool&operation=image_to_prompt` 查看完整记录。
+- **AI 分析是同步调用，不是任务**：图片转提示词只写 `ApiCallLog`（`source=tool`、`operation=image_to_prompt`、`billable=false`），没有轮询、任务状态、重试或取消，因此不进入任务监控；在「调用记录」页按来源 / 操作 / 状态 / 用户 / 时间筛选查看，详情抽屉可看请求与响应报文。
 
 ---
 

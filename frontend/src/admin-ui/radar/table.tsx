@@ -103,6 +103,13 @@ export interface AdminDataTableProps<T> {
    * 不会出现「表头少一列、表体多一列」。
    */
   hiddenColumns?: string[];
+  /**
+   * 隐藏表格底部的「已选 N 条」计数。页面上方已有 `BatchBar` 时用它，
+   * 否则同一个勾选数会在上下两处各说一遍。默认 `false`：不传的页面行为不变。
+   * 底部的「批量操作上限」提示会一并隐藏，需要该提示的页面继续用它自己的
+   * 批量条去说明（如积分账本的删除上限）。
+   */
+  hideSelectionSummary?: boolean;
 }
 
 /** 批量上限。与后端 `common/batch.ts` 的 MAX_BATCH 对齐，超出直接拒绝。 */
@@ -152,6 +159,7 @@ export function AdminDataTable<T>({
   expandedKeys = [],
   onExpandedChange,
   hiddenColumns,
+  hideSelectionSummary = false,
 }: AdminDataTableProps<T>) {
   // hook 必须无条件调用，不能写在 `??` 右边
   const shellDensity = useDensity();
@@ -451,7 +459,7 @@ export function AdminDataTable<T>({
         </Table>
       </div>
 
-      {selectable && onSelectedChange && selected.length > 0 && (
+      {selectable && onSelectedChange && selected.length > 0 && !hideSelectionSummary && (
         <p className="px-1 pt-2 text-xs text-muted-foreground">
           已选 {selected.length} 条
           {selected.length >= SELECT_LIMIT && `（批量操作上限 ${SELECT_LIMIT} 条）`}
